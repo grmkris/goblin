@@ -16,7 +16,7 @@ bun run check      # the full gate (run it through `heavy` on the build box)
 
 - [Architecture](docs/architecture.md): how the Worker, the agent object, Pi, MCP and auth fit together.
 - [Development](docs/development.md): local setup, the dev stage, connecting servers, adding Purrable to Claude Code.
-- [Next](docs/next.md): the seams for routines, Telegram and write approvals.
+- [Next](docs/next.md): the seams for routines and write approvals.
 - [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
 
 The dev stage (`purrable-dev`) is the daily instance. Its sign-up is closed: existing accounts sign in, nobody new can
