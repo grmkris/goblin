@@ -44,6 +44,7 @@ Dev (`https://purrable-dev.<account>.workers.dev`) is the daily instance. Its co
 | `PURRABLE_MODEL_BASE_URL`, `PURRABLE_MODEL_ID`, `PURRABLE_MODEL_KEY` | Railway LiteLLM and the dedicated capped key. Never the master key. |
 | `PURRABLE_MODELS` | More LiteLLM model names users may pick, comma-separated; `PURRABLE_MODEL_ID` stays the default. Allow each on the LiteLLM key too. |
 | `PURRABLE_MODEL_DAILY_TOKENS` | Model tokens each user's agent may spend per UTC day (default 300000). |
+| `PURRABLE_MEMORY_MODEL` | The cheapest offered model; it names threads. Unset or not offered: the default model. |
 | `PURRABLE_MCP_SERVERS` | JSON list of outbound servers: `[{"serverId":"myplan","endpoint":"https://…/mcp"}]`. |
 | `PURRABLE_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP tokens. |
 

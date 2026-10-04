@@ -11,10 +11,16 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   clients talk in it with an author tag (`pi/content.ts`). Threads are Pi forks of main at an entry, or
   `sessions.create()`; every one is registered in `app_conversations` (`conversations.ts`), and only registered ids
   reach Pi. Raw Pi calls outside a task take `BACKGROUND` from `pi/context.ts`.
+- Writing into another conversation (a thread's note into main) is a write submission, never `tx.appendEntry`:
+  `submit({ type: 'write', entry, requestId })`. A busy conversation places it at its next boundary, the request id
+  makes a replayed tool find the same entry, and a write starts no run.
+- Extensions for one kind of conversation are installed in the registry but left out of `settings.extensions` (the
+  default list), then added per conversation: `fork(..., { agent: { extensions: { add } } })` or `configure`.
 - Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
 - Extensions: `persona.ts` (static system prompt sections, keep them static so prompt caches hold),
-  `resident-mcp.ts` (`mcp_list`, `mcp_call`), `ask-user.ts` (`ask_user`) and `budget.ts` (usage recording, tool
-  blocking). Tools with side effects are `replay: 'unsafe'`.
+  `resident-mcp.ts` (`mcp_list`, `mcp_call`), `ask-user.ts` (`ask_user`), `budget.ts` (usage recording, tool
+  blocking) and, on threads only, `thread.ts` (`share_to_main`, titles). Tools with side effects are
+  `replay: 'unsafe'`.
 - A tool that needs a person ends the run (`control: { terminate: true }`) and leaves plain text in its result. The
   answer is the next ordinary user message: never hold a run open waiting for the owner. `ask_user` and `mcp_call`'s
   grant-required result both work this way.
