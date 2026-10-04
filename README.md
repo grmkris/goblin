@@ -19,5 +19,5 @@ bun run check      # the full gate (run it through `heavy` on the build box)
 - [Next](docs/next.md): the seams for routines, Telegram and write approvals.
 - [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
 
-The dev stage (`purrable-dev`) is the daily instance; sign-up there needs an invite code. There is no production
+The dev stage (`purrable-dev`) is the daily instance; anyone can sign up there with a confirmed email address. There is no production
 stage yet.
