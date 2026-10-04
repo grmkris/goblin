@@ -39,6 +39,11 @@ streaming/tool probes and a retained Cloudflare dev submission. No production or
 
 The canonical `bun run check` passed on the repository and in a temporary clean copy after `bun install --frozen-lockfile`:
 
+Final implementation commit: `09a6e5639e6ff8c76f50d41de05b5f4f65833c3c`. The last reproduction used
+`TURBO_FORCE=true heavy bun run check`; every workspace task executed with zero cache hits. The clean source files
+were byte-compared with the main checkout before the commit. The [handoff](handoff.md) records the final directory
+map, dependencies, commands and continuation boundaries.
+
 - formatting, agent/provenance/documentation checks, graph validation, and TypeScript typecheck passed;
 - `lint:gate` reported `0 findings, 0 collection failures`, duplication reported zero clones, and Effect diagnostics/Knip passed;
 - 84 unit tests, two local Alchemy/workerd integration tests, and the production web build passed;

@@ -1,0 +1,23 @@
+{
+  "implementationCommit": "09a6e5639e6ff8c76f50d41de05b5f4f65833c3c",
+  "verifiedLockSha256": "ae91131f735669b548a716278295973aec1698681a22bd87553045773236025a",
+  "cleanReproduction": "/tmp/purrable-clean-final",
+  "frozenInstallExitCode": 0,
+  "canonicalCheckExitCode": 0,
+  "turboForced": true,
+  "typecheckedWorkspaces": 5,
+  "unitTests": 84,
+  "defaultNativeIntegrationTests": 2,
+  "lintFindings": 0,
+  "collectorFailures": 0,
+  "duplicateClones": 0,
+  "twoProcessNativeProof": {
+    "writeTests": 2,
+    "readTests": 3,
+    "receipt": "native-reconstruction.json"
+  },
+  "productionBuild": true,
+  "realDevSmoke": "smoke-dev.json",
+  "realChromiumAppsSmoke": "apps-dev.json",
+  "secretsCopiedToReproduction": false
+}

@@ -16,3 +16,7 @@ Use the installed Effect 4 guide and declarations as the API authority. Verify t
 - Run `bun run check:files <owned paths>` after edits. Run the root Effect diagnostics gate before handoff.
 
 This skill proves source-level conventions only; it does not prove Cloudflare lifecycle behavior or provider reachability. Read the current official Effect 4 docs and installed `node_modules/effect/AGENTS.md` when APIs are uncertain.
+
+Adapted from `grmkris/myapps@54259fdd5a2560d2595167d7ff0650826a039102`, `.agents/skills/effect-in-myapps/SKILL.md`,
+reviewed 2026-10-04. Purrable replaces app-specific MCP/storage paths and adds its native Pi/Drizzle ownership
+boundaries. Source hash, internal-reuse authorization and adaptation details are recorded in `sources.json`.
