@@ -60,9 +60,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 
 ## Using it
 
-- **Add a server.** Connections → Add a server: paste its MCP address (public https only). It appears disconnected;
-  connect it as below. Servers without sign-in (DeepWiki at `https://mcp.deepwiki.com/mcp`, for example) connect
-  at once. Remove takes its sign-in and grants with it.
+- **Add a server.** Connections → Suggested adds and connects one of ours in one tap. Add a server takes any MCP
+  address (public https only). Servers without sign-in (DeepWiki, Context7, Cloudflare Docs) connect at once.
+  Remove takes its sign-in and grants with it. To suggest another server, check that it connects from a Worker,
+  then add it to `apps/runtime/src/mcp/suggested.ts` with its endpoint for each stage.
 - **Connect a server.** Connections → Connect. You sign in at the remote server and approve; you come back
   connected. Then tick the tools the agent may use. Nothing is granted by default. A server marked *needs auth* had
   its token refresh refused: press Reconnect.
