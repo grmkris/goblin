@@ -78,8 +78,10 @@ Changing `PURRABLE_CREDENTIAL_KEY` makes every stored MCP credential unreadable;
   edit an applied migration; never touch Pi or Agents tables.
 - Auth tables: Better Auth's schema lives in `apps/runtime/migrations` and is applied by the Alchemy D1 resource.
 - Bindings: declare them in `apps/runtime/src/env.ts` and `apps/web/alchemy.run.ts` together.
-- UI components: from `packages/ui`, `bunx shadcn@latest add <component>`, then review the generated file. Do not
-  hand-edit `apps/web/src/routeTree.gen.ts`.
+- UI components: Purrable looks like the myapps apps. Prefer porting a component from `~/code/myapps/packages/ui`
+  (with an "Adapted from" header naming the commit); otherwise `bunx shadcn@latest add <component>` from
+  `packages/ui`, then review the generated file. Keep the shared tokens in `packages/ui/src/styles.css` as myapps has
+  them. Do not hand-edit `apps/web/src/routeTree.gen.ts`.
 - Dependencies: `bun add <package> --cwd <workspace>`; commit `package.json` and `bun.lock` together.
 
 Unit tests, local workerd and the deployed dev stage are separate kinds of evidence. Say which one you ran.
