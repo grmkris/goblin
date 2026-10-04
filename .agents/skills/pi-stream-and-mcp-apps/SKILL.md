@@ -7,6 +7,8 @@ description: Change how the browser follows the Pi conversation (SSE snapshot, b
 
 The browser follows committed Pi state over Server-Sent Events: `/api/agent/events` sends a snapshot of entries,
 then batches, with a heartbeat. `apps/web/src/lib/projection.ts` turns entries into messages and tool calls.
+`lib/parts.ts` folds them into render parts: each tool result joins the call that asked for it, with a lifecycle
+state. `components/parts/registry.tsx` picks the renderer for each part.
 
 - Pi state is authoritative. Do not keep a second transcript or invent cursor replay.
 - Reconnect by opening a fresh stream and starting from its snapshot; dispose the previous stream. Back off between
