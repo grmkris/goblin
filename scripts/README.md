@@ -1,26 +1,37 @@
 # Operator scripts
 
-Deployment scripts use Alchemy only. Secrets are read from the operator environment and are never printed.
+Deployment scripts use Alchemy only. Secrets are read from mode-600 files under `.local/` and are never printed.
 
-Run the manual retained-dev smoke with `bun run smoke:dev`, equivalent to:
+| Command                                  | What it does                                                                     |
+| ---------------------------------------- | -------------------------------------------------------------------------------- |
+| `bun dev`                                | Local stack on `http://localhost:18971` (workerd), model calls through CLIProxy. |
+| `bun run plan:dev`                       | Preview changes to the retained dev stage.                                       |
+| `bun run deploy:dev`                     | Deploy the dev stage (`https://purrable-dev.<account>.workers.dev`).             |
+| `bun run destroy:dev -- --confirm-reset` | Erase the dev stage: owner account, conversations, MCP credentials.              |
+| `bun run smoke:dev`                      | Acceptance against the deployed dev stage.                                       |
+| `bun run smoke:local`                    | The same acceptance against the local stack.                                     |
 
-```sh
-bun --env-file .local/dev.env scripts/smoke-dev.ts
-```
+Stage configuration comes from `.local/<stage>.env` (see `.env.example`); `deploy:dev` also reads the shared
+Cloudflare credentials in `~/.config/myapps/dev.env`.
 
-The mode-600 configuration must set `PURRABLE_STAGE=dev`, the retained HTTPS `purrable-dev.*.workers.dev`
-`PURRABLE_APP_URL`, and the provisioned `PURRABLE_OWNER_EMAIL`/`PURRABLE_OWNER_PASSWORD`. The helper signs in;
-it does not register or bootstrap an owner. It refuses other targets and verifies the configured MyPlan and
-MyBrowser dev endpoints before creating exact one-hour tool grants for `myplan_open` and `browser_backends`.
+## Smoke
 
-This explicitly invoked smoke makes bounded read-only MCP calls and one resident Pi submission. It verifies a
-new committed assistant tool call, its successful `pi.tool-result`, and the assistant completion marker. Credentials,
-cookies and response bodies stay in memory. The printed receipt and `.local/smoke-dev-receipt.json` contain only
-statuses, operation ID, negotiated versions, capability names, counts, booleans and a transcript hash. Grants expire
-after one hour. The helper is not a CI check and must not be run without authorized retained-dev acceptance.
+The smoke needs `PURRABLE_OWNER_EMAIL` and `PURRABLE_OWNER_PASSWORD` for an owner that already exists; it signs in
+but never registers one. It refuses any target other than the retained `purrable-dev.*.workers.dev` Worker or
+`http://localhost:18971`.
 
-Outbound MCP access tokens may expire before these grants. A 401 connect result needs fresh private dev credentials
-and an Alchemy binding update before retrying; see [the compatibility record](../docs/archive/2026-10-04-initial-slice/mcp-compatibility.md).
+It reads and changes nothing the owner set:
 
-Browser rendering, sandboxed MCP App initialization and a permitted App interaction remain separate real-browser
-acceptance checks; this helper does not establish them.
+1. health, owner sign-in, resident authority `active`, a main-thread snapshot;
+2. each configured MCP server's status; for a connected server, its tools, and a direct call of a read-only probe
+   (`account_read` on MyPlan, `browser_backends` on MyBrowser) only if the owner has already granted it;
+3. an inbound MCP client: dynamic registration, owner consent, PKCE token, `/mcp` `initialize` and `tools/list`, an
+   `ask_agent` model turn, an agent turn that calls the MyPlan probe through `mcp_call` (only if step 2 proved it),
+   `get_recent_messages`, then revocation and a 401.
+
+Agent turns run in the throwaway client's own conversation, never the main thread, and the client is revoked even
+when a step fails. The receipt (`.local/smoke-<stage>-receipt.json`, mode 600) holds statuses, counts and booleans
+only: no tokens, cookies or message bodies.
+
+Not covered here: the owner's Connect flow (it needs the owner at the remote server's consent screen), rendering
+MCP Apps, and the browser UI.
