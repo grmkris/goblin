@@ -7,8 +7,10 @@ description: Change Purrable's Pi Durable and PiHarness integration - sessions, 
 
 Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native harness; do not rebuild these.
 
-- `PiHarness` is registered with `lifecycle.use` in `PersonalAgent`. The main thread is `ROOT_SESSION`; each inbound
-  client gets a session from `sessions.create()`, mapped in `app_client_sessions` (ids are not choosable).
+- `PiHarness` is registered with `lifecycle.use` in `PersonalAgent`. Main is `ROOT_SESSION` (`MAIN_THREAD`); inbound
+  clients talk in it with an author tag (`pi/content.ts`). Threads are Pi forks of main at an entry, or
+  `sessions.create()`; every one is registered in `app_conversations` (`conversations.ts`), and only registered ids
+  reach Pi. Raw Pi calls outside a task take `BACKGROUND` from `pi/context.ts`.
 - Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
 - Extensions: `persona.ts` (static system prompt sections, keep them static so prompt caches hold),
   `resident-mcp.ts` (`mcp_list`, `mcp_call`), `ask-user.ts` (`ask_user`) and `budget.ts` (usage recording, tool
