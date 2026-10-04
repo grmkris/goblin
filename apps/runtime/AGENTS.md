@@ -1,5 +1,6 @@
 # Runtime
 
-Read the root instructions first. Owns the native Agent/Pi adapter, Effect services, application storage, MCP/auth
-boundaries and runtime tests. Keep the class thin, protect all vendor tables, and enforce grants before execution.
-Alchemy deployment modules must never enter the workerd bundle. Every test labels its evidence environment.
+Read the root instructions first. Owns the native Agent/Pi adapter, Effect services, application storage, the MCP
+host and the auth boundary. Keep `PersonalAgent` thin; services do the work. Never touch vendor tables. Check grants
+and resident authority before any outbound call. Alchemy modules never enter the workerd bundle. Durable Object RPC
+returns encoded results, not thrown custom errors (Workers RPC drops error classes).

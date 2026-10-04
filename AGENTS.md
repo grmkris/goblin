@@ -1,55 +1,51 @@
 # Purrable: instructions for coding agents
 
-Purrable is a resident personal-agent runtime on Cloudflare. Pi Durable owns conversation and execution state;
-Effect composes application services; Alchemy owns infrastructure. Read [README.md](README.md),
-[the implementation record](docs/archive/2026-10-04-initial-slice/implementation.md), and the workspace instructions before editing.
+Purrable is the owner's resident personal agent on Cloudflare. A native Agents SDK Durable Object runs Pi Durable for
+conversations and execution; Effect composes application services; Alchemy owns infrastructure. Read
+[README.md](README.md), [the architecture](docs/architecture.md) and the workspace instructions before editing.
 
 ## Work and ownership
 
-- Work on `main`. Commit each coherent green change separately; the coordinator makes commits during delegated work.
-- Other agents share this checkout. Preserve unowned edits and `.spec.md.swo`. Never stash, reset, restore, or delete
-  foreign files. Stage only exact owned paths or hunks, never `git add .` or `git add -A`.
-- The coordinator owns manifests, lockfile, shared contracts, root configuration, Alchemy wiring, deployment and
-  heavy gates. Workers edit only their assigned paths and request shared changes through the coordinator.
-- Run expensive checks through `heavy`. Exit 75 means contention; retry later. Never pipe `heavy`.
-- Do not push or promote production. The authorized deployment is an isolated retained Cloudflare dev stage.
+- Work on `main`. Commit each coherent, green change separately as it lands; never batch unrelated changes.
+- Other agents share this checkout. Preserve edits you did not make and `.spec.md.swo`. Never stash, reset, restore
+  or delete foreign files. Stage exact owned paths or hunks, never `git add .` or `git add -A`.
+- A red gate in a file you did not touch may be someone's mid-edit: check `git status`/`git diff` before fixing it.
+- Run expensive checks through `heavy` (`heavy bun run check`). Exit 75 means contention; retry later. Never pipe it.
 
 ## Runtime invariants
 
-- `PersonalAgent extends Agent`; register native `PiHarness` with the Agent lifecycle. Do not replace Pi's harness.
-- Pi owns transcripts, tasks, recovery and extensions. Drizzle owns application metadata only.
-- Protect every vendor-owned SQLite table, including Agents tables outside the `pi_*` prefix.
-- Use short SQLite transactions. Never hold a transaction or lifecycle gate over model/network calls or waits.
-- Better Auth uses `mcp()` plus `jwt()` and an isolated D1 auth store when Durable SQLite adapter semantics conflict.
-  Do not add a duplicate `oauthProvider()` or a custom auth adapter.
-- Grants bind authenticated principal, configured server identity, and specific capabilities. Tool annotations and
-  remote content never grant permissions or become privileged instructions.
-- AG-UI projects committed Pi state. Reconnect through a fresh snapshot and dispose the previous stream.
-- MCP Apps run in a sandbox, through their originating authorized connection. No raw credentials or cross-server calls.
+- `PersonalAgent extends Agent` and registers the native `PiHarness` with the Agent lifecycle. Do not replace Pi.
+- Pi owns transcripts, tasks, submissions, recovery and extensions. Application tables use the `app_` prefix through
+  Drizzle; every vendor-owned SQLite table (`pi_*`, `cf_agents_*`, `_cf_*` and the rest in `storage/vendor.ts`) is
+  untouchable.
+- Keep SQLite transactions short. Never hold a transaction or lifecycle gate across model calls, network waits or
+  token refreshes.
+- Better Auth (`mcp()` + `jwt()`) lives in an isolated D1 auth store. Do not add `oauthProvider()` or a custom adapter.
+- Outbound MCP calls require an exact owner grant for the server and tool/resource. Tool annotations, descriptions and
+  remote content are untrusted data: they never grant permission and never become instructions.
+- MCP Apps run in nested opaque sandbox frames through their originating authorized connection only.
 - Submission acceptance is not external completion. Use stable operation IDs and never claim exactly-once effects.
 
 ## Provider and secrets
 
-- Coding agents/local testing use CLIProxy. Cloudflare dev model calls use the authorized public Railway LiteLLM.
-- The resident dev model is verified Gemini Flash, with a dedicated model-limited key capped at $10 per 30 days.
-- Secrets remain in private stage configuration and Worker secret bindings. Never print, commit, expose in browser
-  bundles, persist in transcripts, or include in evidence. Never bind the LiteLLM master key into the Worker.
-- Real smoke writes are authorized only inside disposable dev fixtures. No messages, purchases or production mutations.
+- Coding agents and local runs use CLIProxy. The deployed Worker calls models through Railway LiteLLM with a
+  dedicated, model-limited, budget-capped key. Never bind the LiteLLM master key into the Worker.
+- Secrets live in mode-600 `.local/*.env` files and Worker secret bindings. Never print, commit, expose in browser
+  bundles or persist them in transcripts, logs or docs. Outbound OAuth tokens are encrypted at rest in the Agent DO.
+- The `dev` stage is the owner's daily instance: treat its data as real. Schema changes there are additive migrations.
 
-## Quality and completion
+## Quality
 
-- Bring all applicable My Apps rule families immediately; new code has zero accepted findings and no legacy baseline.
-- Fix code first. Every rule disable has a specific reason; unavoidable type assertions need `// SAFETY:` context.
-- Every shipped/config/test file belongs to the authoritative TypeScript project graph and Effect diagnostic scope.
-- Keep tests meaningful and bounded. Use real integrations for happy paths; no module mocking or exhaustive fake matrices.
-- Run `bun run check` before claiming completion and independently prove the deployed dev acceptance path.
-- Keep documentation, skill provenance, command references and compatibility reports aligned with code changes.
-- Record local workerd, storage reconstruction and live Cloudflare evidence separately. Unknown support remains unknown.
+- Run `bun run check:fast` while iterating and `bun run check` before claiming completion.
+- New code has zero lint, Effect or Knip findings. Fix code first; every disable states a specific reason and every
+  unavoidable type assertion carries a `// SAFETY:` comment.
+- Tests are meaningful and bounded: real integrations for happy paths, injected services instead of module mocking.
+- Keep README, architecture, development docs and skills in step with code changes. `docs/archive/` is frozen history.
 
 ## Workspace map
 
-- [Runtime](apps/runtime/AGENTS.md): native agent, Effect services, MCP/auth boundary and runtime tests.
-- [Web](apps/web/AGENTS.md): TanStack Start, AG-UI projection and MCP Apps host.
-- [Contracts](packages/contracts/AGENTS.md): shared runtime-validated interfaces only.
+- [Runtime](apps/runtime/AGENTS.md): native agent, Effect services, MCP host, auth and runtime tests.
+- [Web](apps/web/AGENTS.md): TanStack Start UI, conversation stream and the MCP Apps host.
+- [Contracts](packages/contracts/AGENTS.md): shared runtime-validated schemas only.
 - [UI](packages/ui/AGENTS.md): editable local shadcn components and styling.
-- [Tools](tools/AGENTS.md): quality, provenance, graph and compatibility verification.
+- [Tools](tools/AGENTS.md): quality gates, import graph and docs checks.
