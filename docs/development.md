@@ -38,6 +38,7 @@ Dev (`https://purrable-dev.<account>.workers.dev`) is the daily instance. Its co
 | --- | --- |
 | `PURRABLE_STAGE`, `PURRABLE_APP_URL` | `dev` and the Worker's HTTPS origin. |
 | `PURRABLE_SIGNUP_MODE`, `PURRABLE_SIGNUP_INVITE_CODE` | `open`, `invite` or `closed` (default), and the invite code. |
+| `PURRABLE_MAIL_SENDER` | Sender on an Email Sending apex (dev: `purrable@mytab.lol`); turns on email verification. |
 | `PURRABLE_OWNER_EMAIL`, `PURRABLE_OWNER_PASSWORD` | An existing account; only the smoke reads them. |
 | `PURRABLE_BETTER_AUTH_SECRET` | Better Auth's secret. |
 | `PURRABLE_MODEL_BASE_URL`, `PURRABLE_MODEL_ID`, `PURRABLE_MODEL_KEY` | Railway LiteLLM and the dedicated capped key. Never the master key. |
