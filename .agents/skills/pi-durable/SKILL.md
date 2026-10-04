@@ -19,8 +19,10 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
 - Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
 - Extensions: `persona.ts` (static system prompt sections, keep them static so prompt caches hold),
   `resident-mcp.ts` (`mcp_list`, `mcp_call`), `ask-user.ts` (`ask_user`), `budget.ts` (usage recording, tool
-  blocking) and, on threads only, `thread.ts` (`share_to_main`, titles). Tools with side effects are
-  `replay: 'unsafe'`.
+  blocking), `subagents.ts` (`subagent`, with anchor and reporter tasks) and, on threads only, `thread.ts`
+  (`share_to_main`, titles). Tools with side effects are `replay: 'unsafe'`.
+- An extension's background tasks resume after a restart only while the extension is installed: keep task names and
+  versions stable, and give a changed task a `migrate`.
 - A tool that needs a person ends the run (`control: { terminate: true }`) and leaves plain text in its result. The
   answer is the next ordinary user message: never hold a run open waiting for the owner. `ask_user` and `mcp_call`'s
   grant-required result both work this way.
