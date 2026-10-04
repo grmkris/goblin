@@ -23,6 +23,11 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   (`share_to_main`, titles). Tools with side effects are `replay: 'unsafe'`.
 - An extension's background tasks resume after a restart only while the extension is installed: keep task names and
   versions stable, and give a changed task a `migrate`.
+- A task phase must commit durable progress: committing the same checkpoint again faults the task ("returned without
+  durable progress"). A looping phase carries a counter. A faulted task skips its own clean-up, so whatever records a
+  running task checks the task's record (`tx.task(id)`) instead of trusting a flag the task clears.
+- A head marker (`head` on an entry: compaction, reset, Purrable's `app.memory` view) starts the model's context and
+  the snapshot at its head. Never write `head: 'self'` into a busy conversation: at a boundary it acts as a reset.
 - A tool that needs a person ends the run (`control: { terminate: true }`) and leaves plain text in its result. The
   answer is the next ordinary user message: never hold a run open waiting for the owner. `ask_user` and `mcp_call`'s
   grant-required result both work this way.
