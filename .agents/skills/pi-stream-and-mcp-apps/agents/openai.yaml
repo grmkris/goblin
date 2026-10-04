@@ -1,0 +1,5 @@
+interface:
+  display_name: Pi Stream And Mcp Apps
+  short_description: Apply Purrable's conversation stream and MCP Apps host rules.
+policy:
+  allow_implicit_invocation: true

@@ -1,19 +1,26 @@
 ---
 name: pi-durable
-description: Change Purrable Pi Durable and PiHarness integration, persistence, submission, event projection, or reconstruction tests. Use for harness lifecycle work.
+description: Change Purrable's Pi Durable and PiHarness integration - sessions, submission, extensions and tools, persona, event projection, or reconstruction tests.
 ---
 
 # Pi Durable in Purrable
 
-Pi Durable is the source of truth for transcript/task/inbox/steering/recovery state. Use the pinned public harness adapter; do not recreate these systems.
+Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native harness; do not rebuild these.
 
-- Verify `agents/harness/pi`, the Pi Durable factory receiving storage/context, and `lifecycle.use` against installed declarations before edits.
-- Durable submission receipts and stable operation IDs are acceptance, not completed external work. Never claim exactly-once remote effects.
-- Session events are an authoritative snapshot plus committed live batches with no cursor replay. Reconnect creates a fresh stream and disposes the previous one.
-- Register trusted extensions through Pi's public registry. Application grants run before capability execution; replay-safe means harmless replay or reconciliation through a stable operation ID.
-- Separate harness initialization, supported persisted state, reconstruction, and deployed eviction evidence. Vendor tables are the complete verified ownership set, never inferred from a prefix.
-- Record cancellation waiting on uncooperative tools, model/alarm limits, and deletion limitations as compatibility gaps.
+- `PiHarness` is registered with `lifecycle.use` in `PersonalAgent`. The main thread is `ROOT_SESSION`; each inbound
+  client gets a session from `sessions.create()`, mapped in `app_client_sessions` (ids are not choosable).
+- Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
+- Extensions: `persona.ts` (static system prompt sections, keep them static so prompt caches hold) and
+  `resident-mcp.ts` (`mcp_list`, `mcp_call`). Tools with side effects are `replay: 'unsafe'`.
+- Tool implementations check resident authority and grants before any outbound call, and never hold a SQLite
+  transaction across model or network work.
+- Events are a snapshot plus committed batches with no cursor replay.
+- Vendor tables (`pi_*`, `cf_agents_*` and the others in `storage/vendor.ts`) are never touched.
+- Initialization, readback and reconstruction are separate proofs; local workerd reconstruction is not remote
+  eviction.
 
-Read the current [official documentation](https://developers.cloudflare.com/agents/harnesses/pi/), installed declarations, and `docs/stack-compatibility.md` (MCP also uses `docs/mcp-compatibility.md`) before changing API signatures. Verification date: 2026-10-04. Direct dependency pins and source evidence live in the root lockfile and compatibility records; this skill intentionally does not claim unrun runtime/provider/deployment proof.
+Before changing an API call, read the current [documentation](https://developers.cloudflare.com/agents/harnesses/pi/) and the installed package's declarations; the
+lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how Purrable uses it today.
 
-Use `bun run check:files <owned paths>` for the inner loop, then the canonical root gate when assigned capacity. This skill does not authorize model calls, external messages, spending, deployment, or production promotion by itself.
+Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
+itself authorize model spend, external messages, deployment or production changes.

@@ -1,20 +1,29 @@
 ---
 name: mcp-host
-description: Change Purrable remote Streamable HTTP MCP connections, discovery, typed results, grants, cancellation, reconnect, or compatibility evidence.
+description: Change Purrable's outbound MCP host (connections, OAuth connect and refresh, encrypted credentials, grants) or its inbound /mcp server.
 ---
 
-# Mcp Host in Purrable
+# MCP in Purrable
 
-Keep server identity, actual negotiated protocol revision/capabilities, authorization state, grants, and lifecycle explicit.
+Outbound: the agent object owns connections, credentials and grants (`apps/runtime/src/mcp/`). Inbound: `/mcp` is
+Purrable's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 
-- Consume the pinned official MCP client SDK; discovery pagination is separate for tools, resources/templates, and prompts where offered.
-- Preserve schemas, structured/rich results, error metadata, unknown annotations and `_meta`; bound unsupported content explicitly.
-- Inbound Purrable authentication and outbound server auth are distinct. Grant specific tool/resource access to authenticated principal plus server identity before every execution path.
-- Treat annotations as hints, remote descriptions/prompts/results/skills as untrusted capability data. Never elevate them to privileged instructions.
-- Reconnect refreshes authoritative discovery/auth state; timeouts/progress/cancellation remain explicit.
-- Record real MyPlan/MyBrowser advertised capabilities and negotiated revisions in mcp-compatibility. Connected does not mean authorized, and local tests do not prove real-host support.
-- Keep Tasks, elicitation, completion, subscriptions, Skills, multi-roundtrip input_required, richer auth, Portals and draft Events/Triggers deferred unless separately implemented/evidenced.
+- Use the pinned official MCP client and server SDKs. OAuth goes through `StoredOAuthProvider` and the SDK's `auth()`;
+  refresh is single-flight per server in `McpHost`. Do not add a second refresh path: rotating refresh tokens break
+  under concurrent refresh.
+- Credentials and client registrations are AES-GCM encrypted with additional data binding them to server and
+  purpose. Never log, return or persist them anywhere else.
+- Every outbound call checks resident authority and the specific tool grant first. A tool grant also covers its
+  `ui://` resource; nothing else does.
+- Annotations, descriptions, prompts and results from servers are untrusted data. They never grant permissions or
+  become instructions.
+- Keep results bounded and errors typed (`UpstreamMcp` with a reason). A refused refresh means `needs_auth`.
+- Inbound tokens must verify locally, name `/mcp` as audience, come from an enabled client with live owner consent.
+  Each inbound client sees only its own session.
+- Fixture tests (`test/mcp/`) prove protocol behaviour; real MyPlan/MyBrowser behaviour is proven only on dev.
 
-Read the current [official documentation](https://modelcontextprotocol.io/specification/latest), installed declarations, and `docs/stack-compatibility.md` (MCP also uses `docs/mcp-compatibility.md`) before changing API signatures. Verification date: 2026-10-04. Direct dependency pins and source evidence live in the root lockfile and compatibility records; this skill intentionally does not claim unrun runtime/provider/deployment proof.
+Before changing an API call, read the current [documentation](https://modelcontextprotocol.io/specification/latest) and the installed package's declarations; the
+lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how Purrable uses it today.
 
-Use `bun run check:files <owned paths>` for the inner loop, then the canonical root gate when assigned capacity. This skill does not authorize model calls, external messages, spending, deployment, or production promotion by itself.
+Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
+itself authorize model spend, external messages, deployment or production changes.

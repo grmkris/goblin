@@ -1,25 +1,21 @@
 # Purrable
 
-A resident personal agent on Cloudflare, using native Agents/PiHarness, Pi Durable, Effect, Alchemy and MCP.
+A resident personal agent on Cloudflare. One owner talks to it in the browser; it keeps running, holds its own
+authority to use the MCP servers the owner connected, and is itself an MCP server other tools can talk to.
+
+Built on the Cloudflare Agents SDK (`PersonalAgent` Durable Object) with the native Pi harness (Pi Durable owns
+conversations and execution), Effect at service seams, Better Auth for identity, and Alchemy for infrastructure.
 
 ```sh
 bun install --frozen-lockfile
-mkdir -p .local
-cp .env.example .local/local.env
-chmod 600 .local/local.env
-bun dev
-bun run check
+mkdir -p .local && cp .env.example .local/local.env && chmod 600 .local/local.env
+bun dev            # http://localhost:18971, models through CLIProxy
+bun run check      # the full gate (run it through `heavy` on the build box)
 ```
 
-Set your owner email and replace the two local secrets before starting. Local model calls inherit `CLIPROXY_API_KEY`.
-The [development guide](docs/development.md) covers owner setup, deployment and the manual smoke command.
+- [Architecture](docs/architecture.md): how the Worker, the agent object, Pi, MCP and auth fit together.
+- [Development](docs/development.md): local setup, the dev stage, connecting servers, adding Purrable to Claude Code.
+- [Next](docs/next.md): the seams for routines, Telegram and write approvals.
+- [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
 
-The [implementation record](docs/archive/2026-10-04-initial-slice/implementation.md) records checkpoint status and actual evidence. An installed
-framework or a local test does not establish live Cloudflare acceptance.
-The [handoff](docs/archive/2026-10-04-initial-slice/handoff.md) summarizes the directory tree, pinned composition, verification and continuation boundaries.
-
-Pi owns agent transcripts/tasks; application metadata stays in application-owned Durable Object SQLite tables.
-The browser projects committed state through AG-UI and hosts sandboxed MCP Apps over authorized MCP connections.
-
-Deployment uses Alchemy only. The retained dev stage uses Railway LiteLLM with a dedicated bounded virtual key.
-Production promotion, Telegram/My Agent, MyTmux, Portals, Durable Streams and advanced extensions are later work.
+The dev stage (`purrable-dev`) is the daily instance. There is no production stage yet.

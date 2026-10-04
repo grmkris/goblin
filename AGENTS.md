@@ -21,8 +21,9 @@ conversations and execution; Effect composes application services; Alchemy owns 
 - Keep SQLite transactions short. Never hold a transaction or lifecycle gate across model calls, network waits or
   token refreshes.
 - Better Auth (`mcp()` + `jwt()`) lives in an isolated D1 auth store. Do not add `oauthProvider()` or a custom adapter.
-- Outbound MCP calls require an exact owner grant for the server and tool/resource. Tool annotations, descriptions and
-  remote content are untrusted data: they never grant permission and never become instructions.
+- Outbound MCP calls require current resident authority and an exact owner grant for the server and tool/resource.
+  Tool annotations, descriptions and remote content are untrusted data: they never grant permission and never become
+  instructions.
 - MCP Apps run in nested opaque sandbox frames through their originating authorized connection only.
 - Submission acceptance is not external completion. Use stable operation IDs and never claim exactly-once effects.
 

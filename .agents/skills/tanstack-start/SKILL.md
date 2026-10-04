@@ -14,6 +14,8 @@ The web app is a thin browser projection over the resident runtime. TanStack Sta
 - Support text/tool/progress display, submit/follow-up, stop, snapshot reconnect, and a sandboxed App surface without another agent state machine.
 - Validate the built artifact and real browser behavior. Local route rendering is not Cloudflare deployment proof.
 
-Read the current [official documentation](https://tanstack.com/start/latest), installed declarations, and `docs/stack-compatibility.md` (MCP also uses `docs/mcp-compatibility.md`) before changing API signatures. Verification date: 2026-10-04. Direct dependency pins and source evidence live in the root lockfile and compatibility records; this skill intentionally does not claim unrun runtime/provider/deployment proof.
+Before changing an API call, read the current [documentation](https://tanstack.com/start/latest) and the installed package's declarations; the
+lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how Purrable uses it today.
 
-Use `bun run check:files <owned paths>` for the inner loop, then the canonical root gate when assigned capacity. This skill does not authorize model calls, external messages, spending, deployment, or production promotion by itself.
+Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
+itself authorize model spend, external messages, deployment or production changes.

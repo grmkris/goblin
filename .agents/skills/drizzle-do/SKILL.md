@@ -14,6 +14,8 @@ Drizzle owns only Purrable application tables and migrations; Pi/vendor storage 
 - Keep transactions short and synchronous to database work; never hold one across model/MCP/HTTP calls or waits.
 - Prove application migrations and their reapplication leave vendor state intact using the actual supported runtime harness.
 
-Read the current [official documentation](https://orm.drizzle.team/docs/connect-cloudflare-do), installed declarations, and `docs/stack-compatibility.md` (MCP also uses `docs/mcp-compatibility.md`) before changing API signatures. Verification date: 2026-10-04. Direct dependency pins and source evidence live in the root lockfile and compatibility records; this skill intentionally does not claim unrun runtime/provider/deployment proof.
+Before changing an API call, read the current [documentation](https://orm.drizzle.team/docs/connect-cloudflare-do) and the installed package's declarations; the
+lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how Purrable uses it today.
 
-Use `bun run check:files <owned paths>` for the inner loop, then the canonical root gate when assigned capacity. This skill does not authorize model calls, external messages, spending, deployment, or production promotion by itself.
+Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
+itself authorize model spend, external messages, deployment or production changes.
