@@ -1,0 +1,5 @@
+interface:
+  display_name: Alchemy
+  short_description: Apply Purrable's alchemy ownership and verification rules.
+policy:
+  allow_implicit_invocation: true

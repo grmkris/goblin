@@ -1,0 +1,5 @@
+interface:
+  display_name: Oxc quality
+  short_description: Keep Purrable's Oxc, Effect, graph, and unused-code gates strict.
+policy:
+  allow_implicit_invocation: true

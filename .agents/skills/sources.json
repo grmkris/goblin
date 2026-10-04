@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "reviewedAt": "2026-10-04",
+  "skills": {
+    "durable-objects": {
+      "repository": "cloudflare/skills",
+      "commit": "b052c32bab7dd493513260228a36c88294f343f1",
+      "path": "skills/durable-objects",
+      "sourceSha256": "bd2ef83fd539c9a33d2baefae7ed5bd6ae1bdeb234f14452cdcbee50414d1a7c",
+      "licenses": ["LICENSE"],
+      "unchanged": true,
+      "adaptation": "Upstream SKILL.md, referenced files, and Apache-2.0 LICENSE copied unchanged through clean grmkris/myapps@54259fdd5a2560d2595167d7ff0650826a039102. Added client metadata; Purrable precedence lives in cloudflare-provenance.md.",
+      "copiedFileHashes": {
+        "LICENSE": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+        "SKILL.md": "bd2ef83fd539c9a33d2baefae7ed5bd6ae1bdeb234f14452cdcbee50414d1a7c",
+        "agents/openai.yaml": "0aff09d17d68791de84a3003ed534b3aa0280f1925167c309f0bea83edcd895f",
+        "references/rules.md": "a656c41eb3bfa57b9b836de880e4fdf79368f1db4e0b63b2fc7a7c75d05ae651",
+        "references/workers.md": "3149c3ee371b5dbf3a84dac7d5bb42c4c6553762480741f6d2808e4ca20fd932",
+        "references/testing.md": "9859a9fa5bba915290ab671c1a9af7c067e52d126a8b18e2a869557b369e184c"
+      }
+    },
+    "workers-best-practices": {
+      "repository": "cloudflare/skills",
+      "commit": "b052c32bab7dd493513260228a36c88294f343f1",
+      "path": "skills/workers-best-practices",
+      "sourceSha256": "8406eabf6375a3e79c77b951d00f3996f4c703c1a852579c38b171188bd19f1f",
+      "licenses": ["LICENSE"],
+      "unchanged": true,
+      "adaptation": "Upstream SKILL.md, referenced files, and Apache-2.0 LICENSE copied unchanged through clean grmkris/myapps@54259fdd5a2560d2595167d7ff0650826a039102. Added client metadata; Purrable precedence lives in cloudflare-provenance.md.",
+      "copiedFileHashes": {
+        "LICENSE": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+        "SKILL.md": "8406eabf6375a3e79c77b951d00f3996f4c703c1a852579c38b171188bd19f1f",
+        "agents/openai.yaml": "35833a57a99bb0d6ce64d102b7c2c08e2be428ba6b5948609bbca6c91d175720",
+        "references/platform-apis.md": "85b9d24b2870767f9875fb148dbeb153ef61f89030bc55043c279fe584501240",
+        "references/runtime-patterns.md": "152cb5456359755ebaf0ff5343e60daed8e8fdc056453c430a1e9120e37da870",
+        "references/configuration.md": "a9ae6018d514324159aabd25004e7f80b69df694c850bce97f7b68e30a72a73e"
+      }
+    },
+    "wrangler": {
+      "repository": "cloudflare/skills",
+      "commit": "b052c32bab7dd493513260228a36c88294f343f1",
+      "path": "skills/wrangler",
+      "sourceSha256": "bb0cbafd6083bd35e904941aff83264fd6edef8814ba1d629bdc55292b16ef50",
+      "licenses": ["LICENSE"],
+      "unchanged": true,
+      "adaptation": "Upstream SKILL.md, referenced files, and Apache-2.0 LICENSE copied unchanged through clean grmkris/myapps@54259fdd5a2560d2595167d7ff0650826a039102. Added client metadata; Purrable precedence lives in cloudflare-provenance.md.",
+      "copiedFileHashes": {
+        "LICENSE": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+        "SKILL.md": "bb0cbafd6083bd35e904941aff83264fd6edef8814ba1d629bdc55292b16ef50",
+        "agents/openai.yaml": "978bbeeda8d7c53af87e2dd4b1e700e1fda08b6eb1caebd3856a1169cb82c34d"
+      }
+    }
+  }
+}

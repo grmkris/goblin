@@ -1,0 +1,6 @@
+---
+description: Canonical Purrable repository instructions
+alwaysApply: true
+---
+
+Read and follow [AGENTS.md](../../AGENTS.md). It is the canonical instruction source for all agents.

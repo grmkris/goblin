@@ -1,0 +1,5 @@
+interface:
+  display_name: Ag Ui And Mcp Apps
+  short_description: Apply Purrable's ag ui and mcp apps ownership and verification rules.
+policy:
+  allow_implicit_invocation: true

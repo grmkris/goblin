@@ -1,0 +1,5 @@
+interface:
+  display_name: Runtime tests
+  short_description: Choose and run Purrable tests with explicit lifecycle evidence boundaries.
+policy:
+  allow_implicit_invocation: true

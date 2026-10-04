@@ -1,0 +1,5 @@
+interface:
+  display_name: Drizzle Do
+  short_description: Apply Purrable's drizzle do ownership and verification rules.
+policy:
+  allow_implicit_invocation: true

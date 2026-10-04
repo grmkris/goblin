@@ -1,0 +1,8 @@
+{
+  "environment": "local-workerd-process-reconstruction",
+  "previousInstance": "-852761562371315",
+  "reconstructedInstance": "-4102632978151463",
+  "previousTestProcess": 3339066,
+  "testProcess": 3340627,
+  "sameTranscript": true
+}

@@ -1,0 +1,5 @@
+interface:
+  display_name: Mcp Host
+  short_description: Apply Purrable's mcp host ownership and verification rules.
+policy:
+  allow_implicit_invocation: true

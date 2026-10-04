@@ -1,0 +1,86 @@
+{
+  "environment": "dev deployment",
+  "utc": "2026-10-04T01:10:45.175Z",
+  "operationId": "7985e4a8-b8c7-424d-a253-5a5f4f7247ea",
+  "status": "done",
+  "statuses": [
+    {
+      "step": "/health",
+      "status": 200
+    },
+    {
+      "step": "/api/auth/sign-in/email",
+      "status": 200
+    },
+    {
+      "step": "/api/agent/snapshot",
+      "status": 200
+    },
+    {
+      "step": "/api/mcp/servers",
+      "status": 200
+    },
+    {
+      "step": "/api/mcp/grants",
+      "status": 201
+    },
+    {
+      "step": "/api/mcp/myplan/connect",
+      "status": 200
+    },
+    {
+      "step": "/api/mcp/myplan/tools/call",
+      "status": 200
+    },
+    {
+      "step": "/api/mcp/grants",
+      "status": 201
+    },
+    {
+      "step": "/api/mcp/mybrowser/connect",
+      "status": 200
+    },
+    {
+      "step": "/api/mcp/mybrowser/tools/call",
+      "status": 200
+    },
+    {
+      "step": "/api/agent",
+      "status": 202
+    },
+    {
+      "step": "/api/agent/wait",
+      "status": 200
+    },
+    {
+      "step": "/api/agent/snapshot",
+      "status": 200
+    }
+  ],
+  "discovery": [
+    {
+      "serverId": "myplan",
+      "version": "2026-07-28",
+      "capabilities": [
+        "resources",
+        "tools"
+      ],
+      "toolCount": 22,
+      "readOk": true
+    },
+    {
+      "serverId": "mybrowser",
+      "version": "2026-07-28",
+      "capabilities": [
+        "tools"
+      ],
+      "toolCount": 35,
+      "readOk": true
+    }
+  ],
+  "accepted": true,
+  "assistantToolCall": true,
+  "toolResult": true,
+  "assistantMarker": true,
+  "transcriptHash": "3f0478dbca2d40916e93f1753e0d8ea47c842d72cdbb7eae3dcfc841af738efd"
+}

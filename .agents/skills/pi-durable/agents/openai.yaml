@@ -1,0 +1,5 @@
+interface:
+  display_name: Pi Durable
+  short_description: Apply Purrable's pi durable ownership and verification rules.
+policy:
+  allow_implicit_invocation: true

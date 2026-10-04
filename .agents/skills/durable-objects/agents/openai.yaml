@@ -1,0 +1,5 @@
+interface:
+  display_name: durable objects
+  short_description: Use the reviewed Cloudflare guidance for Purrable Workers work.
+policy:
+  allow_implicit_invocation: true

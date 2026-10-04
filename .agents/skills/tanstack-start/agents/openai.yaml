@@ -1,0 +1,5 @@
+interface:
+  display_name: Tanstack Start
+  short_description: Apply Purrable's tanstack start ownership and verification rules.
+policy:
+  allow_implicit_invocation: true

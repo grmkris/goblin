@@ -1,0 +1,19 @@
+{
+  "environment": "retained Cloudflare dev",
+  "markerMatched": true,
+  "mcpCallObserved": true,
+  "operationIdPresent": true,
+  "origin": "https://purrable-dev.kristjan-grm11775.workers.dev",
+  "passed": [
+    "authenticated_resident_pi_submission",
+    "resident_mcp_call_committed_readback"
+  ],
+  "remoteGrantPresent": true,
+  "remoteToolObserved": true,
+  "signInStatus": 200,
+  "snapshotStatus": 200,
+  "submitStatus": 202,
+  "toolResultEntryObserved": true,
+  "waitOutcome": "done",
+  "waitStatus": 200
+}
