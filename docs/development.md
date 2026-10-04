@@ -55,6 +55,8 @@ bun run smoke:dev                         # acceptance; see scripts/README.md
 ```
 
 Changing `PURRABLE_CREDENTIAL_KEY` makes every stored MCP credential unreadable; reconnect the servers afterwards.
+Changing a server's `endpoint` drops what was stored for it (credentials, grants, pending sign-ins) at each
+agent's next start; connect it again. Tokens are never carried from one host to another.
 
 ## Using it
 
@@ -63,6 +65,12 @@ Changing `PURRABLE_CREDENTIAL_KEY` makes every stored MCP credential unreadable;
   its token refresh refused: press Reconnect.
 - **Resident authority.** Settings shows when it expires. Any use of the app renews it for 30 days. Revoke stops all
   outbound MCP use by the agent until you enable it again.
+- **MyPlan as an App (the showcase).** Dev points `myplan` at `https://dev-new.myplan.lol/mcp`, the myapps
+  rewrite (the local stack does too). Connect it, then switch on **Allow app** under its `ui://myplan/panel.html`
+  group. Ask the agent to open a note ("Open my Trip plan note"), then press *Show app* on the `myplan · myplan_open`
+  row. The panel edits the note live. Move it to the side panel or picture-in-picture from its chrome and back: it
+  never reloads. Canvases show as previews; the panel offers a link that opens them in MyPlan. What the panel shares
+  (the note in view) rides along with your next message as untrusted context.
 - **Add Purrable to Claude Code.**
 
   ```sh
