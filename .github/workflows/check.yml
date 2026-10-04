@@ -10,10 +10,18 @@ concurrency:
   cancel-in-progress: true
 jobs:
   check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The netcup runner is persistent: run only this repository's own branches, never a fork's code.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, linux, x64, netcup]
+    timeout-minutes: 30
+    env:
+      # Not the local default (18861), so CI never collides with an agent running the harness on the same box.
+      PURRABLE_HARNESS_PORT: '18862'
+      TURBO_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
