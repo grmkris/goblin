@@ -10,8 +10,11 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
 - `PiHarness` is registered with `lifecycle.use` in `PersonalAgent`. The main thread is `ROOT_SESSION`; each inbound
   client gets a session from `sessions.create()`, mapped in `app_client_sessions` (ids are not choosable).
 - Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
-- Extensions: `persona.ts` (static system prompt sections, keep them static so prompt caches hold) and
-  `resident-mcp.ts` (`mcp_list`, `mcp_call`). Tools with side effects are `replay: 'unsafe'`.
+- Extensions: `persona.ts` (static system prompt sections, keep them static so prompt caches hold),
+  `resident-mcp.ts` (`mcp_list`, `mcp_call`) and `budget.ts` (usage recording, tool blocking). Tools with side effects
+  are `replay: 'unsafe'`.
+- Pi reports and swallows exceptions thrown by hooks (`beforeRequest`, `afterResponse`, ...). To stop work from a
+  hook, return a result Pi honours, such as `beforeTool` `{ block }`; a throw does nothing.
 - Tool implementations check resident authority and grants before any outbound call, and never hold a SQLite
   transaction across model or network work.
 - Events are a snapshot plus committed batches with no cursor replay.
