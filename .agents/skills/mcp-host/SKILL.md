@@ -14,7 +14,8 @@ Purrable's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 - Credentials and client registrations are AES-GCM encrypted with additional data binding them to server and
   purpose. Never log, return or persist them anywhere else.
 - Every outbound call checks resident authority and the specific tool grant first. A tool grant also covers its
-  `ui://` resource; nothing else does.
+  `ui://` resource; nothing else does. "Allow app" (`setAppGrant`) writes exact grants for the tools that declare
+  the App's resource, never a wildcard.
 - Annotations, descriptions, prompts and results from servers are untrusted data. They never grant permissions or
   become instructions.
 - Keep results bounded and errors typed (`UpstreamMcp` with a reason). A refused refresh means `needs_auth`.
