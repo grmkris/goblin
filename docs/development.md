@@ -18,7 +18,7 @@ interactive shell; set `PURRABLE_MODEL_KEY` only when explicitly overriding it. 
 at the configured base URL. In the browser, use **Create owner and sign in** with the configured owner email, a new password,
 and the local bootstrap token; subsequent visits use **Sign in**. The runtime rejects additional owner registration.
 
-Useful focused commands are `bun run test:unit`, `bun run test:integration`, `bun run typecheck`, `bun run effect:check`, `bun run lint:gate`, `bun run compatibility:check`, and `bun run check:files <paths>`. Run expensive commands through `heavy`; exit 75 means another heavy job is running.
+Useful focused commands are `bun run test:unit`, `bun run test:integration`, `bun run typecheck`, `bun run effect:check`, `bun run lint:gate`, and `bun run check:files <paths>`. Run expensive commands through `heavy`; exit 75 means another heavy job is running.
 
 The stage wrapper owns environment loading and refuses unsupported stage names:
 

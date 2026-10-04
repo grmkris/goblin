@@ -10,7 +10,7 @@ The reviewed MyApps setup supports Codex, Claude, Grok, Cursor, and Hermes. Code
 Claude uses the linked copies. Cursor needs an always-applied `.mdc` pointer. On 2026-10-04, a fresh read-only Codex
 session listed all 14 repository skills without invoking tools; a fresh Claude session's initialization catalog also
 listed all 14 relative-linked skills. Both used GPT 6.1 Sol through the existing CLIProxy. See
-[the sanitized discovery receipt](../evidence/skill-discovery.json). Grok, Cursor and Hermes have adapter checks but
+[the sanitized discovery receipt](../archive/2026-10-04-initial-slice/evidence/skill-discovery.json). Grok, Cursor and Hermes have adapter checks but
 no fresh-client discovery proof.
 
 The [official Codex skills page](https://developers.openai.com/codex/skills/) was retrieved with HTTP 200 on 2026-10-04

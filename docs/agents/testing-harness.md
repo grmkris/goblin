@@ -7,7 +7,7 @@ Use injected services/layers instead of module mocking. Keep harness ports confi
 Prove real PiHarness initialization, supported persistence, reconstruction against the same SQLite state, and public-API read/resume separately. A second read of one live object is not restart/eviction proof. App migrations must leave the verified full vendor ownership set untouched.
 
 The retained native integration suite includes initialization, durable submission/deduplication, transcript readback
-and public dispose/reopen. [The stack report](../stack-compatibility.md) gives the two explicit process commands for
+and public dispose/reopen. [The stack report](../archive/2026-10-04-initial-slice/stack-compatibility.md) gives the two explicit process commands for
 storage reconstruction; the ordinary gate does not silently claim that separate proof.
 
 Use stable operation IDs and receipt/readback for retried submissions. Authentication, grants, cancellation, reconnect snapshot replacement, metadata/rich-result preservation, and sandboxed Apps messaging deserve focused integration tests. A mocked provider cannot prove real streaming/tool-calling support or deployed reachability.

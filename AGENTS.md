@@ -2,7 +2,7 @@
 
 Purrable is a resident personal-agent runtime on Cloudflare. Pi Durable owns conversation and execution state;
 Effect composes application services; Alchemy owns infrastructure. Read [README.md](README.md),
-[the implementation record](docs/implementation.md), and the workspace instructions before editing.
+[the implementation record](docs/archive/2026-10-04-initial-slice/implementation.md), and the workspace instructions before editing.
 
 ## Work and ownership
 

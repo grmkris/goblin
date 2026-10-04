@@ -20,7 +20,7 @@ statuses, operation ID, negotiated versions, capability names, counts, booleans 
 after one hour. The helper is not a CI check and must not be run without authorized retained-dev acceptance.
 
 Outbound MCP access tokens may expire before these grants. A 401 connect result needs fresh private dev credentials
-and an Alchemy binding update before retrying; see [the compatibility record](../docs/mcp-compatibility.md).
+and an Alchemy binding update before retrying; see [the compatibility record](../docs/archive/2026-10-04-initial-slice/mcp-compatibility.md).
 
 Browser rendering, sandboxed MCP App initialization and a permitted App interaction remain separate real-browser
 acceptance checks; this helper does not establish them.
