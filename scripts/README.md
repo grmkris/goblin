@@ -20,7 +20,10 @@ The smoke needs `PURRABLE_OWNER_EMAIL` and `PURRABLE_OWNER_PASSWORD` for an acco
 but never registers one. It refuses any target other than the retained `purrable-dev.*.workers.dev` Worker or
 `http://localhost:18971`.
 
-It reads and changes nothing the owner set:
+It reads the owner's state and changes one thing only while its agent turns run. With `PURRABLE_SMOKE_MODEL` set
+(dev: `qwen3.8-flash`, an Alibaba Token Plan model, so the smoke does not spend Gemini's small free quota), the agent
+answers on that model, and the owner's own pick is put back afterwards, even when a step fails. The model must be
+one the deployment offers (`PURRABLE_MODEL_ID` or `PURRABLE_MODELS`). Unset, the turns use the owner's pick:
 
 1. health; unless sign-up is open, a sign-up without the invite code is refused; sign-in, resident authority
    `active`, a main-thread snapshot;
