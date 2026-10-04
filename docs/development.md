@@ -10,12 +10,11 @@ mkdir -p .local && cp .env.example .local/local.env && chmod 600 .local/local.en
 bun dev                 # Alchemy runs the Worker in local workerd on http://localhost:18971
 ```
 
-Set `PURRABLE_OWNER_EMAIL` and `PURRABLE_OWNER_BOOTSTRAP_TOKEN` in `.local/local.env`. Model calls go through
-CLIProxy and inherit `CLIPROXY_API_KEY` from the interactive shell. The local stage supplies its own auth secret and
-credential key; set them in `.local/local.env` only to override.
+Model calls go through CLIProxy and inherit `CLIPROXY_API_KEY` from the interactive shell. The local stage supplies
+its own auth secret and credential key and opens sign-up; set them in `.local/local.env` only to override.
 
-The first time, open the app and use **Create owner and sign in** with the owner email, a new password and the
-bootstrap token. That works once: the runtime refuses any further owner and any other email.
+Open the app and use **Create an account**. Each account gets its own agent. For `bun run smoke:local`, put that
+account's email and password in `PURRABLE_OWNER_EMAIL` and `PURRABLE_OWNER_PASSWORD`.
 
 ## Gates
 
@@ -38,8 +37,9 @@ Dev (`https://purrable-dev.<account>.workers.dev`) is the daily instance. Its co
 | Variable | Meaning |
 | --- | --- |
 | `PURRABLE_STAGE`, `PURRABLE_APP_URL` | `dev` and the Worker's HTTPS origin. |
-| `PURRABLE_OWNER_EMAIL`, `PURRABLE_OWNER_PASSWORD` | The owner; the password is only for the smoke. |
-| `PURRABLE_BETTER_AUTH_SECRET`, `PURRABLE_OWNER_BOOTSTRAP_TOKEN` | Auth secret and the one-time owner bootstrap token. |
+| `PURRABLE_SIGNUP_MODE`, `PURRABLE_SIGNUP_INVITE_CODE` | `open`, `invite` or `closed` (default), and the invite code. |
+| `PURRABLE_OWNER_EMAIL`, `PURRABLE_OWNER_PASSWORD` | An existing account; only the smoke reads them. |
+| `PURRABLE_BETTER_AUTH_SECRET` | Better Auth's secret. |
 | `PURRABLE_MODEL_BASE_URL`, `PURRABLE_MODEL_ID`, `PURRABLE_MODEL_KEY` | Railway LiteLLM and the dedicated capped key. Never the master key. |
 | `PURRABLE_MCP_SERVERS` | JSON list of outbound servers: `[{"serverId":"myplan","endpoint":"https://…/mcp"}]`. |
 | `PURRABLE_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP tokens. |
@@ -47,7 +47,7 @@ Dev (`https://purrable-dev.<account>.workers.dev`) is the daily instance. Its co
 ```sh
 bun run plan:dev                          # preview
 bun run deploy:dev                        # deploy
-bun run destroy:dev -- --confirm-reset    # erase owner, conversations and MCP credentials
+bun run destroy:dev -- --confirm-reset    # erase every account, conversation and MCP credential
 bun run smoke:dev                         # acceptance; see scripts/README.md
 ```
 

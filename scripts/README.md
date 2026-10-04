@@ -7,7 +7,7 @@ Deployment scripts use Alchemy only. Secrets are read from mode-600 files under 
 | `bun dev`                                | Local stack on `http://localhost:18971` (workerd), model calls through CLIProxy. |
 | `bun run plan:dev`                       | Preview changes to the retained dev stage.                                       |
 | `bun run deploy:dev`                     | Deploy the dev stage (`https://purrable-dev.<account>.workers.dev`).             |
-| `bun run destroy:dev -- --confirm-reset` | Erase the dev stage: owner account, conversations, MCP credentials.              |
+| `bun run destroy:dev -- --confirm-reset` | Erase the dev stage: every account, conversation and MCP credential.             |
 | `bun run smoke:dev`                      | Acceptance against the deployed dev stage.                                       |
 | `bun run smoke:local`                    | The same acceptance against the local stack.                                     |
 
@@ -16,13 +16,14 @@ Cloudflare credentials in `~/.config/myapps/dev.env`.
 
 ## Smoke
 
-The smoke needs `PURRABLE_OWNER_EMAIL` and `PURRABLE_OWNER_PASSWORD` for an owner that already exists; it signs in
+The smoke needs `PURRABLE_OWNER_EMAIL` and `PURRABLE_OWNER_PASSWORD` for an account that already exists; it signs in
 but never registers one. It refuses any target other than the retained `purrable-dev.*.workers.dev` Worker or
 `http://localhost:18971`.
 
 It reads and changes nothing the owner set:
 
-1. health, owner sign-in, resident authority `active`, a main-thread snapshot;
+1. health; unless sign-up is open, a sign-up without the invite code is refused; sign-in, resident authority
+   `active`, a main-thread snapshot;
 2. each configured MCP server's status; for a connected server, its tools, and a direct call of a read-only probe
    (`account_read` on MyPlan, `browser_backends` on MyBrowser) only if the owner has already granted it;
 3. an inbound MCP client: dynamic registration, owner consent, PKCE token, `/mcp` `initialize` and `tools/list`, an
