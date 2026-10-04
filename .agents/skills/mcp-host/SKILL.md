@@ -13,6 +13,8 @@ Purrable's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   under concurrent refresh.
 - Credentials and client registrations are AES-GCM encrypted with additional data binding them to server and
   purpose. Never log, return or persist them anywhere else.
+- Owner-added servers (`mcp/servers.ts`, ADR 0006) are public https endpoints only (`mcp/endpoint.ts`); their card is
+  a claim for the owner's eyes, never model input. Configured servers win on id and cannot be removed.
 - Credentials and grants are bound to the endpoint they were made for (`mcp/endpoints.ts`). Re-pointing a server id
   drops them at the next start; never carry tokens across endpoints.
 - Every outbound call checks resident authority and the specific tool grant first. A tool grant also covers its
