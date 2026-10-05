@@ -204,5 +204,7 @@ deletion; deletion does not itself cancel provider charges.
 
 Members routing uses a separate local workerd/D1 fixture on `PURRABLE_HARNESS_PORT + 20`. Run
 `bun run --cwd apps/runtime test:integration test/integration/members.test.ts` through `heavy`. The tests prove
-selection fences, invitation-only accounts without personal fallback, closed member/viewer RPCs and owner deletion
-failure/retry. They send no real mail, use no provider keys, and do not prove Phase B shared execution.
+stable ordinary-owner routing and selection fences, invitation-only accounts without personal fallback, email-bound
+OTP admission, paid/concurrent acceptance, replay after removal, rotated/expired proofs, malicious leave payloads,
+closed member/viewer RPCs and owner deletion failure/retry. They capture injected mail, use no provider keys, and do
+not prove real mail delivery or Phase B shared execution.

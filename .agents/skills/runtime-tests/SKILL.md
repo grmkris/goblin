@@ -33,3 +33,8 @@ itself authorize model spend, external messages, deployment or production change
   reads auth D1; only the native model-test subclass injects entitlement policy. Prove checkout alone grants nothing,
   a signed activation opens the Agent, replay preserves the first receipt, cancellation/grace expire, and each account
   receives its own allowance. Real Dodo keys, checkout, merchant review and deployed webhook delivery are separate gates.
+
+- Members native tests use real auth D1 and PersonalAgent with captured injected mail. Prove ordinary accounts keep
+  their own Agent, invitation accounts have no fallback, email/OTP admission and own-plan acceptance, proof rotation,
+  stale contexts, concurrent/replayed receipts, leave payload rejection and deletion retry. Phase A members/viewers
+  remain unable to call owner RPCs; shared execution and real invitation delivery require separate acceptance.
