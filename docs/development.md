@@ -138,10 +138,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - **MyPlan as an App.** The suggested MyPlan server uses `https://dev-new.myplan.lol/mcp` on local and dev
   (`apps/runtime/src/mcp/suggested.ts`); `PURRABLE_MCP_SERVERS` may configure another endpoint. Connect it, then switch
   on **Allow app** under its discovered `ui://` resource group. Ask the agent to open a note ("Open my Trip plan
-  note"); the App opens in place under the tool row (on an older call, open the row and press *Show app*). Its chrome
-  opens it as a page beside the conversation and back, fills the workspace from its page, and × closes it. Several
-  Apps run at once, in any conversation; beyond six the least recently seen unloads to a stub. These moves keep the
-  same iframe and bridge. What an App shares rides along with your next message in its conversation as untrusted
+  note"); the App opens in place under the tool row (on an older call, open the row and press *Show app*). Its bar
+  opens it as a page beside the conversation or closes it; on the page, the pill's menu brings it back, fills the
+  workspace or closes it. Several Apps run at once, in any conversation; beyond six the least recently seen unloads to
+  a stub. These moves keep the same iframe and bridge. What an App shares rides along with your next message in its conversation as untrusted
   context; links it offers wait for your click. The originating server supplies the resource URI and the App's
   behavior.
 - **Add Purrable to Claude Code.**
