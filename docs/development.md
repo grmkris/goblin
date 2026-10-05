@@ -211,22 +211,13 @@ Before prod payments, review the draft legal pages and provide operator identity
 refund/withdrawal policy and retention/subprocessor details. Cancel recurring billing through Dodo before account
 deletion; deletion does not itself cancel provider charges.
 
-## Account workspace tests
+## Owner routing and Apps tests
 
-Members routing uses a separate local workerd/D1 fixture on `PURRABLE_HARNESS_PORT + 20`. Run
-`bun run --cwd apps/runtime test:integration test/integration/members.test.ts` through `heavy`. The tests prove
-stable ordinary-owner routing and selection fences, invitation-only accounts without personal fallback, email-bound
-OTP admission, paid/concurrent acceptance, replay after removal, rotated/expired proofs, malicious leave payloads,
-closed owner RPCs, filtered shared member/viewer reads and owner deletion failure/retry. They capture injected mail
-and use a deterministic native model without provider keys. Browser acceptance uses an intercepted local fixture
-for empty permission choices, exact member/viewer invitations, selection teardown, unpaid leave, fragment clearing,
-OTP sign-in and subscribe-return-join navigation. It does not prove real Dodo checkout or invitation delivery.
-
-The native fixture also counts workspace D1 queries after authentication: established browser/owner resolution
-uses one live read and zero writes while retaining invitation, stale-context, revocation and deletion fences.
-It invokes the actual scheduled Worker entry point without Dodo and verifies bounded expiry cleanup, retained
-unexpired active/used admissions, current hourly counters and repeated sweeps. Cleanup adds only indexes through
-the auth D1 migration; it runs hourly and drains at most 1000 rows from each expiry table per tick.
+The local workerd/auth-D1 owner fixture runs on `PURRABLE_HARNESS_PORT + 20`.
+Run `heavy bun run --cwd apps/runtime test:integration test/integration/owner.test.ts` to verify per-call owner
+Apps, live grants, conversation Close/reopen, and isolation between two authenticated accounts even with forged
+workspace/agent request selectors. Removed workspace, invitation and interaction endpoints return 404.
+These keyless deterministic tests are local evidence; deployed smoke and real provider acceptance are separate.
 
 ## Routine definition checks
 
@@ -252,13 +243,3 @@ and rearm across restart, revoked-authority skip with unchanged usage, active/ru
 using CLIProxy. The native recurring-wake regression verifies the next sweep survives the callback that scheduled it.
 Real provider billing, Telegram delivery, cron-after-deploy and real producer acceptance require separate deployed
 verification.
-
-Alchemy sets `MEMBER_EXECUTION_ENABLED=1` on configured stages. A Worker without that binding denies shared Agent
-access before lookup; the native fixture also verifies that closed default. The Phase B fixture exercises filtered principal
-contexts with the scripted model and actual auth D1. No production sign-up, mail, provider or payment calls are
-part of these checks. The additive auth migration projects member usage account-wide; DO application metadata
-stores context provenance, named readers, sealed interaction decisions and the passive projection outbox.
-Native tests cover designated-answerer and exact-hash replays, owner/private reads, history downgrades, endpoint
-and grant intersections, one-use tool dispatch, existing-account allowance attribution, descendants and idle-stream
-revocation. The delayed-invalidation regression fails without the membership-version fence. Provider billing,
-real two-account Dodo acceptance and delivery on dev remain separate operator checks.

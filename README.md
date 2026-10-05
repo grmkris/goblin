@@ -62,25 +62,9 @@ renewals have bounded grace. Settings provides the billing portal; `/subscribe` 
 privacy and refund pages await operator review before live payments. Native workerd tests use real D1 and an injected
 Dodo client; real Dodo checkout, keys and merchant acceptance remain operator steps.
 
-Account workspaces are selected server-side from verified D1 membership. Existing personal agents keep their owner
-ID and history. Members each need their own Pro plan; the owner reads all workspace conversations. Shared Agent
-access uses principal-bound contexts, live member scope and the acting account's allowance. Email
-invitations carry a link and invitation code; accepting requires the addressed email and an active plan. Settings
-provides workspace selection, empty permission checkboxes, member/viewer invitations and leave/remove controls.
-Workspace access is read live on every request; expired admission and rate-limit data is cleaned up hourly. See
-[ADR 0014](docs/adr/0014-members-and-workspace-authority.md).
-
 Routine proposals are reviewed in Settings → Routines. The owner confirms the exact prompt, trigger, timezone, tool
 pairs, budgets and Telegram policy. Confirmed reminders, cron schedules and MCP Events run in isolated threads and post a short
 passive note to main. Run now, Stop, Pause, Edit and Archive are available; Telegram reports require an explicit
 notification choice. Event confirmation authorizes the exact connected server, event name and JSON filters; controls never start a model turn. See [the routines decision](docs/adr/0012-routines.md).
 
 LOCAL throwaway-account acceptance covers routine reminders, cron recovery across a process restart, revoked-authority skips and caps through CLIProxy. Native alarm tests also verify recurring recovery wakes; real producer Events and deployed acceptance remain separate.
-
-The Members Phase B release includes isolated member contexts, scoped execution, designated question/approval
-receipts, filtered reads and account-wide usage attribution. Deployed Workers opt in through the reviewed Alchemy
-binding; the native fixture also tests the closed default. Invitation-created accounts still do not provision their
-own personal Agent while that product decision is pending.
-Named readers are bound to current membership versions. Questions use the questionnaire and only their designated
-answerer can settle them; viewers can send an access request without starting a model turn. Removal queues durable
-invalidation retries, and late cleanup preserves questions belonging to newer membership versions.

@@ -23,7 +23,3 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
-
-- Account workspace state is an auth-D1 projection. Selection reloads Settings to close streams/Apps/caches and
-  focus rechecks the session context. Phase A member/viewer Agent views stay closed. Invitation fragments are cleared
-  before exchange; OTP sign-in and own-plan activation precede joining. Keep permission checkboxes empty by default.

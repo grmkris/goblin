@@ -34,25 +34,10 @@ itself authorize model spend, external messages, deployment or production change
   a signed activation opens the Agent, replay preserves the first receipt, cancellation/grace expire, and each account
   receives its own allowance. Real Dodo keys, checkout, merchant review and deployed webhook delivery are separate gates.
 
-- Members native tests use real auth D1 and PersonalAgent with captured injected mail. Prove ordinary accounts keep
-  their own Agent, invitation accounts have no fallback, email/OTP admission and own-plan acceptance, proof rotation,
-  stale contexts, concurrent/replayed receipts, leave payload rejection and deletion retry. Phase A members/viewers
-  remain unable to call owner RPCs; shared execution and real invitation delivery require separate acceptance.
-
-- Members query observations delegate to native D1 after session authentication. Established state, browser and owner
-  resolution must each make one live workspace read with no writes; revocation/deletion cannot restore fallback.
-  The scheduled Worker cleanup fixture runs without Dodo and proves 1000-row expiry bounds, retained live active/used
-  admissions and hourly counters, and safe repeated sweeps. It sends no mail or provider requests.
-
 - Signed routine Events use the existing native stack and official fixture, including descriptor argument validation, shared-lease retirement, escaped IDs, replay after receipt retention across a new revision, sealed metadata labelling, global spacing and pending drain. Structural labelling does not prove model injection resistance; local throwaway-account CLIProxy acceptance and real producer/dev acceptance are separate evidence.
 
 - Earliest-wake regressions must execute a real native callback and check that its successor remains scheduled. A direct manual call can miss self-suppression because `listSchedules` includes the firing row. LOCAL acceptance also waits for passive report acceptance; model settlement alone is incomplete evidence.
 
-- The Members Phase B runtime is fail-closed without `MEMBER_EXECUTION_ENABLED`; Alchemy configured stages and
-  `members-stack.ts` explicitly opt in. Native contexts must exclude
-  restricted root/private sentinels, retain owner administrative reads, reject viewer execution and owner RPCs,
-  preserve requester identity and charge the acting account. Exact request/decision replay hashes must reject changed
-  bytes. Filter every stream batch and recheck idle membership; policy epochs fence inherited descendants.
-  Capture named system sections as well as system content when observing actual model inputs. Verify history
-  downgrade, current-version question survival after delayed invalidation, account-wide exhaustion and descendants.
-  A stream-revocation test must observe the open native stream ending, not only a new request being refused.
+- Owner API/Apps tests use real auth D1 and PersonalAgent with a deterministic model and official injected MCP
+  transport. Verify two-account isolation with forged selectors, removed access endpoints, per-call Apps and live
+  grants. Applied dormant migrations remain intact.

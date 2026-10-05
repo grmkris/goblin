@@ -8,11 +8,9 @@ description: Change the PersonalAgent Durable Object shell, its RPC surface, lif
 `PersonalAgent extends Agent` and stays thin: each RPC method runs one Effect program on the object's
 `ManagedRuntime` and returns an encoded result. Services do the work.
 
-- One object per workspace owner, retaining the owner's user ID as its name. Resolve browser selection from the
-  session and live D1 membership, never a request-supplied Agent name. Hooks/inbound MCP resolve verified ownership.
-  Membership never grants owner RPC or resident renewal; shared execution uses trusted principal contexts, scope and
-  the acting account's allowance (ADR 0014). An unconfigured Worker keeps shared access closed. Its SQLite is the
-  durable boundary. Alchemy binds the class directly.
+- One object per user, named by the authenticated user ID. The session user reaches only their own Agent;
+  inbound MCP uses the verified bearer-token subject, and hooks check the user-bound token before object lookup.
+  Never accept an Agent name from the request. Its SQLite is the durable boundary. Alchemy binds the class directly.
 - Workers RPC drops custom error classes. Return `RpcResult` (`http/rpc.ts`) and let the Worker map the tagged error.
 - Owner-facing methods renew resident authority; inbound-client methods do not.
 - Inbound user authentication, the agent's resident authority and outbound MCP authorization are three separate

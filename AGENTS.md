@@ -36,9 +36,7 @@ infrastructure. Read
 - Secrets live in mode-600 `.local/*.env` files and Worker secret bindings. Never print, commit, expose in browser
   bundles or persist them in transcripts, logs or docs. Outbound OAuth tokens are encrypted at rest in the Agent DO.
 - The `dev` stage is the daily instance, with real users' data: treat it as real. Schema changes there are additive
-  migrations. A user reaches only a workspace they own or have an active verified membership in. The Worker derives
-  the Agent name from that workspace's owner in D1; never take an agent name from the request. Membership does not
-  grant owner authority. Member Agent execution stays closed until verified principal, scope and usage integration.
+  migrations. A user only ever reaches their own agent; never add a route that takes an agent name from the request.
 
 ## Quality
 
