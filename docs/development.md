@@ -73,10 +73,13 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - **Connect a server.** Connections → Connect. You sign in at the remote server and approve; you come back
   connected. Servers that answer without sign-in connect directly. Then tick the tools the agent may use. Nothing is
   granted by default. A server marked *needs auth* needs a new sign-in: press Reconnect.
-- **Conversations.** Main is `/`. Use **New thread** for an empty conversation, or **Branch from here** under a settled
-  answer in main. **Share to main** asks the thread to write a note; it starts no answer in main. Rename and Archive
-  are in the thread menu; archiving hides it and keeps its history. Subagents appear under the conversation that
-  started them. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
+- **Conversations.** Main is `/`. Use **New thread** in the sidebar for an empty conversation, or **Reply in thread**
+  under one of your settled messages or the agent's in main: a reply opens beside main (a sheet on a phone), and
+  sending it starts the thread from that message, so an unsent reply leaves nothing behind. Main then shows the thread
+  under that message with its reply count, and a second Reply there opens the same thread. The sidebar
+  lists every thread, and the panel's full-view button opens one at `/t/:id`. **Share to main** asks the thread to
+  write a note; it starts no answer in main. Rename and Archive are in the thread menu; archiving hides it and keeps
+  its history. Subagents appear under the conversation that started them. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
 - **Questions, models and budget.** Answer an `ask_user` card with your next message. Pick an offered model in the
   composer; Settings and the composer's ring show today's token usage, resetting at 00:00 UTC.
 - **Skills.** Connect a server that offers skills, then turn on **Use skills from this server**. The agent reads and
