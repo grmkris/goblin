@@ -38,3 +38,8 @@ itself authorize model spend, external messages, deployment or production change
   their own Agent, invitation accounts have no fallback, email/OTP admission and own-plan acceptance, proof rotation,
   stale contexts, concurrent/replayed receipts, leave payload rejection and deletion retry. Phase A members/viewers
   remain unable to call owner RPCs; shared execution and real invitation delivery require separate acceptance.
+
+- Members query observations delegate to native D1 after session authentication. Established state, browser and owner
+  resolution must each make one live workspace read with no writes; revocation/deletion cannot restore fallback.
+  The scheduled Worker cleanup fixture runs without Dodo and proves 1000-row expiry bounds, retained live active/used
+  admissions and hourly counters, and safe repeated sweeps. It sends no mail or provider requests.

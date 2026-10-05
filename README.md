@@ -61,5 +61,6 @@ Account workspaces are selected server-side from verified D1 membership. Existin
 ID and history. Members each need their own Pro plan; the owner reads all workspace conversations. Phase A stores
 membership and selection while shared Agent access waits for requester scope and allowance integration. Email
 invitations carry a link and invitation code; accepting requires the addressed email and an active plan. Settings
-provides workspace selection, empty permission checkboxes, member/viewer invitations and leave/remove controls. See
+provides workspace selection, empty permission checkboxes, member/viewer invitations and leave/remove controls.
+Workspace access is read live on every request; expired admission and rate-limit data is cleaned up hourly. See
 [ADR 0014](docs/adr/0014-members-and-workspace-authority.md).

@@ -210,3 +210,9 @@ closed member/viewer RPCs and owner deletion failure/retry. They capture injecte
 not prove real mail delivery or Phase B shared execution. Browser acceptance uses an intercepted local fixture
 for empty permission choices, exact member/viewer invitations, selection teardown, unpaid leave, fragment clearing,
 OTP sign-in and subscribe-return-join navigation. It does not prove real Dodo checkout or invitation delivery.
+
+The native fixture also counts workspace D1 queries after authentication: established browser/owner resolution
+uses one live read and zero writes while retaining invitation, stale-context, revocation and deletion fences.
+It invokes the actual scheduled Worker entry point without Dodo and verifies bounded expiry cleanup, retained
+unexpired active/used admissions, current hourly counters and repeated sweeps. Cleanup adds only indexes through
+the auth D1 migration; it runs hourly and drains at most 1000 rows from each expiry table per tick.
