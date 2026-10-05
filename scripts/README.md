@@ -10,6 +10,7 @@ Deployment scripts use Alchemy only. Secrets are read from mode-600 files under 
 | `bun run destroy:dev -- --confirm-reset` | Erase the dev stage: every account, conversation and MCP credential.             |
 | `bun run smoke:dev`                      | Acceptance against the deployed dev stage.                                       |
 | `bun run smoke:local`                    | The same acceptance against the local stack.                                     |
+| `bun run icons`                          | Redraw the app icons and favicon in `apps/web/public` from the one cat mark.     |
 
 Stage configuration comes from `.local/<stage>.env` (see `.env.example`); `plan:dev`, `deploy:dev` and `destroy:dev`
 also read shared Cloudflare credentials in `~/.config/myapps/dev.env`. Smoke loads only the stage file and needs no

@@ -117,7 +117,9 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - UI components: Purrable looks like the myapps apps. Prefer porting a component from `~/code/myapps/packages/ui`
   (with an "Adapted from" header naming the commit); otherwise `bunx shadcn@latest add <component>` from
   `packages/ui`, then review the generated file. Keep the shared tokens in `packages/ui/src/styles.css` as myapps has
-  them (the sidebar tokens are Purrable's: a shade heavier than the page). Do not hand-edit `apps/web/src/routeTree.gen.ts`.
+  them (the sidebar tokens are Purrable's: a shade heavier than the page). The Home Screen icons, favicon and web app
+  manifest are static files in `apps/web/public`; after changing the mark or the page background, run `bun run icons`
+  and keep the manifest's colours and the root route's `theme-color` metas equal to `--background`. Do not hand-edit `apps/web/src/routeTree.gen.ts`.
 - Dependencies: `bun add <package> --cwd <workspace>`; commit `package.json` and `bun.lock` together.
 
 Unit tests, local workerd and the deployed dev stage are separate kinds of evidence. Say which one you ran.
