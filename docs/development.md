@@ -6,6 +6,8 @@ The [memory benchmark workspace](../bench/README.md) runs isolated native Pi exp
 default. `bun run bench:plan` previews the GLM/DeepSeek matrix; `bun run bench:run --manifest
 bench/experiments/native-smoke.json --run smoke-01` starts its own local relay and workerd. Live calls require
 `--live` and the separate mode-600 provider configuration. Runs, resume evidence and reports stay in `.local/bench/`.
+`bench:import` and `bench:canary` freeze a real Claude session and six manually grounded probes; the resulting
+six-arm, 36-answer manifest requires live CLIProxy inference and append-only semantic review before its scores count.
 
 ## MCP Events
 
