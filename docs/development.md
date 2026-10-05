@@ -8,6 +8,8 @@ bench/experiments/native-smoke.json --run smoke-01` starts its own local relay a
 `--live` and the separate mode-600 provider configuration. Runs, resume evidence and reports stay in `.local/bench/`.
 `bench:import` and `bench:canary` freeze a real Claude session and six manually grounded probes; the resulting
 six-arm, 36-answer manifest requires live CLIProxy inference and append-only semantic review before its scores count.
+Native pressure and API transport capacity are separate manifest settings; failed checkpoint builds block dependent
+episodes, and their usage stays charged when a new trial is prepared.
 
 ## MCP Events
 
@@ -101,7 +103,8 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   sheet on a phone), and sending starts the thread (empty, or from that message), so an unsent draft leaves nothing
   behind. Main then shows the thread
   under that message with a connector and the first five messages in an expanded preview (collapse is saved on your device), and a second Reply there opens the same thread. The sidebar
-  lists every thread, and the panel's full-view button opens one at `/t/:id`. **Share to main** asks the thread to
+  lists every thread. Wide screens open multiple dockable thread panes; the pane's full-view button opens one at `/t/:id`.
+  The workspace saves its arrangement on this device; **Reset layout** makes equal panes. Narrow screens use sheets. **Share to main** asks the thread to
   write a note; it starts no answer in main. Rename and Archive are in the thread menu; archiving hides it and keeps
   its history. Subagents appear under the conversation that started them. The sliders button by the composer shows
   what the agent can use in that conversation (connections and their tools, skills, subagents); switching something
