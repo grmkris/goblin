@@ -74,3 +74,8 @@ passive note to main. Run now, Stop, Pause, Edit and Archive are available; Tele
 notification choice. Event confirmation authorizes the exact connected server, event name and JSON filters; controls never start a model turn. See [the routines decision](docs/adr/0012-routines.md).
 
 LOCAL throwaway-account acceptance covers routine reminders, cron recovery across a process restart, revoked-authority skips and caps through CLIProxy. Native alarm tests also verify recurring recovery wakes; real producer Events and deployed acceptance remain separate.
+
+The Members Phase B checkpoint includes isolated member contexts, scoped execution, designated question/approval
+receipts, filtered reads and account-wide usage attribution. It stays closed in deployed Workers until a separate
+reviewed enablement commit; the local native fixture alone opts in. Invitation-created accounts still do not
+provision their own personal Agent while that product decision is pending.

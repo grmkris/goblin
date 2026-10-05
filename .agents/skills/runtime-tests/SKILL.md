@@ -47,3 +47,8 @@ itself authorize model spend, external messages, deployment or production change
 - Signed routine Events use the existing native stack and official fixture, including descriptor argument validation, shared-lease retirement, escaped IDs, replay after receipt retention across a new revision, sealed metadata labelling, global spacing and pending drain. Structural labelling does not prove model injection resistance; local throwaway-account CLIProxy acceptance and real producer/dev acceptance are separate evidence.
 
 - Earliest-wake regressions must execute a real native callback and check that its successor remains scheduled. A direct manual call can miss self-suppression because `listSchedules` includes the firing row. LOCAL acceptance also waits for passive report acceptance; model settlement alone is incomplete evidence.
+
+- The Members Phase B checkpoint is default-closed; only `members-stack.ts` opts in. Native contexts must exclude
+  restricted root/private sentinels, retain owner administrative reads, reject viewer execution and owner RPCs,
+  preserve requester identity and charge the acting account. Exact request/decision replay hashes must reject changed
+  bytes. Filter every stream batch and recheck idle membership; policy epochs fence inherited descendants.

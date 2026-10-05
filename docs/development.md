@@ -245,3 +245,9 @@ and rearm across restart, revoked-authority skip with unchanged usage, active/ru
 using CLIProxy. The native recurring-wake regression verifies the next sweep survives the callback that scheduled it.
 Real provider billing, Telegram delivery, cron-after-deploy and real producer acceptance require separate deployed
 verification.
+
+The Members Phase B checkpoint uses `MEMBER_EXECUTION_ENABLED=1` only in its isolated native fixture. Deployed
+Workers stay closed until the separate enablement change passes review. Fixture tests exercise filtered principal
+contexts with the scripted model and actual auth D1. No production sign-up, mail, provider or payment calls are
+part of these checks. The additive auth migration projects member usage account-wide; DO application metadata
+stores context provenance, named readers, sealed interaction decisions and the passive projection outbox.
