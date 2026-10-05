@@ -73,9 +73,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - **Connect a server.** Connections → Connect. You sign in at the remote server and approve; you come back
   connected. Servers that answer without sign-in connect directly. Then tick the tools the agent may use. Nothing is
   granted by default. A server marked *needs auth* needs a new sign-in: press Reconnect.
-- **Conversations.** Main is `/`. Use **New thread** in the sidebar for an empty conversation, or **Reply in thread**
-  under one of your settled messages or the agent's in main: a reply opens beside main (a sheet on a phone), and
-  sending it starts the thread from that message, so an unsent reply leaves nothing behind. Main then shows the thread
+- **Conversations.** Main is `/`. The **+** beside Threads in the sidebar opens a new thread's draft beside main, or
+  use **Reply in thread** under one of your settled messages or the agent's in main. Either opens beside main (a
+  sheet on a phone), and sending starts the thread (empty, or from that message), so an unsent draft leaves nothing
+  behind. Main then shows the thread
   under that message with its reply count, and a second Reply there opens the same thread. The sidebar
   lists every thread, and the panel's full-view button opens one at `/t/:id`. **Share to main** asks the thread to
   write a note; it starts no answer in main. Rename and Archive are in the thread menu; archiving hides it and keeps
