@@ -61,3 +61,5 @@ itself authorize model spend, external messages, deployment or production change
   same run, release executing slots while waiting, and retain the single-routine lock. Run Stop/archive fence and abort
   owned work; main Stop spares background runs. Frozen Telegram reports and remote receipts are separate from Pi
   acceptance. Local workerd evidence and retained-dev acceptance remain distinct.
+
+- Event routines consume the shared static Events handler at the confirmed revision. Seal scrubbed bounded metadata outside Pi commits, label it as untrusted data, preserve event run IDs across definition revisions and ingress retention, and commit a pending handoff with its consumer ACK. Admission is one event/minute per agent; controls never start model work.

@@ -41,7 +41,7 @@ bun run check      # the full gate (run it through `heavy` on the build box)
 - [Architecture](docs/architecture.md): how the Worker, the agent object, Pi, MCP and auth fit together, including
   conversations, memory, skills, Telegram and MCP Apps.
 - [Development](docs/development.md): local setup, the dev stage, connecting servers, adding Purrable to Claude Code.
-- [Next](docs/next.md): the seams for routines and write approvals.
+- [Next](docs/next.md): remaining acceptance and write approvals.
 - [Memory benchmarks](bench/README.md): isolated native Pi experiments, GLM/DeepSeek variants, bounded accounting and local reports.
 - [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
 
@@ -66,6 +66,6 @@ Workspace access is read live on every request; expired admission and rate-limit
 [ADR 0014](docs/adr/0014-members-and-workspace-authority.md).
 
 Routine proposals are reviewed in Settings → Routines. The owner confirms the exact prompt, trigger, timezone, tool
-pairs, budgets and Telegram policy. Confirmed reminders and cron schedules run in isolated threads and post a short
+pairs, budgets and Telegram policy. Confirmed reminders, cron schedules and MCP Events run in isolated threads and post a short
 passive note to main. Run now, Stop, Pause, Edit and Archive are available; Telegram reports require an explicit
-notification choice. Event-trigger activation follows in the next slice. See [the routines decision](docs/adr/0012-routines.md).
+notification choice. Event confirmation authorizes the exact connected server, event name and JSON filters; controls never start a model turn. See [the routines decision](docs/adr/0012-routines.md).

@@ -224,5 +224,17 @@ zones, DST, cron spacing, explicit reminder offsets, strict write CSRF and summa
 `PURRABLE_HARNESS_PORT=18871 heavy bun run test:integration native.test.ts -t routine` for real local workerd SQLite,
 native dated alarms, Pi run/session/report dedupe, no copied capabilities, committed usage, revoked-authority skips,
 correlated questions, late answers, main Stop, two-running cap, burst collapse, archive and revision fencing. These
-keyless fixture tests establish local behavior. Real provider billing, Telegram delivery and retained-dev reminder,
-cron-after-deploy and caps acceptance require the orchestrator's deployed verification.
+keyless fixture tests establish local behavior. The signed routine Events case shares the native stack and official
+fixture producer: exact descriptor filters, raw signatures, shared leases, escaped run IDs, replay across revisions,
+sealed metadata, one event/minute, pending coalescing, gap/poll recovery and termination/reconfirmation. No live MCP
+producer or Telegram send is involved. To run just that case, use
+`PURRABLE_HARNESS_PORT=18871 heavy bun run test:integration native.test.ts -t 'signed routine Events'`.
+
+For local acceptance, start a separate `bun dev` stack with isolated Alchemy/D1/DO state and a throwaway account;
+use the local operator entitlement override, no mail and no billing provider credentials. Through the authenticated
+API/UI, confirm a near-future reminder, observe one completed run and passive main note, confirm a cron occurrence,
+restart the local process before it fires, then verify firing and next occurrence. Revoke resident authority and
+confirm a reminder yields a visible skip without token usage; check active/running and run/day token caps. Save
+redacted logs and screenshots. Local CLIProxy provider evidence is distinct from Railway LiteLLM and retained dev.
+Real provider billing, Telegram delivery, cron-after-deploy and real producer acceptance require separate deployed
+verification.
