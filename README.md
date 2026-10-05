@@ -16,7 +16,8 @@ MCP Events wake an authoritative inbox pull into main, and replies go back with 
 the doorbell fallback until cut-over. Owner-enabled skills libraries use update Events to invalidate their cached
 catalog; the next activation refetches, while retained activations keep their verified version.
 
-The browser also hosts one sandboxed MCP App at a time. Owners can add public servers by URL or from MCP registries,
+On wide screens, main, multiple threads and one sandboxed MCP App share a dockable, resizable Trellis workspace.
+The device remembers the arrangement; Reset layout restores equal panes. Narrow screens use sheets. Owners can add public servers by URL or from MCP registries,
 grant tools explicitly, choose an offered model, and see the per-account daily token budget. The agent uses `ask_user`
 to ask questions the owner answers in their next message.
 
@@ -53,3 +54,7 @@ Account workspaces are selected server-side from verified D1 membership. Existin
 ID and history. Members each need their own Pro plan; the owner reads all workspace conversations. Phase A stores
 membership and selection while shared Agent access waits for requester scope and allowance integration. See
 [ADR 0014](docs/adr/0014-members-and-workspace-authority.md).
+
+Workspace layout uses [Trellis 0.3.0 by Dan Fessler](https://github.com/DanFessler/trellis), under its commercial
+license and Purrable-specific permission: Purrable may use it without sponsorship until it makes money, then Kris
+sponsors. Dan may showcase Purrable as a Trellis user; the app and this README credit him. See [ADR 0016](docs/adr/0016-workspace-layout-with-trellis.md).

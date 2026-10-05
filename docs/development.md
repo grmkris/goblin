@@ -123,8 +123,9 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - **MyPlan as an App.** The suggested MyPlan server uses `https://dev-new.myplan.lol/mcp` on local and dev
   (`apps/runtime/src/mcp/suggested.ts`); `PURRABLE_MCP_SERVERS` may configure another endpoint. Connect it, then switch
   on **Allow app** under its discovered `ui://` resource group. Ask the agent to open a note ("Open my Trip plan
-  note"), then press *Show app* on the resulting tool row. Move it to the side panel or picture-in-picture from its
-  chrome and back: it keeps the same iframe. What the panel shares rides along with your next message as untrusted
+  note"), then press *Show app* on the resulting tool row. On wide screens it opens in a Trellis pane: use the
+  pane menu to float or dock it, drag its tab to move it, and drag its edges to resize it. Its chrome opens fullscreen
+  and returns to the pane; narrow screens use the App sheet. These moves keep the same iframe and bridge. What the panel shares rides along with your next message as untrusted
   context; links it offers wait for your click. The originating server supplies the resource URI and the panel's
   behavior.
 - **Add Purrable to Claude Code.**
