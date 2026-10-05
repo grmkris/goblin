@@ -166,7 +166,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   them (the sidebar tokens are Purrable's: a shade heavier than the page). The Home Screen icons, favicon and web app
   manifest are static files in `apps/web/public`; after changing the mark or the page background, run `bun run icons`
   and keep the manifest's colours and the root route's `theme-color` metas equal to `--background`. Do not hand-edit `apps/web/src/routeTree.gen.ts`.
-- Dependencies: `bun add <package> --cwd <workspace>`; commit `package.json` and `bun.lock` together.
+- Dependencies: `bun add <package> --cwd <workspace>`; commit `package.json` and `bun.lock` together. A patched
+  dependency (root `patchedDependencies`) stays pinned to the version its patch was made for, and `bun run
+  check:patches` fails when the installed file is not the patched one; `patches/shadcn-react/README.md` says how the
+  MessageScroller patch is rebuilt.
 
 Unit tests, local workerd and the deployed dev stage are separate kinds of evidence. Say which one you ran.
 

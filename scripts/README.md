@@ -2,15 +2,16 @@
 
 Deployment scripts use Alchemy only. Secrets are read from mode-600 files under `.local/` and are never printed.
 
-| Command                                  | What it does                                                                     |
-| ---------------------------------------- | -------------------------------------------------------------------------------- |
-| `bun dev`                                | Local stack on `http://localhost:18971` (workerd), model calls through CLIProxy. |
-| `bun run plan:dev`                       | Preview changes to the retained dev stage.                                       |
-| `bun run deploy:dev`                     | Deploy the dev stage (`https://dev.purrable.lol`).                               |
-| `bun run destroy:dev -- --confirm-reset` | Erase the dev stage: every account, conversation and MCP credential.             |
-| `bun run smoke:dev`                      | Acceptance against the deployed dev stage.                                       |
-| `bun run smoke:local`                    | The same acceptance against the local stack.                                     |
-| `bun run icons`                          | Redraw the app icons and favicon in `apps/web/public` from the one cat mark.     |
+| Command                                          | What it does                                                                               |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `bun dev`                                        | Local stack on `http://localhost:18971` (workerd), model calls through CLIProxy.           |
+| `bun run plan:dev`                               | Preview changes to the retained dev stage.                                                 |
+| `bun run deploy:dev`                             | Deploy the dev stage (`https://dev.purrable.lol`).                                         |
+| `bun run destroy:dev -- --confirm-reset`         | Erase the dev stage: every account, conversation and MCP credential.                       |
+| `bun run smoke:dev`                              | Acceptance against the deployed dev stage.                                                 |
+| `bun run smoke:local`                            | The same acceptance against the local stack.                                               |
+| `bun run icons`                                  | Redraw the app icons and favicon in `apps/web/public` from the one cat mark.               |
+| `heavy bun scripts/patch-shadcn-react.ts --test` | Rebuild the MessageScroller patch from upstream source (`patches/shadcn-react/README.md`). |
 
 Stage configuration comes from `.local/<stage>.env` (see `.env.example`); `plan:dev`, `deploy:dev` and `destroy:dev`
 also read shared Cloudflare credentials in `~/.config/myapps/dev.env`. Smoke loads only the stage file and needs no
