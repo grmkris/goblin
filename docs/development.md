@@ -198,3 +198,10 @@ The model price schedule is not fixed by source; configure reviewed positive mul
 Before prod payments, review the draft legal pages and provide operator identity, support/postal address, jurisdiction,
 refund/withdrawal policy and retention/subprocessor details. Cancel recurring billing through Dodo before account
 deletion; deletion does not itself cancel provider charges.
+
+## Account workspace tests
+
+Members routing uses a separate local workerd/D1 fixture on `PURRABLE_HARNESS_PORT + 20`. Run
+`bun run --cwd apps/runtime test:integration test/integration/members.test.ts` through `heavy`. The tests prove
+selection fences, invitation-only accounts without personal fallback, closed member/viewer RPCs and owner deletion
+failure/retry. They send no real mail, use no provider keys, and do not prove Phase B shared execution.

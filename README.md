@@ -48,3 +48,8 @@ nothing until its signed webhook activates the account. Cancellation keeps acces
 renewals have bounded grace. Settings provides the billing portal; `/subscribe` handles unpaid accounts. Draft terms,
 privacy and refund pages await operator review before live payments. Native workerd tests use real D1 and an injected
 Dodo client; real Dodo checkout, keys and merchant acceptance remain operator steps.
+
+Account workspaces are selected server-side from verified D1 membership. Existing personal agents keep their owner
+ID and history. Members each need their own Pro plan; the owner reads all workspace conversations. Phase A stores
+membership and selection while shared Agent access waits for requester scope and allowance integration. See
+[ADR 0014](docs/adr/0014-members-and-workspace-authority.md).
