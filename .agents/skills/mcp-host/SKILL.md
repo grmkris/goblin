@@ -28,9 +28,12 @@ Purrable's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 - Keep results bounded and errors typed (`UpstreamMcp` with a reason). A refused refresh means `needs_auth`.
 - Inbound tokens must verify locally, name `/mcp` as audience, come from an enabled client with live owner consent.
   An inbound client's messages go into main, labelled with its name.
-- The Telegram channel (`channel/`, ADR 0009) is an outbound connection like any other: the owner's "Use for
-  Telegram" writes its four exact grants, and its pulls and replies check resident authority. Its doorbell route
-  checks the hook token before an agent wakes and myagent's signature inside it; a doorbell never carries content.
+- Events (`mcp/events.ts`, ADR 0011) require resident authority and an exact server/name/canonical-arguments owner
+  grant through the originating endpoint-bound connection. Top-level `capabilities.events` is decoded at the
+  authenticated SDK fetch seam. Signed controls have separate schemas; payloads never grant or become instructions.
+- Telegram (`channel/`, ADR 0009) selects Events when advertised, otherwise the legacy doorbell. Preserve sanitized
+  `telegram-tg-<update>` and reply operation ids; fence old cursor writes only after both leases confirm. Hooks persist
+  receipts before asynchronous dispatch; accepted submissions are distinct from external delivery.
 - Fixture tests (`test/mcp/`) prove protocol behaviour; real MyPlan/MyBrowser behaviour is proven only on dev.
 
 Before changing an API call, read the current [documentation](https://modelcontextprotocol.io/specification/latest) and the installed package's declarations; the

@@ -17,6 +17,9 @@ smoke are different evidence.
 - `bun run smoke:local` and `bun run smoke:dev` prove the real paths, including inbound OAuth, without touching the
   owner's main thread or grants.
 - Report provider, network, auth and deployment gaps as unknown; synthetic tests do not prove real hosts.
+- Events tests use `test/mcp/events-fixture.ts` in workerd: exact capabilities, raw-byte signatures, challenge,
+  replay, gaps, early refresh, termination, shared consumers, durable skill invalidation and failed-handler recovery.
+  Reconstructed local services prove retained SQLite receipts; live producer and real eviction checks are separate.
 - For skill-cache changes, keep a workerd regression that corrupts a persisted `app_skill_files` row, observes the
   refetch, and verifies the repaired bytes; unit tests alone do not prove Durable Object SQLite behavior.
 
