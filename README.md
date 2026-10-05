@@ -22,8 +22,11 @@ grant tools explicitly, choose an offered model, and see the per-account daily t
 to ask questions the owner answers in their next message.
 
 Workspace layout uses [Trellis 0.3.0 by Dan Fessler](https://github.com/DanFessler/trellis), under its commercial
-license and Purrable-specific permission: Purrable may use it without sponsorship until it makes money, then Kris
-sponsors. Dan may showcase Purrable as a Trellis user; the app and this README credit him. See [ADR 0016](docs/adr/0016-workspace-layout-with-trellis.md).
+license and Purrable-specific permission: Purrable may use it without sponsorship until it makes money, in exchange
+for crediting Dan and allowing him to showcase Purrable as a Trellis user. When revenue starts, Kris maintains the
+applicable active GitHub Sponsorship: $10/month for individuals, $100/month for studios of up to 10 members;
+larger organizations require an enterprise agreement. The workspace toolbar also links Dan's credit. See
+[ADR 0016](docs/adr/0016-workspace-layout-with-trellis.md).
 
 Built on the Cloudflare Agents SDK (`PersonalAgent` Durable Object) with the native Pi harness (Pi Durable owns
 conversations and execution), Effect at service seams, Better Auth for identity, and Alchemy for infrastructure.
