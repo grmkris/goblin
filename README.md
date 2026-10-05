@@ -57,5 +57,6 @@ Dodo client; real Dodo checkout, keys and merchant acceptance remain operator st
 Account workspaces are selected server-side from verified D1 membership. Existing personal agents keep their owner
 ID and history. Members each need their own Pro plan; the owner reads all workspace conversations. Phase A stores
 membership and selection while shared Agent access waits for requester scope and allowance integration. Email
-invitations carry a link and invitation code; accepting requires the addressed email and an active plan. See
+invitations carry a link and invitation code; accepting requires the addressed email and an active plan. Settings
+provides workspace selection, empty permission checkboxes, member/viewer invitations and leave/remove controls. See
 [ADR 0014](docs/adr/0014-members-and-workspace-authority.md).

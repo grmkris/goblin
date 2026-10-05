@@ -207,4 +207,6 @@ Members routing uses a separate local workerd/D1 fixture on `PURRABLE_HARNESS_PO
 stable ordinary-owner routing and selection fences, invitation-only accounts without personal fallback, email-bound
 OTP admission, paid/concurrent acceptance, replay after removal, rotated/expired proofs, malicious leave payloads,
 closed member/viewer RPCs and owner deletion failure/retry. They capture injected mail, use no provider keys, and do
-not prove real mail delivery or Phase B shared execution.
+not prove real mail delivery or Phase B shared execution. Browser acceptance uses an intercepted local fixture
+for empty permission choices, exact member/viewer invitations, selection teardown, unpaid leave, fragment clearing,
+OTP sign-in and subscribe-return-join navigation. It does not prove real Dodo checkout or invitation delivery.
