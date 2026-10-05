@@ -25,3 +25,8 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
+
+- Billing native tests use a separate local D1/Worker and an injected Dodo API. Production account admission always
+  reads auth D1; only the native model-test subclass injects entitlement policy. Prove checkout alone grants nothing,
+  a signed activation opens the Agent, replay preserves the first receipt, cancellation/grace expire, and each account
+  receives its own allowance. Real Dodo keys, checkout, merchant review and deployed webhook delivery are separate gates.

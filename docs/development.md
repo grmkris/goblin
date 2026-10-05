@@ -17,7 +17,8 @@ heavy bun run test:integration -t Events
 ```
 
 It covers signed Telegram delivery into main, replay, signature/timestamp rejection, gaps, early refresh, shared
-consumer cleanup and termination. Unit tests independently verify HMAC bytes. A live mygram round-trip is a separate
+consumer cleanup, durable skill invalidation, retained skill versions, failed-handler reconstruction and pending-receipt
+retention. Unit tests independently verify HMAC bytes. A live mygram round-trip is a separate
 deployed acceptance gate. The lane's throwaway conformance vector is handed to the producer orchestrator; never use
 its test secret for a real subscription.
 
@@ -167,7 +168,7 @@ Set `DODO_PAYMENTS_ENVIRONMENT=test_mode` on local/dev and `live_mode` on prod. 
 `DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_WEBHOOK_KEY` and `DODO_PRODUCT_ID` in the stage's mode-600 env file; Alchemy
 binds them as Worker secrets. Choose a Purrable-only recurring $10/month product with no trial. Never bind an account's
 master model key or print payment keys. Configure a separate Standard Webhooks endpoint at `/hooks/dodo` per stage.
-`/health` reports the configured billing mode or null when billing is incomplete; missing keys never bypass admission.
+`/health` reports the stage billing mode and whether billing is configured; missing keys never bypass admission.
 
 The additive billing migration grants users already in D1 a dev-only Pro override. It grants nothing on prod or for
 new signups. An operator can insert/update `app_billing_accounts` for a known user ID, setting `plan_override='pro'`,
