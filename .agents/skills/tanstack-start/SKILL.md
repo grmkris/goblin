@@ -12,8 +12,10 @@ The web app is a thin browser projection over the resident runtime. TanStack Sta
 - Cross-runtime contracts come from packages/contracts; UI primitives come from packages/ui. Do not add hypothetical reuse packages.
 - Generated shadcn components remain editable and locally owned; follow monorepo aliases/components.json and token conventions.
 - Support text/tool/progress display, submit/follow-up, stop, snapshot reconnect, and a sandboxed App surface without another agent state machine.
-- Desktop conversation layout uses Trellis 0.3.0 only after hydration, with nonclosable main and stable React portal hosts.
-  Persist bounded versioned layouts per owner/device; prune stale panes and retain narrow-screen sheets. Reset keeps current panes.
+- Every conversation, draft and App is one tab-less pane (ADR 0019): the pure store in `lib/workspace.ts` owns the
+  layout and drives Trellis 0.3.0 (desktop, after hydration, controlled) or the narrow snapping strip; items render
+  once into stable portal hosts. Routes carry only the focused conversation (`/c/$conversationId`); never add
+  search-param panel state. Stored layouts are bounded, versioned, per owner/device and grant nothing.
 - Validate the built artifact and real browser behavior. Local route rendering is not Cloudflare deployment proof.
 
 Before changing an API call, read the current [documentation](https://tanstack.com/start/latest) and the installed package's declarations; the

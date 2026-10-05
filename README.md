@@ -18,8 +18,9 @@ MCP Events wake an authoritative inbox pull into main, and replies go back with 
 the doorbell fallback until cut-over. Owner-enabled skills libraries use update Events to invalidate their cached
 catalog; the next activation refetches, while retained activations keep their verified version.
 
-On wide screens, main, multiple threads and one sandboxed MCP App share a dockable, resizable Trellis workspace.
-The device remembers the arrangement; Reset layout restores equal panes. Narrow screens use sheets. Owners can add public servers by URL or from MCP registries,
+Every conversation (main, a thread, a subagent) and the sandboxed MCP App is a pane of its own: open beside, drag to
+split or swap, resize, close any but the last. The URL names the focused conversation and the device remembers the
+arrangement; narrow screens show one pane at a time in a swipeable strip. Owners can add public servers by URL or from MCP registries,
 grant tools explicitly, choose an offered model, and see the per-account daily token budget. The agent uses `ask_user`
 to ask questions the owner answers in their next message.
 
@@ -27,8 +28,8 @@ Workspace layout uses [Trellis 0.3.0 by Dan Fessler](https://github.com/DanFessl
 license and Purrable-specific permission: Purrable may use it without sponsorship until it makes money, in exchange
 for crediting Dan and allowing him to showcase Purrable as a Trellis user. When revenue starts, Kris maintains the
 applicable active GitHub Sponsorship: $10/month for individuals, $100/month for studios of up to 10 members;
-larger organizations require an enterprise agreement. The workspace toolbar also links Dan's credit. See
-[ADR 0016](docs/adr/0016-workspace-layout-with-trellis.md).
+larger organizations require an enterprise agreement. The sidebar footer also links Dan's credit. See
+[ADR 0016](docs/adr/0016-workspace-layout-with-trellis.md) and [ADR 0019](docs/adr/0019-panes-for-everything.md).
 
 Built on the Cloudflare Agents SDK (`PersonalAgent` Durable Object) with the native Pi harness (Pi Durable owns
 conversations and execution), Effect at service seams, Better Auth for identity, and Alchemy for infrastructure.

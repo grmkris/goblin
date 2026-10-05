@@ -98,13 +98,16 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - **Connect a server.** Connections → Connect. You sign in at the remote server and approve; you come back
   connected. Servers that answer without sign-in connect directly. Then tick the tools the agent may use. Nothing is
   granted by default. A server marked *needs auth* needs a new sign-in: press Reconnect.
-- **Conversations.** Main is `/`. The **+** beside Threads in the sidebar opens a new thread's draft beside main, or
-  use **Reply in thread** under one of your settled messages or the agent's in main. Either opens beside main (a
-  sheet on a phone), and sending starts the thread (empty, or from that message), so an unsent draft leaves nothing
-  behind. Main then shows the thread
-  under that message with a connector and the first five messages in an expanded preview (collapse is saved on your device), and a second Reply there opens the same thread. The sidebar
-  lists every thread. Wide screens open multiple dockable thread panes; the pane's full-view button opens one at `/t/:id`.
-  The workspace saves its arrangement on this device; **Reset layout** makes equal panes. Narrow screens use sheets. **Share to …** asks the thread to
+- **Conversations.** Each conversation is a pane; the URL (`/c/<id>`) names the focused one and `/` restores your
+  last arrangement. Click a conversation in the sidebar to show it in the focused pane. The **+** beside Threads opens
+  a new thread's draft beside it, and **Reply in thread** under any settled message, in any conversation, opens a
+  reply draft beside that conversation; sending starts the thread (empty, or from that message), so an unsent draft
+  leaves nothing behind. The conversation then shows the thread under that message with a connector and the first
+  five messages in an expanded preview (collapse is saved on your device), and a second Reply there opens the same
+  thread. Drag a pane by the grip in its pill onto another pane: near an edge it splits there, in the middle the two
+  trade places (Escape cancels). Drag a divider to resize, **Fill the workspace** in the pill's menu to show one pane
+  alone, and × to close a pane (any but the last; the conversation goes on). The device remembers the arrangement;
+  narrow screens show one pane at a time, swipe between them. **Share to …** asks the thread to
   write a note into the conversation it came from; it starts no answer there. Rename and Close are in the thread menu;
   Close stops the thread and everything under it (its subagents and nested threads) and keeps its history, and Reopen
   brings it back. Subagents appear under the conversation that started them. The sliders button by the composer shows
@@ -124,8 +127,8 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - **MyPlan as an App.** The suggested MyPlan server uses `https://dev-new.myplan.lol/mcp` on local and dev
   (`apps/runtime/src/mcp/suggested.ts`); `PURRABLE_MCP_SERVERS` may configure another endpoint. Connect it, then switch
   on **Allow app** under its discovered `ui://` resource group. Ask the agent to open a note ("Open my Trip plan
-  note"), then press *Show app* on the resulting tool row. On wide screens it opens in a Trellis pane: use the
-  pane menu to float or dock it, drag its tab to move it, and drag its edges to resize it. Its chrome opens fullscreen
+  note"), then press *Show app* on the resulting tool row. On wide screens it opens in a pane beside the
+  conversation: drag its grip to move it and a divider to resize it, and × closes the App. Its chrome opens fullscreen
   and returns to the pane; narrow screens use the App sheet. These moves keep the same iframe and bridge. What the panel shares rides along with your next message as untrusted
   context; links it offers wait for your click. The originating server supplies the resource URI and the panel's
   behavior.
