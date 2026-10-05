@@ -2,6 +2,11 @@
 
 Requirements are Bun `1.4.2` and Node.js 22.
 
+The [memory benchmark workspace](../bench/README.md) runs isolated native Pi experiments with a keyless provider by
+default. `bun run bench:plan` previews the GLM/DeepSeek matrix; `bun run bench:run --manifest
+bench/experiments/native-smoke.json --run smoke-01` starts its own local relay and workerd. Live calls require
+`--live` and the separate mode-600 provider configuration. Runs, resume evidence and reports stay in `.local/bench/`.
+
 ## Local
 
 ```sh

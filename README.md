@@ -32,6 +32,7 @@ bun run check      # the full gate (run it through `heavy` on the build box)
   conversations, memory, skills, Telegram and MCP Apps.
 - [Development](docs/development.md): local setup, the dev stage, connecting servers, adding Purrable to Claude Code.
 - [Next](docs/next.md): the seams for routines and write approvals.
+- [Memory benchmarks](bench/README.md): isolated native Pi experiments, GLM/DeepSeek variants, bounded accounting and local reports.
 - [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
 
 The dev stage (`purrable-dev`) is the daily instance. Its sign-up is closed: existing accounts sign in, nobody new can
