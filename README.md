@@ -7,8 +7,8 @@ other tools can talk to.
 The agent has one main conversation. Side threads can start empty or branch from any message of any conversation, at
 any depth; they can share a note back to where they came from, and Close stops one with everything under it until it is
 reopened. Main learns the name of a thread started empty, and one live feed keeps every open tab's list and activity
-current. Threads attach to their main message
-with an expanded compact preview of the first five messages, live activity and a device-local collapse preference. Each conversation can switch off,
+current. A thread unfolds in place under the
+message it branched from, live and at any depth, with its own composer, until it is opened in a pane. Each conversation can switch off,
 for its own agent, connections and their tools, skills libraries and subagents; a new thread starts with main's
 switches. Background subagents work in their own conversations and report back to the conversation that started them. Main keeps an OptChat-style memory view: summaries of older messages followed by the
 newest exchange verbatim.

@@ -101,10 +101,11 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - **Conversations.** Each conversation is a pane; the URL (`/c/<id>`) names the focused one and `/` restores your
   last arrangement. Click a conversation in the sidebar to show it in the focused pane. The **+** beside Threads opens
   a new thread's draft beside it, and **Reply in thread** under any settled message, in any conversation, opens a
-  reply draft beside that conversation; sending starts the thread (empty, or from that message), so an unsent draft
-  leaves nothing behind. The conversation then shows the thread under that message with a connector and the first
-  five messages in an expanded preview (collapse is saved on your device), and a second Reply there opens the same
-  thread. Drag a pane by the grip in its pill onto another pane: near an edge it splits there, in the middle the two
+  small reply right under that message; sending starts the thread from it, so an unsent reply leaves nothing behind.
+  The message then carries the thread's chip (replies, name, last activity) instead of Reply in thread: it unfolds
+  the live thread in place, with its own threads unfolding the same way and **Open in pane** to put it beside. While a
+  thread is in a pane its fold says so, with the way to it and back. A conversation off screen for ten seconds stops
+  following and catches up when it is back. Drag a pane by the grip in its pill onto another pane: near an edge it splits there, in the middle the two
   trade places (Escape cancels). Drag a divider to resize, **Fill the workspace** in the pill's menu to show one pane
   alone, and × to close a pane (any but the last; the conversation goes on). The device remembers the arrangement;
   narrow screens show one pane at a time, swipe between them. The sidebar lists every conversation as a tree
