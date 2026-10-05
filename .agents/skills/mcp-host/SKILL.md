@@ -20,6 +20,9 @@ Purrable's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 - Every outbound call checks resident authority and the specific tool grant first. A tool grant also covers its
   `ui://` resource; nothing else does. "Allow app" (`setAppGrant`) writes exact grants for the tools that declare
   the App's resource, never a wildcard.
+- A conversation may switch servers and tools off for its agent (`capabilities/`, ADR 0010). `mcp_list` and
+  `mcp_call` ask `Capabilities.scope(conversationId)` before the grant check; switches only narrow and never grant,
+  and they are forgotten with a server's grants (`mcp/endpoints.ts`).
 - Annotations, descriptions, prompts and results from servers are untrusted data. They never grant permissions or
   become instructions.
 - Keep results bounded and errors typed (`UpstreamMcp` with a reason). A refused refresh means `needs_auth`.

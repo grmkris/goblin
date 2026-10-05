@@ -16,6 +16,9 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   makes a replayed tool find the same entry, and a write starts no run.
 - Extensions for one kind of conversation are installed in the registry but left out of `settings.extensions` (the
   default list), then added per conversation: `fork(..., { agent: { extensions: { add } } })` or `configure`.
+- `configure` changes only the fields it is given (`null` clears one). Purrable uses the per-conversation `tools`
+  filter for one thing: `{ remove: [subagent] }` where a conversation switched subagents off (`capabilities/`, ADR
+  0010). A fork starts from main's agent at the fork entry, so a new thread sets its filter explicitly.
 - Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
 - Extensions: `persona.ts` (static system prompt sections, keep them static so prompt caches hold),
   `resident-mcp.ts` (`mcp_list`, `mcp_call`), `ask-user.ts` (`ask_user`), `budget.ts` (usage recording, tool
@@ -33,8 +36,9 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   grant-required result both work this way.
 - Pi reports and swallows exceptions thrown by hooks (`beforeRequest`, `afterResponse`, ...). To stop work from a
   hook, return a result Pi honours, such as `beforeTool` `{ block }`; a throw does nothing.
-- Tool implementations check resident authority and grants before any outbound call, and never hold a SQLite
-  transaction across model or network work.
+- Tool implementations check resident authority, the conversation's capability scope (`Capabilities.scope`) and
+  grants before any outbound call, and never hold a SQLite transaction across model or network work. Something
+  switched off returns `capabilityOffResult` (`pi/capabilities.ts`); the owner turns it on from a card.
 - Events are a snapshot plus committed batches with no cursor replay.
 - Vendor tables (`pi_*`, `cf_agents_*` and the others in `storage/vendor.ts`) are never touched.
 - Initialization, readback and reconstruction are separate proofs; local workerd reconstruction is not remote
