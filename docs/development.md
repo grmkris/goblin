@@ -80,7 +80,9 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   under that message with its reply count, and a second Reply there opens the same thread. The sidebar
   lists every thread, and the panel's full-view button opens one at `/t/:id`. **Share to main** asks the thread to
   write a note; it starts no answer in main. Rename and Archive are in the thread menu; archiving hides it and keeps
-  its history. Subagents appear under the conversation that started them. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
+  its history. Subagents appear under the conversation that started them. The sliders button by the composer shows
+  what the agent can use in that conversation (connections and their tools, skills, subagents); switching something
+  off there hides it from the agent in that conversation only, and a new thread starts with main's switches. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
 - **Questions, models and budget.** Answer an `ask_user` card with your next message. Pick an offered model in the
   composer; Settings and the composer's ring show today's token usage, resetting at 00:00 UTC.
 - **Skills.** Connect a server that offers skills, then turn on **Use skills from this server**. The agent reads and
