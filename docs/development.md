@@ -255,3 +255,7 @@ Workers stay closed until the separate enablement change passes review. Fixture 
 contexts with the scripted model and actual auth D1. No production sign-up, mail, provider or payment calls are
 part of these checks. The additive auth migration projects member usage account-wide; DO application metadata
 stores context provenance, named readers, sealed interaction decisions and the passive projection outbox.
+Native tests cover designated-answerer and exact-hash replays, owner/private reads, history downgrades, endpoint
+and grant intersections, one-use tool dispatch, existing-account allowance attribution, descendants and idle-stream
+revocation. The delayed-invalidation regression fails without the membership-version fence. Provider billing,
+real two-account Dodo acceptance and delivery on dev remain separate operator checks.

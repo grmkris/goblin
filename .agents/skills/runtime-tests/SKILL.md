@@ -52,3 +52,6 @@ itself authorize model spend, external messages, deployment or production change
   restricted root/private sentinels, retain owner administrative reads, reject viewer execution and owner RPCs,
   preserve requester identity and charge the acting account. Exact request/decision replay hashes must reject changed
   bytes. Filter every stream batch and recheck idle membership; policy epochs fence inherited descendants.
+  Capture named system sections as well as system content when observing actual model inputs. Verify history
+  downgrade, current-version question survival after delayed invalidation, account-wide exhaustion and descendants.
+  A stream-revocation test must observe the open native stream ending, not only a new request being refused.

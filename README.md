@@ -79,3 +79,6 @@ The Members Phase B checkpoint includes isolated member contexts, scoped executi
 receipts, filtered reads and account-wide usage attribution. It stays closed in deployed Workers until a separate
 reviewed enablement commit; the local native fixture alone opts in. Invitation-created accounts still do not
 provision their own personal Agent while that product decision is pending.
+Named readers are bound to current membership versions. Questions use the questionnaire and only their designated
+answerer can settle them; viewers can send an access request without starting a model turn. Removal queues durable
+invalidation retries, and late cleanup preserves questions belonging to newer membership versions.
