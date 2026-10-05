@@ -46,7 +46,10 @@
     "graph": "bun tools/check-graph.ts",
     "check:fast": "bun run fmt:check && bun run agents:check && bun run lint && bun run typecheck && bun run test:unit",
     "check": "bun run fmt:check && bun run agents:check && bun run graph && bun run typecheck && bun run lint:gate && bun run dupes && bun run test && bun run test:integration && bun run build",
-    "infra": "alchemy"
+    "infra": "alchemy",
+    "deploy:prod": "bun scripts/stage.ts deploy:prod",
+    "plan:prod": "bun scripts/stage.ts plan:prod",
+    "smoke:prod": "bun scripts/stage.ts smoke:prod"
   },
   "devDependencies": {
     "@shadcn/lint": "0.2.0",

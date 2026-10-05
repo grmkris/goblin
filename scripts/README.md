@@ -6,7 +6,7 @@ Deployment scripts use Alchemy only. Secrets are read from mode-600 files under 
 | ---------------------------------------- | -------------------------------------------------------------------------------- |
 | `bun dev`                                | Local stack on `http://localhost:18971` (workerd), model calls through CLIProxy. |
 | `bun run plan:dev`                       | Preview changes to the retained dev stage.                                       |
-| `bun run deploy:dev`                     | Deploy the dev stage (`https://purrable-dev.<account>.workers.dev`).             |
+| `bun run deploy:dev`                     | Deploy the dev stage (`https://dev.purrable.lol`).                               |
 | `bun run destroy:dev -- --confirm-reset` | Erase the dev stage: every account, conversation and MCP credential.             |
 | `bun run smoke:dev`                      | Acceptance against the deployed dev stage.                                       |
 | `bun run smoke:local`                    | The same acceptance against the local stack.                                     |
@@ -19,7 +19,7 @@ Cloudflare API credentials.
 ## Smoke
 
 The smoke needs `PURRABLE_OWNER_EMAIL` and `PURRABLE_OWNER_PASSWORD` for an account that already exists; it signs in
-but never registers one. It refuses any target other than the retained `purrable-dev.*.workers.dev` Worker or
+but never registers one. It uses the stage's `PURRABLE_APP_URL` over HTTPS, or
 `http://localhost:18971`.
 
 The smoke spends model tokens and writes conversation history: turns in main, a new side thread and a background
@@ -61,3 +61,13 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 
 Not covered here: the owner's Connect flow (it needs the owner at the remote server's consent screen), rendering
 MCP Apps, the browser UI, thread branching, memory-summary quality, skills, and Telegram hook/inbox acceptance.
+
+Prod commands use `.local/prod.env` and require `PURRABLE_CONFIRM_PROD=1` in the calling shell:
+`bun run plan:prod`, `bun run deploy:prod`, `bun run smoke:prod`. There is no destroy-prod command.
+`smoke:prod` defaults to GET `/health` and GET `/api/threads` without authentication (expected 401).
+Only supplying both credentials for an operator test account enables the full acceptance flow, including model turns.
+Never put the production owner's credentials in the smoke configuration.
+
+`PURRABLE_DOMAIN` attaches the stage's custom domain through Alchemy: `dev.purrable.lol` on dev, `purrable.lol` on
+prod, plus `www.purrable.lol` on prod. The Worker redirects alternate hosts to `PURRABLE_APP_URL`, preserving the path
+and query (301 for GET/HEAD, 308 for writes). Dev sign-up must be closed or invite-only.

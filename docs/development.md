@@ -36,7 +36,7 @@ If a check fails, look at `git status` first. Another agent's half-finished file
 
 ## The dev stage
 
-Dev (`https://purrable-dev.<account>.workers.dev`) is the daily instance. Its configuration is `.local/dev.env`
+Dev (`https://dev.purrable.lol`) is the daily instance. Its configuration is `.local/dev.env`
 (mode 600) plus the shared Cloudflare credentials in `~/.config/myapps/dev.env`:
 
 | Variable | Meaning |
@@ -109,7 +109,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - **Add Purrable to Claude Code.**
 
   ```sh
-  claude mcp add --transport http purrable https://purrable-dev.<account>.workers.dev/mcp
+  claude mcp add --transport http purrable https://dev.purrable.lol/mcp
   ```
 
   Sign in and approve in the browser. It gets `ask_agent` and `get_recent_messages` in the agent's main conversation,
@@ -131,3 +131,17 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - Dependencies: `bun add <package> --cwd <workspace>`; commit `package.json` and `bun.lock` together.
 
 Unit tests, local workerd and the deployed dev stage are separate kinds of evidence. Say which one you ran.
+
+
+## Production preparation
+
+`.local/prod.env` is mode 600, with fresh auth and credential secrets. Fill its model key with a dedicated Railway
+LiteLLM virtual key; never the master key. Set `PURRABLE_DOMAIN=purrable.lol` and
+`PURRABLE_APP_URL=https://purrable.lol`; dev uses `dev.purrable.lol` for both. Set `PURRABLE_MAIL_SENDER=hello@purrable.lol`
+only after Cloudflare Email Sending verifies the sender. Prod open sign-up requires mail; dev must stay closed or
+invite-only. These settings do not authorize a production deploy.
+
+`PURRABLE_CONFIRM_PROD=1 bun run plan:prod` previews, and the same explicit guard protects `deploy:prod` and
+`smoke:prod`. The default prod smoke is read-only: health and an anonymous protected-route probe. An operator smoke
+account's credentials opt into the full flow. After dev's origin changes, sign in by email code and register new
+passkeys; reconnect MCP clients at the new origins.

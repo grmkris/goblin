@@ -35,5 +35,8 @@ bun run check      # the full gate (run it through `heavy` on the build box)
 - [Memory benchmarks](bench/README.md): isolated native Pi experiments, GLM/DeepSeek variants, bounded accounting and local reports.
 - [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
 
-The dev stage (`purrable-dev`) is the daily instance. Its sign-up is closed: existing accounts sign in, nobody new can
-register. There is no production stage yet.
+The deployment stages are `dev` at `dev.purrable.lol` and `prod` at `purrable.lol`, with separate auth databases,
+secrets and dedicated LiteLLM keys. Alchemy can attach the custom domains; deployment and live acceptance are operator
+steps. Alternate hosts redirect to the configured canonical origin. Dev sign-up stays closed or invite-only; prod
+supports open sign-up only with verified mail sending. Both stages use `hello@purrable.lol` after sender onboarding,
+with a host prefix on dev mail subjects. See [development](docs/development.md) for the production guard and smoke.

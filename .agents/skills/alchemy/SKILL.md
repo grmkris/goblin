@@ -9,7 +9,7 @@ Alchemy (a pinned beta) is the sole infrastructure source of truth; check its in
 
 - Bind the native Agent class directly; do not force PiHarness through an Effect-native DO superclass.
 - Keep deployment code out of Worker/runtime imports and runtime migration SQL.
-- Preserve stage-derived physical resource names and explicit dev ownership. `destroy:dev` needs `--confirm-reset`; there is no production stage.
+- Preserve stage-derived physical resource names and explicit dev ownership. `destroy:dev` needs `--confirm-reset`; prod has separate resources and mode-600 secrets; every prod command requires `PURRABLE_CONFIRM_PROD=1`. There is no destroy-prod command.
 - Put secrets in runtime bindings; never browser bundles, logs, transcripts, or iframe state.
 - Verify current TanStack Start/Vite integration compatibility before adding any Cloudflare Vite plugin; do not maintain two deployment systems.
 - Record plan/build evidence, real dev deployment receipts, and smoke results separately. A local artifact is not deployed acceptance.
@@ -19,3 +19,5 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
+
+- Custom domains come from `PURRABLE_DOMAIN`; the Worker canonical origin, auth, passkeys and mail links come from `APP_URL`. Dev sign-up is closed or invite-only. Prod smoke defaults to reads until an operator test account is supplied.
