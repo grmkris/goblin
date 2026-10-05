@@ -10,6 +10,11 @@ bench/experiments/native-smoke.json --run smoke-01` starts its own local relay a
 six-arm, 36-answer manifest requires live CLIProxy inference and append-only semantic review before its scores count.
 Native pressure and API transport capacity are separate manifest settings; failed checkpoint builds block dependent
 episodes, and their usage stays charged when a new trial is prepared.
+`bench:recall` prepares the four-arm DeepSeek recall iteration from the frozen real corpus without inference. It runs
+cutoff 22 first and requires an explicit `bench:resume --live --until-cutoff 32` after the durable operational gate.
+`bench:review-packet` exports blinded original answers; `bench:review-votes` imports independent machine/human votes
+and human adjudication. Reports show strict and semantic results, memory/search effects, shared construction, reader
+efficiency and remaining stage budgets. See the benchmark runbook for the exact limits and commands.
 
 ## MCP Events
 
