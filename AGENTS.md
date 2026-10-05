@@ -53,3 +53,5 @@ infrastructure. Read
 - [Contracts](packages/contracts/AGENTS.md): shared runtime-validated schemas only.
 - [UI](packages/ui/AGENTS.md): editable local shadcn components and styling.
 - [Tools](tools/AGENTS.md): quality gates, import graph and docs checks.
+
+- [Bench](bench/AGENTS.md): reproducible native memory experiments and private run artifacts.
