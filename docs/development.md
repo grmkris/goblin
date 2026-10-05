@@ -7,6 +7,20 @@ default. `bun run bench:plan` previews the GLM/DeepSeek matrix; `bun run bench:r
 bench/experiments/native-smoke.json --run smoke-01` starts its own local relay and workerd. Live calls require
 `--live` and the separate mode-600 provider configuration. Runs, resume evidence and reports stay in `.local/bench/`.
 
+## MCP Events
+
+The workerd fixture advertises `capabilities.events`, sends verification challenges and signs deliveries with
+Standard Webhooks headers. Run the fixture from `apps/runtime`:
+
+```sh
+heavy bun run test:integration -t Events
+```
+
+It covers signed Telegram delivery into main, replay, signature/timestamp rejection, gaps, early refresh, shared
+consumer cleanup and termination. Unit tests independently verify HMAC bytes. A live mygram round-trip is a separate
+deployed acceptance gate. The lane's throwaway conformance vector is handed to the producer orchestrator; never use
+its test secret for a real subscription.
+
 ## Local
 
 ```sh
@@ -48,11 +62,12 @@ Dev (`https://dev.purrable.lol`) is the daily instance. Its configuration is `.l
 | `PURRABLE_BETTER_AUTH_SECRET` | Better Auth's secret. |
 | `PURRABLE_MODEL_BASE_URL`, `PURRABLE_MODEL_ID`, `PURRABLE_MODEL_KEY` | Railway LiteLLM and the dedicated capped key. Never the master key. |
 | `PURRABLE_MODELS` | More LiteLLM model names users may pick, comma-separated; `PURRABLE_MODEL_ID` stays the default. Allow each on the LiteLLM key too. |
-| `PURRABLE_MODEL_DAILY_TOKENS` | Model tokens each user's agent may spend per UTC day (default 300000). |
+| `PURRABLE_MODEL_DAILY_TOKENS` | Local native model fixture allowance only; deployed accounts use their plan/override. |
+| `PURRABLE_MODEL_TOKEN_WEIGHTS` | JSON model-id to positive price multiplier; omitted models count at one. |
 | `PURRABLE_MEMORY_MODEL` | The offered model for thread names, main-memory summaries and skill-draft decisions. It is not selected by price; unset or not offered uses the default. |
 | `PURRABLE_SMOKE_MODEL` | Optional model for smoke turns. It must be one of the offered models; unset keeps the owner's pick. |
 | `PURRABLE_MCP_SERVERS` | JSON list of outbound servers: `[{"serverId":"myplan","endpoint":"https://…/mcp"}]`. |
-| `PURRABLE_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP credentials and the Telegram doorbell secret, and derives the hook token. |
+| `PURRABLE_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP credentials, Events secrets/envelopes and the legacy doorbell secret; derives purpose-separated hook tokens. |
 
 These are source defaults and configuration names; active dev settings and provider caps must be verified separately.
 
@@ -93,10 +108,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - **Skills.** Connect a server that offers skills, then turn on **Use skills from this server**. The agent reads and
   follows those procedures; their tools still need grants. To receive drafts in a library such as MySkills, grant
   `skill_draft` and `skill_draft_status`, then review the proposals there.
-- **Telegram.** Bind the authorized myagent client to the agent's bot in myagent. Under that connection, choose
-  **Use for Telegram**: it grants the four channel tools, skips old inbox entries and subscribes the doorbell. New
-  messages arrive in main as **Telegram** and answers go back to the bot. Only one connection carries Telegram;
-  **Stop** disables it and leaves its tool grants in place.
+- **Telegram.** Bind the authorized mygram connection to the bot, then choose **Use for Telegram**. A server offering
+  Events grants `inbox`, `send_message` and its two exact event selectors; older servers use the four-tool doorbell
+  fallback. Connections shows which transport is active. New inbox messages arrive in main as **Telegram**, including
+  answers to pending questions, and replies go back to the bot. **Stop** unsubscribes and clears pending replies.
 - **Resident authority.** Settings shows when it expires. Owner activity renews it for 30 days; inbound and scheduled
   work do not renew it. Revoke stops all outbound MCP use by the agent until you enable it again.
 - **MyPlan as an App.** The suggested MyPlan server uses `https://dev-new.myplan.lol/mcp` on local and dev
@@ -145,3 +160,35 @@ invite-only. These settings do not authorize a production deploy.
 `smoke:prod`. The default prod smoke is read-only: health and an anonymous protected-route probe. An operator smoke
 account's credentials opt into the full flow. After dev's origin changes, sign in by email code and register new
 passkeys; reconnect MCP clients at the new origins.
+
+## Billing development and acceptance
+
+Set `DODO_PAYMENTS_ENVIRONMENT=test_mode` on local/dev and `live_mode` on prod. Store
+`DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_WEBHOOK_KEY` and `DODO_PRODUCT_ID` in the stage's mode-600 env file; Alchemy
+binds them as Worker secrets. Choose a Purrable-only recurring $10/month product with no trial. Never bind an account's
+master model key or print payment keys. Configure a separate Standard Webhooks endpoint at `/hooks/dodo` per stage.
+`/health` reports the configured billing mode or null when billing is incomplete; missing keys never bypass admission.
+
+The additive billing migration grants users already in D1 a dev-only Pro override. It grants nothing on prod or for
+new signups. An operator can insert/update `app_billing_accounts` for a known user ID, setting `plan_override='pro'`,
+`override_stage` to the intended stage, `daily_tokens` to a positive allowance and both timestamps in milliseconds.
+Remove the override to test paid access. A fresh local user also needs test billing or an explicit local override.
+
+The local billing tests run without keys or provider calls:
+
+```sh
+cd apps/runtime
+heavy bun run test:integration -t billing
+```
+
+They deploy an isolated native Worker with real auth D1 and an injected Dodo client. The fixture levers and signing
+key are reachable only from that test Worker; production imports neither. Acceptance on deployed dev is a separate
+operator step: invite/signup a new account, confirm agent routes return 402, use a test card, wait for the signed
+webhook and agent access, cancel and verify paid-through expiry, then replay a delivery. Preserve receipts without
+card data or secrets. Existing operator accounts retain access.
+
+The model price schedule is not fixed by source; configure reviewed positive multipliers in
+`PURRABLE_MODEL_TOKEN_WEIGHTS`. Local tests prove weighted counting and separate ledgers, not active provider prices.
+Before prod payments, review the draft legal pages and provide operator identity, support/postal address, jurisdiction,
+refund/withdrawal policy and retention/subprocessor details. Cancel recurring billing through Dodo before account
+deletion; deletion does not itself cancel provider charges.

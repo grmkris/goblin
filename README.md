@@ -1,6 +1,6 @@
 # Purrable
 
-Resident personal agents on Cloudflare. Each user signs up and gets their own agent: they talk to it in the browser,
+Resident personal agents on Cloudflare. Each user signs up, subscribes to Pro ($10/month), and gets their own agent: they talk to it in the browser,
 it keeps running, holds its own authority to use the MCP servers that user connected, and is itself an MCP server
 other tools can talk to.
 
@@ -11,9 +11,10 @@ for its own agent, connections and their tools, skills libraries and subagents; 
 switches. Background subagents work in their own conversations and report back to the conversation that started them. Main keeps an OptChat-style memory view: summaries of older messages followed by the
 newest exchange verbatim.
 
-Telegram comes through a myagent MCP connection. The owner turns on **Use for Telegram** for one server in Connections;
-myagent rings a doorbell, Purrable pulls the inbox into main, and answers go back with `send_message`. Skills are read
-from MCP servers the owner enables for skills, and the agent can propose skill drafts for the owner to review.
+Telegram comes through a mygram MCP connection. The owner turns on **Use for Telegram** in Connections; signed
+MCP Events wake an authoritative inbox pull into main, and replies go back with `send_message`. Older servers use
+the doorbell fallback until cut-over. Owner-enabled skills libraries use update Events to invalidate their cached
+catalog; the next activation refetches, while retained activations keep their verified version.
 
 The browser also hosts one sandboxed MCP App at a time. Owners can add public servers by URL or from MCP registries,
 grant tools explicitly, choose an offered model, and see the per-account daily token budget. The agent uses `ask_user`
@@ -41,3 +42,9 @@ secrets and dedicated LiteLLM keys. Alchemy can attach the custom domains; deplo
 steps. Alternate hosts redirect to the configured canonical origin. Dev sign-up stays closed or invite-only; prod
 supports open sign-up only with verified mail sending. Both stages use `hello@purrable.lol` after sender onboarding,
 with a host prefix on dev mail subjects. See [development](docs/development.md) for the production guard and smoke.
+
+Pro has no free tier or trial and includes 2 million weighted tokens per account per UTC day. Dodo checkout grants
+nothing until its signed webhook activates the account. Cancellation keeps access through the paid period, and failed
+renewals have bounded grace. Settings provides the billing portal; `/subscribe` handles unpaid accounts. Draft terms,
+privacy and refund pages await operator review before live payments. Native workerd tests use real D1 and an injected
+Dodo client; real Dodo checkout, keys and merchant acceptance remain operator steps.
