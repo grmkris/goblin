@@ -216,3 +216,13 @@ uses one live read and zero writes while retaining invitation, stale-context, re
 It invokes the actual scheduled Worker entry point without Dodo and verifies bounded expiry cleanup, retained
 unexpired active/used admissions, current hourly counters and repeated sweeps. Cleanup adds only indexes through
 the auth D1 migration; it runs hourly and drains at most 1000 rows from each expiry table per tick.
+
+## Routine definition checks
+
+From `apps/runtime`, run `heavy bun run test:unit test/routines-time.test.ts test/routines-summary.test.ts` for IANA
+zones, DST, cron spacing, explicit reminder offsets, strict write CSRF and summary scrubbing. Run
+`PURRABLE_HARNESS_PORT=18871 heavy bun run test:integration native.test.ts -t routine` for real local workerd SQLite,
+native dated alarms, Pi run/session/report dedupe, no copied capabilities, committed usage, revoked-authority skips,
+correlated questions, late answers, main Stop, two-running cap, burst collapse, archive and revision fencing. These
+keyless fixture tests establish local behavior. Real provider billing, Telegram delivery and retained-dev reminder,
+cron-after-deploy and caps acceptance require the orchestrator's deployed verification.

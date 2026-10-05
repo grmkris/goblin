@@ -64,3 +64,8 @@ invitations carry a link and invitation code; accepting requires the addressed e
 provides workspace selection, empty permission checkboxes, member/viewer invitations and leave/remove controls.
 Workspace access is read live on every request; expired admission and rate-limit data is cleaned up hourly. See
 [ADR 0014](docs/adr/0014-members-and-workspace-authority.md).
+
+Routine proposals are reviewed in Settings → Routines. The owner confirms the exact prompt, trigger, timezone, tool
+pairs, budgets and Telegram policy. Confirmed reminders and cron schedules run in isolated threads and post a short
+passive note to main. Run now, Stop, Pause, Edit and Archive are available; Telegram reports require an explicit
+notification choice. Event-trigger activation follows in the next slice. See [the routines decision](docs/adr/0012-routines.md).

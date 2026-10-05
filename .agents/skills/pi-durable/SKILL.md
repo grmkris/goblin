@@ -49,3 +49,15 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
+
+- Routines use `routine` for draft proposal/list/pause; only the owner confirms an exact revision through the strict-CSRF
+  API. Native dated schedules are fenced by app revision/firing watermarks. Background Pi Anchor/Reporter tasks own
+  empty run conversations; register them without copied main capabilities or an ordinary main-start note. The confirmed
+  ceiling lives in `Capabilities.scope`; management, Skills, subagents, main memory and learner are absent from run
+  extensions. Check the dedicated per-run provider on every model dispatch, including compaction, and MCP authority
+  on every HTTP attempt after token refresh. Never depend on swallowed Pi hook exceptions to stop a model request.
+- Project committed `pi.usage` through app-only cumulative watermarks and stable UTC-day receipts. Passive reports use
+  the actual parent `Conversation.submit` write API; acceptance starts no main model turn. Sealed questions resume the
+  same run, release executing slots while waiting, and retain the single-routine lock. Run Stop/archive fence and abort
+  owned work; main Stop spares background runs. Frozen Telegram reports and remote receipts are separate from Pi
+  acceptance. Local workerd evidence and retained-dev acceptance remain distinct.
