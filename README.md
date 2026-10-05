@@ -5,7 +5,8 @@ it keeps running, holds its own authority to use the MCP servers that user conne
 other tools can talk to.
 
 The agent has one main conversation. Side threads can start empty or branch from a main message; they can share a note
-back to main and can be archived, and main learns the name of one started empty. Each conversation can switch off,
+back to main and can be archived, and main learns the name of one started empty. Threads attach to their main message
+with an expanded compact preview of the first five messages, live activity and a device-local collapse preference. Each conversation can switch off,
 for its own agent, connections and their tools, skills libraries and subagents; a new thread starts with main's
 switches. Background subagents work in their own conversations and report back to the conversation that started them. Main keeps an OptChat-style memory view: summaries of older messages followed by the
 newest exchange verbatim.

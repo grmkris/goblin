@@ -82,7 +82,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   use **Reply in thread** under one of your settled messages or the agent's in main. Either opens beside main (a
   sheet on a phone), and sending starts the thread (empty, or from that message), so an unsent draft leaves nothing
   behind. Main then shows the thread
-  under that message with its reply count, and a second Reply there opens the same thread. The sidebar
+  under that message with a connector and the first five messages in an expanded preview (collapse is saved on your device), and a second Reply there opens the same thread. The sidebar
   lists every thread, and the panel's full-view button opens one at `/t/:id`. **Share to main** asks the thread to
   write a note; it starts no answer in main. Rename and Archive are in the thread menu; archiving hides it and keeps
   its history. Subagents appear under the conversation that started them. The sliders button by the composer shows

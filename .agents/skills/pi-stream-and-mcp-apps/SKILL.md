@@ -8,7 +8,10 @@ description: Change how the browser follows the Pi conversation (SSE snapshot, b
 The browser follows committed Pi state over Server-Sent Events: `/api/threads/:id/events` sends a snapshot of entries,
 then batches, with a heartbeat. `apps/web/src/lib/projection.ts` turns entries into messages and tool calls.
 `lib/parts.ts` folds them into render parts: each tool result joins the call that asked for it, with a lifecycle
-state. `components/parts/registry.tsx` picks the renderer for each part.
+state. `components/parts/registry.tsx` picks the renderer for each part. Main attaches inline thread previews to their
+parent message: first five own messages from the owner-scoped `/api/threads/:id/preview`, clipped text and quiet
+thought/tool lines. Fetch only near the viewport, keep later activity/counts current, and guard device-local collapse
+storage. Never load inherited main history into a compact preview.
 
 - Pi state is authoritative. Do not keep a second transcript or invent cursor replay.
 - Reconnect by opening a fresh stream and starting from its snapshot; dispose the previous stream. Back off between
