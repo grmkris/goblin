@@ -104,11 +104,12 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   behind. Main then shows the thread
   under that message with a connector and the first five messages in an expanded preview (collapse is saved on your device), and a second Reply there opens the same thread. The sidebar
   lists every thread. Wide screens open multiple dockable thread panes; the pane's full-view button opens one at `/t/:id`.
-  The workspace saves its arrangement on this device; **Reset layout** makes equal panes. Narrow screens use sheets. **Share to main** asks the thread to
-  write a note; it starts no answer in main. Rename and Archive are in the thread menu; archiving hides it and keeps
-  its history. Subagents appear under the conversation that started them. The sliders button by the composer shows
+  The workspace saves its arrangement on this device; **Reset layout** makes equal panes. Narrow screens use sheets. **Share to …** asks the thread to
+  write a note into the conversation it came from; it starts no answer there. Rename and Close are in the thread menu;
+  Close stops the thread and everything under it (its subagents and nested threads) and keeps its history, and Reopen
+  brings it back. Subagents appear under the conversation that started them. The sliders button by the composer shows
   what the agent can use in that conversation (connections and their tools, skills, subagents); switching something
-  off there hides it from the agent in that conversation only, and a new thread starts with main's switches. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
+  off there hides it from the agent in that conversation only, and a new thread starts with the switches of the conversation it came from. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
 - **Questions, models and budget.** Answer an `ask_user` card with your next message. Pick an offered model in the
   composer; Settings and the composer's ring show today's token usage, resetting at 00:00 UTC.
 - **Skills.** Connect a server that offers skills, then turn on **Use skills from this server**. The agent reads and

@@ -18,12 +18,16 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   default list), then added per conversation: `fork(..., { agent: { extensions: { add } } })` or `configure`.
 - `configure` changes only the fields it is given (`null` clears one). Purrable uses the per-conversation `tools`
   filter for one thing: `{ remove: [subagent] }` where a conversation switched subagents off (`capabilities/`, ADR
-  0010). A fork starts from main's agent at the fork entry, so a new thread sets its filter explicitly.
+  0010). A fork starts from its parent's agent at the fork entry, so a new thread sets its extensions (the host's plus
+  the thread's, `instructions: null` to drop a subagent's), and its filter, explicitly (ADR 0017).
 - Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
 - Extensions: `persona.ts` (static system prompt sections, keep them static so prompt caches hold),
   `resident-mcp.ts` (`mcp_list`, `mcp_call`), `ask-user.ts` (`ask_user`), `budget.ts` (usage recording, tool
   blocking), `subagents.ts` (`subagent`, with anchor and reporter tasks) and, on threads only, `thread.ts`
-  (`share_to_main`, titles). Tools with side effects are `replay: 'unsafe'`.
+  (`share_back`, titles). Tools with side effects are `replay: 'unsafe'`.
+- Close aborts each closed conversation with `abort({ background: true })` so reporters stop too; never use a
+  background abort on main, which owns memory and routine tasks. The workspace feed reads `watchTaskGraph()`:
+  a non-background task means working, a live `purrable.subagent-reporter` means waiting.
 - An extension's background tasks resume after a restart only while the extension is installed: keep task names and
   versions stable, and give a changed task a `migrate`.
 - A task phase must commit durable progress: committing the same checkpoint again faults the task ("returned without

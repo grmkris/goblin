@@ -5,15 +5,18 @@ description: Change how the browser follows the Pi conversation (SSE snapshot, b
 
 # Conversation stream and MCP Apps in Purrable
 
-The browser follows committed Pi state over Server-Sent Events: `/api/threads/:id/events` sends a snapshot of entries,
+The browser follows committed Pi state over Server-Sent Events: `/api/conversations/:id/events` sends a snapshot of entries,
 then batches, with a heartbeat. `apps/web/src/lib/projection.ts` turns entries into messages and tool calls.
 `lib/parts.ts` folds them into render parts: each tool result joins the call that asked for it, with a lifecycle
 state. `components/parts/registry.tsx` picks the renderer for each part. Main attaches inline thread previews to their
-parent message: first five own messages from the owner-scoped `/api/threads/:id/preview`, clipped text and quiet
+parent message: first five own messages from the owner-scoped `/api/conversations/:id/preview`, clipped text and quiet
 thought/tool lines. Fetch only near the viewport, keep later activity/counts current, and guard device-local collapse
 storage. Never load inherited main history into a compact preview.
 
 - Pi state is authoritative. Do not keep a second transcript or invent cursor replay.
+- The conversation list and activity come from the workspace feed (`/api/workspace/events`,
+  `lib/workspace-feed.ts`, `components/workspace-feed.tsx`): one stream per tab, a fresh snapshot on every reconnect.
+  Never refresh the list after a run.
 - Reconnect by opening a fresh stream and starting from its snapshot; dispose the previous stream. Back off between
   attempts (`conversation-stream.ts`).
 - MCP Apps are tool-associated `ui://` resources from the originating server. Render them in the sandboxed iframe

@@ -35,7 +35,7 @@ owner's pick. Housekeeping still uses `PURRABLE_MEMORY_MODEL`.
 3. an inbound MCP client: dynamic registration, owner consent, PKCE token, `/mcp` `initialize` and `tools/list`, an
    `ask_agent` model turn, an agent turn that calls the MyPlan probe through `mcp_call` (only if step 2 proved it),
    `get_recent_messages` with the smoke client's author label, then revocation and a 401;
-4. a new empty thread, a model turn there, `share_to_main` verified as a new `app.shared` entry in main, then archive;
+4. a new empty thread, a model turn there, `share_back` verified as a new `app.shared` entry in main, then close;
 5. a `smokecount` subagent spawned from main, its authored report back, and main's reply to the report;
 6. `/api/agent/memory`: a nonzero remembered-message count and the current view coverage.
 
@@ -64,7 +64,7 @@ MCP Apps, the browser UI, thread branching, memory-summary quality, skills, and 
 
 Prod commands use `.local/prod.env` and require `PURRABLE_CONFIRM_PROD=1` in the calling shell:
 `bun run plan:prod`, `bun run deploy:prod`, `bun run smoke:prod`. There is no destroy-prod command.
-`smoke:prod` defaults to GET `/health` and GET `/api/threads` without authentication (expected 401).
+`smoke:prod` defaults to GET `/health` and GET `/api/conversations` without authentication (expected 401).
 Only supplying both credentials for an operator test account enables the full acceptance flow, including model turns.
 Never put the production owner's credentials in the smoke configuration.
 
