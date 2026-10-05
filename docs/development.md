@@ -214,8 +214,8 @@ Members routing uses a separate local workerd/D1 fixture on `PURRABLE_HARNESS_PO
 `bun run --cwd apps/runtime test:integration test/integration/members.test.ts` through `heavy`. The tests prove
 stable ordinary-owner routing and selection fences, invitation-only accounts without personal fallback, email-bound
 OTP admission, paid/concurrent acceptance, replay after removal, rotated/expired proofs, malicious leave payloads,
-closed member/viewer RPCs and owner deletion failure/retry. They capture injected mail, use no provider keys, and do
-not prove real mail delivery or Phase B shared execution. Browser acceptance uses an intercepted local fixture
+closed owner RPCs, filtered shared member/viewer reads and owner deletion failure/retry. They capture injected mail
+and use a deterministic native model without provider keys. Browser acceptance uses an intercepted local fixture
 for empty permission choices, exact member/viewer invitations, selection teardown, unpaid leave, fragment clearing,
 OTP sign-in and subscribe-return-join navigation. It does not prove real Dodo checkout or invitation delivery.
 
@@ -250,8 +250,8 @@ using CLIProxy. The native recurring-wake regression verifies the next sweep sur
 Real provider billing, Telegram delivery, cron-after-deploy and real producer acceptance require separate deployed
 verification.
 
-The Members Phase B checkpoint uses `MEMBER_EXECUTION_ENABLED=1` only in its isolated native fixture. Deployed
-Workers stay closed until the separate enablement change passes review. Fixture tests exercise filtered principal
+Alchemy sets `MEMBER_EXECUTION_ENABLED=1` on configured stages. A Worker without that binding denies shared Agent
+access before lookup; the native fixture also verifies that closed default. The Phase B fixture exercises filtered principal
 contexts with the scripted model and actual auth D1. No production sign-up, mail, provider or payment calls are
 part of these checks. The additive auth migration projects member usage account-wide; DO application metadata
 stores context provenance, named readers, sealed interaction decisions and the passive projection outbox.

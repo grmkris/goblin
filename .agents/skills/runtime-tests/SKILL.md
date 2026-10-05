@@ -48,7 +48,8 @@ itself authorize model spend, external messages, deployment or production change
 
 - Earliest-wake regressions must execute a real native callback and check that its successor remains scheduled. A direct manual call can miss self-suppression because `listSchedules` includes the firing row. LOCAL acceptance also waits for passive report acceptance; model settlement alone is incomplete evidence.
 
-- The Members Phase B checkpoint is default-closed; only `members-stack.ts` opts in. Native contexts must exclude
+- The Members Phase B runtime is fail-closed without `MEMBER_EXECUTION_ENABLED`; Alchemy configured stages and
+  `members-stack.ts` explicitly opt in. Native contexts must exclude
   restricted root/private sentinels, retain owner administrative reads, reject viewer execution and owner RPCs,
   preserve requester identity and charge the acting account. Exact request/decision replay hashes must reject changed
   bytes. Filter every stream batch and recheck idle membership; policy epochs fence inherited descendants.
