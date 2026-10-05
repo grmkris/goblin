@@ -22,12 +22,14 @@ conversation outside it.
   attempts (`conversation-stream.ts`).
 - MCP Apps are tool-associated `ui://` resources from the originating server. Render them in the sandboxed iframe
   with its CSP; validate message origin and source.
-- One live App for the workspace for now, from main's transcript (`components/apps`). Its iframe stays in the fixed
-  stage, which follows the slot its display mode names; moving an iframe in the DOM reloads the App and loses its
-  state. On a desktop it has a pane of its own (ADR 0019) whose empty measured slot moves, never the opaque frame;
-  fullscreen fills the workspace and narrow screens retain the snapping sheet. Persisted layouts never restore App
-  selections or grants. Verify moving, resizing, scrolling and responsive changes with an actual SDK-connected iframe,
-  plus origin binding and teardown/reconnect tests.
+- Apps are kept per call in the runtime registry (`apps/registry.ts`, ADR 0020) and listed by the workspace feed;
+  keeping or launching one grants nothing. Several live at once, one instance each (`components/apps/host.tsx`), each
+  iframe in its own fixed stage (`stage.tsx`) that follows the App's page or its place under the tool row; moving an
+  iframe in the DOM reloads the App and loses its state, so only the empty measured slots move. Stages clip to their
+  slot's scrolling containers and the pane's `data-app-cover` elements. At most six load; the least recently seen
+  unloads to a stub, never one on screen (`lib/app-residency.ts`). Fullscreen is the App's page filling the workspace.
+  Persisted layouts restore App pages, never grants. Verify moving, resizing, scrolling and responsive changes with an
+  actual SDK-connected iframe, plus origin binding and teardown/reconnect tests.
 - An App's tool and resource calls go through the owner API to the originating server only, and need that server's
   grant. No cross-server calls, no credentials in iframe state, browser bundles, logs or transcripts.
 - Keep the plain tool-result fallback for hosts or results without an App. Unimplemented host methods stay

@@ -19,8 +19,9 @@ MCP Events wake an authoritative inbox pull into main, and replies go back with 
 the doorbell fallback until cut-over. Owner-enabled skills libraries use update Events to invalidate their cached
 catalog; the next activation refetches, while retained activations keep their verified version.
 
-Every conversation (main, a thread, a subagent) and the sandboxed MCP App is a pane of its own: open beside, drag to
-split or swap, resize, close any but the last. The URL names the focused conversation and the device remembers the
+Every conversation (main, a thread, a subagent) and every kept MCP App is a pane of its own: open beside, drag to
+split or swap, resize, close any but the last. Apps also run in place in any conversation, several at once, and move
+to their page and back without reloading. The URL names the focused conversation or App and the device remembers the
 arrangement; narrow screens show one pane at a time in a swipeable strip. Owners can add public servers by URL or from MCP registries,
 grant tools explicitly, choose an offered model, and see the per-account daily token budget. The agent uses `ask_user`
 to ask questions the owner answers in their next message.
