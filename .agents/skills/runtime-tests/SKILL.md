@@ -17,6 +17,8 @@ smoke are different evidence.
 - `bun run smoke:local` and `bun run smoke:dev` prove the real paths, including inbound OAuth, without touching the
   owner's main thread or grants.
 - Report provider, network, auth and deployment gaps as unknown; synthetic tests do not prove real hosts.
+- For skill-cache changes, keep a workerd regression that corrupts a persisted `app_skill_files` row, observes the
+  refetch, and verifies the repaired bytes; unit tests alone do not prove Durable Object SQLite behavior.
 
 Before changing an API call, read the current [documentation](https://vitest.dev/) and the installed package's declarations; the
 lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how Purrable uses it today.
