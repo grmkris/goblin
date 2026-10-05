@@ -107,7 +107,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   thread. Drag a pane by the grip in its pill onto another pane: near an edge it splits there, in the middle the two
   trade places (Escape cancels). Drag a divider to resize, **Fill the workspace** in the pill's menu to show one pane
   alone, and × to close a pane (any but the last; the conversation goes on). The device remembers the arrangement;
-  narrow screens show one pane at a time, swipe between them. **Share to …** asks the thread to
+  narrow screens show one pane at a time, swipe between them. The sidebar lists every conversation as a tree
+  (subagents under who started them, threads under where they branched); hover a row for **Open beside**, or drag a
+  row onto a pane. ⌘/Ctrl+B folds it to a rail of the active ones; rest on an icon to see what it is. A dot marks
+  unread replies on every device until a pane shows them. **Share to …** asks the thread to
   write a note into the conversation it came from; it starts no answer there. Rename and Close are in the thread menu;
   Close stops the thread and everything under it (its subagents and nested threads) and keeps its history, and Reopen
   brings it back. Subagents appear under the conversation that started them. The sliders button by the composer shows
