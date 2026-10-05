@@ -23,11 +23,15 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
 - Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
 - Extensions: `persona.ts` (static system prompt sections, keep them static so prompt caches hold),
   `resident-mcp.ts` (`mcp_list`, `mcp_call`), `ask-user.ts` (`ask_user`), `budget.ts` (usage recording, tool
-  blocking), `subagents.ts` (`subagent`, with anchor and reporter tasks) and, on threads only, `thread.ts`
+  blocking), `subagents.ts` (`subagent`, with the anchor task; a subagent gets this extension too, so they nest) and
+  `subagent-relay.ts` (the relay task that carries each message and reports the final answer, ADR 0018) and, on threads only, `thread.ts`
   (`share_back`, titles). Tools with side effects are `replay: 'unsafe'`.
-- Close aborts each closed conversation with `abort({ background: true })` so reporters stop too; never use a
+- Close aborts each closed conversation with `abort({ background: true })` so its relays stop too; never use a
   background abort on main, which owns memory and routine tasks. The workspace feed reads `watchTaskGraph()`:
-  a non-background task means working, a live `purrable.subagent-reporter` means waiting.
+  a non-background task means working, a live `purrable.subagent-relay` means waiting. Stop or Close of a subagent
+  aborts the relays carrying to it first (`dropRelaysTo`): a relay parked on helpers would otherwise wake and report.
+  A relay that waits on other tasks parks with `{ status: 'waiting', on, policy: 'allSettled' }` instead of holding its
+  invocation.
 - An extension's background tasks resume after a restart only while the extension is installed: keep task names and
   versions stable, and give a changed task a `migrate`.
 - A task phase must commit durable progress: committing the same checkpoint again faults the task ("returned without

@@ -114,7 +114,9 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   unread replies on every device until a pane shows them. **Share to …** asks the thread to
   write a note into the conversation it came from; it starts no answer there. Rename and Close are in the thread menu;
   Close stops the thread and everything under it (its subagents and nested threads) and keeps its history, and Reopen
-  brings it back. Subagents appear under the conversation that started them. The sliders button by the composer shows
+  brings it back. Subagents appear under the conversation that started them, can start their own, and close by
+  themselves once their answer is reported (they fold into "n closed" under their spawner); writing in one keeps it open, and while it works your
+  message steers it, and its answer goes up to whoever started it with your words quoted. The sliders button by the composer shows
   what the agent can use in that conversation (connections and their tools, skills, subagents); switching something
   off there hides it from the agent in that conversation only, and a new thread starts with the switches of the conversation it came from. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
 - **Questions, models and budget.** Answer an `ask_user` card with your next message. Pick an offered model in the

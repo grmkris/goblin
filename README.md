@@ -10,7 +10,8 @@ reopened. Main learns the name of a thread started empty, and one live feed keep
 current. A thread unfolds in place under the
 message it branched from, live and at any depth, with its own composer, until it is opened in a pane. Each conversation can switch off,
 for its own agent, connections and their tools, skills libraries and subagents; a new thread starts with main's
-switches. Background subagents work in their own conversations and report back to the conversation that started them. Main keeps an OptChat-style memory view: summaries of older messages followed by the
+switches. Background subagents work in their own conversations, start their own when a job splits, report their final
+answer back to the conversation that started them and close when done; the owner can write to one to steer it. Main keeps an OptChat-style memory view: summaries of older messages followed by the
 newest exchange verbatim.
 
 Telegram comes through a mygram MCP connection. The owner turns on **Use for Telegram** in Connections; signed
