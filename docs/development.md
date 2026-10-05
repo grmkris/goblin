@@ -38,15 +38,18 @@ Dev (`https://purrable-dev.<account>.workers.dev`) is the daily instance. Its co
 | --- | --- |
 | `PURRABLE_STAGE`, `PURRABLE_APP_URL` | `dev` and the Worker's HTTPS origin. |
 | `PURRABLE_SIGNUP_MODE`, `PURRABLE_SIGNUP_INVITE_CODE` | `open`, `invite` or `closed` (default), and the invite code. |
-| `PURRABLE_MAIL_SENDER` | Sender on an Email Sending apex (dev: `purrable@mytab.lol`); turns on email verification. |
+| `PURRABLE_MAIL_SENDER` | A sender on an Email Sending apex; turns on email verification. |
 | `PURRABLE_OWNER_EMAIL`, `PURRABLE_OWNER_PASSWORD` | An existing account; only the smoke reads them. |
 | `PURRABLE_BETTER_AUTH_SECRET` | Better Auth's secret. |
 | `PURRABLE_MODEL_BASE_URL`, `PURRABLE_MODEL_ID`, `PURRABLE_MODEL_KEY` | Railway LiteLLM and the dedicated capped key. Never the master key. |
 | `PURRABLE_MODELS` | More LiteLLM model names users may pick, comma-separated; `PURRABLE_MODEL_ID` stays the default. Allow each on the LiteLLM key too. |
 | `PURRABLE_MODEL_DAILY_TOKENS` | Model tokens each user's agent may spend per UTC day (default 300000). |
-| `PURRABLE_MEMORY_MODEL` | The cheapest offered model; it names threads and summarizes main's memory. Unset or not offered: the default model. |
+| `PURRABLE_MEMORY_MODEL` | The offered model for thread names, main-memory summaries and skill-draft decisions. It is not selected by price; unset or not offered uses the default. |
+| `PURRABLE_SMOKE_MODEL` | Optional model for smoke turns. It must be one of the offered models; unset keeps the owner's pick. |
 | `PURRABLE_MCP_SERVERS` | JSON list of outbound servers: `[{"serverId":"myplan","endpoint":"https://…/mcp"}]`. |
-| `PURRABLE_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP tokens. |
+| `PURRABLE_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP credentials and the Telegram doorbell secret, and derives the hook token. |
+
+These are source defaults and configuration names; active dev settings and provider caps must be verified separately.
 
 ```sh
 bun run plan:dev                          # preview
@@ -55,41 +58,57 @@ bun run destroy:dev -- --confirm-reset    # erase every account, conversation an
 bun run smoke:dev                         # acceptance; see scripts/README.md
 ```
 
-Changing `PURRABLE_CREDENTIAL_KEY` makes every stored MCP credential unreadable; reconnect the servers afterwards.
+Changing `PURRABLE_CREDENTIAL_KEY` makes stored MCP credentials and the Telegram secret unreadable and changes the hook
+token; reconnect the servers and re-enable Telegram afterwards.
 Changing a server's `endpoint` drops what was stored for it (credentials, grants, pending sign-ins) at each
 agent's next start; connect it again. Tokens are never carried from one host to another.
 
 ## Using it
 
 - **Add a server.** Connections → Suggested adds and connects one of ours in one tap. Find a server searches the MCP
-  registries; add your own under Registries searched. Add a server takes any MCP address (public https only). Servers without sign-in (DeepWiki, Context7, Cloudflare Docs) connect at once.
+  registries; add your own under Registries searched. Add a server takes any MCP address (public https only). Servers
+  without sign-in connect directly; the suggestions mark DeepWiki, Context7 and Cloudflare Docs this way.
   Remove takes its sign-in and grants with it. To suggest another server, check that it connects from a Worker,
   then add it to `apps/runtime/src/mcp/suggested.ts` with its endpoint for each stage.
 - **Connect a server.** Connections → Connect. You sign in at the remote server and approve; you come back
-  connected. Then tick the tools the agent may use. Nothing is granted by default. A server marked *needs auth* had
-  its token refresh refused: press Reconnect.
-- **Resident authority.** Settings shows when it expires. Any use of the app renews it for 30 days. Revoke stops all
-  outbound MCP use by the agent until you enable it again.
-- **MyPlan as an App (the showcase).** Dev points `myplan` at `https://dev-new.myplan.lol/mcp`, the myapps
-  rewrite (the local stack does too). Connect it, then switch on **Allow app** under its `ui://myplan/panel.html`
-  group. Ask the agent to open a note ("Open my Trip plan note"), then press *Show app* on the `myplan · myplan_open`
-  row. The panel edits the note live. Move it to the side panel or picture-in-picture from its chrome and back: it
-  never reloads. Canvases show as previews; the panel offers a link that opens them in MyPlan. What the panel shares
-  (the note in view) rides along with your next message as untrusted context.
+  connected. Servers that answer without sign-in connect directly. Then tick the tools the agent may use. Nothing is
+  granted by default. A server marked *needs auth* needs a new sign-in: press Reconnect.
+- **Conversations.** Main is `/`. Use **New thread** for an empty conversation, or **Branch from here** under a settled
+  answer in main. **Share to main** asks the thread to write a note; it starts no answer in main. Rename and Archive
+  are in the thread menu; archiving hides it and keeps its history. Subagents appear under the conversation that
+  started them. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
+- **Questions, models and budget.** Answer an `ask_user` card with your next message. Pick an offered model in the
+  composer; Settings and the composer's ring show today's token usage, resetting at 00:00 UTC.
+- **Skills.** Connect a server that offers skills, then turn on **Use skills from this server**. The agent reads and
+  follows those procedures; their tools still need grants. To receive drafts in a library such as MySkills, grant
+  `skill_draft` and `skill_draft_status`, then review the proposals there.
+- **Telegram.** Bind the authorized myagent client to the agent's bot in myagent. Under that connection, choose
+  **Use for Telegram**: it grants the four channel tools, skips old inbox entries and subscribes the doorbell. New
+  messages arrive in main as **Telegram** and answers go back to the bot. Only one connection carries Telegram;
+  **Stop** disables it and leaves its tool grants in place.
+- **Resident authority.** Settings shows when it expires. Owner activity renews it for 30 days; inbound and scheduled
+  work do not renew it. Revoke stops all outbound MCP use by the agent until you enable it again.
+- **MyPlan as an App.** The suggested MyPlan server uses `https://dev-new.myplan.lol/mcp` on local and dev
+  (`apps/runtime/src/mcp/suggested.ts`); `PURRABLE_MCP_SERVERS` may configure another endpoint. Connect it, then switch
+  on **Allow app** under its discovered `ui://` resource group. Ask the agent to open a note ("Open my Trip plan
+  note"), then press *Show app* on the resulting tool row. Move it to the side panel or picture-in-picture from its
+  chrome and back: it keeps the same iframe. What the panel shares rides along with your next message as untrusted
+  context; links it offers wait for your click. The originating server supplies the resource URI and the panel's
+  behavior.
 - **Add Purrable to Claude Code.**
 
   ```sh
   claude mcp add --transport http purrable https://purrable-dev.<account>.workers.dev/mcp
   ```
 
-  Claude Code opens the browser; sign in and approve. It gets `ask_agent` and `get_recent_messages`, in its own
-  conversation. Revoke it under Settings → Connected MCP clients.
+  Sign in and approve in the browser. It gets `ask_agent` and `get_recent_messages` in the agent's main conversation,
+  with its messages labelled by client name. Revoke it under Settings → Connected MCP clients.
 
 ## Changing things
 
 - Application tables: edit `apps/runtime/src/storage/schema.ts` and append a migration to
-  `storage/migrations.ts` (`'<14-digit timestamp>_name'`, statements joined by `--> statement-breakpoint`). Never
-  edit an applied migration; never touch Pi or Agents tables.
+  `apps/runtime/src/storage/migrations.ts` (`'<14-digit timestamp>_name'`, statements joined by `--> statement-breakpoint`).
+  Never edit an applied migration; never touch Pi or Agents tables.
 - Auth tables: Better Auth's schema lives in `apps/runtime/migrations` and is applied by the Alchemy D1 resource.
 - Bindings: declare them in `apps/runtime/src/env.ts` and `apps/web/alchemy.run.ts` together.
 - UI components: Purrable looks like the myapps apps. Prefer porting a component from `~/code/myapps/packages/ui`

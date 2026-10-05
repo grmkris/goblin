@@ -4,6 +4,19 @@ Resident personal agents on Cloudflare. Each user signs up and gets their own ag
 it keeps running, holds its own authority to use the MCP servers that user connected, and is itself an MCP server
 other tools can talk to.
 
+The agent has one main conversation. Side threads can start empty or branch from a main message; they can share a note
+back to main and can be archived. Background subagents work in their own conversations and report back to the
+conversation that started them. Main keeps an OptChat-style memory view: summaries of older messages followed by the
+newest exchange verbatim.
+
+Telegram comes through a myagent MCP connection. The owner turns on **Use for Telegram** for one server in Connections;
+myagent rings a doorbell, Purrable pulls the inbox into main, and answers go back with `send_message`. Skills are read
+from MCP servers the owner enables for skills, and the agent can propose skill drafts for the owner to review.
+
+The browser also hosts one sandboxed MCP App at a time. Owners can add public servers by URL or from MCP registries,
+grant tools explicitly, choose an offered model, and see the per-account daily token budget. The agent uses `ask_user`
+to ask questions the owner answers in their next message.
+
 Built on the Cloudflare Agents SDK (`PersonalAgent` Durable Object) with the native Pi harness (Pi Durable owns
 conversations and execution), Effect at service seams, Better Auth for identity, and Alchemy for infrastructure.
 
@@ -14,7 +27,8 @@ bun dev            # http://localhost:18971, models through CLIProxy
 bun run check      # the full gate (run it through `heavy` on the build box)
 ```
 
-- [Architecture](docs/architecture.md): how the Worker, the agent object, Pi, MCP and auth fit together.
+- [Architecture](docs/architecture.md): how the Worker, the agent object, Pi, MCP and auth fit together, including
+  conversations, memory, skills, Telegram and MCP Apps.
 - [Development](docs/development.md): local setup, the dev stage, connecting servers, adding Purrable to Claude Code.
 - [Next](docs/next.md): the seams for routines and write approvals.
 - [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
