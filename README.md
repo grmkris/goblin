@@ -71,3 +71,5 @@ Routine proposals are reviewed in Settings → Routines. The owner confirms the 
 pairs, budgets and Telegram policy. Confirmed reminders, cron schedules and MCP Events run in isolated threads and post a short
 passive note to main. Run now, Stop, Pause, Edit and Archive are available; Telegram reports require an explicit
 notification choice. Event confirmation authorizes the exact connected server, event name and JSON filters; controls never start a model turn. See [the routines decision](docs/adr/0012-routines.md).
+
+LOCAL throwaway-account acceptance covers routine reminders, cron recovery across a process restart, revoked-authority skips and caps through CLIProxy. Native alarm tests also verify recurring recovery wakes; real producer Events and deployed acceptance remain separate.

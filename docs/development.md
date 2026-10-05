@@ -237,5 +237,8 @@ API/UI, confirm a near-future reminder, observe one completed run and passive ma
 restart the local process before it fires, then verify firing and next occurrence. Revoke resident authority and
 confirm a reminder yields a visible skip without token usage; check active/running and run/day token caps. Save
 redacted logs and screenshots. Local CLIProxy provider evidence is distinct from Railway LiteLLM and retained dev.
+The Events lane's LOCAL throwaway-account receipts verify reminder dedupe/passive acceptance, retained cron firing
+and rearm across restart, revoked-authority skip with unchanged usage, active/running caps and run/day token blocking
+using CLIProxy. The native recurring-wake regression verifies the next sweep survives the callback that scheduled it.
 Real provider billing, Telegram delivery, cron-after-deploy and real producer acceptance require separate deployed
 verification.
