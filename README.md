@@ -1,6 +1,6 @@
 # goblin
 
-Resident personal agents on Cloudflare. Each user signs up, subscribes to Pro ($10/month), and gets their own agent: they talk to it in the browser,
+Your own goblin, always on. Resident personal agents on Cloudflare. Each user signs up, subscribes to Pro ($10/month), and gets their own agent: they talk to it in the browser,
 it keeps running, holds its own authority to use the MCP servers that user connected, and is itself an MCP server
 other tools can talk to.
 

@@ -10,7 +10,7 @@ Deployment scripts use Alchemy only. Secrets are read from mode-600 files under 
 | `bun run destroy:dev -- --confirm-reset`         | Erase the dev stage: every account, conversation and MCP credential.                       |
 | `bun run smoke:dev`                              | Acceptance against the deployed dev stage.                                                 |
 | `bun run smoke:local`                            | The same acceptance against the local stack.                                               |
-| `bun run icons`                                  | Redraw the app icons and favicon in `apps/web/public` from the one cat mark.         |
+| `bun run icons`                                  | Redraw the app icons and favicon in `apps/web/public` from the shared goblin mark.         |
 | `heavy bun scripts/patch-shadcn-react.ts --test` | Rebuild the MessageScroller patch from upstream source (`patches/shadcn-react/README.md`). |
 
 Stage configuration comes from `.local/<stage>.env` (see `.env.example`); `plan:dev`, `deploy:dev` and `destroy:dev`
