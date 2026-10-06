@@ -15,9 +15,9 @@ and never shows inherited history. Every pane and inline thread follows through 
 conversation outside it.
 
 - Assistant figures use `MessageText` → `RichBlock` and lazy kit entries. `mdxcn` is a bounded JSON union of
-  timeline, check, compare, stat and spark (`packages/kit/src/mdxcn-spec.ts`), rendered only by `AssistantText`.
+  timeline, check, compare, stat and spark (`packages/kit/src/mdxcn-spec.ts`), used for assistant text and Home note tiles.
   Keep open streaming fences, invalid specs and drawing failures as code; tool Markdown and shared notes keep mdxcn
-  as code. Use the same components/parser in agent-app views through `@goblin/kit/mdxcn`, its import allowlist and
+  as code. Home note tiles use the figure renderer with flat card surfaces and bounded fixed geometry; snapshots name when they were true. Use the same components/parser in agent-app views through `@goblin/kit/mdxcn`, its import allowlist and
   frame bundle. Figures are read-only and grant no app power. Verify light/dark, narrow panes and reduced motion.
 - Pi state is authoritative. Do not keep a second transcript or invent cursor replay.
 - The conversation list and activity come from the workspace feed (`/api/workspace/events`,
@@ -59,4 +59,4 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
 
-- Main's Home is a non-anchor row after the newest transcript part (ADR 0025), with fixed tile geometry. Now targets the latest owner turn; Home explicitly reaches the scroller's end, within 24 px above the dock and without a jump arrow. Reserve turn space above Home. Keep the single stage with page > Home > inline slots, stubs, lazy loading and the six-instance soft cap. Never clone a Home iframe. Test frame/bridge/draft continuity across tile size, page/back and close/show; distinguish browser/dev evidence. Placement grants nothing.
+- Main's Home is a non-anchor row after the newest transcript part (ADR 0025), with fixed tile geometry. Now targets the latest owner turn; Home explicitly reaches the scroller's end, within 24 px above the dock and without a jump arrow. Reserve turn space above Home. Keep the single stage with page > Home > inline slots, stubs, lazy loading and the six-instance soft cap. Never clone a Home iframe. Test frame/bridge/draft continuity across tile size, page/back and close/show; distinguish browser/dev evidence. After springs and resize reflow settle, assert stage and frame lie inside the Home body within 1px in four size/theme runs and reduced motion. Home grant cards overlay the frame without overflow. Owner-only open MCP pins recheck the tool declaration; closed Show uses keep-call POST. Placement grants nothing.

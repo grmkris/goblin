@@ -86,4 +86,4 @@ notification choice. Event confirmation authorizes the exact connected server, e
 
 LOCAL throwaway-account acceptance covers routine reminders, cron recovery across a process restart, revoked-authority skips and caps through CLIProxy. Native alarm tests also verify recurring recovery wakes; real producer Events and deployed acceptance remain separate.
 
-Main has a Home surface below its latest exchange: notes, recent conversations and agent-app tiles. Ask "Build me a reading list and put it on Home", then use it there or open its page. Edit Home changes the shared order and size; agent edits leave Show and Undo receipts. See [ADR 0025](docs/adr/0025-home-surface.md).
+Main has Home below its latest exchange: figure snapshots, recent conversations, agent apps and owner-pinned MCP Apps. Ask for a tile, such as a reading tracker or inbox; Edit Home changes shared order and size, and agent edits leave Show and Undo receipts. Placement grants nothing. See [ADR 0025](docs/adr/0025-home-surface.md).

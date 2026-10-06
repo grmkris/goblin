@@ -42,4 +42,5 @@ itself authorize model spend, external messages, deployment or production change
   transport. Verify two-account isolation with forged selectors, removed access endpoints, per-call Apps and live
   grants. Applied dormant migrations remain intact.
 
+- Home MCP regressions cover agent add rejection, owner add, closed/thread-closed retained tiles, unrelated edits and revoked App-caller grants. The no-auth inbox fixture builds the documented app, advances 15-minute job slots, keeps five validated messages and last-good data, and places its view. Browser receipts render the native-built view through a controlled feed; they do not prove a real signed-in inbox.
 - Auth fixtures inject mail capture and use actual OTP endpoints against native D1. No capture endpoint ships in the deployed Worker. Verify closed/invite policy at send and sign-in, hashing, expiry, attempts, replay, rate limits, mail-failure cleanup and fresh-session deletion.

@@ -146,7 +146,8 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   Events grants `inbox`, `send_message` and its two exact event selectors; older servers use the four-tool doorbell
   fallback. Connections shows which transport is active. New inbox messages arrive in main as **Telegram**, including
   answers to pending questions, and replies go back to the bot. Turning it off unsubscribes and clears pending
-  replies.
+  replies. The suggested MyGram endpoint is `https://dev.mygram.lol/mcp` for local/dev and `https://mygram.lol/mcp`
+  for test/prod. It is unchanged while the owner decides the goblin bot/account setup; a dedicated bot is not assumed.
 - **Resident authority.** Settings → Your agent → **Work while you're away** shows it and when it expires. Owner
   activity renews it for 30 days; inbound and scheduled work do not renew it. Turning it off stops all outbound MCP
   use by the agent until you turn it on again.
@@ -161,7 +162,12 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   workspace or closes it. Several Apps run at once, in any conversation; beyond six the least recently seen unloads to
   a stub. These moves keep the same iframe and bridge. What an App shares rides along with your next message in its conversation as untrusted
   context; links it offers wait for your click. The originating server supplies the resource URI and the App's
-  behavior.
+  behavior. An open MCP App offers **Put on Home** in its bar and page menu. Only the owner pins it; closing it leaves
+  Closed · Show, whose keep-call POST rechecks the tool. Pinning grants nothing.
+- **MyInbox.** The suggestion uses `https://dev.myinbox.lol/mcp` locally and `https://myinbox.lol/mcp` on dev/test/prod.
+  Public metadata advertises DCR, PKCE S256 and public clients; this does not prove a signed-in connection. The owner
+  connects it in Connections, asks “Put my inbox on Home”, and allows the app power card. The agent uses the exact
+  connected tool schema/server id, the `app_docs` `examples` pattern, and a 15-minute refresh schedule.
 - **Add goblin to Claude Code.**
 
   ```sh
@@ -308,6 +314,19 @@ verification.
 
 On Main, ask "Build me a reading list and put it on Home". Add and complete an item in its tile, reload, then open its page and return Home; the durable item remains and placement/resize preserves the iframe and draft. Edit Home provides drag handles, size and remove controls; the tile menu offers the same actions by keyboard. Open a second tab and verify its order/size follows the workspace feed. Remove from Home keeps the app, Close waits for Show, and deleting the acceptance app removes its tile. Agent changes leave Show/Undo receipts and changing an owner tile requires its approval.
 
-Home unit tests cover landing, feed revision ordering and momentum projection; native workerd tests cover persistence, operation replay, stale writes, owner authority, bounds, feed reconstruction and app deletion. Browser acceptance separately measures Home/Now navigation, history/stream anchors, frame identity, actions, two tabs and a 1440×900/390×844 light/dark matrix (load CLS < 0.02). Save private receipts outside living docs in `.local/goblin-acceptance/home-*` and remove only acceptance-owned data. Dev is real data; use additive migrations and deploy committed green trees.
+Home unit tests cover landing, feed revision ordering and momentum projection; native workerd tests cover persistence, operation replay, stale writes, owner authority, bounds, feed reconstruction, app deletion, owner-only MCP pins and revoked grants. Browser acceptance separately measures Home/Now navigation, history/stream anchors, frame identity, actions, two tabs and a 1440×900/390×844 light/dark matrix (load CLS < 0.02). Save private receipts outside living docs in `.local/goblin-acceptance/home-*` and remove only acceptance-owned data. Dev is real data; use additive migrations and deploy committed green trees.
+
+For figures, ask for a dated stat/spark snapshot, check both fit a medium note tile flat on its card surface, and verify
+Ask for a tile and all starter prompts fill without sending. Assert no stray zero under the empty-state prompts. For
+MCP Apps, use a connected App on dev or the no-auth official SDK fixture in `scripts/fixtures/mcp-app` locally; verify
+pin, Home/page/frame continuity, reload and closed Show. After springs settle, stage and frame rectangles must lie
+inside the tile body within 1 px in every size/theme run; the grant overlay must not overflow. Test normal springs and
+reduced motion. A real-server run waits on the owner when no App server is connected.
+
+The no-auth inbox fixture builds the exact `app_docs` example in Dynamic Workers and drives the native job callback
+with a clock advanced through 15-minute slots. It checks newest-five validation, freshness, last-good retention on an
+invalid response and agent Home placement; local browser acceptance renders that built view and its state revisions.
+Run it from `apps/runtime` with `heavy bun run test:integration test/integration/inbox.test.ts`. These are local
+workerd/browser proofs; real MyInbox sign-in, app-power approval and message freshness on dev are owner steps.
 
 The owner checks an installed real-iPhone cold launch, landing and touch drag versus native scrolling. Chromium viewport emulation does not establish real-device behaviour. Home adds no fixed edge material, preserves the existing safe-area dock insets and becomes solid under reduced transparency; reduced motion uses 150 ms fades.

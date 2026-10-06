@@ -34,6 +34,8 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 - Telegram (`channel/`, ADR 0009) selects Events when advertised, otherwise the legacy doorbell. Preserve sanitized
   `telegram-tg-<update>` and reply operation ids; fence old cursor writes only after both leases confirm. Hooks persist
   receipts before asynchronous dispatch; accepted submissions are distinct from external delivery.
+- MyInbox suggestions use dev.myinbox.lol locally and myinbox.lol on dev/test/prod. Discovery advertises DCR and PKCE public clients; owner sign-in/power approval and real-message acceptance are separate. MyGram local/dev stays dev.mygram.lol pending the owner's bot/account decision.
+- Home pinning adds no grant: only the owner adds an open MCP App after launch/resource re-verification. Browser `/api/mcp/` writes require the same-origin CSRF marker; the bridge remains bound to the originating server.
 - Fixture tests (`test/mcp/`) prove protocol behaviour; real MyPlan/MyBrowser behaviour is proven only on dev.
 
 Before changing an API call, read the current [documentation](https://modelcontextprotocol.io/specification/latest) and the installed package's declarations; the
