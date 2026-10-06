@@ -17,6 +17,8 @@ conversation outside it.
 - Pi state is authoritative. Do not keep a second transcript or invent cursor replay.
 - The conversation list and activity come from the workspace feed (`/api/workspace/events`,
   `lib/workspace-feed.ts`, `components/workspace-feed.tsx`): one stream per tab, a fresh snapshot on every reconnect.
+  The tab reads each conversation, activity, App and change on its own and skips one it cannot read, so a server
+  newer than the tab never stops the feed; only a frame of another shape reconnects.
   Never refresh the list after a run.
 - Reconnect by opening a fresh stream and starting from its snapshot; dispose the previous stream. Back off between
   attempts (`conversation-stream.ts`).
