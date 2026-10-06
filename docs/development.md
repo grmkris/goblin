@@ -138,6 +138,9 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - **Resident authority.** Settings → Your agent → **Work while you're away** shows it and when it expires. Owner
   activity renews it for 30 days; inbound and scheduled work do not renew it. Turning it off stops all outbound MCP
   use by the agent until you turn it on again.
+- **Routines.** Settings → Routines → New routine: what it does, when it runs (once at a time you pick, on a cron
+  schedule, or on a server's event) and the tools and limits it may use. Saving makes a proposal; Confirm on its card
+  turns it on, and an edit pauses it until you confirm again. The agent can also propose one in chat.
 - **MyPlan as an App.** The suggested MyPlan server uses `https://dev-new.myplan.lol/mcp` on local and dev
   (`apps/runtime/src/mcp/suggested.ts`); `PURRABLE_MCP_SERVERS` may configure another endpoint. Connect it, then switch
   on **Its App** above the tools that App uses. Ask the agent to open a note ("Open my Trip plan
