@@ -14,7 +14,7 @@ switches. Background subagents work in their own conversations, start their own 
 answer back to the conversation that started them and close when done; the owner can write to one to steer it. Main keeps an OptChat-style memory view: summaries of older messages followed by the
 newest exchange verbatim.
 
-Telegram comes through a mygram MCP connection. The owner turns on **Use for Telegram** in Connections; signed
+Telegram comes through a mygram MCP connection. The owner turns on a server's **Telegram** switch in Connections; signed
 MCP Events wake an authoritative inbox pull into main, and replies go back with `send_message`. Older servers use
 the doorbell fallback until cut-over. Owner-enabled skills libraries use update Events to invalidate their cached
 catalog; the next activation refetches, while retained activations keep their verified version.

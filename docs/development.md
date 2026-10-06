@@ -95,14 +95,15 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 
 ## Using it
 
-- **Add a server.** Connections → Suggested adds and connects one of ours in one tap. Find a server searches the MCP
-  registries; add your own under Registries searched. Add a server takes any MCP address (public https only). Servers
-  without sign-in connect directly; the suggestions mark DeepWiki, Context7 and Cloudflare Docs this way.
-  Remove takes its sign-in and grants with it. To suggest another server, check that it connects from a Worker,
+- **Add a server.** Connections → Add a server. **Suggested** adds and connects one of ours in one tap. **Search**
+  searches the MCP registries; add your own under Registries searched. **By address** takes any MCP address (public
+  https only). Servers without sign-in connect directly; the suggestions mark DeepWiki, Context7 and Cloudflare Docs
+  this way. Remove, in a server's ··· menu, asks first and takes its sign-in and grants with it. To suggest another server, check that it connects from a Worker,
   then add it to `apps/runtime/src/mcp/suggested.ts` with its endpoint for each stage.
 - **Connect a server.** Connections → Connect. You sign in at the remote server and approve; you come back
-  connected. Servers that answer without sign-in connect directly. Then tick the tools the agent may use. Nothing is
-  granted by default. A server marked *needs auth* needs a new sign-in: press Reconnect.
+  connected. Servers that answer without sign-in connect directly. Then turn on the tools the agent may use, one by one
+  or with Allow all; None turns them all off. Nothing is granted by default. A server marked **Needs sign-in** needs a
+  new sign-in: press Sign in again. **Try a tool**, at the bottom, calls an allowed tool by hand.
 - **Conversations.** Each conversation is a pane; the URL (`/c/<id>`) names the focused one and `/` restores your
   last arrangement. Click a conversation in the sidebar to show it in the focused pane. The **+** beside Threads opens
   a new thread's draft beside it, and **Reply in thread** under any settled message, in any conversation, opens a
@@ -126,13 +127,14 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   off there hides it from the agent in that conversation only, and a new thread starts with the switches of the conversation it came from. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
 - **Questions, models and budget.** Answer an `ask_user` card with your next message. Pick an offered model in the
   composer; Settings and the composer's ring show today's token usage, resetting at 00:00 UTC.
-- **Skills.** Connect a server that offers skills, then turn on **Use skills from this server**. The agent reads and
+- **Skills.** Connect a server that offers skills, then turn on its **Use its skills** switch. The agent reads and
   follows those procedures; their tools still need grants. To receive drafts in a library such as MySkills, grant
   `skill_draft` and `skill_draft_status`, then review the proposals there.
-- **Telegram.** Bind the authorized mygram connection to the bot, then choose **Use for Telegram**. A server offering
+- **Telegram.** Bind the authorized mygram connection to the bot, then turn on its **Telegram** switch. A server offering
   Events grants `inbox`, `send_message` and its two exact event selectors; older servers use the four-tool doorbell
   fallback. Connections shows which transport is active. New inbox messages arrive in main as **Telegram**, including
-  answers to pending questions, and replies go back to the bot. **Stop** unsubscribes and clears pending replies.
+  answers to pending questions, and replies go back to the bot. Turning it off unsubscribes and clears pending
+  replies.
 - **Resident authority.** Settings shows when it expires. Owner activity renews it for 30 days; inbound and scheduled
   work do not renew it. Revoke stops all outbound MCP use by the agent until you enable it again.
 - **MyPlan as an App.** The suggested MyPlan server uses `https://dev-new.myplan.lol/mcp` on local and dev
