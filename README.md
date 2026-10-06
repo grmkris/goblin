@@ -27,7 +27,7 @@ Every conversation (main, a thread, a subagent) and every kept MCP App is a pane
 split or swap, resize, close any but the last. Apps also run in place in any conversation, several at once, and move
 to their page and back without reloading. The URL names the focused conversation or App and the device remembers the
 arrangement; narrow screens show one pane at a time in a swipeable strip. Owners can add public servers by URL or from MCP registries,
-grant tools explicitly, choose an offered model, and see the per-account daily token budget. The agent uses `ask_user`
+grant tools explicitly, choose an offered model, and see the per-account daily budget in Credits. The agent uses `ask_user`
 to ask questions the owner answers in their next message. The owner attaches files to a message with the composer's
 paperclip; the agent reads them and writes its own results beside them, kept per agent in SQLite and R2.
 
@@ -73,7 +73,7 @@ steps. Alternate hosts redirect to the configured canonical origin. Dev sign-up 
 supports open sign-up after sender verification. Email OTP is the sole login method, and every stage requires mail. Both stages use `hello@goblin.surf` after sender onboarding,
 with a host prefix on dev mail subjects. See [development](docs/development.md) for the production guard and smoke.
 
-Pro has no free tier or trial and includes 2 million weighted tokens per account per UTC day. Dodo checkout grants
+Pro has no free tier or trial and includes 800 model Credits (about 2 million tokens) per account per UTC day. Dodo checkout grants
 nothing until its signed webhook activates the account. Cancellation keeps access through the paid period, and failed
 renewals have bounded grace. Settings provides the billing portal; `/subscribe` handles unpaid accounts. Draft terms,
 privacy and refund pages await operator review before live payments. Native workerd tests use real D1 and an injected

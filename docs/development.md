@@ -76,8 +76,7 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_BETTER_AUTH_SECRET` | Better Auth's secret. |
 | `GOBLIN_MODEL_BASE_URL`, `GOBLIN_MODEL_ID`, `GOBLIN_MODEL_KEY` | Railway LiteLLM and the dedicated capped key. Never the master key. |
 | `GOBLIN_MODELS` | More LiteLLM model names users may pick, comma-separated; `GOBLIN_MODEL_ID` stays the default. Allow each on the LiteLLM key too. |
-| `GOBLIN_MODEL_DAILY_TOKENS` | Local native model fixture allowance only; deployed accounts use their plan/override. |
-| `GOBLIN_MODEL_TOKEN_WEIGHTS` | JSON model-id to positive price multiplier; omitted models count at one. |
+| `GOBLIN_MODEL_CREDIT_RATES` | JSON tokens per estimated Token Plan Credit (`{ default?, models?, aliases? }`, each rate `{ input, cached, output }`); unset, Alibaba's example rates (ADR 0026). |
 | `GOBLIN_MEMORY_MODEL` | The offered model for thread names, main-memory summaries and skill-draft decisions. It is not selected by price; unset or not offered uses the default. |
 | `GOBLIN_SMOKE_MODEL` | Optional model for smoke turns. It must be one of the offered models; unset keeps the owner's pick. |
 | `GOBLIN_MCP_SERVERS` | JSON list of outbound servers: `[{"serverId":"myplan","endpoint":"https://…/mcp"}]`. |
@@ -135,7 +134,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   what the agent can use in that conversation (connections and their tools, skills, subagents); switching something
   off there hides it from the agent in that conversation only, and a new thread starts with the switches of the conversation it came from. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
 - **Questions, models and budget.** Answer an `ask_user` card with your next message. Pick an offered model in the
-  composer; Settings and the composer's ring show today's token usage, resetting at 00:00 UTC.
+  composer; Settings and the composer's ring show today's usage in Credits, resetting at 00:00 UTC.
 - **Figures.** Assistant replies can draw `mdxcn` JSON fences as a timeline, checklist, comparison, stats or spark.
   An open streaming fence or an invalid spec stays readable code; tool output stays code too. Figures follow the
   pane's width and light/dark theme, with entrance animation disabled under reduced motion. Agent-app views import
@@ -249,7 +248,8 @@ master model key or print payment keys. Configure a separate Standard Webhooks e
 
 The billing migration grants existing users a dev-only Pro override; a fresh database has no such users. New OTP
 signups need an operator override or test billing. Overrides grant nothing outside their configured stage. An operator can insert/update `app_billing_accounts` for a known user ID, setting `plan_override='pro'`,
-`override_stage` to the intended stage, `daily_tokens` to a positive allowance and both timestamps in milliseconds.
+`override_stage` to the intended stage, `daily_credits` to a positive allowance in Credits (Pro's is 800) and both
+timestamps in milliseconds. `daily_tokens` is retired and no longer read.
 Remove the override to test paid access. A fresh local user also needs test billing or an explicit local override.
 
 The local billing tests run without keys or provider calls:
@@ -265,8 +265,8 @@ operator step: invite/signup a new account, confirm agent routes return 402, use
 webhook and agent access, cancel and verify paid-through expiry, then replay a delivery. Preserve receipts without
 card data or secrets. Existing operator accounts retain access.
 
-The model price schedule is not fixed by source; configure reviewed positive multipliers in
-`GOBLIN_MODEL_TOKEN_WEIGHTS`. Local tests prove weighted counting and separate ledgers, not active provider prices.
+The Credit rates are estimates, not the plan's bill; configure reviewed rates in `GOBLIN_MODEL_CREDIT_RATES`. Local
+tests prove the pricing and separate ledgers, not the provider's actual charges.
 Before prod payments, review the draft legal pages and provide operator identity, support/postal address, jurisdiction,
 refund/withdrawal policy and retention/subprocessor details. Cancel recurring billing through Dodo before account
 deletion; deletion does not itself cancel provider charges.
