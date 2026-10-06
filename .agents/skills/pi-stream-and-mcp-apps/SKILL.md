@@ -14,6 +14,11 @@ and never shows inherited history. Every pane and inline thread follows through 
 (`lib/stream-pool.ts`, one stream per conversation, capped, suspended off screen); never open a second stream for a
 conversation outside it.
 
+- Assistant figures use `MessageText` → `RichBlock` and lazy kit entries. `mdxcn` is a bounded JSON union of
+  timeline, check, compare, stat and spark (`packages/kit/src/mdxcn-spec.ts`), rendered only by `AssistantText`.
+  Keep open streaming fences, invalid specs and drawing failures as code; tool Markdown and shared notes keep mdxcn
+  as code. Use the same components/parser in agent-app views through `@goblin/kit/mdxcn`, its import allowlist and
+  frame bundle. Figures are read-only and grant no app power. Verify light/dark, narrow panes and reduced motion.
 - Pi state is authoritative. Do not keep a second transcript or invent cursor replay.
 - The conversation list and activity come from the workspace feed (`/api/workspace/events`,
   `lib/workspace-feed.ts`, `components/workspace-feed.tsx`): one stream per tab, a fresh snapshot on every reconnect.
