@@ -26,6 +26,11 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   filter for one thing: `{ remove: [subagent] }` where a conversation switched subagents off (`capabilities/`, ADR
   0010). A fork starts from its parent's agent at the fork entry, so a new thread sets its extensions (the host's plus
   the thread's, `instructions: null` to drop a subagent's), and its filter, explicitly (ADR 0017).
+- Observing Pi means its commit listener, not hooks: `subscribeCommits` sees every conversation's committed entries,
+  tasks and submissions, and the run ledger (`telemetry/pi.ts`, ADR 0024) is attached in the harness factory as soon
+  as `Harness.open` returns. A listener runs inside Pi's commit: if it throws, Pi faults the user's task, so guard it,
+  keep it synchronous and never call Session APIs from it. Hooks do not pair reliably (no `afterTool` for a blocked
+  call, no `afterResponse` after an abort) and subagents and routine runs keep their own extension lists.
 - Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
 - Extensions: `persona.ts` (static system prompt sections, keep them static so prompt caches hold),
   `resident-mcp.ts` (`mcp_list`, `mcp_call`), `ask-user.ts` (`ask_user`), `budget.ts` (usage recording, tool
