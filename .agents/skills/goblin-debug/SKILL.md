@@ -15,8 +15,6 @@ is read-only: no query changes the agent or calls a model.
   `inspect_conversations`.
 - Terminal: `bun run goblin login` once, then `bun run goblin problems|turns|turn|conversation|logs …`
   (`--origin http://localhost:18971` for a local stack, `--json` for the raw result).
-- Another user's agent: only an operator listed in `GOBLIN_OPERATORS`, through `/mcp/operator` or
-  `goblin --operator --user <id or email>`. Every read is recorded in the operator's own agent.
 
 ## Work from the outside in
 
