@@ -178,6 +178,23 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   `inspect_turn` with an operation id (a Telegram message is `telegram-<id>`), then `inspect_conversation` for the
   words. An operator listed in `GOBLIN_OPERATORS` adds `https://dev.goblin.surf/mcp/operator` the same way and passes
   `user` (id or email) to every tool; `operator_reads` lists what they read.
+- **The `goblin` CLI** (`apps/cli`) is the same inspection from a terminal: an MCP client of `/mcp/inspect` (or
+  `/mcp/operator` with `--operator --user <id or email>`), whose commands come from the server's tools.
+
+  ```sh
+  bun run goblin login                  # once: prints the sign-in URL; approve in a browser
+  bun run goblin problems --since 6h
+  bun run goblin turns
+  bun run goblin turn telegram-<id>     # one turn end to end
+  bun run goblin conversation 1         # main's entries, in full
+  bun run goblin logs telegram-<id>     # Workers Logs lines that mention an id
+  ```
+
+  `--origin` (or `GOBLIN_ORIGIN`) picks the stage, default `https://dev.goblin.surf`. Credentials live in
+  `~/.config/goblin/credentials.json` (mode 600). The sign-in redirects to `http://127.0.0.1:18979/callback`; when the
+  browser is on another machine, paste the URL it lands on into the prompt. `goblin logs` reads Cloudflare with your
+  own `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` and the stage Worker from `/health`; the Worker never sees
+  them. `--json` prints a tool's structured result; `bun link` in `apps/cli` puts `goblin` on your path.
 
 ## Changing things
 
