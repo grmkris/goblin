@@ -9,7 +9,8 @@ Drizzle owns only goblin application tables and migrations; Pi/vendor storage st
 
 - Verify the current Durable Object SQLite driver and runtime-safe migration entrypoints from installed source.
 - Use `app_*` names for every application table. Protect the complete vendor ownership set even when a vendor table has another prefix.
-- Never introspect/adopt/migrate vendor tables. Migration generation reads application schema only.
+- Never introspect/adopt/migrate vendor tables. Migration generation reads application schema only. Shell's Workspace
+  tables (`cf_workspace_*`, the owner's files, ADR 0022) are vendor-owned too.
 - Apply minimal additive migrations before application code needs them; repeated initialization must be safe.
 - Keep transactions short and synchronous to database work; never hold one across model/MCP/HTTP calls or waits.
 - Prove application migrations and their reapplication leave vendor state intact using the actual supported runtime harness.

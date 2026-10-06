@@ -32,14 +32,15 @@ owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
 
 1. health; unless sign-up is open, a sign-up without the invite code is refused; sign-in, resident authority
    `active`, a main-thread snapshot;
-2. each configured or owner-added MCP server's status; for a connected server, its tools, and a direct call of a
+2. a small text file uploaded to the owner's `/uploads`, listed, read back byte for byte and deleted (ADR 0022);
+3. each configured or owner-added MCP server's status; for a connected server, its tools, and a direct call of a
    read-only probe (`account_read` on MyPlan, `browser_backends` on MyBrowser) only if the owner has already granted it;
-3. an inbound MCP client: dynamic registration, owner consent, PKCE token, `/mcp` `initialize` and `tools/list`, an
+4. an inbound MCP client: dynamic registration, owner consent, PKCE token, `/mcp` `initialize` and `tools/list`, an
    `ask_agent` model turn, an agent turn that calls the MyPlan probe through `mcp_call` (only if step 2 proved it),
    `get_recent_messages` with the smoke client's author label, then revocation and a 401;
-4. a new empty thread, a model turn there, `share_back` verified as a new `app.shared` entry in main, then close;
-5. a `smokecount` subagent spawned from main, its authored report back, and main's reply to the report;
-6. `/api/agent/memory`: a nonzero remembered-message count and the current view coverage.
+5. a new empty thread, a model turn there, `share_back` verified as a new `app.shared` entry in main, then close;
+6. a `smokecount` subagent spawned from main, its authored report back, and main's reply to the report;
+7. `/api/agent/memory`: a nonzero remembered-message count and the current view coverage.
 
 Inbound turns run in main as `goblin-smoke`. The thread is archived and the client revoked through `finally` cleanup;
 their history and the subagent remain. If Telegram is on, main's answer to the subagent report is also queued for
@@ -53,6 +54,7 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `stage`, `signup`, `resident`, `model` | Target stage, sign-up mode, active authority and smoke model or `owner pick`.                                  |
 | `servers`                              | Server statuses, tool/grant counts and probe outcome (`ok`, `error` or `not-granted`).                         |
+| `files`                                | `ok`: the owner's file round trip, the file deleted again.                                                     |
 | `inbound`                              | Initialization, model turn, optional resident tool call, recent history and revocation followed by 401.        |
 | `inbound.author`                       | `ok`: the smoke user's message has author `goblin-smoke`.                                                      |
 | `thread`, `shared`                     | `ok` and `true`: the empty thread ran and wrote a new `app.shared` entry to main.                              |

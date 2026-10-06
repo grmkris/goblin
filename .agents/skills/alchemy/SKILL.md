@@ -11,6 +11,8 @@ Alchemy (a pinned beta) is the sole infrastructure source of truth; check its in
 - Keep deployment code out of Worker/runtime imports and runtime migration SQL.
 - Preserve stage-derived physical resource names and explicit dev ownership. `destroy:dev` needs `--confirm-reset`; prod has separate resources and mode-600 secrets; every prod command requires `GOBLIN_CONFIRM_PROD=1`. There is no destroy-prod command.
 - Put secrets in runtime bindings; never browser bundles, logs, transcripts, or iframe state.
+- Declare a binding in `apps/web/alchemy.run.ts`, `apps/runtime/src/env.ts` and the integration stacks together; the
+  `FILES` R2 bucket (the owner's files) is stage-named and local under workerd.
 - Verify current TanStack Start/Vite integration compatibility before adding any Cloudflare Vite plugin; do not maintain two deployment systems.
 - Record plan/build evidence, real dev deployment receipts, and smoke results separately. A local artifact is not deployed acceptance.
 

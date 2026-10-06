@@ -174,7 +174,11 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   `apps/runtime/src/storage/migrations.ts` (`'<14-digit timestamp>_name'`, statements joined by `--> statement-breakpoint`).
   Never edit an applied migration; never touch Pi or Agents tables.
 - Auth tables: Better Auth's schema lives in `apps/runtime/migrations` and is applied by the Alchemy D1 resource.
-- Bindings: declare them in `apps/runtime/src/env.ts` and `apps/web/alchemy.run.ts` together.
+- Bindings: declare them in `apps/runtime/src/env.ts` and `apps/web/alchemy.run.ts` together, and in the integration
+  stacks (`apps/runtime/test/integration/*-stack.ts`, `stack.ts`) when the runtime reads them.
+- The owner's files: the `FILES` R2 bucket is local under Alchemy's workerd state in `bun dev` and the integration
+  stacks, so nothing reaches a real bucket. Shell's `cf_workspace_*` tables are vendor-owned, like `pi_*`: migrations
+  never touch them (ADR 0022).
 - UI components: goblin looks like the myapps apps. Prefer porting a component from `~/code/myapps/packages/ui`
   (with an "Adapted from" header naming the commit); otherwise `bunx shadcn@latest add <component>` from
   `packages/ui`, then review the generated file. Keep the shared tokens in `packages/ui/src/styles.css` as myapps has
