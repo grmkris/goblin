@@ -40,11 +40,14 @@ owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
    `get_recent_messages` with the smoke client's author label, then revocation and a 401;
 5. a new empty thread, a model turn there, `share_back` verified as a new `app.shared` entry in main, then close;
 6. a `smokecount` subagent spawned from main, its authored report back, and main's reply to the report;
-7. `/api/agent/memory`: a nonzero remembered-message count and the current view coverage.
+7. `/api/agent/memory`: a nonzero remembered-message count and the current view coverage;
+8. an agent app (`scripts/smoke-apps.ts`): in a new thread the agent builds `smoke-counter` from exact code, the owner
+   runs its schedule now and its revision moves by one, then the owner deletes it (typing its name) and the thread
+   closes.
 
-Inbound turns run in main as `goblin-smoke`. The thread is archived and the client revoked through `finally` cleanup;
-their history and the subagent remain. If Telegram is on, main's answer to the subagent report is also queued for
-delivery there. Cleanup requests can themselves fail.
+Inbound turns run in main as `goblin-smoke`. The threads are archived, the app deleted and the client revoked through
+`finally` cleanup; their history and the subagent remain. If Telegram is on, main's answer to the subagent report is
+also queued for delivery there. Cleanup requests can themselves fail.
 
 On success the script writes `.local/smoke-<stage>-receipt.json` (mode 600) and prints it. A failure prints its reason
 and completed HTTP steps but writes no new receipt; an older file may remain. Receipts contain model/server names,
@@ -55,6 +58,7 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 | `stage`, `signup`, `resident`, `model` | Target stage, sign-up mode, active authority and smoke model or `owner pick`.                                  |
 | `servers`                              | Server statuses, tool/grant counts and probe outcome (`ok`, `error` or `not-granted`).                         |
 | `files`                                | `ok`: the owner's file round trip, the file deleted again.                                                     |
+| `app`                                  | `ok`: an agent app built, run by the owner (revision +1) and deleted.                                          |
 | `inbound`                              | Initialization, model turn, optional resident tool call, recent history and revocation followed by 401.        |
 | `inbound.author`                       | `ok`: the smoke user's message has author `goblin-smoke`.                                                      |
 | `thread`, `shared`                     | `ok` and `true`: the empty thread ran and wrote a new `app.shared` entry to main.                              |
