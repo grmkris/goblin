@@ -1,4 +1,4 @@
-# Purrable
+# goblin
 
 Resident personal agents on Cloudflare. Each user signs up, subscribes to Pro ($10/month), and gets their own agent: they talk to it in the browser,
 it keeps running, holds its own authority to use the MCP servers that user connected, and is itself an MCP server
@@ -29,8 +29,8 @@ grant tools explicitly, choose an offered model, and see the per-account daily t
 to ask questions the owner answers in their next message.
 
 Workspace layout uses [Trellis 0.3.0 by Dan Fessler](https://github.com/DanFessler/trellis), under its commercial
-license and Purrable-specific permission: Purrable may use it without sponsorship until it makes money, in exchange
-for crediting Dan and allowing him to showcase Purrable as a Trellis user. When revenue starts, Kris maintains the
+license and goblin-specific permission: goblin may use it without sponsorship until it makes money, in exchange
+for crediting Dan and allowing him to showcase goblin as a Trellis user. When revenue starts, Kris maintains the
 applicable active GitHub Sponsorship: $10/month for individuals, $100/month for studios of up to 10 members;
 larger organizations require an enterprise agreement. The sidebar footer also links Dan's credit. See
 [ADR 0016](docs/adr/0016-workspace-layout-with-trellis.md) and [ADR 0019](docs/adr/0019-panes-for-everything.md).
@@ -47,15 +47,15 @@ bun run check      # the full gate (run it through `heavy` on the build box)
 
 - [Architecture](docs/architecture.md): how the Worker, the agent object, Pi, MCP and auth fit together, including
   conversations, memory, skills, Telegram and MCP Apps.
-- [Development](docs/development.md): local setup, the dev stage, connecting servers, adding Purrable to Claude Code.
+- [Development](docs/development.md): local setup, the dev stage, connecting servers, adding goblin to Claude Code.
 - [Next](docs/next.md): remaining acceptance and write approvals.
 - [Memory benchmarks](bench/README.md): real Claude/Hermes recall campaigns, persistent checkpoints, shared CLIProxy budgets and blinded review.
 - [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
 
-The deployment stages are `dev` at `dev.purrable.lol` and `prod` at `purrable.lol`, with separate auth databases,
+The deployment stages are `dev` at `dev.goblin.surf` and `prod` at `goblin.surf`, with separate auth databases,
 secrets and dedicated LiteLLM keys. Alchemy can attach the custom domains; deployment and live acceptance are operator
 steps. Alternate hosts redirect to the configured canonical origin. Dev sign-up stays closed or invite-only; prod
-supports open sign-up only with verified mail sending. Both stages use `hello@purrable.lol` after sender onboarding,
+supports open sign-up only with verified mail sending. Both stages use `hello@goblin.surf` after sender onboarding,
 with a host prefix on dev mail subjects. See [development](docs/development.md) for the production guard and smoke.
 
 Pro has no free tier or trial and includes 2 million weighted tokens per account per UTC day. Dodo checkout grants

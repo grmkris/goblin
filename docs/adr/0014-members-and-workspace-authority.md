@@ -1,7 +1,7 @@
 # ADR 0014: Members and workspace authority
 
 Status: **Withdrawn 2026-10-05**. Kris dropped Members after the
-[Phase B security review](file:///tmp/purrable-lanes/20261005/claude-phaseb-review.md) identified unsafe owner-labelled
+[Phase B security review](file:///tmp/goblin-lanes/20261005/claude-phaseb-review.md) identified unsafe owner-labelled
 member projections. All feature code is removed; git history retains the implementation. Every user again reaches
 only their own Agent. Applied auth D1 and DO migrations and their data remain dormant under the additive rule.
 
@@ -19,7 +19,7 @@ backfilling metadata preserves their SQLite, Pi history and credentials.
 The Worker resolves the selected workspace from a cookie session and active D1 membership. A client can request a
 selection but cannot supply an Agent name or role. The opaque selection context belongs to one session; a stale
 context returns 409 and a foreign or revoked workspace returns 404. Selection writes require exact Origin and
-`x-purrable-csrf: 1`. Hooks and inbound MCP resolve the authenticated owner's workspace independently of browser
+`x-goblin-csrf: 1`. Hooks and inbound MCP resolve the authenticated owner's workspace independently of browser
 selection. Invitation-only accounts never provision a personal Agent or fall back to their account ID.
 
 Established workspace resolution uses one live joined D1 read and performs no writes. It reads account kind,

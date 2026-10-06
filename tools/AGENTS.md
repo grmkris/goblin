@@ -1,4 +1,4 @@
-# Purrable quality tooling
+# goblin quality tooling
 
 This workspace owns checks, diagnostics collectors, the runtime/import graph, docs checks and custom AST plugins. The
 vendored anti-slop rules stay byte-identical to upstream (see `tools/oxlint/anti-slop/PROVENANCE.md`).

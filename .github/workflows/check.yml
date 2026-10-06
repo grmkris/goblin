@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 30
     env:
       # Not the local default (18861), so CI never collides with an agent running the harness on the same box.
-      PURRABLE_HARNESS_PORT: '18862'
+      GOBLIN_HARNESS_PORT: '18862'
       TURBO_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4

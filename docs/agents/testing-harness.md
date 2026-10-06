@@ -8,7 +8,7 @@ Use injected services/layers instead of module mocking. Keep harness ports confi
 Never destroy an Alchemy harness stack to resolve a port conflict; stop only processes you own.
 
 The native suite covers initialization, durable submission/deduplication, transcript readback and public
-dispose/reopen. `PURRABLE_NATIVE_LIFECYCLE_PHASE=write|read` runs the two-process reconstruction proof; the ordinary
+dispose/reopen. `GOBLIN_NATIVE_LIFECYCLE_PHASE=write|read` runs the two-process reconstruction proof; the ordinary
 gate does not claim it. Reconstruction in local workerd is not proof of remote eviction.
 
 Use stable operation IDs and readback for retried submissions. A fixture model cannot prove real streaming or

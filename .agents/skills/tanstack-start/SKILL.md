@@ -1,9 +1,9 @@
 ---
 name: tanstack-start
-description: Change Purrable TanStack Start routes, server/client boundaries, shared shadcn UI, Vite integration, or browser build behavior.
+description: Change goblin TanStack Start routes, server/client boundaries, shared shadcn UI, Vite integration, or browser build behavior.
 ---
 
-# Tanstack Start in Purrable
+# Tanstack Start in goblin
 
 The web app is a thin browser projection over the resident runtime. TanStack Start owns routing and build integration.
 
@@ -20,7 +20,7 @@ The web app is a thin browser projection over the resident runtime. TanStack Sta
 - Validate the built artifact and real browser behavior. Local route rendering is not Cloudflare deployment proof.
 
 Before changing an API call, read the current [documentation](https://tanstack.com/start/latest) and the installed package's declarations; the
-lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how Purrable uses it today.
+lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how goblin uses it today.
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.

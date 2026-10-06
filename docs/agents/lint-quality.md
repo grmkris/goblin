@@ -1,6 +1,7 @@
 # Quality gates
 
-Purrable has zero accepted lint, Effect or Knip findings and no baseline. The rule set was adapted from My Apps; its original inventory is archived in `docs/archive/2026-10-04-initial-slice/`.
+goblin has zero accepted lint, Effect or Knip findings and no baseline. The rule set was adapted from My Apps;
+the vendored rules keep their upstream provenance and license under `tools/oxlint/anti-slop/`.
 
 `bun run check` runs format, agent/docs checks, graph, typecheck, the zero-finding lint/Effect/Knip gate, duplication, unit/runtime tests and the production build. Run expensive checks through `heavy` on this box. Never pipe `heavy`; exit 75 means capacity contention. Gate collectors do not nest `heavy` calls.
 

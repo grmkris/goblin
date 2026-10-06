@@ -1,5 +1,5 @@
 interface:
   display_name: Docs Verification
-  short_description: Apply Purrable's docs verification ownership and verification rules.
+  short_description: Apply goblin's docs verification ownership and verification rules.
 policy:
   allow_implicit_invocation: true

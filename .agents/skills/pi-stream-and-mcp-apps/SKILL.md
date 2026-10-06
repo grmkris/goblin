@@ -3,7 +3,7 @@ name: pi-stream-and-mcp-apps
 description: Change how the browser follows the Pi conversation (SSE snapshot, batches, reconnect) or the sandboxed MCP Apps host.
 ---
 
-# Conversation stream and MCP Apps in Purrable
+# Conversation stream and MCP Apps in goblin
 
 The browser follows committed Pi state over Server-Sent Events: `/api/conversations/:id/events` sends a snapshot of entries,
 then batches, with a heartbeat. `apps/web/src/lib/projection.ts` turns entries into messages and tool calls.
@@ -47,7 +47,7 @@ conversation outside it.
 - A real browser render and a permitted App interaction are separate evidence from unit tests.
 
 Before changing an API call, read the current [documentation](https://apps.extensions.modelcontextprotocol.io/) and the installed package's declarations; the
-lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how Purrable uses it today.
+lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how goblin uses it today.
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.

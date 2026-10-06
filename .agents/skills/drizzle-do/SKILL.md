@@ -1,11 +1,11 @@
 ---
 name: drizzle-do
-description: Change Purrable application-owned Durable Object schemas, SQLite migrations, or Drizzle driver integration.
+description: Change goblin application-owned Durable Object schemas, SQLite migrations, or Drizzle driver integration.
 ---
 
-# Drizzle Do in Purrable
+# Drizzle Do in goblin
 
-Drizzle owns only Purrable application tables and migrations; Pi/vendor storage stays outside this schema.
+Drizzle owns only goblin application tables and migrations; Pi/vendor storage stays outside this schema.
 
 - Verify the current Durable Object SQLite driver and runtime-safe migration entrypoints from installed source.
 - Use `app_*` names for every application table. Protect the complete vendor ownership set even when a vendor table has another prefix.
@@ -15,7 +15,7 @@ Drizzle owns only Purrable application tables and migrations; Pi/vendor storage 
 - Prove application migrations and their reapplication leave vendor state intact using the actual supported runtime harness.
 
 Before changing an API call, read the current [documentation](https://orm.drizzle.team/docs/connect-cloudflare-do) and the installed package's declarations; the
-lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how Purrable uses it today.
+lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how goblin uses it today.
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.

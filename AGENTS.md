@@ -1,6 +1,6 @@
-# Purrable: instructions for coding agents
+# goblin: instructions for coding agents
 
-Purrable gives every user their own resident personal agent on Cloudflare: one native Agents SDK Durable Object per
+goblin gives every user their own resident personal agent on Cloudflare: one native Agents SDK Durable Object per
 user runs Pi Durable for conversations and execution; Effect composes application services; Alchemy owns
 infrastructure. Read
 [README.md](README.md), [the architecture](docs/architecture.md) and the workspace instructions before editing.
@@ -44,7 +44,8 @@ infrastructure. Read
 - New code has zero lint, Effect or Knip findings. Fix code first; every disable states a specific reason and every
   unavoidable type assertion carries a `// SAFETY:` comment.
 - Tests are meaningful and bounded: real integrations for happy paths, injected services instead of module mocking.
-- Keep README, architecture, development docs and skills in step with code changes. `docs/archive/` is frozen history.
+- Keep README, architecture, development docs and skills in step with code changes. Keep historical evidence outside
+  the living documentation tree.
 
 ## Workspace map
 

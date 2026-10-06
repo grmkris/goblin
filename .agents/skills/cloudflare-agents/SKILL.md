@@ -3,7 +3,7 @@ name: cloudflare-agents
 description: Change the PersonalAgent Durable Object shell, its RPC surface, lifecycle adapters, or how the Worker reaches it.
 ---
 
-# Cloudflare Agents in Purrable
+# Cloudflare Agents in goblin
 
 `PersonalAgent extends Agent` and stays thin: each RPC method runs one Effect program on the object's
 `ManagedRuntime` and returns an encoded result. Services do the work.
@@ -18,7 +18,7 @@ description: Change the PersonalAgent Durable Object shell, its RPC surface, lif
 - Never import Alchemy deployment code into workerd. Transactions and gates never span network or model work.
 
 Before changing an API call, read the current [documentation](https://developers.cloudflare.com/agents/) and the installed package's declarations; the
-lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how Purrable uses it today.
+lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how goblin uses it today.
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.

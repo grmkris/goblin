@@ -1,5 +1,5 @@
 interface:
   display_name: Cloudflare Agents
-  short_description: Apply Purrable's cloudflare agents ownership and verification rules.
+  short_description: Apply goblin's cloudflare agents ownership and verification rules.
 policy:
   allow_implicit_invocation: true

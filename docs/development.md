@@ -43,7 +43,7 @@ Model calls go through CLIProxy and inherit `CLIPROXY_API_KEY` from the interact
 its own auth secret and credential key and opens sign-up; set them in `.local/local.env` only to override.
 
 Open the app and use **Create an account**. Each account gets its own agent. For `bun run smoke:local`, put that
-account's email and password in `PURRABLE_OWNER_EMAIL` and `PURRABLE_OWNER_PASSWORD`.
+account's email and password in `GOBLIN_OWNER_EMAIL` and `GOBLIN_OWNER_PASSWORD`.
 
 ## Gates
 
@@ -60,24 +60,24 @@ If a check fails, look at `git status` first. Another agent's half-finished file
 
 ## The dev stage
 
-Dev (`https://dev.purrable.lol`) is the daily instance. Its configuration is `.local/dev.env`
+Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.local/dev.env`
 (mode 600) plus the shared Cloudflare credentials in `~/.config/myapps/dev.env`:
 
 | Variable | Meaning |
 | --- | --- |
-| `PURRABLE_STAGE`, `PURRABLE_APP_URL` | `dev` and the Worker's HTTPS origin. |
-| `PURRABLE_SIGNUP_MODE`, `PURRABLE_SIGNUP_INVITE_CODE` | `open`, `invite` or `closed` (default), and the invite code. |
-| `PURRABLE_MAIL_SENDER` | A sender on an Email Sending apex; turns on email verification. |
-| `PURRABLE_OWNER_EMAIL`, `PURRABLE_OWNER_PASSWORD` | An existing account; only the smoke reads them. |
-| `PURRABLE_BETTER_AUTH_SECRET` | Better Auth's secret. |
-| `PURRABLE_MODEL_BASE_URL`, `PURRABLE_MODEL_ID`, `PURRABLE_MODEL_KEY` | Railway LiteLLM and the dedicated capped key. Never the master key. |
-| `PURRABLE_MODELS` | More LiteLLM model names users may pick, comma-separated; `PURRABLE_MODEL_ID` stays the default. Allow each on the LiteLLM key too. |
-| `PURRABLE_MODEL_DAILY_TOKENS` | Local native model fixture allowance only; deployed accounts use their plan/override. |
-| `PURRABLE_MODEL_TOKEN_WEIGHTS` | JSON model-id to positive price multiplier; omitted models count at one. |
-| `PURRABLE_MEMORY_MODEL` | The offered model for thread names, main-memory summaries and skill-draft decisions. It is not selected by price; unset or not offered uses the default. |
-| `PURRABLE_SMOKE_MODEL` | Optional model for smoke turns. It must be one of the offered models; unset keeps the owner's pick. |
-| `PURRABLE_MCP_SERVERS` | JSON list of outbound servers: `[{"serverId":"myplan","endpoint":"https://…/mcp"}]`. |
-| `PURRABLE_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP credentials, Events secrets/envelopes and the legacy doorbell secret; derives purpose-separated hook tokens. |
+| `GOBLIN_STAGE`, `GOBLIN_APP_URL` | `dev` and the Worker's HTTPS origin. |
+| `GOBLIN_SIGNUP_MODE`, `GOBLIN_SIGNUP_INVITE_CODE` | `open`, `invite` or `closed` (default), and the invite code. |
+| `GOBLIN_MAIL_SENDER` | A sender on an Email Sending apex; turns on email verification. |
+| `GOBLIN_OWNER_EMAIL`, `GOBLIN_OWNER_PASSWORD` | An existing account; only the smoke reads them. |
+| `GOBLIN_BETTER_AUTH_SECRET` | Better Auth's secret. |
+| `GOBLIN_MODEL_BASE_URL`, `GOBLIN_MODEL_ID`, `GOBLIN_MODEL_KEY` | Railway LiteLLM and the dedicated capped key. Never the master key. |
+| `GOBLIN_MODELS` | More LiteLLM model names users may pick, comma-separated; `GOBLIN_MODEL_ID` stays the default. Allow each on the LiteLLM key too. |
+| `GOBLIN_MODEL_DAILY_TOKENS` | Local native model fixture allowance only; deployed accounts use their plan/override. |
+| `GOBLIN_MODEL_TOKEN_WEIGHTS` | JSON model-id to positive price multiplier; omitted models count at one. |
+| `GOBLIN_MEMORY_MODEL` | The offered model for thread names, main-memory summaries and skill-draft decisions. It is not selected by price; unset or not offered uses the default. |
+| `GOBLIN_SMOKE_MODEL` | Optional model for smoke turns. It must be one of the offered models; unset keeps the owner's pick. |
+| `GOBLIN_MCP_SERVERS` | JSON list of outbound servers: `[{"serverId":"myplan","endpoint":"https://…/mcp"}]`. |
+| `GOBLIN_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP credentials, Events secrets/envelopes and the legacy doorbell secret; derives purpose-separated hook tokens. |
 
 These are source defaults and configuration names; active dev settings and provider caps must be verified separately.
 
@@ -88,7 +88,7 @@ bun run destroy:dev -- --confirm-reset    # erase every account, conversation an
 bun run smoke:dev                         # acceptance; see scripts/README.md
 ```
 
-Changing `PURRABLE_CREDENTIAL_KEY` makes stored MCP credentials and the Telegram secret unreadable and changes the hook
+Changing `GOBLIN_CREDENTIAL_KEY` makes stored MCP credentials and the Telegram secret unreadable and changes the hook
 token; reconnect the servers and re-enable Telegram afterwards.
 Changing a server's `endpoint` drops what was stored for it (credentials, grants, pending sign-ins) at each
 agent's next start; connect it again. Tokens are never carried from one host to another.
@@ -147,7 +147,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   schedule, or on a server's event) and the tools and limits it may use. Saving makes a proposal; Confirm on its card
   turns it on, and an edit pauses it until you confirm again. The agent can also propose one in chat.
 - **MyPlan as an App.** The suggested MyPlan server uses `https://dev-new.myplan.lol/mcp` on local and dev
-  (`apps/runtime/src/mcp/suggested.ts`); `PURRABLE_MCP_SERVERS` may configure another endpoint. Connect it, then switch
+  (`apps/runtime/src/mcp/suggested.ts`); `GOBLIN_MCP_SERVERS` may configure another endpoint. Connect it, then switch
   on **Its App** above the tools that App uses. Ask the agent to open a note ("Open my Trip plan
   note"); the App opens in place under the tool row (on an older call, open the row and press *Show app*). Its bar
   opens it as a page beside the conversation or closes it; on the page, the pill's menu brings it back, fills the
@@ -155,10 +155,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   a stub. These moves keep the same iframe and bridge. What an App shares rides along with your next message in its conversation as untrusted
   context; links it offers wait for your click. The originating server supplies the resource URI and the App's
   behavior.
-- **Add Purrable to Claude Code.**
+- **Add goblin to Claude Code.**
 
   ```sh
-  claude mcp add --transport http purrable https://dev.purrable.lol/mcp
+  claude mcp add --transport http goblin https://dev.goblin.surf/mcp
   ```
 
   Sign in and approve in the browser. It gets `ask_agent` and `get_recent_messages` in the agent's main conversation,
@@ -171,10 +171,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   Never edit an applied migration; never touch Pi or Agents tables.
 - Auth tables: Better Auth's schema lives in `apps/runtime/migrations` and is applied by the Alchemy D1 resource.
 - Bindings: declare them in `apps/runtime/src/env.ts` and `apps/web/alchemy.run.ts` together.
-- UI components: Purrable looks like the myapps apps. Prefer porting a component from `~/code/myapps/packages/ui`
+- UI components: goblin looks like the myapps apps. Prefer porting a component from `~/code/myapps/packages/ui`
   (with an "Adapted from" header naming the commit); otherwise `bunx shadcn@latest add <component>` from
   `packages/ui`, then review the generated file. Keep the shared tokens in `packages/ui/src/styles.css` as myapps has
-  them (the sidebar tokens are Purrable's: a shade heavier than the page). The Home Screen icons, favicon and web app
+  them (the sidebar tokens are goblin's: a shade heavier than the page). The Home Screen icons, favicon and web app
   manifest are static files in `apps/web/public`; after changing the mark or the page background, run `bun run icons`
   and keep the manifest's colours and the root route's `theme-color` metas equal to `--background`. It also draws a
   startup image for every iPhone and iPad screen in `apps/web/src/lib/startup-images.ts`, which the root route links;
@@ -191,12 +191,12 @@ Unit tests, local workerd and the deployed dev stage are separate kinds of evide
 ## Production preparation
 
 `.local/prod.env` is mode 600, with fresh auth and credential secrets. Fill its model key with a dedicated Railway
-LiteLLM virtual key; never the master key. Set `PURRABLE_DOMAIN=purrable.lol` and
-`PURRABLE_APP_URL=https://purrable.lol`; dev uses `dev.purrable.lol` for both. Set `PURRABLE_MAIL_SENDER=hello@purrable.lol`
+LiteLLM virtual key; never the master key. Set `GOBLIN_DOMAIN=goblin.surf` and
+`GOBLIN_APP_URL=https://goblin.surf`; dev uses `dev.goblin.surf` for both. Set `GOBLIN_MAIL_SENDER=hello@goblin.surf`
 only after Cloudflare Email Sending verifies the sender. Prod open sign-up requires mail; dev must stay closed or
 invite-only. These settings do not authorize a production deploy.
 
-`PURRABLE_CONFIRM_PROD=1 bun run plan:prod` previews, and the same explicit guard protects `deploy:prod` and
+`GOBLIN_CONFIRM_PROD=1 bun run plan:prod` previews, and the same explicit guard protects `deploy:prod` and
 `smoke:prod`. The default prod smoke is read-only: health and an anonymous protected-route probe. An operator smoke
 account's credentials opt into the full flow. After dev's origin changes, sign in by email code and register new
 passkeys; reconnect MCP clients at the new origins.
@@ -205,7 +205,7 @@ passkeys; reconnect MCP clients at the new origins.
 
 Set `DODO_PAYMENTS_ENVIRONMENT=test_mode` on local/dev and `live_mode` on prod. Store
 `DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_WEBHOOK_KEY` and `DODO_PRODUCT_ID` in the stage's mode-600 env file; Alchemy
-binds them as Worker secrets. Choose a Purrable-only recurring $10/month product with no trial. Never bind an account's
+binds them as Worker secrets. Choose a goblin-only recurring $10/month product with no trial. Never bind an account's
 master model key or print payment keys. Configure a separate Standard Webhooks endpoint at `/hooks/dodo` per stage.
 `/health` reports the stage billing mode and whether billing is configured; missing keys never bypass admission.
 
@@ -228,14 +228,14 @@ webhook and agent access, cancel and verify paid-through expiry, then replay a d
 card data or secrets. Existing operator accounts retain access.
 
 The model price schedule is not fixed by source; configure reviewed positive multipliers in
-`PURRABLE_MODEL_TOKEN_WEIGHTS`. Local tests prove weighted counting and separate ledgers, not active provider prices.
+`GOBLIN_MODEL_TOKEN_WEIGHTS`. Local tests prove weighted counting and separate ledgers, not active provider prices.
 Before prod payments, review the draft legal pages and provide operator identity, support/postal address, jurisdiction,
 refund/withdrawal policy and retention/subprocessor details. Cancel recurring billing through Dodo before account
 deletion; deletion does not itself cancel provider charges.
 
 ## Owner routing and Apps tests
 
-The local workerd/auth-D1 owner fixture runs on `PURRABLE_HARNESS_PORT + 20`.
+The local workerd/auth-D1 owner fixture runs on `GOBLIN_HARNESS_PORT + 20`.
 Run `heavy bun run --cwd apps/runtime test:integration test/integration/owner.test.ts` to verify per-call owner
 Apps, live grants, conversation Close/reopen, and isolation between two authenticated accounts even with forged
 workspace/agent request selectors. Removed workspace, invitation and interaction endpoints return 404.
@@ -245,14 +245,14 @@ These keyless deterministic tests are local evidence; deployed smoke and real pr
 
 From `apps/runtime`, run `heavy bun run test:unit test/routines-time.test.ts test/routines-summary.test.ts` for IANA
 zones, DST, cron spacing, explicit reminder offsets, strict write CSRF and summary scrubbing. Run
-`PURRABLE_HARNESS_PORT=18871 heavy bun run test:integration native.test.ts -t routine` for real local workerd SQLite,
+`GOBLIN_HARNESS_PORT=18871 heavy bun run test:integration native.test.ts -t routine` for real local workerd SQLite,
 native dated alarms, Pi run/session/report dedupe, no copied capabilities, committed usage, revoked-authority skips,
 correlated questions, late answers, main Stop, two-running cap, burst collapse, archive and revision fencing. These
 keyless fixture tests establish local behavior. The signed routine Events case shares the native stack and official
 fixture producer: exact descriptor filters, raw signatures, shared leases, escaped run IDs, replay across revisions,
 sealed metadata, one event/minute, pending coalescing, gap/poll recovery and termination/reconfirmation. No live MCP
 producer or Telegram send is involved. To run just that case, use
-`PURRABLE_HARNESS_PORT=18871 heavy bun run test:integration native.test.ts -t 'signed routine Events'`.
+`GOBLIN_HARNESS_PORT=18871 heavy bun run test:integration native.test.ts -t 'signed routine Events'`.
 
 For local acceptance, start a separate `bun dev` stack with isolated Alchemy/D1/DO state and a throwaway account;
 use the local operator entitlement override, no mail and no billing provider credentials. Through the authenticated

@@ -1,12 +1,12 @@
 ---
 name: mcp-host
-description: Change Purrable's outbound MCP host (connections, OAuth connect and refresh, encrypted credentials, grants) or its inbound /mcp server.
+description: Change goblin's outbound MCP host (connections, OAuth connect and refresh, encrypted credentials, grants) or its inbound /mcp server.
 ---
 
-# MCP in Purrable
+# MCP in goblin
 
 Outbound: the agent object owns connections, credentials and grants (`apps/runtime/src/mcp/`). Inbound: `/mcp` is
-Purrable's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
+goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 
 - Use the pinned official MCP client and server SDKs. OAuth goes through `StoredOAuthProvider` and the SDK's `auth()`;
   refresh is single-flight per server in `McpHost`. Do not add a second refresh path: rotating refresh tokens break
@@ -37,7 +37,7 @@ Purrable's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 - Fixture tests (`test/mcp/`) prove protocol behaviour; real MyPlan/MyBrowser behaviour is proven only on dev.
 
 Before changing an API call, read the current [documentation](https://modelcontextprotocol.io/specification/latest) and the installed package's declarations; the
-lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how Purrable uses it today.
+lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how goblin uses it today.
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.

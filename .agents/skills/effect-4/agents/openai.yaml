@@ -1,5 +1,5 @@
 interface:
   display_name: Effect 4
-  short_description: Apply Purrable's Effect 4 service, error, and diagnostic rules.
+  short_description: Apply goblin's Effect 4 service, error, and diagnostic rules.
 policy:
   allow_implicit_invocation: true

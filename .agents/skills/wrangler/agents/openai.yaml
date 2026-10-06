@@ -1,5 +1,5 @@
 interface:
   display_name: wrangler
-  short_description: Use the reviewed Cloudflare guidance for Purrable Workers work.
+  short_description: Use the reviewed Cloudflare guidance for goblin Workers work.
 policy:
   allow_implicit_invocation: true

@@ -1,9 +1,9 @@
 ---
 name: runtime-tests
-description: Run or design Purrable unit, workerd integration and dev-stage tests while keeping evidence classes apart. Use for test changes or failures.
+description: Run or design goblin unit, workerd integration and dev-stage tests while keeping evidence classes apart. Use for test changes or failures.
 ---
 
-# Purrable runtime tests
+# goblin runtime tests
 
 Choose the test that proves the claim: unit tests, local workerd integration, reconstruction, and the deployed dev
 smoke are different evidence.
@@ -24,7 +24,7 @@ smoke are different evidence.
   refetch, and verifies the repaired bytes; unit tests alone do not prove Durable Object SQLite behavior.
 
 Before changing an API call, read the current [documentation](https://vitest.dev/) and the installed package's declarations; the
-lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how Purrable uses it today.
+lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how goblin uses it today.
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.

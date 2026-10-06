@@ -1,9 +1,9 @@
 ---
 name: pi-durable
-description: Change Purrable's Pi Durable and PiHarness integration - sessions, submission, extensions and tools, persona, event projection, or reconstruction tests.
+description: Change goblin's Pi Durable and PiHarness integration - sessions, submission, extensions and tools, persona, event projection, or reconstruction tests.
 ---
 
-# Pi Durable in Purrable
+# Pi Durable in goblin
 
 Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native harness; do not rebuild these.
 
@@ -16,7 +16,7 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   makes a replayed tool find the same entry, and a write starts no run.
 - Extensions for one kind of conversation are installed in the registry but left out of `settings.extensions` (the
   default list), then added per conversation: `fork(..., { agent: { extensions: { add } } })` or `configure`.
-- `configure` changes only the fields it is given (`null` clears one). Purrable uses the per-conversation `tools`
+- `configure` changes only the fields it is given (`null` clears one). goblin uses the per-conversation `tools`
   filter for one thing: `{ remove: [subagent] }` where a conversation switched subagents off (`capabilities/`, ADR
   0010). A fork starts from its parent's agent at the fork entry, so a new thread sets its extensions (the host's plus
   the thread's, `instructions: null` to drop a subagent's), and its filter, explicitly (ADR 0017).
@@ -28,7 +28,7 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   (`share_back`, titles). Tools with side effects are `replay: 'unsafe'`.
 - Close aborts each closed conversation with `abort({ background: true })` so its relays stop too; never use a
   background abort on main, which owns memory and routine tasks. The workspace feed reads `watchTaskGraph()`:
-  a non-background task means working, a live `purrable.subagent-relay` means waiting. Stop or Close of a subagent
+  a non-background task means working, a live `goblin.subagent-relay` means waiting. Stop or Close of a subagent
   aborts the relays carrying to it first (`dropRelaysTo`): a relay parked on helpers would otherwise wake and report.
   A relay that waits on other tasks parks with `{ status: 'waiting', on, policy: 'allSettled' }` instead of holding its
   invocation.
@@ -37,7 +37,7 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
 - A task phase must commit durable progress: committing the same checkpoint again faults the task ("returned without
   durable progress"). A looping phase carries a counter. A faulted task skips its own clean-up, so whatever records a
   running task checks the task's record (`tx.task(id)`) instead of trusting a flag the task clears.
-- A head marker (`head` on an entry: compaction, reset, Purrable's `app.memory` view) starts the model's context and
+- A head marker (`head` on an entry: compaction, reset, goblin's `app.memory` view) starts the model's context and
   the snapshot at its head. Never write `head: 'self'` into a busy conversation: at a boundary it acts as a reset.
 - A tool that needs a person ends the run (`control: { terminate: true }`) and leaves plain text in its result. The
   answer is the next ordinary user message: never hold a run open waiting for the owner. `ask_user` and `mcp_call`'s
@@ -53,7 +53,7 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   eviction.
 
 Before changing an API call, read the current [documentation](https://developers.cloudflare.com/agents/harnesses/pi/) and the installed package's declarations; the
-lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how Purrable uses it today.
+lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how goblin uses it today.
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.

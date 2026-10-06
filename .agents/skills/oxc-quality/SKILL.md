@@ -1,11 +1,11 @@
 ---
 name: oxc-quality
-description: Configure or repair Purrable's Oxlint, Oxfmt, Effect diagnostics, graph boundaries, Knip, duplication, and agent checks. Use for quality-gate work.
+description: Configure or repair goblin's Oxlint, Oxfmt, Effect diagnostics, graph boundaries, Knip, duplication, and agent checks. Use for quality-gate work.
 ---
 
-# Purrable Oxc quality
+# goblin Oxc quality
 
-Keep the MyApps quality families at zero new findings. Adapt paths and runtime zones to Purrable; do not weaken a rule to clear a finding.
+Keep the MyApps quality families at zero new findings. Adapt paths and runtime zones to goblin; do not weaken a rule to clear a finding.
 
 - Oxlint is primary; Oxfmt owns formatting. Keep correctness, suspicious, TypeScript type-aware, import, unicorn, Oxc, anti-slop, complexity, boundary, and project-invariant rules at error.
 - Retain `require-safety-comment-for-type-assertion`, no chained assertions, no widening then asserting, no module mocking, no unknown returns, no reflection calls, and Effect tag/match rules. Every disable names the rule and ends with a concrete reason.
@@ -13,6 +13,6 @@ Keep the MyApps quality families at zero new findings. Adapt paths and runtime z
 - `tools/graph.ts` is the runtime/import authority. Keep `apps/runtime` cloud, `apps/web` with explicit server/browser zones, `packages/contracts` shared, `packages/ui` browser, and tools tooling. Workspace manifest edges and graph edges must agree.
 - Keep `process.env` out of runtime code; use Effect Config. Permit environment reads only in explicitly scoped test/build/tooling files.
 - Run Knip, jscpd, Effect diagnostics, and TypeScript as separate gates. A checker that cannot resolve a project must fail, not report zero.
-- New Purrable code starts without a lint baseline. If a legacy finding is discovered, record the exact file/rule/reason and resolve it before merging.
+- New goblin code starts without a lint baseline. If a legacy finding is discovered, record the exact file/rule/reason and resolve it before merging.
 
 Canonical commands are `bun run format:check`, `bun run agents:check`, `bun run graph`, `bun run dupes`, `bun run typecheck`, `bun run effect:check`, `bun run lint`, `bun run knip`, and `bun run test`; `check:files` is the inner loop. `heavy` is coordinator-owned.

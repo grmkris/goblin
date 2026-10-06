@@ -6,7 +6,7 @@ Deployment scripts use Alchemy only. Secrets are read from mode-600 files under 
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | `bun dev`                                        | Local stack on `http://localhost:18971` (workerd), model calls through CLIProxy.           |
 | `bun run plan:dev`                               | Preview changes to the retained dev stage.                                                 |
-| `bun run deploy:dev`                             | Deploy the dev stage (`https://dev.purrable.lol`).                                         |
+| `bun run deploy:dev`                             | Deploy the dev stage (`https://dev.goblin.surf`).                                          |
 | `bun run destroy:dev -- --confirm-reset`         | Erase the dev stage: every account, conversation and MCP credential.                       |
 | `bun run smoke:dev`                              | Acceptance against the deployed dev stage.                                                 |
 | `bun run smoke:local`                            | The same acceptance against the local stack.                                               |
@@ -19,15 +19,15 @@ Cloudflare API credentials.
 
 ## Smoke
 
-The smoke needs `PURRABLE_OWNER_EMAIL` and `PURRABLE_OWNER_PASSWORD` for an account that already exists; it signs in
-but never registers one. It uses the stage's `PURRABLE_APP_URL` over HTTPS, or
+The smoke needs `GOBLIN_OWNER_EMAIL` and `GOBLIN_OWNER_PASSWORD` for an account that already exists; it signs in
+but never registers one. It uses the stage's `GOBLIN_APP_URL` over HTTPS, or
 `http://localhost:18971`.
 
 The smoke spends model tokens and writes conversation history: turns in main, a new side thread and a background
 subagent. It leaves the owner's grants unchanged and renews resident authority through owner requests. With
-`PURRABLE_SMOKE_MODEL` set, it temporarily selects that offered model (`PURRABLE_MODEL_ID` or `PURRABLE_MODELS`) and
+`GOBLIN_SMOKE_MODEL` set, it temporarily selects that offered model (`GOBLIN_MODEL_ID` or `GOBLIN_MODELS`) and
 attempts to restore the owner's effective pick in `finally`, including after a failed step. Unset, turns use the
-owner's pick. Housekeeping still uses `PURRABLE_MEMORY_MODEL`.
+owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
 
 1. health; unless sign-up is open, a sign-up without the invite code is refused; sign-in, resident authority
    `active`, a main-thread snapshot;
@@ -40,7 +40,7 @@ owner's pick. Housekeeping still uses `PURRABLE_MEMORY_MODEL`.
 5. a `smokecount` subagent spawned from main, its authored report back, and main's reply to the report;
 6. `/api/agent/memory`: a nonzero remembered-message count and the current view coverage.
 
-Inbound turns run in main as `purrable-smoke`. The thread is archived and the client revoked through `finally` cleanup;
+Inbound turns run in main as `goblin-smoke`. The thread is archived and the client revoked through `finally` cleanup;
 their history and the subagent remain. If Telegram is on, main's answer to the subagent report is also queued for
 delivery there. Cleanup requests can themselves fail.
 
@@ -53,7 +53,7 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 | `stage`, `signup`, `resident`, `model` | Target stage, sign-up mode, active authority and smoke model or `owner pick`.                                  |
 | `servers`                              | Server statuses, tool/grant counts and probe outcome (`ok`, `error` or `not-granted`).                         |
 | `inbound`                              | Initialization, model turn, optional resident tool call, recent history and revocation followed by 401.        |
-| `inbound.author`                       | `ok`: the smoke user's message has author `purrable-smoke`.                                                    |
+| `inbound.author`                       | `ok`: the smoke user's message has author `goblin-smoke`.                                                      |
 | `thread`, `shared`                     | `ok` and `true`: the empty thread ran and wrote a new `app.shared` entry to main.                              |
 | `subagent`                             | `reported`: the report reached main and main answered it.                                                      |
 | `memory.messages`                      | Messages logged since memory activation; must be greater than zero.                                            |
@@ -63,12 +63,12 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 Not covered here: the owner's Connect flow (it needs the owner at the remote server's consent screen), rendering
 MCP Apps, the browser UI, thread branching, memory-summary quality, skills, and Telegram hook/inbox acceptance.
 
-Prod commands use `.local/prod.env` and require `PURRABLE_CONFIRM_PROD=1` in the calling shell:
+Prod commands use `.local/prod.env` and require `GOBLIN_CONFIRM_PROD=1` in the calling shell:
 `bun run plan:prod`, `bun run deploy:prod`, `bun run smoke:prod`. There is no destroy-prod command.
 `smoke:prod` defaults to GET `/health` and GET `/api/conversations` without authentication (expected 401).
 Only supplying both credentials for an operator test account enables the full acceptance flow, including model turns.
 Never put the production owner's credentials in the smoke configuration.
 
-`PURRABLE_DOMAIN` attaches the stage's custom domain through Alchemy: `dev.purrable.lol` on dev, `purrable.lol` on
-prod, plus `www.purrable.lol` on prod. The Worker redirects alternate hosts to `PURRABLE_APP_URL`, preserving the path
+`GOBLIN_DOMAIN` attaches the stage's custom domain through Alchemy: `dev.goblin.surf` on dev, `goblin.surf` on
+prod, plus `www.goblin.surf` on prod. The Worker redirects alternate hosts to `GOBLIN_APP_URL`, preserving the path
 and query (301 for GET/HEAD, 308 for writes). Dev sign-up must be closed or invite-only.
