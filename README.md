@@ -31,6 +31,12 @@ grant tools explicitly, choose an offered model, and see the per-account daily t
 to ask questions the owner answers in their next message. The owner attaches files to a message with the composer's
 paperclip; the agent reads them and writes its own results beside them, kept per agent in SQLite and R2.
 
+The agent builds apps for its owner from ordinary conversation (ADR 0021): small programs goblin runs in Cloudflare
+Dynamic Workers, with durable state, actions and views that become the agent's tools, an optional live UI drawn with
+goblin's components, charts, maps and diagrams, schedules that run on their own, and powers (the web, the owner's MCP
+tools, a cheap model, Telegram, other apps) that each wait for the owner's Allow. The Apps page lists them; an app can
+fill the workspace with its conversation docked beside it, roll back to an earlier version, or be deleted.
+
 Workspace layout uses [Trellis 0.3.0 by Dan Fessler](https://github.com/DanFessler/trellis), under its commercial
 license and goblin-specific permission: goblin may use it without sponsorship until it makes money, in exchange
 for crediting Dan and allowing him to showcase goblin as a Trellis user. When revenue starts, Kris maintains the
