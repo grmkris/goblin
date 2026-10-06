@@ -15,6 +15,7 @@ answer back to the conversation that started them and close when done; the owner
 newest exchange verbatim.
 
 Tool calls expand in place to readable input and output, with folding JSON branches, full-value copying and a Raw view.
+The agent's replies draw Mermaid diagrams, charts and maps from fenced blocks, in the theme's colours.
 
 Telegram comes through a mygram MCP connection. The owner turns on a server's **Telegram** switch in Connections; signed
 MCP Events wake an authoritative inbox pull into main, and replies go back with `send_message`. Older servers use
