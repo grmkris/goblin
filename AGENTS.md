@@ -37,6 +37,8 @@ infrastructure. Read
   bundles or persist them in transcripts, logs or docs. Outbound OAuth tokens are encrypted at rest in the Agent DO.
 - The `dev` stage is the daily instance, with real users' data: treat it as real. Schema changes there are additive
   migrations. A user only ever reaches their own agent; never add a route that takes an agent name from the request.
+  The one exception is the read-only operator resource of [ADR 0024](docs/adr/0024-observing-conversations.md):
+  stage-allowlisted operators, checked on every request, every read recorded. Telemetry never carries content.
 
 ## Quality
 
