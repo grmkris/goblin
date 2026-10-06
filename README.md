@@ -55,7 +55,7 @@ bun run check      # the full gate (run it through `heavy` on the build box)
 The deployment stages are `dev` at `dev.goblin.surf` and `prod` at `goblin.surf`, with separate auth databases,
 secrets and dedicated LiteLLM keys. Alchemy can attach the custom domains; deployment and live acceptance are operator
 steps. Alternate hosts redirect to the configured canonical origin. Dev sign-up stays closed or invite-only; prod
-supports open sign-up only with verified mail sending. Both stages use `hello@goblin.surf` after sender onboarding,
+supports open sign-up after sender verification. Email OTP is the sole login method, and every stage requires mail. Both stages use `hello@goblin.surf` after sender onboarding,
 with a host prefix on dev mail subjects. See [development](docs/development.md) for the production guard and smoke.
 
 Pro has no free tier or trial and includes 2 million weighted tokens per account per UTC day. Dodo checkout grants

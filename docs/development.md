@@ -42,8 +42,11 @@ bun dev                 # Alchemy runs the Worker in local workerd on http://loc
 Model calls go through CLIProxy and inherit `CLIPROXY_API_KEY` from the interactive shell. The local stage supplies
 its own auth secret and credential key and opens sign-up; set them in `.local/local.env` only to override.
 
-Open the app and use **Create an account**. Each account gets its own agent. For `bun run smoke:local`, put that
-account's email and password in `GOBLIN_OWNER_EMAIL` and `GOBLIN_OWNER_PASSWORD`.
+Open the app and use **Create an account**, enter an email and the six-digit code captured under
+`apps/web/.alchemy/local/email/`. Each account gets its own agent after plan admission. Smoke uses the session from
+an actual OTP login: store `{"origin":"http://localhost:18971","cookie":"<session cookie>"}` in
+`.local/local-session.json` with mode 600, then configure `GOBLIN_OWNER_EMAIL` and `GOBLIN_SMOKE_SESSION_FILE`. Never
+print or commit the cookie. Smoke validates the file origin and the authenticated owner before making agent calls.
 
 ## Gates
 
@@ -66,9 +69,10 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | Variable | Meaning |
 | --- | --- |
 | `GOBLIN_STAGE`, `GOBLIN_APP_URL` | `dev` and the Worker's HTTPS origin. |
+| `GOBLIN_DOMAIN`, `GOBLIN_ZONE_ID` | Custom hostname and its Cloudflare zone ID. |
 | `GOBLIN_SIGNUP_MODE`, `GOBLIN_SIGNUP_INVITE_CODE` | `open`, `invite` or `closed` (default), and the invite code. |
-| `GOBLIN_MAIL_SENDER` | A sender on an Email Sending apex; turns on email verification. |
-| `GOBLIN_OWNER_EMAIL`, `GOBLIN_OWNER_PASSWORD` | An existing account; only the smoke reads them. |
+| `GOBLIN_MAIL_SENDER` | Required OTP sender on a Cloudflare Email Sending domain. |
+| `GOBLIN_OWNER_EMAIL`, `GOBLIN_SMOKE_SESSION_FILE` | Existing owner email and mode-600 OTP session JSON; only smoke reads them. |
 | `GOBLIN_BETTER_AUTH_SECRET` | Better Auth's secret. |
 | `GOBLIN_MODEL_BASE_URL`, `GOBLIN_MODEL_ID`, `GOBLIN_MODEL_KEY` | Railway LiteLLM and the dedicated capped key. Never the master key. |
 | `GOBLIN_MODELS` | More LiteLLM model names users may pick, comma-separated; `GOBLIN_MODEL_ID` stays the default. Allow each on the LiteLLM key too. |
@@ -193,13 +197,12 @@ Unit tests, local workerd and the deployed dev stage are separate kinds of evide
 `.local/prod.env` is mode 600, with fresh auth and credential secrets. Fill its model key with a dedicated Railway
 LiteLLM virtual key; never the master key. Set `GOBLIN_DOMAIN=goblin.surf` and
 `GOBLIN_APP_URL=https://goblin.surf`; dev uses `dev.goblin.surf` for both. Set `GOBLIN_MAIL_SENDER=hello@goblin.surf`
-only after Cloudflare Email Sending verifies the sender. Prod open sign-up requires mail; dev must stay closed or
+only after Cloudflare Email Sending verifies the sender. Every stage requires OTP mail; dev must stay closed or
 invite-only. These settings do not authorize a production deploy.
 
 `GOBLIN_CONFIRM_PROD=1 bun run plan:prod` previews, and the same explicit guard protects `deploy:prod` and
 `smoke:prod`. The default prod smoke is read-only: health and an anonymous protected-route probe. An operator smoke
-account's credentials opt into the full flow. After dev's origin changes, sign in by email code and register new
-passkeys; reconnect MCP clients at the new origins.
+account's mode-600 OTP session file opts into the full flow. MCP clients authorize against the stage's origin.
 
 ## Billing development and acceptance
 
@@ -209,8 +212,8 @@ binds them as Worker secrets. Choose a goblin-only recurring $10/month product w
 master model key or print payment keys. Configure a separate Standard Webhooks endpoint at `/hooks/dodo` per stage.
 `/health` reports the stage billing mode and whether billing is configured; missing keys never bypass admission.
 
-The additive billing migration grants users already in D1 a dev-only Pro override. It grants nothing on prod or for
-new signups. An operator can insert/update `app_billing_accounts` for a known user ID, setting `plan_override='pro'`,
+The billing migration grants existing users a dev-only Pro override; a fresh database has no such users. New OTP
+signups need an operator override or test billing. Overrides grant nothing outside their configured stage. An operator can insert/update `app_billing_accounts` for a known user ID, setting `plan_override='pro'`,
 `override_stage` to the intended stage, `daily_tokens` to a positive allowance and both timestamps in milliseconds.
 Remove the override to test paid access. A fresh local user also needs test billing or an explicit local override.
 

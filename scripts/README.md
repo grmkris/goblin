@@ -5,12 +5,12 @@ Deployment scripts use Alchemy only. Secrets are read from mode-600 files under 
 | Command                                          | What it does                                                                               |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | `bun dev`                                        | Local stack on `http://localhost:18971` (workerd), model calls through CLIProxy.           |
-| `bun run plan:dev`                               | Preview changes to the retained dev stage.                                                 |
+| `bun run plan:dev`                               | Preview changes to the dev stage.                                                          |
 | `bun run deploy:dev`                             | Deploy the dev stage (`https://dev.goblin.surf`).                                          |
 | `bun run destroy:dev -- --confirm-reset`         | Erase the dev stage: every account, conversation and MCP credential.                       |
 | `bun run smoke:dev`                              | Acceptance against the deployed dev stage.                                                 |
 | `bun run smoke:local`                            | The same acceptance against the local stack.                                               |
-| `bun run icons`                                  | Redraw the app icons and favicon in `apps/web/public` from the one cat mark.               |
+| `bun run icons`                                  | Redraw the app icons and favicon in `apps/web/public` from the one cat mark.         |
 | `heavy bun scripts/patch-shadcn-react.ts --test` | Rebuild the MessageScroller patch from upstream source (`patches/shadcn-react/README.md`). |
 
 Stage configuration comes from `.local/<stage>.env` (see `.env.example`); `plan:dev`, `deploy:dev` and `destroy:dev`
@@ -19,9 +19,10 @@ Cloudflare API credentials.
 
 ## Smoke
 
-The smoke needs `GOBLIN_OWNER_EMAIL` and `GOBLIN_OWNER_PASSWORD` for an account that already exists; it signs in
-but never registers one. It uses the stage's `GOBLIN_APP_URL` over HTTPS, or
-`http://localhost:18971`.
+The smoke needs `GOBLIN_OWNER_EMAIL` and `GOBLIN_SMOKE_SESSION_FILE`. Capture a session through a real OTP login,
+then save `{"origin":"https://dev.goblin.surf","cookie":"<session cookie>"}` in a mode-600 private JSON file.
+Smoke checks that origin, validates the live session and verifies its owner email before agent requests. It never
+requests a login code or creates an account. Local uses `http://localhost:18971` and Alchemy's captured `.eml` code.
 
 The smoke spends model tokens and writes conversation history: turns in main, a new side thread and a background
 subagent. It leaves the owner's grants unchanged and renews resident authority through owner requests. With
@@ -66,9 +67,9 @@ MCP Apps, the browser UI, thread branching, memory-summary quality, skills, and 
 Prod commands use `.local/prod.env` and require `GOBLIN_CONFIRM_PROD=1` in the calling shell:
 `bun run plan:prod`, `bun run deploy:prod`, `bun run smoke:prod`. There is no destroy-prod command.
 `smoke:prod` defaults to GET `/health` and GET `/api/conversations` without authentication (expected 401).
-Only supplying both credentials for an operator test account enables the full acceptance flow, including model turns.
-Never put the production owner's credentials in the smoke configuration.
+Only supplying the email and private OTP session file for an operator test account enables the full acceptance flow, including model turns.
+Use a dedicated operator test account for production smoke.
 
-`GOBLIN_DOMAIN` attaches the stage's custom domain through Alchemy: `dev.goblin.surf` on dev, `goblin.surf` on
+`GOBLIN_DOMAIN` with the required `GOBLIN_ZONE_ID` attaches the stage's custom domain through Alchemy: `dev.goblin.surf` on dev, `goblin.surf` on
 prod, plus `www.goblin.surf` on prod. The Worker redirects alternate hosts to `GOBLIN_APP_URL`, preserving the path
 and query (301 for GET/HEAD, 308 for writes). Dev sign-up must be closed or invite-only.

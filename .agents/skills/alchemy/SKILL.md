@@ -20,4 +20,4 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
 
-- Custom domains come from `GOBLIN_DOMAIN`; the Worker canonical origin, auth, passkeys and mail links come from `APP_URL`. Dev sign-up is closed or invite-only. Prod smoke defaults to reads until an operator test account is supplied.
+- Custom domains require `GOBLIN_DOMAIN` and `GOBLIN_ZONE_ID`; the Worker canonical origin, OTP auth and inbound MCP metadata come from `APP_URL`. Every stage requires an OTP mail sender. Dev sign-up is closed or invite-only. Prod smoke defaults to reads until an operator test account is supplied.

@@ -41,3 +41,5 @@ itself authorize model spend, external messages, deployment or production change
 - Owner API/Apps tests use real auth D1 and PersonalAgent with a deterministic model and official injected MCP
   transport. Verify two-account isolation with forged selectors, removed access endpoints, per-call Apps and live
   grants. Applied dormant migrations remain intact.
+
+- Auth fixtures inject mail capture and use actual OTP endpoints against native D1. No capture endpoint ships in the deployed Worker. Verify closed/invite policy at send and sign-in, hashing, expiry, attempts, replay, rate limits, mail-failure cleanup and fresh-session deletion.
