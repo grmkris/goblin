@@ -71,6 +71,7 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_STAGE`, `GOBLIN_APP_URL` | `dev` and the Worker's HTTPS origin. |
 | `GOBLIN_DOMAIN`, `GOBLIN_ZONE_ID` | Custom hostname and its Cloudflare zone ID. |
 | `GOBLIN_SIGNUP_MODE`, `GOBLIN_SIGNUP_INVITE_CODE` | `open`, `invite` or `closed` (default), and the invite code. |
+| `GOBLIN_OPERATORS` | User ids allowed on `/mcp/operator` to read any user's agent (ADR 0024), comma separated. Empty (default): none. |
 | `GOBLIN_MAIL_SENDER` | Required OTP sender on a Cloudflare Email Sending domain. |
 | `GOBLIN_OWNER_EMAIL`, `GOBLIN_SMOKE_SESSION_FILE` | Existing owner email and mode-600 OTP session JSON; only smoke reads them. |
 | `GOBLIN_BETTER_AUTH_SECRET` | Better Auth's secret. |
@@ -167,6 +168,16 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 
   Sign in and approve in the browser. It gets `ask_agent` and `get_recent_messages` in the agent's main conversation,
   with its messages labelled by client name. Revoke it under Settings → Apps that use your agent.
+- **Inspect your agent from a coding agent** (ADR 0024).
+
+  ```sh
+  claude mcp add --transport http goblin-inspect https://dev.goblin.surf/mcp/inspect
+  ```
+
+  The consent page says it reads your conversations and runs. Start with `inspect_problems` or `inspect_turns`, then
+  `inspect_turn` with an operation id (a Telegram message is `telegram-<id>`), then `inspect_conversation` for the
+  words. An operator listed in `GOBLIN_OPERATORS` adds `https://dev.goblin.surf/mcp/operator` the same way and passes
+  `user` (id or email) to every tool; `operator_reads` lists what they read.
 
 ## Changing things
 
