@@ -135,11 +135,12 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   fallback. Connections shows which transport is active. New inbox messages arrive in main as **Telegram**, including
   answers to pending questions, and replies go back to the bot. Turning it off unsubscribes and clears pending
   replies.
-- **Resident authority.** Settings shows when it expires. Owner activity renews it for 30 days; inbound and scheduled
-  work do not renew it. Revoke stops all outbound MCP use by the agent until you enable it again.
+- **Resident authority.** Settings → Your agent → **Work while you're away** shows it and when it expires. Owner
+  activity renews it for 30 days; inbound and scheduled work do not renew it. Turning it off stops all outbound MCP
+  use by the agent until you turn it on again.
 - **MyPlan as an App.** The suggested MyPlan server uses `https://dev-new.myplan.lol/mcp` on local and dev
   (`apps/runtime/src/mcp/suggested.ts`); `PURRABLE_MCP_SERVERS` may configure another endpoint. Connect it, then switch
-  on **Allow app** under its discovered `ui://` resource group. Ask the agent to open a note ("Open my Trip plan
+  on **Its App** above the tools that App uses. Ask the agent to open a note ("Open my Trip plan
   note"); the App opens in place under the tool row (on an older call, open the row and press *Show app*). Its bar
   opens it as a page beside the conversation or closes it; on the page, the pill's menu brings it back, fills the
   workspace or closes it. Several Apps run at once, in any conversation; beyond six the least recently seen unloads to
@@ -153,7 +154,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   ```
 
   Sign in and approve in the browser. It gets `ask_agent` and `get_recent_messages` in the agent's main conversation,
-  with its messages labelled by client name. Revoke it under Settings → Connected MCP clients.
+  with its messages labelled by client name. Revoke it under Settings → Apps that use your agent.
 
 ## Changing things
 
