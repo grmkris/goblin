@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-06",
+  "scope": "local synthetic Chromium fixture, no model calls or accounts",
+  "receipts": [
+    "All five figures render; tool Markdown and shared notes remain code.",
+    {
+      "light": {
+        "background": "oklch(0.985 0.002 90)",
+        "foreground": "oklch(0.17 0.01 255)"
+      },
+      "dark": {
+        "background": "oklch(0.2 0.006 255)",
+        "foreground": "oklch(0.94 0.004 90)"
+      }
+    },
+    {
+      "narrow": {
+        "viewport": 320,
+        "page": 320,
+        "figures": [
+          {
+            "width": 241,
+            "scroll": 241
+          },
+          {
+            "width": 241,
+            "scroll": 241
+          },
+          {
+            "width": 241,
+            "scroll": 241
+          },
+          {
+            "width": 241,
+            "scroll": 241
+          },
+          {
+            "width": 241,
+            "scroll": 241
+          }
+        ],
+        "compare": {
+          "width": 209,
+          "scroll": 352
+        }
+      }
+    },
+    {
+      "motion": {
+        "normal": "kit-mdxcn-entrance",
+        "reduced": "none"
+      }
+    },
+    "Streaming keeps an open complete-JSON fence as code, draws it when closed, and preserves the earlier figure DOM node.",
+    "Malformed, unknown, empty and unclosed specs remain readable code.",
+    "A component throw is contained by RichBlock and shows its original code.",
+    "Built mdxcn.js shares core React in an opaque, network-disabled frame; unavailable imports are refused."
+  ],
+  "errors": []
+}

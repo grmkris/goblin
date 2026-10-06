@@ -33,8 +33,8 @@ paperclip; the agent reads them and writes its own results beside them, kept per
 
 The agent builds apps for its owner from ordinary conversation (ADR 0021): small programs goblin runs in Cloudflare
 Dynamic Workers, with durable state, actions and views that become the agent's tools, an optional live UI drawn with
-goblin's components, charts, maps and diagrams, schedules that run on their own, and powers (the web, the owner's MCP
-tools, a cheap model, Telegram, other apps) that each wait for the owner's Allow. The Apps page lists them; an app can
+goblin's components, charts, maps, diagrams and mdxcn figures, schedules that run on their own, and powers (the web,
+the owner's MCP tools, a cheap model, Telegram, other apps) that each wait for the owner's Allow. The Apps page lists them; an app can
 fill the workspace with its conversation docked beside it, roll back to an earlier version, or be deleted.
 
 Every turn can be seen end to end (ADR 0024). Beside Pi's own record, each agent keeps a 30-day run ledger of how its

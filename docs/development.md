@@ -136,6 +136,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   off there hides it from the agent in that conversation only, and a new thread starts with the switches of the conversation it came from. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
 - **Questions, models and budget.** Answer an `ask_user` card with your next message. Pick an offered model in the
   composer; Settings and the composer's ring show today's token usage, resetting at 00:00 UTC.
+- **Figures.** Assistant replies can draw `mdxcn` JSON fences as a timeline, checklist, comparison, stats or spark.
+  An open streaming fence or an invalid spec stays readable code; tool output stays code too. Figures follow the
+  pane's width and light/dark theme, with entrance animation disabled under reduced motion. Agent-app views import
+  the same components from `@goblin/kit/mdxcn`; see `app_docs` topic `ui` for data props and examples.
 - **Skills.** Connect a server that offers skills, then turn on its **Use its skills** switch. The agent reads and
   follows those procedures; their tools still need grants. To receive drafts in a library such as MySkills, grant
   `skill_draft` and `skill_draft_status`, then review the proposals there.
