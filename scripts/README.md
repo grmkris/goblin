@@ -35,8 +35,8 @@ owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
 2. a small text file uploaded to the owner's `/uploads`, listed, read back byte for byte and deleted (ADR 0022);
 3. each configured or owner-added MCP server's status; for a connected server, its tools, and a direct call of a
    read-only probe (`account_read` on MyPlan, `browser_backends` on MyBrowser) only if the owner has already granted it;
-4. an inbound MCP client: dynamic registration, owner consent, PKCE token, `/mcp` `initialize` and `tools/list`, an
-   `ask_agent` model turn, an agent turn that calls the MyPlan probe through `mcp_call` (only if step 2 proved it),
+4. an inbound MCP client: dynamic registration, owner consent including `goblin:inspect`, PKCE token, `/mcp`
+   `initialize` and `tools/list` with the five inspection tools, an `inspect_problems` read, an `ask_agent` model turn, an agent turn that calls the MyPlan probe through `mcp_call` (only if step 2 proved it),
    `get_recent_messages` with the smoke client's author label, then revocation and a 401;
 5. a new empty thread, a model turn there, `share_back` verified as a new `app.shared` entry in main, then close;
 6. a `smokecount` subagent spawned from main, its authored report back, and main's reply to the report;
@@ -59,7 +59,7 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 | `servers`                              | Server statuses, tool/grant counts and probe outcome (`ok`, `error` or `not-granted`).                         |
 | `files`                                | `ok`: the owner's file round trip, the file deleted again.                                                     |
 | `app`                                  | `ok`: an agent app built, run by the owner (revision +1) and deleted.                                          |
-| `inbound`                              | Initialization, model turn, optional resident tool call, recent history and revocation followed by 401.        |
+| `inbound`                              | Initialization, inspection read, model turn, optional resident tool call, recent history and 401 after revoke. |
 | `inbound.author`                       | `ok`: the smoke user's message has author `goblin-smoke`.                                                      |
 | `thread`, `shared`                     | `ok` and `true`: the empty thread ran and wrote a new `app.shared` entry to main.                              |
 | `subagent`                             | `reported`: the report reached main and main answered it.                                                      |
