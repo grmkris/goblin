@@ -34,6 +34,16 @@ conversation outside it.
   grant. No cross-server calls, no credentials in iframe state, browser bundles, logs or transcripts.
 - Keep the plain tool-result fallback for hosts or results without an App. Unimplemented host methods stay
   unsupported.
+- The transcript scrolls in `Conversation` (`components/conversation.tsx`) over the patched @shadcn/react
+  MessageScroller (`patches/shadcn-react/README.md`; `bun run check:patches` proves the patch is installed). Only
+  the owner's own turns are scroll anchors (`isOwnTurn` in `lib/parts.ts`); keep part ids stable across a reply's
+  commit and give every row a `messageId`, because the scroller tells appends, prepends and new anchors apart by rows.
+  Rows render without `content-visibility`, so measurements are real heights. While the snapshot is loading the
+  transcript shows nothing, so it opens at its end.
+- The turn map (`components/turn-map.tsx`, geometry in `lib/turn-map.ts`) sits in the transcript's right gutter with
+  `data-app-cover`: a mark per own turn where it is, a band for what is on screen, a hover list that jumps with
+  `scrollToMessage`, and an edge tab with a bottom sheet where there is no fine pointer or room. It measures turns
+  without the scroller's tail spacer and draws in SVG attributes, never inline styles.
 - A real browser render and a permitted App interaction are separate evidence from unit tests.
 
 Before changing an API call, read the current [documentation](https://apps.extensions.modelcontextprotocol.io/) and the installed package's declarations; the
