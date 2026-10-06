@@ -176,6 +176,11 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - Auth tables: Better Auth's schema lives in `apps/runtime/migrations` and is applied by the Alchemy D1 resource.
 - Bindings: declare them in `apps/runtime/src/env.ts` and `apps/web/alchemy.run.ts` together, and in the integration
   stacks (`apps/runtime/test/integration/*-stack.ts`, `stack.ts`) when the runtime reads them.
+- Agent apps: `packages/app` holds the SDK, release entry, transpiler and the agent's docs; `bun run build` there writes
+  `dist/toolchain.js`, which the runtime bundles. `bun dev`, deploys and the integration tests build it first; run it
+  yourself after editing `packages/app/src` or `docs` for an editor or a unit test. Local workerd runs Dynamic Workers
+  (`--experimental`, which Alchemy passes) but enforces no CPU limit: never test an app with a busy loop locally. A
+  change to the SDK or release entry changes the toolchain hash, so every app's next build is a new release.
 - The owner's files: the `FILES` R2 bucket is local under Alchemy's workerd state in `bun dev` and the integration
   stacks, so nothing reaches a real bucket. Shell's `cf_workspace_*` tables are vendor-owned, like `pi_*`: migrations
   never touch them (ADR 0022).

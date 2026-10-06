@@ -16,6 +16,12 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   makes a replayed tool find the same entry, and a write starts no run.
 - Extensions for one kind of conversation are installed in the registry but left out of `settings.extensions` (the
   default list), then added per conversation: `fork(..., { agent: { extensions: { add } } })` or `configure`.
+- Agent apps (ADR 0021) are the exception that is live: `settings.extensions` is a getter over the defaults plus the
+  apps' extensions (`pi/harness.ts`), read at every use, so `registry.install` of an app's extension is offered from
+  the next model request. Never add one per conversation with `configure({ extensions: { add } })`: it replaces the
+  stored add list (a thread would lose its own). The harness factory restores the apps (migrations, then installs)
+  before `Harness.open`, because it runs before `onStart`. A generated tool pins its release with
+  `api.memo('goblin.release', …)` and uses `c<conversation>:<call>` as its operation id.
 - `configure` changes only the fields it is given (`null` clears one). goblin uses the per-conversation `tools`
   filter for one thing: `{ remove: [subagent] }` where a conversation switched subagents off (`capabilities/`, ADR
   0010). A fork starts from its parent's agent at the fork entry, so a new thread sets its extensions (the host's plus
