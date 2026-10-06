@@ -37,6 +37,12 @@ goblin's components, charts, maps and diagrams, schedules that run on their own,
 tools, a cheap model, Telegram, other apps) that each wait for the owner's Allow. The Apps page lists them; an app can
 fill the workspace with its conversation docked beside it, roll back to an earlier version, or be deleted.
 
+Every turn can be seen end to end (ADR 0024). Beside Pi's own record, each agent keeps a 30-day run ledger of how its
+turns ran: model attempts, tool calls, retries, MCP steps, Telegram replies, timings, tokens and errors, never content.
+Workers Logs and Traces carry the same ids. A coding agent reads the owner's conversations and any turn's timeline
+through goblin's read-only `/mcp/inspect` endpoint or the `goblin` CLI (`apps/cli`), the agent answers "why did that
+fail?" with its own `diagnose` tool, and allowlisted operators can read any agent, each read recorded on their side.
+
 Workspace layout uses [Trellis 0.3.0 by Dan Fessler](https://github.com/DanFessler/trellis), under its commercial
 license and goblin-specific permission: goblin may use it without sponsorship until it makes money, in exchange
 for crediting Dan and allowing him to showcase goblin as a Trellis user. When revenue starts, Kris maintains the
