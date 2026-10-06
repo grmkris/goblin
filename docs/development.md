@@ -95,6 +95,9 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 
 ## Using it
 
+- **Tool details.** Open a tool line in a conversation to inspect Input and Output. JSON branches fold, long strings
+  offer Show more, and large arrays load 50 items at a time. Tree and Raw switch the presentation; Copy keeps the
+  full original input or output. Plain-text results remain readable. This also works on existing conversation history.
 - **Add a server.** Connections → Add a server. **Suggested** adds and connects one of ours in one tap. **Search**
   searches the MCP registries; add your own under Registries searched. **By address** takes any MCP address (public
   https only). Servers without sign-in connect directly; the suggestions mark DeepWiki, Context7 and Cloudflare Docs
