@@ -170,8 +170,8 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   ```
 
   Sign in and approve in the browser. It gets `ask_agent` and `get_recent_messages` in the agent's main conversation,
-  with its messages labelled by client name, and, if you allow it on the consent page, the read-only inspection tools
-  (ADR 0024). Revoke it under Settings → Apps that use your agent. A connection made before inspection joined `/mcp`
+  with its messages labelled by client name, and, if you turn on "Also let it read your conversations and runs" on
+  the consent page (it starts off), the read-only inspection tools (ADR 0024). Revoke it under Settings → Apps that use your agent. A connection made before inspection joined `/mcp`
   gets those tools after reconnecting once (in Claude Code: `/mcp` → goblin → Clear authentication).
 - **Inspect your agent from a coding agent.** Start with `inspect_problems` or `inspect_turns`, then `inspect_turn`
   with an operation id (a Telegram message is `telegram-<id>`), then `inspect_conversation` for the words. Reading
