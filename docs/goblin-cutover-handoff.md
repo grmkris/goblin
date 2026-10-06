@@ -115,5 +115,11 @@ subsequent Apps changes must be additive; do not reset its stores to reproduce t
 - The pending Apps implementation must preserve these gates, use additive migrations only, and deploy each green
   milestone to `dev.goblin.surf`. Re-run `heavy bun run check` before claiming completion.
 
+The concurrent-handoff gate rerun initially failed at `native.test.ts:240`: the routine-usage fixture did not reach its
+expected `failed` state and returned `500`. The unchanged focused test passed on `GOBLIN_HARNESS_PORT=18931`, and
+`GOBLIN_HARNESS_PORT=18931 heavy bun run check` then passed fully. No runtime files were changed; the first failure's
+cause is not established. Logs are `/tmp/goblin-handoff-check.log`, `/tmp/goblin-handoff-routine-check.log` and
+`/tmp/goblin-handoff-check-retry.log`.
+
 The pending plan's SHA-256 at handoff is
 `4fbe0a99abb964d385b951a8090366e1c53b2afdb04c00bdc335acfc91526e30`; it was read but not modified.
