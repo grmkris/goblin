@@ -166,18 +166,14 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   ```
 
   Sign in and approve in the browser. It gets `ask_agent` and `get_recent_messages` in the agent's main conversation,
-  with its messages labelled by client name. Revoke it under Settings → Apps that use your agent.
-- **Inspect your agent from a coding agent** (ADR 0024).
-
-  ```sh
-  claude mcp add --transport http goblin-inspect https://dev.goblin.surf/mcp/inspect
-  ```
-
-  The consent page says it reads your conversations and runs. Start with `inspect_problems` or `inspect_turns`, then
-  `inspect_turn` with an operation id (a Telegram message is `telegram-<id>`), then `inspect_conversation` for the
-  words.
-- **The `goblin` CLI** (`apps/cli`) is the same inspection from a terminal: an MCP client of `/mcp/inspect`, whose
-  commands come from the server's tools.
+  with its messages labelled by client name, and, if you allow it on the consent page, the read-only inspection tools
+  (ADR 0024). Revoke it under Settings → Apps that use your agent. A connection made before inspection joined `/mcp`
+  gets those tools after reconnecting once (in Claude Code: `/mcp` → goblin → Clear authentication).
+- **Inspect your agent from a coding agent.** Start with `inspect_problems` or `inspect_turns`, then `inspect_turn`
+  with an operation id (a Telegram message is `telegram-<id>`), then `inspect_conversation` for the words. Reading
+  needs no plan; `ask_agent` does.
+- **The `goblin` CLI** (`apps/cli`) is the same from a terminal: an MCP client of `/mcp` that asks for
+  `goblin:inspect`, whose commands come from the server's tools.
 
   ```sh
   bun run goblin login                  # once: prints the sign-in URL; approve in a browser

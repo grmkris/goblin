@@ -40,8 +40,8 @@ fill the workspace with its conversation docked beside it, roll back to an earli
 Every turn can be seen end to end (ADR 0024). Beside Pi's own record, each agent keeps a 30-day run ledger of how its
 turns ran: model attempts, tool calls, retries, MCP steps, Telegram replies, timings, tokens and errors, never content.
 Workers Logs and Traces carry the same ids. A coding agent reads the owner's conversations and any turn's timeline
-through goblin's read-only `/mcp/inspect` endpoint or the `goblin` CLI (`apps/cli`), and the agent answers "why did that
-fail?" with its own `diagnose` tool.
+through the read-only inspection tools of goblin's one MCP endpoint, `/mcp` (when the owner grants `goblin:inspect`), or
+the `goblin` CLI (`apps/cli`), and the agent answers "why did that fail?" with its own `diagnose` tool.
 
 Workspace layout uses [Trellis 0.3.0 by Dan Fessler](https://github.com/DanFessler/trellis), under its commercial
 license and goblin-specific permission: goblin may use it without sponsorship until it makes money, in exchange

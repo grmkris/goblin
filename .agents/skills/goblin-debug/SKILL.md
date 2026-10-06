@@ -1,6 +1,6 @@
 ---
 name: goblin-debug
-description: Find out what happened in a goblin turn (a Telegram message with no answer, a failing MCP tool, a slow or wrong reply) from the run ledger and conversations, via /mcp/inspect, the goblin CLI or Workers Logs.
+description: Find out what happened in a goblin turn (a Telegram message with no answer, a failing MCP tool, a slow or wrong reply) from the run ledger and conversations, via the inspect tools on /mcp, the goblin CLI or Workers Logs.
 ---
 
 # Debugging a goblin turn
@@ -10,9 +10,11 @@ is read-only: no query changes the agent or calls a model.
 
 ## Get access
 
-- MCP: `claude mcp add --transport http goblin-inspect https://dev.goblin.surf/mcp/inspect`, then the owner approves
-  in the browser. Tools: `inspect_problems`, `inspect_turns`, `inspect_turn`, `inspect_conversation`,
-  `inspect_conversations`.
+- MCP: `claude mcp add --transport http goblin https://dev.goblin.surf/mcp`, then the owner approves in the browser,
+  inspection included (`goblin:inspect`). Tools: `inspect_problems`, `inspect_turns`, `inspect_turn`,
+  `inspect_conversation`, `inspect_conversations`, beside `ask_agent`. A connection that lists no `inspect_*` tools
+  was approved before inspection joined `/mcp`: reconnect once (Claude Code: `/mcp` → goblin → Clear
+  authentication).
 - Terminal: `bun run goblin login` once, then `bun run goblin problems|turns|turn|conversation|logs …`
   (`--origin http://localhost:18971` for a local stack, `--json` for the raw result).
 
@@ -52,6 +54,7 @@ found in it.
 ## Changing the instrumentation
 
 The ledger lives in `apps/runtime/src/telemetry/` and follows Pi's commit listener (`telemetry/pi.ts`); inspection is
-`apps/runtime/src/inspect/`; the endpoints are `apps/runtime/src/inbound/inspect-*.ts`. A listener that throws faults
+`apps/runtime/src/inspect/`; the MCP tools are `apps/runtime/src/inbound/inspection.ts`, added to `/mcp` by
+`inbound/route.ts` for a token whose consent grants `goblin:inspect`. A listener that throws faults
 the user's task, so every sink stays guarded. Never read Pi's vendor tables directly; tests drive real Pi
 (`test/telemetry.test.ts`) and local workerd (`test/integration/native-telemetry.ts`, `auth-inspect.ts`).
