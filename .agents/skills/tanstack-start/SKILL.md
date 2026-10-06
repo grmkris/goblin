@@ -24,3 +24,5 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
+
+- Home (ADR 0025) belongs only to Main and uses the existing MessageScroller/dock. Fixed geometry, shared order/size, page > Home > inline slots and one canonical App frame are invariants. Owner edit mode is device-local; gestures preserve native scrolling, carry release velocity, have keyboard equivalents and respect reduced motion. The installed iPhone cold-launch check belongs to the owner.

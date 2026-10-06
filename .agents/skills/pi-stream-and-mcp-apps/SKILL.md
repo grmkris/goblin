@@ -31,7 +31,7 @@ conversation outside it.
   with its CSP; validate message origin and source.
 - Apps are kept per call in the runtime registry (`apps/registry.ts`, ADR 0020) and listed by the workspace feed;
   keeping or launching one grants nothing. Several live at once, one instance each (`components/apps/host.tsx`), each
-  iframe in its own fixed stage (`stage.tsx`) that follows the App's page or its place under the tool row; moving an
+  iframe in its own fixed stage (`stage.tsx`) that follows page > Home > inline slots; moving an
   iframe in the DOM reloads the App and loses its state, so only the empty measured slots move. Stages clip to their
   slot's scrolling containers and the pane's `data-app-cover` elements. At most six load; the least recently seen
   unloads to a stub, never one on screen (`lib/app-residency.ts`). Fullscreen is the App's page filling the workspace.
@@ -58,3 +58,5 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
+
+- Main's Home is a non-anchor row after the newest transcript part (ADR 0025), with fixed tile geometry. Now targets the latest owner turn; Home explicitly reaches the scroller's end, within 24 px above the dock and without a jump arrow. Reserve turn space above Home. Keep the single stage with page > Home > inline slots, stubs, lazy loading and the six-instance soft cap. Never clone a Home iframe. Test frame/bridge/draft continuity across tile size, page/back and close/show; distinguish browser/dev evidence. Placement grants nothing.

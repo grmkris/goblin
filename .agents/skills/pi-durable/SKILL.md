@@ -82,3 +82,5 @@ itself authorize model spend, external messages, deployment or production change
   acceptance. Local workerd evidence and retained-dev acceptance remain distinct.
 
 - Event routines consume the shared static Events handler at the confirmed revision. Seal scrubbed bounded metadata outside Pi commits, label it as untrusted data, preserve event run IDs across definition revisions and ingress retention, and commit a pending handoff with its consumer ACK. Admission is one event/minute per agent; controls never start model work.
+
+- Home layout is app-only metadata (`home/service.ts`), never Pi transcript state. `home_read`/`home_edit` join app tools on Main and ordinary threads; routine/subagent exact extension lists exclude them. Agent edits need operation ids and layout revisions, leave transcript receipts, and changing owner tiles returns a terminating ask. Placement grants no authority.

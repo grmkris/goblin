@@ -303,3 +303,11 @@ and rearm across restart, revoked-authority skip with unchanged usage, active/ru
 using CLIProxy. The native recurring-wake regression verifies the next sweep survives the callback that scheduled it.
 Real provider billing, Telegram delivery, cron-after-deploy and real producer acceptance require separate deployed
 verification.
+
+## Home acceptance
+
+On Main, ask "Build me a reading list and put it on Home". Add and complete an item in its tile, reload, then open its page and return Home; the durable item remains and placement/resize preserves the iframe and draft. Edit Home provides drag handles, size and remove controls; the tile menu offers the same actions by keyboard. Open a second tab and verify its order/size follows the workspace feed. Remove from Home keeps the app, Close waits for Show, and deleting the acceptance app removes its tile. Agent changes leave Show/Undo receipts and changing an owner tile requires its approval.
+
+Home unit tests cover landing, feed revision ordering and momentum projection; native workerd tests cover persistence, operation replay, stale writes, owner authority, bounds, feed reconstruction and app deletion. Browser acceptance separately measures Home/Now navigation, history/stream anchors, frame identity, actions, two tabs and a 1440×900/390×844 light/dark matrix (load CLS < 0.02). Save private receipts outside living docs in `.local/goblin-acceptance/home-*` and remove only acceptance-owned data. Dev is real data; use additive migrations and deploy committed green trees.
+
+The owner checks an installed real-iPhone cold launch, landing and touch drag versus native scrolling. Chromium viewport emulation does not establish real-device behaviour. Home adds no fixed edge material, preserves the existing safe-area dock insets and becomes solid under reduced transparency; reduced motion uses 150 ms fades.

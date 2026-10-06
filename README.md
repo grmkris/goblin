@@ -85,3 +85,5 @@ passive note to main. Run now, Stop, Pause, Edit and Archive are available; Tele
 notification choice. Event confirmation authorizes the exact connected server, event name and JSON filters; controls never start a model turn. See [the routines decision](docs/adr/0012-routines.md).
 
 LOCAL throwaway-account acceptance covers routine reminders, cron recovery across a process restart, revoked-authority skips and caps through CLIProxy. Native alarm tests also verify recurring recovery wakes; real producer Events and deployed acceptance remain separate.
+
+Main has a Home surface below its latest exchange: notes, recent conversations and agent-app tiles. Ask "Build me a reading list and put it on Home", then use it there or open its page. Edit Home changes the shared order and size; agent edits leave Show and Undo receipts. See [ADR 0025](docs/adr/0025-home-surface.md).
