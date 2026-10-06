@@ -26,7 +26,8 @@ split or swap, resize, close any but the last. Apps also run in place in any con
 to their page and back without reloading. The URL names the focused conversation or App and the device remembers the
 arrangement; narrow screens show one pane at a time in a swipeable strip. Owners can add public servers by URL or from MCP registries,
 grant tools explicitly, choose an offered model, and see the per-account daily token budget. The agent uses `ask_user`
-to ask questions the owner answers in their next message.
+to ask questions the owner answers in their next message. The owner attaches files to a message with the composer's
+paperclip; the agent reads them and writes its own results beside them, kept per agent in SQLite and R2.
 
 Workspace layout uses [Trellis 0.3.0 by Dan Fessler](https://github.com/DanFessler/trellis), under its commercial
 license and goblin-specific permission: goblin may use it without sponsorship until it makes money, in exchange
