@@ -174,7 +174,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   `packages/ui`, then review the generated file. Keep the shared tokens in `packages/ui/src/styles.css` as myapps has
   them (the sidebar tokens are Purrable's: a shade heavier than the page). The Home Screen icons, favicon and web app
   manifest are static files in `apps/web/public`; after changing the mark or the page background, run `bun run icons`
-  and keep the manifest's colours and the root route's `theme-color` metas equal to `--background`. Do not hand-edit `apps/web/src/routeTree.gen.ts`.
+  and keep the manifest's colours and the root route's `theme-color` metas equal to `--background`. It also draws a
+  startup image for every iPhone and iPad screen in `apps/web/src/lib/startup-images.ts`, which the root route links;
+  add a screen there, bump its `VERSION` (iOS caches the images hard; installed apps need removing and re-adding),
+  and run it again. Do not hand-edit `apps/web/src/routeTree.gen.ts`.
 - Dependencies: `bun add <package> --cwd <workspace>`; commit `package.json` and `bun.lock` together. A patched
   dependency (root `patchedDependencies`) stays pinned to the version its patch was made for, and `bun run
   check:patches` fails when the installed file is not the patched one; `patches/shadcn-react/README.md` says how the
