@@ -71,7 +71,7 @@ bun run check      # the full gate (run it through `heavy` on the build box)
 - [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
 
 The deployment stages are `dev` at `dev.goblin.surf` and `prod` at `goblin.surf`, with separate auth databases,
-secrets and dedicated LiteLLM keys. Alchemy can attach the custom domains; deployment and live acceptance are operator
+secrets and dedicated LiteLLM keys. The first production release is invite-only; owner OTP bootstrap is an explicit operator step. Alchemy can attach the custom domains; deployment and live acceptance are operator
 steps. Alternate hosts redirect to the configured canonical origin. Dev sign-up stays closed or invite-only; prod
 supports open sign-up after sender verification. Email OTP is the sole login method, and every stage requires mail. Both stages use `hello@goblin.surf` after sender onboarding,
 with a host prefix on dev mail subjects. See [development](docs/development.md) for the production guard and smoke.

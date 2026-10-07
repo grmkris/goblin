@@ -1,0 +1,77 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Deployment stage
+        type: choice
+        required: true
+        options: [dev, prod]
+      sha:
+        description: Full main commit SHA with successful Check
+        type: string
+        required: true
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: goblin-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: [self-hosted, linux, x64, netcup]
+    environment: ${{ inputs.stage }}
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_STAGE: ${{ inputs.stage }}
+      RELEASE_SHA: ${{ inputs.sha }}
+      GOBLIN_CONFIRM_PROD: '1'
+      GOBLIN_RELEASE_ROOT: /var/lib/goblin-release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Materialize private stage credentials
+        env:
+          STAGE_ENV: ${{ secrets.GOBLIN_STAGE_ENV }}
+          CLOUD_ENV: ${{ secrets.GOBLIN_CLOUD_ENV }}
+          OWNER_SESSION: ${{ secrets.GOBLIN_SMOKE_SESSION }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          os.umask(0o077)
+          stage = os.environ['RELEASE_STAGE']
+          if stage not in ['dev', 'prod']: raise SystemExit('invalid stage')
+          for key in ['STAGE_ENV', 'CLOUD_ENV']:
+              if not os.environ.get(key): raise SystemExit('missing environment secret: ' + key)
+          Path('.local').mkdir(exist_ok=True, mode=0o700)
+          Path('.local/' + stage + '.env').write_text(os.environ['STAGE_ENV'])
+          Path('.local/cloud.env').write_text(os.environ['CLOUD_ENV'])
+          if stage == 'dev' and not os.environ.get('OWNER_SESSION'): raise SystemExit('real dev session required')
+          if os.environ.get('OWNER_SESSION'):
+              Path('.local/' + stage + '-session.json').write_text(os.environ['OWNER_SESSION'])
+          for path in [Path('.local/' + stage + '.env'), Path('.local/cloud.env'), Path('.local/' + stage + '-session.json')]:
+              if path.exists(): path.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write('GOBLIN_CLOUD_ENV_FILE=' + str(Path('.local/cloud.env').resolve()) + '\n')
+          PY
+      - name: Verify promotion guards
+        run: python3 scripts/release_test.py
+      - name: Deploy and verify exact commit
+        run: python3 scripts/release.py "$RELEASE_STAGE" "$RELEASE_SHA"
+      - name: Remove transient credentials
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          stage = os.environ['RELEASE_STAGE']
+          for name in [stage + '.env', 'cloud.env', stage + '-session.json', 'smoke-' + stage + '-receipt.json']:
+              Path('.local', name).unlink(missing_ok=True)
+          PY

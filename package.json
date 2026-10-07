@@ -61,7 +61,10 @@
     "infra": "alchemy",
     "deploy:prod": "bun scripts/stage.ts deploy:prod",
     "plan:prod": "bun scripts/stage.ts plan:prod",
-    "smoke:prod": "bun scripts/stage.ts smoke:prod"
+    "smoke:prod": "bun scripts/stage.ts smoke:prod",
+    "drift:dev": "bun scripts/stage.ts drift:dev",
+    "drift:prod": "bun scripts/stage.ts drift:prod",
+    "release": "python3 scripts/release.py"
   },
   "devDependencies": {
     "@shadcn/lint": "0.2.0",

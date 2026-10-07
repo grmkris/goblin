@@ -251,6 +251,10 @@ invite-only. These settings do not authorize a production deploy.
 `smoke:prod`. The default prod smoke is read-only: health and an anonymous protected-route probe. An operator smoke
 account's mode-600 OTP session file opts into the full flow. MCP clients authorize against the stage's origin.
 
+The release workflow is manually dispatched with a full `main` SHA. It requires the successful Check workflow for that exact SHA, uses a persistent private Alchemy state directory, serializes deploys with a host lock, rejects destructive plans, deploys from a clean detached snapshot, runs stage smoke and non-repairing drift checks, and records sanitized receipts outside the checkout. Production promotion also requires an authenticated dev receipt for the same SHA and a clean migration inventory. The first production receipt is public-only until the owner completes the real OTP session and entitlement override; no owner email, invite code or session is stored in this repository.
+
+For the first production bootstrap, an operator supplies `GOBLIN_OWNER_EMAIL` and `GOBLIN_SIGNUP_INVITE_CODE` in the mode-600 prod environment, signs in through the real email OTP flow, and records the resulting mode-600 `prod-session.json`. The operator then applies exactly one stage-scoped Pro override of 800 Credits/day to that verified owner. Dodo stays deferred and its live keys remain unset.
+
 ## Billing development and acceptance
 
 Set `DODO_PAYMENTS_ENVIRONMENT=test_mode` on local/dev and `live_mode` on prod. Store
