@@ -186,11 +186,18 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   ```sh
   bun run goblin login                  # once: prints the sign-in URL; approve in a browser
   bun run goblin problems --since 6h
+  bun run goblin problems --all --since 6h # expected waits and recovered model attempts too
   bun run goblin turns
   bun run goblin turn telegram-<id>     # one turn end to end
   bun run goblin conversation 1         # main's entries, in full
   bun run goblin logs telegram-<id>     # Workers Logs lines that mention an id
   ```
+
+  Problems filter expected authority waits and confirmed automatic model retries before applying the limit. They keep
+  unresolved tool failures, cutoffs, empty final answers and coverage gaps. `inspect_problems` and `diagnose` take
+  `all: true` for the full retained problem history; a turn's timeline always includes every recorded event. Private
+  errors and tool payloads stay in `inspect_conversation`; telemetry summaries are fixed host codes. Old ledger reads
+  are sanitized too. These changes need no schema migration.
 
   `--origin` (or `GOBLIN_ORIGIN`) picks the stage, default `https://dev.goblin.surf`. Credentials live in
   `~/.config/goblin/credentials.json` (mode 600). The sign-in redirects to `http://127.0.0.1:18979/callback`; when the

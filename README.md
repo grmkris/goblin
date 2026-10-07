@@ -42,6 +42,8 @@ turns ran: model attempts, tool calls, retries, MCP steps, Telegram replies, tim
 Workers Logs and Traces carry the same ids. A coding agent reads the owner's conversations and any turn's timeline
 through the read-only inspection tools of goblin's one MCP endpoint, `/mcp` (when the owner grants `goblin:inspect`), or
 the `goblin` CLI (`apps/cli`), and the agent answers "why did that fail?" with its own `diagnose` tool.
+Diagnostics focus on work needing attention; `problems --all` includes expected waits and recovered model attempts.
+Private error details stay in conversation inspection; logs and traces carry fixed summaries.
 
 Workspace layout uses [Trellis 0.3.0 by Dan Fessler](https://github.com/DanFessler/trellis), under its commercial
 license and goblin-specific permission: goblin may use it without sponsorship until it makes money, in exchange
