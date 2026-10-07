@@ -8,7 +8,7 @@ class PromotionTest(unittest.TestCase):
         for plan in ["Delete Files", "Replace goblinAuth", "Destroy Web", "partial output"]:
             with self.assertRaises(RuntimeError):
                 safe_plan(plan)
-        for plan in ["No changes", "Create Web", "Update Web"]:
+        for plan in ["No changes", "Create Web", "Update Web", "Plan: 3 to create, 23 binding changes", "[Web] update"]:
             safe_plan(plan)
 
     def test_requires_same_sha_authenticated_and_current_version(self):

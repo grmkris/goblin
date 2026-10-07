@@ -29,7 +29,7 @@ def safe_plan(output):
     # Plan tables label destructive actions Delete/Replace. Unknown output fails closed.
     if re.search(r"\b(delete|replace|destroy)\b", output, re.I):
         raise RuntimeError("destructive_plan_requires_separate_review")
-    if not re.search(r"No changes|Create|Update", output):
+    if not re.search(r"No changes|Create|Update", output, re.I):
         raise RuntimeError("unrecognized_plan_output")
 
 
@@ -110,7 +110,7 @@ def release(stage, sha):
         execute(["bun", "--env-file", str(config_dir / (stage + ".env")), "scripts/smoke-dev.ts"],
                 snapshot, env, Path(str(prefix) + "-smoke.log"))
         drift = execute(["bun", "run", "drift:" + stage], snapshot, env, Path(str(prefix) + "-drift.log"))
-        if "No changes" not in drift:
+        if not re.search(r"no changes", drift, re.I):
             raise RuntimeError("drift_not_clean")
     smoke = json.loads((config_dir / f"smoke-{stage}-receipt.json").read_text())
     if smoke.get("status") != "passed" or smoke.get("stage") != stage:

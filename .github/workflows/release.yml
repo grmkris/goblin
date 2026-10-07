@@ -62,9 +62,9 @@ jobs:
               env.write('GOBLIN_CLOUD_ENV_FILE=' + str(Path('.local/cloud.env').resolve()) + '\n')
           PY
       - name: Verify promotion guards
-        run: python3 scripts/release_test.py
+        run: python3 -B scripts/release_test.py
       - name: Deploy and verify exact commit
-        run: python3 scripts/release.py "$RELEASE_STAGE" "$RELEASE_SHA"
+        run: python3 -B scripts/release.py "$RELEASE_STAGE" "$RELEASE_SHA"
       - name: Remove transient credentials
         if: always()
         run: |
