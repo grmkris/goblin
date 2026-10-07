@@ -120,7 +120,7 @@ def release(stage, sha):
         raise RuntimeError("dev_requires_authenticated_smoke")
     state = STATE / "alchemy/state/goblin" / stage
     db = json.loads((state / "goblinAuth.json").read_text())["attr"]["databaseId"]
-    migrations = cloud(config, f"/d1/database/{db}/query", {"sql": "SELECT name FROM d1_migrations ORDER BY id"})
+    migrations = cloud(config, f"/d1/database/{db}/query", {"sql": "SELECT name FROM __alchemy_migrations ORDER BY id"})
     names = [row["name"] for result in migrations for row in result.get("results", [])]
     if sorted(names) != expected:
         raise RuntimeError("migration_inventory_mismatch")
