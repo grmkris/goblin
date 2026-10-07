@@ -197,7 +197,8 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   unresolved tool failures, cutoffs, empty final answers and coverage gaps. `inspect_problems` and `diagnose` take
   `all: true` for the full retained problem history; a turn's timeline always includes every recorded event. Private
   errors and tool payloads stay in `inspect_conversation`; telemetry summaries are fixed host codes. Old ledger reads
-  are sanitized too. These changes need no schema migration.
+  are sanitized too. Successful background model calls, including bounded memory completions ending in `length`,
+  are excluded from both problem views; actual background failures remain. These changes need no schema migration.
 
   `--origin` (or `GOBLIN_ORIGIN`) picks the stage, default `https://dev.goblin.surf`. Credentials live in
   `~/.config/goblin/credentials.json` (mode 600). The sign-in redirects to `http://127.0.0.1:18979/callback`; when the

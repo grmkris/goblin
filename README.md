@@ -43,6 +43,7 @@ Workers Logs and Traces carry the same ids. A coding agent reads the owner's con
 through the read-only inspection tools of goblin's one MCP endpoint, `/mcp` (when the owner grants `goblin:inspect`), or
 the `goblin` CLI (`apps/cli`), and the agent answers "why did that fail?" with its own `diagnose` tool.
 Diagnostics focus on work needing attention; `problems --all` includes expected waits and recovered model attempts.
+Successful background model completions stay out of problems; their failures remain visible.
 Private error details stay in conversation inspection; logs and traces carry fixed summaries.
 
 Workspace layout uses [Trellis 0.3.0 by Dan Fessler](https://github.com/DanFessler/trellis), under its commercial

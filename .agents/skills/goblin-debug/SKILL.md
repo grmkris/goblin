@@ -48,6 +48,8 @@ Use `all: true` to include expected waits and confirmed recovered attempts. Full
   `UpstreamMcp:timeout`; expected authorization waits are blocked. Shared connection discovery has no turn attribution.
 - `channel.received` / `channel.reply`: Telegram in and out; a reply is `sent` in pieces or `given_up` after a day.
 - `model.aux`: model calls outside a turn (naming, memory, skills, app `llm`).
+  Successful completions, including a bounded memory call ending in `length`, stay out of both problem views;
+  actual failures remain visible. The events remain in the ledger, logs and traces.
 - `recovery`: the agent restarted and interrupted what was running; an event that finished after it says `resumed`.
 
 Telemetry error types and summaries are host-owned fixed codes; detailed private errors stay in conversation inspection.
