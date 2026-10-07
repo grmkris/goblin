@@ -72,10 +72,18 @@ MCP Apps, the browser UI, thread branching, memory-summary quality, skills, and 
 
 Prod commands use `.local/prod.env` and require `GOBLIN_CONFIRM_PROD=1` in the calling shell:
 `bun run plan:prod`, `bun run deploy:prod`, `bun run smoke:prod`. There is no destroy-prod command.
-`smoke:prod` defaults to GET `/health` and GET `/api/conversations` without authentication (expected 401).
+`smoke:prod` defaults to public health, anonymous auth refusal, invite refusal, MCP metadata, the page and the canonical `www` redirect. Owner email/session remain empty until the real OTP bootstrap.
 Only supplying the email and private OTP session file for an operator test account enables the full acceptance flow, including model turns.
 Use a dedicated operator test account for production smoke.
 
 `GOBLIN_DOMAIN` with the required `GOBLIN_ZONE_ID` attaches the stage's custom domain through Alchemy: `dev.goblin.surf` on dev, `goblin.surf` on
 prod, plus `www.goblin.surf` on prod. The Worker redirects alternate hosts to `GOBLIN_APP_URL`, preserving the path
 and query (301 for GET/HEAD, 308 for writes). Dev sign-up must be closed or invite-only.
+
+## Release operation
+
+Dispatch the Release workflow with a stage and full main SHA, or run `heavy bun run release dev <full-sha>` locally. After its authenticated receipt passes, run `GOBLIN_CONFIRM_PROD=1 heavy bun run release prod <same-full-sha>`. Persistent state, clean source snapshots, private logs and sanitized receipts live under `/var/lib/goblin-release`; only the operator and runner share its group. GitHub environment secrets are an explicit operator provisioning step.
+
+The first production release is invite-only with no configured invite or owner email, so it admits nobody until the operator securely supplies those values. Its dedicated model key offers the approved five models and caps spending at $10 per 30 days. Dodo remains unconfigured in live mode. After the owner signs in with delivered OTP, grant exactly that verified production user a prod-scoped Pro override of 800 Credits/day and run authenticated prod smoke.
+
+For an emergency code rollback, prepare a clean snapshot of the last compatible green SHA, review its plan against the retained prod state, and run the guarded prod deploy with the existing private prod config. Leave all auth, app and vendor data intact; do not run down migrations. Confirm that older code supports every additive schema already applied, then repeat public/authenticated acceptance and drift inspection and record the resulting Worker version. The normal release path continues to require a matching dev receipt.

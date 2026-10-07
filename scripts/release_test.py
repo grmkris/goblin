@@ -1,6 +1,6 @@
 """Fail-closed checks for promotion, independent of credentials and Cloudflare."""
 import unittest
-from release import require_dev, safe_plan
+from release import require_clean_snapshot, require_dev, safe_plan
 
 
 class PromotionTest(unittest.TestCase):
@@ -10,6 +10,12 @@ class PromotionTest(unittest.TestCase):
                 safe_plan(plan)
         for plan in ["No changes", "Create Web", "Update Web", "Plan: 3 to create, 23 binding changes", "[Web] update"]:
             safe_plan(plan)
+
+    def test_retained_private_link_does_not_allow_dirty_source(self):
+        require_clean_snapshot(["?? .local"], False)
+        for lines, directory in [([" M apps/web/src/worker.ts"], False), (["?? source.ts"], False), (["?? .local"], True)]:
+            with self.assertRaises(RuntimeError):
+                require_clean_snapshot(lines, directory)
 
     def test_requires_same_sha_authenticated_and_current_version(self):
         good = {"sha": "a" * 40, "acceptance": "authenticated", "version": "v1"}

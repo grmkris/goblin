@@ -34,6 +34,11 @@ def safe_plan(output):
         raise RuntimeError("unrecognized_plan_output")
 
 
+def require_clean_snapshot(lines, config_is_directory):
+    if any(line != "?? .local" for line in lines) or config_is_directory:
+        raise RuntimeError("release_checkout_must_be_clean")
+
+
 def require_dev(receipt, sha, version):
     if receipt.get("sha") != sha or receipt.get("acceptance") != "authenticated" or receipt.get("version") != version:
         raise RuntimeError("prod_requires_current_authenticated_dev_of_same_sha")
@@ -104,9 +109,9 @@ def release(stage, sha):
         run(["git", "checkout", "--quiet", "--detach", sha], cwd=snapshot)
     elif run(["git", "rev-parse", "HEAD"], cwd=snapshot).strip() != sha:
         raise RuntimeError("release_checkout_sha_mismatch")
-    if run(["git", "status", "--porcelain"], cwd=snapshot).strip():
-        raise RuntimeError("release_checkout_must_be_clean")
     local_link = snapshot / ".local"
+    dirty = run(["git", "status", "--porcelain"], cwd=snapshot).splitlines()
+    require_clean_snapshot(dirty, local_link.exists() and not local_link.is_symlink())
     if local_link.exists() or local_link.is_symlink():
         local_link.unlink()
     local_link.symlink_to(config_dir, target_is_directory=True)
