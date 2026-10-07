@@ -237,7 +237,11 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - UI components: goblin looks like the myapps apps. Prefer porting a component from `~/code/myapps/packages/ui`
   (with an "Adapted from" header naming the commit); otherwise `bunx shadcn@latest add <component>` from
   `packages/ui`, then review the generated file. Keep the shared tokens in `packages/ui/src/styles.css` as myapps has
-  them (the sidebar tokens are goblin's: a shade heavier than the page). The Home Screen icons, favicon and web app
+  them (the sidebar tokens are goblin's: a shade heavier than the page). Motion uses the theme's curves (`ease-out`,
+  `ease-in-out`, `ease-drawer`, the default for every `transition-*`), never ease-in or `transition-all`, at 300ms or
+  less with exits faster than entrances (sheets excepted). Every raw `:hover` in the app CSS sits under
+  `(hover: hover)`, and a control that tints on hover tints on `:active` too, because the tap highlight is off. Fields
+  stay at 16px on touch screens (`pointer-fine:md:` for anything smaller). The Home Screen icons, favicon and web app
   manifest are static files in `apps/web/public`; after changing the mark or the page background, run `bun run icons`
   and keep the manifest's colours and the root route's `theme-color` metas equal to `--background`. It also draws a
   startup image for every iPhone and iPad screen in `apps/web/src/lib/startup-images.ts`, which the root route links;
