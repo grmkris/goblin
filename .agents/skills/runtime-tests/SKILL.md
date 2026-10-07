@@ -46,3 +46,8 @@ itself authorize model spend, external messages, deployment or production change
 - Auth fixtures inject mail capture and use actual OTP endpoints against native D1. No capture endpoint ships in the deployed Worker. Verify closed/invite policy at send and sign-in, hashing, expiry, attempts, replay, rate limits, mail-failure cleanup and fresh-session deletion.
 
 - Same-process native fixtures use a process-scoped Alchemy stage and fresh HTTP connections, so retained alarms and eviction sockets from previous runs do not leak into the next gate. Explicit write/read reconstruction retains its stable stage. Interrupted `code_run` reconstruction must keep the first file write and report interruption without replay. Routine cap fixtures observe Pi's bounded provider retry settlement before checking the terminal state; they do not retry the test or drop cap assertions.
+
+- MCP ask-first native tests use authenticated owner requests, real D1/SQLite and official injected MCP transport.
+  Keep assertions for frozen arguments and operationKey, redacted review, refusal, second-account isolation, changed
+  grants/scopes, routine/subagent holds, alternate App refusal and reconstruction without dispatch replay. Real
+  Sidequest hiring and provider-side operation reconciliation remain separate acceptance.

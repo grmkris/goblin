@@ -31,6 +31,18 @@ retention. Unit tests independently verify HMAC bytes. A live mygram round-trip 
 deployed acceptance gate. The lane's throwaway conformance vector is handed to the producer orchestrator; never use
 its test secret for a real subscription.
 
+## MCP call approvals
+
+Under Connections, allow the exact tool, then change **Run when needed** to **Ask first**. An agent call ends its
+turn with an approval card showing the exact redacted arguments. Approve once sends the original call, including
+its `operationKey`; Refuse leaves the remote untouched. A later text message grants no approval. Existing grants
+keep their prior automatic policy until the owner explicitly changes it; remote hints never choose it.
+
+For a Sidequest showcase, mark `create_task`, `request_quotes`, `pick_quote`, `select_worker`, `approve_work`,
+`reject_work` and `cancel_task` Ask first after connecting and granting them. App and background paths cannot bypass
+this policy. An uncertain call may have taken effect; reconcile with the service before making another call.
+The native owner test verifies routine/subagent holds and recovery fencing without a real hire or model spend.
+
 ## Local
 
 ```sh

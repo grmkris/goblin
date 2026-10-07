@@ -53,8 +53,9 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
 - A tool that needs a person ends the run (`control: { terminate: true }`) and leaves plain text in its result. The
   answer is the next ordinary user message: never hold a run open waiting for the owner. `ask_user` and `mcp_call`'s
   grant-required result both work this way.
-- Pi reports and swallows exceptions thrown by hooks (`beforeRequest`, `afterResponse`, ...). To stop work from a
-  hook, return a result Pi honours, such as `beforeTool` `{ block }`; a throw does nothing.
+- Pi's generation hooks may report and swallow exceptions. The pinned ToolTask's beforeTool catches a throw as a
+  block, but a blocked call skips afterTool. Ask-first prepares in beforeTool and emits its terminating approval
+  marker from the tool body; the body and shared dispatch seam independently recheck policy (ADR 0028).
 - Tool implementations check resident authority, the conversation's capability scope (`Capabilities.scope`) and
   grants before any outbound call, and never hold a SQLite transaction across model or network work. Something
   switched off returns `capabilityOffResult` (`pi/capabilities.ts`); the owner turns it on from a card.

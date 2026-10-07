@@ -45,3 +45,9 @@ Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun ru
 itself authorize model spend, external messages, deployment or production changes.
 
 - Routine confirmation grants only the reviewed exact Event selector. Subscribe validates arguments against the installed producer descriptor schema. Routine consumers share leases, retire by revision and ACK only after run/pending/skip metadata is durable; gap/termination controls do not authorize a model turn.
+
+- Per-call approvals (ADR 0028): only owner-selected `askFirst` policy pauses a granted tool. Prepare the encrypted
+  frozen call in Pi's beforeTool hook and terminate with a local approval marker from execution. Owner approval
+  dispatches identical arguments through the shared guard; bind endpoint, grant version, caller and execution ids.
+  Claim dispatch intent once, refuse automatic retries, and mark interrupted intent uncertain on reconstruction.
+  Routine, subagent and App paths cannot bypass the policy; remote hints never choose it.
