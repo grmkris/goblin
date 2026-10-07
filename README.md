@@ -16,7 +16,7 @@ newest exchange verbatim.
 
 Tool calls expand in place to readable input and output, with folding JSON branches, formatted Markdown, full-value
 copying and a Raw view.
-The agent's replies draw Mermaid diagrams, charts, maps and compact mdxcn figures from fenced blocks, in the theme's colours.
+The agent's replies draw Mermaid diagrams, charts and maps from fenced blocks, in the theme's colours.
 
 Telegram comes through a mygram MCP connection. The owner turns on a server's **Telegram** switch in Connections; signed
 MCP Events wake an authoritative inbox pull into main, and replies go back with `send_message`. Older servers use
@@ -33,7 +33,7 @@ paperclip; the agent reads them and writes its own results beside them, kept per
 
 The agent builds apps for its owner from ordinary conversation (ADR 0021): small programs goblin runs in Cloudflare
 Dynamic Workers, with durable state, actions and views that become the agent's tools, an optional live UI drawn with
-goblin's components, charts, maps, diagrams and mdxcn figures, schedules that run on their own, and powers (the web,
+goblin's components, charts, maps and diagrams, schedules that run on their own, and powers (the web,
 the owner's MCP tools, a cheap model, Telegram, other apps) that each wait for the owner's Allow. The Apps page lists them; an app can
 fill the workspace with its conversation docked beside it, roll back to an earlier version, or be deleted.
 

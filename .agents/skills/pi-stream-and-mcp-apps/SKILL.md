@@ -14,11 +14,10 @@ and never shows inherited history. Every pane and inline thread follows through 
 (`lib/stream-pool.ts`, one stream per conversation, capped, suspended off screen); never open a second stream for a
 conversation outside it.
 
-- Assistant figures use `MessageText` → `RichBlock` and lazy kit entries. `mdxcn` is a bounded JSON union of
-  timeline, check, compare, stat and spark (`packages/kit/src/mdxcn-spec.ts`), used for assistant text and Home note tiles.
-  Keep open streaming fences, invalid specs and drawing failures as code; tool Markdown and shared notes keep mdxcn
-  as code. Home note tiles use the figure renderer with flat card surfaces and bounded fixed geometry; snapshots name when they were true. Use the same components/parser in agent-app views through `@goblin/kit/mdxcn`, its import allowlist and
-  frame bundle. Figures are read-only and grant no app power. Verify light/dark, narrow panes and reduced motion.
+- Assistant figures and Home notes use `MessageText` → `RichBlock` and lazy kit entries for Mermaid, chart and map
+  fences. Keep open streaming fences, invalid specs and drawing failures as code. Home notes use bounded fixed
+  geometry; snapshots name when they were true. Agent-app views share the kit through its import allowlist and frame
+  bundles. Figures are read-only and grant no app power. Verify light/dark, narrow panes and reduced motion.
 - Pi state is authoritative. Do not keep a second transcript or invent cursor replay.
 - The conversation list and activity come from the workspace feed (`/api/workspace/events`,
   `lib/workspace-feed.ts`, `components/workspace-feed.tsx`): one stream per tab, a fresh snapshot on every reconnect.
