@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 import re
 import subprocess
-import tempfile
 import urllib.request
 
 REPO = "grmkris/goblin"
@@ -15,6 +14,8 @@ STATE = Path(os.environ.get("GOBLIN_RELEASE_ROOT", "/var/lib/goblin-release"))
 
 
 def run(args, cwd=ROOT, env=None):
+    if args[0] == "git" and cwd != ROOT:
+        args = ["git", "-c", "safe.directory=" + str(cwd), *args[1:]]
     return subprocess.check_output(args, cwd=cwd, env=env, text=True)
 
 
@@ -95,23 +96,32 @@ def release(stage, sha):
     prefix = STATE / "logs" / f"{stamp}-{stage}-{sha[:12]}"
     env = dict(os.environ, GOBLIN_STAGE=stage, GOBLIN_ENV_DIR=str(config_dir),
                GOBLIN_CLOUD_ENV_FILE=str(shared), ALCHEMY_PLAIN="1", CI="true")
-    with tempfile.TemporaryDirectory(prefix="goblin-release-") as tmp:
-        snapshot = Path(tmp) / "checkout"
-        run(["git", "clone", "--quiet", "--shared", "--no-checkout", str(ROOT), str(snapshot)])
+    checkouts = STATE / "checkouts"
+    checkouts.mkdir(parents=True, exist_ok=True)
+    snapshot = checkouts / sha
+    if not snapshot.exists():
+        run(["git", "clone", "--quiet", "--no-hardlinks", "--no-checkout", str(ROOT), str(snapshot)])
         run(["git", "checkout", "--quiet", "--detach", sha], cwd=snapshot)
-        (snapshot / ".local").symlink_to(config_dir, target_is_directory=True)
-        execute(["bun", "install", "--frozen-lockfile"], snapshot, env, Path(str(prefix) + "-install.log"))
-        plan = execute(["bun", "run", "plan:" + stage], snapshot, env, Path(str(prefix) + "-plan.log"))
-        expected = sorted(p.name for p in (snapshot / "apps/runtime/migrations").glob("*.sql"))
-        safe_plan(plan)
-        print(stage + ": non-destructive plan verified", flush=True)
-        execute(["bun", "run", "deploy:" + stage], snapshot, env, Path(str(prefix) + "-deploy.log"))
-        print(stage + ": deployed; verifying smoke and drift", flush=True)
-        execute(["bun", "--env-file", str(config_dir / (stage + ".env")), "scripts/smoke-dev.ts"],
-                snapshot, env, Path(str(prefix) + "-smoke.log"))
-        drift = execute(["bun", "run", "drift:" + stage], snapshot, env, Path(str(prefix) + "-drift.log"))
-        if not re.search(r"no changes", drift, re.I):
-            raise RuntimeError("drift_not_clean")
+    elif run(["git", "rev-parse", "HEAD"], cwd=snapshot).strip() != sha:
+        raise RuntimeError("release_checkout_sha_mismatch")
+    if run(["git", "status", "--porcelain"], cwd=snapshot).strip():
+        raise RuntimeError("release_checkout_must_be_clean")
+    local_link = snapshot / ".local"
+    if local_link.exists() or local_link.is_symlink():
+        local_link.unlink()
+    local_link.symlink_to(config_dir, target_is_directory=True)
+    execute(["bun", "install", "--frozen-lockfile"], snapshot, env, Path(str(prefix) + "-install.log"))
+    plan = execute(["bun", "run", "plan:" + stage], snapshot, env, Path(str(prefix) + "-plan.log"))
+    expected = sorted(p.name for p in (snapshot / "apps/runtime/migrations").glob("*.sql"))
+    safe_plan(plan)
+    print(stage + ": non-destructive plan verified", flush=True)
+    execute(["bun", "run", "deploy:" + stage], snapshot, env, Path(str(prefix) + "-deploy.log"))
+    print(stage + ": deployed; verifying smoke and drift", flush=True)
+    execute(["bun", "--env-file", str(config_dir / (stage + ".env")), "scripts/smoke-dev.ts"],
+            snapshot, env, Path(str(prefix) + "-smoke.log"))
+    drift = execute(["bun", "run", "drift:" + stage], snapshot, env, Path(str(prefix) + "-drift.log"))
+    if not any(line.startswith("{") and json.loads(line).get("drift") == "verified" for line in drift.splitlines()):
+        raise RuntimeError("drift_not_clean")
     smoke = json.loads((config_dir / f"smoke-{stage}-receipt.json").read_text())
     if smoke.get("status") != "passed" or smoke.get("stage") != stage:
         raise RuntimeError("stage_smoke_required")
@@ -126,7 +136,7 @@ def release(stage, sha):
         raise RuntimeError("migration_inventory_mismatch")
     receipt = {"utc": stamp, "stage": stage, "sha": sha, "ci": checks[0]["html_url"],
                "version": version(config, stage), "acceptance": acceptance,
-               "drift": "clean", "migrations": names,
+               "drift": "verified", "providerNormalizations": ["Web.domain.zone bookkeeping", "D1 default disabled replication"], "migrations": names,
                "resources": {"worker": "goblin-" + stage, "auth": db, "files": "goblin-" + stage + "-files"}}
     # No content, credentials, owner identity, or provider token enters this receipt.
     for path in [STATE / f"receipts/{stage}.json", STATE / f"receipts/{stamp}-{stage}-{sha[:12]}.json"]:
