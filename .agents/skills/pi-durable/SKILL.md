@@ -7,7 +7,7 @@ description: Change goblin's Pi Durable and PiHarness integration - sessions, su
 
 Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native harness; do not rebuild these.
 
-- `PiHarness` is registered with `lifecycle.use` in `PersonalAgent`. Main is `ROOT_SESSION` (`MAIN_THREAD`); inbound
+- `PiHarness` is registered with `lifecycle.use` in `PersonalAgent`. Main is `ROOT_SESSION` (`PRIMARY_CHAT`); inbound
   clients talk in it with an author tag (`pi/content.ts`). Threads are Pi forks of main at an entry, or
   `sessions.create()`; every one is registered in `app_conversations` (`conversations.ts`), and only registered ids
   reach Pi. Raw Pi calls outside a task take `BACKGROUND` from `pi/context.ts`.
