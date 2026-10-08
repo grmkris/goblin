@@ -36,3 +36,22 @@ comparison passed.
 The Worker remains deployed for follow-up comparison. The temporary Cloudflare-backed MCP server and tunnel are owned
 tmux sessions `goblin-coding-cf-spike` and `goblin-coding-cf-spike-tunnel`; its private configuration and OAuth state
 are under `.local/coding-cf-spike/mcp` and are not committed.
+
+## Final receipt
+
+- Spike implementation committed on main as `10a3c14` (18 exact owned files). No shared-main push or standard Goblin
+  release was performed by this lane.
+- Exact PR head CI completed successfully: [run 37826957190](https://github.com/grmkris/goblin/actions/runs/37826957190)
+  ran `bun run check`, including 17 passing CLI tests across four files. This proves the generated PR against its
+  frozen baseline; it does not prove the infrastructure spike's separate main commit.
+- The live chat's `coding_ready` returned zero diagnostics in 12,410 ms for revision
+  `613335bfc8a7f9036f25bb610a44535de1830b5e0a08442b479e7fe5ed7cddb6`. The exact-head operator verification passed
+  again in 13,839 ms at that same revision; Cloudflare execution printed exactly `Hello, world!\n`, with empty stderr
+  and exit code 0. The PR preserves `main.ts`'s 100755 mode.
+- The parallel coding service returned health 200 with zero retained sessions and refused unauthenticated MCP with 401.
+- The existing Netcup service remained available. Its operator authorization key was rotated and reloaded; neither
+  operator authorization key nor runner credentials are part of this evidence or any commit.
+- Root `check:fast` passed. The App lane fixed the unrelated Knip fixture in `256a96b` after this lane's full-gate
+  attempt; the App release owner will run combined candidate acceptance. Foreign files were preserved throughout.
+- This remains an operator spike on `grmkris/goblin` using host `gh` as `grmkris`. Generic repository linking,
+  GitHub App installation credentials, tenant-derived container identity and browser acceptance are future work.
