@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "reviewedAt": "2026-10-04",
+  "reviewedAt": "2026-10-08",
   "skills": {
     "durable-objects": {
       "repository": "cloudflare/skills",
@@ -62,6 +62,176 @@
       "copiedFileHashes": {
         "SKILL.md": "a96df043d8bd56831760a91f5437858d5c8ab0e7685b12f575d940d4c5641d91",
         "agents/openai.yaml": "1bdb008dba126619805e583db29362630561361f9684a4a769462ac1860c4535"
+      }
+    },
+    "animate": {
+      "repository": "emilkowalski/skills",
+      "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
+      "path": "skills/animate",
+      "sourceSha256": "b8ede161270458e6ae2e45e8a1985373515d4c63de5568ddb0f9012d7634356c",
+      "licenses": ["LICENSE"],
+      "unchanged": false,
+      "reviewedAt": "2026-10-08",
+      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
+      "copiedFileHashes": {
+        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
+        "RECIPES.md": "fca232fcb4b692e59270799ea8a43d417041ededdd1369b51e07bef8d94c3451",
+        "SKILL.md": "a7638eaf0ad934f595b2d8a6cda9a0c37b654cc79240bd3d322111e43b46e249"
+      }
+    },
+    "animation-vocabulary": {
+      "repository": "emilkowalski/skills",
+      "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
+      "path": "skills/animation-vocabulary",
+      "sourceSha256": "40d2b27adfdfeb0570a9f20e7d0255109d9233c50603878bcd0dcd04c923fd94",
+      "licenses": ["LICENSE"],
+      "unchanged": false,
+      "reviewedAt": "2026-10-08",
+      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
+      "copiedFileHashes": {
+        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
+        "SKILL.md": "3f41b86097d9887830c6556522738d50c1b77bde7d949506809cef021a5c4015"
+      }
+    },
+    "apple-design": {
+      "repository": "emilkowalski/skills",
+      "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
+      "path": "skills/apple-design",
+      "sourceSha256": "77bb63b7043bb93aca2ff4ab040c249484eef35682bb6ff7163433c31d30adc7",
+      "licenses": ["LICENSE"],
+      "unchanged": false,
+      "reviewedAt": "2026-10-08",
+      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
+      "copiedFileHashes": {
+        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
+        "SKILL.md": "985fa2cc91343d918b52fbf9165f9058e8b42c4c2bf628c6b1b112f4468d0529"
+      }
+    },
+    "break-ui": {
+      "repository": "emilkowalski/skills",
+      "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
+      "path": "skills/break-ui",
+      "sourceSha256": "e7eec1d70ac56a04255e9c0dbe98084ea3d544cc04aaad34f32c95d6fa9dff5e",
+      "licenses": ["LICENSE"],
+      "unchanged": false,
+      "reviewedAt": "2026-10-08",
+      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
+      "copiedFileHashes": {
+        "CATALOG.md": "c7f13e91c868a0254f1623881c2d469eb263e36db405216770d42971a61f707f",
+        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
+        "SKILL.md": "8e407aa5b8fae64b4fdec30c38e4f0f7ee74fc46f52fb5913ec4b94df3de2792"
+      }
+    },
+    "emil-design-eng": {
+      "repository": "emilkowalski/skills",
+      "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
+      "path": "skills/emil-design-eng",
+      "sourceSha256": "ffbe68e6007fb42cb8149f089b400a1ca007d59ba23e8948e2be4476f3175939",
+      "licenses": ["LICENSE"],
+      "unchanged": false,
+      "reviewedAt": "2026-10-08",
+      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting.",
+      "copiedFileHashes": {
+        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
+        "SKILL.md": "ce45b35be1cdeb431b682bae547ded7faa9d81e65992d4b1a8a3a536d1b22491"
+      }
+    },
+    "find-animation-opportunities": {
+      "repository": "emilkowalski/skills",
+      "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
+      "path": "skills/find-animation-opportunities",
+      "sourceSha256": "d52a377819b84a71930f0c822cfe2849f40301605a2d5c7eccbfa3b257700df2",
+      "licenses": ["LICENSE"],
+      "unchanged": false,
+      "reviewedAt": "2026-10-08",
+      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
+      "copiedFileHashes": {
+        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
+        "SKILL.md": "d84282abf4b1e4587f601caea2c8644840c0c19f4ddd90db105022845dd0b568"
+      }
+    },
+    "improve-animations": {
+      "repository": "emilkowalski/skills",
+      "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
+      "path": "skills/improve-animations",
+      "sourceSha256": "73962447464433476343e2c12cd08ab39cc99a9e5f3c118c5fb54ed897574ef6",
+      "licenses": ["LICENSE"],
+      "unchanged": false,
+      "reviewedAt": "2026-10-08",
+      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
+      "copiedFileHashes": {
+        "AUDIT.md": "1309fb360bc1cc636a415e4526dba09e83bb4030cef8b6dac0d75cb8d7855bf3",
+        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
+        "PLAN-TEMPLATE.md": "6a893aa723482a9cae953558e076c796cf5fda91a67d1482b2bc42f9234c5018",
+        "SKILL.md": "3f4db51e2fe911c9bd4fceb95c8d60ca096665230a1f209502d0fc00c1a83ea1"
+      }
+    },
+    "mobile-native": {
+      "repository": "emilkowalski/skills",
+      "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
+      "path": "skills/mobile-native",
+      "sourceSha256": "888b7651d66d66dbac4e72b7c554638eb19bd971d686d6cbdf030a5ef3788f55",
+      "licenses": ["LICENSE"],
+      "unchanged": false,
+      "reviewedAt": "2026-10-08",
+      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
+      "copiedFileHashes": {
+        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
+        "SKILL.md": "bd28c19403bc7756c5a479d9b309d8cbf2a8ed723059b23144314482fae811d5"
+      }
+    },
+    "prototype": {
+      "repository": "emilkowalski/skills",
+      "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
+      "path": "skills/prototype",
+      "sourceSha256": "bba39c955eb1871c5a02733976ceec5d0324198e0812e667604756489c89f7b9",
+      "licenses": ["LICENSE"],
+      "unchanged": false,
+      "reviewedAt": "2026-10-08",
+      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery. Added Codex invocation metadata matching upstream Claude manual-only policy.",
+      "copiedFileHashes": {
+        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
+        "PICKER.md": "8c9042ad5633c8024dc74d11f47d11d97a6ad6ff662961c34b1f999d60efa1bb",
+        "SKILL.md": "63d8a023b907fa088675d5db97ed98d960f0d63c035774de5a66bd1b13ef1f49",
+        "agents/openai.yaml": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94"
+      }
+    },
+    "review-animations": {
+      "repository": "emilkowalski/skills",
+      "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
+      "path": "skills/review-animations",
+      "sourceSha256": "6ff590d29e436766135aa3d137be1fac2a867165c7257fc315b189361f1873af",
+      "licenses": ["LICENSE"],
+      "unchanged": false,
+      "reviewedAt": "2026-10-08",
+      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Added Codex invocation metadata matching upstream Claude manual-only policy.",
+      "copiedFileHashes": {
+        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
+        "SKILL.md": "17b51e9068616396d9140b140da4b748ebcc91310905deffe56fea0ee9b7454e",
+        "STANDARDS.md": "670125153cb4349e79a7f9609c48f156e8fb55dee65fceea0c6853c4b4b1feb4",
+        "agents/openai.yaml": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94"
+      }
+    },
+    "good-css": {
+      "repository": "vojtaholik/good-css",
+      "commit": "3e7c9a5790311ca520c7cb3d2237f6e7beac1eb7",
+      "path": "skills/good-css",
+      "sourceSha256": "5958eb7629b3029b98e2890fb662ab805b909c76426e4c5c7ae952bdac574ecc",
+      "licenses": ["LICENSE"],
+      "unchanged": false,
+      "reviewedAt": "2026-10-08",
+      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
+      "copiedFileHashes": {
+        "LICENSE": "dcdeb88707627233bbc76f69febd77ef78a665424a0e0194b3416a473d33cede",
+        "SKILL.md": "014559a5f403b325155355681712f12c22874dc7896421fc6c29bc89fe58bd30",
+        "references/foundations.md": "27e24ef467798d90878db34eb59528c9ee38b5c20718711365caa73d20bb3885",
+        "references/interaction.md": "a70e7955e730a4fa4f269bc51a09310f3ddf96b8ba6cb42ac079644b77af8b85",
+        "references/layout.md": "cb7d22386587427f37cad491d84dc697a48bc527d2f709396e33e927f37099b9",
+        "references/motion.md": "e3d704a4036d2cbd4a5ccaed245c682ca18135cfb714ff6664138410399cd37c",
+        "references/scroll-and-viewport.md": "2183c3a272f36a11b1256ffb806957aa857fdf27c0bfe2d75bb5dbff178f9142",
+        "references/show-and-hide.md": "2705edcbca3c19dfd3c8c3b330cbf4e1d6feac000d0e3dc3f74b25fc6bafa74d",
+        "references/spacing-and-shape.md": "d7e0413b3aff8af5d4b07c338b87e26b362a4384e4a5928e83cbf90ca8026091",
+        "references/text-and-media.md": "ad457afbd0b56aae19556c336a55389ae623a868d3924c766bc12e4c18ce674b"
       }
     }
   }
