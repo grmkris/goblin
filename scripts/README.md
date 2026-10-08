@@ -21,7 +21,8 @@ Cloudflare API credentials.
 ## UI acceptance
 
 `bun run ui:acceptance` opens the stage named by the smoke session file (`.local/dev-session.json` unless another
-is given) in headless Chromium, as a phone (390×844, touch) and a desktop (1440×900), light and dark. It only taps
+is given) in headless Chromium, as a phone (390×844, touch), landscape phone (844×390), tablet (820×1180),
+hybrid pointer device and desktop (1440×900), light and dark. It only taps
 and clicks what changes nothing: menus, a Thoughts disclosure, the sidebar. It sends no message and edits nothing.
 It checks behaviour the eye cannot confirm from a screenshot: the theme's curves, menus that scale, Return-key
 hints, 16px fields and 44px icon targets on touch, panels that open to their content's height, and phone drawers
@@ -29,6 +30,15 @@ that close: the sidebar on a link to the page already showing and on a swipe lef
 `.local/goblin-acceptance/ui-<utc>/`; it exits non-zero on a failed check or a page error. Run it after each dev
 deploy that touches the web app. Chromium emulation is not device evidence: feel, the keyboard and gestures still
 need a real phone.
+
+Data-dependent controls that are absent are recorded as skipped, separately from passing checks. Thoughts closure
+is measured on the opened panel itself. All visible editable fields are checked for at least 16px type; the code
+input uses 18px. The hybrid context verifies touch behavior with a fine primary pointer.
+
+`heavy bun apps/web/test/ui-local.ts` runs the source components in a local Vite fixture without an account or model
+call. It covers editable primitives, composer Return behavior, full Home note reading with focus return, synthetic
+keyboard/pinch-zoom handling, failed attachment retry/remove/send blocking, and Home feedback under reduced motion.
+Its private receipts and screenshots go under `.local/goblin-acceptance/local-*`.
 
 ## Smoke
 
