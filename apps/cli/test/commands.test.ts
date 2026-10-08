@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { UsageError, parseArgs, windowOf } from '../src/args.ts'
-import { type ToolInfo, argumentsFor, commandOf, usage } from '../src/commands.ts'
+import { type ToolInfo, HELP, answerLocally, argumentsFor, commandOf, usage } from '../src/commands.ts'
 
 const turn: ToolInfo = {
   name: 'inspect_turn',
@@ -67,5 +67,28 @@ describe('goblin command lines (unit)', () => {
     expect(usage(turn)).toBe(
       "goblin turn\n\nOne turn end to end.\n\n  --operation-id (required)  The turn's operation id.",
     )
+  })
+})
+
+describe('goblin hello (unit)', () => {
+  it('greets exactly, and reaches nothing else', () => {
+    // The answer is a word the CLI owns: reaching it must not need settings, credentials or a client.
+    expect(answerLocally(parseArgs(['hello']))).toBe('Hello, world!')
+    // Global flags the CLI itself reads do not change the answer.
+    expect(answerLocally(parseArgs(['hello', '--json', '--origin', 'http://localhost:18971']))).toBe('Hello, world!')
+    // Hello takes no words of its own.
+    expect(() => answerLocally(parseArgs(['hello', 'world']))).toThrow(UsageError)
+    expect(() => answerLocally(parseArgs(['hello', 'world']))).toThrow('unexpected world')
+  })
+
+  it('leaves every other command to the server', () => {
+    // Only `hello` answers locally; the rest fall through to `settingsOf` and `connect` as before.
+    for (const argv of [['tools'], ['login'], ['logout'], ['turn', 'telegram-12'], ['logs', 'abc'], []])
+      expect(answerLocally(parseArgs(argv))).toBeUndefined()
+  })
+
+  it('is in the help the CLI prints with no command', () => {
+    expect(HELP).toContain('goblin hello')
+    expect(HELP.split('\n')[2]).toBe('  goblin hello                 greet without signing in or reaching the network')
   })
 })

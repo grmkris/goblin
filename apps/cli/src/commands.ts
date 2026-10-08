@@ -21,6 +21,39 @@ const GLOBAL = new Set(['origin', 'json', 'help', 'port', 'open'])
 /** A tool's command: `inspect_turn` is `goblin turn`; other tools keep their names. */
 export const commandOf = (tool: string): string => tool.replace(/^inspect_/u, '')
 
+/** What `goblin hello` prints, exactly. */
+const HELLO = 'Hello, world!'
+
+/**
+ * The one command the CLI answers itself: `goblin hello` greets and exits 0 before settings, sign-in or any network
+ * call, so it works on a machine that has never signed in. Flags are ignored; extra words are a usage error, as the
+ * command takes none. `undefined` means the command is the server's to answer.
+ */
+export function answerLocally(args: Args): string | undefined {
+  if (args.command !== 'hello') return undefined
+  if (args.positionals.length > 0) throw new UsageError(`unexpected ${args.positionals.join(' ')}`)
+  return HELLO
+}
+
+/** Every command line starts here; `goblin` with nothing to say prints this. */
+export const HELP = `goblin: your goblin agent from the terminal, as an MCP client of /mcp (ADR 0024)
+
+  goblin hello                 greet without signing in or reaching the network
+  goblin login                 sign in and approve (once per machine and origin)
+  goblin tools                 the commands this server offers
+  goblin problems [--since …]  what failed, was blocked or cut short
+  goblin turns                 recent turns, one line each
+  goblin turn <operation id>   one turn end to end
+  goblin conversation <id>     a conversation's entries, in full
+  goblin logs <id> [--since 6h]  Workers Logs lines that mention an id
+  goblin ask_agent <message>   ask your agent in its main conversation (needs a plan)
+  goblin logout
+
+  --origin URL   default https://dev.goblin.surf (or GOBLIN_ORIGIN)
+  --json         print the tool's structured result
+  --open         open the sign-in page in a browser
+  --port N       the sign-in callback's loopback port (default 18979)`
+
 function coerce(text: string, property: Property, name: string, now: number): unknown {
   // A time is given the way people say it: `--since 6h` is six hours ago.
   if (name === 'since' && /^\d+[mhd]$/u.test(text)) return now - windowOf(text)
