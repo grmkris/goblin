@@ -35,8 +35,8 @@ infrastructure. Read
   dedicated, model-limited, budget-capped key. Never bind the LiteLLM master key into the Worker.
 - Secrets live in mode-600 `.local/*.env` files and Worker secret bindings. Never print, commit, expose in browser
   bundles or persist them in transcripts, logs or docs. Outbound OAuth tokens are encrypted at rest in the Agent DO.
-- The `dev` stage is the daily instance, with real users' data: treat it as real. Schema changes there are additive
-  migrations. A user only ever reaches their own agent; never add a route that takes an agent name from the request.
+- The `dev` stage is the daily instance. It holds test data only (owner, 2026-10-08), so spikes may deploy there, but
+  schema changes there stay additive migrations. A user only ever reaches their own agent; never add a route that takes an agent name from the request.
   Telemetry never carries content ([ADR 0024](docs/adr/0024-observing-conversations.md)).
 
 ## Quality
