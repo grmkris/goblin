@@ -49,3 +49,17 @@ pre-layer baseline in `.local/goblin-acceptance/local-1791474422477/`. Attachmen
 The parallel source-composer run also passed, including IME, skill-only sends, references and draft transfer:
 `.local/goblin-acceptance/composer-1791475092900/receipt.json`. These are local source-fixture checks; physical iOS and
 authenticated deployed UI behavior require separate evidence.
+
+UI follow-up commits: `ad44421` (editable fields and hybrid touch), `116b29a` (keyboard, phone chat and note reading),
+`21085c2` (Home feedback), `52e3fed` (explicit variants and CSS layering), `329c87f` (honest read-only acceptance),
+`6ac31ab` (portable attachments, failure retention/retry and blocked sends), `18bab80` (local browser coverage), and
+`a5e1a41` (design-skill packaging with source commits, adapted hashes, MIT licenses and matching invocation metadata).
+The temporary stylesheet regression in `3f1dbff` was corrected by `7952a91`; the final composer styles belong to the
+parallel agent's `6c178e8`. No history was rewritten.
+
+After `a5e1a41`, scoped skill formatting and `bun run agents:check` passed. `heavy bun run check:fast` passed all three
+release-script tests, then formatting stopped on 10 in-progress files in the untracked coding spike: `package.json`,
+`github.ts`, `lsp.ts`, `oauth.ts`, `overlay.ts`, `prepare.ts`, `server.ts`, `state.ts`, `tools.ts`, and `verifier.ts`.
+Their owner received the exact blocker through the Codex task server. No UI or skill-owned path was reported by that
+gate. The complete local gate remains unproven; later steps did not run after formatting failed. Other agents' live
+files and unrelated captures remain preserved, and no deployment was performed by this UI task.
