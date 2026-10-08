@@ -122,6 +122,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   connected. Servers that answer without sign-in connect directly. Then turn on the tools the agent may use, one by one
   or with Allow all; None turns them all off. Nothing is granted by default. A server marked **Needs sign-in** needs a
   new sign-in: press Sign in again. **Try a tool**, at the bottom, calls an allowed tool by hand.
+- **Queued messages.** While Main or an ordinary thread is working, Send adds a follow-up. Queued messages appear
+  above both full and inline composers with expandable text, files, references and authors. They enter the transcript
+  only when Pi starts them. Reload or reconnect to restore the queue; a failed content read retains the last view and
+  retries. An idle conversation with pending inputs does not say Ready. Helpers and routine runs use their existing flows.
 - **Conversations.** Each conversation is a pane; the URL (`/c/<id>`) names the focused one and `/` restores your
   last arrangement. Click a conversation in the sidebar to show it in the focused pane. The **+** beside Threads opens
   a new thread's draft beside it, and **Reply in thread** under any settled message, in any conversation, opens a

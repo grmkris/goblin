@@ -19,6 +19,10 @@ conversation outside it.
   geometry; snapshots name when they were true. Agent-app views share the kit through its import allowlist and frame
   bundles. Figures are read-only and grant no app power. Verify light/dark, narrow panes and reduced motion.
 - Pi state is authoritative. Do not keep a second transcript or invent cursor replay.
+- Queue contents for Main and ordinary threads come from the owner queue API over `InboxDoc`; native snapshot/inbox
+  IDs remain authoritative membership. Keep one cancellable content read in the shared stream, reject stale reads,
+  retain contents on failure, and render the queue above both composers, outside the transcript and turn map. Normal
+  Send stays a follow-up; unchanged failed drafts reuse their operation IDs.
 - The conversation list and activity come from the workspace feed (`/api/workspace/events`,
   `lib/workspace-feed.ts`, `components/workspace-feed.tsx`): one stream per tab, a fresh snapshot on every reconnect.
   The tab reads each conversation, activity, App and change on its own and skips one it cannot read, so a server
