@@ -14,9 +14,8 @@ and never shows inherited history. Every pane and inline thread follows through 
 (`lib/stream-pool.ts`, one stream per conversation, capped, suspended off screen); never open a second stream for a
 conversation outside it.
 
-- Assistant figures and Home notes use `MessageText` → `RichBlock` and lazy kit entries for Mermaid, chart and map
-  fences. Keep open streaming fences, invalid specs and drawing failures as code. Home notes use bounded fixed
-  geometry; snapshots name when they were true. Agent-app views share the kit through its import allowlist and frame
+- Assistant figures use `MessageText` → `RichBlock` and lazy kit entries for Mermaid, chart and map
+  fences. Keep open streaming fences, invalid specs and drawing failures as code. Snapshots name when they were true. Agent-app views share the kit through its import allowlist and frame
   bundles. Figures are read-only and grant no app power. Verify light/dark, narrow panes and reduced motion.
 - Pi state is authoritative. Do not keep a second transcript or invent cursor replay.
 - Queue contents for Main and ordinary threads come from the owner queue API over `InboxDoc`; native snapshot/inbox
@@ -34,7 +33,7 @@ conversation outside it.
   with its CSP; validate message origin and source.
 - Apps are kept per call in the runtime registry (`apps/registry.ts`, ADR 0020) and listed by the workspace feed;
   keeping or launching one grants nothing. Several live at once, one instance each (`components/apps/host.tsx`), each
-  iframe in its own fixed stage (`stage.tsx`) that follows page > Home > inline slots; moving an
+  iframe in its own fixed stage (`stage.tsx`) that follows page > inline slots; moving an
   iframe in the DOM reloads the App and loses its state, so only the empty measured slots move. Stages clip to their
   slot's scrolling containers and the pane's `data-app-cover` elements. At most six load; the least recently seen
   unloads to a stub, never one on screen (`lib/app-residency.ts`). Fullscreen is the App's page filling the workspace.
@@ -62,4 +61,4 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
 
-- Main's Home is a non-anchor row after the newest transcript part (ADR 0025), with fixed tile geometry. Now targets the latest owner turn; Home explicitly reaches the scroller's end, within 24 px above the dock and without a jump arrow. Reserve turn space above Home. Keep the single stage with page > Home > inline slots, stubs, lazy loading and the six-instance soft cap. Never clone a Home iframe. Test frame/bridge/draft continuity across tile size, page/back and close/show; distinguish browser/dev evidence. After springs and resize reflow settle, assert stage and frame lie inside the Home body within 1px in four size/theme runs and reduced motion. Home grant cards overlay the frame without overflow. Owner-only open MCP pins recheck the tool declaration; closed Show uses keep-call POST. Placement grants nothing.
+- Home presentation is deferred (ADR 0025). Main has only its transcript and composer; the single App stage follows page > inline slots. Saved Home placements must not hide inline Apps. Keep frame/bridge continuity, clipping, grants and the six-instance soft cap.
