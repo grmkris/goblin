@@ -34,6 +34,7 @@ paperclip; the agent reads them and writes its own results beside them, kept per
 Messages sent while Main or an ordinary thread works stay visible in a queue above its composer, oldest first,
 with their author, files and references. Sending adds a follow-up; it does not interrupt the current turn. The queue
 is separate from the transcript until Pi starts that input, and survives refreshes and reconnects.
+Each queued message can be removed while it is waiting; a message Pi has already started keeps running.
 
 In the composer, `/` selects skills or `/help`, `/new-thread` and `/stop`; `@` selects connected servers, skills or
 helpers. Selections become removable chips. A skill can be sent alone; a helper reference brings its latest report

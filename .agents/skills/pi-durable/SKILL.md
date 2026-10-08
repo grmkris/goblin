@@ -32,6 +32,10 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   keep it synchronous and never call Session APIs from it. Hooks do not pair reliably (no `afterTool` for a blocked
   call, no `afterResponse` after an abort) and subagents and routine runs keep their own extension lists.
 - Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
+- The owner queue reads `InboxDoc` for Main and ordinary threads only. Removal validates the registered conversation
+  and input type, then uses native `abortSubmission(id, BACKGROUND, conversationId)`: it withdraws queued input only.
+  `already_placed` means the run continues; never implement row removal with `PiHarness.abort` or Stop. Passive writes,
+  helpers and routine queues remain outside this API.
 - Extensions: `persona.ts` (static system prompt sections, keep them static so prompt caches hold),
   `resident-mcp.ts` (`mcp_list`, `mcp_call`), `ask-user.ts` (`ask_user`), `budget.ts` (usage recording, tool
   blocking), `subagents.ts` (`subagent`, with the anchor task; a subagent gets this extension too, so they nest) and

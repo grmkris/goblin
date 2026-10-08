@@ -126,6 +126,8 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   above both full and inline composers with expandable text, files, references and authors. They enter the transcript
   only when Pi starts them. Reload or reconnect to restore the queue; a failed content read retains the last view and
   retries. An idle conversation with pending inputs does not say Ready. Helpers and routine runs use their existing flows.
+  Remove withdraws one waiting message without stopping active work. If Pi has already started it, the message keeps
+  running and the UI says so. Failed removals keep the row visible for retry.
 - **Conversations.** Each conversation is a pane; the URL (`/c/<id>`) names the focused one and `/` restores your
   last arrangement. Click a conversation in the sidebar to show it in the focused pane. The **+** beside Threads opens
   a new thread's draft beside it, and **Reply in thread** under any settled message, in any conversation, opens a
@@ -316,9 +318,14 @@ deletion; deletion does not itself cancel provider charges.
 
 The local workerd/auth-D1 owner fixture runs on `GOBLIN_HARNESS_PORT + 20`.
 Run `heavy bun run --cwd apps/runtime test:integration test/integration/owner.test.ts` to verify per-call owner
-Apps, live grants, conversation Close/reopen, and isolation between two authenticated accounts even with forged
+Apps, live grants, queued inputs and safe removal in Main/threads, conversation Close/reopen, and isolation between two authenticated accounts even with forged
 workspace/agent request selectors. Removed workspace, invitation and interaction endpoints return 404.
 These keyless deterministic tests are local evidence; deployed smoke and real provider acceptance are separate.
+
+`heavy bun apps/web/test/ui-queue.ts` renders the real queue and composers in local Chromium with controlled HTTP and
+native event fixtures. It checks full/inline shared reads, refresh, failed sends, removal and failed-removal retry at desktop/phone widths in
+light/dark with reduced motion. Private receipts go under `.local/goblin-acceptance/queue-*`; this is browser fixture
+evidence, separate from signed-in deployed acceptance and real-device checks.
 
 ## Routine definition checks
 

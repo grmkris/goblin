@@ -22,6 +22,8 @@ conversation outside it.
   IDs remain authoritative membership. Keep one cancellable content read in the shared stream, reject stale reads,
   retain contents on failure, and render the queue above both composers, outside the transcript and turn map. Normal
   Send stays a follow-up; unchanged failed drafts reuse their operation IDs.
+  Row removal uses the owner DELETE queue API and disables only that row while pending. Keep failures visible,
+  refresh through the shared stream, and report an already-started outcome without invoking Stop.
 - The conversation list and activity come from the workspace feed (`/api/workspace/events`,
   `lib/workspace-feed.ts`, `components/workspace-feed.tsx`): one stream per tab, a fresh snapshot on every reconnect.
   The tab reads each conversation, activity, App and change on its own and skips one it cannot read, so a server
