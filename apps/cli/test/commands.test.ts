@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { UsageError, parseArgs, windowOf } from '../src/args.ts'
-import { type ToolInfo, argumentsFor, commandOf, usage } from '../src/commands.ts'
+import { type ToolInfo, HELP, argumentsFor, commandOf, localRunOf, usage } from '../src/commands.ts'
 
 const turn: ToolInfo = {
   name: 'inspect_turn',
@@ -67,5 +67,42 @@ describe('goblin command lines (unit)', () => {
     expect(usage(turn)).toBe(
       "goblin turn\n\nOne turn end to end.\n\n  --operation-id (required)  The turn's operation id.",
     )
+  })
+})
+
+/** The commands the CLI does not answer itself: each reads `Config` first, then `/mcp` or Workers Logs (ADR 0024). */
+const SERVER_COMMANDS = ['login', 'logout', 'tools', 'logs', 'problems', 'turns', 'turn', 'conversation', 'ask_agent']
+
+describe('goblin hello (unit)', () => {
+  it('greets with exactly one line and a successful exit', () => {
+    expect(localRunOf(parseArgs(['hello']).command)).toEqual({ text: 'Hello, world!', exitCode: 0 })
+    expect(localRunOf(parseArgs(['hello', '--json']).command)).toEqual({ text: 'Hello, world!', exitCode: 0 })
+    expect(localRunOf('hello')?.text).not.toMatch(/[\r\n]/u)
+  })
+
+  it('answers the greeting without a request', () => {
+    const network = vi.fn(() => Promise.reject(new Error('the greeting reached the network')))
+    vi.stubGlobal('fetch', network)
+    expect(localRunOf('hello')).toEqual({ text: 'Hello, world!', exitCode: 0 })
+    expect(network).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
+  it('leaves every command that needs the server or the shell alone', () => {
+    for (const command of SERVER_COMMANDS) expect(localRunOf(command)).toBeUndefined()
+    for (const command of [undefined, '', 'hellos', 'Help']) expect(localRunOf(command)).toBeUndefined()
+  })
+
+  it('lists hello in help, lined up ahead of the commands that sign in', () => {
+    const lines = HELP.split('\n')
+    const hello = lines.findIndex((line) => line.includes('goblin hello'))
+    const login = lines.findIndex((line) => line.includes('goblin login'))
+    expect(hello).toBeGreaterThanOrEqual(0)
+    expect(login).toBeGreaterThan(hello)
+    const listing = lines[hello] ?? ''
+    expect(listing).toMatch(/no sign-in/u)
+    expect(listing).toMatch(/no network/u)
+    // both commands are five letters, so their descriptions start in the same column
+    expect(listing.indexOf('print')).toBe((lines[login] ?? '').indexOf('sign in and approve'))
   })
 })

@@ -21,6 +21,42 @@ const GLOBAL = new Set(['origin', 'json', 'help', 'port', 'open'])
 /** A tool's command: `inspect_turn` is `goblin turn`; other tools keep their names. */
 export const commandOf = (tool: string): string => tool.replace(/^inspect_/u, '')
 
+/** What `goblin hello` prints: the CLI's own greeting, with nothing behind it. */
+const HELLO_TEXT = 'Hello, world!'
+
+/** A run the CLI answers by itself: the line it prints and the exit code it returns. */
+export type LocalRun = {
+  readonly text: string
+  readonly exitCode: number
+}
+
+/**
+ * The commands `goblin` answers on its own, before `Config`, credentials or any client of `/mcp`: this reads one
+ * string and returns it, so it cannot reach the network. Every other command is a server tool from `tools/list`.
+ */
+export function localRunOf(command: string | undefined): LocalRun | undefined {
+  return command === 'hello' ? { text: HELLO_TEXT, exitCode: 0 } : undefined
+}
+
+/** The top-level help: the CLI's own greeting first, then the commands the server's tools offer. */
+export const HELP = `goblin: your goblin agent from the terminal, as an MCP client of /mcp (ADR 0024)
+
+  goblin hello                 print "Hello, world!" and exit: no sign-in, no network
+  goblin login                 sign in and approve (once per machine and origin)
+  goblin tools                 the commands this server offers
+  goblin problems [--since …]  what failed, was blocked or cut short
+  goblin turns                 recent turns, one line each
+  goblin turn <operation id>   one turn end to end
+  goblin conversation <id>     a conversation's entries, in full
+  goblin logs <id> [--since 6h]  Workers Logs lines that mention an id
+  goblin ask_agent <message>   ask your agent in its main conversation (needs a plan)
+  goblin logout
+
+  --origin URL   default https://dev.goblin.surf (or GOBLIN_ORIGIN)
+  --json         print the tool's structured result
+  --open         open the sign-in page in a browser
+  --port N       the sign-in callback's loopback port (default 18979)`
+
 function coerce(text: string, property: Property, name: string, now: number): unknown {
   // A time is given the way people say it: `--since 6h` is six hours ago.
   if (name === 'since' && /^\d+[mhd]$/u.test(text)) return now - windowOf(text)
