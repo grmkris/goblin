@@ -65,7 +65,8 @@
     "smoke:prod": "bun scripts/stage.ts smoke:prod",
     "drift:dev": "bun scripts/stage.ts drift:dev",
     "drift:prod": "bun scripts/stage.ts drift:prod",
-    "release": "python3 scripts/release.py"
+    "release": "python3 scripts/release.py",
+    "bench:decisions": "bun bench/scripts/decisions.ts"
   },
   "devDependencies": {
     "@shadcn/lint": "0.2.0",
