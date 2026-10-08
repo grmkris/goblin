@@ -12,6 +12,9 @@ The web app is a thin browser projection over the resident runtime. TanStack Sta
 - Cross-runtime contracts come from packages/contracts; UI primitives come from packages/ui. Do not add hypothetical reuse packages.
 - Generated shadcn components remain editable and locally owned; follow monorepo aliases/components.json and token conventions.
 - Support text/tool/progress display, submit/follow-up, stop, snapshot reconnect, and a sandboxed App surface without another agent state machine.
+- Keep the composer as one native textarea. Its `/` and `@` picker produces stable-identity chips, preserves unselected
+  prose, supports keyboard and IME behavior, and is shared by full, draft and compact inline composers. Local commands
+  stay local; server failures preserve the draft and identify the chip.
 - Tool payloads use the local `JsonView` and `ToolPayload` primitives. Select MCP structured output from existing redacted details, retain supplementary content and exact Raw text, and keep JSON branches and large child lists bounded. Markdown output (`lib/markdown.ts`) renders through `ToolMarkdown` as untrusted text: no images, only absolute http(s)/mailto links, raw HTML as text. Rendering grants nothing and fetches no remote content.
 - Every conversation, draft and App is one tab-less pane (ADR 0019): the pure store in `lib/workspace.ts` owns the
   layout and drives Trellis 0.3.0 (desktop, after hydration, controlled) or the narrow snapping strip; items render

@@ -86,4 +86,10 @@ itself authorize model spend, external messages, deployment or production change
 
 - Home layout is app-only metadata (`home/service.ts`), never Pi transcript state. `home_read`/`home_edit` join app tools on Main and ordinary threads; routine/subagent exact extension lists exclude them. Agent edits need operation ids and layout revisions, leave transcript receipts, and changing owner tiles returns a terminating ask. Placement grants no authority. Notes can contain dated figure snapshots; scheduled agent apps own live refresh and freshness/error state. Only the owner pins MCP Apps; after building a view in Main, offer a Home tile.
 
+- The composer is a browser affordance over stable server-side selections. `/` chooses local commands or skills and `@`
+  chooses connections, skills or helpers. Resolve each selection again before `useModel`; catalog labels never authorize
+  a call. Helpers receive live MCP, skills, files, code, app calls and delegation, while owner-only questions, Home,
+  routines, memory and skill learning stay absent. `subagent_config` adds exclusions only, and retained helpers receive
+  the current execution extension selection after reconstruction.
+
 - `code_run` may write owner files and is `replay: unsafe`; after an interrupted invocation, Pi reports the interruption and never automatically runs the script again. The native recovery regression writes, evicts, and reads the unchanged file through the reconstructed agent.

@@ -147,6 +147,11 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   off there hides it from the agent in that conversation only, and a new thread starts with the switches of the conversation it came from. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
 - **Questions, models and budget.** Answer an `ask_user` card with your next message. Pick an offered model in the
   composer; Settings and the composer's ring show today's usage in Credits, resetting at 00:00 UTC.
+- **Commands and references.** Type `/` to choose a skill, `/help`, `/stop` or `/new-thread`, and `@` to choose a
+  connection, skill or helper. Arrows browse; Enter or Tab selects; Escape dismisses. Unselected tokens remain prose.
+  Chips can be removed. Skill-only sends are allowed; connection hints grant nothing; helpers bring their latest
+  bounded report into this conversation. New thread moves the prose, chips and attachments into a fresh draft pane.
+  Failed selections preserve the draft and mark the failing chip. These controls work in panes, drafts and inline replies.
 - **Figures.** Assistant replies and Home notes can draw Mermaid, chart and map fences. Ordinary Markdown is the
   default for checklists, timelines, comparisons and small sets of values. Open streaming fences, invalid specs and
   drawing failures stay readable code. Agent-app views share the kit; see `app_docs` topic `ui`.

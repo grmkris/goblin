@@ -31,6 +31,10 @@ grant tools explicitly, mark individual tools **Ask first** for approval of ever
 to ask questions the owner answers in their next message. The owner attaches files to a message with the composer's
 paperclip; the agent reads them and writes its own results beside them, kept per agent in SQLite and R2.
 
+In the composer, `/` selects skills or `/help`, `/new-thread` and `/stop`; `@` selects connected servers, skills or
+helpers. Selections become removable chips. A skill can be sent alone; a helper reference brings its latest report
+into the current conversation. Helpers share live execution capabilities and can be narrowed by their parent.
+
 The agent builds apps for its owner from ordinary conversation (ADR 0021): small programs goblin runs in Cloudflare
 Dynamic Workers, with durable state, actions and views that become the agent's tools, an optional live UI drawn with
 goblin's components, charts, maps and diagrams, schedules that run on their own, and powers (the web,
