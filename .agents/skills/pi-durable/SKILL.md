@@ -7,10 +7,11 @@ description: Change goblin's Pi Durable and PiHarness integration - sessions, su
 
 Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native harness; do not rebuild these.
 
-- `PiHarness` is registered with `lifecycle.use` in `PersonalAgent`. Main is `ROOT_SESSION` (`PRIMARY_CHAT`); inbound
-  clients talk in it with an author tag (`pi/content.ts`). Threads are Pi forks of main at an entry, or
-  `sessions.create()`; every one is registered in `app_conversations` (`conversations.ts`), and only registered ids
-  reach Pi. Raw Pi calls outside a task take `BACKGROUND` from `pi/context.ts`.
+- `PiHarness` is registered with `lifecycle.use` in `PersonalAgent`. Main is the stable chat id `PRIMARY_CHAT` (`1`),
+  resolved by `Chats` to its current Pi session; a fresh agent initially maps it to Pi's root. Inbound clients
+  talk in the primary chat with an author tag (`pi/content.ts`). Threads are Pi forks of main at an entry, or
+  `sessions.create()`; every one is registered in `app_conversations` (`conversations.ts`), and only registered chat
+  ids resolve to sessions at the owner boundary. Raw Pi calls outside a task take `BACKGROUND` from `pi/context.ts`.
 - Writing into another conversation (a thread's note into main) is a write submission, never `tx.appendEntry`:
   `submit({ type: 'write', entry, requestId })`. A busy conversation places it at its next boundary, the request id
   makes a replayed tool find the same entry, and a write starts no run.
@@ -32,6 +33,12 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   keep it synchronous and never call Session APIs from it. Hooks do not pair reliably (no `afterTool` for a blocked
   call, no `afterResponse` after an abort) and subagents and routine runs keep their own extension lists.
 - Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
+- Owner, inbound and Telegram submissions admit `(chat, operationId)` through `Chats` before calling Pi. The admission
+  ledger pins the first Pi session for retries across a future rebind; the per-chat lock covers admission only and is
+  released before model execution or waiting. `harness.wait` resolves through that operation binding. A rebind uses
+  an epoch compare-and-set and closes the affected SSE streams; it does not move a running Pi turn. The application
+  ledger prunes old operations opportunistically after 30 days. Passive reports, share-backs and thread-start notes
+  resolve their target chat's current session, then use stable Pi write request ids; they start no model run.
 - The owner queue reads `InboxDoc` for Main and ordinary threads only. Removal validates the registered conversation
   and input type, then uses native `abortSubmission(id, BACKGROUND, conversationId)`: it withdraws queued input only.
   `already_placed` means the run continues; never implement row removal with `PiHarness.abort` or Stop. Passive writes,
@@ -64,6 +71,14 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   grants before any outbound call, and never hold a SQLite transaction across model or network work. Something
   switched off returns `capabilityOffResult` (`pi/capabilities.ts`); the owner turns it on from a card.
 - Events are a snapshot plus committed batches with no cursor replay.
+- Browser URLs, snapshots and SSE routes carry chat ids. Resolve them at the boundary, then use the returned Pi session
+  for Pi APIs. `chatOf(session)` maps capability and task activity back to the current chat; unknown sessions fail
+  closed. Pi-keyed approvals, App call records, run events, skill activations, fork entries and memory entry ids stay
+  on their original Pi identities deliberately. A helper's `parent_session` is its parent chat; immutable
+  `spawner_session` holds its original anchor and relays. Primary memory resolves the current session, with Builder
+  state on the generation API's `conversationId`; the memory store remains agent-wide. See
+  [ADR 0030](../../../docs/adr/0030-logical-chats-over-pi-sessions.md) and the development guide's permuted-primary
+  native profile for unit/local workerd proof. Move to thread, Topics and per-primary memory remain future work.
 - Vendor tables (`pi_*`, `cf_agents_*` and the others in `storage/vendor.ts`) are never touched.
 - Initialization, readback and reconstruction are separate proofs; local workerd reconstruction is not remote
   eviction.

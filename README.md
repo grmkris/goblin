@@ -4,7 +4,7 @@ Your own goblin, always on. Resident personal agents on Cloudflare. Each user si
 it keeps running, holds its own authority to use the MCP servers that user connected, and is itself an MCP server
 other tools can talk to.
 
-The agent has one main conversation. Side threads can start empty or branch from any message of any conversation, at
+The agent has one stable main chat (`/c/1`); it resolves to the current Pi session. Side threads can start empty or branch from any message of any conversation, at
 any depth; they can share a note back to where they came from, and Close stops one with everything under it until it is
 reopened. Main learns the name of a thread started empty, and one live feed keeps every open tab's list and activity
 current. A thread unfolds in place under the
@@ -99,4 +99,4 @@ notification choice. Event confirmation authorizes the exact connected server, e
 
 LOCAL throwaway-account acceptance covers routine reminders, cron recovery across a process restart, revoked-authority skips and caps through CLIProxy. Native alarm tests also verify recurring recovery wakes; real producer Events and deployed acceptance remain separate.
 
-Main is the conversation and composer. The dashboard surface is deferred while its runtime layout data remains available for a later UI iteration.
+Main is the stable chat and composer. The dashboard surface is deferred while its runtime layout data remains available for a later UI iteration. The logical chat identity layer keeps URLs, capabilities, placement and operation admission stable while Pi owns the physical sessions and transcripts; Move to thread, Topics and per-primary memory build on it later.

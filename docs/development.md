@@ -73,6 +73,26 @@ failure. Never pipe `heavy`. Focused commands: `bun run test:unit`, `bun run tes
 
 If a check fails, look at `git status` first. Another agent's half-finished file failing is not your change failing.
 
+## Chat identities and local proof
+
+Browser conversation ids are stable logical chat ids. `ChatDirectory` resolves one to its current Pi session, and the
+primary remains chat `1` even when a future Move to thread operation rebinds it. Owner, inbound MCP and Telegram
+admission records the operation and selected session in `app_chat_operations`; retries keep that session, while Pi
+continues to own transcripts, tasks, request ids and documents. A rebind is an epoch compare-and-set and closes the
+affected SSE streams so clients reconnect. The operation ledger is pruned opportunistically after 30 days.
+
+The unit suite covers lookup, replay binding, retention, ownership fencing and independent chat locks. The local
+workerd profile proves the boundary by rebinding chat `1` to a fresh non-root Pi session before service composition:
+
+```sh
+GOBLIN_HARNESS_PORT=19101 heavy bun run --cwd apps/runtime test:integration:permuted
+```
+
+The profile runs the owner, helper, routine, Telegram, memory and related native cases; owner and inbound proofs check
+the non-root session and an empty root transcript. The root `heavy bun run check` includes that profile. These are unit
+and local workerd results only; they do not establish deployed-stage, live-provider, Telegram-service or remote
+eviction acceptance.
+
 ## The dev stage
 
 Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.local/dev.env`

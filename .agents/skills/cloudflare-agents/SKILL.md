@@ -15,6 +15,12 @@ description: Change the PersonalAgent Durable Object shell, its RPC surface, lif
 - Owner-facing methods renew resident authority; inbound-client methods do not.
 - Inbound user authentication, the agent's resident authority and outbound MCP authorization are three separate
   things. Check them at the boundary that owns them.
+- Conversation routes carry stable logical chat ids. Resolve a chat through `Chats` before reaching Pi, and admit owner,
+  inbound or Telegram operations through its recorded session. A future epoch-fenced rebind closes that chat's SSE
+  stream for a fresh snapshot; it never moves a running Pi turn. Keep the Agent shell thin while services own this
+  resolution and the application operation ledger. [ADR 0030](../../../docs/adr/0030-logical-chats-over-pi-sessions.md)
+  defines intentionally Pi-keyed records and the unit/local workerd proof; the test-only permuted primary binding
+  ships in no production class.
 - Never import Alchemy deployment code into workerd. Transactions and gates never span network or model work.
 
 Before changing an API call, read the current [documentation](https://developers.cloudflare.com/agents/) and the installed package's declarations; the
