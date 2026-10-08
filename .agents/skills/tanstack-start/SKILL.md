@@ -16,6 +16,9 @@ The web app is a thin browser projection over the resident runtime. TanStack Sta
   prose, supports keyboard and IME behavior, and is shared by full, draft and compact inline composers. Local commands
   stay local; server failures preserve the draft and identify the chip.
 - Tool payloads use the local `JsonView` and `ToolPayload` primitives. Select MCP structured output from existing redacted details, retain supplementary content and exact Raw text, and keep JSON branches and large child lists bounded. Markdown output (`lib/markdown.ts`) renders through `ToolMarkdown` as untrusted text: no images, only absolute http(s)/mailto links, raw HTML as text. Rendering grants nothing and fetches no remote content.
+- Mermaid fences use the kit's inert preview and read-only native-dialog explorer (ADR 0023). Keep untrusted inline
+  SVG behind `diagram-svg.ts`: scoped CSS, unique marker IDs, no active elements or external references. Verify
+  gestures, node selection, focus return and frame confinement with `apps/web/test/ui-diagram.ts`.
 - Every conversation, draft and App is one tab-less pane (ADR 0019): the pure store in `lib/workspace.ts` owns the
   layout and drives Trellis 0.3.0 (desktop, after hydration, controlled) or the narrow snapping strip; items render
   once into stable portal hosts. Routes carry only the focused conversation or App (`/c/$conversationId`,

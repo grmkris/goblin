@@ -17,6 +17,7 @@ newest exchange verbatim.
 Tool calls expand in place to readable input and output, with folding JSON branches, formatted Markdown, full-value
 copying and a Raw view.
 The agent's replies draw Mermaid diagrams, charts and maps from fenced blocks, in the theme's colours.
+Diagrams offer an explorer with zoom, pan and node connections, shared with agent apps.
 
 Telegram comes through a mygram MCP connection. The owner turns on a server's **Telegram** switch in Connections; signed
 MCP Events wake an authoritative inbox pull into main, and replies go back with `send_message`. Older servers use

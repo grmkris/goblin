@@ -160,7 +160,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   Failed selections preserve the draft and mark the failing chip. These controls work in panes, drafts and inline replies.
 - **Figures.** Assistant replies can draw Mermaid, chart and map fences. Ordinary Markdown is the
   default for checklists, timelines, comparisons and small sets of values. Open streaming fences, invalid specs and
-  drawing failures stay readable code. Agent-app views share the kit; see `app_docs` topic `ui`.
+  drawing failures stay readable code. **Explore diagram** opens zoom, pan and node connections: scroll or pinch to
+  zoom, drag or use arrows when zoomed, and select a node by click, tap, Enter or Space. Fit restores the view; Escape
+  clears selection, then closes. Agent-app views share the kit; see `app_docs` topic `ui`. Local browser acceptance:
+  build the app runtime with `heavy bun run --cwd packages/app build`, then run `heavy bun apps/web/test/ui-diagram.ts`.
 - **Skills.** Connect a server that offers skills, then turn on its **Use its skills** switch. The agent reads and
   follows those procedures; their tools still need grants. To receive drafts in a library such as MySkills, grant
   `skill_draft` and `skill_draft_status`, then review the proposals there.
