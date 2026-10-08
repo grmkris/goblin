@@ -179,7 +179,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - **Routines.** Settings → Routines → New routine: what it does, when it runs (once at a time you pick, on a cron
   schedule, or on a server's event) and the tools and limits it may use. Saving makes a proposal; Confirm on its card
   turns it on, and an edit pauses it until you confirm again. The agent can also propose one in chat.
-- **MyPlan as an App.** The suggested MyPlan server uses `https://dev-new.myplan.lol/mcp` on local and dev
+- **MyPlan as an App.** The suggested MyPlan server uses `https://dev.myplan.lol/mcp` on local and dev
   (`apps/runtime/src/mcp/suggested.ts`); `GOBLIN_MCP_SERVERS` may configure another endpoint. Connect it, then switch
   on **Its App** above the tools that App uses. Ask the agent to open a note ("Open my Trip plan
   note"); the App opens in place under the tool row (on an older call, open the row and press *Show app*). Its bar
@@ -188,6 +188,12 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   a stub. These moves keep the same iframe and bridge. What an App shares rides along with your next message in its conversation as untrusted
   context; links it offers wait for your click. The originating server supplies the resource URI and the App's
   behavior. Home dashboard placement is deferred; Apps open in their conversations or as pages.
+  A MyPlan question App saves the answer in MyPlan, then offers a bounded saved-answer receipt through
+  `ui/message`. Goblin shows **Continue** and **Dismiss** in its own chrome. Only the owner's Continue click
+  submits a fixed message with the receipt as untrusted App context in the originating conversation; it sends no
+  answer text or capability. Retry and reload reuse the same submission operation. Dismiss leaves the answer saved.
+  Local host acceptance: `heavy bun apps/web/test/ui-message.ts` covers save, stage, Continue, retry, reload and
+  Dismiss with fixture tool replies; it does not prove authenticated MyPlan acceptance or a deployed release.
 - **MyInbox.** The suggestion uses `https://dev.myinbox.lol/mcp` locally and `https://myinbox.lol/mcp` on dev/test/prod.
   Public metadata advertises DCR, PKCE S256 and public clients; this does not prove a signed-in connection. The owner
   connects it in Connections, asks “Show my inbox in an app”, and allows the app power card. The agent uses the exact
