@@ -24,8 +24,8 @@ Cloudflare API credentials.
 is given) in headless Chromium, as a phone (390×844, touch) and a desktop (1440×900), light and dark. It only taps
 and clicks what changes nothing: menus, a Thoughts disclosure, the sidebar. It sends no message and edits nothing.
 It checks behaviour the eye cannot confirm from a screenshot: the theme's curves, menus that scale, Return-key
-hints, 16px fields and 44px icon targets on touch, panels that open to their content's height, and a phone sidebar
-that closes on a link to the page already showing. Screenshots and a receipt go to the private
+hints, 16px fields and 44px icon targets on touch, panels that open to their content's height, and phone drawers
+that close: the sidebar on a link to the page already showing and on a swipe left, the turn map on a swipe down. Screenshots and a receipt go to the private
 `.local/goblin-acceptance/ui-<utc>/`; it exits non-zero on a failed check or a page error. Run it after each dev
 deploy that touches the web app. Chromium emulation is not device evidence: feel, the keyboard and gestures still
 need a real phone.
