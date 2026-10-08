@@ -63,3 +63,11 @@ release-script tests, then formatting stopped on 10 in-progress files in the unt
 Their owner received the exact blocker through the Codex task server. No UI or skill-owned path was reported by that
 gate. The complete local gate remains unproven; later steps did not run after formatting failed. Other agents' live
 files and unrelated captures remain preserved, and no deployment was performed by this UI task.
+
+Final full-gate attempt after the spike owner formatted its files: `heavy bun run check` passed formatting, agent
+checks, patches, graph and all nine workspace typechecks. It stopped at `lint:gate` with 10 Knip unused-file findings
+and zero collection failures, all in `spikes/coding/scripts/`: `binaries.ts`, `github.ts`, `lsp.ts`, `oauth.ts`,
+`overlay.ts`, `prepare.ts`, `server.ts`, `state.ts`, `tools.ts`, and `verifier.ts`. The remaining work is the spike's
+real entrypoint/package boundary configuration, owned by that agent; later full-gate steps did not run. The owner was
+notified and the heavy lock is released. The final UI handoff/source-registry scoped check passed formatting, root
+TypeScript, Effect checks (zero errors in 42 files), and `agents:check`.
