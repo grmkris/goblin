@@ -28,4 +28,6 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun install --frozen-lockfile
         working-directory: scripts/fixtures/mcp-app
+      - run: bun install --frozen-lockfile
+        working-directory: spikes/coding
       - run: bun run check
