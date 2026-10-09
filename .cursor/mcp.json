@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "goblin": {
+      "url": "https://dev.goblin.surf/mcp"
+    },
+    "mytab": {
+      "url": "https://mytab.lol/mcp"
+    }
+  }
+}

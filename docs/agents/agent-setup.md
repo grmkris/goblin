@@ -1,6 +1,6 @@
 # Coding agents and skills
 
-`AGENTS.md` is canonical. Root `CLAUDE.md` imports it with `@AGENTS.md`; each nested workspace has the same one-line shim. The root task map links all workspace instructions because Codex does not load files below its starting directory.
+`AGENTS.md` is canonical. Every `CLAUDE.md` (root and nested) is a symlink to its sibling `AGENTS.md`: Grok reads only `CLAUDE.md` and ignores `@AGENTS.md` imports, and Claude Code prefers `CLAUDE.md`. `.mcp.json` is the MCP master; `bun scripts/agents-sync.ts` regenerates `.codex/config.toml` and `.cursor/mcp.json` and repairs the links (standard: grmkris/personal `infra/agents.md`). The root task map links all workspace instructions because Codex does not load files below its starting directory.
 
 Skills live in `.agents/skills/<name>/SKILL.md`. Each Claude link is relative: `.claude/skills/<name> -> ../../.agents/skills/<name>`. Keep `.claude/skills` as a real directory of per-skill links. `agents/openai.yaml` invocation policy must agree with any Claude `disable-model-invocation` frontmatter.
 
