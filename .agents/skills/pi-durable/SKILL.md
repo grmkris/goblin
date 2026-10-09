@@ -80,7 +80,12 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   `spawner_session` holds its original anchor and relays. Primary memory resolves the current session, with Builder
   state on the generation API's `conversationId`; the memory store remains agent-wide. See
   [ADR 0030](../../../docs/adr/0030-logical-chats-over-pi-sessions.md) and the development guide's permuted-primary
-  native profile for unit/local workerd proof. Move to thread, Topics and per-primary memory remain future work.
+  native profile for unit/local workerd proof. Move to thread and per-Topic memory remain future work.
+- Topics (ADR 0032): a Topic's Conversation is a **new** `sessions.create()` session configured explicitly (extension
+  list and Personal's tool filter), never a fork of Personal. Threads, "+" threads and subagents inherit their
+  parent's `topic_id`; a "+" thread announces itself in its Topic's Conversation (`conversationAbove`). Inbound,
+  Telegram and `recentOwnerMessages` keep resolving `primary()`. Archive stops a Topic's chats through the owner's
+  Stop, never a background abort of a Conversation, and refuses new work until Restore, which restarts nothing.
 - Vendor tables (`pi_*`, `cf_agents_*` and the others in `storage/vendor.ts`) are never touched.
 - Initialization, readback and reconstruction are separate proofs; local workerd reconstruction is not remote
   eviction.

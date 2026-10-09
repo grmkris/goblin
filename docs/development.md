@@ -344,7 +344,9 @@ deletion; deletion does not itself cancel provider charges.
 
 The local workerd/auth-D1 owner fixture runs on `GOBLIN_HARNESS_PORT + 20`.
 Run `heavy bun run --cwd apps/runtime test:integration test/integration/owner.test.ts` to verify per-call owner
-Apps, live grants, queued inputs and safe removal in Main/threads, conversation Close/reopen, and isolation between two authenticated accounts even with forged
+Apps, live grants, queued inputs and safe removal in Main/threads, conversation Close/reopen, Topics (`topics-case.ts`:
+one Pi session per create, name clashes, inherited threads, archive stopping a held run, restore, inbound landing in
+Personal), and isolation between two authenticated accounts even with forged
 workspace/agent request selectors. Removed workspace, invitation and interaction endpoints return 404.
 These keyless deterministic tests are local evidence; deployed smoke and real provider acceptance are separate.
 
