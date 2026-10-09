@@ -80,7 +80,7 @@ primary remains chat `1` even if a future mover rebinds it (Move to thread forks
 admission records the operation and selected session in `app_chat_operations`; retries keep that session, while Pi
 continues to own transcripts, tasks, request ids and documents. A rebind is an epoch compare-and-set and closes the
 affected SSE streams so clients reconnect. The operation ledger is pruned opportunistically after 30 days. All
-services share the directory created in `compose.ts`; passive writes resolve and submit under its per-chat admission
+services share the directory created in `layers/legacy.ts`; passive writes resolve and submit under its per-chat admission
 lock without waiting for model execution.
 
 The unit suite covers lookup, replay binding, retention, ownership fencing and independent chat locks. The local
