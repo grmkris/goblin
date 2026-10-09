@@ -104,7 +104,9 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   not subagents or routine runs). `TranscriptIndex` reads `Conversation.entries` in entry-id windows and indexes only
   entries whose `conversationId` is the session (never forked history, never `role = 'persona'` forks), redacted and
   bounded, into `app_transcript_*`; its `afterResponse` catch-up is fire and forget. `search_chats` records its frozen
-  sources under the call id, so a replay returns them unchanged. Move to thread calls `reassign(session, fromEntry,
+  sources under the call id, so a replay returns them unchanged. Automatic retrieval is a `beforeRequest` hook: it picks sources once per input
+  (task memo `goblin.retrieval:<entry>`), puts at most three in the context tail and records them; it never holds a
+  transaction across its cheap-model rerank. Move to thread calls `reassign(session, fromEntry,
 chat)`.
 - Vendor tables (`pi_*`, `cf_agents_*` and the others in `storage/vendor.ts`) are never touched.
 - Initialization, readback and reconstruction are separate proofs; local workerd reconstruction is not remote
