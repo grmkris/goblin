@@ -167,6 +167,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   message steers it, and its answer goes up to whoever started it with your words quoted. The sliders button by the composer shows
   what the agent can use in that conversation (connections and their tools, skills, subagents); switching something
   off there hides it from the agent in that conversation only, and a new thread starts with the switches of the conversation it came from. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
+- **Threads from the composer, Personas and sources.** The composer's thread button (or `/new-thread`) makes the next
+  send start a thread; × goes back with the draft kept. On a server with Move, a message of yours in a channel offers
+  Move to thread in its toolbar. With Personas, `@` offers them; tag two or more and choose Together or In turn.
+  A strip under an answer that used other chats opens to each source.
 - **Questions, models and budget.** Answer an `ask_user` card with your next message. Pick an offered model in the
   composer; Settings and the composer's ring show today's usage in Credits, resetting at 00:00 UTC.
 - **Commands and references.** Type `/` to choose a skill, `/help`, `/stop` or `/new-thread`, and `@` to choose a
