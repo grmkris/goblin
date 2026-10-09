@@ -1,7 +1,7 @@
 import * as Context from 'effect/Context'
 import { DecisionAction, type DecisionLabel, type DecisionProposal } from '@goblin/contracts'
-import { and, asc, eq, inArray } from 'drizzle-orm'
-import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
+import { and, desc, eq, inArray } from 'drizzle-orm'
+import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Schema from 'effect/Schema'
 import { appDecisionLabels, appDecisionProposals } from '../storage/decision-schema.ts'
 
@@ -30,10 +30,13 @@ const view = (row: Row): StoredDecision => {
     proposal: { ...fields, payload: data.action, ...(decidedAt === null ? {} : { decidedAt }) },
   }
 }
+/** How many proposals the workspace snapshot carries: the newest open and confirmed ones. */
+const LISTED = 100
+
 export class DecisionStore implements ProposalStore {
-  readonly #db: DrizzleSqliteDODatabase
+  readonly #db: SQLiteAsyncDatabase<'sync', unknown>
   readonly #listeners = new Set<(proposal: DecisionProposal) => void>()
-  constructor(db: DrizzleSqliteDODatabase) {
+  constructor(db: SQLiteAsyncDatabase<'sync', unknown>) {
     this.#db = db
   }
   onChange(listener: (proposal: DecisionProposal) => void): () => void {
@@ -47,15 +50,17 @@ export class DecisionStore implements ProposalStore {
     const row = this.#db.select().from(appDecisionProposals).where(eq(appDecisionProposals.id, id)).get()
     return row === undefined ? undefined : view(row)
   }
+  /** The newest open and confirmed proposals, oldest first: older ones age out, so new ones always show. */
   list(): readonly DecisionProposal[] {
     return this.#db
       .select()
       .from(appDecisionProposals)
       .where(inArray(appDecisionProposals.state, ['open', 'confirmed']))
-      .orderBy(asc(appDecisionProposals.createdAt))
-      .limit(100)
+      .orderBy(desc(appDecisionProposals.createdAt), desc(appDecisionProposals.id))
+      .limit(LISTED)
       .all()
       .map((row) => view(row).proposal)
+      .toReversed()
   }
   add(proposal: DecisionProposal, fence: DecisionFence): DecisionProposal {
     const inserted = this.#db
