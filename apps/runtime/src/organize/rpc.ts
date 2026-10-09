@@ -1,8 +1,10 @@
-import type { CreatePersona, CreateTopic, UpdatePersona, UpdateTopic } from '@goblin/contracts'
+import type { CreatePersona, CreateTopic, DecisionLabel, UpdatePersona, UpdateTopic } from '@goblin/contracts'
 import { Agent } from 'agents'
 import type * as Effect from 'effect/Effect'
 import type { StopRuntime } from '../agent-program.ts'
 import type { RuntimeEnv } from '../env.ts'
+import { type ClefClient, workersClef } from '../decisions/client.ts'
+import { labelDecision } from '../decisions/program.ts'
 import type { AppError } from '../http/errors.ts'
 import type { RpcResult } from '../http/rpc.ts'
 import * as PersonaPrograms from '../personas/program.ts'
@@ -12,7 +14,8 @@ import * as OrganizePrograms from './program.ts'
 
 /**
  * The owner's workspace organization on the Agent: Topics (ADR 0032), Personas and the receipts of what was organized
- * (ADR 0033). `PersonalAgent` supplies how an owner request runs and what a Stop reaches; each method is one program.
+ * (ADR 0033), and the owner's labels of decision proposals (ADR 0031). `PersonalAgent` supplies how an owner request
+ * runs and what a Stop reaches; each method is one program.
  */
 export abstract class OrganizingAgent extends Agent<RuntimeEnv> {
   /** An owner request: renews resident authority, then runs the program. */
@@ -51,5 +54,14 @@ export abstract class OrganizingAgent extends Agent<RuntimeEnv> {
   }
   undoOrganize(id: string) {
     return this.owner(OrganizePrograms.undoReceipt(this.stopping(), id))
+  }
+
+  /** The owner confirms or dismisses a decision proposal; the first label wins (ADR 0031). */
+  labelDecision(id: string, label: DecisionLabel['label']) {
+    return this.owner(labelDecision(id, label))
+  }
+  /** Clef through the Workers AI binding (ADR 0031); native tests inject a fake without changing authorization. */
+  protected clefClient(): ClefClient {
+    return workersClef(this.env.AI)
   }
 }
