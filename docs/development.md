@@ -75,17 +75,19 @@ If a check fails, look at `git status` first. Another agent's half-finished file
 
 ## Chat identities and local proof
 
-Browser conversation ids are stable logical chat ids. `ChatDirectory` resolves one to its current Pi session, and the
-primary remains chat `1` even if a future mover rebinds it (Move to thread forks and never rebinds, ADR 0034). Owner, inbound MCP and Telegram
-admission records the operation and selected session in `app_chat_operations`; retries keep that session, while Pi
-continues to own transcripts, tasks, request ids and documents. A rebind is an epoch compare-and-set and closes the
-affected SSE streams so clients reconnect. The operation ledger is pruned opportunistically after 30 days. All
-services share one directory, which the legacy start makes (`layers/legacy.ts`, being retired) and the `Chats` service
-reads (`chats/service.ts`); passive writes resolve and submit under its per-chat admission lock without waiting for
-model execution.
+Browser conversation ids are stable logical chat ids. `ChatReads` (`chats/directory.ts`) resolves one to its current Pi
+session, and the primary remains chat `1` (nothing rebinds a chat: Move to thread forks, ADR 0034). Every input into a
+chat goes through one admission sequence (`ChatOperations.send`, `chats/operations.ts`), which records the operation's
+receipt and selected session in `app_chat_operations` (`chats/receipts.ts`); retries keep that session, while Pi
+continues to own transcripts, tasks, request ids and documents. Receipts are pruned opportunistically after 30 days.
+Admission and passive writes hold the chat's `KeyedLock` lock, and inside it the per-chat lock of the one
+`ChatDirectory` the legacy start makes (`layers/legacy.ts`, being retired), which its Promise callers still take,
+never across model execution.
 
-The unit suite covers lookup, replay binding, retention, ownership fencing and independent chat locks. The local
-workerd profile proves the boundary by rebinding chat `1` to a fresh non-root Pi session before service composition:
+The unit suite covers lookup, receipts (a row from before them reads as `legacy`), replay binding, retention, the one
+admission sequence, flows and chat locks (`chat-receipts.test.ts`, `chats.test.ts`, `chats-service.test.ts`). The
+local workerd profile proves the boundary by binding chat `1` to a fresh non-root Pi session before service
+composition:
 
 ```sh
 GOBLIN_HARNESS_PORT=19101 heavy bun run --cwd apps/runtime test:integration:permuted
