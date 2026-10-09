@@ -22,9 +22,11 @@ Use the installed Effect 4 guide and declarations as the API authority. Verify t
   stays a plain class or function, wrapped once where its service is built. Keep a multi-statement invariant inside one
   transaction or one `Effect.sync`, never spread across `yield*`.
 - Layers: `layers/core.ts` (`AgentInput`, `Db`, `Changes`, `PiSessions`, `KeyedLock`, `FlowEvents`, the logger and
-  reporter), then one layer per area in the order `layers/index.ts` gives; each sees only the layers before it.
-  `AgentServices` is derived from them. `layers/legacy.ts` and `services.ts` are the legacy start, being retired: build
-  new services in their area's layer, never a second instance of a stateful class.
+  reporter), then the start's steps and one layer per area in the order `layers/index.ts` gives; each sees only the
+  layers before it, and the start's order is the boot contract. `AgentServices` is derived from them. A stateful
+  object is made once, by its start step, and shared by an instance tag in its module (never a second instance);
+  programs use the services. `layers/legacy.ts` and `services.ts` hold only the chat directory, conversation registry
+  and mover until the conversation layer makes them.
 - Programs run through the agent's bridge (`runtime/bridge.ts`): `run` checks the plan, `local` does not, `exit`
   returns the exit. Never call `run`, `local` or `Effect.run*` inside an Effect; compose the program instead.
 - Owner API handlers are `HttpApiBuilder.group` programs in `<area>/api.ts` over the contract in
