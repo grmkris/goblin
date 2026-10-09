@@ -11,7 +11,7 @@ current. The web app is a Slack-style shell: a moss rail and a sidebar of Topics
 is Main), and a thread panel beside it where a message's thread opens, stacking threads opened inside threads. Each conversation can switch off,
 for its own agent, connections and their tools, skills libraries and subagents; a new thread starts with main's
 switches. Background subagents work in their own conversations, start their own when a job splits, report their final
-answer back to the conversation that started them and close when done; the owner can write to one to steer it. Main keeps an OptChat-style memory view: summaries of older messages followed by the
+answer back to the conversation that started them and close when done; the owner can write to one to steer it. Every Topic's Conversation (Main is Personal's) keeps its own OptChat-style memory view: summaries of older messages followed by the
 newest exchange verbatim.
 
 Tool calls expand in place to readable input and output, with folding JSON branches, formatted Markdown, full-value
@@ -91,4 +91,4 @@ notification choice. Event confirmation authorizes the exact connected server, e
 
 LOCAL throwaway-account acceptance covers routine reminders, cron recovery across a process restart, revoked-authority skips and caps through CLIProxy. Native alarm tests also verify recurring recovery wakes; real producer Events and deployed acceptance remain separate.
 
-Main is the stable chat and composer. The dashboard surface is deferred while its runtime layout data remains available for a later UI iteration. The logical chat identity layer keeps URLs, capabilities, placement and operation admission stable while Pi owns the physical sessions and transcripts; Topics build on it: each Topic is a channel with its own Conversation (a new Pi session, not a fork) and the threads under it, Personal holds Main and receives every inbound channel, and archiving a Topic stops its chats' work until it is restored (ADR 0032). Move to thread and per-Topic memory build on it later.
+Main is the stable chat and composer. The dashboard surface is deferred while its runtime layout data remains available for a later UI iteration. The logical chat identity layer keeps URLs, capabilities, placement and operation admission stable while Pi owns the physical sessions and transcripts; Topics build on it: each Topic is a channel with its own Conversation (a new Pi session, not a fork) and the threads under it, Personal holds Main and receives every inbound channel, and archiving a Topic stops its chats' work until it is restored (ADR 0032). Move to thread builds on it later.

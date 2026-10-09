@@ -77,10 +77,12 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   for Pi APIs. `chatOf(session)` maps capability and task activity back to the current chat; unknown sessions fail
   closed. Pi-keyed approvals, App call records, run events, skill activations, fork entries and memory entry ids stay
   on their original Pi identities deliberately. A helper's `parent_session` is its parent chat; immutable
-  `spawner_session` holds its original anchor and relays. Primary memory resolves the current session, with Builder
-  state on the generation API's `conversationId`; the memory store remains agent-wide. See
+  `spawner_session` holds its original anchor and relays. Each Topic Conversation's memory (`ChatMemories`, keyed by
+  chat id) resolves the chat's current session on each use, with Builder state on the generation API's
+  `conversationId`; the builder runs only for a Conversation, and `zoom` reads the Conversation above its caller. See
   [ADR 0030](../../../docs/adr/0030-logical-chats-over-pi-sessions.md) and the development guide's permuted-primary
-  native profile for unit/local workerd proof. Move to thread and per-Topic memory remain future work.
+  native profile for unit/local workerd proof. Move to thread remains future work; it forgets a moved turn's memory
+  with `ChatMemories.truncate(chat, size)`.
 - Topics (ADR 0032): a Topic's Conversation is a **new** `sessions.create()` session configured explicitly (extension
   list and Personal's tool filter), never a fork of Personal. Threads, "+" threads and subagents inherit their
   parent's `topic_id`; a "+" thread announces itself in its Topic's Conversation (`conversationAbove`). Inbound,
