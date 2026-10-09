@@ -86,6 +86,9 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   parent's `topic_id`; a "+" thread announces itself in its Topic's Conversation (`conversationAbove`). Inbound,
   Telegram and `recentOwnerMessages` keep resolving `primary()`. Archive stops a Topic's chats through the owner's
   Stop, never a background abort of a Conversation, and refuses new work until Restore, which restarts nothing.
+- Start thread (ADR 0034, `chats/thread-heads.ts`): a Thread is made once per owner operation (`origin_op`), forked at
+  the chat's newest entry outside a running turn (`pi/turns.ts`, never inside one), then `app.thread_head` goes into
+  the chat as a passive write (`thread-head:<op>`) before the message enters the Thread through `submitOwner`.
 - Vendor tables (`pi_*`, `cf_agents_*` and the others in `storage/vendor.ts`) are never touched.
 - Initialization, readback and reconstruction are separate proofs; local workerd reconstruction is not remote
   eviction.
