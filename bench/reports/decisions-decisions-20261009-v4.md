@@ -37,11 +37,11 @@ The development fixtures and rules share an author, so their exact scores are li
 | separate-work | jev | 96/120 | 80.0% | 0 / 0 / 0 / 0 | 231 / 265 | $0.001963 |
 | separate-work | openai-decisions | 108/120 | 90.0% | 0 / 0 / 0 / 0 | 98 / 157 | $0.003457 |
 
-Development campaign new spend was $0.146297; historical attempts remain in the private append-only ledger. The combined development report includes $0.640711 of retained compatible attempts, including prior runs and unknown reservations; that aggregate is not tonight-only spend.
+Development campaign new spend was $0.146297; historical attempts remain in the private append-only ledger. The private development report shows $0.640711 of all ledger attempts settled through that point, including the prior held-out run and unknown reservations; that aggregate is not development-only or tonight-only spend.
 
 ## Held-out set
 
-Claude Sonnet authored 100 cases independently and blind to the rules and scoring. Cheap chat contributes its prior partial repetition plus the 97-call completion run; four invalid brief rows and eight invalid organization rows remain counted as format failures. Clef, Clef-flash, Jev and OpenAI Decisions each have three held-out repetitions.
+Claude Sonnet authored 100 cases independently and blind to the rules and scoring. Cheap chat contributes its prior partial repetition plus the 97-call completion run; four invalid brief rows and eight invalid organization rows remain counted as format failures. Ten of these arose during tonight's cheap completion and two were already present; these are decoding failures rather than provider failures. Clef, Clef-flash, Jev and OpenAI Decisions each have three held-out repetitions.
 
 | Task | Arm | Correct / judged | Exact | Provider / timeout / format / skipped | p50 / p95 ms | Charged USD |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
@@ -82,10 +82,10 @@ The held-out numbers carry the recommendation. Every threshold below is the froz
 
 | Judgment | Arm | Frozen threshold | Held-out exact | Recommendation |
 | --- | --- | ---: | ---: | --- |
-| Context relevance | cheap-llm | 0.95 | 59/75 | Best exact held-out result among complete-ish model rows; precision 95.5%, recall 66.7%, with four invalid rows retained. |
+| Context relevance | clef | 0.594 | 54/75 | Frozen inclusion precision 100%, recall 78.1%, and zero wrong-context choices. Cheap chat has higher exact accuracy but misses the 70% inclusion recall target. |
 | Brief update | clef | 0.9158 | 54/75 | Highest complete model exact score (72.0%) without cheap-chat format failures; false decision labels remain. |
 | Attention | clef | 0.5107 | 63/75 | 84.0%, all held-out highlight cases selected at the frozen threshold; Clef and critic tie. |
-| Separate work | clef | 0.7503 | 60/75 | 80.0% and 91.7% positive precision/84.6% recall; critic ties on exact score but has no model calls for many cases. |
+| Separate work | clef | 0.7503 | 60/75 | 80.0% and 91.7% positive precision/84.6% recall; critic ties on exact score and makes a model call for every held-out organization case. |
 
 No arm is enabled for automatic actions. All outputs remain owner-confirmed proposals. Questions, approvals and failures continue to be surfaced by runtime rules regardless of model score.
 
