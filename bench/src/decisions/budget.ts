@@ -22,9 +22,10 @@ export function admission(
   output: number,
 ): string | null {
   const current = records.filter((record) => record.runId === manifest.runId)
-  const used = totals(records)
+  const used = totals(manifest.campaign === undefined ? records : current)
+  const global = totals(records)
   const currentState = totals(current)
-  if (used.unfinished) return 'unfinished-attempt'
+  if (global.unfinished) return 'unfinished-attempt'
   if (currentState.breach) return 'reservation-breach'
   // A terminal access/route rejection skips that arm; its full allowance still counts.
   if (
@@ -38,6 +39,10 @@ export function admission(
   )
     return 'unknown-usage'
   const cap = manifest.limits
+  if (manifest.campaign !== undefined) {
+    const campaign = totals(records.filter((record) => record.campaignId === manifest.campaign?.id))
+    if (campaign.usd + cost(model, input, output) > manifest.campaign.maxUsd) return 'campaign-budget-ceiling'
+  }
   if (input > cap.perCallInput || output > cap.perCallOutput) return 'per-call-token-ceiling'
   if (
     used.requests + 1 > cap.maxRequests ||
