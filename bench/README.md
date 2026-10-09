@@ -1,5 +1,15 @@
 # Memory benchmark workspace
 
+Interrupted decision attempts remain fully charged and block later admission. Only an explicit owner approval can
+settle a reservation without known usage; the command appends a receipt under the same coordinator lock and refuses
+unknown or already settled attempts:
+
+```sh
+bun run bench:decisions settle-unfinished --run decisions-heldout-20261008 --attempt decisions-heldout-20261008.536 --owner-approved 2026-10-09
+```
+
+The approval permits later admission without claiming recovered usage or retrying the interrupted request.
+
 ## Cross-chat transcript retrieval spike
 
 The [retrieval spike report](retrieval-report.md) compares a native DO FTS5 candidate index with a bounded

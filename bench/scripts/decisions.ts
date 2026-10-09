@@ -13,6 +13,7 @@ import { plan } from '../src/decisions/runner.ts'
 import { Attempt, Row, arms } from '../src/decisions/schema.ts'
 import { reportData, markdown, combineRows } from '../src/decisions/report.ts'
 import { totals } from '../src/decisions/budget.ts'
+import { settleUnfinished } from './decisions-settle.ts'
 
 const [command = 'plan', ...args] = Bun.argv.slice(2)
 const root = resolve(import.meta.dirname, '../..')
@@ -206,6 +207,12 @@ const report = Effect.fn('decisions.command.report')(function* () {
   yield* fs.writeFileString(path, markdown(data))
   return { report: path, totals: data.totals }
 })
+const settleCommand = Effect.fn('decisions.command.settle')(function* () {
+  const runId = option('run')
+  const attemptId = option('attempt')
+  if (runId === undefined || attemptId === undefined) return yield* fail('Supply --run and --attempt')
+  return yield* settleUnfinished({ root: privateRoot, runId, attemptId, ownerApproved: option('owner-approved') })
+})
 const main = Effect.gen(function* () {
   yield* steer
   const result =
@@ -215,7 +222,9 @@ const main = Effect.gen(function* () {
         ? yield* run()
         : command === 'report'
           ? yield* report()
-          : yield* fail('Use plan, run or report')
+          : command === 'settle-unfinished'
+            ? yield* settleCommand()
+            : yield* fail('Use plan, run, report or settle-unfinished')
   yield* Console.log(json(result))
 }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(BunServices.layer, FetchHttpClient.layer)))
 BunRuntime.runMain(main)

@@ -30,7 +30,10 @@ export function admission(
   if (
     records.some(
       (record) =>
-        record.phase === 'settle' && !record.usageKnown && ![400, 401, 402, 403, 404, 405].includes(record.status),
+        record.phase === 'settle' &&
+        !record.usageKnown &&
+        record.ownerApproved === undefined &&
+        ![400, 401, 402, 403, 404, 405].includes(record.status),
     )
   )
     return 'unknown-usage'
