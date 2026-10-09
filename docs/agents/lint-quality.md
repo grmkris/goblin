@@ -3,7 +3,7 @@
 goblin has zero accepted lint, Effect or Knip findings and no baseline. The rule set was adapted from My Apps;
 the vendored rules keep their upstream provenance and license under `tools/oxlint/anti-slop/`.
 
-`bun run check` runs format, agent/docs checks, graph, typecheck, the zero-finding lint/Effect/Knip gate, duplication, unit/runtime tests and the production build. Run expensive checks through `heavy` on this box. Never pipe `heavy`; exit 75 means capacity contention. Gate collectors do not nest `heavy` calls.
+`bun run check` runs format, agent/docs checks, graph, typecheck, the spikes' typecheck and tests (`check:spikes`; install `spikes/coding` and `spikes/coding-cf` with `bun install --frozen-lockfile` first, as CI does; the native verifier regression needs a prepared snapshot and stays out), the zero-finding lint/Effect/Knip gate, duplication, unit/runtime tests and the production build. Run expensive checks through `heavy` on this box. Never pipe `heavy`; exit 75 means capacity contention. Gate collectors do not nest `heavy` calls.
 
 Oxlint enables correctness/suspicious categories, TypeScript type-aware rules, Oxc, Unicorn, import, a trimmed set of anti-slop rules (SAFETY-commented assertions, no chained or widen-then-assert assertions, no module mocking, no Reflect get/apply, Effect tag rules), runtime/import boundaries, repository configuration/resource-name rules, cognitive complexity, and shadcn rules. Oxfmt owns formatting. Use a consistent nearest `tsconfig.json` for TypeScript and type-aware diagnostics; do not use `oxlint --type-check` as the type gate.
 
