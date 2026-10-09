@@ -6,7 +6,10 @@ description: Change how the browser follows the Pi conversation (SSE snapshot, b
 # Conversation stream and MCP Apps in goblin
 
 The browser follows committed Pi state over Server-Sent Events: `/api/conversations/:id/events` sends a snapshot of entries,
-then batches, with a heartbeat. `apps/web/src/lib/projection.ts` turns entries into messages and tool calls.
+then batches, with a heartbeat. The two event streams are raw routes of the agent (`agent-requests.ts`), behind the
+Worker's edge like the typed owner API (ADR 0038); the stream's own reads (the JSON snapshot, the queue) and every
+other server read go through the typed client's factories (`conversations/queries.ts`), and a stream event only
+invalidates the query keys it affects. `apps/web/src/lib/projection.ts` turns entries into messages and tool calls.
 `lib/parts.ts` folds them into render parts: each tool result joins the call that asked for it, with a lifecycle
 state; the entries the app writes itself (thread heads, Persona asks and answers, Topic briefs, Delegate results) are
 decoded with their contract schemas, and entries a later entry's edits omit are hidden.
@@ -43,7 +46,9 @@ conversation outside it.
   unloads to a stub, never one on screen (`lib/app-residency.ts`). Fullscreen is the App's page (`/a/<id>`). Verify moving, resizing, scrolling and responsive changes with an
   actual SDK-connected iframe, plus origin binding and teardown/reconnect tests.
 - An App's tool and resource calls go through the owner API to the originating server only, and need that server's
-  grant. No cross-server calls, no credentials in iframe state, browser bundles, logs or transcripts.
+  grant: the frame (`components/apps/frame.tsx`) sends them through `apps/queries.ts` with `x-mcp-caller: app`, and an
+  agent app's actions, state reads and failure reports through the same factories. No cross-server calls, no
+  credentials in iframe state, browser bundles, logs or transcripts.
 - Keep the plain tool-result fallback for hosts or results without an App. Unimplemented host methods stay
   unsupported.
 - The transcript scrolls in `Conversation` (`components/conversation.tsx`) over the patched @shadcn/react

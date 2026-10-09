@@ -23,21 +23,24 @@ is read-only: no query changes the agent or calls a model.
 
 1. `problems --since 6h`: unresolved failures, cutoffs, empty answers and coverage gaps, newest first. Expected
    authority waits and confirmed recovered model retries are filtered; use `problems --all --since 6h` for the full retained history.
-2. `turns`: recent turns in a line: source (`direct`, `telegram`, `routine`, `subagent`, …), outcome, attempts, tool
-   calls, failures, tokens.
+2. `turns`: recent turns in a line: source (`direct`, `telegram`, `routine`, `subagent`, `persona`, …), outcome,
+   attempts, tool calls, failures, `error` events, tokens.
 3. `turn <operation id>`: Pi's settlement (`done`, or `unanswered` and why) and every event in order with timings.
    Read `coverage.gaps`: they say what the timeline cannot show (a restart mid-turn, open events, a missing final answer, a compaction's
    model call). A gap is not evidence that nothing happened.
 4. `conversation <id> --before <entry>`: the words, tool arguments and results around the turn, in full but bounded
    (`truncated` marks a cut).
-5. `flows --chat <id> --since 6h`: how conversations moved (ADR 0037), content-free: sends, replies, thread starts,
-   moves, Personas, Delegates, each with its operation id and how it ended (`ok`, `replayed`, `refused`, `error`).
-   Filter with `--flow reply`. `details --operation <id>` (or `--chat <id> --entry <id>` for an answer or tool result) is
-   one operation's timeline, with a turn when it ran one, and the operations related to it: its parent, the thread it
-   started, the Personas it asked.
-6. `lookup <ref|request|operation>`: the reference the app shows with an error (`… · ref 7f3a9c12`), a request id or
-   an operation id; it finds the Worker's log lines that mention it, then shows the details of the operation they name
-   (Cloudflare credentials as for `logs`).
+5. `flows --chat <id> --since 6h`: how conversations moved (ADR 0037), content-free, each step with its operation id
+   and how it ended (`ok`, `replayed`, `refused`, `error`). Filter with `--flow subagent_report`. Today the agent
+   records Persona answers, Delegate spawns and reports, Topic creates and archives, organize Undo, routine firings and
+   reports, and Telegram deliveries; sends, replies, thread starts and moves have flow names but no steps yet.
+   `details --operation <id>` (or `--chat <id> --entry <id>` for an answer or tool result) is one operation's
+   timeline, with a turn when it ran one, and the operations related to it: its parent, the thread it started, the
+   Personas it asked.
+6. `lookup <ref|request|operation>`: the reference the app shows with an error (`… · ref 7f3a9c12`: the start of the
+   Worker's cf-ray, or of the browser's request id when no answer came), a request id or an operation id; it finds the
+   Worker's log lines that mention it, then shows the details of the operation they name (Cloudflare credentials as
+   for `logs`).
 7. `stats --since 24h`: flow totals across every agent of the stage (Analytics Engine, hashed agent ids), to see
    whether a flow fails for everyone or for one owner (the token needs Account Analytics read).
 8. `logs <operation id>`: the Worker's own lines for that id (needs `CLOUDFLARE_API_TOKEN` and
@@ -45,11 +48,28 @@ is read-only: no query changes the agent or calls a model.
 
 The owner can also ask the agent itself ("why did that fail?"): its `diagnose` tool reads the same ledger.
 Use `all: true` to include expected waits and confirmed recovered attempts. Full turn timelines are never filtered.
+In the app, a message's Details (in its toolbar) shows what `details` shows, from the owner API
+(`GET /api/conversations/:id/details`).
+
+## From a reference to the code
+
+- Every failure the app shows quotes a reference: the Worker edge's `x-goblin-ref` (the request's cf-ray, also
+  `error.ref` in the error envelope), or the browser's own `x-goblin-request` id when nothing answered. Sign-in and
+  `/health` failures quote one too.
+- The Worker writes one `http.failure` line per failed API answer: route template, method, status, code, `ref`,
+  `request`, `operation` and the agent. Inside the agent the request's lines carry `goblin.rpc`
+  (`<group>.<endpoint>`), `goblin.operation` and `ref`.
+- A reported failure is one `failure` line: `where`, `error.type`, `frames` (`file:line:col` only) and `severity`,
+  never its message. Its `where` and top frame say where to read the code.
+- A browser crash is a `client_error` line (route id, error type, frames, build, `ref`) and a `client_error` point in
+  Analytics Engine.
+- Lines never carry content: a message, prompt, argument or result is read only through `conversation`.
 
 ## Reading events
 
 - Operation ids: a Telegram message is `telegram-<mygram id>`; routines `routine-input:` and `routine-report:`;
-  subagents `subagent:` and `subagent-report:`; the owner's browser and MCP clients use their own ids (`direct`).
+  subagents `subagent:` and `subagent-report:`; a Persona's answer `persona:<operation>:<persona>`; the owner's
+  browser and MCP clients use their own ids (`direct`).
 - `model.attempt`: one provider request. `error` with `gen_ai.response.finish_reasons` and a fixed `goblin.error` summary; a retried
   attempt is a new event with a higher `goblin.attempt`.
 - `tool.call`: `blocked` (`goblin.blocked_reason`: a missing grant, the budget, an inactive resident authority),
@@ -72,8 +92,12 @@ found in it.
 ## Changing the instrumentation
 
 The ledger lives in `apps/runtime/src/telemetry/` and follows Pi's commit listener (`telemetry/pi.ts`); inspection is
-`apps/runtime/src/inspect/`; the MCP tools are `apps/runtime/src/inbound/inspection.ts`, added to `/mcp` by
-`inbound/route.ts` for a token whose consent grants `goblin:inspect`. A listener that throws faults
+`apps/runtime/src/inspect/` (the `Inspection` service, and the owner API's `inspect` group in `inspect/api.ts`); the
+MCP tools are `apps/runtime/src/inbound/inspection.ts`, added to `/mcp` by `inbound/route.ts` for a token whose consent
+grants `goblin:inspect`. Lines go only through `observability/logger.ts` (closed `LOG_EVENTS`, allowlisted keys),
+failures through `observability/report.ts`, and flow steps through `FlowEvents.record` (`observability/flows.ts`) to
+the ledger and, one point per operation, to Analytics Engine (`observability/ae.ts`). Their content-freedom is tested
+in `test/observability/`. A listener that throws faults
 the user's task, so every sink and MCP report callback stays guarded. Restore correlation through supported Pi inspection
 and `LiveDoc` outside the listener, before enabling work; listeners only read publications and the application ledger. Never read Pi's vendor tables directly; tests drive real Pi
 (`test/telemetry.test.ts`) and local workerd (`test/integration/native-telemetry.ts`, `auth-inspect.ts`).

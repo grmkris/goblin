@@ -35,7 +35,16 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   `telegram-tg-<update>` and reply operation ids; fence old cursor writes only after both leases confirm. Hooks persist
   receipts before asynchronous dispatch; accepted submissions are distinct from external delivery.
 - MyInbox suggestions use dev.myinbox.lol locally and myinbox.lol on dev/test/prod. Discovery advertises DCR and PKCE public clients; owner sign-in/power approval and real-message acceptance are separate. MyGram local/dev stays dev.mygram.lol pending the owner's bot/account decision.
-- Home pinning adds no grant: only the owner adds an open MCP App after launch/resource re-verification. Browser `/api/mcp/` writes require the same-origin CSRF marker; the bridge remains bound to the originating server.
+- Home pinning adds no grant: only the owner adds an open MCP App after launch/resource re-verification. Every owner
+  write, `/api/mcp/` included, needs the app's Origin and the CSRF header at the Worker's edge (ADR 0038); the bridge
+  remains bound to the originating server.
+- The owner's MCP endpoints are the owner API's `mcp` and `resident` groups (`packages/contracts/src/api/mcp.ts` and
+  `resident.ts`, handlers in `mcp/api.ts` and `mcp/resident-api.ts`) over the services in `mcp/service.ts` (`McpServers`,
+  `McpGrants`, `McpConnections`, `Approvals`, `Events`, `Resident`). An App's own calls carry `x-mcp-caller: app`,
+  which the edge forwards and the contract reads, so they are held to the App's grants. The OAuth callback is a raw
+  route of the agent (`GET /api/mcp/oauth/callback`) that redirects to Connections, with `ref` when it failed.
+- Inbound `/mcp` reaches the agent through its RPC methods `askAsClient` and `recentMessages`, and its internal
+  `/inspect` route for a token that holds `goblin:inspect`.
 - Fixture tests (`test/mcp/`) prove protocol behaviour; real MyPlan/MyBrowser behaviour is proven only on dev.
 
 Before changing an API call, read the current [documentation](https://modelcontextprotocol.io/specification/latest) and the installed package's declarations; the

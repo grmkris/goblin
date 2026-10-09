@@ -15,4 +15,4 @@ Keep the MyApps quality families at zero new findings. Adapt paths and runtime z
 - Run Knip, jscpd, Effect diagnostics, and TypeScript as separate gates. A checker that cannot resolve a project must fail, not report zero.
 - New goblin code starts without a lint baseline. If a legacy finding is discovered, record the exact file/rule/reason and resolve it before merging.
 
-Canonical commands are `bun run format:check`, `bun run agents:check`, `bun run graph`, `bun run dupes`, `bun run typecheck`, `bun run effect:check`, `bun run lint`, `bun run knip`, and `bun run test`; `check:files` is the inner loop. `heavy` is coordinator-owned.
+Canonical commands are `bun run fmt:check`, `bun run agents:check`, `bun run graph`, `bun run dupes`, `bun run typecheck`, `bun run effect:check`, `bun run lint`, `bun run knip`, and `bun run test`; `check:files` is the inner loop. `heavy` is coordinator-owned.
