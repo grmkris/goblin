@@ -1,6 +1,6 @@
 """Fail-closed checks for promotion, independent of credentials and Cloudflare."""
 import unittest
-from release import require_clean_snapshot, require_dev, safe_plan
+from release import require_clean_snapshot, require_dev, safe_plan, stale_checkouts
 
 
 class PromotionTest(unittest.TestCase):
@@ -24,6 +24,11 @@ class PromotionTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 require_dev(good | change, "a" * 40, "v1")
 
+
+    def test_prunes_only_checkouts_no_stage_runs(self):
+        dev, prod, old = "a" * 40, "b" * 40, "c" * 40
+        self.assertEqual(stale_checkouts([dev, prod, old, "notes", "d" * 39], {dev, prod}), [old])
+        self.assertEqual(stale_checkouts([dev], {dev, None}), [])
 
 if __name__ == "__main__":
     unittest.main()

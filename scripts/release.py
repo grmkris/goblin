@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import urllib.request
 
@@ -37,6 +38,21 @@ def safe_plan(output):
 def require_clean_snapshot(lines, config_is_directory):
     if any(line != "?? .local" for line in lines) or config_is_directory:
         raise RuntimeError("release_checkout_must_be_clean")
+
+
+def stale_checkouts(names, live):
+    # Each checkout holds a full dependency copy (about 2.6 GB); only the live releases are worth keeping.
+    return sorted(name for name in names if re.fullmatch(r"[0-9a-f]{40}", name) and name not in live)
+
+
+def prune_checkouts(checkouts):
+    live = set()
+    for stage in ["dev", "prod"]:
+        path = STATE / f"receipts/{stage}.json"
+        if path.exists():
+            live.add(json.loads(path.read_text()).get("sha"))
+    for name in stale_checkouts([path.name for path in checkouts.iterdir()], live):
+        shutil.rmtree(checkouts / name)
 
 
 def require_dev(receipt, sha, version):
@@ -146,6 +162,7 @@ def release(stage, sha):
     # No content, credentials, owner identity, or provider token enters this receipt.
     for path in [STATE / f"receipts/{stage}.json", STATE / f"receipts/{stamp}-{stage}-{sha[:12]}.json"]:
         path.write_text(json.dumps(receipt, indent=2) + "\n")
+    prune_checkouts(checkouts)
     print(json.dumps(receipt, indent=2))
 
 
