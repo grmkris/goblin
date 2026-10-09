@@ -15,7 +15,8 @@ is read-only: no query changes the agent or calls a model.
   `inspect_conversation`, `inspect_conversations`, `inspect_flows`, `inspect_details`, beside `ask_agent`. A connection that lists no `inspect_*` tools
   was approved before inspection joined `/mcp`: reconnect once (Claude Code: `/mcp` → goblin → Clear
   authentication).
-- Terminal: `bun run goblin login` once, then `bun run goblin problems|turns|turn|conversation|flows|details|logs …`
+- Terminal: `bun run goblin login` once, then
+  `bun run goblin problems|turns|turn|conversation|flows|details|logs|lookup|stats …`
   (`--origin http://localhost:18971` for a local stack, `--json` for the raw result).
 
 ## Work from the outside in
@@ -31,9 +32,15 @@ is read-only: no query changes the agent or calls a model.
    (`truncated` marks a cut).
 5. `flows --chat <id> --since 6h`: how conversations moved, content-free: sends, replies, thread starts, moves,
    Personas, Delegates, each with its operation id and how it ended (`ok`, `replayed`, `refused`, `error`). Filter
-   with `--flow reply`. `details --operation <id>` is one operation's timeline, as `turn` shows it, for now only for an
-   operation that ran a turn.
-6. `logs <operation id>`: the Worker's own lines for that id (needs `CLOUDFLARE_API_TOKEN` and
+   with `--flow reply`. `details --operation <id>` (or `--chat <id> --entry <id>` for an answer or tool result) is
+   one operation's timeline, with a turn when it ran one, and the operations related to it: its parent, the thread it
+   started, the Personas it asked.
+6. `lookup <ref|request|operation>`: the reference the app shows with an error (`… · ref 7f3a9c12`), a request id or
+   an operation id; it finds the Worker's log lines that mention it, then shows the details of the operation they name
+   (Cloudflare credentials as for `logs`).
+7. `stats --since 24h`: flow totals across every agent of the stage (Analytics Engine, hashed agent ids), to see
+   whether a flow fails for everyone or for one owner (the token needs Account Analytics read).
+8. `logs <operation id>`: the Worker's own lines for that id (needs `CLOUDFLARE_API_TOKEN` and
    `CLOUDFLARE_ACCOUNT_ID` in your shell; seven days of retention).
 
 The owner can also ask the agent itself ("why did that fail?"): its `diagnose` tool reads the same ledger.
