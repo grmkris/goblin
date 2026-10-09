@@ -10,7 +10,8 @@ Server data goes through the typed API and TanStack Query, after myapps' `docs/a
 
 - **Clients.** `lib/api.ts` has `owner` (the agent's `OwnerApi`) and `account` (the Worker's `AccountApi`: billing,
   inbound clients, crash reports). They send `x-goblin-request`, CSRF on every write and, with `withOperation`, the
-  operation id. Never `fetch` an `/api` path elsewhere. Untyped values (stream frames, App messages, tool payloads)
+  operation id. Never `fetch` an `/api` path elsewhere; the owner's file bytes (`lib/files.ts`), the two SSE stores and
+  Better Auth's client are the only exceptions. Untyped values (stream frames, App messages, tool payloads)
   are read with `lib/values.ts`, never decoded as API answers.
 - **Factories.** One `src/<feature>/queries.ts` per feature: `owner.apiQuery` / `owner.apiMutation`, keys
   `[feature, kind, input]` naming every input. A mutation's `onSuccess` returns its invalidation promise. A conditional
@@ -25,5 +26,7 @@ Server data goes through the typed API and TanStack Query, after myapps' `docs/a
 - **Streams.** The conversation and workspace SSE stores stay; their events only `invalidateQueries`.
 - **Failures.** `messageOf(error, action)` beside the control, `describeError` when behaviour depends on the kind. Both
   quote the reference ("… · ref 7f3a9c12"). A route that fails shows `ReportedRouteError`; only a defect is reported
-  to `/api/client-errors`.
+  to `/api/client-errors`. Better Auth and `/health` answer outside the typed API: `auth/queries.ts` sends each call's
+  `x-goblin-request` id and turns a refusal or silence into `AuthRefused` with the answer's `x-goblin-ref` (else
+  cf-ray, else that id); show it with `authMessageOf` or `quoting`.
 - **Tests.** `lib/query/testing.ts` `fakeHttpApi` serves the real contract in memory through an injected `fetch`.
