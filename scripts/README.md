@@ -21,19 +21,21 @@ Cloudflare API credentials.
 ## UI acceptance
 
 `bun run ui:acceptance` opens the stage named by the smoke session file (`.local/dev-session.json` unless another
-is given) in headless Chromium, as a phone (390×844, touch), landscape phone (844×390), tablet (820×1180),
-hybrid pointer device and desktop (1440×900), light and dark. It only taps
-and clicks what changes nothing: menus, a Thoughts disclosure, the sidebar. It sends no message and edits nothing.
-It checks behaviour the eye cannot confirm from a screenshot: the theme's curves, menus that scale, Return-key
-hints, 16px fields and 44px icon targets on touch, panels that open to their content's height, and phone drawers
-that close: the sidebar on a link to the page already showing and on a swipe left, the turn map on a swipe down. Screenshots and a receipt go to the private
+is given; a `http://localhost` session runs it against the local stack) in headless Chromium, as a phone (390×844,
+touch), landscape phone (844×390), tablet (820×1180), hybrid pointer device and desktop (1440×900), light and dark,
+on `/c/1`, a thread's panel, Threads, Activity, Tasks, Settings, Connections and Apps. It only taps and clicks what
+changes nothing: menus, a Thoughts disclosure, the navigation drawer, a thread's panel. It sends no message and edits
+nothing. It checks behaviour the eye cannot confirm from a screenshot: the theme's curves, menus that scale, Return-key
+hints, 16px text fields and 44px icon targets on touch, panels that open to their content's height, the thread panel
+beside the channel (a full view on a phone), no page wider than its screen, and phone drawers that close: the
+navigation on a link to the page already showing and on a swipe left, the turn map on a swipe down. Screenshots and a receipt go to the private
 `.local/goblin-acceptance/ui-<utc>/`; it exits non-zero on a failed check or a page error. Run it after each dev
 deploy that touches the web app. Chromium emulation is not device evidence: feel, the keyboard and gestures still
 need a real phone.
 
 Data-dependent controls that are absent are recorded as skipped, separately from passing checks. Thoughts closure
-is measured on the opened panel itself. All visible editable fields are checked for at least 16px type; the code
-input uses 18px. The hybrid context verifies touch behavior with a fine primary pointer.
+is measured on the opened panel itself. All visible text fields are checked for at least 16px type (a checkbox, radio
+or range has no text to size); the code input uses 18px. The hybrid context verifies touch behavior with a fine primary pointer.
 
 `heavy bun apps/web/test/ui-local.ts` runs the source components in a local Vite fixture without an account or model
 call. It covers editable primitives, composer Return behavior, full Home note reading with focus return, synthetic
