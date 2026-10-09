@@ -91,6 +91,15 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
 - Start thread (ADR 0034, `chats/thread-heads.ts`): a Thread is made once per owner operation (`origin_op`), forked at
   the chat's newest entry outside a running turn (`pi/turns.ts`, never inside one), then `app.thread_head` goes into
   the chat as a passive write (`thread-head:<op>`) before the message enters the Thread through `submitOwner`.
+- Personas (ADR 0033): a tagged send admits the operation, writes a passive `app.persona_ask` and creates background
+  `goblin.persona-turn` tasks (guarded by `app.persona-asks`); it starts no Goblin run. A turn forks in a task commit
+  (`tx.forkConversation`, task-owned), edits the fork's stored selection **by name** (`personaSelection`: `agent.extensions`
+  and `agent.tools` are replaced as a whole, never merged by `configure`), puts the frozen revision in the context tail
+  through a `beforeRequest` hook keyed on the `app.persona-turn` document, and writes the answer back as `app.persona`.
+  The fork is a hidden `persona`-role thread with a `subagents` exclusion; it never has the delegating, organizing or
+  asking tools. A task's passive writes go through `ConversationRegistry.writeEntry`, because a task's conversation
+  handle submits inputs only. Delegate reports are passive `app.delegate_result` writes unless the spawn set
+  `synthesize: true`. Organize tools write `app_organize_receipts` in the same synchronous step as the change.
 - Vendor tables (`pi_*`, `cf_agents_*` and the others in `storage/vendor.ts`) are never touched.
 - Initialization, readback and reconstruction are separate proofs; local workerd reconstruction is not remote
   eviction.
