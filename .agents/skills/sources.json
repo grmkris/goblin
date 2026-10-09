@@ -57,10 +57,10 @@
       "sourceSha256": "2c3541cf289010370ed35df03398c6406d7c170f1b466ee940135b64520a94d3",
       "licenses": [],
       "unchanged": false,
-      "reviewedAt": "2026-10-04",
-      "adaptation": "Explicitly adapted internal guidance: rename to effect-4, retain installed-guide/service/Schema/platform/diagnostic conventions, remove My Apps-only MCP toolkit, snapshots and storage links, and add Pi-owned state and short transaction boundaries. Source repository has no root LICENSE declaration; internal reuse is authorized by the implementation prompt, with no invented upstream license. Local product references renamed to goblin.",
+      "reviewedAt": "2026-10-09",
+      "adaptation": "Explicitly adapted internal guidance: rename to effect-4, retain installed-guide/service/Schema/platform/diagnostic conventions, remove My Apps-only MCP toolkit, snapshots and storage links, and add Pi-owned state and short transaction boundaries. 2026-10-09: add goblin's runtime shape (service tags, area layers, the bridge, KeyedLock, Changes, the content-free logger and reporter, the typed owner API of ADR 0038). Source repository has no root LICENSE declaration; internal reuse is authorized by the implementation prompt, with no invented upstream license. Local product references renamed to goblin.",
       "copiedFileHashes": {
-        "SKILL.md": "a96df043d8bd56831760a91f5437858d5c8ab0e7685b12f575d940d4c5641d91",
+        "SKILL.md": "1768b7df9b35f2af2e0f4135fa9952e2de01c946ea27f5bf2a676b3d210fec4b",
         "agents/openai.yaml": "1bdb008dba126619805e583db29362630561361f9684a4a769462ac1860c4535"
       }
     },

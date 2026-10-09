@@ -33,14 +33,19 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   keep it synchronous and never call Session APIs from it. Hooks do not pair reliably (no `afterTool` for a blocked
   call, no `afterResponse` after an abort) and subagents and routine runs keep their own extension lists.
 - Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
+- Extensions take the agent's bridge (`runtime/bridge.ts`) as their way into its services: `run` checks the plan,
+  `local` does not (the ledger, budget records, routine gates, diagnose). A hook calls one of them; a program never
+  calls them from inside an Effect. New Effect code reaches Pi through `PiSessions` (`pi/sessions.ts`): every call
+  names its session, failures are a typed `PiFailure`, and interrupting a `wait` ends only the wait.
 - Owner, inbound and Telegram submissions admit `(chat, operationId)` through `Chats` before calling Pi. The admission
   ledger pins the first Pi session for retries across a future rebind; the per-chat lock covers admission only and is
   released before model execution or waiting. `harness.wait` resolves through that operation binding. A rebind uses
   an epoch compare-and-set and closes the affected SSE streams; it does not move a running Pi turn. The application
-  ledger prunes old operations opportunistically after 30 days. Passive reports, share-backs and thread-start notes
-  use the shared `Chats.passiveWrite` admission lock to resolve their target chat's current session and submit with stable
-  Pi write request ids; they start no model run. Subagent report admission uses that same directory and lock; never
-  construct a private `ChatDirectory` outside composition or tests.
+  ledger prunes old operations opportunistically after 30 days. Passive reports, share-backs, thread-start notes,
+  memory views and subagent reports take the target chat's admission lock (`ChatOperations.passiveWrite`, or the
+  directory's `passiveWrite` under it) to resolve its current session and submit with stable Pi write request ids;
+  they start no model run. There is one directory and one lock per chat; never construct a private `ChatDirectory`
+  outside the legacy start (`layers/legacy.ts`) or tests.
 - The owner queue reads `InboxDoc` for Main and ordinary threads only. Removal validates the registered conversation
   and input type, then uses native `abortSubmission(id, BACKGROUND, conversationId)`: it withdraws queued input only.
   `already_placed` means the run continues; never implement row removal with `PiHarness.abort` or Stop. Passive writes,
@@ -124,8 +129,8 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
 
-- Routines use `routine` for draft proposal/list/pause; only the owner confirms an exact revision through the strict-CSRF
-  API. Native dated schedules are fenced by app revision/firing watermarks. Background Pi Anchor/Reporter tasks own
+- Routines use `routine` for draft proposal/list/pause; only the owner confirms an exact revision through the owner
+  API (every write needs the CSRF header). Native dated schedules are fenced by app revision/firing watermarks. Background Pi Anchor/Reporter tasks own
   empty run conversations; register them without copied main capabilities or an ordinary main-start note. The confirmed
   ceiling lives in `Capabilities.scope`; management, Skills, subagents, main memory and learner are absent from run
   extensions. Check the dedicated per-run provider on every model dispatch, including compaction, and MCP authority
