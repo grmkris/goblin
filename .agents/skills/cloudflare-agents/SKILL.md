@@ -28,3 +28,5 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
+
+- `POST /api/decisions/:id` requires the owner cookie session and strict browser CSRF. Agent RPC records the first label and publishes a durable highlight/thread-draft affordance; stale open proposals refuse confirmation. No Agent selector is accepted (ADR 0031).

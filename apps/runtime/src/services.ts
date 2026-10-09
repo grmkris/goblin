@@ -33,6 +33,10 @@ import type { PersonaInvocations } from './personas/invocations.ts'
 import type { OrganizeReceipts } from './organize/receipts.ts'
 import type { ChatRetrieval } from './retrieval/service.ts'
 import type { ChatMover } from './chats/mover.ts'
+import { Decisions, type DecisionService } from './decisions/service.ts'
+export { Decisions } from './decisions/service.ts'
+import { DecisionCandidates } from './decisions/source.ts'
+import { Proposals } from './decisions/store.ts'
 
 /** The Agent DO's application services, provided once per object through a ManagedRuntime (agent.ts). */
 export class Mcp extends Context.Service<Mcp, McpHost>()('goblin/Mcp') {}
@@ -105,6 +109,9 @@ export type AgentServices =
   | Inspect
   | Home
   | Retrieval
+  | Decisions
+  | DecisionCandidates
+  | Proposals
 
 export const agentLayer = (services: {
   readonly host: McpHost
@@ -130,8 +137,12 @@ export const agentLayer = (services: {
   readonly workspace: WorkspaceFeed
   readonly apps: AppRegistry
   readonly home: HomeService
+  readonly decisions: DecisionService
 }): Layer.Layer<
-  Exclude<AgentServices, Entitlements | Events | EventStorage | Files | AppEngine | Inspect | Retrieval>
+  Exclude<
+    AgentServices,
+    Entitlements | Events | EventStorage | Files | AppEngine | Inspect | Retrieval | DecisionCandidates | Proposals
+  >
 > =>
   Layer.mergeAll(
     Layer.succeed(Mcp, services.host),
@@ -157,6 +168,7 @@ export const agentLayer = (services: {
     Layer.succeed(Workspace, services.workspace),
     Layer.succeed(Apps, services.apps),
     Layer.succeed(Home, services.home),
+    Layer.succeed(Decisions, services.decisions),
   )
 
 /** Wrap a plain async step so its failure lands in the typed `AppError` channel. */

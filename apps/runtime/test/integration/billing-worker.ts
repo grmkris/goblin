@@ -1,3 +1,4 @@
+import { unavailableClef } from './decisions-fixture.ts'
 import { authFixtureRoute, fixtureAuth } from './auth-fixture.ts'
 import { Effect } from 'effect'
 import runtime from '../../src/worker.ts'
@@ -28,6 +29,9 @@ const dodo: DodoApi = {
 }
 /** Real account policy and actual PersonalAgent, with only the model stream replaced by the native test fixture. */
 export class BillingAgent extends PersonalAgent {
+  protected override clefClient() {
+    return unavailableClef
+  }
   protected override modelStreams() {
     return scriptedStreams(() => undefined)
   }

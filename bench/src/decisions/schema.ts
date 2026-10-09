@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import { tasks, Answers, ContextState, BriefState, AttentionState, WorkState } from '@goblin/runtime/decisions'
 export { tasks, Answers }
-export type { Task, Question, Questions, Usage } from '@goblin/runtime/decisions'
+export type { Task, Usage } from '@goblin/runtime/decisions'
 
 export const arms = ['rules', 'critic', 'cheap-llm', 'clef', 'clef-flash', 'jev', 'openai-decisions'] as const
 export type Arm = (typeof arms)[number]

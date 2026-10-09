@@ -1,3 +1,4 @@
+import { decisionsOwnerCase } from './decisions-owner-case.ts'
 import * as Alchemy from 'alchemy'
 import * as Cloudflare from 'alchemy/Cloudflare'
 import * as Test from 'alchemy/Test/Vitest'
@@ -182,3 +183,8 @@ if (primaryProfile === 'permuted')
       expect(result.rootMessages).toBe(0)
     }),
   )
+
+harness.test(
+  'native: decisions require strict CSRF and stay isolated in the owner feed',
+  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => decisionsOwnerCase(url)))),
+)

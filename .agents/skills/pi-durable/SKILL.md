@@ -147,3 +147,5 @@ itself authorize model spend, external messages, deployment or production change
   the current execution extension selection after reconstruction.
 
 - `code_run` may write owner files and is `replay: unsafe`; after an interrupted invocation, Pi reports the interruption and never automatically runs the script again. The native recovery regression writes, evicts, and reads the unchanged file through the reconstructed agent.
+
+- Owner chats install `goblin.decisions` onYield for reviewable thread drafts (ADR 0031). Helpers and routines exclude it. Delegate attention runs after the report write outside Pi commits, keyed by relay id; proposals never hide reports, reroute sends or merge history.

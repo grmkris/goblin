@@ -51,3 +51,5 @@ itself authorize model spend, external messages, deployment or production change
   Keep assertions for frozen arguments and operationKey, redacted review, refusal, second-account isolation, changed
   grants/scopes, routine/subagent holds, alternate App refusal and reconstruction without dispatch replay. Real
   Sidequest hiring and provider-side operation reconciliation remain separate acceptance.
+
+- Decisions native probes use an injected fake ClefClient with real SQLite. Assert one proposal per relay id, first-label persistence/replay, stale discard, no call after exhausted budget and chat after unavailability. All native PersonalAgent subclasses override ClefClient; native gates never call paid Workers AI.

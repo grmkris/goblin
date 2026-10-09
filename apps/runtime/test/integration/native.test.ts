@@ -1,3 +1,4 @@
+import { decisionsCase } from './native-decisions.ts'
 import * as Alchemy from 'alchemy'
 import * as Cloudflare from 'alchemy/Cloudflare'
 import * as Test from 'alchemy/Test/Vitest'
@@ -1064,3 +1065,8 @@ if (primaryProfile === 'permuted')
     'local workerd: the stable primary chat writes only to its non-root Pi session',
     stack.pipe(Effect.flatMap(({ url }) => primaryBindingCase(url))),
   )
+
+harness.test(
+  'local workerd: decisions are labelled once and failures leave chat working',
+  Effect.flatMap(stack, ({ url }) => decisionsCase(url)),
+)

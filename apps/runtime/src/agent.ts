@@ -1,6 +1,9 @@
 import { OrganizingAgent } from './organize/rpc.ts'
+import { decisionsExtension } from './pi/decisions.ts'
+import { labelDecision } from './decisions/program.ts'
+import { workersClef, type ClefClient } from './decisions/client.ts'
 import { type Extension } from '@earendil-works/pi-durable'
-import { type CapabilityChange, type JsonObject, type QueueRemoval } from '@goblin/contracts'
+import { type CapabilityChange, type DecisionLabel, type JsonObject, type QueueRemoval } from '@goblin/contracts'
 import { ownerQueue, removeOwnerQueuedInput } from './conversation-queue.ts'
 import type { OwnerMessageContext } from './agent-program.ts'
 import { composerOptions as composerOptionsProgram } from './composer.ts'
@@ -121,7 +124,8 @@ export class PersonalAgent extends OrganizingAgent implements AgentRpcMethods {
     const { personas, organize } = organizingKit(run, () => this.stopping())
     this.#personas = personas
     const retrieval = retrievalExtension(run)
-    const base = [...execution, skillLearningExtension(run), ...appsExtension(apps, run), organize, retrieval]
+    const learning = [skillLearningExtension(run), decisionsExtension(run)]
+    const base = [...execution, ...learning, ...appsExtension(apps, run), organize, retrieval]
     const own = [serversExtension(run, env.STAGE), subagents, routinesExtension(run), this.#telemetry.diagnose]
     const extras = [this.#thread, memory, recall, this.#personas.extension, ...routineKit.extra]
     this.harness = makePiHarness(this.#pi, [...base, ...own], extras, apps, this.#telemetry.recorder)
@@ -152,6 +156,9 @@ export class PersonalAgent extends OrganizingAgent implements AgentRpcMethods {
     return LITELLM_STREAMS
   }
   /** The normal platform boundary; tests inject an official SDK fixture without changing authorization. */
+  protected clefClient(): ClefClient {
+    return workersClef(this.env.AI)
+  }
   protected mcpFetch(): typeof fetch {
     // SAFETY: SDK transport alone adds OAuth tokens; binding platform fetch preserves its execution context.
     return globalThis.fetch.bind(globalThis)
@@ -185,6 +192,7 @@ export class PersonalAgent extends OrganizingAgent implements AgentRpcMethods {
       scheduleEvents: (at) => this.#scheduleWake('mcpEventsWake', at),
       pullTelegram: () => this.channelPull(),
       routineEvent: (context) => this.#routines.consumeEvent(context),
+      clefClient: this.clefClient(),
       mcpFetch: this.mcpFetch(),
       agentApps: this.#apps,
       telemetry: this.#telemetry.telemetry,
@@ -284,6 +292,9 @@ export class PersonalAgent extends OrganizingAgent implements AgentRpcMethods {
   }
   composerOptions(thread: string) {
     return this.#owner(composerOptionsProgram(thread, (program) => this.#runOrThrow(program)))
+  }
+  labelDecision(id: string, label: DecisionLabel['label']) {
+    return this.#owner(labelDecision(id, label))
   }
   conversations() {
     return this.#owner(Conversations.use((conversations) => attempt(() => conversations.list())))
@@ -526,6 +537,7 @@ export class PersonalAgent extends OrganizingAgent implements AgentRpcMethods {
   async #onChannel<T>(work: (channel: TelegramChannel, ports: ChannelPorts) => Promise<T>): Promise<T | undefined> {
     return onChannel(this.harness, this.#applied, (program) => this.#runOrThrow(program), work)
   }
+
   async channelPull(): Promise<void> {
     this.#pulling = this.#pulling
       .then(() => this.#onChannel((channel, ports) => channel.pull(ports, nowSeconds())))

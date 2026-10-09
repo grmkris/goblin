@@ -396,3 +396,17 @@ Check Main with an empty transcript and existing history at desktop and phone wi
 Home's runtime API and native workerd tests still cover persistence, replay, stale revisions, owner authority, bounds, app deletion and MCP grants. The browser does not render this saved layout. Dashboard UI acceptance resumes with a future iteration; installed iPhone behavior remains an owner device check.
 
 The no-auth inbox fixture builds the `app_docs` example in Dynamic Workers and drives the native job callback through 15-minute slots. It checks newest-five validation, freshness and last-good retention after an invalid response. Run it from `apps/runtime` with `heavy bun run test:integration test/integration/inbox.test.ts`. Real MyInbox sign-in, app-power approval and message freshness on dev are separate owner steps.
+
+## Typed decisions on the decisions branch
+
+Clef is the scoped Workers AI `AI` binding exception in ADR 0031. The native test stacks mirror that binding but
+inject a fake or unavailable `ClefClient`; they never dispatch paid Workers AI calls. Runtime unit tests cover critic
+routing, decoding, stale results, authority, budget and unknown usage. The native decisions probe exercises actual
+SQLite labels and reconstruction, repeated relay identity, stale-result discard and chat after an unavailable
+service. This is local workerd evidence, separate from provider evaluation and a deployed dev receipt.
+
+The model `clef` has an explicit input-only estimated Credit rate (5,000 input tokens/Credit). Operators can override
+it in `GOBLIN_MODEL_CREDIT_RATES` with `output:null`; unrelated model overrides preserve the Clef default. This
+conservative app-budget estimate is not a conversion of Workers AI dollars into Token Plan Credits. A dispatched
+call with unknown usage charges its full bounded 65,536-token context; a missing binding makes no call or charge.
+Proposals are owner-confirmed only. The runtime contract precedes the new shell UI and retrieval integration.

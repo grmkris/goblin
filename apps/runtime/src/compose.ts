@@ -1,3 +1,5 @@
+import { DecisionSource, DecisionCandidates } from './decisions/source.ts'
+import { Proposals } from './decisions/store.ts'
 import type { Extension, ToolRegistration } from '@earendil-works/pi-durable'
 import type { PiHarness } from 'agents/harness/pi'
 import { type DrizzleSqliteDODatabase, drizzle } from 'drizzle-orm/durable-sqlite'
@@ -63,6 +65,9 @@ import { HomeService } from './home/service.ts'
 import { restoreHelperExecution } from './pi/helper-execution.ts'
 import { TranscriptIndex, piTranscripts } from './retrieval/index.ts'
 import { ChatRetrieval } from './retrieval/service.ts'
+import { DecisionStore } from './decisions/store.ts'
+import { DecisionService } from './decisions/service.ts'
+import type { ClefClient } from './decisions/client.ts'
 
 /** What the agent's services are built from: its storage and env, and the Pi pieces its constructor made. */
 export type ComposeInput = {
@@ -82,6 +87,7 @@ export type ComposeInput = {
   readonly scheduleEvents: (at: number) => Promise<void>
   readonly pullTelegram: () => Promise<void>
   readonly routineEvent: EventHandler
+  readonly clefClient: ClefClient
   readonly mcpFetch: typeof fetch
   /** The agent's apps, made before Pi opened (their tools are Pi's). */
   readonly agentApps: AgentApps
@@ -136,7 +142,12 @@ async function makeRoutines(input: ComposeInput) {
   return { routines, routineRuns, routineUsage }
 }
 /** The conversation registry, the kept Apps (closed with their conversation), and the live workspace feed over both. */
-function conversationServices(db: DrizzleSqliteDODatabase, input: ComposeInput, kit: ThreadKit) {
+function conversationServices(
+  db: DrizzleSqliteDODatabase,
+  input: ComposeInput,
+  kit: ThreadKit,
+  decisions: DecisionStore,
+) {
   const { harness } = input
   const conversations = new ConversationRegistry(db, harness, kit, nowSeconds())
   const { agentApps } = input
@@ -168,7 +179,7 @@ function conversationServices(db: DrizzleSqliteDODatabase, input: ComposeInput, 
   })
   const workspace = new WorkspaceFeed(
     harness,
-    { conversations, apps, home, topics, personas, invocations, receipts },
+    { conversations, apps, home, topics, personas, invocations, receipts, decisions },
     kit.chats,
   )
   // Cross-Topic retrieval (ADR 0035): one transcript index, which a Move to thread also reassigns (ADR 0034).
@@ -252,6 +263,32 @@ function makeMemories(input: ComposeInput, deps: MemoryDeps): ChatMemories {
   return new ChatMemories(deps, options, [input.memory.memory, input.memory.recall])
 }
 
+function cheapModels(input: ComposeInput, budget: ModelBudget, options: ReturnType<typeof modelOptions>) {
+  const cheapModelId = memoryModelId(input.env.MEMORY_MODEL, options)
+  return (purpose: AuxPurpose) =>
+    new CheapModel(
+      input.pi.models,
+      cheapModelId,
+      (use) => budget.record(use, nowSeconds(), cheapModelId),
+      auxReporter(input.telemetry, purpose),
+    )
+}
+
+function makeDecisions(
+  input: ComposeInput,
+  db: DrizzleSqliteDODatabase,
+  authority: { budget: ModelBudget; resident: ResidentAuthority },
+) {
+  const decisionStore = new DecisionStore(db)
+  const decisions = new DecisionService({
+    client: input.clefClient,
+    ...authority,
+    store: decisionStore,
+    report: auxReporter(input.telemetry, 'decision'),
+  })
+  return { decisionStore, decisions }
+}
+
 /**
  * The agent's services over its SQLite, built once per isolate on first use: MCP host and grants, budget and models,
  * main's memory, conversations, resident authority, skills and the Telegram channel. Migrations run first, and every
@@ -265,16 +302,10 @@ export async function composeServices(
   const db = drizzle(input.storage)
   const { host, cipher, resident, eventStore, skillState, grants, approvals } = await makeHost(input, db)
   const budget = makeBudgets(input, db)
+  const { decisionStore, decisions } = makeDecisions(input, db, { budget, resident })
   const options = modelOptions(env.MODELS, env.MODEL_ID)
   const models = new ModelPicker(new ModelChoiceStore(db), options)
-  const cheapModelId = memoryModelId(env.MEMORY_MODEL, options)
-  const cheap = (purpose: AuxPurpose) =>
-    new CheapModel(
-      input.pi.models,
-      cheapModelId,
-      (use) => budget.record(use, nowSeconds(), cheapModelId),
-      auxReporter(input.telemetry, purpose),
-    )
+  const cheap = cheapModels(input, budget, options)
   const chats = new ChatDirectory(db)
   const { recall } = input.memory
   const memories = makeMemories(input, { db, harness, model: cheap('memory'), chats })
@@ -284,7 +315,7 @@ export async function composeServices(
   await capabilities.retoolOnce('retool:subagent-config', nowSeconds())
   const routineServices = await makeRoutines(input)
   const kit = { thread: input.thread, recall, memories, namer: cheap('naming'), capabilities, chats }
-  const conversations = conversationServices(db, input, kit)
+  const conversations = conversationServices(db, input, kit, decisionStore)
   await memories.activateConversations()
   const skills = new SkillLibrary(host.manager, skillState, nowMillis)
   const learner = new SkillLearner({
@@ -327,7 +358,10 @@ export async function composeServices(
         channel,
         capabilities,
         ...routineServices,
+        decisions,
       }),
+      Layer.succeed(DecisionCandidates, new DecisionSource(db, harness, chats)),
+      Layer.succeed(Proposals, decisionStore),
       Layer.succeed(Entitlements, input.entitlements),
       Layer.succeed(Events, events),
       Layer.succeed(EventStorage, eventStore),

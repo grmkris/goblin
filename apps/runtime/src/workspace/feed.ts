@@ -9,6 +9,7 @@ import type { TopicRegistry } from '../topics/registry.ts'
 import type { PersonaRegistry } from '../personas/registry.ts'
 import type { PersonaInvocations } from '../personas/invocations.ts'
 import type { OrganizeReceipts } from '../organize/receipts.ts'
+import type { DecisionStore } from '../decisions/store.ts'
 import { sseResponse } from '../http/sse.ts'
 import { BACKGROUND } from '../pi/context.ts'
 import { SUBAGENT_RELAY } from '../pi/subagent-relay.ts'
@@ -41,6 +42,7 @@ export type FeedSources = {
   readonly personas: PersonaRegistry
   readonly invocations: PersonaInvocations
   readonly receipts: OrganizeReceipts
+  readonly decisions: DecisionStore
 }
 
 /**
@@ -58,17 +60,19 @@ export class WorkspaceFeed {
   readonly #personas: PersonaRegistry
   readonly #invocations: PersonaInvocations
   readonly #receipts: OrganizeReceipts
+  readonly #decisions: DecisionStore
   readonly #listeners = new Set<Listener>()
   #activity = new Map<string, ConversationActivity>()
   #watch: Promise<TaskGraphWatch> | undefined
 
   constructor(
     harness: PiHarness,
-    { conversations, apps, home, topics, personas, invocations, receipts }: FeedSources,
+    { conversations, apps, home, topics, personas, invocations, receipts, decisions }: FeedSources,
     chats: ChatDirectory,
   ) {
     this.#harness = harness
     this.#chats = chats
+    this.#decisions = decisions
     this.#conversations = conversations
     this.#apps = apps
     this.#home = home
@@ -88,6 +92,7 @@ export class WorkspaceFeed {
     apps.onChange((changed) => this.#emit(changed.map((app) => ({ type: 'app' as const, app }))))
     apps.onRemove((id) => this.#emit([{ type: 'app-removed' as const, id }]))
     home.onChange((layout) => this.#emit([{ type: 'home' as const, home: layout }]))
+    decisions.onChange((proposal) => this.#emit([{ type: 'proposal' as const, proposal }]))
   }
 
   /**
@@ -119,6 +124,7 @@ export class WorkspaceFeed {
         personas: this.#personas.list(),
         invocations: this.#invocations.live(),
         receipts: this.#receipts.list(),
+        proposals: this.#decisions.list(),
       })
     } catch (error) {
       await close()

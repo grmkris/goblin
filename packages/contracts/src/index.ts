@@ -1,3 +1,5 @@
+import { DecisionProposal } from './decisions.ts'
+export { DecisionAction, DecisionLabel, DecisionProposal } from './decisions.ts'
 import * as Schema from 'effect/Schema'
 import { CapabilityTarget } from './capabilities.ts'
 import { ComposerSelections } from './composer.ts'
@@ -504,6 +506,7 @@ export type AppDiagnostic = typeof AppDiagnostic.Type
 
 /** The workspace feed's first event: every conversation and App, and the conversations not idle. */
 export const WorkspaceSnapshot = Schema.Struct({
+  proposals: Schema.optional(Schema.Array(DecisionProposal)),
   primary: Schema.optional(Schema.String),
   conversations: Schema.Array(ConversationView),
   activity: Schema.Array(ConversationActivity),
@@ -520,6 +523,7 @@ export type WorkspaceSnapshot = typeof WorkspaceSnapshot.Type
 
 /** One change the workspace feed sends after its snapshot: a conversation or App as it is now, or what one is doing. */
 export const WorkspaceChange = Schema.Union([
+  Schema.Struct({ type: Schema.Literal('proposal'), proposal: DecisionProposal }),
   Schema.Struct({ type: Schema.Literal('home'), home: HomeLayout }),
   Schema.Struct({ type: Schema.Literal('conversation'), conversation: ConversationView }),
   Schema.Struct({ type: Schema.Literal('activity'), activity: ConversationActivity }),

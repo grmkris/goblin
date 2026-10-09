@@ -81,6 +81,10 @@ export interface AgentRpcMethods {
   readonly removeQueuedInput: (thread: string, input: QueueRemoval) => Promise<RpcResult<QueueRemovalResult>>
   readonly composerOptions: (thread: string) => Promise<RpcResult<ComposerOptions>>
   readonly stop: (thread: string, operationId?: string) => Promise<RpcResult<boolean>>
+  readonly labelDecision: (
+    id: string,
+    label: import('@goblin/contracts').DecisionLabel['label'],
+  ) => Promise<RpcResult<import('@goblin/contracts').DecisionProposal>>
   readonly conversations: () => Promise<RpcResult<readonly ConversationView[]>>
   readonly createConversation: (input: CreateConversation) => Promise<RpcResult<ConversationView>>
   readonly updateConversation: (id: string, change: UpdateConversation) => Promise<RpcResult<ConversationView>>

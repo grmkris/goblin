@@ -1,3 +1,7 @@
+import { DecisionStore } from '../../src/decisions/store.ts'
+import { appConversations } from '../../src/storage/schema.ts'
+import { eq } from 'drizzle-orm'
+import { unavailableClef } from './decisions-fixture.ts'
 import { authFixtureRoute, fixtureAuth } from './auth-fixture.ts'
 /** Native auth D1 + owner Agent fixture; test levers never enter the deployed Worker. */
 import { Effect, Schema } from 'effect'
@@ -20,6 +24,9 @@ import type { MovePhase } from '../../src/chats/mover.ts'
 import { moveState, readRounds } from './move-probe.ts'
 
 export class OwnerAgent extends PersonalAgent {
+  protected override clefClient() {
+    return unavailableClef
+  }
   readonly #mcp = new AppsMcpFixture()
   /** The move boundary at which the next move stops the object (a restart then finishes the move). */
   #crashAt: MovePhase | undefined
@@ -71,6 +78,28 @@ export class OwnerAgent extends PersonalAgent {
       return Response.json(unwrap(await this.askAsClient('topics-client', input, operationId, 5000)))
     }
     if (path.startsWith('/test/move/')) return this.#moveProbe(path, request)
+    if (path === '/test/decisions/seed') {
+      await this.conversations()
+      const db = drizzle(this.ctx.storage)
+      const row = db.select().from(appConversations).where(eq(appConversations.chatId, '1')).get()
+      const session = new ChatDirectory(db).session('1')
+      return Response.json(
+        new DecisionStore(db).add(
+          {
+            id: 'dp_report_owner',
+            chatId: '1',
+            kind: 'attention-triage',
+            subject: 'owner-report',
+            state: 'open',
+            probability: 0.85,
+            provider: 'cloudflare/clef',
+            createdAt: 1,
+            payload: { type: 'highlight', relayId: 'owner-report', text: `Private report for ${this.name}` },
+          },
+          { session, epoch: row?.epoch ?? 0 },
+        ),
+      )
+    }
     if (path === '/test/queue/held') return Response.json({ inputs: queueModel(this).held() })
     if (path === '/test/queue/seen') return Response.json({ requests: queueModel(this).requests() })
     if (path === '/test/retrieval/excerpts')
@@ -152,6 +181,10 @@ export default {
         return env.AGENTS.getByName(userId).fetch(
           new Request(`https://agent/test/move/${url.pathname.split('/').at(-1)}`, input),
         )
+      }
+      if (url.pathname === '/__test/decisions/seed') {
+        const { userId } = await requireUserSession(input, env)
+        return env.AGENTS.getByName(userId).fetch('https://agent/test/decisions/seed')
       }
       if (url.pathname.startsWith('/__test/queue/')) {
         const { userId } = await requireUserSession(input, env)

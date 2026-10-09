@@ -25,3 +25,5 @@ itself authorize model spend, external messages, deployment or production change
 - Custom domains require `GOBLIN_DOMAIN` and `GOBLIN_ZONE_ID`; the Worker canonical origin, OTP auth and inbound MCP metadata come from `APP_URL`. Every stage requires an OTP mail sender. Dev sign-up is closed or invite-only. Prod smoke defaults to reads until an operator test account is supplied.
 
 - Operator and CI stage commands share `/var/lib/goblin-release` state and `flock`; seed dev before first use. Deploy exact green main SHAs with `bun run release dev <full-sha>`, then the same SHA on prod. Keep sanitized receipts and private logs outside the checkout. The read-only drift audit normalizes only beta.80 domain-zone bookkeeping and D1 default disabled replication; any other cloud difference fails.
+
+- Bind `AI: Cloudflare.Workers.AI()` on the web Worker and all three native stacks for ADR 0031. RuntimeEnv exposes a narrow optional DecisionsBinding; this binding is exclusively for typed Clef decisions.

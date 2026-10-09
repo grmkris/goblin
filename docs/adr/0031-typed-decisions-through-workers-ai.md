@@ -13,8 +13,9 @@ budget or stale state produces no proposal and leaves the conversation working a
 a SQLite transaction, Pi commit or lifecycle gate open.
 
 Every call checks the owner's budget before dispatch and records returned usage as model `clef` into estimated
-Credits ([ADR 0026](0026-daily-budget-in-credits.md)). Clef uses an explicit input-only rate; unknown usage is charged
-conservatively rather than treated as free. Aux telemetry uses purpose `decision` and model `cloudflare/clef`, with
+Credits ([ADR 0026](0026-daily-budget-in-credits.md)). Clef uses an explicit input-only app-budget estimate of 5,000 input tokens per Credit,
+overridable through `MODEL_CREDIT_RATES`. Its published $0.24/M input-token price does not establish a USD-to-Token-Plan-Credit
+exchange rate. Unknown usage is charged at the bounded full 65,536-token context reservation rather than treated as free. Aux telemetry uses purpose `decision` and model `cloudflare/clef`, with
 content-free timings, outcome and token counters ([ADR 0024](0024-observing-conversations.md)). State, questions,
 answers and proposal payloads never enter telemetry.
 

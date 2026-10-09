@@ -1,1 +1,1 @@
-export { attentionLevels, prompt, questionsFor, chosen } from '@goblin/runtime/decisions'
+export { prompt, questionsFor, chosen } from '@goblin/runtime/decisions'

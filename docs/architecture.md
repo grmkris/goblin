@@ -77,7 +77,7 @@ error tag, never bodies or credentials.
 `PersonalAgent extends Agent` and registers the native `PiHarness` with the Agent lifecycle. Pi owns transcripts,
 tasks, submissions, recovery and tool replay. The object builds one Effect `ManagedRuntime` lazily, providing its
 services: `Mcp` (the MCP host), `Resident` (resident authority), `Chats` (logical chat resolution), `Conversations` (the conversation registry), `Topics` (the owner's Topics),
-`Budget`, `Models`, `Memory`, `Skills`, `Learner`, `Channel`, `Files` and `Retrieval` (cross-Topic retrieval, ADR 0035) (`services.ts`). DO methods are thin: each runs one Effect
+`Budget`, `Models`, `Memory`, `Skills`, `Learner`, `Channel`, `Decisions`, `Files` and `Retrieval` (cross-Topic retrieval, ADR 0035) (`services.ts`). DO methods are thin: each runs one Effect
 program and encodes the exit. PiHarness and Pi Durable are experimental; Alchemy is a pinned beta and Drizzle an RC. `@shadcn/react` is pinned at
 0.3.1 and patched (`patches/shadcn-react/README.md`): its MessageScroller carries unreleased upstream fixes.
 
@@ -720,6 +720,27 @@ compaction starts a conversation's snapshot later, the web reads the earlier ent
 messages main remembers; `GET /api/agent/memory?chat=<id>` reports the memory of that chat's Conversation (Personal's
 without one). Unit tests prove the copy migration and per-chat isolation and truncation in `node:sqlite`; the local
 workerd case `native-topics.ts` proves two Topics remember apart with each view placed only in its own Conversation.
+
+## Typed decision proposals
+
+The rules, question builders and strict answer/usage decoding live in `apps/runtime/src/decisions/`, exported as
+`@goblin/runtime/decisions`. The benchmark imports that pure boundary; fixture labels and provider experiments stay
+in bench. The critic chooses rules first, then Clef only for undecided ordinary evidence. Attention offers a report
+highlight at 0.5107; separate work offers a thread draft at 0.7503. Quiet and uncertain remain valid outcomes. The
+held-out evaluation supports owner review, not automatic actions.
+
+`pi/subagent-relay.ts` considers a final Delegate report after its write, outside Pi commits, with its relay id as
+proposal identity. `goblin.decisions` considers a bounded owner exchange after yield; helpers, routine runs and
+externally authored requests are excluded. Both paths check resident authority and budget first, fence the current
+registered chat/session/epoch and recheck evidence before persistence. Calls use an injected `ClefClient` port with a
+five-second Workers AI timeout. Failures never fail the owner's turn.
+
+Additive Drizzle tables `app_decision_proposals` and `app_decision_labels` keep proposals and the first owner label.
+The workspace feed includes proposals in its snapshot and `{type:'proposal', proposal}` updates. The authenticated
+strict-CSRF `POST /api/decisions/:id` takes `{label:'confirm'|'dismiss'}` and derives the Agent from the session user.
+A repeated label returns the first result; the opposite label conflicts, and a stale open proposal cannot be
+confirmed. Confirmation persists a highlight or an empty thread draft affordance, leaving Pi history and send targets
+untouched. The new shell's owner-only rendering and cross-Topic retrieval are pending the coordinated main rebase.
 
 ## Models
 

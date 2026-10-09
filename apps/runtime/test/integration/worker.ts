@@ -1,3 +1,5 @@
+import { decisionsProbe } from './decisions-probe.ts'
+import { unavailableClef } from './decisions-fixture.ts'
 import type { EntitlementPolicy } from '../../src/billing/gates.ts'
 import { canonicalRedirect } from '../../src/http/canonical.ts'
 import { inboundHostProbe } from './inbound-host.ts'
@@ -70,12 +72,31 @@ const notesAt = (endpoint: string) => [{ serverId: 'notes', endpoint }]
 
 /** The actual PersonalAgent on a scripted model (no network): every request it makes is kept for the test to read. */
 export class PersonalAgentProbe extends PersonalAgent {
+  protected override clefClient() {
+    return unavailableClef
+  }
   readonly seen: SeenRequest[] = []
   readonly instance = String(Effect.runSync(nextInt))
   readonly routineProducer = new EventsFixture()
 
   modelRequestCount(): number {
     return this.seen.length
+  }
+  async decisionsProbe(): Promise<string> {
+    await this.submit(PRIMARY_CHAT, 'Compare trip options', 'decisions-focus')
+    await this.settle(PRIMARY_CHAT, 'decisions-focus')
+    return JSON.stringify(
+      await decisionsProbe({
+        storage: this.ctx.storage,
+        harness: this.harness,
+        label: (id, label) => this.labelDecision(id, label),
+        chatProof: async () => {
+          await this.submit(PRIMARY_CHAT, 'Chat still works', 'decisions-chat-proof')
+          const answer = await this.settle(PRIMARY_CHAT, 'decisions-chat-proof')
+          return JSON.stringify(answer)
+        },
+      }),
+    )
   }
   helperExclusionsProbe() {
     return helperExclusionsProbe(this.ctx.storage)
@@ -946,6 +967,7 @@ async function destroySequence(env: Env, name: string): Promise<Response> {
 
 /** The agent apps probes, which answer JSON text (their results carry app values RPC types cannot). */
 const APPS_PROBES: Readonly<Record<string, (agent: DurableObjectStub<PersonalAgentProbe>) => Promise<string>>> = {
+  '/decisions-probe': (agent) => agent.decisionsProbe(),
   '/home-probe': (agent) => agent.homeProbe(),
   '/home-retained': (agent) => agent.homeRetained(),
   '/inbox-app': (agent) => agent.inboxAppProbe(),

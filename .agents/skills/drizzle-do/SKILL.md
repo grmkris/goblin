@@ -20,3 +20,5 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
+
+- Decisions add `app_decision_proposals` and `app_decision_labels` (ADR 0031). Probability is REAL; proposal id is the label primary key, so the first terminal owner label wins. State transition and label insertion share a short synchronous application transaction.

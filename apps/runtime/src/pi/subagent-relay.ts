@@ -1,3 +1,4 @@
+import { considerReport } from '../decisions/program.ts'
 import {
   type ConversationId,
   type EntryId,
@@ -253,6 +254,10 @@ const reportPhase =
           ),
         )
       }
+      // Optional, after the write and outside any commit: whether this result deserves the owner's attention (ADR 0031).
+      void run(considerReport(String(runtime.conversationId), String(relay.id), report, close && !failed)).catch(
+        () => undefined,
+      )
     }
     if (close) await run(closeAsDone(String(conversationId)))
     await runtime.commit(() => ({ status: 'terminal', outcome: { status: 'completed', result: null } }), context)

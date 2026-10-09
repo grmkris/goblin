@@ -1,3 +1,4 @@
+import { decisionRoute } from './decisions/routes.ts'
 import * as Schema from 'effect/Schema'
 import * as Effect from 'effect/Effect'
 import {
@@ -376,6 +377,7 @@ async function apiRequest(request: Request, env: RuntimeEnv): Promise<Response> 
       '/api/agent-apps',
       '/api/home',
       '/api/mcp',
+      '/api/decisions',
     ].some((prefix) => under(path, prefix)) ||
     (request.method === 'DELETE' && /^\/api\/conversations\/\d{1,12}\/queue$/u.test(path)) ||
     (request.method === 'POST' && /^\/api\/conversations\/\d{1,12}\/(?:threads|move)$/u.test(path))
@@ -398,6 +400,7 @@ const ownedRoutes: readonly (readonly [
   ['/api/topics', topicRoute],
   ['/api/personas', personaRoute],
   ['/api/organize', organizeRoute],
+  ['/api/decisions', decisionRoute],
 ]
 
 async function ownerApiRequest(

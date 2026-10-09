@@ -10,7 +10,7 @@ export type TokenUse = {
 }
 
 /** How many tokens of each kind make one Credit for a model. */
-export type CreditRate = { readonly input: number; readonly cached: number; readonly output: number }
+export type CreditRate = { readonly input: number; readonly cached: number; readonly output: number | null }
 
 /** Rates by model: one default, overrides per model id, and aliases that price one model as another. */
 export type CreditRates = {
@@ -23,10 +23,14 @@ export type CreditRates = {
  * Alibaba's own example for the Token Plan: about 5,000 fresh input tokens, 50,000 cached input tokens or 830 output
  * tokens per Credit. Gemini 3.8 Flash, which the plan does not list, is priced as Qwen 3.8 Flash.
  */
+/** App-budget estimate only: Clef is input-only ($0.24/M). There is no defined USD-to-Token-Plan-Credit exchange;
+ * use the conservative fresh-input allowance until an operator supplies an explicit Clef override. */
+const CLEF_RATE: CreditRate = { input: 5000, cached: 5000, output: null }
+
 export const DEFAULT_RATES: CreditRates = {
   default: { input: 5000, cached: 50_000, output: 830 },
-  models: {},
-  aliases: { 'gemini-3.8-flash': 'qwen3.8-flash' },
+  models: { clef: CLEF_RATE },
+  aliases: { 'gemini-3.8-flash': 'qwen3.8-flash', 'cloudflare/clef': 'clef' },
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -34,13 +38,16 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const positive = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0
 
 const rateOf = (value: unknown): CreditRate | undefined =>
-  isRecord(value) && positive(value.input) && positive(value.cached) && positive(value.output)
+  isRecord(value) &&
+  positive(value.input) &&
+  positive(value.cached) &&
+  (value.output === null || positive(value.output))
     ? { input: value.input, cached: value.cached, output: value.output }
     : undefined
 
 /**
  * `GOBLIN_MODEL_CREDIT_RATES`: JSON `{ default?, models?: { id: rate }, aliases?: { id: id } }`, each rate
- * `{ input, cached, output }` in tokens per Credit. What is missing or invalid keeps {@link DEFAULT_RATES}.
+ * `{ input, cached, output }` in tokens per Credit (`output: null` means input-only billing). What is missing or invalid keeps {@link DEFAULT_RATES}.
  */
 export function creditRates(value: string | undefined): CreditRates {
   if (value === undefined || value.trim() === '') return DEFAULT_RATES
@@ -66,7 +73,7 @@ export function creditRates(value: string | undefined): CreditRates {
     : {}
   return {
     default: rateOf(parsed.default) ?? DEFAULT_RATES.default,
-    models,
+    models: { ...DEFAULT_RATES.models, ...models },
     aliases: { ...DEFAULT_RATES.aliases, ...aliases },
   }
 }
@@ -81,7 +88,10 @@ export function rateFor(model: string | undefined, rates: CreditRates): CreditRa
 /** A response's cost in thousandths of a Credit, rounded up (a cache write is priced as fresh input). */
 export function milliCredits(use: TokenUse, model: string | undefined, rates: CreditRates): number {
   const rate = rateFor(model, rates)
-  const credits = (use.input + use.cacheWrite) / rate.input + use.cacheRead / rate.cached + use.output / rate.output
+  const credits =
+    (use.input + use.cacheWrite) / rate.input +
+    use.cacheRead / rate.cached +
+    (rate.output === null ? 0 : use.output / rate.output)
   return Number.isFinite(credits) && credits > 0 ? Math.ceil(credits * 1000) : 0
 }
 

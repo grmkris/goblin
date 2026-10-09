@@ -92,6 +92,8 @@ function organizing(state: WorkspaceState, change: WorkspaceChange): WorkspaceSt
   }
   if (change.type === 'receipt')
     return { ...state, receipts: upsertBy(state.receipts, change.receipt, same, newestReceipt).slice(0, KEPT) }
+  // Owner-only proposal rendering joins the shell after its ephemeral slot lands.
+  if (change.type === 'proposal') return state
   return state
 }
 
