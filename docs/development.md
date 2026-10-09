@@ -233,8 +233,9 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   the consent page (it starts off), the read-only inspection tools (ADR 0024). Revoke it under Settings → Apps that use your agent. A connection made before inspection joined `/mcp`
   gets those tools after reconnecting once (in Claude Code: `/mcp` → goblin → Clear authentication).
 - **Inspect your agent from a coding agent.** Start with `inspect_problems` or `inspect_turns`, then `inspect_turn`
-  with an operation id (a Telegram message is `telegram-<id>`), then `inspect_conversation` for the words. Reading
-  needs no plan; `ask_agent` does.
+  with an operation id (a Telegram message is `telegram-<id>`), then `inspect_conversation` for the words.
+  `inspect_flows` shows how conversations moved (sends, replies, thread starts, moves, Personas, Delegates) and
+  `inspect_details` the operation behind a message. Reading needs no plan; `ask_agent` does.
 - **The `goblin` CLI** (`apps/cli`) is the same from a terminal: an MCP client of `/mcp` that asks for
   `goblin:inspect`, whose commands come from the server's tools.
 
@@ -245,6 +246,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   bun run goblin turns
   bun run goblin turn telegram-<id>     # one turn end to end
   bun run goblin conversation 1         # main's entries, in full
+  bun run goblin flows --chat 12        # how a chat's conversation moved, content-free
   bun run goblin logs telegram-<id>     # Workers Logs lines that mention an id
   ```
 
