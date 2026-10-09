@@ -755,16 +755,18 @@ feed state (`apps/web/test/decisions.test.ts`).
 
 Cross-Topic context relevance (`decisions/context.ts`) is the third judgment, after the same owner yield and fenced on
 the same exchange as the thread suggestion: `TranscriptIndex.latestInput` gives the owner's newest message, and after
-a bounded catch-up `index.search` (ADR 0035's default Topic policy, never the asking chat or a Persona fork) gives at
-most three candidate sources. The rules decide a case whose candidates share no word of four or more letters with the
-request (none relevant); otherwise Clef judges each candidate, and those at or above 0.594 (the v4 frozen threshold)
-become one `context` proposal carrying only them. Its row ("Earlier work may help here") quotes the first source and
-offers Use and Dismiss. Use labels it confirmed; `goblin.decisions`' `beforeRequest` hook then adds the chat's newest
-such proposal confirmed in the last day to each request as a `<chosen-context>` part of goblin's context block (quoted
-history, for that request only), and records an `auto` use (`decision:<proposal>:<entry>`) for each later owner
-message it serves, so the source strip shows under that answer. Unit tests cover candidates over a real index
-(node:sqlite), the critic's selection and rules path, and the note, its once-per-message record and its one-day expiry
-(`apps/runtime/test/decision-context.test.ts`).
+a bounded catch-up `index.search` (ADR 0035's default Topic policy, never the asking chat or a Persona fork) gives the
+top three sources that automatic retrieval did not already give that message (its `auto:<session>:<entry>` use): the
+owner-confirmed judgment is a second look at what the gate and rerank left out, never a repeat. The rules decide a
+case whose candidates share no word of four or more letters with the request (none relevant); otherwise Clef judges
+each candidate, and those at or above 0.594 (the v4 frozen threshold) become one `context` proposal carrying only
+them. Its row ("Earlier work may help here") quotes the first source and offers Use and Dismiss. Use labels it
+confirmed; `goblin.decisions`' `beforeRequest` hook then adds the chat's newest such proposal confirmed in the last
+day to each request as a `<chosen-context>` part of goblin's context block (quoted history, for that request only),
+and records an `auto` use (`decision:<proposal>:<entry>`) for each later owner message it serves, so the source strip
+shows under that answer. Unit tests cover candidates over a real index (node:sqlite), the critic's selection and rules
+path, and the note, its once-per-message record and its one-day expiry (`apps/runtime/test/decision-context.test.ts`);
+the native probe runs on its own stack (`test/integration/decisions.test.ts`, port offset 70).
 
 ## Models
 

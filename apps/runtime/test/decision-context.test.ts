@@ -17,6 +17,8 @@ import { chatDatabase } from './chats-sqlite.ts'
 
 const open: (() => void)[] = []
 const now = () => Math.floor(Date.now() / 1000)
+/** These cases never rerank: automatic retrieval's model must not be called. */
+const NO_MODEL = { complete: async () => Promise.reject(new Error('no rerank in decision tests')) }
 afterEach(() => {
   for (const close of open.splice(0)) close()
 })
@@ -77,7 +79,7 @@ function fixture() {
   }
   const index = new TranscriptIndex(database.db, pi, now)
   const later = (id: number, text: string) => histories['1']?.push(entry(id, 1, 'pi.user', text))
-  return { ...database, index, retrieval: new ChatRetrieval(index, now), later }
+  return { ...database, index, retrieval: new ChatRetrieval(index, NO_MODEL, now), later }
 }
 
 describe('cross-Topic context candidates', () => {
@@ -91,6 +93,23 @@ describe('cross-Topic context candidates', () => {
     expect(judged.state.candidates).toEqual([
       expect.objectContaining({ id: 'c1', topic: 'Garden', autoEnabled: true, archived: false, supersededBy: null }),
     ])
+  })
+
+  it('sets aside what automatic retrieval already gave the message', async () => {
+    const { index } = fixture()
+    const found = await contextCandidates(index, '1', '1')
+    const [given] = found?.sources ?? []
+    if (given === undefined) throw new Error('fixture source')
+    index.record({
+      id: 'auto:1:2',
+      chat: '1',
+      session: '1',
+      inputEntry: 2,
+      mode: 'auto',
+      sources: [given],
+      retrievedAt: 1,
+    })
+    expect(await contextCandidates(index, '1', '1')).toBeUndefined()
   })
 
   it('offers nothing to a Persona fork or when nothing matches', async () => {

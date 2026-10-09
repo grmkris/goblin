@@ -24,8 +24,8 @@ work from the owner's other chats (cross-Topic context relevance). Reports remai
 stays a runtime fact. Report judgments are keyed by the relay's stable operation identity; resumed work cannot create
 another proposal for it. Context candidates come only from the transcript index of ADR 0035 under its default Topic
 policy (active Topics that take part in search, never the asking chat): the top three sources of a search for the
-owner's newest message, each judged relevant or not at the frozen v4 threshold, with "none relevant" a valid outcome.
-This ADR grants no new retrieval authority.
+owner's newest message that automatic retrieval did not already give it, each judged relevant or not at the frozen v4
+threshold, with "none relevant" a valid outcome. This ADR grants no new retrieval authority.
 
 The signed-in owner confirms or dismisses each proposal. Application-owned `app_decision_proposals` and
 `app_decision_labels` retain the outcome and its provider/probability label. Confirm may highlight an existing report,
