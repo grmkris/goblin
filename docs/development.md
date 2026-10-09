@@ -143,31 +143,25 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   or with Allow all; None turns them all off. Nothing is granted by default. A server marked **Needs sign-in** needs a
   new sign-in: press Sign in again. **Try a tool**, at the bottom, calls an allowed tool by hand.
 - **Queued messages.** While Main or an ordinary thread is working, Send adds a follow-up. Queued messages appear
-  above both full and inline composers with expandable text, files, references and authors. They enter the transcript
+  above the composer in the channel and in the thread panel with expandable text, files, references and authors. They enter the transcript
   only when Pi starts them. Reload or reconnect to restore the queue; a failed content read retains the last view and
   retries. An idle conversation with pending inputs does not say Ready. Helpers and routine runs use their existing flows.
   Remove withdraws one waiting message without stopping active work. If Pi has already started it, the message keeps
   running and the UI says so. Failed removals keep the row visible for retry.
-- **Conversations.** Each conversation is a pane; the URL (`/c/<id>`) names the focused one and `/` restores your
-  last arrangement. Click a conversation in the sidebar to show it in the focused pane. The **+** beside Threads opens
-  a new thread's draft beside it, and **Reply in thread** under any settled message, in any conversation, opens a
-  small reply right under that message; sending starts the thread from it, so an unsent reply leaves nothing behind.
-  The message then carries the thread's chip (replies, name, last activity) instead of Reply in thread: it unfolds
-  the live thread in place, with its own threads unfolding the same way and **Open in pane** to put it beside. While a
-  thread is in a pane its fold says so, with the way to it and back. A conversation off screen for ten seconds stops
-  following and catches up when it is back. Drag a pane by the grip in its pill onto another pane: near an edge it splits there, in the middle the two
-  trade places (Escape cancels). Drag a divider to resize, **Fill the workspace** in the pill's menu to show one pane
-  alone, and × to close a pane (any but the last; the conversation goes on). The device remembers the arrangement;
-  narrow screens show one pane at a time, swipe between them. The sidebar lists every conversation as a tree
-  (subagents under who started them, threads under where they branched); hover a row for **Open beside**, or drag a
-  row onto a pane. ⌘/Ctrl+B folds it to a rail of the active ones; rest on an icon to see what it is. A dot marks
-  unread replies on every device until a pane shows them. **Share to …** asks the thread to
-  write a note into the conversation it came from; it starts no answer there. Rename and Close are in the thread menu;
-  Close stops the thread and everything under it (its subagents and nested threads) and keeps its history, and Reopen
-  brings it back. Subagents appear under the conversation that started them, can start their own, and close by
-  themselves once their answer is reported (they fold into "n closed" under their spawner); one left open folds into
-  "n idle" once it is idle and you have read it. The chevron at the end of a row hides what it started, and this
-  browser remembers it. Writing in a subagent keeps it open, and while it works your
+- **Conversations.** Each Topic is a channel in the sidebar; Personal's is Main (`/c/1`), and the rail's Home opens
+  the channel you showed last. **Reply in thread** in the toolbar over any settled message, in any conversation,
+  opens a draft in the thread panel beside the channel; sending starts the thread from that message, so an unsent
+  reply leaves nothing behind. The message then carries the thread's summary ("n replies · Last reply …"), which
+  opens it in the panel. Threads opened inside a thread stack there with a back crumb; × closes the panel and stops
+  nothing. The URL (`/c/<channel>?thread=<id>`) names what the panel shows, so reload, links and Back work, and a
+  thread's own `/c/<id>` opens its channel with the panel. On a phone the sidebar is a drawer from the top bar and a
+  thread is a full view with a back to its channel. A conversation off screen for ten seconds stops following and
+  catches up when it is back. A dot marks unread replies on every device until a chat shows them. **Share back** in
+  the thread's menu asks the thread to write a note into the conversation it came from; it starts no answer there.
+  Rename and Close are in the same menu; Close stops the thread and everything under it (its subagents and nested
+  threads) and keeps its history, and Reopen brings it back. Subagents open in the panel from their spawner's
+  transcript, can start their own, and close by themselves once their answer is reported. Writing in a subagent
+  keeps it open, and while it works your
   message steers it, and its answer goes up to whoever started it with your words quoted. The sliders button by the composer shows
   what the agent can use in that conversation (connections and their tools, skills, subagents); switching something
   off there hides it from the agent in that conversation only, and a new thread starts with the switches of the conversation it came from. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
@@ -176,8 +170,9 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - **Commands and references.** Type `/` to choose a skill, `/help`, `/stop` or `/new-thread`, and `@` to choose a
   connection, skill or helper. Arrows browse; Enter or Tab selects; Escape dismisses. Unselected tokens remain prose.
   Chips can be removed. Skill-only sends are allowed; connection hints grant nothing; helpers bring their latest
-  bounded report into this conversation. New thread moves the prose, chips and attachments into a fresh draft pane.
-  Failed selections preserve the draft and mark the failing chip. These controls work in panes, drafts and inline replies.
+  bounded report into this conversation. New thread moves the prose, chips and attachments into a new thread's draft
+  in the panel. Failed selections preserve the draft and mark the failing chip. These controls work in channels,
+  threads and drafts.
 - **Figures.** Assistant replies can draw Mermaid, chart and map fences. Ordinary Markdown is the
   default for checklists, timelines, comparisons and small sets of values. Open streaming fences, invalid specs and
   drawing failures stay readable code. **Explore diagram** opens zoom, pan and node connections: scroll or pinch to
@@ -276,7 +271,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - UI components: goblin looks like the myapps apps. Prefer porting a component from `~/code/myapps/packages/ui`
   (with an "Adapted from" header naming the commit); otherwise `bunx shadcn@latest add <component>` from
   `packages/ui`, then review the generated file. Keep the shared tokens in `packages/ui/src/styles.css` as myapps has
-  them (the sidebar tokens are goblin's: a shade heavier than the page). Motion uses the theme's curves (`ease-out`,
+  them (the shell's `--shell-*` and `--moss` tokens are goblin's: the moss rail and sidebar beside the off-white page). Motion uses the theme's curves (`ease-out`,
   `ease-in-out`, `ease-drawer`, the default for every `transition-*`), never ease-in or `transition-all`, at 300ms or
   less with exits faster than entrances (sheets excepted). Every raw `:hover` in the app CSS sits under
   `(hover: hover)`, and a control that tints on hover tints on `:active` too, because the tap highlight is off. Fields

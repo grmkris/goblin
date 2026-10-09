@@ -8,15 +8,17 @@ description: Change how the browser follows the Pi conversation (SSE snapshot, b
 The browser follows committed Pi state over Server-Sent Events: `/api/conversations/:id/events` sends a snapshot of entries,
 then batches, with a heartbeat. `apps/web/src/lib/projection.ts` turns entries into messages and tool calls.
 `lib/parts.ts` folds them into render parts: each tool result joins the call that asked for it, with a lifecycle
-state. `components/parts/registry.tsx` picks the renderer for each part. A thread unfolds inline under the message it
-branched from as the live thread itself (`components/inline-thread.tsx`), never a copy: it starts at its fork entry
-and never shows inherited history. Every pane and inline thread follows through the shared stream pool
+state; the entries the app writes itself (thread heads, Persona asks and answers, Topic briefs, Delegate results) are
+decoded with their contract schemas, and entries a later entry's edits omit are hidden.
+`components/parts/registry.tsx` picks the renderer for each part. A thread opens in the thread panel beside its
+channel as the live thread itself (`components/shell/thread-panel.tsx`), never a copy: it starts at its fork entry and
+never shows inherited history. The channel and the panel follow through the shared stream pool
 (`lib/stream-pool.ts`, one stream per conversation, capped, suspended off screen); never open a second stream for a
 conversation outside it.
 
 - Assistant figures use `MessageText` → `RichBlock` and lazy kit entries for Mermaid, chart and map
   fences. Keep open streaming fences, invalid specs and drawing failures as code. Snapshots name when they were true. Agent-app views share the kit through its import allowlist and frame
-  bundles. Figures are read-only and grant no app power. Verify light/dark, narrow panes and reduced motion.
+  bundles. Figures are read-only and grant no app power. Verify light/dark, narrow chats and reduced motion.
 - Pi state is authoritative. Do not keep a second transcript or invent cursor replay.
 - Queue contents for Main and ordinary threads come from the owner queue API over `InboxDoc`; native snapshot/inbox
   IDs remain authoritative membership. Keep one cancellable content read in the shared stream, reject stale reads,
@@ -37,9 +39,8 @@ conversation outside it.
   keeping or launching one grants nothing. Several live at once, one instance each (`components/apps/host.tsx`), each
   iframe in its own fixed stage (`stage.tsx`) that follows page > inline slots; moving an
   iframe in the DOM reloads the App and loses its state, so only the empty measured slots move. Stages clip to their
-  slot's scrolling containers and the pane's `data-app-cover` elements. At most six load; the least recently seen
-  unloads to a stub, never one on screen (`lib/app-residency.ts`). Fullscreen is the App's page filling the workspace.
-  Persisted layouts restore App pages, never grants. Verify moving, resizing, scrolling and responsive changes with an
+  slot's scrolling containers, their chat's `data-app-cover` elements and any `data-app-overlay` (the thread panel). At most six load; the least recently seen
+  unloads to a stub, never one on screen (`lib/app-residency.ts`). Fullscreen is the App's page (`/a/<id>`). Verify moving, resizing, scrolling and responsive changes with an
   actual SDK-connected iframe, plus origin binding and teardown/reconnect tests.
 - An App's tool and resource calls go through the owner API to the originating server only, and need that server's
   grant. No cross-server calls, no credentials in iframe state, browser bundles, logs or transcripts.

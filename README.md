@@ -7,8 +7,8 @@ other tools can talk to.
 The agent has one stable main chat (`/c/1`); it resolves to the current Pi session. Side threads can start empty or branch from any message of any conversation, at
 any depth; they can share a note back to where they came from, and Close stops one with everything under it until it is
 reopened. Main learns the name of a thread started empty, and one live feed keeps every open tab's list and activity
-current. A thread unfolds in place under the
-message it branched from, live and at any depth, with its own composer, until it is opened in a pane. Each conversation can switch off,
+current. The web app is a Slack-style shell: a moss rail and a sidebar of Topics as channels, the channel (Personal's
+is Main), and a thread panel beside it where a message's thread opens, stacking threads opened inside threads. Each conversation can switch off,
 for its own agent, connections and their tools, skills libraries and subagents; a new thread starts with main's
 switches. Background subagents work in their own conversations, start their own when a job splits, report their final
 answer back to the conversation that started them and close when done; the owner can write to one to steer it. Main keeps an OptChat-style memory view: summaries of older messages followed by the
@@ -24,10 +24,9 @@ MCP Events wake an authoritative inbox pull into main, and replies go back with 
 the doorbell fallback until cut-over. Owner-enabled skills libraries use update Events to invalidate their cached
 catalog; the next activation refetches, while retained activations keep their verified version.
 
-Every conversation (main, a thread, a subagent) and every kept MCP App is a pane of its own: open beside, drag to
-split or swap, resize, close any but the last. Apps also run in place in any conversation, several at once, and move
-to their page and back without reloading. The URL names the focused conversation or App and the device remembers the
-arrangement; narrow screens show one pane at a time in a swipeable strip. Owners can add public servers by URL or from MCP registries,
+Apps run in place in any conversation, several at once, and move to their page (`/a/<id>`, with the way back to its
+channel) and back without reloading. On a phone the navigation is a drawer and a thread is a full view with a back to
+its channel. Owners can add public servers by URL or from MCP registries,
 grant tools explicitly, mark individual tools **Ask first** for approval of every exact call, choose an offered model, and see the per-account daily budget in Credits. The agent uses `ask_user`
 to ask questions the owner answers in their next message. The owner attaches files to a message with the composer's
 paperclip; the agent reads them and writes its own results beside them, kept per agent in SQLite and R2.
@@ -55,13 +54,6 @@ the `goblin` CLI (`apps/cli`), and the agent answers "why did that fail?" with i
 Diagnostics focus on work needing attention; `problems --all` includes expected waits and recovered model attempts.
 Successful background model completions stay out of problems; their failures remain visible.
 Private error details stay in conversation inspection; logs and traces carry fixed summaries.
-
-Workspace layout uses [Trellis 0.3.0 by Dan Fessler](https://github.com/DanFessler/trellis), under its commercial
-license and goblin-specific permission: goblin may use it without sponsorship until it makes money, in exchange
-for crediting Dan and allowing him to showcase goblin as a Trellis user. When revenue starts, Kris maintains the
-applicable active GitHub Sponsorship: $10/month for individuals, $100/month for studios of up to 10 members;
-larger organizations require an enterprise agreement. The sidebar footer also links Dan's credit. See
-[ADR 0016](docs/adr/0016-workspace-layout-with-trellis.md) and [ADR 0019](docs/adr/0019-panes-for-everything.md).
 
 Built on the Cloudflare Agents SDK (`PersonalAgent` Durable Object) with the native Pi harness (Pi Durable owns
 conversations and execution), Effect at service seams, Better Auth for identity, and Alchemy for infrastructure.
