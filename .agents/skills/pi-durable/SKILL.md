@@ -100,6 +100,12 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   asking tools. A task's passive writes go through `ConversationRegistry.writeEntry`, because a task's conversation
   handle submits inputs only. Delegate reports are passive `app.delegate_result` writes unless the spawn set
   `synthesize: true`. Organize tools write `app_organize_receipts` in the same synchronous step as the change.
+- Cross-Topic retrieval (ADR 0035): `goblin.retrieval` is in the default extension list (Conversations and threads,
+  not subagents or routine runs). `TranscriptIndex` reads `Conversation.entries` in entry-id windows and indexes only
+  entries whose `conversationId` is the session (never forked history, never `role = 'persona'` forks), redacted and
+  bounded, into `app_transcript_*`; its `afterResponse` catch-up is fire and forget. `search_chats` records its frozen
+  sources under the call id, so a replay returns them unchanged. Move to thread calls `reassign(session, fromEntry,
+chat)`.
 - Vendor tables (`pi_*`, `cf_agents_*` and the others in `storage/vendor.ts`) are never touched.
 - Initialization, readback and reconstruction are separate proofs; local workerd reconstruction is not remote
   eviction.
