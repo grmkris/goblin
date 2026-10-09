@@ -57,7 +57,9 @@ owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
 
 1. health; unless sign-up is open, a sign-up without the invite code is refused; sign-in, resident authority
    `active`, a main-thread snapshot;
-2. a small text file uploaded to the owner's `/uploads`, listed, read back byte for byte and deleted (ADR 0022);
+2. a small text file uploaded to the owner's `/uploads`, listed, read back byte for byte and deleted (ADR 0022); then
+   the typed API's edge: an unknown chat answers 404 in the error envelope quoting the response's `x-goblin-ref`, and
+   a write without the CSRF header is refused 403;
 3. each configured or owner-added MCP server's status; for a connected server, its tools, and a direct call of a
    read-only probe (`account_read` on MyPlan, `browser_backends` on MyBrowser) only if the owner has already granted it;
 4. an inbound MCP client: dynamic registration, owner consent including `goblin:inspect`, PKCE token, `/mcp`
@@ -83,6 +85,7 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 | `stage`, `signup`, `resident`, `model` | Target stage, sign-up mode, active authority and smoke model or `owner pick`.                                  |
 | `servers`                              | Server statuses, tool/grant counts and probe outcome (`ok`, `error` or `not-granted`).                         |
 | `files`                                | `ok`: the owner's file round trip, the file deleted again.                                                     |
+| `edge`                                 | `envelope: ok` and `csrf: refused`: failures answer in the envelope with their ref; CSRF on every write.       |
 | `app`                                  | `ok`: an agent app built, run by the owner (revision +1) and deleted.                                          |
 | `inbound`                              | Initialization, inspection read, model turn, optional resident tool call, recent history and 401 after revoke. |
 | `inbound.author`                       | `ok`: the smoke user's message has author `goblin-smoke`.                                                      |
@@ -90,7 +93,7 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 | `subagent`                             | `reported`: the Delegate's result reached main (passively, or answered when synthesis was asked for).          |
 | `memory.messages`                      | Messages logged since memory activation; must be greater than zero.                                            |
 | `memory.summarized`                    | Messages covered before the newest input by the last placed memory view; recorded without a minimum assertion. |
-| `utc`, `status`, `steps`               | Completion timestamp, `passed` and HTTP step/status pairs.                                                     |
+| `utc`, `status`, `steps`               | Completion timestamp, `passed` and HTTP steps with status and the answer's ref (`goblin lookup <ref>`).        |
 
 Not covered here: the owner's Connect flow (it needs the owner at the remote server's consent screen), rendering
 MCP Apps, the browser UI, thread branching, memory-summary quality, skills, and Telegram hook/inbox acceptance.
