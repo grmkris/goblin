@@ -59,12 +59,17 @@ describe('decision proposals as owner-only rows', () => {
     })
   })
 
-  it('quotes a long report on one line, cut with an ellipsis', () => {
-    const [row] = proposalMessages([report('dp_report_8', `Found it.\n\n${'word '.repeat(200)}`)])
-    expect(row?.body.startsWith('Found it. word word')).toBe(true)
-    expect(row?.body.endsWith('…')).toBe(true)
-    expect(row?.body).toHaveLength(280)
-    expect(row?.body).not.toContain('\n')
+  it('quotes a long report once, on one line, cut after a whole word with an ellipsis', () => {
+    const text = `Found it.\n\n${'Alfama flats under budget. '.repeat(20)}`
+    const [row] = proposalMessages([report('dp_report_8', text)])
+    const body = row?.body ?? ''
+    expect(body.startsWith('Found it. Alfama flats under budget. Alfama')).toBe(true)
+    expect(body.length).toBeLessThanOrEqual(280)
+    expect(body).toMatch(/(?:Alfama|flats|under|budget\.)…$/u)
+    expect(body).not.toContain('\n')
+    expect(body.split('Found it.')).toHaveLength(2)
+    const [long] = proposalMessages([report('dp_report_9', 'x'.repeat(400))])
+    expect(long?.body).toBe(`${'x'.repeat(279)}…`)
   })
 
   it('shows nothing for a settled proposal, and only the newest thread suggestion of a chat', () => {

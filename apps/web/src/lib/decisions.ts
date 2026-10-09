@@ -12,10 +12,13 @@ const CONFIRM: Readonly<Record<DecisionProposal['payload']['type'], string>> = {
 /** How much of a Delegate's report the row quotes. */
 const EXCERPT = 280
 
-/** `text` on one line, cut at `limit` characters with an ellipsis. */
+/** `text` on one line, at most `limit` characters: a longer one is cut after a whole word, with an ellipsis. */
 const excerpt = (text: string, limit: number): string => {
   const flat = text.replaceAll(/\s+/gu, ' ').trim()
-  return flat.length <= limit ? flat : `${flat.slice(0, limit - 1).trimEnd()}…`
+  if (flat.length <= limit) return flat
+  const space = flat.slice(0, limit).lastIndexOf(' ')
+  // One very long word has no break to cut at, so it is cut inside.
+  return `${flat.slice(0, space > limit / 2 ? space : limit - 1).trimEnd()}…`
 }
 
 /** What a row says: the judgment as a title, and the evidence it was made on. */

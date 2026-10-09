@@ -11,6 +11,22 @@ import type { Judgment } from './service.ts'
 import type { DecisionFence } from './store.ts'
 import type { WorkState } from './schema.ts'
 
+/** How long a suggested thread's title may be. */
+const TITLE = 60
+
+/**
+ * The owner's message as a suggested thread's title: one line, at most 60 characters, a longer one cut after a whole
+ * word with an ellipsis.
+ */
+export function threadTitle(text: string): string {
+  const flat = text.replaceAll(/\s+/gu, ' ').trim()
+  if (flat === '') return 'New thread'
+  if (flat.length <= TITLE) return flat
+  const space = flat.slice(0, TITLE).lastIndexOf(' ')
+  // One very long word has no break to cut at, so it is cut inside.
+  return `${flat.slice(0, space > TITLE / 2 ? space : TITLE - 1).trimEnd()}…`
+}
+
 /** Only registered open owner chats and bounded ordinary prose are candidates. */
 export class DecisionSource {
   readonly #db: DrizzleSqliteDODatabase
@@ -97,7 +113,7 @@ export class DecisionSource {
       case: { id: 'work', task: 'separate-work', state: work },
       payload: {
         type: 'thread-draft',
-        title: work.exchange.findLast((message) => message.role === 'owner')?.text.slice(0, 60) ?? 'New thread',
+        title: threadTitle(work.exchange.findLast((message) => message.role === 'owner')?.text ?? ''),
       },
       current: () => this.current(chatId, frozen),
     }

@@ -7,6 +7,7 @@ import { BudgetExhausted, ResidentInactive } from '../src/http/errors.ts'
 import { DecisionService, type Judgment } from '../src/decisions/service.ts'
 import { ClefError, workersClef } from '../src/decisions/client.ts'
 import type { DecisionFence, ProposalStore, StoredDecision } from '../src/decisions/store.ts'
+import { threadTitle } from '../src/decisions/source.ts'
 import { decodeAnswers } from '../src/decisions/wire.ts'
 import type { AuxCall } from '../src/telemetry/report.ts'
 
@@ -175,5 +176,18 @@ describe('typed decision critic', () => {
     ).toBe(500)
     const budget = new ModelBudget({ milliCredits: () => 0, add: () => undefined }, 1)
     await budget.require(0)
+  })
+})
+
+describe('a suggested thread title', () => {
+  it("keeps the owner's short message on one line", () => {
+    expect(threadTitle('  Find flights\n to Kyoto  ')).toBe('Find flights to Kyoto')
+    expect(threadTitle(' \n ')).toBe('New thread')
+  })
+  it('cuts a long message after a whole word, with an ellipsis, within 60 characters', () => {
+    const title = threadTitle('Can you also compare apartment prices in Lisbon vs Porto for a three month stay?')
+    expect(title).toBe('Can you also compare apartment prices in Lisbon vs Porto…')
+    expect(title.length).toBeLessThanOrEqual(60)
+    expect(threadTitle('x'.repeat(80))).toBe(`${'x'.repeat(59)}…`)
   })
 })
