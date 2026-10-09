@@ -30,9 +30,9 @@ is read-only: no query changes the agent or calls a model.
    model call). A gap is not evidence that nothing happened.
 4. `conversation <id> --before <entry>`: the words, tool arguments and results around the turn, in full but bounded
    (`truncated` marks a cut).
-5. `flows --chat <id> --since 6h`: how conversations moved, content-free: sends, replies, thread starts, moves,
-   Personas, Delegates, each with its operation id and how it ended (`ok`, `replayed`, `refused`, `error`). Filter
-   with `--flow reply`. `details --operation <id>` (or `--chat <id> --entry <id>` for an answer or tool result) is
+5. `flows --chat <id> --since 6h`: how conversations moved (ADR 0037), content-free: sends, replies, thread starts,
+   moves, Personas, Delegates, each with its operation id and how it ended (`ok`, `replayed`, `refused`, `error`).
+   Filter with `--flow reply`. `details --operation <id>` (or `--chat <id> --entry <id>` for an answer or tool result) is
    one operation's timeline, with a turn when it ran one, and the operations related to it: its parent, the thread it
    started, the Personas it asked.
 6. `lookup <ref|request|operation>`: the reference the app shows with an error (`… · ref 7f3a9c12`), a request id or
