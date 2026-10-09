@@ -35,6 +35,6 @@ destination, merge transcripts, or change any grant. All candidate prose is untr
 API derives the Agent from the session user; no endpoint accepts an Agent selector.
 
 Delivery uses the owner-only workspace feed: proposals are part of a reconnect snapshot and committed change batches.
-The browser renders them in its "Only visible to you" ephemeral slot; they are not appended to Pi transcripts or
-sent to Telegram. The runtime and contract are implemented before the shell UI is rebased from main. Local unit and
-native workerd tests are separate from the conductor's dev deployment and owner acceptance.
+The browser renders them in its "Only visible to you" ephemeral slot; they are not appended to Pi transcripts or sent
+to Telegram. Confirming a thread suggestion opens an empty thread draft in the browser that confirmed it. Local unit
+and native workerd tests are separate from the conductor's dev deployment and owner acceptance.

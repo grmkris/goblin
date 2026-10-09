@@ -2,6 +2,7 @@ import {
   AppView,
   ConversationActivity,
   ConversationView,
+  DecisionProposal,
   OrganizeReceipt,
   PersonaInvocationView,
   PersonaView,
@@ -15,7 +16,7 @@ import { type PiEventSource, type ReconnectScheduler, browserScheduler, reconnec
 /**
  * The owner's conversations, oldest first, what each one that is not idle is doing, their kept Apps, oldest first, the
  * Topics and Personas, the Persona answers still on their way (and the newest settled ones), and the latest organizing
- * receipts, newest first.
+ * receipts, newest first, and the decision proposals still open or confirmed, oldest first.
  */
 export type WorkspaceState = {
   readonly conversations: readonly ConversationView[]
@@ -25,6 +26,7 @@ export type WorkspaceState = {
   readonly personas: readonly PersonaView[]
   readonly invocations: readonly PersonaInvocationView[]
   readonly receipts: readonly OrganizeReceipt[]
+  readonly proposals: readonly DecisionProposal[]
 }
 
 export const EMPTY_WORKSPACE: WorkspaceState = {
@@ -35,6 +37,7 @@ export const EMPTY_WORKSPACE: WorkspaceState = {
   personas: [],
   invocations: [],
   receipts: [],
+  proposals: [],
 }
 
 /** How many settled Persona answers and organizing receipts the state keeps: enough for Activity and Tasks. */
@@ -46,7 +49,7 @@ const oldestFirst = (a: ConversationView, b: ConversationView) =>
 /** The workspace as the feed's snapshot describes it. */
 export function fromSnapshot(snapshot: WorkspaceSnapshot): WorkspaceState {
   const busy = snapshot.activity.filter(({ state }) => state !== 'idle')
-  const { topics = [], personas = [], invocations = [], receipts = [] } = snapshot
+  const { topics = [], personas = [], invocations = [], receipts = [], proposals = [] } = snapshot
   return {
     conversations: snapshot.conversations.toSorted(oldestFirst),
     activity: new Map(busy.map((activity) => [activity.id, activity])),
@@ -55,6 +58,7 @@ export function fromSnapshot(snapshot: WorkspaceSnapshot): WorkspaceState {
     personas: personas.toSorted(byNumber),
     invocations,
     receipts: receipts.toSorted(newestReceipt).slice(0, KEPT),
+    proposals: proposals.filter(kept).toSorted(oldestProposal),
   }
 }
 
@@ -82,7 +86,18 @@ const keptInvocations = (invocations: readonly PersonaInvocationView[]) => {
 
 const same = <T extends { readonly id: unknown }>(a: T, b: T) => a.id === b.id
 
-/** The Topic, Persona, invocation and receipt changes of a batch, applied in order. */
+/** A proposal the state keeps: open, or confirmed (as the server's snapshot keeps it); dismissed and stale ones go. */
+const kept = (proposal: DecisionProposal) => proposal.state === 'open' || proposal.state === 'confirmed'
+const oldestProposal = (a: DecisionProposal, b: DecisionProposal) =>
+  a.createdAt - b.createdAt || a.id.localeCompare(b.id)
+
+/** The proposals with `proposal` as it is now: in place of the one with its id, or added; gone once settled away. */
+function withProposal(proposals: readonly DecisionProposal[], proposal: DecisionProposal) {
+  const others = proposals.filter((each) => each.id !== proposal.id)
+  return kept(proposal) ? [...others, proposal].toSorted(oldestProposal) : others
+}
+
+/** The Topic, Persona, invocation, receipt and proposal changes of a batch, applied in order. */
 function organizing(state: WorkspaceState, change: WorkspaceChange): WorkspaceState {
   if (change.type === 'topic') return { ...state, topics: upsertBy(state.topics, change.topic, same, byNumber) }
   if (change.type === 'persona') return { ...state, personas: upsertBy(state.personas, change.persona, same, byNumber) }
@@ -92,8 +107,7 @@ function organizing(state: WorkspaceState, change: WorkspaceChange): WorkspaceSt
   }
   if (change.type === 'receipt')
     return { ...state, receipts: upsertBy(state.receipts, change.receipt, same, newestReceipt).slice(0, KEPT) }
-  // Owner-only proposal rendering joins the shell after its ephemeral slot lands.
-  if (change.type === 'proposal') return state
+  if (change.type === 'proposal') return { ...state, proposals: withProposal(state.proposals, change.proposal) }
   return state
 }
 
@@ -158,6 +172,7 @@ const decodeSnapshotFrame = Schema.decodeUnknownSync(
     personas: Schema.optional(Items),
     invocations: Schema.optional(Items),
     receipts: Schema.optional(Items),
+    proposals: Schema.optional(Items),
   }),
 )
 const decodeChangeFrame = Schema.decodeUnknownSync(Items)
@@ -176,7 +191,7 @@ const readable = <A>(items: readonly unknown[], decode: (item: unknown) => Optio
  */
 export function decodeSnapshot(data: unknown): WorkspaceSnapshot {
   const frame = decodeSnapshotFrame(data)
-  const { topics, personas, invocations, receipts } = frame
+  const { topics, personas, invocations, receipts, proposals } = frame
   return {
     conversations: readable(frame.conversations, decodeConversation),
     activity: readable(frame.activity, decodeActivity),
@@ -187,6 +202,7 @@ export function decodeSnapshot(data: unknown): WorkspaceSnapshot {
       invocations: readable(invocations, Schema.decodeUnknownOption(PersonaInvocationView)),
     }),
     ...(receipts !== undefined && { receipts: readable(receipts, Schema.decodeUnknownOption(OrganizeReceipt)) }),
+    ...(proposals !== undefined && { proposals: readable(proposals, Schema.decodeUnknownOption(DecisionProposal)) }),
   }
 }
 

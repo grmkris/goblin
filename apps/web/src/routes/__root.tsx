@@ -2,7 +2,7 @@ import { HeadContent, Outlet, Scripts, createRootRoute, useRouterState } from '@
 import type { ReactNode } from 'react'
 import { AppHost } from '../components/apps/host.tsx'
 import { AppLayer } from '../components/apps/stage.tsx'
-import { EphemeralProvider } from '../components/shell/ephemeral-slot.tsx'
+import { DecisionProposals } from '../components/shell/decision-proposals.tsx'
 import { ShellNavigation } from '../components/shell/navigation.tsx'
 import { ShellFrame } from '../components/shell/shell.tsx'
 import { WorkspaceFeedProvider } from '../components/workspace-feed.tsx'
@@ -70,9 +70,9 @@ function Shell({ children }: { readonly children: ReactNode }) {
     <WorkspaceFeedProvider enabled={enabled}>
       <ShellNavigation>
         <AppHost>
-          <EphemeralProvider>
+          <DecisionProposals>
             <ShellFrame>{children}</ShellFrame>
-          </EphemeralProvider>
+          </DecisionProposals>
           <AppLayer />
         </AppHost>
       </ShellNavigation>

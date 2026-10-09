@@ -131,8 +131,9 @@ server the composer offers them as `@` references (with their avatars), and with
 In turn choice that is sent as `personaOrder`. What an answer used from other chats shows as a strip under it: a
 `search_chats` call's `SourcesDetails`, and automatic retrieval from `GET /api/conversations/:id/sources`
 (`lib/sources.ts`), each source opening its chat. Owner-only messages (`EphemeralMessage`, "Only visible to you")
-have a slot after the entry they follow and a provider (`components/shell/ephemeral-slot.tsx`) that nothing fills
-yet.
+have a slot after the entry they follow and a provider (`components/shell/ephemeral-slot.tsx`); acting on one or
+dismissing it hides it at once and shows it again if its sender fails. Decision proposals fill it (see Typed decision
+proposals).
 A thread started with "+" tells its channel its name once it has one (ADR 0010): the channel gets one
 `app.thread_started` note, `[thread started: "<title>"]`, and its transcript shows that thread's summary.
 **Start thread** ([ADR 0034](adr/0034-move-to-thread.md), `chats/thread-heads.ts`) posts the owner's message as the
@@ -740,7 +741,17 @@ The workspace feed includes proposals in its snapshot and `{type:'proposal', pro
 strict-CSRF `POST /api/decisions/:id` takes `{label:'confirm'|'dismiss'}` and derives the Agent from the session user.
 A repeated label returns the first result; the opposite label conflicts, and a stale open proposal cannot be
 confirmed. Confirmation persists a highlight or an empty thread draft affordance, leaving Pi history and send targets
-untouched. The new shell's owner-only rendering and cross-Topic retrieval are pending the coordinated main rebase.
+untouched.
+
+The browser keeps the feed's open and confirmed proposals (`lib/workspace-feed.ts`) and
+`components/shell/decision-proposals.tsx` shows each open one as an "Only visible to you" row at the end of its chat
+(`lib/decisions.ts`): a report highlight quotes the report with Useful and Dismiss, and "This could be a thread"
+quotes the owner's message with New thread and Dismiss; of a chat's thread suggestions only the newest shows, since an
+older one judged an exchange that has moved on. Either button, or the row's close, posts the label through the
+browser's CSRF-headed request and the row goes; a gone, stale or oppositely settled proposal (404/409) stays gone, any
+other failure brings the row back. A confirmed thread suggestion then opens an empty new-thread draft in that chat's
+channel (`Navigation.newThreadWith`); nothing is sent or moved. Unit tests cover the mapping, the label call and the
+feed state (`apps/web/test/decisions.test.ts`). Cross-Topic context relevance waits for the retrieval index.
 
 ## Models
 

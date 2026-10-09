@@ -1,0 +1,171 @@
+import { describe, expect, it } from 'vitest'
+import { DecisionProposal, EphemeralMessage, type JsonValue } from '@goblin/contracts'
+import { Schema } from 'effect'
+import { ApiFailure, type RequestOptions } from '../src/lib/boundary.ts'
+import { labelOf, opensThread, proposalMessages, sendLabel } from '../src/lib/decisions.ts'
+import { applyChanges, decodeChanges, decodeSnapshot, fromSnapshot } from '../src/lib/workspace-feed.ts'
+
+// Every fixture decodes with the contract schema the runtime answers with.
+const proposal = (id: string, fields: Record<string, unknown> = {}) =>
+  Schema.decodeUnknownSync(DecisionProposal)({
+    id,
+    chatId: '1',
+    kind: 'separate-work',
+    subject: 'sha',
+    payload: { type: 'thread-draft', title: 'Find flights to Kyoto in April' },
+    state: 'open',
+    probability: 0.8,
+    provider: 'cloudflare/clef',
+    createdAt: 10,
+    ...fields,
+  })
+const report = (id: string, text: string, fields: Record<string, unknown> = {}) =>
+  proposal(id, {
+    kind: 'attention-triage',
+    payload: { type: 'highlight', relayId: id.slice(10), text },
+    provider: 'rules',
+    probability: 0.6,
+    ...fields,
+  })
+const valid = Schema.decodeUnknownSync(Schema.Array(EphemeralMessage))
+const EMPTY = { conversations: [], activity: [], apps: [] }
+
+describe('decision proposals as owner-only rows', () => {
+  it('shows each open proposal in its chat with its confirm and Dismiss, oldest first', () => {
+    const rows = valid(
+      proposalMessages([
+        report('dp_report_7', 'The flat on Elm Street is available from May.', { chatId: '4', createdAt: 30 }),
+        proposal('dp_thread_1_a'),
+      ]),
+    )
+    expect(rows.map(({ id, chat }) => [id, chat])).toEqual([
+      ['dp_thread_1_a', '1'],
+      ['dp_report_7', '4'],
+    ])
+    expect(rows[0]).toMatchObject({
+      title: 'This could be a thread',
+      body: '“Find flights to Kyoto in April” looks like separate work. A new thread keeps it apart; nothing here moves.',
+      actions: [
+        { id: 'confirm', label: 'New thread', tone: 'primary' },
+        { id: 'dismiss', label: 'Dismiss', tone: 'neutral' },
+      ],
+      createdAt: 10,
+    })
+    expect(rows[0]?.afterEntry).toBeUndefined()
+    expect(rows[1]).toMatchObject({
+      title: 'A report worth your attention',
+      body: 'The flat on Elm Street is available from May.',
+      actions: [{ id: 'confirm', label: 'Useful' }, { id: 'dismiss' }],
+    })
+  })
+
+  it('quotes a long report on one line, cut with an ellipsis', () => {
+    const [row] = proposalMessages([report('dp_report_8', `Found it.\n\n${'word '.repeat(200)}`)])
+    expect(row?.body.startsWith('Found it. word word')).toBe(true)
+    expect(row?.body.endsWith('…')).toBe(true)
+    expect(row?.body).toHaveLength(280)
+    expect(row?.body).not.toContain('\n')
+  })
+
+  it('shows nothing for a settled proposal, and only the newest thread suggestion of a chat', () => {
+    const rows = proposalMessages([
+      proposal('dp_thread_1_old', { createdAt: 5 }),
+      proposal('dp_thread_1_new', { createdAt: 9 }),
+      proposal('dp_thread_2_a', { chatId: '2', createdAt: 7 }),
+      proposal('dp_thread_1_done', { state: 'confirmed', createdAt: 12 }),
+      report('dp_report_1', 'Done.', { createdAt: 3 }),
+      report('dp_report_2', 'Also done.', { createdAt: 4 }),
+      report('dp_report_3', 'Gone.', { state: 'dismissed' }),
+      report('dp_report_4', 'Old.', { state: 'stale' }),
+    ])
+    expect(rows.map(({ id }) => id)).toEqual(['dp_report_1', 'dp_report_2', 'dp_thread_2_a', 'dp_thread_1_new'])
+  })
+
+  it('reads an action as its label, and opens a thread only for a confirmed thread suggestion', () => {
+    expect(labelOf('confirm')).toBe('confirm')
+    expect(labelOf('dismiss')).toBe('dismiss')
+    expect(labelOf('accept')).toBeUndefined()
+    expect(opensThread(proposal('dp_thread_1_a', { state: 'confirmed' }))).toBe(true)
+    expect(opensThread(proposal('dp_thread_1_a'))).toBe(false)
+    expect(opensThread(proposal('dp_thread_1_a', { state: 'dismissed' }))).toBe(false)
+    expect(opensThread(report('dp_report_1', 'Done.', { state: 'confirmed' }))).toBe(false)
+  })
+})
+
+/** A stand-in for the browser's API call: notes what it was asked, then answers (or fails) as `answer` does. */
+const answering =
+  (answer: () => JsonValue, seen: [string, RequestOptions | undefined][] = []) =>
+  async (path: string, options?: RequestOptions): Promise<JsonValue> => {
+    seen.push([path, options])
+    return answer()
+  }
+
+describe('the owner label', () => {
+  it('posts the label for the proposal and gives the proposal as it is now', async () => {
+    const seen: [string, RequestOptions | undefined][] = []
+    const confirmed = proposal('dp_thread_1_a', { state: 'confirmed', decidedAt: 20 })
+    const answer = Schema.decodeUnknownSync(Schema.MutableJson)(Schema.encodeSync(DecisionProposal)(confirmed))
+    expect(
+      await sendLabel(
+        'dp_thread_1_a',
+        'confirm',
+        answering(() => answer, seen),
+      ),
+    ).toEqual(confirmed)
+    expect(seen).toEqual([['/api/decisions/dp_thread_1_a', { body: { label: 'confirm' } }]])
+  })
+
+  it('gives nothing for a proposal that is gone, settled the other way or stale, and throws on any other failure', async () => {
+    const failing = (status: number, tag: string) =>
+      answering(() => {
+        throw new ApiFailure(tag, status)
+      })
+    expect(await sendLabel('dp_report_1', 'dismiss', failing(404, 'NotFound'))).toBeUndefined()
+    expect(await sendLabel('dp_report_1', 'confirm', failing(409, 'Conflict'))).toBeUndefined()
+    await expect(sendLabel('dp_report_1', 'confirm', failing(503, 'Unavailable'))).rejects.toThrow('Unavailable')
+    await expect(
+      sendLabel(
+        'dp_report_1',
+        'confirm',
+        answering(() => ({ id: 1 })),
+      ),
+    ).rejects.toThrow()
+  })
+})
+
+describe('proposals in the workspace feed', () => {
+  it('keeps open and confirmed proposals from the snapshot, skipping one this tab cannot read', () => {
+    const snapshot = decodeSnapshot({
+      ...EMPTY,
+      proposals: [
+        report('dp_report_2', 'Later.', { createdAt: 20 }),
+        { id: 'dp_future', kind: 'brief-update' },
+        proposal('dp_thread_1_a', { state: 'confirmed' }),
+        report('dp_report_3', 'Gone.', { state: 'dismissed' }),
+      ],
+    })
+    expect(fromSnapshot(snapshot).proposals.map(({ id }) => id)).toEqual(['dp_thread_1_a', 'dp_report_2'])
+    expect(fromSnapshot(decodeSnapshot(EMPTY)).proposals).toEqual([])
+  })
+
+  it('adds a new proposal, replaces one whose state changed, and drops it once dismissed or stale', () => {
+    const start = fromSnapshot({ ...EMPTY, proposals: [proposal('dp_thread_1_a')] })
+    const added = applyChanges(
+      start,
+      decodeChanges([
+        { type: 'proposal', proposal: report('dp_report_1', 'Done.', { createdAt: 4 }) },
+        { type: 'proposal', proposal: proposal('dp_thread_1_a', { state: 'confirmed', decidedAt: 12 }) },
+      ]),
+    )
+    expect(added.proposals.map(({ id, state }) => [id, state])).toEqual([
+      ['dp_report_1', 'open'],
+      ['dp_thread_1_a', 'confirmed'],
+    ])
+    const settled = applyChanges(added, [
+      { type: 'proposal', proposal: report('dp_report_1', 'Done.', { state: 'dismissed' }) },
+      { type: 'proposal', proposal: proposal('dp_thread_1_b', { state: 'stale' }) },
+    ])
+    expect(settled.proposals.map(({ id }) => id)).toEqual(['dp_thread_1_a'])
+    expect(proposalMessages(settled.proposals)).toEqual([])
+  })
+})
