@@ -1,6 +1,6 @@
 import * as Context from 'effect/Context'
 import { DecisionAction, type DecisionLabel, type DecisionProposal } from '@goblin/contracts'
-import { and, desc, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray } from 'drizzle-orm'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Schema from 'effect/Schema'
 import { appDecisionLabels, appDecisionProposals } from '../storage/decision-schema.ts'
@@ -61,6 +61,23 @@ export class DecisionStore implements ProposalStore {
       .all()
       .map((row) => view(row).proposal)
       .toReversed()
+  }
+  /** The chat's newest context proposal confirmed at or after `since`: the earlier work the owner chose to use there. */
+  chosenContext(chat: string, since: number): DecisionProposal | undefined {
+    const row = this.#db
+      .select()
+      .from(appDecisionProposals)
+      .where(
+        and(
+          eq(appDecisionProposals.chatId, chat),
+          eq(appDecisionProposals.state, 'confirmed'),
+          eq(appDecisionProposals.kind, 'context-relevance'),
+          gte(appDecisionProposals.decidedAt, since),
+        ),
+      )
+      .orderBy(desc(appDecisionProposals.decidedAt), desc(appDecisionProposals.id))
+      .get()
+    return row === undefined ? undefined : view(row).proposal
   }
   add(proposal: DecisionProposal, fence: DecisionFence): DecisionProposal {
     const inserted = this.#db

@@ -410,4 +410,5 @@ it in `GOBLIN_MODEL_CREDIT_RATES` with `output:null`; unrelated model overrides 
 conservative app-budget estimate is not a conversion of Workers AI dollars into Token Plan Credits. A dispatched
 call with unknown usage charges its full bounded 65,536-token context; a missing binding makes no call or charge.
 Proposals are owner-confirmed only and show as "Only visible to you" rows in the shell; web unit tests cover their
-mapping, label call and feed state, not a browser run. Cross-Topic context relevance waits for the retrieval index.
+mapping, label call and feed state, not a browser run. Cross-Topic context relevance is unit-tested over a real
+transcript index in `node:sqlite` with a fake Pi source and a fake Clef; the native probe still covers the report path.

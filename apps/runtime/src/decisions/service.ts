@@ -31,15 +31,40 @@ type DecisionDeps = {
   readonly store: ProposalStore
   readonly report: (call: AuxCall) => void
 }
-const selection = (item: Judgment, answers: Answers): number | undefined => {
+/** What a judgment proposes: how sure it is, and the action (a context proposal keeps only its relevant sources). */
+type Selected = { readonly probability: number; readonly payload: DecisionAction }
+/** The frozen v4 thresholds (bench/reports/decisions-decisions-20261009-v4.md), Clef's for every judgment. */
+const THRESHOLD = { attention: 0.5107, organization: 0.7503, context: 0.594 } as const
+/** A question's answers, under its case-scoped name (a model's) or its own (the rules'). */
+const answer = (item: Judgment, answers: Answers, question: string) =>
+  answers[`${item.case.id}.${question}`] ?? answers[question]
+const sure = (distribution: Readonly<Record<string, number>> | undefined, target: string, threshold: number) => {
+  const probability = distribution?.[target] ?? 0
+  return distribution !== undefined && chosen(distribution) === target && probability >= threshold
+    ? probability
+    : undefined
+}
+/** The candidates judged relevant at the frozen threshold, in their order; none when none is. */
+function contextSelection(item: Judgment, answers: Answers): Selected | undefined {
+  if (item.case.task !== 'context-relevance' || item.payload.type !== 'context') return undefined
+  const kept = item.case.state.candidates.map((candidate) =>
+    sure(answer(item, answers, candidate.id), 'yes', THRESHOLD.context),
+  )
+  const sources = item.payload.sources.filter((_source, index) => kept[index] !== undefined)
+  const [first, ...rest] = sources
+  if (first === undefined) return undefined
+  return {
+    probability: Math.max(...kept.flatMap((probability) => (probability === undefined ? [] : [probability]))),
+    payload: { ...item.payload, sources: [first, ...rest] },
+  }
+}
+const selection = (item: Judgment, answers: Answers): Selected | undefined => {
+  if (item.case.task === 'context-relevance') return contextSelection(item, answers)
   const attention = item.case.task === 'attention-triage'
-  const distribution =
-    answers[item.case.id + (attention ? '.attention' : '.organization')] ??
-    answers[attention ? 'attention' : 'organization']
-  if (distribution === undefined) return undefined
-  const target = attention ? 'highlight' : 'suggest-thread'
-  const probability = distribution[target] ?? 0
-  return chosen(distribution) === target && probability >= (attention ? 0.5107 : 0.7503) ? probability : undefined
+  const probability = attention
+    ? sure(answer(item, answers, 'attention'), 'highlight', THRESHOLD.attention)
+    : sure(answer(item, answers, 'organization'), 'suggest-thread', THRESHOLD.organization)
+  return probability === undefined ? undefined : { probability, payload: item.payload }
 }
 const fullReservation = { input: 65_536, output: 0, cacheRead: 0, cacheWrite: 0 }
 const authorize = (deps: DecisionDeps, now: number, checkBudget = true): Effect.Effect<void, AppError> =>
@@ -59,23 +84,24 @@ const considerWith = (deps: DecisionDeps, item: Judgment) =>
     const result = local.decided
       ? { answers: local.answers, provider: 'rules' as const }
       : { answers: yield* modelAnswers(deps, item, startedAt), provider: 'cloudflare/clef' as const }
-    const probability = selection(item, result.answers)
-    if (probability === undefined) return undefined
+    const selected = selection(item, result.answers)
+    if (selected === undefined) return undefined
     const current = yield* Effect.tryPromise({ try: item.current, catch: () => new ClefError({ reason: 'format' }) })
     if (!current) return undefined
     const endedAt = yield* Clock.currentTimeMillis
     yield* authorize(deps, Math.floor(endedAt / 1000), false)
-    if (item.case.task !== 'attention-triage' && item.case.task !== 'separate-work') return undefined
+    const kind = item.case.task
+    if (kind === 'brief-update') return undefined
     return yield* Effect.sync(() =>
       deps.store.add(
         {
           id: item.id,
           chatId: item.chatId,
           subject: item.subject,
-          payload: item.payload,
-          kind: item.case.task === 'attention-triage' ? 'attention-triage' : 'separate-work',
+          payload: selected.payload,
+          kind,
           provider: result.provider,
-          probability,
+          probability: selected.probability,
           state: 'open',
           createdAt: Math.floor(endedAt / 1000),
         },

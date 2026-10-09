@@ -7,9 +7,10 @@ const DISMISS = { id: 'dismiss', label: 'Dismiss', tone: 'neutral' } as const
 const CONFIRM: Readonly<Record<DecisionProposal['payload']['type'], string>> = {
   'thread-draft': 'New thread',
   highlight: 'Useful',
+  context: 'Use',
 }
 
-/** How much of a Delegate's report the row quotes. */
+/** How much of a Delegate's report, or of an earlier chat, the row quotes. */
 const EXCERPT = 280
 
 /** `text` on one line, at most `limit` characters: a longer one is cut after a whole word, with an ellipsis. */
@@ -21,8 +22,21 @@ const excerpt = (text: string, limit: number): string => {
   return `${flat.slice(0, space > limit / 2 ? space : limit - 1).trimEnd()}…`
 }
 
+type Payload = DecisionProposal['payload']
+
+/** Where earlier work comes from, and how many more places the proposal offers. */
+function contextWords({ sources: [first, ...rest] }: Extract<Payload, { readonly type: 'context' }>) {
+  const where = first.chatTitle === undefined ? first.topicName : `${first.topicName} · ${first.chatTitle}`
+  const more = rest.length === 0 ? '' : ` And ${rest.length} more ${rest.length === 1 ? 'place' : 'places'}.`
+  return {
+    title: 'Earlier work may help here',
+    body: `From ${where}: “${excerpt(first.excerpt, EXCERPT)}”${more} Use gives goblin these excerpts with your next messages in this chat.`,
+  }
+}
+
 /** What a row says: the judgment as a title, and the evidence it was made on. */
-function words(payload: DecisionProposal['payload']): Pick<EphemeralMessage, 'title' | 'body'> {
+function words(payload: Payload): Pick<EphemeralMessage, 'title' | 'body'> {
+  if (payload.type === 'context') return contextWords(payload)
   if (payload.type === 'thread-draft')
     return {
       title: 'This could be a thread',
@@ -30,6 +44,11 @@ function words(payload: DecisionProposal['payload']): Pick<EphemeralMessage, 'ti
     }
   return { title: 'A report worth your attention', body: excerpt(payload.text, EXCERPT) }
 }
+
+/** Proposals about one exchange of a chat: a newer exchange makes an older one stale, so only the newest shows. */
+const PER_EXCHANGE: ReadonlySet<Payload['type']> = new Set(['thread-draft', 'context'])
+const exchangeKey = (proposal: DecisionProposal) =>
+  PER_EXCHANGE.has(proposal.payload.type) ? `${proposal.chatId}:${proposal.payload.type}` : undefined
 
 /** One open proposal as the owner-only row of its chat. */
 const message = (proposal: DecisionProposal): EphemeralMessage => ({
@@ -42,19 +61,22 @@ const message = (proposal: DecisionProposal): EphemeralMessage => ({
 
 /**
  * The owner-only rows the open decision proposals make, oldest first: every open report highlight, and of a chat's
- * thread suggestions only the newest (an older one judged an exchange that has moved on, and the runtime would refuse
- * it as stale). Confirmed, dismissed and stale proposals show nothing.
+ * thread and context suggestions only the newest of each (an older one judged an exchange that has moved on, and the
+ * runtime would refuse it as stale). Confirmed, dismissed and stale proposals show nothing.
  */
 export function proposalMessages(proposals: readonly DecisionProposal[]): readonly EphemeralMessage[] {
   const open = proposals.filter((proposal) => proposal.state === 'open')
-  const newestThread = new Map<string, DecisionProposal>()
+  const newest = new Map<string, DecisionProposal>()
   for (const proposal of open) {
-    if (proposal.payload.type !== 'thread-draft') continue
-    const shown = newestThread.get(proposal.chatId)
-    if (shown === undefined || shown.createdAt <= proposal.createdAt) newestThread.set(proposal.chatId, proposal)
+    const key = exchangeKey(proposal)
+    const shown = key === undefined ? undefined : newest.get(key)
+    if (key !== undefined && (shown === undefined || shown.createdAt <= proposal.createdAt)) newest.set(key, proposal)
   }
   return open
-    .filter((proposal) => proposal.payload.type !== 'thread-draft' || newestThread.get(proposal.chatId) === proposal)
+    .filter((proposal) => {
+      const key = exchangeKey(proposal)
+      return key === undefined || newest.get(key) === proposal
+    })
     .toSorted((a, b) => a.createdAt - b.createdAt)
     .map(message)
 }

@@ -7,6 +7,8 @@ import { BACKGROUND, conversationId } from '../pi/context.ts'
 import { recentMessages } from '../pi/transcript.ts'
 import { digestOf } from '../skills/verify.ts'
 import type { ChatDirectory } from '../chats/directory.ts'
+import type { TranscriptIndex } from '../retrieval/index.ts'
+import { contextCandidates, contextCase } from './context.ts'
 import type { Judgment } from './service.ts'
 import type { DecisionFence } from './store.ts'
 import type { WorkState } from './schema.ts'
@@ -27,15 +29,20 @@ export function threadTitle(text: string): string {
   return `${flat.slice(0, space > TITLE / 2 ? space : TITLE - 1).trimEnd()}…`
 }
 
-/** Only registered open owner chats and bounded ordinary prose are candidates. */
+/**
+ * Only registered open owner chats and bounded ordinary prose are candidates; cross-Topic context comes from the
+ * transcript index (ADR 0035) under its default Topic policy.
+ */
 export class DecisionSource {
   readonly #db: DrizzleSqliteDODatabase
   readonly #harness: PiHarness
   readonly #chats: ChatDirectory
-  constructor(db: DrizzleSqliteDODatabase, harness: PiHarness, chats: ChatDirectory) {
+  readonly #index: TranscriptIndex
+  constructor(db: DrizzleSqliteDODatabase, harness: PiHarness, chats: ChatDirectory, index: TranscriptIndex) {
     this.#db = db
     this.#harness = harness
     this.#chats = chats
+    this.#index = index
   }
   #ownerRow(chatId: string) {
     const row = this.#db.select().from(appConversations).where(eq(appConversations.chatId, chatId)).get()
@@ -95,28 +102,43 @@ export class DecisionSource {
         })),
     }
   }
-  async ownerYield(session: string): Promise<Judgment | undefined> {
+  /**
+   * What the owner's answered exchange is judged for: whether it could be a thread, and which earlier work in the
+   * owner's other chats could help with it. Both are fenced on the same exchange, so a newer one makes them stale.
+   */
+  async ownerYield(session: string): Promise<readonly Judgment[]> {
     const chatId = this.#chats.chatOf(session)
-    if (chatId === undefined) return undefined
-    const fence = this.#fence(chatId)
-    if (fence === undefined) return undefined
+    const fence = chatId === undefined ? undefined : this.#fence(chatId)
+    if (chatId === undefined || fence === undefined) return []
     const work = await this.#work(chatId, session)
-    if (work === undefined) return undefined
+    if (work === undefined) return []
     const evidence = await digestOf(new TextEncoder().encode(JSON.stringify(work)))
     const frozen = { ...fence, evidence }
-    return {
-      id: `dp_thread_${session}_${evidence.slice(7)}`,
+    const shared = {
       chatId,
       subject: evidence,
       ordinary: true,
       fence: frozen,
+      current: () => this.current(chatId, frozen),
+    }
+    const thread: Judgment = {
+      ...shared,
+      id: `dp_thread_${session}_${evidence.slice(7)}`,
       case: { id: 'work', task: 'separate-work', state: work },
       payload: {
         type: 'thread-draft',
         title: threadTitle(work.exchange.findLast((message) => message.role === 'owner')?.text ?? ''),
       },
-      current: () => this.current(chatId, frozen),
     }
+    const found = await contextCandidates(this.#index, session, chatId)
+    if (found === undefined) return [thread]
+    const context: Judgment = {
+      ...shared,
+      id: `dp_context_${session}_${evidence.slice(7)}`,
+      case: contextCase(found.input.text, found.sources),
+      payload: { type: 'context', inputEntry: found.input.entry, sources: found.sources },
+    }
+    return [thread, context]
   }
   async report(session: string, relayId: string, text: string, complete: boolean): Promise<Judgment | undefined> {
     const chatId = this.#chats.chatOf(session)

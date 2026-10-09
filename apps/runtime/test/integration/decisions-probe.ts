@@ -4,6 +4,8 @@ import { eq, sql } from 'drizzle-orm'
 import * as Effect from 'effect/Effect'
 import type { DecisionProposal } from '@goblin/contracts'
 import { DecisionSource } from '../../src/decisions/source.ts'
+import { TranscriptIndex, piTranscripts } from '../../src/retrieval/index.ts'
+import { nowSeconds } from '../../src/clock.ts'
 import { DecisionService } from '../../src/decisions/service.ts'
 import { DecisionStore } from '../../src/decisions/store.ts'
 import { ChatDirectory } from '../../src/chats/directory.ts'
@@ -25,7 +27,8 @@ export async function decisionsProbe(input: {
   const chats = new ChatDirectory(db)
   const session = chats.session(chats.primary())
   const store = new DecisionStore(db)
-  const source = new DecisionSource(db, input.harness, chats)
+  const index = new TranscriptIndex(db, piTranscripts(input.harness), nowSeconds)
+  const source = new DecisionSource(db, input.harness, chats, index)
   const changes: DecisionProposal[] = []
   store.onChange((proposal) => changes.push(proposal))
   let calls = 0
@@ -99,7 +102,7 @@ export async function decisionsProbe(input: {
   })
   const candidate = await source.report(session, 'native-unavailable', 'A new useful comparison.', true)
   if (candidate !== undefined) await Effect.runPromise(unavailable.consider(candidate))
-  const work = await source.ownerYield(session)
+  const [work] = await source.ownerYield(session)
   const evidenceFence = work?.fence
   const labels = db.select().from(appDecisionLabels).all()
   return {

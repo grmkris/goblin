@@ -5,7 +5,7 @@ export const appDecisionProposals = sqliteTable(
   {
     id: text('id').primaryKey().notNull(),
     chatId: text('chat_id').notNull(),
-    kind: text('kind', { enum: ['attention-triage', 'separate-work'] }).notNull(),
+    kind: text('kind', { enum: ['attention-triage', 'separate-work', 'context-relevance'] }).notNull(),
     subject: text('subject').notNull(),
     payload: text('payload').notNull(),
     state: text('state', { enum: ['open', 'confirmed', 'dismissed', 'stale'] }).notNull(),

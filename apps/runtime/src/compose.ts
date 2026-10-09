@@ -342,6 +342,7 @@ export async function composeServices(
   )
   const events = await makeEvents(input, host, resident, eventStore, cipher)
   installEventConsumers(events, channel, skills, input.pullTelegram)
+  const retrieval = new ChatRetrieval(conversations.transcripts, cheap('retrieval'), nowSeconds)
   return ManagedRuntime.make(
     Layer.mergeAll(
       agentLayer({
@@ -360,7 +361,7 @@ export async function composeServices(
         ...routineServices,
         decisions,
       }),
-      Layer.succeed(DecisionCandidates, new DecisionSource(db, harness, chats)),
+      Layer.succeed(DecisionCandidates, new DecisionSource(db, harness, chats, retrieval.index)),
       Layer.succeed(Proposals, decisionStore),
       Layer.succeed(Entitlements, input.entitlements),
       Layer.succeed(Events, events),
@@ -368,7 +369,7 @@ export async function composeServices(
       Layer.succeed(Files, new FileStore(input.storage.sql, env.FILES, () => input.userId)),
       Layer.succeed(AppEngine, input.agentApps),
       Layer.succeed(Inspect, new Inspector(new RunLedger(db), conversations.conversations, harness)),
-      Layer.succeed(Retrieval, new ChatRetrieval(conversations.transcripts, cheap('retrieval'), nowSeconds)),
+      Layer.succeed(Retrieval, retrieval),
     ),
   )
 }

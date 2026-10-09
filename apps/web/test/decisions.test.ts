@@ -27,6 +27,24 @@ const report = (id: string, text: string, fields: Record<string, unknown> = {}) 
     probability: 0.6,
     ...fields,
   })
+const source = (chat: string, excerpt: string, chatTitle?: string) => ({
+  topic: 2,
+  topicName: 'Garden',
+  chat,
+  ...(chatTitle !== undefined && { chatTitle }),
+  entryStart: 11,
+  entryEnd: 12,
+  excerpt,
+  retrievedAt: 5,
+  score: -3,
+})
+const context = (id: string, sources: readonly ReturnType<typeof source>[], fields: Record<string, unknown> = {}) =>
+  proposal(id, {
+    kind: 'context-relevance',
+    payload: { type: 'context', inputEntry: 7, sources },
+    probability: 0.9,
+    ...fields,
+  })
 const valid = Schema.decodeUnknownSync(Schema.Array(EphemeralMessage))
 const EMPTY = { conversations: [], activity: [], apps: [] }
 
@@ -86,6 +104,38 @@ describe('decision proposals as owner-only rows', () => {
     expect(rows.map(({ id }) => id)).toEqual(['dp_report_1', 'dp_report_2', 'dp_thread_2_a', 'dp_thread_1_new'])
   })
 
+  it('offers earlier work from another chat with Use, naming where it is from and how many places', () => {
+    const [one, many] = valid(
+      proposalMessages([
+        context('dp_context_1_a', [source('10', 'Raised beds need 30 cm of soil.', 'Beds')]),
+        context(
+          'dp_context_2_a',
+          [source('10', 'Tomatoes need sun.'), source('11', 'Basil too.'), source('12', 'Water.')],
+          {
+            chatId: '2',
+            createdAt: 11,
+          },
+        ),
+      ]),
+    )
+    expect(one).toMatchObject({
+      chat: '1',
+      title: 'Earlier work may help here',
+      body: 'From Garden · Beds: “Raised beds need 30 cm of soil.” Use gives goblin these excerpts with your next messages in this chat.',
+      actions: [{ id: 'confirm', label: 'Use', tone: 'primary' }, { id: 'dismiss' }],
+    })
+    expect(many?.body).toContain('From Garden: “Tomatoes need sun.” And 2 more places.')
+  })
+
+  it('shows the newest thread and context suggestion of a chat side by side', () => {
+    const rows = proposalMessages([
+      context('dp_context_1_old', [source('10', 'Old.')], { createdAt: 5 }),
+      proposal('dp_thread_1_new', { createdAt: 9 }),
+      context('dp_context_1_new', [source('10', 'New.')], { createdAt: 9 }),
+    ])
+    expect(rows.map(({ id }) => id)).toEqual(['dp_thread_1_new', 'dp_context_1_new'])
+  })
+
   it('reads an action as its label, and opens a thread only for a confirmed thread suggestion', () => {
     expect(labelOf('confirm')).toBe('confirm')
     expect(labelOf('dismiss')).toBe('dismiss')
@@ -94,6 +144,7 @@ describe('decision proposals as owner-only rows', () => {
     expect(opensThread(proposal('dp_thread_1_a'))).toBe(false)
     expect(opensThread(proposal('dp_thread_1_a', { state: 'dismissed' }))).toBe(false)
     expect(opensThread(report('dp_report_1', 'Done.', { state: 'confirmed' }))).toBe(false)
+    expect(opensThread(context('dp_context_1_a', [source('10', 'Soil.')], { state: 'confirmed' }))).toBe(false)
   })
 })
 

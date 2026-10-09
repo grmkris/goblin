@@ -751,7 +751,20 @@ older one judged an exchange that has moved on. Either button, or the row's clos
 browser's CSRF-headed request and the row goes; a gone, stale or oppositely settled proposal (404/409) stays gone, any
 other failure brings the row back. A confirmed thread suggestion then opens an empty new-thread draft in that chat's
 channel (`Navigation.newThreadWith`); nothing is sent or moved. Unit tests cover the mapping, the label call and the
-feed state (`apps/web/test/decisions.test.ts`). Cross-Topic context relevance waits for the retrieval index.
+feed state (`apps/web/test/decisions.test.ts`).
+
+Cross-Topic context relevance (`decisions/context.ts`) is the third judgment, after the same owner yield and fenced on
+the same exchange as the thread suggestion: `TranscriptIndex.latestInput` gives the owner's newest message, and after
+a bounded catch-up `index.search` (ADR 0035's default Topic policy, never the asking chat or a Persona fork) gives at
+most three candidate sources. The rules decide a case whose candidates share no word of four or more letters with the
+request (none relevant); otherwise Clef judges each candidate, and those at or above 0.594 (the v4 frozen threshold)
+become one `context` proposal carrying only them. Its row ("Earlier work may help here") quotes the first source and
+offers Use and Dismiss. Use labels it confirmed; `goblin.decisions`' `beforeRequest` hook then adds the chat's newest
+such proposal confirmed in the last day to each request as a `<chosen-context>` part of goblin's context block (quoted
+history, for that request only), and records an `auto` use (`decision:<proposal>:<entry>`) for each later owner
+message it serves, so the source strip shows under that answer. Unit tests cover candidates over a real index
+(node:sqlite), the critic's selection and rules path, and the note, its once-per-message record and its one-day expiry
+(`apps/runtime/test/decision-context.test.ts`).
 
 ## Models
 

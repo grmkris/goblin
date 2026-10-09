@@ -1,5 +1,5 @@
 import { DecisionProposal } from './decisions.ts'
-export { DecisionAction, DecisionLabel, DecisionProposal } from './decisions.ts'
+export { CONTEXT_SOURCES, DecisionAction, DecisionLabel, DecisionProposal } from './decisions.ts'
 import * as Schema from 'effect/Schema'
 import { CapabilityTarget } from './capabilities.ts'
 import { ComposerSelections } from './composer.ts'

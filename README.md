@@ -58,10 +58,10 @@ Successful background model completions stay out of problems; their failures rem
 Private error details stay in conversation inspection; logs and traces carry fixed summaries.
 
 The decisions branch evaluates ordinary Delegate reports and owner exchanges with rules, then Cloudflare Clef for
-undecided cases. It proposes a highlight or a thread draft for the owner to confirm or dismiss, keeps that label,
-and leaves chat working when decisions are unavailable. It never moves history, routes a send or grants permission.
-Each open proposal shows in its chat as an "Only visible to you" row; cross-Topic context relevance waits for the
-retrieval index. See [ADR 0031](docs/adr/0031-typed-decisions-through-workers-ai.md).
+undecided cases. It proposes a highlight, a thread draft, or earlier work from the owner's other chats for the owner
+to confirm or dismiss, keeps that label, and leaves chat working when decisions are unavailable. It never moves
+history, routes a send or grants permission. Each open proposal shows in its chat as an "Only visible to you" row. See
+[ADR 0031](docs/adr/0031-typed-decisions-through-workers-ai.md).
 
 Built on the Cloudflare Agents SDK (`PersonalAgent` Durable Object) with the native Pi harness (Pi Durable owns
 conversations and execution), Effect at service seams, Better Auth for identity, and Alchemy for infrastructure.
