@@ -80,8 +80,9 @@ primary remains chat `1` even if a future mover rebinds it (Move to thread forks
 admission records the operation and selected session in `app_chat_operations`; retries keep that session, while Pi
 continues to own transcripts, tasks, request ids and documents. A rebind is an epoch compare-and-set and closes the
 affected SSE streams so clients reconnect. The operation ledger is pruned opportunistically after 30 days. All
-services share the directory created in `layers/legacy.ts`; passive writes resolve and submit under its per-chat admission
-lock without waiting for model execution.
+services share one directory, which the legacy start makes (`layers/legacy.ts`, being retired) and the `Chats` service
+reads (`chats/service.ts`); passive writes resolve and submit under its per-chat admission lock without waiting for
+model execution.
 
 The unit suite covers lookup, replay binding, retention, ownership fencing and independent chat locks. The local
 workerd profile proves the boundary by rebinding chat `1` to a fresh non-root Pi session before service composition:
@@ -247,7 +248,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   bun run goblin turn telegram-<id>     # one turn end to end
   bun run goblin conversation 1         # main's entries, in full
   bun run goblin flows --chat 12        # how a chat's conversation moved, content-free
+  bun run goblin details --operation <id> # what happened behind one message, and its related operations
   bun run goblin logs telegram-<id>     # Workers Logs lines that mention an id
+  bun run goblin lookup 7f3a9c12        # a reference the app showed: its log lines, then its operation's details
+  bun run goblin stats --since 24h      # flow totals across every agent of the stage (Analytics Engine)
   ```
 
   Problems filter expected authority waits and confirmed automatic model retries before applying the limit. They keep
@@ -259,15 +263,23 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 
   `--origin` (or `GOBLIN_ORIGIN`) picks the stage, default `https://dev.goblin.surf`. Credentials live in
   `~/.config/goblin/credentials.json` (mode 600). The sign-in redirects to `http://127.0.0.1:18979/callback`; when the
-  browser is on another machine, paste the URL it lands on into the prompt. `goblin logs` reads Cloudflare with your
-  own `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` and the stage Worker from `/health`; the Worker never sees
-  them. `--json` prints a tool's structured result; `bun link` in `apps/cli` puts `goblin` on your path.
+  browser is on another machine, paste the URL it lands on into the prompt. `goblin logs`, `goblin lookup` and
+  `goblin stats` read Cloudflare with your own `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` and the stage
+  Worker from `/health`; the Worker never sees them. `goblin stats` queries the stage's Analytics Engine dataset
+  (`goblin-<stage>-flows`) and needs a token with Account Analytics read. `--json` prints a tool's structured result; `bun link` in `apps/cli` puts `goblin` on your path.
 
 ## Changing things
 
-- Application tables: edit `apps/runtime/src/storage/schema.ts` and append a migration to
-  `apps/runtime/src/storage/migrations.ts` (`'<14-digit timestamp>_name'`, statements joined by `--> statement-breakpoint`).
+- Application tables: edit `apps/runtime/src/storage/schema.ts` and append a migration to its area's list in
+  `apps/runtime/src/storage/migrations/` (`base.ts`, or `conversation.ts` for the conversation-operation migrations):
+  `{ key: '<14-digit timestamp>_name', tables, sql }`, statements joined by `BREAK` (`--> statement-breakpoint`).
+  `storage/migrations.ts` applies every list in key order and refuses a table that is not an application table.
   Never edit an applied migration; never touch Pi or Agents tables.
+- Owner API endpoints: add the endpoint to its area's group in `packages/contracts/src/api/` (paths are relative to
+  `/api`; `error` names the failures the endpoint itself produces), then its handler in the area's `api.ts`
+  (`http/api/groups.ts` wires every group). The owner gate admits each request first; nothing in the Worker changes.
+  Test a group by serving it alone (`OwnerHttp.serve(ownerApiOf(Group), handlers)`, `apps/runtime/test/http/api/`),
+  and call it from the web through a factory in the feature's `queries.ts` (ADR 0038).
 - Auth tables: Better Auth's schema lives in `apps/runtime/migrations` and is applied by the Alchemy D1 resource.
 - Bindings: declare them in `apps/runtime/src/env.ts` and `apps/web/alchemy.run.ts` together, and in the integration
   stacks (`apps/runtime/test/integration/*-stack.ts`, `stack.ts`) when the runtime reads them.
