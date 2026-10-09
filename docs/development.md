@@ -167,6 +167,9 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   message steers it, and its answer goes up to whoever started it with your words quoted. The sliders button by the composer shows
   what the agent can use in that conversation (connections and their tools, skills, subagents); switching something
   off there hides it from the agent in that conversation only, and a new thread starts with the switches of the conversation it came from. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
+- **Threads, Activity and Tasks.** The rail's Threads lists every thread, unread first; Activity what needs you (with
+  Undo for what Goblin organized); Tasks the Delegates, Personas and routines at work. A Persona in the sidebar opens
+  its profile: edit it (each save is a revision), archive it, or read its revisions. **Add persona** makes one.
 - **Threads from the composer, Personas and sources.** The composer's thread button (or `/new-thread`) makes the next
   send start a thread; × goes back with the draft kept. On a server with Move, a message of yours in a channel offers
   Move to thread in its toolbar. With Personas, `@` offers them; tag two or more and choose Together or In turn.
