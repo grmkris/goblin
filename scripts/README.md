@@ -64,14 +64,14 @@ owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
    `initialize` and `tools/list` with the five inspection tools, an `inspect_problems` read, an `ask_agent` model turn, an agent turn that calls the MyPlan probe through `mcp_call` (only if step 2 proved it),
    `get_recent_messages` with the smoke client's author label, then revocation and a 401;
 5. a new empty thread, a model turn there, `share_back` verified as a new `app.shared` entry in main, then close;
-6. a `smokecount` subagent spawned from main, its authored report back, and main's reply to the report;
+6. a `smokecount` subagent spawned from main and its attributed result posted back in main (a passive Delegate result, ADR 0033; with `synthesize` the report is an input main answers instead);
 7. `/api/agent/memory`: a nonzero remembered-message count and the current view coverage;
 8. an agent app (`scripts/smoke-apps.ts`): in a new thread the agent builds `smoke-counter` from exact code, the owner
    runs its schedule now and its revision moves by one, then the owner deletes it (typing its name) and the thread
    closes.
 
 Inbound turns run in main as `goblin-smoke`. The threads are archived, the app deleted and the client revoked through
-`finally` cleanup; their history and the subagent remain. If Telegram is on, main's answer to the subagent report is
+`finally` cleanup; their history and the subagent remain. If Telegram is on, main's replies are
 also queued for delivery there. Cleanup requests can themselves fail.
 
 On success the script writes `.local/smoke-<stage>-receipt.json` (mode 600) and prints it. A failure prints its reason
@@ -87,7 +87,7 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 | `inbound`                              | Initialization, inspection read, model turn, optional resident tool call, recent history and 401 after revoke. |
 | `inbound.author`                       | `ok`: the smoke user's message has author `goblin-smoke`.                                                      |
 | `thread`, `shared`                     | `ok` and `true`: the empty thread ran and wrote a new `app.shared` entry to main.                              |
-| `subagent`                             | `reported`: the report reached main and main answered it.                                                      |
+| `subagent`                             | `reported`: the Delegate's result reached main (passively, or answered when synthesis was asked for).          |
 | `memory.messages`                      | Messages logged since memory activation; must be greater than zero.                                            |
 | `memory.summarized`                    | Messages covered before the newest input by the last placed memory view; recorded without a minimum assertion. |
 | `utc`, `status`, `steps`               | Completion timestamp, `passed` and HTTP step/status pairs.                                                     |
