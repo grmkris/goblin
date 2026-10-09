@@ -20,6 +20,7 @@ export default Alchemy.Stack(
         AUTH_DB: auth,
         FILES: files,
         LOADER: Cloudflare.WorkerLoader(),
+        AI: Cloudflare.Workers.AI(),
         APP_URL: 'https://goblin.test',
         BETTER_AUTH_SECRET: 'fixture-billing-auth-secret-at-least-32-chars',
         SIGNUP_MODE: 'open',

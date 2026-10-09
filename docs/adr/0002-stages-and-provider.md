@@ -10,6 +10,10 @@ Host coding and local provider tests use CLIProxy. A public Cloudflare Worker ca
 proxy, so the user authorized public self-hosted Railway LiteLLM for Cloudflare. The dedicated `goblin-dev` key is
 limited to `gemini-3.8-flash`, a $10 budget per 30 days, and a 30-day expiry. Its master key is operator-only.
 
+[ADR 0031](0031-typed-decisions-through-workers-ai.md) records the scoped exception for typed decisions: Clef uses
+the Workers AI binding, with Credits metering and content-free telemetry. Conversations and housekeeping continue
+through the configured model plane; decision outputs remain proposals the owner confirms.
+
 Dev resources are retained for the handoff. Disposable dev fixture writes require stable operation IDs, receipts,
 readback, and cleanup instructions. There is no production deployment, message sending, or destructive cleanup.
 

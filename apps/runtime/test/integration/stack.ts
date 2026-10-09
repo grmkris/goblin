@@ -26,6 +26,7 @@ export default Alchemy.Stack(
         AUTH_DB: auth,
         FILES: files,
         LOADER: Cloudflare.WorkerLoader(),
+        AI: Cloudflare.Workers.AI(),
         LIFECYCLE: Cloudflare.DurableObject('NativeLifecycleProbe'),
         MODEL_BASE_URL: 'https://no-model-calls.invalid/v1',
         MODEL_ID: 'storage-only',

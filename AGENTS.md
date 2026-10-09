@@ -32,7 +32,9 @@ infrastructure. Read
 ## Provider and secrets
 
 - Coding agents and local runs use CLIProxy. The deployed Worker calls models through Railway LiteLLM with a
-  dedicated, model-limited, budget-capped key. Never bind the LiteLLM master key into the Worker.
+  dedicated, model-limited, budget-capped key. Typed decisions through the Workers AI `AI` binding are the scoped
+  exception in [ADR 0031](docs/adr/0031-typed-decisions-through-workers-ai.md): metered, content-free telemetry,
+  owner-confirmed proposals and no authority changes. Never bind the LiteLLM master key into the Worker.
 - Secrets live in mode-600 `.local/*.env` files and Worker secret bindings. Never print, commit, expose in browser
   bundles or persist them in transcripts, logs or docs. Outbound OAuth tokens are encrypted at rest in the Agent DO.
 - The `dev` stage is the daily instance. It holds test data only (owner, 2026-10-08), so spikes may deploy there, but

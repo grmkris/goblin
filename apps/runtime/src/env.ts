@@ -40,6 +40,7 @@ import type {
 } from '@goblin/contracts'
 import type { TranscriptMessage } from './pi/transcript.ts'
 import type { MailBinding } from './auth/mail.ts'
+import type { DecisionsBinding } from './decisions/binding.ts'
 import type { ServerSource } from './mcp/servers.ts'
 import type { EventWebhook, EventWebhookResult } from './mcp/events.ts'
 import type { Doorbell } from './channel/doorbell.ts'
@@ -215,6 +216,8 @@ export interface RuntimeEnv {
   readonly FILES: R2Bucket
   /** Dynamic Workers: every agent app release, the app transpiler and `code_run` scripts run in one (ADR 0021). */
   readonly LOADER: WorkerLoader
+  /** Workers AI for the scoped typed-decision service (ADR 0031); never used for chat generation. */
+  readonly AI?: DecisionsBinding
   readonly APP_URL: string
   readonly BETTER_AUTH_SECRET: string
   /** Cloudflare Email Sending; with `MAIL_SENDER` it turns on email verification (`auth/mail.ts`). */

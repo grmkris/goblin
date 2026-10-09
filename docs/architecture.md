@@ -723,6 +723,13 @@ workerd case `native-topics.ts` proves two Topics remember apart with each view 
 
 ## Models
 
+Typed decisions are the scoped Workers AI exception ([ADR 0031](adr/0031-typed-decisions-through-workers-ai.md)).
+Clef evaluates bounded state and questions through `AI`, after rules decide the cases they can. Calls check Credits
+first and record usage as `clef`, emit content-free `model.aux` telemetry with purpose `decision`, and hold no
+transaction or lifecycle gate across inference. Stale or unavailable results leave chat unchanged. Results remain
+owner-confirmed proposals with confirm/dismiss labels; they never grant authority, hide questions or approvals,
+reroute a send or merge transcripts.
+
 Each user picks the model their agent answers with, in the composer. The deployment offers `GOBLIN_MODEL_ID` (the
 default) plus `GOBLIN_MODELS`, all served by the same LiteLLM key; `models.ts` names and groups them by route
 (Google, Alibaba Cloud), because quota runs out per route. The pick is one row in `app_model_choice`; without one, or
@@ -966,7 +973,7 @@ meet its contract (ADR 0001). SQLite transactions are short and never span model
 
 `apps/web/alchemy.run.ts` declares the Vite Worker, the `PersonalAgent` namespace, the D1 database, the `FILES` R2
 bucket and the `LOADER` Worker Loader (Dynamic Workers, open beta, Workers Paid); it is the only deployment
-entrypoint. `scripts/stage.ts` builds `packages/app`'s toolchain before Alchemy runs. The local stage runs in workerd with CLIProxy; the dev stage calls Railway LiteLLM with a
+entrypoint. It also binds Workers AI for the scoped typed-decision service (ADR 0031). `scripts/stage.ts` builds `packages/app`'s toolchain before Alchemy runs. The local stage runs in workerd with CLIProxy; the dev stage calls Railway LiteLLM with a
 dedicated model-limited, budget-capped key. Offered models and Credit rates come from stage configuration; the per-account allowance comes from its plan or
 operator override. The key's provider caps and shared quotas are managed outside this repository; source does not prove
 their active values. Secrets are Worker secret bindings, never in the browser bundle. Every stage turns on Workers
