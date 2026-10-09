@@ -79,7 +79,9 @@ Browser conversation ids are stable logical chat ids. `ChatDirectory` resolves o
 primary remains chat `1` even when a future Move to thread operation rebinds it. Owner, inbound MCP and Telegram
 admission records the operation and selected session in `app_chat_operations`; retries keep that session, while Pi
 continues to own transcripts, tasks, request ids and documents. A rebind is an epoch compare-and-set and closes the
-affected SSE streams so clients reconnect. The operation ledger is pruned opportunistically after 30 days.
+affected SSE streams so clients reconnect. The operation ledger is pruned opportunistically after 30 days. All
+services share the directory created in `compose.ts`; passive writes resolve and submit under its per-chat admission
+lock without waiting for model execution.
 
 The unit suite covers lookup, replay binding, retention, ownership fencing and independent chat locks. The local
 workerd profile proves the boundary by rebinding chat `1` to a fresh non-root Pi session before service composition:
