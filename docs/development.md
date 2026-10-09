@@ -75,14 +75,13 @@ If a check fails, look at `git status` first. Another agent's half-finished file
 
 ## Chat identities and local proof
 
-Browser conversation ids are stable logical chat ids. `ChatReads` (`chats/directory.ts`) resolves one to its current Pi
+Browser conversation ids are stable logical chat ids. `ChatDirectory` (`chats/directory.ts`) resolves one to its current Pi
 session, and the primary remains chat `1` (nothing rebinds a chat: Move to thread forks, ADR 0034). Every input into a
 chat goes through one admission sequence (`ChatOperations.send`, `chats/operations.ts`), which records the operation's
 receipt and selected session in `app_chat_operations` (`chats/receipts.ts`); retries keep that session, while Pi
 continues to own transcripts, tasks, request ids and documents. Receipts are pruned opportunistically after 30 days.
-Admission and passive writes hold the chat's `KeyedLock` lock, and inside it the per-chat lock of the one
-`ChatDirectory` the legacy start makes (`layers/legacy.ts`, being retired), which its Promise callers still take,
-never across model execution.
+Admission and passive writes hold the chat's one lock, `KeyedLock`'s (the mover and a Topic's seed, which are Promise
+code, take it through the bridge), never across model execution.
 
 The unit suite covers lookup, receipts (a row from before them reads as `legacy`), replay binding, retention, the one
 admission sequence, flows and chat locks (`chat-receipts.test.ts`, `chats.test.ts`, `chats-service.test.ts`). The

@@ -25,8 +25,7 @@ Use the installed Effect 4 guide and declarations as the API authority. Verify t
   reporter), then the start's steps and one layer per area in the order `layers/index.ts` gives; each sees only the
   layers before it, and the start's order is the boot contract. `AgentServices` is derived from them. A stateful
   object is made once, by its start step, and shared by an instance tag in its module (never a second instance);
-  programs use the services. `layers/legacy.ts` and `services.ts` hold only the chat directory, conversation registry
-  and mover until the conversation layer makes them.
+  programs use the services.
 - Programs run through the agent's bridge (`runtime/bridge.ts`): `run` checks the plan, `local` does not, `exit`
   returns the exit. Never call `run`, `local` or `Effect.run*` inside an Effect; compose the program instead.
 - Owner API handlers are `HttpApiBuilder.group` programs in `<area>/api.ts` over the contract in

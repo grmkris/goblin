@@ -60,7 +60,7 @@
       "reviewedAt": "2026-10-09",
       "adaptation": "Explicitly adapted internal guidance: rename to effect-4, retain installed-guide/service/Schema/platform/diagnostic conventions, remove My Apps-only MCP toolkit, snapshots and storage links, and add Pi-owned state and short transaction boundaries. 2026-10-09: add goblin's runtime shape (service tags, area layers, the bridge, KeyedLock, Changes, the content-free logger and reporter, the typed owner API of ADR 0038); the start's ordered steps and instance tags. Source repository has no root LICENSE declaration; internal reuse is authorized by the implementation prompt, with no invented upstream license. Local product references renamed to goblin.",
       "copiedFileHashes": {
-        "SKILL.md": "21f392036fcc86c46204b0cee2a1e1ba94d187f800774bbd79708dfec9999079",
+        "SKILL.md": "33c2c386ac7cab681fa042b807ffdad06802b58120675cd2d0a71979333a06e4",
         "agents/openai.yaml": "1bdb008dba126619805e583db29362630561361f9684a4a769462ac1860c4535"
       }
     },

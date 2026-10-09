@@ -42,10 +42,9 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   released before model execution or waiting. `harness.wait` resolves through that operation binding. A rebind uses
   an epoch compare-and-set and closes the affected SSE streams; it does not move a running Pi turn. The application
   ledger prunes old operations opportunistically after 30 days. Passive reports, share-backs, thread-start notes,
-  memory views and subagent reports take the target chat's admission lock (`ChatOperations.passiveWrite`, or the
-  directory's `passiveWrite` under it) to resolve its current session and submit with stable Pi write request ids;
-  they start no model run. There is one directory and one lock per chat; never construct a private `ChatDirectory`
-  outside the legacy start (`layers/legacy.ts`) or tests.
+  memory views and subagent reports take the target chat's admission lock (`ChatOperations.passiveWrite`) to resolve
+  its current session and submit with stable Pi write request ids; they start no model run. There is one lock per
+  chat (`KeyedLock`); construct a `ChatDirectory` only in the conversation layer (`layers/conversation.ts`) or tests.
 - The owner queue reads `InboxDoc` for Main and ordinary threads only. Removal validates the registered conversation
   and input type, then uses native `abortSubmission(id, BACKGROUND, conversationId)`: it withdraws queued input only.
   `already_placed` means the run continues; never implement row removal with `PiHarness.abort` or Stop. Passive writes,

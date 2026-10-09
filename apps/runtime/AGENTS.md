@@ -13,8 +13,7 @@ enter the workerd bundle.
 - **Composition.** Services are `Context.Service` tags in `<area>/service.ts`, built by their area's layer in
   `layers/` over the core layer (`layers/core.ts`). `layers/index.ts` orders the start's steps, which are the boot
   contract (keep their order and every await), then the area layers. A stateful object is made once, by its start
-  step, and shared by an instance tag in its own module; programs use the services. `layers/legacy.ts` and
-  `services.ts` hold only the chat directory, conversation registry and mover until the conversation layer makes them.
+  step, and shared by an instance tag in its own module; programs use the services.
   Run programs only through the bridge (`runtime/bridge.ts`), never `run` or `local` inside an Effect.
 - **Failures and logs.** Write lines only through `observability/logger.ts`; report a failure with `reportFailure` or
   `reportAndRecover` (`observability/report.ts`); record flow steps with `FlowEvents.record`. Never content (ADR
