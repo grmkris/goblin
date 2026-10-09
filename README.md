@@ -56,9 +56,14 @@ the `goblin` CLI (`apps/cli`), and the agent answers "why did that fail?" with i
 Diagnostics focus on work needing attention; `problems --all` includes expected waits and recovered model attempts.
 Successful background model completions stay out of problems; their failures remain visible.
 Private error details stay in conversation inspection; logs and traces carry fixed summaries.
+The ledger also records how conversations move, content-free (ADR 0037): Persona answers, Delegates, Topics, organize
+Undo, routines and Telegram deliveries today. A message's Details shows what ran behind it, every failure the app
+shows quotes a reference (`… · ref 7f3a9c12`) that `goblin lookup` finds in the Worker's logs, and `goblin stats` sums
+flows across every agent of a stage from Workers Analytics Engine, under hashed agent ids.
 
 Built on the Cloudflare Agents SDK (`PersonalAgent` Durable Object) with the native Pi harness (Pi Durable owns
-conversations and execution), Effect at service seams, Better Auth for identity, and Alchemy for infrastructure.
+conversations and execution), Effect for the agent's services and its typed owner API (an Effect HttpApi each user's
+agent serves, ADR 0038), TanStack Query in the browser, Better Auth for identity, and Alchemy for infrastructure.
 
 ```sh
 bun install --frozen-lockfile
