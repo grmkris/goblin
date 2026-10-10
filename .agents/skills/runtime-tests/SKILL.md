@@ -16,11 +16,21 @@ smoke are different evidence.
   `test/http/api/fixture.ts`), and call it through the typed client. The edge's admission (origin, session, CSRF on every write,
   plan, body cap, header allowlist) is unit-tested in `test/http/api/edge.test.ts`. Integration probes reach the agent
   through `test/owner-client.ts`, the typed client over the stub's `fetch` with `x-goblin-ref`; never an RPC
-  method for an owner call. The web serves the contract in memory with `fakeHttpApi`.
+  method for an owner call. The owner stack's cases go through the real Worker as a signed-in browser
+  (`signedIn(base, person)` in `test/integration/owner-requests.ts`) with the same client; a refusal is asserted by its
+  tag (`answerOf`). Raw requests are for what the client cannot say: edge refusals, forged selectors and bodies, the
+  auth routes and the SSE streams. The web serves the contract in memory with `fakeHttpApi`.
+- Fakes are typed rather than cast to `never`: `fake<T>(members)` and `unread` (`test/fake.ts`), `executeTool` for a
+  Pi tool (`test/pi-tool.ts`), `durable(db)` and `sqliteDb(db)` for node:sqlite (`test/chats-sqlite.ts`), and
+  `stub(Tag, parts)` for a service.
 - Content-freedom is tested where lines are made: the logger never writes a message or a cause, the reporter keeps only
   stack locations (`test/observability/`), and a crash report keeps no message.
 - Integration tests boot workerd through Alchemy (`test/integration`) with a deterministic fixture model. Keep ports
   configurable; never destroy an Alchemy stack to clear a port conflict.
+- A native probe is an entry of its module's `probes` record (`probe.ts`): `inAgent` runs inside the agent over its
+  one `probe(name)` RPC method, `inWorker` in the test Worker against the agent's stub. The Worker serves them all on
+  `GET /probe/<name>?name=<agent>`, and `native.test.ts` runs the case modules' `cases` (each with its `[canary]` tag
+  where it has one) through `probeOf`. Poll with `until`/`waitFor` (`until.ts`).
 - Test grants and resident authority before any model, MCP or App call.
 - No credentials in fixtures, transcripts, logs or receipts.
 - `bun run smoke:local` and `bun run smoke:dev` prove the real paths, including inbound OAuth, without touching the
