@@ -75,9 +75,10 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
 - Pi's generation hooks may report and swallow exceptions. The pinned ToolTask's beforeTool catches a throw as a
   block, but a blocked call skips afterTool. Ask-first prepares in beforeTool and emits its terminating approval
   marker from the tool body; the body and shared dispatch seam independently recheck policy (ADR 0028).
-- Tool implementations check resident authority, the conversation's capability scope (`Capabilities.scope`) and
-  grants before any outbound call, and never hold a SQLite transaction across model or network work. Something
-  switched off returns `capabilityOffResult` (`pi/capabilities.ts`); the owner turns it on from a card.
+- Tool implementations check resident authority, the chat's scope (`Capabilities.scope`: its Topic's setup, ADR 0040)
+  and grants before any outbound call, and never hold a SQLite transaction across model or network work. Something
+  outside the scope returns `capabilityOffResult` (`pi/capabilities.ts`); outside the Topic's setup, the owner adds it
+  to the Topic from a card.
 - Events are a snapshot plus committed batches with no cursor replay.
 - Browser URLs, snapshots and SSE routes carry chat ids. Resolve them at the boundary, then use the returned Pi session
   for Pi APIs. `chatOf(session)` maps capability and task activity back to the current chat; unknown sessions fail

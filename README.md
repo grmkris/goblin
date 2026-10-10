@@ -8,9 +8,9 @@ The agent has one stable main chat (`/c/1`); it resolves to the current Pi sessi
 any depth; they can share a note back to where they came from, and Close stops one with everything under it until it is
 reopened. Main learns the name of a thread started empty, and one live feed keeps every open tab's list and activity
 current. The web app is a Slack-style shell: a moss rail and a sidebar of Topics as channels, the channel (Personal's
-is Main), and a thread panel beside it where a message's thread opens, stacking threads opened inside threads. Each conversation can switch off,
-for its own agent, connections and their tools, skills libraries and subagents; a new thread starts with main's
-switches. Background subagents work in their own conversations, start their own when a job splits, post their final
+is Main), and a thread panel beside it where a message's thread opens, stacking threads opened inside threads. Each Topic has a setup:
+the MCP servers and their tools, skills, agent apps and subagents its chats work with, everything until the owner
+chooses a list, and a Persona adds its own while it answers there. Background subagents work in their own conversations, start their own when a job splits, post their final
 answer in the conversation that started them (attributed, and not answered again unless the job asked for synthesis) and close
 when done; the owner can write to one to steer it. Personas are named, versioned agents the owner tags with `@name`: each tagged Persona
 answers once, attributed, in the same chat, and Goblin can organize Topics and Personas on request, leaving receipts the owner can undo. Every Topic's Conversation (Main is Personal's) keeps its own OptChat-style memory view: summaries of older messages followed by the

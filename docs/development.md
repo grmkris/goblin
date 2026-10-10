@@ -166,9 +166,8 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   threads) and keeps its history, and Reopen brings it back. Subagents open in the panel from their spawner's
   transcript, can start their own, and close by themselves once their answer is reported. Writing in a subagent
   keeps it open, and while it works your
-  message steers it, and its answer goes up to whoever started it with your words quoted. The sliders button by the composer shows
-  what the agent can use in that conversation (connections and their tools, skills, subagents); switching something
-  off there hides it from the agent in that conversation only, and a new thread starts with the switches of the conversation it came from. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
+  message steers it, and its answer goes up to whoever started it with your words quoted. Every chat of a Topic works
+  with the Topic's setup (its MCP servers and their tools, skills, apps and subagents; ADR 0040). Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
 - **Threads, Activity and Tasks.** The rail's Threads lists every thread, unread first; Activity what needs you (with
   Undo for what Goblin organized); Tasks the Delegates, Personas and routines at work. A Persona in the sidebar opens
   its profile: edit it (each save is a revision), archive it, or read its revisions. **Add persona** makes one.
