@@ -5,27 +5,15 @@
 Use it on any page built from reorderable sections, above all in a CMS where an editor decides the order. When two particular sections meet, the spacing between them changes on its own.
 
 ```css
-section {
-  padding-block: 6rem;
-}
+section { padding-block: 6rem; }
 
-.logos:has(+ .features) {
-  padding-block-end: 2rem;
-}
-.features:has(+ .cta) {
-  padding-block-end: 0;
-}
+.logos:has(+ .features) { padding-block-end: 2rem; }
+.features:has(+ .cta) { padding-block-end: 0; }
 
-.hero + .logos {
-  padding-block-start: 2rem;
-}
-.features + .faq {
-  padding-block-start: 3rem;
-}
+.hero + .logos { padding-block-start: 2rem; }
+.features + .faq { padding-block-start: 3rem; }
 
-.logos:where(.hero + *) {
-  border-block-start: 1px solid;
-}
+.logos:where(.hero + *) { border-block-start: 1px solid; }
 ```
 
 Rules:
@@ -50,19 +38,11 @@ Use it wherever elements sit one above another, such as form fields, the parts o
   gap: 1rem;
 }
 
-.prose > * {
-  margin-block: 0;
-}
-.prose > * + * {
-  margin-block-start: var(--flow-space, 1em);
-}
+.prose > * { margin-block: 0; }
+.prose > * + * { margin-block-start: var(--flow-space, 1em); }
 
-.prose > :is(h2, h3) {
-  --flow-space: 2em;
-}
-.prose > :is(h2, h3) + * {
-  --flow-space: 0.5em;
-}
+.prose > :is(h2, h3) { --flow-space: 2em; }
+.prose > :is(h2, h3) + * { --flow-space: 0.5em; }
 ```
 
 Rules:
@@ -86,18 +66,14 @@ Use it when one item in a flex row or column sits apart from the rest, such as t
   gap: 0.5rem;
 }
 
-.card > .actions {
-  margin-block-start: auto;
-}
+.card > .actions { margin-block-start: auto; }
 
 .toolbar {
   display: flex;
   gap: 1rem;
 }
 
-.toolbar > .account {
-  margin-inline-start: auto;
-}
+.toolbar > .account { margin-inline-start: auto; }
 
 .hero {
   display: flex;
@@ -106,9 +82,7 @@ Use it when one item in a flex row or column sits apart from the rest, such as t
   min-block-size: 100svh;
 }
 
-.hero > h1 {
-  margin-block: auto;
-}
+.hero > h1 { margin-block: auto; }
 ```
 
 Rules:
@@ -133,9 +107,7 @@ Use it wherever a rounded element sits inside a padded rounded parent, such as a
   border-radius: calc(var(--radius) + var(--pad));
 }
 
-.card > * {
-  border-radius: var(--radius);
-}
+.card > * { border-radius: var(--radius); }
 ```
 
 Rules:

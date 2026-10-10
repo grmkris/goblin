@@ -24,41 +24,27 @@ dialog::backdrop {
 }
 
 dialog[open],
-dialog[open]::backdrop {
-  opacity: 1;
-}
+dialog[open]::backdrop { opacity: 1; }
 
-[popover]:popover-open {
-  opacity: 1;
-}
+[popover]:popover-open { opacity: 1; }
 
 @starting-style {
   dialog[open],
   [popover]:popover-open,
-  dialog[open]::backdrop {
-    opacity: 0;
-  }
+  dialog[open]::backdrop { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
   dialog,
-  [popover] {
-    translate: 0 0.5rem;
-  }
+  [popover] { translate: 0 0.5rem; }
 
-  dialog[open] {
-    translate: 0 0;
-  }
+  dialog[open] { translate: 0 0; }
 
-  [popover]:popover-open {
-    translate: 0 0;
-  }
+  [popover]:popover-open { translate: 0 0; }
 
   @starting-style {
     dialog[open],
-    [popover]:popover-open {
-      translate: 0 0.5rem;
-    }
+    [popover]:popover-open { translate: 0 0.5rem; }
   }
 }
 ```
@@ -91,10 +77,7 @@ Use it for dropdown menus and other popovers opened by a click. It replaces a po
     margin: 0;
     margin-block-start: 0.5rem;
     position-area: block-end span-inline-end;
-    position-try-fallbacks:
-      flip-block,
-      flip-inline,
-      flip-block flip-inline;
+    position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
   }
 }
 ```
@@ -113,18 +96,14 @@ Support: Chrome 133, Firefox 147, Safari 26.
 Use it for FAQs and any other disclosure. `<details>` already gives you the toggle, keyboard support and find-in-page. These rules animate the open and the close with no JavaScript.
 
 ```css
-:root {
-  interpolate-size: allow-keywords;
-}
+:root { interpolate-size: allow-keywords; }
 
 details::details-content {
   height: 0;
   overflow: clip;
 }
 
-details[open]::details-content {
-  height: auto;
-}
+details[open]::details-content { height: auto; }
 
 @media (prefers-reduced-motion: no-preference) {
   details::details-content {

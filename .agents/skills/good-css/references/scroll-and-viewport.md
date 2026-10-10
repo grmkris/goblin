@@ -22,9 +22,7 @@ Use it for any horizontal row of cards. The carousel is a real scroll container,
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .carousel {
-    scroll-behavior: smooth;
-  }
+  .carousel { scroll-behavior: smooth; }
 }
 ```
 
@@ -36,24 +34,26 @@ Arrow buttons are the one part that needs a script.
 ```
 
 ```js
-const carousel = document.querySelector('.carousel')
-const [prev, next] = document.querySelectorAll('[data-carousel-dir]')
+const carousel = document.querySelector(".carousel");
+const [prev, next] = document.querySelectorAll("[data-carousel-dir]");
+const sign = getComputedStyle(carousel).direction === "rtl" ? -1 : 1;
 
 const step = (dir) => {
-  const card = carousel.firstElementChild.getBoundingClientRect().width
-  carousel.scrollBy({ left: dir * card })
-}
+  const card = carousel.firstElementChild.getBoundingClientRect().width;
+  carousel.scrollBy({ left: sign * dir * card });
+};
 
 const sync = () => {
-  const max = carousel.scrollWidth - carousel.clientWidth
-  prev.disabled = carousel.scrollLeft <= 1
-  next.disabled = carousel.scrollLeft >= max - 1
-}
+  const max = carousel.scrollWidth - carousel.clientWidth;
+  const scrolled = Math.abs(carousel.scrollLeft);
+  prev.disabled = scrolled <= 1;
+  next.disabled = scrolled >= max - 1;
+};
 
-prev.addEventListener('click', () => step(-1))
-next.addEventListener('click', () => step(1))
-carousel.addEventListener('scroll', sync, { passive: true })
-sync()
+prev.addEventListener("click", () => step(-1));
+next.addEventListener("click", () => step(1));
+carousel.addEventListener("scroll", sync, { passive: true });
+sync();
 ```
 
 Rules:
@@ -104,10 +104,7 @@ Use it on any row that may or may not fit, such as tabs, a toolbar or a table wr
 
 ```css
 @keyframes overflowing {
-  from,
-  to {
-    --fade: 2rem;
-  }
+  from, to { --fade: 2rem; }
 }
 
 .scroller {
@@ -115,7 +112,13 @@ Use it on any row that may or may not fit, such as tabs, a toolbar or a table wr
   overflow-x: auto;
   animation: overflowing linear;
   animation-timeline: scroll(self inline);
-  mask-image: linear-gradient(to right, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--fade),
+    #000 calc(100% - var(--fade)),
+    transparent
+  );
 }
 ```
 
@@ -123,31 +126,21 @@ To fade only the side that still has content, register the two lengths and give 
 
 ```css
 @property --fade-start {
-  syntax: '<length>';
+  syntax: "<length>";
   inherits: false;
   initial-value: 0px;
 }
 
 @property --fade-end {
-  syntax: '<length>';
+  syntax: "<length>";
   inherits: false;
   initial-value: 0px;
 }
 
 @keyframes edges {
-  from {
-    --fade-start: 0px;
-    --fade-end: 2rem;
-  }
-  10%,
-  90% {
-    --fade-start: 2rem;
-    --fade-end: 2rem;
-  }
-  to {
-    --fade-start: 2rem;
-    --fade-end: 0px;
-  }
+  from { --fade-start: 0px; --fade-end: 2rem; }
+  10%, 90% { --fade-start: 2rem; --fade-end: 2rem; }
+  to { --fade-start: 2rem; --fade-end: 0px; }
 }
 
 .scroller-edges {
@@ -178,14 +171,10 @@ Support: `animation-timeline` in Chrome 115 and Safari 26. Firefox has it in Nig
 Use it on any page with in-page links and a fixed or sticky header.
 
 ```css
-html {
-  scroll-padding-block-start: 5rem;
-}
+html { scroll-padding-block-start: 5rem; }
 
 @media (prefers-reduced-motion: no-preference) {
-  html {
-    scroll-behavior: smooth;
-  }
+  html { scroll-behavior: smooth; }
 }
 ```
 
@@ -201,14 +190,10 @@ Support: Chrome 69, Firefox 68, Safari 14.1.
 Use it on app-like pages with fixed UI, such as a sidebar or a sticky header. On macOS a trackpad scroll stretches the whole page past its edge and drags the fixed UI along.
 
 ```css
-html {
-  overscroll-behavior-y: none;
-}
+html { overscroll-behavior-y: none; }
 
 @media (any-pointer: coarse) {
-  html {
-    overscroll-behavior-y: auto;
-  }
+  html { overscroll-behavior-y: auto; }
 }
 ```
 
@@ -223,17 +208,11 @@ Rules:
 Use it on fixed headers, bottom bars, toasts and sheets in anything that should feel like an app on a phone. Add `viewport-fit=cover` to the viewport meta tag, then pad those elements by the safe-area insets.
 
 ```css
-.app-header {
-  padding-block-start: env(safe-area-inset-top, 0px);
-}
+.app-header { padding-block-start: env(safe-area-inset-top, 0px); }
 
-.bottom-bar {
-  padding-block-end: env(safe-area-inset-bottom, 0px);
-}
+.bottom-bar { padding-block-end: env(safe-area-inset-bottom, 0px); }
 
-.sheet {
-  padding-block-end: calc(1rem + env(safe-area-inset-bottom, 0px));
-}
+.sheet { padding-block-end: calc(1rem + env(safe-area-inset-bottom, 0px)); }
 ```
 
 Rules:

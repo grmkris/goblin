@@ -1,6 +1,6 @@
 ---
 name: good-css
-description: Write or review responsive, accessible styles using modern CSS to simplify layouts, scrolling, sizing and interaction. Use for CSS, Tailwind or component styling work.
+description: "Modern CSS techniques that replace breakpoint ladders, wrapper elements and scripts. Use when writing or reviewing the CSS or Tailwind implementation of a layout or component. Visual direction belongs to frontend-design; finish details to make-interfaces-feel-better."
 ---
 
 # Good CSS
@@ -13,7 +13,7 @@ Each technique is a set of properties and values, so it works in any authoring s
 
 These need no file.
 
-- Write `inline` and `block` properties in place of left, right, top and bottom. Tailwind has them too, as in `mbs-`, `pe-` and `inset-bs-`, so never write `mt-`, `pr-` or `top-`.
+- Write `inline` and `block` properties in place of left, right, top and bottom. Tailwind has them too, as in `mbs-`, `pe-` and `inset-bs-`, so never write `mt-`, `pr-` or `top-`. The block ones need Tailwind 4.2. Below it, write them as arbitrary properties, as in `[margin-block-start:theme(spacing.4)]`.
 - Write colors in `oklch()`, with `none` as the hue of a gray, white or black. Derive a hover, tint or transparent version with `color-mix(in oklch, …)`.
 - Put sizes that grow with the screen in one `clamp()` token.
 - Put every `:hover` rule inside `@media (hover: hover) and (pointer: fine)`.
@@ -26,16 +26,16 @@ These need no file.
 
 Each file holds entries with the CSS and its rules. The rules are the conditions the CSS needs to work, so keep all of them. Read only the files whose row matches what you are about to write. One component matches two or three, and a whole page matches most of them.
 
-| Read                                | Before you write                                                                                                                                                                                              |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `references/foundations.md`         | a reset or base stylesheet, a set of color tokens, dark mode, a type or spacing scale                                                                                                                         |
-| `references/layout.md`              | a page container or wrapper, a grid of cards, cards whose parts line up, a sidebar, a component placed in slots of different widths, overlapping layers, centered content that can overflow                   |
-| `references/spacing-and-shape.md`   | spacing between sections, elements stacked one above another, one item pushed to the far end of a row or column, nested rounded corners                                                                       |
-| `references/text-and-media.md`      | text or images that come from a user or a CMS, such as names, titles, excerpts, thumbnails, avatars and embeds, an icon next to a label, a label that looks off-center, numbers in a column                   |
-| `references/interaction.md`         | the focus, hover and press states of a button, link, input or card, a small tap target, a clickable card, form validation, a textarea, a parent styled by what it contains, page scroll locked behind a modal |
-| `references/motion.md`              | easing and duration tokens, one state change that drives several values, a shadow that changes on hover, a transition between pages, the indicator under an active tab                                        |
-| `references/show-and-hide.md`       | a dialog, popover, dropdown menu or accordion                                                                                                                                                                 |
-| `references/scroll-and-viewport.md` | a carousel, a row that may overflow, a modal body, chat list or drawer that scrolls between a header and a footer, in-page links under a sticky header, an app shell on desktop or on a phone                 |
+| Read | Before you write |
+| --- | --- |
+| `references/foundations.md` | a reset or base stylesheet, a set of color tokens, dark mode, a type or spacing scale |
+| `references/layout.md` | a page container or wrapper, a grid of cards, cards whose parts line up, a sidebar, a component placed in slots of different widths, overlapping layers, centered content that can overflow |
+| `references/spacing-and-shape.md` | spacing between sections, elements stacked one above another, one item pushed to the far end of a row or column, nested rounded corners |
+| `references/text-and-media.md` | text or images that come from a user or a CMS, such as names, titles, excerpts, thumbnails, avatars and embeds, an icon next to a label, a label that looks off-center, numbers in a column |
+| `references/interaction.md` | the focus, hover and press states of a button, link, input or card, a small tap target, a clickable card, form validation, a textarea, a parent styled by what it contains, page scroll locked behind a modal |
+| `references/motion.md` | easing and duration tokens, one state change that drives several values, a shadow that changes on hover, a transition between pages, the indicator under an active tab |
+| `references/show-and-hide.md` | a dialog, popover, dropdown menu or accordion |
+| `references/scroll-and-viewport.md` | a carousel, a row that may overflow, a modal body, chat list or drawer that scrolls between a header and a footer, in-page links under a sticky header, an app shell on desktop or on a phone |
 
 ## Left out on purpose
 

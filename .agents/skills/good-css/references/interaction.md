@@ -24,9 +24,7 @@ Use it on every `:hover` rule, so a tap on a touch screen does not leave the hov
 
 ```css
 @media (hover: hover) and (pointer: fine) {
-  .button:hover {
-    background: var(--primary-hover);
-  }
+  .button:hover { background: var(--primary-hover); }
 }
 ```
 
@@ -42,14 +40,10 @@ Support: Chrome 38, Firefox 64, Safari 9.
 Use it on every button and anything else that can be pressed.
 
 ```css
-.button:active {
-  transform: scale(0.97);
-}
+.button:active { transform: scale(0.97); }
 
 @media (prefers-reduced-motion: no-preference) {
-  .button {
-    transition: transform 160ms var(--ease-out, ease-out);
-  }
+  .button { transition: transform 160ms var(--ease-out, ease-out); }
 }
 ```
 
@@ -66,12 +60,10 @@ Support: every browser.
 Use it on icon buttons, close buttons and any target that looks smaller than 44px.
 
 ```css
-.icon-button {
-  position: relative;
-}
+.icon-button { position: relative; }
 
 .icon-button::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: min(0px, (100% - 44px) / 2);
 }
@@ -97,19 +89,15 @@ Use it for cards, list rows and tiles where the whole area should navigate. It r
 ```
 
 ```css
-.card {
-  position: relative;
-}
+.card { position: relative; }
 
 .card-link::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
 }
 
-.card-link:focus-visible {
-  outline: 2px solid transparent;
-}
+.card-link:focus-visible { outline: 2px solid transparent; }
 
 .card:has(.card-link:focus-visible) {
   outline: 2px solid currentColor;
@@ -136,22 +124,12 @@ Support: Chrome 105, Firefox 121, Safari 15.4.
 Use it wherever a script adds a class to a parent because of what it contains or what state a child is in.
 
 ```css
-article:has(img) {
-  grid-column: span 2;
-}
-h2:has(+ p) {
-  margin-block-end: 0;
-}
-form:has(:focus-visible) {
-  background: var(--surface-raised);
-}
+article:has(img) { grid-column: span 2; }
+h2:has(+ p) { margin-block-end: 0; }
+form:has(:focus-visible) { background: var(--surface-raised); }
 
-html {
-  scrollbar-gutter: stable;
-}
-html:has(dialog:modal) {
-  overflow: hidden;
-}
+html { scrollbar-gutter: stable; }
+html:has(dialog:modal) { overflow: hidden; }
 ```
 
 Rules:
@@ -167,16 +145,12 @@ Support: Chrome 105, Firefox 121, Safari 15.4.
 Use it for inline form validation, in place of blur listeners and a "touched" class.
 
 ```css
-input:user-invalid {
-  border-color: var(--danger);
-}
-input:user-valid {
-  border-color: var(--success);
-}
+input:user-invalid { border-color: var(--danger); }
+input:user-valid { border-color: var(--success); }
 ```
 
 ```html
-<input type="password" required minlength="8" />
+<input type="password" required minlength="8">
 ```
 
 Rules:
@@ -212,18 +186,16 @@ The height snaps to each new line. To animate it, wrap the textarea and let a `R
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .field {
-    transition: height 0.2s var(--ease-out, ease-out);
-  }
+  .field { transition: height 0.2s var(--ease-out, ease-out); }
 }
 ```
 
 ```js
-const textarea = document.querySelector('.field textarea')
+const textarea = document.querySelector(".field textarea");
 
 new ResizeObserver(([entry]) => {
-  textarea.parentElement.style.height = `${entry.borderBoxSize[0].blockSize}px`
-}).observe(textarea)
+  textarea.parentElement.style.height = `${entry.borderBoxSize[0].blockSize}px`;
+}).observe(textarea);
 ```
 
 Rules:

@@ -20,7 +20,8 @@
     "unresolved": "error",
   },
   "treatConfigHintsAsErrors": true,
-  "ignore": ["tools/oxlint/anti-slop/**"],
+  // Vendored agent skills (scripts, assets) are upstream files, not goblin sources.
+  "ignore": ["tools/oxlint/anti-slop/**", ".agents/skills/**"],
   // `cloudflare:workers` is a Workers runtime module (RpcTarget, WorkerEntrypoint), not a package.
   "ignoreDependencies": ["@effect/language-service", "cloudflare"],
   "workspaces": {

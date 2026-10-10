@@ -29,35 +29,19 @@ body {
   min-height: 100svh;
 }
 
-h1,
-h2,
-h3,
-h4 {
-  text-wrap: balance;
-}
+h1, h2, h3, h4 { text-wrap: balance; }
 
-img,
-svg,
-video {
+img, svg, video {
   display: block;
   max-width: 100%;
   height: auto;
 }
 
-input,
-textarea,
-select {
-  font-size: max(16px, 1rem);
-}
+input, textarea, select { font-size: max(16px, 1rem); }
 
-button,
-a,
-[role='button'] {
-  touch-action: manipulation;
-}
+button, a, [role="button"] { touch-action: manipulation; }
 
-button,
-[role='button'] {
+button, [role="button"] {
   user-select: none;
   -webkit-user-select: none;
 }
@@ -129,12 +113,8 @@ Use it on any site with a dark mode. Each token holds both values, so there is n
   --foreground: light-dark(oklch(0.145 0 none), oklch(0.985 0 none));
 }
 
-[data-theme='light'] {
-  color-scheme: light;
-}
-[data-theme='dark'] {
-  color-scheme: dark;
-}
+[data-theme="light"] { color-scheme: light; }
+[data-theme="dark"] { color-scheme: dark; }
 ```
 
 Rules:
@@ -196,18 +176,10 @@ Use it when a design has more than two or three font sizes. Six numbers describe
   --space-s-l: calc(var(--at-narrow) + 2 * var(--at-wide));
 }
 
-body {
-  font-size: var(--step-0);
-}
-h1 {
-  font-size: var(--step-4);
-}
-h2 {
-  font-size: var(--step-2);
-}
-small {
-  font-size: var(--step--1);
-}
+body { font-size: var(--step-0); }
+h1 { font-size: var(--step-4); }
+h2 { font-size: var(--step-2); }
+small { font-size: var(--step--1); }
 
 .card {
   display: grid;

@@ -5,9 +5,7 @@
 Use it on any text that comes from a user or a CMS, such as names, titles, URLs and excerpts. Decide for each one what happens when the content is longer than the design. It wraps, it is cut to one line, or it is cut to a few lines.
 
 ```css
-:root {
-  overflow-wrap: break-word;
-}
+:root { overflow-wrap: break-word; }
 
 .name {
   white-space: nowrap;
@@ -78,9 +76,7 @@ Use it on any number that changes or sits in a column, such as prices, tables, t
 ```css
 .price,
 td,
-time {
-  font-variant-numeric: tabular-nums;
-}
+time { font-variant-numeric: tabular-nums; }
 ```
 
 Rules:
@@ -108,9 +104,7 @@ Use it on single-line labels in buttons, badges and chips, so equal padding look
   padding: 0.75rem 1.25rem;
 }
 
-.button-with-icon > span {
-  text-box: trim-both cap alphabetic;
-}
+.button-with-icon > span { text-box: trim-both cap alphabetic; }
 ```
 
 Rules:

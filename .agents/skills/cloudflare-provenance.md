@@ -1,6 +1,6 @@
 # Cloudflare skill provenance and goblin precedence
 
-The generic skills `durable-objects`, `workers-best-practices`, and `wrangler` come from cloudflare/skills@b052c32bab7dd493513260228a36c88294f343f1 through the clean MyApps checkout recorded in sources.json. Each keeps its Apache-2.0 license, original SKILL.md, and every referenced file. The recorded upstream SKILL.md hashes match the copies.
+The generic skills `durable-objects`, `workers-best-practices`, and `wrangler` come from cloudflare/skills@0871daceb347e3c51693fbe9c77555468df7e410 through the clean MyApps checkout recorded in sources.json. Each keeps its Apache-2.0 license, original SKILL.md, and every referenced file. The recorded upstream SKILL.md hashes match the copies.
 
 goblin instructions take precedence over generic examples: Alchemy is the only infrastructure/deployment authority; do not create an independently maintained Wrangler stack. Use one native `PersonalAgent extends Agent` Durable Object per agent identity with SQLite. Pi Durable and PiHarness own their verified vendor storage; application Drizzle code only owns `app_*` tables. Never assume a table prefix enumerates vendor ownership. Keep initialization and application migrations idempotent and short; no lifecycle gate or transaction spans external work. Alarms/model limits and reconstruction claims require the actual pinned API and tests.
 

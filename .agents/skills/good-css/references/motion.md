@@ -6,15 +6,11 @@ Use it for every transition or animation that moves or scales something.
 
 ```css
 @media (hover: hover) and (pointer: fine) {
-  .box:hover {
-    transform: scale(1.2);
-  }
+  .box:hover { transform: scale(1.2); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .box {
-    transition: transform 300ms var(--ease-out, ease-out);
-  }
+  .box { transition: transform 300ms var(--ease-out, ease-out); }
 }
 ```
 
@@ -36,9 +32,7 @@ Use them in every transition and animation. Two easing curves, defined once, and
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
-.dropdown {
-  transition: opacity 180ms var(--ease-out);
-}
+.dropdown { transition: opacity 180ms var(--ease-out); }
 ```
 
 Rules:
@@ -57,19 +51,15 @@ Use it when one state change should drive several values together, or when a scr
 
 ```css
 @property --progress {
-  syntax: '<number>';
+  syntax: "<number>";
   inherits: true;
   initial-value: 0;
 }
 
-.card:focus-within {
-  --progress: 1;
-}
+.card:focus-within { --progress: 1; }
 
 @media (hover: hover) and (pointer: fine) {
-  .card:hover {
-    --progress: 1;
-  }
+  .card:hover { --progress: 1; }
 }
 
 .card .icon {
@@ -82,14 +72,10 @@ Use it when one state change should drive several values together, or when a scr
   scale: calc(0.25 + var(--progress) * 0.75) 1;
 }
 
-.card .more {
-  opacity: var(--progress);
-}
+.card .more { opacity: var(--progress); }
 
 @media (prefers-reduced-motion: no-preference) {
-  .card {
-    transition: --progress 0.3s var(--ease-out, ease-out);
-  }
+  .card { transition: --progress 0.3s var(--ease-out, ease-out); }
 }
 ```
 
@@ -115,7 +101,7 @@ Use it on cards that lift on hover, most of all in a grid of many cards or with 
 
 .card::before,
 .card::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
@@ -137,19 +123,13 @@ Use it on cards that lift on hover, most of all in a grid of many cards or with 
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .card:hover::before {
-    opacity: 0;
-  }
-  .card:hover::after {
-    opacity: 1;
-  }
+  .card:hover::before { opacity: 0; }
+  .card:hover::after { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .card::before,
-  .card::after {
-    transition: opacity 0.3s var(--ease-out, ease-out);
-  }
+  .card::after { transition: opacity 0.3s var(--ease-out, ease-out); }
 }
 ```
 
@@ -166,9 +146,7 @@ Support: every browser.
 Use it on any multi-page site to crossfade between pages. It replaces a client-side router or a page-transition script.
 
 ```css
-@view-transition {
-  navigation: auto;
-}
+@view-transition { navigation: auto; }
 ```
 
 Rules:
@@ -193,21 +171,17 @@ Use it for the underline on a tab row or the bar beside a side nav. It replaces 
 ```
 
 ```css
-.tabs {
-  anchor-scope: --active;
-}
+.tabs { anchor-scope: --active; }
 
 .tabs ul {
   position: relative;
   display: flex;
 }
 
-.tabs [aria-current='page'] {
-  anchor-name: --active;
-}
+.tabs [aria-current="page"] { anchor-name: --active; }
 
 .tabs ul::after {
-  content: '';
+  content: "";
   position: absolute;
   position-anchor: --active;
   inset-block-end: 0;

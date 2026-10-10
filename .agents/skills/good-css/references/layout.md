@@ -25,12 +25,8 @@ The container defines three nested widths with named grid lines:
 Each child picks a width with `grid-column`. Content is the default:
 
 ```css
-:is(.content-grid, .full-width) > * {
-  grid-column: content;
-}
-:is(.content-grid, .full-width) > .breakout {
-  grid-column: breakout;
-}
+:is(.content-grid, .full-width) > * { grid-column: content; }
+:is(.content-grid, .full-width) > .breakout { grid-column: breakout; }
 :is(.content-grid, .full-width) > .full-width {
   grid-column: full-width;
   display: grid;
@@ -127,13 +123,9 @@ Support: Chrome 84, Firefox 63, Safari 14.1.
 Use it for any component that appears in slots of different widths. The component responds to the space it is given, where a media query only knows the viewport.
 
 ```css
-.slot {
-  container-type: inline-size;
-}
+.slot { container-type: inline-size; }
 
-.card h2 {
-  font-size: clamp(1.25rem, 1rem + 2cqi, 2rem);
-}
+.card h2 { font-size: clamp(1.25rem, 1rem + 2cqi, 2rem); }
 
 @container (width > 30rem) {
   .card {
@@ -159,19 +151,11 @@ Support: Chrome 105, Firefox 110, Safari 16.
 Use it whenever things sit on top of each other, such as text over an image, a badge on a card, or two icons that swap. It replaces `position: absolute` with its offsets, sizes and transforms.
 
 ```css
-.stack {
-  display: grid;
-}
-.stack > * {
-  grid-area: 1 / 1;
-}
+.stack { display: grid; }
+.stack > * { grid-area: 1 / 1; }
 
-.stack > .title {
-  place-self: center;
-}
-.stack > .badge {
-  place-self: start end;
-}
+.stack > .title { place-self: center; }
+.stack > .badge { place-self: start end; }
 ```
 
 Rules:
@@ -203,9 +187,7 @@ Support: Chrome 115, Firefox 63, Safari 17.6.
 Use it whenever you want to cut off overflow and do not need scrolling.
 
 ```css
-.hero {
-  overflow-x: clip;
-}
+.hero { overflow-x: clip; }
 ```
 
 Rules:

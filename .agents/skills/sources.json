@@ -1,238 +1,291 @@
 {
-  "version": 1,
-  "reviewedAt": "2026-10-08",
+  "version": 2,
   "skills": {
-    "durable-objects": {
+    "agents-sdk": {
       "repository": "cloudflare/skills",
-      "commit": "b052c32bab7dd493513260228a36c88294f343f1",
-      "path": "skills/durable-objects",
-      "sourceSha256": "bd2ef83fd539c9a33d2baefae7ed5bd6ae1bdeb234f14452cdcbee50414d1a7c",
-      "licenses": ["LICENSE"],
-      "unchanged": true,
-      "adaptation": "Upstream SKILL.md, referenced files, and Apache-2.0 LICENSE copied unchanged through clean grmkris/myapps@54259fdd5a2560d2595167d7ff0650826a039102. Added client metadata; goblin precedence lives in cloudflare-provenance.md. Local product references renamed to goblin.",
-      "copiedFileHashes": {
-        "LICENSE": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
-        "SKILL.md": "bd2ef83fd539c9a33d2baefae7ed5bd6ae1bdeb234f14452cdcbee50414d1a7c",
-        "agents/openai.yaml": "8114766f4f48165385d2a64c932fd52cfcc79bad92f3952a1a4accbbb6b63e39",
-        "references/rules.md": "a656c41eb3bfa57b9b836de880e4fdf79368f1db4e0b63b2fc7a7c75d05ae651",
-        "references/workers.md": "3149c3ee371b5dbf3a84dac7d5bb42c4c6553762480741f6d2808e4ca20fd932",
-        "references/testing.md": "9859a9fa5bba915290ab671c1a9af7c067e52d126a8b18e2a869557b369e184c"
-      }
-    },
-    "workers-best-practices": {
-      "repository": "cloudflare/skills",
-      "commit": "b052c32bab7dd493513260228a36c88294f343f1",
-      "path": "skills/workers-best-practices",
-      "sourceSha256": "8406eabf6375a3e79c77b951d00f3996f4c703c1a852579c38b171188bd19f1f",
-      "licenses": ["LICENSE"],
-      "unchanged": true,
-      "adaptation": "Upstream SKILL.md, referenced files, and Apache-2.0 LICENSE copied unchanged through clean grmkris/myapps@54259fdd5a2560d2595167d7ff0650826a039102. Added client metadata; goblin precedence lives in cloudflare-provenance.md. Local product references renamed to goblin.",
-      "copiedFileHashes": {
-        "LICENSE": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
-        "SKILL.md": "8406eabf6375a3e79c77b951d00f3996f4c703c1a852579c38b171188bd19f1f",
-        "agents/openai.yaml": "60477138946aff30617d650b4577c896db5fdf1b646ca634f39342c20f3f63b5",
-        "references/platform-apis.md": "85b9d24b2870767f9875fb148dbeb153ef61f89030bc55043c279fe584501240",
-        "references/runtime-patterns.md": "152cb5456359755ebaf0ff5343e60daed8e8fdc056453c430a1e9120e37da870",
-        "references/configuration.md": "a9ae6018d514324159aabd25004e7f80b69df694c850bce97f7b68e30a72a73e"
-      }
-    },
-    "wrangler": {
-      "repository": "cloudflare/skills",
-      "commit": "b052c32bab7dd493513260228a36c88294f343f1",
-      "path": "skills/wrangler",
-      "sourceSha256": "bb0cbafd6083bd35e904941aff83264fd6edef8814ba1d629bdc55292b16ef50",
-      "licenses": ["LICENSE"],
-      "unchanged": true,
-      "adaptation": "Upstream SKILL.md, referenced files, and Apache-2.0 LICENSE copied unchanged through clean grmkris/myapps@54259fdd5a2560d2595167d7ff0650826a039102. Added client metadata; goblin precedence lives in cloudflare-provenance.md. Local product references renamed to goblin.",
-      "copiedFileHashes": {
-        "LICENSE": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
-        "SKILL.md": "bb0cbafd6083bd35e904941aff83264fd6edef8814ba1d629bdc55292b16ef50",
-        "agents/openai.yaml": "518a440659e0be792a4c1bf46ed0b1c9a25699bad3782834001b577b086f473f"
-      }
-    },
-    "effect-4": {
-      "repository": "grmkris/myapps",
-      "commit": "54259fdd5a2560d2595167d7ff0650826a039102",
-      "path": ".agents/skills/effect-in-myapps",
-      "sourceSha256": "2c3541cf289010370ed35df03398c6406d7c170f1b466ee940135b64520a94d3",
-      "licenses": [],
-      "unchanged": false,
-      "reviewedAt": "2026-10-09",
-      "adaptation": "Explicitly adapted internal guidance: rename to effect-4, retain installed-guide/service/Schema/platform/diagnostic conventions, remove My Apps-only MCP toolkit, snapshots and storage links, and add Pi-owned state and short transaction boundaries. 2026-10-09: add goblin's runtime shape (service tags, area layers, the bridge, KeyedLock, Changes, the content-free logger and reporter, the typed owner API of ADR 0038); the start's ordered steps and instance tags. Source repository has no root LICENSE declaration; internal reuse is authorized by the implementation prompt, with no invented upstream license. Local product references renamed to goblin.",
-      "copiedFileHashes": {
-        "SKILL.md": "33c2c386ac7cab681fa042b807ffdad06802b58120675cd2d0a71979333a06e4",
-        "agents/openai.yaml": "1bdb008dba126619805e583db29362630561361f9684a4a769462ac1860c4535"
-      }
+      "commit": "0871daceb347e3c51693fbe9c77555468df7e410",
+      "path": "skills/agents-sdk",
+      "license": "Apache-2.0",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "b837d1266601b96f10cc2e16f8d9e38f192d89698986208979dc6c826ad0d15e",
+      "localTreeSha256": "b837d1266601b96f10cc2e16f8d9e38f192d89698986208979dc6c826ad0d15e",
+      "unchanged": true
     },
     "animate": {
       "repository": "emilkowalski/skills",
       "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
       "path": "skills/animate",
-      "sourceSha256": "b8ede161270458e6ae2e45e8a1985373515d4c63de5568ddb0f9012d7634356c",
-      "licenses": ["LICENSE"],
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "cad4cbda82810bbd771af0c636015ceab28a89460f619d48332709cc370a57c4",
+      "localTreeSha256": "585419279f9b7cd085f67d961158ab8413be20a57b1c78ced831db3cbe044685",
       "unchanged": false,
-      "reviewedAt": "2026-10-08",
-      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
-      "copiedFileHashes": {
-        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
-        "RECIPES.md": "fca232fcb4b692e59270799ea8a43d417041ededdd1369b51e07bef8d94c3451",
-        "SKILL.md": "a7638eaf0ad934f595b2d8a6cda9a0c37b654cc79240bd3d322111e43b46e249"
-      }
+      "adaptation": "Cross-reference points at find-animation-opportunities (improve-animations is not in the shared set).",
+      "baseCommit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d"
     },
     "animation-vocabulary": {
       "repository": "emilkowalski/skills",
       "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
       "path": "skills/animation-vocabulary",
-      "sourceSha256": "40d2b27adfdfeb0570a9f20e7d0255109d9233c50603878bcd0dcd04c923fd94",
-      "licenses": ["LICENSE"],
-      "unchanged": false,
-      "reviewedAt": "2026-10-08",
-      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
-      "copiedFileHashes": {
-        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
-        "SKILL.md": "3f41b86097d9887830c6556522738d50c1b77bde7d949506809cef021a5c4015"
-      }
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "e8f2f403dff9e422b11c420d78bac0ed82c999cf7f56ef75745c9e8c548ec142",
+      "localTreeSha256": "e8f2f403dff9e422b11c420d78bac0ed82c999cf7f56ef75745c9e8c548ec142",
+      "unchanged": true
     },
     "apple-design": {
       "repository": "emilkowalski/skills",
       "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
       "path": "skills/apple-design",
-      "sourceSha256": "77bb63b7043bb93aca2ff4ab040c249484eef35682bb6ff7163433c31d30adc7",
-      "licenses": ["LICENSE"],
-      "unchanged": false,
-      "reviewedAt": "2026-10-08",
-      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
-      "copiedFileHashes": {
-        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
-        "SKILL.md": "985fa2cc91343d918b52fbf9165f9058e8b42c4c2bf628c6b1b112f4468d0529"
-      }
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "17d56c00b870b03bfcfe83e603a47f81e01c48937105c5850be5f4a748b213e2",
+      "localTreeSha256": "17d56c00b870b03bfcfe83e603a47f81e01c48937105c5850be5f4a748b213e2",
+      "unchanged": true
+    },
+    "apple-web-app": {
+      "repository": "joe-bell/skills",
+      "commit": "2eb6b5da2ff003abf428255599d002047312b815",
+      "path": "skills/apple-web-app",
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "614619e9f53f261d4d714ff9853ace03a00f2654955f693c77c4f89a7d9e972c",
+      "localTreeSha256": "614619e9f53f261d4d714ff9853ace03a00f2654955f693c77c4f89a7d9e972c",
+      "unchanged": true
     },
     "break-ui": {
       "repository": "emilkowalski/skills",
       "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
       "path": "skills/break-ui",
-      "sourceSha256": "e7eec1d70ac56a04255e9c0dbe98084ea3d544cc04aaad34f32c95d6fa9dff5e",
-      "licenses": ["LICENSE"],
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "c1c67d8e5bf7431ea78226e4c2558908a0aea7bbfa558736063227bb37d91690",
+      "localTreeSha256": "4f983a943048d604ff1e13cff680e7cbc3940520680e74c67b9d6538cefd3048",
       "unchanged": false,
-      "reviewedAt": "2026-10-08",
-      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
-      "copiedFileHashes": {
-        "CATALOG.md": "c7f13e91c868a0254f1623881c2d469eb263e36db405216770d42971a61f707f",
-        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
-        "SKILL.md": "8e407aa5b8fae64b4fdec30c38e4f0f7ee74fc46f52fb5913ec4b94df3de2792"
-      }
+      "adaptation": "Made manual-only (disable-model-invocation: true). agents/openai.yaml added so Codex also treats it as manual-only.",
+      "baseCommit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d"
     },
-    "emil-design-eng": {
-      "repository": "emilkowalski/skills",
-      "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
-      "path": "skills/emil-design-eng",
-      "sourceSha256": "ffbe68e6007fb42cb8149f089b400a1ca007d59ba23e8948e2be4476f3175939",
-      "licenses": ["LICENSE"],
+    "domain-modeling": {
+      "repository": "mattpocock/skills",
+      "commit": "49dd158d1076134a641b33efb035946536778336",
+      "path": "skills/engineering/domain-modeling",
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "45bcb33893d56d32d760599a706a731e9281e595092740179755608127efdef6",
+      "localTreeSha256": "45bcb33893d56d32d760599a706a731e9281e595092740179755608127efdef6",
+      "unchanged": true
+    },
+    "durable-objects": {
+      "repository": "cloudflare/skills",
+      "commit": "0871daceb347e3c51693fbe9c77555468df7e410",
+      "path": "skills/durable-objects",
+      "license": "Apache-2.0",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "57d6553178ac88801def139889b4932af574dbb3db0f7949f3b8bf45b3d7335d",
+      "localTreeSha256": "57d6553178ac88801def139889b4932af574dbb3db0f7949f3b8bf45b3d7335d",
+      "unchanged": true
+    },
+    "effect-4": {
+      "repository": "grmkris/myapps",
+      "commit": "54259fdd5a2560d2595167d7ff0650826a039102",
+      "path": ".agents/skills/effect-in-myapps",
+      "license": "LicenseRef-grmkris-private",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "24b1dc8293bf6377506c4af656da159563c482c62b0177345408cc450aa5c513",
+      "localTreeSha256": "a4bc09e731208f8dce3e8802e34ae0035238311b9c293ea2af1267f2b018b3b5",
       "unchanged": false,
-      "reviewedAt": "2026-10-08",
-      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting.",
-      "copiedFileHashes": {
-        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
-        "SKILL.md": "ce45b35be1cdeb431b682bae547ded7faa9d81e65992d4b1a8a3a536d1b22491"
-      }
+      "adaptation": "Explicitly adapted internal guidance: rename to effect-4, retain installed-guide/service/Schema/platform/diagnostic conventions, remove My Apps-only MCP toolkit, snapshots and storage links, and add Pi-owned state and short transaction boundaries. 2026-10-09: add goblin's runtime shape (service tags, area layers, the bridge, KeyedLock, Changes, the content-free logger and reporter, the typed owner API of ADR 0038); the start's ordered steps and instance tags. Source repository has no root LICENSE declaration; internal reuse is authorized by the implementation prompt, with no invented upstream license. Local product references renamed to goblin. LICENSE note added (private same-owner source).",
+      "baseCommit": "54259fdd5a2560d2595167d7ff0650826a039102"
     },
     "find-animation-opportunities": {
       "repository": "emilkowalski/skills",
       "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
       "path": "skills/find-animation-opportunities",
-      "sourceSha256": "d52a377819b84a71930f0c822cfe2849f40301605a2d5c7eccbfa3b257700df2",
-      "licenses": ["LICENSE"],
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "d9225e049ebfc4dab5eac71fc2c6994eb1d340475b105808cdbc9ef3a3cec426",
+      "localTreeSha256": "4450c9a13e17417f2a2d8e4dae8b4cf67d8e6bd9fe9e2364bc380d7b0b80abe2",
       "unchanged": false,
-      "reviewedAt": "2026-10-08",
-      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
-      "copiedFileHashes": {
-        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
-        "SKILL.md": "d84282abf4b1e4587f601caea2c8644840c0c19f4ddd90db105022845dd0b568"
-      }
+      "adaptation": "Cross-reference points at review-animations only (improve-animations is not in the shared set).",
+      "baseCommit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d"
     },
-    "improve-animations": {
-      "repository": "emilkowalski/skills",
-      "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
-      "path": "skills/improve-animations",
-      "sourceSha256": "73962447464433476343e2c12cd08ab39cc99a9e5f3c118c5fb54ed897574ef6",
-      "licenses": ["LICENSE"],
+    "frontend-design": {
+      "repository": "anthropics/skills",
+      "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+      "path": "skills/frontend-design",
+      "license": "Apache-2.0",
+      "licenses": [
+        "LICENSE.txt"
+      ],
+      "treeSha256": "7e9c2af00fd5b3144f49ce6fb1b16037b392ab9c2f049423b0b6114d99381ba2",
+      "localTreeSha256": "7e9c2af00fd5b3144f49ce6fb1b16037b392ab9c2f049423b0b6114d99381ba2",
+      "unchanged": true
+    },
+    "good-css": {
+      "repository": "vojtaholik/good-css",
+      "commit": "b645ab15b9fcd059c0227c21b6a144bb70639f1a",
+      "path": "skills/good-css",
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "c2a7a6b2a292b775cd700bfe8440ea07df308ae5bd379f8a037cf6d795f7b2d4",
+      "localTreeSha256": "20af66f79b57c1c1319056092bca631d4ff89a42fc7aac755881508b1606ac3a",
       "unchanged": false,
-      "reviewedAt": "2026-10-08",
-      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
-      "copiedFileHashes": {
-        "AUDIT.md": "1309fb360bc1cc636a415e4526dba09e83bb4030cef8b6dac0d75cb8d7855bf3",
-        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
-        "PLAN-TEMPLATE.md": "6a893aa723482a9cae953558e076c796cf5fda91a67d1482b2bc42f9234c5018",
-        "SKILL.md": "3f4db51e2fe911c9bd4fceb95c8d60ca096665230a1f209502d0fc00c1a83ea1"
-      }
+      "adaptation": "Description narrowed to CSS implementation; direction and finish deferred to frontend-design and make-interfaces-feel-better.",
+      "baseCommit": "b645ab15b9fcd059c0227c21b6a144bb70639f1a"
+    },
+    "grilling": {
+      "repository": "mattpocock/skills",
+      "commit": "49dd158d1076134a641b33efb035946536778336",
+      "path": "skills/productivity/grilling",
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "714b8c4d1544298615f0647b237e7ea13c6940c302417c51571ca77ba5161dad",
+      "localTreeSha256": "714b8c4d1544298615f0647b237e7ea13c6940c302417c51571ca77ba5161dad",
+      "unchanged": true
+    },
+    "make-interfaces-feel-better": {
+      "repository": "jakubkrehel/make-interfaces-feel-better",
+      "commit": "35545ea1512ad59fa463e6b1f95ca9c052981fe6",
+      "path": "skills/make-interfaces-feel-better",
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "a38394c031e268bf8d7d05ff6f742baf1787395692bedf76f07cef911c472bcb",
+      "localTreeSha256": "3fd67c0f8a5f0d5777331755f0c6d08745e50aa247b09dd34f29438d597f1853",
+      "unchanged": false,
+      "adaptation": "Description narrowed to static polish; motion and visual direction deferred to animate/apple-design and frontend-design (no overlap in the shared set).",
+      "baseCommit": "35545ea1512ad59fa463e6b1f95ca9c052981fe6"
     },
     "mobile-native": {
       "repository": "emilkowalski/skills",
       "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
       "path": "skills/mobile-native",
-      "sourceSha256": "888b7651d66d66dbac4e72b7c554638eb19bd971d686d6cbdf030a5ef3788f55",
-      "licenses": ["LICENSE"],
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "e09d6a584beac50f1f52be3c80164e1935ca0694f9e93fcb6893b564c7ce1d44",
+      "localTreeSha256": "1f4c18339885d3a74329fb24a2daec840726a9d30ce473aa548dbc7776bf6710",
       "unchanged": false,
-      "reviewedAt": "2026-10-08",
-      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
-      "copiedFileHashes": {
-        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
-        "SKILL.md": "bd28c19403bc7756c5a479d9b309d8cbf2a8ed723059b23144314482fae811d5"
-      }
-    },
-    "prototype": {
-      "repository": "emilkowalski/skills",
-      "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
-      "path": "skills/prototype",
-      "sourceSha256": "bba39c955eb1871c5a02733976ceec5d0324198e0812e667604756489c89f7b9",
-      "licenses": ["LICENSE"],
-      "unchanged": false,
-      "reviewedAt": "2026-10-08",
-      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery. Added Codex invocation metadata matching upstream Claude manual-only policy.",
-      "copiedFileHashes": {
-        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
-        "PICKER.md": "8c9042ad5633c8024dc74d11f47d11d97a6ad6ff662961c34b1f999d60efa1bb",
-        "SKILL.md": "63d8a023b907fa088675d5db97ed98d960f0d63c035774de5a66bd1b13ef1f49",
-        "agents/openai.yaml": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94"
-      }
+      "adaptation": "Description narrowed to general touch/mobile web; Apple and Safari specifics deferred to apple-web-app.",
+      "baseCommit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d"
     },
     "review-animations": {
       "repository": "emilkowalski/skills",
       "commit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d",
       "path": "skills/review-animations",
-      "sourceSha256": "6ff590d29e436766135aa3d137be1fac2a867165c7257fc315b189361f1873af",
-      "licenses": ["LICENSE"],
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "42e71687b56e255eb085d668506e12ac0a067c19a6f19088ee45fd6b419c14a3",
+      "localTreeSha256": "4b44ce5f57154df18a336fdd5df169834eb04113d6c5f1ea39a39765b7e6e71b",
       "unchanged": false,
-      "reviewedAt": "2026-10-08",
-      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Added Codex invocation metadata matching upstream Claude manual-only policy.",
-      "copiedFileHashes": {
-        "LICENSE": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
-        "SKILL.md": "17b51e9068616396d9140b140da4b748ebcc91310905deffe56fea0ee9b7454e",
-        "STANDARDS.md": "670125153cb4349e79a7f9609c48f156e8fb55dee65fceea0c6853c4b4b1feb4",
-        "agents/openai.yaml": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94"
-      }
+      "adaptation": "agents/openai.yaml added so Codex also treats it as manual-only.",
+      "baseCommit": "e8a175de22ae1e49370fc144c1f3bb9aeedf988d"
     },
-    "good-css": {
-      "repository": "vojtaholik/good-css",
-      "commit": "3e7c9a5790311ca520c7cb3d2237f6e7beac1eb7",
-      "path": "skills/good-css",
-      "sourceSha256": "5958eb7629b3029b98e2890fb662ab805b909c76426e4c5c7ae952bdac574ecc",
-      "licenses": ["LICENSE"],
+    "shadcn": {
+      "repository": "shadcn-ui/ui",
+      "commit": "2d3f1cd436b18ea12f24130de4df781355925b08",
+      "path": "skills/shadcn",
+      "license": "MIT",
+      "licenses": [
+        "LICENSE.md"
+      ],
+      "treeSha256": "baa5d621c794745ae8295f478cfacdcc1f89e2f49b435f5afc236031b03819ed",
+      "localTreeSha256": "baa5d621c794745ae8295f478cfacdcc1f89e2f49b435f5afc236031b03819ed",
+      "unchanged": true
+    },
+    "thermo-nuclear-code-quality-review": {
+      "repository": "cursor/plugins",
+      "commit": "ccb5507cec1546dc88135c1139c811e6c59115ba",
+      "path": "thermos/skills/thermo-nuclear-code-quality-review",
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "b92ba8ebcf36f421a22a6af2972325d4e8b56ee397ca7de6734f84806050dbb4",
+      "localTreeSha256": "dce8793eba43c2e18caa103e747f44205d41462c0a9e5eac469dbab277dedd11",
       "unchanged": false,
-      "reviewedAt": "2026-10-08",
-      "adaptation": "Formatted Markdown and code examples for repository conventions; instruction bodies match the pinned source after formatting. Shortened the frontmatter description for repository discovery.",
-      "copiedFileHashes": {
-        "LICENSE": "dcdeb88707627233bbc76f69febd77ef78a665424a0e0194b3416a473d33cede",
-        "SKILL.md": "014559a5f403b325155355681712f12c22874dc7896421fc6c29bc89fe58bd30",
-        "references/foundations.md": "27e24ef467798d90878db34eb59528c9ee38b5c20718711365caa73d20bb3885",
-        "references/interaction.md": "a70e7955e730a4fa4f269bc51a09310f3ddf96b8ba6cb42ac079644b77af8b85",
-        "references/layout.md": "cb7d22386587427f37cad491d84dc697a48bc527d2f709396e33e927f37099b9",
-        "references/motion.md": "e3d704a4036d2cbd4a5ccaed245c682ca18135cfb714ff6664138410399cd37c",
-        "references/scroll-and-viewport.md": "2183c3a272f36a11b1256ffb806957aa857fdf27c0bfe2d75bb5dbff178f9142",
-        "references/show-and-hide.md": "2705edcbca3c19dfd3c8c3b330cbf4e1d6feac000d0e3dc3f74b25fc6bafa74d",
-        "references/spacing-and-shape.md": "d7e0413b3aff8af5d4b07c338b87e26b362a4384e4a5928e83cbf90ca8026091",
-        "references/text-and-media.md": "ad457afbd0b56aae19556c336a55389ae623a868d3924c766bc12e4c18ce674b"
-      }
+      "adaptation": "agents/openai.yaml added so Codex also treats it as manual-only.",
+      "baseCommit": "ccb5507cec1546dc88135c1139c811e6c59115ba"
+    },
+    "thermo-nuclear-review": {
+      "repository": "cursor/plugins",
+      "commit": "ccb5507cec1546dc88135c1139c811e6c59115ba",
+      "path": "thermos/skills/thermo-nuclear-review",
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "6555687f1bffa96a3cd813aa7e94707d4aec98465c1184c3d12fbfd034bfc3f0",
+      "localTreeSha256": "6e28f1a80f415ec4c2db5942d1331343f796e48300f3bd64c1c66cac12a0d694",
+      "unchanged": false,
+      "adaptation": "agents/openai.yaml added so Codex also treats it as manual-only.",
+      "baseCommit": "ccb5507cec1546dc88135c1139c811e6c59115ba"
+    },
+    "unslop": {
+      "repository": "cursor/plugins",
+      "commit": "ccb5507cec1546dc88135c1139c811e6c59115ba",
+      "path": "pstack/skills/unslop",
+      "license": "MIT",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "8ccc1d0bebf98bb77486238ca07d7dc7fba9b467aef3ad49477aa64cbcef89aa",
+      "localTreeSha256": "a3acfd72b95b3dce0feb5cfde79797526ece9270f46bdcfac1139f8ed74b704e",
+      "unchanged": false,
+      "adaptation": "Description scoped to prose; upstream 'Must always apply' contradicts its manual-only flag (cursor/plugins#308, #367). agents/openai.yaml added so Codex also treats it as manual-only.",
+      "baseCommit": "ccb5507cec1546dc88135c1139c811e6c59115ba"
+    },
+    "workers-best-practices": {
+      "repository": "cloudflare/skills",
+      "commit": "0871daceb347e3c51693fbe9c77555468df7e410",
+      "path": "skills/workers-best-practices",
+      "license": "Apache-2.0",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "d5490ccefce4c472ec34b7d78218e358ed2a5d659a6950f79c084b38c2dc1349",
+      "localTreeSha256": "d5490ccefce4c472ec34b7d78218e358ed2a5d659a6950f79c084b38c2dc1349",
+      "unchanged": true
+    },
+    "wrangler": {
+      "repository": "cloudflare/skills",
+      "commit": "0871daceb347e3c51693fbe9c77555468df7e410",
+      "path": "skills/wrangler",
+      "license": "Apache-2.0",
+      "licenses": [
+        "LICENSE"
+      ],
+      "treeSha256": "1e707db60202e48cdd03b2456b85580b03b713d7a2bc2c459fce8d37e2ea28f2",
+      "localTreeSha256": "1e707db60202e48cdd03b2456b85580b03b713d7a2bc2c459fce8d37e2ea28f2",
+      "unchanged": true
     }
   }
 }
