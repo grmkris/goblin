@@ -20,8 +20,8 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
 - Agent apps (ADR 0021) are the exception that is live: `settings.extensions` is a getter over the defaults plus the
   apps' extensions (`pi/harness.ts`), read at every use, so `registry.install` of an app's extension is offered from
   the next model request. Never add one per conversation with `configure({ extensions: { add } })`: it replaces the
-  stored add list (a thread would lose its own). The harness factory restores the apps (migrations, then installs)
-  before `Harness.open`, because it runs before `onStart`. A generated tool pins its release with
+  stored add list (a thread would lose its own). The harness factory installs the apps before `Harness.open`, because
+  it runs before `onStart`; the agent's constructor made the application tables. A generated tool pins its release with
   `api.memo('goblin.release', …)` and uses `c<conversation>:<call>` as its operation id.
 - `configure` changes only the fields it is given (`null` clears one). goblin uses the per-conversation `tools`
   filter for one thing: `{ remove: [subagent] }` where a conversation switched subagents off (`capabilities/`, ADR
