@@ -15,7 +15,7 @@ smoke are different evidence.
 - Owner API: serve one group in memory with only its area's services (`OwnerHttp.serve(ownerApiOf(Group), handlers)`,
   `test/http/api/`), and call it through the typed client. The edge's admission (origin, session, CSRF on every write,
   plan, body cap, header allowlist) is unit-tested in `test/http/api/edge.test.ts`. Integration probes reach the agent
-  through `test/integration/owner-api.ts`, the typed client over the stub's `fetch` with `x-goblin-ref`; never an RPC
+  through `test/owner-client.ts`, the typed client over the stub's `fetch` with `x-goblin-ref`; never an RPC
   method for an owner call. The web serves the contract in memory with `fakeHttpApi`.
 - Content-freedom is tested where lines are made: the logger never writes a message or a cause, the reporter keeps only
   stack locations (`test/observability/`), and a crash report keeps no message.
