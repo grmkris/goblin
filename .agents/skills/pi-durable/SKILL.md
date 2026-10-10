@@ -10,7 +10,7 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
 - `PiHarness` is registered with `lifecycle.use` in `PersonalAgent`. Main is the stable chat id `PRIMARY_CHAT` (`1`),
   resolved by `Chats` to its current Pi session; a fresh agent initially maps it to Pi's root. Inbound clients
   talk in the primary chat with an author tag (`pi/content.ts`). Threads are Pi forks of main at an entry, or
-  `sessions.create()`; every one is registered in `app_conversations` (`conversations.ts`), and only registered chat
+  `sessions.create()`; every one is registered in `app_conversations` (`chats/conversations/`), and only registered chat
   ids resolve to sessions at the owner boundary. Raw Pi calls outside a task take `BACKGROUND` from `pi/context.ts`.
 - Writing into another conversation (a thread's note into main) is a write submission, never `tx.appendEntry`:
   `submit({ type: 'write', entry, requestId })`. A busy conversation places it at its next boundary, the request id
@@ -100,7 +100,7 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   and `agent.tools` are replaced as a whole, never merged by `configure`), puts the frozen revision in the context tail
   through a `beforeRequest` hook keyed on the `app.persona-turn` document, and writes the answer back as `app.persona`.
   The fork is a hidden `persona`-role thread with a `subagents` exclusion; it never has the delegating, organizing or
-  asking tools. A task's passive writes go through `ConversationRegistry.writeEntry`, because a task's conversation
+  asking tools. A task's passive writes go through `Conversations.writeEntry`, because a task's conversation
   handle submits inputs only. Delegate reports are passive `app.delegate_result` writes unless the spawn set
   `synthesize: true`. Organize tools write `app_organize_receipts` in the same synchronous step as the change.
 - Cross-Topic retrieval (ADR 0035): `goblin.retrieval` is in the default extension list (Conversations and threads,
