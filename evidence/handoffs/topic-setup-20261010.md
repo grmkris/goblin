@@ -101,8 +101,9 @@ directly on `main`, one commit per change.
 
 - On dev, every Topic still holds everything until you choose: from the Topic menu's "MCP servers & skills…", the
   button beside the composer, or when you create a Topic. A Persona's page has the same picker for what it adds.
-- The per-conversation switches are gone. On dev, the owner's rows were deleted at the first start of `c8a0a4a2`, and
-  that start logged a `job` line, kind `conversation-switches-dropped`, with the count. Prod still has its switches;
+- The per-conversation switches are gone. On dev, the owner's rows were deleted at the agent's first start on
+  `c8a0a4a2`. That start writes a `job` line, kind `conversation-switches-dropped`, with the count. I did not read it
+  in Workers Logs, because `goblin logs` needs Cloudflare credentials this session did not have. Prod still has its switches;
   releasing there drops them the same way.
 - Prod waits for your go. `GOBLIN_CONFIRM_PROD=1 heavy bun run release prod 53ccaadc…` would need the matching dev
   receipt, which `20261010T201205Z` is.
