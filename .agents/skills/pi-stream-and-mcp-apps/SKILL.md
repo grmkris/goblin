@@ -9,9 +9,10 @@ The browser follows committed Pi state over Server-Sent Events: `/api/conversati
 then batches, with a heartbeat. The two event streams are owner endpoints served through raw handlers
 (`conversations.events`, `workspace.events`), behind the Worker's edge like the rest of the typed owner API (ADR 0038); the stream's own reads (the JSON snapshot, the queue) and every
 other server read go through the typed client's factories (`conversations/queries.ts`), and a stream event only
-invalidates the query keys it affects. `apps/web/src/lib/projection.ts` turns entries into messages and tool calls.
-`lib/parts.ts` folds them into render parts: each tool result joins the call that asked for it, with a lifecycle
-state; the entries the app writes itself (thread heads, Persona asks and answers, Topic briefs, Delegate results) are
+invalidates the query keys it affects. `apps/web/src/lib/projection.ts` keeps the stream's snapshot and batches as a
+projection; `lib/entry-messages.ts` and `lib/chat-messages.ts` turn its entries into messages and tool calls, and
+`lib/conversation-parts.ts` folds them into render parts (the `Part` types are in `lib/parts.ts`): each tool result
+joins the call that asked for it, with a lifecycle state; the entries the app writes itself (thread heads, Persona asks and answers, Topic briefs, Delegate results) are
 decoded with their contract schemas, and entries a later entry's edits omit are hidden.
 `components/parts/registry.tsx` picks the renderer for each part. A thread opens in the thread panel beside its
 channel as the live thread itself (`components/shell/thread-panel.tsx`), never a copy: it starts at its fork entry and
@@ -30,11 +31,13 @@ conversation outside it.
   Send stays a follow-up; unchanged failed drafts reuse their operation IDs.
   Row removal uses the owner DELETE queue API and disables only that row while pending. Keep failures visible,
   refresh through the shared stream, and report an already-started outcome without invoking Stop.
-- The conversation list and activity come from the workspace feed (`/api/workspace/events`,
-  `lib/workspace-feed.ts`, `components/workspace-feed.tsx`): one stream per tab, a fresh snapshot on every reconnect.
-  The tab reads each conversation, activity, App and change on its own and skips one it cannot read, so a server
-  newer than the tab never stops the feed; only a frame of another shape reconnects.
-  Never refresh the list after a run.
+- The conversation list and activity come from the workspace feed (`/api/workspace/events`, opened by
+  `components/workspace-feed.tsx` and kept by `lib/workspace/`): one stream per tab, a fresh snapshot on every
+  reconnect, written into the Query cache as one slice per kind (`['workspace', slice]`) that components read through
+  the hooks in `lib/workspace/hooks.ts` with a `select`. The tab reads each conversation, activity, App and change on
+  its own and skips one it cannot read (`lib/workspace/decode.ts`), so a server newer than the tab never stops the
+  feed; only a frame of another shape reconnects. Never refresh the list after a run, and never hold feed data in a
+  second store.
 - Reconnect by opening a fresh stream and starting from its snapshot; dispose the previous stream. Back off between
   attempts (`conversation-stream.ts`).
 - MCP Apps are tool-associated `ui://` resources from the originating server. Render them in the sandboxed iframe

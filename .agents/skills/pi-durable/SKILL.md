@@ -24,7 +24,7 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   it runs before `onStart`; the agent's constructor made the application tables. A generated tool pins its release with
   `api.memo('goblin.release', …)` and uses `c<conversation>:<call>` as its operation id.
 - `configure` changes only the fields it is given (`null` clears one). goblin uses the per-conversation `tools`
-  filter for one thing: `{ remove: [subagent] }` where a conversation switched subagents off (`capabilities/`, ADR
+  filter for one thing: `{ remove: subagentTools }` where a conversation switched subagents off (`capabilities/`, ADR
   0010). A fork starts from its parent's agent at the fork entry, so a new thread sets its extensions (the host's plus
   the thread's, `instructions: null` to drop a subagent's), and its filter, explicitly (ADR 0017).
 - Observing Pi means its commit listener, not hooks: `subscribeCommits` sees every conversation's committed entries,
@@ -37,21 +37,23 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   `local` does not (the ledger, budget records, routine gates, diagnose). A hook calls one of them; a program never
   calls them from inside an Effect. New Effect code reaches Pi through `PiSessions` (`pi/sessions.ts`): every call
   names its session, failures are a typed `PiFailure`, and interrupting a `wait` ends only the wait.
-- Owner, inbound and Telegram submissions admit `(chat, operationId)` through `Chats` before calling Pi. The admission
-  ledger pins the first Pi session for retries across a future rebind; the per-chat lock covers admission only and is
-  released before model execution or waiting. `harness.wait` resolves through that operation binding. A rebind uses
-  an epoch compare-and-set and closes the affected SSE streams; it does not move a running Pi turn. The application
-  ledger prunes old operations opportunistically after 30 days. Passive reports, share-backs, thread-start notes,
-  memory views and subagent reports take the target chat's admission lock (`ChatOperations.passiveWrite`) to resolve
-  its current session and submit with stable Pi write request ids; they start no model run. There is one lock per
-  chat (`KeyedLock`); construct a `ChatDirectory` only in the conversation layer (`layers/conversation.ts`) or tests.
+- Owner, inbound and Telegram submissions admit `(chat, operationId)` through `ChatOperations.send` before calling
+  Pi. The operation's receipt pins the Pi session it was admitted to, so a retry submits there again; the per-chat lock
+  covers admission only and is released before model execution or waiting. `PiSessions.wait` resolves through that
+  binding. Nothing rebinds a chat (ADR 0030): Move to thread forks a new Thread instead. The application ledger prunes
+  old operations opportunistically after 30 days. Passive reports, share-backs, thread-start notes, memory views and
+  subagent reports take the target chat's admission lock (`ChatOperations.passiveWrite`) to resolve its current
+  session and submit with stable Pi write request ids; they start no model run. There is one lock per chat
+  (`ChatOperations.withChat`, `KeyedLock`); chat resolution is functions of the database (`chats/directory.ts`), read
+  through `Chats`.
 - The owner queue reads `InboxDoc` for Main and ordinary threads only. Removal validates the registered conversation
   and input type, then uses native `abortSubmission(id, BACKGROUND, conversationId)`: it withdraws queued input only.
   `already_placed` means the run continues; never implement row removal with `PiHarness.abort` or Stop. Passive writes,
   helpers and routine queues remain outside this API.
 - Extensions: `persona.ts` (static system prompt sections, keep them static so prompt caches hold),
   `resident-mcp.ts` (`mcp_list`, `mcp_call`), `ask-user.ts` (`ask_user`), `budget.ts` (usage recording, tool
-  blocking), `subagents.ts` (`subagent`, with the anchor task; a subagent gets this extension too, so they nest) and
+  blocking), `subagents.ts` (`subagent_spawn`, `subagent_send`, `subagent_stop`, `subagent_config` and
+  `subagent_status`, with the anchor task; a subagent gets this extension too, so they nest) and
   `subagent-relay.ts` (the relay task that carries each message and reports the final answer, ADR 0018) and, on threads only, `thread.ts`
   (`share_back`, titles). Tools with side effects are `replay: 'unsafe'`.
 - Close aborts each closed conversation with `abort({ background: true })` so its relays stop too; never use a
@@ -89,7 +91,7 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
 - Topics (ADR 0032): a Topic's Conversation is a **new** `sessions.create()` session configured explicitly (extension
   list and Personal's tool filter), never a fork of Personal. Threads, "+" threads and subagents inherit their
   parent's `topic_id`; a "+" thread announces itself in its Topic's Conversation (`conversationAbove`). Inbound,
-  Telegram and `recentOwnerMessages` keep resolving `primary()`. Archive stops a Topic's chats through the owner's
+  Telegram and `recentOwnerMessages` keep resolving the primary chat. Archive stops a Topic's chats through the owner's
   Stop, never a background abort of a Conversation, and refuses new work until Restore, which restarts nothing.
 - Start thread (ADR 0034, `chats/thread-heads.ts`): a Thread is made once per owner operation (`origin_op`), forked at
   the chat's newest entry outside a running turn (`pi/turns.ts`, never inside one), then `app.thread_head` goes into
@@ -109,8 +111,7 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   bounded, into `app_transcript_*`; its `afterResponse` catch-up is fire and forget. `search_chats` records its frozen
   sources under the call id, so a replay returns them unchanged. Automatic retrieval is a `beforeRequest` hook: it picks sources once per input
   (task memo `goblin.retrieval:<entry>`), puts at most three in the context tail and records them; it never holds a
-  transaction across its cheap-model rerank. Move to thread calls `reassign(session, fromEntry,
-chat)`.
+  transaction across its cheap-model rerank. Move to thread calls `reassignExcerpts(db, session, fromEntry, chat)`.
 - Move to thread (ADR 0034, `chats/mover.ts`) moves only the newest finished turn: the Thread is a fork at the turn's
   last entry (`pi/moves.ts`, a witness document per operation so a restart never forks twice) and the chat omits the
   turn with Pi `edits` in its `app.thread_head`; it never rebinds the chat, whose session would otherwise deepen by one
@@ -128,7 +129,7 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
 
-- Routines use `routine` for draft proposal/list/pause; only the owner confirms an exact revision through the owner
+- Routines use `routine_propose`, `routine_list` and `routine_pause` (ADR 0027); only the owner confirms an exact revision through the owner
   API (every write needs the CSRF header). Native dated schedules are fenced by app revision/firing watermarks. Background Pi Anchor/Reporter tasks own
   empty run conversations; register them without copied main capabilities or an ordinary main-start note. The confirmed
   ceiling lives in `Capabilities.scope`; management, Skills, subagents, main memory and learner are absent from run
