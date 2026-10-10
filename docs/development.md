@@ -407,6 +407,17 @@ includes other agents' edits) in scratch worktrees under `/tmp/goblin-perf-workt
 Receipts go to `.local/goblin-perf/<utc>-perf/` and `-bytes/` (`summary.md`, `receipt.json`). This is local fixture
 evidence: no account, real Apps or provider, and not a device measurement.
 
+**Long chats (2026-10-10).** Streaming into 1,000 parts on the phone profile is still about 4 fps (frame p50 ≈ 230 ms).
+A trace of that stream puts 52 s of main-thread work against a 10 s reply, and React's render is only 5–7 s of it: the
+rest is the browser hit-testing, painting and laying out every row on each batch. Skipping settled off-screen rows
+(`content-visibility: auto` with remembered sizes) cut that to 29 s in Chromium, but was not kept: rows whose content
+loads late (a diagram, a chart) keep their pre-load height while skipped, and WebKit then followed a streaming reply
+less far. The attempt is kept in `.local/goblin-perf/phase5-settled-rows/`. Virtualize, or retry skipping with async
+content measured, when a chat the owner actually has reaches the size where this costs: the phone profile's stream
+frame p95 over 150 ms or opening it over 10 s. At 200 parts it is 50 ms p50 and about 4 s to open; at 1,000, 230 ms
+and about 20 s. The React Compiler was measured and not adopted: both engines cut React's work while streaming by
+15–27%, at +7% on the chat route's first load and +2–8% heap.
+
 ## Routine definition checks
 
 From `apps/runtime`, run `heavy bun run test:unit test/routines-time.test.ts test/routines-summary.test.ts` for IANA
