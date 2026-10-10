@@ -28,8 +28,25 @@ not kept. `conductor/landed.md` there lists every land with its ready and landed
 
 ## Release
 
-TODO (conductor): the B3 check, the dev release with its authenticated smoke, UI acceptance and a Clef proposal, the
-prod release with its public smoke and drift check, and PR #4's closing comment, each with its commit and result.
+- **B3** (`f6536733`): the full check passed: runtime 591 unit tests, web 499, native 81/81, the permuted profile 70/70,
+  the build and strict lint.
+- **CI.** Green on `04efb68a`, `53774279` and `12cedb2b`. The run for `12cedb2b` took four attempts, none of them a
+  code failure:
+  - the first two were OOM-killed in `ci.slice` while another repo's CI ran;
+  - the third crashed one workerd stack on `SQLITE_BUSY` under load;
+  - the fourth passed.
+- **Dev:** `12cedb2b` is released (receipt `20261010T134347Z`), with the authenticated smoke and drift verified.
+  `ui:acceptance` passed with 0 errors and 64 screenshots. Two earlier attempts failed:
+  - **`04efb68a`.** The new `/internal` check expected the runtime's JSON 404, but the deployed web Worker answers
+    `/internal/*` itself with its HTML not-found page. `53774279` accepts either kind of 404, and `12cedb2b` makes a
+    failing inbound turn report its status and reason.
+  - **`53774279`, and the first run of `12cedb2b`.** The Alibaba Token Plan's monthly quota was spent, so every dev
+    model call answered `provider_error`. At the owner's direction, a parallel session moved dev's default, memory and
+    smoke model to `muse-spark-1.3-contributor` through LiteLLM (`.local/dev.env`) and released the same SHA.
+- **Not checked on dev:** a Clef decision proposal end to end.
+- **Prod:** not released. It still runs `4c8c485` and waits for the owner. The range since then also holds a parallel
+  session's client-performance commits.
+- **PR #4:** closed with a comment that lists the port's commits (`1212538e`..`db5b9791`, docs `367ed1d2`).
 
 ## What changed
 
@@ -116,6 +133,12 @@ prod release with its public smoke and drift check, and PR #4's closing comment,
 ## Known gaps
 
 - A permuted native case, "main Stop preserves executing routines", is timing-sensitive under load; it passes alone.
+- Under load, a workerd integration stack can crash with `SQLITE_BUSY` and take its file's cases down with it. The inbox
+  case also failed once with a workerd `nodejs_compat` ConfigError. Both passed on rerun.
+- **`muse-spark-1.3-contributor`, dev's model now, is flaky at Meta.** On 2026-10-10, 16 of 26 direct calls answered
+  404 `model_not_found` while `muse-spark-1.3` and `-1.2` answered every call.
+  - LiteLLM was given cooldown 0 and retry fallbacks for it.
+  - The smoke's subagent step has no retry, so a 404 at the wrong moment fails a release.
 - Two test comments still say "the owner gate" (`test/fixed-services.ts`, `test/http/api/apps.test.ts`), and two unit
   tests import integration fixtures (`inbox-docs.test.ts`, `queue.test.ts`); tests were outside the comment sweep.
 - `ChatDirectory`, `CapabilityProfiles` and `ResidentAuthority` remain only for probes and fixtures, and the
