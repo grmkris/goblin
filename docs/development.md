@@ -380,8 +380,8 @@ light/dark with reduced motion. Private receipts go under `.local/goblin-accepta
 evidence, separate from signed-in deployed acceptance and real-device checks.
 
 `heavy bun apps/web/test/ui-markdown.ts` renders chat Markdown from source in local Chromium at desktop and phone
-widths: a reply that settles keeps its blocks (a table keeps its element and sideways scroll), and an image is fetched
-only when asked, once, without a referrer. Receipts go under `.local/goblin-acceptance/markdown-*`.
+widths: a reply that settles keeps its blocks (a table keeps its element and sideways scroll), a link asks before it
+opens and shows its address, and an image is fetched only when asked, once, without a referrer. Receipts go under `.local/goblin-acceptance/markdown-*`.
 
 ## Client performance
 
