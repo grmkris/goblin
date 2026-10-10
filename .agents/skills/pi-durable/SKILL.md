@@ -119,6 +119,11 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   `pi/subagents.ts`); stopping a relay waits for it, so never do it under the chat's admission lock. The chat's memory
   forgets the turn (`forgetFrom`), its collector skips entries a later entry omits, and the transcript
   index gives the turn to the Thread (`reassignExcerpts`).
+- Typed decisions (ADR 0031): the owner's chats install `goblin.decisions` (`pi/decisions.ts`; helpers and routine
+  runs never do). `onYield` hands the answered exchange to `Decisions` in the background; `beforeRequest` adds earlier
+  work the owner chose to use as a `<chosen-context>` part of goblin's context block, never a transcript entry. A
+  Delegate's report is judged after its passive write, outside Pi commits, keyed by its relay. Without the `AI` binding
+  both hooks do nothing. Proposals never hide a report, reroute a send or merge history.
 - Vendor tables (`pi_*`, `cf_agents_*` and the others in `storage/vendor.ts`) are never touched.
 - Initialization, readback and reconstruction are separate proofs; local workerd reconstruction is not remote
   eviction.

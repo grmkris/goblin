@@ -70,3 +70,8 @@ itself authorize model spend, external messages, deployment or production change
   Keep assertions for frozen arguments and operationKey, redacted review, refusal, second-account isolation, changed
   grants/scopes, routine/subagent holds, alternate App refusal and reconstruction without dispatch replay. Real
   Sidequest hiring and provider-side operation reconciliation remain separate acceptance.
+
+- Decisions (ADR 0031) are tested with an injected Clef and real SQLite: the native `decisions` probe uses the probe's
+  own Clef and asserts one proposal per relay, the first label kept and replayed, a stale result discarded, no call once
+  the budget is spent and nothing judged without Clef while chat goes on. The native stacks bind no `AI`; native gates
+  never call paid Workers AI.

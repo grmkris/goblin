@@ -67,7 +67,7 @@ read nothing watches yet, and primes nothing on the server.
 
 `lib/workspace/` is the one module that keeps the agent's workspace in the cache, fed by the workspace stream. Each
 slice has its key, `workspaceKeys.slice(name)` (`['workspace', name]`): conversations, activity, apps, topics,
-personas, invocations and receipts. The slices never go stale and are never collected (`setQueryDefaults` on
+personas, invocations, receipts and proposals. The slices never go stale and are never collected (`setQueryDefaults` on
 `['workspace']` with `staleTime` and `gcTime` at `Infinity`); `['workspace', 'status']` holds what is wrong with the
 feed.
 
@@ -75,7 +75,8 @@ feed.
   that the stream writes each changed slice with `setQueryData`, and a reconnect's snapshot replaces them all.
   `activity` is a plain record keyed by chat, so structural sharing keeps every unchanged entry.
 - **Hooks.** `useConversations(select)`, `useConversation(id)`, `useActivities(select)`, `useActivity(id)`,
-  `useApps(select)`, `useTopics`, `usePersonas`, `useInvocations`, `useReceipts` and `useFeedStatus`
+  `useApps(select)`, `useTopics`, `usePersonas`, `useInvocations`, `useReceipts`, `useProposals(select)` and
+  `useFeedStatus`
   (`lib/workspace/hooks.ts`). Read through a `select`, so a component renders again only when its part changes.
 - **Writes.** A workspace write is a mutation in `lib/workspace/mutations.ts` that shows the server's answer through
   `applyWorkspaceChanges` before the stream repeats it. Closing an App shows at once and rolls back on a refusal; the

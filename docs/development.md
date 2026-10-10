@@ -28,7 +28,7 @@ heavy bun run test:integration -t Events
 It covers signed Telegram delivery into main, replay, signature/timestamp rejection, gaps, early refresh, shared
 consumer cleanup, durable skill invalidation, retained skill versions, failed-handler reconstruction and pending-receipt
 retention. Unit tests independently verify HMAC bytes. A live mygram round-trip is a separate
-deployed acceptance gate. The lane's throwaway conformance vector is handed to the producer orchestrator; never use
+deployed acceptance gate. The fixture's throwaway conformance vector is handed to the producer orchestrator; never use
 its test secret for a real subscription.
 
 ## MCP call approvals
@@ -426,7 +426,7 @@ API/UI, confirm a near-future reminder, observe one completed run and passive ma
 restart the local process before it fires, then verify firing and next occurrence. Revoke resident authority and
 confirm a reminder yields a visible skip without token usage; check active/running and run/day token caps. Save
 redacted logs and screenshots. Local CLIProxy provider evidence is distinct from Railway LiteLLM and retained dev.
-The Events lane's LOCAL throwaway-account receipts verify reminder dedupe/passive acceptance, retained cron firing
+LOCAL throwaway-account receipts verify reminder dedupe/passive acceptance, retained cron firing
 and rearm across restart, revoked-authority skip with unchanged usage, active/running caps and run/day token blocking
 using CLIProxy. The native recurring-wake regression verifies the next sweep survives the callback that scheduled it.
 Real provider billing, Telegram delivery, cron-after-deploy and real producer acceptance require separate deployed
@@ -436,6 +436,23 @@ verification.
 
 Check Main with an empty transcript and existing history at desktop and phone widths: the composer remains reachable, the latest exchange is the landing point, and there is no Home grid or Home entry in the turn map. Apps previously placed on Home should be available in their tool rows or their own pages. Moving between page and chat preserves the single iframe and action bridge.
 
-Home's runtime API and native workerd tests still cover persistence, replay, stale revisions, owner authority, bounds, app deletion and MCP grants. The browser does not render this saved layout. Dashboard UI acceptance resumes with a future iteration; installed iPhone behavior remains an owner device check.
+Home's runtime service and native workerd tests still cover persistence, replay, stale revisions, owner authority, bounds, app deletion and MCP grants. The browser does not render this saved layout. Dashboard UI acceptance resumes with a future iteration; installed iPhone behavior remains an owner device check.
 
 The no-auth inbox fixture builds the `app_docs` example in Dynamic Workers and drives the native job callback through 15-minute slots. It checks newest-five validation, freshness and last-good retention after an invalid response. Run it from `apps/runtime` with `heavy bun run test:integration test/integration/inbox.test.ts`. Real MyInbox sign-in, app-power approval and message freshness on dev are separate owner steps.
+
+## Typed decisions
+
+Only the dev stage binds Workers AI (`AI`) for Clef (ADR 0031). The local stack and the native test stacks bind none,
+so decisions judge nothing there and nothing calls paid Workers AI. Runtime unit tests cover the critic's routing,
+decoding, stale results, authority, budget and unknown usage, and context relevance over a real transcript index in
+`node:sqlite` with a fake Pi source and a fake Clef. The native `decisions` probe (in the probe registry) and the
+owner's decisions case run the real service over the object's SQLite and Pi with the probe's own Clef: a report judged
+once per relay, the first label kept and replayed, a stale result discarded, no call once the budget is spent, nothing
+judged without Clef, and main still answering. Web unit tests cover the rows, the label call and the feed's slice, not
+a browser run. These are local results: provider evaluation is the benchmark's (`bench/README.md`), and dev acceptance
+is separate.
+
+The model `clef` has an input-only estimated Credit rate (5,000 input tokens a Credit). Override it in
+`GOBLIN_MODEL_CREDIT_RATES` with `output: null`; unrelated model overrides keep Clef's default. It is a conservative
+app-budget estimate, not a conversion of Workers AI dollars into Token Plan Credits. A dispatched call whose usage is
+unknown is charged its whole 65,536-token context; without the binding there is no call and no charge.

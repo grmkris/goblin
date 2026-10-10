@@ -33,6 +33,11 @@ The web app is a thin browser projection over the resident runtime. TanStack Sta
   and goes to `/login`. The router's default error component is `ReportedRouteError`, which shows the failure with its
   reference and reports a defect to `/api/client-errors`; `routes/__root.tsx` reports uncaught errors and rejections
   the same way (`lib/query/crash-report.ts`, content-free, ADR 0037).
+- "Only visible to you" rows (`components/shell/ephemeral-slot.tsx`) are owner-only, never transcript entries or
+  sends. Decision proposals fill them (`decisions/hooks.ts`, `decisions/rows.ts`, ADR 0031): a choice posts its label
+  to `POST /api/decisions/:id`, and a confirmed thread suggestion opens an empty thread draft through `Navigation`.
+  The rows are a report highlight (Useful), a thread suggestion (New thread) and earlier work (Use), each with
+  Dismiss.
 - Validate the built artifact and real browser behavior. Local route rendering is not Cloudflare deployment proof.
 
 Before changing an API call, read the current [documentation](https://tanstack.com/start/latest) and the installed package's declarations; the
