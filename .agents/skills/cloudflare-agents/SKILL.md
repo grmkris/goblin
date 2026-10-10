@@ -18,11 +18,13 @@ lazily from `AgentLive` (`layers/index.ts`), through the bridge (`runtime/bridge
   the cookie session, CSRF on every write, a fresh plan, the 64 KiB body cap) and forwards it with an allowlisted set
   of headers and `x-goblin-ref`. The agent's `OwnerGate` (`http/api/middleware.ts`) checks the plan the agent keeps
   and renews resident authority, except on an endpoint annotated `RenewsResident: false`.
-- What is not JSON in and out (the SSE streams, the owner's file bytes, the OAuth callback redirect) stays a raw route
-  in `agent-requests.ts`, behind the same edge. `/inspect` is reached only from `/mcp`.
-- Workers RPC drops custom error classes. The RPC methods left (`askAsClient`, `recentMessages`, `channelDoorbell`,
-  `mcpEventsWebhook`, `deleteAgentData`) return `RpcResult` (`http/rpc.ts`) and the Worker unwraps it; the owner API
-  answers its error envelope instead. Inbound-client methods do not renew resident authority.
+- What is not JSON in and out (the SSE streams, the owner's file bytes, the OAuth callback redirect) is an endpoint
+  served through HttpApi's raw handlers, behind the same edge. One router (`AgentHttp`) serves the owner API and the
+  internal API (`/internal`, `@goblin/contracts/internal`), which only the Worker calls on the stub: an inbound
+  client's ask, recent read and inspection, the doorbell and MCP Events. Its gate refuses an owner forward and checks
+  the plan; it never renews resident authority.
+- Workers RPC drops custom error classes. The one RPC method left (`deleteAgentData`) returns `RpcResult`
+  (`http/rpc.ts`) and the Worker unwraps it; both APIs answer their error envelope instead.
 - Run programs through the bridge: `run` checks the plan, `local` does not (ledger, budget records, routine gates,
   diagnose), `exit` returns the exit. Never call `run` or `local` inside an Effect. What a program needs from the
   instance is in `AgentInput` (`runtime/input.ts`); build services in a layer, never at module level, and keep no

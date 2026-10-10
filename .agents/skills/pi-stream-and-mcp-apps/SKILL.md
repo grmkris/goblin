@@ -6,8 +6,8 @@ description: Change how the browser follows the Pi conversation (SSE snapshot, b
 # Conversation stream and MCP Apps in goblin
 
 The browser follows committed Pi state over Server-Sent Events: `/api/conversations/:id/events` sends a snapshot of entries,
-then batches, with a heartbeat. The two event streams are raw routes of the agent (`agent-requests.ts`), behind the
-Worker's edge like the typed owner API (ADR 0038); the stream's own reads (the JSON snapshot, the queue) and every
+then batches, with a heartbeat. The two event streams are owner endpoints served through raw handlers
+(`conversations.events`, `workspace.events`), behind the Worker's edge like the rest of the typed owner API (ADR 0038); the stream's own reads (the JSON snapshot, the queue) and every
 other server read go through the typed client's factories (`conversations/queries.ts`), and a stream event only
 invalidates the query keys it affects. `apps/web/src/lib/projection.ts` turns entries into messages and tool calls.
 `lib/parts.ts` folds them into render parts: each tool result joins the call that asked for it, with a lifecycle

@@ -12,8 +12,8 @@ smoke are different evidence.
   injected `fetch`. No `vi.mock`, no module mocking. Effect programs use `@effect/vitest` and layers made for the test
   (`FlowEvents.noop` where flows are not under test, `makeChanges()` for the change bus, real migrations in
   `node:sqlite` for stores).
-- Owner API: serve one group in memory with only its area's services (`OwnerHttp.serve(ownerApiOf(Group), handlers)`,
-  `test/http/api/`), and call it through the typed client. The edge's admission (origin, session, CSRF on every write,
+- Owner API: serve one group in memory with only its area's services (`served([Group], handlers)` in
+  `test/http/api/fixture.ts`), and call it through the typed client. The edge's admission (origin, session, CSRF on every write,
   plan, body cap, header allowlist) is unit-tested in `test/http/api/edge.test.ts`. Integration probes reach the agent
   through `test/owner-client.ts`, the typed client over the stub's `fetch` with `x-goblin-ref`; never an RPC
   method for an owner call. The web serves the contract in memory with `fakeHttpApi`.

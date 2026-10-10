@@ -279,7 +279,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - Owner API endpoints: add the endpoint to its area's group in `packages/contracts/src/api/` (paths are relative to
   `/api`; `error` names the failures the endpoint itself produces), then its handler in the area's `api.ts`
   (`http/api/groups.ts` wires every group). The owner gate admits each request first; nothing in the Worker changes.
-  Test a group by serving it alone (`OwnerHttp.serve(ownerApiOf(Group), handlers)`, `apps/runtime/test/http/api/`),
+  Test a group by serving it alone (`served([Group], handlers)` in `apps/runtime/test/http/api/fixture.ts`),
   and call it from the web through a factory in the feature's `queries.ts` (ADR 0038).
 - Auth tables: Better Auth's schema lives in `apps/runtime/migrations` and is applied by the Alchemy D1 resource.
 - Bindings: declare them in `apps/runtime/src/env.ts` and `apps/web/alchemy.run.ts` together, and in the integration
