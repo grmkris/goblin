@@ -34,7 +34,7 @@
     "test:unit": "turbo run test:unit",
     "test:integration": "turbo run test:integration",
     "test:integration:permuted": "turbo run test:integration:permuted",
-    "agents:check": "bun scripts/agents-sync.ts --check && bun tools/agents-check.ts",
+    "agents:check": "bunx repoagents@1 check && bun tools/agents-check.ts",
     "bench:recall": "bun bench/scripts/cli.ts recall",
     "bench:campaign-plan": "bun bench/scripts/cli.ts campaign-plan",
     "bench:campaign-run": "bun bench/scripts/cli.ts campaign-run",

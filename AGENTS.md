@@ -1,6 +1,6 @@
 # goblin: instructions for coding agents
 
-Master file. `CLAUDE.md` is a symlink to it — edit `AGENTS.md`. Agent config: `.agents/skills` (master) → `.claude/skills` links; `.mcp.json` → generated `.codex/config.toml` + `.cursor/mcp.json`. Run `bun scripts/agents-sync.ts` after changing any of them.
+Master file. `CLAUDE.md` is a symlink to it — edit `AGENTS.md`. Agent config: `.agents/skills` (master) → `.claude/skills` links; `.mcp.json` → generated `.codex/config.toml` + `.cursor/mcp.json`. Run `bunx repoagents` after changing any of them.
 
 goblin gives every user their own resident personal agent on Cloudflare: one native Agents SDK Durable Object per
 user runs Pi Durable for conversations and execution; Effect composes application services; Alchemy owns
