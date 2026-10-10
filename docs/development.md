@@ -379,6 +379,24 @@ native event fixtures. It checks full/inline shared reads, refresh, failed sends
 light/dark with reduced motion. Private receipts go under `.local/goblin-acceptance/queue-*`; this is browser fixture
 evidence, separate from signed-in deployed acceptance and real-device checks.
 
+## Client performance
+
+A change made for speed is measured against the revision before it; nothing is inferred from bundle size or transform
+speed alone. Both scripts build two revisions (`--base`, default `HEAD`; `--candidate`, default the working tree, which
+includes other agents' edits) in scratch worktrees under `/tmp/goblin-perf-worktrees` with today's harness copied in.
+
+- `heavy bun apps/web/test/ui-perf.ts` builds `apps/web/test/perf/` for production (the real `useConversation`,
+  projection and `Conversation` over a faked stream, `react-dom/profiling` so `<Profiler>` reports) and measures A
+  and B interleaved on a 390px phone profile at 4× CPU slowdown and on desktop: opening 100–1,600 parts, streaming a
+  reply at pi-durable's 100 ms batches while typing, wheel-scrolling 1,000 parts, and idle work after a reply. A win
+  or a regression needs the medians to differ by more than either side's spread; this box is shared, so only compare
+  numbers from one run. The same revision on both sides gives the noise floor.
+- `heavy bun apps/web/test/ui-bytes.ts` builds the app into fresh directories and sizes, from TanStack Start's route
+  manifest, the JavaScript a chat route preloads, the stylesheet, all client JavaScript and the Worker.
+
+Receipts go to `.local/goblin-perf/<utc>-perf/` and `-bytes/` (`summary.md`, `receipt.json`). This is local fixture
+evidence: no account, real Apps or provider, and not a device measurement.
+
 ## Routine definition checks
 
 From `apps/runtime`, run `heavy bun run test:unit test/routines-time.test.ts test/routines-summary.test.ts` for IANA
