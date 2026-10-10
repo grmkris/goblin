@@ -167,7 +167,9 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   transcript, can start their own, and close by themselves once their answer is reported. Writing in a subagent
   keeps it open, and while it works your
   message steers it, and its answer goes up to whoever started it with your words quoted. Every chat of a Topic works
-  with the Topic's setup (its MCP servers and their tools, skills, apps and subagents; ADR 0040). Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
+  with the Topic's setup (its MCP servers and their tools, skills, apps and subagents; ADR 0040): choose it when you
+  create the Topic, from the Topic menu's "MCP servers & skills…" or from the button beside the composer, which reads
+  what a narrowed setup holds. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
 - **Threads, Activity and Tasks.** The rail's Threads lists every thread, unread first; Activity what needs you (with
   Undo for what Goblin organized); Tasks the Delegates, Personas and routines at work. A Persona in the sidebar opens
   its profile: edit it (each save is a revision), archive it, or read its revisions. **Add persona** makes one.
@@ -380,6 +382,11 @@ These keyless deterministic tests are local evidence; deployed smoke and real pr
 native event fixtures. It checks full/inline shared reads, refresh, failed sends, removal and failed-removal retry at desktop/phone widths in
 light/dark with reduced motion. Private receipts go under `.local/goblin-acceptance/queue-*`; this is browser fixture
 evidence, separate from signed-in deployed acceptance and real-device checks.
+
+`heavy bun apps/web/test/ui-setup.ts` renders a Topic's setup editor (ADR 0040) from source in local Chromium, from the
+right on a desktop and from the bottom on a phone, in light and dark: Everything to Only these, a tool switched off,
+touch rows of 44px, no sideways scroll, and Save as the owner API's compare-and-set answered with a routine left short.
+Screenshots go under `.local/goblin-acceptance/setup-*`; this is browser fixture evidence only.
 
 `heavy bun apps/web/test/ui-markdown.ts` renders chat Markdown from source in local Chromium at desktop and phone
 widths: a reply that settles keeps its blocks (a table keeps its element and sideways scroll), with and without
