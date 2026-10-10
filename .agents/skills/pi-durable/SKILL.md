@@ -24,8 +24,8 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   it runs before `onStart`; the agent's constructor made the application tables. A generated tool pins its release with
   `api.memo('goblin.release', …)` and uses `c<conversation>:<call>` as its operation id.
 - `configure` changes only the fields it is given (`null` clears one). goblin uses the per-conversation `tools`
-  filter for one thing: `{ remove: subagentTools }` where a conversation switched subagents off (`capabilities/`, ADR
-  0010). A fork starts from its parent's agent at the fork entry, so a new thread sets its extensions (the host's plus
+  filter for one thing: `{ remove: subagentTools }` where a chat may not start subagents (its Topic's setup or its
+  spawner's exclusions; `setup/`, ADR 0040). A fork starts from its parent's agent at the fork entry, so a new thread sets its extensions (the host's plus
   the thread's, `instructions: null` to drop a subagent's), and its filter, explicitly (ADR 0017).
 - Observing Pi means its commit listener, not hooks: `subscribeCommits` sees every conversation's committed entries,
   tasks and submissions, and the run ledger (`telemetry/pi.ts`, ADR 0024) is attached in the harness factory as soon
@@ -75,9 +75,9 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
 - Pi's generation hooks may report and swallow exceptions. The pinned ToolTask's beforeTool catches a throw as a
   block, but a blocked call skips afterTool. Ask-first prepares in beforeTool and emits its terminating approval
   marker from the tool body; the body and shared dispatch seam independently recheck policy (ADR 0028).
-- Tool implementations check resident authority, the chat's scope (`Capabilities.scope`: its Topic's setup, ADR 0040)
+- Tool implementations check resident authority, the chat's scope (`Setups.scope`: its Topic's setup, ADR 0040)
   and grants before any outbound call, and never hold a SQLite transaction across model or network work. Something
-  outside the scope returns `capabilityOffResult` (`pi/capabilities.ts`); outside the Topic's setup, the owner adds it
+  outside the scope returns `outsideScopeResult` (`pi/setup.ts`); outside the Topic's setup, the owner adds it
   to the Topic from a card.
 - Events are a snapshot plus committed batches with no cursor replay.
 - Browser URLs, snapshots and SSE routes carry chat ids. Resolve them at the boundary, then use the returned Pi session
@@ -138,7 +138,7 @@ itself authorize model spend, external messages, deployment or production change
 - Routines use `routine_propose`, `routine_list` and `routine_pause` (ADR 0027); only the owner confirms an exact revision through the owner
   API (every write needs the CSRF header). Native dated schedules are fenced by app revision/firing watermarks. Background Pi Anchor/Reporter tasks own
   empty run conversations; register them without copied main capabilities or an ordinary main-start note. The confirmed
-  ceiling lives in `Capabilities.scope`; management, Skills, subagents, main memory and learner are absent from run
+  ceiling lives in `Setups.scope`; management, Skills, subagents, main memory and learner are absent from run
   extensions. Check the dedicated per-run provider on every model dispatch, including compaction, and MCP authority
   on every HTTP attempt after token refresh. Never depend on swallowed Pi hook exceptions to stop a model request.
 - Project committed `pi.usage` through app-only cumulative watermarks and stable UTC-day receipts. Passive reports use

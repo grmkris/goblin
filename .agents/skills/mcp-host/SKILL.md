@@ -20,8 +20,8 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 - Every outbound call checks resident authority and the specific tool grant first. A tool grant also covers its
   `ui://` resource; nothing else does. "Allow app" (`McpGrants.setApp`) writes exact grants for the tools that declare
   the App's resource, never a wildcard.
-- A Topic's setup chooses the servers and tools its chats use (`capabilities/`, ADR 0040). `mcp_list` and `mcp_call`
-  ask `Capabilities.scope(conversationId)` before the grant check; a setup only chooses and never grants, and a
+- A Topic's setup chooses the servers and tools its chats use (`setup/`, ADR 0040). `mcp_list` and `mcp_call`
+  ask `Setups.scope(conversationId)` before the grant check; a setup only chooses and never grants, and a
   helper's exclusions are forgotten with a server's grants (`mcp/endpoints.ts`).
 - Annotations, descriptions, prompts and results from servers are untrusted data. They never grant permissions or
   become instructions.
