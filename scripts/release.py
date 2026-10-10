@@ -60,6 +60,12 @@ def require_dev(receipt, sha, version):
         raise RuntimeError("prod_requires_current_authenticated_dev_of_same_sha")
 
 
+def resources(stage, auth_database):
+    # The stage's named Cloudflare resources (apps/web/alchemy.run.ts), as the receipt lists them.
+    prefix = "goblin-" + stage
+    return {"worker": prefix, "auth": auth_database, "files": prefix + "-files", "flows": prefix + "-flows"}
+
+
 def cloud(config, path, body=None):
     account = config["CLOUDFLARE_ACCOUNT_ID"]
     url = "https://api.cloudflare.com/client/v4/accounts/" + account + path
@@ -158,7 +164,7 @@ def release(stage, sha):
     receipt = {"utc": stamp, "stage": stage, "sha": sha, "ci": checks[0]["html_url"],
                "version": version(config, stage), "acceptance": acceptance,
                "drift": "verified", "providerNormalizations": ["Web.domain.zone bookkeeping", "D1 default disabled replication"], "migrations": names,
-               "resources": {"worker": "goblin-" + stage, "auth": db, "files": "goblin-" + stage + "-files"}}
+               "resources": resources(stage, db)}
     # No content, credentials, owner identity, or provider token enters this receipt.
     for path in [STATE / f"receipts/{stage}.json", STATE / f"receipts/{stamp}-{stage}-{sha[:12]}.json"]:
         path.write_text(json.dumps(receipt, indent=2) + "\n")

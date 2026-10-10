@@ -71,7 +71,11 @@ owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
 7. `/api/agent/memory`: a nonzero remembered-message count and the current view coverage;
 8. an agent app (`scripts/smoke-apps.ts`): in a new thread the agent builds `smoke-counter` from exact code, the owner
    runs its schedule now and its revision moves by one, then the owner deletes it (typing its name) and the thread
-   closes.
+   closes;
+9. the smoke's own sends reached the stage's Analytics Engine flows dataset (`goblin-<stage>-flows`, ADR 0037): a
+   `send` point since the smoke started, waited for up to two minutes. It reads with the operator's own
+   `CLOUDFLARE_API_TOKEN` (Account Analytics read) and `CLOUDFLARE_ACCOUNT_ID` from the environment, as `goblin stats`
+   does; without them, or with a token that cannot read Analytics Engine, the receipt says why it was skipped.
 
 Inbound turns run in main as `goblin-smoke`. The threads are archived, the app deleted and the client revoked through
 `finally` cleanup; their history and the subagent remain. If Telegram is on, main's replies are
@@ -85,6 +89,7 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `stage`, `signup`, `resident`, `model` | Target stage, sign-up mode, active authority and smoke model or `owner pick`.                                  |
 | `build`                                | The commit the deployed client bundle names, or `skipped: <reason>` on the local stack.                        |
+| `flows`                                | `ok`: a `send` point of the smoke reached the flows dataset; or `skipped: <reason>`.                           |
 | `servers`                              | Server statuses, tool/grant counts and probe outcome (`ok`, `error` or `not-granted`).                         |
 | `files`                                | `ok`: the owner's file round trip, the file deleted again.                                                     |
 | `edge`                                 | `envelope: ok` and `csrf: refused`: failures answer in the envelope with their ref; CSRF on every write.       |

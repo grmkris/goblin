@@ -1,6 +1,6 @@
 """Fail-closed checks for promotion, independent of credentials and Cloudflare."""
 import unittest
-from release import require_clean_snapshot, require_dev, safe_plan, stale_checkouts
+from release import require_clean_snapshot, require_dev, resources, safe_plan, stale_checkouts
 
 
 class PromotionTest(unittest.TestCase):
@@ -24,6 +24,10 @@ class PromotionTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 require_dev(good | change, "a" * 40, "v1")
 
+
+    def test_receipt_lists_every_named_resource(self):
+        self.assertEqual(resources("dev", "db-1"), {"worker": "goblin-dev", "auth": "db-1",
+                                                    "files": "goblin-dev-files", "flows": "goblin-dev-flows"})
 
     def test_prunes_only_checkouts_no_stage_runs(self):
         dev, prod, old = "a" * 40, "b" * 40, "c" * 40
