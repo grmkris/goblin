@@ -92,9 +92,19 @@ directly on `main`, one commit per change.
   - a fresh refusal showed one card on phone and desktop, and Add worked again;
   - the phone composer row shows only the setup icon;
   - the Persona page's setup section fits the phone, picker included.
-- **On `main` but not on dev:** `a5aaca88`. The setup button's label said "everything" while the catalog of a
-  narrowed Topic loaded; it now says "a chosen list". This is accessibility wording only, so the next release carries
-  it.
+- **`a5aaca88`:** the setup button's label said "everything" while the catalog of a narrowed Topic loaded; it now says
+  "a chosen list". This is accessibility wording only.
+- **Third dev deploy: `9359ef77`, with no receipt.** It carries `a5aaca88` and `4faef240`. With `4faef240`, a server's
+  skills switch on even when its Events lack `skills.updated`/`skills.list_changed`; Sidequest's switch had reverted
+  with "The request was not valid." The full gate passed and CI run 38088030492 was green.
+  - Four `release dev` runs deployed it (Worker version `a54dab81`). Each smoke then failed on a model-driven or
+    transient step, never one this range touches:
+    - Meta `404 model not found` for `muse-spark-1.3-contributor`, three times: `app_not_built`, the first model
+      turn, and after the subagent step;
+    - one D1 "Network connection lost." on the auth store's `oauthResource` update (ref `a488d607d9d66c45`, read in
+      Workers Logs).
+  - `bun run drift:dev` verified on its own. A prod release of `9359ef77` needs a passing dev receipt first, so rerun
+    `release dev` once Meta is steady.
 - **Cleanup:** the acceptance's Topics (2, 3), the Persona "Scout 1937" and the proposed routine were archived on dev.
 
 ## For the owner
