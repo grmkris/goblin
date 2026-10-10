@@ -24,10 +24,11 @@ Use the installed Effect 4 guide and declarations as the API authority. Verify t
 - Layers: `layers/core.ts` (`AgentInput`, `Db`, `Changes`, `PiSessions`, `KeyedLock`, `FlowEvents`, the logger and
   reporter), then the start's steps and one layer per area in the order `layers/index.ts` gives; each sees only the
   layers before it, and the start's order is the boot contract. `AgentServices` is derived from them. A stateful
-  object is made once, by its start step, and shared by an instance tag in its module (never a second instance);
-  programs use the services.
-- Programs run through the agent's bridge (`runtime/bridge.ts`): `run` checks the plan, `local` does not, `exit`
-  returns the exit. Never call `run`, `local` or `Effect.run*` inside an Effect; compose the program instead.
+  object is made once, by its layer, and shared as a service (never a second instance); programs use the services.
+- Programs compose; a program's requirements are inferred, never written out to dodge a type cycle. Code outside the
+  runtime (Pi kits, alarms, the apps engine) runs programs through the bridge `agent.ts` hands it (`runtime/bridge.ts`):
+  `run` checks the plan, `local` does not, `exit` returns the exit. Never call `run`, `local` or `Effect.run*` inside
+  an Effect. Only the files `tools/graph.ts` lists may import the bridge or `promiseWith` (`boundaries/no-closed-import`).
 - Owner API handlers are `HttpApiBuilder.group` programs in `<area>/api.ts` over the contract in
   `packages/contracts/src/api` (ADR 0038). Imports have no `unstable/` segment: `effect/http-api/HttpApi`,
   `effect/http/HttpRouter`.

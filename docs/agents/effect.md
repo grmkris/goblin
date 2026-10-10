@@ -17,7 +17,8 @@ Programs are Effects composed with other Effects. Code outside the runtime enter
   captures its context once (`Effect.context()`) and runs the callback's Effect with it. It rejects with the typed
   failure itself, so an `AppError` crosses the SDK unchanged.
 
-A program calls neither, and never `Effect.run*`: it composes. An import allowlist enforces both doors.
+A program calls neither, and never `Effect.run*`: it composes. `boundaries/no-closed-import` enforces both doors:
+`tools/graph.ts` closes `runtime/bridge.ts`, and `promiseWith` in `runtime/boundary.ts`, to the files it lists.
 
 ## Services and layers
 
