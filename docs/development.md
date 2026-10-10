@@ -379,6 +379,10 @@ native event fixtures. It checks full/inline shared reads, refresh, failed sends
 light/dark with reduced motion. Private receipts go under `.local/goblin-acceptance/queue-*`; this is browser fixture
 evidence, separate from signed-in deployed acceptance and real-device checks.
 
+`heavy bun apps/web/test/ui-markdown.ts` renders chat Markdown from source in local Chromium at desktop and phone
+widths: a reply that settles keeps its blocks (a table keeps its element and sideways scroll), and an image is fetched
+only when asked, once, without a referrer. Receipts go under `.local/goblin-acceptance/markdown-*`.
+
 ## Client performance
 
 A change made for speed is measured against the revision before it; nothing is inferred from bundle size or transform
