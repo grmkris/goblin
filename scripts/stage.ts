@@ -2,6 +2,7 @@
 import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { resolve } from 'node:path'
+import { releaseBuild } from './build-id.ts'
 import { resolveStage } from './stage-config.ts'
 import { attachStageState, DEFAULT_RELEASE_ROOT } from './stage-state.ts'
 
@@ -53,6 +54,8 @@ for (const key of Object.keys(childEnv)) {
 childEnv['GOBLIN_STAGE'] = stage.name
 childEnv['GOBLIN_RELEASE_ROOT'] = releaseRoot
 childEnv['BUN_CONFIG_NO_ENVFILE'] = '1'
+// A deployed web bundle names its commit, which its crash reports quote (crash-report.ts); local stays `dev`.
+if (!stage.local) childEnv['VITE_GOBLIN_BUILD'] = releaseBuild(root)
 if (command === 'smoke:prod') {
   if ((statSync(config).mode & 0o077) !== 0) throw new Error('private_stage_file_requires_mode_600')
   const smoke = Bun.spawn(['bun', '--env-file', config, resolve(root, 'scripts/smoke-dev.ts')], {

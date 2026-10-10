@@ -55,8 +55,9 @@ subagent. It leaves the owner's grants unchanged and renews resident authority t
 attempts to restore the owner's effective pick in `finally`, including after a failed step. Unset, turns use the
 owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
 
-1. health; unless sign-up is open, a sign-up without the invite code is refused; sign-in, resident authority
-   `active`, a main-thread snapshot;
+1. health; the deployed client bundle names this checkout's commit (`VITE_GOBLIN_BUILD`, which `scripts/stage.ts`
+   sets for every deployed stage, so crash reports name their release; skipped on the local stack); unless sign-up is
+   open, a sign-up without the invite code is refused; sign-in, resident authority `active`, a main-thread snapshot;
 2. a small text file uploaded to the owner's `/uploads`, listed, read back byte for byte and deleted (ADR 0022); then
    the typed API's edge: an unknown chat answers 404 in the error envelope quoting the response's `x-goblin-ref`, and
    a write without the CSRF header is refused 403;
@@ -83,6 +84,7 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 | Receipt field                          | What it checks or records                                                                                      |
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `stage`, `signup`, `resident`, `model` | Target stage, sign-up mode, active authority and smoke model or `owner pick`.                                  |
+| `build`                                | The commit the deployed client bundle names, or `skipped: <reason>` on the local stack.                        |
 | `servers`                              | Server statuses, tool/grant counts and probe outcome (`ok`, `error` or `not-granted`).                         |
 | `files`                                | `ok`: the owner's file round trip, the file deleted again.                                                     |
 | `edge`                                 | `envelope: ok` and `csrf: refused`: failures answer in the envelope with their ref; CSRF on every write.       |
@@ -100,7 +102,7 @@ MCP Apps, the browser UI, thread branching, memory-summary quality, skills, and 
 
 Prod commands use `.local/prod.env` and require `GOBLIN_CONFIRM_PROD=1` in the calling shell:
 `bun run plan:prod`, `bun run deploy:prod`, `bun run smoke:prod`. There is no destroy-prod command.
-`smoke:prod` defaults to public health, anonymous auth refusal, invite refusal, MCP metadata, the page and the canonical `www` redirect. Owner email/session remain empty until the real OTP bootstrap.
+`smoke:prod` defaults to public health, the client bundle's build, anonymous auth refusal, invite refusal, MCP metadata, the page and the canonical `www` redirect. Owner email/session remain empty until the real OTP bootstrap.
 Only supplying the email and private OTP session file for an operator test account enables the full acceptance flow, including model turns.
 Use a dedicated operator test account for production smoke.
 
