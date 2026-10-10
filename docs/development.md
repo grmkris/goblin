@@ -401,6 +401,15 @@ includes other agents' edits) in scratch worktrees under `/tmp/goblin-perf-workt
   reply at pi-durable's 100 ms batches while typing, wheel-scrolling 1,000 parts, and idle work after a reply. A win
   or a regression needs the medians to differ by more than either side's spread; this box is shared, so only compare
   numbers from one run. The same revision on both sides gives the noise floor.
+- `heavy bun apps/web/test/ui-follow.ts` plays scripted owner turns against the same fixture (a streamed reply, a tool
+  round after a slow provider, a storm of parallel calls, a reply already past the fold when its turn lands, a
+  re-snapshot after the tab was away, the composer growing mid-stream) on the phone and desktop profiles and reports,
+  frame by frame, how far the newest row sat under the composer, whether the jump-to-end arrow was offered while
+  streaming, whether the view was pulled back up, how many rows the turn takes, and how often the gap between two rows
+  that are both on screen changed (a visible jump; rows above the screen settling are not one, the scroller keeps the
+  screen where it was). `--assert` exits 1 when a turn ends with its newest row hidden or the arrow still offered;
+  `--shots` saves the live, settled and opened screens; `--dist` reuses a built fixture. Chromium only: WebKit follows
+  less far on a phone and needs Playwright's image on this box.
 - `heavy bun apps/web/test/ui-bytes.ts` builds the app into fresh directories and sizes, from TanStack Start's route
   manifest, the JavaScript a chat route preloads, the stylesheet, all client JavaScript and the Worker.
 
