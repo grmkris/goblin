@@ -9,13 +9,15 @@ starts, how work is serialised and how areas talk.
 Programs are Effects composed with other Effects. Code outside the runtime enters through exactly one of two doors.
 
 - **The bridge** (`runtime/bridge.ts`), for code the runtime does not own: Pi kits, the agent-apps engine and its
-  Dynamic-Worker powers, Durable Object alarms and `deleteAgentData`. `agent.ts` hands the bridge to each of them when
-  it builds them; `AgentInput` does not carry it. `run` checks the account's plan first, `local` does not, and `exit`
-  answers the exit.
+  Dynamic-Worker powers, Durable Object alarms and `onRequest`. `agent.ts` hands the bridge to each of them when it
+  builds them; `AgentInput` does not carry it. `run` checks the account's plan first, `local` does not, and `exit`
+  answers the exit (`onRequest` answers a failure in the API's envelope).
 - **`promiseWith(context)`** (`runtime/boundary.ts`), for a foreign callback wired inside a layer that must answer a
   Promise: the MCP SDK's auth provider (`token`, `onUnauthorized`) and dispatch guards, and the skills guard. The layer
   captures its context once (`Effect.context()`) and runs the callback's Effect with it. It rejects with the typed
-  failure itself, so an `AppError` crosses the SDK unchanged.
+  failure itself, so an `AppError` crosses the SDK unchanged. To hand an Effect to Promise code that runs it later (an
+  `authorize` option of a tool call or a skills request), bind it to its program's services first
+  (`bound(effect)`, same module).
 
 A program calls neither, and never `Effect.run*`: it composes. `boundaries/no-closed-import` enforces both doors:
 `tools/graph.ts` closes `runtime/bridge.ts`, and `promiseWith` in `runtime/boundary.ts`, to the files it lists.
@@ -43,6 +45,20 @@ A program calls neither, and never `Effect.run*`: it composes. `boundaries/no-cl
   it in the layer's scope, so interrupting the first caller does not cancel it; `skip(key, effect)` answers at once when
   one is in flight.
 - A promise map or a `#running` set in a service is one of these, written by hand: use the primitive.
+
+## Shared helpers
+
+Use these instead of a local copy:
+
+- `attempt(() => promise)` and `attemptSync(() => value)` (`http/errors.ts`) turn foreign code into an Effect that
+  fails with an `AppError` (an unexpected failure becomes a reported `Internal`); `isAppError` tells one apart.
+- `requirePlan()` (`billing/gates.ts`), `requireBudget` (`budget.ts`) and `requireResident` (`mcp/service.ts`) are the
+  gates a program composes before work that needs them.
+- `epochSeconds` (`clock.ts`) is the Clock's time in seconds, so tests can move it.
+- `sha256Hex` and `isRecord` (`runtime/digest.ts`).
+- `ChatOperations.tracked` records an operation's receipt, runs the work and moves the receipt on, or to `refused` with
+  the failure's type when the work fails; `withFlow` (`observability/flows.ts`) records the operation's flow the same
+  way.
 
 ## Changes, not listeners
 

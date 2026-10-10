@@ -9,9 +9,12 @@ Never destroy an Alchemy harness stack to resolve a port conflict; stop only pro
 
 The owner API is tested by serving one group in memory with only its area's services, through the shared fixture
 (`apps/runtime/test/http/api/fixture.ts`: `served`, `serve`, `plans`, `stub`, the request builders); the Worker's
-admission has its own unit tests (`edge.test.ts`). Those tests and the integration probes call the agent through one
-typed client over its `fetch` (`test/owner-client.ts`), never through a Durable Object RPC method. The web serves the
-contract in memory with `fakeHttpApi` (ADR 0038), with `unusedHandlers(group)` for the endpoints a test never calls.
+admission has its own unit tests (`edge.test.ts`). Those tests and the integration cases call the owner API through one
+typed client (`test/owner-client.ts`): over the agent's `fetch`, or through the real Worker signed in (`signedIn`),
+never through a Durable Object RPC method; the internal API has its own (`test/internal-client.ts`). The native suite is
+a table of probes each module registers (`probes`, served on one test route; see the [runtime-tests
+skill](../../.agents/skills/runtime-tests/SKILL.md)). The web serves the contract in memory with `fakeHttpApi` (ADR
+0038), with `unusedHandlers(group)` for the endpoints a test never calls.
 
 The native suite covers initialization, durable submission/deduplication, transcript readback and public
 dispose/reopen. `GOBLIN_NATIVE_LIFECYCLE_PHASE=write|read` runs the two-process reconstruction proof; the ordinary

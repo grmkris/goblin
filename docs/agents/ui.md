@@ -9,15 +9,17 @@ transport boundary.
 `lib/api.ts` has two clients: `owner` (the agent's `OwnerApi`) and `account` (the Worker's `AccountApi`: billing,
 inbound clients, crash reports). Each request carries `x-goblin-request`, the CSRF header on every write and, with
 `withOperation`, the operation id. Nothing else calls an `/api` path, except four transports: the owner's file bytes
-(`lib/files.ts`), the conversation stream (`lib/conversation-stream.ts`), the workspace stream (`lib/workspace/`) and
-Better Auth's client. Untyped values (stream frames, App messages, tool payloads) are read with `lib/values.ts`, never
+(`lib/files.ts`), the conversation stream (`lib/conversation-stream.ts`), the workspace stream (opened by
+`WorkspaceFeedProvider`, `components/workspace-feed.tsx`, over the same `BrowserPiEvents`, and kept by
+`lib/workspace/`) and Better Auth's client. Untyped values (stream frames, App messages, tool payloads) are read with `lib/values.ts`, never
 decoded as API answers.
 
 ## Factories and keys
 
 Each feature has `src/<feature>/queries.ts`, which holds factories only: `owner.apiQuery` and `owner.apiMutation`
-options, and the feature's keys. Hooks that read or combine them live in `src/<feature>/hooks.ts`; components never
-build query options inline.
+options, and the feature's keys. Hooks that read or combine them live in `src/<feature>/hooks.ts` (the session in
+`auth/hooks.ts` `useSession`, the plan in `account/hooks.ts` `useBilling`, adding and connecting a server in
+`mcp/hooks.ts` `useAddAndConnect`); components never build query options inline.
 
 Keys come from one `<feature>Keys` object whose root is the feature's name, and name every input:
 
@@ -87,12 +89,14 @@ no owner data that a query also holds.
 
 ## Failures
 
-`messageOf(error, action)` gives the copy beside the control that failed, and `describeError` the failure's kind when
-behaviour depends on it. Both end with the reference ("… · ref 7f3a9c12"), and so does every other refusal the web
-shows: one builder adds it. A route that fails shows `ReportedRouteError`; only a defect is reported to
-`/api/client-errors`. Better Auth and `/health` answer outside the typed API: `auth/queries.ts` sends each call's
-`x-goblin-request` id and turns a refusal or silence into `AuthRefused` with the answer's `x-goblin-ref` (else cf-ray,
-else that id), shown with `authMessageOf` or `quoting`.
+`messageOf(error, action)` gives the copy beside the control that failed, and `describeError` the failure's kind (and
+its `ref`) when behaviour depends on it. A page's own words for a failure it expects ("that name is taken") go through
+`withRef(text, error)`. All of them end with the reference ("… · ref 7f3a9c12") through one builder in
+`lib/query/app-error.ts`. A route that fails shows `ReportedRouteError`; only a defect is reported to
+`/api/client-errors`. An answer's reference is read in one place, `answerRef` (`x-goblin-ref`, else cf-ray); without
+an answer the failure quotes the request's own `x-goblin-request` id. Better Auth and `/health` answer outside the
+typed API: `auth/queries.ts` sends each call's `x-goblin-request` id and turns a refusal or silence into `AuthRefused`
+carrying that reference, which `messageOf` and `withRef` quote like any other.
 
 ## Tests
 
