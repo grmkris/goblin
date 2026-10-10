@@ -80,8 +80,8 @@ session, and the primary remains chat `1` (nothing rebinds a chat: Move to threa
 chat goes through one admission sequence (`ChatOperations.send`, `chats/operations.ts`), which records the operation's
 receipt and selected session in `app_chat_operations` (`chats/receipts.ts`); retries keep that session, while Pi
 continues to own transcripts, tasks, request ids and documents. Receipts are pruned opportunistically after 30 days.
-Admission and passive writes hold the chat's one lock, `KeyedLock`'s (the mover and a Topic's seed, which are Promise
-code, take it through the bridge), never across model execution.
+Admission and passive writes hold the chat's one lock, `KeyedLock`'s (`ChatOperations.withChat`; the mover and a
+Topic's seed take it too), never across model execution.
 
 The unit suite covers lookup, receipts (a row from before them reads as `legacy`), replay binding, retention, the one
 admission sequence, flows and chat locks (`chat-receipts.test.ts`, `chats.test.ts`, `chats-service.test.ts`). The
@@ -278,7 +278,10 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   Never edit an applied migration; never touch Pi or Agents tables.
 - Owner API endpoints: add the endpoint to its area's group in `packages/contracts/src/api/` (paths are relative to
   `/api`; `error` names the failures the endpoint itself produces), then its handler in the area's `api.ts`
-  (`http/api/groups.ts` wires every group). The owner gate admits each request first; nothing in the Worker changes.
+  (`http/api/groups.ts` wires every group). Owner admission runs before each request; nothing in the Worker changes.
+  A caller that is not the owner's browser (an MCP client, a hook) gets an endpoint of the internal API instead
+  (`packages/contracts/src/api/internal.ts`, behind `InternalGate`), which the Worker calls through
+  `inbound/client.ts`; never add a Durable Object RPC method.
   Test a group by serving it alone (`served([Group], handlers)` in `apps/runtime/test/http/api/fixture.ts`),
   and call it from the web through a factory in the feature's `queries.ts` (ADR 0038).
 - Auth tables: Better Auth's schema lives in `apps/runtime/migrations` and is applied by the Alchemy D1 resource.
