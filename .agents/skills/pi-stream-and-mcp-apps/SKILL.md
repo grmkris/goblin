@@ -19,8 +19,9 @@ never shows inherited history. The channel and the panel follow through the shar
 (`lib/stream-pool.ts`, one stream per conversation, capped, suspended off screen); never open a second stream for a
 conversation outside it.
 
-- Assistant figures use `MessageText` → `RichBlock` and lazy kit entries for Mermaid, chart and map
-  fences. Keep open streaming fences, invalid specs and drawing failures as code. Snapshots name when they were true. Agent-app views share the kit through its import allowlist and frame
+- Assistant figures use `MessageText` → `ChatMarkdown` (Streamdown) → `RichBlock` and lazy kit entries for Mermaid,
+  chart and map fences. Keep open streaming fences, invalid specs and drawing failures as code; Streamdown says which
+  block's fence is still open. Keep its renderers plain (`PLAIN`) and its rehype plugins explicit. Snapshots name when they were true. Agent-app views share the kit through its import allowlist and frame
   bundles. Figures are read-only and grant no app power. Verify light/dark, narrow chats and reduced motion.
 - Pi state is authoritative. Do not keep a second transcript or invent cursor replay.
 - Queue contents for Main and ordinary threads come from the owner queue API over `InboxDoc`; native snapshot/inbox
