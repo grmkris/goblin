@@ -380,7 +380,8 @@ light/dark with reduced motion. Private receipts go under `.local/goblin-accepta
 evidence, separate from signed-in deployed acceptance and real-device checks.
 
 `heavy bun apps/web/test/ui-markdown.ts` renders chat Markdown from source in local Chromium at desktop and phone
-widths: a reply that settles keeps its blocks (a table keeps its element and sideways scroll), code highlights once
+widths: a reply that settles keeps its blocks (a table keeps its element and sideways scroll), with and without
+motion (words fade in behind a caret only when motion is allowed), code highlights once
 Shiki loads and Copy copies exactly the code, a table copies as CSV or Markdown and downloads as CSV, math sets in KaTeX while prices stay prices, a link asks
 before it
 opens and shows its address, and an image is fetched only when asked, once, without a referrer. Receipts go under `.local/goblin-acceptance/markdown-*`.
