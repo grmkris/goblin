@@ -81,7 +81,7 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   for Pi APIs. `chatOf(session)` maps capability and task activity back to the current chat; unknown sessions fail
   closed. Pi-keyed approvals, App call records, run events, skill activations, fork entries and memory entry ids stay
   on their original Pi identities deliberately. A helper's `parent_session` is its parent chat; immutable
-  `spawner_session` holds its original anchor and relays. Each Topic Conversation's memory (`ChatMemories`, keyed by
+  `spawner_session` holds its original anchor and relays. Each Topic Conversation's memory (`ChatMemory`, keyed by
   chat id) resolves the chat's current session on each use, with Builder state on the generation API's
   `conversationId`; the builder runs only for a Conversation, and `zoom` reads the Conversation above its caller. See
   [ADR 0030](../../../docs/adr/0030-logical-chats-over-pi-sessions.md) and the development guide's permuted-primary
@@ -104,7 +104,7 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   handle submits inputs only. Delegate reports are passive `app.delegate_result` writes unless the spawn set
   `synthesize: true`. Organize tools write `app_organize_receipts` in the same synchronous step as the change.
 - Cross-Topic retrieval (ADR 0035): `goblin.retrieval` is in the default extension list (Conversations and threads,
-  not subagents or routine runs). `TranscriptIndex` reads `Conversation.entries` in entry-id windows and indexes only
+  not subagents or routine runs). The transcript index reads `Conversation.entries` in entry-id windows and indexes only
   entries whose `conversationId` is the session (never forked history, never `role = 'persona'` forks), redacted and
   bounded, into `app_transcript_*`; its `afterResponse` catch-up is fire and forget. `search_chats` records its frozen
   sources under the call id, so a replay returns them unchanged. Automatic retrieval is a `beforeRequest` hook: it picks sources once per input
@@ -116,8 +116,8 @@ chat)`.
   turn with Pi `edits` in its `app.thread_head`; it never rebinds the chat, whose session would otherwise deepen by one
   fork per move. The turn's helpers' relays are handed to the Thread with their delivery request ids (`handover` in
   `pi/subagents.ts`); stopping a relay waits for it, so never do it under the chat's admission lock. The chat's memory
-  forgets the turn (`ChatMemories.truncate`), its collector skips entries a later entry omits, and the transcript
-  index gives the turn to the Thread (`TranscriptIndex.reassign`).
+  forgets the turn (`forgetFrom`), its collector skips entries a later entry omits, and the transcript
+  index gives the turn to the Thread (`reassignExcerpts`).
 - Vendor tables (`pi_*`, `cf_agents_*` and the others in `storage/vendor.ts`) are never touched.
 - Initialization, readback and reconstruction are separate proofs; local workerd reconstruction is not remote
   eviction.
