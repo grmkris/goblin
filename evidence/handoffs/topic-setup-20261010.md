@@ -103,8 +103,15 @@ directly on `main`, one commit per change.
       turn, and after the subagent step;
     - one D1 "Network connection lost." on the auth store's `oauthResource` update (ref `a488d607d9d66c45`, read in
       Workers Logs).
-  - `bun run drift:dev` verified on its own. A prod release of `9359ef77` needs a passing dev receipt first, so rerun
-    `release dev` once Meta is steady.
+  - `bun run drift:dev` verified on its own.
+- **Fourth dev release: `1ab4da80`, receipt `20261011T080545Z`** (Worker `f32c37b4`, CI run 38123246974; smoke
+  authenticated, drift verified; gate: runtime 619, web 524, integration 81). It fixes two failures the owner hit
+  connecting Sidequest, both read in Workers Logs:
+  - `448e2fd5`: an outbound sign-in's callback showed a route 404 (ref `a48c3f857c54ed58`), although the sign-in had
+    finished. The owner forward followed the agent's 302 to `/connections` back into the agent.
+  - `1ab4da80`: Sidequest's setup-only connection (4 tools) answers `events/list` with a JSON-RPC error, which failed
+    the skills switch with `upstream_mcp` (ref `a48c45f8b9cbed62`). That refusal is now treated like an event that is
+    not offered.
 - **Cleanup:** the acceptance's Topics (2, 3), the Persona "Scout 1937" and the proposed routine were archived on dev.
 
 ## For the owner
