@@ -1,7 +1,9 @@
-# Prompt for the Sidequest session: skills and platform Events into goblin
+# Prompt for the Sidequest session: skills, platform Events and two bots into goblin
 
 Written 2026-10-10 by the goblin session after reading both codebases (goblin `main` 4faef240, agent-jobs `dev`
-eac22c8b) and the current MCP specs. Paste everything below the line into a Claude session in `~/code/agent-jobs`.
+eac22c8b) and the current MCP specs; updated 2026-10-11 for goblin's ADR 0041 (goblin `main` 907c8468: several
+connections per server, Tell me and Hand to). Paste everything below the line into a Claude session in
+`~/code/agent-jobs`.
 
 ---
 
@@ -15,8 +17,29 @@ dev:
    owner-confirmed routine wakes and tells the owner. These are the platform's notifications, delivered to the owner's
    agent.
 
+3. **Two bots from one goblin.** The owner connects Sidequest twice, as a hirer and as a worker. Each goblin
+   *connection* is its own OAuth client and account on Sidequest, with its own label ("Sidequest · Hirer",
+   "Sidequest · Worker"), grants and webhook URL. Events from each become notices in a goblin Topic ("Tell me"),
+   handed to the Personas @Hirer and @Worker ("Hand to"), and @Worker quotes through an owner approval.
+
 Most of this already exists on both sides. This run closes the gaps below and proves them end to end. Coordinate with
 the goblin session that sent this prompt; the protocol is at the end.
+
+## What goblin does now (ADR 0041, on goblin `main`)
+
+- **Connections.** One server may be connected several times. Each connection registers its own DCR client named
+  `goblin · <label>` and gets its own webhook URL, `/hooks/mcp-events/<user>/<connection>/<token>`; the token is an
+  HMAC of user and connection. So two Sidequest accounts subscribe to the same event with **different callback URLs**.
+- **Events detection.** Top-level `capabilities.events` or `capabilities.extensions['io.modelcontextprotocol/events']`;
+  goblin declares the extension too. `payloadSchema` is optional. Every Events request has a 15 s timeout (was 5 s).
+- **Tell me.** An event's notice text comes from the producer: `data.title` (else `data.summary`) as its line, a
+  short body, and `data.url` as its one link (https only, no credentials, no secret-looking query). Without them it
+  reads "<event> from <label>". Up to 20 notices per routine per hour, then one digest line.
+- **Replay guard.** An occurrence more than 5 minutes older than the routine's confirmation, or more than a day old,
+  is acknowledged and dropped: no notice and no run.
+- **Hand to a Persona.** A routine may hand its work to a Persona pinned at its revision; the Persona works with the
+  routine's allowed tools within its Topic's setup joined with its own. Ask-first calls wait for the owner, also
+  inside a Persona's turn.
 
 ## Rules for this run
 
@@ -150,6 +173,24 @@ Sidequest today: `apps/api/src/mcp.ts:243-249` (capabilities) and `:337-400` (re
 (`packages/indexer/src/telegram-notifications.ts`). Once goblin watches `sidequest.inbox`, the owner may be pinged
 twice. Note the overlap and leave both on.
 
+**S11 (must): key subscriptions by principal and callback URL.**
+- goblin's hirer and worker connections are two OAuth grants on Sidequest, and each subscribes with its own callback
+  URL. A subscription must belong to its grant (principal); one connection's subscribe or unsubscribe must never
+  replace or remove the other's, even for the same event name and arguments.
+- **Tests.** Two grants subscribe to `sidequest.inbox` with `{}` and different URLs: two active rows, each delivered
+  to its own URL with its own secret; unsubscribing one leaves the other.
+
+**S12 (must): show the client's name at consent, and pick the agent every time.**
+- goblin names each connection's client `goblin · <label>`. Show that name on the consent screen, and let the owner
+  pick (or create) the Sidequest agent for this grant on every consent, never reusing the last pick silently. That
+  is how the hirer and worker connections end up on different agents.
+
+**S13 (should): producer text on events.**
+- Put `title` (a short line), optionally `summary`, and `url` (an https link to the job, quote or message) in each
+  occurrence's `data`. goblin shows exactly these as the notice; without them it can only say "sidequest.inbox from
+  Sidequest · Worker".
+- No secrets in them, and no instructions: goblin frames them as untrusted data.
+
 **S10 (could): say `terminated` when access stops.**
 - `terminateSubscriptions` and `terminateGrantSubscriptions` only mark rows terminated; no `terminated` control is sent.
 - goblin therefore learns at its next poll or lease renewal (`-32003`), which comes within 5 minutes.
@@ -158,13 +199,28 @@ twice. Note the overlap and leave both on.
 
 ## goblin side (the goblin session does these)
 
-- **G1.** Release 4faef240 to goblin dev. Switching skills on keeps working when a server offers Events but not the
-  skills ones; the grant is withdrawn and the listing refreshes on its `ttlMs`.
-- **G2.** Detect Events from `capabilities.extensions['io.modelcontextprotocol/events']` as well as from top-level
-  `capabilities.events`.
-- **G3.** Raise the subscribe request timeout above 5 s if S5's numbers call for it.
+- **G1 (done, on dev).** Switching skills on keeps working when a server offers Events but not the skills ones.
+- **G2 (done).** Events detected from `capabilities.extensions['io.modelcontextprotocol/events']` as well as from
+  top-level `capabilities.events`.
+- **G3 (done).** Every Events request now has 15 s; S5's numbers still decide whether that is enough.
+- **G4.** Release ADR 0041 to goblin dev. Goblin's dev data is reset for it (its storage changed shape), so Kris
+  connects both Sidequest accounts afresh.
 
-## Live acceptance on dev (testnet only, no funds moved)
+## Live acceptance on dev: two bots (testnet only; every write waits for Kris's go)
+
+Sidequest dev must carry S1–S3 and S11–S13, and goblin dev must carry G4.
+
+1. In goblin Connections, Kris adds Sidequest twice: "Sidequest · Hirer" and "Sidequest · Worker". At each consent
+   Sidequest shows the client name and Kris picks the matching agent. Skills on for both.
+2. Kris makes Personas @Hirer and @Worker, and from each connection's Events section sets up routines: worker
+   requests → Hand to @Worker; worker inbox → Tell me + @Worker; hirer inbox → Tell me + @Hirer. Your side shows two
+   grants, each with its own active subscriptions and callback URLs (S11); no backlog arrives (S1).
+3. A zero-bond request from the hirer that ecosystem bots quote on (Kris's go first).
+4. @Worker quotes through an ask-first approval in goblin (Kris approves; Kris's go for the testnet write).
+5. "You got picked" arrives as a notice in goblin, with your `title` and `url` (S13).
+6. Record both halves: your receipt and reality check, goblin's handoff.
+
+## Earlier single-connection acceptance (still useful as a first pass)
 
 Sidequest dev must carry S1–S3 and goblin dev must carry G1. Kris drives the owner steps in goblin; you read your logs
 and tables.
@@ -196,7 +252,7 @@ and tables.
 
 - Reply to the goblin session with SendMessage; use this message's `from` as `to`. Message at each milestone:
   - your plan, including the S1 omitted-cursor answer and the S4 decision;
-  - S1–S3 committed and on Sidequest dev, with sha and receipt;
+  - S1–S3 and S11–S13 committed and on Sidequest dev, with sha and receipt;
   - S5's numbers;
   - ready for live acceptance;
   - every finding during acceptance.
