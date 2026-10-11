@@ -99,10 +99,16 @@ renewals have bounded grace. Settings provides the billing portal; `/subscribe` 
 privacy and refund pages await operator review before live payments. Native workerd tests use real D1 and an injected
 Dodo client; real Dodo checkout, keys and merchant acceptance remain operator steps.
 
-Routine proposals are reviewed in Settings → Routines. The owner confirms the exact prompt, trigger, timezone, tool
-pairs, budgets and Telegram policy. Confirmed reminders, cron schedules and MCP Events run in isolated threads and post a short
-passive note to main. Run now, Stop, Pause, Edit and Archive are available; Telegram reports require an explicit
-notification choice. Event confirmation authorizes the exact connected server, event name and JSON filters; controls never start a model turn. See [the routines decision](docs/adr/0012-routines.md).
+Several connections to one MCP server are normal: each is the owner's account there, with its own label, sign-in,
+grants and webhook (ADR 0041). A routine fires once, on a schedule or when a connection sends an event; it lives in a
+Topic and can **Tell me** (each event, reminder and answer is a notice in the Topic and a notification in Activity,
+on Telegram too if asked) and **Hand to** Goblin or a Persona pinned at its revision, with an instruction, exact tool
+pairs and budgets. The owner confirms each revision in Settings → Routines or on the connection's Events section;
+Goblin may propose one, never confirm it. Run now, Stop, Pause, Edit and Archive are available. Event confirmation
+authorizes the exact connection, event name and JSON filters; event text reaches the model only as framed untrusted
+data, and controls never start a model turn. A Persona's ask-first call or tool to allow waits under its answer for
+the owner, and their decision resumes it. See [the routines decision](docs/adr/0012-routines.md) and
+[connections, Tell me and Hand to](docs/adr/0041-connections-tell-me-hand-to.md).
 
 LOCAL throwaway-account acceptance covers routine reminders, cron recovery across a process restart, revoked-authority skips and caps through CLIProxy. Native alarm tests also verify recurring recovery wakes; real producer Events and deployed acceptance remain separate.
 

@@ -144,8 +144,12 @@ itself authorize model spend, external messages, deployment or production change
 - Project committed `pi.usage` through app-only cumulative watermarks and stable UTC-day receipts. Passive reports use
   the actual parent `Conversation.submit` write API; acceptance starts no main model turn. Sealed questions resume the
   same run, release executing slots while waiting, and retain the single-routine lock. Run Stop/archive fence and abort
-  owned work; main Stop spares background runs. Frozen Telegram reports and remote receipts are separate from Pi
-  acceptance. Local workerd evidence and retained-dev acceptance remain distinct.
+  owned work; main Stop spares background runs. Frozen Telegram copies of notices and their remote receipts are
+  separate from Pi acceptance. Local workerd evidence and retained-dev acceptance remain distinct.
+- A routine handed to a Persona (ADR 0041) runs in its own run conversation with the Persona's text in the context tail
+  (`markPersona`, `personaText(…, 'routine')`), never a Topic fork; its completed answer is the Persona's `app.persona`
+  entry with the routine's link. A Persona turn that stops on goblin's own approval or grant marker writes its hold
+  into the answer; the owner's reply resumes the same `goblin.persona-turn` task kind with `resume: { fork, text }`.
 
 - Event routines consume the shared static Events handler at the confirmed revision. Seal scrubbed bounded metadata outside Pi commits, label it as untrusted data, preserve event run IDs across definition revisions and ingress retention, and commit a pending handoff with its consumer ACK. Admission is one event/minute per agent; controls never start model work.
 

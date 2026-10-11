@@ -57,6 +57,11 @@ Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun ru
 itself authorize model spend, external messages, deployment or production changes.
 
 - Routine confirmation grants only the reviewed exact Event selector. Subscribe validates arguments against the installed producer descriptor schema. Routine consumers share leases, retire by revision and ACK only after run/pending/skip metadata is durable; gap/termination controls do not authorize a model turn.
+- Connections (ADR 0041): one server may have several connections, each with the owner's label (`mcp/labels.ts`,
+  unique ignoring case; DCR `client_name` is "goblin · <label>") and its own webhook URL
+  (`/hooks/mcp-events/<user>/<connection>/<token>`). Model text names one as `"<label>" (<id>)` (`named`); labels and
+  notice text never enter telemetry. A connection that sends events offers them (`ServerView.events`: open, dismissed,
+  done; `mcp/events/offers.ts`); `mcp_list` shows its first 64 event streams as untrusted data.
 
 - Per-call approvals (ADR 0028): only owner-selected `askFirst` policy pauses a granted tool. Prepare the encrypted
   frozen call in Pi's beforeTool hook and terminate with a local approval marker from execution. Owner approval
