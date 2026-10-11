@@ -115,7 +115,7 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_MODEL_CREDIT_RATES` | JSON tokens per estimated Token Plan Credit (`{ default?, models?, aliases? }`, each rate `{ input, cached, output }`); unset, Alibaba's example rates (ADR 0026). |
 | `GOBLIN_MEMORY_MODEL` | The offered model for thread names, Topic Conversation memory summaries and skill-draft decisions. It is not selected by price; unset or not offered uses the default. |
 | `GOBLIN_SMOKE_MODEL` | Optional model for smoke turns. It must be one of the offered models; unset keeps the owner's pick. |
-| `GOBLIN_MCP_SERVERS` | JSON list of outbound servers: `[{"serverId":"myplan","endpoint":"https://…/mcp"}]`. |
+| `GOBLIN_MCP_SERVERS` | JSON list of outbound servers: `[{"connectionId":"myplan","endpoint":"https://…/mcp"}]`. |
 | `GOBLIN_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP credentials, Events secrets/envelopes and the legacy doorbell secret; derives purpose-separated hook tokens. |
 
 These are source defaults and configuration names; active dev settings and provider caps must be verified separately.
