@@ -67,7 +67,7 @@ read nothing watches yet, and primes nothing on the server.
 
 `lib/workspace/` is the one module that keeps the agent's workspace in the cache, fed by the workspace stream. Each
 slice has its key, `workspaceKeys.slice(name)` (`['workspace', name]`): conversations, activity, apps, topics,
-personas, invocations, receipts and proposals. The slices never go stale and are never collected (`setQueryDefaults` on
+personas, invocations, receipts, proposals and notifications. The slices never go stale and are never collected (`setQueryDefaults` on
 `['workspace']` with `staleTime` and `gcTime` at `Infinity`); `['workspace', 'status']` holds what is wrong with the
 feed.
 
