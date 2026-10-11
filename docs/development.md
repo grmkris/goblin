@@ -389,6 +389,12 @@ right on a desktop and from the bottom on a phone, in light and dark: Everything
 touch rows of 44px, no sideways scroll, and Save as the owner API's compare-and-set answered with a routine left short.
 Screenshots go under `.local/goblin-acceptance/setup-*`; this is browser fixture evidence only.
 
+`heavy bun apps/web/test/ui-events.ts` renders a connection's Events (ADR 0041) from source in local Chromium at desktop
+and phone widths, light and dark: the open offer, Set up on a stream, its filters as a form from the stream's input
+schema (and JSON for one a flat form cannot hold), Hand to a Persona in another Topic, and the proposal's review, with
+the owner API routed in the page and the proposal it receives checked. Screenshots go under
+`.local/goblin-acceptance/events-*`; this is browser fixture evidence only.
+
 `heavy bun apps/web/test/ui-markdown.ts` renders chat Markdown from source in local Chromium at desktop and phone
 widths: a reply that settles keeps its blocks (a table keeps its element and sideways scroll), with and without
 motion (words fade in behind a caret only when motion is allowed), code highlights once
