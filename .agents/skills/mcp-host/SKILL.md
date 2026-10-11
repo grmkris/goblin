@@ -29,8 +29,10 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 - Inbound tokens must verify locally, name `/mcp` as audience, come from an enabled client with live owner consent.
   An inbound client's messages go into main, labelled with its name.
 - Events (`mcp/events.ts`, ADR 0011) require resident authority and an exact server/name/canonical-arguments owner
-  grant through the originating endpoint-bound connection. Top-level `capabilities.events` is decoded at the
-  authenticated SDK fetch seam. Signed controls have separate schemas; payloads never grant or become instructions.
+  grant through the originating endpoint-bound connection. A server offers Events by top-level `capabilities.events`
+  (decoded at the authenticated SDK fetch seam, which strips it) or by the `io.modelcontextprotocol/events` extension,
+  which goblin declares too (ADR 0041). Signed controls have separate schemas; payloads never grant or become
+  instructions.
 - Telegram (`channel/`, ADR 0009) selects Events when advertised, otherwise the legacy doorbell. Preserve sanitized
   `telegram-tg-<update>` and reply operation ids; fence old cursor writes only after both leases confirm. Hooks persist
   receipts before asynchronous dispatch; accepted submissions are distinct from external delivery.

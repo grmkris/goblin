@@ -18,7 +18,8 @@ efficiency and remaining stage budgets. See the benchmark runbook for the exact 
 
 ## MCP Events
 
-The workerd fixture advertises `capabilities.events`, sends verification challenges and signs deliveries with
+The workerd fixture advertises Events (top-level `capabilities.events`, or the SEP-3415 extension), sends verification
+challenges and signs deliveries with
 Standard Webhooks headers. Run the fixture from `apps/runtime`:
 
 ```sh
