@@ -395,6 +395,12 @@ schema (and JSON for one a flat form cannot hold), Hand to a Persona in another 
 the owner API routed in the page and the proposal it receives checked. Screenshots go under
 `.local/goblin-acceptance/events-*`; this is browser fixture evidence only.
 
+`heavy bun apps/web/test/ui-holds.ts` renders the MCP 2026 owner cards (ADR 0042) from source in local Chromium at
+desktop and phone widths, light and dark: a URL request on the connection's own host and one elsewhere (flagged), its
+Open link (a new tab, never followed by the page), Done while the server still waits and Done once it answers, Cancel,
+and the step-up card's sign-in link and Continue, with the owner API routed in the page. Screenshots go under
+`.local/goblin-acceptance/holds-*`; this is browser fixture evidence only.
+
 `heavy bun apps/web/test/ui-markdown.ts` renders chat Markdown from source in local Chromium at desktop and phone
 widths: a reply that settles keeps its blocks (a table keeps its element and sideways scroll), with and without
 motion (words fade in behind a caret only when motion is allowed), code highlights once
