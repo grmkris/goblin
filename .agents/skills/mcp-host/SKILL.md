@@ -68,3 +68,12 @@ itself authorize model spend, external messages, deployment or production change
   dispatches identical arguments through the shared guard; bind endpoint, grant version, caller and execution ids.
   Claim dispatch intent once, refuse automatic retries, and mark interrupted intent uncertain on reconstruction.
   Routine, subagent and App paths cannot bypass the policy; remote hints never choose it.
+
+- Protocol 2026-07-28 (ADR 0042). Tools are re-listed in place (`mcp/tool-list.ts`: one flight per connection, never a
+  partial list, stale on failure); a `subscriptions/listen` stream is held only while a connection is used (closed
+  60 s after its last use, the next use lists first). Only the model's own `mcp_call` declares URL elicitation, per
+  request (`McpConnections.callModelTool`, `mcp/url-asks.ts`): never declare it on the Client, or the console, Apps and
+  approval dispatch would receive requests they cannot answer. A URL request's link and message stay sealed in
+  `app_mcp_url_requests` and out of every tool result; its one retry is claimed before I/O, and an interrupted one is
+  `uncertain`. A 403 `insufficient_scope` is `ScopeRequired`, never `UpstreamMcp`: the connection stays open, and
+  step-up (`beginStepUp`) keeps the tokens until new ones arrive.

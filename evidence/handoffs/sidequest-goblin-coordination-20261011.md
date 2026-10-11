@@ -35,9 +35,9 @@ write.
 | 3 | Skills extension | ready (`ttlMs: 0`; S3: honest TTL) | ready | skills on for both; activate one; digest and frontmatter verify |
 | 4 | Events (SEP-3415) | top-level capability; S1 `cursor: null` = now, S2 extension spelling, S11 subscription per principal and URL | ready (ADR 0041) | each connection subscribes with its own URL; an event becomes a notice; no backlog |
 | 5 | Event text | `summary`, `url` (S13: add `title`) | uses `title`, else `summary`, plus `url` | the notice reads the producer's line and links |
-| 6 | Tool list changes after approval | planned: listen stream + `list_changed` push | to build: re-read the tool list after an approval completes, and on `list_changed` while connected | setup → approve → the same goblin chat can call role tools |
-| 7 | Approvals as "input required: open this URL" | planned (2026 lane) | to build: an owner card with the link, then retry with the request state (chat, Persona and routine turns) | `create_agent` / `request_role` pop the link in goblin and continue |
-| 8 | Missing scope: 403 `insufficient_scope` | planned | to verify: the SDK step-up becomes "sign in again with more access" on the connection | a call beyond the granted scope asks the owner to re-consent |
+| 6 | Tool list changes after approval | ready on dev (exact list while a listen stream is held) | ready on main (0aedcb46, e63dc1d9): re-list in place; listen while in use, closed 60 s after the last use; re-list on a missed tool and after a URL request completes | setup → approve → the same goblin chat can call role tools |
+| 7 | Approvals as "input required: open this URL" | ready on dev (2026 lane) | ready on main (c76b9d26, 6929d711, ad211653, b20908e3, 03d52045): the model's calls declare URL elicitation per request; owner card with the link and host; Done retries with the request state; chat, Persona and routine turns | `create_agent` / `request_role` pop the link in goblin and continue |
+| 8 | Missing scope: 403 `insufficient_scope` | ready on dev (cfd71f59, b3eb624e) | ready on main (d72674f6, 2d4145da, 50f8c2c3): `ScopeRequired`, connection kept; step-up card opens a fresh consent for offered ∪ held ∪ asked, tokens kept until new ones arrive | a call beyond the granted scope asks the owner to re-consent; needs a narrow sign-in (goblin asks for every offered scope; Kris to choose) |
 | 9 | Missing role: tool error → `request_role` | planned | works (plain tool error) | the model calls `request_role`, which leads to #7 |
 | 10 | Owner approval before a write in goblin | n/a | ready (ask-first, also in Persona turns) | @Worker quotes through an approval |
 
@@ -56,3 +56,17 @@ write.
    no mainnet; Kris's go before every write.
 
 The full Sidequest prompt (S1–S13, the live acceptance) is `evidence/handoffs/sidequest-skills-events-prompt-20261010.md`.
+
+## The 2026 lane, as built (ADR 0042)
+
+Sidequest's contract for row 7: `requestState` is the agent operation id and never expires; a retry is idempotent;
+pending answers `input_required` again; a decline completes as an error (`closed:…`) and leaves the approval pending
+on Sidequest; a mismatched state is -32602; the one input key is `approval`. For row 6, the exact list is per OAuth
+token family while it holds at least one listen stream; a deploy drops streams, and the next list is the stable one
+(stable ⊇ exact) until goblin listens again. For row 8, goblin's connect asks for every scope the server offers, so a
+403 appears only when an agent gains a role beyond an older sign-in; the joint run needs a narrow sign-in, either an
+untick on Sidequest's consent (reverses Kris's Q7) or a scope picker in goblin. Kris decides.
+
+The joint chain: connect narrow (read + hire) → `request_role {role: 'work'}` meets a URL request (7) → Kris allows it
+on Sidequest → `list_changed` (6) → the re-list includes `apply` → `apply` answers 403 (8) → step-up → `apply` runs.
+Testnet only; Kris's go before every write.
