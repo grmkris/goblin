@@ -108,6 +108,7 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_STAGE`, `GOBLIN_APP_URL` | `dev` and the Worker's HTTPS origin. |
 | `GOBLIN_DOMAIN`, `GOBLIN_ZONE_ID` | Custom hostname and its Cloudflare zone ID. |
 | `GOBLIN_SIGNUP_MODE`, `GOBLIN_SIGNUP_INVITE_CODE` | `open`, `invite` or `closed` (default), and the invite code. |
+| `GOBLIN_FREE_DAILY_CREDITS` | The free plan: daily model Credits for an account without Pro (no routines); unset or `0`, every account must subscribe. Capped at Pro's 800. |
 | `GOBLIN_MAIL_SENDER` | Required OTP sender on a Cloudflare Email Sending domain. |
 | `GOBLIN_OWNER_EMAIL`, `GOBLIN_SMOKE_SESSION_FILE` | Existing owner email and mode-600 OTP session JSON; only smoke reads them. |
 | `GOBLIN_BETTER_AUTH_SECRET` | Better Auth's secret. |
