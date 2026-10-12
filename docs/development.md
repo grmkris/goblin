@@ -34,7 +34,7 @@ its test secret for a real subscription.
 
 ## MCP call approvals
 
-Under Connections, allow the exact tool, then change **Run when needed** to **Ask first**. An agent call ends its
+Under Connections, allow the exact tool, then choose **Asks you first** in its policy menu. An agent call ends its
 turn with an approval card showing the exact redacted arguments. Approve once sends the original call, including
 its `operationKey`; Refuse leaves the remote untouched. A later text message grants no approval. Existing grants
 keep their prior automatic policy until the owner explicitly changes it; remote hints never choose it.
@@ -214,8 +214,8 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   turns it on, and an edit pauses it until you confirm again. The agent can also propose one in chat.
 - **MyPlan as an App.** The suggested MyPlan server uses `https://dev.myplan.lol/mcp` on local and dev
   (`apps/runtime/src/mcp/suggested.ts`); `GOBLIN_MCP_SERVERS` may configure another endpoint. Connect it, then switch
-  on **Its App** above the tools that App uses. Ask the agent to open a note ("Open my Trip plan
-  note"); the App opens in place under the tool row (on an older call, open the row and press *Show app*). Its bar
+  on the App's group (named after its `ui://` resource) above the tools it uses. Ask the agent to open a note ("Open
+  my Trip plan note"); the App opens in place under the tool row (on an older call, open the row and press *Show app*). Its bar
   opens it as a page beside the conversation or closes it; on the page, the pill's menu brings it back, fills the
   workspace or closes it. Several Apps run at once, in any conversation; beyond six the least recently seen unloads to
   a stub. These moves keep the same iframe and bridge. What an App shares rides along with your next message in its conversation as untrusted
