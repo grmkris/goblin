@@ -1,6 +1,12 @@
 [
   {
     "rule": "generic-api-key",
+    "path": "apps/wallet/src/services/programs/setup.test.ts",
+    "sha256": "a674ffd2fb85bde6baa7b8bb7fd47d0ecbb20871c3ae3aeddbd7951aa4a8e5d7",
+    "reason": "Public Base USDC contract address used as a deterministic unit-test fixture."
+  },
+  {
+    "rule": "generic-api-key",
     "path": ".agents/skills/sources.json",
     "sha256": "753df38196772f087da2c6fac0ed7ce4efd46131d19016aeec997370efd4e904",
     "reason": "Reviewed deterministic fixture or migration identifier; see private publication audit."
