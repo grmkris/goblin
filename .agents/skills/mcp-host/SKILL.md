@@ -75,9 +75,11 @@ itself authorize model spend, external messages, deployment or production change
 
 - Protocol 2026-07-28 (ADR 0042). Tools are re-listed in place (`mcp/tool-list.ts`: one flight per connection, never a
   partial list, stale on failure); a `subscriptions/listen` stream is held only while a connection is used (closed
-  60 s after its last use, the next use lists first). Only the model's own `mcp_call` declares URL elicitation, per
-  request (`McpConnections.callModelTool`, `mcp/url-asks.ts`): never declare it on the Client, or the console, Apps and
-  approval dispatch would receive requests they cannot answer. A URL request's link and message stay sealed in
+  60 s after its last use, the next use lists first). Only the model's `mcp_call` declares URL elicitation, per
+  request (`McpConnections.callModelTool`, `mcp/url-asks.ts`), and so does the dispatch of its approved held call
+  (`sendApproved`): a 2026 server refuses (-32021) an ask it may not make. Never declare it on the Client, or the
+  console and Apps would receive requests they cannot answer. An approved dispatch that meets one goes on as the URL
+  request, whose retry carries the approval (`ApprovedDispatch.answered`). A URL request's link and message stay sealed in
   `app_mcp_url_requests` and out of every tool result; its one retry is claimed before I/O, and an interrupted one is
   `uncertain`. A 403 `insufficient_scope` is `ScopeRequired`, never `UpstreamMcp`: the connection stays open, and
   step-up (`beginStepUp`) keeps the tokens until new ones arrive. It asks for what the connection holds and what the
