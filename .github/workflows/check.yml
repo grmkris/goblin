@@ -15,8 +15,9 @@ jobs:
     runs-on: [self-hosted, linux, x64, netcup]
     timeout-minutes: 30
     env:
-      # Not the local default (18861), so CI never collides with an agent running the harness on the same box.
-      GOBLIN_HARNESS_PORT: '18862'
+      # Clear of the local default (18861) and of the 188xx ports video previews take on this box, so CI never collides
+      # with an agent running the harness or a preview server.
+      GOBLIN_HARNESS_PORT: '38862'
       TURBO_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
