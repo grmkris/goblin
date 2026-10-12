@@ -1,10 +1,11 @@
 # Wallet worker
 
 Read the root instructions first. `@goblin/wallet-worker` is the Goblin Wallet Cloudflare Worker: the owner API, the
-inbound MCP server, OAuth, the per-owner `WalletLedger` Durable Object and the `WalletAuth` singleton. It serves the
-`@goblin/wallet-web` build as static assets and `/views/*.html` through `env.ASSETS`. It may import `@goblin/wallet`
-only. Infrastructure is `alchemy.run.ts` (Stack `goblin-wallet`); it is deployed by `bun run deploy:wallet-dev`
-(`scripts/wallet-stage.ts`), never by `scripts/stage.ts`.
+inbound MCP server, OAuth, the per-owner `WalletLedger` Durable Object, the `WalletAuth` singleton and `WalletRelay`
+(one per network chain id and relay address: the only signer of relay transactions, with their stored bytes, nonces
+and daily upgrade quota). It serves the `@goblin/wallet-web` build as static assets and `/views/*.html` through
+`env.ASSETS`. It may import `@goblin/wallet` only. Infrastructure is `alchemy.run.ts` (Stack `goblin-wallet`); it is
+deployed by `bun run deploy:wallet-dev` (`scripts/wallet-stage.ts`), never by `scripts/stage.ts`.
 
 ## Checks
 
@@ -16,6 +17,8 @@ only. Infrastructure is `alchemy.run.ts` (Stack `goblin-wallet`); it is deployed
 - Unit tests call `worker.fetch` with a hand-built env. There is no workerd integration test yet; the first lane that
   adds a Durable Object behavior adds one, and this line changes with it.
 - Money paths get table tests in `@goblin/wallet`, not here.
+- `WALLET_LIVE` selects mainnets or their testnets for every rail (`RailsDeps.live`, `rpcFromEnv`, the relay); on
+  testnets Tempo transfers, swaps and bridges are refused because their packages speak mainnet only.
 
 ## Landmines
 
