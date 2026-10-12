@@ -21,15 +21,19 @@ copying and a Raw view.
 The agent's replies draw Mermaid diagrams, charts and maps from fenced blocks, in the theme's colours.
 Diagrams offer an explorer with zoom, pan and node connections, shared with agent apps.
 
-Telegram comes through a mygram MCP connection. The owner turns on a server's **Telegram** switch in Connections; signed
-MCP Events wake an authoritative inbox pull into main, and replies go back with `send_message`. Older servers use
-the doorbell fallback until cut-over. Owner-enabled skills libraries use update Events to invalidate their cached
+Telegram comes through mygram, connected directly or through mysi, which brings the owner's own my* apps (notes,
+browsers, Telegram, email, skills, terminals) in one connection with its tools named `<app>_<tool>`. The owner turns on
+a connection's **Telegram** switch in Connections; signed MCP Events wake an authoritative inbox pull (`inbox_read`)
+into main, and replies go back with `message_send`, under either spelling (ADR 0052). A server without Events uses the
+doorbell fallback. The agent's `mcp_list` lists a connection with many tools, such as mysi, by service first.
+Owner-enabled skills libraries use update Events to invalidate their cached
 catalog; the next activation refetches, while retained activations keep their verified version.
 
 Apps run in place in any conversation, several at once, and move to their page (`/a/<id>`, with the way back to its
 channel) and back without reloading. On a phone the navigation is a drawer and a thread is a full view with a back to
-its channel. Owners can add public servers by URL or from MCP registries,
-grant tools explicitly, mark individual tools **Ask first** for approval of every exact call, choose an offered model, and see the per-account daily budget in Credits. The agent uses `ask_user`
+its channel. Owners can add public servers by URL, from MCP registries, or from goblin's shelf (mysi, goblin's own
+services, and servers that need no sign-in grouped by what they are for: travel, knowledge, crypto data, views in the
+chat, code), grant tools explicitly, mark individual tools **Ask first** for approval of every exact call, choose an offered model, and see the per-account daily budget in Credits. The agent uses `ask_user`
 to ask questions the owner answers in their next message. The owner attaches files to a message with the composer's
 paperclip; the agent reads them and writes its own results beside them, kept per agent in SQLite and R2.
 

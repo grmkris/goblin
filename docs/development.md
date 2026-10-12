@@ -197,23 +197,29 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   zoom, drag or use arrows when zoomed, and select a node by click, tap, Enter or Space. Fit restores the view; Escape
   clears selection, then closes. Agent-app views share the kit; see `app_docs` topic `ui`. Local browser acceptance:
   build the app runtime with `heavy bun run --cwd packages/app build`, then run `heavy bun apps/web/test/ui-diagram.ts`.
+- **mysi.** The shelf's first suggestion is one mysi connection for the owner's own apps (MyPlan, MyTab, MyGram,
+  MyInbox, MySkills, MyTmux): `https://dev.mysi.lol/mcp?codemode=off` on local and dev, `https://mysi.lol/mcp?codemode=off`
+  on test and prod (`apps/runtime/src/mcp/suggested.ts`, ADR 0052). mysi is a product of its own with a free tier; the
+  owner signs up there and chooses which apps the connection reaches on mysi's consent page. Its tools are
+  `<service>_<tool>` (`mygram_inbox_read`), so ask the agent for one app's tools ("list my myplan tools") and it calls
+  `mcp_list` with `service`. A connection made to plain `/mcp` counts as added, but lists the code tools instead.
 - **Skills.** Connect a server that offers skills, then turn on its **Use its skills** switch. The agent reads and
-  follows those procedures; their tools still need grants. To receive drafts in a library such as MySkills, grant
-  `skill_draft` and `skill_draft_status`, then review the proposals there.
-- **Telegram.** Bind the authorized mygram connection to the bot, then turn on its **Telegram** switch. A server offering
-  Events grants `inbox`, `send_message` and its two exact event selectors; older servers use the four-tool doorbell
-  fallback. Connections shows which transport is active. New inbox messages arrive in main as **Telegram**, including
-  answers to pending questions, and replies go back to the bot. Turning it off unsubscribes and clears pending
-  replies. The suggested MyGram endpoint is `https://dev.mygram.lol/mcp` for local/dev and `https://mygram.lol/mcp`
-  for test/prod. It is unchanged while the owner decides the goblin bot/account setup; a dedicated bot is not assumed.
+  follows those procedures; their tools still need grants. To receive drafts in a library such as myskills, grant
+  `skill_draft` and `skill_draft_status` (through mysi, `myskills_skill_draft` and `myskills_skill_draft_status`), then
+  review the proposals there.
+- **Telegram.** Bind the authorized mygram profile to the bot (in mygram, or on mysi's consent page), then turn on the
+  connection's **Telegram** switch. A server offering Events grants mygram's inbox and send tools (`inbox_read` and
+  `message_send`, or `mygram_inbox_read` and `mygram_message_send` through mysi) and its two exact event selectors;
+  a server without Events uses the four-tool doorbell fallback. Connections shows which transport is active. New inbox
+  messages arrive in main as **Telegram**, including answers to pending questions, and replies go back to the bot.
+  Turning it off unsubscribes and clears pending replies.
 - **Resident authority.** Settings → Your agent → **Work while you're away** shows it and when it expires. Owner
   activity renews it for 30 days; inbound and scheduled work do not renew it. Turning it off stops all outbound MCP
   use by the agent until you turn it on again.
 - **Routines.** Settings → Routines → New routine: what it does, when it runs (once at a time you pick, on a cron
   schedule, or on a server's event) and the tools and limits it may use. Saving makes a proposal; Confirm on its card
   turns it on, and an edit pauses it until you confirm again. The agent can also propose one in chat.
-- **MyPlan as an App.** The suggested MyPlan server uses `https://dev.myplan.lol/mcp` on local and dev
-  (`apps/runtime/src/mcp/suggested.ts`); `GOBLIN_MCP_SERVERS` may configure another endpoint. Connect it, then switch
+- **MyPlan as an App.** Connect mysi with MyPlan included (or MyPlan's own `https://dev.myplan.lol/mcp` by address), then switch
   on the App's group (named after its `ui://` resource) above the tools it uses. Ask the agent to open a note ("Open
   my Trip plan note"); the App opens in place under the tool row (on an older call, open the row and press *Show app*). Its bar
   opens it as a page beside the conversation or closes it; on the page, the pill's menu brings it back, fills the
@@ -227,9 +233,9 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   answer text or capability. Retry and reload reuse the same submission operation. Dismiss leaves the answer saved.
   Local host acceptance: `heavy bun apps/web/test/ui-message.ts` covers save, stage, Continue, retry, reload and
   Dismiss with fixture tool replies; it does not prove authenticated MyPlan acceptance or a deployed release.
-- **MyInbox.** The suggestion uses `https://dev.myinbox.lol/mcp` locally and `https://myinbox.lol/mcp` on dev/test/prod.
-  Public metadata advertises DCR, PKCE S256 and public clients; this does not prove a signed-in connection. The owner
-  connects it in Connections, asks “Show my inbox in an app”, and allows the app power card. The agent uses the exact
+- **MyInbox.** Connect mysi with MyInbox included (or MyInbox's own `https://myinbox.lol/mcp` by address). Public
+  metadata advertises DCR, PKCE S256 and public clients; this does not prove a signed-in connection. The owner asks
+  “Show my inbox in an app” and allows the app power card. The agent uses the exact
   connected tool schema/server id, the `app_docs` `examples` pattern, and a 15-minute refresh schedule.
 - **Add goblin to Claude Code.**
 

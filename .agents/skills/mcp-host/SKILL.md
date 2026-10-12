@@ -33,10 +33,16 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   (decoded at the authenticated SDK fetch seam, which strips it) or by the `io.modelcontextprotocol/events` extension,
   which goblin declares too (ADR 0041). Signed controls have separate schemas; payloads never grant or become
   instructions.
-- Telegram (`channel/`, ADR 0009) selects Events when advertised, otherwise the legacy doorbell. Preserve sanitized
+- Telegram (`channel/`, ADR 0009) selects Events when advertised, otherwise the legacy doorbell. Its tool and Event
+  names are mygram's or mysi's spelling, read from the connection (`telegramTools`, `telegramEvent`). Preserve sanitized
   `telegram-tg-<update>` and reply operation ids; fence old cursor writes only after both leases confirm. Hooks persist
   receipts before asynchronous dispatch; accepted submissions are distinct from external delivery.
-- MyInbox suggestions use dev.myinbox.lol locally and myinbox.lol on dev/test/prod. Discovery advertises DCR and PKCE public clients; owner sign-in/power approval and real-message acceptance are separate. MyGram local/dev stays dev.mygram.lol pending the owner's bot/account decision.
+- The shelf (`mcp/suggested.ts`, ADR 0052) offers one mysi connection (`mysi.lol/mcp?codemode=off`, dev.mysi.lol on
+  local/dev) instead of the separate my* servers, then goblin's services, then servers that need no sign-in in groups,
+  only where Mercator does not sell the same thing; re-probe one with an `initialize` before adding it. mysi names
+  tools `<service>_<tool>` and Events `<service>.<event>`: check an app's tool or Event name only through
+  `packages/contracts/src/service-names.ts`, never with a bare string. `mcp_list` lists a connection with many such
+  tools by service (`service`, `query`).
 - Home pinning adds no grant: only the owner adds an open MCP App after launch/resource re-verification. Every owner
   write, `/api/mcp/` included, needs the app's Origin and the CSRF header at the Worker's edge (ADR 0038); the bridge
   remains bound to the originating server.

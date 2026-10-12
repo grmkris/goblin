@@ -17,5 +17,5 @@ Vendored skills are pinned in `.agents/skills/sources.json` (v2: upstream commit
 recorded adaptations) and verified by `bunx repoagents check`, which `agents:check` runs first;
 `tools/agents.ts` keeps only the repo-authored checks. The shared design, review and grilling skills come from
 grmkris/personal (emil-design-eng, improve-animations and prototype retired for overlap); Cloudflare skills from
-cloudflare/skills, see `cloudflare-provenance.md`. `.mcp.json` lists myplan, myinbox, mytab, mytmux, mygram and
-cloudflare (OAuth). Change skills with `bunx repoagents skills add`, `skills rehash` and `skills update`.
+cloudflare/skills, see `cloudflare-provenance.md`. `.mcp.json` lists mysi (one OAuth for the my* apps: myplan,
+myinbox, mytab, mytmux, mygram, myskills) and cloudflare (OAuth). Change skills with `bunx repoagents skills add`, `skills rehash` and `skills update`.
