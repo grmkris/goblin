@@ -98,4 +98,4 @@ Run `bun run check:public` for the complete product and tooling gates after inst
 
 [Architecture](docs/architecture.md), [decisions](docs/adr/) and [glossary](GLOSSARY.md) explain the implementation. [Publication](PUBLICATION.md) explains the private-dev to production to public-source flow. Promote verifies core Goblin and Wallet production before publishing the accepted source.
 
-Core Goblin-owned code is source available under [PolyForm Noncommercial 1.0.0](LICENSE). Wallet source in `apps/wallet`, `apps/wallet-web` and `packages/wallet` uses MIT. [NOTICE](NOTICE.md) lists attribution and third-party terms, including React Leaflet's Hippocratic-2.1 license. Feedback is welcome through Issues.
+Goblin-owned code is available under the [MIT License](LICENSE). [NOTICE](NOTICE.md) lists author-owned provenance and third-party terms, including React Leaflet's Hippocratic-2.1 license. Feedback is welcome through Issues.

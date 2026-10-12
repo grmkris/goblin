@@ -6,4 +6,4 @@ A private `dev` push passes checks, deploys the daily dev instance and runs auth
 
 Goblin Wallet runs at `https://wallet.goblin.surf`. Promote deploys both core Goblin and Wallet production from the same accepted source SHA, then checks Wallet live health, the production OAuth issuer and anonymous MCP refusal. Publication requires current source/version receipts for both Workers. These public probes do not establish payment or financial-provider acceptance. Local tests, dev acceptance, production acceptance and live financial-provider evidence are separate claims.
 
-Core Goblin uses PolyForm Noncommercial; the three Wallet workspaces use MIT. See [NOTICE](NOTICE.md) for the exact boundaries and third-party terms. Synthetic fixtures and demo assets are not production user data.
+Goblin-owned code uses MIT. See [NOTICE](NOTICE.md) for the exact ownership boundary and third-party terms. Synthetic fixtures and demo assets are not production user data.

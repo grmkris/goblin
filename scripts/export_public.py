@@ -77,7 +77,7 @@ def portable_manifest(data):
             scripts[name] = scripts[name].replace('bun run test:release && ', '').replace('python3 -B scripts/release_test.py && ', '')
     if 'check' in scripts:
         scripts['check:public'] = scripts['check']
-    manifest['license'] = 'PolyForm-Noncommercial-1.0.0'
+    manifest['license'] = 'MIT'
     return (json.dumps(manifest, indent=2) + '\n').encode()
 
 
