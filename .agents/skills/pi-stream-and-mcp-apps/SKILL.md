@@ -47,7 +47,7 @@ conversation outside it.
   iframe in its own fixed stage (`stage.tsx`) that follows page > inline slots; moving an
   iframe in the DOM reloads the App and loses its state, so only the empty measured slots move. Stages clip to their
   slot's scrolling containers, their chat's `data-app-cover` elements and any `data-app-overlay` (the thread panel). At most six load; the least recently seen
-  unloads to a stub, never one on screen (`lib/app-residency.ts`). Fullscreen is the App's page (`/a/<id>`). Verify moving, resizing, scrolling and responsive changes with an
+  unloads to a stub, never one on screen (`lib/app-residency.ts`). Fullscreen is the App's page (`/a/<id>`), with goblin's composer for its conversation over the bottom edge as `data-app-cover` and what it covers told to the App as `safeAreaInsets` (ADR 0053); a server's own App lives in its own thread and loads with its tool called as the owner. Verify moving, resizing, scrolling and responsive changes with an
   actual SDK-connected iframe, plus origin binding and teardown/reconnect tests.
 - An App's tool and resource calls go through the owner API to the originating server only, and need that server's
   grant: the frame (`components/apps/frame.tsx`) sends them through `apps/queries.ts` with `x-mcp-caller: app`, and an

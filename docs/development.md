@@ -179,6 +179,11 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - **Threads, Activity and Tasks.** The rail's Threads lists every thread, unread first; Activity what needs you (with
   Undo for what Goblin organized); Tasks the Delegates, Personas and routines at work. A Persona in the sidebar opens
   its profile: edit it (each save is a revision), archive it, or read its revisions. **Add persona** makes one.
+- **Pinned and an App full screen.** The sidebar's Pinned section lists what you pinned, in your order, on every
+  device; a connected server with its own App is pinned until you unpin it. Pin to sidebar is in a server card's menu,
+  an App page's menu and the bar above an App in a chat; a row's own menu moves it or unpins it. A pinned server opens
+  its App in its own thread (listed under Threads). On an App's page goblin's composer stays at the bottom: a reply
+  shows as one line over it, and a tap opens the conversation beside the App (a sheet on a phone).
 - **Threads from the composer, Personas and sources.** The composer's thread button (or `/new-thread`) makes the next
   send start a thread; × goes back with the draft kept. On a server with Move, a message of yours in a channel offers
   Move to thread in its toolbar. With Personas, `@` offers them; tag two or more and choose Together or In turn.
