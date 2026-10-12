@@ -414,6 +414,12 @@ Open link (a new tab, never followed by the page), Done while the server still w
 and the step-up card's sign-in link and Continue, with the owner API routed in the page. Screenshots go under
 `.local/goblin-acceptance/holds-*`; this is browser fixture evidence only.
 
+`heavy bun apps/web/test/ui-start.ts` renders first-run Start (ADR 0048) from source in local Chromium at phone (light)
+and desktop (dark) widths: the splash, the welcome, the wallet to connect, with setup left (its own words and the link
+to its setup page) and ready (what it holds, and Change for how goblin pays), services and the kickoff, with the owner
+API routed in the page and no screen scrolling sideways. It needs `@goblin/app`'s runtime built (its own
+`build` script). Screenshots go under `.local/goblin-acceptance/start-*`; this is browser fixture evidence only.
+
 `heavy bun apps/web/test/ui-markdown.ts` renders chat Markdown from source in local Chromium at desktop and phone
 widths: a reply that settles keeps its blocks (a table keeps its element and sideways scroll), with and without
 motion (words fade in behind a caret only when motion is allowed), code highlights once
