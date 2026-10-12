@@ -18,7 +18,7 @@ EXCLUDED = (
     '.agents/**', '.claude/**', '.codex/**', '.cursor/**', '.grok/**', '.mcp.json',
     '.local/**', '.alchemy/**', '.aws/**', '.github/**', 'evidence/**',
     'AGENTS.md', 'CLAUDE.md', '*/AGENTS.md', '*/CLAUDE.md', 'docs/agents/**', '**/evidence/**',
-    'docs/goblin-cutover-handoff.md', 'docs/implementation.md', 'docs/evidence/**',
+    '*handoff*.md', 'docs/archive/**', 'docs/implementation.md', 'docs/evidence/**',
     'scripts/release*.py', 'scripts/promote*.py', 'scripts/publish*.py',
     'scripts/export_public*.py', 'scripts/publication_audit*.py', 'scripts/ci_credentials.py', 'scripts/publication/**',
     'scripts/wallet_release*.py', 'scripts/ci_credentials_test.py',

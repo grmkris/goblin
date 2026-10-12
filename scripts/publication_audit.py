@@ -12,7 +12,11 @@ import tempfile
 ROOT = Path(__file__).resolve().parent.parent
 
 
-
+def private_history_paths(root):
+    from export_public import excluded, overlays
+    public_overlays = set(overlays())
+    paths = subprocess.check_output(['git', 'log', '--format=', '--name-only', 'HEAD'], cwd=root, text=True).splitlines()
+    return sorted({path for path in paths if path and excluded(path) and path not in public_overlays})
 
 def leak_findings(root):
     binary = os.environ.get('GOBLIN_GITLEAKS', '/var/lib/goblin-release/tools/gitleaks')
@@ -60,13 +64,15 @@ def dependency_findings(root):
 
 
 def audit(root: Path, output: Path) -> dict[str, object]:
+    private_paths = private_history_paths(root)
     findings, fixtures = leak_findings(root)
     advisories, reviewed = dependency_findings(root)
-    result = {'historyFindings': findings, 'reviewedFixtureMatches': fixtures, 'blockingAdvisories': advisories,
-              'nonApplicableAdvisories': reviewed, 'status': 'passed' if not findings and not advisories else 'failed'}
+    result = {'privateHistoryPaths': private_paths, 'historyFindings': findings, 'reviewedFixtureMatches': fixtures,
+              'blockingAdvisories': advisories, 'nonApplicableAdvisories': reviewed,
+              'status': 'passed' if not private_paths and not findings and not advisories else 'failed'}
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, indent=2) + '\n')
-    if findings or advisories:
+    if private_paths or findings or advisories:
         raise RuntimeError('public_history_or_dependency_audit_failed')
     return result
 

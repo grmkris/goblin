@@ -55,9 +55,13 @@ class PublicExportTest(unittest.TestCase):
         nested = self.source / 'docs/archive/initial/evidence'
         nested.mkdir(parents=True)
         (nested / 'deployment.json').write_text('{"token":"fixture-secret"}\n')
+        (self.source / 'docs/archive/initial/myapps-source-inventory.json').write_text('{}\n')
+        (self.source / 'docs/handoff.md').write_text('private operational handoff\n')
         sha = self.commit('nested evidence')
         export(self.source, self.destination, sha, self.directory / 'map.json')
         self.assertFalse((self.destination / 'docs/archive/initial/evidence/deployment.json').exists())
+        self.assertFalse((self.destination / 'docs/archive/initial/myapps-source-inventory.json').exists())
+        self.assertFalse((self.destination / 'docs/handoff.md').exists())
 
     def test_sanitizing_private_urls_keeps_source_delimiters(self):
         (self.source / 'source.ts').write_text(
