@@ -31,4 +31,7 @@ a barrel. Plain async code with Schema at boundaries; Effect lives in `apps/wall
   Tempo Moderato has no USDC; `0x20c0…0000` is `pathUSD` (6 decimals) on both Tempo networks.
 - All ten Delegation Framework v1.3.0 contracts (manager, delegator, eight enforcers) have code on all eight chains,
   Tempo and Moderato included.
+- Pimlico quotes its ERC-20 paymaster `0x7777…834C` on EntryPoint v0.7 for USDC on Base, Arbitrum and Ethereum
+  (`pimlico_getTokenQuotes`, 12 Oct), and the DeleGator's `entryPoint()` is that v0.7 EntryPoint. UserOperations
+  through it ran on Base mainnet (ADR 0050).
 - Not verified: the explorer URLs (spot-checked by eye only) and the testnet USDC addresses' faucet availability.

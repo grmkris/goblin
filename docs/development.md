@@ -521,10 +521,9 @@ Its stage commands are `scripts/wallet-stage.ts`, not `scripts/stage.ts`:
   `goblin-wallet-dev[-role]`; Alchemy state lives in `/var/lib/goblin-release/alchemy/state/goblin-wallet/dev` and the
   first deploy creates it.
 - `bun run plan:wallet-prod` and `GOBLIN_CONFIRM_PROD=1 bun run deploy:wallet-prod` do the same for the `prod` stage
-  (`wallet.goblin.surf`, `goblin-wallet-prod[-role]`), reading `.local/wallet-prod.env`. Prod has its own relay key: a
-  relay's nonces live in its stage's `WalletRelay`, so two stages must never share one key.
+  (`wallet.goblin.surf`, `goblin-wallet-prod[-role]`), reading `.local/wallet-prod.env`.
 
-The script scrubs `CLOUDFLARE_*`, `GOBLIN_*`, `PRIVY_*`, `RELAY_*`, `TREASURY_*` and `WALLET_*` from the inherited
+The script scrubs `CLOUDFLARE_*`, `GOBLIN_*`, `PRIVY_*`, `PIMLICO_*`, `TREASURY_*` and `WALLET_*` from the inherited
 environment, then merges the shared Cloudflare file and `.local/wallet-<stage>.env` (mode 600) into a temporary
 mode-600 file. Names below; never commit or print the values.
 
@@ -536,7 +535,7 @@ mode-600 file. Names below; never commit or print the values.
 | `PRIVY_AUTHORIZATION_PUBLIC_KEY` | operator: registers the key quorum in Privy |
 | `PRIVY_POLICY_ADMIN_KEY`, `PRIVY_POLICY_ADMIN_PUBLIC_KEY` | operator: policy administration |
 | `PRIVY_SIGNER_ID`, `PRIVY_POLICY_ID` | Worker (plain); optional until Privy is provisioned |
-| `RELAY_PRIVATE_KEY`, `RELAY_ADDRESS` | Worker (secret) and its public address: pays gas for relayed transactions |
+| `PIMLICO_API_KEY` | Worker (secret): Pimlico's bundler and ERC-20 paymaster; spends nothing |
 | `TREASURY_PRIVATE_KEY`, `TREASURY_ADDRESS` | operator only: funds test wallets; never bound to the Worker |
 | `WALLET_DOMAIN`, `WALLET_ZONE_ID` | custom domain; empty domain serves on workers.dev |
 | `WALLET_RPC_URLS` | optional JSON object of chain id to RPC URL; empty uses the public RPCs |
