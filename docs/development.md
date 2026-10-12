@@ -373,7 +373,8 @@ stage, with Kris, before the first subscription:
 2. Write the collector's Privy policy and create it in Privy (it is never applied by a script):
    `bun packages/wallet/scripts/create-collector.ts --env .local/wallet-<stage>.env --policy-out <file>`. The
    document's owner is `PRIVY_POLICY_ADMIN_ID`; its rules allow only redeeming a delegation, the paymaster's gas
-   approval and the DeleGator upgrade, and deny export.
+   approval and the DeleGator upgrade, and deny export. `packages/wallet/policies/collector-base.json` is the same
+   document for review, its owner left as a placeholder.
 3. Create the collector with that policy's id:
    `bun packages/wallet/scripts/create-collector.ts --env .local/wallet-<stage>.env --stage <stage> --policy-id <id> --out <file>`.
    It is owned by the policy-admin key quorum, signed for by `PRIVY_SIGNER_ID` under the policy, created once per
