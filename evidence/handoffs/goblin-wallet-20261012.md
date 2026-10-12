@@ -30,6 +30,36 @@ Spike receipts are in `evidence/wallet/`:
   against it.
 - **S5**: Exa's live 402 offers x402 on Base and MPP on Tempo, and Privy signs the x402 payment.
 
+## The afternoon (12:30–14:00)
+
+Decided with Kris in a grill session:
+
+- The wallet workspaces are MIT, and goblin stays PolyForm Noncommercial.
+- The README carries the wallet with explorer links and screenshots, and a corrected disclosure: everything was built in
+  the contest window.
+- The wallet joins Promote; the Codex publication pane is building `wallet_release.py`.
+- goblin opens sign-up with a 50 Credits/day free plan, shipped by the Mercator session.
+- Paid inference through the wallet waits until after the deadline (`docs/next.md`).
+
+Built and proven on mainnet:
+
+- **Add funds from any chain.** `POST /api/deposits` returns a one-off Relay deposit address, and
+  `GET /api/deposits/:address` follows it by address. Relay's keyless status API rate-limits, so `unknown` is a state
+  and the card also watches the balance. Live: 0.0004 ETH sent to the address (`0x7deaa692…61e6`) arrived as 0.99 USDC.
+  Onboarding now starts with "Fund your account".
+- **The UX plan's wallet slices.** One display model (integer micro-dollars; spendable scoped to what the agent can
+  execute; unknown is never zero), a shared overview for Home and the App, and payment shown apart from delivery.
+- **Beat 6.** The swap of 1 USDC to ETH through LI.FI went through on the second try (`0x8670f3d1…45fc`); the first
+  reverted in simulation because a node behind the fresh approval was asked. Swaps and bridges now wait until the
+  approval is visible. Revoke: the owner disconnected goblin in the wallet, goblin's next call was refused and it asked
+  to sign in again, and reconnecting restored it with the grants intact.
+
+Still open:
+
+- **Public RPCs remain the weak point.** Tenderly's gateway rate-limited this box once. A keyed RPC for prod would
+  remove the risk.
+- **Arbitrum and Ethereum upgrades are not run.** The relay holds no ETH there.
+
 ## The live pass (11:00–12:20)
 
 Kris funded the test owner with 0.012 ETH on Base. Every hash is in `evidence/wallet/beats-mainnet-20261012.json`.
