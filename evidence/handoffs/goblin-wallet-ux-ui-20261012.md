@@ -2,14 +2,15 @@
 
 **Status:** Proposed implementation handoff; no product code changed.
 
-**Update, 12 October 2026 (later):** a visual-upgrade pass implemented most of this on `main`. `0b5a7c0b`: unread
-chains reported as unknown, never zero; owner funds count as spendable only where an allowance reaches them.
-`3b47fd48`: one shared overview for the dashboard App and Home (spending sentence, needs-attention, rows that open to
-payment/delivery/evidence, limits by layer, chain × token balances). `680b3f8a`: Limits summary and editor in view.
-`b85acac4`: a connection's App page fills its pane. `4cc49726`: explicit call-policy select, named and partly-allowed
-App groups. Addressed: F01–F04, F06–F10, F11 (inspection only), F13 (unread chains, refresh failure copy). Still open:
-F05 (compact Connections and recommended-access review), F11 reconciliation ("Check status"), F12 hit areas, keeping
-the view's place on return. The embedded App and Connections were not yet re-walked on deployed dev.
+**Update, 12 October 2026 (later):** two sessions implemented this in parallel; `main` keeps the afternoon session's
+overview (`overview-model.ts`, `views/overview.tsx`: one display model per network, shared by Home and the App, with
+Add funds) and adds on top of it: unread chains as unknown and owner funds only where an allowance reaches them in
+`wallet_status`; `site`, so the App opens Approve and the wallet site, and names a link the host refuses; uncertain
+operations that keep their tx hash or x402 authorization, with `operation_check` / Check status settling, releasing or
+leaving them and never paying; Limits as one line per limit; 40px copy targets; the App page filling its pane, taking
+newer results live, asking for grants and reporting safe-area insets; Connections as summary cards with Manage access
+and Review recommended access, Open without payment powers and an explicit call-policy select; and the wallet's Home
+Screen icon and manifest. Real-iPhone safe areas, the installed icon and touch feel still need a device.
 
 **Review mode:** Full, limited to the recorded Goblin → wallet MCP App → owner-console journey.
 
