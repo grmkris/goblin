@@ -123,3 +123,12 @@ Dispatch the Release workflow with a stage and full main SHA, or run `heavy bun 
 The first production release is invite-only with no configured invite or owner email, so it admits nobody until the operator securely supplies those values. Its dedicated model key offers the approved five models and caps spending at $10 per 30 days. Dodo remains unconfigured in live mode. After the owner signs in with delivered OTP, grant exactly that verified production user a prod-scoped Pro override of 800 Credits/day and run authenticated prod smoke.
 
 For an emergency code rollback, prepare a clean snapshot of the last compatible green SHA, review its plan against the retained prod state, and run the guarded prod deploy with the existing private prod config. Leave all auth, app and vendor data intact; do not run down migrations. Confirm that older code supports every additive schema already applied, then repeat public/authenticated acceptance and drift inspection and record the resulting Worker version. The normal release path continues to require a matching dev receipt.
+
+## Goblin Wallet stage
+
+`bun run dev:wallet`, `bun run plan:wallet-dev` and `bun run deploy:wallet-dev` run `scripts/wallet-stage.ts`
+(`dev`, `plan:dev`, `deploy:dev`). It never touches `scripts/stage.ts`, which `scripts/release.py` depends on. It builds
+`apps/wallet-web`, takes the wallet deploy lock (`$GOBLIN_RELEASE_ROOT/wallet-deploy.lock`), attaches Alchemy state from
+`/var/lib/goblin-release/alchemy/state/goblin-wallet/<stage>`, scrubs the environment, and merges the shared Cloudflare
+file with `.local/wallet-dev.env` (both must be mode 600). The variables are listed in `docs/development.md`, "Goblin
+Wallet (dev stage)". There is no wallet smoke script yet.
