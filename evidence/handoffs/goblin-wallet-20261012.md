@@ -62,13 +62,41 @@ Spike receipts are in `evidence/wallet/`:
 - **Privy refuses `fee_payer: true` on Tempo.** MPP payments use the form where the agent pays its own fee in USDC.e,
   and x402 on Base stays Exa's main rail.
 
+## Security review and fixes
+
+At about 06:40 a Codex `gpt-6-astra` pass reviewed the three wallet workspaces read-only and reported ten money-path
+findings, seven of them high. Two Claude Opus lanes fixed all ten by 07:00, and the conductor added two follow-ups;
+wallet-dev was redeployed with them at 07:06.
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 | Two calls with one operation id and different arguments could both execute | `begin` conflict is rejected (`operation_id_reused`) |
+| 2 | An owner could drain the relay with future-nonce authorizations | The authorization nonce must equal the owner's account nonce; quota of 3 per owner and 30 per chain per day; `upgraded` only once the code delegates |
+| 3 | Gas bypassed the ledger (zero and self transfers, no fee ceiling) | Zero and self transfers refused; per-chain fee ceilings before signing, Tempo at $0.05 |
+| 4 | A paid response that broke mid-read erased the settlement | Settlement kept, delivery reported failed; the body is bounded while streaming |
+| 5 | A 402 after the credential left counted as "nothing paid" | It is `unknown`, so the reservation stays |
+| 6 | Swap and bridge calldata were not checked against the quote | LI.FI and Relay calldata decoded and checked against the request |
+| 7 | Relay nonces and signed bytes lived in isolate memory | The `WalletRelay` Durable Object, one per chain and relay address |
+| 8 | A stale reservation could sign after its grant expired | The reserved-to-signing step re-checks grant, quote and current limits |
+| 9 | `WALLET_LIVE=0` did not govern the relay | Every rail follows `WALLET_LIVE`; paid services refuse on testnets |
+| 10 | A quote retry after expiry hid the earlier payment | The operation is looked up before the quote |
+
+Still open from the review:
+
+- **Fees are not reserved in the ledger.** The ceilings bound what one signature can burn, but the dollar windows count
+  principal only, and failed-transaction gas is not budgeted.
+- **The EVM ceiling is a pre-flight check.** Privy chooses the signed fees; binding it needs `AgentSigner` to pass gas
+  limits.
+- **Relay recipient.** Relay binds the destination recipient through an order id the wallet cannot decode, so it is
+  checked against the quote's details only.
+- **Relay keys per deployment.** Dev and prod need separate `RELAY_PRIVATE_KEY`s, since each has its own `WalletRelay`.
+
 ## Known gaps
 
-- **Relay transactions are held in memory.** The relay persists the raw transaction in isolate memory only; that store
-  belongs in a Durable Object table.
 - **The first transfer is stuck as `uncertain`.** `wallet-demo-transfer-0001` happened before the classification fix,
   so its $0.01 reservation stays until it is reconciled.
-- **No workerd integration test for the wallet yet.** All tests run against `node:sqlite` and fakes.
+- **No workerd integration test for the wallet yet.** All tests, `WalletRelay`'s included, run against `node:sqlite`
+  and fakes.
 - **Not yet built:**
   - an owner route to list or decide `request_policy_change`;
   - the Tempo access-key layer, for which the fallback is the Privy policy plus the ledger;
