@@ -25,8 +25,8 @@ EXCLUDED = (
     'scripts/publication-*.json', 'scripts/github-known-hosts',
 )
 PRIVATE_PATTERNS = (
-    (r'file:///[^\s<>)]*', 'https://example.invalid/private-reference'),
-    (r'https?://[^\s<>)]*(?:/ws_[A-Za-z0-9]+|myplan[^\s<>)]*/(?:w|workspaces|documents)/)[^\s<>)]*', 'https://example.invalid/private-reference'),
+    (r"file:///(?:home|tmp|var)/[^\s<>'\"`)]+", 'https://example.invalid/private-reference'),
+    (r"https?://[^\s<>'\"`)]*(?:/ws_[A-Za-z0-9]{12,}|myplan[^\s<>'\"`)]*/(?:w|workspaces|documents)/[A-Za-z0-9_-]{12,})[^\s<>'\"`)]*", 'https://example.invalid/private-reference'),
     (r'\bws_[A-Za-z0-9]{12,}\b', 'private-workspace'),
     (r'/home/(?:kristjan|ubuntu|claude)(?:/[^\s`"\'<>)]*)?', '/path/to/project'),
     (r'~/(?:\.claude/(?:plans|projects)|\.codex/(?:sessions|memories))[^\s`<>)]*', 'private-planning-record'),

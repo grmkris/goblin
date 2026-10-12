@@ -8,7 +8,7 @@ import tempfile
 import shutil
 import unittest
 
-from export_public import export
+from export_public import export, transform
 
 
 def command(args, cwd):
@@ -50,6 +50,26 @@ class PublicExportTest(unittest.TestCase):
         self.assertNotIn("/home/kristjan", text)
         self.assertNotIn("ws_abcdefghijklmnop", text)
         self.assertIn("private-workspace", text)
+
+    def test_sanitizing_private_urls_keeps_source_delimiters(self):
+        (self.source / 'source.ts').write_text(
+            "const a = 'https://myplan.example/mcp/ws_abcdefghijklmnop';\n"
+            'const b = "file:///home/kristjan/private-note";\n'
+        )
+        sha = self.commit('sanitize private URLs')
+        export(self.source, self.destination, sha, self.directory / 'map.json')
+        source = (self.destination / 'source.ts').read_text()
+        self.assertIn("'https://example.invalid/private-reference';", source)
+        self.assertIn('"https://example.invalid/private-reference";', source)
+
+    def test_synthetic_resource_uris_and_workspace_placeholders_stay_usable(self):
+        for fixture in [
+            b"const uri = 'file:///out/report 1.csv'",
+            b"const stack = 'at read (file:///worker.js:10:5)'",
+            b"const uri = 'https://myplan.lol/mcp/ws_ab12'",
+            b"const uri = 'https://dev.myplan.lol/workspaces/ws_fixture/items/item_fixture'",
+        ]:
+            self.assertEqual(transform('fixture.ts', fixture), fixture)
 
     def test_incremental_export_is_idempotent_and_preserves_authorship(self):
         (self.source / "app.ts").write_text("one\n")
