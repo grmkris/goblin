@@ -1,0 +1,57 @@
+{
+ "lane": "S",
+ "step": "S3 agent policy",
+ "at": "2026-10-12T03:29:04Z",
+ "policyId": "l57oel4tqkttsvzbrv1x00wy",
+ "owner": "policy-admin quorum k6jmz9g665ljwkdpy3c01xhy (admin-signed PATCH)",
+ "before": [
+  "USDC payment on 1",
+  "USDC payment on 8453",
+  "USDC payment on 42161",
+  "Allow DeleGator upgrade",
+  "Deny export"
+ ],
+ "after": [
+  "USDC payment on 8453",
+  "Redeem allowance on 8453",
+  "USDC transfer on 8453",
+  "USDC payment on 1",
+  "Redeem allowance on 1",
+  "USDC transfer on 1",
+  "USDC payment on 42161",
+  "Redeem allowance on 42161",
+  "USDC transfer on 42161",
+  "USDC.e transfer on 4217",
+  "USDC.e transferWithMemo on 4217",
+  "USDC approve LI.FI on 8453",
+  "LI.FI call on 8453",
+  "USDC approve Relay on 8453",
+  "Relay call on 8453",
+  "Allow DeleGator upgrade",
+  "Deny export"
+ ],
+ "name": "Goblin Wallet agent signer v1 -> Goblin Wallet agent signer v2",
+ "cap": "5 USDC per payment (5000000 base units)",
+ "probe": {
+  "walletId": "qxuaf8yex1yfesx9cx4724vm",
+  "results": {
+   "typed data 0.001 USDC on Base (expect allowed)": "allowed",
+   "typed data 6 USDC on Base (expect refused)": "refused 400 policy_violation",
+   "Tempo transfer 0.01 USDC.e (expect allowed)": "allowed",
+   "Tempo transferWithMemo 0.01 USDC.e (expect allowed)": "allowed",
+   "Tempo sponsored (fee_payer) transferWithMemo (Privy answers invalid_data, 2026-10-12)": "refused 400 invalid_data",
+   "Tempo transfer 6 USDC.e (expect refused)": "refused 400 policy_violation",
+   "Tempo transfer of another token (expect refused)": "refused 400 policy_violation",
+   "Base send to another contract (expect refused)": "refused 400 policy_violation",
+   "Base USDC transfer 6 USDC (expect refused, or broadcast failure from the simulation)": "refused 400 transaction_broadcast_failure",
+   "Base USDC approve 0.01 to LI.FI (expect allowed: broadcast_failure, no ETH for gas)": "refused 400 transaction_broadcast_failure",
+   "Base USDC approve 6 USDC to LI.FI (expect refused)": "refused 400 policy_violation",
+   "Base USDC approve 0.01 to another spender (expect refused)": "refused 400 policy_violation"
+  }
+ },
+ "notes": [
+  "probes sign only; the agent wallet held 0 ETH on Base so no send could broadcast",
+  "Privy refuses Tempo fee_payer:true with invalid_data; nonce_key and valid_before are accepted",
+  "eth_sendTransaction that would revert in simulation answers transaction_broadcast_failure before the policy (USDC transfer with no balance)"
+ ]
+}
