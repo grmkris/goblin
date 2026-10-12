@@ -30,6 +30,30 @@ Spike receipts are in `evidence/wallet/`:
   against it.
 - **S5**: Exa's live 402 offers x402 on Base and MPP on Tempo, and Privy signs the x402 payment.
 
+## The evening (16:00–17:30)
+
+- **Recording on prod (goblin.surf 8fd49a6b, wallet.goblin.surf), as goblin-demo@myinbox.lol.** The clips are in
+  `.local/evidence/wallet/clips/`, with notes in `CLIPS.md`:
+  - onboarding (01a–c);
+  - paid inference over MPP plus a paid Exa search over x402 (02-04): Base `0xabe9…85100`, about $0.021 of USDC.e per
+    model call on Tempo;
+  - first-use approval and 0.5 USDC.e to Kris's Mercator address (03): Tempo `0x0ea8fe76…8b88`.
+- **The prod `paid_fetch` failures** ("The chain did not answer before signing") predate the 16:20 redeploy of cff883c8,
+  which names the failing method. A direct MCP call then paid (`0xf4da4508…c870`), and so did one through goblin.surf.
+- **goblin bug, owned by the inference session:** for a first-use `transfer`, the wallet's URL request showed "may have
+  run" in goblin's chat instead of the approval link. The Approve page and a retry delivered.
+- **Funding from inside the App (asked by Kris via the inference session):**
+  - Commits b39e5501..057985d0. Relay deposit addresses deliver USDC.e on Tempo to the agent.
+  - New: `add_funds` and `add_funds_status`, `payFrom` in `wallet_status`, `wallet_open {focus:"add_funds"}`.
+  - `pay_challenge` answers `insufficient_funds` before signing; a rail's own refusal reaches the caller as `rail_refused`.
+  - The App's "Pays from" card shows the address, a QR code and Add funds.
+  - **Proven on wallet-dev in dev goblin:** 0.5 USDC on Base (`0xfa2ba728…9e21`), then 0.475952 USDC.e with the agent
+    on Tempo (`0x51821855…57de`); the App said Arrived.
+  - An App frame cannot submit a `<form>` (no `allow-forms`), so Add funds acts on click and Enter.
+  - goblin needs the two tools in the wallet profile's recommended grants. Until then, the first App call that raises
+    goblin's grant prompt fails with "processing response error".
+- **Money moved:** the run treasury's last 0.5 USDC on Base went to the dev agent's Tempo balance through that deposit.
+
 ## The afternoon (12:30–14:00)
 
 Decided with Kris in a grill session:
