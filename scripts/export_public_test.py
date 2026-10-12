@@ -131,6 +131,8 @@ class PublicExportTest(unittest.TestCase):
         export(self.source, self.destination, sha, map_path)
         (self.destination / "manual.md").write_text("unreviewed\n")
         command(["add", "-A"], self.destination)
+        command(["config", "user.name", "Public Test Author"], self.destination)
+        command(["config", "user.email", "public-test@example.test"], self.destination)
         command(["commit", "-m", "manual"], self.destination)
         with self.assertRaises(RuntimeError):
             export(self.source, self.destination, sha, map_path)
