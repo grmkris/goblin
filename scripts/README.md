@@ -126,9 +126,11 @@ For an emergency code rollback, prepare a clean snapshot of the last compatible 
 
 ## Goblin Wallet stage
 
-`bun run dev:wallet`, `bun run plan:wallet-dev` and `bun run deploy:wallet-dev` run `scripts/wallet-stage.ts`
-(`dev`, `plan:dev`, `deploy:dev`). It never touches `scripts/stage.ts`, which `scripts/release.py` depends on. It builds
-`apps/wallet-web`, takes the wallet deploy lock (`$GOBLIN_RELEASE_ROOT/wallet-deploy.lock`), attaches Alchemy state from
+`bun run dev:wallet`, `bun run plan:wallet-dev`, `bun run deploy:wallet-dev`, `bun run plan:wallet-prod` and
+`bun run deploy:wallet-prod` run `scripts/wallet-stage.ts` (`dev`, `plan:dev`, `deploy:dev`, `plan:prod`,
+`deploy:prod`; the prod deploy needs `GOBLIN_CONFIRM_PROD=1`). It never touches `scripts/stage.ts`, which
+`scripts/release.py` depends on. It builds `apps/wallet-web`, takes the wallet deploy lock
+(`$GOBLIN_RELEASE_ROOT/wallet-deploy.lock`), attaches Alchemy state from
 `/var/lib/goblin-release/alchemy/state/goblin-wallet/<stage>`, scrubs the environment, and merges the shared Cloudflare
-file with `.local/wallet-dev.env` (both must be mode 600). The variables are listed in `docs/development.md`, "Goblin
-Wallet (dev stage)". There is no wallet smoke script yet.
+file with `.local/wallet-<stage>.env` (both must be mode 600). The variables are listed in `docs/development.md`,
+"Goblin Wallet stages". There is no wallet smoke script yet.

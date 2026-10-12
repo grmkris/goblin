@@ -499,20 +499,24 @@ The model `clef` has an input-only estimated Credit rate (5,000 input tokens a C
 app-budget estimate, not a conversion of Workers AI dollars into Token Plan Credits. A dispatched call whose usage is
 unknown is charged its whole 65,536-token context; without the binding there is no call and no charge.
 
-## Goblin Wallet (dev stage)
+## Goblin Wallet stages
 
 Goblin Wallet is a separate Worker beside goblin: `apps/wallet` (Worker and Alchemy stack `goblin-wallet`),
 `apps/wallet-web` (the Vite and React console, built to static assets) and `packages/wallet` (the shared library).
 Its stage commands are `scripts/wallet-stage.ts`, not `scripts/stage.ts`:
 
 - `bun run dev:wallet` builds `wallet-web` and runs the stack locally (placeholder Cloudflare credentials).
-- `bun run plan:wallet-dev` and `bun run deploy:wallet-dev` plan and deploy the `dev` stage under
-  `flock $GOBLIN_RELEASE_ROOT/wallet-deploy.lock`. Resources are named `goblin-wallet-dev[-role]`; Alchemy state lives in
-  `/var/lib/goblin-release/alchemy/state/goblin-wallet/dev` and the first deploy creates it.
+- `bun run plan:wallet-dev` and `bun run deploy:wallet-dev` plan and deploy the `dev` stage
+  (`wallet-dev.goblin.surf`) under `flock $GOBLIN_RELEASE_ROOT/wallet-deploy.lock`. Resources are named
+  `goblin-wallet-dev[-role]`; Alchemy state lives in `/var/lib/goblin-release/alchemy/state/goblin-wallet/dev` and the
+  first deploy creates it.
+- `bun run plan:wallet-prod` and `GOBLIN_CONFIRM_PROD=1 bun run deploy:wallet-prod` do the same for the `prod` stage
+  (`wallet.goblin.surf`, `goblin-wallet-prod[-role]`), reading `.local/wallet-prod.env`. Prod has its own relay key: a
+  relay's nonces live in its stage's `WalletRelay`, so two stages must never share one key.
 
 The script scrubs `CLOUDFLARE_*`, `GOBLIN_*`, `PRIVY_*`, `RELAY_*`, `TREASURY_*` and `WALLET_*` from the inherited
-environment, then merges the shared Cloudflare file and `.local/wallet-dev.env` (mode 600) into a temporary mode-600
-file. Names below; never commit or print the values.
+environment, then merges the shared Cloudflare file and `.local/wallet-<stage>.env` (mode 600) into a temporary
+mode-600 file. Names below; never commit or print the values.
 
 | Variable | Used by |
 | --- | --- |
