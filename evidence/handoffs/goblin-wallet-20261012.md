@@ -72,7 +72,7 @@ wallet-dev was redeployed with them at 07:06.
 |---|---|---|
 | 1 | Two calls with one operation id and different arguments could both execute | `begin` conflict is rejected (`operation_id_reused`) |
 | 2 | An owner could drain the relay with future-nonce authorizations | The authorization nonce must equal the owner's account nonce; quota of 3 per owner and 30 per chain per day; `upgraded` only once the code delegates |
-| 3 | Gas bypassed the ledger (zero and self transfers, no fee ceiling) | Zero and self transfers refused; per-chain fee ceilings before signing, Tempo at $0.05 |
+| 3 | Gas bypassed the ledger (zero and self transfers, no fee ceiling) | Zero and self transfers refused; per-chain fee ceilings, signed as the transaction's exact fee bounds; Tempo at $0.05 |
 | 4 | A paid response that broke mid-read erased the settlement | Settlement kept, delivery reported failed; the body is bounded while streaming |
 | 5 | A 402 after the credential left counted as "nothing paid" | It is `unknown`, so the reservation stays |
 | 6 | Swap and bridge calldata were not checked against the quote | LI.FI and Relay calldata decoded and checked against the request |
@@ -85,8 +85,6 @@ Still open from the review:
 
 - **Fees are not reserved in the ledger.** The ceilings bound what one signature can burn, but the dollar windows count
   principal only, and failed-transaction gas is not budgeted.
-- **The EVM ceiling is a pre-flight check.** Privy chooses the signed fees; binding it needs `AgentSigner` to pass gas
-  limits.
 - **Relay recipient.** Relay binds the destination recipient through an order id the wallet cannot decode, so it is
   checked against the quote's details only.
 - **Relay keys per deployment.** Dev and prod need separate `RELAY_PRIVATE_KEY`s, since each has its own `WalletRelay`.
