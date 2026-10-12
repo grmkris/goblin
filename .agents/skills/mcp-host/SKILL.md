@@ -61,7 +61,9 @@ itself authorize model spend, external messages, deployment or production change
   unique ignoring case; DCR `client_name` is "goblin · <label>") and its own webhook URL
   (`/hooks/mcp-events/<user>/<connection>/<token>`). Model text names one as `"<label>" (<id>)` (`named`); labels and
   notice text never enter telemetry. A connection that sends events offers them (`ServerView.events`: open, dismissed,
-  done; `mcp/events/offers.ts`); `mcp_list` shows its first 64 event streams as untrusted data.
+  done; `mcp/events/offers.ts`); `mcp_list` shows its first 64 event streams as untrusted data when asked
+  (`events: true`). `mcp_list` lists a connection's tools in brief (name, one-line description, flags that differ) and
+  gives input schemas only for the tools named in `tools`: its result stays in the model's context.
 
 - Per-call approvals (ADR 0028): only owner-selected `askFirst` policy pauses a granted tool. Prepare the encrypted
   frozen call in Pi's beforeTool hook and terminate with a local approval marker from execution. Owner approval
