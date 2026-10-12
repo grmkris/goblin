@@ -108,6 +108,20 @@ def overlays():
             for path in POLICY.rglob('*') if path.is_file()}
 
 
+def portable_readme(source, template):
+    # Keep portable setup/release instructions, but carry the accepted source's proof and disclosure forward.
+    text = template.decode()
+    original = sanitize(source.decode())
+    wallet = r'(?ms)^\*\*Goblin Wallet\*\*.*?(?=^Built on )'
+    section = re.search(wallet, original)
+    if section:
+        text = re.sub(wallet, lambda _: section[0], text)
+    disclosure = re.search(r'(?ms)^## Hackathon disclosure[^\n]*\n.*?(?=^## |\Z)', original)
+    if disclosure:
+        text += '\n' + disclosure[0].strip() + '\n'
+    return text.encode()
+
+
 def write_tree(source, target, sha, raw_cache, hash_cache, extra, index):
     entries = {}
     for row in git(source, 'ls-tree', '-r', '-z', sha).split(b'\0'):
@@ -132,7 +146,10 @@ def write_tree(source, target, sha, raw_cache, hash_cache, extra, index):
                     raise RuntimeError('unsafe_public_symlink')
             hash_cache[key] = git(target, 'hash-object', '-w', '--stdin', data=data).decode().strip()
         entries[path] = (mode, hash_cache[key])
+    readme = entries.get('README.md')
     for path, data in extra.items():
+        if path == 'README.md' and readme:
+            data = portable_readme(git(target, 'cat-file', 'blob', readme[1]), data)
         entries[path] = ('100644', git(target, 'hash-object', '-w', '--stdin', data=data).decode().strip())
     env = dict(os.environ, GIT_INDEX_FILE=str(index))
     git(target, 'read-tree', '--empty', env=env)

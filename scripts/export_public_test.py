@@ -120,6 +120,21 @@ class PublicExportTest(unittest.TestCase):
             self.assertEqual(json.loads((self.destination / path / 'package.json').read_text())['license'], 'MIT')
         self.assertEqual((self.destination / 'docs/images/wallet/proof.png').read_bytes(), b'\x89PNG\r\n')
 
+    def test_public_readme_tracks_source_wallet_proof_and_disclosure(self):
+        (self.source / 'README.md').write_text(
+            '# goblin\n\n**Goblin Wallet** at wallet.goblin.surf.\n'
+            '![Proof](docs/images/wallet/proof.png)\n\n'
+            'Built on the native SDK.\n\n'
+            '## Hackathon disclosure\n\nBuilt inside the contest window; reused Sidequest patterns.\n'
+        )
+        sha = self.commit('Updated Wallet proof and provenance')
+        export(self.source, self.destination, sha, self.directory / 'map.json')
+        readme = (self.destination / 'README.md').read_text()
+        self.assertIn('**Goblin Wallet** at wallet.goblin.surf.', readme)
+        self.assertIn('![Proof](docs/images/wallet/proof.png)', readme)
+        self.assertIn('Built inside the contest window; reused Sidequest patterns.', readme)
+        self.assertIn('bun run check:public', readme)
+
     def test_private_history_cannot_rewind_or_without_map(self):
         (self.source / 'app.ts').write_text('one')
         first = self.commit('first')
