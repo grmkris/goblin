@@ -89,3 +89,8 @@ itself authorize model spend, external messages, deployment or production change
   plain decimal only. A call within the rule is an approval the owner's standing rule granted at hold time, recorded
   in `app_mcp_spend` in the same transaction; anything else asks. Agent apps, Telegram and the skills learner never
   spend under a rule. The wallet's own limit stays the hard stop.
+
+- MCP Apps: goblin declares `io.modelcontextprotocol/ui` (`text/html;profile=mcp-app`) to every server. An App's HTML
+  is read from a resource's `text` or base64 `blob` (decoded and bounded in `mcp/app-html.ts`, strict UTF-8). A call
+  held for approval, or a finished URL request, keeps its App when it completes (`mcp/kept-app.ts`), and the App
+  launches with the real result, not the transcript's placeholder.
