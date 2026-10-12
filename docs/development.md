@@ -110,7 +110,7 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_SIGNUP_MODE`, `GOBLIN_SIGNUP_INVITE_CODE` | `open`, `invite` or `closed` (default), and the invite code. |
 | `GOBLIN_PAID_INFERENCE` | Paid-per-call routes the stage sells (ADR 0047), between which the owner's pay mode chooses: comma-separated `goblin` (this stage's own paid endpoint, every offered model) and `tempo` (Tempo's MPP proxy). Calls are paid from the owner's Goblin Wallet; unset, every call is on Credits. |
 | `GOBLIN_MPP_RECIPIENT`, `GOBLIN_MPP_SECRET` | goblin's own paid endpoint (the `goblin` route, ADR 0047): the Tempo address its MPP charges pay, and the secret (at least 32 characters) it signs challenges with. Without both, `/v1/chat/completions` is a 404. |
-| `GOBLIN_FREE_DAILY_CREDITS` | The free plan: daily model Credits for an account without Pro (no routines); unset or `0`, every account must subscribe. Capped at Pro's 800. |
+| `GOBLIN_FREE_DAILY_CREDITS` | The free plan: daily model Credits for an account without Pro (routines that tell, no hand-over); unset or `0`, every account must subscribe. Capped at Pro's 800. |
 | `GOBLIN_FREE_WALLET_USD` | The dollars of USDC and USDC.e a connected Goblin Wallet must hold for the free plan's Credits (ADR 0047); unset or `0`, none. Below it, a free account's day has no allowance and it says so; paying per call still works. |
 | `GOBLIN_MAIL_SENDER` | Required OTP sender on a Cloudflare Email Sending domain. |
 | `GOBLIN_OWNER_EMAIL`, `GOBLIN_SMOKE_SESSION_FILE` | Existing owner email and mode-600 OTP session JSON; only smoke reads them. |
@@ -414,9 +414,10 @@ touch rows of 44px, no sideways scroll, and Save as the owner API's compare-and-
 Screenshots go under `.local/goblin-acceptance/setup-*`; this is browser fixture evidence only.
 
 `heavy bun apps/web/test/ui-events.ts` renders a connection's Events (ADR 0041) from source in local Chromium at desktop
-and phone widths, light and dark: the open offer, Set up on a stream, its filters as a form from the stream's input
-schema (and JSON for one a flat form cannot hold), Hand to a Persona in another Topic, and the proposal's review, with
-the owner API routed in the page and the proposal it receives checked. Screenshots go under
+and phone widths, light and dark: the open offer, the picker with the server's titles, groups and rate, the
+recommended event picked already, an event the Telegram channel takes, a filter the server requires asked for in
+Advanced, a hand-over to a Persona, and both events set up in one step (each proposed, then confirmed), with the owner
+API routed in the page and the proposals it receives checked. Screenshots go under
 `.local/goblin-acceptance/events-*`; this is browser fixture evidence only.
 
 `heavy bun apps/web/test/ui-holds.ts` renders the MCP 2026 owner cards (ADR 0042) from source in local Chromium at
