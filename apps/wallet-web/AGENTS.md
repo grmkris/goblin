@@ -21,7 +21,8 @@ server signing and Privy app credentials never enter the browser bundle.
   the network is a pure model (`model.ts`, `consent-model.ts`, `return.ts`) with its tests.
 - `?fixtures` (busy wallet), `?fixtures=fresh` (just signed in, goblin asking to connect), `?fixtures=funded` (USDC on
   Base, spending off) and `?fixtures=expired` (consent ran out) run the app on fixtures, for previews: Privy sign-in does
-  not work on localhost.
+  not work on localhost. goblin Pro's sign sheet has a request per billing, `/subscribe/sub_5ab0…5ab0?fixtures`
+  (every 30 days) and `/subscribe/sub_0da7…0da7?fixtures` (the day pass); a busy wallet runs both.
 
 ## Test floor
 
