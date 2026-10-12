@@ -108,8 +108,8 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_STAGE`, `GOBLIN_APP_URL` | `dev` and the Worker's HTTPS origin. |
 | `GOBLIN_DOMAIN`, `GOBLIN_ZONE_ID` | Custom hostname and its Cloudflare zone ID. |
 | `GOBLIN_SIGNUP_MODE`, `GOBLIN_SIGNUP_INVITE_CODE` | `open`, `invite` or `closed` (default), and the invite code. |
-| `GOBLIN_PAID_INFERENCE` | Paid-per-call routes the model picker offers (ADR 0047): comma-separated `tempo` (Tempo's MPP proxy) and `goblin` (this stage's own paid endpoint). Calls are paid from the owner's Goblin Wallet. |
-| `GOBLIN_MPP_RECIPIENT`, `GOBLIN_MPP_SECRET` | goblin's own paid endpoint (`paid:goblin`, ADR 0047): the Tempo address its MPP charges pay, and the secret (at least 32 characters) it signs challenges with. Without both, `/v1/chat/completions` is a 404. |
+| `GOBLIN_PAID_INFERENCE` | Paid-per-call routes the stage sells (ADR 0047), between which the owner's pay mode chooses: comma-separated `goblin` (this stage's own paid endpoint, every offered model) and `tempo` (Tempo's MPP proxy). Calls are paid from the owner's Goblin Wallet; unset, every call is on Credits. |
+| `GOBLIN_MPP_RECIPIENT`, `GOBLIN_MPP_SECRET` | goblin's own paid endpoint (the `goblin` route, ADR 0047): the Tempo address its MPP charges pay, and the secret (at least 32 characters) it signs challenges with. Without both, `/v1/chat/completions` is a 404. |
 | `GOBLIN_FREE_DAILY_CREDITS` | The free plan: daily model Credits for an account without Pro (no routines); unset or `0`, every account must subscribe. Capped at Pro's 800. |
 | `GOBLIN_FREE_WALLET_USD` | The dollars of USDC and USDC.e a connected Goblin Wallet must hold for the free plan's Credits (ADR 0047); unset or `0`, none. Below it, a free account's day has no allowance and it says so; paying per call still works. |
 | `GOBLIN_MAIL_SENDER` | Required OTP sender on a Cloudflare Email Sending domain. |
