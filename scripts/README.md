@@ -63,9 +63,9 @@ owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
    the typed API's edge: an unknown chat answers 404 in the error envelope quoting the response's `x-goblin-ref`, and
    a write without the CSRF header is refused 403;
 3. each configured or owner-added MCP server's status; for a connected server, its tools, and a direct call of a
-   read-only probe (`account_read` on MyPlan, `browser_backends` on MyBrowser) only if the owner has already granted it;
+   read-only probe (mysi's own `access_read`, on a mysi connection) only if the owner has already granted it;
 4. an inbound MCP client: dynamic registration, owner consent including `goblin:inspect`, PKCE token, `/mcp`
-   `initialize` and `tools/list` with the seven inspection tools, an `inspect_problems` read, an `ask_agent` model turn, an agent turn that calls the MyPlan probe through `mcp_call` (only if step 2 proved it),
+   `initialize` and `tools/list` with the seven inspection tools, an `inspect_problems` read, an `ask_agent` model turn, an agent turn that calls that probe through `mcp_call` (only if step 3 proved it),
    `get_recent_messages` with the smoke client's author label, then revocation and a 401;
 5. a new empty thread, a model turn there, `share_back` verified as a new `app.shared` entry in main, then close;
 6. a `smokecount` subagent spawned from main and its attributed result posted back in main (a passive Delegate result, ADR 0033; with `synthesize` the report is an input main answers instead);
