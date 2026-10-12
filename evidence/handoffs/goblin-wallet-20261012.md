@@ -16,7 +16,10 @@ ledger and by Privy's policy. Below, **proven** means it ran on the deployment t
 | `wallet_status` through goblin | **proven**: goblin's `WalletStatus` shape, four chains, limits per layer |
 | The wallet's dashboard MCP App inside goblin's sandbox | **proven**: shots `.local/evidence/wallet/07–08` |
 | Over-limit or new-recipient spend (beat 4) | **proven up to payment**: `transfer`, then the wallet's URL request, then goblin's "Finish a step" card, then the Approve page (frozen terms, the hash checked in the browser), then Approved and retry. The result is an honest `failed — nothing sent`, because the agent holds no funds |
-| EIP-7702 upgrade on Base, the allowance, and paid x402/MPP calls | **waiting on funding**: treasury `0x7Ad36C62Aa4e8D1e49aCC0e69362E4eC6c19Ad50` and relay `0x253F4234cEfB26cBE26066AFb362d906DCf4E22F` are still empty |
+| EIP-7702 upgrade on Base and the $20/hour allowance (beat 1) | **proven on mainnet, 12:00**: the owner was funded with ETH only; a Relay deposit address swapped it to USDC; the relay (funded by the owner) sent the upgrade |
+| A paid Exa search over x402, topped up from the allowance (beat 3) | **proven on mainnet**: settlement `0xc09ca95d…b0fd`, receipt App in goblin |
+| A new recipient approved, then paid (beat 4) | **proven on mainnet**: 1 USDC, `0xe4219e53…e3dc` |
+| Mercator short: bridge Base → Tempo, then pay Mercator (beat 5) | **proven on mainnet**: Relay deposit `0x2dce0489…3e7b`; 1.5 USDC.e to Mercator `0xf144e54d…2add`; Mercator went 0.55 → 2.05 USDC.e |
 
 Spike receipts are in `evidence/wallet/`:
 
@@ -26,6 +29,29 @@ Spike receipts are in `evidence/wallet/`:
 - **S3**: Privy signs Tempo type-118 transactions. **S3 policy** records the live 17-rule policy and the probes run
   against it.
 - **S5**: Exa's live 402 offers x402 on Base and MPP on Tempo, and Privy signs the x402 payment.
+
+## The live pass (11:00–12:20)
+
+Kris funded the test owner with 0.012 ETH on Base. Every hash is in `evidence/wallet/beats-mainnet-20261012.json`.
+
+- **One address, any chain.** The owner's address is the same on every EVM chain. A Relay deposit address converts
+  whatever arrives (ETH, USDC; Arbitrum, Ethereum, Base) to the asset needed on Base in about two seconds, for a few
+  cents. EVM sources need no API key; Solana needs a Relay key.
+- **The owner sends its own upgrade: no.** Privy's embedded wallet answers HTTP 500 to a type-4 transaction, through
+  both its send hook and its provider; plain sends work. So the relay stays for the upgrade, and the owner can fund it.
+- **Fixed during the pass:**
+  - publicnode answers 403 to a receipt it has not seen, and mainnet.base.org and drpc rate-limit Cloudflare.
+    wallet-dev and prod now use Tenderly's public gateway.
+  - The facilitator and our RPC both lagged a fresh top-up. x402 now waits two blocks after one, and every top-up
+    waits until the RPC shows the new balance.
+  - Swaps and bridges never drew on the allowance, and a bridge signed an approval from an empty wallet.
+  - Home and the dashboard App added ETH to the dollars.
+- **wallet.goblin.surf (prod)** is deployed for goblin prod `9ca847e2`. It has its own relay `0x60F6…6969`, funded
+  with 0.001 ETH.
+- **goblin bug, not fixed here.** In chat, Send does nothing while several "Sharing from <App>" chips are stacked over
+  the composer; removing them lets it send.
+- **Left over.** `wallet-beat3-exa-0001` stays `unknown`, holding $0.007. Its credential can no longer settle, but
+  there is no reconcile route yet.
 
 ## Where it stands (07:40)
 
@@ -43,11 +69,8 @@ Spike receipts are in `evidence/wallet/`:
 
 ## Morning steps (Kris)
 
-1. **Fund the run's addresses.**
-   - Treasury: about $20 USDC on Base and $10 USDC.e on Tempo.
-   - Relay: ETH on Base, plus Arbitrum and Ethereum if those tracks matter.
-   - Then send the test owner's account some USDC on Base, and the agent a little Base ETH for gas, from the treasury.
-     The conductor can do this once the treasury is funded.
+1. **Funding: done.** Kris sent 0.012 ETH to the test owner at about 11:05; beats 1–5 ran from it. For Arbitrum and
+   Ethereum, fund the relay on those chains.
 2. **Privy dashboard.** Turn on Google if you want to sign in with Google. The run turned "External wallets" off
    through the shared tab; the app config already creates embedded wallets on login.
 3. **Decide on prod with the Mercator session.** The choice is 6c249c18, which has no wallet, or the wallet integration
