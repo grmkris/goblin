@@ -51,6 +51,14 @@ class PublicExportTest(unittest.TestCase):
         self.assertNotIn("ws_abcdefghijklmnop", text)
         self.assertIn("private-workspace", text)
 
+    def test_excludes_nested_evidence_directories(self):
+        nested = self.source / 'docs/archive/initial/evidence'
+        nested.mkdir(parents=True)
+        (nested / 'deployment.json').write_text('{"token":"fixture-secret"}\n')
+        sha = self.commit('nested evidence')
+        export(self.source, self.destination, sha, self.directory / 'map.json')
+        self.assertFalse((self.destination / 'docs/archive/initial/evidence/deployment.json').exists())
+
     def test_sanitizing_private_urls_keeps_source_delimiters(self):
         (self.source / 'source.ts').write_text(
             "const a = 'https://myplan.example/mcp/ws_abcdefghijklmnop';\n"
