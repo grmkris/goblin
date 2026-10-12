@@ -119,8 +119,8 @@ bun run check      # the full gate (run it through `heavy` on the build box)
 - [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
 
 The deployment stages are `dev` at `dev.goblin.surf` and `prod` at `goblin.surf`, with separate auth databases,
-secrets and dedicated LiteLLM keys. The first production release is invite-only; owner OTP bootstrap is an explicit operator step. Alchemy can attach the custom domains; deployment and live acceptance are operator
-steps. Alternate hosts redirect to the configured canonical origin. Dev sign-up stays closed or invite-only; prod
+secrets and dedicated LiteLLM keys. The first production release is invite-only; owner OTP bootstrap is an explicit operator step. Alchemy can attach the custom domains; a passing push to private `dev` deploys and verifies dev automatically. The Promote action advances private `prod` to the accepted SHA, deploys and verifies core Goblin and Wallet production, then publishes sanitized source to `goblin-public/main`.
+Publication can be retried independently of deployment. Alternate hosts redirect to the configured canonical origin. Dev sign-up stays closed or invite-only; prod
 supports open sign-up after sender verification. Email OTP is the sole login method, and every stage requires mail. Both stages use `hello@goblin.surf` after sender onboarding,
 with a host prefix on dev mail subjects. See [development](docs/development.md) for the production guard and smoke.
 
@@ -154,3 +154,5 @@ Sidequest, a separate project begun on 25 September that goblin reaches only as 
 author's myapps services (mygram, myinbox, myplan, mytab; begun 28 September) as connected MCP servers. Built on open
 source and third-party services: Cloudflare Agents SDK, Pi, Effect, Alchemy, Privy, MetaMask Delegation Framework
 v1.3.0, x402, mppx, LI.FI, Relay, viem and shadcn. Built with AI coding agents (Claude Code, Codex).
+
+Core Goblin-owned code is source available under [PolyForm Noncommercial 1.0.0](LICENSE). The three Wallet workspaces use MIT. Third-party terms and same-owner reuse are described in [NOTICE](NOTICE.md). See [ADR 0046](docs/adr/0046-production-promotion-and-public-source.md) for branches and publication.
