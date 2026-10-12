@@ -27,6 +27,20 @@ Spike receipts are in `evidence/wallet/`:
   against it.
 - **S5**: Exa's live 402 offers x402 on Base and MPP on Tempo, and Privy signs the x402 payment.
 
+## Where it stands (07:40)
+
+- goblin `main` is at `bb091a24`, and goblin dev is released at `9ca847e2` (acceptance authenticated). Everything after
+  `9ca847e2` touches the wallet only.
+- wallet-dev runs `226b9eb0`, which adds:
+  - the review fixes;
+  - the `WalletRelay` Durable Object;
+  - binding fee bounds;
+  - the owner's view of the agent's `request_policy_change` asks, on the Limits page.
+- Two probes ran against live services, signing nothing:
+  - Privy accepts the fee fields (it signed and failed to broadcast at zero balance).
+  - Relay quotes 2 USDC on Base → 1.979 USDC.e on Tempo, and LI.FI quotes USDC → ETH on Base.
+- The funded run is scripted in `/tmp/wallet-run/beats.md`. The capped funding moves are in `/tmp/wallet-run/fund.ts`.
+
 ## Morning steps (Kris)
 
 1. **Fund the run's addresses.**
@@ -34,10 +48,8 @@ Spike receipts are in `evidence/wallet/`:
    - Relay: ETH on Base, plus Arbitrum and Ethereum if those tracks matter.
    - Then send the test owner's account some USDC on Base, and the agent a little Base ETH for gas, from the treasury.
      The conductor can do this once the treasury is funded.
-2. **Privy dashboard.**
-   - Turn on Google if you want to sign in with Google.
-   - Turn off "External wallets": an external wallet cannot take the DeleGator's 7702 upgrade.
-   - Turn on embedded wallets "create on login" for new users. Our test owner was created through the API.
+2. **Privy dashboard.** Turn on Google if you want to sign in with Google. The run turned "External wallets" off
+   through the shared tab; the app config already creates embedded wallets on login.
 3. **Decide on prod with the Mercator session.** The choice is 6c249c18, which has no wallet, or the wallet integration
    sha. The prod shelf entry already points at `wallet.goblin.surf`, which does not exist yet.
 4. **Before submitting:**
@@ -96,7 +108,6 @@ Still open from the review:
 - **No workerd integration test for the wallet yet.** All tests, `WalletRelay`'s included, run against `node:sqlite`
   and fakes.
 - **Not yet built:**
-  - an owner route to list or decide `request_policy_change`;
   - the Tempo access-key layer, for which the fallback is the Privy policy plus the ledger;
   - the "Wallet" thread for the global entrypoint, for which the fallback is no conversation.
 - **Leftover Privy objects.** The spike wallets (`SPIKE_TEMPO_*` in `.local/wallet-dev.env`) and their policy stay in
