@@ -277,7 +277,9 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   `apps/runtime/src/storage/migrations/` (`base.ts`, or `conversation.ts` for the conversation-operation migrations):
   `{ key: '<14-digit timestamp>_name', tables, sql }`, statements joined by `BREAK` (`--> statement-breakpoint`).
   `storage/migrations.ts` applies every list in key order and refuses a table that is not an application table.
-  Never edit an applied migration; never touch Pi or Agents tables.
+  Until launch goblin is greenfield: a migration is edited in place as if the schema had always been so, and a
+  release that edits an applied one resets dev first (`bun run destroy:dev -- --confirm-reset`); a new table or column
+  may also arrive as its own migration, which needs no reset. Never touch Pi or Agents tables.
 - Owner API endpoints: add the endpoint to its area's group in `packages/contracts/src/api/` (paths are relative to
   `/api`; `error` names the failures the endpoint itself produces), then its handler in the area's `api.ts`
   (`http/api/groups.ts` wires every group). Owner admission runs before each request; nothing in the Worker changes.
