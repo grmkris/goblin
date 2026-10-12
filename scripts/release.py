@@ -60,6 +60,53 @@ def require_dev(receipt, sha, version):
         raise RuntimeError("prod_requires_current_authenticated_dev_of_same_sha")
 
 
+def require_check(runs, sha, branch):
+    checks = [item for item in runs if item.get("head_sha") == sha and item.get("head_branch") == branch
+              and item.get("event") == "push" and item.get("conclusion") == "success"]
+    if not checks:
+        raise RuntimeError("successful_dev_check_for_exact_sha_required")
+    return checks[0]
+
+
+def require_ref(stage, sha, dev_sha, prod_sha):
+    if stage == "dev" and sha != dev_sha:
+        raise RuntimeError("superseded_dev_commit")
+    if stage == "prod" and sha != prod_sha:
+        raise RuntimeError("prod_ref_must_equal_release_sha")
+
+
+def ref(branch):
+    return json.loads(run(["gh", "api", f"repos/{REPO}/git/ref/heads/{branch}"]))["object"]["sha"]
+
+
+def checked_source(stage, sha):
+    runs = json.loads(run(["gh", "api", f"repos/{REPO}/actions/workflows/check.yml/runs?head_sha={sha}&event=push&per_page=100"]))
+    check = require_check(runs["workflow_runs"], sha, "dev")
+    require_ref(stage, sha, ref("dev"), ref("prod") if stage == "prod" else None)
+    if json.loads(run(["gh", "api", f"repos/{REPO}/compare/{sha}...dev"]))["status"] not in ["ahead", "identical"]:
+        raise RuntimeError("dev_ancestor_required")
+    return check
+
+
+def stage_config(stage):
+    directory = Path(os.environ.get("GOBLIN_ENV_DIR", str(ROOT / ".local"))).resolve()
+    shared = Path(os.environ.get("GOBLIN_CLOUD_ENV_FILE", str(Path.home() / ".config/myapps/dev.env")))
+    return directory, shared, envfile(shared) | envfile(directory / (stage + ".env"))
+
+
+def require_prod(receipt, sha, current_version):
+    if (receipt.get("stage") != "prod" or receipt.get("sha") != sha or receipt.get("drift") != "verified"
+            or receipt.get("acceptance") not in ["public", "authenticated"] or receipt.get("version") != current_version):
+        raise RuntimeError("current_verified_prod_receipt_required")
+
+
+def accepted_prod(sha):
+    receipt = json.loads((STATE / "receipts/prod.json").read_text())
+    _, _, config = stage_config("prod")
+    require_prod(receipt, sha, version(config, "prod"))
+    return receipt
+
+
 def resources(stage, auth_database):
     # The stage's named Cloudflare resources (apps/web/alchemy.run.ts), as the receipt lists them.
     prefix = "goblin-" + stage
@@ -81,8 +128,8 @@ def cloud(config, path, body=None):
     return data["result"]
 
 
-def version(config, stage):
-    data = cloud(config, "/workers/scripts/goblin-" + stage + "/deployments")
+def version(config, stage, stack="goblin"):
+    data = cloud(config, "/workers/scripts/" + stack + "-" + stage + "/deployments")
     deployments = data.get("deployments", []) if isinstance(data, dict) else data
     versions = deployments[0].get("versions", []) if deployments else []
     if len(versions) != 1 or versions[0].get("percentage") != 100:
@@ -110,16 +157,8 @@ def release(stage, sha):
         raise RuntimeError("full_commit_sha_required")
     if stage == "prod" and os.environ.get("GOBLIN_CONFIRM_PROD") != "1":
         raise RuntimeError("prod_requires_GOBLIN_CONFIRM_PROD=1")
-    runs = json.loads(run(["gh", "api", f"repos/{REPO}/actions/workflows/check.yml/runs?head_sha={sha}&event=push&per_page=100"]))
-    checks = [x for x in runs["workflow_runs"] if x["head_sha"] == sha and x["head_branch"] == "main"
-              and x["conclusion"] == "success"]
-    if not checks:
-        raise RuntimeError("successful_main_check_for_exact_sha_required")
-    if json.loads(run(["gh", "api", f"repos/{REPO}/compare/{sha}...main"]))["status"] not in ["ahead", "identical"]:
-        raise RuntimeError("main_ancestor_required")
-    config_dir = Path(os.environ.get("GOBLIN_ENV_DIR", str(ROOT / ".local"))).resolve()
-    shared = Path(os.environ.get("GOBLIN_CLOUD_ENV_FILE", str(Path.home() / ".config/myapps/dev.env")))
-    config = envfile(shared) | envfile(config_dir / (stage + ".env"))
+    check = checked_source(stage, sha)
+    config_dir, shared, config = stage_config(stage)
     if stage == "prod":
         receipt = json.loads((STATE / "receipts/dev.json").read_text())
         require_dev(receipt, sha, version(config, "dev"))
@@ -166,7 +205,7 @@ def release(stage, sha):
     names = [row["name"] for result in migrations for row in result.get("results", [])]
     if sorted(names) != expected:
         raise RuntimeError("migration_inventory_mismatch")
-    receipt = {"utc": stamp, "stage": stage, "sha": sha, "ci": checks[0]["html_url"],
+    receipt = {"utc": stamp, "stage": stage, "sha": sha, "ci": check["html_url"],
                "version": version(config, stage), "acceptance": acceptance,
                "drift": "verified", "providerNormalizations": ["Web.domain.zone bookkeeping", "D1 default disabled replication"], "migrations": names,
                "resources": resources(stage, db)}

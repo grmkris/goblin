@@ -1,0 +1,57 @@
+name: Promote
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Full SHA with current authenticated dev acceptance
+        type: string
+        required: true
+      operation:
+        description: Promote and publish, or retry publication of accepted production
+        type: choice
+        required: true
+        default: promote
+        options: [promote, publish]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: goblin-release
+  cancel-in-progress: false
+jobs:
+  promote:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: [self-hosted, linux, x64, netcup]
+    environment: prod
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_SHA: ${{ inputs.sha }}
+      RELEASE_OPERATION: ${{ inputs.operation }}
+      GOBLIN_RELEASE_ROOT: /var/lib/goblin-release
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: dev
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: .bun-version
+      - name: Materialize private stage credentials
+        env:
+          STAGE_ENV: ${{ secrets.GOBLIN_STAGE_ENV }}
+          CLOUD_ENV: ${{ secrets.GOBLIN_CLOUD_ENV }}
+          OWNER_SESSION: ${{ secrets.GOBLIN_SMOKE_SESSION }}
+          WALLET_PROD_ENV: ${{ secrets.GOBLIN_WALLET_PROD_ENV }}
+        run: python3 -B scripts/ci_credentials.py prod
+      - name: Advance production and verify core and Wallet deployments
+        if: inputs.operation == 'promote'
+        run: heavy python3 -B scripts/promote.py "$RELEASE_SHA"
+      - name: Export, validate and publish accepted production
+        env:
+          GOBLIN_PUBLIC_DEPLOY_KEY: ${{ secrets.GOBLIN_PUBLIC_DEPLOY_KEY }}
+        run: heavy python3 -B scripts/publish.py "$RELEASE_SHA"
+      - name: Remove transient credentials
+        if: always()
+        run: python3 -B scripts/ci_credentials.py prod --cleanup

@@ -1,9 +1,30 @@
 """Fail-closed checks for promotion, independent of credentials and Cloudflare."""
 import unittest
-from release import require_clean_snapshot, require_dev, resources, safe_plan, stale_checkouts
+from release import require_check, require_clean_snapshot, require_dev, require_prod, require_ref, resources, safe_plan, stale_checkouts
 
 
 class PromotionTest(unittest.TestCase):
+    def test_only_successful_exact_dev_push_is_accepted(self):
+        good = {"head_sha": "a" * 40, "head_branch": "dev", "event": "push", "conclusion": "success"}
+        self.assertEqual(require_check([good], "a" * 40, "dev"), good)
+        for change in [{"head_sha": "b" * 40}, {"head_branch": "main"}, {"event": "pull_request"}, {"conclusion": "failure"}]:
+            with self.assertRaises(RuntimeError):
+                require_check([good | change], "a" * 40, "dev")
+
+    def test_branch_targets_reject_stale_dev_and_different_prod(self):
+        require_ref("dev", "a" * 40, "a" * 40, None)
+        require_ref("prod", "a" * 40, "b" * 40, "a" * 40)
+        for stage, dev, prod in [("dev", "b" * 40, None), ("prod", "a" * 40, "b" * 40)]:
+            with self.assertRaises(RuntimeError):
+                require_ref(stage, "a" * 40, dev, prod)
+
+    def test_export_requires_current_accepted_production(self):
+        good = {"stage": "prod", "sha": "a" * 40, "acceptance": "public", "version": "v1", "drift": "verified"}
+        require_prod(good, "a" * 40, "v1")
+        for change in [{"stage": "dev"}, {"sha": "b" * 40}, {"acceptance": "failed"}, {"drift": "failed"}, {"version": "v0"}]:
+            with self.assertRaises(RuntimeError):
+                require_prod(good | change, "a" * 40, "v1")
+
     def test_rejects_destructive_and_unrecognized_plans(self):
         for plan in ["Delete Files", "Replace goblinAuth", "Destroy Web", "partial output"]:
             with self.assertRaises(RuntimeError):

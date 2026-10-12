@@ -1,14 +1,13 @@
-name: Release
+name: Release dev
 on:
+  workflow_run:
+    workflows: [Check]
+    branches: [dev]
+    types: [completed]
   workflow_dispatch:
     inputs:
-      stage:
-        description: Deployment stage
-        type: choice
-        required: true
-        options: [dev, prod]
       sha:
-        description: Full main commit SHA with successful Check
+        description: Full dev SHA to retry after a successful Check
         type: string
         required: true
 permissions:
@@ -19,21 +18,25 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
+    if: >-
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'dev' &&
+       github.event.workflow_run.head_repository.full_name == github.repository) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev')
     runs-on: [self-hosted, linux, x64, netcup]
-    environment: ${{ inputs.stage }}
+    environment: dev
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_STAGE: ${{ inputs.stage }}
-      RELEASE_SHA: ${{ inputs.sha }}
-      GOBLIN_CONFIRM_PROD: '1'
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || inputs.sha }}
       GOBLIN_RELEASE_ROOT: /var/lib/goblin-release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ inputs.sha }}
+          ref: ${{ github.event.workflow_run.head_sha || inputs.sha }}
+          fetch-depth: 0
           persist-credentials: false
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version-file: .bun-version
       - name: Materialize private stage credentials
@@ -41,37 +44,9 @@ jobs:
           STAGE_ENV: ${{ secrets.GOBLIN_STAGE_ENV }}
           CLOUD_ENV: ${{ secrets.GOBLIN_CLOUD_ENV }}
           OWNER_SESSION: ${{ secrets.GOBLIN_SMOKE_SESSION }}
-        run: |
-          python3 - <<'PY'
-          import os
-          from pathlib import Path
-          os.umask(0o077)
-          stage = os.environ['RELEASE_STAGE']
-          if stage not in ['dev', 'prod']: raise SystemExit('invalid stage')
-          for key in ['STAGE_ENV', 'CLOUD_ENV']:
-              if not os.environ.get(key): raise SystemExit('missing environment secret: ' + key)
-          Path('.local').mkdir(exist_ok=True, mode=0o700)
-          Path('.local/' + stage + '.env').write_text(os.environ['STAGE_ENV'])
-          Path('.local/cloud.env').write_text(os.environ['CLOUD_ENV'])
-          if stage == 'dev' and not os.environ.get('OWNER_SESSION'): raise SystemExit('real dev session required')
-          if os.environ.get('OWNER_SESSION'):
-              Path('.local/' + stage + '-session.json').write_text(os.environ['OWNER_SESSION'])
-          for path in [Path('.local/' + stage + '.env'), Path('.local/cloud.env'), Path('.local/' + stage + '-session.json')]:
-              if path.exists(): path.chmod(0o600)
-          with open(os.environ['GITHUB_ENV'], 'a') as env:
-              env.write('GOBLIN_CLOUD_ENV_FILE=' + str(Path('.local/cloud.env').resolve()) + '\n')
-          PY
-      - name: Verify promotion guards
-        run: python3 -B scripts/release_test.py
-      - name: Deploy and verify exact commit
-        run: python3 -B scripts/release.py "$RELEASE_STAGE" "$RELEASE_SHA"
+        run: python3 -B scripts/ci_credentials.py dev
+      - name: Deploy and verify exact dev commit
+        run: heavy python3 -B scripts/release.py dev "$RELEASE_SHA"
       - name: Remove transient credentials
         if: always()
-        run: |
-          python3 - <<'PY'
-          import os
-          from pathlib import Path
-          stage = os.environ['RELEASE_STAGE']
-          for name in [stage + '.env', 'cloud.env', stage + '-session.json', 'smoke-' + stage + '-receipt.json']:
-              Path('.local', name).unlink(missing_ok=True)
-          PY
+        run: python3 -B scripts/ci_credentials.py dev --cleanup

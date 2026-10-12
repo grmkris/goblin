@@ -9,7 +9,7 @@ Alchemy (a pinned beta) is the sole infrastructure source of truth; check its in
 
 - Bind the native Agent class directly; do not force PiHarness through an Effect-native DO superclass.
 - Keep deployment code out of Worker/runtime imports and runtime migration SQL.
-- Preserve stage-derived physical resource names and explicit dev ownership. `destroy:dev` needs `--confirm-reset`; prod has separate resources and mode-600 secrets; every prod command requires `GOBLIN_CONFIRM_PROD=1`. There is no destroy-prod command.
+- Preserve stage-derived physical resource names and explicit dev ownership. `destroy:dev` needs `--confirm-reset`; prod has separate resources and mode-600 secrets; every prod command requires `GOBLIN_CONFIRM_PROD=1`. Destroying prod requires the owner's explicit reset decision and `--confirm-reset`.
 - Put secrets in runtime bindings; never browser bundles, logs, transcripts, or iframe state.
 - Declare a binding in `apps/web/alchemy.run.ts`, `apps/runtime/src/env.ts` and the integration stacks together; the
   `FILES` R2 bucket (the owner's files) is stage-named and local under workerd.
@@ -24,7 +24,7 @@ itself authorize model spend, external messages, deployment or production change
 
 - Custom domains require `GOBLIN_DOMAIN` and `GOBLIN_ZONE_ID`; the Worker canonical origin, OTP auth and inbound MCP metadata come from `APP_URL`. Every stage requires an OTP mail sender. Dev sign-up is closed or invite-only. Prod smoke defaults to reads until an operator test account is supplied.
 
-- Operator and CI stage commands share `/var/lib/goblin-release` state and `flock`; seed dev before first use. Deploy exact green main SHAs with `bun run release dev <full-sha>`, then the same SHA on prod. Keep sanitized receipts and private logs outside the checkout. The read-only drift audit normalizes only beta.80 domain-zone bookkeeping and D1 default disabled replication; any other cloud difference fails.
+- Operator and CI stage commands share `/var/lib/goblin-release` state and `flock`; seed dev before first use. Passing private dev push checks deploy that exact current tip automatically. Use `bun run promote <full-sha>` for deliberate prod promotion and subsequent sanitized public export; `bun run publish <accepted-prod-sha>` retries only publication. Promote also deploys Wallet production from the same snapshot using `GOBLIN_CONFIRM_PROD=1 bun run deploy:wallet-prod`, its own wallet lock/state and `.local/wallet-prod.env` (CI secret `GOBLIN_WALLET_PROD_ENV`). Public smoke checks live health, production OAuth issuer and anonymous MCP 401; publication requires its current SHA/version receipt alongside core acceptance. Keep sanitized receipts and private logs outside the checkout. The read-only drift audit normalizes only beta.80 domain-zone bookkeeping and D1 default disabled replication; any other cloud difference fails.
 
 - Workers AI (`AI: Cloudflare.Workers.AI()`) is bound on the dev stage only, exclusively for typed Clef decisions
   (ADR 0031); `RuntimeEnv.AI` is a narrow optional binding. Without it (prod, the local stack, the native test stacks)

@@ -118,7 +118,9 @@ and query (301 for GET/HEAD, 308 for writes). Dev sign-up must be closed or invi
 
 ## Release operation
 
-Dispatch the Release workflow with a stage and full main SHA, or run `heavy bun run release dev <full-sha>` locally. After its authenticated receipt passes, run `GOBLIN_CONFIRM_PROD=1 heavy bun run release prod <same-full-sha>`. Persistent state, clean source snapshots, private logs and sanitized receipts live under `/var/lib/goblin-release`; only the operator and runner share its group. GitHub environment secrets are an explicit operator provisioning step.
+Push daily work to private `dev`: passing Check automatically runs Release dev. Retry with a full dev-tip SHA through Release dev's manual input, or `heavy bun run release dev <full-sha>`.
+
+Dispatch Promote on `dev` with the exact current accepted dev SHA and operation `promote`, or run `heavy bun run promote <full-sha>`. Promotion requires current authenticated dev acceptance and a fast-forward prod ref, then deploys and verifies prod directly. It publishes only after production acceptance. Operation `publish` (or `heavy bun run publish <accepted-prod-sha>`) retries publication alone. Persistent state, clean source snapshots, private logs and sanitized receipts remain under `/var/lib/goblin-release`. The public export uses its own repo/map there and a deploy key scoped only to `goblin-public`; it never mirrors the private repository. GitHub environment secrets must be provisioned for dev and prod before enabling automation. The public checkout has hosted CI with no private deployment credentials. Promote also plans and deploys Wallet production from the same source snapshot using `GOBLIN_CONFIRM_PROD=1 bun run deploy:wallet-prod`. It verifies live health, the production OAuth issuer and anonymous MCP 401, then records the active Wallet Worker version. Publication requires current same-SHA receipts for both Workers. Prod CI materializes mode-600 `.local/wallet-prod.env` from `GOBLIN_WALLET_PROD_ENV`.
 
 The first production release is invite-only with no configured invite or owner email, so it admits nobody until the operator securely supplies those values. Its dedicated model key offers the approved five models and caps spending at $10 per 30 days. Dodo remains unconfigured in live mode. After the owner signs in with delivered OTP, grant exactly that verified production user a prod-scoped Pro override of 800 Credits/day and run authenticated prod smoke.
 
@@ -133,4 +135,4 @@ For an emergency code rollback, prepare a clean snapshot of the last compatible 
 (`$GOBLIN_RELEASE_ROOT/wallet-deploy.lock`), attaches Alchemy state from
 `/var/lib/goblin-release/alchemy/state/goblin-wallet/<stage>`, scrubs the environment, and merges the shared Cloudflare
 file with `.local/wallet-<stage>.env` (both must be mode 600). The variables are listed in `docs/development.md`,
-"Goblin Wallet stages". There is no wallet smoke script yet.
+"Goblin Wallet stages". `scripts/wallet_release.py` performs the public Wallet smoke as part of Promote without signing or spending.
