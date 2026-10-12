@@ -76,4 +76,16 @@ itself authorize model spend, external messages, deployment or production change
   approval dispatch would receive requests they cannot answer. A URL request's link and message stay sealed in
   `app_mcp_url_requests` and out of every tool result; its one retry is claimed before I/O, and an interrupted one is
   `uncertain`. A 403 `insufficient_scope` is `ScopeRequired`, never `UpstreamMcp`: the connection stays open, and
-  step-up (`beginStepUp`) keeps the tokens until new ones arrive.
+  step-up (`beginStepUp`) keeps the tokens until new ones arrive. It asks for what the connection holds and what the
+  call needs, so access the owner left out with Choose access (`beginConnect(id, scope)`, `GET /api/mcp/:id/access`)
+  stays out.
+
+- First-class servers (ADR 0043, `mcp/first-class.ts`): goblin's own profile, matched by exact endpoint, never by what
+  the server says. A profile carries our words, the recommended grants (free tools run, paid ones ask first), a status
+  tool decoded with goblin's own Schema (`WalletStatus`, bounded, the server's claim), an app tool, a top-up link, the
+  paid tool and its amount argument, and extra sign-in scopes (`signInScope`). Mercator is configured for every
+  account; Cloudflare's API is on the shelf for publishing Workers. A profile grants nothing by itself.
+- Spending rules (ADR 0044, `mcp/spend.ts`): per job and per day in micro-dollars, read from the paid argument as a
+  plain decimal only. A call within the rule is an approval the owner's standing rule granted at hold time, recorded
+  in `app_mcp_spend` in the same transaction; anything else asks. Agent apps, Telegram and the skills learner never
+  spend under a rule. The wallet's own limit stays the hard stop.
