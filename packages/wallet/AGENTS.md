@@ -1,10 +1,10 @@
 # Wallet package
 
 Read the root instructions first. `@goblin/wallet` is the shared, runtime-independent library of Goblin Wallet:
-chain facts, amounts, the contract between the Worker and its clients, and the rails (Privy, signer, relay, x402,
-Tempo, LI.FI, bridge, balances). It imports no workspace and runs in Workers, the browser and tests. No Bun, `node:*`
-or Cloudflare APIs, no `process.env`; use WebCrypto. Secret-bearing modules (`privy`, `signer`, `relay`, `x402`,
-`tempo`, `lifi`, `bridge`) are closed to the browser by `tools/graph.ts`.
+chain facts, amounts, the contract between the Worker and its clients, UserOperations (`userop`, `bundler`) and the
+rails (Privy, signer, x402, Tempo, LI.FI, bridge, balances). It imports no workspace and runs in Workers, the browser
+and tests. No Bun, `node:*` or Cloudflare APIs, no `process.env`; use WebCrypto. Secret-bearing modules (`privy`,
+`signer`, `x402`, `tempo`, `lifi`, `bridge`, `bundler`) are closed to the browser by `tools/graph.ts`.
 
 Each module is a subpath export (`@goblin/wallet/<module>`) with its own `src/<module>/index.ts`, so lanes never share
 a barrel. Plain async code with Schema at boundaries; Effect lives in `apps/wallet`.

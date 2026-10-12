@@ -3,7 +3,7 @@
 Read the root instructions first. `@goblin/wallet-web` is the Goblin Wallet browser app: a Vite and React SPA (the owner
 console) and, later, the single-file MCP App views in `src/views/`. It is built to `dist/` and served as static assets
 by `@goblin/wallet-worker`. It may import `@goblin/wallet` and `@goblin/ui` only, and never the server modules of
-`@goblin/wallet` (`privy`, `signer`, `relay`, `x402`, `tempo`, `lifi`, `bridge`): `tools/graph.ts` forbids it, because
+`@goblin/wallet` (`privy`, `signer`, `x402`, `tempo`, `lifi`, `bridge`, `bundler`): `tools/graph.ts` forbids it, because
 server signing and Privy app credentials never enter the browser bundle.
 
 ## Checks
