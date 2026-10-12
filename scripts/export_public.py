@@ -89,6 +89,11 @@ def transform(path, data):
     except UnicodeDecodeError:
         return data
     text = sanitize(text)
+    if path == 'knip.jsonc':
+        # Private agent skills are excluded from every public tree; their ignore glob would be a gating hint.
+        text = text.replace(', ".agents/skills/**"', '')
+        text = text.replace('// Vendored agent skills (scripts, assets) are upstream files, not goblin sources.',
+                            '// Vendored lint rules are upstream files, not goblin sources.')
     if path.endswith('.md'):
         # Remove links to private coordination/configuration while retaining the technical prose.
         def link(match):
