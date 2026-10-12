@@ -69,6 +69,16 @@ history, route a send or grant permission. Each open proposal shows in its chat 
 the dev stage binds Workers AI; elsewhere nothing is judged. See
 [ADR 0031](docs/adr/0031-typed-decisions-through-workers-ai.md).
 
+**Goblin Wallet** (ADR 0045) gives the agent money with limits its owner sets, as a separate Worker with its own MCP
+server at `wallet-dev.goblin.surf` (`apps/wallet`, `apps/wallet-web`, `packages/wallet`). The owner signs in with
+Privy; their account is upgraded with EIP-7702 to MetaMask's DeleGator and signs an ERC-7710 period allowance to an agent
+wallet that Privy holds under a signer policy. The agent pays x402 services on Base and MPP services on Tempo, sends
+USDC, swaps through LI.FI and bridges through Relay. Every limit names the layer that enforces it: the on-chain
+allowance, Privy's policy, the wallet's ledger (per call, hour and week) or goblin's spending rules (ADR 0044). A spend
+over the limit, or to a new recipient, becomes a URL request to the wallet's Approve page, where the owner checks the
+frozen terms; goblin retries the call with the same operation id. goblin connects it like any MCP server, shows its
+status on the connection card and its dashboard App under Services.
+
 Built on the Cloudflare Agents SDK (`PersonalAgent` Durable Object) with the native Pi harness (Pi Durable owns
 conversations and execution), Effect for the agent's services and its typed owner API (an Effect HttpApi each user's
 agent serves, ADR 0038), TanStack Query in the browser, Better Auth for identity, and Alchemy for infrastructure.
@@ -113,3 +123,11 @@ the owner, and their decision resumes it. See [the routines decision](docs/adr/0
 LOCAL throwaway-account acceptance covers routine reminders, cron recovery across a process restart, revoked-authority skips and caps through CLIProxy. Native alarm tests also verify recurring recovery wakes; real producer Events and deployed acceptance remain separate.
 
 Main is the stable chat and composer. The dashboard surface is deferred while its runtime layout data remains available for a later UI iteration. The logical chat identity layer keeps URLs, capabilities, placement and operation admission stable while Pi owns the physical sessions and transcripts; Topics build on it: each Topic is a channel with its own Conversation (a new Pi session, not a fork) and the threads under it, Personal holds Main and receives every inbound channel, and archiving a Topic stops its chats' work until it is restored (ADR 0032). Start thread and Move to thread add Threads as forks, never rebinding a chat (ADR 0034). goblin can search the owner's other chats across active Topics (`search_chats`), adds up to three relevant excerpts on its own when a cheap rerank finds them, and what an answer retrieved is kept as frozen excerpts behind `GET /api/conversations/:id/sources` (ADR 0035).
+
+## Hackathon disclosure (draft, for the owner to confirm)
+
+goblin's repository started on 4 October 2026, and most of the resident agent predates the Colosseum Crypto World's
+Fair submission. Goblin Wallet (`apps/wallet`, `apps/wallet-web`, `packages/wallet`, ADR 0045) and its goblin host
+changes were built on 12 October 2026. Patterns for the 7702 upgrade, the Privy signer and policy, the allowance and
+MCP OAuth were ported from the author's earlier project Sidequest. The code was written by AI coding agents (Claude Code
+with Claude Opus and Sonnet, and OpenAI Codex) under the author's direction, with a Codex review of the money paths.
