@@ -14,8 +14,8 @@ server signing and Privy app credentials never enter the browser bundle.
 ## Pages
 
 - The console (Home, Activity, Limits, Connections, Add funds) opens whether or not setup is finished; nothing gates
-  its navigation. `/setup`, `/consent` and `/approve/:id` are focus pages without it. Routes are `app/routes.ts`; a
-  trailing slash names the same page.
+  its navigation. `/setup`, `/consent`, `/approve/:id` and `/subscribe/:id` (a merchant's subscription to sign once,
+  ADR 0054) are focus pages without it. Routes are `app/routes.ts`; a trailing slash names the same page.
 - Setup lives in `pages/setup/*` and is shared by `/setup` and `/consent`: the agent wallet is created for the owner,
   then Add funds, then Turn on spending, each resuming from `/api/me` and `/api/status`. What a screen decides without
   the network is a pure model (`model.ts`, `consent-model.ts`, `return.ts`) with its tests.

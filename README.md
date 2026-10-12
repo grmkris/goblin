@@ -1,6 +1,6 @@
 # goblin
 
-Your own goblin, always on. Resident personal agents on Cloudflare. Each user signs up, subscribes to Pro ($10/month), and gets their own agent: they talk to it in the browser,
+Your own goblin, always on. Resident personal agents on Cloudflare. Each user signs up, subscribes to Pro ($10 in USDC every 30 days), and gets their own agent: they talk to it in the browser,
 it keeps running, holds its own authority to use the MCP servers that user connected, and is itself an MCP server
 other tools can talk to.
 
@@ -135,11 +135,13 @@ Publication can be retried independently of deployment. Alternate hosts redirect
 supports open sign-up after sender verification. Email OTP is the sole login method, and every stage requires mail. Both stages use `hello@goblin.surf` after sender onboarding,
 with a host prefix on dev mail subjects. See [development](docs/development.md) for the production guard and smoke.
 
-Pro has no free tier or trial and includes 800 model Credits (about 2 million tokens) per account per UTC day. Dodo checkout grants
-nothing until its signed webhook activates the account. Cancellation keeps access through the paid period, and failed
-renewals have bounded grace. Settings provides the billing portal; `/subscribe` handles unpaid accounts. Draft terms,
-privacy and refund pages await operator review before live payments. Native workerd tests use real D1 and an injected
-Dodo client; real Dodo checkout, keys and merchant acceptance remain operator steps.
+Pro is $10 in USDC every 30 days, paid from the owner's Goblin Wallet as a subscription they sign once (ADR 0054): an
+on-chain permission that lets goblin's collector take at most $10 a period, for 12 periods, and that they cancel by
+revoking it in the wallet. It includes 800 model Credits (about 2 million tokens) per account per UTC day, hand-overs to
+goblin or a Persona, and subagents. goblin takes the first payment when the owner comes back from signing, reminds them
+three days before each renewal, and retries a failed one each day through a seven-day grace; cancellation keeps access
+through the paid period. The card checkout (Dodo) is off unless a stage turns it on. Draft terms, privacy and refund
+pages await operator review before live payments. The subscription has not run against Base mainnet yet.
 
 Several connections to one MCP server are normal: each is the owner's account there, with its own label, sign-in,
 grants and webhook (ADR 0041). A routine fires once, on a schedule or when a connection sends an event; it lives in a

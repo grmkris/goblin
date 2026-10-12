@@ -28,8 +28,12 @@ deployed by `bun run deploy:wallet-dev` (`scripts/wallet-stage.ts`), never by `s
   later also needs its guarded `ALTER TABLE` (`addOpenedAt` in `oauth/store.ts`). A consent request is bound to the
   first owner who reads it; every consent route checks that binding.
 - No `node:*` imports and no `process.env` in `src`; use WebCrypto and the `env` binding.
-- Secrets (`PRIVY_APP_SECRET`, `PRIVY_AUTHORIZATION_KEY`, `PIMLICO_API_KEY`) are redacted Alchemy bindings: never
-  log, return or persist them. `GET /api/config` serves the public app id only.
+- Secrets (`PRIVY_APP_SECRET`, `PRIVY_AUTHORIZATION_KEY`, `PIMLICO_API_KEY`, `WALLET_MERCHANT_GOBLIN_KEY`) are
+  redacted Alchemy bindings: never log, return or persist them. `GET /api/config` serves the public app id only.
+- Merchant subscriptions (ADR 0054) live in the `WalletAuth` singleton beside OAuth (`merchant/store.ts`, served at
+  `POST /subscriptions`), not in an owner's ledger: a request exists before its owner. `/api/merchant/*` answers only
+  goblin's bearer key and never reaches the owner API; a period is collected at most once, and the collector reads the
+  chain before it signs anything.
 - Lint limits: 80 lines per function, cognitive complexity 15, 5 parameters, a `// SAFETY:` on every assertion, one
   MCP tool per file.
 - Only `src/runtime.ts` (when it exists) calls `Effect.runPromise`.

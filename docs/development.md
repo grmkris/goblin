@@ -110,7 +110,9 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_SIGNUP_MODE`, `GOBLIN_SIGNUP_INVITE_CODE` | `open`, `invite` or `closed` (default), and the invite code. |
 | `GOBLIN_PAID_INFERENCE` | Paid-per-call routes the stage sells (ADR 0047), between which the owner's pay mode chooses: comma-separated `goblin` (this stage's own paid endpoint, every offered model) and `tempo` (Tempo's MPP proxy). Calls are paid from the owner's Goblin Wallet; unset, every call is on Credits. |
 | `GOBLIN_MPP_RECIPIENT`, `GOBLIN_MPP_SECRET` | goblin's own paid endpoint (the `goblin` route, ADR 0047): the Tempo address its MPP charges pay, and the secret (at least 32 characters) it signs challenges with. Without both, `/v1/chat/completions` is a 404. |
-| `GOBLIN_FREE_DAILY_CREDITS` | The free plan: daily model Credits for an account without Pro (routines that tell, no hand-over); unset or `0`, every account must subscribe. Capped at Pro's 800. |
+| `GOBLIN_FREE_DAILY_CREDITS` | The free plan: daily model Credits for an account without Pro (routines that tell you, no hand-overs); unset or `0`, every account must subscribe. Capped at Pro's 800. |
+| `GOBLIN_WALLET_ORIGIN`, `GOBLIN_WALLET_MERCHANT_KEY` | Pro paid from the Goblin Wallet (ADR 0054): the wallet's origin (`https://wallet-dev.goblin.surf` on dev) and goblin's merchant key there (a secret; the wallet holds the same value as `WALLET_MERCHANT_GOBLIN_KEY`). Without both, Subscribe with USDC says it is being set up. |
+| `GOBLIN_CARD_CHECKOUT` | `on` turns the Dodo card checkout and portal back on (ADR 0015); unset or anything else, they answer `card_disabled` and the web hides them. |
 | `GOBLIN_FREE_WALLET_USD` | The dollars of USDC and USDC.e a connected Goblin Wallet must hold for the free plan's Credits (ADR 0047); unset or `0`, none. Below it, a free account's day has no allowance and it says so; paying per call still works. |
 | `GOBLIN_MAIL_SENDER` | Required OTP sender on a Cloudflare Email Sending domain. |
 | `GOBLIN_OWNER_EMAIL`, `GOBLIN_SMOKE_SESSION_FILE` | Existing owner email and mode-600 OTP session JSON; only smoke reads them. |
@@ -360,6 +362,33 @@ For the first production bootstrap, an operator supplies `GOBLIN_OWNER_EMAIL` an
 
 ## Billing development and acceptance
 
+### Pro from the Goblin Wallet (ADR 0054)
+
+Pro is a subscription the owner signs once in the Goblin Wallet; goblin's collector takes one payment a period. Per
+stage, with Kris, before the first subscription:
+
+1. Generate one merchant key (`openssl rand -hex 32`) and put it in `.local/<stage>.env` as
+   `GOBLIN_WALLET_MERCHANT_KEY` and in `.local/wallet-<stage>.env` as `WALLET_MERCHANT_GOBLIN_KEY`; set
+   `GOBLIN_WALLET_ORIGIN` to the wallet's origin.
+2. Write the collector's Privy policy and create it in Privy (it is never applied by a script):
+   `bun packages/wallet/scripts/create-collector.ts --env .local/wallet-<stage>.env --policy-out <file>`. The
+   document's owner is `PRIVY_POLICY_ADMIN_ID`; its rules allow only redeeming a delegation, the paymaster's gas
+   approval and the DeleGator upgrade, and deny export.
+3. Create the collector with that policy's id:
+   `bun packages/wallet/scripts/create-collector.ts --env .local/wallet-<stage>.env --stage <stage> --policy-id <id> --out <file>`.
+   It is owned by the policy-admin key quorum, signed for by `PRIVY_SIGNER_ID` under the policy, created once per
+   stage (Privy's idempotency key), and the script writes `WALLET_COLLECTOR_WALLET_ID` and `WALLET_COLLECTOR_ADDRESS`
+   to `<file>`, mode 600. Copy both into `.local/wallet-<stage>.env`.
+4. Send the collector a small USDC float on Base (a dollar covers many collections): it pays each collection's gas in
+   USDC. Its first collection upgrades it to the DeleGator (EIP-7702) in the same operation.
+5. Deploy the wallet, then goblin. `WALLET_MERCHANT_RETURN_ORIGINS` defaults to `https://goblin.surf` on prod and
+   `https://dev.goblin.surf,http://localhost:18971` elsewhere.
+
+Collections run on Base mainnet only (`WALLET_LIVE=1`); on testnets a collection fails as `chain`. The money stays in
+the collector; only the admins can move it out.
+
+### The card checkout (Dodo, off)
+
 Set `DODO_PAYMENTS_ENVIRONMENT=test_mode` on local/dev and `live_mode` on prod. Store
 `DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_WEBHOOK_KEY` and `DODO_PRODUCT_ID` in the stage's mode-600 env file; Alchemy
 binds them as Worker secrets. Choose a goblin-only recurring $10/month product with no trial. Never bind an account's
@@ -558,6 +587,10 @@ mode-600 file. Names below; never commit or print the values.
 | `WALLET_DOMAIN`, `WALLET_ZONE_ID` | custom domain; empty domain serves on workers.dev |
 | `WALLET_RPC_URLS` | optional JSON object of chain id to RPC URL; empty uses the public RPCs |
 | `WALLET_LIVE` | `1` allows mainnet money; anything else is testnets only |
+| `WALLET_MERCHANT_GOBLIN_KEY` | Worker (secret): goblin's merchant key, the bearer of `/api/merchant/*` (ADR 0054); empty turns the merchant API off |
+| `WALLET_COLLECTOR_WALLET_ID`, `WALLET_COLLECTOR_ADDRESS` | Worker (plain): goblin's collector, from `packages/wallet/scripts/create-collector.ts`; empty until created |
+| `WALLET_MERCHANT_RETURN_ORIGINS` | Worker (plain): comma-separated origins a subscription request may return to; defaults per stage |
+| `PRIVY_POLICY_ADMIN_ID` | operator: the key quorum that owns the agent and collector policies, and the collector itself |
 
 Checks per workspace: `bun run --cwd apps/wallet test`, `bun run --cwd packages/wallet test`,
 `bun run --cwd apps/wallet-web build`. The Worker has unit tests only; there is no workerd integration test yet.
