@@ -70,7 +70,9 @@ itself authorize model spend, external messages, deployment or production change
   done; `mcp/events/offers.ts`); `mcp_list` shows its first 64 event streams as untrusted data when asked
   (`events: true`). A descriptor's `title` and `_meta["lol.mysi/suggest"]` are read leniently, field by field
   (`eventSuggestion`): suggestions that pre-select in the owner's picker and never grant or confirm a selector. `mcp_list` lists a connection's tools in brief (name, one-line description, flags that differ) and
-  gives input schemas only for the tools named in `tools`: its result stays in the model's context.
+  gives input schemas only for the tools named in `tools`: its result stays in the model's context. Its list of
+  connections puts connected ones first and names a first-class server by goblin's own `server` name, and an added
+  first-class connection is labelled from that name, so a configured connection never signed in does not win.
 
 - Per-call approvals (ADR 0028): only owner-selected `askFirst` policy pauses a granted tool. Prepare the encrypted
   frozen call in Pi's beforeTool hook and terminate with a local approval marker from execution. Owner approval
