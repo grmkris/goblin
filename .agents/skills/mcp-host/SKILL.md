@@ -95,6 +95,11 @@ itself authorize model spend, external messages, deployment or production change
   plain decimal only. A call within the rule is an approval the owner's standing rule granted at hold time, recorded
   in `app_mcp_spend` in the same transaction; anything else asks. Agent apps, Telegram and the skills learner never
   spend under a rule. The wallet's own limit stays the hard stop.
+- Top-ups (ADR 0049, `mcp/top-up.ts`, `mcp/fund-job.ts`): a profile's `prepaid` balance (Mercator's) is topped up from
+  the Goblin Wallet right before its paid tool goes out, under the rule kept as tool `topup`. The caller `funding`
+  reaches only the wallet profile's `funding` tool, and `heldCalls` lets it out only as the recorded top-up
+  (`assertRecordedTopUp`: operation id, amount, chain, token, destination). The address comes only from the server's
+  own status (`depositTo`), never from model text; never add another way to send a `funding` call.
 
 - MCP Apps: goblin declares `io.modelcontextprotocol/ui` (`text/html;profile=mcp-app`) to every server. An App's HTML
   is read from a resource's `text` or base64 `blob` (decoded and bounded in `mcp/app-html.ts`, strict UTF-8). A call
