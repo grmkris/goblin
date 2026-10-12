@@ -9,6 +9,7 @@ import shutil
 import unittest
 
 from export_public import export, transform
+from publication_audit import private_history_paths
 
 
 def command(args, cwd):
@@ -62,6 +63,18 @@ class PublicExportTest(unittest.TestCase):
         self.assertFalse((self.destination / 'docs/archive/initial/evidence/deployment.json').exists())
         self.assertFalse((self.destination / 'docs/archive/initial/myapps-source-inventory.json').exists())
         self.assertFalse((self.destination / 'docs/handoff.md').exists())
+
+    def test_private_path_audit_checks_deleted_history_and_allows_public_overlays(self):
+        (self.source / 'docs').mkdir()
+        handoff = self.source / 'docs/handoff.md'
+        handoff.write_text('private operational record\n')
+        self.commit('private handoff')
+        handoff.unlink()
+        (self.source / 'app.ts').write_text('export const app = true\n')
+        sha = self.commit('remove private handoff')
+        self.assertEqual(private_history_paths(self.source), ['docs/handoff.md'])
+        export(self.source, self.destination, sha, self.directory / 'map.json')
+        self.assertEqual(private_history_paths(self.destination), [])
 
     def test_sanitizing_private_urls_keeps_source_delimiters(self):
         (self.source / 'source.ts').write_text(
