@@ -34,5 +34,14 @@ class PromotionTest(unittest.TestCase):
         self.assertEqual(stale_checkouts([dev, prod, old, "notes", "d" * 39], {dev, prod}), [old])
         self.assertEqual(stale_checkouts([dev], {dev, None}), [])
 
+    def test_only_the_first_prod_release_must_be_invite_only(self):
+        from release import require_signup
+
+        require_signup({"GOBLIN_SIGNUP_MODE": "invite"}, False)
+        require_signup({"GOBLIN_SIGNUP_MODE": "open"}, True)
+        for mode in ["open", "closed", None]:
+            with self.assertRaises(RuntimeError):
+                require_signup({} if mode is None else {"GOBLIN_SIGNUP_MODE": mode}, False)
+
 if __name__ == "__main__":
     unittest.main()

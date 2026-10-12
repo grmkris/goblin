@@ -99,6 +99,12 @@ def execute(command, snapshot, env, log):
     return log.read_text()
 
 
+def require_signup(config, released_before):
+    # The first prod release is invite-only; later ones may open sign-up (owner, 2026-10-12: open, with a free plan).
+    if config.get("GOBLIN_SIGNUP_MODE") != "invite" and not released_before:
+        raise RuntimeError("first_prod_release_must_be_invite_only")
+
+
 def release(stage, sha):
     if not re.fullmatch(r"[a-f0-9]{40}", sha):
         raise RuntimeError("full_commit_sha_required")
@@ -117,8 +123,7 @@ def release(stage, sha):
     if stage == "prod":
         receipt = json.loads((STATE / "receipts/dev.json").read_text())
         require_dev(receipt, sha, version(config, "dev"))
-        if config.get("GOBLIN_SIGNUP_MODE") != "invite":
-            raise RuntimeError("first_prod_release_must_be_invite_only")
+        require_signup(config, (STATE / "receipts/prod.json").exists())
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     prefix = STATE / "logs" / f"{stamp}-{stage}-{sha[:12]}"
     env = dict(os.environ, GOBLIN_STAGE=stage, GOBLIN_ENV_DIR=str(config_dir),
