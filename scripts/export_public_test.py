@@ -71,6 +71,18 @@ class PublicExportTest(unittest.TestCase):
         ]:
             self.assertEqual(transform('fixture.ts', fixture), fixture)
 
+    def test_public_knip_retains_hint_gate_without_excluded_skill_glob(self):
+        config = b'''{
+  "treatConfigHintsAsErrors": true,
+  // Vendored agent skills (scripts, assets) are upstream files, not goblin sources.
+  "ignore": ["tools/oxlint/anti-slop/**", ".agents/skills/**"]
+}
+'''
+        public = transform('knip.jsonc', config).decode()
+        self.assertNotIn('.agents/skills', public)
+        self.assertIn('"treatConfigHintsAsErrors": true', public)
+        self.assertIn('"ignore": ["tools/oxlint/anti-slop/**"]', public)
+
     def test_incremental_export_is_idempotent_and_preserves_authorship(self):
         (self.source / "app.ts").write_text("one\n")
         first = self.commit("first")
