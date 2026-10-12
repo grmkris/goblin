@@ -30,6 +30,36 @@ Spike receipts are in `evidence/wallet/`:
   against it.
 - **S5**: Exa's live 402 offers x402 on Base and MPP on Tempo, and Privy signs the x402 payment.
 
+## The night (17:30–19:40): gas in USDC through UserOperations (ADR 0050)
+
+Kris chose the long-term pattern: no account of the wallet ever needs ETH.
+
+- **Built on main** (`e6d1348f`..`61e681b5`), deployed to wallet-dev and wallet prod:
+  - Every EVM send is a Pimlico UserOperation, its gas paid in USDC by the ERC-20 paymaster.
+  - The agent acts only through `sendCalls`. When it is short, the same batch redeems the shortfall plus the gas.
+  - The owner's upgrade is their own UserOperation, prepared and confirmed like the allowance and signed in the browser.
+  - The relay is deleted. Its accounts' ETH was swept to the run treasury (`0xdc9476ed…`, `0x9e0f3ea7…`).
+  - The Privy policy now allows the agent's calls only as `eth_signUserOperation` (24 rules).
+- **Proven on Base mainnet, zero ETH throughout:**
+
+  | Path | Gas (USDC) | Proof |
+  | --- | --- | --- |
+  | A fresh owner's upgrade, signed through Privy in the browser | 0.0038 | — |
+  | An agent transfer with its top-up in the same operation | 0.0073 | `0x5725377f…5d55` |
+  | A fresh agent's first operation (its 7702 authorization and a redeem), then x402 | 0.0098 | `0xe1662494…2058` |
+
+  On prod, goblin-demo's agent upgraded itself through its first operation and paid two searches:
+  `0x45109aa6…933b`, `0xc772effb…da7d`.
+- **Privy finding.** Its React SDK drops `authorization_list` from type-4 sends, which is why it answered 500. A
+  self-sent upgrade works once that is patched (`0x13e75ea3…1f1c`). The report draft is
+  `.local/privy-7702-authorization-list-bug.md`. goblin does not carry the patch, and Sidequest will adopt it with
+  `bun patch`.
+- **Slip, disclosed and fixed.** A spike edited the shared bun cache's copy of react-auth in place from 17:58 to 18:24.
+  It was restored byte for byte, and Sidequest confirmed no impact.
+- **Ops.**
+  - `PIMLICO_API_KEY` is in `.local/wallet-*.env`, and the `RELAY_*` lines are gone.
+  - The Codex publication pane is asked to re-upload `GOBLIN_WALLET_PROD_ENV`.
+
 ## The evening (16:00–17:30)
 
 - **Recording on prod (goblin.surf 8fd49a6b, wallet.goblin.surf), as goblin-demo@myinbox.lol.** The clips are in
