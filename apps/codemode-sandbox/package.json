@@ -1,0 +1,9 @@
+{
+  "name": "@goblin/codemode-sandbox",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@earendil-works/pi-codemode": "file:../../vendor/pi/earendil-works-pi-codemode-1.1.0.tgz"
+  }
+}

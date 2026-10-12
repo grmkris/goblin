@@ -110,6 +110,8 @@ const ServerRequest = Schema.Struct({
 /** `mcp_request_server`: a card asking the owner to add a server; they add and connect it, or not. */
 export const requestTool = typedTool({
   name: 'mcp_request_server',
+  // Asks or tells the owner, or acts outside goblin: the model calls it, never a code mode script.
+  callers: ['model'],
   description:
     'Ask the owner to add an MCP server (its https endpoint, from mcp_suggest or from them). They see a card with its name and your reason, and add and connect it themselves; you cannot. Stop and wait for their reply.',
   input: ServerRequest,

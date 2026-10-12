@@ -21,8 +21,9 @@
   "dependencies": {
     "@better-auth/mcp": "1.7.6",
     "@cloudflare/shell": "0.4.3",
-    "@earendil-works/pi-ai": "1.0.1",
-    "@earendil-works/pi-durable": "1.0.1",
+    "@earendil-works/pi-ai": "file:../../vendor/pi/earendil-works-pi-ai-1.1.0.tgz",
+    "@earendil-works/pi-codemode": "file:../../vendor/pi/earendil-works-pi-codemode-1.1.0.tgz",
+    "@earendil-works/pi-durable": "file:../../vendor/pi/earendil-works-pi-durable-1.1.0.tgz",
     "@goblin/app": "workspace:*",
     "@goblin/contracts": "workspace:*",
     "@modelcontextprotocol/client": "2.2.0",

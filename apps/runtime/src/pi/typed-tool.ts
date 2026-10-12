@@ -56,6 +56,11 @@ export type TypedTool<I, O> = {
   readonly input: Schema.Codec<I, unknown>
   readonly output: Schema.Codec<O, unknown>
   readonly replay: 'safe' | 'unsafe'
+  /**
+   * Who may call the tool: the model, code mode scripts (`tools`), or both (the default). A tool that asks the owner,
+   * moves money, or sends mail is `['model']`, so a script can never reach it.
+   */
+  readonly callers?: readonly ('model' | 'tools')[]
   readonly execute: (input: I, api: ToolExecutionApi, context: Context) => Promise<O | ReadyResult>
   /** What the model reads of the output (and the input it answers); its JSON by default. */
   readonly text?: (output: O, input: I) => string
@@ -104,7 +109,7 @@ function parametersOf(name: string, schema: JsonSchema): JsonSchema {
 }
 
 const failed = (text: string, code: string): ToolExecutionResult => ({
-  content: [{ type: 'text', text }],
+  output: [{ type: 'text', text }],
   isError: true,
   diagnostics: [{ severity: 'error', code, message: text }],
 })
@@ -113,13 +118,18 @@ export function typedTool<I, O>(tool: TypedTool<I, O>): ToolRegistration {
   const inputSchema = parametersOf(tool.name, jsonSchemaOf(tool.input))
   // The model is offered the input's JSON form (an optional field may be null), so arguments decode through it.
   const decode = Schema.decodeUnknownSync(Schema.toCodecJson(tool.input))
+  // SAFETY: Pi compiles plain JSON Schema with TypeBox, as it does `parameters`.
+  const outputSchema = jsonSchemaOf(tool.output) as never
   const encode = Schema.encodeSync(Schema.toCodecJson(tool.output))
   return defineTool({
     name: tool.name,
     description: tool.description,
     // Pi compiles plain JSON Schema with TypeBox's `Compile`; this one is self-contained (no `$ref`).
     parameters: inputSchema,
+    // The output's JSON Schema: code mode scripts get the validated value (`structuredOutput`) instead of text.
+    structuredOutputSchema: outputSchema,
     replay: tool.replay,
+    ...(tool.callers === undefined ? {} : { callers: tool.callers }),
     execute: async (args, api, context) => {
       let input: I
       try {
@@ -139,7 +149,8 @@ export function typedTool<I, O>(tool: TypedTool<I, O>): ToolRegistration {
       // SAFETY: the JSON codec's encoded side is JSON.
       const structuredContent = encode(output) as JsonValue
       return {
-        content: [{ type: 'text', text: tool.text?.(output, input) ?? JSON.stringify(structuredContent) }],
+        output: [{ type: 'text', text: tool.text?.(output, input) ?? JSON.stringify(structuredContent) }],
+        structuredOutput: structuredContent,
         details: { ...tool.details?.(output, input), structuredContent },
         ...(tool.terminate?.(output) === true ? { control: { terminate: true } } : {}),
       }

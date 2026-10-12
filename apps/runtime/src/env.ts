@@ -20,6 +20,8 @@ export interface RuntimeEnv {
   readonly FLOWS?: AnalyticsEngineDataset
   /** Dynamic Workers: every agent app release, the app transpiler and `code_run` scripts run in one (ADR 0021). */
   readonly LOADER: WorkerLoader
+  /** Durable code mode's sandbox, a Durable Object of the separate codemode sandbox Worker; unbound, no `codemode`. */
+  readonly CODEMODE_SANDBOX?: import('./pi/codemode.ts').CodemodeSandboxBinding
   /** Workers AI, for typed decisions through Clef alone (ADR 0031); only the dev stage binds it. */
   readonly AI?: DecisionsBinding
   readonly APP_URL: string

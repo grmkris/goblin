@@ -24,7 +24,7 @@ function notInTopicResult(item: SetupItem, topic: ScopeTopic, editable: boolean)
   const diagnostics = [{ severity: 'info', code: 'not_in_topic', message: 'Not in the Topic setup.' }] as const
   if (!editable)
     return {
-      content: [
+      output: [
         {
           type: 'text',
           text: `Not in #${topic.name}'s setup: ${what}. Nothing ran. Say in your answer that you could not use it.`,
@@ -35,7 +35,7 @@ function notInTopicResult(item: SetupItem, topic: ScopeTopic, editable: boolean)
     }
   const details: NotInTopic = { kind: 'not-in-topic', target: item, topic: { id: topic.id, name: topic.name } }
   return {
-    content: [
+    output: [
       {
         type: 'text',
         text: `Not in #${topic.name}'s setup: ${what}. Nothing ran. The owner has been shown a button to add it to #${topic.name}. Stop here and wait for their reply. Do not add it to the setup yourself unless the owner asks you to.`,
@@ -56,7 +56,7 @@ export function outsideScopeResult(target: ExclusionTarget, scope: SetupScope): 
   const item = itemOf(target)
   if (scope.topic !== undefined && !scope.topic.holds(item)) return notInTopicResult(item, scope.topic, scope.editable)
   return {
-    content: [
+    output: [
       {
         type: 'text',
         text: `Off for the conversation that started you: ${named(target)}. Nothing ran. Say in your answer that you could not use it.`,

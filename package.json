@@ -91,6 +91,11 @@
   },
   "overrides": {
     "@better-auth/oauth-provider": "1.7.6",
+    "@earendil-works/chord": "file:./vendor/pi/earendil-works-chord-1.1.0.tgz",
+    "@earendil-works/pi-ai": "file:./vendor/pi/earendil-works-pi-ai-1.1.0.tgz",
+    "@earendil-works/pi-codemode": "file:./vendor/pi/earendil-works-pi-codemode-1.1.0.tgz",
+    "@earendil-works/pi-durable": "file:./vendor/pi/earendil-works-pi-durable-1.1.0.tgz",
+    "@earendil-works/pi-telemetry": "file:./vendor/pi/earendil-works-pi-telemetry-1.1.0.tgz",
     "@effect/platform-bun": "4.0.1",
     "@effect/platform-node": "4.0.1",
     "@effect/platform-node-shared": "4.0.1",

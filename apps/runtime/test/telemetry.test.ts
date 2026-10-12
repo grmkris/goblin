@@ -84,7 +84,7 @@ const tools = defineExtension({
       description: 'echo',
       parameters: Type.Object({ text: Type.String() }),
       replay: 'safe',
-      execute: async ({ text }) => ({ content: [{ type: 'text', text }] }),
+      execute: async ({ text }) => ({ output: [{ type: 'text', text }] }),
     }),
     defineTool({
       name: 'mcp_call',
@@ -105,7 +105,7 @@ const tools = defineExtension({
       description: 'always blocked',
       parameters: Type.Object({}),
       replay: 'safe',
-      execute: async () => ({ content: [{ type: 'text', text: 'never runs' }] }),
+      execute: async () => ({ output: [{ type: 'text', text: 'never runs' }] }),
     }),
   ],
   hooks: [

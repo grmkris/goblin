@@ -91,6 +91,8 @@ export function askingExtension(
     tools: [
       typedTool({
         name: 'ask_user',
+        // Asks or tells the owner, or acts outside goblin: the model calls it, never a code mode script.
+        callers: ['model'],
         description:
           'Ask the owner one to five short questions when you cannot continue without their decision or a missing detail. Offer 2-8 options for a choice. Call it alone, then stop: their answers arrive as their next message.',
         input: Schema.Struct({ questions: Questions }),

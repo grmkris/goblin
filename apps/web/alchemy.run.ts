@@ -18,6 +18,25 @@ const modelEnv = {
   MEMORY_MODEL: Config.String('GOBLIN_MEMORY_MODEL').pipe(Config.withDefault('')),
 }
 
+/**
+ * Durable code mode's sandbox (spike): its own Worker, so a script that computes never holds the agent's object.
+ * Deployed before the Web Worker, whose binding names it; it has no routes and keeps no state.
+ */
+const codemodeSandbox = (stage: ReturnType<typeof resolveStage>) =>
+  Effect.gen(function* () {
+    const worker = yield* Cloudflare.Worker('CodemodeSandbox', {
+      name: stage.resourceName('codemode-sandbox'),
+      main: fileURLToPath(new URL('../codemode-sandbox/src/index.ts', import.meta.url)),
+      workersDev: false,
+      compatibility: { date: '2026-09-25' },
+      // One script is one request; keep the CPU limit above the interrupt budget so a runaway times out cleanly.
+      limits: { cpuMs: 60_000 },
+      env: { CodemodeSandbox: Cloudflare.DurableObject('CodemodeSandbox', { className: 'CodemodeSandbox' }) },
+    })
+    // The agent Worker's binding: the class by script name, so scripts run in the sandbox Worker's isolate.
+    return Cloudflare.DurableObject('CodemodeSandbox', { className: 'CodemodeSandbox', scriptName: worker.workerName })
+  })
+
 /** What the Website build reads: a change to any of them builds again. */
 const BUILD_INPUTS = [
   'src/**',
@@ -84,6 +103,7 @@ export default Alchemy.Stack(
       },
       env: {
         AGENTS: agents,
+        CODEMODE_SANDBOX: yield* codemodeSandbox(stage),
         AUTH_DB: db,
         FILES: files,
         FLOWS: flows,

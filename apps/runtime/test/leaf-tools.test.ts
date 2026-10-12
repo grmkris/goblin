@@ -50,7 +50,7 @@ describe('leaf tools (unit, ADR 0027)', () => {
     )
     expect(asked.control).toEqual({ terminate: true })
     expect(asked.details).toMatchObject({ kind: 'home-owner-required', edit })
-    expect(JSON.stringify(asked.content)).toContain('May I change these owner-placed Home tiles?')
+    expect(JSON.stringify(asked.output)).toContain('May I change these owner-placed Home tiles?')
 
     const applied = { kind: 'applied', operationId: 'op1', layout, tileIds: ['t1'], message: 'Removed a note.' }
     const done = await call(tool(homeExtension(runner(applied)), 'home_edit'), edit)
@@ -82,14 +82,14 @@ describe('leaf tools (unit, ADR 0027)', () => {
     const shared = await call(tool(threadExtension(runner(undefined, '12')), 'share_back'), {
       note: 'the word is lantern',
     })
-    expect(shared.content).toEqual([{ type: 'text', text: 'Shared with 12.' }])
+    expect(shared.output).toEqual([{ type: 'text', text: 'Shared with 12.' }])
     expect(shared.details).toEqual({ structuredContent: { sharedWith: '12' } })
   })
 
   it('skill_activate shows the verified skill in its tags, and skill_read returns an image as content as it is', async () => {
     const loaded = { handle: 'lib:review', origin: 'lib', body: '# Review\n', files: [{ path: 'a.md', size: 3 }] }
     const activated = await call(tool(skillsExtension(runner(loaded)), 'skill_activate'), { skill: 'lib:review' })
-    expect(activated.content).toEqual([
+    expect(activated.output).toEqual([
       {
         type: 'text',
         text: '<skill handle="lib:review" origin="lib">\n\n# Review\n\n</skill>\n\nFiles you may read with skill_read: a.md (3 bytes)',
@@ -97,7 +97,7 @@ describe('leaf tools (unit, ADR 0027)', () => {
     ])
     expect(activated.details).toEqual({ structuredContent: loaded })
 
-    const image = { content: [{ type: 'image' as const, data: 'AAAA', mimeType: 'image/png' }] }
+    const image = { output: [{ type: 'image' as const, data: 'AAAA', mimeType: 'image/png' }] }
     const read = await call(tool(skillsExtension(runner(new ReadyResult(image))), 'skill_read'), {
       skill: 'lib:review',
       path: 'a.png',
@@ -122,7 +122,7 @@ describe('leaf tools (unit, ADR 0027)', () => {
     }
     const suggested = await call(tool(serversExtension(runner(found), undefined), 'mcp_suggest'), { query: 'weather' })
     expect(suggested.details).toEqual({ structuredContent: found })
-    expect(suggested.content).toEqual([{ type: 'text', text: JSON.stringify(found) }])
+    expect(suggested.output).toEqual([{ type: 'text', text: JSON.stringify(found) }])
   })
 
   it('ask_user records the questions, ends the turn, and refuses a choice without two options', async () => {
@@ -142,7 +142,7 @@ describe('leaf tools (unit, ADR 0027)', () => {
     const asked = await call(tool(asking, 'ask_user'), { questions: [question] })
     expect(asked.control).toEqual({ terminate: true })
     expect(asked.details).toMatchObject({ kind: 'question', questions: [question] })
-    expect(asked.content).toEqual([
+    expect(asked.output).toEqual([
       {
         type: 'text',
         text: 'Asked the owner:\n1. Which?\n   - A\n   - B\nTheir answers will arrive as their next message.',
@@ -154,6 +154,6 @@ describe('leaf tools (unit, ADR 0027)', () => {
       questions: [{ ...question, options: [{ id: 'a', label: 'A' }] }],
     })
     expect(lonely.isError).toBe(true)
-    expect(JSON.stringify(lonely.content)).toContain('needs at least two options')
+    expect(JSON.stringify(lonely.output)).toContain('needs at least two options')
   })
 })

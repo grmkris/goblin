@@ -75,7 +75,7 @@ export const approvalResult = (session: string, callId: string, id: string, inpu
     const connection = named(yield* (yield* McpServers).labels(), input.connectionId)
     yield* waitOnOwner(session, callId, 'mcp-approval', `Approve ${connection} · ${input.name}?`)
     return {
-      content: [
+      output: [
         {
           type: 'text',
           text: `Ask first: ${connection} · ${input.name}. Nothing ran. The owner must approve or refuse the exact held arguments in the chat card. Stop and wait. Do not call the tool again; approval dispatches this held call.`,

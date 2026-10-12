@@ -160,7 +160,7 @@ const call = (name: string, conversationId = 7) =>
   execute('mcp_call', { connectionId: 'notes', name, arguments: {} }, conversationId)
 const listed = async (input: Record<string, unknown>, conversationId: number): Promise<unknown> => {
   const result = await execute('mcp_list', input, conversationId)
-  const [block] = result.content ?? []
+  const [block] = result.output ?? []
   return block?.type === 'text' ? JSON.parse(block.text) : undefined
 }
 
@@ -168,11 +168,11 @@ describe('mcp_call and the owner grant (unit)', () => {
   it('runs a granted tool and returns its untrusted result', async () => {
     const result = await call('read')
     expect(result.isError).toBe(false)
-    expect(JSON.stringify(result.content)).toContain('ran read')
+    expect(JSON.stringify(result.output)).toContain('ran read')
     expect(result.details).toMatchObject({ origin: { connectionId: 'notes', trust: 'untrusted' } })
     // Arguments the model sent as the JSON string of an object run the same tool.
     const stringly = await execute('mcp_call', { connectionId: 'notes', name: 'read', arguments: '{}' }, 7)
-    expect(JSON.stringify(stringly.content)).toContain('ran read')
+    expect(JSON.stringify(stringly.output)).toContain('ran read')
   })
   it('turns an ungranted tool into a request for the owner instead of an empty error', async () => {
     const result = await call('write')
@@ -180,8 +180,8 @@ describe('mcp_call and the owner grant (unit)', () => {
       isError: true,
       details: { kind: 'grant-required', connectionId: 'notes', name: 'write' },
     })
-    expect(JSON.stringify(result.content)).toContain('Allow button')
-    expect(JSON.stringify(result.content)).toContain('Not granted: \\"Notes · Mine\\" (notes) · write')
+    expect(JSON.stringify(result.output)).toContain('Allow button')
+    expect(JSON.stringify(result.output)).toContain('Not granted: \\"Notes · Mine\\" (notes) · write')
   })
   it('asks the owner to sign in again with more access when the server says the scope is short (ADR 0042)', async () => {
     const result = await call('admin')
@@ -189,7 +189,7 @@ describe('mcp_call and the owner grant (unit)', () => {
       isError: true,
       details: { kind: 'scope-required', connectionId: 'notes', scope: 'notes:read notes:admin' },
     })
-    expect(JSON.stringify(result.content)).toContain('Needs more access: \\"Notes · Mine\\" (notes)')
+    expect(JSON.stringify(result.output)).toContain('Needs more access: \\"Notes · Mine\\" (notes)')
     // The connection is not broken by it: the next granted call runs.
     expect((await call('read')).isError).toBe(false)
   })
@@ -236,7 +236,7 @@ describe('mcp_call and the owner grant (unit)', () => {
       const result = await call(name)
       expect(result).toMatchObject({ isError: true })
       expect(result.details).toBeUndefined()
-      expect(JSON.stringify(result.content)).toContain('NotFound')
+      expect(JSON.stringify(result.output)).toContain('NotFound')
     }
   })
 })
@@ -246,7 +246,7 @@ describe("what a Topic's setup leaves out (unit)", () => {
     expect(await listed({}, 8)).toEqual({ servers: [] })
     const hidden = await execute('mcp_list', { connectionId: 'notes' }, 8)
     expect(hidden.isError).toBe(true)
-    expect(JSON.stringify(hidden.content)).toContain('NotFound')
+    expect(JSON.stringify(hidden.output)).toContain('NotFound')
     const notesTools = await listed({ connectionId: 'notes' }, 9)
     expect(notesTools).toMatchObject({ tools: [{ name: 'write', granted: false }] })
   })
@@ -266,13 +266,13 @@ describe("what a Topic's setup leaves out (unit)", () => {
       target: { kind: 'tool', connectionId: 'notes', name: 'read' },
       topic: { id: 2, name: 'Work' },
     })
-    expect(JSON.stringify(tool.content)).toContain('add it to #Work')
+    expect(JSON.stringify(tool.output)).toContain('add it to #Work')
     expect(ran).toEqual([])
   })
   it('tells a subagent it cannot, with no card for the owner to answer', async () => {
     const result = await call('read', 10)
     expect(result.isError).toBe(true)
     expect(result.details).toBeUndefined()
-    expect(JSON.stringify(result.content)).toContain('the conversation that started you')
+    expect(JSON.stringify(result.output)).toContain('the conversation that started you')
   })
 })

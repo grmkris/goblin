@@ -11,8 +11,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "1.0.1",
-    "@earendil-works/pi-durable": "1.0.1",
+    "@earendil-works/pi-ai": "file:../vendor/pi/earendil-works-pi-ai-1.1.0.tgz",
+    "@earendil-works/pi-durable": "file:../vendor/pi/earendil-works-pi-durable-1.1.0.tgz",
     "@goblin/runtime": "workspace:*",
     "agents": "0.26.0",
     "drizzle-orm": "1.0.0-rc.5-ab785fc",

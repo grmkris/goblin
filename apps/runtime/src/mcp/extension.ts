@@ -2,8 +2,8 @@ import type { CallToolResult } from '@modelcontextprotocol/client'
 import type { ToolExecutionResult } from '@earendil-works/pi-durable'
 import { redactSecretFields as redact } from './redaction.ts'
 /** Pi supports text and image blocks. Other MCP blocks remain explicit tagged data in the result details. */
-const mcpModelContent = (result: CallToolResult): NonNullable<ToolExecutionResult['content']> => {
-  const blocks: NonNullable<ToolExecutionResult['content']> = []
+const mcpModelContent = (result: CallToolResult): NonNullable<ToolExecutionResult['output']> => {
+  const blocks: NonNullable<ToolExecutionResult['output']> = []
   for (const block of result.content) {
     if (block.type === 'text') blocks.push({ type: 'text', text: block.text })
     else if (block.type === 'image') blocks.push({ type: 'image', data: block.data, mimeType: block.mimeType })
@@ -13,7 +13,7 @@ const mcpModelContent = (result: CallToolResult): NonNullable<ToolExecutionResul
 }
 /** A redacted model envelope; the manager retains the original rich MCP result for the host. */
 export const mcpModelResult = (connectionId: string, result: CallToolResult): ToolExecutionResult => ({
-  content: [
+  output: [
     { type: 'text', text: JSON.stringify({ origin: { connectionId, trust: 'untrusted' } }) },
     ...mcpModelContent(result),
   ],
@@ -32,7 +32,7 @@ export const mcpModelResult = (connectionId: string, result: CallToolResult): To
  * server's content cannot forge it. The model is told to wait: granting is the owner's act, never the model's.
  */
 export const grantRequiredResult = (connectionId: string, name: string, connection: string): ToolExecutionResult => ({
-  content: [
+  output: [
     {
       type: 'text',
       text: `Not granted: ${connection} · ${name}. The owner has been shown an Allow button for this tool. Stop here and wait for their decision; do not retry until they reply.`,
@@ -54,7 +54,7 @@ export const scopeRequiredResult = (
   scope: string,
   connection: string,
 ): ToolExecutionResult => ({
-  content: [
+  output: [
     {
       type: 'text',
       text: `Needs more access: ${connection} says this call needs ${scope === '' ? 'more access' : `the scope ${scope}`}. The owner has been shown a card to sign in to it again with more access. Stop here and wait until they say to continue.`,
@@ -78,7 +78,7 @@ export const urlRequiredResult = (
   name: string,
   connection: string,
 ): ToolExecutionResult => ({
-  content: [
+  output: [
     {
       type: 'text',
       text: `Waiting on the owner: ${connection} · ${name} asks them to finish a step on its site first, and nothing has completed yet. They have a card with the server's link. Once they finish or cancel it, the server's answer comes back here. Stop and wait; do not call the tool again.`,

@@ -56,7 +56,9 @@ describe('typed tools (unit, ADR 0027)', () => {
   it('decode the arguments, and return the output as JSON text and structuredContent beside the web fields', async () => {
     const result = await call(trips, { from: { name: 'Tallinn', lat: 59 }, to: { name: 'Riga', lat: 57 }, days: 2 })
     expect(result).toEqual({
-      content: [{ type: 'text', text: '{"legs":2,"note":"Tallinn to Riga"}' }],
+      output: [{ type: 'text', text: '{"legs":2,"note":"Tallinn to Riga"}' }],
+      // Code mode scripts get the value itself, checked against the tool's structuredOutputSchema.
+      structuredOutput: { legs: 2, note: 'Tallinn to Riga' },
       details: { kind: 'trip', legs: 2, structuredContent: { legs: 2, note: 'Tallinn to Riga' } },
     })
     // The offered schema lets an optional field be null (its JSON form); it decodes as absent.
@@ -69,13 +71,19 @@ describe('typed tools (unit, ADR 0027)', () => {
   it('turn bad arguments and failures into error results the model can act on', async () => {
     const bad = await call(trips, { from: { name: 'Tallinn' }, to: 'Riga' })
     expect(bad.isError).toBe(true)
-    expect(JSON.stringify(bad.content)).toContain("The arguments do not match trip_plan's input")
+    expect(JSON.stringify(bad.output)).toContain("The arguments do not match trip_plan's input")
     expect(bad.diagnostics).toMatchObject([{ severity: 'error', code: 'invalid_arguments' }])
     const thrown = await call(trips, { from: { name: 'A', lat: 0 }, to: { name: 'A', lat: 0 } })
     expect(thrown).toEqual({
-      content: [{ type: 'text', text: 'nowhere to go' }],
+      output: [{ type: 'text', text: 'nowhere to go' }],
       isError: true,
       diagnostics: [{ severity: 'error', code: 'Error', message: 'nowhere to go' }],
     })
+  })
+
+  it('declare the output schema for code mode and keep model-only tools out of scripts', () => {
+    expect(trips.structuredOutputSchema).toMatchObject({ type: 'object' })
+    expect(trips.callers).toBeUndefined()
+    expect(typedTool({ ...trip, callers: ['model'] }).callers).toEqual(['model'])
   })
 })

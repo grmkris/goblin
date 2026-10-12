@@ -28,6 +28,8 @@ export function threadExtension(run: RunProgram) {
     tools: [
       typedTool({
         name: 'share_back',
+        // Asks or tells the owner, or acts outside goblin: the model calls it, never a code mode script.
+        callers: ['model'],
         description:
           'Share a note from this thread with the conversation it branched from, only when the owner asks you to. That conversation sees it as context and does not answer it.',
         input: Schema.Struct({ note: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4000)) }),

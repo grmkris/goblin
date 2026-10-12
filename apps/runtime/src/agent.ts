@@ -1,3 +1,4 @@
+import { codemodeExtension } from './pi/codemode.ts'
 import { Agent } from 'agents'
 import { type Extension } from '@earendil-works/pi-durable'
 import { PiHarness } from 'agents/harness/pi'
@@ -103,7 +104,9 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     const subagents = this.#subagents.extension
     const retrieval = retrievalExtension(run)
     const learning = [skillLearningExtension(run), decisionsExtension(run, env.AI !== undefined)]
-    const base = [...execution, ...learning, ...appsExtension(apps, run), organize, retrieval]
+    const codemode =
+      env.CODEMODE_SANDBOX === undefined ? [] : [codemodeExtension(env.CODEMODE_SANDBOX, () => this.name)]
+    const base = [...codemode, ...execution, ...learning, ...appsExtension(apps, run), organize, retrieval]
     const own = [serversExtension(run, env.STAGE), subagents, routinesExtension(run), this.#telemetry.diagnose]
     const extras = [this.#thread, memory, recall, this.#personas.extension, ...routineKit.extra]
     this.harness = makePiHarness(this.#pi, [...base, ...own], extras, apps, this.#telemetry.recorder)

@@ -73,7 +73,7 @@ export function searchExtension(
         parameters: Type.Object({ query: Type.String({ minLength: 1 }) }),
         replay: 'safe',
         execute: async ({ query }, api) => ({
-          content: [
+          output: [
             {
               type: 'text',
               text: await use(
@@ -96,7 +96,7 @@ export function searchExtension(
         }),
         replay: 'safe',
         execute: async ({ id, offsetBytes, maxBytes }, api) => ({
-          content: [
+          output: [
             {
               type: 'text',
               text: await use(

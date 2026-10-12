@@ -21,7 +21,7 @@ async function heldQueue() {
         execute: async () => {
           entered.resolve()
           await release.promise
-          return { content: [{ type: 'text', text: 'released' }] }
+          return { output: [{ type: 'text', text: 'released' }] }
         },
       }),
     ],
@@ -91,7 +91,8 @@ describe('queued content from real Pi (in memory, keyless fixture)', () => {
       expect(await withdrawQueuedInput(pi, String(root.id), queued.id)).toEqual({ status: 'already_settled' })
       const write = await root.submit({ type: 'write', entry: { kind: 'fixture.note' } }, BACKGROUND)
       expect(await withdrawQueuedInput(pi, String(root.id), write.id)).toEqual({ status: 'not_found' })
-      expect((await write.status(BACKGROUND)).status).toBe('queued')
+      // Pi settles a display-only write at once, even while the run is busy (pi-durable Unreleased, #10407).
+      expect((await write.status(BACKGROUND)).status).toBe('done')
       expect(await withdrawQueuedInput(pi, '999', first.id)).toEqual({ status: 'not_found' })
       expect(await withdrawQueuedInput(pi, String(root.id), Number.MAX_SAFE_INTEGER)).toEqual({ status: 'not_found' })
       expect(await withdrawQueuedInput(pi, String(root.id), first.id)).toEqual({ status: 'already_started' })
