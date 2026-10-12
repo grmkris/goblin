@@ -69,7 +69,9 @@ itself authorize model spend, external messages, deployment or production change
   frozen call in Pi's beforeTool hook and terminate with a local approval marker from execution. Owner approval
   dispatches identical arguments through the shared guard; bind endpoint, grant version, caller and execution ids.
   Claim dispatch intent once, refuse automatic retries, and mark interrupted intent uncertain on reconstruction.
-  Routine, subagent and App paths cannot bypass the policy; remote hints never choose it.
+  Routine, subagent and App paths cannot bypass the policy; remote hints never choose it. The outcome goes back to
+  its chat as an input (`sendOutcome`); when nothing can pay for a turn it is kept there as a passive `app.mcp_outcome`
+  entry instead, and the decision still answers 200: the call already ran, so the budget never loses its outcome.
 
 - Protocol 2026-07-28 (ADR 0042). Tools are re-listed in place (`mcp/tool-list.ts`: one flight per connection, never a
   partial list, stale on failure); a `subscriptions/listen` stream is held only while a connection is used (closed
