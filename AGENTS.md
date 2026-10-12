@@ -42,7 +42,8 @@ infrastructure. Read
 - The `dev` stage is the daily instance. It holds test data only (owner, 2026-10-08), so spikes may deploy there.
   goblin is greenfield until launch (owner, 2026-10-11): no backwards compatibility, no legacy decoders; migrations are
   edited in place as if the schema had always been so, and a release that edits an applied one resets dev first
-  (`bun run destroy:dev -- --confirm-reset`); prod waits for the owner's reset decision. A user only ever reaches their
+  (`bun run destroy:dev -- --confirm-reset`). Prod is reset only when the owner decides, as for the hackathon release
+  (owner, 2026-10-12): `GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset`, then release the same sha. A user only ever reaches their
   own agent; never add a route that takes an agent name from the request.
   Telemetry never carries content ([ADR 0024](docs/adr/0024-observing-conversations.md)).
 

@@ -125,6 +125,7 @@ These are source defaults and configuration names; active dev settings and provi
 bun run plan:dev                          # preview
 bun run deploy:dev                        # deploy
 bun run destroy:dev -- --confirm-reset    # erase every account, conversation and MCP credential
+GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset   # the same on prod, only at a reset the owner decided
 bun run smoke:dev                         # acceptance; see scripts/README.md
 ```
 
