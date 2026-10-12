@@ -14,11 +14,13 @@ deployed by `bun run deploy:wallet-dev` (`scripts/wallet-stage.ts`), never by `s
 
 ## Test floor
 
-- Unit tests call `worker.fetch` with a hand-built env. There is no workerd integration test yet; the first lane that
-  adds a Durable Object behavior adds one, and this line changes with it.
+- Unit tests call `worker.fetch` with a hand-built env. There is no workerd integration test yet. The ledger's alarm
+  (the Tempo float, ADR 0051) is tested against a fake host (`ledger/fixtures.ts` `alarmHost`); a workerd test of it
+  is still owed.
 - Money paths get table tests in `@goblin/wallet`, not here.
 - `WALLET_LIVE` selects mainnets or their testnets for every rail (`RailsDeps.live`, `rpcFromEnv`); on testnets every
-  EVM send, Tempo transfer, swap and bridge is refused: UserOperations and those packages run on mainnet only.
+  EVM send, Tempo transfer, swap and bridge is refused: UserOperations and those packages run on mainnet only, and the
+  Tempo float is never refilled.
 
 ## Landmines
 
@@ -29,3 +31,7 @@ deployed by `bun run deploy:wallet-dev` (`scripts/wallet-stage.ts`), never by `s
   MCP tool per file.
 - Only `src/runtime.ts` (when it exists) calls `Effect.runPromise`.
 - The Durable Object classes are exported from `src/worker.ts`; renaming one needs an Alchemy migration.
+- `WalletLedger`'s alarm is the Tempo float's (ADR 0051): set it only through `scheduleFloat`, which keeps the earliest
+  request. A float refill is an operation that is never reserved; never count it in the spend windows, and never retry
+  one that may have moved money. The owner's signer and rails come from `owner-deps.ts` given a ledger, so the alarm
+  uses its own store and the Worker its client; `ledger/durable.ts` must not import `context.ts` or `wiring.ts`.
