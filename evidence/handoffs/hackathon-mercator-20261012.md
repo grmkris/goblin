@@ -151,3 +151,37 @@ Prod was reset first (`destroy:prod`, owner-approved), then released at `9ca847e
 - `plan_override='pro'` for the owner;
 - connect Mercator (Allow recommended) and Telegram;
 - save a smoke session, then run the signed-in `smoke:prod`.
+
+## Inference paid per call from the Goblin Wallet (ADR 0047), 12 Oct afternoon
+
+**Shipped** (main, then dev and prod at `8fd49a6b`):
+- G1 `cb34d0d7`: paid routes `paid:tempo` and `paid:goblin`, the `inference` MCP caller and the 402 → pay → retry fetch.
+- G2 `84ac4aa3`: "How goblin pays for its model" in Settings, and the pay offer in Get started.
+- G3 `a9b4eb99`: goblin's own `POST /v1/chat/completions` behind an mppx `tempo` charge to the treasury.
+- G4 `7ded50de` and `b4192bd9`: the free plan's 50 Credits ask for a Goblin Wallet with at least $5, read from the
+  wallet's own `stablecoinUsd` total.
+- `2a399c3f`: a paid call reports its `Payment-Receipt` to `pay_challenge`, so the wallet settles the operation. A
+  spend the wallet holds over a limit says so.
+
+**Releases.** CI's Release dev fails at "Materialize private stage credentials", so releases ran by hand from a
+worktree with `GOBLIN_ENV_DIR` set to the shared `.local`.
+- dev: receipt `20261012T140139Z`, authenticated.
+- prod: `heavy bun run promote <sha>`, receipt `20261012T140827Z`, public acceptance; wallet prod `7b86ac2d` from the
+  same sha.
+- Prod env (Kris approved directly): `GOBLIN_PAID_INFERENCE=tempo,goblin`, recipient treasury
+  `0x6649868b1B87711e405aa6690E3f0245d9510631` and a prod-only `GOBLIN_MPP_SECRET`.
+
+**Proven on mainnet from dev** (Kris approved). Both payments came from kristjan@myinbox.lol's wallet-dev connection
+(agent `0xD354…274F`). Each turn answered, and the wallet marked its operation delivered from goblin's receipt report.
+- `paid:tempo`: tx `0x67d58f4f4649276e5b88dc0714c7ece6a5745fee700074c1768ea837b94cf211`, 0.020527 USDC.e to Tempo's
+  payee.
+- `paid:goblin`: tx `0x68b7d933e7536db346e546240361a9b4c2928ed565d44945549fdf32847af06f`, 0.019957 USDC.e to the
+  treasury, plus 0.000178 USDC.e network fee. This is the first mainnet proof of the self-paid fee.
+
+**To use it on an account:**
+1. Connections → Goblin Wallet → review recommended access → Allow (`pay_challenge`).
+2. Settings → "How goblin pays for its model" → a pay-per-call route.
+
+**Open.**
+- Per-token billing waits for MPP sessions.
+- No paid call has run on prod yet; the recording's clips 2–4 are the first.
