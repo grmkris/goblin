@@ -11,9 +11,21 @@ server signing and Privy app credentials never enter the browser bundle.
 - `bun run --cwd apps/wallet-web typecheck`, `... build`, `... effect:check`.
 - Use the shared shadcn components from `@goblin/ui`; theme tokens, no raw colours or inline styles.
 
+## Pages
+
+- The console (Home, Activity, Limits, Connections, Add funds) opens whether or not setup is finished; nothing gates
+  its navigation. `/setup`, `/consent` and `/approve/:id` are focus pages without it. Routes are `app/routes.ts`; a
+  trailing slash names the same page.
+- Setup lives in `pages/setup/*` and is shared by `/setup` and `/consent`: the agent wallet is created for the owner,
+  then Add funds, then Turn on spending, each resuming from `/api/me` and `/api/status`. What a screen decides without
+  the network is a pure model (`model.ts`, `consent-model.ts`, `return.ts`) with its tests.
+- `?fixtures` (busy wallet), `?fixtures=fresh` (just signed in, goblin asking to connect), `?fixtures=funded` (USDC on
+  Base, spending off) and `?fixtures=expired` (consent ran out) run the app on fixtures, for previews: Privy sign-in does
+  not work on localhost.
+
 ## Test floor
 
-- No test script yet: vitest with no files exits 1. The first component with behavior adds a test and the script.
+- Vitest on the pure models (setup, consent, routes, deposits, the views' display models); no DOM tests.
 
 ## Landmines
 

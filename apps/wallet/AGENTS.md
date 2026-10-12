@@ -24,6 +24,9 @@ deployed by `bun run deploy:wallet-dev` (`scripts/wallet-stage.ts`), never by `s
 
 ## Landmines
 
+- `WalletAuth`'s tables are created by `CREATE TABLE IF NOT EXISTS`, which never alters a deployed one: a column added
+  later also needs its guarded `ALTER TABLE` (`addOpenedAt` in `oauth/store.ts`). A consent request is bound to the
+  first owner who reads it; every consent route checks that binding.
 - No `node:*` imports and no `process.env` in `src`; use WebCrypto and the `env` binding.
 - Secrets (`PRIVY_APP_SECRET`, `PRIVY_AUTHORIZATION_KEY`, `PIMLICO_API_KEY`) are redacted Alchemy bindings: never
   log, return or persist them. `GET /api/config` serves the public app id only.
