@@ -1807,6 +1807,44 @@
     }
   }
   /*
+   * A Telegram offer in Activity: its words in the row, then where it goes, Not now and Set up under them, past the
+   * row's mark. Its title wraps, so a long chat name is read whole. On a phone the selects take the width and the
+   * buttons follow on their own line.
+   */
+  .telegram-offer {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+    container: telegram-route / inline-size;
+  }
+  .telegram-offer .list-row-title,
+  .telegram-offer .list-row-meta {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+  .telegram-offer-pick {
+    display: flex;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding-inline-start: 2.5rem;
+  }
+  .telegram-offer-pick > .row-actions {
+    margin-inline-start: auto;
+  }
+  /* An offer has room: its selects are as wide as what they say, so a new Topic's name is read whole. */
+  @container telegram-route (width >= 38rem) {
+    .telegram-offer-pick > .telegram-route,
+    .telegram-offer-pick > .telegram-route > [data-slot='native-select-wrapper'] {
+      flex: 0 1 auto;
+    }
+  }
+  @container telegram-route (width < 38rem) {
+    .telegram-offer-pick {
+      padding-inline-start: 0;
+    }
+  }
+  /*
  * Settings-list rows: what a switch allows on the left, the switch on the right, hairlines between. A row the agent
  * may use (a tool) and a row the owner picks (a suggestion) share the layout.
  */

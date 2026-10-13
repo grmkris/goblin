@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import type { Attention, NotificationView, OrganizeReceipt, ServerView } from '@goblin/contracts'
+import type { Attention, NotificationView, OrganizeReceipt, ServerView, TelegramChat } from '@goblin/contracts'
 import { Button } from '@goblin/ui'
 import {
   AlarmClockIcon,
@@ -15,6 +15,7 @@ import {
   MessageSquareTextIcon,
   PlugIcon,
   RadioTowerIcon,
+  SendIcon,
   Settings2Icon,
   WandSparklesIcon,
 } from 'lucide-react'
@@ -33,6 +34,19 @@ import { ChatRow, RowContents } from './chat-link.tsx'
 import { StartChecklist } from '../../start/setup-cards.tsx'
 import { onboardingQuery } from '../../../onboarding/queries.ts'
 import { relativeTime } from '../../../lib/format.ts'
+import { useTelegramChats } from '../../../agent/hooks.ts'
+import { routeChannelMutation } from '../../../agent/queries.ts'
+import {
+  type RouteChoice,
+  chatKey,
+  offerWords,
+  offersOf,
+  pickOf,
+  suggestedChoice,
+  waitingWords,
+} from '../../../lib/telegram-chats.ts'
+import { notNowChats, rememberNotNow } from '../../../lib/telegram-not-now.ts'
+import { type RoutePlaces, RouteSelect, useRoutePlaces } from '../../telegram-chats.tsx'
 
 const ASKS: Readonly<Record<Attention['kind'], { readonly icon: typeof KeyRoundIcon; readonly label: string }>> = {
   question: { icon: MessageCircleQuestionIcon, label: 'A question for you' },
@@ -196,6 +210,89 @@ function EventOfferRow({ server }: { readonly server: ServerView }) {
   )
 }
 
+/**
+ * A Telegram chat or forum topic goblin asked the owner about (ADR 0055), as it asks in the private chat: where its
+ * messages go (a new Topic named after it, to start with) and who answers, then Set up, which delivers what it held,
+ * or Not now, which leaves it waiting.
+ */
+function TelegramOfferRow({
+  chat,
+  places,
+  onNotNow,
+}: {
+  readonly chat: TelegramChat
+  readonly places: RoutePlaces
+  readonly onNotNow: () => void
+}) {
+  const route = useMutation(routeChannelMutation)
+  const [touched, setTouched] = useState<RouteChoice>()
+  const choice = touched ?? suggestedChoice(chat, places.topics)
+  const pick = pickOf(chat, choice, places.topics)
+  // expected: a refusal shows why in place of the row's line, and the row stays
+  const error = route.error === null ? '' : messageOf(route.error, `set up “${chat.title}”`)
+  const within = chat.thread > 0 && chat.chatTitle !== undefined ? ` in ${chat.chatTitle}` : ''
+  return (
+    <li className="list-row telegram-offer" data-static>
+      <RowContents
+        mark={<SendIcon aria-hidden />}
+        title={`${offerWords(chat)} “${chat.title}”${within}`}
+        meta={error === '' ? (waitingWords(chat.held) ?? 'Choose where its messages go') : error}
+      />
+      <span className="telegram-offer-pick">
+        <RouteSelect
+          chat={chat}
+          choice={choice}
+          places={places}
+          onChoose={(next) => {
+            route.reset()
+            setTouched(next)
+          }}
+        />
+        <span className="row-actions">
+          <Button variant="ghost" size="sm" disabled={route.isPending} onClick={onNotNow}>
+            Not now
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            pending={route.isPending}
+            disabled={pick === undefined}
+            onClick={() => {
+              if (pick !== undefined) route.mutate(pick)
+            }}
+          >
+            Set up
+          </Button>
+        </span>
+      </span>
+    </li>
+  )
+}
+
+/** The Telegram chats waiting for a route, less the ones this browser was told Not now. */
+function useTelegramOffers() {
+  const chats = useTelegramChats().data?.chats ?? []
+  const [hidden, setHidden] = useState(notNowChats)
+  const waiting = offersOf(chats)
+  const offers = waiting.filter((chat) => !hidden.includes(chatKey(chat)))
+  const notNow = (chat: TelegramChat) => setHidden(rememberNotNow(chatKey(chat), waiting.map(chatKey)))
+  return { offers, notNow }
+}
+
+/** The Telegram chats and topics waiting for the owner to say where they go (ADR 0055). */
+function TelegramOffers({ telegram }: { readonly telegram: ReturnType<typeof useTelegramOffers> }) {
+  const places = useRoutePlaces()
+  return (
+    <PageSection id="telegram-offers" title="Telegram chats">
+      <ul className="list-rows">
+        {telegram.offers.map((chat) => (
+          <TelegramOfferRow key={chatKey(chat)} chat={chat} places={places} onNotNow={() => telegram.notNow(chat)} />
+        ))}
+      </ul>
+    </PageSection>
+  )
+}
+
 /** What organizing did (a Topic made, renamed, archived; a Persona changed), with Undo while nothing else touched it. */
 function ReceiptRow({ receipt, now }: { readonly receipt: OrganizeReceipt; readonly now: number }) {
   const undo = useMutation(undoWorkspaceReceiptMutation)
@@ -226,7 +323,8 @@ function ReceiptRow({ receipt, now }: { readonly receipt: OrganizeReceipt; reado
 
 /**
  * `/activity`: what needs the owner across every Topic (questions, approvals, grants, App schedules), linked to where
- * it waits; Tell me's notifications; the chats with unread replies; and what organizing did, with Undo.
+ * it waits; the Telegram chats waiting for a route; Tell me's notifications; the chats with unread replies; and what
+ * organizing did, with Undo.
  */
 export function ActivityPage() {
   const conversations = useConversations()
@@ -238,7 +336,9 @@ export function ActivityPage() {
   const offers = (useQuery(serversQuery).data ?? []).filter((server) => server.events === 'open')
   const setup = useQuery(onboardingQuery).data
   const setupLeft = setup?.steps.filter((step) => !step.done).length ?? 0
-  if (needs.length + offers.length + setupLeft + notifications.length + receipts.length + unread.length === 0)
+  const telegram = useTelegramOffers()
+  const waiting = needs.length + offers.length + telegram.offers.length + setupLeft
+  if (waiting + notifications.length + receipts.length + unread.length === 0)
     return <p className="page-empty">Nothing needs you.</p>
   return (
     <div className="page-stack">
@@ -269,6 +369,7 @@ export function ActivityPage() {
           </ul>
         </PageSection>
       )}
+      {telegram.offers.length > 0 && <TelegramOffers telegram={telegram} />}
       {notifications.length > 0 && (
         <Notifications
           notifications={notifications}
