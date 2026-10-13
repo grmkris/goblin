@@ -1,14 +1,13 @@
 # Debuggability, Effect-native runtime and the typed owner API: 2026-10-10
 
-The plan, approved by the owner on 2026-10-09, is in `~/.claude/plans/okay-let-s-go-grill-noble-muffin.md`. A
-conductor session ran it in parallel lanes, all Claude subagents:
+The plan, approved by the owner on 2026-10-09, is the owner's private plan file. A conductor session ran it in parallel
+lanes, all Claude subagents:
 
 - three foundation lanes;
 - twelve area lanes, in three waves;
 - three integration lanes: lint, runtime and docs.
 
-Lane briefs, status logs and gate logs are in `/tmp/goblin-lanes/20261010/`; that directory is temporary and not
-kept.
+Lane briefs, status logs and gate logs were kept in a scratch directory on the dev box that is temporary and not kept.
 
 ## What is live
 

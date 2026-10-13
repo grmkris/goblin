@@ -1,6 +1,6 @@
 # 0048: First-run Start
 
-Accepted 2026-10-12 with the owner, for the hackathon. The plan is `~/.claude/plans/let-s-grill-me-to-fancy-catmull.md`.
+Accepted 2026-10-12 with the owner, for the hackathon. The plan is private.
 It builds on ADR 0043 (first-class servers), 0045 (Goblin Wallet) and 0047 (paid inference).
 
 ## Context

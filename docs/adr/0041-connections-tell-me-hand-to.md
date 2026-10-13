@@ -1,10 +1,9 @@
 # ADR 0041: Connections, Tell me and Hand to
 
-Accepted 2026-10-11 with the owner, in a design interview; the plan is
-`~/.claude/plans/let-s-grill-me-to-fancy-catmull.md`. Amends ADRs 0006 (servers the owner adds), 0011 (MCP Events),
-0012 (routines) and 0033 (Personas). Amended 2026-10-12 by ADR 0048: every connection registers as plain `goblin`.
-Amended 2026-10-12 again (with the owner): the Events picker, the server's suggestions from `_meta`, and send to a
-Topic or a Persona. See the end.
+Accepted 2026-10-11 with the owner, in a design interview; the plan is private. Amends ADRs 0006 (servers the owner
+adds), 0011 (MCP Events), 0012 (routines) and 0033 (Personas). Amended 2026-10-12 by ADR 0048: every connection
+registers as plain `goblin`. Amended 2026-10-12 again (with the owner): the Events picker, the server's suggestions
+from `_meta`, and send to a Topic or a Persona. See the end.
 
 The owner wants goblin to listen to the platforms it is connected to. A Sidequest event, "you were picked for a job",
 should reach them as a notification. An event can also wake Goblin or a Persona to act on it. They also want to run

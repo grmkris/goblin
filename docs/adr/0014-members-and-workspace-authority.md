@@ -1,9 +1,9 @@
 # ADR 0014: Members and workspace authority
 
-Status: **Withdrawn 2026-10-05**. Kris dropped Members after the
-[Phase B security review](file:///tmp/goblin-lanes/20261005/claude-phaseb-review.md) identified unsafe owner-labelled
-member projections. All feature code is removed; git history retains the implementation. Every user again reaches
-only their own Agent. Applied auth D1 and DO migrations and their data remain dormant under the additive rule.
+Status: **Withdrawn 2026-10-05**. Kris dropped Members after the Phase B security review (a private lane report)
+identified unsafe owner-labelled member projections. All feature code is removed; git history retains the
+implementation. Every user again reaches only their own Agent. Applied auth D1 and DO migrations and their data remain
+dormant under the additive rule.
 
 The decision below is historical and no longer describes the runtime.
 

@@ -4,7 +4,7 @@ Date: 2026-10-06
 
 Status: research artifact for review. No application implementation or provider mutation was performed for this handoff.
 
-Repository: `/home/kristjan/code/purrable`, product name `goblin`, branch `main`. HEAD observed while preparing this file: `71454fa53db15da5abc9107b0daafde36f75fd55`. The shared checkout has concurrent uncommitted application edits; this is a source snapshot, not an assertion that every observation belongs to that commit or is deployed.
+Repository: the `purrable` checkout on the dev box, product name `goblin`, branch `main`. HEAD observed while preparing this file: `71454fa53db15da5abc9107b0daafde36f75fd55`. The shared checkout has concurrent uncommitted application edits; this is a source snapshot, not an assertion that every observation belongs to that commit or is deployed.
 
 Reviewer: please validate the protocol claims against the current installed declarations and the latest official MCP documents before implementation. Treat sections labelled **Proposed** as design material, not as shipped behavior.
 
@@ -277,7 +277,7 @@ GitHub discussion/review pointers, not independent proof of released behavior:
 
 Research depth: primary release documentation, source/declaration inspection, official repository pages, and selected public search results. This was not an exhaustive framework comparison or an interoperability implementation. Search snippets and discussions are leads for the reviewer; normative documents and pinned code should decide behavior.
 
-Earlier public Cloudflare research copies are under `/tmp/goblin-observability-20261006/` and `/tmp/goblin-do-inspection-20261006/` on this box; they are convenience caches and are not required to read this handoff. Refresh drift-prone claims before implementation.
+Earlier public Cloudflare research copies were kept in scratch directories on the dev box; they are convenience caches and are not required to read this handoff. Refresh drift-prone claims before implementation.
 
 Before editing, read the root and workspace AGENTS.md files and applicable MCP/Apps/Effect skills. Preserve concurrent edits and `.spec.md.swo`; never stash/reset/restore foreign work. Work on main and stage only owned paths. Expensive implementation checks run through `heavy`; exit 75 means contention. No credentials, raw Alchemy state, private conversation content, or secret values belong in the review report.
 

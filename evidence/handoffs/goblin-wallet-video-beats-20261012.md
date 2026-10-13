@@ -49,5 +49,5 @@ most. Only mark a beat as recorded when it was captured live; anything that wasn
 
 ## Proof to show on screen or in the README
 - Transaction hashes for each beat (Basescan / Tempo explorer).
-- Spike receipts: `evidence/wallet/s{1,2,3,5}.json`.
+- The spike results (S1, S2, S3, S5), summarised in words; the receipts themselves stay private.
 - The ADR 0045 authority diagram (the five layers).

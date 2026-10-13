@@ -1,7 +1,7 @@
 # Overnight run 2026-10-09: Topics, coding runners, decisions PR
 
-The plan, approved by the owner on 2026-10-09 around 02:30, is in `~/.claude/plans/okay-let-s-go-grill-noble-muffin.md`. A
-conductor session ran eight lanes. Codex lanes stalled repeatedly on model capacity, so most work finished in Claude
+The plan, approved by the owner on 2026-10-09 around 02:30, is the owner's private plan file. A conductor session ran
+eight lanes. Codex lanes stalled repeatedly on model capacity, so most work finished in Claude
 subagents. Every lane landed on `main` through review: small commits, a full gate per batch, ff-only landings or
 cherry-picks.
 
@@ -79,7 +79,7 @@ Handoff: `evidence/handoffs/coding-runner-20261009.md`.
 
 1. **Prod coding connections.** On goblin.surf → Connections:
    - The native server is already added (`shapes-encounter-…`, "Not connected"). Press **Connect**.
-   - On the approval page, run `bun spikes/coding/scripts/approval-code.ts native` in `~/code/goblin` and paste the
+   - On the approval page, run `bun spikes/coding/scripts/approval-code.ts native` in the goblin checkout and paste the
      code from `.local/coding-runner/native-prod-approval.txt`. Codes are single-use and valid for 30 minutes.
    - Then allow the 7 coding tools.
    - Add the other two **By address** and repeat with `docker` / `cloudflare`:
@@ -87,7 +87,7 @@ Handoff: `evidence/handoffs/coding-runner-20261009.md`.
      - `https://assessed-chairs-characteristics-photographer.trycloudflare.com/mcp` (Cloudflare).
    - The conductor stopped short of typing approval codes into the owner's browser.
 2. **Review PR #4.** Merge it or leave it. If merged, release `main` (dev, then prod) as usual.
-3. **Token scopes for stable coding hostnames** (above). Rotate keys before wider use, as already planned.
+3. **Token scopes for stable coding hostnames** (above).
 
 ## Owner-facing flags found during the night
 

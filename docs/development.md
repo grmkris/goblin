@@ -316,7 +316,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - The owner's files: the `FILES` R2 bucket is local under Alchemy's workerd state in `bun dev` and the integration
   stacks, so nothing reaches a real bucket. Shell's `cf_workspace_*` tables are vendor-owned, like `pi_*`: migrations
   never touch them (ADR 0022).
-- UI components: goblin looks like the myapps apps. Prefer porting a component from `~/code/myapps/packages/ui`
+- UI components: goblin looks like the myapps apps. Prefer porting a component from the myapps checkout's `packages/ui`
   (with an "Adapted from" header naming the commit); otherwise `bunx shadcn@latest add <component>` from
   `packages/ui`, then review the generated file. Keep the shared tokens in `packages/ui/src/styles.css` as myapps has
   them (the shell's `--shell-*` and `--moss` tokens are goblin's: the moss rail and sidebar beside the off-white page). Motion uses the theme's curves (`ease-out`,

@@ -1,18 +1,16 @@
 # Handoff: Topics, Personas, Delegates spike and research (2026-10-08/09)
 
-The owner (Kristjan) approved a spike and research plan for the myplan spec "Goblin Topics, Personas, Delegates, and MCP
+The owner approved a spike and research plan for the myplan spec "Goblin Topics, Personas, Delegates, and MCP
 App Surfaces". This file is where the next agent picks it up.
 
 ## Sources of truth
 
-- **Spec** (myplan, Work workspace `ws_YTK4h3a0VC3Od7DXRUvS`):
-  https://myplan.lol/n/doc_79n51n9na6htxepmwzp8v1pmt0. It is at rev 7. Rounds 2 and 3 are recorded in §10
+- **Spec** (a note in the owner's private myplan Work workspace). It is at rev 7. Rounds 2 and 3 are recorded in §10
   "Amendments". Another agent (Goblin) added a separate "Operational decisions" section; leave it alone.
-- **Decision experiments note:** https://myplan.lol/n/doc_3t71vd4hrs23p2cwq438tn2awq. It holds the 8 rejected
+- **Decision experiments note** (private myplan). It holds the 8 rejected
   "Decision API" suggestions, rewritten around the rules-first "critic" pattern with Cloudflare Clef.
-- **Approved plan:** `~/.claude/plans/resilient-whistling-sparkle.md`. It has the phases, lanes, the Move-to-thread
-  design (Phase 3a) and the kill criteria.
-- **Project memory:** `~/.claude/projects/-home-kristjan-code-goblin/memory/goblin-topics-spike-plan.md`.
+- **Approved plan:** the owner's private plan file. It has the phases, lanes, the Move-to-thread design (Phase 3a) and
+  the kill criteria.
 
 ## Owner decisions
 
@@ -68,10 +66,9 @@ App Surfaces". This file is where the next agent picks it up.
     `bench/fixtures/decisions-heldout.json`) the rules scored 37/100, so they overfit. A partial cheap-model run judged
     79/104 rows.
   - The lane's own report says nothing is ready for automatic use.
-- **Mockup v1** (old IA, not the Slack design) is served from
-  `/tmp/goblin-lanes/20261008/mockup/site/index.html`. The server is a `python3 -m http.server 8767 --bind
-  100.105.51.45` started from this session, so it stops when the session closes. Restart it with the same command
-  from that directory.
+- **Mockup v1** (old IA, not the Slack design) was served from a scratch directory on the dev box by a
+  `python3 -m http.server 8767` bound to the box's tailnet address, started from this session, so it stopped when the
+  session closed.
 
 ## Blocked and waiting on the owner
 
@@ -79,12 +76,11 @@ App Surfaces". This file is where the next agent picks it up.
    session restarted, so its usage is unknown. The harness fails closed and refuses all further paid calls. Clef,
    Jev and OpenAI arms cannot run until the owner decides how to settle that attempt. Do not bypass the guard without
    the owner's explicit decision.
-2. **Credentials** (in `~/.config/secrets.env`, mode 600; never print them):
-   - the owner says the existing `CLOUDFLARE_API_TOKEN` was updated with Workers AI (+Vectorize?) permissions;
+2. **Credentials** (in the dev box's private secrets file; never print them):
+   - the owner says the existing Cloudflare token was updated with Workers AI (+Vectorize?) permissions;
      **unverified**;
-   - `JEV_API_KEY` (TypeSafe direct) was added;
-   - `OPENAI_DECISIONS_API_KEY` was added. CLIProxy returns 404 for `/v1/decisions`, so call it directly.
-   - The owner plans to rotate all keys before prod.
+   - a key for Jev (TypeSafe direct) was added;
+   - an OpenAI key for decisions was added. CLIProxy returns 404 for `/v1/decisions`, so call it directly.
 
 ## Next steps, in order
 
@@ -112,23 +108,21 @@ App Surfaces". This file is where the next agent picks it up.
 - **Ports:** a foreign process holds 18983. Set `GOBLIN_HARNESS_PORT` to an unused base such as 19101, 19201, 19301
   or 19401; the harness uses offsets +10, +40, +50 and +60.
 - **`heavy`:** exit 75 means retry later. Never pipe it.
-- **Shared checkout:** `~/code/goblin` holds other agents' uncommitted edits. Land by cherry-picking or rebasing in a
+- **Shared checkout:** the main checkout holds other agents' uncommitted edits. Land by cherry-picking or rebasing in a
   separate worktree, run the full gate there, then `git merge --ff-only` into main. Squash before landing if a
   branch ever committed a large blob.
 - **Codex TUI lanes** in tern drop off the shared app-server ("Reconnect failed"), stop on "model at capacity", or
   show "Conversation interrupted". Resume them with
   `codex resume <uuid> -m gpt-6.1-sol --dangerously-bypass-approvals-and-sandbox "<re-orient>"`, or use gpt-6-sol
   when gpt-6.1-sol is at capacity.
-- **Lane records:** briefs, status and steer files are in `/tmp/goblin-lanes/20261008/<lane>/`. Codex session UUIDs:
-  - chats `01a11cd6-4de0-7cf1-a272-76e88058bd93`
-  - decisions `01a11cd6-502e-7b53-8aab-03cdd45e411b`
-  - retrieval `01a11cd6-543f-7a50-a65e-68d04713957d`
+- **Lane records:** briefs, status and steer files were kept in a per-lane scratch directory on the dev box, with one
+  Codex session per lane (chats, decisions, retrieval).
 
 ## Leftovers to clean when no longer needed
 
-- **Worktrees:**
-  - `~/code/goblin-land-chats` (`land/chats`; holds copies of `.local/*.env`, so remove it first);
-  - `~/code/goblin-wt-chats` (`chats/logical-ids`, landed);
-  - `~/code/goblin-wt-retrieval` (`spike/retrieval`, landed; reuse it for Arm B);
-  - `~/code/goblin-wt-decisions` (`spike/decisions`, landed; reuse it for the provider arms).
+- **Worktrees** beside the main checkout:
+  - `land/chats` (holds copies of `.local/*.env`, so remove it first);
+  - `chats/logical-ids` (landed);
+  - `spike/retrieval` (landed; reuse it for Arm B);
+  - `spike/decisions` (landed; reuse it for the provider arms).
 - **Tern tabs:** the three Codex lane tabs. Nothing is running in them.

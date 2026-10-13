@@ -1,7 +1,7 @@
 # 0050: Gas in USDC through UserOperations; the relay removed
 
-Accepted 2026-10-12 with the owner, the night before the Colosseum deadline. The plan is
-`~/.claude/plans/ok-map-it-out-floofy-crab.md` ("gas in USDC through userOps, relay deleted"). It amends ADR 0045
+Accepted 2026-10-12 with the owner, the night before the Colosseum deadline. The plan is private ("gas in USDC through
+userOps, relay deleted"). It amends ADR 0045
 (Goblin Wallet): its on-chain allowance layer and its rejection of Privy's gas sponsorship.
 
 ## Context

@@ -1,6 +1,6 @@
 # ADR 0042: MCP 2026 client: live tool lists, URL requests and step-up
 
-Accepted 2026-10-11 with the owner; the plan is `~/.claude/plans/let-s-grill-me-to-fancy-catmull.md`. Amends ADR 0028
+Accepted 2026-10-11 with the owner; the plan is private. Amends ADR 0028
 (MCP call approvals) and ADR 0041 (connections).
 
 Sidequest's MCP server is adding three features of protocol 2026-07-28 that change what a connection can do while the

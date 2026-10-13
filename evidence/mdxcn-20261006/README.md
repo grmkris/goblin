@@ -17,8 +17,8 @@ components and theme, then loads the built `core.js` and `mdxcn.js` in an opaque
 - Invalid, unknown, empty and unclosed specs remain code. A component throw falls back to the original code.
 - Tool output and shared-note Markdown stay code. Unavailable frame imports are rejected.
 
-The fixture and runner were retained during the session in `/tmp/goblin-mdxcn-acceptance-20261006/`; those temporary
-files are not a permanent test harness. Screenshots show synthetic display data.
+The fixture and runner were retained during the session in a scratch directory; those temporary files are not a
+permanent test harness. Screenshots show synthetic display data.
 
 ## Check boundary
 

@@ -1,6 +1,6 @@
 # ADR 0043: Outside work comes through MCP servers, and some servers are first-class
 
-Accepted 2026-10-12 with the owner; the plan is `~/.claude/plans/let-s-grill-me-to-fancy-catmull.md`. Follows the
+Accepted 2026-10-12 with the owner; the plan is private. Follows the
 showcase run with Sidequest (`evidence/handoffs/showcase-run-20261011.md`), where goblin could neither read a worker's
 delivery page nor publish its own deliverable.
 

@@ -1,7 +1,7 @@
 # 0052: One mysi connection and a shelf that needs no sign-in
 
-Accepted 2026-10-12 with the owner. The plan is `/tmp/goblin-mysi-usdc-subscription-plan-20261012.md` ("mysi as the one
-connection"). It amends ADR 0006 (the shelf) and ADR 0009 (the Telegram channel's tool names).
+Accepted 2026-10-12 with the owner. The plan is private ("mysi as the one connection"). It amends ADR 0006 (the shelf)
+and ADR 0009 (the Telegram channel's tool names).
 
 ## Context
 

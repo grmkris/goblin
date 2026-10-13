@@ -1,7 +1,7 @@
 # Cloudflare coding verifier spike — 2026-10-08
 
 The second coding runner uses a Cloudflare Worker plus one Cloudflare Container per verification job. The Worker is
-`https://goblin-coding-cf-dev.kristjan-grm11775.workers.dev` in the Goblin Cloudflare account. The Alchemy stack is
+`goblin-coding-cf-dev` on a `workers.dev` host in the Goblin Cloudflare account. The Alchemy stack is
 dev-only (`goblin-coding-cf-dev`); the container image is a frozen Goblin snapshot with dependencies installed.
 `enableInternet` is false. GitHub, model, Cloudflare and host credentials stay outside the container.
 

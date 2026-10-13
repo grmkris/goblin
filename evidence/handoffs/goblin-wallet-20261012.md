@@ -1,6 +1,6 @@
 # Goblin Wallet overnight run, 12 October 2026
 
-The plan is `~/.claude/plans/ok-map-it-out-floofy-crab.md` and the design record is
+The plan is the owner's private plan file and the design record is
 [ADR 0045](../../docs/adr/0045-agent-wallet.md). The run went from 04:40 to about 06:30 CEST; the conductor was a
 Claude Opus session working with Sonnet and Opus lanes.
 
@@ -11,7 +11,7 @@ ledger and by Privy's policy. Below, **proven** means it ran on the deployment t
 
 | Beat | State |
 |---|---|
-| Privy sign-in (email OTP) and agent wallet creation | **proven**: test owner `goblin-wallet-demo@myinbox.lol`, owner `0x76C7…5e94`, agent `0xD354…274F` |
+| Privy sign-in (email OTP) and agent wallet creation | **proven**: a demo test owner signed in, with its owner wallet and agent wallet created |
 | goblin connects over MCP OAuth (DCR, then the wallet's consent page, then a token) | **proven**: goblin dev shows Connected and lists all 16 tools grouped by their two Apps |
 | `wallet_status` through goblin | **proven**: goblin's `WalletStatus` shape, four chains, limits per layer |
 | The wallet's dashboard MCP App inside goblin's sandbox | **proven**: shots `.local/evidence/wallet/07–08` |
@@ -21,7 +21,7 @@ ledger and by Privy's policy. Below, **proven** means it ran on the deployment t
 | A new recipient approved, then paid (beat 4) | **proven on mainnet**: 1 USDC, `0xe4219e53…e3dc` |
 | Mercator short: bridge Base → Tempo, then pay Mercator (beat 5) | **proven on mainnet**: Relay deposit `0x2dce0489…3e7b`; 1.5 USDC.e to Mercator `0xf144e54d…2add`; Mercator went 0.55 → 2.05 USDC.e |
 
-Spike receipts are in `evidence/wallet/`:
+The spike receipts were kept privately, not in the repository:
 
 - **S1**: Privy agent wallet. A payment over the cap is refused with `policy_violation`.
 - **S2**: on Tempo Moderato, a 7702 upgrade and a period allowance. The redeem within the cap succeeded; the one over
@@ -38,7 +38,7 @@ Kris chose the long-term pattern: no account of the wallet ever needs ETH.
   - Every EVM send is a Pimlico UserOperation, its gas paid in USDC by the ERC-20 paymaster.
   - The agent acts only through `sendCalls`. When it is short, the same batch redeems the shortfall plus the gas.
   - The owner's upgrade is their own UserOperation, prepared and confirmed like the allowance and signed in the browser.
-  - The relay is deleted. Its accounts' ETH was swept to the run treasury (`0xdc9476ed…`, `0x9e0f3ea7…`).
+  - The relay is deleted. Its accounts' ETH was swept to the run treasury.
   - The Privy policy now allows the agent's calls only as `eth_signUserOperation` (24 rules).
 - **Proven on Base mainnet, zero ETH throughout:**
 
@@ -48,7 +48,7 @@ Kris chose the long-term pattern: no account of the wallet ever needs ETH.
   | An agent transfer with its top-up in the same operation | 0.0073 | `0x5725377f…5d55` |
   | A fresh agent's first operation (its 7702 authorization and a redeem), then x402 | 0.0098 | `0xe1662494…2058` |
 
-  On prod, goblin-demo's agent upgraded itself through its first operation and paid two searches:
+  On prod, a demo account's agent upgraded itself through its first operation and paid two searches:
   `0x45109aa6…933b`, `0xc772effb…da7d`.
 - **Privy finding.** Its React SDK drops `authorization_list` from type-4 sends, which is why it answered 500. A
   self-sent upgrade works once that is patched (`0x13e75ea3…1f1c`). The report draft is
@@ -62,7 +62,7 @@ Kris chose the long-term pattern: no account of the wallet ever needs ETH.
 
 ## The evening (16:00–17:30)
 
-- **Recording on prod (goblin.surf 8fd49a6b, wallet.goblin.surf), as goblin-demo@myinbox.lol.** The clips are in
+- **Recording on prod (goblin.surf 8fd49a6b, wallet.goblin.surf), as a demo account.** The clips are in
   `.local/evidence/wallet/clips/`, with notes in `CLIPS.md`:
   - onboarding (01a–c);
   - paid inference over MPP plus a paid Exa search over x402 (02-04): Base `0xabe9…85100`, about $0.021 of USDC.e per
@@ -116,7 +116,7 @@ Still open:
 
 ## The live pass (11:00–12:20)
 
-Kris funded the test owner with 0.012 ETH on Base. Every hash is in `evidence/wallet/beats-mainnet-20261012.json`.
+Kris funded the test owner with 0.012 ETH on Base. The README links the main transactions.
 
 - **One address, any chain.** The owner's address is the same on every EVM chain. A Relay deposit address converts
   whatever arrives (ETH, USDC; Arbitrum, Ethereum, Base) to the asset needed on Base in about two seconds, for a few
@@ -130,8 +130,7 @@ Kris funded the test owner with 0.012 ETH on Base. Every hash is in `evidence/wa
     waits until the RPC shows the new balance.
   - Swaps and bridges never drew on the allowance, and a bridge signed an approval from an empty wallet.
   - Home and the dashboard App added ETH to the dollars.
-- **wallet.goblin.surf (prod)** is deployed for goblin prod `9ca847e2`. It has its own relay `0x60F6…6969`, funded
-  with 0.001 ETH.
+- **wallet.goblin.surf (prod)** is deployed for goblin prod `9ca847e2`. It has its own relay, funded with 0.001 ETH.
 - **goblin bug, not fixed here.** In chat, Send does nothing while several "Sharing from <App>" chips are stacked over
   the composer; removing them lets it send.
 - **Left over.** `wallet-beat3-exa-0001` stays `unknown`, holding $0.007. Its credential can no longer settle, but
@@ -149,7 +148,7 @@ Kris funded the test owner with 0.012 ETH on Base. Every hash is in `evidence/wa
 - Two probes ran against live services, signing nothing:
   - Privy accepts the fee fields (it signed and failed to broadcast at zero balance).
   - Relay quotes 2 USDC on Base → 1.979 USDC.e on Tempo, and LI.FI quotes USDC → ETH on Base.
-- The funded run is scripted in `/tmp/wallet-run/beats.md`. The capped funding moves are in `/tmp/wallet-run/fund.ts`.
+- The funded run and its capped funding moves were scripted in a scratch directory on the dev box.
 
 ## Morning steps (Kris)
 

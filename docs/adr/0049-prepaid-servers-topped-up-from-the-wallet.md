@@ -1,7 +1,7 @@
 # 0049: Prepaid servers topped up from the Goblin Wallet
 
-Accepted 2026-10-12 with the owner, for the first-run onboarding. The plan is
-`~/.claude/plans/let-s-grill-me-to-fancy-catmull.md` ("Automatic top-ups for prepaid servers"). It builds on ADR 0042
+Accepted 2026-10-12 with the owner, for the first-run onboarding. The plan is private ("Automatic top-ups for prepaid
+servers"). It builds on ADR 0042
 (URL requests), 0043 (first-class servers), 0044 (spending rules), 0045 (Goblin Wallet) and 0047 (the `inference`
 caller).
 

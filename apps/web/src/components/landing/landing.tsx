@@ -40,7 +40,7 @@ const DEFAULT_PLANS: readonly PublicPlan[] = [
   { id: 'day', amountUsd: '1.00', periodDays: 1 },
   { id: 'month', amountUsd: '15.00', periodDays: 30 },
 ]
-/** Payments goblin made on mainnet on 12 October 2026 (README, evidence/wallet/beats-mainnet-20261012.json). */
+/** Payments goblin made on mainnet on 12 October 2026 (README). */
 const TX = {
   search: 'https://basescan.org/tx/0xc09ca95d5ff071d45e83d09504a4dfa1d367a289d6beabc1ba878029b39cb0fd',
   approved: 'https://basescan.org/tx/0xe4219e53ec87f363181090b28a2e008f0bc02221dc689fb75068cb8dbab8e3dc',

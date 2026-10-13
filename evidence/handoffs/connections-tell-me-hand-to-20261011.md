@@ -1,6 +1,6 @@
 # Handoff: connections, Tell me and Hand to (ADR 0041), 2026-10-11
 
-The approved plan (`~/.claude/plans/let-s-grill-me-to-fancy-catmull.md`, phases 0/A–F) is built on `main` up to
+The approved plan (the owner's private plan file, phases 0/A–F) is built on `main` up to
 907c8468, in 28 commits from 8d2f4721. It is **not released to dev yet**: the release needs a dev reset and the
 owner's sign-in right after (below). The done gate, a live two-bot run on Sidequest dev, waits on the Sidequest team.
 

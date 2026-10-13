@@ -1,6 +1,6 @@
 # Cleanup round: the Effect migration finished, one router, the feed in Query, PR #4 ported: 2026-10-10
 
-The plan, approved by the owner on 2026-10-10, is `~/.claude/plans/okay-let-s-go-grill-noble-muffin.md`. A conductor
+The plan, approved by the owner on 2026-10-10, is the owner's private plan file. A conductor
 session ran it in parallel lanes, all Claude subagents in their own worktrees, landing each by replay (rebase, gate,
 fast-forward) with a canary after every land:
 
@@ -11,8 +11,8 @@ fast-forward) with a canary after every land:
 - **the cut:** K (the bridge out of the agent's inputs, the workaround unions, the leftover instance tags);
 - **wave 2:** T2 (integration tests), W2 (web consistency), P (PR #4) and X (docs and comments).
 
-Lane briefs, status logs and gate logs are in `/tmp/goblin-lanes/cleanup-20261010/`; that directory is temporary and
-not kept. `conductor/landed.md` there lists every land with its ready and landed commit.
+Lane briefs, status logs and gate logs were kept in a scratch directory on the dev box that is temporary and not kept.
+Its `conductor/landed.md` listed every land with its ready and landed commit.
 
 ## Where it stands
 

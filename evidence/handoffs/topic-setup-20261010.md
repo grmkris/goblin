@@ -1,9 +1,9 @@
 # Topic setup and Persona setup: 2026-10-10
 
 The owner settled the design in a grilling session on 2026-10-10, from the research handoff
-`topic-persona-capabilities-20261010.md`. The approved plan is `~/.claude/plans/let-s-grill-me-to-fancy-catmull.md`
-and the decision record is [ADR 0040](../../docs/adr/0040-topic-and-persona-setup.md). One session implemented it
-directly on `main`, one commit per change.
+`topic-persona-capabilities-20261010.md`. The approved plan is the owner's private plan file, and the decision record
+is [ADR 0040](../../docs/adr/0040-topic-and-persona-setup.md). One session implemented it directly on `main`, one
+commit per change.
 
 ## What it is
 

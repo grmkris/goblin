@@ -1,9 +1,9 @@
 # 0054: Pro paid as a signed USDC subscription
 
 Accepted 2026-10-12 with the owner (Kris), for the night's build. Amended 2026-10-13 with the owner: Pro is paid by a
-day pass or monthly at the deployment's prices, and there is no free plan (see the end). The plan is
-`/tmp/goblin-mysi-usdc-subscription-plan-20261012.md`. It builds on ADR 0015 (plans and payments, amended below for the
-card flag), 0045 (Goblin Wallet), 0049 (top-ups from the wallet) and 0050 (gas in USDC through UserOperations).
+day pass or monthly at the deployment's prices, and there is no free plan (see the end). The plan is private. It builds
+on ADR 0015 (plans and payments, amended below for the card flag), 0045 (Goblin Wallet), 0049 (top-ups from the wallet)
+and 0050 (gas in USDC through UserOperations).
 
 ## Context
 
@@ -89,7 +89,7 @@ back.
 
 ## Amended 2026-10-13: a day pass or monthly, and no free plan
 
-Kris decided the pricing on the night of 2026-10-13. The spec is `/tmp/goblin-lanes-20261012/basic-v2-spec.md`.
+Kris decided the pricing on the night of 2026-10-13, in a private spec.
 
 **One plan, two ways to pay.** goblin Pro is the only plan: 800 Credits a day, hand-overs, subagents and routines. It
 is paid from the Goblin Wallet, signed once as above, by:

@@ -1,6 +1,6 @@
 # Handoff: goblin for the hackathon — first-class Mercator, spending rules, showcase fixes (2026-10-12)
 
-Plan: `~/.claude/plans/let-s-grill-me-to-fancy-catmull.md` (approved by the owner, 12 Oct). ADRs 0043 (outside work
+Plan: the owner's private plan file (approved by the owner, 12 Oct). ADRs 0043 (outside work
 through MCP servers) and 0044 (spending rules for paid tools); ADR 0042 amended (choosing access, step-up keeps the
 owner's narrower choice); ADR 0041 amended (folded notices go to Activity).
 
@@ -12,7 +12,7 @@ owner's narrower choice); ADR 0041 amended (folded notices go to Activity).
 | Showcase fixes | `551f1250` deadlines, `c355dfbc` answer after the tool left, `373baa34` listen follows use, `aca5d157` Events wake when due, `47e2585d` live tool lists, `c684ad2f` outcome rows, `3cf7d72c` dock, `909a4b2e` labels, `09465715` cards and receipts, `bb2e0f17` notices past the cap |
 | First-class Mercator | `f4b6668f` profiles, `3f1b01a5` configured + signed-out offer, `21d4d694` Allow recommended + wallet line, `718184c5` its App in one tap, `39193a35` spending rules, `2a05a956` paid-job card + rule controls, `21343c4b` test fix, `065dac1e` instructions + connect card, `5c7d0806` onboarding, `1704d9e4` Add funds |
 | Publishing | `df2ce4d0` Cloudflare first-class on the shelf (Workers scripts scopes added at sign-in; `execute` asks first) |
-| Models | `cc0184d0` DeepSeek V4.1 Flash label; LiteLLM alias in the personal repo `7920984`, allowed on `goblin-prod` and `goblin-dev-otp-20261006`; `.local/{dev,prod}.env` default + memory (+ dev smoke) = `deepseek-v4.1-flash`, Muse and Qwen stay pickable |
+| Models | `cc0184d0` DeepSeek V4.1 Flash label; LiteLLM alias in the owner's infrastructure repo, allowed on the prod and dev virtual keys; `.local/{dev,prod}.env` default + memory (+ dev smoke) = `deepseek-v4.1-flash`, Muse and Qwen stay pickable |
 | Access | `3be96a18` Choose access (row 8) |
 | Ops | `e9c82ee5` `destroy:prod` (needs `--confirm-reset` and `GOBLIN_CONFIRM_PROD=1`) |
 | Owner's GLM report | the starved-request guard (`MIN_ANSWER_ROOM`), the thinking-only cut-off and overflow wording, GLM's picker note |
@@ -32,7 +32,7 @@ owner's narrower choice); ADR 0041 amended (folded notices go to Activity).
   answers 403 `insufficient_scope` with the full scope set; refresh tokens are issued without `offline_access`.
 - **Mercator's top-up**: its `fund_wallet` tool hands the owner to `https://mercator.sh/account`; goblin links there
   while `get_connection_status` says funding is blocked. The Agentic Wallet MCP does not exist yet (the Codex session
-  produced research only: `/tmp/goblin-mcp-apps-plan-20261012.md`); its profile takes the top-up slot when it does.
+  produced research only); its profile takes the top-up slot when it does.
 
 - **GLM cut off in Personal (prod, 2026-10-09 and 10-12).** glm-5.3 reasoned through its whole 32,768-token output at
   ~99K context (op `548fb4c3…`); pi-ai's estimate then counted that output into the context (131,410 > 131,072), so
@@ -171,8 +171,8 @@ worktree with `GOBLIN_ENV_DIR` set to the shared `.local`.
 - Prod env (Kris approved directly): `GOBLIN_PAID_INFERENCE=tempo,goblin`, recipient treasury
   `0x6649868b1B87711e405aa6690E3f0245d9510631` and a prod-only `GOBLIN_MPP_SECRET`.
 
-**Proven on mainnet from dev** (Kris approved). Both payments came from kristjan@myinbox.lol's wallet-dev connection
-(agent `0xD354…274F`). Each turn answered, and the wallet marked its operation delivered from goblin's receipt report.
+**Proven on mainnet from dev** (Kris approved). Both payments came from the owner's wallet-dev connection and its agent
+wallet. Each turn answered, and the wallet marked its operation delivered from goblin's receipt report.
 - `paid:tempo`: tx `0x67d58f4f4649276e5b88dc0714c7ece6a5745fee700074c1768ea837b94cf211`, 0.020527 USDC.e to Tempo's
   payee.
 - `paid:goblin`: tx `0x68b7d933e7536db346e546240361a9b4c2928ed565d44945549fdf32847af06f`, 0.019957 USDC.e to the

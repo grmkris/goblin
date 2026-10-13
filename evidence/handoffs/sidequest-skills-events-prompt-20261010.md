@@ -2,14 +2,14 @@
 
 Written 2026-10-10 by the goblin session after reading both codebases (goblin `main` 4faef240, agent-jobs `dev`
 eac22c8b) and the current MCP specs; updated 2026-10-11 for goblin's ADR 0041 (goblin `main` 907c8468: several
-connections per server, Tell me and Hand to). Paste everything below the line into a Claude session in
-`~/code/agent-jobs`.
+connections per server, Tell me and Hand to). Paste everything below the line into a Claude session in the
+`agent-jobs` checkout.
 
 ---
 
-You are working in `~/code/agent-jobs` (Sidequest). goblin (`~/code/goblin`, earlier named purrable) is the owner's
-resident personal agent on Cloudflare and an MCP client of Sidequest's `/mcp`. The goal is two things, proven live on
-dev:
+You are working in the `agent-jobs` checkout (Sidequest). goblin (its own checkout, earlier named purrable) is the
+owner's resident personal agent on Cloudflare and an MCP client of Sidequest's `/mcp`. The goal is two things, proven
+live on dev:
 
 1. **Skills.** goblin's owner switches on Sidequest's skills, and they verify and load. The switch currently reverts
    to off; goblin fixes that on its side.
@@ -49,7 +49,7 @@ the goblin session that sent this prompt; the protocol is at the end.
 - After editing `skill/*/SKILL.md`, run `node scripts/gen-skills.mjs`.
 - Record outcomes in `docs/reality-check.md` and `docs/integrations/goblin.md`, with sanitized receipts under
   `docs/evidence/`. Keep testnet and mainnet evidence separate.
-- Never edit `~/code/goblin`. Report goblin-side needs to the goblin session.
+- Never edit the goblin checkout. Report goblin-side needs to the goblin session.
 
 ## Sources
 

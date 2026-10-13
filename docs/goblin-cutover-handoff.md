@@ -1,20 +1,20 @@
 # Goblin cutover handoff
 
 This note is for concurrent implementation work resumed after the goblin rebrand. It records the deployed boundary and
-the source names that the pending Purrable Apps plan must use. The pending plan in `~/.claude/plans/concurrent-popping-pike.md`
-is intentionally unchanged; reconcile its old Purrable names before applying it.
+the source names that the pending Purrable Apps plan must use. The pending plan (the owner's private plan file) is
+intentionally unchanged; reconcile its old Purrable names before applying it.
 
-The supervisor identified Claude session `da5b927e-330a-416e-bf07-6c2e4b7c539f` at `purrable:0.2` (pane `%15`). Its
-plan approval remains deferred until quota returns at 06:50 Ljubljana time; the supervisor will manually verify
-resumption. The local folder and tmux session names remain in place for that session.
+The supervisor identified the Claude session that holds that plan. Its plan approval remains deferred until quota
+returns at 06:50 Ljubljana time; the supervisor will manually verify resumption. The local folder and tmux session names
+remain in place for that session.
 
 ## Source and repository
 
-- The active checkout is still `/home/kristjan/code/purrable` because another live Claude session has it open. Do not
-  move or rename that folder until all concurrent sessions are idle.
+- The active checkout on the dev box is still the old `purrable` folder because another live Claude session has it
+  open. Do not move or rename that folder until all concurrent sessions are idle.
 - The branch is `main`; the completed rebrand/live-acceptance baseline is `5525f22`, and the first handoff commit is
   `2b19aba`. `origin` is `https://github.com/grmkris/goblin.git`.
-- The GitHub repository is private at `https://github.com/grmkris/goblin`.
+- The GitHub repository is `https://github.com/grmkris/goblin`.
 - Active workspace packages and imports use `@goblin/*`; runtime, stage and Worker names use `goblin-*`. Do not add
   new `@purrable/*` imports or Purrable resource names.
 
@@ -85,7 +85,7 @@ same. Keep the goblin mark and shared Geist/theme styling when adding the app ki
 
 If a clean deploy worktree is needed, use current `main` and only `apps/web/.alchemy/state/goblin/dev/` for Alchemy
 state, plus the current mode-600 stage files and OTP session when smoke needs it. Older linked worktrees and the
-`/tmp/purrable-spikes/` evidence were not rebased or rewritten. They are not a source of current dev state or
+scratch spike evidence were not rebased or rewritten. They are not a source of current dev state or
 credentials. Coordinate deployment/state writeback so only one operator updates this dev stack at a time.
 
 M0's MyPlan App check now needs a fresh owner connection and exact grants: the old connection was not imported.
@@ -118,8 +118,7 @@ subsequent Apps changes must be additive; do not reset its stores to reproduce t
 The concurrent-handoff gate rerun initially failed at `native.test.ts:240`: the routine-usage fixture did not reach its
 expected `failed` state and returned `500`. The unchanged focused test passed on `GOBLIN_HARNESS_PORT=18931`, and
 `GOBLIN_HARNESS_PORT=18931 heavy bun run check` then passed fully. No runtime files were changed; the first failure's
-cause is not established. Logs are `/tmp/goblin-handoff-check.log`, `/tmp/goblin-handoff-routine-check.log` and
-`/tmp/goblin-handoff-check-retry.log`.
+cause is not established. The logs were kept in scratch files on the dev box.
 
 The pending plan's SHA-256 at handoff is
 `4fbe0a99abb964d385b951a8090366e1c53b2afdb04c00bdc335acfc91526e30`; it was read but not modified.

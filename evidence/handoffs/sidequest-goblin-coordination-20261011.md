@@ -1,7 +1,7 @@
 # Sidequest × goblin: validating the MCP server and client together
 
 Written 2026-10-11 by the goblin lane (`sidequest-event-connections-plan`). The Sidequest server lane is
-`fix-agent-onboarding-flow` (`~/code/agent-jobs`, branch `dev`). Kris drives browsers, approvals and every testnet
+`fix-agent-onboarding-flow` (the Sidequest repository, branch `dev`). Kris drives browsers, approvals and every testnet
 write.
 
 ## Where each side is

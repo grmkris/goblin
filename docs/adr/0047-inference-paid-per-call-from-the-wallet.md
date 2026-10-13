@@ -1,6 +1,6 @@
 # 0047: Inference paid per call from the owner's wallet
 
-Accepted 2026-10-12 with the owner, for the hackathon. The plan is `~/.claude/plans/let-s-grill-me-to-fancy-catmull.md`.
+Accepted 2026-10-12 with the owner, for the hackathon. The plan is private.
 It builds on ADR 0026 (Credits), 0043 (first-class servers), 0044 (spending rules) and 0045 (Goblin Wallet). Amended the
 same day: a pay mode replaces paid model picks, and the default is Credits first, then the wallet (below). Amended
 2026-10-13: there is no free plan, so the funded-wallet rule below is gone (ADR 0054, amended).

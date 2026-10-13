@@ -39,6 +39,8 @@ infrastructure. Read
   telemetry, owner-confirmed proposals and no authority changes. Never bind the LiteLLM master key into the Worker.
 - Secrets live in mode-600 `.local/*.env` files and Worker secret bindings. Never print, commit, expose in browser
   bundles or persist them in transcripts, logs or docs. Outbound OAuth tokens are encrypted at rest in the Agent DO.
+- The repository is public. Committed handoffs, evidence and docs never carry private paths, tailnet IPs, personal
+  emails, private ids (myplan, Privy, wallet) or personal wallet addresses; private notes go to myplan.
 - The `dev` stage is the daily instance. It holds test data only (owner, 2026-10-08), so spikes may deploy there.
   goblin is greenfield until launch (owner, 2026-10-11): no backwards compatibility, no legacy decoders; migrations are
   edited in place as if the schema had always been so, and a release that edits an applied one resets dev first

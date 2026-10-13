@@ -16,11 +16,11 @@ Screen icon and manifest. Real-iPhone safe areas, the installed icon and touch f
 
 **Source baseline:** `eeaaa90d`, inspected on 12 October 2026. Line references describe that checkout; re-check them before editing.
 
-**Screenshots:** Real deployed dev UI, 1440 × 960, recorded from 09:24:34 UTC on 12 October 2026. These are current-state evidence, not proposed designs. Another session was funding and changing the demo account; values are historical snapshots. The deployed revision was not independently established in this design pass.
+**Screenshots:** Real deployed dev UI, 1440 × 960, recorded from 09:24:34 UTC on 12 October 2026. These were current-state evidence, not proposed designs. Another session was funding and changing the demo account; values were historical snapshots. The deployed revision was not independently established in this design pass.
 
 **Start here:** Fix monetary meaning and permission clarity, then replace the long wallet scroll with a useful overview. Preserve Goblin's moss sidebar, Slack-like organization, and first-class MCP Apps. The wallet should feel like part of a person's working environment: they can immediately see what their agent can do, what it may spend, and what needs their attention.
 
-The screenshots below are copied into a sibling directory so this document works in another checkout. The original [captioned walkthrough](../../.local/evidence/wallet/walkthrough-20261012-092434/goblin-wallet-walkthrough.mp4) is local and ignored by Git; the plan does not depend on it.
+The screenshots and the captioned walkthrough they came from are not kept in the repository, because they show demo balances and addresses; each section below names its frame in words. The plan does not depend on them.
 
 ## Design brief and boundaries
 
@@ -137,11 +137,11 @@ There are **13 consolidated findings: 3 HIGH and 10 MEDIUM**. IDs below are reus
 
 ## Screenshot-by-screenshot handoff
 
-Each image is an unchanged frame from the same walkthrough. Source links below are implementation entry points, not permission to replace the surrounding runtime or weaken the MCP boundary.
+Each section names an unchanged frame from the same walkthrough. Source links below are implementation entry points, not permission to replace the surrounding runtime or weaken the MCP boundary.
 
 ### 1. Connections: make the wallet identifiable and manageable
 
-![Current Connections screen showing wallet tool grants and long descriptions](goblin-wallet-ux-ui-20261012/01-connected.png)
+*Frame: Current Connections screen showing wallet tool grants and long descriptions.*
 
 **Video:** about 00:00. **Findings:** F02–F05, F12.
 
@@ -155,7 +155,7 @@ Within Manage access, show “Read wallet,” “Spend or move funds,” and “
 
 ### 2. Tool permissions: distinguish access, policy and partial groups
 
-![Current wallet tool list with repeated Its App groups, raw identifiers, switches and Run when needed controls](goblin-wallet-ux-ui-20261012/02-permissions.png)
+*Frame: Current wallet tool list with repeated Its App groups, raw identifiers, switches and Run when needed controls.*
 
 **Video:** about 00:08. **Findings:** F03–F05, F12.
 
@@ -169,7 +169,7 @@ Source review resolves the apparent off-switch contradiction: AppGroup derives i
 
 ### 3. Embedded overview: correct the money and use the workspace
 
-![Current embedded wallet with an overlong dollar figure, repeated balance rows and unused workspace below the frame](goblin-wallet-ux-ui-20261012/03-embedded.png)
+*Frame: Current embedded wallet with an overlong dollar figure, repeated balance rows and unused workspace below the frame.*
 
 **Video:** about 00:18. **Findings:** F01, F02, F06, F07.
 
@@ -183,7 +183,7 @@ Give the dedicated wallet page the available pane, then show attention, spending
 
 ### 4. Balance refresh: communicate freshness without losing context
 
-![Current wallet dashboard immediately after using Refresh](goblin-wallet-ux-ui-20261012/04-refresh.png)
+*Frame: Current wallet dashboard immediately after using Refresh.*
 
 **Video:** about 00:26. **Findings:** F01, F02, F12, F13.
 
@@ -197,7 +197,7 @@ This frame demonstrates a successful refresh interaction only. It does not demon
 
 ### 5. Limits in the App: show how boundaries combine
 
-![Current embedded limits with separate on-chain allowance and wallet ledger rows](goblin-wallet-ux-ui-20261012/05-limits.png)
+*Frame: Current embedded limits with separate on-chain allowance and wallet ledger rows.*
 
 **Video:** about 00:34. **Findings:** F06, F08.
 
@@ -211,7 +211,7 @@ Do not compute a universal “tightest” amount by comparing unrelated tokens, 
 
 ### 6. Activity: make uncertain outcomes inspectable
 
-![Current recent activity with an Exa search marked Outcome unknown and an earlier transfer marked Failed](goblin-wallet-ux-ui-20261012/06-history.png)
+*Frame: Current recent activity with an Exa search marked Outcome unknown and an earlier transfer marked Failed.*
 
 **Video:** about 00:43. **Findings:** F07, F11, F13.
 
@@ -225,7 +225,7 @@ Reuse the receipt model's separation of payment and delivery, after checking its
 
 ### 7. Standalone Home: share the overview, add owner controls
 
-![Current standalone owner Home with long token precision and repeated owner and agent balances](goblin-wallet-ux-ui-20261012/07-owner.png)
+*Frame: Current standalone owner Home with long token precision and repeated owner and agent balances.*
 
 **Video:** about 00:54. **Findings:** F01, F02, F07, F09.
 
@@ -239,7 +239,7 @@ Use the wider desktop space for a main activity column and a compact boundaries/
 
 ### 8. Owner Limits: bring editing into view
 
-![Current owner Limits page with five large summary cards above the editable wallet limits form](goblin-wallet-ux-ui-20261012/08-owner-limits.png)
+*Frame: Current owner Limits page with five large summary cards above the editable wallet limits form.*
 
 **Video:** about 01:03. **Findings:** F08, F10, F12.
 
@@ -253,7 +253,7 @@ Below that, use distinct sections for Allowed services and Recipients. Service r
 
 ### 9. Return to Goblin: make the service feel resident
 
-![Current return to the wallet MCP App in the Goblin service sidebar](goblin-wallet-ux-ui-20261012/09-return.png)
+*Frame: Current return to the wallet MCP App in the Goblin service sidebar.*
 
 **Video:** about 01:16. **Findings:** F06, F09, F13.
 

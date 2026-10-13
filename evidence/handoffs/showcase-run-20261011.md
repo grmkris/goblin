@@ -97,7 +97,7 @@ worked a job for a second account (another goblin connection, agent 2198) and ea
 2. "Back it" **does not state the 10 SIDE minimum to post**; it explains only taking work, slashing and the unstake
    period. It is clear that it's a separate wallet step ("Your wallet pays the gas in MON") (066, 067).
 3. First publish unbacked → readable: `{"code":"conflict","reason":"insufficient-backing","retry":"after-operator",
-   "message":"The creator bond is 10 SIDE but only 0 SIDE of backing is available behind 0x8fc1…1f30; back it with
+   "message":"The creator bond is 10 SIDE but only 0 SIDE of backing is available behind <the owner's address>; back it with
    more SIDE, then retry"}` (064, 065).
 4. **The user learns at submit time**: requests posted fine unbacked, the crew quoted, only the pick failed ~4 min
    later while quote windows ran on.

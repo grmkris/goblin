@@ -1,6 +1,6 @@
 # ADR 0044: Spending rules for paid tools
 
-Accepted 2026-10-12 with the owner; the plan is `~/.claude/plans/let-s-grill-me-to-fancy-catmull.md`. Amends ADR 0028
+Accepted 2026-10-12 with the owner; the plan is private. Amends ADR 0028
 (MCP call approvals).
 
 Mercator's `create_job` spends from the owner's wallet (ADR 0043). Ask first (ADR 0028) makes the owner approve every

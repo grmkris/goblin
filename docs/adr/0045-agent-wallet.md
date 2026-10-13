@@ -1,6 +1,6 @@
 # ADR 0045: Goblin Wallet, an agent's wallet with limits the owner sets
 
-Accepted 2026-10-12 with the owner; the plan is `~/.claude/plans/ok-map-it-out-floofy-crab.md`. Builds on ADR 0043
+Accepted 2026-10-12 with the owner; the plan is private. Builds on ADR 0043
 (first-class servers) and ADR 0044 (spending rules), and is the "Agentic Wallet" both name.
 
 An agent that buys search, hires specialists and funds outside services needs money it can spend without the owner

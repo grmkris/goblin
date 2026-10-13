@@ -1,6 +1,6 @@
 # First-run Start, Credits then wallet, Mercator top-ups: 12 Oct evening
 
-Plan: `~/.claude/plans/let-s-grill-me-to-fancy-catmull.md` (Kris approved). The decisions are recorded in ADR 0048
+Plan: the owner's private plan file (Kris approved). The decisions are recorded in ADR 0048
 (Start), ADR 0047 (amended: pay mode) and ADR 0049 (prepaid top-ups).
 
 ## Why
