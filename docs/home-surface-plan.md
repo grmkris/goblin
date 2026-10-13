@@ -403,7 +403,7 @@ never a translucent surface on another translucent surface.
 ## 12. Delivery
 
 - **Live URL:** `https://dev.goblin.surf` (owner session). Production is not part of this delivery.
-- **Delivered** means: every slice on `main`, deployed to dev, `smoke:dev` green, the section 9 run passed with
+- **Delivered** means: every slice on `dev`, deployed to dev, `smoke:dev` green, the section 9 run passed with
   receipts and screenshots in `.local/goblin-acceptance/home-*`, and docs and ADR 0025 updated. Owner-dependent MCP App,
   real-inbox and real-device checks are listed separately. Goblin's own Telegram setup belongs to the orchestrator and
   owner; the coding lane sends no status-channel Telegram update.

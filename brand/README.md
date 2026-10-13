@@ -1,7 +1,7 @@
 # goblin brand
 
 The mark, app tiles, lockups and social images for goblin and Goblin Wallet. Every file here is public. Link to it at
-`https://raw.githubusercontent.com/grmkris/goblin/main/brand/<file>`, or download the folder from GitHub.
+`https://raw.githubusercontent.com/grmkris/goblin/dev/brand/<file>`, or download the folder from GitHub.
 
 ![goblin on moss](goblin-lockup-on-moss.png)
 
