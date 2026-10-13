@@ -7,6 +7,9 @@ import { resolveStage } from './stage-config.ts'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const ASSET_TIMEOUT_MS = 30_000
+/** How long a fresh deploy may take to reach every edge, during which a page can still come from the old version. */
+const BUILD_WAIT_MS = 120_000
+const BUILD_POLL_MS = 5_000
 /** How long a written point may take to show in Analytics Engine queries, and how often the smoke asks. */
 const FLOWS_WAIT_MS = 120_000
 const FLOWS_POLL_MS = 10_000
@@ -18,14 +21,18 @@ const FLOWS_POLL_MS = 10_000
 export async function clientBuild(dev: DevClient, stage: string): Promise<string> {
   if (stage === 'local') return 'skipped: the local stack serves unbuilt source'
   const build = releaseBuild(ROOT)
-  const page = await dev.send('/terms', { owner: false })
-  if (!page.ok) throw new Error('client_page_unavailable')
   const read = async (path: string): Promise<string> => {
     const asset = await fetch(new URL(path, dev.origin), { signal: AbortSignal.timeout(ASSET_TIMEOUT_MS) })
     return asset.ok ? asset.text() : ''
   }
-  if (!(await bundleCarries(await page.text(), build, read))) throw new Error('client_build_mismatch')
-  return build
+  const deadline = Date.now() + BUILD_WAIT_MS
+  for (;;) {
+    const page = await dev.send('/terms', { owner: false })
+    if (!page.ok) throw new Error('client_page_unavailable')
+    if (await bundleCarries(await page.text(), build, read)) return build
+    if (Date.now() >= deadline) throw new Error('client_build_mismatch')
+    await new Promise((resolve) => setTimeout(resolve, BUILD_POLL_MS))
+  }
 }
 
 /**
