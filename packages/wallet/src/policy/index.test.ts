@@ -4,7 +4,7 @@ import { ARBITRUM, BASE, BASE_SEPOLIA, ETHEREUM, TEMPO } from '../chains/index.t
 import { LIFI_DIAMOND } from '../lifi/index.ts'
 import { AGENT_POLICY_NAME, AGENT_ROUTES, PAYMENT_CAP_UNITS, agentPolicy, samePolicy, writablePolicy } from './index.ts'
 
-const ADMIN = 'k6jmz9g665ljwkdpy3c01xhy'
+const ADMIN = 'quorum-test'
 const MAINNETS = [BASE, ETHEREUM, ARBITRUM, TEMPO]
 
 describe('the agent policy', () => {
@@ -105,7 +105,7 @@ describe('the agent policy', () => {
   test('a live policy compares by content, ignoring ids and timestamps; unknown fields refuse', () => {
     const desired = agentPolicy({ ownerId: ADMIN, chains: [BASE] })
     const live = {
-      id: 'l57oel4tqkttsvzbrv1x00wy',
+      id: 'policy-test',
       created_at: 1_791_773_009_456,
       ...desired,
       rules: desired.rules.map((rule, index) => ({ id: `rule-${index}`, ...rule })),

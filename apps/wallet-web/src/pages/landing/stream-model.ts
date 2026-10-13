@@ -20,7 +20,7 @@ export interface StreamRequest {
 export const REQUESTS: readonly StreamRequest[] = [
   { id: 'search', title: 'Web search', payee: 'Exa, over x402', amountUsd: '0.007' },
   { id: 'service', title: 'Video transcript', payee: 'A paid service', amountUsd: '6.00', decidedBy: 'signer' },
-  { id: 'send', title: 'Send USDC', payee: '0x7Ad3…Ad50, a new address', amountUsd: '1.00', decidedBy: 'ledger' },
+  { id: 'send', title: 'Send USDC', payee: '0x5e1a…c0de, a new address', amountUsd: '1.00', decidedBy: 'ledger' },
 ]
 
 /** Where a request stands. `hidden` until it arrives; `checking` while the limits look at it. */

@@ -46,7 +46,9 @@ Fixed execution is an operator check, not another granted agent tool.
 ## Compare
 
 `heavy bun spikes/coding-cf/scripts/compare.ts <immutable-image-reference> https://<deployed-worker> <private-snapshot-state>`
-compares the existing Hello World PR fixture on native, Docker and Cloudflare with the same base and revisions. The token is read from the private
+compares the existing Hello World PR fixture on native, Docker and Cloudflare with the same base and revisions. The
+Worker URL has no default: pass it as the second argument, or pass an empty string there and set
+`GOBLIN_CODING_CF_URL`. `scripts/benchmark.ts` takes the same arguments. The token is read from the private
 `.local/coding-cf-spike/runner.env`. It requires identical diagnostics, rejects the invalid edit, accepts the Hello and
 two warm checks, and requires execution to return `Hello, world!\n` with exit code zero. Both containers are closed
 afterwards. Timings and the bounded receipt go to `.local/coding-cf-spike/comparison-cloudflare.json`.

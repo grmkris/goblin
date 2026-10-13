@@ -1,7 +1,7 @@
 /**
- * Test doubles for UserOperation sends: Pimlico as the Base spike saw it (`/tmp/wallet-run/spike-aa/run-send.json`), a
- * chain node with the agent's USDC and code, and an agent signer over a viem local account that signs the DeleGator's
- * typed data the way Privy's `eth_signUserOperation` does. Imported by tests only.
+ * Test doubles for UserOperation sends: Pimlico as the Base spike saw it, a chain node with the agent's USDC and code,
+ * and an agent signer over a viem local account that signs the DeleGator's typed data the way Privy's
+ * `eth_signUserOperation` does. Imported by tests only.
  */
 import { privateKeyToAccount } from 'viem/accounts'
 import { toAddress } from '../balances/hex.ts'

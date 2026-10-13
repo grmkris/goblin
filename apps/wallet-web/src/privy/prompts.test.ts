@@ -15,7 +15,7 @@ import { asFailure, FlowFailure } from './flow.ts'
 import { allowancePrompt, upgradePrompt, walletTypedData } from './prompts.ts'
 
 const OWNER = '0x76c70100000000000000000000000000000000aa'
-const AGENT = '0xD354C247817d233Ee0abDB9ffcDF356b5E6B274F'
+const AGENT = '0x1111111111111111111111111111111111111111'
 const NOW = 1_800_000_000_000
 function failTest(): never {
   throw new Error('Base takes UserOperations')

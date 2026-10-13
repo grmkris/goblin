@@ -3,7 +3,7 @@ import path from 'node:path'
 import { digest, Overlay } from '../../coding/scripts/overlay.ts'
 import { type CodingRunnerFactory } from '../../coding/scripts/runner/contract.ts'
 import { sampleStats } from './stats.ts'
-import { backends, fixture, request, specification, state } from './fixture.ts'
+import { backends, fixture, request, specification, state, workerUrl } from './fixture.ts'
 
 const data = await fixture()
 const results: Record<string, Sample[]> = {}
@@ -12,11 +12,7 @@ const save = () =>
   writeFile(path.join(state, 'benchmark-three.json'), JSON.stringify({ base: data.base, results, stats }, null, 2), {
     mode: 0o600,
   })
-const runners = await backends(
-  data,
-  Bun.argv[2],
-  Bun.argv[3] ?? 'https://goblin-coding-cf-dev.kristjan-grm11775.workers.dev',
-)
+const runners = await backends(data, Bun.argv[2], workerUrl())
 type Sample = { temperature: string; startupMs: number; verifyMs: number; executeMs?: number; cleanupMs: number }
 const milliseconds = (start: number) => Math.round(performance.now() - start)
 const percentile = (numbers: number[], fraction: number) =>

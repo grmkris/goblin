@@ -2,14 +2,10 @@ import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { digest, Overlay } from '../../coding/scripts/overlay.ts'
 import { type CheckReceipt, type CodingRunnerLease } from '../../coding/scripts/runner/contract.ts'
-import { backends, fixture, request, specification, state } from './fixture.ts'
+import { backends, fixture, request, specification, state, workerUrl } from './fixture.ts'
 
 const data = await fixture()
-const runners = await backends(
-  data,
-  Bun.argv[2],
-  Bun.argv[3] ?? 'https://goblin-coding-cf-dev.kristjan-grm11775.workers.dev',
-)
+const runners = await backends(data, Bun.argv[2], workerUrl())
 const id = digest(`goblin-runner-parity-20261009:${data.base}`)
 const overlay = new Overlay(data.base, data.files, id)
 const leases: CodingRunnerLease[] = []

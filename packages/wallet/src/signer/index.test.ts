@@ -50,7 +50,7 @@ const fakePrivy = async (handler: Handler) => {
   return { client, seen, publicKey: key.publicKey }
 }
 
-const AGENT = '0xD354C247817d233Ee0abDB9ffcDF356b5E6B274F'
+const AGENT = '0x1111111111111111111111111111111111111111'
 const signerOf = (client: PrivyClient, live = true) =>
   new PrivyAgentSigner({ privy: client, walletId: 'wallet-1', address: AGENT, live })
 

@@ -9,6 +9,12 @@ import { limits } from '../../coding/scripts/runner/contract.ts'
 
 export const root = path.resolve(import.meta.dirname, '../../..')
 export const state = path.join(root, '.local/coding-cf-spike')
+/** The deployed coding-cf Worker's URL: the script's second argument, else `GOBLIN_CODING_CF_URL`. No default. */
+export function workerUrl(): string {
+  const url = Bun.argv[3] || Bun.env['GOBLIN_CODING_CF_URL']
+  if (!url) throw new Error('worker_url_missing: pass the deployed Worker URL or set GOBLIN_CODING_CF_URL')
+  return url
+}
 export async function fixture() {
   const snapshotState = path.resolve(root, Bun.argv[4] ?? '.local/coding-spike')
   const config: { root: string; base: string } = await Bun.file(path.join(snapshotState, 'config.json')).json()

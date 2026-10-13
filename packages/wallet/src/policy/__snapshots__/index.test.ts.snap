@@ -4,7 +4,7 @@ exports[`the agent policy > the mainnet document (snapshot) 1`] = `
 {
   "chain_type": "ethereum",
   "name": "Goblin Wallet agent signer v2",
-  "owner_id": "k6jmz9g665ljwkdpy3c01xhy",
+  "owner_id": "quorum-test",
   "rules": [
     {
       "action": "ALLOW",

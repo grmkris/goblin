@@ -48,7 +48,7 @@ import {
 /** Throwaway test keys, never funded. */
 const owner = privateKeyToAccount(`0x${'11'.repeat(32)}`)
 const stranger = privateKeyToAccount(`0x${'22'.repeat(32)}`)
-const AGENT: Address = '0xD354C247817d233Ee0abDB9ffcDF356b5E6B274F'
+const AGENT: Address = '0x1111111111111111111111111111111111111111'
 const NOW_MS = 1_800_000_000_000
 const NOW_S = 1_800_000_000
 const SALT = 0x1234n

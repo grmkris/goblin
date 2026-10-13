@@ -258,7 +258,7 @@ const fillAt = (status: string) => async () =>
   })
 
 describe('deposit addresses', () => {
-  const OWNER = '0x76C70140b195ABcFf6406D0a83f8b64A2d435e94'
+  const OWNER = '0x1111111111111111111111111111111111111111'
   const relayQuote = {
     steps: [{ id: 'deposit', depositAddress: '0xc9b1672f6fbc38f66d775bb9a5d46b8f0dd2613f', requestId: '0x1791' }],
     details: { currencyOut: { amount: '10158603' }, timeEstimate: 2 },
