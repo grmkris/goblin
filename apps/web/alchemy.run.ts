@@ -6,6 +6,7 @@ import * as Redacted from 'effect/Redacted'
 import * as Schema from 'effect/Schema'
 import { PlanCatalogSetting } from '@goblin/contracts'
 import { fileURLToPath } from 'node:url'
+import { stackState } from '../../scripts/alchemy-state.ts'
 import { resolveStage } from '../../scripts/stage-config.ts'
 
 const root = fileURLToPath(new URL('./', import.meta.url))
@@ -65,7 +66,7 @@ const runtimeStage = (name: string) => (name === 'local' || name === 'dev' || na
 
 export default Alchemy.Stack(
   'goblin',
-  { providers: Cloudflare.providers(), state: Alchemy.localState() },
+  { providers: Cloudflare.providers(), state: stackState() },
   Effect.gen(function* () {
     const stage = resolveStage(yield* Alchemy.Stage)
     const appUrl = yield* Config.String('GOBLIN_APP_URL').pipe(Config.withDefault('http://localhost:18971'))

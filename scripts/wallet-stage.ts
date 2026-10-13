@@ -1,15 +1,14 @@
 /**
  * Goblin Wallet's stage loader: `dev` (local), `plan:dev`/`deploy:dev` and `plan:prod`/`deploy:prod` (the latter needs
- * `GOBLIN_CONFIRM_PROD=1`). Each stage reads `.local/wallet-<stage>.env`. scripts/stage.ts stays goblin's own.
+ * `GOBLIN_CONFIRM_PROD=1`). Each stage reads `.local/wallet-<stage>.env`. scripts/stage.ts stays goblin's own. Like
+ * goblin's, dev and prod state live in the account's Cloudflare state store, so a deploy outside CI is break-glass.
  */
-import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { resolve } from 'node:path'
-import { resolveStage } from './stage-config.ts'
-import { attachStageState, DEFAULT_RELEASE_ROOT } from './stage-state.ts'
+import { requireDeployInCi, resolveStage } from './stage-config.ts'
 
 const root = resolve(import.meta.dirname, '..')
-const releaseRoot = process.env['GOBLIN_RELEASE_ROOT'] ?? DEFAULT_RELEASE_ROOT
 const command = Bun.argv[2] ?? 'dev'
 const subcommands: Record<string, readonly [alchemy: string, stage: string]> = {
   dev: ['dev', 'local'],
@@ -23,6 +22,7 @@ if (selected === undefined) throw new Error('unsupported_wallet_stage_command')
 const [alchemyCommand, stageName] = selected
 if (command === 'deploy:prod' && process.env['GOBLIN_CONFIRM_PROD'] !== '1')
   throw new Error('prod_deploy_requires_confirmation')
+if (alchemyCommand === 'deploy' && stageName !== 'local') requireDeployInCi(process.env)
 
 const stage = resolveStage(stageName, 'goblin-wallet')
 // Local development runs with the dev stage's values.
@@ -35,31 +35,11 @@ const requirePrivate = (file: string) => {
   if ((statSync(file).mode & 0o077) !== 0) throw new Error(`private_stage_file_requires_mode_600: ${file}`)
 }
 
-// One wallet deploy at a time, beside goblin's own deploy lock.
-if (!stage.local && process.env['GOBLIN_STAGE_LOCK_HELD'] !== `wallet:${releaseRoot}`) {
-  const locked = Bun.spawn(
-    ['flock', '-x', resolve(releaseRoot, 'wallet-deploy.lock'), 'bun', import.meta.filename, ...Bun.argv.slice(2)],
-    {
-      cwd: root,
-      env: { ...process.env, GOBLIN_STAGE_LOCK_HELD: `wallet:${releaseRoot}` },
-      stdio: ['inherit', 'inherit', 'inherit'],
-    },
-  )
-  process.exit(await locked.exited)
-}
-if (!stage.local) {
-  process.umask(0o007)
-  // The first deploy seeds the wallet's state directory; goblin's stages are seeded by hand.
-  mkdirSync(resolve(releaseRoot, 'alchemy/state/goblin-wallet', stage.name), { recursive: true })
-  attachStageState(root, stage.name, releaseRoot, { stack: 'goblin-wallet', dir: 'apps/wallet' })
-}
-
 const childEnv: Record<string, string | undefined> = { ...process.env }
 for (const key of Object.keys(childEnv)) {
   if (/^(CLOUDFLARE_|GOBLIN_|PRIVY_|PIMLICO_|TREASURY_|WALLET_|ALCHEMY_STAGE)/u.test(key)) delete childEnv[key]
 }
 childEnv['GOBLIN_STAGE'] = stage.name
-childEnv['GOBLIN_RELEASE_ROOT'] = releaseRoot
 childEnv['BUN_CONFIG_NO_ENVFILE'] = '1'
 
 requirePrivate(config)

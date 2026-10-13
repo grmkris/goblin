@@ -1,13 +1,15 @@
-/** One stage loader; shared Cloudflare credentials stay in the existing mode-600 dev configuration. */
+/**
+ * One stage loader; shared Cloudflare credentials stay in the existing mode-600 dev configuration. Alchemy state for
+ * dev and prod lives in the account's Cloudflare state store (scripts/alchemy-state.ts), which has no lock: CI deploys
+ * them one at a time, and a deploy or destroy from anywhere else is break-glass.
+ */
 import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { resolve } from 'node:path'
 import { releaseBuild } from './build-id.ts'
-import { resolveStage } from './stage-config.ts'
-import { attachStageState, DEFAULT_RELEASE_ROOT } from './stage-state.ts'
+import { requireDeployInCi, resolveStage } from './stage-config.ts'
 
 const root = resolve(import.meta.dirname, '..')
-const releaseRoot = process.env['GOBLIN_RELEASE_ROOT'] ?? DEFAULT_RELEASE_ROOT
 const command = Bun.argv[2] ?? 'dev'
 if (
   ![
@@ -31,30 +33,15 @@ if (command.startsWith('destroy:') && !Bun.argv.includes('--confirm-reset'))
 const stage = resolveStage(command === 'dev' ? 'local' : command.endsWith(':prod') ? 'prod' : 'dev')
 if (stage.name === 'prod' && process.env['GOBLIN_CONFIRM_PROD'] !== '1')
   throw new Error('prod_requires_GOBLIN_CONFIRM_PROD=1')
+if (command.startsWith('deploy:') || command.startsWith('destroy:')) requireDeployInCi(process.env)
 const config = resolve(process.env['GOBLIN_ENV_DIR'] ?? resolve(root, '.local'), `${stage.name}.env`)
 const shared = process.env['GOBLIN_CLOUD_ENV_FILE'] ?? resolve(homedir(), '.config/myapps/dev.env')
-if (!stage.local && command !== 'smoke:prod' && process.env['GOBLIN_STAGE_LOCK_HELD'] !== releaseRoot) {
-  const locked = Bun.spawn(
-    ['flock', '-x', resolve(releaseRoot, 'deploy.lock'), 'bun', import.meta.filename, ...Bun.argv.slice(2)],
-    {
-      cwd: root,
-      env: { ...process.env, GOBLIN_STAGE_LOCK_HELD: releaseRoot },
-      stdio: ['inherit', 'inherit', 'inherit'],
-    },
-  )
-  process.exit(await locked.exited)
-}
-if (!stage.local && command !== 'smoke:prod') {
-  process.umask(0o007)
-  attachStageState(root, stage.name, releaseRoot)
-}
 const childEnv: Record<string, string | undefined> = { ...process.env }
 for (const key of Object.keys(childEnv)) {
   if (/^(CLOUDFLARE_|GOBLIN_|DODO_|MYAGENT_|MYBROWSER_|MYPLAN_|MYINBOX_|MYTMUX_|LITELLM_|ALCHEMY_STAGE)/u.test(key))
     delete childEnv[key]
 }
 childEnv['GOBLIN_STAGE'] = stage.name
-childEnv['GOBLIN_RELEASE_ROOT'] = releaseRoot
 childEnv['BUN_CONFIG_NO_ENVFILE'] = '1'
 // A deployed web bundle names its commit, which its crash reports quote (crash-report.ts); local stays `dev`.
 if (!stage.local) childEnv['VITE_GOBLIN_BUILD'] = releaseBuild(root)

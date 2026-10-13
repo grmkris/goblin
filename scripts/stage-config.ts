@@ -21,3 +21,13 @@ export function resolveStage(name: string, app = 'goblin') {
     observability: OBSERVABILITY,
   }
 }
+
+/**
+ * Dev and prod keep their Alchemy state in the shared Cloudflare state store, which has no lock: GitHub Actions deploys
+ * each stage through one non-cancelling concurrency group. A deploy or destroy anywhere else is break-glass, and the
+ * operator says so with `GOBLIN_BREAK_GLASS=1` (after pausing CI). Plan, drift and smoke stay available anywhere.
+ */
+export function requireDeployInCi(env: Readonly<Record<string, string | undefined>>): void {
+  if (env['GITHUB_ACTIONS'] !== 'true' && env['GOBLIN_BREAK_GLASS'] !== '1')
+    throw new Error('deploy_runs_in_ci_or_GOBLIN_BREAK_GLASS=1')
+}

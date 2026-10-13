@@ -4,6 +4,7 @@ import * as Config from 'effect/Config'
 import * as Effect from 'effect/Effect'
 import * as Redacted from 'effect/Redacted'
 import { fileURLToPath } from 'node:url'
+import { stackState } from '../../scripts/alchemy-state.ts'
 import { resolveStage } from '../../scripts/stage-config.ts'
 
 /** Paths the Worker answers before any static asset (the SPA fallback never swallows them). */
@@ -11,7 +12,7 @@ const WORKER_FIRST = ['/mcp', '/mcp/*', '/api/*', '/oauth/*', '/.well-known/*', 
 
 export default Alchemy.Stack(
   'goblin-wallet',
-  { providers: Cloudflare.providers(), state: Alchemy.localState() },
+  { providers: Cloudflare.providers(), state: stackState() },
   Effect.gen(function* () {
     const stage = resolveStage(yield* Alchemy.Stage, 'goblin-wallet')
     // Empty domain: the Worker serves on workers.dev only.
