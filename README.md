@@ -1,6 +1,6 @@
 # goblin
 
-Your own goblin, always on. Resident personal agents on Cloudflare. Each user signs up, subscribes to Pro ($10 in USDC every 30 days), and gets their own agent: they talk to it in the browser,
+Your own goblin, always on. Resident personal agents on Cloudflare. Each user signs up, picks goblin Pro (a $1 day pass or $15 monthly, in USDC), and gets their own agent: they talk to it in the browser,
 it keeps running, holds its own authority to use the MCP servers that user connected, and is itself an MCP server
 other tools can talk to.
 
@@ -135,19 +135,26 @@ Publication can be retried independently of deployment. Alternate hosts redirect
 supports open sign-up after sender verification. Email OTP is the sole login method, and every stage requires mail. Both stages use `hello@goblin.surf` after sender onboarding,
 with a host prefix on dev mail subjects. See [development](docs/development.md) for the production guard and smoke.
 
-Pro is $10 in USDC every 30 days, paid from the owner's Goblin Wallet as a subscription they sign once (ADR 0054): an
-on-chain permission that lets goblin's collector take at most $10 a period, for 12 periods, and that they cancel by
-revoking it in the wallet. It includes 800 model Credits (about 2 million tokens) per account per UTC day, hand-overs to
-goblin or a Persona, and subagents. goblin takes the first payment when the owner comes back from signing, reminds them
-three days before each renewal, and retries a failed one each day through a seven-day grace; cancellation keeps access
-through the paid period. The card checkout (Dodo) is off unless a stage turns it on. Draft terms, privacy and refund
+goblin Pro is the one plan; there is no free plan, and goblin answers only with it. It includes 800 model Credits
+(about 2 million tokens) per account per UTC day, hand-overs to goblin or a Persona, routines and subagents. It is paid
+from the owner's Goblin Wallet as a subscription they sign once (ADR 0054): an on-chain permission that lets goblin's
+collector take at most the price a period, for 12 months, and that they cancel by revoking it in the wallet. Two ways
+to pay, at prices each stage sets (`GOBLIN_PLAN_CATALOG`):
+
+- **the day pass**, $1 for each UTC day the owner uses goblin: the first message of a day pays for it in the
+  background, an idle day costs nothing, and a day the wallet cannot pay ends Pro until the owner adds funds;
+- **monthly**, $15 every 30 days: goblin takes the first payment when the owner comes back from signing, reminds them
+  three days before each renewal, and retries a failed one each day through a seven-day grace; cancellation keeps
+  access through the paid period. A day-pass owner can move to monthly.
+
+An account without Pro still signs in, connects its wallet and chooses Pro in Start. The card checkout (Dodo) is off unless a stage turns it on. Draft terms, privacy and refund
 pages await operator review before live payments. The subscription has not run against Base mainnet yet.
 
 Several connections to one MCP server are normal: each is the owner's account there, with its own label, sign-in,
 grants and webhook (ADR 0041). A routine fires once, on a schedule or when a connection sends an event; it lives in a
 Topic and can **Tell me** (each event, reminder and answer is a notice in the Topic and a notification in Activity,
 on Telegram too if asked) and **Hand to** Goblin or a Persona pinned at its revision, with an instruction, exact tool
-pairs and budgets. A routine that only tells is on the free plan too; a hand-over is part of Pro. The owner confirms
+pairs and budgets. Routines are part of Pro. The owner confirms
 each revision in Settings → Routines or on the connection's Events section, a picker that names each event as its
 server suggests, picks the recommended ones, sends each to a Topic (Tell me) or hands it to goblin or a Persona, and
 sets them up in one step; Goblin may propose one, never confirm it. Run now, Stop, Pause, Edit and Archive are available. Event confirmation
