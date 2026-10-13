@@ -4,7 +4,6 @@
  * goblin's, dev and prod state live in the account's Cloudflare state store, so a deploy outside CI is break-glass.
  */
 import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { resolve } from 'node:path'
 import { requireDeployInCi, resolveStage } from './stage-config.ts'
 
@@ -30,7 +29,8 @@ const config = resolve(
   process.env['GOBLIN_ENV_DIR'] ?? resolve(root, '.local'),
   `wallet-${stage.local ? 'dev' : stage.name}.env`,
 )
-const shared = process.env['GOBLIN_CLOUD_ENV_FILE'] ?? resolve(homedir(), '.config/myapps/dev.env')
+// Only CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, mode 600; CI materializes it (scripts/ci_credentials.py).
+const shared = process.env['GOBLIN_CLOUD_ENV_FILE'] ?? resolve(root, '.local/cloud.env')
 const requirePrivate = (file: string) => {
   if ((statSync(file).mode & 0o077) !== 0) throw new Error(`private_stage_file_requires_mode_600: ${file}`)
 }

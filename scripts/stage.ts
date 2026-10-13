@@ -1,10 +1,9 @@
 /**
- * One stage loader; shared Cloudflare credentials stay in the existing mode-600 dev configuration. Alchemy state for
- * dev and prod lives in the account's Cloudflare state store (scripts/alchemy-state.ts), which has no lock: CI deploys
- * them one at a time, and a deploy or destroy from anywhere else is break-glass.
+ * One stage loader: the stage's `.local/<stage>.env` plus the Cloudflare credentials in `.local/cloud.env`. Alchemy
+ * state for dev and prod lives in the account's Cloudflare state store (scripts/alchemy-state.ts), which has no lock:
+ * CI deploys them one at a time, and a deploy or destroy from anywhere else is break-glass.
  */
 import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { resolve } from 'node:path'
 import { releaseBuild } from './build-id.ts'
 import { requireDeployInCi, resolveStage } from './stage-config.ts'
@@ -35,7 +34,8 @@ if (stage.name === 'prod' && process.env['GOBLIN_CONFIRM_PROD'] !== '1')
   throw new Error('prod_requires_GOBLIN_CONFIRM_PROD=1')
 if (command.startsWith('deploy:') || command.startsWith('destroy:')) requireDeployInCi(process.env)
 const config = resolve(process.env['GOBLIN_ENV_DIR'] ?? resolve(root, '.local'), `${stage.name}.env`)
-const shared = process.env['GOBLIN_CLOUD_ENV_FILE'] ?? resolve(homedir(), '.config/myapps/dev.env')
+// Only CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, mode 600; CI materializes it (scripts/ci_credentials.py).
+const shared = process.env['GOBLIN_CLOUD_ENV_FILE'] ?? resolve(root, '.local/cloud.env')
 const childEnv: Record<string, string | undefined> = { ...process.env }
 for (const key of Object.keys(childEnv)) {
   if (/^(CLOUDFLARE_|GOBLIN_|DODO_|MYAGENT_|MYBROWSER_|MYPLAN_|MYINBOX_|MYTMUX_|LITELLM_|ALCHEMY_STAGE)/u.test(key))
