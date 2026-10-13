@@ -462,6 +462,13 @@ to its setup page) and ready (what it holds, and Change for how goblin pays), se
 API routed in the page and no screen scrolling sideways. It needs `@goblin/app`'s runtime built (its own
 `build` script). Screenshots go under `.local/goblin-acceptance/start-*`; this is browser fixture evidence only.
 
+`heavy bun apps/web/test/ui-subscribe.ts` renders goblin Pro (ADR 0054) from source in local Chromium at phone (light)
+and desktop (dark) widths: `/subscribe` with the day pass and monthly side by side or stacked (no plan, on a day pass,
+a day pass that could not pay), the wallet's balance from its status and what it covers, Settings' plan card in each
+state, and the composer's no-plan card, with the owner API routed in the page. It checks the Add funds and Pick a plan
+links, that Subscribe with USDC asks for the billing pressed, and that no screen scrolls sideways. Screenshots go under
+`.local/goblin-acceptance/subscribe-*`; this is browser fixture evidence only.
+
 `heavy bun apps/web/test/ui-markdown.ts` renders chat Markdown from source in local Chromium at desktop and phone
 widths: a reply that settles keeps its blocks (a table keeps its element and sideways scroll), with and without
 motion (words fade in behind a caret only when motion is allowed), code highlights once
