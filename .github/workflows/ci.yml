@@ -1,0 +1,150 @@
+name: CI
+# The repository is public, so every job runs on a fresh GitHub-hosted runner. Pull requests, forks included, run only
+# Check, on refs/pull/<n>/merge, which neither environment's branch policy admits: they never reach a secret. Never add
+# pull_request_target or workflow_run here (ADR 0046).
+on:
+  push:
+    branches: [dev, prod]
+  pull_request:
+permissions:
+  contents: read
+env:
+  TURBO_TELEMETRY_DISABLED: '1'
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: check-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile
+        working-directory: scripts/fixtures/mcp-app
+      - run: bun install --frozen-lockfile
+        working-directory: spikes/coding
+      - run: bun install --frozen-lockfile
+        working-directory: spikes/coding-cf
+      - run: bun run check
+
+  # Every green push to dev deploys goblin dev and Goblin Wallet dev. The stage's secrets live in the `dev` environment,
+  # which only the dev branch may use. Alchemy state is the shared Cloudflare state store, which has no lock: one deploy
+  # per stage at a time, and a running one is never cancelled.
+  deploy-dev:
+    name: Deploy dev
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && github.repository == 'grmkris/goblin'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: dev
+      url: https://dev.goblin.surf
+    concurrency:
+      group: goblin-deploy-dev
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: .bun-version
+      # The deploy needs the root workspaces only: no fixture or spike dependency runs beside the stage's secrets.
+      - run: bun install --frozen-lockfile
+      - name: Materialize dev credentials
+        env:
+          GOBLIN_STAGE_ENV: ${{ secrets.GOBLIN_STAGE_ENV }}
+          GOBLIN_WALLET_ENV: ${{ secrets.GOBLIN_WALLET_ENV }}
+          GOBLIN_CLOUD_ENV: ${{ secrets.GOBLIN_CLOUD_ENV }}
+          GOBLIN_SMOKE_SESSION: ${{ secrets.GOBLIN_SMOKE_SESSION }}
+          ALCHEMY_STATE_STORE_CREDENTIALS: ${{ secrets.ALCHEMY_STATE_STORE_CREDENTIALS }}
+        run: python3 -B scripts/ci_credentials.py dev
+      - name: Release goblin dev
+        env:
+          GOBLIN_RECEIPTS_DIR: ${{ runner.temp }}/receipts
+          GOBLIN_LOG_DIR: ${{ runner.temp }}/release-logs
+        run: python3 -B scripts/release.py dev "$GITHUB_SHA"
+      - name: Release Goblin Wallet dev
+        env:
+          GOBLIN_RECEIPTS_DIR: ${{ runner.temp }}/receipts
+          GOBLIN_LOG_DIR: ${{ runner.temp }}/release-logs
+        run: python3 -B scripts/wallet_release.py dev "$GITHUB_SHA"
+      # The sanitized receipts: Deploy prod requires this artifact of the same sha.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dev-acceptance
+          path: ${{ runner.temp }}/receipts
+          retention-days: 90
+          if-no-files-found: error
+      - name: Remove transient credentials
+        if: always()
+        run: python3 -B scripts/ci_credentials.py dev --cleanup
+
+  # A push to prod (`bun run promote <sha>`) deploys goblin prod and Goblin Wallet prod, only for a sha with current
+  # authenticated dev acceptance, fast-forwarded and not force-pushed (scripts/release.py).
+  deploy-prod:
+    name: Deploy prod
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/prod' && github.repository == 'grmkris/goblin'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: prod
+      url: https://goblin.surf
+    concurrency:
+      group: goblin-deploy-prod
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GOBLIN_CONFIRM_PROD: '1'
+      GOBLIN_PROD_BEFORE: ${{ github.event.before }}
+      GOBLIN_PROD_FORCED: ${{ github.event.forced }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Materialize prod credentials
+        env:
+          GOBLIN_STAGE_ENV: ${{ secrets.GOBLIN_STAGE_ENV }}
+          GOBLIN_WALLET_ENV: ${{ secrets.GOBLIN_WALLET_ENV }}
+          GOBLIN_CLOUD_ENV: ${{ secrets.GOBLIN_CLOUD_ENV }}
+          ALCHEMY_STATE_STORE_CREDENTIALS: ${{ secrets.ALCHEMY_STATE_STORE_CREDENTIALS }}
+        run: python3 -B scripts/ci_credentials.py prod
+      - name: Release goblin prod
+        env:
+          GOBLIN_RECEIPTS_DIR: ${{ runner.temp }}/receipts
+          GOBLIN_LOG_DIR: ${{ runner.temp }}/release-logs
+        run: python3 -B scripts/release.py prod "$GITHUB_SHA"
+      - name: Release Goblin Wallet prod
+        env:
+          GOBLIN_RECEIPTS_DIR: ${{ runner.temp }}/receipts
+          GOBLIN_LOG_DIR: ${{ runner.temp }}/release-logs
+        run: python3 -B scripts/wallet_release.py prod "$GITHUB_SHA"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prod-acceptance
+          path: ${{ runner.temp }}/receipts
+          retention-days: 90
+          if-no-files-found: error
+      - name: Remove transient credentials
+        if: always()
+        run: python3 -B scripts/ci_credentials.py prod --cleanup
