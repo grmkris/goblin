@@ -42,10 +42,12 @@ def envfile(path):
 
 
 def safe_plan(output):
-    # Plan tables label destructive actions Delete/Replace. Unknown output fails closed.
-    if re.search(r"\b(delete|replace|destroy)\b", output, re.I):
+    # Plan tables label destructive actions Delete/Replace. Unknown output fails closed. A colour code would hide a
+    # word boundary, so it is stripped first.
+    plain = ANSI.sub("", output)
+    if re.search(r"\b(delete|replace|destroy)\b", plain, re.I):
         raise RuntimeError("destructive_plan_requires_separate_review")
-    if not re.search(r"No changes|Create|Update", output, re.I):
+    if not re.search(r"No changes|Create|Update", plain, re.I):
         raise RuntimeError("unrecognized_plan_output")
 
 
