@@ -10,14 +10,38 @@ concurrency:
   cancel-in-progress: true
 jobs:
   check:
-    # The netcup runner is persistent: run only this repository's own branches, never a fork's code.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # The netcup runner is persistent and holds the stages' credentials: it runs only pushes to this repository's own
+    # branches. Pull requests, a fork's included, run on GitHub's hosted runners below.
+    if: github.event_name == 'push'
     runs-on: [self-hosted, linux, x64, netcup]
     timeout-minutes: 30
     env:
       # Clear of the local default (18861) and of the 188xx ports video previews take on this box, so CI never collides
       # with an agent running the harness or a preview server.
       GOBLIN_HARNESS_PORT: '38862'
+      TURBO_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile
+        working-directory: scripts/fixtures/mcp-app
+      - run: bun install --frozen-lockfile
+        working-directory: spikes/coding
+      - run: bun install --frozen-lockfile
+        working-directory: spikes/coding-cf
+      - run: bun run check
+
+  pull-request:
+    # The repository is public: a pull request's code runs only on a fresh hosted runner, with read-only access.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
       TURBO_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
