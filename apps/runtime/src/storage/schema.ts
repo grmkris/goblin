@@ -235,9 +235,17 @@ export const appChannel = sqliteTable('app_channel', {
   enabledAt: integer('enabled_at').notNull(),
 })
 
-/** Turns of main whose answers go back to Telegram, until they are sent. */
+/**
+ * Turns whose answers go back to Telegram, until they are sent (ADR 0055): the goblin chat the turn ran in (none for
+ * main), the Telegram chat and thread the answer goes to, and the Persona that answers instead of goblin, whose
+ * invocation under the same operation id holds its answer.
+ */
 export const appChannelReplies = sqliteTable('app_channel_replies', {
   operationId: text('operation_id').primaryKey().notNull(),
+  chatId: text('chat_id'),
+  tgChat: text('tg_chat').notNull().default('dm'),
+  tgThread: integer('tg_thread').notNull().default(0),
+  personaId: integer('persona_id'),
   createdAt: integer('created_at').notNull(),
   deliveredAt: integer('delivered_at'),
 })
@@ -341,12 +349,23 @@ export const appEventConsumerReceipts = sqliteTable(
   (t) => [primaryKey({ columns: [t.subscriptionId, t.webhookId, t.consumerId, t.revision] })],
 )
 
-/** The Events checkpoint fences historical doorbell cursor writes. Reply operation ids do not change. */
+/**
+ * The Telegram channel (channel/channel.ts): at most one row, the connection whose Events carry it and its inbox
+ * cursor; what goblin does with a chat it has not seen (`new_chats`, ADR 0055); and how far the grant reaches (`reach`),
+ * with the URL that widens a DM-only grant to all the bot's chats.
+ */
 export const appTelegramChannel = sqliteTable('app_telegram_channel', {
   id: integer('id').primaryKey().notNull(),
   connectionId: text('connection_id').notNull(),
   inboxCursor: text('inbox_cursor').notNull(),
   enabledAt: integer('enabled_at').notNull(),
+  newChats: text('new_chats', { enum: ['ask', 'topic', 'personal'] })
+    .notNull()
+    .default('ask'),
+  reach: text('reach', { enum: ['dm', 'all'] })
+    .notNull()
+    .default('dm'),
+  widenUrl: text('widen_url'),
 })
 
 /** A newer invalidation cannot be cleared by an older listing response. */
