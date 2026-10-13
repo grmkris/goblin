@@ -612,7 +612,7 @@ mode-600 file. Names below; never commit or print the values.
 Checks per workspace: `bun run --cwd apps/wallet test`, `bun run --cwd packages/wallet test`,
 `bun run --cwd apps/wallet-web build`. The Worker has unit tests only; there is no workerd integration test yet.
 
-`heavy bun scripts/wallet-landing-shots.ts [out-dir]` renders the wallet's public landing (`/` signed out) on the
+`heavy bun apps/wallet-web/test/ui-landing.ts [out-dir]` renders the wallet's public landing (`/` signed out) on the
 web app's fixtures (`?fixtures=signed-out`, no Privy or API) in local Chromium: phone 390×844 and desktop 1280×800,
 light and dark, and reduced motion. It approves the hero's ask by hand, waits for an untouched one to settle itself,
 checks that a deep link keeps the plain sign-in and that no page scrolls sideways, and keeps full-page screenshots
