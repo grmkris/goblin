@@ -1,0 +1,50 @@
+{
+  "name": "goblin-mobile-spike",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "workspaces": [],
+  "type": "module",
+  "scripts": {
+    "dev": "one dev --port 18980",
+    "build": "one build",
+    "build:ios": "one build --platform ios",
+    "build:android": "one build --platform android",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:browser": "node scripts/browser.ts",
+    "check": "bun run typecheck && bun run test",
+    "prebuild:native": "one prebuild",
+    "ios": "one run:ios",
+    "android": "one run:android",
+    "test:local": "cd ../.. && node apps/runtime/node_modules/vitest/vitest.mjs run --config spikes/mobile/vitest.local.config.ts"
+  },
+  "dependencies": {
+    "@goblin/contracts": "file:../../packages/contracts",
+    "@react-navigation/core": "8.0.0-alpha.40",
+    "@react-navigation/drawer": "8.0.0-alpha.57",
+    "@react-navigation/native": "8.0.0-alpha.50",
+    "effect": "4.0.1",
+    "one": "2.6.11",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.87.1",
+    "react-native-gesture-handler": "3.0.0",
+    "react-native-reanimated": "4.6.0",
+    "react-native-screens": "4.27.0",
+    "react-native-web": "0.21.2",
+    "react-native-worklets": "0.12.2"
+  },
+  "devDependencies": {
+    "@react-native-community/template": "0.87.1",
+    "@types/node": "22.18.0",
+    "@types/react": "19.2.14",
+    "playwright-core": "1.63.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.1",
+    "vitest": "5.0.1"
+  },
+  "patchedDependencies": {
+    "one@2.6.11": "patches/one@2.6.11.patch"
+  }
+}

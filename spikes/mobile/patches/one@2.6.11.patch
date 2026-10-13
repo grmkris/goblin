@@ -1,0 +1,29 @@
+diff --git a/android/src/main/java/com/margelo/nitro/one/HybridOneFetch.kt b/android/src/main/java/com/margelo/nitro/one/HybridOneFetch.kt
+index 3faee06e120360ec094e849d963fba5131280dbc..3d96f3458e509134b1bd41a3ee1bdd7a73195c28 100644
+--- a/android/src/main/java/com/margelo/nitro/one/HybridOneFetch.kt
++++ b/android/src/main/java/com/margelo/nitro/one/HybridOneFetch.kt
+@@ -49,7 +49,9 @@ class HybridOneFetch : HybridOneFetchSpec() {
+     private val local = Executors.newCachedThreadPool()
+ 
+     private val client: OkHttpClient by lazy {
+-        OkHttpClientProvider.createClient().also {
++        // Goblin spike: explicit owner cookies and OTP bodies must never follow redirects.
++        OkHttpClientProvider.createClient().newBuilder()
++            .followRedirects(false).followSslRedirects(false).build().also {
+             (it.cookieJar as? CookieJarContainer)
+                 ?.setCookieJar(JavaNetCookieJar(ForwardingCookieHandler()))
+         }
+diff --git a/ios/Nitro/HybridOneFetch.swift b/ios/Nitro/HybridOneFetch.swift
+index e454679c2a826065bc645211f5f10f421b2ce96f..518e81e3905a291060e64c64c38f6f8ba66b0ec7 100644
+--- a/ios/Nitro/HybridOneFetch.swift
++++ b/ios/Nitro/HybridOneFetch.swift
+@@ -86,7 +86,8 @@ final class HybridOneFetch: HybridOneFetchSpec {
+       completionHandler: @escaping (URLRequest?) -> Void
+     ) {
+       requests[task.taskIdentifier]?.redirected = true
+-      completionHandler(newRequest)
++      // Goblin spike: explicit owner cookies and OTP bodies must never follow redirects.
++      completionHandler(nil)
+     }
+ 
+     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
