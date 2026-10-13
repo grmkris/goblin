@@ -1,45 +1,67 @@
-"""Promote one accepted dev SHA without relying on a bot push to trigger deployment."""
+"""Pre-flight one accepted dev SHA for production, then fast-forward `prod`; CI's Deploy prod job deploys it.
+
+`bun run promote <full-sha>` (any machine with `gh` signed in to the repository and `.local/cloud.env`). It deploys
+nothing and needs no prod credentials: Deploy prod repeats every check before it touches production.
+"""
 import argparse
-import json
-import os
-import re
 import subprocess
-from release import REPO, STATE, checked_source, ref, release, require_dev, run, stage_config, version
-from wallet_release import config as wallet_config, deploy_wallet
+import time
+
+from release import (REPO, SHA, WORKFLOW, checked_source, cloud_config, compare, dev_acceptance, gh, ref, require_dev,
+                     require_fast_forward, run, version)
 
 
-def require_fast_forward(status):
-    if status not in ["ahead", "identical"]:
-        raise RuntimeError("promotion_must_fast_forward")
+class GitHub:
+    """The real checks and the one write, against GitHub and Cloudflare."""
+
+    def source(self, sha):
+        checked_source('dev', sha)
+
+    def acceptance(self, sha):
+        return dev_acceptance(sha)
+
+    def dev_version(self):
+        return version(cloud_config(), 'dev')
+
+    def fast_forward(self, sha):
+        return compare(ref('prod'), sha)
+
+    def move_prod(self, sha):
+        run(['gh', 'api', '--method', 'PATCH', f'repos/{REPO}/git/refs/heads/prod', '-f', 'sha=' + sha,
+             '-F', 'force=false'])
+
+    def deploy_run(self, sha):
+        # Best effort: the push run takes a few seconds to appear.
+        for _ in range(10):
+            found = gh(f'repos/{REPO}/actions/workflows/{WORKFLOW}/runs?head_sha={sha}&event=push&branch=prod')
+            if found['workflow_runs']:
+                return found['workflow_runs'][0]['html_url']
+            time.sleep(3)
+        return f'https://github.com/{REPO}/actions/workflows/{WORKFLOW}?query=branch%3Aprod'
 
 
-def promote(sha):
-    if not re.fullmatch(r"[a-f0-9]{40}", sha):
-        raise RuntimeError("full_commit_sha_required")
-    checked_source("dev", sha)
-    wallet_config()  # Fail before advancing prod if Wallet credentials are absent or target another stage.
-    _, _, config = stage_config("prod")
-    receipt = json.loads((STATE / "receipts/dev.json").read_text())
-    require_dev(receipt, sha, version(config, "dev"))
-    previous = ref("prod")
-    comparison = json.loads(run(["gh", "api", f"repos/{REPO}/compare/{previous}...{sha}"]))
-    require_fast_forward(comparison["status"])
-    run(["gh", "api", "--method", "PATCH", f"repos/{REPO}/git/refs/heads/prod", "-f", "sha=" + sha, "-F", "force=false"])
-    release("prod", sha)
-    deploy_wallet(sha)
+def promote(sha, github):
+    """Every check first, in order; `prod` moves only when all of them pass."""
+    if not SHA.fullmatch(sha):
+        raise RuntimeError('full_commit_sha_required')
+    github.source(sha)
+    require_dev(github.acceptance(sha), sha, github.dev_version())
+    require_fast_forward(github.fast_forward(sha))
+    github.move_prod(sha)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("sha")
+    parser.add_argument('sha')
     args = parser.parse_args()
-    os.umask(0o007)
-    if os.environ.get("GOBLIN_STAGE_LOCK_HELD") != str(STATE):
-        os.execvpe("flock", ["flock", "-x", str(STATE / "deploy.lock"), "python3", __file__, args.sha],
-                  dict(os.environ, GOBLIN_STAGE_LOCK_HELD=str(STATE)))
-    os.environ["GOBLIN_CONFIRM_PROD"] = "1"
+    github = GitHub()
     try:
-        promote(args.sha)
+        promote(args.sha, github)
     except (RuntimeError, subprocess.CalledProcessError) as error:
         print(str(error))
         raise SystemExit(1) from None
+    print('prod moved to ' + args.sha + '; Deploy prod: ', end='', flush=True)
+    try:
+        print(github.deploy_run(args.sha))
+    except (RuntimeError, subprocess.CalledProcessError, KeyError, ValueError):
+        print(f'https://github.com/{REPO}/actions/workflows/{WORKFLOW}?query=branch%3Aprod')

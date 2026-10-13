@@ -1,14 +1,23 @@
-"""Deploy Wallet from the accepted source snapshot and verify its public production boundary."""
+"""Deploy Goblin Wallet on dev or prod from the deploy job's checkout and verify its public boundary.
+
+`python3 -B scripts/wallet_release.py dev|prod <full-sha>` runs in the same CI deploy job right after
+`scripts/release.py` passed for that stage and sha, and refuses to run without that job's goblin receipt. The probes
+never sign, spend or touch funds.
+"""
+import argparse
 import datetime
-import fcntl
 import json
 import os
+import subprocess
 import urllib.error
 import urllib.request
 
-from release import STATE, envfile, execute, safe_plan, stage_config, version
+from release import (LOCAL, SHA, cloud_env, directories, envfile, execute, require_existing, require_release_checkout,
+                     safe_plan, version)
 
-ORIGIN = 'https://wallet.goblin.surf'
+ORIGINS = {'dev': 'https://wallet-dev.goblin.surf', 'prod': 'https://wallet.goblin.surf'}
+# A Wallet plan that would create the Worker has lost its state.
+STATEFUL = ['Wallet']
 
 
 def probe(url, method='GET'):
@@ -23,12 +32,15 @@ def probe(url, method='GET'):
         return response.status, response.read(4096)
 
 
-def smoke(origin=ORIGIN):
+def smoke(origin, require_live):
     status, body = probe(origin + '/health')
     if status != 200:
         raise RuntimeError('wallet_health_failed')
     health = json.loads(body)
-    if health.get('ok') is not True or health.get('live') is not True:
+    if health.get('ok') is not True:
+        raise RuntimeError('wallet_health_failed')
+    # Dev runs on testnets; only prod must report live mainnet rails.
+    if require_live and health.get('live') is not True:
         raise RuntimeError('wallet_live_health_required')
     status, body = probe(origin + '/.well-known/oauth-authorization-server')
     if status != 200 or json.loads(body).get('issuer') != origin:
@@ -38,48 +50,56 @@ def smoke(origin=ORIGIN):
         raise RuntimeError('wallet_anonymous_mcp_must_be_401')
 
 
-def config():
-    directory, shared, _ = stage_config('prod')
-    values = envfile(shared) | envfile(directory / 'wallet-prod.env')
-    if values.get('WALLET_DOMAIN') != 'wallet.goblin.surf' or values.get('WALLET_LIVE') != '1':
+def config(stage):
+    values = envfile(cloud_env()) | envfile(LOCAL / f'wallet-{stage}.env')
+    if values.get('WALLET_DOMAIN') != ORIGINS[stage].removeprefix('https://'):
+        raise RuntimeError('wallet_domain_must_match_stage')
+    if stage == 'prod' and values.get('WALLET_LIVE') != '1':
         raise RuntimeError('wallet_live_production_config_required')
-    return directory, shared, values
+    return values
 
 
-def require_wallet(receipt, sha, current_version):
-    if (receipt.get('sha') != sha or receipt.get('worker') != 'goblin-wallet-prod'
-            or receipt.get('version') != current_version or receipt.get('acceptance') != 'public'
-            or receipt.get('origin') != ORIGIN):
-        raise RuntimeError('current_verified_wallet_prod_receipt_required')
+def require_release(receipt, stage, sha):
+    """Goblin's own release of this stage and sha passed in this job, with every provenance check it makes."""
+    if receipt.get('stage') != stage or receipt.get('sha') != sha or receipt.get('drift') != 'verified':
+        raise RuntimeError('wallet_requires_goblin_release_of_same_stage_and_sha')
 
 
-def accepted_wallet(sha):
-    _, _, values = config()
-    receipt = json.loads((STATE / 'receipts/wallet-prod.json').read_text())
-    require_wallet(receipt, sha, version(values, 'prod', 'goblin-wallet'))
-    return receipt
-
-
-def deploy_wallet(sha):
-    directory, shared, values = config()
-    snapshot = STATE / 'checkouts' / sha
+def deploy_wallet(stage, sha):
+    if not SHA.fullmatch(sha):
+        raise RuntimeError('full_commit_sha_required')
+    if stage == 'prod' and os.environ.get('GOBLIN_CONFIRM_PROD') != '1':
+        raise RuntimeError('prod_requires_GOBLIN_CONFIRM_PROD=1')
+    values = config(stage)
+    receipts, logs = directories(os.environ)
+    goblin = receipts / f'{stage}.json'
+    require_release(json.loads(goblin.read_text()) if goblin.exists() else {}, stage, sha)
+    require_release_checkout(sha)
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-    prefix = STATE / 'logs' / f'{stamp}-wallet-prod-{sha[:12]}'
-    env = dict(os.environ, GOBLIN_CONFIRM_PROD='1', GOBLIN_ENV_DIR=str(directory),
-               GOBLIN_CLOUD_ENV_FILE=str(shared), GOBLIN_RELEASE_ROOT=str(STATE),
-               GOBLIN_STAGE_LOCK_HELD='wallet:' + str(STATE), ALCHEMY_PLAIN='1', CI='true')
-    # Hold Wallet's own lock through deployment, smoke and version recording. Never touch funds.
-    with (STATE / 'wallet-deploy.lock').open('a') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        plan = execute(['bun', 'run', 'plan:wallet-prod'], snapshot, env, prefix.with_suffix('.plan.log'))
-        safe_plan(plan)
-        execute(['bun', 'run', 'deploy:wallet-prod'], snapshot, env, prefix.with_suffix('.deploy.log'))
-        current = version(values, 'prod', 'goblin-wallet')
-        smoke()
-        if current != version(values, 'prod', 'goblin-wallet'):
-            raise RuntimeError('wallet_changed_during_smoke')
-        receipt = {'utc': stamp, 'sha': sha, 'worker': 'goblin-wallet-prod', 'origin': ORIGIN,
-                   'version': current, 'acceptance': 'public'}
-        for path in [STATE / 'receipts/wallet-prod.json', STATE / f'receipts/{stamp}-wallet-prod-{sha[:12]}.json']:
-            path.write_text(json.dumps(receipt, indent=2) + '\n')
-    print(json.dumps(receipt))
+    prefix = f'{stamp}-wallet-{stage}-{sha[:12]}'
+    env = dict(os.environ, GOBLIN_ENV_DIR=str(LOCAL), GOBLIN_CLOUD_ENV_FILE=str(cloud_env()), ALCHEMY_PLAIN='1',
+               CI='true')
+    plan = execute(['bun', 'run', f'plan:wallet-{stage}'], env, logs / f'{prefix}-plan.log')
+    safe_plan(plan)
+    require_existing(plan, STATEFUL)
+    execute(['bun', 'run', f'deploy:wallet-{stage}'], env, logs / f'{prefix}-deploy.log')
+    current = version(values, stage, 'goblin-wallet')
+    smoke(ORIGINS[stage], require_live=stage == 'prod')
+    if current != version(values, stage, 'goblin-wallet'):
+        raise RuntimeError('wallet_changed_during_smoke')
+    receipt = {'utc': stamp, 'stage': stage, 'sha': sha, 'worker': f'goblin-wallet-{stage}', 'origin': ORIGINS[stage],
+               'version': current, 'acceptance': 'public'}
+    (receipts / f'wallet-{stage}.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    print(json.dumps(receipt, indent=2))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('stage', choices=['dev', 'prod'])
+    parser.add_argument('sha')
+    args = parser.parse_args()
+    try:
+        deploy_wallet(args.stage, args.sha)
+    except (RuntimeError, subprocess.CalledProcessError) as error:
+        print(str(error))
+        raise SystemExit(1) from None

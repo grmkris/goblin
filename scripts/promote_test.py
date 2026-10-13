@@ -1,35 +1,69 @@
-"""Promotion cannot rewrite production history or bypass stage acceptance."""
+"""Promotion moves prod only after every check passes, in order, and never rewrites production history."""
 import unittest
-from promote import require_fast_forward
-from wallet_release import require_wallet
+from promote import promote
+
+A, B = 'a' * 40, 'b' * 40
 
 
-class PromotionGuardTest(unittest.TestCase):
-    def test_only_fast_forward_or_retry_is_allowed(self):
-        for status in ['ahead', 'identical']:
-            require_fast_forward(status)
-        for status in ['behind', 'diverged', '', None]:
-            with self.assertRaises(RuntimeError):
-                require_fast_forward(status)
+class FakeGitHub:
+    """Records each step; a check fails by raising, as the real ones do."""
 
-    def test_wallet_receipt_is_bound_to_live_prod_worker_and_origin(self):
-        good = {
-            'sha': 'a' * 40,
-            'worker': 'goblin-wallet-prod',
-            'version': 'wallet-v1',
-            'acceptance': 'public',
-            'origin': 'https://wallet.goblin.surf',
-        }
-        require_wallet(good, 'a' * 40, 'wallet-v1')
-        for change in [
-            {'sha': 'b' * 40},
-            {'worker': 'goblin-wallet-dev'},
-            {'version': 'wallet-v0'},
-            {'acceptance': 'authenticated'},
-            {'origin': 'https://wallet-dev.goblin.surf'},
+    def __init__(self, receipt=None, live='dev-v1', status='ahead', checked=True):
+        self.calls = []
+        self.receipt = {'sha': A, 'acceptance': 'authenticated', 'version': 'dev-v1'} if receipt is None else receipt
+        self.live, self.status, self.checked = live, status, checked
+
+    def source(self, sha):
+        self.calls.append(('source', sha))
+        if not self.checked:
+            raise RuntimeError('successful_dev_check_for_exact_sha_required')
+
+    def acceptance(self, sha):
+        self.calls.append(('acceptance', sha))
+        return self.receipt
+
+    def dev_version(self):
+        self.calls.append(('dev_version',))
+        return self.live
+
+    def fast_forward(self, sha):
+        self.calls.append(('fast_forward', sha))
+        return self.status
+
+    def move_prod(self, sha):
+        self.calls.append(('move_prod', sha))
+
+
+class PromotionTest(unittest.TestCase):
+    def test_checks_dev_source_acceptance_and_fast_forward_before_moving_prod(self):
+        github = FakeGitHub()
+        promote(A, github)
+        self.assertEqual(github.calls, [('source', A), ('acceptance', A), ('dev_version',), ('fast_forward', A),
+                                        ('move_prod', A)])
+        identical = FakeGitHub(status='identical')
+        promote(A, identical)
+        self.assertEqual(identical.calls[-1], ('move_prod', A))
+
+    def test_any_failed_check_leaves_prod_where_it_is(self):
+        receipt = {'sha': A, 'acceptance': 'authenticated', 'version': 'dev-v1'}
+        for github in [
+            FakeGitHub(checked=False),
+            FakeGitHub(receipt=receipt | {'sha': B}),
+            FakeGitHub(receipt=receipt | {'acceptance': 'public'}),
+            FakeGitHub(live='dev-v2'),
+            FakeGitHub(status='behind'),
+            FakeGitHub(status='diverged'),
         ]:
             with self.assertRaises(RuntimeError):
-                require_wallet(good | change, 'a' * 40, 'wallet-v1')
+                promote(A, github)
+            self.assertNotIn('move_prod', [call[0] for call in github.calls])
+
+    def test_only_a_full_sha_is_promoted(self):
+        for sha in [A[:12], 'dev', A.upper(), '']:
+            github = FakeGitHub()
+            with self.assertRaisesRegex(RuntimeError, 'full_commit_sha_required'):
+                promote(sha, github)
+            self.assertEqual(github.calls, [])
 
 
 if __name__ == '__main__':
