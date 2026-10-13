@@ -129,7 +129,8 @@ bun run check      # the full gate (run it through `heavy` on the build box)
 - [Memory benchmarks](bench/README.md): real Claude/Hermes recall campaigns, persistent checkpoints, shared CLIProxy budgets and blinded review.
 - [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
 
-The deployment stages are `dev` at `dev.goblin.surf` and `prod` at `goblin.surf`, with separate auth databases,
+A visitor who is signed out meets goblin's landing page at `/`, which links to Goblin Wallet's own; a signed-in owner
+goes straight to their chat. The deployment stages are `dev` at `dev.goblin.surf` and `prod` at `goblin.surf`, with separate auth databases,
 secrets and dedicated LiteLLM keys. The first production release is invite-only; owner OTP bootstrap is an explicit operator step. Alchemy can attach the custom domains; a passing push to private `dev` deploys and verifies dev automatically. The Promote action advances private `prod` to the accepted SHA, deploys and verifies core Goblin and Wallet production, then publishes sanitized source to `goblin-public/main`.
 Publication can be retried independently of deployment. Alternate hosts redirect to the configured canonical origin. Dev sign-up stays closed or invite-only; prod
 supports open sign-up after sender verification. Email OTP is the sole login method, and every stage requires mail. Both stages use `hello@goblin.surf` after sender onboarding,
@@ -148,7 +149,8 @@ to pay, at prices each stage sets (`GOBLIN_PLAN_CATALOG`):
   access through the paid period. A day-pass owner can move to monthly.
 
 An account without Pro still signs in, connects its wallet and chooses Pro in Start. The card checkout (Dodo) is off unless a stage turns it on. Draft terms, privacy and refund
-pages await operator review before live payments. The subscription has not run against Base mainnet yet.
+pages await operator review before live payments. The subscription runs on Base mainnet: production took a real $1
+day pass on 13 October 2026.
 
 Several connections to one MCP server are normal: each is the owner's account there, with its own label, sign-in,
 grants and webhook (ADR 0041). A routine fires once, on a schedule or when a connection sends an event; it lives in a
