@@ -221,6 +221,12 @@ def tail(text, count=40):
     return "\n".join(text.splitlines()[-count:])
 
 
+def failure_reason(text):
+    # A failed smoke writes its machine reason near the top of its JSON, which the 40-line tail cuts off.
+    match = re.search(r'^\s*"reason":\s*"([^"\n]{1,300})"', text, re.MULTILINE)
+    return match.group(1) if match else None
+
+
 def execute(command, env, log):
     log.touch(mode=0o600)
     with log.open("w") as handle:
@@ -228,7 +234,9 @@ def execute(command, env, log):
                                 stdout=handle, stderr=subprocess.STDOUT)
     if result.returncode:
         # CI masks every stage secret of eight or more characters before this prints (scripts/ci_credentials.py).
-        print(f"--- last 40 lines of {log.name} ---\n{tail(log.read_text())}\n---", flush=True)
+        text = log.read_text()
+        reason = failure_reason(text)
+        print(f"--- last 40 lines of {log.name} ---\n{tail(text)}\n---" + (f"\nreason: {reason}" if reason else ""), flush=True)
         raise RuntimeError("release_step_failed: " + log.name)
     return log.read_text()
 

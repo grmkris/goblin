@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from release import (acceptance_run, directories, pick_database, prod_push, require_check,
                      require_clean_checkout, require_dev, require_existing, require_fast_forward, require_ref,
-                     require_signup, resources, safe_plan, tail)
+                     require_signup, resources, safe_plan, tail, failure_reason)
 
 A, B = "a" * 40, "b" * 40
 
@@ -101,6 +101,11 @@ class ReleaseTest(unittest.TestCase):
             self.assertEqual((receipts, logs), (Path(temporary) / "r", Path(temporary) / "l"))
             self.assertEqual(receipts.stat().st_mode & 0o777, 0o700)
         self.assertEqual(tail("\n".join(str(n) for n in range(100))).splitlines(), [str(n) for n in range(60, 100)])
+
+    def test_failure_reason_is_the_smoke_receipts_reason(self):
+        self.assertEqual(failure_reason('{\n  "status": "failed",\n  "reason": "client_build_mismatch",\n  "steps": []\n}'),
+                         "client_build_mismatch")
+        self.assertIsNone(failure_reason("plain deploy output\nno json here"))
 
     def test_only_the_first_prod_release_must_be_invite_only(self):
         require_signup({"GOBLIN_SIGNUP_MODE": "invite"}, False)
