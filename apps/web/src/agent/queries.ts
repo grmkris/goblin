@@ -108,6 +108,9 @@ export const channelChatsQuery = (connectionId: string | undefined) =>
           }).queryFn,
   })
 
+/** Every read of the Telegram channel's chats, whichever connection carries it: what a route changed elsewhere stales. */
+export const channelChatsKey = agentKeys.chats
+
 /** The chats list with one row as the agent answered it. */
 const withChat = (list: TelegramChats, chat: TelegramChat): TelegramChats => ({
   ...list,
