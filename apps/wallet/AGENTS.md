@@ -33,9 +33,11 @@ deployed by `bun run deploy:wallet-dev` (`scripts/wallet-stage.ts`), never by `s
 - Merchant subscriptions (ADR 0054) live in the `WalletAuth` singleton beside OAuth (`merchant/store.ts`, served at
   `POST /subscriptions`), not in an owner's ledger: a request exists before its owner. `/api/merchant/*` answers only
   goblin's bearer key and never reaches the owner API; a period is collected at most once, and the collector reads the
-  chain before it signs anything. A paid period answers its payment whenever it is collected again. A day pass
-  (`billing: 'day'`) has one-day periods that start at the UTC midnight of the day it was prepared, so period n is UTC
-  day n for both the chain and goblin; `merchant_subscriptions.billing` came later and is added by a guarded `ALTER`.
+  chain before it signs anything. A paid period answers its payment whenever it is collected again. The owner's
+  Activity lists each collected payment from `GET /api/subscription-payments`, beside the ledger's operations and never
+  among them: a collection never counts against the agent's limits. A day pass (`billing: 'day'`) has one-day periods
+  that start at the UTC midnight of the day it was prepared, so period n is UTC day n for both the chain and goblin;
+  `merchant_subscriptions.billing` came later and is added by a guarded `ALTER`.
 - Lint limits: 80 lines per function, cognitive complexity 15, 5 parameters, a `// SAFETY:` on every assertion, one
   MCP tool per file.
 - Only `src/runtime.ts` (when it exists) calls `Effect.runPromise`.
