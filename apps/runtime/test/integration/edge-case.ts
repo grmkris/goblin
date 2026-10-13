@@ -1,7 +1,6 @@
 import * as Schema from 'effect/Schema'
 import { request as httpRequest } from 'node:http'
 import { expect } from 'vitest'
-import { hookToken } from '../../src/channel/doorbell.ts'
 import { eventsHookToken } from '../../src/mcp/events/route-token.ts'
 import { callOwner } from '../owner-client.ts'
 import { call, grantPlan, ownerFetch, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
@@ -131,15 +130,15 @@ const rawGet = (base: string, path: string, headers: Record<string, string>) =>
     sent.end()
   })
 
-/** A hook as its sender posts it to the real Worker: myagent's doorbell or an MCP Events webhook. */
+/** A hook as its sender posts it to the real Worker: an MCP Events webhook. */
 const hook = (url: string, path: string, headers: Record<string, string>, body: string) =>
   ownerFetch(`${url}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body })
 
 /**
  * The agent's internal API from outside the Worker (`/internal/*`): nobody reaches it, signed in or not, whatever the
- * path says on the way. The Worker's own callers still do: a doorbell with its user's route token reaches the agent,
- * which refuses it without a plan (402) and checks myagent's signature with one (403, no channel here); an Events
- * webhook reaches ingress, which ends the subscription once resident authority is off (410).
+ * path says on the way. The Worker's own callers still do: an Events webhook with its route token reaches the agent,
+ * which refuses it without a plan (402), and with one reaches ingress, which ends the subscription once resident
+ * authority is off (410).
  */
 export async function internalRefusalCase(url: string): Promise<void> {
   const outside = await ownerFetch(`${url}/internal/recent?limit=5`, { headers: { 'cf-ray': 'ray-internal' } })
@@ -148,20 +147,17 @@ export async function internalRefusalCase(url: string): Promise<void> {
   const session = { cookie: owner.cookie, 'cf-connecting-ip': owner.ip }
   for (const path of ['/api/%2e%2e/internal/recent?limit=5', '/api/%2E%2E/internal/inspect', '/api/../internal/recent'])
     expect(await rawGet(url, path, session)).toMatchObject({ status: 404, body: expect.stringContaining('not_found') })
-  const doorbell = `/hooks/myagent/${owner.userId}/${await hookToken(CREDENTIAL_KEY, owner.userId)}`
-  const ring = () =>
-    hook(url, doorbell, { 'x-myagent-timestamp': String(Date.now()), 'x-myagent-signature': 'x' }, '{"cursor":"0"}')
-  expect(await refusalOf(await ring())).toMatchObject({ status: 402, code: 'subscription_required' })
+  const deliver = async () =>
+    hook(
+      url,
+      `/hooks/mcp-events/${owner.userId}/fixture/${await eventsHookToken(CREDENTIAL_KEY, owner.userId, 'fixture')}`,
+      { 'x-mcp-subscription-id': 'remote-1', 'webhook-id': 'msg_1', 'webhook-timestamp': '0', 'webhook-signature': '' },
+      '{}',
+    )
+  expect(await refusalOf(await deliver())).toMatchObject({ status: 402, code: 'subscription_required' })
   await grantPlan(url, owner)
-  expect(await refusalOf(await ring())).toMatchObject({ status: 403, code: 'forbidden', quoted: true })
   await callOwner(signedIn(url, owner), (api) => api.resident.set({ payload: { enabled: false } }))
-  const webhook = await hook(
-    url,
-    `/hooks/mcp-events/${owner.userId}/fixture/${await eventsHookToken(CREDENTIAL_KEY, owner.userId, 'fixture')}`,
-    { 'x-mcp-subscription-id': 'remote-1', 'webhook-id': 'msg_1', 'webhook-timestamp': '0', 'webhook-signature': '' },
-    '{}',
-  )
-  expect(webhook.status).toBe(410)
+  expect((await deliver()).status).toBe(410)
 }
 
 /** The text of the server-sent events on `response` so far: `until` reads on until `seen` holds or `ms` pass. */

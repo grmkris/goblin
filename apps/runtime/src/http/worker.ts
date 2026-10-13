@@ -4,15 +4,14 @@ import { handleAuth, resourceMetadata, requireUserSession } from '../auth/index.
 import { mailerOf } from '../auth/mail.ts'
 import { signupMode } from '../auth/signup.ts'
 import { readBytes } from './body.ts'
-import { InvalidInput, NotFound, attempt } from './errors.ts'
+import { NotFound, attempt } from './errors.ts'
 import { accountRecords } from './api/account.ts'
 import { type Edge, type EdgeHttp, isAccountPath, makeEdgeHttp, runAtEdge } from './api/edge.ts'
 import { secured } from './api/render.ts'
-import { deliverEvents, internalCall } from '../inbound/client.ts'
+import { deliverEvents } from '../inbound/client.ts'
 import { handleInboundMcp } from '../inbound/route.ts'
 import { eventsHookTokenValid } from '../mcp/events/route-token.ts'
 import { EVENT_BODY_BYTES } from '../mcp/events/webhook.ts'
-import { hookTokenValid } from '../channel/doorbell.ts'
 import { canonicalRedirect } from './canonical.ts'
 import { billingDeps, walletBillingDeps } from '../billing/routes.ts'
 import { billingWebhook } from '../billing/webhook.ts'
@@ -38,29 +37,6 @@ const edgeOf = (env: RuntimeEnv): Edge => ({
 /** The edge, built once per isolate on its first request. */
 let edgeHttp: Promise<EdgeHttp> | undefined
 const edge = (): Promise<EdgeHttp> => (edgeHttp ??= runAtEdge(makeEdgeHttp))
-
-/** The largest doorbell body accepted (myagent sends `{ botId, cursor }`). */
-const DOORBELL_BYTES = 1024
-
-/**
- * POST /hooks/myagent/<userId>/<token>: a doorbell from myagent (channel/doorbell.ts). The token is checked here,
- * before any agent wakes; only the user it was made for reaches their agent, which checks its plan and myagent's
- * signature.
- */
-async function doorbellRoute(request: Request, env: RuntimeEnv, path: string, ref: string): Promise<Response> {
-  const [, userId = '', token = ''] = /^\/hooks\/myagent\/([\w-]{1,200})\/([\w-]{43})$/u.exec(path) ?? []
-  if (request.method !== 'POST' || userId === '' || !(await hookTokenValid(env.CREDENTIAL_KEY, userId, token)))
-    throw new NotFound({ what: 'route' })
-  const body = await request.text()
-  if (body.length > DOORBELL_BYTES) throw new InvalidInput({ reason: 'doorbell too large' })
-  const doorbell = {
-    body,
-    timestamp: request.headers.get('x-myagent-timestamp') ?? '',
-    signature: request.headers.get('x-myagent-signature') ?? '',
-  }
-  await runAtEdge(internalCall(agentOf(env, userId), (api) => api.inbound.doorbell({ payload: doorbell }), ref))
-  return new Response(null, { status: 204 })
-}
 
 /**
  * POST /hooks/mcp-events/<userId>/<connectionId>/<token>: one connection's MCP Events webhook. The route token, bound
@@ -102,7 +78,6 @@ async function workerRoute(
   if (path === '/mcp') return handleInboundMcp(request, env)
   if (path === '/hooks/dodo') return runAtEdge(billingWebhook(billingDeps(env), request, ctx))
   if (path.startsWith('/hooks/mcp-events/')) return mcpEventsRoute(request, env, path, ref)
-  if (path.startsWith('/hooks/')) return doorbellRoute(request, env, path, ref)
   // goblin's own model endpoint, paid per call over MPP (ADR 0047), where the stage sells it. It is loaded on its first
   // call: mppx and viem would otherwise be evaluated at every isolate's startup, which has a CPU limit.
   if (path === '/v1/chat/completions') {

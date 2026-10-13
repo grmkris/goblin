@@ -6,10 +6,8 @@ import { routeRow, seeChat } from '../src/channel/routes.ts'
 import { enableEvents, pendingReplies } from '../src/channel/store.ts'
 import { type ChannelCall, TelegramRefused } from '../src/channel/tools.ts'
 import { registerPrimary } from '../src/chats/directory.ts'
-import { CredentialCipher } from '../src/mcp/cipher.ts'
 import { chatDatabase, durable } from './chats-sqlite.ts'
 
-const KEY = 'cHVycmFibGUtdGVzdC1rZXktMzItYnl0ZXMtbG9uZyE='
 const GROUP = 'g_trip0000000000000'
 
 const closes: (() => void)[] = []
@@ -29,8 +27,7 @@ const fixture = (answers: ReadonlyMap<string, Answer> = new Map(), refuse?: stri
     closes.push(close)
     registerPrimary(db, 1)
     const sqlite = durable(db)
-    const cipher = yield* Effect.promise(() => CredentialCipher.fromBase64(KEY))
-    const channel = yield* telegramChannel({ db: sqlite, cipher, telemetry: undefined, wake: () => undefined })
+    const channel = yield* telegramChannel({ db: sqlite, telemetry: undefined, wake: () => undefined })
     enableEvents(sqlite, 'mygram', 'c0', 1, { reach: 'all' })
     const inbox: Entry[] = []
     const calls: { readonly tool: string; readonly args: Record<string, unknown> }[] = []
@@ -76,7 +73,10 @@ describe('routing Telegram chats to Topics', () => {
     Effect.gen(function* () {
       const { calls, turns, pull } = yield* fixture()
       yield* pull(message('m1'), message('m2', { chat: 'dm', threadId: null, sender: null, trigger: null }))
-      expect(calls[0]).toEqual({ tool: 'inbox', args: { chat: 'all', cursor: 'c0', limit: 100 } })
+      expect(calls.slice(0, 2)).toEqual([
+        { tool: 'chats', args: {} },
+        { tool: 'inbox', args: { chat: 'all', cursor: 'c0', limit: 100 } },
+      ])
       expect(turns.map(({ turn }) => [turn.topic, turn.operationId, turn.author])).toEqual([
         [1, 'telegram-m1', 'Telegram'],
         [1, 'telegram-m2', 'Telegram'],

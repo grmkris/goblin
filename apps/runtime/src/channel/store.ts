@@ -1,73 +1,57 @@
-// The Telegram channel's rows: the connection that carries it (its Events or the doorbell), the inbox cursor, the sealed
-// doorbell secret, and the turns whose answers are still to send. Plain functions over the agent's SQLite.
+// The Telegram channel's rows: the connection whose Events carry it, the inbox cursor, how far its grant reaches and
+// what goblin does with new chats, and the turns whose answers are still to send. Plain functions over the agent's
+// SQLite.
 import type { ChannelStatus, NewChatsDefault, TelegramReach } from '@goblin/contracts'
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
-import { appChannel, appChannelReplies, appTelegramChannel } from '../storage/schema.ts'
+import { appChannelReplies, appTelegramChannel } from '../storage/schema.ts'
 import { dropHeld } from './routes.ts'
 
 type Db = DrizzleSqliteDODatabase
 
-/** The channel while it is on: the connection that carries it and how. */
+/** The channel while it is on: the connection that carries it and how far its grant reaches. */
 export type ChannelOn = NonNullable<ChannelStatus>
 
 /** The connection that carries the channel, or null when it is off. */
 export function channelStatus(db: Db): ChannelStatus {
-  const events = db.select().from(appTelegramChannel).get()
-  if (events !== undefined)
-    return {
-      connectionId: events.connectionId,
-      enabledAt: events.enabledAt,
-      transport: 'events',
-      reach: events.reach,
-      ...(events.widenUrl === null ? {} : { widenUrl: events.widenUrl }),
-      newChats: events.newChats,
-    }
-  const row = db
-    .select({ connectionId: appChannel.connectionId, enabledAt: appChannel.enabledAt })
-    .from(appChannel)
-    .get()
-  return row === undefined ? null : { ...row, transport: 'doorbell' }
+  const row = db.select().from(appTelegramChannel).get()
+  if (row === undefined) return null
+  return {
+    connectionId: row.connectionId,
+    enabledAt: row.enabledAt,
+    transport: 'events',
+    reach: row.reach,
+    ...(row.widenUrl === null ? {} : { widenUrl: row.widenUrl }),
+    newChats: row.newChats,
+    ...(row.ended ? { ended: true } : {}),
+  }
 }
 
-/** Whether `status` still carries the channel. */
-export function carries(db: Db, status: ChannelOn): boolean {
-  const current = channelStatus(db)
-  return current?.connectionId === status.connectionId && current?.transport === status.transport
-}
+/** Whether `status`'s connection still carries the channel. */
+export const carries = (db: Db, status: ChannelOn): boolean => channelStatus(db)?.connectionId === status.connectionId
 
-/** The inbox cursor stored for either transport, the Events one first; the inbox's start when there is none. */
-export const storedCursor = (db: Db): string =>
-  db.select().from(appTelegramChannel).get()?.inboxCursor ?? db.select().from(appChannel).get()?.cursor ?? ''
+/** The stored inbox cursor; the inbox's start when there is none. */
+export const storedCursor = (db: Db): string => db.select().from(appTelegramChannel).get()?.inboxCursor ?? ''
 
-/** The inbox cursor `transport` keeps, while it carries the channel. */
-export const inboxCursor = (db: Db, transport: ChannelOn['transport']): string | undefined =>
-  transport === 'events'
-    ? db.select().from(appTelegramChannel).get()?.inboxCursor
-    : db.select().from(appChannel).get()?.cursor
+/** The inbox cursor, while the channel is on. */
+export const inboxCursor = (db: Db): string | undefined => db.select().from(appTelegramChannel).get()?.inboxCursor
 
-/** Moves `status`'s inbox cursor to `cursor`, while the same connection still carries the channel. */
+/** Moves the inbox cursor to `cursor`, while `status`'s connection still carries the channel. */
 export function checkpoint(db: Db, status: ChannelOn, cursor: string): void {
-  if (status.transport === 'events')
-    db.update(appTelegramChannel)
-      .set({ inboxCursor: cursor })
-      .where(eq(appTelegramChannel.connectionId, status.connectionId))
-      .run()
-  else if (channelStatus(db)?.transport === 'doorbell')
-    db.update(appChannel).set({ cursor }).where(eq(appChannel.connectionId, status.connectionId)).run()
+  db.update(appTelegramChannel)
+    .set({ inboxCursor: cursor })
+    .where(eq(appTelegramChannel.connectionId, status.connectionId))
+    .run()
 }
+
+/** How far a grant reaches: every chat, or the DM alone with the URL that widens it. */
+export type Reach = { readonly reach: TelegramReach; readonly widenUrl?: string }
 
 /**
- * `connectionId`'s Events carry the channel from `cursor`, with the grant reaching `reach` (the DM only, with the URL
- * that widens it); this row fences every older cursor writer. What goblin does with new chats stays as the owner set it.
+ * `connectionId`'s Events carry the channel from `cursor`, with the grant reaching `reach`; this row fences every older
+ * cursor writer, and the chat list is read again at the next pull. What goblin does with new chats stays as it was.
  */
-export function enableEvents(
-  db: Db,
-  connectionId: string,
-  cursor: string,
-  now: number,
-  reach: { readonly reach: TelegramReach; readonly widenUrl?: string } = { reach: 'dm' },
-): ChannelStatus {
+export function enableEvents(db: Db, connectionId: string, cursor: string, now: number, reach: Reach): ChannelStatus {
   const row = {
     id: 1,
     connectionId,
@@ -75,46 +59,62 @@ export function enableEvents(
     enabledAt: now,
     reach: reach.reach,
     widenUrl: reach.widenUrl ?? null,
+    syncDue: true,
+    ended: false,
   }
   db.insert(appTelegramChannel).values(row).onConflictDoUpdate({ target: appTelegramChannel.id, set: row }).run()
   return channelStatus(db)
 }
 
-/** What goblin does with a chat it has not seen, while the channel is on; whether it is on. */
-export function setNewChats(db: Db, newChats: NewChatsDefault): boolean {
-  if (db.select().from(appTelegramChannel).get() === undefined) return false
-  db.update(appTelegramChannel).set({ newChats }).run()
-  return true
+/** How far the grant reaches now (a widened grant reaches every chat); its Events run again. */
+export function setReach(db: Db, reach: Reach): void {
+  db.update(appTelegramChannel)
+    .set({ reach: reach.reach, widenUrl: reach.widenUrl ?? null, ended: false })
+    .run()
 }
 
-/** `connectionId`'s doorbell carries the channel from `cursor`, signed with the `secret` sealed under the credential key. */
-export function enableDoorbell(
+/** The server ended the channel's Events and goblin could not subscribe again. */
+export function markEnded(db: Db): void {
+  db.update(appTelegramChannel).set({ ended: true }).run()
+}
+
+/**
+ * What goblin does with a chat it has not seen, while the channel is on: its settings revision moves on. The setting
+ * before and after; none while the channel is off.
+ */
+export function setNewChats(
   db: Db,
-  input: {
-    readonly connectionId: string
-    readonly cursor: string
-    readonly secret: string
-    readonly enabledAt: number
-  },
-): ChannelStatus {
-  const row = { id: 1, ...input }
-  db.insert(appChannel).values(row).onConflictDoUpdate({ target: appChannel.id, set: row }).run()
-  db.delete(appTelegramChannel).run()
-  return channelStatus(db)
+  newChats: NewChatsDefault,
+): { readonly before: NewChatsDefault; readonly revision: number } | undefined {
+  return db.transaction(() => {
+    const row = db.select().from(appTelegramChannel).get()
+    if (row === undefined) return undefined
+    db.update(appTelegramChannel)
+      .set({ newChats, settingsRevision: sql`${appTelegramChannel.settingsRevision} + 1` })
+      .run()
+    return { before: row.newChats, revision: row.settingsRevision + 1 }
+  })
+}
+
+/** The server's chat list is to be read again (a chat changed) at the next pull. */
+export function markSyncDue(db: Db): void {
+  db.update(appTelegramChannel).set({ syncDue: true }).run()
+}
+
+/** Whether the chat list is to be read again; read, it is not. */
+export function takeSyncDue(db: Db): boolean {
+  return db.transaction(() => {
+    const due = db.select({ syncDue: appTelegramChannel.syncDue }).from(appTelegramChannel).get()?.syncDue === true
+    if (due) db.update(appTelegramChannel).set({ syncDue: false }).run()
+    return due
+  })
 }
 
 /** Turns the channel off; answers still to send and held messages are dropped, the routes stay. */
 export function disableChannel(db: Db): void {
   db.delete(appTelegramChannel).run()
-  db.delete(appChannel).run()
   db.delete(appChannelReplies).run()
   dropHeld(db)
-}
-
-/** The doorbell secret, sealed, while the doorbell carries the channel. */
-export function sealedSecret(db: Db): string | undefined {
-  if (channelStatus(db)?.transport === 'events') return undefined
-  return db.select({ secret: appChannel.secret }).from(appChannel).get()?.secret
 }
 
 /**

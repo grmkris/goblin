@@ -249,7 +249,7 @@ export const McpHostLive: Layer.Layer<
 
 /**
  * What the Telegram and skills consumers reach, read when an event arrives: the channel and skills services of the
- * start (steps 10 and 11, before Events), and the agent's Telegram pull, scheduled as a doorbell schedules it.
+ * start (steps 10 and 11, before Events), and the agent's Telegram pull, scheduled at once.
  */
 const consumerPorts = (
   { schedulePull }: AgentInputs,
@@ -257,6 +257,7 @@ const consumerPorts = (
 ): EventConsumerPorts => ({
   channel: Channel.use((channel) => channel.status).pipe(Effect.provideContext(context)),
   pull: Effect.asVoid(attempt(schedulePull)),
+  chatsChanged: Channel.use((channel) => channel.chatsChanged).pipe(Effect.provideContext(context)),
   skills: {
     enabled: (connectionId) =>
       Skills.use((skills) => skills.enabled(connectionId)).pipe(Effect.provideContext(context)),

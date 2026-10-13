@@ -43,7 +43,6 @@ const recording = () => {
     group
       .handle('ask', ({ payload }) => mark('ask', { status: 'running' as const, operationId: payload.operationId }))
       .handle('recent', () => mark('recent', []))
-      .handle('doorbell', () => mark('doorbell', undefined))
       .handle('mcpEvents', () => mark('mcpEvents', { status: 204 as const }))
       .handle('inspect', () => mark('inspect', { conversations: [] }))
       .handle('billingNotice', () => mark('billingNotice', undefined)),
@@ -85,11 +84,7 @@ describe('the internal API served by the agent', () => {
   it('answers SubscriptionRequired without a plan on every endpoint but inspection', async () => {
     const { ran, handlers } = recording()
     const { fetch } = serve(servedInternal(handlers).pipe(Layer.provide(plans(false))))
-    for (const request of [
-      internal('/ask', ASK, { 'x-goblin-ref': 'ray-402' }),
-      internal('/recent?limit=5'),
-      internal('/doorbell', { body: '{}', timestamp: '0', signature: '' }),
-    ]) {
+    for (const request of [internal('/ask', ASK, { 'x-goblin-ref': 'ray-402' }), internal('/recent?limit=5')]) {
       const response = await fetch(request)
       expect(response.status).toBe(402)
       expect(await response.json()).toMatchObject({ error: { code: 'subscription_required' } })

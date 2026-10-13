@@ -68,9 +68,6 @@ const RecentQuery = {
   limit: Schema.NumberFromString.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 50 })),
 }
 
-/** A doorbell as myagent sent it: its body and the two headers that sign it. */
-const Doorbell = Schema.Struct({ body: Schema.String, timestamp: Schema.String, signature: Schema.String })
-
 /** The connection whose Events webhook a delivery came to (its id, as the hook's path names it). */
 const ConnectionParam = Schema.String.check(Schema.isPattern(/^[\w-]{1,64}$/u))
 
@@ -107,7 +104,6 @@ export type BillingNotice = typeof BillingNotice.Type
  *
  * - `ask`: `POST /internal/ask`, an inbound MCP client's question (needs current resident authority, never renews it).
  * - `recent`: `GET /internal/recent?limit=`, the newest messages of main.
- * - `doorbell`: `POST /internal/doorbell`, myagent's doorbell (channel/doorbell.ts), checked against its signature.
  * - `mcpEvents`: `POST /internal/mcp-events/:connectionId`, one connection's MCP Events webhook: its bytes and the
  *   headers that sign it.
  * - `inspect`: `POST /internal/inspect` with `{ query }`, /mcp's read-only inspection (ADR 0024). It answers the result
@@ -122,11 +118,6 @@ export class InboundGroup extends HttpApiGroup.make('inbound').add(
     error: [ApiErrors.conflict, ApiErrors.budgetExhausted],
   }),
   HttpApiEndpoint.get('recent', '/recent', { query: RecentQuery, success: Schema.Array(TranscriptMessage) }),
-  HttpApiEndpoint.post('doorbell', '/doorbell', {
-    payload: Doorbell,
-    success: HttpApiSchema.NoContent,
-    error: [ApiErrors.forbidden],
-  }),
   HttpApiEndpoint.post('mcpEvents', '/mcp-events/:connectionId', {
     params: { connectionId: ConnectionParam },
     headers: WebhookHeaders,

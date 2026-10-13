@@ -6,7 +6,6 @@ import { creditRates } from '../budget-credits.ts'
 import { telegramChannel } from '../channel/channel.ts'
 import { Channel } from '../channel/service.ts'
 import { attempt, attemptSync } from '../http/errors.ts'
-import { Cipher } from '../mcp/cipher.ts'
 import { type RoutineControlServices, makeRoutineControl } from '../routines/control.ts'
 import type { RoutineRunStore } from '../routines/runs.ts'
 import { RoutineRunStore as RunStore } from '../routines/runs.ts'
@@ -124,21 +123,13 @@ export const RoutineRunsLive: Layer.Layer<RoutineRuns | RoutineUsage, never, Age
   }),
 )
 
-/**
- * Start step 11: the Telegram channel, the one instance, over the agent's database and the credential cipher, with its
- * pull's own semaphore.
- */
-export const ChannelLive: Layer.Layer<Channel, never, AgentInput | Db | Cipher> = Layer.effect(
+/** Start step 11: the Telegram channel, the one instance, over the agent's database, with its pull's own semaphore. */
+export const ChannelLive: Layer.Layer<Channel, never, AgentInput | Db> = Layer.effect(
   Channel,
   Effect.gen(function* () {
     const { scheduleReplies, telemetry } = yield* AgentInput
     const db = yield* Db
-    return yield* telegramChannel({
-      db,
-      cipher: yield* Cipher,
-      telemetry,
-      wake: scheduleReplies,
-    })
+    return yield* telegramChannel({ db, telemetry, wake: scheduleReplies })
   }),
 )
 

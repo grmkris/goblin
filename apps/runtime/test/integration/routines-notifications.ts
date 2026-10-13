@@ -3,7 +3,6 @@ import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import { drizzle } from 'drizzle-orm/durable-sqlite'
 import { eq } from 'drizzle-orm'
-import { CredentialCipher } from '../../src/mcp/cipher.ts'
 import { mcpHost } from '../../src/mcp/host.ts'
 import { deliverNoticeCopies } from '../../src/notices/telegram.ts'
 import { Notices } from '../../src/notices/service.ts'
@@ -29,7 +28,6 @@ import { runApplicationMigrations } from '../../src/storage/migrations.ts'
 import { lowLevelServer } from '../mcp/low-level-server.ts'
 import { type Probes, inAgent } from './probe.ts'
 
-const KEY = 'Z29ibGluLXRlc3QtZml4dHVyZS1rZXkhISEhISEhISE='
 const fixturePlan = () =>
   Effect.succeed({
     active: true,
@@ -87,13 +85,8 @@ async function setupNotifications(storage: DurableObjectStorage) {
   const notices = new NoticeStore(db)
   const resident = new ResidentAuthority(db)
   resident.enable(Math.floor(Date.now() / 1000))
-  const channel = telegramChannel({
-    db,
-    cipher: await CredentialCipher.fromBase64(KEY),
-    telemetry: undefined,
-    wake: () => undefined,
-  })
-  enableEvents(db, 'mygram', '', Math.floor(Date.now() / 1000))
+  const channel = telegramChannel({ db, telemetry: undefined, wake: () => undefined })
+  enableEvents(db, 'mygram', '', Math.floor(Date.now() / 1000), { reach: 'dm' })
   const credentials = new MemoryCredentials()
   await credentials.saveTokens('mygram', { access_token: 'keyless-fixture', token_type: 'bearer' }, 1)
   const attempts: Record<string, unknown>[] = []

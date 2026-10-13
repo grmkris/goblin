@@ -6,10 +6,7 @@ import type { ChannelCall } from '../src/channel/tools.ts'
 import { enableEvents, trackReply } from '../src/channel/store.ts'
 import { registerPrimary } from '../src/chats/directory.ts'
 import { UpstreamMcp } from '../src/http/errors.ts'
-import { CredentialCipher } from '../src/mcp/cipher.ts'
 import { chatDatabase, durable } from './chats-sqlite.ts'
-
-const KEY = 'cHVycmFibGUtdGVzdC1rZXktMzItYnl0ZXMtbG9uZyE='
 
 const closes: (() => void)[] = []
 afterEach(() => {
@@ -22,15 +19,13 @@ const fixture = (sends: ChannelCall) =>
     const { db, close } = chatDatabase()
     closes.push(close)
     registerPrimary(db, 1)
-    const cipher = yield* Effect.promise(() => CredentialCipher.fromBase64(KEY))
     const sqlite = durable(db)
     const channel = yield* telegramChannel({
       db: sqlite,
-      cipher,
       telemetry: undefined,
       wake: () => undefined,
     })
-    enableEvents(sqlite, 'mygram', '', 1)
+    enableEvents(sqlite, 'mygram', '', 1, { reach: 'dm' })
     trackReply(sqlite, 'telegram-m1', 1)
     const ports: ChannelPorts = {
       call: sends,

@@ -23,7 +23,9 @@ export type MemoryStatus = typeof MemoryStatus.Type
 /**
  * The Telegram channel: the connection that carries it, or null when it is off. `reach` is how far its grant sees (the
  * DM only, or all the bot's chats); with `dm`, `widenUrl` is where the owner lets goblin see their groups. `newChats`
- * is what goblin does with a chat it has not seen before (ADR 0055).
+ * is what goblin does with a chat it has not seen before (ADR 0055). `ended` is true when the server ended the
+ * channel's Events (a revoked or changed grant) and goblin could not subscribe again: the owner turns Telegram off and
+ * on, or reconnects the server.
  */
 export const ChannelStatus = Schema.NullOr(
   Schema.Struct({
@@ -33,6 +35,7 @@ export const ChannelStatus = Schema.NullOr(
     reach: Schema.optional(TelegramReach),
     widenUrl: Schema.optional(Schema.String),
     newChats: Schema.optional(NewChatsDefault),
+    ended: Schema.optional(Schema.Boolean),
   }),
 )
 export type ChannelStatus = typeof ChannelStatus.Type

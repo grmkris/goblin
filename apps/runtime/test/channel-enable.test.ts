@@ -5,10 +5,7 @@ import { telegramChannel } from '../src/channel/channel.ts'
 import type { ChannelCall } from '../src/channel/tools.ts'
 import { registerPrimary } from '../src/chats/directory.ts'
 import { UpstreamMcp } from '../src/http/errors.ts'
-import { CredentialCipher } from '../src/mcp/cipher.ts'
 import { chatDatabase, durable } from './chats-sqlite.ts'
-
-const KEY = 'cHVycmFibGUtdGVzdC1rZXktMzItYnl0ZXMtbG9uZyE='
 
 /** A channel server that cannot be reached. */
 const unreachable: ChannelCall = () => Effect.fail(new UpstreamMcp({ connectionId: 'mygram', reason: 'transport' }))
@@ -18,26 +15,20 @@ afterEach(() => {
   for (const close of closes.splice(0)) close()
 })
 
-/** A real channel on SQLite, and the channel server's tools answering from `pages` (one inbox page per call). */
-const fixture = (pages: number, subscribe: unknown = { status: 'subscribed' }) =>
+/** A real channel on SQLite, and the channel server's inbox answering from `pages` (one inbox page per call). */
+const fixture = (pages: number) =>
   Effect.gen(function* () {
     const { db, close } = chatDatabase()
     closes.push(close)
     registerPrimary(db, 1)
-    const cipher = yield* Effect.promise(() => CredentialCipher.fromBase64(KEY))
-    const channel = yield* telegramChannel({
-      db: durable(db),
-      cipher,
-      telemetry: undefined,
-      wake: () => undefined,
-    })
+    const channel = yield* telegramChannel({ db: durable(db), telemetry: undefined, wake: () => undefined })
     const calls: string[] = []
     const call: ChannelCall = (name, args) =>
       Effect.sync(() => {
         const cursor = args['cursor']
-        calls.push(`${name}:${typeof cursor === 'string' ? cursor : ''}`)
-        if (name === 'subscribe') return subscribe
-        const page = calls.filter((each) => each.startsWith('inbox')).length
+        const chat = args['chat']
+        calls.push(`${name}:${typeof cursor === 'string' ? cursor : ''}:${typeof chat === 'string' ? chat : ''}`)
+        const page = calls.length
         const messages = page <= pages ? [{ id: `m${page}`, text: 'old', direction: 'in' }] : []
         return { messages, nextCursor: `c${page}` }
       })
@@ -45,24 +36,22 @@ const fixture = (pages: number, subscribe: unknown = { status: 'subscribed' }) =
   })
 
 describe('turning the Telegram channel on', () => {
-  it.effect('reads an inbox to its end, so its history is not taken for new messages, and keeps the doorbell', () =>
+  it.effect('reads every chat to the end of its inbox, so its history is not taken for new messages', () =>
     Effect.gen(function* () {
       const { channel, call, calls } = yield* fixture(2)
-      const status = yield* channel.enable('mygram', 'https://goblin.test/hooks/x', call, 100)
-      expect(status).toEqual({ connectionId: 'mygram', enabledAt: 100, transport: 'doorbell' })
-      expect(calls).toEqual(['inbox:', 'inbox:c1', 'inbox:c2', 'subscribe:'])
-      expect(yield* channel.secret).toMatch(/^[A-Za-z0-9+/]{43}=$/u)
+      const cursor = yield* channel.startCursor('mygram', call, { chat: 'all' })
+      expect(cursor).toBe('c3')
+      expect(calls).toEqual(['inbox::all', 'inbox:c1:all', 'inbox:c2:all'])
+      const status = yield* channel.enableEvents('mygram', cursor, 100, { reach: 'all' })
+      expect(status).toEqual({
+        connectionId: 'mygram',
+        enabledAt: 100,
+        transport: 'events',
+        reach: 'all',
+        newChats: 'ask',
+      })
       expect(yield* channel.startCursor('mygram', call)).toBe('c3')
-      expect(calls).toHaveLength(4)
-    }),
-  )
-
-  it.effect('refuses a doorbell myagent did not subscribe, and stores nothing', () =>
-    Effect.gen(function* () {
-      const { channel, call } = yield* fixture(0, { status: 'refused', reason: 'bot' })
-      const refused = yield* Effect.flip(channel.enable('mygram', 'https://goblin.test/hooks/x', call, 100))
-      expect(refused).toMatchObject({ _tag: 'InvalidInput', reason: 'the doorbell was refused: bot' })
-      expect(yield* channel.status).toBeNull()
+      expect(calls).toHaveLength(3)
     }),
   )
 

@@ -31,6 +31,7 @@ export async function eventsSkillsProbe(state: EventsProbeState) {
     installEventConsumers(events, {
       channel: channel.status,
       pull: attempt(state.pull),
+      chatsChanged: channel.chatsChanged,
       skills: { enabled: library.enabled, invalidate: library.invalidate },
     }),
   )

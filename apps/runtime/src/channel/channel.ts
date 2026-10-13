@@ -1,6 +1,6 @@
 // The Telegram channel (ADRs 0009, 0055): one MCP connection the owner chose, mygram's bound to the agent's own bot
-// (directly, or through mysi), carries Telegram both ways. The server's Events deliver, or a server without them rings a
-// doorbell (channel/doorbell.ts); the agent then reads the inbox from its cursor, every chat the grant reaches in one
+// (directly, or through mysi), carries Telegram both ways. The server's Events wake the agent (channel/program.ts); it
+// then reads the inbox from its cursor, every chat the grant reaches in one
 // stream, and routes each new message from the owner by its chat and forum topic (channel/routes.ts): a turn in the
 // Topic of its route answered by goblin or a Persona, a note kept there, nothing, or held while the chat waits for the
 // owner's choice. Each answer goes back to the chat and topic its message came from. The rows are channel/store.ts and
@@ -13,8 +13,7 @@ import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import * as Semaphore from 'effect/Semaphore'
 import { chatSession, operationSession, primaryChat } from '../chats/directory.ts'
-import { type AppError, InvalidInput, attempt, toAppError } from '../http/errors.ts'
-import type { CredentialCipher } from '../mcp/cipher.ts'
+import { type AppError, InvalidInput, toAppError } from '../http/errors.ts'
 import { writeLine } from '../observability/logger.ts'
 import { failureAttributes, outcomeOf } from '../telemetry/attributes.ts'
 import type { RunTelemetry } from '../telemetry/events.ts'
@@ -38,16 +37,19 @@ import {
   channelStatus,
   checkpoint,
   disableChannel,
-  enableDoorbell,
   enableEvents,
   inboxCursor,
   markDelivered,
   pendingReplies,
-  sealedSecret,
+  markEnded,
+  markSyncDue,
   setNewChats,
+  setReach,
   storedCursor,
+  takeSyncDue,
   trackReply,
 } from './store.ts'
+import { syncChats } from './sync.ts'
 import { type ChannelCall, type TelegramRefused, refusedAsUpstream } from './tools.ts'
 
 /** Pages of 100 read at most per pull. */
@@ -76,7 +78,6 @@ const Message = Schema.Struct({
 })
 type Message = typeof Message.Type
 const Inbox = Schema.Struct({ messages: Schema.Array(Message), nextCursor: Schema.String })
-const Subscribed = Schema.Struct({ status: Schema.String, reason: Schema.optional(Schema.String) })
 const isHandle = Schema.is(TelegramChatHandle)
 
 /** One message from the owner into a goblin Topic: where, under which operation, from whom, and its words. */
@@ -120,8 +121,6 @@ export interface ChannelPorts {
 /** One answer's delivery to Telegram: the turn's operation id, how many messages it took, and why it failed if it did. */
 export type DeliveredReply = { readonly operationId: string; readonly pieces: number; readonly errorType?: string }
 
-const AAD = 'channel:secret'
-
 /** An operation id mygram accepts (letters, digits, `_` and `-`, at most 100). */
 const myagentId = (prefix: string, id: string) => `${prefix}-${id.replaceAll(/[^\w-]/gu, '-')}`.slice(0, 100)
 
@@ -151,7 +150,7 @@ const messageText = (message: Message) =>
     .join('\n')
 
 /** One line when a pull or a delivery fails: the alarm's step and the error's type, never message content. */
-export function reportChannelFailure(step: 'pull' | 'replies', error: unknown): void {
+export function reportChannelFailure(step: 'pull' | 'replies' | 'resubscribe' | 'offer', error: unknown): void {
   const tag = outcomeOf(error)
   writeLine(expectedFailure(tag) ? 'info' : 'warn', { event: 'wake', task: `channel.${step}`, 'error.type': tag })
 }
@@ -163,8 +162,6 @@ const after = (cursor: string | undefined) => (cursor === undefined || cursor ==
 const chatsRead = (status: ChannelStatus) => (status?.reach === 'all' ? { chat: 'all' } : {})
 
 const decodeInbox = (value: unknown) => Schema.decodeUnknownEffect(Inbox)(value).pipe(Effect.mapError(toAppError))
-const decodeSubscribed = (value: unknown) =>
-  Schema.decodeUnknownEffect(Subscribed)(value).pipe(Effect.mapError(toAppError))
 
 /** Reads the inbox from its start to its end, a page of 100 at a time: the cursor after the last message. */
 const readToEnd = Effect.fn('Channel.readToEnd')(function* (call: ChannelCall, chats: { readonly chat?: string }) {
@@ -177,10 +174,9 @@ const readToEnd = Effect.fn('Channel.readToEnd')(function* (call: ChannelCall, c
   return yield* new InvalidInput({ reason: 'the inbox is too long to start from its end' })
 })
 
-/** What the channel is made over: the agent's database, its credential cipher and its run ledger. */
+/** What the channel is made over: the agent's database and its run ledger. */
 export interface ChannelInput {
   readonly db: DrizzleSqliteDODatabase
-  readonly cipher: CredentialCipher
   readonly telemetry: RunTelemetry | undefined
   /** Asks the agent to send the answers that are ready (a schedule of its own). */
   readonly wake: () => void
@@ -222,21 +218,6 @@ const startCursor = (
   Effect.suspend(() =>
     channelStatus(db)?.connectionId === connectionId ? Effect.sync(() => storedCursor(db)) : readToEnd(call, chats),
   )
-
-/**
- * Turns the channel on for `connectionId`'s doorbell at `url`: reads to the end of its inbox (older messages are history,
- * not new turns), subscribes the doorbell with a fresh secret, then stores all three.
- */
-const enable = ({ db, cipher }: ChannelInput, connectionId: string, url: string, call: ChannelCall, now: number) =>
-  Effect.gen(function* () {
-    const cursor = yield* startCursor(db, connectionId, call, {})
-    const secret = btoa(String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(32))))
-    const subscribed = yield* decodeSubscribed(yield* call('subscribe', { url, secret }))
-    if (subscribed.status !== 'subscribed')
-      return yield* new InvalidInput({ reason: `the doorbell was refused: ${subscribed.reason ?? subscribed.status}` })
-    const sealed = yield* attempt(() => cipher.encrypt(secret, AAD))
-    return yield* Effect.sync(() => enableDoorbell(db, { connectionId, cursor, secret: sealed, enabledAt: now }))
-  })
 
 /** Where a message came from: its chat (`dm` when absent) and forum topic (0 when none). */
 const placeOf = (message: Message) => ({ chat: message.chat ?? TELEGRAM_DM, thread: message.threadId ?? 0 })
@@ -338,14 +319,18 @@ const router = (input: ChannelInput, record: Recorder, ports: ChannelPorts) => {
   return { route, releaseHeld, take }
 }
 
-/** Reads the inbox from the cursor and routes each new message from the owner; the cursor follows each page. */
+/**
+ * Reads the server's chat list when it is due (the channel was turned on, or a chat changed), then the inbox from the
+ * cursor, routing each new message from the owner; the cursor follows each page.
+ */
 const pullPages = (input: ChannelInput, take: ReturnType<typeof router>['take'], ports: ChannelPorts, now: number) =>
   Effect.gen(function* () {
     const { db } = input
+    if (takeSyncDue(db) && !(yield* syncChats(db, ports.call, now)).synced) markSyncDue(db)
     for (let page = 0; page < MAX_PAGES; page += 1) {
       const status = channelStatus(db)
       if (status === null) return
-      const cursor = inboxCursor(db, status.transport)
+      const cursor = inboxCursor(db)
       if (cursor === undefined) return
       const inbox = yield* decodeInbox(
         yield* ports.call('inbox', { ...chatsRead(status), ...after(cursor), limit: 100 }),
@@ -473,13 +458,10 @@ export const telegramChannel = (input: ChannelInput): Effect.Effect<Channel['Ser
         startCursor(db, connectionId, call, chats).pipe(refusedAsUpstream, Effect.withSpan('Channel.startCursor')),
       enableEvents: (connectionId, cursor, now, reach) =>
         Effect.sync(() => enableEvents(db, connectionId, cursor, now, reach)),
-      enable: (connectionId, url, call, now) =>
-        enable(input, connectionId, url, call, now).pipe(refusedAsUpstream, Effect.withSpan('Channel.enable')),
+      setReach: (reach) => Effect.sync(() => setReach(db, reach)),
+      chatsChanged: Effect.sync(() => markSyncDue(db)),
+      ended: Effect.sync(() => markEnded(db)),
       disable: Effect.sync(() => disableChannel(db)),
-      secret: Effect.suspend(() => {
-        const sealed = sealedSecret(db)
-        return sealed === undefined ? Effect.succeed(undefined) : attempt(() => input.cipher.decrypt(sealed, AAD))
-      }),
       track: (operationId, now) =>
         Effect.sync(() => {
           if (trackReply(db, operationId, now)) input.wake()
@@ -500,7 +482,7 @@ export const telegramChannel = (input: ChannelInput): Effect.Effect<Channel['Ser
             }),
           )
           .pipe(refusedAsUpstream, Effect.withSpan('Channel.route')),
-      newChats: (value) => Effect.sync(() => setNewChats(db, value)),
+      newChats: (value) => Effect.sync(() => setNewChats(db, value) !== undefined),
       deliver: (ports, now, delivered = () => Effect.void) =>
         deliver(input, record, ports, now, delivered).pipe(refusedAsUpstream, Effect.withSpan('Channel.deliver')),
     })

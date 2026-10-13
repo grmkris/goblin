@@ -7,10 +7,7 @@ import { type ChannelPorts, telegramChannel } from '../src/channel/channel.ts'
 import type { ChannelCall } from '../src/channel/tools.ts'
 import { enableEvents } from '../src/channel/store.ts'
 import { registerPrimary } from '../src/chats/directory.ts'
-import { CredentialCipher } from '../src/mcp/cipher.ts'
 import { chatDatabase, durable } from './chats-sqlite.ts'
-
-const KEY = 'cHVycmFibGUtdGVzdC1rZXktMzItYnl0ZXMtbG9uZyE='
 
 const closes: (() => void)[] = []
 afterEach(() => {
@@ -26,21 +23,21 @@ const fixture = Effect.gen(function* () {
   closes.push(close)
   registerPrimary(db, 1)
   const sqlite = durable(db)
-  const cipher = yield* Effect.promise(() => CredentialCipher.fromBase64(KEY))
   const channel = yield* telegramChannel({
     db: sqlite,
-    cipher,
     telemetry: undefined,
     wake: () => undefined,
   })
-  enableEvents(sqlite, 'mygram', 'c0', 1)
+  enableEvents(sqlite, 'mygram', 'c0', 1, { reach: 'dm' })
   const opened = yield* Deferred.make<void>()
   const reads: string[] = []
   const submitted: string[] = []
   let reading = 0
   let most = 0
-  const call: ChannelCall = (_name, args) =>
+  const call: ChannelCall = (name, args) =>
     Effect.gen(function* () {
+      // The chat list read once the channel is on: no chats but the DM.
+      if (name === 'chats') return { chats: [] }
       const cursor = String(args['cursor'])
       reads.push(cursor)
       reading += 1

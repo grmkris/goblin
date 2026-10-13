@@ -27,7 +27,6 @@ import { AgentInput } from '../../../src/runtime/input.ts'
 import { callOwner } from '../../owner-client.ts'
 import { durable } from '../../chats-sqlite.ts'
 import { PLAN, currentResident, database, json, plans, serve, served, stub } from './fixture.ts'
-import { unread } from '../../fake.ts'
 
 const fixture = () => {
   const db = database()
@@ -44,8 +43,8 @@ const fixture = () => {
   const legacy = Layer.mergeAll(
     Layer.effect(
       Channel,
-      // The channel's status and disable read and clear its tables only; the cipher stays unused.
-      telegramChannel({ db: sqlite, cipher: unread, telemetry: undefined, wake: () => undefined }),
+      // The channel's status and disable read and clear its tables only.
+      telegramChannel({ db: sqlite, telemetry: undefined, wake: () => undefined }),
     ),
     // The channel's tools: the server offers none, so turning the channel on is refused before anything is granted.
     stub(McpServers, { tools: () => Effect.succeed([]), list: () => Effect.succeed([]) }),

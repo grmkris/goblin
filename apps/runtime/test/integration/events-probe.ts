@@ -72,7 +72,7 @@ async function setup(storage: DurableObjectStorage, harness: PiHarness) {
   const { run } = services
   await run(TestClock.setTime(fixture.now))
   const connections = await run(McpConnections)
-  const channel = await Effect.runPromise(telegramChannel({ db, cipher, telemetry, wake: () => undefined }))
+  const channel = await Effect.runPromise(telegramChannel({ db, telemetry, wake: () => undefined }))
   const eventOptions: EventsOptions = {
     connections,
     store,
@@ -184,7 +184,9 @@ async function subscribeTelegram(state: Awaited<ReturnType<typeof setup>>) {
       handlerKey: 'telegram-inbox',
     }),
   )
-  await Effect.runPromise(state.channel.enableEvents('mygram', '0', Math.floor(state.fixture.now / 1000)))
+  await Effect.runPromise(
+    state.channel.enableEvents('mygram', '0', Math.floor(state.fixture.now / 1000), { reach: 'dm' }),
+  )
 }
 
 /** The first message's turn answered; the second still runs. */

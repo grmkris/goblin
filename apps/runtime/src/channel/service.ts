@@ -1,14 +1,15 @@
-import type { ChannelStatus, NewChatsDefault, TelegramReach } from '@goblin/contracts'
+import type { ChannelStatus, NewChatsDefault } from '@goblin/contracts'
 import * as Context from 'effect/Context'
 import type * as Effect from 'effect/Effect'
 import type { AppError } from '../http/errors.ts'
 import type { ChannelPorts, DeliveredReply } from './channel.ts'
 import type { RouteChoice, RouteRow } from './routes.ts'
+import type { Reach } from './store.ts'
 import type { ChannelCall } from './tools.ts'
 
 /**
- * The Telegram channel (ADRs 0009, 0055): the one connection the owner chose to carry Telegram, its inbox cursor, the
- * doorbell secret, where each chat goes and the answers still to send. Instants are epoch seconds. Built once, by start
+ * The Telegram channel (ADRs 0009, 0055): the one connection the owner chose to carry Telegram, its inbox cursor, how
+ * far its grant reaches, where each chat goes and the answers still to send. Instants are epoch seconds. Built once, by start
  * step 11 (`telegramChannel`).
  */
 export class Channel extends Context.Service<
@@ -33,19 +34,16 @@ export class Channel extends Context.Service<
       connectionId: string,
       inboxCursor: string,
       now: number,
-      reach?: { readonly reach: TelegramReach; readonly widenUrl?: string },
+      reach: Reach,
     ) => Effect.Effect<ChannelStatus>
-    /** Carries the channel through `connectionId`'s doorbell at `url`, subscribed with a fresh secret. */
-    readonly enable: (
-      connectionId: string,
-      url: string,
-      call: ChannelCall,
-      now: number,
-    ) => Effect.Effect<ChannelStatus, AppError>
+    /** How far the grant reaches now. */
+    readonly setReach: (reach: Reach) => Effect.Effect<void>
+    /** A chat changed: the server's chat list is read again at the next pull. */
+    readonly chatsChanged: Effect.Effect<void>
+    /** The server ended the channel's Events and they could not be subscribed again: the owner must look. */
+    readonly ended: Effect.Effect<void>
     /** Turns the channel off; answers still to send and held messages are dropped, the routes stay. */
     readonly disable: Effect.Effect<void>
-    /** The doorbell secret, when the doorbell carries the channel. */
-    readonly secret: Effect.Effect<string | undefined, AppError>
     /** Remembers a turn of main whose answer goes to Telegram's DM. */
     readonly track: (operationId: string, now: number) => Effect.Effect<void>
     /** Reads the inbox from the cursor and routes each new message from the owner, one pull at a time. */

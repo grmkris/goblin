@@ -22,7 +22,6 @@ import {
   appHelperExclusions,
   appExecutionExclusions,
   appConversations,
-  appChannel,
   appMetadata,
   appTelegramChannel,
 } from '../storage/schema.ts'
@@ -242,7 +241,7 @@ const routineScope = (db: Db, scope: SetupScope, runId: string): SetupScope => {
   if (run === undefined) return CLOSED
   const definition = definitionOf(run)
   const allowedTools = handOverOf(definition)?.allowedTools ?? []
-  const channel = db.select().from(appTelegramChannel).get() ?? db.select().from(appChannel).get()
+  const channel = db.select().from(appTelegramChannel).get()
   return {
     editable: false,
     ...(scope.topic === undefined ? {} : { topic: scope.topic }),

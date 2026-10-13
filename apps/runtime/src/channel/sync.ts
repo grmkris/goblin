@@ -5,7 +5,7 @@ import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { markListed, seeChat, setPresence } from './routes.ts'
+import { markListed, routeRow, seeChat, setPresence } from './routes.ts'
 import type { ChannelCall } from './tools.ts'
 
 const isHandle = Schema.is(TelegramChatHandle)
@@ -23,9 +23,11 @@ const ChatList = Schema.Struct({
     }),
   ),
 })
-/** `thread_list`: a chat's forum topics (untrusted names). */
+/** `thread_list`: a chat's forum topics, the bot's own and the ones it has seen, named when it knows (untrusted). */
 const ThreadList = Schema.Struct({
-  threads: Schema.Array(Schema.Struct({ threadId: Schema.Number, name: Schema.String })),
+  threads: Schema.Array(
+    Schema.Struct({ threadId: Schema.Number, name: Schema.optional(Schema.NullOr(Schema.String)) }),
+  ),
 })
 const decodeChats = Schema.decodeUnknownOption(ChatList)
 const decodeThreads = Schema.decodeUnknownOption(ThreadList)
@@ -40,11 +42,7 @@ const presenceOf = (status: string) =>
 /** A chat or topic goblin saw for the first time in the server's lists. */
 export type Discovered = { readonly chat: string; readonly thread: number }
 
-/**
- * Reads the server's chat list and every forum's topics into the routes: new chats wait for the owner, known ones take
- * their titles and whether the bot is in them, chats the list no longer names are marked. The chats and topics that
- * were new and active; `synced` false when the chat list could not be read.
- */
+/** One chat as the server lists it. */
 type Listed = (typeof ChatList.Type)['chats'][number]
 
 /** One listed chat into the routes; whether it is new to goblin and the bot is in it. */
@@ -61,19 +59,32 @@ function seeListed(db: DrizzleSqliteDODatabase, each: Listed, now: number): bool
   return seen.created && presence === 'active'
 }
 
+type ListedTopic = (typeof ThreadList.Type)['threads'][number]
+
+/** One listed forum topic into the routes, as new to goblin or not; one the server cannot name keeps the name it has. */
+function seeTopic(db: DrizzleSqliteDODatabase, each: Listed, topic: ListedTopic, now: number): Discovered[] {
+  const { threadId, name } = topic
+  if ((name === undefined || name === null) && routeRow(db, each.chat, threadId) !== undefined) return []
+  const title = name ?? `Topic ${String(threadId)}`
+  const seen = seeChat(db, { chat: each.chat, thread: threadId, title, kind: kindOf(each.kind) }, now)
+  return seen.created ? [{ chat: each.chat, thread: threadId }] : []
+}
+
 /** A forum's topics into the routes, as the server lists them; the ones new to goblin. */
 const seeTopics = (db: DrizzleSqliteDODatabase, call: ChannelCall, each: Listed, now: number) =>
   Effect.gen(function* () {
     const threads = Option.flatMap(yield* Effect.option(call('threads', { chat: each.chat })), decodeThreads)
     const listed = Option.match(threads, { onNone: () => [], onSome: ({ threads: all }) => all })
-    const valid = listed.filter(({ threadId }) => Number.isSafeInteger(threadId) && threadId > 0)
-    return valid.flatMap(({ threadId, name }): Discovered[] =>
-      seeChat(db, { chat: each.chat, thread: threadId, title: name, kind: kindOf(each.kind) }, now).created
-        ? [{ chat: each.chat, thread: threadId }]
-        : [],
-    )
+    return listed
+      .filter(({ threadId }) => Number.isSafeInteger(threadId) && threadId > 0)
+      .flatMap((topic) => seeTopic(db, each, topic, now))
   })
 
+/**
+ * Reads the server's chat list and every forum's topics into the routes: new chats wait for the owner, known ones take
+ * their titles and whether the bot is in them, chats the list no longer names are marked. The chats and topics that
+ * were new and active; `synced` false when the chat list could not be read.
+ */
 export const syncChats = (db: DrizzleSqliteDODatabase, call: ChannelCall, now: number) =>
   Effect.gen(function* () {
     const chats = Option.flatMap(yield* Effect.option(call('chats', {})), decodeChats)

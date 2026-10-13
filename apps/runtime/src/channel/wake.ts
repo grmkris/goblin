@@ -4,6 +4,7 @@ import { epochSeconds } from '../clock.ts'
 import { FlowEvents } from '../observability/flows.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { type DeliveredReply, reportChannelFailure } from './channel.ts'
+import { resubscribeEnded } from './program.ts'
 import { onChannel } from './turns.ts'
 
 // The Telegram channel's alarms, as the agent's schedule callbacks run them: each is one program through the bridge's
@@ -21,9 +22,24 @@ const deliveryFlow = (reply: DeliveredReply) =>
     ...(reply.errorType === undefined ? {} : { errorType: reply.errorType }),
   })
 
-/** The inbox read from its cursor into main, while the channel is on; the channel takes one pull at a time. */
+/**
+ * The inbox read from its cursor and routed, while the channel is on; the channel takes one pull at a time. A
+ * subscription the server ended is subscribed again first.
+ */
 export const pullChannel = onChannel((channel, ports) =>
-  Effect.flatMap(epochSeconds, (now) => channel.pull(ports, now)),
+  Effect.gen(function* () {
+    // A subscription that cannot be made again (a revoked grant) marks the channel for the owner, once, not in a loop:
+    // only a new event or the owner's switch pulls again.
+    yield* resubscribeEnded.pipe(
+      Effect.catch((error) =>
+        Effect.andThen(
+          Effect.sync(() => reportChannelFailure('resubscribe', error)),
+          channel.ended,
+        ),
+      ),
+    )
+    yield* channel.pull(ports, yield* epochSeconds)
+  }),
 )
 
 /**
@@ -39,7 +55,7 @@ const sendReplies = Effect.gen(function* () {
   return Option.getOrElse(running, () => false) ? 15 : undefined
 })
 
-/** `channelPull`: one pull; a failed one is reported, and the next doorbell or event pulls again. */
+/** `channelPull`: one pull; a failed one is reported, and the next event pulls again. */
 export async function channelPull(run: RunProgram): Promise<void> {
   await run(Effect.asVoid(pullChannel)).catch((error: unknown) => reportChannelFailure('pull', error))
 }

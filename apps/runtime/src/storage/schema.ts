@@ -225,16 +225,6 @@ export const appSkillDrafts = sqliteTable('app_skill_drafts', {
   updatedAt: integer('updated_at').notNull(),
 })
 
-/** The Telegram channel (channel/channel.ts): at most one row, the connection that carries it. */
-export const appChannel = sqliteTable('app_channel', {
-  id: integer('id').primaryKey(),
-  connectionId: text('connection_id').notNull(),
-  cursor: text('cursor').notNull(),
-  /** The doorbell secret, sealed with the credential key. */
-  secret: text('secret').notNull(),
-  enabledAt: integer('enabled_at').notNull(),
-})
-
 /**
  * Turns whose answers go back to Telegram, until they are sent (ADR 0055): the goblin chat the turn ran in (none for
  * main), the Telegram chat and thread the answer goes to, and the Persona that answers instead of goblin, whose
@@ -366,6 +356,12 @@ export const appTelegramChannel = sqliteTable('app_telegram_channel', {
     .notNull()
     .default('dm'),
   widenUrl: text('widen_url'),
+  /** Counts changes of `new_chats`, so Undo can tell whether anything touched it. */
+  settingsRevision: integer('settings_revision').notNull().default(0),
+  /** The server's chat list is to be read again at the next pull (turned on, or a chat changed). */
+  syncDue: integer('sync_due', { mode: 'boolean' }).notNull().default(true),
+  /** The server ended the channel's Events and goblin could not subscribe again: the owner's attention is needed. */
+  ended: integer('ended', { mode: 'boolean' }).notNull().default(false),
 })
 
 /** A newer invalidation cannot be cleared by an older listing response. */
