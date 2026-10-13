@@ -389,10 +389,12 @@ the collector; only the admins can move it out.
 
 ### The card checkout (Dodo, off)
 
-Set `DODO_PAYMENTS_ENVIRONMENT=test_mode` on local/dev and `live_mode` on prod. Store
-`DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_WEBHOOK_KEY` and `DODO_PRODUCT_ID` in the stage's mode-600 env file; Alchemy
-binds them as Worker secrets. Choose a goblin-only recurring $10/month product with no trial. Never bind an account's
-master model key or print payment keys. Configure a separate Standard Webhooks endpoint at `/hooks/dodo` per stage.
+The card checkout is off by default: checkout and the portal answer `card_disabled` until a stage sets
+`GOBLIN_CARD_CHECKOUT=on`. To turn it on, set `DODO_PAYMENTS_ENVIRONMENT=test_mode` on local/dev and `live_mode` on
+prod. Store `DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_WEBHOOK_KEY` and `DODO_PRODUCT_ID` in the stage's mode-600 env file;
+Alchemy binds them as Worker secrets. The product is a goblin-only recurring one with no trial, priced as the stage's
+catalog prices monthly (`GOBLIN_PLAN_CATALOG`, $15 every 30 days by default). Never bind an account's master model key
+or print payment keys. Configure a separate Standard Webhooks endpoint at `/hooks/dodo` per stage.
 `/health` reports the stage billing mode and whether billing is configured; missing keys never bypass admission.
 
 The billing migration grants existing users a dev-only Pro override; a fresh database has no such users. New OTP

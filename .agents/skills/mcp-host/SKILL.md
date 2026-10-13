@@ -54,7 +54,8 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   failed.
 - Inbound `/mcp` reaches the agent through its internal API (`@goblin/contracts/internal`): `ask`, `recent`, and
   `inspect` for a token that holds `goblin:inspect`, called on the stub through `inbound/client.ts`.
-- Fixture tests (`test/mcp/`) prove protocol behaviour; real MyPlan/MyBrowser behaviour is proven only on dev.
+- Fixture tests (`test/mcp/`) prove protocol behaviour; the real behaviour of mysi and its apps (myplan, mytab and the
+  rest) is proven only on dev.
 
 Before changing an API call, read the current [documentation](https://modelcontextprotocol.io/specification/latest) and the installed package's declarations; the
 lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how goblin uses it today.
