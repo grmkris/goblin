@@ -470,6 +470,14 @@ state, and the composer's no-plan card, with the owner API routed in the page. I
 links, that Subscribe with USDC asks for the billing pressed, and that no screen scrolls sideways. Screenshots go under
 `.local/goblin-acceptance/subscribe-*`; this is browser fixture evidence only.
 
+`heavy bun apps/web/test/ui-landing.ts [--out <dir>]` renders goblin's landing (`/`, signed out) from source in local
+Chromium at phone and desktop widths, light and dark: the hero's session playing, waiting on its question, answered by
+Allow and on its own, and the whole page; under reduced motion the session starts at its question and Allow still
+answers it. With `/health` and the session check routed in the page, it checks the way in (`/login?new=1`), the Goblin
+Wallet's origin from `/health`, Claude Code's command for the page's origin, the mainnet links, that the Source link
+stays off, that a signed-in session leaves for its channel, and that nothing scrolls sideways. Screenshots go under
+`.local/goblin-acceptance/landing-*`; this is browser fixture evidence only.
+
 `heavy bun apps/web/test/ui-markdown.ts` renders chat Markdown from source in local Chromium at desktop and phone
 widths: a reply that settles keeps its blocks (a table keeps its element and sideways scroll), with and without
 motion (words fade in behind a caret only when motion is allowed), code highlights once
