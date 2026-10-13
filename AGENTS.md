@@ -9,7 +9,7 @@ infrastructure. Read
 
 ## Work and ownership
 
-- Work on `dev`; release dev and promote an accepted SHA to `prod` from the build box (`heavy bun run release dev <sha>`, `heavy bun run promote <sha>`). Commit each coherent, green change separately as it lands; never batch unrelated changes.
+- Work on `dev` (the default branch; there is no `main`). CI on GitHub-hosted runners deploys every push to `dev` that passes Check; `bun run promote <sha>` fast-forwards `prod`, which CI deploys. A deploy or destroy of dev or prod by hand is break-glass (`GOBLIN_BREAK_GLASS=1`). Commit each coherent, green change separately as it lands; never batch unrelated changes.
 - Other agents share this checkout. Preserve edits you did not make and `.spec.md.swo`. Never stash, reset, restore
   or delete foreign files. Stage exact owned paths or hunks, never `git add .` or `git add -A`.
 - A red gate in a file you did not touch may be someone's mid-edit: check `git status`/`git diff` before fixing it.
@@ -44,9 +44,12 @@ infrastructure. Read
 - The `dev` stage is the daily instance. It holds test data only (owner, 2026-10-08), so spikes may deploy there.
   goblin is greenfield until launch (owner, 2026-10-11): no backwards compatibility, no legacy decoders; migrations are
   edited in place as if the schema had always been so, and a release that edits an applied one resets dev first
-  (`bun run destroy:dev -- --confirm-reset`). Prod is reset only when the owner decides, as for the hackathon release
-  (owner, 2026-10-12): `GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset`, then release the same sha. A user only ever reaches their
-  own agent; never add a route that takes an agent name from the request.
+  (`GOBLIN_BREAK_GLASS=1 bun run destroy:dev -- --confirm-reset`, then `GOBLIN_BREAK_GLASS=1 bun run deploy:dev`
+  re-creates it: CI refuses a plan that would create goblinAuth, Files or Web). Prod is reset only when the owner
+  decides, as for the hackathon release (owner, 2026-10-12):
+  `GOBLIN_BREAK_GLASS=1 GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset`, then re-create it with a
+  break-glass `deploy:prod` of the same sha. A user only ever reaches their own agent; never add a route that takes an
+  agent name from the request.
   Telemetry never carries content ([ADR 0024](docs/adr/0024-observing-conversations.md)).
 
 ## Quality

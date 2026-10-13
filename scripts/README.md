@@ -2,22 +2,27 @@
 
 Deployment scripts use Alchemy only. Secrets are read from mode-600 files under `.local/` and are never printed.
 
-| Command                                                         | What it does                                                                               |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `bun dev`                                                       | Local stack on `http://localhost:18971` (workerd), model calls through CLIProxy.           |
-| `bun run plan:dev`                                              | Preview changes to the dev stage.                                                          |
-| `bun run deploy:dev`                                            | Deploy the dev stage (`https://dev.goblin.surf`).                                          |
-| `bun run destroy:dev -- --confirm-reset`                        | Erase the dev stage: every account, conversation and MCP credential.                       |
-| `GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset` | Erase the prod stage the same way, at a release the owner decided resets it.               |
-| `bun run smoke:dev`                                             | Acceptance against the deployed dev stage.                                                 |
-| `bun run smoke:local`                                           | The same acceptance against the local stack.                                               |
-| `bun run ui:acceptance [session-file]`                          | Read-only UI checks and screenshots against dev (see UI acceptance below).                 |
-| `bun run icons`                                                 | Redraw the app icons and favicon in `apps/web/public` from the shared goblin mark.         |
-| `heavy bun scripts/patch-shadcn-react.ts --test`                | Rebuild the MessageScroller patch from upstream source (`patches/shadcn-react/README.md`). |
+| Command                                                                              | What it does                                                                               |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `bun dev`                                                                            | Local stack on `http://localhost:18971` (workerd), model calls through CLIProxy.           |
+| `bun run plan:dev`                                                                   | Preview changes to the dev stage.                                                          |
+| `GOBLIN_BREAK_GLASS=1 bun run deploy:dev`                                            | Deploy the dev stage (`https://dev.goblin.surf`) by hand; CI normally does (see below).    |
+| `GOBLIN_BREAK_GLASS=1 bun run destroy:dev -- --confirm-reset`                        | Erase the dev stage: every account, conversation and MCP credential.                       |
+| `GOBLIN_BREAK_GLASS=1 GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset` | Erase the prod stage the same way, at a release the owner decided resets it.               |
+| `bun run promote <full-sha>`                                                         | Pre-flight an accepted dev SHA and fast-forward `prod`; CI then deploys prod.              |
+| `bun scripts/state-copy.ts --stack <stack> --stage <stage>`                          | One-off copy of a stack's Alchemy state between local files and the Cloudflare store.      |
+| `bun run smoke:dev`                                                                  | Acceptance against the deployed dev stage.                                                 |
+| `bun run smoke:local`                                                                | The same acceptance against the local stack.                                               |
+| `bun run ui:acceptance [session-file]`                                               | Read-only UI checks and screenshots against dev (see UI acceptance below).                 |
+| `bun run icons`                                                                      | Redraw the app icons and favicon in `apps/web/public` from the shared goblin mark.         |
+| `heavy bun scripts/patch-shadcn-react.ts --test`                                     | Rebuild the MessageScroller patch from upstream source (`patches/shadcn-react/README.md`). |
 
 Stage configuration comes from `.local/<stage>.env` (see `.env.example`); `plan:dev`, `deploy:dev` and `destroy:dev`
-also read shared Cloudflare credentials in `~/.config/myapps/dev.env`. Smoke loads only the stage file and needs no
-Cloudflare API credentials.
+also read the Cloudflare credentials in `.local/cloud.env` (mode 600, only `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID`; `GOBLIN_CLOUD_ENV_FILE` names another file). Smoke loads only the stage file; its flows check
+also reads those two variables when the environment has them. On dev and prod, `deploy:*` and `destroy:*` refuse unless
+they run in GitHub Actions or `GOBLIN_BREAK_GLASS=1` is set (`deploy_runs_in_ci_or_GOBLIN_BREAK_GLASS=1`); `plan:*`,
+`drift:*` and `smoke:*` run anywhere.
 
 ## UI acceptance
 
@@ -107,7 +112,7 @@ Not covered here: the owner's Connect flow (it needs the owner at the remote ser
 MCP Apps, the browser UI, thread branching, memory-summary quality, skills, and Telegram hook/inbox acceptance.
 
 Prod commands use `.local/prod.env` and require `GOBLIN_CONFIRM_PROD=1` in the calling shell:
-`bun run plan:prod`, `bun run deploy:prod`, `bun run smoke:prod`. There is no destroy-prod command.
+`bun run plan:prod`, `bun run deploy:prod` (break-glass outside CI), `bun run smoke:prod`.
 `smoke:prod` defaults to public health, the client bundle's build, anonymous auth refusal, invite refusal, MCP metadata, the page and the canonical `www` redirect. Owner email/session remain empty until the real OTP bootstrap.
 Only supplying the email and private OTP session file for an operator test account enables the full acceptance flow, including model turns.
 Use a dedicated operator test account for production smoke.
@@ -118,21 +123,59 @@ and query (301 for GET/HEAD, 308 for writes). Dev sign-up must be closed or invi
 
 ## Release operation
 
-Push daily work to `dev`. Check runs on GitHub-hosted runners; once it passes, release that exact dev tip from the build box with `heavy bun run release dev <full-sha>`, as a user in group `goblin-release`.
+Branches: `dev` (the default) deploys dev and wallet-dev, `prod` deploys prod and Wallet production. Everything runs in
+`.github/workflows/ci.yml` on GitHub-hosted runners, each job in its own checkout.
 
-Promote the current accepted dev SHA with `heavy bun run promote <full-sha>`. Promotion requires current authenticated dev acceptance and a fast-forward prod ref, then deploys and verifies prod directly. Persistent state, clean source snapshots, private logs and sanitized receipts remain under `/var/lib/goblin-release`. Promote also plans and deploys Wallet production from the same source snapshot using `GOBLIN_CONFIRM_PROD=1 bun run deploy:wallet-prod`. It verifies live health, the production OAuth issuer and anonymous MCP 401, then records the active Wallet Worker version. Both read the mode-600 stage files in `.local/`; no stage secret lives in GitHub, and the repository has no self-hosted runner.
+- **Check** runs on every push and pull request: `bun run check`, no secrets.
+- **Deploy dev** runs after Check for every push to `dev`, in the `dev` environment. `scripts/ci_credentials.py dev`
+  masks every secret value of eight or more characters in the log, then writes the stage files mode 600; `--cleanup`
+  removes them in an `always()` step. `scripts/release.py dev <sha>` requires a clean checkout at that sha, the sha to
+  be the dev tip and the `Check` job of its `ci.yml` push run to have passed; it plans (no delete or replace, and no
+  create of goblinAuth, Files or Web, which would mean lost state), deploys, runs the authenticated smoke, drift and the
+  D1 migration inventory (the database found by exact name through the Cloudflare API), and writes `dev.json`.
+  `scripts/wallet_release.py dev <sha>` runs only after that receipt exists: it plans (no create of the Wallet Worker),
+  deploys and smokes wallet-dev (`ok`, the stage's OAuth issuer, anonymous MCP 401) and writes `wallet-dev.json`. Both
+  receipts become the run's `dev-acceptance` artifact (90 days). Receipts go to `GOBLIN_RECEIPTS_DIR`, step logs to
+  `GOBLIN_LOG_DIR` (default `.local/receipts` and `.local/release-logs`); a failed step prints its log's last 40 lines.
+- **Promote** with `bun run promote <full-sha>` from any checkout with `gh` signed in and `.local/cloud.env`. It needs
+  no prod credentials: it requires the sha to be the dev tip with a passing Check, its `dev-acceptance` receipt to be
+  authenticated and name the live dev Worker version, and `prod...sha` to fast-forward, then moves `prod` with
+  `force=false` and prints the started run.
+- **Deploy prod** runs after Check for every push to `prod`, in the `prod` environment. `release.py prod` repeats the
+  provenance and acceptance checks, requires the push to fast-forward from its `before` sha and not be forced, keeps the
+  first release invite-only (until the `goblin-prod` Worker serves a version), then releases as on dev with the public
+  smoke unless an operator test session is configured. `wallet_release.py prod` also requires `live:true`. Its artifact
+  is `prod-acceptance`.
+
+GitHub secrets per environment, each a whole file (`gh secret set <name> --env <stage> < file`, never echoed):
+`GOBLIN_STAGE_ENV` (`.local/<stage>.env`), `GOBLIN_WALLET_ENV` (`wallet-<stage>.env` with only the keys the wallet
+stack reads: never `TREASURY_PRIVATE_KEY`, `PRIVY_POLICY_ADMIN_KEY`, `TEST_*` or `SPIKE_*`), `GOBLIN_CLOUD_ENV` (only
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`), `ALCHEMY_STATE_STORE_CREDENTIALS` (the cached
+`~/.alchemy/credentials/default/cloudflare-state-store.json`, because the Cloudflare token cannot read the Secrets
+Store to mint it) and, on dev only, `GOBLIN_SMOKE_SESSION` (`dev-session.json`). The `dev` environment admits only the
+dev branch and `prod` only prod; a pull request runs on its merge ref and reaches neither.
+
+Alchemy state for dev and prod lives in the account's shared Cloudflare state store (`scripts/alchemy-state.ts`), as
+`goblin/<stage>` and `goblin-wallet/<stage>` beside myapps' stacks. It has no lock: each stage deploys in one
+non-cancelling concurrency group, and a deploy from the build box is break-glass (pause CI first, then
+`GOBLIN_BREAK_GLASS=1`). `scripts/state-copy.ts` moved the box's local state into it once: it touches only those four
+stacks, refuses a non-empty destination or an unsettled record, verifies sha256 by record name and copies back with
+`--to local`. Never use Alchemy's `syncState` against this store: it deletes every stack the source lacks.
 
 The first production release is invite-only with no configured invite or owner email, so it admits nobody until the operator securely supplies those values. Its dedicated model key offers the approved five models and caps spending at $10 per 30 days. Dodo remains unconfigured in live mode. After the owner signs in with delivered OTP, grant exactly that verified production user a prod-scoped Pro override of 800 Credits/day and run authenticated prod smoke.
 
-For an emergency code rollback, prepare a clean snapshot of the last compatible green SHA, review its plan against the retained prod state, and run the guarded prod deploy with the existing private prod config. Leave all auth, app and vendor data intact; do not run down migrations. Confirm that older code supports every additive schema already applied, then repeat public/authenticated acceptance and drift inspection and record the resulting Worker version. The normal release path continues to require a matching dev receipt.
+Roll back code with a revert commit on `dev`: CI deploys it to dev with full acceptance, then `bun run promote` it.
+When prod cannot wait for that, roll the `goblin-prod` (or `goblin-wallet-prod`) Worker back to its previous version in
+Cloudflare (`wrangler rollback` or the dashboard) and follow with the revert, so the next deploy does not undo it. Leave
+all auth, app and vendor data intact and never run down migrations: confirm that the older code supports every additive
+schema already applied, then repeat acceptance and drift inspection.
 
 ## Goblin Wallet stage
 
 `bun run dev:wallet`, `bun run plan:wallet-dev`, `bun run deploy:wallet-dev`, `bun run plan:wallet-prod` and
 `bun run deploy:wallet-prod` run `scripts/wallet-stage.ts` (`dev`, `plan:dev`, `deploy:dev`, `plan:prod`,
-`deploy:prod`; the prod deploy needs `GOBLIN_CONFIRM_PROD=1`). It never touches `scripts/stage.ts`, which
-`scripts/release.py` depends on. It builds `apps/wallet-web`, takes the wallet deploy lock
-(`$GOBLIN_RELEASE_ROOT/wallet-deploy.lock`), attaches Alchemy state from
-`/var/lib/goblin-release/alchemy/state/goblin-wallet/<stage>`, scrubs the environment, and merges the shared Cloudflare
-file with `.local/wallet-<stage>.env` (both must be mode 600). The variables are listed in `docs/development.md`,
-"Goblin Wallet stages". `scripts/wallet_release.py` performs the public Wallet smoke as part of Promote without signing or spending.
+`deploy:prod`; the prod deploy needs `GOBLIN_CONFIRM_PROD=1`, and a deploy outside CI `GOBLIN_BREAK_GLASS=1`). It never
+touches `scripts/stage.ts`, which `scripts/release.py` depends on. It builds `apps/wallet-web`, scrubs the environment,
+and merges `.local/cloud.env` with `.local/wallet-<stage>.env` (both must be mode 600); its dev and prod state lives in
+the Cloudflare state store as `goblin-wallet/<stage>`. The variables are listed in `docs/development.md`, "Goblin
+Wallet stages". `scripts/wallet_release.py` deploys and smokes Wallet in CI's deploy jobs without signing or spending.

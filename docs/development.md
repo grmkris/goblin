@@ -101,7 +101,9 @@ eviction acceptance.
 ## The dev stage
 
 Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.local/dev.env`
-(mode 600) plus the shared Cloudflare credentials in `~/.config/myapps/dev.env`:
+(mode 600) plus the Cloudflare credentials in `.local/cloud.env` (mode 600, only `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID`; `GOBLIN_CLOUD_ENV_FILE` names another file). CI deploys dev from the same names, held as the
+`dev` environment's secrets (scripts/README.md, "Release operation"):
 
 | Variable | Meaning |
 | --- | --- |
@@ -127,10 +129,10 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 These are source defaults and configuration names; active dev settings and provider caps must be verified separately.
 
 ```sh
-bun run plan:dev                          # preview
-bun run deploy:dev                        # deploy
-bun run destroy:dev -- --confirm-reset    # erase every account, conversation and MCP credential
-GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset   # the same on prod, only at a reset the owner decided
+bun run plan:dev                          # preview; CI deploys every push to dev that passes Check
+GOBLIN_BREAK_GLASS=1 bun run deploy:dev   # deploy by hand: break-glass only, with CI's deploys paused
+GOBLIN_BREAK_GLASS=1 bun run destroy:dev -- --confirm-reset    # erase every account, conversation and MCP credential
+GOBLIN_BREAK_GLASS=1 GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset   # the same on prod, at an owner reset
 bun run smoke:dev                         # acceptance; see scripts/README.md
 ```
 
@@ -295,7 +297,8 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   `{ key: '<14-digit timestamp>_name', tables, sql }`, statements joined by `BREAK` (`--> statement-breakpoint`).
   `storage/migrations.ts` applies every list in key order and refuses a table that is not an application table.
   Until launch goblin is greenfield: a migration is edited in place as if the schema had always been so, and a
-  release that edits an applied one resets dev first (`bun run destroy:dev -- --confirm-reset`); a new table or column
+  release that edits an applied one resets dev first (`GOBLIN_BREAK_GLASS=1 bun run destroy:dev -- --confirm-reset`, then
+  `GOBLIN_BREAK_GLASS=1 bun run deploy:dev` re-creates it, since CI refuses a plan that creates goblinAuth); a new table or column
   may also arrive as its own migration, which needs no reset. Never touch Pi or Agents tables.
 - Owner API endpoints: add the endpoint to its area's group in `packages/contracts/src/api/` (paths are relative to
   `/api`; `error` names the failures the endpoint itself produces), then its handler in the area's `api.ts`
@@ -346,14 +349,34 @@ only after Cloudflare Email Sending verifies the sender. Every stage requires OT
 invite-only. These settings do not authorize a production deploy.
 
 `GOBLIN_CONFIRM_PROD=1 bun run plan:prod` previews, and the same explicit guard protects `deploy:prod` and
-`smoke:prod`. The default prod smoke is read-only: health and an anonymous protected-route probe. An operator smoke
+`smoke:prod`; a `deploy:prod` outside CI is also break-glass (`GOBLIN_BREAK_GLASS=1`). The default prod smoke is read-only: health and an anonymous protected-route probe. An operator smoke
 account's mode-600 OTP session file opts into the full flow. MCP clients authorize against the stage's origin.
 
-Daily work targets the `dev` branch, and Check runs on every dev push and pull request on GitHub-hosted runners. Release dev from the build box once Check passes: `heavy bun run release dev <full-sha>`, as a user in group `goblin-release` (`sg goblin-release -c "…"`). It requires the passing push Check of that exact current dev tip, deploys from a clean snapshot, verifies authenticated smoke, drift and migration inventory, and records the active Worker version. A superseded dev commit cannot deploy.
+There are two branches: `dev` (the default; every change lands here) deploys to `dev.goblin.surf` and
+`wallet-dev.goblin.surf`, and `prod` to `goblin.surf` and `wallet.goblin.surf`. One workflow, `.github/workflows/ci.yml`,
+runs on GitHub-hosted runners. Check runs on every push and pull request. A push to `dev` that passes Check runs Deploy
+dev: `scripts/release.py dev` requires that exact dev tip and its passing Check, plans without a delete, replace or
+re-create of goblinAuth, Files or Web, deploys, and verifies authenticated smoke, drift and the D1 migration inventory;
+then `scripts/wallet_release.py dev` plans, deploys and smokes wallet-dev. Their sanitized receipts are the run's
+`dev-acceptance` artifact. A superseded dev commit cannot deploy.
 
-Promote from the build box with `heavy bun run promote <full-sha>`. It requires current authenticated dev acceptance of that SHA, advances `prod` without a force push, then deploys and verifies prod. All stage operations share `/var/lib/goblin-release/deploy.lock`, stage names and Alchemy state. Destructive plans still require a separate explicit reset decision. Promote also plans and deploys Wallet production from the same source snapshot through `GOBLIN_CONFIRM_PROD=1 bun run deploy:wallet-prod`, preserving its separate wallet deploy lock and Alchemy state and reading the mode-600 `.local/wallet-prod.env`. Wallet smoke requires `GET /health` with `ok:true,live:true`, OAuth metadata issuer `https://wallet.goblin.surf`, and anonymous `POST /mcp` returning 401. Its receipt binds the source SHA to the active `goblin-wallet-prod` version. These probes never sign or spend.
+Promote with `bun run promote <full-sha>` from any checkout with `gh` signed in and `.local/cloud.env`. It deploys nothing:
+it requires that SHA's dev Check, its `dev-acceptance` receipt (authenticated, at the live dev Worker version) and a
+fast-forward, then moves `prod`. That push runs Deploy prod, which repeats those checks, refuses a forced push, and
+releases goblin prod and Wallet production. Wallet smoke requires `GET /health` with `ok:true,live:true` on prod (dev
+only `ok:true`), the stage's OAuth issuer and anonymous `POST /mcp` returning 401; these probes never sign or spend.
+Destructive plans still require a separate explicit reset decision.
 
-`grmkris/goblin` is the public source: its branches, history and Issues are public. No self-hosted runner is registered on it and no stage secret lives in GitHub, so nothing a pull request runs can reach the build box or a credential. See [ADR 0046](adr/0046-production-promotion-and-public-source.md).
+Alchemy state for dev and prod lives in the account's shared Cloudflare state store (`scripts/alchemy-state.ts`), the
+`alchemy-state-store` Worker myapps also uses; every other stage keeps local `.alchemy/state`. The store has no lock, so
+each stage deploys in one non-cancelling CI concurrency group, and `deploy:*` or `destroy:*` on dev or prod anywhere else
+refuses unless `GOBLIN_BREAK_GLASS=1`: the break-glass path from the build box, with CI's deploys paused first. `plan:*`,
+`drift:*` and `smoke:*` run anywhere.
+
+`grmkris/goblin` is the public source: its branches, history, Issues, workflow logs and artifacts are public. Stage
+secrets are GitHub environment secrets behind branch policies (`dev` for the dev branch, `prod` for prod), masked in
+the logs before use; pull requests run only Check and never reach them. See
+[ADR 0046](adr/0046-production-promotion-and-public-source.md).
 
 For the first production bootstrap, an operator supplies `GOBLIN_OWNER_EMAIL` and `GOBLIN_SIGNUP_INVITE_CODE` in the mode-600 prod environment, signs in through the real email OTP flow, and records the resulting mode-600 `prod-session.json`. The operator then applies exactly one stage-scoped Pro override of 800 Credits/day to that verified owner. Dodo stays deferred and its live keys remain unset.
 
@@ -579,9 +602,9 @@ Its stage commands are `scripts/wallet-stage.ts`, not `scripts/stage.ts`:
 
 - `bun run dev:wallet` builds `wallet-web` and runs the stack locally (placeholder Cloudflare credentials).
 - `bun run plan:wallet-dev` and `bun run deploy:wallet-dev` plan and deploy the `dev` stage
-  (`wallet-dev.goblin.surf`) under `flock $GOBLIN_RELEASE_ROOT/wallet-deploy.lock`. Resources are named
-  `goblin-wallet-dev[-role]`; Alchemy state lives in `/var/lib/goblin-release/alchemy/state/goblin-wallet/dev` and the
-  first deploy creates it.
+  (`wallet-dev.goblin.surf`). Resources are named `goblin-wallet-dev[-role]`; Alchemy state lives in the shared
+  Cloudflare state store as `goblin-wallet/dev`. CI's Deploy dev deploys it after goblin; by hand, a deploy is
+  break-glass (`GOBLIN_BREAK_GLASS=1`).
 - `bun run plan:wallet-prod` and `GOBLIN_CONFIRM_PROD=1 bun run deploy:wallet-prod` do the same for the `prod` stage
   (`wallet.goblin.surf`, `goblin-wallet-prod[-role]`), reading `.local/wallet-prod.env`.
 

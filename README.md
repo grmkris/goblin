@@ -132,7 +132,7 @@ bun run check      # the full gate (run it through `heavy` on the build box)
 
 A visitor who is signed out meets goblin's landing page at `/`, which links to Goblin Wallet's own; a signed-in owner
 goes straight to their chat. The deployment stages are `dev` at `dev.goblin.surf` and `prod` at `goblin.surf`, with separate auth databases,
-secrets and dedicated LiteLLM keys. The first production release is invite-only; owner OTP bootstrap is an explicit operator step. Alchemy can attach the custom domains; a `dev` commit with a passing push Check is released to dev from the build box, and promoting an accepted SHA advances `prod`, then deploys and verifies core Goblin and Wallet production.
+secrets and dedicated LiteLLM keys. The first production release is invite-only; owner OTP bootstrap is an explicit operator step. Alchemy can attach the custom domains. CI on GitHub-hosted runners deploys every push to `dev` that passes Check to dev and wallet-dev; `bun run promote <sha>` fast-forwards `prod` to an accepted dev SHA, and CI then deploys and verifies core Goblin and Wallet production.
 Alternate hosts redirect to the configured canonical origin. Dev sign-up stays closed or invite-only; prod
 supports open sign-up after sender verification. Email OTP is the sole login method, and every stage requires mail. Both stages use `hello@goblin.surf` after sender onboarding,
 with a host prefix on dev mail subjects. See [development](docs/development.md) for the production guard and smoke.

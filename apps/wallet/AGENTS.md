@@ -5,7 +5,8 @@ inbound MCP server, OAuth, the per-owner `WalletLedger` Durable Object and the `
 the agent's and the owner's account upgrade alike, is a UserOperation through Pimlico (`PIMLICO_API_KEY`), its gas
 paid in USDC; the Worker holds no key that spends ETH. It serves the `@goblin/wallet-web` build as static assets and
 `/views/*.html` through `env.ASSETS`. It may import `@goblin/wallet` only. Infrastructure is `alchemy.run.ts` (Stack `goblin-wallet`); it is
-deployed by `bun run deploy:wallet-dev` (`scripts/wallet-stage.ts`), never by `scripts/stage.ts`.
+deployed by CI's Deploy dev and Deploy prod jobs through `scripts/wallet_release.py` and `scripts/wallet-stage.ts`
+(by hand only as break-glass: `GOBLIN_BREAK_GLASS=1 bun run deploy:wallet-dev`), never by `scripts/stage.ts`.
 
 ## Checks
 

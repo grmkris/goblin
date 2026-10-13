@@ -2053,6 +2053,20 @@ answers only for a settled payment.
 
 ## Release and public source
 
-`dev` is the daily source branch, and `prod` records the deliberately promoted SHA. A dev commit whose push Check passed is released from the build box, with exact-tip deployment and authenticated acceptance. Promote verifies the stored dev SHA and live Worker version, advances prod without rewriting history, and deploys/verifies that commit under the existing stage lock and Alchemy state. Promote deploys core Goblin and the separate Wallet production Worker from that same snapshot. Wallet keeps its own stage file, Alchemy state and wallet deploy lock; health, production OAuth issuer and anonymous MCP refusal establish its public smoke receipt.
+`dev` is the daily source branch and the default; `prod` records the deliberately promoted SHA. One workflow,
+`ci.yml`, runs on GitHub-hosted runners: Check on every push and pull request, then, for a push to `dev`, Deploy dev
+(goblin dev and wallet-dev, exact-tip deployment and authenticated acceptance, published as the `dev-acceptance`
+artifact), and for a push to `prod`, Deploy prod. `bun run promote <sha>` verifies the dev Check, that SHA's
+`dev-acceptance` receipt at the live dev Worker version and a fast-forward, then moves `prod`; Deploy prod repeats the
+checks, refuses a forced push and deploys core Goblin and the separate Wallet production Worker from the same commit.
+Wallet keeps its own stage file and Alchemy stack; health, the stage's OAuth issuer and anonymous MCP refusal establish
+its public smoke receipt.
 
-The repository is the public source: its branches, history and Issues are public, and deployed commit ids are public commit ids. Every check runs on GitHub-hosted runners with read-only permissions and no secrets; no self-hosted runner is registered and no stage secret is stored in GitHub, so pull requests cannot reach the build box. [ADR 0046](adr/0046-production-promotion-and-public-source.md) records the boundaries.
+Alchemy state for dev and prod lives in the account's shared Cloudflare state store (`scripts/alchemy-state.ts`), which
+myapps also uses; local, test and bench stages keep local state. The store has no lock: each stage deploys through one
+non-cancelling CI concurrency group, and a deploy from anywhere else is break-glass (`GOBLIN_BREAK_GLASS=1`).
+
+The repository is the public source: its branches, history, Issues, workflow logs and artifacts are public, and deployed
+commit ids are public commit ids. Stage secrets are GitHub environment secrets that only their branch's deploy job can
+read, masked before use; pull requests run only Check, with read-only permissions and no secrets.
+[ADR 0046](adr/0046-production-promotion-and-public-source.md) records the boundaries.
