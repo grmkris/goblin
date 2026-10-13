@@ -76,7 +76,7 @@
     "check:chat-ids": "bun tools/check-chat-ids.ts",
     "check:spikes": "bun run --cwd spikes/coding typecheck && bun run --cwd spikes/coding test --path-ignore-patterns=test/verifier.test.ts && bun run --cwd spikes/coding-cf typecheck",
     "promote": "python3 scripts/promote.py",
-    "test:release": "python3 -B scripts/release_test.py && python3 -B scripts/promote_test.py && python3 -B scripts/wallet_release_test.py && python3 -B scripts/ci_credentials_test.py"
+    "test:release": "python3 -B scripts/release_test.py && python3 -B scripts/promote_test.py && python3 -B scripts/wallet_release_test.py"
   },
   "devDependencies": {
     "@shadcn/lint": "0.2.0",

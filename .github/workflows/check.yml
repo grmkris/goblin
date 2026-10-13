@@ -10,44 +10,17 @@ concurrency:
   cancel-in-progress: true
 jobs:
   check:
-    # The netcup runner is persistent and holds the stages' credentials: it runs only pushes to this repository's own
-    # branches. Pull requests, a fork's included, run on GitHub's hosted runners below.
-    if: github.event_name == 'push'
-    runs-on: [self-hosted, linux, x64, netcup]
-    timeout-minutes: 30
-    env:
-      # Clear of the local default (18861) and of the 188xx ports video previews take on this box, so CI never collides
-      # with an agent running the harness or a preview server.
-      GOBLIN_HARNESS_PORT: '38862'
-      TURBO_TELEMETRY_DISABLED: '1'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: .bun-version
-      - run: bun install --frozen-lockfile
-      - run: bun install --frozen-lockfile
-        working-directory: scripts/fixtures/mcp-app
-      - run: bun install --frozen-lockfile
-        working-directory: spikes/coding
-      - run: bun install --frozen-lockfile
-        working-directory: spikes/coding-cf
-      - run: bun run check
-
-  pull-request:
-    # The repository is public: a pull request's code runs only on a fresh hosted runner, with read-only access.
-    if: github.event_name == 'pull_request'
+    # The repository is public, so every check runs on a fresh GitHub-hosted runner with read-only access and no
+    # secrets. No self-hosted runner is registered here: releases run from the build box (ADR 0046).
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       TURBO_TELEMETRY_DISABLED: '1'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
