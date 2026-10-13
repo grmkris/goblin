@@ -1,5 +1,13 @@
-import { mutationOptions } from '@tanstack/react-query'
-import type { ChatId, PayMode, PayRoute } from '@goblin/contracts'
+import { mutationOptions, queryOptions, skipToken } from '@tanstack/react-query'
+import type {
+  ChatId,
+  NewChatsDefault,
+  PayMode,
+  PayRoute,
+  RoutePick,
+  TelegramChat,
+  TelegramChats,
+} from '@goblin/contracts'
 import { owner } from '../lib/api.ts'
 import { mcpKeys } from '../mcp/queries.ts'
 
@@ -12,6 +20,8 @@ const agentKeys = {
   model: ['agent', 'model'] as const,
   pay: ['agent', 'pay'] as const,
   channel: ['agent', 'channel'] as const,
+  chats: ['agent', 'channel', 'chats'] as const,
+  chatsOf: (connectionId: string) => ['agent', 'channel', 'chats', connectionId] as const,
   resident: ['agent', 'resident'] as const,
   memory: (chat: ChatId | undefined) => ['agent', 'memory', chat ?? null] as const,
 }
@@ -80,6 +90,59 @@ export const changeChannelMutation = mutationOptions({
       client.invalidateQueries({ queryKey: agentKeys.channel }),
       client.invalidateQueries({ queryKey: mcpKeys.servers }),
     ]),
+})
+
+/**
+ * The chats and forum topics the Telegram channel on `connectionId` reaches, each with its route (ADR 0055); nothing is
+ * read while the channel is off (no connection carries it).
+ */
+export const channelChatsQuery = (connectionId: string | undefined) =>
+  queryOptions({
+    queryKey: agentKeys.chatsOf(connectionId ?? ''),
+    queryFn:
+      connectionId === undefined
+        ? skipToken
+        : owner.apiQuery({
+            queryKey: agentKeys.chatsOf(connectionId),
+            queryFn: (api) => api.agent.channelChats(),
+          }).queryFn,
+  })
+
+/** The chats list with one row as the agent answered it. */
+const withChat = (list: TelegramChats, chat: TelegramChat): TelegramChats => ({
+  ...list,
+  chats: list.chats.map((each) => (each.chat === chat.chat && each.thread === chat.thread ? chat : each)),
+})
+
+/**
+ * Routes one chat or forum topic, which also answers goblin's offer for it and delivers what it held. A pick that makes
+ * a new Topic has no id to show before the agent answers, so the row shows the pick on its way (the mutation's
+ * variables) rather than a guess in the cache; the answer replaces the row, then the list is read again for the topics
+ * that follow it.
+ */
+export const routeChannelMutation = mutationOptions({
+  ...owner.apiMutation({ mutationFn: (api, pick: RoutePick) => api.agent.routeChannel({ payload: pick }) }),
+  onSuccess: (chat, _pick, _result, { client }) => {
+    client.setQueriesData<TelegramChats>({ queryKey: agentKeys.chats }, (list) => list && withChat(list, chat))
+    return client.invalidateQueries({ queryKey: agentKeys.chats })
+  },
+})
+
+/** Sets what goblin does with chats it has not seen: shown at once, put back if the agent refuses it. */
+export const channelSettingsMutation = mutationOptions({
+  ...owner.apiMutation({
+    mutationFn: (api, newChats: NewChatsDefault) => api.agent.channelSettings({ payload: { newChats } }),
+  }),
+  onMutate: async (newChats: NewChatsDefault, { client }) => {
+    await client.cancelQueries({ queryKey: agentKeys.chats })
+    const previous = client.getQueriesData<TelegramChats>({ queryKey: agentKeys.chats })
+    client.setQueriesData<TelegramChats>({ queryKey: agentKeys.chats }, (list) => list && { ...list, newChats })
+    return { previous }
+  },
+  onError: (_error, _newChats, result, { client }) => {
+    for (const [key, list] of result?.previous ?? []) client.setQueryData(key, list)
+  },
+  onSuccess: (status, _newChats, _result, { client }) => client.setQueryData(channelQuery.queryKey, status),
 })
 
 /** Resident authority (ADR 0003), renewed by the read itself. */

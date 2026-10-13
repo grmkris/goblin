@@ -7,6 +7,7 @@ import { Switch } from '@goblin/ui'
 import { changeChannelMutation, channelQuery } from '../agent/queries.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { shortDate } from '../lib/format.ts'
+import { TelegramChats } from './telegram-chats.tsx'
 
 export const hasTelegramTools = (tools: readonly ToolView[]): boolean =>
   telegramTools(tools.map(({ name }) => name)) !== undefined
@@ -25,7 +26,10 @@ export function useTelegramChannel(onMessage: (message: string) => void) {
 
 export type TelegramChannel = ReturnType<typeof useTelegramChannel>
 
-/** Whether this server carries the Telegram channel; turning it on here moves it from any other. */
+/**
+ * Whether this server carries the Telegram channel; turning it on here moves it from any other. While it does, its chats
+ * follow, each with its route (ADR 0055).
+ */
 export function TelegramControl({
   connectionId,
   channel,
@@ -38,31 +42,35 @@ export function TelegramControl({
   if (status === undefined) return null
   const here = status !== null && status.connectionId === connectionId
   return (
-    <div className="setting-row" aria-busy={pending}>
-      <span className="grant-text">
-        <span id={id} className="grant-name">
-          Telegram
+    <>
+      <div className="setting-row" aria-busy={pending}>
+        <span className="grant-text">
+          <span id={id} className="grant-name">
+            Telegram
+          </span>
+          <span className="grant-about telegram-about">
+            Your private chat goes to #Personal, and each other chat where its route says. Answers go back to the chat
+            they came from.
+            {here && (
+              <>
+                {' '}
+                On since{' '}
+                <time dateTime={new Date(status.enabledAt * 1000).toISOString()}>
+                  {shortDate(status.enabledAt * 1000)}
+                </time>
+                ,{status.transport === 'events' ? ' through Events.' : ' through the older doorbell.'}
+              </>
+            )}
+          </span>
         </span>
-        <span className="grant-about">
-          Messages to your bot come into #Personal, and the answers go back to Telegram.
-          {here && (
-            <>
-              {' '}
-              On since{' '}
-              <time dateTime={new Date(status.enabledAt * 1000).toISOString()}>
-                {shortDate(status.enabledAt * 1000)}
-              </time>
-              ,{status.transport === 'events' ? ' through Events.' : ' through the older doorbell.'}
-            </>
-          )}
-        </span>
-      </span>
-      <Switch
-        checked={here}
-        disabled={pending}
-        aria-labelledby={id}
-        onCheckedChange={(checked) => change(checked ? connectionId : null)}
-      />
-    </div>
+        <Switch
+          checked={here}
+          disabled={pending}
+          aria-labelledby={id}
+          onCheckedChange={(checked) => change(checked ? connectionId : null)}
+        />
+      </div>
+      {here && <TelegramChats connectionId={connectionId} />}
+    </>
   )
 }

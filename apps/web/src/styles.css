@@ -1656,6 +1656,156 @@
     gap: 0.75rem;
     margin-inline-start: auto;
   }
+  /* How the channel works is read whole, not cut at two lines like a tool's purpose. */
+  .grant-about.telegram-about {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    text-wrap: pretty;
+  }
+  /*
+   * The Telegram channel's chats (components/telegram-chats.tsx, ADR 0055): the New chats default, how far goblin sees,
+   * then a row per chat with its forum topics hanging from it on a thin rail, as Telegram nests them. A row's state shows
+   * only when it is not the usual one. On a wide card the route selects keep one column at the row's end, where it goes
+   * then who answers; on a narrow one they go under the words, each the full width.
+   */
+  .telegram-chats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding-block-end: 0.5rem;
+    container: telegram-route / inline-size;
+  }
+  .telegram-setting {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 0.75rem;
+    padding-block: 0.5rem;
+  }
+  .telegram-setting > .grant-text {
+    flex: 1 1 14rem;
+  }
+  .telegram-setting > [data-slot='native-select-wrapper'] {
+    flex: 0 0 14rem;
+  }
+  .telegram-reach {
+    margin: 0;
+    padding-block-end: 0.25rem;
+    color: var(--muted-foreground);
+    font-size: var(--text-13);
+    line-height: 1.45;
+    text-wrap: pretty;
+  }
+  .telegram-widen {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 1.5rem;
+  }
+  @media (pointer: coarse) {
+    .telegram-widen {
+      min-height: 2.75rem;
+    }
+  }
+  .telegram-widen > svg {
+    width: 0.8125rem;
+    height: 0.8125rem;
+  }
+  .telegram-chat-list,
+  .telegram-topics {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .telegram-chat-list {
+    border-block-start: 1px solid var(--hairline);
+  }
+  .telegram-chat-group + .telegram-chat-group {
+    border-block-start: 1px solid var(--hairline);
+  }
+  .telegram-topics {
+    margin-block-end: 0.5rem;
+    margin-inline-start: 0.375rem;
+    padding-inline-start: 0.875rem;
+    border-inline-start: 1px solid var(--hairline);
+  }
+  .telegram-chat {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.375rem 0.75rem;
+    padding-block: 0.5rem;
+    font-size: 0.875rem;
+  }
+  .telegram-topics .telegram-chat {
+    padding-block: 0.375rem;
+  }
+  .telegram-chat-text {
+    display: flex;
+    flex: 1 1 12rem;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+  }
+  .telegram-chat-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.125rem 0.625rem;
+    font-weight: 500;
+  }
+  .telegram-chat-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .telegram-chat-heading {
+    margin: 0;
+    padding-block: 0.625rem 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+  .telegram-chat-meta {
+    color: var(--muted-foreground);
+    font-size: var(--text-13);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
+  }
+  /* Where it goes (14rem), then who answers (11rem): the same column on every row, empty where no one answers. */
+  .telegram-route {
+    display: flex;
+    flex: 0 0 25.375rem;
+    gap: 0.375rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .telegram-route > [data-slot='native-select-wrapper'] {
+    flex: 0 0 14rem;
+    min-width: 0;
+  }
+  .telegram-route > [data-slot='native-select-wrapper'] + [data-slot='native-select-wrapper'] {
+    flex-basis: 11rem;
+  }
+  .telegram-route select {
+    text-overflow: ellipsis;
+  }
+  @container telegram-route (width < 38rem) {
+    .telegram-route {
+      flex: 1 1 100%;
+      flex-wrap: wrap;
+    }
+    .telegram-route > [data-slot='native-select-wrapper'],
+    .telegram-setting > [data-slot='native-select-wrapper'] {
+      flex: 1 1 100%;
+      width: 100%;
+    }
+  }
   /*
  * Settings-list rows: what a switch allows on the left, the switch on the right, hairlines between. A row the agent
  * may use (a tool) and a row the owner picks (a suggestion) share the layout.
