@@ -88,6 +88,8 @@ jobs:
           path: ${{ runner.temp }}/receipts
           retention-days: 90
           if-no-files-found: error
+          # A re-run attempt replaces this run's receipts with the ones of the deploy it just made.
+          overwrite: true
       - name: Remove transient credentials
         if: always()
         run: python3 -B scripts/ci_credentials.py dev --cleanup
@@ -145,6 +147,8 @@ jobs:
           path: ${{ runner.temp }}/receipts
           retention-days: 90
           if-no-files-found: error
+          # A re-run attempt replaces this run's receipts with the ones of the deploy it just made.
+          overwrite: true
       - name: Remove transient credentials
         if: always()
         run: python3 -B scripts/ci_credentials.py prod --cleanup
