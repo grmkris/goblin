@@ -2,7 +2,7 @@ import { TELEGRAM_EVENTS, telegramEvent, telegramTools } from '@goblin/contracts
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
-import { DOORBELL_TOOLS, channelTool } from './channel.ts'
+import { DOORBELL_TOOLS, channelTool } from './tools.ts'
 import { type Doorbell, doorbellValid, hookToken, hookUrl } from './doorbell.ts'
 import { Channel } from './service.ts'
 import { Forbidden, InvalidInput, attempt } from '../http/errors.ts'

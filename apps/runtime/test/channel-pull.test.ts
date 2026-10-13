@@ -3,7 +3,8 @@ import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import * as Fiber from 'effect/Fiber'
 import { afterEach } from 'vitest'
-import { type ChannelCall, type ChannelPorts, telegramChannel } from '../src/channel/channel.ts'
+import { type ChannelPorts, telegramChannel } from '../src/channel/channel.ts'
+import type { ChannelCall } from '../src/channel/tools.ts'
 import { enableEvents } from '../src/channel/store.ts'
 import { registerPrimary } from '../src/chats/directory.ts'
 import { CredentialCipher } from '../src/mcp/cipher.ts'
@@ -52,7 +53,12 @@ const fixture = Effect.gen(function* () {
     })
   const ports: ChannelPorts = {
     call,
-    submit: (_text, operationId) => Effect.sync(() => void submitted.push(operationId)),
+    submit: (turn) =>
+      Effect.sync(() => {
+        submitted.push(turn.operationId)
+        return { chatId: '1' }
+      }),
+    keep: () => Effect.void,
     answer: () => Effect.succeed(undefined),
   }
   return { channel, ports, opened, reads, submitted, most: () => most }

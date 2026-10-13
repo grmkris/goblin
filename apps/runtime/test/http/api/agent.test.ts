@@ -11,6 +11,13 @@ import { telegramChannel } from '../../../src/channel/channel.ts'
 import { Channel } from '../../../src/channel/service.ts'
 import { registerPrimary } from '../../../src/chats/directory.ts'
 import { AgentHandlers } from '../../../src/routines/agent-api.ts'
+import { AppEngine } from '../../../src/agent-apps/service.ts'
+import { ChatOperations, Conversations } from '../../../src/chats/service.ts'
+import { FlowEvents } from '../../../src/observability/flows.ts'
+import { Receipts } from '../../../src/organize/service.ts'
+import { Invocations, Personas } from '../../../src/personas/service.ts'
+import { Skills } from '../../../src/skills/service.ts'
+import { Topics } from '../../../src/topics/service.ts'
 import { ChatsLive } from '../../../src/layers/conversation.ts'
 import { ModelBudgetLive } from '../../../src/layers/budget.ts'
 import { Events, McpConnections, McpGrants, McpServers, Resident } from '../../../src/mcp/service.ts'
@@ -45,6 +52,16 @@ const fixture = () => {
     stub(McpConnections, { snapshot: () => Effect.succeedNone }),
     stub(McpGrants),
     stub(Events, { activeConsumer: () => Effect.succeedNone }),
+    // Routes reach Topics, Personas and their chats only while the channel is on; these are never used here.
+    stub(Topics),
+    stub(Personas),
+    stub(Invocations),
+    stub(Receipts),
+    stub(ChatOperations),
+    stub(Conversations),
+    stub(FlowEvents),
+    stub(Skills),
+    stub(AppEngine),
     // The database the lane builds its stores over, and the gate's resident authority and plan.
     Layer.succeed(Db, sqlite),
     Layer.succeed(Resident, currentResident().service),
@@ -135,5 +152,19 @@ describe('the agent group served by the agent', () => {
     expect(off.status).toBe(200)
     expect(await off.text()).toBe('null')
     expect(await callOwner({ fetch }, (api) => api.agent.channel())).toBeNull()
+  })
+
+  it('refuses the Chats list, a route and the new-chats default while the channel is off', async () => {
+    const { fetch } = fixture()
+    const chats = await fetch(json('GET', '/api/agent/channel/chats'))
+    expect(chats.status).toBe(400)
+    expect(await chats.json()).toMatchObject({ error: { code: 'invalid_input', reason: 'telegram_off' } })
+    const route = await fetch(json('PUT', '/api/agent/channel/routes', { chat: 'g_abc', mode: 'ignore' }))
+    expect(route.status).toBe(400)
+    expect(await route.json()).toMatchObject({ error: { reason: 'telegram_off' } })
+    const settings = await fetch(json('PUT', '/api/agent/channel/settings', { newChats: 'topic' }))
+    expect(settings.status).toBe(400)
+    const unnamed = await fetch(json('PUT', '/api/agent/channel/routes', { chat: 'g_abc', mode: 'answer' }))
+    expect(unnamed.status).toBe(400)
   })
 })

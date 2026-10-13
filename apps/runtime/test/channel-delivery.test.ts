@@ -1,7 +1,8 @@
 import { describe, expect, it } from '@effect/vitest'
 import * as Effect from 'effect/Effect'
 import { afterEach } from 'vitest'
-import { type ChannelCall, type ChannelPorts, type DeliveredReply, telegramChannel } from '../src/channel/channel.ts'
+import { type ChannelPorts, type DeliveredReply, telegramChannel } from '../src/channel/channel.ts'
+import type { ChannelCall } from '../src/channel/tools.ts'
 import { enableEvents, trackReply } from '../src/channel/store.ts'
 import { registerPrimary } from '../src/chats/directory.ts'
 import { UpstreamMcp } from '../src/http/errors.ts'
@@ -33,8 +34,9 @@ const fixture = (sends: ChannelCall) =>
     trackReply(sqlite, 'telegram-m1', 1)
     const ports: ChannelPorts = {
       call: sends,
-      submit: () => Effect.void,
-      answer: () => Effect.succeed('The plants are watered.'),
+      submit: () => Effect.die('nothing is routed here'),
+      keep: () => Effect.void,
+      answer: () => Effect.succeed({ text: 'The plants are watered.' }),
     }
     const delivered: DeliveredReply[] = []
     const deliver = channel.deliver(ports, 2, (reply) => Effect.sync(() => void delivered.push(reply)))

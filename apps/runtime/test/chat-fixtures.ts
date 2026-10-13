@@ -4,7 +4,10 @@ import * as Layer from 'effect/Layer'
 import { Budget, type ModelBudget } from '../src/budget.ts'
 import { attempt, attemptSync } from '../src/http/errors.ts'
 import { makeChatOperations } from '../src/chats/operations.ts'
-import { ChatOperations } from '../src/chats/service.ts'
+import { PERSONAL_TOPIC } from '@goblin/contracts'
+import { primaryChat } from '../src/chats/directory.ts'
+import { ChatOperations, Conversations } from '../src/chats/service.ts'
+import { Invocations, Personas } from '../src/personas/service.ts'
 import { ChatsLive } from '../src/layers/conversation.ts'
 import { Models, type ModelPicker } from '../src/models.ts'
 import { FlowEvents } from '../src/observability/flows.ts'
@@ -55,10 +58,21 @@ export const portServices = ({ db, harness, budget, models, flows = FlowEvents.n
   const pi = PiSessions.layer.pipe(Layer.provide(input))
   const core = Layer.mergeAll(Layer.succeed(Db, db), KeyedLock.layer, pi, flows, plans, input)
   const operations = Layer.effect(ChatOperations, makeChatOperations)
+  // A probe's routes all go to Personal, main, and no Persona answers there.
+  const topics = Layer.mergeAll(
+    Layer.mock(Conversations, {
+      routineHome: (topic: number) =>
+        Effect.succeed({ chat: primaryChat, topic: topic === PERSONAL_TOPIC ? topic : PERSONAL_TOPIC }),
+    }),
+    Layer.mock(Personas, { active: Effect.succeed([]) }),
+    Layer.mock(Invocations, {}),
+  )
   return Layer.mergeAll(
     ChatsLive.pipe(Layer.provide(Layer.succeed(Db, db))),
     operations.pipe(Layer.provide(core)),
     plans,
     pi,
+    topics,
+    input,
   )
 }

@@ -1,4 +1,4 @@
-import { PRIMARY_CHAT } from '@goblin/contracts'
+import { PERSONAL_TOPIC, PRIMARY_CHAT } from '@goblin/contracts'
 import { FlowRecord } from '@goblin/contracts/inspect'
 import type { FlowEvent } from '@goblin/contracts/telemetry'
 import type { PiHarness } from 'agents/harness/pi'
@@ -96,8 +96,14 @@ async function telegramFlowsProbe(storage: DurableObjectStorage, harness: PiHarn
   })
   const twice = Effect.gen(function* () {
     const ports = yield* channelPorts(() => Effect.void)
-    yield* ports.submit('hello from telegram', 'telegram-flow')
-    yield* ports.submit('hello from telegram', 'telegram-flow')
+    const turn = {
+      topic: PERSONAL_TOPIC,
+      operationId: 'telegram-flow',
+      author: 'Telegram',
+      text: 'hello from telegram',
+    }
+    yield* ports.submit(turn)
+    yield* ports.submit(turn)
   })
   await Effect.runPromise(Effect.provide(twice, services))
   return { flows: recorded }

@@ -1,9 +1,10 @@
+import { TELEGRAM_DM } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
 import { requirePlan } from '../billing/gates.ts'
 import { requireBudget } from '../budget.ts'
 import { Setups } from '../setup/service.ts'
-import { channelToolName } from '../channel/channel.ts'
+import { channelToolName } from '../channel/tools.ts'
 import { Channel } from '../channel/service.ts'
 import { Forbidden } from '../http/errors.ts'
 import type { AgentServices } from '../layers/index.ts'
@@ -97,7 +98,8 @@ export function appServices(run: RunProgram, complete: AppCompletion): AppServic
               connections.callTool(
                 connectionId,
                 send,
-                { operationId: op, text: escaped(text) },
+                // An app tells the owner in their DM, never in a group (ADR 0055).
+                { operationId: op, text: escaped(text), chat: TELEGRAM_DM },
                 { caller: 'model', timeout: 5000, authorize: recheck },
               ),
             ),

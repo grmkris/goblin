@@ -1,8 +1,9 @@
+import { TELEGRAM_DM } from '@goblin/contracts'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { requirePlan } from '../billing/gates.ts'
-import { channelToolName } from '../channel/channel.ts'
+import { channelToolName } from '../channel/tools.ts'
 import { Channel } from '../channel/service.ts'
 import { Forbidden, toAppError } from '../http/errors.ts'
 import { McpConnections, requireResident } from '../mcp/service.ts'
@@ -67,7 +68,8 @@ const deliver = (row: NoticeRow) =>
           connections.callTool(
             connectionId,
             send,
-            { operationId, text },
+            // Notices always go to the owner's DM, never into a group (ADR 0055).
+            { operationId, text, chat: TELEGRAM_DM },
             { caller: 'model', timeout: 5000, authorize },
           ),
         ),

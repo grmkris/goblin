@@ -6,7 +6,8 @@ import * as Exit from 'effect/Exit'
 import * as Layer from 'effect/Layer'
 import * as ManagedRuntime from 'effect/ManagedRuntime'
 import * as TestClock from 'effect/testing/TestClock'
-import { type ChannelCall, channelTool, telegramChannel } from '../../src/channel/channel.ts'
+import { telegramChannel } from '../../src/channel/channel.ts'
+import { type ChannelCall, channelTool } from '../../src/channel/tools.ts'
 import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import { CollectedRuns, RunTelemetry } from '../../src/telemetry/events.ts'
 import { mcpReporter } from '../../src/telemetry/report.ts'
@@ -116,10 +117,10 @@ async function setup(storage: DurableObjectStorage, harness: PiHarness) {
       channel.pull(
         {
           ...ports,
-          submit: (text, operationId) =>
+          submit: (turn, persona) =>
             Effect.andThen(
-              Effect.sync(() => void operations.push(operationId)),
-              ports.submit(text, operationId),
+              Effect.sync(() => void operations.push(turn.operationId)),
+              ports.submit(turn, persona),
             ),
           answer: () => Effect.succeed(undefined),
         },
@@ -187,7 +188,8 @@ async function subscribeTelegram(state: Awaited<ReturnType<typeof setup>>) {
 }
 
 /** The first message's turn answered; the second still runs. */
-const answer = (operationId: string) => Effect.succeed(operationId === 'telegram-tg-123' ? 'hello back' : undefined)
+const answer = ({ operationId }: { readonly operationId: string }) =>
+  Effect.succeed(operationId === 'telegram-tg-123' ? { text: 'hello back' } : undefined)
 
 async function exercise(state: Awaited<ReturnType<typeof setup>>) {
   const { fixture, events, store, channel, operations, run } = state
@@ -233,7 +235,10 @@ async function exercise(state: Awaited<ReturnType<typeof setup>>) {
   await run(events.unsubscribe({ consumerId: 'telegram:question.answered', revision: 1 }))
   // The first message's turn answered; the second still runs: one reply goes out, one waits.
   const waiting = await Effect.runPromise(
-    channel.deliver({ call: state.call, submit: () => Effect.void, answer }, Math.floor(first / 1000)),
+    channel.deliver(
+      { call: state.call, submit: () => Effect.die('no message is routed here'), keep: () => Effect.void, answer },
+      Math.floor(first / 1000),
+    ),
   )
   await Effect.runPromise(channel.disable)
   return {
