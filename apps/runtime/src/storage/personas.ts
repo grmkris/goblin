@@ -71,6 +71,8 @@ export const ORGANIZE_KINDS = [
   'topic.setup',
   'persona.create',
   'persona.update',
+  'telegram.route',
+  'telegram.default',
 ] as const
 
 /**

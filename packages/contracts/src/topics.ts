@@ -70,7 +70,8 @@ export type TopicSetupSaved = typeof TopicSetupSaved.Type
 
 /**
  * What organizing changed, shown in Activity with Undo: who did it (`actor`), to what (`target`, a Topic or Persona
- * id), a one-line `summary`, and the chat whose run did it. `undoable` is false once a later edit touched the target.
+ * id; for a Telegram route its chat and thread as `<chat>:<thread>`, for the new-chats default `new_chats`), a
+ * one-line `summary`, and the chat whose run did it. `undoable` is false once a later edit touched the target.
  */
 export const OrganizeReceipt = Schema.Struct({
   id: Schema.String,
@@ -82,6 +83,8 @@ export const OrganizeReceipt = Schema.Struct({
     'topic.setup',
     'persona.create',
     'persona.update',
+    'telegram.route',
+    'telegram.default',
   ]),
   target: Schema.String,
   summary: Schema.String,
