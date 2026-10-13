@@ -9,7 +9,7 @@ infrastructure. Read
 
 ## Work and ownership
 
-- Work on private `dev`; promote an accepted SHA to `prod` through the Promote action. Commit each coherent, green change separately as it lands; never batch unrelated changes.
+- Work on `dev`; promote an accepted SHA to `prod` through the Promote action. Commit each coherent, green change separately as it lands; never batch unrelated changes.
 - Other agents share this checkout. Preserve edits you did not make and `.spec.md.swo`. Never stash, reset, restore
   or delete foreign files. Stage exact owned paths or hunks, never `git add .` or `git add -A`.
 - A red gate in a file you did not touch may be someone's mid-edit: check `git status`/`git diff` before fixing it.
