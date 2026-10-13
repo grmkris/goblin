@@ -10,8 +10,8 @@ import { LayersVisual } from './layers.tsx'
 import { goblinSite, mcpEndpoint } from './origins.ts'
 import { ConnectVisual, GasVisual, KeysVisual, SubscriptionVisual } from './sections.tsx'
 
-/** The public source, public since 13 Oct 2026. */
-const SOURCE = { href: 'https://github.com/grmkris/goblin-public', public: true } as const
+/** goblin's public homes: its source on GitHub and its account on X. */
+const ELSEWHERE = { github: 'https://github.com/grmkris/goblin', x: 'https://x.com/goblin_surf' } as const
 
 /** The moss field at the top of the page, light and dark (`--shell`, and `--shell-rail` in dark), for Safari's bars. */
 const MOSS = { light: '#233e27', dark: '#0e1b11' } as const
@@ -113,6 +113,13 @@ function Footer({ goblin }: { readonly goblin: string }) {
           },
           { title: 'goblin', links: [{ label: 'Meet goblin', href: goblin }] },
           {
+            title: 'Follow',
+            links: [
+              { label: 'X, @goblin_surf', href: ELSEWHERE.x, external: true },
+              { label: 'GitHub', href: ELSEWHERE.github, external: true },
+            ],
+          },
+          {
             title: 'Legal',
             links: [
               { label: 'Terms', href: `${goblin}/terms` },
@@ -121,8 +128,6 @@ function Footer({ goblin }: { readonly goblin: string }) {
             ],
           },
         ]}
-        source={SOURCE.href}
-        showSource={SOURCE.public}
       />
     </div>
   )

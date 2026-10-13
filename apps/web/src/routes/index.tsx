@@ -48,6 +48,7 @@ export const Route = createFileRoute('/')({
       { property: 'og:image:height', content: '630' },
       { property: 'og:image:alt', content: 'goblin: your own goblin, always on.' },
       { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:site', content: '@goblin_surf' },
       { name: 'twitter:title', content: TITLE },
       { name: 'twitter:description', content: DESCRIPTION },
       { name: 'twitter:image', content: IMAGE },

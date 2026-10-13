@@ -30,8 +30,8 @@ import lisbonLight from '../../assets/landing/lisbon-light.webp'
 import lisbonPhoneDark from '../../assets/landing/lisbon-phone-dark.webp'
 import trivagoApp from '../../assets/landing/trivago-app.webp'
 
-/** goblin's public source, public since 13 Oct 2026. */
-const SOURCE = { href: 'https://github.com/grmkris/goblin-public', public: true } as const
+/** goblin's public homes: its source on GitHub and its account on X. */
+const ELSEWHERE = { github: 'https://github.com/grmkris/goblin', x: 'https://x.com/goblin_surf' } as const
 /** Production, which every stage's page names until its own `/health` says otherwise. */
 const PRODUCTION = 'https://goblin.surf'
 const WALLET = 'https://wallet.goblin.surf'
@@ -119,6 +119,13 @@ export function Landing() {
           },
           { title: 'Goblin Wallet', links: [{ label: 'Open Goblin Wallet', href: wallet }] },
           {
+            title: 'Follow',
+            links: [
+              { label: 'X, @goblin_surf', href: ELSEWHERE.x, external: true },
+              { label: 'GitHub', href: ELSEWHERE.github, external: true },
+            ],
+          },
+          {
             title: 'Policies',
             links: [
               { label: 'Terms', href: '/terms' },
@@ -127,8 +134,6 @@ export function Landing() {
             ],
           },
         ]}
-        source={SOURCE.href}
-        showSource={SOURCE.public}
       />
     </>
   )
@@ -308,7 +313,13 @@ function Open() {
         Everyone gets their own agent on Cloudflare, with its own memory and its own keys to the services they connect.
         Reach yours from the web, from Telegram, or from Claude Code and any other MCP client.
       </p>
-      <p>Open source, MIT.</p>
+      <p>
+        Open source, MIT:{' '}
+        <a className="landing-link" href={ELSEWHERE.github} rel="noopener">
+          the code is on GitHub
+        </a>
+        .
+      </p>
     </Section>
   )
 }
