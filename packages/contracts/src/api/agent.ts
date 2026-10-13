@@ -3,6 +3,7 @@ import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { ChannelStatus, ModelChoice, PayChoice, PayMode, PayRoute, UsageToday } from '../agent.ts'
 import { NonEmptyString } from '../ids.ts'
+import { RoutePick, TelegramChat, TelegramChats, TelegramSettings } from '../telegram.ts'
 import { ApiErrors } from './errors.ts'
 
 /** The owner's pick of a model the deployment offers. */
@@ -26,6 +27,11 @@ const ChannelPick = Schema.Struct({ connectionId: NonEmptyString(64) })
  * - `enableChannel`: `PUT /api/agent/channel` grants the connection's channel tools and subscribes its Events (or the
  *   legacy doorbell). A connection that lacks a tool is invalid input.
  * - `disableChannel`: `DELETE /api/agent/channel`, answered with null.
+ * - `channelChats`: `GET /api/agent/channel/chats`, every chat and forum topic the channel reaches with its route
+ *   (ADR 0055), read fresh from the server's chat list; invalid input while the channel is off.
+ * - `routeChannel`: `PUT /api/agent/channel/routes` sets where one chat or topic goes and who answers there, answers
+ *   goblin's open offer for it and delivers what was held. A Topic or Persona that is gone or archived is not found.
+ * - `channelSettings`: `PUT /api/agent/channel/settings`, what goblin does with chats it has not seen before.
  */
 export class AgentGroup extends HttpApiGroup.make('agent').add(
   HttpApiEndpoint.get('usage', '/agent/usage', { success: UsageToday }),
@@ -48,4 +54,18 @@ export class AgentGroup extends HttpApiGroup.make('agent').add(
     error: [ApiErrors.invalidInput, ApiErrors.upstream, ApiErrors.upstreamTimeout],
   }),
   HttpApiEndpoint.delete('disableChannel', '/agent/channel', { success: Schema.Null }),
+  HttpApiEndpoint.get('channelChats', '/agent/channel/chats', {
+    success: TelegramChats,
+    error: [ApiErrors.invalidInput, ApiErrors.upstream, ApiErrors.upstreamTimeout],
+  }),
+  HttpApiEndpoint.put('routeChannel', '/agent/channel/routes', {
+    payload: RoutePick,
+    success: TelegramChat,
+    error: [ApiErrors.invalidInput, ApiErrors.notFound, ApiErrors.upstream, ApiErrors.upstreamTimeout],
+  }),
+  HttpApiEndpoint.put('channelSettings', '/agent/channel/settings', {
+    payload: TelegramSettings,
+    success: ChannelStatus,
+    error: [ApiErrors.invalidInput],
+  }),
 ) {}

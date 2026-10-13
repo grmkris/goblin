@@ -1,4 +1,5 @@
 import * as Schema from 'effect/Schema'
+import { NewChatsDefault, TelegramReach } from './telegram.ts'
 
 export const ResidentStatus = Schema.Struct({
   state: Schema.Literals(['active', 'expired', 'revoked', 'never']),
@@ -19,12 +20,19 @@ export type UsageToday = typeof UsageToday.Type
 export const MemoryStatus = Schema.Struct({ messages: Schema.Number, summarized: Schema.Number })
 export type MemoryStatus = typeof MemoryStatus.Type
 
-/** The Telegram channel: the connection that carries it, or null when it is off. */
+/**
+ * The Telegram channel: the connection that carries it, or null when it is off. `reach` is how far its grant sees (the
+ * DM only, or all the bot's chats); with `dm`, `widenUrl` is where the owner lets goblin see their groups. `newChats`
+ * is what goblin does with a chat it has not seen before (ADR 0055).
+ */
 export const ChannelStatus = Schema.NullOr(
   Schema.Struct({
     connectionId: Schema.String,
     enabledAt: Schema.Number,
     transport: Schema.optional(Schema.Literals(['events', 'doorbell'])),
+    reach: Schema.optional(TelegramReach),
+    widenUrl: Schema.optional(Schema.String),
+    newChats: Schema.optional(NewChatsDefault),
   }),
 )
 export type ChannelStatus = typeof ChannelStatus.Type

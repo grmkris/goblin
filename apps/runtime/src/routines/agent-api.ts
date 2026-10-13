@@ -5,6 +5,7 @@ import { chooseOwnerModel } from '../agent-model.ts'
 import { Budget } from '../budget.ts'
 import { disableTelegram, enableTelegram } from '../channel/program.ts'
 import { Channel } from '../channel/service.ts'
+import { InvalidInput } from '../http/errors.ts'
 import { Models } from '../models.ts'
 import { Pay } from '../pay-mode.ts'
 import { AgentInput } from '../runtime/input.ts'
@@ -29,5 +30,9 @@ export const AgentHandlers = HttpApiBuilder.group(OwnerApi, 'agent', (handlers) 
         enableTelegram(payload.connectionId, env.APP_URL, env.CREDENTIAL_KEY, userId, schedulePull),
       ),
     )
-    .handle('disableChannel', () => disableTelegram),
+    .handle('disableChannel', () => disableTelegram)
+    // The routes land with the channel core (ADR 0055); until then the endpoints refuse.
+    .handle('channelChats', () => Effect.fail(new InvalidInput({ reason: 'telegram_routes' })))
+    .handle('routeChannel', () => Effect.fail(new InvalidInput({ reason: 'telegram_routes' })))
+    .handle('channelSettings', () => Effect.fail(new InvalidInput({ reason: 'telegram_routes' }))),
 )

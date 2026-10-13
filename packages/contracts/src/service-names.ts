@@ -9,23 +9,48 @@ export const toolSpellings = (service: string, tool: string): readonly [string, 
 /** The Telegram channel's server (ADR 0009): mygram, directly or through mysi. */
 const TELEGRAM_SERVICE = 'mygram'
 
-/** What the channel calls on it: read the inbox from a cursor, and send a message. */
-const TELEGRAM_TOOLS = { inbox: 'inbox_read', send: 'message_send' } as const
+/**
+ * What the channel calls on it: read the inbox from a cursor and send a message (the two a channel needs), ask with
+ * buttons, list the bot's chats and a chat's forum topics (ADR 0055).
+ */
+const TELEGRAM_TOOLS = {
+  inbox: 'inbox_read',
+  send: 'message_send',
+  ask: 'question_ask',
+  chats: 'chat_list',
+  threads: 'thread_list',
+} as const
 export type TelegramTool = keyof typeof TELEGRAM_TOOLS
 
-/** The Events that wake the channel, by the app's own names; a consumer is keyed by these whatever the spelling. */
-export const TELEGRAM_EVENTS = ['message.received', 'question.answered'] as const
-type TelegramEvent = (typeof TELEGRAM_EVENTS)[number]
+/** The tools a server must offer to carry the channel at all. */
+const REQUIRED_TELEGRAM_TOOLS = ['inbox', 'send'] as const satisfies readonly TelegramTool[]
 
-/** The channel's tools on one server: both under one spelling, mygram's own or mysi's. */
+/**
+ * The Events that wake the channel, by the app's own names; a consumer is keyed by these whatever the spelling.
+ * `TELEGRAM_EVENTS` must be offered; `chat.changed` is used once the server offers it (ADR 0055).
+ */
+export const TELEGRAM_EVENTS = ['message.received', 'question.answered'] as const
+export const TELEGRAM_OPTIONAL_EVENTS = ['chat.changed'] as const
+type TelegramEvent = (typeof TELEGRAM_EVENTS)[number] | (typeof TELEGRAM_OPTIONAL_EVENTS)[number]
+
+/** The channel's tools on one server, all under one spelling, mygram's own or mysi's, whether it offers each or not. */
 export type TelegramTools = Readonly<Record<TelegramTool, string>>
 
-/** The channel's tools as a server offering `offered` names them; none unless it offers both under one spelling. */
+/**
+ * The channel's tools as a server offering `offered` names them: under the spelling of its inbox and send tools, none
+ * unless it offers both under one. The others are named the same way; `offered` says which of them it has.
+ */
 export function telegramTools(offered: Iterable<string>): TelegramTools | undefined {
   const names = new Set(offered)
   for (const prefix of ['', `${TELEGRAM_SERVICE}_`]) {
-    const tools = { inbox: `${prefix}${TELEGRAM_TOOLS.inbox}`, send: `${prefix}${TELEGRAM_TOOLS.send}` }
-    if (names.has(tools.inbox) && names.has(tools.send)) return tools
+    const tools: TelegramTools = {
+      inbox: `${prefix}${TELEGRAM_TOOLS.inbox}`,
+      send: `${prefix}${TELEGRAM_TOOLS.send}`,
+      ask: `${prefix}${TELEGRAM_TOOLS.ask}`,
+      chats: `${prefix}${TELEGRAM_TOOLS.chats}`,
+      threads: `${prefix}${TELEGRAM_TOOLS.threads}`,
+    }
+    if (REQUIRED_TELEGRAM_TOOLS.every((tool) => names.has(tools[tool]))) return tools
   }
   return undefined
 }
