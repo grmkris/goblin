@@ -474,6 +474,14 @@ Advanced, a hand-over to a Persona, and both events set up in one step (each pro
 API routed in the page and the proposals it receives checked. Screenshots go under
 `.local/goblin-acceptance/events-*`; this is browser fixture evidence only.
 
+`heavy bun apps/web/test/ui-telegram.ts` renders the Telegram channel's chats (ADR 0055) from source in local Chromium
+at phone width in light and desk width in dark: the Chats list in mysi's card (the private chat and its topic, a waiting
+group and its topic, a group goblin routed, a paused and a left one), a route and who answers picked and shown at once,
+a refused pick put back with a calm line, the New chats default, the line and link while goblin sees only the private
+chat, and Activity's offers (Not now kept across a reload, Set up making a new Topic), with no sideways scroll and the
+owner API routed in the page. Screenshots go under `.local/goblin-acceptance/telegram-*`; this is browser fixture
+evidence only.
+
 `heavy bun apps/web/test/ui-holds.ts` renders the MCP 2026 owner cards (ADR 0042) from source in local Chromium at
 desktop and phone widths, light and dark: a URL request on the connection's own host and one elsewhere (flagged), its
 Open link (a new tab, never followed by the page), Done while the server still waits and Done once it answers, Cancel,
