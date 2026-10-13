@@ -29,6 +29,8 @@ jobs:
       RELEASE_SHA: ${{ inputs.sha }}
       RELEASE_OPERATION: ${{ inputs.operation }}
       GOBLIN_RELEASE_ROOT: /var/lib/goblin-release
+      # The public export's checks run the integration harness: clear of Check's 38862 and the 188xx video previews.
+      GOBLIN_HARNESS_PORT: '38962'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:

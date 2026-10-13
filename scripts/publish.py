@@ -19,9 +19,10 @@ def remote_head(directory, env):
 
 
 def public_env(key_file):
-    # Public validation runs without the private job's tokens, sessions or deployment credentials.
+    # Public validation runs without the private job's tokens, sessions or deployment credentials. The harness port is
+    # no secret: it keeps the export's integration tests clear of other servers on the same box.
     return {key: value for key, value in os.environ.items()
-            if key in ['PATH', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR', 'USER', 'LOGNAME']}
+            if key in ['PATH', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR', 'USER', 'LOGNAME', 'GOBLIN_HARNESS_PORT']}
 
 
 def validate(directory, log, env):
