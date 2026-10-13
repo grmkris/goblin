@@ -19,6 +19,8 @@ The spike directly imports Goblin's existing pure [Pi projection](../../apps/web
 
 Goblin's DOM/shadcn UI is not a native UI kit. This spike supplies small React Native screens instead. One supplies routing, native bundling, safe areas, streaming fetch and secure storage; it does not remove the work of building mobile screens.
 
+One's web renderer is a production target. In the browser, these React Native components render HTML/CSS through React Native Web; on Android and iOS, they render native views. The native app includes a JavaScript runtime and native shell, rather than embedding the website. One supports [SPA, SSG and SSR web routes](https://onestack.dev/docs/render-modes). This spike uses SPA mode for the signed-in chat. Its web build is currently a development and test companion; shipping it as Goblin's web app would require feature parity and hosting/API integration.
+
 Three integration details matter:
 
 1. **Platform imports must be extensionless.** `./client.ts` selected the browser client even in a native bundle. `./client` selects `client.native.ts`; final native bundles must be inspected for the secure-store implementation.
@@ -56,11 +58,19 @@ For native development, create `.env.local` from [.env.example](.env.example), t
 heavy bun run build:android
 heavy bun run build:ios
 bun run prebuild:native --platform android --no-install
-# With the required Android SDK/NDK and an emulator available:
+# Terminal 1: leave One's dev server running while using the native app.
+heavy bun run dev
+```
+
+In a second terminal in `spikes/mobile`, with an Android emulator already booted or a device connected:
+
+```sh
 heavy bun run android
-# On macOS with Xcode and CocoaPods:
+# Or on macOS with Xcode, CocoaPods and an iOS simulator:
 heavy bun run ios
 ```
+
+Both launchers use the Vite config's port, 18980, to find One's dev server. The dev script specifies that same port; change both together. The strict port prevents silently switching to another server if it is occupied. One's Android runner requires a connected target; it does not create or boot an emulator. Check targets with `adb devices -l`. An installed debug app loads its JavaScript from One's dev server; a release app packages its JavaScript for offline startup.
 
 `ONE_PUBLIC_GOBLIN_URL` defaults to the public dev origin and is embedded in the native bundle. Only put a public origin in this setting, never a secret. Sign-in and sends from a native app target that origin and are real actions. The browser client is always same-origin: plain `bun run dev` needs an API mounted at that origin; use the synthetic browser check for a self-contained preview.
 
@@ -71,6 +81,8 @@ One's build replaces `dist`, so run the web build again before browser acceptanc
 See [the dated receipt](evidence/2026-10-13.md) for commands and results. A JavaScript bundle is not an APK, IPA or device run.
 
 The generated Android project requires compile SDK 37, build tools 37.0.0 and NDK 27.1.12297006. This build environment has SDK/build tools 35 and no NDK. iOS binaries require macOS/Xcode. Neither platform's native binary has been built or installed here.
+
+The emulator follow-up also found no installed Android emulator or AVD, no connected ADB targets, and no exposed KVM device or CPU virtualization extensions on this host. Software emulation may be possible but would be slow and would not establish device performance. Use a machine with usable [Android virtualization](https://developer.android.com/studio/run/emulator-acceleration), or a connected Android device, for native acceptance.
 
 Still missing: rich Markdown/code rendering, attachments, conversation discovery/history pagination, queue editing, embedded MCP Apps, push notifications, app-store packaging and production session lifecycle review. Native startup time, memory use, scroll performance, keyboard avoidance, secure-store persistence and background recovery need actual device measurements.
 

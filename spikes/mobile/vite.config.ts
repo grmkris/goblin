@@ -3,7 +3,8 @@ import { defineConfig } from 'vite'
 import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
-  server: { host: '127.0.0.1' },
+  // Native runners read this port; keep it aligned with the dev script's explicit port.
+  server: { host: '127.0.0.1', port: 18980, strictPort: true },
   resolve: {
     alias: [
       {
