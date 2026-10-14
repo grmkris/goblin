@@ -182,8 +182,10 @@ connection stays open. The model's `mcp_call` ends the turn with `{ kind: 'scope
 and the owner's card starts `POST /api/mcp/:id/step-up`: a fresh authorization (`forceReauthorization`) for the union of
 what the connection holds, what it asked for and `offline_access` (everything offered when the held scope is not
 known), opened from a real link in a new tab. Choose access, in the card's menu, reads `GET /api/mcp/:id/access`
-(what a sign-in can ask for, and what the connection holds) and signs in with the owner's pick
-(`POST /api/mcp/:id/connect { scope }`, each one offered, plus `offline_access`). The
+(what a sign-in can ask for: the resource's scopes and its authorization server's together, since a resource may list
+only a narrow default; and what the connection holds) and signs in with the owner's pick
+(`POST /api/mcp/:id/connect { scope }`, each one offered, plus `offline_access`). A plain Connect stays narrow: the
+resource's own list, else its authorization server's, with `offline_access` when offered. The
 connection keeps its tokens until the new ones arrive; an abandoned step-up leaves it as it was. The owner presses
 Continue in the chat once signed in.
 

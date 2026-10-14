@@ -41,20 +41,18 @@ import type { McpConnectionSnapshot, McpServerConfig } from './types.ts'
 /** The failures that mean a server was not reached at all, rather than that it refused this agent. */
 const UNREACHABLE: ReadonlySet<UpstreamMcp['reason']> = new Set(['transport', 'timeout', 'cancelled'])
 
-/**
- * Request every scope the server offers: the resource's own list, else its authorization server's. The SDK only
- * falls back to the resource's list, so a server that publishes scopes on the authorization server alone would get
- * no scope request, and with it no `offline_access` and no refresh token. Grants, not scopes, limit what runs.
- */
-export const offeredScope = async (endpoint: string, fetchFn: typeof fetch): Promise<string | undefined> => {
-  const info = await discoverOAuthServerInfo(endpoint, { fetchFn })
-  const scopes = info.resourceMetadata?.scopes_supported ?? info.authorizationServerMetadata?.scopes_supported ?? []
-  return scopes.length === 0 ? undefined : scopes.join(' ')
-}
+/** A scope list as one scope string, none when it is empty. */
+const joined = (scopes: readonly string[] | undefined): string | undefined =>
+  scopes === undefined || scopes.length === 0 ? undefined : scopes.join(' ')
 
-/** What goblin asks for at sign-in: every scope the server offers, and those its first-class profile adds. */
-const signInScope = async (endpoint: string, fetchFn: typeof fetch): Promise<string | undefined> =>
-  computeScopeUnion(await offeredScope(endpoint, fetchFn), profileOf(endpoint)?.scope?.join(' '))
+/** The scopes a server publishes: its resource's own list, and its authorization server's. */
+const publishedScopes = async (endpoint: string, fetchFn: typeof fetch) => {
+  const info = await discoverOAuthServerInfo(endpoint, { fetchFn })
+  return {
+    resource: joined(info.resourceMetadata?.scopes_supported),
+    server: joined(info.authorizationServerMetadata?.scopes_supported),
+  }
+}
 
 /** A scope string's tokens, each once. */
 const tokensOf = (scope: string | undefined): string[] => [...new Set((scope ?? '').split(' ').filter((t) => t !== ''))]
@@ -64,12 +62,36 @@ const refreshOf = (offered: string | undefined): string | undefined =>
   tokensOf(offered).includes('offline_access') ? 'offline_access' : undefined
 
 /**
+ * What a sign-in asks for by default: the resource's own list, else its authorization server's, with `offline_access`
+ * when the authorization server offers it. The SDK only falls back to the resource's list, so a server that publishes
+ * scopes on the authorization server alone would get no scope request, and with it no refresh token. Grants, not
+ * scopes, limit what runs.
+ */
+export const offeredScope = async (endpoint: string, fetchFn: typeof fetch): Promise<string | undefined> => {
+  const { resource, server } = await publishedScopes(endpoint, fetchFn)
+  return computeScopeUnion(resource ?? server, refreshOf(server))
+}
+
+/** What goblin asks for at sign-in by default: what the server offers, and the scopes its first-class profile adds. */
+const signInScope = async (endpoint: string, fetchFn: typeof fetch): Promise<string | undefined> =>
+  computeScopeUnion(await offeredScope(endpoint, fetchFn), profileOf(endpoint)?.scope?.join(' '))
+
+/**
+ * Every scope Choose access offers: the resource's list and its authorization server's together (a resource may list
+ * only a narrow default while its authorization server lists every API it guards), and the profile's.
+ */
+const availableScope = async (endpoint: string, fetchFn: typeof fetch): Promise<string | undefined> => {
+  const { resource, server } = await publishedScopes(endpoint, fetchFn)
+  return computeScopeUnion(resource, server, profileOf(endpoint)?.scope?.join(' '))
+}
+
+/**
  * The scope for a sign-in the owner chose access for: the chosen tokens and `offline_access`, refused unless the
  * server offers each of them.
  */
 const chosenScope = (owner: OwnerServers, endpoint: string, chosen: readonly string[]) =>
   Effect.gen(function* () {
-    const offered = yield* attempt(() => signInScope(endpoint, owner.fetch))
+    const offered = yield* attempt(() => availableScope(endpoint, owner.fetch))
     const known = new Set(tokensOf(offered))
     if (chosen.length === 0 || chosen.some((token) => !known.has(token)))
       return yield* new InvalidInput({ reason: 'scope_not_offered' })
@@ -377,7 +399,7 @@ const connecting = (owner: OwnerServers) => ({
   }),
   access: Effect.fn('McpServers.access')(function* (connectionId: string) {
     const server = yield* owner.manager.server(connectionId)
-    const offered = yield* attempt(() => signInScope(server.endpoint, owner.fetch))
+    const offered = yield* attempt(() => availableScope(server.endpoint, owner.fetch))
     const held = yield* attempt(() => owner.credentials.tokens(connectionId))
     return { offered: tokensOf(offered), held: held?.scope === undefined ? null : tokensOf(held.scope) }
   }),

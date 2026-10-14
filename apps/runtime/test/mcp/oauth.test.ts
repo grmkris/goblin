@@ -89,12 +89,19 @@ class FixtureAuthorizationServer {
   /** Paths no request reaches: a fetch to one fails as a network failure does. */
   readonly unreachable = new Set<string>()
 
+  /** The scopes the protected resource itself lists; none by default, as MyTab publishes them. */
+  resourceScopes: string[] | undefined
+
   readonly fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const request = new Request(input, init)
     const { pathname } = new URL(request.url)
     if (this.unreachable.has(pathname)) throw new TypeError('fetch failed')
     if (pathname.startsWith('/.well-known/oauth-protected-resource'))
-      return Response.json({ resource: `${BASE}/mcp`, authorization_servers: [BASE] })
+      return Response.json({
+        resource: `${BASE}/mcp`,
+        authorization_servers: [BASE],
+        ...(this.resourceScopes === undefined ? {} : { scopes_supported: this.resourceScopes }),
+      })
     if (pathname === '/.well-known/oauth-authorization-server')
       return Response.json({
         issuer: BASE,
@@ -304,6 +311,20 @@ describe('outbound OAuth connect and refresh (unit, fixture authorization server
       expect((await servers.access('fixture')).held).toEqual(['notes', 'offline_access'])
       const stepUp = await servers.beginStepUp('fixture', 'notes:write')
       expect(scopeOf(stepUp.authorizationUrl)).toEqual(['notes', 'notes:write', 'offline_access'])
+    } finally {
+      await dispose()
+    }
+  })
+
+  it("signs in narrowly by default, while Choose access offers the resource's and its authorization server's scopes", async () => {
+    const { authorizationServer, servers, dispose } = setup()
+    authorizationServer.resourceScopes = ['notes']
+    authorizationServer.scopes = ['notes', 'notes:write', 'admin', 'offline_access']
+    try {
+      expect((await servers.access('fixture')).offered).toEqual(['notes', 'notes:write', 'admin', 'offline_access'])
+      expect(scopeOf((await servers.beginConnect('fixture')).authorizationUrl)).toEqual(['notes', 'offline_access'])
+      const chosen = await servers.beginConnect('fixture', ['notes', 'admin'])
+      expect(scopeOf(chosen.authorizationUrl)).toEqual(['admin', 'notes', 'offline_access'])
     } finally {
       await dispose()
     }
