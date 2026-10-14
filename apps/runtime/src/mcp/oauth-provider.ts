@@ -24,7 +24,7 @@ export type OAuthMode =
 
 /**
  * The name goblin registers under with every authorization server: a consent screen names the app, `goblin`, and the
- * connection's label stays goblin's own (ADR 0048).
+ * connection's label stays goblin's own (ADR 0062).
  */
 const CLIENT_NAME = 'goblin'
 

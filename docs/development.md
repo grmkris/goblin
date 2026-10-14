@@ -422,10 +422,10 @@ Open link (a new tab, never followed by the page), Done while the server still w
 and the step-up card's sign-in link and Continue, with the owner API routed in the page. Screenshots go under
 `.local/goblin-acceptance/holds-*`; this is browser fixture evidence only.
 
-`heavy bun apps/web/test/ui-start.ts` renders first-run Start (ADR 0048) from source in local Chromium at phone (light)
-and desktop (dark) widths: the splash, the welcome, the wallet to connect, with setup left (its own words and the link
-to its setup page) and ready (what it holds), services and the kickoff, with the owner API routed in the page and no
-screen scrolling sideways. It needs `@goblin/app`'s runtime built (its own `build` script). Screenshots go under
+`heavy bun apps/web/test/ui-start.ts` renders first-run Start (ADR 0062) from source in local Chromium at phone (light)
+and desktop (dark) widths: the splash, the welcome, the model step on the deployment's models and on the owner's own,
+services before and after a server connects (Use suggested access offered, then in place) and the kickoff, with the
+owner API routed in the page and no screen scrolling sideways. It needs `@goblin/app`'s runtime built (its own `build` script). Screenshots go under
 `.local/goblin-acceptance/start-*`; this is browser fixture evidence only.
 
 `heavy bun apps/web/test/ui-landing.ts [--out <dir>]` renders goblin's landing (`/`, signed out) from source in local

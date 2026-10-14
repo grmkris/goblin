@@ -11,7 +11,7 @@ added (`AddServer.label`), else the first free name from goblin's own name for a
 2`) or a server on the shelf (`Kiwi.com`, `suggestedTitle`), else its server card's title (`Example`, `Example 2`),
 else its host, or the
 configured `label` (else its id) for a configured one, set once at start; `PATCH /api/mcp/:id` renames it. Every
-connection registers with its authorization server as plain `goblin` (ADR 0048: a consent screen names the app, not
+connection registers with its authorization server as plain `goblin` (ADR 0062: a consent screen names the app, not
 goblin's own label); MCP has no standard "who am I", so goblin cannot show which account a sign-in reached. An added endpoint is a public https address
 (`mcp/endpoint.ts`), and its server card's title, description and icon are the server's own claims, for the owner's
 eyes only. Configured connections win on ID and cannot be removed. Removing an added connection forgets its row,

@@ -18,8 +18,8 @@ decoded as API answers.
 
 Each feature has `src/<feature>/queries.ts`, which holds factories only: `owner.apiQuery` and `owner.apiMutation`
 options, and the feature's keys. Hooks that read or combine them live in `src/<feature>/hooks.ts` (the session in
-`auth/hooks.ts` `useSession`, Start's decision in `onboarding/hooks.ts` `useStartDecision`, adding and connecting a
-server in `mcp/hooks.ts` `useAddAndConnect`); components never build query options inline.
+`auth/hooks.ts` `useSession`, adding and connecting a server in `mcp/hooks.ts` `useAddAndConnect`); components never
+build query options inline.
 
 Keys come from one `<feature>Keys` object whose root is the feature's name, and name every input:
 

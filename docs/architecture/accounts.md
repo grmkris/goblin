@@ -46,44 +46,36 @@ production allows everything but `/api/` and `/mcp`, other stages nothing. `Meet
 
 ### First-run Start
 
-ADR 0048. A signed-in owner whose Start is open meets it before the chats, and never sees the app first.
+ADR 0062. A short tour the owner may pass by or skip; no page waits for it, whatever its status, so the app is drawn
+the same for an open, skipped or finished Start. An owner who signs in through Create an account (`routes/login.tsx`)
+lands on `/start/welcome`.
 
-**What gates.** The chat routes and Activity carry `staticData.startRequired`. The root shell (`routes/__root.tsx`,
-`onboarding/hooks.ts` `useStartDecision`) reads `GET /api/onboarding/status` as soon as someone is signed in. Until it
-knows, a gated page shows goblin's splash (the mark alone, as the Home Screen startup image draws it), not the rail,
-the sidebar or the workspace feed; an open Start then goes from the splash to `/start/<step>`, the first step still
-to do. The shell follows the shown matches, not the location, so the splash holds while Start loads. Settings and
-Connections are never gated, and a state that cannot be read lets the owner in.
-
-**The page** (`components/start`). One task per screen beside a panel in the rail's own green, which on a phone narrows
-to a band with a count and one segment per step:
-1. welcome: what goblin is (the Goblin Wallet that pays for it, goblin, more to come);
-2. the Goblin Wallet: connect it (its recommended tools allowed), then what its own status says is left, with Finish
-   setup in your wallet (its `/setup` page, which comes back here), then what it holds, with Add funds in your wallet
-   while it holds nothing;
-3. services: Mercator first and optional, then the other suggestions;
+**The page** (`components/start`). `/start/<step>` fills the screen (`routes/__root.tsx` draws no shell around it): one
+task per screen beside a panel in the rail's own green, which on a phone narrows to a band with a count and one
+segment per step:
+1. welcome: what goblin is (goblin, the model it thinks with, the services it reaches);
+2. model: the deployment's models unless the owner brings their own endpoint and key, in Settings' own form
+   (`model-endpoint-card.tsx` `ModelEndpoint`);
+3. services: the shelf (`server-add.tsx` `SuggestedServers`); the server just connected from here, by a sign-in that
+   came back or one that needed none, offers Use suggested access (`start/connect-server.tsx`);
 4. what the owner wants goblin for. The kickoff is recorded before its message is sent.
 
-Finishing narrows the panel into the rail as the chat appears.
+Continue marks the step gone through; Skip setup skips Start. Finishing narrows the panel into the rail as the chat
+appears.
 
-**State** (`onboarding/`):
-- `app_onboarding` keeps what only the owner can say (finished, skipped, the welcome and services steps, the kickoff),
-  and `done` once Start is first found complete. Going through a step never sets the status; `open` there means the
-  status is derived. A step id an older Start had is dropped when the row is read.
-- Every other step is read live by `GET /api/onboarding` from the connections, the grants (each first-class server's
-  status tool, and the wallet's payment tool) and the wallet's own status (`WalletStatus.setup`, `payFrom`).
-- The wallet is ready once its status reads, lists no setup and has an address goblin pays from; funded once ready and
-  holding anything. Its setup page is built from the
-  connection's configured endpoint origin (`mcp/first-class.ts` `walletSetupUrl`), never from what the server says.
-- A derived Start is open until the wallet is ready and funded; Mercator is optional. A kept status is answered
-  without asking any server.
+**State** (`onboarding/`). `app_onboarding` keeps the status the owner set (`done`, `skipped`; `open` otherwise, and
+again after they reopen it), the steps they went through and the kickoff's time. `GET /api/onboarding` answers from
+the agent alone: a step is done once the owner went through it, the model step also once they set their own endpoint
+(`Inference.view`), the goblin step once the kickoff was sent. It also carries the endpoint in use and how many servers
+are connected. A step id an older Start had is dropped when the row is read.
 
-**Sign-ins.** `POST /api/onboarding/connect` notes the step and whether to allow the server's recommended tools
-(`app_onboarding_connects`, an hour). The OAuth callback (`mcp/program.ts` `connectCallback`) takes the note,
-allows the tools and redirects to `/start/<step>` rather than Connections.
+**Sign-ins.** `POST /api/onboarding/connect` notes the step against the connection (`app_onboarding_connects`, an
+hour). The OAuth callback (`mcp/program.ts` `connectCallback`) takes the note and redirects to `/start/<step>` rather
+than Connections. Nothing is allowed on the way.
 
-**In the chat.**
-- A skipped Start with something left gets one quiet line back to it. Settings has a Set up goblin card.
-- In main, `pi/onboarding.ts` adds to goblin's context block, none of it read from a server: that goblin pays for
-  itself from the Goblin Wallet and the wallet's setup page, the pieces not set up yet (Mercator marked optional), and
-  for twenty minutes after the kickoff the ask to propose Topics and Personas with one `ask_user`.
+**Ways back** (`start/setup-cards.tsx`). While Start is not finished and the model or services step is left, the chat
+shows one quiet line back to the first step still to do, which the owner can put away for the visit. Settings has a
+Set up goblin card and Activity a Get started checklist.
+
+**In the chat.** In main, for twenty minutes after the kickoff, `pi/onboarding.ts` adds the ask to propose Topics and
+Personas with one `ask_user` to goblin's context block. Nothing else about setup reaches the model.
