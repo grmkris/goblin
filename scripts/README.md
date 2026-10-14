@@ -67,8 +67,9 @@ owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
 2. a small text file uploaded to the owner's `/uploads`, listed, read back byte for byte and deleted (ADR 0022); then
    the typed API's edge: an unknown chat answers 404 in the error envelope quoting the response's `x-goblin-ref`, and
    a write without the CSRF header is refused 403;
-3. each configured or owner-added MCP server's status; for a connected server, its tools, and a direct call of a
-   read-only probe (mysi's own `access_read`, on a mysi connection) only if the owner has already granted it;
+3. each configured or owner-added MCP server's status; for a connected server, its tools, and a direct call of one
+   probe: a tool the owner already allowed to run without asking, that the server says only reads (`readOnlyHint`), that
+   the agent may call and that needs no input; a server without one is skipped;
 4. an inbound MCP client: dynamic registration, owner consent including `goblin:inspect`, PKCE token, `/mcp`
    `initialize` and `tools/list` with the seven inspection tools, an `inspect_problems` read, an `ask_agent` model turn, an agent turn that calls that probe through `mcp_call` (only if step 3 proved it),
    `get_recent_messages` with the smoke client's author label, then revocation and a 401;
@@ -96,7 +97,7 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 | `stage`, `signup`, `resident`, `model` | Target stage, sign-up mode, active authority and smoke model or `owner pick`.                                  |
 | `build`                                | The commit the deployed client bundle names, or `skipped: <reason>` on the local stack.                        |
 | `flows`                                | `ok`: a `send` point of the smoke reached the flows dataset; or `skipped: <reason>`.                           |
-| `servers`                              | Server statuses, tool/grant counts and probe outcome (`ok`, `error` or `not-granted`).                         |
+| `servers`                              | Server statuses, tool/grant counts and probe outcome (`ok`, `error` or `none`) with the tool probed.           |
 | `files`                                | `ok`: the owner's file round trip, the file deleted again.                                                     |
 | `edge`                                 | `envelope: ok` and `csrf: refused`: failures answer in the envelope with their ref; CSRF on every write.       |
 | `app`                                  | `ok`: an agent app built, run by the owner (revision +1) and deleted.                                          |

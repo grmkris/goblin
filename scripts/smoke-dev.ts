@@ -8,6 +8,7 @@
 import { Config, Effect, Option, Redacted, Schema } from 'effect'
 import { createHash, randomBytes } from 'node:crypto'
 import { chmod, stat, writeFile } from 'node:fs/promises'
+import type { ToolView } from '../packages/contracts/src/mcp.ts'
 import { appChecks } from './smoke-apps.ts'
 import { DevClient, type Step } from './smoke-client.ts'
 import { edgeChecks, internalChecks } from './smoke-edge.ts'
@@ -21,11 +22,6 @@ const object = Schema.decodeUnknownSync(ObjectSchema)
 const objects = Schema.decodeUnknownSync(Schema.Array(ObjectSchema))
 const string = Schema.decodeUnknownSync(Schema.String)
 
-/**
- * A read-only tool per known server, by its endpoint's host, called only if the owner has already granted it: mysi's
- * own summary of the apps it reaches (ADR 0052).
- */
-const PROBES: Readonly<Record<string, string>> = { 'mysi.lol': 'access_read', 'dev.mysi.lol': 'access_read' }
 const REDIRECT_URI = 'http://127.0.0.1:9/callback'
 const DEV_MARKER = 'GOBLIN_DEV_OK'
 const MCP_MARKER = 'GOBLIN_MCP_OK'
@@ -181,19 +177,24 @@ type ServerReport = {
   probeTool?: string
 }
 
-/** The probe for `endpoint`'s server, if it is one we know. */
-const probeOf = (endpoint: string): string | undefined => {
-  try {
-    return PROBES[new URL(endpoint).host]
-  } catch {
-    // expected: an endpoint the URL parser refuses is no server we probe
-    return undefined
-  }
-}
+/**
+ * The tool a connected server is probed with: one the owner allowed to run without asking, that the server says only
+ * reads, that the agent may call too, and that needs no input. None when the server has no such tool.
+ */
+const probeOf = (tools: readonly ToolView[]): string | undefined =>
+  tools.find(
+    (tool) =>
+      tool.granted &&
+      tool.askFirst !== true &&
+      tool.readOnlyHint === true &&
+      tool.destructiveHint !== true &&
+      tool.modelVisible &&
+      tool.needsInput !== true,
+  )?.name
 
 async function serverReport(
   dev: DevClient,
-  server: { readonly connectionId: string; readonly status: string; readonly endpoint: string },
+  server: { readonly connectionId: string; readonly status: string },
 ): Promise<ServerReport> {
   const { connectionId } = server
   const report: ServerReport = { connectionId, status: server.status }
@@ -211,10 +212,9 @@ async function serverReport(
   if (tools === 'needs_auth') return { ...report, status: 'needs_auth' }
   report.tools = tools.length
   report.granted = tools.filter((tool) => tool.granted).length
-  const probe = probeOf(server.endpoint)
-  const granted = tools.some((tool) => tool.name === probe && tool.granted)
-  if (probe === undefined || !granted) {
-    report.probe = 'not-granted'
+  const probe = probeOf(tools)
+  if (probe === undefined) {
+    report.probe = 'none'
     return report
   }
   const result = await dev.owner((api) =>
@@ -226,8 +226,8 @@ async function serverReport(
 }
 
 /**
- * If the owner has granted a probe (mysi's `access_read`), the agent must be able to call it through its resident
- * authority; skipped when no connection proved one.
+ * If a connection proved a probe (a granted read-only tool that needs no input), the agent must be able to call it
+ * through its resident authority; skipped when none did.
  */
 async function residentToolTurn(client: InboundClient, servers: readonly ServerReport[]): Promise<'ok' | 'skipped'> {
   const probed = servers.find((server) => server.probe === 'ok' && server.probeTool !== undefined)

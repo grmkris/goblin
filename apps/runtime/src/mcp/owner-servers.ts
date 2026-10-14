@@ -361,6 +361,7 @@ const finishConnect = (owner: OwnerServers, state: string, code: string, issuer:
 export const toolView = (grants: Grants, connectionId: string, tool: Tool): ToolView => {
   const appResource = toolAppResource(tool)
   const { readOnlyHint, destructiveHint } = tool.annotations ?? {}
+  const needsInput = (tool.inputSchema.required?.length ?? 0) > 0
   return {
     name: tool.name,
     ...(tool.title === undefined ? {} : { title: tool.title }),
@@ -368,6 +369,7 @@ export const toolView = (grants: Grants, connectionId: string, tool: Tool): Tool
     ...(readOnlyHint === undefined ? {} : { readOnlyHint }),
     ...(destructiveHint === undefined ? {} : { destructiveHint }),
     suggested: suggestedPolicy(tool),
+    ...(needsInput ? { needsInput } : {}),
     modelVisible: toolOffered(tool, 'model'),
     ...(appResource === undefined ? {} : { appResource }),
     granted: grants.allows({ connectionId, capability: 'tool', name: tool.name }),

@@ -1,6 +1,7 @@
 import { createMcpHandler } from '@modelcontextprotocol/server'
 import { describe, expect, it } from 'vitest'
 import { allowSuggested, suggestedPolicy } from '../../src/mcp/suggested-access.ts'
+import { toolView } from '../../src/mcp/owner-servers.ts'
 import { McpServers } from '../../src/mcp/service.ts'
 import { lowLevelServer } from './low-level-server.ts'
 import { hostOf } from './manager.ts'
@@ -81,5 +82,17 @@ describe('suggested access from tool annotations (ADR 0060)', () => {
     } finally {
       await mcp.dispose()
     }
+  })
+})
+
+describe("a tool's input, as the owner's listing says it", () => {
+  it('says a tool needs input only when its schema requires an argument', () => {
+    const grants = new MemoryGrants()
+    const find = { ...input, properties: { q: { type: 'string' } }, required: ['q'] }
+    expect(toolView(grants, 'notes', { name: 'find', inputSchema: find }).needsInput).toBe(true)
+    expect(toolView(grants, 'notes', { name: 'list', inputSchema: input })).not.toHaveProperty('needsInput')
+    expect(toolView(grants, 'notes', { name: 'all', inputSchema: { ...input, required: [] } })).not.toHaveProperty(
+      'needsInput',
+    )
   })
 })

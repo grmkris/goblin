@@ -438,6 +438,8 @@ export const ToolView = Schema.Struct({
    * `ask`. A suggestion, never a grant: it applies only when the owner taps "Use suggested access".
    */
   suggested: Schema.Literals(['run', 'ask']),
+  /** Its input schema requires an argument; absent when a call needs none. */
+  needsInput: Schema.optional(Schema.Literal(true)),
   modelVisible: Schema.Boolean,
   appResource: Schema.optional(Schema.String),
   granted: Schema.Boolean,
