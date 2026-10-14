@@ -147,10 +147,14 @@ companion PIDs, including WebView helper processes. A portable sampler is includ
 
 ```sh
 python3 scripts/measure.py --pid APP_PID --companion-pid COMPANION_PID \
-  --label tauri-idle --seconds 20 --output artifacts/tauri-idle.json
+  --label tauri-idle --warmup 3 --seconds 20 --repeats 3 --output artifacts/tauri-idle.json
 ```
 
-This records a process-tree RSS sum, which can double-count shared pages; it is not macOS private footprint. It does
-not time startup or measure frames. The script never records command lines, tokens or chat content and does not stop
-any process. Use Instruments for Metal/frame timing and memory footprint, and state exactly which metric is reported.
+This records a deduplicated process-tree RSS sum, numeric process snapshots, cumulative CPU-time deltas (100% is one
+logical core), and median/p95/peak summaries. Add repeatable `--helper-pid PID` options for verified reparented WebView
+helpers; helper completeness is never inferred. Shared pages can still be double-counted across processes: RSS is not
+macOS private footprint. Dead/reused roots invalidate totals; CPU intervals with process churn are recorded as null.
+The repeated windows sample the same running processes, not independent launches. Sampling is bounded to one hour.
+It does not time startup or measure frames. The script never records command lines, tokens or chat content and does
+not stop any process. Use Instruments for Metal/frame timing and memory footprint, and state the metric reported.
 Compare cold and warm launches separately; exclude compiler and package-download time.
