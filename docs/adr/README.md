@@ -57,3 +57,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0057](0057-goblin-pays-for-no-model-call.md) | goblin pays for no model call | Accepted |
 | [0058](0058-no-plans-tokens-and-an-optional-cap.md) | No plans: access by sign-up, usage in tokens with an optional cap | Accepted |
 | [0059](0059-bring-your-own-model-endpoint.md) | Bring your own model endpoint | Accepted |
+| [0060](0060-suggested-access-from-tool-annotations.md) | Suggested access from tool annotations | Accepted |

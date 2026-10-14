@@ -99,14 +99,18 @@ resource. An App's switch (`PUT /api/mcp/app-grants`, `McpGrants.setApp`) grants
 tools that declare its `ui://` resource, including the ones only the App may call, and the resource itself.
 Connections (`components/tool-grants.tsx`) names the App from its resource, says how many of its tools a partly
 allowed App has, lists those tools under the switch, each still adjustable (an allowed tool's call policy is a select:
-runs without asking, or asks first), and offers Allow
-all and None, which send the same exact grants one at a time, skip (and count) a tool the server no longer offers, then
+runs without asking, or asks first), and offers Use suggested access, Allow
+all and None. Each tool carries goblin's suggestion from its annotations (`ToolView.suggested`,
+`mcp/suggested-access.ts`, [ADR 0060](../adr/0060-suggested-access-from-tool-annotations.md)): `run` for one that says it
+only reads and does not say it destroys, else `ask`. Use suggested access (`POST /api/mcp/:id/suggested`) allows every
+tool the agent can see and turns ask first on for each one suggested to ask, never off; it shows until that state is in
+place. Allow all and None send exact grants one at a time, skip (and count) a tool the server no longer offers, then
 read the list again; the card says how it went. Granting a tool goblin has not listed lists the tools once more first;
 taking a grant back always works, even for a tool the server dropped or while it cannot be reached. When a connection's
 whole tool list differs from the last one it saw, the runtime publishes `mcp.tools` with a digest of the new list; the
 workspace feed carries it (`tools`) and the web reads that connection's tools again. "Look for new tools" lists them
 again over the open connection. Tool annotations from the server are shown as its claims
-("says read-only") but never grant anything. Disconnecting forgets credentials and keeps grants. When the model calls a tool that exists but is
+("says read-only") and suggest a policy, but never grant anything until the owner applies the suggestion. Disconnecting forgets credentials and keeps grants. When the model calls a tool that exists but is
 not granted, nothing runs. `mcp_call` returns an error result whose details are
 `{ kind: 'grant-required', connectionId, name }`, and the model is told to wait.
 `mcpModelResult` details never carry a top-level `kind`, so remote content cannot forge one. The web turns that

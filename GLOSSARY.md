@@ -23,6 +23,11 @@ An MCP client (Claude Code, another agent) the owner authorized to call goblin's
 **Grant**:
 The owner's permission for one tool of one connection. A tool grant also covers the App that tool declares.
 
+**Suggested access**:
+goblin's suggestion for each tool from its annotations (ADR 0060): run when needed for one that says it only reads,
+ask first for every other. It applies only when the owner taps Use suggested access.
+_Avoid_: recommended access
+
 **URL request**:
 A server asking the owner to finish something on its site (approve a new agent, a role) before a call can complete.
 The owner opens the link, then presses Done (goblin retries the call) or Cancel (ADR 0042).
