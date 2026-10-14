@@ -439,6 +439,12 @@ fn main() {
             move |window, cx| cx.new(|cx| Desktop::new(connection, true, window, cx)),
         )
         .expect("Open GPUI window");
+        if std::env::var("GOBLIN_DESKTOP_BENCH").as_deref() == Ok("1") {
+            println!(
+                "DESKTOP_READY {}",
+                json!({"version":1,"shell":"gpui","stage":"window_created","pid":std::process::id()})
+            );
+        }
         cx.activate(true);
     });
 }

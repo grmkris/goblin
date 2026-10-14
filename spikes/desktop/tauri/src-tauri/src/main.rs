@@ -40,6 +40,12 @@ fn main() {
                 .title("Goblin · Tauri spike")
                 .inner_size(1180.0, 820.0)
                 .build()?;
+            if std::env::var("GOBLIN_DESKTOP_BENCH").as_deref() == Ok("1") {
+                println!(
+                    "DESKTOP_READY {}",
+                    serde_json::json!({"version":1,"shell":"tauri","stage":"window_created","pid":std::process::id()})
+                );
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

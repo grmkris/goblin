@@ -9,7 +9,7 @@
     "build": "vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:browser": "bun scripts/browser.ts",
-    "check": "bun run typecheck && bun run test && bun run build && bun run test:browser",
+    "check": "bun run typecheck && bun run test && bun run test:bench && bun run build && bun run test:browser",
     "tauri:dev": "cd tauri && ../node_modules/.bin/tauri dev",
     "tauri:build": "cd tauri && ../node_modules/.bin/tauri build --no-bundle",
     "electrobun:dev": "bun run --cwd electrobun dev",
@@ -18,7 +18,10 @@
     "serve": "bun scripts/serve.ts",
     "test": "bun test service/test",
     "launch": "bun scripts/launch.ts",
-    "compare": "bun scripts/compare.ts"
+    "compare": "bun scripts/compare.ts",
+    "test:bench": "python3 -B -m unittest discover -s scripts -p \"test_*.py\"",
+    "benchmark": "python3 scripts/benchmark.py",
+    "benchmark:browser": "bun scripts/browser-benchmark.ts"
   },
   "dependencies": {
     "@goblin/contracts": "file:../../packages/contracts",

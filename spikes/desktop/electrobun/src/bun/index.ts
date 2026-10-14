@@ -12,3 +12,8 @@ export const mainWindow = new BrowserWindow({
   renderer: 'native',
   frame: { width: 1180, height: 820, x: 100, y: 80 },
 })
+// oxlint-disable-next-line goblin/no-process-env -- Opt-in local benchmark signalling, never enabled in the renderer.
+if (process.env.GOBLIN_DESKTOP_BENCH === '1')
+  process.stdout.write(
+    `DESKTOP_READY ${JSON.stringify({ version: 1, shell: 'electrobun', stage: 'window_created', pid: process.pid })}\n`,
+  )

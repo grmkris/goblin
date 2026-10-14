@@ -5,7 +5,11 @@ Three desktop clients for the same chat experiment: GPUI Kit 0.7.3, Tauri 2.12.3
 
 ## Run on your Mac
 
-Install Xcode command line tools (`xcode-select --install`), Rust stable, Bun 1.4.2 or newer, and Node 22 or newer.
+Install Xcode command line tools (`xcode-select --install`), Rust >=1.93, Bun >=1.4.2, Node >=22, and Python >=3.9.
+Mac arm64 build/process-launch checks passed with Rust 1.99 and Bun 1.4.3; Rust 1.93 is the observed dependency floor,
+not a separately tested toolchain. The Electrobun dev build can warn that `electrobun/icon.iconset` is missing; this
+spike has no finished Mac icon assets. Resolve that warning before packaging a distribution. The CLI Bun version
+can differ from Electrobun's bundled Bun (Hutch 0.27.1 downloaded Bun 1.4.0 in the Mac handoff).
 Use a checkout of this branch that includes `spikes/mobile`: the companion reuses that spike's owner transport and
 Goblin's canonical Pi projection. Install the repository dependencies as well as the isolated desktop dependencies.
 
@@ -158,3 +162,62 @@ The repeated windows sample the same running processes, not independent launches
 It does not time startup or measure frames. The script never records command lines, tokens or chat content and does
 not stop any process. Use Instruments for Metal/frame timing and memory footprint, and state the metric reported.
 Compare cold and warm launches separately; exclude compiler and package-download time.
+
+## Automated benchmark commands
+
+These probes require no Accessibility or Screen Recording permission. Native launches still need a logged-in Mac
+desktop session (or Xvfb on Linux). Prebuild artifacts, then run the runner against an executable or `.app`, never a
+dev compiler/watcher. From `spikes/desktop`, for a quick check using the existing development artifacts:
+
+```sh
+bun run build
+cargo build --locked -p goblin-gpui-spike -p goblin-tauri-spike
+bun run electrobun:build
+python3 scripts/benchmark.py --shell gpui --app target/debug/goblin-gpui-spike \
+  --build-label dev --scenario history --trials 3 --warmup-runs 1 --seconds 10 \
+  --output artifacts/gpui-history.json
+python3 scripts/benchmark.py --shell tauri --app target/debug/goblin-tauri-spike \
+  --build-label dev --scenario history --trials 3 --warmup-runs 1 --seconds 10 \
+  --output artifacts/tauri-history.json
+```
+
+For Electrobun, pass `--shell electrobun --app PATH_TO_BUILT_APP` using the `.app` under `electrobun/build/` on Mac
+or the bundle directory containing `bin/launcher` on Linux. The runner reads `CFBundleExecutable` from a Mac bundle;
+`--cwd PATH` overrides its working-directory choice when needed. Run one shell at a time. Change `--scenario` to
+`idle` for the four-message baseline. Each trial owns a new fixture companion and native process group, and cleans
+up only those processes. It uses private temporary connection files; the manual `bun run serve` session is untouched.
+
+The runner automatically opts into `GOBLIN_DESKTOP_BENCH=1`. Each host then emits exactly one content-free
+`DESKTOP_READY` JSON line after its native window constructor returns (`stage: window_created`, shell, PID and schema
+version). Logging is off by default. Spawn-to-ready includes pipe-observer delay and is **not** first paint, loaded
+chat, input, or accessibility acceptance. Unrecognized host logs are discarded so capability-bearing URLs cannot
+enter the receipts. Startup failures/timeouts remain failed trials and produce a nonzero exit status.
+
+JSON receipts include every trial, warmup labels, startup median/p95/peak, process samples and CPU/RSS summaries,
+executable/lockfile hashes, artifact and web-asset bytes, and fixture HTTP/SSE timings. SSE timings observe the
+companion, not renderer updates; 204-message setup is service-verified. macOS helper attribution remains incomplete
+unless separately checked with the sampler's `--helper-pid` options. Artifact inventory is shell-only: the companion
+is not packaged, Tauri bundling is disabled, and a GPUI binary is not an app bundle. No installer-size claim follows.
+
+Use a new output filename for each run; existing runner/browser reports are never overwritten. For comparisons,
+build optimized artifacts first (`cargo build --release --locked ...` for Rust), label the actual build profile, and
+keep dev/release results separate. Warmup runs are excluded from startup summaries. Cache state is uncontrolled;
+repeated launches are not cold starts. Keep viewport/display/power conditions constant and retain failed trials.
+
+For the shared DOM renderer alone:
+
+```sh
+bun run benchmark:browser -- --trials 3 --seconds 2 --output artifacts/browser-scroll.json
+bun run test:bench
+```
+
+The browser benchmark uses headless Chromium and runs two fresh-fixture workloads per trial: 204 rows at rest,
+and 206 rows after Send adds a user message and streamed reply. It records DOM counts, scroll range, raw animation
+callback intervals, scroll-step JavaScript time, and long tasks when supported. The finite reply may finish during
+the trial. These are programmatic-scroll/scheduling proxies, not native WebView, GPU frame-presentation or trackpad
+measurements. It does not modify the existing 12-check `scripts/browser.ts` acceptance suite. `bun run check` also
+runs the Python sampler/runner regression tests.
+
+GPUI virtualizes row drawing while retaining Markdown state for all messages; the web client retains DOM rows.
+The companion sends full normalized snapshots, including history, on every update. These implementation costs
+remain part of the workload and must not be attributed to a toolkit without separate measurement.
