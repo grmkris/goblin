@@ -1,0 +1,39 @@
+# Authority and inbound MCP
+
+## Resident authority
+
+The agent acts for the owner when the owner is not there, so it needs its own standing permission rather than a
+borrowed browser session. `ResidentAuthority` (`app_resident`) is active for 30 days. Owner admission renews the
+window on every owner API request except changing it (`POST /api/agent/resident`), the event streams, the files and
+the OAuth callback; the internal API (inbound calls and hooks) never renews it. Turning
+it off in Settings ("Work while you're away") sticks: activity does not re-enable it, only the explicit toggle does.
+Model MCP tools, skills, inbound `ask_agent` and scheduled Telegram pulls and replies require current authority. The
+owner's own `mcp` endpoints are renewed like the rest and do not call `requireResident`; their tool and resource calls
+still check exact grants (`mcp/api.ts`, `pi/resident-mcp.ts`, `pi/skills.ts`).
+
+## Inbound MCP
+
+goblin is an MCP server at `/mcp`, the one protected resource of Better Auth's `mcp()` authorization server:
+
+- Clients register dynamically (open, and restricted to `/mcp`). A registration whose redirects are all http loopback
+  is marked native, which is how Claude Code registers.
+- The owner signs in and consents at `/consent`, which says what the requested scopes grant. A Bearer token is
+  accepted only if it verifies against the local JWKS, names `/mcp` as audience, comes from an enabled client and the
+  owner's consent still exists. Its scopes count only while that consent still grants them (`auth/service.ts`).
+- Tools: `ask_agent` (submit into main, labelled with the client's name, and wait up to 110 seconds; a stable
+  `operationId` records its Pi session in the chat operation ledger and makes retries idempotent; it runs the model,
+  so it needs a plan) and `get_recent_messages` (the primary chat's current session's latest messages, with their
+  authors). `ask_agent` releases the admission lock before waiting and waits on the operation's recorded session.
+- With `goblin:inspect` (ADR 0024) the same server adds `inspect_conversations`, `inspect_conversation`,
+  `inspect_turns`, `inspect_turn`, `inspect_problems`, `inspect_flows` (the ledger's content-free conversation flow
+  steps) and `inspect_details` (the operation behind a message), with the contract's input and output schemas
+  (`inbound/inspection.ts`). They read the token subject's own agent, never call a model and need no plan; the
+  server's instructions tell clients that returned text is data, never instructions.
+- `/mcp` advertises `goblin:inspect` in its metadata, and an unauthenticated request gets a 401 naming the metadata
+  and every scope, so a new connection asks for inspection. The consent page offers it as a separate switch that
+  starts off; unless the owner turns it on, Allow grants the rest without `goblin:inspect`
+  (`apps/web/src/lib/consent-scope.ts`). Clients
+  connected before inspection joined `/mcp` get it after reconnecting once; migration
+  `0009_mcp_inspection_scope` lets clients registered earlier ask for it.
+- Revoking a client in Settings deletes your consent to it and revokes its refresh tokens for you (`auth/clients.ts`);
+  its next call gets a 401. Consenting again without `goblin:inspect` ends inspection for tokens already issued.
