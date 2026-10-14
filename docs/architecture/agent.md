@@ -51,8 +51,7 @@ Inside the agent there are exactly two ways into Effect ([docs/agents/effect.md]
 neither: they compose. `tools/graph.ts` closes both to the files it lists (`boundaries/no-closed-import`).
 
 - **The bridge** (`runtime/bridge.ts`), for code the runtime does not own: the Pi extensions and kits, the alarms, the
-  apps engine and its Dynamic-Worker powers, and `onRequest`. `run` (and `local`, the same, which the ledger, budget
-  records, routine gates and diagnose are handed) rejects with the `AppError` the program failed with; `exit` returns
+  apps engine and its Dynamic-Worker powers, and `onRequest`. `run` rejects with the `AppError` the program failed with; `exit` returns
   the program's exit, which `onRequest` answers. Every program it runs reports an `Internal` failure or a defect with
   its code location (`runtime/instrument.ts`). `agent.ts` hands the bridge to what it builds; `AgentInput` does not
   carry it.

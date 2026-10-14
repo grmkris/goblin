@@ -40,13 +40,13 @@ const reportUnchecked = (error: unknown): BudgetVerdict => {
  * calls are blocked, so a turn looping through tools ends after one more reply. New turns are refused at submission
  * (agent.ts). Pi reports and swallows hook exceptions, so blocking a tool is the lever, not throwing.
  */
-export function budgetExtension(local: RunProgram) {
+export function budgetExtension(run: RunProgram) {
   return defineExtension({
     name: 'goblin.budget',
     hooks: [
       hook(GenerationTask, {
         afterResponse: async (message) => {
-          await local(
+          await run(
             Effect.gen(function* () {
               const budget = yield* Budget
               yield* budget.record(message.usage, yield* epochSeconds)
@@ -56,7 +56,7 @@ export function budgetExtension(local: RunProgram) {
       }),
       hook(ToolTask, {
         beforeTool: async () => {
-          const verdict = await local(budgetVerdict).catch(reportUnchecked)
+          const verdict = await run(budgetVerdict).catch(reportUnchecked)
           return verdict === 'open' ? undefined : { block: BUDGET_BLOCKS[verdict] }
         },
       }),

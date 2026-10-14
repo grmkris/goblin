@@ -10,7 +10,7 @@ Programs are Effects composed with other Effects. Code outside the runtime enter
 
 - **The bridge** (`runtime/bridge.ts`), for code the runtime does not own: Pi kits, the agent-apps engine and its
   Dynamic-Worker powers, Durable Object alarms and `onRequest`. `agent.ts` hands the bridge to each of them when it
-  builds them; `AgentInput` does not carry it. `run` (and `local`, the same) rejects with the program's failure, and
+  builds them; `AgentInput` does not carry it. `run` rejects with the program's failure, and
   `exit` answers the exit (`onRequest` answers a failure in the API's envelope).
 - **`promiseWith(context)`** (`runtime/boundary.ts`), for a foreign callback wired inside a layer that must answer a
   Promise: the MCP SDK's auth provider (`token`, `onUnauthorized`) and dispatch guards, and the skills guard. The layer

@@ -17,11 +17,11 @@ const bridge = () => {
 describe('the bridge', () => {
   it('rejects with the typed failure the program failed with, the same object', async () => {
     const failure = new NotFound({ what: 'chat' })
-    await expect(bridge().local(Effect.fail(failure))).rejects.toBe(failure)
+    await expect(bridge().run(Effect.fail(failure))).rejects.toBe(failure)
   })
 
   it('rejects with Internal when the program dies', async () => {
-    await expect(bridge().local(Effect.die(new RangeError('boom')))).rejects.toBeInstanceOf(Internal)
+    await expect(bridge().run(Effect.die(new RangeError('boom')))).rejects.toBeInstanceOf(Internal)
   })
 
   it('answers a runtime that failed to build as a failure, not a throw', async () => {
@@ -29,6 +29,6 @@ describe('the bridge', () => {
       throw new RangeError('start failed')
     })
     expect(Exit.isFailure(await failing.exit(Effect.succeed(1)))).toBe(true)
-    await expect(failing.local(Effect.succeed(1))).rejects.toBeInstanceOf(Internal)
+    await expect(failing.run(Effect.succeed(1))).rejects.toBeInstanceOf(Internal)
   })
 })

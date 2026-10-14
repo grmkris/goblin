@@ -14,17 +14,15 @@ export type RunProgram = <A>(program: Program<A>) => Promise<A>
 type ExitProgram = <A>(program: Program<A>) => Promise<Exit.Exit<A, AppError>>
 
 export interface Bridge {
-  /** Runs the program. */
+  /** Runs the program to its value, or rejects with its `AppError`. */
   readonly run: RunProgram
-  /** The same as `run`: what the ledger, budget records, routine gates and diagnose were handed. */
-  readonly local: RunProgram
   /** Runs the program to its exit: the agent's typed APIs answer a failure in their envelope. */
   readonly exit: ExitProgram
 }
 
 /**
  * The one place the Durable Object runs its Effect programs: on the runtime `getRuntime` gives (built lazily, once per
- * object), each wrapped in `options.instrument`. Never call `run` or `local` inside an Effect: compose the program.
+ * object), each wrapped in `options.instrument`. Never call `run` inside an Effect: compose the program.
  */
 export function makeBridge(
   getRuntime: () => Promise<Runtime>,
@@ -43,7 +41,7 @@ export function makeBridge(
     if (Exit.isSuccess(result)) return result.value
     throw failureOf(result.cause)
   }
-  return { run, local: run, exit }
+  return { run, exit }
 }
 
 /** Builds the runtime's layers before handing it out, so a failed start rejects (and the next caller starts again). */

@@ -82,23 +82,23 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     // before onStart, and an RPC or the runtime may come first too. Synchronous, as the Agents SDK's own schema is.
     runApplicationMigrations(ctx.storage)
     this.#bridge = makeBridge(() => this.#services(), { instrument })
-    const { run, local: routineRun } = this.#bridge
-    this.#pi = makePiModels(env, this.modelStreams(), undefined, (id) => routineRun(requireRoutine(id)))
+    const { run } = this.#bridge
+    this.#pi = makePiModels(env, this.modelStreams(), undefined, (id) => run(requireRoutine(id)))
     const residentTools = residentMcpExtension(run)
-    const tools = [residentTools, budgetExtension(routineRun)]
+    const tools = [residentTools, budgetExtension(run)]
     this.#thread = threadExtension(run)
     this.#memory = memoryExtensions(run)
     const { memory, recall } = this.#memory
     const { personas, organize } = organizingKit(run)
     this.#personas = personas
-    const routineKit = routineExtensions(routineRun, residentTools, personas.extension, env.CREDENTIAL_KEY)
+    const routineKit = routineExtensions(run, residentTools, personas.extension, env.CREDENTIAL_KEY)
     this.#routineStart = routineKit.start
     const apps = agentApps(ctx.storage, env, () => this.name, {
       schedules: this.#jobSchedules(),
       ...appPorts(this.#bridge),
     })
     this.#apps = apps
-    this.#telemetry = agentTelemetry(ctx.storage, () => this.name, routineRun)
+    this.#telemetry = agentTelemetry(ctx.storage, () => this.name, run)
     const execution = [...tools, skillsExtension(run), filesExtension(run), appExecutionExtension(apps, run)]
     this.#subagents = subagentsExtension(run, (self) => [personaExtension, ...execution, ...apps.extensions(), self])
     const subagents = this.#subagents.extension
@@ -202,16 +202,16 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
   }
   // The schedule callbacks: the Agents SDK calls them by name; each body lives in its area's wake.ts.
   async mcpEventsWake(): Promise<void> {
-    await this.#bridge.local(mcpEventsWake)
+    await this.#bridge.run(mcpEventsWake)
   }
   async routinesWake(): Promise<void> {
-    await routinesWake(this.#bridge.local, (at) => this.#scheduleWake('routinesWake', at))
+    await routinesWake(this.#bridge.run, (at) => this.#scheduleWake('routinesWake', at))
   }
   async runRoutine(slot: RoutineSlot): Promise<void> {
-    await runRoutine(this.#bridge.local, slot)
+    await runRoutine(this.#bridge.run, slot)
   }
   async runRoutineDeadline(input: { runId: string }): Promise<void> {
-    await runRoutineDeadline(this.#bridge.local, input)
+    await runRoutineDeadline(this.#bridge.run, input)
   }
   /** An agent app's job is due (ADR 0021). */
   async runAppJob(slot: JobSlot): Promise<void> {

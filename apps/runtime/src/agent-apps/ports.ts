@@ -117,19 +117,16 @@ export function appServices(run: RunProgram, complete: AppCompletion): AppServic
 }
 
 /**
- * What the agent object lends its apps from its bridge, made once with the engine (agent.ts): the powers' services
- * (each enters the runtime through `run`, which checks the plan), the apps' lock (the runtime's KeyedLock, taken
- * through `local`), and `changed`, which tells the change bus `agent-apps.changed` without waiting for it.
+ * What the agent object lends its apps from its bridge, made once with the engine (agent.ts): the powers' services,
+ * the apps' lock (the runtime's KeyedLock) and `changed`, which tells the change bus `agent-apps.changed` without
+ * waiting for it. Each enters the runtime through `run`.
  */
-export function appPorts({
-  run,
-  local,
-}: Pick<Bridge, 'run' | 'local'>): Pick<AppPorts, 'services' | 'lock' | 'changed'> {
+export function appPorts({ run }: Pick<Bridge, 'run'>): Pick<AppPorts, 'services' | 'lock' | 'changed'> {
   return {
     services: appServices(run, appCompletion),
-    lock: appLock(local),
+    lock: appLock(run),
     changed: (app) =>
-      void local(Changes.use((changes) => changes.publish('agent-apps.changed', { name: app }))).catch(
+      void run(Changes.use((changes) => changes.publish('agent-apps.changed', { name: app }))).catch(
         // expected: the bridge reported why the runtime is down; the App follows the next change once it is up
         () => undefined,
       ),

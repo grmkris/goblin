@@ -17,7 +17,7 @@ with a read-only state snapshot and the app's powers (its own files in Shell's n
 then, holding the app's lock (the agent runtime's `KeyedLock`, one key per app, first come first served), `run` reads
 the current state and returns the next, which is checked and committed as one revision with the operation's receipt.
 The owner's paths hold that lock in the runtime (`agent-apps/live.ts`); Pi's tools, job alarms and an isolate's calls
-take the same lock through the bridge's `local`. A replayed operation id returns its receipt. The agent calls every app through
+take the same lock through the bridge's `run`. A replayed operation id returns its receipt. The agent calls every app through
 one typed tool, `app_call(app, member, input)` (`agent-apps/toolset.ts`, ADR 0027), so the tool list stays the same
 whatever apps exist and a build leaves the prompt the provider caches alone; an action the app keeps for its view is
 refused, and a state or value over 8 KB comes back as a valid summary (its size and fields). The `<apps>` part of the

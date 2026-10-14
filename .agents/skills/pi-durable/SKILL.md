@@ -33,9 +33,8 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   keep it synchronous and never call Session APIs from it. Hooks do not pair reliably (no `afterTool` for a blocked
   call, no `afterResponse` after an abort) and subagents and routine runs keep their own extension lists.
 - Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
-- Extensions take the agent's bridge (`runtime/bridge.ts`) as their way into its services: `run`, or `local`, the same,
-  for the ledger, budget records, routine gates and diagnose. A hook calls one of them; a program never
-  calls them from inside an Effect. New Effect code reaches Pi through `PiSessions` (`pi/sessions.ts`): every call
+- Extensions take the agent's bridge (`runtime/bridge.ts`) as their way into its services: `run`. A hook calls it; a
+  program never calls it from inside an Effect. New Effect code reaches Pi through `PiSessions` (`pi/sessions.ts`): every call
   names its session, failures are a typed `PiFailure`, and interrupting a `wait` ends only the wait.
 - Owner, inbound and Telegram submissions admit `(chat, operationId)` through `ChatOperations.send` before calling
   Pi. The operation's receipt pins the Pi session it was admitted to, so a retry submits there again; the per-chat lock

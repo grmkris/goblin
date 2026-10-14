@@ -7,7 +7,7 @@ import { KeyedLock } from '../observability/lock.ts'
 import { IsolateTimeout } from './isolates.ts'
 
 /**
- * Runs a program in the agent's runtime (the bridge's `local`). The engine lives outside the
+ * Runs a program in the agent's runtime (the bridge's `run`). The engine lives outside the
  * runtime (Pi's tools, job alarms, an isolate's calls reach it as Promises), so this is how it takes an app's lock.
  */
 export type AppRunner = <A>(program: Effect.Effect<A, never, KeyedLock>) => Promise<A>

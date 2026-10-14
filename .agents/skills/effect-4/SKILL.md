@@ -27,7 +27,7 @@ Use the installed Effect 4 guide and declarations as the API authority. Verify t
   object is made once, by its layer, and shared as a service (never a second instance); programs use the services.
 - Programs compose; a program's requirements are inferred, never written out to dodge a type cycle. Code outside the
   runtime (Pi kits, alarms, the apps engine) runs programs through the bridge `agent.ts` hands it (`runtime/bridge.ts`):
-  `run` (and `local`, the same) runs a program, `exit` returns the exit. Never call `run`, `local` or `Effect.run*` inside
+  `run` runs a program, `exit` returns the exit. Never call `run` or `Effect.run*` inside
   an Effect. Only the files `tools/graph.ts` lists may import the bridge or `promiseWith` (`boundaries/no-closed-import`).
 - Owner API handlers are `HttpApiBuilder.group` programs in `<area>/api.ts` over the contract in
   `packages/contracts/src/api` (ADR 0038). Imports have no `unstable/` segment: `effect/http-api/HttpApi`,

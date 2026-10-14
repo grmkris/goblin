@@ -28,8 +28,8 @@ through `promiseWith` (`runtime/boundary.ts`).
   method.
 - Workers RPC drops custom error classes. The one RPC method left (`deleteAgentData`) returns `RpcResult`
   (`http/rpc.ts`) and the Worker unwraps it; both APIs answer their error envelope instead.
-- Run programs through the bridge, which `agent.ts` hands to the kits, alarms and apps engine it builds: `run` (and
-  `local`, the same, for the ledger, budget records, routine gates and diagnose) runs a program, `exit` returns the exit. Only the files
+- Run programs through the bridge, which `agent.ts` hands to the kits, alarms and apps engine it builds: `run` runs a
+  program, `exit` returns the exit. Only the files
   `tools/graph.ts` lists may import it, and never call it inside an Effect. What a program needs from the
   instance is in `AgentInput` (`runtime/input.ts`); build services in a layer, never at module level, and keep no
   module-level mutable state in the object's code. Work that outlives its caller is finite (`background()`,

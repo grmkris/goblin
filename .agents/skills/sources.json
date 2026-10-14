@@ -110,9 +110,9 @@
         "LICENSE"
       ],
       "treeSha256": "24b1dc8293bf6377506c4af656da159563c482c62b0177345408cc450aa5c513",
-      "localTreeSha256": "374217151055e8ca11543e87675fb26b66dffc50470163cd36c34793df3ca094",
+      "localTreeSha256": "9fc49463dfb4cf9ce223bb439980523bdcdce44dae55df46c9fc304c80fc6d0e",
       "unchanged": false,
-      "adaptation": "the bridge's run no longer checks a plan (ADR 0058)",
+      "adaptation": "the bridge has one runner, run",
       "baseCommit": "54259fdd5a2560d2595167d7ff0650826a039102"
     },
     "find-animation-opportunities": {
