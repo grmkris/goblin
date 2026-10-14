@@ -1,3 +1,4 @@
+import { Channel } from '../../../src/channel/service.ts'
 import { OrganizeGroup, PersonasGroup, TopicsGroup } from '@goblin/contracts/api'
 import type { FlowEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
@@ -120,6 +121,8 @@ export const organizing = (options: { readonly active?: boolean } = {}) => {
           stub(RoutineControl),
           stub(Apps),
           stub(McpConnections, { snapshot: () => Effect.succeed(Option.none()) }),
+          // Only a Telegram receipt's Undo reaches the channel.
+          stub(Channel),
           catalog,
           Layer.succeed(Resident, resident.service),
           plans(options.active),

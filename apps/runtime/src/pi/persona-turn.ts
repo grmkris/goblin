@@ -131,6 +131,8 @@ export const PERSONA_DENIED_TOOLS: readonly string[] = [
   'topic_setup',
   'persona_create',
   'persona_update',
+  'telegram_chats',
+  'telegram_route',
   'routine_propose',
   'routine_pause',
   'home_edit',

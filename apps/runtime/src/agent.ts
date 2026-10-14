@@ -7,6 +7,7 @@ import * as ManagedRuntime from 'effect/ManagedRuntime'
 import type { AgentRpcMethods, RuntimeEnv } from './env.ts'
 import { failureOf, toAppError } from './http/errors.ts'
 import { channelPull, channelReplies } from './channel/wake.ts'
+import { telegramExtension } from './pi/telegram.ts'
 import { type RpcResult, encodeExit } from './http/rpc.ts'
 import { filesExtension } from './pi/files.ts'
 import { type AgentApps, agentApps } from './agent-apps/engine.ts'
@@ -122,7 +123,15 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     const subagents = this.#subagents.extension
     const retrieval = retrievalExtension(run)
     const learning = [skillLearningExtension(run), decisionsExtension(run, env.AI !== undefined)]
-    const base = [...execution, ...learning, ...appsExtension(apps, run), organize, retrieval, onboardingExtension(run)]
+    const base = [
+      ...execution,
+      ...learning,
+      ...appsExtension(apps, run),
+      organize,
+      telegramExtension(run),
+      retrieval,
+      onboardingExtension(run),
+    ]
     const own = [serversExtension(run, env.STAGE), subagents, routinesExtension(run), this.#telemetry.diagnose]
     const extras = [this.#thread, memory, recall, this.#personas.extension, ...routineKit.extra]
     this.harness = makePiHarness(this.#pi, [...base, ...own], extras, apps, this.#telemetry.recorder)

@@ -50,6 +50,7 @@ import {
   setReach,
   storedCursor,
   takeSyncDue,
+  telegramRevision,
   trackReply,
 } from './store.ts'
 import { syncChats } from './sync.ts'
@@ -562,7 +563,10 @@ export const telegramChannel = (input: ChannelInput): Effect.Effect<Channel['Ser
         serial
           .withPermit(taker(input, record, ports).sync(now))
           .pipe(refusedAsUpstream, Effect.withSpan('Channel.sync')),
-      newChats: (value) => Effect.sync(() => setNewChats(db, value) !== undefined),
+      restore: (key, choice, now) =>
+        serial.withPermit(Effect.sync(() => setRoute(db, key, choice, 'owner', now)?.after)),
+      revision: (kind, target) => Effect.sync(() => telegramRevision(db, kind, target)),
+      newChats: (value) => Effect.sync(() => setNewChats(db, value)),
       deliver: (ports, now, delivered = () => Effect.void) =>
         deliver(input, record, ports, now, delivered).pipe(refusedAsUpstream, Effect.withSpan('Channel.deliver')),
     })

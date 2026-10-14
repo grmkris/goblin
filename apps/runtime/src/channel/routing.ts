@@ -15,6 +15,7 @@ import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { epochSeconds } from '../clock.ts'
 import { type AppError, InvalidInput, NotFound } from '../http/errors.ts'
+import { Receipts } from '../organize/service.ts'
 import { Personas } from '../personas/service.ts'
 import { Db } from '../runtime/db.ts'
 import { Topics } from '../topics/service.ts'
@@ -167,31 +168,108 @@ export const choiceOf = (pick: RoutePick, actor: 'owner' | 'agent') =>
  * delivered). The row before and after; `NotFound` for a chat or topic goblin has never seen, `InvalidInput` while
  * the channel is off.
  */
-export const setChatRoute = (pick: RoutePick, actor: 'owner' | 'agent') =>
+/** Who changed a route and from where: the receipt it leaves says so (ADR 0033). */
+export type RouteProvenance = {
+  readonly actor: 'owner' | 'agent'
+  readonly chat?: string
+  readonly operationId?: string
+}
+
+/** A route in words, with its Topic's and Persona's names: what a receipt and the agent read. */
+export const routeWords = (route: TelegramRoute | undefined, inherited = false) =>
+  Effect.gen(function* () {
+    if (route === undefined) return inherited ? 'follows its chat' : "waits for the owner's choice"
+    if (route.mode === 'ignore') return 'ignored'
+    const topic = yield* (yield* Topics).get(route.topic).pipe(Effect.option)
+    const place = `#${Option.match(topic, { onNone: () => 'Personal', onSome: ({ name }) => name })}`
+    if (route.mode === 'listen') return `kept as notes in ${place}`
+    if (route.persona === undefined) return `answered by goblin in ${place}`
+    const persona = yield* (yield* Personas).get(route.persona).pipe(Effect.option)
+    return `answered by @${Option.match(persona, { onNone: () => 'Persona', onSome: ({ name }) => name })} in ${place}`
+  })
+
+/** A chat or topic by name, for a receipt: "Trip planning", or "Flights" in "Trip planning". */
+const placeName = (db: DrizzleSqliteDODatabase, row: RouteRow) =>
+  row.thread === 0 ? `"${row.title}"` : `"${row.title}" in "${routeRow(db, row.chat, 0)?.title ?? 'Telegram'}"`
+
+/** A route as a receipt keeps it: the row's own route, none while it waits or follows its chat. */
+const routeSnapshot = (row: RouteRow) => ({ route: ownRoute(row) ?? null })
+
+/** The receipt target of a chat's or topic's route. */
+const routeTarget = (row: Pick<RouteRow, 'chat' | 'thread'>) => `${row.chat}:${String(row.thread)}`
+
+/**
+ * Sets one chat's or topic's route as `by` picked it, through the channel (its offer closes and what it held is
+ * delivered), and leaves an organizing receipt with Undo. The row before and after and the receipt's words; `NotFound`
+ * for a chat or topic goblin has never seen, `InvalidInput` while the channel is off.
+ */
+export const setChatRoute = (pick: RoutePick, by: RouteProvenance) =>
   Effect.gen(function* () {
     yield* channelOn
     const db = yield* Db
     const key = { chat: pick.chat, thread: pick.thread ?? 0 }
     if (routeRow(db, key.chat, key.thread) === undefined) return yield* new NotFound({ what: 'telegram chat' })
-    const choice = yield* choiceOf(pick, actor)
+    const choice = yield* choiceOf(pick, by.actor)
     const now = yield* epochSeconds
-    const changed = yield* onChannel((channel, ports) => channel.route(ports, key, choice, actor, now))
+    const changed = yield* onChannel((channel, ports) => channel.route(ports, key, choice, by.actor, now))
     const result = Option.getOrUndefined(changed)
     if (result === undefined) return yield* new NotFound({ what: 'telegram chat' })
-    return result
+    const { before, after } = result
+    const words = yield* routeWords(ownRoute(after), after.thread > 0)
+    const summary = `Telegram ${placeName(db, after)} is ${words}`
+    yield* (yield* Receipts).record({
+      kind: 'telegram.route',
+      target: routeTarget(after),
+      summary,
+      actor: by.actor,
+      ...(by.chat === undefined ? {} : { chat: by.chat }),
+      before: routeSnapshot(before),
+      after: routeSnapshot(after),
+      afterRevision: after.revision,
+      ...(by.operationId === undefined ? {} : { operationId: `telegram.route:${by.operationId}` }),
+    })
+    return { before, after, summary }
   })
 
 /** `PUT /api/agent/channel/routes`: the owner's route for one chat or topic, as the Chats list shows it after. */
 export const routeChannel = (pick: RoutePick) =>
   Effect.gen(function* () {
-    const { after } = yield* setChatRoute(pick, 'owner')
+    const { after } = yield* setChatRoute(pick, { actor: 'owner' })
     return yield* chatOf(yield* Db, after.chat, after.thread)
+  })
+
+const NEW_CHATS_WORDS: Record<NewChatsDefault, string> = {
+  ask: 'wait for the owner to choose',
+  topic: 'each get a new Topic',
+  personal: 'go to Personal',
+}
+
+/**
+ * What goblin does with new chats, as `by` set it, with an organizing receipt and Undo; the receipt's words.
+ * `InvalidInput` while the channel is off.
+ */
+export const setNewChatsDefault = (newChats: NewChatsDefault, by: RouteProvenance) =>
+  Effect.gen(function* () {
+    const changed = yield* (yield* Channel).newChats(newChats)
+    if (changed === undefined) return yield* new InvalidInput({ reason: 'telegram_off' })
+    const summary = `New Telegram chats ${NEW_CHATS_WORDS[newChats]}`
+    yield* (yield* Receipts).record({
+      kind: 'telegram.default',
+      target: 'new_chats',
+      summary,
+      actor: by.actor,
+      ...(by.chat === undefined ? {} : { chat: by.chat }),
+      before: { newChats: changed.before },
+      after: { newChats },
+      afterRevision: changed.revision,
+      ...(by.operationId === undefined ? {} : { operationId: `telegram.default:${by.operationId}` }),
+    })
+    return summary
   })
 
 /** `PUT /api/agent/channel/settings`: what goblin does with new chats; the channel's status after. */
 export const channelSettings = (newChats: NewChatsDefault) =>
   Effect.gen(function* () {
-    const channel = yield* Channel
-    if (!(yield* channel.newChats(newChats))) return yield* new InvalidInput({ reason: 'telegram_off' })
-    return yield* channel.status
+    yield* setNewChatsDefault(newChats, { actor: 'owner' })
+    return yield* (yield* Channel).status
   })

@@ -5,7 +5,7 @@ import type { ChannelStatus, NewChatsDefault, TelegramReach } from '@goblin/cont
 import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import { appChannelReplies, appTelegramChannel } from '../storage/schema.ts'
-import { dropHeld } from './routes.ts'
+import { dropHeld, routeRow } from './routes.ts'
 
 type Db = DrizzleSqliteDODatabase
 
@@ -94,6 +94,17 @@ export function setNewChats(
       .run()
     return { before: row.newChats, revision: row.settingsRevision + 1 }
   })
+}
+
+/**
+ * The revision a Telegram receipt's target is at now (ADR 0055): a route's (`<chat>:<thread>`) or the new-chats
+ * default's; none when it is gone or the channel is off.
+ */
+export function telegramRevision(db: Db, kind: string, target: string): number | undefined {
+  if (kind === 'telegram.default')
+    return db.select({ revision: appTelegramChannel.settingsRevision }).from(appTelegramChannel).get()?.revision
+  const split = target.lastIndexOf(':')
+  return routeRow(db, target.slice(0, split), Number(target.slice(split + 1)))?.revision
 }
 
 /** The server's chat list is to be read again (a chat changed) at the next pull. */

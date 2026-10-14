@@ -1,3 +1,4 @@
+import { telegramRevision } from '../channel/store.ts'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
@@ -70,6 +71,7 @@ const stores: Effect.Effect<DelegationStores, never, AgentInput | Db | Conversat
       modelOptions(input.env.MODELS, input.env.MODEL_ID).map((option) => option.id),
     )
     const receipts = new OrganizeReceipts(db, (kind, target) => {
+      if (kind === 'telegram.route' || kind === 'telegram.default') return telegramRevision(db, kind, target)
       try {
         return (kind.startsWith('topic.') ? topics : personas).get(Number(target)).revision
       } catch {

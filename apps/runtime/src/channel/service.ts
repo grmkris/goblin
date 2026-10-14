@@ -64,8 +64,18 @@ export class Channel extends Context.Service<
      * list could be read.
      */
     readonly sync: (ports: ChannelPorts, now: number) => Effect.Effect<boolean, AppError>
-    /** What goblin does with a chat it has not seen; false while the channel is off. */
-    readonly newChats: (value: NewChatsDefault) => Effect.Effect<boolean>
+    /** Puts `key`'s route back as an Undo found it, with no delivery; the row after, none for a chat goblin never saw. */
+    readonly restore: (
+      key: { readonly chat: string; readonly thread: number },
+      choice: RouteChoice,
+      now: number,
+    ) => Effect.Effect<RouteRow | undefined>
+    /** The revision a Telegram receipt's target is at now (a route's, or the new-chats default's). */
+    readonly revision: (kind: string, target: string) => Effect.Effect<number | undefined>
+    /** What goblin does with a chat it has not seen: the setting before and its revision now; none while it is off. */
+    readonly newChats: (
+      value: NewChatsDefault,
+    ) => Effect.Effect<{ readonly before: NewChatsDefault; readonly revision: number } | undefined>
     /** Sends every answer that is ready, telling `delivered` about each; true while some are still running. */
     readonly deliver: (
       ports: ChannelPorts,
