@@ -12,3 +12,4 @@ replaced it. Living docs never cite an archived ADR as current behaviour.
 | [0015](0015-plans-and-payments.md) | Plans and payments | [0058](../0058-no-plans-tokens-and-an-optional-cap.md) |
 | [0026](0026-daily-budget-in-credits.md) | The daily budget is estimated Token Plan Credits | [0058](../0058-no-plans-tokens-and-an-optional-cap.md) |
 | [0054](0054-pro-paid-as-a-signed-usdc-subscription.md) | Pro paid as a signed USDC subscription | [0058](../0058-no-plans-tokens-and-an-optional-cap.md) |
+| [0048](0048-first-run-start.md) | First-run Start | [0062](../0062-short-skippable-start.md) |
