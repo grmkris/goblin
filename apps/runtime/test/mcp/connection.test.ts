@@ -492,7 +492,8 @@ describe('a slow tool call (unit)', () => {
   })
 
   it('lets a server that reports progress run past the deadline of one wait', async () => {
-    const manager = slowManager(240, 40)
+    // Twice one wait, reporting progress well inside it: a busy machine's pauses stay within the margin.
+    const manager = slowManager(600, 40, { toolTimeoutMs: 300, toolDeadlineMs: 5000 })
     try {
       const result = await manager.connections.callTool('fixture', 'slow', {})
       expect(result.content).toEqual([{ type: 'text', text: 'done' }])
