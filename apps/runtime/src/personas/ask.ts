@@ -1,5 +1,5 @@
 import type { TextContent } from '@earendil-works/pi-ai'
-import type { PersonaAskData } from '@goblin/contracts'
+import { type PersonaAskData, authorOf } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { epochSeconds } from '../clock.ts'
@@ -11,14 +11,23 @@ import type { FrozenPersona } from '../pi/persona-turn.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { Invocations, Personas } from './service.ts'
 
-/** The owner's content with the Personas it went to named in front, as the model of the chat reads it. */
+/**
+ * The owner's content with the Personas it went to named in front, as the model of the chat reads it. A message from
+ * elsewhere (Telegram) keeps its author's block first; the words after it are addressed.
+ */
 export function addressedTo(names: readonly string[], content: string | TextContent[]): string | TextContent[] {
   const tag = `[to ${names.map((name) => `@${name}`).join(', ')}] `
   if (typeof content === 'string') return `${tag}${content}`
   const [first, ...rest] = content
-  return first === undefined
-    ? [{ type: 'text', text: tag.trimEnd() }]
-    : [{ ...first, text: `${tag}${first.text}` }, ...rest]
+  if (first === undefined) return [{ type: 'text', text: tag.trimEnd() }]
+  if (authorOf(first.text) !== undefined && rest.length > 0) return [first, ...addressedBlocks(tag, rest)]
+  return addressedBlocks(tag, content)
+}
+
+/** `blocks` with `tag` in front of the first one's words. */
+const addressedBlocks = (tag: string, blocks: readonly TextContent[]): TextContent[] => {
+  const [first, ...rest] = blocks
+  return first === undefined ? [] : [{ ...first, text: `${tag}${first.text}` }, ...rest]
 }
 
 /** Persona `id` at `revision`, frozen for a turn: its words, its setup, and its model when offered. */

@@ -287,6 +287,18 @@ describe('what a Persona turn changes in its fork', () => {
       addressedTo(
         ['A'],
         [
+          { type: 'text', text: '[from Telegram · Trip planning]' },
+          { type: 'text', text: 'hello' },
+        ],
+      ),
+    ).toEqual([
+      { type: 'text', text: '[from Telegram · Trip planning]' },
+      { type: 'text', text: '[to @A] hello' },
+    ])
+    expect(
+      addressedTo(
+        ['A'],
+        [
           { type: 'text', text: 'hi' },
           { type: 'text', text: '{}' },
         ],

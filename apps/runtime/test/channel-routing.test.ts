@@ -184,6 +184,23 @@ describe('routing Telegram chats to Topics', () => {
     }),
   )
 
+  it.effect("takes the owner's tap on goblin's buttons as their reply: the button's label, in the same Topic", () =>
+    Effect.gen(function* () {
+      const { db, channel, ports, turns, pull } = yield* fixture()
+      seeChat(db, { chat: GROUP, thread: 0, title: 'Trip planning', kind: 'supergroup' }, 1)
+      yield* channel.route(ports, { chat: GROUP, thread: 0 }, { mode: 'answer', topic: 4 }, 'owner', 1)
+      yield* pull(
+        message('answer:q7', {
+          chat: GROUP,
+          trigger: 'answer',
+          questionId: 'q7',
+          text: 'Question q7: Kris tapped "w" (Window).',
+        }),
+      )
+      expect(turns.map(({ turn }) => [turn.topic, turn.text])).toEqual([[4, 'Window']])
+    }),
+  )
+
   it.effect('gives up an answer for a chat the bot was removed from, and marks the chat paused', () =>
     Effect.gen(function* () {
       const answers = new Map<string, Answer>([['telegram-p1', { text: 'Too late.' }]])

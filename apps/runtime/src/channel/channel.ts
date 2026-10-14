@@ -18,7 +18,7 @@ import { writeLine } from '../observability/logger.ts'
 import { failureAttributes, outcomeOf } from '../telemetry/attributes.ts'
 import type { RunTelemetry } from '../telemetry/events.ts'
 import { expectedFailure } from '../telemetry/safety.ts'
-import { type ChatKey, type Offering, discover, resolveOffer } from './offers.ts'
+import { type ChatKey, type Offering, discover, resolveOffer, tapOf } from './offers.ts'
 import {
   type Held,
   type RouteChoice,
@@ -153,6 +153,16 @@ const messageText = (message: Message) =>
   [message.text, ...(message.media ?? []).map((media) => `[attachment: ${media.kind} ${JSON.stringify(media.name)}]`)]
     .filter((part) => part !== '')
     .join('\n')
+
+/**
+ * An answer to one of goblin's questions (an `ask_user` sent as buttons) as the owner's reply: the label of the button
+ * they tapped, else their words.
+ */
+const answerText = (message: Message) => {
+  const tap = message.trigger === 'answer' ? tapOf(message.text) : undefined
+  if (tap === undefined) return messageText(message)
+  return tap.label === '' ? tap.choice : tap.label
+}
 
 /** One line when a pull or a delivery fails: the alarm's step and the error's type, never message content. */
 export function reportChannelFailure(step: 'pull' | 'replies' | 'resubscribe' | 'offer', error: unknown): void {
@@ -376,7 +386,7 @@ const taker = (input: ChannelInput, record: Recorder, ports: ChannelPorts) => {
       const placeholders = firstSight(db, chat, thread, now)
       yield* offer([...listed, ...placeholders, { chat, thread: 0 }], now)
       yield* route(
-        { entryId: message.id, chat, thread, text: messageText(message), trigger: message.trigger ?? null },
+        { entryId: message.id, chat, thread, text: answerText(message), trigger: message.trigger ?? null },
         now,
       )
     })
