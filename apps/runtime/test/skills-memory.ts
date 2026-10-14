@@ -1,5 +1,5 @@
 // In-memory skills state for unit tests, with the SQLite stores' semantics (src/skills/store.ts).
-import type { Activation, DraftLog, DraftRecord, DraftStatus, SkillState } from '../src/skills/store.ts'
+import type { Activation, DraftLog, DraftRecord, SkillState } from '../src/skills/store.ts'
 
 /** The skills state in memory, with the SQLite store's semantics. */
 export class MemorySkillState implements SkillState {
@@ -32,20 +32,8 @@ export class MemoryDraftLog implements DraftLog {
   readonly rows = new Map<string, DraftRecord & { readonly createdAt: number }>()
   countSince = (since: number) => [...this.rows.values()].filter((row) => row.createdAt >= since).length
   known = (contentHash: string) => this.rows.has(contentHash)
-  blocked = (connectionId: string, name: string, baseUri: string | undefined) =>
-    [...this.rows.values()].some(
-      (row) =>
-        row.connectionId === connectionId &&
-        row.name === name &&
-        (row.status === 'open' || (row.status === 'rejected' && row.baseUri === baseUri)),
-    )
-  open = (limit: number) => [...this.rows.values()].filter((row) => row.status === 'open').slice(0, limit)
   add(record: DraftRecord, now: number) {
     this.rows.set(record.contentHash, { ...record, createdAt: now })
-  }
-  update(contentHash: string, change: { readonly draftId?: string; readonly status: DraftStatus }) {
-    const row = this.rows.get(contentHash)
-    if (row !== undefined) this.rows.set(contentHash, { ...row, ...change })
   }
   forget(contentHash: string) {
     this.rows.delete(contentHash)

@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, sql } from 'drizzle-orm'
+import { and, count, eq, gte, sql } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import * as Schema from 'effect/Schema'
 import {
@@ -182,31 +182,30 @@ export class SqliteSkillState implements SkillState {
   }
 }
 
-export type DraftStatus = 'open' | 'accepted' | 'rejected'
-/** A draft the agent proposed: its content hash, the library, the skill it names or improves, and its review. */
+/**
+ * A skill draft the learner wrote to the owner's files: its content hash, the skill it names, and the skill it improves
+ * with that skill's server, when it improves one.
+ */
 export type DraftRecord = {
   readonly contentHash: string
-  readonly connectionId: string
   readonly name: string
-  readonly baseUri: string | undefined
-  readonly draftId: string | undefined
-  readonly status: DraftStatus
+  readonly base: { readonly connectionId: string; readonly uri: string } | undefined
 }
 
-/** The learner's record of the drafts it proposed (skills/learner.ts). */
+/** The learner's record of the drafts it wrote (skills/learner.ts). */
 export interface DraftLog {
-  /** Drafts proposed since `since` (ms). */
+  /** Drafts written since `since` (ms). */
   countSince(since: number): number
-  /** A draft with this content was proposed before. */
+  /** A draft with this content was written before. */
   known(contentHash: string): boolean
-  /** A draft for this skill waits for review, or one for the same base was rejected. */
-  blocked(connectionId: string, name: string, baseUri: string | undefined): boolean
-  open(limit: number): readonly DraftRecord[]
   add(record: DraftRecord, now: number): void
-  update(contentHash: string, change: { readonly draftId?: string; readonly status: DraftStatus }, now: number): void
   forget(contentHash: string): void
 }
 
+/**
+ * The draft log in `app_skill_drafts`. A new skill's draft has no server (`connection_id` is empty); its review is the
+ * owner's, in their files, so every row stays `open`.
+ */
 export class SqliteDraftLog implements DraftLog {
   readonly #db: DrizzleSqliteDODatabase
   constructor(db: DrizzleSqliteDODatabase) {
@@ -229,56 +228,19 @@ export class SqliteDraftLog implements DraftLog {
     )
   }
 
-  blocked(connectionId: string, name: string, baseUri: string | undefined): boolean {
-    return this.#db
-      .select({ status: appSkillDrafts.status, baseUri: appSkillDrafts.baseUri })
-      .from(appSkillDrafts)
-      .where(
-        and(
-          eq(appSkillDrafts.connectionId, connectionId),
-          eq(appSkillDrafts.name, name),
-          inArray(appSkillDrafts.status, ['open', 'rejected']),
-        ),
-      )
-      .all()
-      .some((row) => row.status === 'open' || row.baseUri === (baseUri ?? null))
-  }
-
-  open(limit: number): readonly DraftRecord[] {
-    return this.#db
-      .select()
-      .from(appSkillDrafts)
-      .where(eq(appSkillDrafts.status, 'open'))
-      .limit(limit)
-      .all()
-      .map((row) => ({
-        contentHash: row.contentHash,
-        connectionId: row.connectionId,
-        name: row.name,
-        baseUri: row.baseUri ?? undefined,
-        draftId: row.draftId ?? undefined,
-        status: row.status,
-      }))
-  }
-
-  add(record: DraftRecord, now: number): void {
+  add({ contentHash, name, base }: DraftRecord, now: number): void {
     this.#db
       .insert(appSkillDrafts)
       .values({
-        ...record,
-        baseUri: record.baseUri ?? null,
-        draftId: record.draftId ?? null,
+        contentHash,
+        connectionId: base?.connectionId ?? '',
+        name,
+        baseUri: base?.uri ?? null,
+        draftId: null,
+        status: 'open',
         createdAt: now,
         updatedAt: now,
       })
-      .run()
-  }
-
-  update(contentHash: string, change: { readonly draftId?: string; readonly status: DraftStatus }, now: number): void {
-    this.#db
-      .update(appSkillDrafts)
-      .set({ ...change, updatedAt: now })
-      .where(eq(appSkillDrafts.contentHash, contentHash))
       .run()
   }
 

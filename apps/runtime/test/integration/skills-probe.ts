@@ -1,13 +1,20 @@
 import { drizzle } from 'drizzle-orm/durable-sqlite'
 import { eq } from 'drizzle-orm'
 import { createMcpHandler } from '@modelcontextprotocol/server'
+import type { FileEntry } from '@goblin/contracts'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
+import { ChatId } from '../../src/chats/directory.ts'
+import { Chats, Conversations } from '../../src/chats/service.ts'
+import { Files } from '../../src/files/service.ts'
+import { NotFound } from '../../src/http/errors.ts'
 import { makeManager } from '../../src/mcp/manager.ts'
-import { McpConnections, McpGrants } from '../../src/mcp/service.ts'
+import { McpConnections } from '../../src/mcp/service.ts'
+import { Notices } from '../../src/notices/service.ts'
+import { Changes, makeChanges } from '../../src/runtime/changes.ts'
 import type { McpManagerOptions } from '../../src/mcp/types.ts'
 import { SingleFlight } from '../../src/observability/single-flight.ts'
 import { PiSessions } from '../../src/pi/sessions.ts'
@@ -29,12 +36,7 @@ import { makePiModels } from '../../src/pi/model.ts'
 import { conversationId } from '../../src/pi/context.ts'
 import type { PiHarness } from 'agents/harness/pi'
 import { lowLevelServer } from '../mcp/low-level-server.ts'
-import { draftTools } from '../mcp/skill-drafts.ts'
 import { servicesOf } from '../mcp/runtime.ts'
-
-/** The draft tools the learner probe's owner granted. */
-const draftTool = (connectionId: string, name: string) =>
-  connectionId === 'myskills' && (name === 'skill_draft' || name === 'skill_draft_status')
 
 /** One skill as a library lists it: its `SKILL.md` at `uri` is the one resource. */
 interface ListedSkill {
@@ -164,50 +166,43 @@ export async function skillsPersistedRead(storage: DurableObjectStorage) {
   }
 }
 
-/** Real workerd SQLite learner state and MCP transport, with a deterministic scripted cheap model and library double. */
-export async function skillsLearnerRejectionProbe(storage: DurableObjectStorage, harness: PiHarness) {
+/** A file entry as the owner's files answer for `path`. */
+const fileEntry = (path: string): FileEntry => ({
+  path,
+  name: path.slice(path.lastIndexOf('/') + 1),
+  kind: 'file',
+  size: 0,
+  mimeType: 'text/markdown',
+  updatedAt: 0,
+})
+
+/**
+ * Real workerd SQLite learner state and MCP transport, with a deterministic scripted cheap model: an improvement of an
+ * activated skill is written once to the owner's files (held in memory here), and the same lesson again is a duplicate.
+ */
+export async function skillsLearnerDraftProbe(storage: DurableObjectStorage, harness: PiHarness) {
   runApplicationMigrations(storage)
   const db = drizzle(storage)
   const state = new SqliteSkillState(db)
   const body = new TextEncoder().encode(
-    '---\nname: rejection-proof\ndescription: Keep a checksum procedure.\n---\n\n# Checksum procedure\n',
+    '---\nname: draft-proof\ndescription: Keep a checksum procedure.\n---\n\n# Checksum procedure\n',
   )
-  const uri = 'skill://skv_222222222222222222222222/rejection-proof/SKILL.md'
+  const uri = 'skill://skv_222222222222222222222222/draft-proof/SKILL.md'
   const entry = {
     uri,
-    frontmatter: { name: 'rejection-proof', description: 'Keep a checksum procedure.' },
+    frontmatter: { name: 'draft-proof', description: 'Keep a checksum procedure.' },
     resources: [{ uri, digest: await digestOf(body), size: body.byteLength }],
   } as const
-  let submitted = 0
-  let statusCalls = 0
-  const handler = createMcpHandler(() => {
-    const server = libraryServer('myskills-double', entry, body, true)
-    server.setRequestHandler('tools/list', draftTools)
-    server.setRequestHandler('tools/call', (request) => {
-      if (request.params.name === 'skill_draft') {
-        submitted += 1
-        return { content: [], structuredContent: { draftId: 'draft-rejected', status: 'open' } }
-      }
-      statusCalls += 1
-      return { content: [], structuredContent: { draftId: 'draft-rejected', status: 'rejected' } }
-    })
-    return server
-  })
-  const manager = managerOver(
-    state,
-    'myskills',
-    (input, init) => handler.fetch(new Request(input, init)),
-    ({ connectionId, capability, name }) => capability === 'tool' && draftTool(connectionId, name),
-  )
-  state.setEnabled('myskills', true, 1)
+  const handler = createMcpHandler(() => libraryServer('skills-library', entry, body, false))
+  const manager = managerOver(state, 'library', (input, init) => handler.fetch(new Request(input, init)))
+  state.setEnabled('library', true, 1)
   const receipt = await harness.submit('Run the checksum procedure.', {
     operationId: 'checksum-procedure',
   })
   await harness.wait(receipt.operationId)
-  const drafts = new SqliteDraftLog(db)
   const decision = JSON.stringify({
     action: 'improve',
-    skill: 'myskills:rejection-proof',
+    skill: 'library:draft-proof',
     description: 'Verify checksums before submitting a report.',
     body: '1. Calculate the checksum.\n2. Verify it before submitting.',
     evidence: 'The owner corrected the order of checksum verification.',
@@ -219,6 +214,9 @@ export async function skillsLearnerRejectionProbe(storage: DurableObjectStorage,
       () => [{ type: 'text', text: decision }],
     ),
   )
+  /** The owner's files the learner wrote, and the notices it claimed. */
+  const written = new Map<string, string>()
+  const notices: string[] = []
   // SAFETY: PiSessions reads only the harness from the agent's inputs.
   const input = Object.assign(Object.create(null), { harness }) as AgentInputs
   const { run, dispose } = servicesOf(
@@ -226,7 +224,7 @@ export async function skillsLearnerRejectionProbe(storage: DurableObjectStorage,
       Effect.gen(function* () {
         const skills = yield* makeSkills(state)
         const learner = yield* makeLearner({
-          drafts,
+          drafts: new SqliteDraftLog(db),
           state,
           skills,
           model: new CheapModel(scripted.models, scripted.model.id, () => undefined),
@@ -237,19 +235,33 @@ export async function skillsLearnerRejectionProbe(storage: DurableObjectStorage,
       Layer.provide(
         Layer.mergeAll(
           connectionsLayer(manager),
-          Layer.mock(McpGrants)({
-            policy: (connectionId: string, name: string) =>
-              Effect.succeed(
-                draftTool(connectionId, name) ? Option.some({ askFirst: false, version: 'fixture' }) : Option.none(),
-              ),
+          Layer.mock(Files)({
+            stat: (path: string) =>
+              written.has(path) ? Effect.succeed(fileEntry(path)) : Effect.fail(new NotFound({ what: 'file' })),
+            write: (_caller, path: string, text) =>
+              Effect.sync(() => {
+                // SAFETY: the learner writes its drafts as text.
+                written.set(path, text as string)
+                return fileEntry(path)
+              }),
           }),
+          Layer.mock(Notices)({
+            claim: (notice: { readonly title: string }) =>
+              Effect.sync(() => {
+                notices.push(notice.title)
+                return { posted: false }
+              }),
+          }),
+          Layer.mock(Chats)({ primary: ChatId('1'), chatOf: () => Effect.succeed(Option.some(ChatId('1'))) }),
+          Layer.mock(Conversations)({}),
+          Layer.succeed(Changes, makeChanges()),
           PiSessions.layer.pipe(Layer.provide(Layer.succeed(AgentInput, input))),
           SingleFlight.layer,
         ),
       ),
     ),
   )
-  await run(Effect.flatMap(Skills, (library) => library.activate(receipt.session, 'myskills:rejection-proof')))
+  await run(Effect.flatMap(Skills, (library) => library.activate(receipt.session, 'library:draft-proof')))
   const corrected = await harness.submit('No, next time verify the checksum before submitting.', {
     operationId: 'checksum-correction',
   })
@@ -261,9 +273,12 @@ export async function skillsLearnerRejectionProbe(storage: DurableObjectStorage,
   })
   await harness.wait(repeated.operationId)
   const second = await run(learner.consider(conversationId(receipt.session)))
-  const row = db.select({ status: appSkillDrafts.status }).from(appSkillDrafts).all()
+  const rows = db
+    .select({ connectionId: appSkillDrafts.connectionId, name: appSkillDrafts.name, baseUri: appSkillDrafts.baseUri })
+    .from(appSkillDrafts)
+    .all()
   await dispose()
-  return { first, second, submitted, statusCalls, row }
+  return { first, second, files: [...written.keys()], notices, rows }
 }
 
 export const probes: Probes = { 'skills-cache': inAgent(({ storage }) => skillsCacheProbe(storage)) }

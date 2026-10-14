@@ -13,7 +13,7 @@ import { ActivateMemoriesLive, CheapModelsLive, KnowledgeLive } from './knowledg
 import { McpEventsLive, McpHostLive } from './mcp.ts'
 import { OnboardingLive } from './onboarding.ts'
 import { ChannelLive, RoutineRunsLive, RoutinesLive } from './routines.ts'
-import { SkillsLive } from './skills.ts'
+import { LearnerLive, SkillsLive } from './skills.ts'
 import { WorkspaceLive } from '../workspace/live.ts'
 
 /** `step`, built after and over everything `built` provides; the result provides both. */
@@ -29,7 +29,7 @@ const then =
  * 2. The MCP host. Awaits the credential cipher's key, which every stored credential and held call is sealed with;
  *    each server's endpoint binding is checked and the held calls a restart cut off are recovered before anything
  *    can connect or decide one.
- * 3. The cheap models, which the memories (9) and the skill learner (10) are built over.
+ * 3. The cheap models, which the memories (9) and the skill learner (after the start) are built over.
  * 4. Helper execution. Awaits Pi: every registered helper goes on with the execution extensions the agent has now,
  *    also after the object was rebuilt.
  * 5. Retooling. Awaits Pi: every conversation's stored tool filter is applied to Pi again, once (a marker records it),
@@ -40,7 +40,7 @@ const then =
  * 8. The App registry, which follows `conversations.changed` and `agent-apps.changed` from the first write on.
  * 9. Memories. Awaits every Topic Conversation without memory being given it (a fresh agent's Personal, registered
  *    at 7, or a Topic whose activation a crash cut short).
- * 10. Skills and the learner, over the host's connections.
+ * 10. Skills, over the host's connections.
  * 11. The Telegram channel.
  * 12. Events. Awaits the hook token, then registers the Telegram and skills consumers (10, 11) before any delivery
  *     can reach the engine.
@@ -63,7 +63,7 @@ const start = (input: AgentInputs) =>
 /**
  * Every service of one agent, built once per Durable Object (agent.ts): the start (above), the model budget and model
  * picker (a send's admission reads them), then each area's layer in turn, each built
- * after and over everything before it.
+ * after and over everything before it: the skill learner after the owner's files and the routines' notices it writes.
  */
 export const AgentLive = (input: AgentInputs) =>
   start(input).pipe(
@@ -75,6 +75,7 @@ export const AgentLive = (input: AgentInputs) =>
     then(RoutinesLive),
     then(Inspection.layer),
     then(AppsLive),
+    then(LearnerLive),
     then(DecisionsLive),
     then(WorkspaceLive),
     then(OnboardingLive),

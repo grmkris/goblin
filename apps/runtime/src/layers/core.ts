@@ -29,7 +29,7 @@ import type { Channel } from '../channel/service.ts'
 import type { Cipher } from '../mcp/cipher.ts'
 import type { CheapModels } from '../memory/model.ts'
 import type { RoutineUsage } from '../routines/service.ts'
-import type { Learner, Skills } from '../skills/service.ts'
+import type { Skills } from '../skills/service.ts'
 
 /**
  * Conversation flows go to the agent's run ledger and its log line (ADR 0024), then, one point per operation with a
@@ -110,7 +110,6 @@ type StartServices =
   | Events
   | CheapModels
   | Skills
-  | Learner
   | RoutineUsage
   | Channel
   | Apps

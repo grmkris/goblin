@@ -1,5 +1,6 @@
 import { createMcpHandler } from '@modelcontextprotocol/server'
 import type { ConversationId, GenerationHooks, HookApi } from '@earendil-works/pi-durable'
+import type { FileEntry } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
@@ -11,8 +12,14 @@ import { type LearnOutcome, logLearnOutcome, makeLearner } from '../src/skills/l
 import { skillLearningExtension } from '../src/pi/skills.ts'
 import type { RunProgram } from '../src/runtime/bridge.ts'
 import { Budget } from '../src/budget.ts'
+import { ChatId } from '../src/chats/directory.ts'
+import { Chats, Conversations } from '../src/chats/service.ts'
+import { Files } from '../src/files/service.ts'
 import { Resident } from '../src/mcp/service.ts'
-import type { AppError } from '../src/http/errors.ts'
+import { type AppError, NotFound } from '../src/http/errors.ts'
+import { Notices } from '../src/notices/service.ts'
+import type { NewNotice } from '../src/notices/store.ts'
+import { Changes, makeChanges } from '../src/runtime/changes.ts'
 import { SingleFlight } from '../src/observability/single-flight.ts'
 import { PiSessions } from '../src/pi/sessions.ts'
 import { knowledgeOver } from './knowledge-layer.ts'
@@ -26,31 +33,37 @@ import { servicesOf } from './mcp/runtime.ts'
 import { fake, unread } from './fake.ts'
 import { BACKGROUND } from '../src/pi/context.ts'
 import type { CheapModel } from '../src/memory/model.ts'
-import { draftTools } from './mcp/skill-drafts.ts'
 
-/** What the library fixture received and answers: drafts in order, and the status it reports for each. */
-const library: { drafts: Record<string, unknown>[]; status: 'open' | 'accepted' | 'rejected' } = {
-  drafts: [],
-  status: 'open',
-}
+/** The owner's files the learner wrote, by path, and the notices it claimed, in order. */
+const owner: { files: Map<string, string>; notices: NewNotice[] } = { files: new Map(), notices: [] }
+const ownerFiles = Layer.mock(Files)({
+  stat: (path: string) =>
+    owner.files.has(path) ? Effect.succeed(fake<FileEntry>({ path })) : Effect.fail(new NotFound({ what: 'file' })),
+  write: (caller, path: string, body) =>
+    Effect.sync(() => {
+      expect(caller).toBe('agent')
+      // SAFETY: the learner writes its drafts as text.
+      owner.files.set(path, body as string)
+      return fake<FileEntry>({ path })
+    }),
+})
+const ownerNotices = Layer.mock(Notices)({
+  claim: (notice: NewNotice) =>
+    Effect.sync(() => {
+      owner.notices.push(notice)
+      return { posted: true }
+    }),
+  // The notice's entry is written by the routines' notices, which this test does not run.
+  get: () => Effect.succeed(undefined),
+})
 const AnyParams = Schema.toStandardSchemaV1(Schema.Record(Schema.String, Schema.Unknown))
 const skills = createMcpHandler(() => {
   const server = lowLevelServer(
     { name: 'library', version: '1.0.0' },
-    { capabilities: { tools: {}, resources: {}, extensions: { [SKILLS_EXTENSION]: {} } } },
+    { capabilities: { resources: {}, extensions: { [SKILLS_EXTENSION]: {} } } },
   )
   server.setRequestHandler('skills/list', { params: AnyParams }, () => ({ skills: [], ttlMs: 60_000 }))
   server.setRequestHandler('resources/list', () => ({ resources: [] }))
-  server.setRequestHandler('tools/list', draftTools)
-  server.setRequestHandler('tools/call', (request) => {
-    if (request.params.name === 'skill_draft') {
-      library.drafts.push(request.params.arguments ?? {})
-      const draftId = `draft-${library.drafts.length}`
-      return { content: [], structuredContent: { draftId, status: 'open' } }
-    }
-    const draftId = String(request.params.arguments?.['draftId'])
-    return { content: [], structuredContent: { draftId, status: library.status } }
-  })
   return server
 })
 
@@ -74,14 +87,16 @@ const model = { answer: '{"action":"none"}', calls: 0 }
 const state = new MemorySkillState()
 const credentials = new MemoryCredentials()
 await credentials.saveTokens('lib', { access_token: 'fixture-token', token_type: 'bearer' }, 0)
-const grants = new MemoryGrants()
 let drafts = new MemoryDraftLog()
-/** The learner over an MCP host for the library server, on a test clock at 10,000,000 ms. */
+/**
+ * The learner over an MCP host for the library server it takes skills from, the owner's files and notices, and a chat
+ * for the conversation, on a test clock at 10,000,000 ms.
+ */
 const learnerAt = () => {
   const host = mcpHost({
     servers: [{ connectionId: 'lib', endpoint: 'https://library.test/mcp' }],
     credentials,
-    grants,
+    grants: new MemoryGrants(),
     registries: new MemoryRegistries(),
     labels: new MemoryLabels(),
     skillsEnabled: (connectionId) => state.enabled(connectionId),
@@ -110,6 +125,11 @@ const learnerAt = () => {
       Layer.provideMerge(
         Layer.mergeAll(
           host.pipe(Layer.provide(SingleFlight.layer)),
+          ownerFiles,
+          ownerNotices,
+          Layer.mock(Chats)({ primary: ChatId('1'), chatOf: () => Effect.succeed(Option.some(ChatId('7'))) }),
+          Layer.mock(Conversations)({}),
+          Layer.succeed(Changes, makeChanges()),
           Layer.mock(PiSessions)({
             // SAFETY: the learner only reads `entries()` of the conversation, which this fixture answers.
             conversation: () => Effect.succeed(Option.some(piConversation as never)),
@@ -146,14 +166,12 @@ const hasYieldHook = (handlers: object | undefined): handlers is Pick<Generation
   handlers !== undefined && 'onYield' in handlers && typeof handlers.onYield === 'function'
 
 beforeEach(() => {
-  library.drafts = []
-  library.status = 'open'
+  owner.files = new Map()
+  owner.notices = []
   model.calls = 0
   model.answer = '{"action":"none"}'
   drafts = new MemoryDraftLog()
   state.setEnabled('lib', true)
-  for (const name of ['skill_draft', 'skill_draft_status'])
-    grants.set({ connectionId: 'lib', capability: 'tool', name }, true)
   exchange = [
     { role: 'user', text: 'Do the weekly review.' },
     { role: 'assistant', text: 'Here is the review: decisions first.' },
@@ -226,46 +244,56 @@ describe('the skill learner (unit)', () => {
   it('drafts nothing when the model finds no procedure', async () => {
     expect(await consider(MAIN)).toBe('none')
     expect(model.calls).toBe(1)
-    expect(library.drafts).toEqual([])
+    expect([...owner.files.keys()]).toEqual([])
+    expect(owner.notices).toEqual([])
   })
 
-  it('proposes a new skill draft without private details, and never the same draft twice', async () => {
+  it("writes a new skill's draft to the owner's files without private details, tells them, and never twice", async () => {
     model.answer = `Sure. ${NEW_SKILL}`
     expect(await consider(MAIN)).toBe('drafted')
-    expect(library.drafts).toHaveLength(1)
-    // SAFETY: the learner sends these fields; the assertions below fail if it does not.
-    const sent = library.drafts[0] as { files: { path: string; text: string }[]; name: string; operationId: string }
-    expect(sent.name).toBe('weekly-review')
-    expect(sent.operationId).toMatch(/^learn-[0-9a-f]{32}$/u)
-    const text = sent.files[0]?.text ?? ''
+    expect([...owner.files.keys()]).toEqual(['/agent/skills/drafts/weekly-review.md'])
+    const text = owner.files.get('/agent/skills/drafts/weekly-review.md') ?? ''
     expect(text).toMatch(/^---\nname: weekly-review\ndescription: "Review the week/u)
     expect(text).toContain('List blocked tasks first.')
     expect(text).not.toContain('ana@example.com')
-    // The same lesson again, while the first draft waits for review: no second draft.
+    // The owner is told in the chat the lesson came from, with where the draft is and what taught it.
+    expect(owner.notices).toEqual([
+      expect.objectContaining({
+        chatId: '7',
+        connectionId: null,
+        title: 'Drafted a new skill, "weekly-review", for you to review: /agent/skills/drafts/weekly-review.md',
+        body: 'The owner said the review must start with blocked tasks.',
+      }),
+    ])
+    expect(owner.notices[0]?.id).toMatch(/^notice:skill-draft:[0-9a-f]{32}$/u)
+    // The same lesson again, while the first draft waits in the owner's files: no second draft.
     expect(await consider(MAIN)).toBe('duplicate')
-    expect(library.drafts).toHaveLength(1)
+    expect(owner.notices).toHaveLength(1)
   })
 
-  it('does not propose a rejected draft again', async () => {
+  it("does not write over a draft still in the owner's files, and drafts the skill again once they moved it", async () => {
     model.answer = NEW_SKILL
     expect(await consider(MAIN)).toBe('drafted')
-    library.status = 'rejected'
+    model.answer = NEW_SKILL.replace('List blocked tasks first.', 'List the blocked tasks first of all.')
     expect(await consider(MAIN)).toBe('duplicate')
-    expect([...drafts.rows.values()].map((row) => row.status)).toEqual(['rejected'])
-    expect(library.drafts).toHaveLength(1)
+    owner.files.clear()
+    expect(await consider(MAIN)).toBe('drafted')
+    expect(owner.files.get('/agent/skills/drafts/weekly-review.md')).toContain('List the blocked tasks first of all.')
+    // The same draft as the first is still never written again.
+    owner.files.clear()
+    model.answer = NEW_SKILL
+    expect(await consider(MAIN)).toBe('duplicate')
   })
 
-  it('stays quiet when the owner has not allowed the draft tool, or skills are off', async () => {
+  it('stays quiet, without asking the model, while skills are off for every server', async () => {
     model.answer = NEW_SKILL
-    grants.set({ connectionId: 'lib', capability: 'tool', name: 'skill_draft' }, false)
-    expect(await consider(MAIN)).toBe('skipped')
-    grants.set({ connectionId: 'lib', capability: 'tool', name: 'skill_draft' }, true)
     state.setEnabled('lib', false)
     expect(await consider(MAIN)).toBe('skipped')
     expect(model.calls).toBe(0)
+    expect([...owner.files.keys()]).toEqual([])
   })
 
-  it('proposes at most five drafts a day', async () => {
+  it('writes at most five drafts a day', async () => {
     for (let n = 0; n < 5; n++) {
       model.answer = NEW_SKILL.replace('weekly-review', `review-${n}`)
       expect(await consider(MAIN)).toBe('drafted')

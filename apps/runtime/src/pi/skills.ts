@@ -253,8 +253,8 @@ export function skillLearningExtension(
     name: 'goblin.skill-learning',
     hooks: [
       hook(GenerationTask, {
-        // Fire and forget after a final answer: the learner may propose a skill draft for the owner to review. It
-        // never holds up the turn, and an attempt an eviction cuts short is simply not made.
+        // Fire and forget after a final answer: the learner may write a skill draft for the owner to review. It never
+        // holds up the turn, and an attempt an eviction cuts short is simply not made.
         onYield: (_answer, api) => {
           void run(
             Effect.gen(function* () {

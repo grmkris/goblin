@@ -5,7 +5,7 @@ import * as Effect from 'effect/Effect'
 import { nextInt } from 'effect/Random'
 import { FIXTURE_INPUT, fixtureModels, model } from './model.ts'
 import { type Probe, type Probes, inWorker } from './probe.ts'
-import { skillsCacheProbe, skillsLearnerRejectionProbe, skillsPersistedRead } from './skills-probe.ts'
+import { skillsCacheProbe, skillsLearnerDraftProbe, skillsPersistedRead } from './skills-probe.ts'
 
 /** Same public factory/lifecycle seam as PersonalAgent, with a keyless deterministic model. */
 export class NativeLifecycleProbe extends Agent {
@@ -24,8 +24,8 @@ export class NativeLifecycleProbe extends Agent {
   override async onRequest(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const operationId = url.searchParams.get('operationId') ?? 'missing-fixture-operation'
-    if (url.pathname === '/skills-rejection')
-      return Response.json(await skillsLearnerRejectionProbe(this.ctx.storage, this.harness))
+    if (url.pathname === '/skills-draft')
+      return Response.json(await skillsLearnerDraftProbe(this.ctx.storage, this.harness))
     if (url.pathname === '/skills-write') {
       await skillsCacheProbe(this.ctx.storage)
       return Response.json({ instance: this.instance, retained: await skillsPersistedRead(this.ctx.storage) })
@@ -61,7 +61,7 @@ export const probes: Probes = {
   'lifecycle-wait': step('/wait'),
   'lifecycle-read': step('/read'),
   'lifecycle-reopen': step('/reopen'),
-  'skills-rejection': step('/skills-rejection'),
+  'skills-draft': step('/skills-draft'),
   'skills-write': step('/skills-write'),
   'skills-read': step('/skills-read'),
   'skills-evict': step('/skills-evict'),

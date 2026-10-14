@@ -11,12 +11,14 @@ const SkillsCache = Schema.Struct({
   repaired: Schema.Boolean,
 })
 const LearnerOutcome = Schema.Literals(['skipped', 'none', 'duplicate', 'drafted', 'failed'])
-const SkillsLearnerRejection = Schema.Struct({
+const SkillsLearnerDraft = Schema.Struct({
   first: LearnerOutcome,
   second: LearnerOutcome,
-  submitted: Schema.Number,
-  statusCalls: Schema.Number,
-  row: Schema.Array(Schema.Struct({ status: Schema.Literal('rejected') })),
+  files: Schema.Array(Schema.String),
+  notices: Schema.Array(Schema.String),
+  rows: Schema.Array(
+    Schema.Struct({ connectionId: Schema.String, name: Schema.String, baseUri: Schema.NullOr(Schema.String) }),
+  ),
 })
 const SkillsPersisted = Schema.Struct({
   instance: Schema.String,
@@ -91,16 +93,24 @@ export const cases: readonly NativeCase[] = [
     },
   ),
   probeCase(
-    'a rejected learner draft is refreshed and never submitted again',
-    'skills-rejection',
-    SkillsLearnerRejection,
+    "a learner's improvement is written to the owner's files once, naming the skill it improves",
+    'skills-draft',
+    SkillsLearnerDraft,
     (result) =>
       expect(result).toEqual({
         first: 'drafted',
         second: 'duplicate',
-        submitted: 1,
-        statusCalls: 1,
-        row: [{ status: 'rejected' }],
+        files: ['/agent/skills/drafts/draft-proof.md'],
+        notices: [
+          'Drafted an improvement to the skill "draft-proof", for you to review: /agent/skills/drafts/draft-proof.md',
+        ],
+        rows: [
+          {
+            connectionId: 'library',
+            name: 'draft-proof',
+            baseUri: 'skill://skv_222222222222222222222222/draft-proof/SKILL.md',
+          },
+        ],
       }),
   ),
   { title: 'skill activation and verified bytes survive a Durable Object restart', run: skillsRestartChecks },

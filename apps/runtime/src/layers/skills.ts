@@ -1,31 +1,45 @@
-import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
-import type { McpConnections, McpGrants } from '../mcp/service.ts'
+import type { Chats, Conversations } from '../chats/service.ts'
+import type { Files } from '../files/service.ts'
+import type { McpConnections } from '../mcp/service.ts'
 import { CheapModels } from '../memory/model.ts'
+import type { Notices } from '../notices/service.ts'
 import type { SingleFlight } from '../observability/single-flight.ts'
 import type { PiSessions } from '../pi/sessions.ts'
+import type { Changes } from '../runtime/changes.ts'
 import { Db } from '../runtime/db.ts'
 import { makeLearner } from '../skills/learner.ts'
 import { makeSkills } from '../skills/library.ts'
 import { Learner, Skills } from '../skills/service.ts'
 import { SqliteDraftLog, SqliteSkillState } from '../skills/store.ts'
 
+/** Start step 10: skills from the owner's MCP libraries, over the host's connections and the skills state. */
+export const SkillsLive: Layer.Layer<Skills, never, Db | McpConnections | SingleFlight> = Layer.effect(
+  Skills,
+  Effect.gen(function* () {
+    return yield* makeSkills(new SqliteSkillState(yield* Db))
+  }),
+)
+
 /**
- * Start step 10: skills from the owner's MCP libraries over the host's connections, and the learner that proposes new
- * ones, each made once over the skills state in the agent's database.
+ * The skill learner, after the start: it writes its drafts to the owner's files and tells them with a notice, so it is
+ * built over the files (`AppsLive`) and the routines' notices (`RoutinesLive`) as well as the skills (start step 10).
  */
-export const SkillsLive: Layer.Layer<
-  Skills | Learner,
+export const LearnerLive: Layer.Layer<
+  Learner,
   never,
-  Db | McpConnections | McpGrants | PiSessions | SingleFlight | CheapModels
-> = Layer.effectContext(
+  Db | Skills | CheapModels | Files | PiSessions | SingleFlight | Chats | Notices | Conversations | Changes
+> = Layer.effect(
+  Learner,
   Effect.gen(function* () {
     const db = yield* Db
     const cheap = yield* CheapModels
-    const state = new SqliteSkillState(db)
-    const skills = yield* makeSkills(state)
-    const learner = yield* makeLearner({ drafts: new SqliteDraftLog(db), state, skills, model: cheap('skill') })
-    return Context.merge(Skills.context(skills), Learner.context(learner))
+    return yield* makeLearner({
+      drafts: new SqliteDraftLog(db),
+      state: new SqliteSkillState(db),
+      skills: yield* Skills,
+      model: cheap('skill'),
+    })
   }),
 )

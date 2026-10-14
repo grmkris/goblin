@@ -50,8 +50,8 @@ export class Skills extends Context.Service<
 >()('goblin/skills/Skills') {}
 
 /**
- * The skill learner: after a final answer, whether the exchange teaches a procedure worth proposing as a draft to the
- * owner's skills library. Its outcome is all it says; a failure is the `failed` outcome.
+ * The skill learner: after a final answer, whether the exchange teaches a procedure worth a draft in the owner's files.
+ * Its outcome is all it says; a failure is the `failed` outcome.
  */
 export class Learner extends Context.Service<
   Learner,
