@@ -50,7 +50,6 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0043](0043-outside-work-through-mcp-servers.md) | Outside work comes through MCP servers, and some servers are first-class | Accepted |
 | [0044](0044-spending-rules-for-paid-tools.md) | Spending rules for paid tools | Accepted |
 | [0046](0046-production-promotion-and-public-source.md) | Daily development, deliberate production promotion and public source | Accepted |
-| [0047](0047-inference-paid-per-call-from-the-wallet.md) | Inference paid per call from the owner's wallet | Accepted |
 | [0048](0048-first-run-start.md) | First-run Start | Accepted |
 | [0049](0049-prepaid-servers-topped-up-from-the-wallet.md) | Prepaid servers topped up from the Goblin Wallet | Accepted |
 | [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted |
@@ -58,3 +57,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0054](0054-pro-paid-as-a-signed-usdc-subscription.md) | Pro paid as a signed USDC subscription | Accepted |
 | [0055](0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | Accepted |
 | [0056](0056-goblin-wallet-leaves-goblin.md) | Goblin Wallet leaves goblin | Accepted |
+| [0057](0057-goblin-pays-for-no-model-call.md) | goblin pays for no model call | Accepted |

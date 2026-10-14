@@ -8,3 +8,4 @@ replaced it. Living docs never cite an archived ADR as current behaviour.
 | [0045](0045-agent-wallet.md) | Goblin Wallet, an agent's wallet with limits the owner sets | [0056](../0056-goblin-wallet-leaves-goblin.md) |
 | [0050](0050-gas-in-usdc-through-useroperations.md) | Gas in USDC through UserOperations; the relay removed | [0056](../0056-goblin-wallet-leaves-goblin.md) |
 | [0051](0051-tempo-float-refilled-from-the-base-allowance.md) | The Tempo float, refilled from the Base allowance | [0056](../0056-goblin-wallet-leaves-goblin.md) |
+| [0047](0047-inference-paid-per-call-from-the-wallet.md) | Inference paid per call from the owner's wallet | [0057](../0057-goblin-pays-for-no-model-call.md) |
