@@ -1,8 +1,8 @@
-import { FILE_PATH, type FileEntry } from '@goblin/contracts'
+import { FILE_PATH, type FileEntry, fileName, freeFileName } from '@goblin/contracts'
 import { NotFound, PayloadTooLarge } from '@goblin/contracts/api'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { owner } from '../src/lib/api.ts'
-import { fileSize, freeName, uploadAttachment, uploadFolder, uploadName } from '../src/lib/files.ts'
+import { fileSize, uploadAttachment, uploadFolder } from '../src/lib/files.ts'
 import { messageOf } from '../src/lib/query/app-error.ts'
 
 const DAY = new Date(2026, 9, 6)
@@ -87,28 +87,28 @@ describe('an upload', () => {
 
 describe('upload names', () => {
   it('keep what the path rule accepts and replace the rest', () => {
-    expect(uploadName('Poročilo (final).pdf')).toBe('Poročilo (final).pdf')
-    expect(uploadName('a/b\\c:d?.txt')).toBe('a-b-c-d-.txt')
-    expect(uploadName('  tabs\tand  spaces .md ')).toBe('tabs and spaces .md')
-    expect(uploadName('..')).toBe('file')
-    expect(uploadName('')).toBe('file')
+    expect(fileName('Poročilo (final).pdf')).toBe('Poročilo (final).pdf')
+    expect(fileName('a/b\\c:d?.txt')).toBe('a-b-c-d-.txt')
+    expect(fileName('  tabs\tand  spaces .md ')).toBe('tabs and spaces .md')
+    expect(fileName('..')).toBe('file')
+    expect(fileName('')).toBe('file')
   })
   it('shorten a long name and keep its extension', () => {
-    const name = uploadName(`${'x'.repeat(200)}.csv`)
+    const name = fileName(`${'x'.repeat(200)}.csv`)
     expect(name).toHaveLength(80)
     expect(name.endsWith('.csv')).toBe(true)
   })
   it('always make a path the runtime accepts', () => {
     for (const raw of ['report.csv', '日本語.txt', '...', 'a'.repeat(300), '<script>.html', 'emoji 🎉.png'])
-      expect(FILE_PATH.test(`${uploadFolder(new Date(2026, 9, 6))}/${uploadName(raw)}`)).toBe(true)
+      expect(FILE_PATH.test(`${uploadFolder(new Date(2026, 9, 6))}/${fileName(raw)}`)).toBe(true)
   })
 })
 
 describe('free names', () => {
   it('number a taken name before its extension', () => {
-    expect(freeName('data.csv', new Set())).toBe('data.csv')
-    expect(freeName('data.csv', new Set(['data.csv', 'data (2).csv']))).toBe('data (3).csv')
-    expect(freeName('notes', new Set(['notes']))).toBe('notes (2)')
+    expect(freeFileName('data.csv', new Set())).toBe('data.csv')
+    expect(freeFileName('data.csv', new Set(['data.csv', 'data (2).csv']))).toBe('data (3).csv')
+    expect(freeFileName('notes', new Set(['notes']))).toBe('notes (2)')
   })
 })
 

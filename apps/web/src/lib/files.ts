@@ -2,7 +2,7 @@
 // name the runtime's path rule accepts and that replaces nothing already there. The listing goes through the typed
 // owner API; an upload sends the file's bytes as its body, so this module sends it itself, with the headers the typed
 // client sends.
-import { type Attachment, FILE_LIMITS, FileEntry } from '@goblin/contracts'
+import { type Attachment, FILE_LIMITS, FileEntry, fileName, freeFileName } from '@goblin/contracts'
 import { API_ERRORS, PayloadTooLarge } from '@goblin/contracts/api'
 import * as Data from 'effect/Data'
 import * as Option from 'effect/Option'
@@ -10,34 +10,6 @@ import * as Schema from 'effect/Schema'
 import { owner, requestId } from './api.ts'
 import { answerRef } from './query/app-error.ts'
 import { pad } from './format.ts'
-
-const NAME_LIMIT = 80
-
-/** A file name the path rule accepts: unknown characters become `-`, and a long name keeps its extension. */
-export function uploadName(name: string): string {
-  const cleaned = name
-    .normalize('NFC')
-    .replaceAll(/\s+/gu, ' ')
-    .replaceAll(/[^\p{L}\p{N}_ .()-]/gu, '-')
-    .trim()
-  if (/^\.*$/u.test(cleaned)) return 'file'
-  if (cleaned.length <= NAME_LIMIT) return cleaned
-  const dot = cleaned.lastIndexOf('.')
-  const extension = dot > 0 && cleaned.length - dot <= 12 ? cleaned.slice(dot) : ''
-  return `${cleaned.slice(0, NAME_LIMIT - extension.length).trimEnd()}${extension}`
-}
-
-/** `name`, or `name (2)`, `name (3)`… with its extension kept, whichever is not taken yet. */
-export function freeName(name: string, taken: ReadonlySet<string>): string {
-  if (!taken.has(name)) return name
-  const dot = name.lastIndexOf('.')
-  const [stem, extension] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, '']
-  for (let n = 2; ; n += 1) {
-    const suffix = ` (${n})${extension}`
-    const candidate = `${stem.slice(0, NAME_LIMIT - suffix.length).trimEnd()}${suffix}`
-    if (!taken.has(candidate)) return candidate
-  }
-}
 
 /** The day's upload folder, by the owner's local date. */
 export function uploadFolder(now: Date): string {
@@ -95,7 +67,7 @@ export async function uploadAttachment(file: File, taken: Set<string>, now = new
   const folder = uploadFolder(now)
   const listing = await owner.run((api) => api.files.list({ query: { dir: folder } }))
   const held = new Set([...taken, ...listing.entries.map((entry) => entry.name)])
-  const name = freeName(uploadName(file.name), held)
+  const name = freeFileName(fileName(file.name), held)
   taken.add(name)
   const type = file.type === '' ? 'application/octet-stream' : file.type
   const entry = decodeEntry(await put(fileUrl(`${folder}/${name}`), file, type))

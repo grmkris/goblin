@@ -15,6 +15,38 @@ export const FILE_PATH = /^\/(?:uploads|agent)(?:\/(?!\.+(?:\/|$))[\p{L}\p{N}_ .
 export const FilePath = Schema.String.check(Schema.isMaxLength(512), Schema.isPattern(FILE_PATH))
 export type FilePath = typeof FilePath.Type
 
+/** The longest name one segment of a file path may have (`FILE_PATH`). */
+const NAME_LIMIT = 80
+
+/**
+ * A file name `FILE_PATH` accepts, from any name: other characters become `-`, runs of space one, and a long name keeps
+ * its extension. The web names uploads with it and the runtime the files it keeps (ADR 0065).
+ */
+export function fileName(name: string): string {
+  const cleaned = name
+    .normalize('NFC')
+    .replaceAll(/\s+/gu, ' ')
+    .replaceAll(/[^\p{L}\p{N}_ .()-]/gu, '-')
+    .trim()
+  if (/^\.*$/u.test(cleaned)) return 'file'
+  if (cleaned.length <= NAME_LIMIT) return cleaned
+  const dot = cleaned.lastIndexOf('.')
+  const extension = dot > 0 && cleaned.length - dot <= 12 ? cleaned.slice(dot) : ''
+  return `${cleaned.slice(0, NAME_LIMIT - extension.length).trimEnd()}${extension}`
+}
+
+/** `name`, or `name (2)`, `name (3)`… with its extension kept, whichever `taken` does not hold yet. */
+export function freeFileName(name: string, taken: ReadonlySet<string>): string {
+  if (!taken.has(name)) return name
+  const dot = name.lastIndexOf('.')
+  const [stem, extension] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, '']
+  for (let n = 2; ; n += 1) {
+    const suffix = ` (${n})${extension}`
+    const candidate = `${stem.slice(0, NAME_LIMIT - suffix.length).trimEnd()}${suffix}`
+    if (!taken.has(candidate)) return candidate
+  }
+}
+
 /** The directory a listing starts from: a file path, or one of the two areas itself. */
 export const FileDirectory = Schema.Union([Schema.Literals(['/uploads', '/agent']), FilePath])
 
