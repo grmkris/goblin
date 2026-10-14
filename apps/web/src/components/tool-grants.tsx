@@ -17,7 +17,13 @@ import {
   Switch,
 } from '@goblin/ui'
 import { CircleAlertIcon } from 'lucide-react'
-import { appGrantMutation, askFirstMutation, refreshToolsMutation, toolGrantMutation } from '../mcp/queries.ts'
+import {
+  allowSuggestedMutation,
+  appGrantMutation,
+  askFirstMutation,
+  refreshToolsMutation,
+  toolGrantMutation,
+} from '../mcp/queries.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { AppTile } from './apps/app-tile.tsx'
 
@@ -184,14 +190,23 @@ function AppGroup({
   )
 }
 
-/** How many tools are allowed, with Allow all and None for the whole server. */
+/**
+ * Whether suggested access is in place (ADR 0060): every tool the agent can see allowed, and each one suggested to ask
+ * first asking first.
+ */
+export const suggestedApplied = (tools: Tools): boolean =>
+  tools.every((tool) => !tool.modelVisible || (tool.granted && (tool.suggested === 'run' || tool.askFirst === true)))
+
+/** How many tools are allowed, with Use suggested access, Allow all and None for the whole server. */
 function GrantsHead({
   tools,
   busy,
+  onSuggested,
   onAll,
 }: {
   readonly tools: Tools
   readonly busy: boolean
+  readonly onSuggested: () => void
   readonly onAll: (allowed: boolean) => void
 }) {
   const allowed = tools.filter((tool) => tool.granted).length
@@ -200,6 +215,11 @@ function GrantsHead({
       <h3 className="server-part-title">
         Tools <span className="server-part-count">{`${allowed} of ${tools.length} allowed`}</span>
       </h3>
+      {!suggestedApplied(tools) && (
+        <Button size="xs" variant="outline" disabled={busy} onClick={onSuggested}>
+          Use suggested access
+        </Button>
+      )}
       {allowed < tools.length && (
         <Button size="xs" variant="ghost" disabled={busy} onClick={() => onAll(true)}>
           Allow all
@@ -263,6 +283,7 @@ function useGrants(connectionId: string, tools: Tools, onNote: (note: Note | und
   const appGrant = useMutation(appGrantMutation)
   const askFirst = useMutation(askFirstMutation)
   const refresh = useMutation(refreshToolsMutation)
+  const suggested = useMutation(allowSuggestedMutation)
   const tool = (name: string, allowed: boolean) => toolGrant.mutateAsync({ connectionId, name, allowed })
   const app = (uri: string, allowed: boolean) => appGrant.mutateAsync({ connectionId, uri, allowed })
   const attempt = (busy: readonly string[], action: string, work: () => Promise<unknown>) =>
@@ -275,6 +296,12 @@ function useGrants(connectionId: string, tools: Tools, onNote: (note: Note | und
     })
   return {
     pending,
+    /** Suggested access in one go: the runtime applies it, and the list it reads again shows the result. */
+    suggested: () =>
+      attempt(names(tools), 'use the suggested access', async () => {
+        await suggested.mutateAsync(connectionId)
+        onNote({ tone: 'neutral', text: 'Tools that say they only read run when needed; the rest ask you first.' })
+      }),
     askFirst: (target: ToolView, enabled: boolean) =>
       attempt([target.name], `change whether ${target.name} asks first`, () =>
         askFirst.mutateAsync({ connectionId, name: target.name, enabled }),
@@ -316,7 +343,7 @@ export function ToolGrants({ connectionId, tools }: { readonly connectionId: str
   if (tools.length === 0) return <p className="server-note">This server offers no tools.</p>
   return (
     <section className="server-part" aria-label="Tools">
-      <GrantsHead tools={tools} busy={grants.pending.size > 0} onAll={grants.all} />
+      <GrantsHead tools={tools} busy={grants.pending.size > 0} onSuggested={grants.suggested} onAll={grants.all} />
       {note !== undefined && (
         <Receipt tone={note.tone}>
           {note.tone === 'error' && <CircleAlertIcon aria-hidden />}
@@ -356,8 +383,8 @@ export function ToolGrants({ connectionId, tools }: { readonly connectionId: str
         </div>
       ))}
       <p className="server-note">
-        Your agent may call only the tools you allow. Ask first holds each call for your decision; remote hints do not
-        choose that policy.
+        Your agent may call only the tools you allow. Ask first holds each call for your decision. Suggested access
+        follows what the server says each tool does, and applies only when you choose it.
       </p>
     </section>
   )

@@ -53,7 +53,10 @@ const world = (reach: Reach, refuseAll = false) =>
     const services = Layer.mergeAll(
       Layer.succeed(Channel, channel),
       Layer.mock(McpServers, {
-        tools: () => Effect.succeed(TOOLS.map((name) => ({ name, modelVisible: true, granted: false }))),
+        tools: () =>
+          Effect.succeed(
+            TOOLS.map((name) => ({ name, suggested: 'ask' as const, modelVisible: true, granted: false })),
+          ),
       }),
       Layer.mock(McpConnections, {
         snapshot: () => Effect.succeedSome(snapshot),

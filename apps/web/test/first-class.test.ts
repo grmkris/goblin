@@ -25,6 +25,7 @@ const tool = (name: string, granted: boolean, askFirst = false): ToolView => ({
   name,
   granted,
   askFirst,
+  suggested: 'ask',
   modelVisible: true,
 })
 

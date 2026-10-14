@@ -241,6 +241,20 @@ export const askFirstMutation = mutationOptions({
 })
 
 /**
+ * "Use suggested access" (ADR 0060): every tool the agent can see is allowed, the ones the server does not say only read
+ * asking first. The server's tools are read again.
+ */
+export const allowSuggestedMutation = mutationOptions({
+  ...owner.apiMutation({
+    mutationFn: (api, connectionId: string) => api.mcp.allowSuggested({ params: { id: connectionId } }),
+  }),
+  onSuccess: (grants, connectionId, _result, { client }) => {
+    client.setQueryData(grantsQuery.queryKey, grants)
+    return client.invalidateQueries({ queryKey: mcpKeys.tools(connectionId) })
+  },
+})
+
+/**
  * A first-class server's recommended grants, applied in one go (ADR 0043): its free tools run when needed, its paid
  * ones ask first. Its tools and status line are read again.
  */

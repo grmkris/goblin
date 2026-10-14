@@ -172,6 +172,15 @@ export class McpGroup extends HttpApiGroup.make('mcp').add(
     error: [ApiErrors.notFound, ...REMOTE],
   }),
   /**
+   * `POST /api/mcp/:id/suggested`: "Use suggested access" (ADR 0060). Every tool the agent can see is allowed, and each
+   * one the server does not say only reads asks first; an ask-first switch already on stays on.
+   */
+  HttpApiEndpoint.post('allowSuggested', '/mcp/:id/suggested', {
+    params: { id: ConnectionParam },
+    success: Schema.Array(Grant),
+    error: [ApiErrors.notFound, ...REMOTE],
+  }),
+  /**
    * `POST /api/mcp/:id/recommended`: a first-class server's recommended grants (ADR 0043), applied in one go: its free
    * tools run when needed, its paid ones ask first. A tool the server does not list now is skipped.
    */

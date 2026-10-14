@@ -27,6 +27,7 @@ import {
   spendingView,
   topUpView,
 } from './first-class-owner.ts'
+import { allowSuggested as allowSuggestedGrants } from './suggested-access.ts'
 import { urlRequestView } from './url-request.ts'
 import { connectCallback, disconnectOwnerServer, ownerServers, removeOwnerServer, suggestedServers } from './program.ts'
 import { Events, McpConnections, McpGrants, McpServers } from './service.ts'
@@ -122,6 +123,7 @@ const stepUp = endpoint('stepUp')(({ params, payload }) =>
     withFlow({ flow: 'step_up', via: 'app', actor: 'owner' }),
   ),
 )
+const allowSuggested = endpoint('allowSuggested')(({ params }) => allowSuggestedGrants(params.id))
 const allowRecommended = endpoint('allowRecommended')(({ params }) => allowRecommendedGrants(params.id))
 const spending = endpoint('spending')(({ params }) => spendingView(params.id))
 const setSpending = endpoint('setSpending')(({ params, payload }) => setSpendingRule(params.id, payload))
@@ -185,6 +187,7 @@ export const McpHandlers = HttpApiBuilder.group(OwnerApi, 'mcp', (handlers) =>
       connect,
       access,
       stepUp,
+      allowSuggested,
       allowRecommended,
       serverStatus,
       spending,

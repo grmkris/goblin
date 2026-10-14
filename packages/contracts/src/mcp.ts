@@ -432,6 +432,11 @@ export const ToolView = Schema.Struct({
   description: Schema.optional(Schema.String),
   readOnlyHint: Schema.optional(Schema.Boolean),
   destructiveHint: Schema.optional(Schema.Boolean),
+  /**
+   * What goblin suggests for the tool from its annotations (ADR 0060): `run` when the server says it only reads, else
+   * `ask`. A suggestion, never a grant: it applies only when the owner taps "Use suggested access".
+   */
+  suggested: Schema.Literals(['run', 'ask']),
   modelVisible: Schema.Boolean,
   appResource: Schema.optional(Schema.String),
   granted: Schema.Boolean,

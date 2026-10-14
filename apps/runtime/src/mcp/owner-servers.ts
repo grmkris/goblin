@@ -31,6 +31,7 @@ import type { AddedRegistries } from './registries.ts'
 import { profileOf, profileView } from './first-class.ts'
 import { makeCatalog } from './registry.ts'
 import { globalEntrypoint, offersEvents, offersSkills, toolAppResource, toolOffered } from './remote.ts'
+import { suggestedPolicy } from './suggested-access.ts'
 import { type AddedServer, type AddedServers, MAX_ADDED_SERVERS } from './servers.ts'
 import { McpServers } from './service.ts'
 import { type Stage, suggestedTitle, suggestions } from './suggested.ts'
@@ -333,6 +334,7 @@ export const toolView = (grants: Grants, connectionId: string, tool: Tool): Tool
     ...(tool.description === undefined ? {} : { description: tool.description }),
     ...(readOnlyHint === undefined ? {} : { readOnlyHint }),
     ...(destructiveHint === undefined ? {} : { destructiveHint }),
+    suggested: suggestedPolicy(tool),
     modelVisible: toolOffered(tool, 'model'),
     ...(appResource === undefined ? {} : { appResource }),
     granted: grants.allows({ connectionId, capability: 'tool', name: tool.name }),
