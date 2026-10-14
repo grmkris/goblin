@@ -49,11 +49,11 @@ Not now, the dismissal kept in the browser) and the empty chat's line. Connectio
 also offers a shelf of suggested servers (`mcp/suggested.ts`, ADR 0052), with source comments recording their
 connection checks, each in a group (`ServerSuggestion.group`) that the picker's Suggested tab and Start's services step
 show under its name (`server-add.tsx`): the owner's own apps through one mysi connection
-(`https://mysi.lol/mcp?codemode=off`, `dev.mysi.lol` on local and dev; the query keeps every app's tools listed as
-`<service>_<tool>` under the same OAuth resource), goblin's services (Goblin Wallet, Cloudflare), then servers that
-need no sign-in by what they are for: travel, knowledge, crypto data, views in the chat and code. A server that needs
-no sign-in is shelved only for what Mercator does not already sell (web search and scraping are Mercator's). A
-suggestion is marked added when a connection has its endpoint's origin and path, whatever its query. One tap adds and
+(`https://mysi.lol/mcp?codemode=off`; the query keeps every app's tools listed as `<service>_<tool>` under the same
+OAuth resource), publishing (Cloudflare), then servers that need no sign-in by what they are for: travel, knowledge,
+crypto data, views in the chat and code. The shelf is data, one endpoint per entry
+([ADR 0061](../adr/0061-the-shelf-is-data.md)); a deployment's `MCP_SHELF` replaces an entry by its id or adds its own
+(`shelfOf`). A suggestion is marked added when a connection has its endpoint's origin and path, whatever its query. One tap adds and
 connects. It also searches MCP registries that speak
 the generic registry API (`mcp/registry.ts`, `GET /api/mcp/catalog?q=`): the Official MCP Registry and GitHub's, built
 in, then up to eight the owner adds (`app_mcp_registries`). A registry is

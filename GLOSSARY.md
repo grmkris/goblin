@@ -196,7 +196,7 @@ _Avoid_: server (the gateway is the server)
 
 **Shelf**:
 The servers goblin suggests on Connections and Start, in groups, each in goblin's own words; one tap adds and
-connects. A server on it that needs no sign-in offers something Mercator does not already sell (ADR 0052).
+connects. It is data a deployment may change with `GOBLIN_MCP_SHELF` (ADRs 0052, 0061).
 _Avoid_: catalog (that is the registry search), marketplace
 
 **First-class server**:

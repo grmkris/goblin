@@ -35,8 +35,8 @@ Apps run in place in any conversation, several at once, and move to their page (
 channel and goblin's composer for that conversation at the bottom) and back without reloading. The sidebar's Pinned
 section holds the servers and App views the owner pins, in their order, on every device; a pinned server opens its own
 App full screen in a thread of its own. On a phone the navigation is a drawer and a thread is a full view with a back to
-its channel. Owners can add public servers by URL, from MCP registries, or from goblin's shelf (mysi, goblin's own
-services, and servers that need no sign-in grouped by what they are for: travel, knowledge, crypto data, views in the
+its channel. Owners can add public servers by URL, from MCP registries, or from goblin's shelf (mysi, Cloudflare to
+publish with, and servers that need no sign-in grouped by what they are for: travel, knowledge, crypto data, views in the
 chat, code), grant tools explicitly, mark individual tools **Ask first** for approval of every exact call, bring their own
 OpenAI-compatible model endpoint and key or use the deployment's, choose among its models, and see the day's token
 usage against the deployment's optional per-account cap. The agent uses

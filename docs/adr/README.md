@@ -50,7 +50,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0046](0046-production-promotion-and-public-source.md) | Daily development, deliberate production promotion and public source | Accepted |
 | [0048](0048-first-run-start.md) | First-run Start | Accepted |
 | [0049](0049-prepaid-servers-topped-up-from-the-wallet.md) | Prepaid servers topped up from the Goblin Wallet | Accepted |
-| [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted |
+| [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted; amended by 0061 |
 | [0053](0053-pinned-services-and-apps-with-a-chat-bar.md) | Pinned services and Apps with a chat bar | Accepted |
 | [0055](0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | Accepted |
 | [0056](0056-goblin-wallet-leaves-goblin.md) | Goblin Wallet leaves goblin | Accepted |
@@ -58,3 +58,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0058](0058-no-plans-tokens-and-an-optional-cap.md) | No plans: access by sign-up, usage in tokens with an optional cap | Accepted |
 | [0059](0059-bring-your-own-model-endpoint.md) | Bring your own model endpoint | Accepted |
 | [0060](0060-suggested-access-from-tool-annotations.md) | Suggested access from tool annotations | Accepted |
+| [0061](0061-the-shelf-is-data.md) | The shelf is data | Accepted |

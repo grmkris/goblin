@@ -119,6 +119,7 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_MEMORY_MODEL` | The offered model for thread names, Topic Conversation memory summaries and skill-draft decisions. It is not selected by price; unset or not offered uses the default. |
 | `GOBLIN_SMOKE_MODEL` | Optional model for smoke turns. It must be one of the offered models; unset keeps the owner's pick. |
 | `GOBLIN_MCP_SERVERS` | JSON list of outbound servers every account starts with: `[{"connectionId":"mercator","endpoint":"https://mercator.sh/mcp/auth","label":"Mercator"}]`. Dev and prod configure Mercator (ADR 0043); each owner still signs in. |
+| `GOBLIN_MCP_SHELF` | Optional JSON list of shelf entries (`id`, `title`, `description`, `endpoint`, `group`, `signIn`): one with the id of goblin's own entry replaces it, the others are added after (ADR 0061). Unset, the shelf is goblin's. |
 | `GOBLIN_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP credentials and Events secrets/envelopes; derives purpose-separated hook tokens. |
 
 These are source defaults and configuration names; active dev settings and provider caps must be verified separately.
@@ -202,8 +203,8 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   clears selection, then closes. Agent-app views share the kit; see `app_docs` topic `ui`. Local browser acceptance:
   build the app runtime with `heavy bun run --cwd packages/app build`, then run `heavy bun apps/web/test/ui-diagram.ts`.
 - **mysi.** The shelf's first suggestion is one mysi connection for the owner's own apps (MyPlan, MyTab, MyGram,
-  MyInbox, MySkills, MyTmux): `https://dev.mysi.lol/mcp?codemode=off` on local and dev, `https://mysi.lol/mcp?codemode=off`
-  on test and prod (`apps/runtime/src/mcp/suggested.ts`, ADR 0052). mysi is a product of its own with a free tier; the
+  MyInbox, MySkills, MyTmux): `https://mysi.lol/mcp?codemode=off` (`apps/runtime/src/mcp/suggested.ts`, ADRs 0052 and
+  0061); a deployment against mysi's dev sets `GOBLIN_MCP_SHELF` to point the `mysi` entry at `dev.mysi.lol`. mysi is a product of its own with a free tier; the
   owner signs up there and chooses which apps the connection reaches on mysi's consent page. Its tools are
   `<service>_<tool>` (`mygram_inbox_read`), so ask the agent for one app's tools ("list my myplan tools") and it calls
   `mcp_list` with `service`. A connection made to plain `/mcp` counts as added, but lists the code tools instead.
