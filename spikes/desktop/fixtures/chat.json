@@ -1,0 +1,56 @@
+{
+  "conversations": [
+    {
+      "id": "desktop",
+      "title": "A home for your agent",
+      "detail": "The desktop experiment",
+      "messages": [
+        { "id": "u1", "role": "user", "text": "What would a desktop Goblin feel like?" },
+        {
+          "id": "a1",
+          "role": "assistant",
+          "text": "A quiet place for the things you are working on. Your conversations, tools and personal agent, always close by.\n\nThis experiment uses the same content in **three desktop toolkits**. Try sending a message, stopping a reply and scrolling a longer conversation."
+        },
+        {
+          "id": "t1",
+          "role": "tool",
+          "text": "Research complete · 3 desktop toolkits\nGPUI Kit, Tauri and Electrobun.",
+          "label": "Toolkit research"
+        },
+        {
+          "id": "a2",
+          "role": "assistant",
+          "text": "Start with how it feels: text selection, keyboard input, resizing and scrolling. Then compare startup, memory and accessibility on the same machine."
+        }
+      ]
+    },
+    {
+      "id": "mobile",
+      "title": "From your desk to your phone",
+      "detail": "One · React Native",
+      "messages": [
+        { "id": "m1", "role": "user", "text": "Does a desktop toolkit replace the mobile spike?" },
+        {
+          "id": "m2",
+          "role": "assistant",
+          "text": "These are separate experiments. One targets React Native and web. GPUI Kit is a Rust UI toolkit; Tauri and Electrobun host browser interfaces on desktop. Shared API contracts can serve all of them."
+        }
+      ]
+    },
+    {
+      "id": "apps",
+      "title": "Tools that have a view",
+      "detail": "The MCP Apps boundary",
+      "messages": [
+        { "id": "v1", "role": "user", "text": "Can native Markdown display an interactive MCP App?" },
+        {
+          "id": "v2",
+          "role": "assistant",
+          "text": "Interactive MCP Apps need a browser surface with the existing authorization and opaque-frame boundaries. This spike displays text tool results only; it does not execute MCP Apps."
+        }
+      ]
+    }
+  ],
+  "reply": "Here is the same streamed answer in every client.\n\n**GPUI Kit** draws the interface with native GPU rendering. **Tauri** puts the shared interface in the system WebView. **Electrobun** pairs a desktop WebView with Bun.\n\nThe service behind this fixture is deterministic. No email, model or external tool is called.\n\nTry selecting this text while it streams, or scroll up and keep reading. Your position should stay put.",
+  "historyCount": 200
+}
