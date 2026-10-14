@@ -4,6 +4,7 @@ import { startServer } from '../service/server'
 const token = crypto.randomUUID()
 const server = startServer({ token })
 const browser = await chromium.launch({
+  // oxlint-disable-next-line goblin/no-process-env -- This native desktop CLI reads launch settings, not Worker configuration.
   ...(process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {}),
   headless: true,
 })
@@ -71,8 +72,8 @@ try {
   await page.getByRole('button', { name: 'A home for your agent' }).click()
   await page.screenshot({ path: 'artifacts/browser-final.png' })
   check(errors.length === 0, `page errors: ${errors.join('; ')}`)
-  console.log(`browser acceptance: ${checks} passed, 0 skipped (Chromium fixture only)`)
+  process.stdout.write(`browser acceptance: ${checks} passed, 0 skipped (Chromium fixture only)\n`)
 } finally {
   await browser.close()
-  server.stop()
+  await server.stop()
 }

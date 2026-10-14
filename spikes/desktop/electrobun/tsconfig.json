@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Preserve",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "types": ["bun", "node"],
+    "paths": {
+      "electrobun/main": ["./.hutch/devkit/api/sdks/main/index.ts"]
+    }
+  },
+  "include": ["src/bun", "electrobun.config.ts", "hutch.config.ts"]
+}

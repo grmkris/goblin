@@ -2,9 +2,9 @@ import { afterEach, expect, test } from 'bun:test'
 import { Fixture } from '../fixture'
 import { startServer } from '../server'
 
-const disposers: (() => void)[] = []
-afterEach(() => {
-  for (const dispose of disposers.splice(0)) dispose()
+const disposers: (() => void | Promise<void>)[] = []
+afterEach(async () => {
+  for (const dispose of disposers.splice(0)) await dispose()
 })
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 function bridge() {
@@ -187,10 +187,23 @@ test('live SSE projects Pi deltas and uncertain submission keeps one operation i
   for (let i = 0; i < 100 && !live.view().messages.some((m) => m.text === 'Streamed from Pi'); i++) await delay(5)
   expect(live.view().messages.at(-1)?.text).toBe('Streamed from Pi')
   const send = { type: 'send', text: 'Synthetic only', operationId: 'uncertain-operation' } as const
-  await expect(live.command(send)).rejects.toThrow()
+  await live.command(send).then(
+    () => {
+      throw new Error('Expected synthetic refusal')
+    },
+    (error: unknown) => {
+      expect(error).toBeInstanceOf(Error)
+    },
+  )
   expect(live.view().pendingOperation).toBe('uncertain-operation')
-  await expect(live.command({ ...send, operationId: 'different-operation' })).rejects.toThrow(
-    'Retry the uncertain message',
+  await live.command({ ...send, operationId: 'different-operation' }).then(
+    () => {
+      throw new Error('Expected different operation to be refused')
+    },
+    (error: unknown) => {
+      expect(error).toBeInstanceOf(Error)
+      expect(error instanceof Error && error.message).toContain('Retry the uncertain message')
+    },
   )
   await live.command(send)
   expect(operations).toEqual(['uncertain-operation', 'uncertain-operation'])

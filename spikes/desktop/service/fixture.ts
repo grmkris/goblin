@@ -58,28 +58,30 @@ export class Fixture {
     clearInterval(this.#stream)
     this.#stream = undefined
   }
+  #send(input: string, operationId: string): void {
+    if (this.#operations.has(operationId)) return
+    if (this.#stream) throw new Error('Stop the current reply first')
+    const text = input.trim()
+    if (!text || text.length > 32000) throw new Error('Enter a message of up to 32,000 characters')
+    this.#operations.add(operationId)
+    const chat = this.chat
+    chat.messages.push({ id: operationId, role: 'user', text })
+    const answer: Message = { id: `${operationId}-reply`, role: 'assistant', text: '' }
+    chat.messages.push(answer)
+    let end = 0
+    this.#stream = setInterval(() => {
+      end = Math.min(fixture.reply.length, end + 9)
+      answer.text = fixture.reply.slice(0, end)
+      if (end === fixture.reply.length) {
+        this.dispose()
+        this.#changed('Fixture response complete')
+      } else this.#changed('Goblin is writing…')
+    }, this.interval)
+    this.#changed('Message accepted · streaming locally')
+  }
   command(command: Command): void {
-    if (command.type === 'send') {
-      if (this.#operations.has(command.operationId)) return
-      if (this.#stream) throw new Error('Stop the current reply first')
-      const text = command.text.trim()
-      if (!text || text.length > 32000) throw new Error('Enter a message of up to 32,000 characters')
-      this.#operations.add(command.operationId)
-      const chat = this.chat
-      chat.messages.push({ id: command.operationId, role: 'user', text })
-      const answer: Message = { id: `${command.operationId}-reply`, role: 'assistant', text: '' }
-      chat.messages.push(answer)
-      let end = 0
-      this.#stream = setInterval(() => {
-        end = Math.min(fixture.reply.length, end + 9)
-        answer.text = fixture.reply.slice(0, end)
-        if (end === fixture.reply.length) {
-          this.dispose()
-          this.#changed('Fixture response complete')
-        } else this.#changed('Goblin is writing…')
-      }, this.interval)
-      this.#changed('Message accepted · streaming locally')
-    } else if (command.type === 'stop') {
+    if (command.type === 'send') this.#send(command.text, command.operationId)
+    else if (command.type === 'stop') {
       this.dispose()
       this.#changed('Reply stopped · partial text kept')
     } else if (command.type === 'select') {

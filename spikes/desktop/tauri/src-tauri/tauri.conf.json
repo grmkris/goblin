@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Goblin Desktop Tauri Spike",
+  "version": "0.1.0",
+  "identifier": "dev.goblin.desktop.tauri-spike",
+  "build": {
+    "frontendDist": "../../dist"
+  },
+  "app": {
+    "windows": []
+  },
+  "bundle": {
+    "active": false
+  }
+}

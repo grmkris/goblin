@@ -7,11 +7,12 @@ Three desktop clients for the same chat experiment: GPUI Kit 0.7.3, Tauri 2.12.3
 
 Install Xcode command line tools (`xcode-select --install`), Rust stable, Bun 1.4.2 or newer, and Node 22 or newer.
 Use a checkout of this branch that includes `spikes/mobile`: the companion reuses that spike's owner transport and
-Goblin's canonical Pi projection. No root monorepo install is required.
+Goblin's canonical Pi projection. Install the repository dependencies as well as the isolated desktop dependencies.
 
 From the repository root:
 
 ```sh
+bun install --frozen-lockfile
 cd spikes/desktop
 bun install --frozen-lockfile
 bun run build
@@ -27,7 +28,7 @@ bun run launch tauri
 bun run launch electrobun
 ```
 
-The first native launches compile/download dependencies. Each window uses its own fixture conversation state.
+`bun run compare` opens all three; arrange their windows beside one another. The first native launches compile/download dependencies. Each window uses its own fixture conversation state.
 `bun run launch browser` prints a local URL for the same web renderer. That URL contains a temporary local capability;
 keep it private. The capability file is ignored, mode 0600, and replaced whenever the companion starts.
 
@@ -70,9 +71,8 @@ forgets the session. This is not an OS keychain implementation. Uncertain submis
 ID. A submission receipt means acceptance, not completed external work.
 
 The live adapter reuses `spikes/mobile/src/api.ts` and `conversation.ts`, including current origin/CSRF checks,
-validated submission receipts, the existing Pi projection, and fresh-snapshot reconnect. The launch scripts use an
-explicit TypeScript resolution config for those shared imports. Bun 1.4.2 can print a directory-mismatch diagnostic
-with `--tsconfig-override`; the scoped tests determine success by their real exit status, not that diagnostic.
+validated submission receipts, the existing Pi projection, and fresh-snapshot reconnect. The repository install
+supplies dependencies to those shared sources; the desktop install pins the shell and browser tooling separately.
 
 ## Architecture and boundaries
 
@@ -114,6 +114,24 @@ heavy docker build -t goblin-desktop-spike:20261014 -f spikes/desktop/scripts/Do
 cd spikes/desktop
 scripts/linux-build.sh build --locked -p goblin-gpui-spike -p goblin-tauri-spike
 scripts/linux-build.sh test --locked -p goblin-gpui-spike
+# With `bun run serve` running in another terminal:
+scripts/linux-smoke.sh gpui       # or tauri / electrobun
 ```
 
 `heavy` is specific to the shared build box. Exit 75 means capacity contention; retry the unchanged command.
+
+## Measuring on Mac
+
+Build once before timing anything. Use the same viewport, display scale and fixture. For idle and stress-history
+measurements, run one shell at a time with a fresh companion. Use Activity Monitor to identify the native app and
+companion PIDs, including WebView helper processes. A portable sampler is included:
+
+```sh
+python3 scripts/measure.py --pid APP_PID --companion-pid COMPANION_PID \
+  --label tauri-idle --seconds 20 --output artifacts/tauri-idle.json
+```
+
+This records a process-tree RSS sum, which can double-count shared pages; it is not macOS private footprint. It does
+not time startup or measure frames. The script never records command lines, tokens or chat content and does not stop
+any process. Use Instruments for Metal/frame timing and memory footprint, and state exactly which metric is reported.
+Compare cold and warm launches separately; exclude compiler and package-download time.

@@ -1,3 +1,4 @@
+import { decodeView, object } from './decode'
 import './style.css'
 import { readSse } from '../../../mobile/src/sse'
 import { hostName, type Command, type Message, type ViewState } from './types'
@@ -74,7 +75,28 @@ function row(message: Message): HTMLElement {
   }
   return entry.element
 }
+function updateNav(next: ViewState) {
+  const nav = JSON.stringify([next.chats, next.selected])
+  if (nav !== previousNav) {
+    previousNav = nav
+    const list = required('#chats', HTMLElement)
+    list.replaceChildren()
+    for (const chat of next.chats) {
+      const button = document.createElement('button')
+      button.className = chat.id === next.selected ? 'selected' : ''
+      button.setAttribute('aria-current', String(chat.id === next.selected))
+      const title = document.createElement('span')
+      title.textContent = chat.title
+      const detail = document.createElement('small')
+      detail.textContent = chat.detail
+      button.append(title, detail)
+      button.addEventListener('click', () => dispatch({ type: 'select', id: chat.id }))
+      list.append(button)
+    }
+  }
+}
 function render(next: ViewState) {
+  if (state && next.revision < state.revision) return
   state = next
   const switched = previousChat !== `${next.mode}/${next.selected}`
   const bottom = nearBottom() || switched
@@ -99,24 +121,7 @@ function render(next: ViewState) {
   required('#title', HTMLHeadingElement).textContent = next.title
   status.textContent = next.status
   required('#count', HTMLSpanElement).textContent = `${next.messages.length} messages`
-  const nav = JSON.stringify([next.chats, next.selected])
-  if (nav !== previousNav) {
-    previousNav = nav
-    const list = required('#chats', HTMLElement)
-    list.replaceChildren()
-    for (const chat of next.chats) {
-      const button = document.createElement('button')
-      button.className = chat.id === next.selected ? 'selected' : ''
-      button.setAttribute('aria-current', String(chat.id === next.selected))
-      const title = document.createElement('span')
-      title.textContent = chat.title
-      const detail = document.createElement('small')
-      detail.textContent = chat.detail
-      button.append(title, detail)
-      button.onclick = () => void command({ type: 'select', id: chat.id })
-      list.append(button)
-    }
-  }
+  updateNav(next)
   required('#mode', HTMLSelectElement).value = next.mode
   required('#auth', HTMLFormElement).hidden = next.mode !== 'live' || next.signedIn
   required('#signout', HTMLButtonElement).hidden = !next.signedIn || next.mode !== 'live'
@@ -136,12 +141,13 @@ async function command(value: Command): Promise<boolean> {
       headers: { ...headers, 'content-type': 'application/json' },
       body: JSON.stringify(value),
     })
-    const data = await response.json()
+    const data = object(await response.json())
     if (!response.ok)
       throw new Error(typeof data.error === 'string' ? data.error : `Command refused (${response.status})`)
-    render(data)
+    render(decodeView(data))
     return true
   } catch (error) {
+    // expected: surface local command failures in the status line, retaining an uncertain submission for retry.
     status.textContent = error instanceof Error ? error.message : 'Connection failed'
     return false
   } finally {
@@ -149,15 +155,13 @@ async function command(value: Command): Promise<boolean> {
     controls()
   }
 }
-input.oninput = controls
-input.onkeydown = (event) => {
-  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
-    event.preventDefault()
-    required('#composer', HTMLFormElement).requestSubmit()
-  }
+function report(error: unknown) {
+  status.textContent = error instanceof Error ? error.message : 'Desktop command failed'
 }
-required('#composer', HTMLFormElement).onsubmit = async (event) => {
-  event.preventDefault()
+function dispatch(value: Command) {
+  command(value).catch(report)
+}
+async function submit() {
   if (sendButton.disabled) return
   pending ??= { text: input.value.trim(), operationId: crypto.randomUUID() }
   if (await command({ type: 'send', ...pending })) {
@@ -167,64 +171,73 @@ required('#composer', HTMLFormElement).onsubmit = async (event) => {
     input.focus()
   }
 }
-required('#new', HTMLButtonElement).onclick = () => void command({ type: 'new' })
-required('#stop', HTMLButtonElement).onclick = () => void command({ type: 'stop' })
-required('#history', HTMLButtonElement).onclick = () => void command({ type: 'history' })
-required('#reconnect', HTMLButtonElement).onclick = () => void command({ type: 'reconnect' })
-required('#signout', HTMLButtonElement).onclick = async () => {
-  await command({ type: 'signout' })
-  pending = undefined
-  input.value = ''
-  controls()
-}
-required('#mode', HTMLSelectElement).onchange = async (event) => {
-  if (event.target instanceof HTMLSelectElement) {
-    const mode = event.target.value === 'live' ? 'live' : 'fixture'
-    if (await command({ type: 'mode', mode })) {
-      pending = undefined
-      input.value = ''
-      controls()
-    }
+input.addEventListener('input', controls)
+input.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+    event.preventDefault()
+    required('#composer', HTMLFormElement).requestSubmit()
+  }
+})
+required('#composer', HTMLFormElement).addEventListener('submit', (event) => {
+  event.preventDefault()
+  submit().catch(report)
+})
+required('#new', HTMLButtonElement).addEventListener('click', () => dispatch({ type: 'new' }))
+required('#stop', HTMLButtonElement).addEventListener('click', () => dispatch({ type: 'stop' }))
+required('#history', HTMLButtonElement).addEventListener('click', () => dispatch({ type: 'history' }))
+required('#reconnect', HTMLButtonElement).addEventListener('click', () => dispatch({ type: 'reconnect' }))
+async function signout() {
+  if (await command({ type: 'signout' })) {
+    pending = undefined
+    input.value = ''
+    controls()
   }
 }
+required('#signout', HTMLButtonElement).addEventListener('click', () => {
+  signout().catch(report)
+})
+async function changeMode(mode: 'fixture' | 'live') {
+  if (await command({ type: 'mode', mode })) {
+    pending = undefined
+    input.value = ''
+    controls()
+  }
+}
+required('#mode', HTMLSelectElement).addEventListener('change', (event) => {
+  if (event.target instanceof HTMLSelectElement)
+    changeMode(event.target.value === 'live' ? 'live' : 'fixture').catch(report)
+})
 const email = () => required('#email', HTMLInputElement).value.trim()
 const invite = () => required('#invite', HTMLInputElement).value.trim()
-required('#code', HTMLButtonElement).onclick = () => void command({ type: 'code', email: email(), invite: invite() })
-required('#auth', HTMLFormElement).onsubmit = (event) => {
+required('#code', HTMLButtonElement).addEventListener('click', () =>
+  dispatch({ type: 'code', email: email(), invite: invite() }),
+)
+required('#auth', HTMLFormElement).addEventListener('submit', (event) => {
   event.preventDefault()
-  void command({
-    type: 'verify',
-    email: email(),
-    otp: required('#otp', HTMLInputElement).value.trim(),
-    invite: invite(),
-  })
-}
-transcript.onscroll = () => {
-  latest.hidden = nearBottom()
-}
-latest.onclick = () => {
-  transcript.scrollTop = transcript.scrollHeight
-}
-let running = true
-window.addEventListener('pagehide', () => {
-  running = false
+  dispatch({ type: 'verify', email: email(), otp: required('#otp', HTMLInputElement).value.trim(), invite: invite() })
 })
+transcript.addEventListener('scroll', () => {
+  latest.hidden = nearBottom()
+})
+latest.addEventListener('click', () => {
+  transcript.scrollTop = transcript.scrollHeight
+})
+const lifetime = new AbortController()
+window.addEventListener('pagehide', () => lifetime.abort())
 async function follow() {
-  while (running) {
-    const abort = new AbortController()
+  while (!lifetime.signal.aborted) {
     try {
-      const response = await fetch('/bridge/events', { headers, signal: abort.signal })
+      const response = await fetch('/bridge/events', { headers, signal: lifetime.signal })
       if (response.status === 401) {
         status.textContent = 'Open this client through bun run launch so it receives the local connection key.'
         return
       }
-      await readSse(response, abort.signal, (frame) => render(JSON.parse(frame.data)))
+      await readSse(response, lifetime.signal, (frame) => render(decodeView(JSON.parse(frame.data))))
     } catch {
+      // expected: a lost companion is visible and retried from a fresh view; pagehide ends the loop.
       status.textContent = 'Companion disconnected. Reconnecting…'
-    } finally {
-      abort.abort()
     }
-    if (running) await new Promise((resolve) => setTimeout(resolve, 1000))
+    if (!lifetime.signal.aborted) await new Promise((resolve) => setTimeout(resolve, 1000))
   }
 }
-void follow()
+follow().catch(report)

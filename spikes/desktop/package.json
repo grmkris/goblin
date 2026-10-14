@@ -8,15 +8,17 @@
     "dev": "vite --host 127.0.0.1 --port 4173",
     "build": "vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:browser": "NODE_PATH=\"$PWD/node_modules\" bun --tsconfig-override tsconfig.json scripts/browser.ts",
+    "test:browser": "bun scripts/browser.ts",
     "check": "bun run typecheck && bun run test && bun run build && bun run test:browser",
     "tauri:dev": "cd tauri && ../node_modules/.bin/tauri dev",
     "tauri:build": "cd tauri && ../node_modules/.bin/tauri build --no-bundle",
-    "electrobun:dev": "bun --cwd electrobun run dev",
-    "electrobun:build": "bun --cwd electrobun run build",
-    "serve": "NODE_PATH=\"$PWD/node_modules\" bun --tsconfig-override tsconfig.json service/main.ts",
-    "test": "NODE_PATH=\"$PWD/node_modules\" bun test --tsconfig-override ./tsconfig.json service/test",
-    "launch": "bun scripts/launch.ts"
+    "electrobun:dev": "bun run --cwd electrobun dev",
+    "electrobun:build": "bun run --cwd electrobun build",
+    "electrobun:typecheck": "tsc -p electrobun/tsconfig.json --noEmit",
+    "serve": "bun scripts/serve.ts",
+    "test": "bun test service/test",
+    "launch": "bun scripts/launch.ts",
+    "compare": "bun scripts/compare.ts"
   },
   "dependencies": {
     "@goblin/contracts": "file:../../packages/contracts",

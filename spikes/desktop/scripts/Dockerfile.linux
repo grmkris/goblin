@@ -1,0 +1,10 @@
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  build-essential clang lld cmake pkg-config curl ca-certificates \
+  libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+  libasound2-dev libxkbcommon-x11-dev libx11-xcb-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+  libvulkan-dev libssl-dev libfontconfig1-dev libfreetype6-dev \
+  libwayland-dev libxkbcommon-dev xorg-dev libstdc++-12-dev \
+  xvfb xauth mesa-vulkan-drivers mesa-utils fonts-dejavu-core dbus-x11 python3 \
+  && rm -rf /var/lib/apt/lists/*

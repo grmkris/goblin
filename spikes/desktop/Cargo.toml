@@ -1,0 +1,9 @@
+[workspace]
+members = ["gpui", "tauri/src-tauri"]
+resolver = "2"
+
+[profile.dev]
+debug = 0
+
+[profile.release]
+strip = true

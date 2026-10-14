@@ -3,3 +3,6 @@ target/
 .hutch/
 artifacts/
 *.local.json
+
+__pycache__/
+tauri/src-tauri/gen/
