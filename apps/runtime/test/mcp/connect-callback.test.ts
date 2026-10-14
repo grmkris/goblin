@@ -6,23 +6,21 @@ import { connectCallback } from '../../src/mcp/program.ts'
 import { McpConnections, McpGrants, McpServers, Resident } from '../../src/mcp/service.ts'
 import { Onboarding } from '../../src/onboarding/service.ts'
 import type { StartedConnect } from '../../src/onboarding/store.ts'
-import { plans, stub } from '../http/api/fixture.ts'
+import { stub } from '../http/api/fixture.ts'
 
 /**
- * The callback over a plan, resident authority that counts renewals, a host whose `finishConnect` is `finish`, and the
- * note first-run Start left for the sign-in (none unless `started`); the tools it allowed are counted.
+ * The callback over resident authority that counts renewals, a host whose `finishConnect` is `finish`, and the note
+ * first-run Start left for the sign-in (none unless `started`); the tools it allowed are counted.
  */
 const callback = async (
   query: string,
   finish: (state: string) => Effect.Effect<string, InvalidInput> = () => Effect.succeed('notes'),
-  active = true,
   started?: StartedConnect,
 ) => {
   const renewals: number[] = []
   const finished: string[] = []
   const allowed: string[] = []
   const services = Layer.mergeAll(
-    plans(active),
     stub(Resident, { renew: () => Effect.sync(() => void renewals.push(1)) }),
     stub(McpServers, {
       finishConnect: (state: string) => Effect.tap(finish(state), () => Effect.sync(() => void finished.push(state))),
@@ -58,18 +56,12 @@ describe('the outbound sign-in callback', () => {
   })
 
   it("goes back to first-run Start's step, allowing the server's recommended tools when the owner left that ticked", async () => {
-    const allowing = await callback('state=s1&code=c1', undefined, true, { step: 'wallet', recommend: true })
+    const allowing = await callback('state=s1&code=c1', undefined, { step: 'wallet', recommend: true })
     expect(allowing.target).toBe('https://goblin.test/start/wallet?connected=notes')
     expect(allowing.allowed).toContain('wallet_status')
     expect(allowing.allowed).toContain('pay_challenge')
-    const choosing = await callback('state=s1&code=c1', undefined, true, { step: 'services', recommend: false })
+    const choosing = await callback('state=s1&code=c1', undefined, { step: 'services', recommend: false })
     expect(choosing).toMatchObject({ target: 'https://goblin.test/start/services?connected=notes', allowed: [] })
-  })
-
-  it('finishes for an owner without a plan: Start connects the Goblin Wallet before Pro is chosen (ADR 0054)', async () => {
-    const planless = await callback('state=s1&code=c1', undefined, false, { step: 'wallet', recommend: true })
-    expect(planless).toMatchObject({ target: 'https://goblin.test/start/wallet?connected=notes', renewals: 1 })
-    expect(planless.finished).toEqual(['s1'])
   })
 
   it("answers the authorization server's error, or an incomplete callback, without finishing anything", async () => {

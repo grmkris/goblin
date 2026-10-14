@@ -43,7 +43,7 @@ type Binding = { readonly consumerId: string; readonly revision: number }
 type ReceiptKey = Pick<Receipt, 'subscriptionId' | 'webhookId' | 'consumerId' | 'revision' | 'operationId'>
 
 export type EventsOptions = EventClient & {
-  /** The plan and resident authority: checked before a subscription, a sweep, a dispatch and a delivery. */
+  /** Resident authority: checked before a subscription, a sweep, a dispatch and a delivery. */
   readonly authority: Effect.Effect<void, AppError>
 }
 

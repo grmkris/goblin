@@ -688,7 +688,7 @@
   }
 }
 
-/* The chat's setup card (components/plan-needed.tsx) and Start's ways back (components/start/setup-cards.tsx). */
+/* Start's ways back (components/start/setup-cards.tsx). */
 .setup-card {
   display: flex;
   flex-direction: column;

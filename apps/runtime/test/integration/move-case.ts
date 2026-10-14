@@ -5,7 +5,7 @@ import * as Schema from 'effect/Schema'
 import { ThreadHeadData, type TopicView } from '@goblin/contracts'
 import { statusOf } from '@goblin/contracts/api'
 import { type OwnerClient, callOwner } from '../owner-client.ts'
-import { grantPlan, holding, lever, person, showing, signedIn, workspaceOf, type Person } from './owner-requests.ts'
+import { holding, lever, person, showing, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 import { ownerResult, ownerSnapshot } from './probe-reads.ts'
 import { waitFor } from './until.ts'
 
@@ -112,7 +112,6 @@ const heads = async (url: string, owner: Person, chat: string) =>
 
 async function owned(url: string): Promise<Person> {
   const owner = await person(url)
-  await grantPlan(url, owner)
   return owner
 }
 

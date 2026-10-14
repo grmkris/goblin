@@ -1,4 +1,4 @@
-import type { BillingState, ResidentStatus, RoutineRunView, RoutineView, ServerView } from '@goblin/contracts'
+import type { ResidentStatus, RoutineRunView, RoutineView, ServerView } from '@goblin/contracts'
 
 /**
  * A state in the owner's words, with the tone its dot takes: `good` (working as it should), `attention` (the owner can
@@ -42,24 +42,6 @@ export const connectionName = (server: Pick<ServerView, 'label'>): string => ser
 /** What the server behind a connection calls itself: its card's title, else the name it reports. */
 export const serverName = (server: Pick<ServerView, 'title' | 'serverName'>): string | undefined =>
   server.title ?? server.serverName
-
-/**
- * The owner's plan, from billing state: a Goblin Wallet subscription by its own status (ADR 0054), a day pass that could
- * not take a day's payment as due, a card subscription by the provider's.
- */
-export function planStatus(state: BillingState): Label {
-  const wallet = state.source === 'wallet' || !state.active ? state.wallet : undefined
-  if (!state.active)
-    return wallet?.billing === 'day' && wallet.status === 'lapsed'
-      ? { text: 'Payment due', tone: 'attention' }
-      : { text: 'Not subscribed', tone: 'quiet' }
-  if (wallet?.status === 'grace') return { text: 'Payment due', tone: 'attention' }
-  if (wallet?.status === 'cancelled') return { text: 'Ending', tone: 'quiet' }
-  if (wallet !== undefined) return { text: 'Active', tone: 'good' }
-  if (state.status === 'past_due' || state.status === 'on_hold') return { text: 'Payment due', tone: 'attention' }
-  if (state.cancelAtPeriodEnd || state.status === 'cancelled') return { text: 'Ending', tone: 'quiet' }
-  return { text: 'Active', tone: 'good' }
-}
 
 /** Whether the agent may act while the owner is away (resident authority). */
 export function residentStatus(state: ResidentStatus['state']): Label {

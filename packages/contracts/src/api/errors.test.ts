@@ -27,7 +27,6 @@ import {
   PayloadTooLarge,
   ResidentInactive,
   ScopeRequired,
-  SubscriptionRequired,
   Unauthenticated,
   UpstreamMcp,
   codeOf,
@@ -47,7 +46,6 @@ const CASES: readonly (readonly [AppError, number])[] = [
   [new PayloadTooLarge({ limit: 65_536 }), 413],
   [new ResidentInactive({ state: 'revoked' }), 409],
   [new BudgetExhausted({ limit: 1000, resetsAt: 86_400 }), 429],
-  [new SubscriptionRequired({ subscribe: '/subscribe' }), 402],
   [new NeedsAuthorization({ connectionId: 'myplan' }), 409],
   [new ScopeRequired({ connectionId: 'sidequest', scope: 'sidequest:read sidequest:hire' }), 403],
   [new UpstreamMcp({ connectionId: 'myplan', reason: 'remote-rpc', code: -32_601 }), 502],
@@ -132,34 +130,6 @@ describe('the API error envelope', () => {
         ref: '7f3a9c12',
       },
     })
-  })
-
-  it('says which feature is part of Pro when the refusal names one, and keeps the feature through a decode', () => {
-    const handOver = new SubscriptionRequired({ subscribe: '/subscribe', feature: 'hand_over' })
-    expect(envelopeOf(handOver)).toEqual({
-      error: {
-        code: 'subscription_required',
-        message: 'Handing an event or a schedule to goblin or a Persona is part of Pro.',
-        recovery: 'Subscribe to Pro, or have it only tell you.',
-        subscribe: '/subscribe',
-        feature: 'hand_over',
-      },
-    })
-    expect(Schema.decodeUnknownSync(ApiErrors.subscriptionRequired)(envelopeOf(handOver))).toEqual(handOver)
-  })
-
-  it('says goblin needs Pro to answer an account without a plan, and keeps `chat` through a decode', () => {
-    const chat = new SubscriptionRequired({ subscribe: '/subscribe', feature: 'chat' })
-    expect(envelopeOf(chat)).toEqual({
-      error: {
-        code: 'subscription_required',
-        message: 'goblin answers once you have goblin Pro.',
-        recovery: 'Pick a day pass or monthly. If a day pass could not be paid, add funds in your Goblin Wallet.',
-        subscribe: '/subscribe',
-        feature: 'chat',
-      },
-    })
-    expect(Schema.decodeUnknownSync(ApiErrors.subscriptionRequired)(envelopeOf(chat))).toEqual(chat)
   })
 
   it('says an MCP server that was not reached could not be, and to try again', () => {

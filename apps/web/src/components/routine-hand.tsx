@@ -16,7 +16,6 @@ import {
   Textarea,
 } from '@goblin/ui'
 import { EditorPart } from './editor-part.tsx'
-import { ProNote } from './pro-note.tsx'
 
 type Tool = { readonly connectionId: string; readonly name: string }
 
@@ -42,8 +41,6 @@ export type HandKit = {
   readonly available: readonly Tool[]
   readonly selected: readonly Tool[]
   readonly toggle: (tool: Tool, on: boolean) => void
-  /** The plan hands over (Pro); without Pro a hand-over cannot be picked (ADR 0012, amended 2026-10-12; ADR 0054). */
-  readonly canHandOver: boolean
 }
 
 const same = (a: Tool, b: Tool): boolean => a.connectionId === b.connectionId && a.name === b.name
@@ -202,33 +199,26 @@ function PersonaField({ kit }: { readonly kit: HandKit }) {
 }
 
 /** What a routine handed to nobody does: it tells the owner, or with Tell me off nothing yet, and what would change that. */
-export const nobodyNote = (tellMe: boolean, locked: boolean): string =>
-  tellMe ? 'It only tells you.' : `It does nothing yet. Turn Tell me on${locked ? '' : ', or hand it over'}.`
+export const nobodyNote = (tellMe: boolean): string =>
+  tellMe ? 'It only tells you.' : 'It does nothing yet. Turn Tell me on, or hand it over.'
 
-/**
- * Hand to: nobody, goblin or a Persona; a hand-over says what to do, then with which tools, within which limits.
- * Without Pro a hand-over cannot be picked (one the routine already has stays shown), and Get Pro says why.
- */
+/** Hand to: nobody, goblin or a Persona; a hand-over says what to do, then with which tools, within which limits. */
 export function HandToFields({ kit }: { readonly kit: HandKit }) {
   const { id, hand, setHand, handOver } = kit
-  const locked = !kit.canHandOver
   return (
     <>
       <EditorPart title="Hand to">
         <Tabs value={hand} onValueChange={(value: HandKind) => setHand(value)}>
           <TabsList>
             <TabsTrigger value="none">Nobody</TabsTrigger>
-            <TabsTrigger value="goblin" disabled={locked && hand !== 'goblin'}>
-              goblin
-            </TabsTrigger>
-            <TabsTrigger value="persona" disabled={kit.personas.length === 0 || (locked && hand !== 'persona')}>
+            <TabsTrigger value="goblin">goblin</TabsTrigger>
+            <TabsTrigger value="persona" disabled={kit.personas.length === 0}>
               A Persona
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        {locked && <ProNote>Handing it to goblin or a Persona is part of Pro.</ProNote>}
         {hand === 'none' ? (
-          <p className="server-note">{nobodyNote(kit.tellMe, locked)}</p>
+          <p className="server-note">{nobodyNote(kit.tellMe)}</p>
         ) : (
           <>
             {hand === 'persona' && <PersonaField kit={kit} />}

@@ -5,24 +5,15 @@ import {
   type RoutineEdit,
   type RoutineRevision,
   type RoutineSettings,
-  handOverOf,
 } from '@goblin/contracts'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { nextInt } from 'effect/Random'
-import { requirePlan } from '../billing/gates.ts'
 import { Chats } from '../chats/service.ts'
 import { personaNamed } from '../personas/program.ts'
 import { topicNamed } from '../topics/program.ts'
 import { RoutineControl, Routines } from './service.ts'
-import { definitionOf } from './store.ts'
-
-/**
- * What `definition` needs of the plan (ADR 0012, amended 2026-10-12): a routine that only tells the owner is on the free
- * plan too; one that hands its work over runs the agent, which is Pro.
- */
-const featureOf = (definition: RoutineDefinition) => (handOverOf(definition) === undefined ? 'routines' : 'handOver')
 
 export const routinesList = Effect.gen(function* () {
   const store = yield* Routines
@@ -34,7 +25,6 @@ export const proposeRoutine = Effect.fn('routines.propose')(function* (
   operationId: string,
   topic: number,
 ) {
-  yield* requirePlan(featureOf(definition))
   const store = yield* Routines
   const at = yield* Clock.currentTimeMillis
   const suffix = yield* nextInt
@@ -88,7 +78,6 @@ export const proposeAsked = Effect.fn('routines.proposeAsked')(function* (
 })
 
 export const editRoutine = Effect.fn('routines.edit')(function* (id: string, input: RoutineEdit) {
-  yield* requirePlan(featureOf(input.definition))
   const store = yield* Routines
   const at = yield* Clock.currentTimeMillis
   return (yield* store.edit(id, input, at)).routine
@@ -96,18 +85,13 @@ export const editRoutine = Effect.fn('routines.edit')(function* (id: string, inp
 /** What the owner does to one revision of a routine; "confirm again" repins its Persona first (ADR 0041). */
 type RoutineAction = 'confirm' | 'confirmAgain' | 'pause' | 'archive'
 
-/**
- * The owner changes one revision of routine `id`. Confirming (or confirming again) needs what its definition needs of
- * the plan, so an account without Pro never switches on a hand-over; pausing or archiving one is always theirs to do.
- */
+/** The owner changes one revision of routine `id`. */
 export const changeRoutine = Effect.fn('routines.changeRevision')(function* (
   id: string,
   input: RoutineRevision,
   action: RoutineAction,
 ) {
   const store = yield* Routines
-  const switching = action === 'confirm' || action === 'confirmAgain'
-  yield* requirePlan(switching ? featureOf(definitionOf(yield* store.get(id))) : 'routines')
   const at = yield* Clock.currentTimeMillis
   return (yield* store[action](id, input.revision, input.operationId, at)).routine
 })

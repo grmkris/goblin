@@ -14,7 +14,7 @@ import { RoutineControl, RoutineRuns, Routines } from '../../../src/routines/ser
 import { RoutineStore } from '../../../src/routines/store.ts'
 import { callOwner } from '../../owner-client.ts'
 import { durable } from '../../chats-sqlite.ts'
-import { currentResident, database, json, plans, post, serve, served, stub } from './fixture.ts'
+import { currentResident, database, json, post, serve, served, stub } from './fixture.ts'
 import { PERSONAL_TOPIC } from '@goblin/contracts'
 import { withHandOver } from '../../routine-definition.ts'
 
@@ -64,9 +64,8 @@ const fixture = () => {
     Layer.succeed(Routines, routinesOf(routines)),
     Layer.succeed(RoutineRuns, routineRunsOf(runs)),
     control,
-    // The gate's resident authority and plan.
+    // The gate's resident authority.
     Layer.succeed(Resident, resident.service),
-    plans(),
   )
   const { fetch } = serve(served([RoutinesGroup], RoutinesHandlers).pipe(Layer.provide(services)))
   const personas = new PersonaRegistry(sqlite, ['model-a'])

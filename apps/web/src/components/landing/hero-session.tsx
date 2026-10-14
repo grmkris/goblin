@@ -1,6 +1,6 @@
 // The landing's one orchestrated moment: a short goblin session playing in the hero's panel, as the app draws it. The
 // owner asks for a ferry and a price watch, goblin asks Ferryhopper, its picker opens in the chat (a real screenshot),
-// and goblin asks before it spends: the visitor can press Allow (or Not now) themselves. Left alone on screen for about
+// and goblin asks before it acts: the visitor can press Allow (or Not now) themselves. Left alone on screen for about
 // six seconds, it allows on its own, so someone only watching still sees the end.
 //
 // The entrances are CSS (landing.css): they start with the first paint, before any script, and run off the main
@@ -187,12 +187,11 @@ function HeroAsk({
       <p className="hero-ask-head">
         <KeyRoundIcon aria-hidden />
         <span>
-          <b>Mercator</b> wants to run a paid job
+          <b>Ferryhopper</b> wants to set a price watch
         </span>
       </p>
       <p className="hero-ask-detail">
-        Check this fare every morning, <span className="tabular-nums">$0.007</span> a check. That is within your{' '}
-        <span className="tabular-nums">$5</span> limit a job.
+        Check this fare every morning and tell you when it drops. You marked this tool Ask first.
       </p>
       <div className="hero-ask-foot">
         <div className="hero-ask-actions" inert={answered}>
@@ -207,15 +206,13 @@ function HeroAsk({
           {answer === 'allowed' && (
             <>
               <CheckIcon aria-hidden />
-              <span>
-                Allowed. <span className="tabular-nums">$0.007</span> paid from your Goblin Wallet.
-              </span>
+              <span>Allowed. goblin checks it every morning.</span>
             </>
           )}
           {answer === 'declined' && (
             <>
               <XIcon aria-hidden />
-              <span>Not now. Nothing was paid.</span>
+              <span>Not now. Nothing was set.</span>
             </>
           )}
         </p>

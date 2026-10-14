@@ -1,7 +1,6 @@
-import { SubscriptionRequired, ownerApiOf } from '@goblin/contracts/api'
+import { ownerApiOf } from '@goblin/contracts/api'
 import type { NonEmptyReadonlyArray } from 'effect/Array'
 import type * as Context from 'effect/Context'
-import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as ManagedRuntime from 'effect/ManagedRuntime'
 import * as Schema from 'effect/Schema'
@@ -9,8 +8,6 @@ import * as HttpServer from 'effect/http/HttpServer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { afterEach } from 'vitest'
-import { Entitlements, type EntitlementPolicy } from '../../../src/billing/gates.ts'
-import type { AccountPlan } from '../../../src/billing/reconcile.ts'
 import { OwnerAdmissionLive } from '../../../src/http/api/middleware.ts'
 import { routeNames } from '../../../src/http/api/context.ts'
 import { AgentHttp } from '../../../src/http/api/server.ts'
@@ -18,35 +15,6 @@ import { chatDatabase } from '../../chats-sqlite.ts'
 
 export { currentResident } from '../../fixed-services.ts'
 export { type ChatDatabase as Database, sqliteDb } from '../../chats-sqlite.ts'
-
-/** The account's plan in these tests: an active override with 100 Credits a day. */
-export const PLAN: AccountPlan = {
-  active: true,
-  plan: 'pro',
-  source: 'override',
-  billing: null,
-  until: null,
-  dailyCredits: 100,
-  status: 'active',
-  hasCustomer: false,
-  cancelAtPeriodEnd: false,
-}
-
-/** The account's plan as owner admission reads it (`Entitlements`): active, or refused as `SubscriptionRequired`. */
-export const plans = (active = true): Layer.Layer<Entitlements> => {
-  const plan = Effect.succeed({ ...PLAN, active })
-  const policy: EntitlementPolicy = {
-    state: () => plan,
-    require: () =>
-      Effect.flatMap(plan, (current) =>
-        current.active
-          ? Effect.succeed(current)
-          : Effect.fail(new SubscriptionRequired({ subscribe: '/subscribe', feature: 'chat' })),
-      ),
-    payDay: () => Effect.succeed('settled'),
-  }
-  return Layer.succeed(Entitlements, policy)
-}
 
 /**
  * `groups` and their `handlers` served the way the agent serves the owner API (`AgentHttp.serve`): behind owner

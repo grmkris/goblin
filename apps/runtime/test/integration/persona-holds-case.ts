@@ -3,7 +3,7 @@ import * as Schema from 'effect/Schema'
 import { PersonaAnswerData, type PersonaDefinition, type PersonaView, type RoutineDefinition } from '@goblin/contracts'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
 import { decide, heldIn } from './approvals-case.ts'
-import { grantPlan, lever, person, signedIn, type Person } from './owner-requests.ts'
+import { lever, person, signedIn, type Person } from './owner-requests.ts'
 import { ownerSnapshot } from './probe-reads.ts'
 import { until as untilWithin } from './until.ts'
 
@@ -153,7 +153,6 @@ async function routineToPersona(url: string, owner: Person, me: AgentFetch, runn
  */
 export async function personaHoldsCase(url: string): Promise<void> {
   const owner = await person(url)
-  await grantPlan(url, owner)
   const me = signedIn(url, owner)
   await callOwner(me, (api) => api.mcp.connect({ params: { id: SERVER }, payload: {} }))
   await callOwner(me, (api) => api.mcp.setToolGrant({ payload: { connectionId: SERVER, name: TOOL, allowed: true } }))

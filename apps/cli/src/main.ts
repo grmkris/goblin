@@ -22,7 +22,7 @@ const HELP = `goblin: your goblin agent from the terminal, as an MCP client of /
   goblin logs <id> [--since 6h]  Workers Logs lines that mention an id
   goblin lookup <ref|request|op>  those lines, then the details of the operation they name
   goblin stats [--since 24h]   flow totals across every agent (Analytics Engine)
-  goblin ask_agent <message>   ask your agent in its main conversation (needs a plan)
+  goblin ask_agent <message>   ask your agent in its main conversation
   goblin logout
 
   --origin URL   default https://dev.goblin.surf (or GOBLIN_ORIGIN)

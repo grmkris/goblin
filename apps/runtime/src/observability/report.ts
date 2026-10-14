@@ -63,7 +63,7 @@ const LEVELS: Readonly<Record<Severity, LineLevel>> = {
 
 /**
  * The typed failures an owner request ends with in the normal course (the AppError tags of
- * packages/contracts/src/api/errors.ts, all but `Internal`): a 404, 409 or 402 is an answer, not a fault. HttpApi
+ * packages/contracts/src/api/errors.ts, all but `Internal`): a 404 or 409 is an answer, not a fault. HttpApi
  * reports every handler failure, so the reporter skips these when they arrive as a failure. `Internal`, any other
  * failure and any defect, even one of these thrown, are reported. Update it with AppError.
  */
@@ -77,7 +77,6 @@ export const EXPECTED_ERROR_TAGS: ReadonlySet<string> = new Set([
   'PayloadTooLarge',
   'ResidentInactive',
   'BudgetExhausted',
-  'SubscriptionRequired',
   'NeedsAuthorization',
   'ScopeRequired',
   'UpstreamMcp',

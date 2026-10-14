@@ -31,6 +31,8 @@ export const ownerStack = (name: string, offset: number) =>
           MODEL_BASE_URL: 'https://no-model-calls.invalid/v1',
           MODEL_ID: 'storage-only',
           MODEL_KEY: 'unused-fixture',
+          // A cap the queue model's turns (no tokens) never reach; the `approvals/spent` lever goes past it.
+          DAILY_TOKEN_CAP: '1000000',
           MCP_SERVERS: '[{"connectionId":"apps-fixture","endpoint":"https://apps-fixture.test/mcp"}]',
           CREDENTIAL_KEY: 'Z29ibGluLXRlc3QtZml4dHVyZS1rZXkhISEhISEhISE=',
         },

@@ -3,10 +3,10 @@ import { eq, sql } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
-import { type CreditRates, DEFAULT_RATES, type TokenUse, milliCredits, totalTokens } from './budget-credits.ts'
 import { type AppError, BudgetExhausted } from './http/errors.ts'
 import { appUsageDaily } from './storage/schema.ts'
 import { epochSeconds } from './clock.ts'
+import { type TokenUse, totalTokens } from './token-use.ts'
 
 const DAY_SECONDS = 86_400
 
@@ -16,123 +16,96 @@ export const utcDay = (now: number): { readonly day: string; readonly resetsAt: 
   return { day: new Date(start * 1000).toISOString().slice(0, 10), resetsAt: start + DAY_SECONDS }
 }
 
-/** What the agent spent per UTC day: tokens, and thousandths of a Credit, which the budget counts. */
+/** What the agent spent per UTC day, in tokens. */
 export interface UsageLedger {
-  milliCredits(day: string): number
-  add(day: string, tokens: number, milli: number, now: number): void
+  tokens(day: string): number
+  add(day: string, tokens: number, now: number): void
 }
 
-/** Thousandths of a Credit the agent spent on `day`. */
-export const usageMilliCredits = (db: DrizzleSqliteDODatabase, day: string): number =>
-  db.select().from(appUsageDaily).where(eq(appUsageDaily.day, day)).get()?.milliCredits ?? 0
+/** Tokens the agent spent on `day`. */
+export const usageTokens = (db: DrizzleSqliteDODatabase, day: string): number =>
+  db.select().from(appUsageDaily).where(eq(appUsageDaily.day, day)).get()?.tokens ?? 0
 
-/** Adds one response's tokens and thousandths of a Credit to `day`. */
-export const addUsage = (
-  db: DrizzleSqliteDODatabase,
-  day: string,
-  tokens: number,
-  milli: number,
-  now: number,
-): void => {
+/** Adds one response's tokens to `day`. */
+export const addUsage = (db: DrizzleSqliteDODatabase, day: string, tokens: number, now: number): void => {
   db.insert(appUsageDaily)
-    .values({ day, tokens, milliCredits: milli, updatedAt: now })
+    .values({ day, tokens, updatedAt: now })
     .onConflictDoUpdate({
       target: appUsageDaily.day,
-      set: {
-        tokens: sql`${appUsageDaily.tokens} + ${tokens}`,
-        milliCredits: sql`${appUsageDaily.milliCredits} + ${milli}`,
-        updatedAt: now,
-      },
+      set: { tokens: sql`${appUsageDaily.tokens} + ${tokens}`, updatedAt: now },
     })
     .run()
 }
 
 /** The agent's usage ledger: the daily table in its database. */
 export const usageLedger = (db: DrizzleSqliteDODatabase): UsageLedger => ({
-  milliCredits: (day) => usageMilliCredits(db, day),
-  add: (day, tokens, milli, now) => addUsage(db, day, tokens, milli, now),
+  tokens: (day) => usageTokens(db, day),
+  add: (day, tokens, now) => addUsage(db, day, tokens, now),
 })
 
-/** Counts one model response's tokens in `ledger`, priced at `model`'s rate: what the daily budget sums. */
-export function recordUse(ledger: UsageLedger, rates: CreditRates, use: TokenUse, now: number, model?: string): void {
+/** Counts one model response's tokens in `ledger`. */
+export function recordUse(ledger: UsageLedger, use: TokenUse, now: number): void {
   const tokens = totalTokens(use)
   if (!Number.isFinite(tokens) || tokens <= 0) return
-  ledger.add(utcDay(now).day, tokens, milliCredits(use, model, rates), now)
+  ledger.add(utcDay(now).day, tokens, now)
 }
 
+/** The deployment's daily token cap per account (`DAILY_TOKEN_CAP`, a positive whole number), or none. */
+export const dailyTokenCap = (value: string | undefined): number | null => {
+  const cap = Number(value)
+  return value !== undefined && value.trim() !== '' && Number.isSafeInteger(cap) && cap > 0 ? cap : null
+}
+
+/** Today's spend against `cap`: `BudgetExhausted` once a cap is set and reached. */
+export const refuseSpent = (today: UsageToday): Effect.Effect<void, BudgetExhausted> =>
+  today.limit !== null && today.used >= today.limit
+    ? Effect.fail(new BudgetExhausted({ limit: today.limit, resetsAt: today.resetsAt }))
+    : Effect.void
+
 /**
- * This agent's model budget in estimated Token Plan Credits (ADR 0026): every model response counts against the
- * user's UTC day at its model's rate, fresh input, cached input and output each priced as the plan prices them. Users
- * share one capped model key, so one user must not be able to spend it for everyone.
+ * This agent's model usage per UTC day, in tokens, against an optional daily cap. A deployment whose accounts share
+ * one model key caps each account, so one cannot spend it for everyone; without a cap nothing is refused.
  */
 export class ModelBudget {
   readonly #ledger: UsageLedger
-  readonly #limit: number | ((now: number) => Promise<number>)
-  readonly #rates: CreditRates
-  /** `limit` is in Credits. */
-  constructor(
-    ledger: UsageLedger,
-    limit: number | ((now: number) => Promise<number>),
-    rates: CreditRates = DEFAULT_RATES,
-  ) {
+  readonly #limit: number | null
+  constructor(ledger: UsageLedger, limit: number | null) {
     this.#ledger = ledger
     this.#limit = limit
-    this.#rates = rates
   }
 
-  /** Today's spend and allowance, in Credits. */
+  /** Today's tokens and cap. */
   async today(now: number): Promise<UsageToday> {
     const { day, resetsAt } = utcDay(now)
-    const limit = typeof this.#limit === 'number' ? this.#limit : await this.#limit(now)
-    return { used: this.#ledger.milliCredits(day) / 1000, limit, resetsAt }
+    return { used: this.#ledger.tokens(day), limit: this.#limit, resetsAt }
   }
 
-  record(use: TokenUse, now: number, model?: string): void {
-    recordUse(this.#ledger, this.#rates, use, now, model)
+  record(use: TokenUse, now: number): void {
+    recordUse(this.#ledger, use, now)
   }
 
-  /** Fails with `BudgetExhausted` once today's spend has reached the limit. */
+  /** Fails with `BudgetExhausted` once a cap is set and today's tokens have reached it. */
   async require(now: number): Promise<void> {
     const today = await this.today(now)
-    if (today.used >= today.limit) throw new BudgetExhausted({ limit: today.limit, resetsAt: today.resetsAt })
+    if (today.limit !== null && today.used >= today.limit)
+      throw new BudgetExhausted({ limit: today.limit, resetsAt: today.resetsAt })
   }
 }
 
-/** The agent's daily model budget in Credits (ADR 0026), as the programs use it. Instants are epoch seconds. */
+/** The agent's daily model usage and cap, as the programs use it. Instants are epoch seconds. */
 export class Budget extends Context.Service<
   Budget,
   {
-    /** Today's spend and allowance; the allowance is the account plan's, none without a plan. */
+    /** Today's tokens and the deployment's cap, null when there is none. */
     readonly today: (now: number) => Effect.Effect<UsageToday, AppError>
-    /** One model response's tokens, priced at `model`'s rate. */
-    readonly record: (use: TokenUse, now: number, model?: string) => Effect.Effect<void>
-    /**
-     * `SubscriptionRequired` without a plan, `BudgetExhausted` once today's spend has reached the allowance: work
-     * goblin pays for (routines, housekeeping) runs only on a plan and while Credits are left.
-     */
+    /** One model response's tokens. */
+    readonly record: (use: TokenUse, now: number) => Effect.Effect<void>
+    /** `BudgetExhausted` once a cap is set and today's tokens have reached it. Every model call goblin makes asks this. */
     readonly require: (now: number) => Effect.Effect<void, AppError>
-    /**
-     * Whether a model call may go on now: with a plan (else `SubscriptionRequired`) and while Credits are left (else
-     * `BudgetExhausted`). A tool call inside a turn asks this.
-     */
-    readonly open: (now: number) => Effect.Effect<void, AppError>
-    /**
-     * Whether an owner's turn may start: `open`. On a day pass, the first turn of a UTC day also takes that day's
-     * payment, in the background (ADR 0054), so only an owner's message ever pays for a day.
-     */
-    readonly admit: (now: number) => Effect.Effect<void, AppError>
   }
 >()('goblin/budget/Budget') {}
 
-/** `BudgetExhausted` once the agent has spent today's model budget. */
+/** `BudgetExhausted` once the agent has spent today's capped tokens. */
 export const requireBudget: Effect.Effect<void, AppError, Budget> = Effect.flatMap(epochSeconds, (now) =>
   Budget.use((budget) => budget.require(now)),
-)
-
-/**
- * `SubscriptionRequired` without a plan, `BudgetExhausted` when the owner's turn may not start (Credits spent); on a day
- * pass, the day's payment starts in the background (ADR 0054).
- */
-export const admitTurn: Effect.Effect<void, AppError, Budget> = Effect.flatMap(epochSeconds, (now) =>
-  Budget.use((budget) => budget.admit(now)),
 )

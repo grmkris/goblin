@@ -62,7 +62,7 @@ const start = (input: AgentInputs) =>
 
 /**
  * Every service of one agent, built once per Durable Object (agent.ts): the start (above), the model budget and model
- * picker (a send's admission reads them, with the plan the core keeps), then each area's layer in turn, each built
+ * picker (a send's admission reads them), then each area's layer in turn, each built
  * after and over everything before it.
  */
 export const AgentLive = (input: AgentInputs) =>

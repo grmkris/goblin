@@ -1,6 +1,6 @@
 // Picking a connection's events (ADR 0041, amended 2026-10-12): each event the server offers in its group, with its
 // own words, the ones the server recommends picked already, where each goes (a Topic, or a hand-over to goblin or a
-// Persona on Pro), Advanced for filters, an instruction and Tell me, and one action that sets them all up.
+// Persona), Advanced for filters, an instruction and Tell me, and one action that sets them all up.
 import { useId, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { EventStream, PersonaView, ServerView, TopicView } from '@goblin/contracts'
@@ -19,7 +19,6 @@ import {
   Textarea,
 } from '@goblin/ui'
 import { ChevronRightIcon } from 'lucide-react'
-import { useBilling } from '../account/hooks.ts'
 import {
   type EventChoice,
   type EventRoute,
@@ -36,25 +35,22 @@ import { RATE_WORDS, eventGroups, eventSummary, eventTitle } from '../lib/events
 import { messageOf } from '../lib/query/app-error.ts'
 import { usePersonas, useTopics } from '../lib/workspace/hooks.ts'
 import { routineSettingsQuery, setUpEventsMutation } from '../routines/queries.ts'
-import { ProNote, hasHandOver } from './pro-note.tsx'
 import { SwitchRow } from './routine-hand.tsx'
 import { SchemaForm } from './schema-form.tsx'
 
 type Choices = ReadonlyMap<string, EventChoice>
 
-/** What the picker offers a route to: the live Topics and Personas, and whether the owner may hand over (Pro). */
+/** What the picker offers a route to: the live Topics and Personas. */
 type Places = {
   readonly topics: readonly TopicView[]
   readonly personas: readonly PersonaView[]
-  readonly handOver: boolean
 }
 
-/** Where routes go, and whether the plan hands over (Pro): the owner's live Topics and Personas. */
+/** Where routes go: the owner's live Topics and Personas. */
 function usePlaces(): Places {
-  const { state } = useBilling()
   const topics = useTopics().filter((topic) => topic.archivedAt === undefined)
   const personas = usePersonas().filter((persona) => persona.archivedAt === undefined)
-  return { topics, personas, handOver: hasHandOver(state) }
+  return { topics, personas }
 }
 
 /** A route in words, for a picked event's line: where it is told, or who acts on it and where. */
@@ -75,8 +71,8 @@ function answerWords(route: EventRoute, places: Places): string {
 }
 
 /**
- * Where one picked event goes, as one compact select: Tell me in a Topic, or (Pro) goblin acting on it in a Topic or a
- * Persona acting on it. Without Pro the hand-overs show, but cannot be picked.
+ * Where one picked event goes, as one compact select: Tell me in a Topic, or goblin acting on it in a Topic or a
+ * Persona acting on it.
  */
 function RouteSelect({
   title,
@@ -89,8 +85,8 @@ function RouteSelect({
   readonly places: Places
   readonly onRoute: (route: EventRoute) => void
 }) {
-  const option = (each: EventRoute, disabled = false) => (
-    <NativeSelectOption key={routeKey(each)} value={routeKey(each)} disabled={disabled}>
+  const option = (each: EventRoute) => (
+    <NativeSelectOption key={routeKey(each)} value={routeKey(each)}>
       {routeWords(each, places)}
     </NativeSelectOption>
   )
@@ -106,9 +102,9 @@ function RouteSelect({
         }}
       >
         <optgroup label="Tell me">{places.topics.map((topic) => option({ kind: 'tell', topic: topic.id }))}</optgroup>
-        <optgroup label={places.handOver ? 'Hand it over' : 'Hand it over (Pro)'}>
-          {places.topics.map((topic) => option({ kind: 'goblin', topic: topic.id }, !places.handOver))}
-          {places.personas.map((persona) => option({ kind: 'persona', persona: persona.id }, !places.handOver))}
+        <optgroup label="Hand it over">
+          {places.topics.map((topic) => option({ kind: 'goblin', topic: topic.id }))}
+          {places.personas.map((persona) => option({ kind: 'persona', persona: persona.id }))}
         </optgroup>
       </NativeSelect>
     </span>
@@ -250,7 +246,7 @@ function useEventPicks(server: ServerView, available: readonly EventStream[], pl
   const suggested = new Map<string, EventChoice>()
   if (touched === undefined && server.events === 'open')
     for (const stream of available) {
-      const route = suggestedRoute(stream, places.handOver)
+      const route = suggestedRoute(stream)
       if (route !== undefined) suggested.set(stream.name, choiceFor(stream, route))
     }
   const choices: Choices = new Map(
@@ -263,7 +259,7 @@ function useEventPicks(server: ServerView, available: readonly EventStream[], pl
   }
   const pick = (stream: EventStream, picked: boolean) => {
     const next = new Map(choices)
-    if (picked) next.set(stream.name, choiceFor(stream, suggestedRoute(stream, places.handOver) ?? TELL_MAIN))
+    if (picked) next.set(stream.name, choiceFor(stream, suggestedRoute(stream) ?? TELL_MAIN))
     else next.delete(stream.name)
     change(next)
   }
@@ -378,9 +374,6 @@ export function EventPicker({
           </ul>
         </div>
       ))}
-      {!places.handOver && available.length > 0 && (
-        <ProNote>Handing an event to goblin or a Persona is part of Pro.</ProNote>
-      )}
       {count > 0 && <AdvancedSection server={server} streams={available} picks={picks} />}
       {picks.error !== '' && (
         <Alert variant="destructive">

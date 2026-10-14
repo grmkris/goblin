@@ -7,19 +7,19 @@ import { Resident } from '../../../src/mcp/service.ts'
 import { flowRunEvent } from '../../../src/telemetry/events.ts'
 import { inspectionFixture } from '../../inspection-fixture.ts'
 import { callOwner } from '../../owner-client.ts'
-import { cleanup, currentResident, get as request, plans, serve, served } from './fixture.ts'
+import { cleanup, currentResident, get as request, serve, served } from './fixture.ts'
 
 /**
  * The inspect group as the agent serves it, over inspection of a real ledger (`inspectionFixture`: chat `12` is Pi
- * session `40`). The gate's plan and resident authority are the only fakes.
+ * session `40`). The gate's resident authority is the only fake.
  */
-const fixture = (options: { readonly active?: boolean } = {}) => {
+const fixture = () => {
   const resident = currentResident()
   const inspection = inspectionFixture()
   cleanup(inspection.close)
   const { fetch } = serve(
     served([InspectGroup], InspectHandlers).pipe(
-      Layer.provide(Layer.mergeAll(inspection.layer, Layer.succeed(Resident, resident.service), plans(options.active))),
+      Layer.provide(Layer.mergeAll(inspection.layer, Layer.succeed(Resident, resident.service))),
     ),
   )
   return { fetch, resident, ledger: inspection.ledger }
@@ -76,12 +76,6 @@ describe('the inspect group served by the agent', () => {
     const route = await fetch(get('/api/conversations/main/details?operation=op-1'))
     expect(route.status).toBe(404)
     expect(await route.json()).toMatchObject({ error: { code: 'not_found', what: 'route' } })
-  })
-
-  it('serves an owner without a plan: the gate reads none, and inspecting spends nothing (ADR 0054)', async () => {
-    const { fetch } = fixture({ active: false })
-    const response = await fetch(get('/api/conversations/12/details?operation=op-1'))
-    expect(response.status).not.toBe(402)
   })
 
   it("serves the probes' typed client: details decode, and a refusal decodes as the NotFound class", async () => {

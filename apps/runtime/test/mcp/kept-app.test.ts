@@ -24,7 +24,7 @@ import { Changes, makeChanges } from '../../src/runtime/changes.ts'
 import { scopeOf } from '../../src/setup/scope.ts'
 import { Setups } from '../../src/setup/service.ts'
 import { chatDatabase, durable } from '../chats-sqlite.ts'
-import { plans, stub } from '../http/api/fixture.ts'
+import { stub } from '../http/api/fixture.ts'
 import { MemoryCredentials, MemoryGrants, MemoryLabels, MemoryRegistries } from './memory.ts'
 import { SIDEQUEST, sidequestServer } from './sidequest-fixture.ts'
 
@@ -90,7 +90,6 @@ const fixture = async () => {
               return {} as AppView
             }),
         }),
-        plans(),
       ),
     ),
   )

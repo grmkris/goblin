@@ -1,17 +1,7 @@
 import { expect } from 'vitest'
 import * as Schema from 'effect/Schema'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
-import {
-  call,
-  grantPlan,
-  holding,
-  lever,
-  ownerFetch,
-  person,
-  showing,
-  signedIn,
-  type Person,
-} from './owner-requests.ts'
+import { call, holding, lever, ownerFetch, person, showing, signedIn, type Person } from './owner-requests.ts'
 import { answerOf, ownerSnapshot } from './probe-reads.ts'
 
 const active = Schema.decodeUnknownSync(Schema.Struct({ run: Schema.Struct({ inputs: Schema.Array(Schema.Int) }) }))
@@ -88,7 +78,6 @@ const deleteQueued = (url: string, who: Person, body: unknown, headers: Record<s
 export async function queueCase(url: string): Promise<void> {
   const owner = await person(url)
   const other = await person(url)
-  for (const who of [owner, other]) await grantPlan(url, who)
   await conversationCase(url, owner, other, '1')
   const thread = await callOwner(signedIn(url, owner), (api) => api.conversations.create({ payload: {} }))
   await conversationCase(url, owner, other, thread.id)

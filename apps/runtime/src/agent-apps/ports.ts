@@ -1,7 +1,6 @@
 import { TELEGRAM_DM } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
-import { requirePlan } from '../billing/gates.ts'
 import { requireBudget } from '../budget.ts'
 import { Setups } from '../setup/service.ts'
 import { channelToolName } from '../channel/tools.ts'
@@ -75,8 +74,8 @@ export function appServices(run: RunProgram, complete: AppCompletion): AppServic
       return settled(
         Effect.gen(function* () {
           yield* authorize
-          // The host checks again right before the call leaves, after the plan as `run` checks it.
-          const recheck = yield* bound(Effect.andThen(requirePlan(), authorize))
+          // The host checks again right before the call leaves.
+          const recheck = yield* bound(authorize)
           return yield* McpConnections.use((connections) =>
             connections.callTool(connectionId, name, args, { caller: 'model', timeout: 15_000, authorize: recheck }),
           )
@@ -92,7 +91,7 @@ export function appServices(run: RunProgram, complete: AppCompletion): AppServic
           const connectionId = (yield* Channel.use((channel) => channel.status))?.connectionId
           if (connectionId === undefined)
             return yield* Effect.fail(new AppCodeError('notify: the owner has no Telegram channel connected'))
-          const recheck = yield* bound(Effect.andThen(requirePlan(), requireResident))
+          const recheck = yield* bound(requireResident)
           const result = yield* McpConnections.use((connections) =>
             Effect.flatMap(channelToolName(connections, connectionId, 'send'), (send) =>
               connections.callTool(

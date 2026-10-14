@@ -3,7 +3,6 @@ import * as Schema from 'effect/Schema'
 import type { TopicView } from '@goblin/contracts'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
 import {
-  grantPlan,
   holding,
   lever,
   person,
@@ -122,7 +121,6 @@ async function archiveAndRestore(url: string, owner: Person, topic: TopicView, t
 export async function topicsCase(url: string): Promise<void> {
   const owner = await person(url)
   const other = await person(url)
-  for (const who of [owner, other]) await grantPlan(url, who)
   expect(await topics(url, owner)).toEqual([
     expect.objectContaining({ id: 1, name: 'Personal', conversation: '1', personal: true }),
   ])

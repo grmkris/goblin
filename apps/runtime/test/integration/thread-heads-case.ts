@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 import * as Schema from 'effect/Schema'
 import { ThreadHeadData } from '@goblin/contracts'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
-import { grantPlan, holding, lever, person, showing, signedIn, workspaceOf, type Person } from './owner-requests.ts'
+import { holding, lever, person, showing, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 import { answerOf, ownerSnapshot } from './probe-reads.ts'
 
 const Snapshot = Schema.Struct({
@@ -107,7 +107,6 @@ async function runningAndEmpty(url: string, owner: Person): Promise<void> {
 
 export async function threadHeadsCase(url: string): Promise<void> {
   const owner = await person(url)
-  await grantPlan(url, owner)
   await headAndInput(url, owner)
   await runningAndEmpty(url, owner)
 }

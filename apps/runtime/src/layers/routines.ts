@@ -2,7 +2,6 @@ import * as Clock from 'effect/Clock'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
-import { creditRates } from '../budget-credits.ts'
 import { telegramChannel } from '../channel/channel.ts'
 import { Channel } from '../channel/service.ts'
 import { attempt, attemptSync } from '../http/errors.ts'
@@ -110,10 +109,10 @@ export const routineRunsOf = (store: RoutineRunStore) =>
  */
 export const RoutineRunsLive: Layer.Layer<RoutineRuns | RoutineUsage, never, AgentInput | Db> = Layer.effectContext(
   Effect.gen(function* () {
-    const { env, harness, userId } = yield* AgentInput
+    const { harness, userId } = yield* AgentInput
     const db = yield* Db
     const runs = new RunStore(db, userId)
-    const projection = new UsageProjection(db, runs, creditRates(env.MODEL_CREDIT_RATES), harness)
+    const projection = new UsageProjection(db, runs, harness)
     yield* Effect.promise(() => installRoutineUsage(harness, projection, runs))
     const usage = RoutineUsage.of({
       project: trySync('RoutineUsage.project', projection.project.bind(projection)),

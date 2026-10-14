@@ -24,8 +24,7 @@ import { TopicsGroup } from './topics.ts'
 import { WorkspaceGroup } from './workspace.ts'
 
 /**
- * Admission to every owner endpoint, run by the agent before the handler: the account's plan, then a renewal of
- * resident authority. Its implementation lives in the runtime (`http/api/middleware.ts`); clients need none. Its error
+ * Admission to every owner endpoint, run by the agent before the handler: a renewal of resident authority. Its implementation lives in the runtime (`http/api/middleware.ts`); clients need none. Its error
  * schema is every envelope, so a handler may fail with any `AppError` and the client decodes it.
  */
 export class OwnerAdmission extends HttpApiMiddleware.Service<OwnerAdmission>()('goblin/api/OwnerAdmission', {

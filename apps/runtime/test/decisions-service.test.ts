@@ -101,7 +101,7 @@ describe('decisions after a Delegate report', () => {
     await f.run(report('r1'))
     expect(f.state.calls).toBe(1)
     expect(storedProposal(f.db, 'dp_report_r1')).toBeUndefined()
-    expect(f.charged.map(({ use, model }) => [use.input, model])).toEqual([[1000, 'clef']])
+    expect(f.charged.map(({ input }) => input)).toEqual([1000])
   })
 })
 

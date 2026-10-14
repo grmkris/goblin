@@ -1,4 +1,4 @@
-import { BillingRefused, NotFound, Unauthenticated, envelopeOf } from '@goblin/contracts/api'
+import { NotFound, Unauthenticated, envelopeOf } from '@goblin/contracts/api'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { describe, expect, it } from 'vitest'
@@ -10,23 +10,7 @@ import { withLines } from '../../observability/lines.ts'
 
 const APP = 'https://goblin.test'
 const OWNER = 'user-owner'
-const PLAN_LESS = 'user-plan-less'
 const SECRET = 'secret-words'
-const STATE = {
-  active: false,
-  source: 'none',
-  until: null,
-  dailyCredits: 0,
-  status: 'none',
-  hasCustomer: false,
-  cancelAtPeriodEnd: false,
-  mode: null,
-  plan: null,
-  catalog: [
-    { id: 'day', amountUsd: '1.00', periodDays: 1, dailyCredits: 800 },
-    { id: 'month', amountUsd: '15.00', periodDays: 30, dailyCredits: 800 },
-  ],
-} as const
 
 /** The account's records, keeping the crash points asked for: each one's user, if the report came with a session. */
 const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
@@ -34,11 +18,6 @@ const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
   const records: AccountRecords = {
     clients: () => Effect.succeed([{ clientId: 'client.1', name: 'Claude' }]),
     revokeClient: () => Effect.void,
-    billingState: () => Effect.succeed(STATE),
-    checkout: () => Effect.fail(new BillingRefused({ code: 'already_subscribed' })),
-    portal: () => Effect.succeed({ url: 'https://portal.test/x' }),
-    walletStart: () => Effect.succeed({ signUrl: 'https://wallet.test/subscribe/x' }),
-    walletConfirm: () => Effect.fail(new BillingRefused({ code: 'subscription_unsigned' })),
     crash: (report, userId) => {
       crashes.push(Option.getOrUndefined(userId))
       return crash(report, userId)
@@ -59,7 +38,7 @@ const deployment = (
       const cookie = request.headers.get('cookie')
       if (request.headers.has('authorization') || cookie === null)
         return Effect.fail(new Unauthenticated({ reason: 'session required' }))
-      return Effect.succeed(cookie === 'session=plan-less' ? PLAN_LESS : OWNER)
+      return Effect.succeed(OWNER)
     },
     agent: () => ({
       fetch: async (request) => {
@@ -134,7 +113,7 @@ describe('the owner forward', () => {
     ['/API/internal/x', 404],
     ['/api%2Finternal/x', 404],
     ['/api\\..\\internal\\x', 404],
-    ['/api/billing/state', 404],
+    ['/api/clients', 404],
     ['/api/internal/x', 200],
     ['/api/%2F..%2Finternal/x', 200],
   ] as const)('forwards %s only under /api/ and marked as the owner', async (path, status) => {
@@ -191,17 +170,6 @@ describe('the owner forward', () => {
     expect(response.status).toBe(status)
     expect(await response.json()).toMatchObject({ error: { code } })
     expect(seen).toHaveLength(0)
-  })
-
-  it('forwards an account without a plan to its agent, which refuses what needs one (ADR 0054)', async () => {
-    const { seen, edge } = deployment()
-    const { response } = await through(
-      'owner',
-      new Request(`${APP}/api/topics`, { headers: { cookie: 'session=plan-less' } }),
-      edge,
-    )
-    expect(response.status).toBe(200)
-    expect(seen).toHaveLength(1)
   })
 
   it('refuses a JSON body over 64 KB without waking the agent, but streams a file upload through', async () => {
@@ -340,26 +308,8 @@ describe('the account API in the Worker', () => {
     expect((await through('account', big, edge)).response.status).toBe(413)
   })
 
-  it('answers billing for an account without a plan, and its refusals in the envelope with the reference', async () => {
+  it('answers clients for a signed-in account, and revokes one', async () => {
     const { edge } = deployment()
-    const plan = new Request(`${APP}/api/billing/state`, { headers: { cookie: 'session=plan-less' } })
-    expect(await (await through('account', plan, edge)).response.json()).toEqual(STATE)
-    const { response } = await through(
-      'account',
-      write('/api/billing/checkout', { headers: { 'cf-ray': 'ray-9' } }),
-      edge,
-    )
-    expect(response.status).toBe(409)
-    expect(response.headers.get('x-goblin-ref')).toBe('ray-9')
-    expect(await response.json()).toEqual({
-      error: { code: 'already_subscribed', message: 'You already have Pro.', ref: 'ray-9' },
-    })
-  })
-
-  it('answers clients for any signed-in account, and revokes one', async () => {
-    const { edge } = deployment()
-    const planLess = new Request(`${APP}/api/clients`, { headers: { cookie: 'session=plan-less' } })
-    expect((await through('account', planLess, edge)).response.status).toBe(200)
     const list = new Request(`${APP}/api/clients`, { headers: { cookie: 'session=owner' } })
     expect(await (await through('account', list, edge)).response.json()).toEqual([
       { clientId: 'client.1', name: 'Claude' },
@@ -371,10 +321,10 @@ describe('the account API in the Worker', () => {
   })
 
   it('owns its paths: anything else under them is a 404 in the envelope', async () => {
-    expect(['/api/billing/state', '/api/clients/x', '/api/client-errors'].every(isAccountPath)).toBe(true)
-    expect(['/api/billing-x', '/api/topics', '/api/clientsx'].some(isAccountPath)).toBe(false)
+    expect(['/api/clients', '/api/clients/x', '/api/client-errors'].every(isAccountPath)).toBe(true)
+    expect(['/api/billing/state', '/api/topics', '/api/clientsx'].some(isAccountPath)).toBe(false)
     const { edge } = deployment()
-    const { response } = await through('account', new Request(`${APP}/api/billing`), edge)
+    const { response } = await through('account', new Request(`${APP}/api/clients/x/y`), edge)
     expect(response.status).toBe(404)
     expect(await response.json()).toMatchObject({ error: { code: 'not_found' } })
   })

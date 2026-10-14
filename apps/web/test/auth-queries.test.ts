@@ -19,31 +19,12 @@ afterEach(() => {
 })
 
 describe('the public health', () => {
-  it("reads the sign-up mode, mail, Pro's prices and the wallet's origin, and anything unsaid as off or none", async () => {
+  it('reads the sign-up mode and mail, and anything unsaid as off', async () => {
     vi.stubGlobal('location', new URL('http://app.test/'))
-    answering(() =>
-      Response.json({
-        ok: true,
-        signup: 'invite',
-        mail: true,
-        plans: [
-          { id: 'day', amountUsd: '1.00', periodDays: 1 },
-          { id: 'month', amountUsd: '15.00', periodDays: 30 },
-        ],
-        walletOrigin: 'https://wallet-dev.goblin.surf',
-      }),
-    )
-    expect(await testQueryClient().query(healthQuery)).toEqual({
-      signup: 'invite',
-      mail: true,
-      plans: [
-        { id: 'day', amountUsd: '1.00', periodDays: 1 },
-        { id: 'month', amountUsd: '15.00', periodDays: 30 },
-      ],
-      walletOrigin: 'https://wallet-dev.goblin.surf',
-    })
+    answering(() => Response.json({ ok: true, signup: 'invite', mail: true }))
+    expect(await testQueryClient().query(healthQuery)).toEqual({ signup: 'invite', mail: true })
     answering(() => Response.json({ ok: true }))
-    expect(await testQueryClient().query(healthQuery)).toEqual({ signup: 'closed', mail: false, plans: [] })
+    expect(await testQueryClient().query(healthQuery)).toEqual({ signup: 'closed', mail: false })
   })
 })
 

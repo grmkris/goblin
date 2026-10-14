@@ -27,26 +27,19 @@ const answer = (agent: AgentFetch): Promise<number | string> =>
 
 /**
  * Events ingress (M1) on the native agent, through its internal API as the Worker's Events route reaches it. The
- * internal gate's plan lookup fails once (`failPlanCheck(1)` arms the next lookup to fail with Internal): the sender is
- * answered 503, so it keeps the subscription and retries. The owner's own refusal (resident authority revoked) answers
- * 410, which ends it. Both are decided before any subscription row is read.
+ * owner's own refusal (resident authority revoked) answers 410, which ends the subscription; it is decided before any
+ * subscription row is read.
  */
 async function eventsIngressCase(
   agent: AgentFetch,
-  failPlanCheck: (nth: number) => void,
   revokeResident: () => Promise<void>,
-): Promise<{ readonly transient: number | string; readonly revoked: number | string }> {
-  failPlanCheck(1)
-  const transient = await answer(agent)
+): Promise<{ readonly revoked: number | string }> {
   await revokeResident()
-  const revoked = await answer(agent)
-  return { transient, revoked }
+  return { revoked: await answer(agent) }
 }
 
 export const probes: Probes = {
-  'events-ingress': inAgent(({ api, plan, storage }) =>
-    eventsIngressCase(api, plan.failAt, async () =>
-      new ResidentAuthority(drizzle(storage)).revoke(Math.floor(Date.now() / 1000)),
-    ),
+  'events-ingress': inAgent(({ api, storage }) =>
+    eventsIngressCase(api, async () => new ResidentAuthority(drizzle(storage)).revoke(Math.floor(Date.now() / 1000))),
   ),
 }

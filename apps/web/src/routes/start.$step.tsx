@@ -40,7 +40,7 @@ function StartRoute() {
   const { step } = Route.useParams()
   const search = Route.useSearch()
   return (
-    <OwnerGate planRequired={false} pending={<StartSplash />}>
+    <OwnerGate pending={<StartSplash />}>
       <StartPage step={isStep(step) ? step : 'welcome'} search={search} />
     </OwnerGate>
   )

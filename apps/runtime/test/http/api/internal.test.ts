@@ -18,7 +18,7 @@ import { ResidentHandlers } from '../../../src/mcp/resident-api.ts'
 import { PiSessions } from '../../../src/pi/sessions.ts'
 import { Changes } from '../../../src/runtime/changes.ts'
 import { AgentInput } from '../../../src/runtime/input.ts'
-import { currentResident, get, plans, post, serve, served, stub, unrouted } from './fixture.ts'
+import { currentResident, get, post, serve, served, stub, unrouted } from './fixture.ts'
 
 /** The internal API as the agent serves it, behind the internal gate, over `handlers`. */
 const servedInternal = <Handlers, R>(handlers: Layer.Layer<Handlers, never, R>) =>
@@ -44,8 +44,7 @@ const recording = () => {
       .handle('ask', ({ payload }) => mark('ask', { status: 'running' as const, operationId: payload.operationId }))
       .handle('recent', () => mark('recent', []))
       .handle('mcpEvents', () => mark('mcpEvents', { status: 204 as const }))
-      .handle('inspect', () => mark('inspect', { conversations: [] }))
-      .handle('billingNotice', () => mark('billingNotice', undefined)),
+      .handle('inspect', () => mark('inspect', { conversations: [] })),
   )
   return { ran, handlers }
 }
@@ -55,9 +54,9 @@ const internal = (path: string, body?: unknown, headers: Record<string, string> 
   body === undefined ? get(`/internal${path}`, headers) : post(`/internal${path}`, body, headers)
 
 describe('the internal API served by the agent', () => {
-  it('answers a request without the owner mark, after the plan check', async () => {
+  it('answers a request without the owner mark', async () => {
     const { ran, handlers } = recording()
-    const { fetch } = serve(servedInternal(handlers).pipe(Layer.provide(plans())))
+    const { fetch } = serve(servedInternal(handlers))
     const asked = await fetch(internal('/ask', ASK, { 'x-goblin-ref': 'ray-1' }))
     expect(asked.status).toBe(200)
     expect(await asked.json()).toEqual({ status: 'running', operationId: 'op-1' })
@@ -67,7 +66,7 @@ describe('the internal API served by the agent', () => {
 
   it('refuses a request marked as the owner forward with the 404 envelope, before any handler runs', async () => {
     const { ran, handlers } = recording()
-    const { fetch } = serve(servedInternal(handlers).pipe(Layer.provide(plans())))
+    const { fetch } = serve(servedInternal(handlers))
     for (const request of [
       internal('/ask', ASK, { 'x-goblin-forwarded': 'owner', 'x-goblin-ref': 'ray-2' }),
       internal('/recent?limit=5', undefined, { 'x-goblin-forwarded': 'owner' }),
@@ -81,27 +80,14 @@ describe('the internal API served by the agent', () => {
     expect(ran).toEqual([])
   })
 
-  it('answers SubscriptionRequired without a plan on every endpoint but inspection', async () => {
-    const { ran, handlers } = recording()
-    const { fetch } = serve(servedInternal(handlers).pipe(Layer.provide(plans(false))))
-    for (const request of [internal('/ask', ASK, { 'x-goblin-ref': 'ray-402' }), internal('/recent?limit=5')]) {
-      const response = await fetch(request)
-      expect(response.status).toBe(402)
-      expect(await response.json()).toMatchObject({ error: { code: 'subscription_required' } })
-    }
-    const inspected = await fetch(internal('/inspect', { query: { kind: 'conversations' } }))
-    expect(inspected.status).toBe(200)
-    expect(ran).toEqual(['inspect'])
-  })
-
   it('serves only its own prefix, and the owner API only its own', async () => {
     const { handlers } = recording()
-    const internalOnly = serve(servedInternal(handlers).pipe(Layer.provide(plans())))
+    const internalOnly = serve(servedInternal(handlers))
     expect(await unrouted(await internalOnly.fetch(get('/api/agent/resident')))).toBe(true)
     const resident = currentResident()
     const ownerOnly = serve(
       served([ResidentGroup], ResidentHandlers).pipe(
-        Layer.provide(Layer.mergeAll(plans(), Layer.succeed(Resident, resident.service), stub(Events))),
+        Layer.provide(Layer.mergeAll(Layer.succeed(Resident, resident.service), stub(Events))),
       ),
     )
     const refused = await ownerOnly.fetch(internal('/recent?limit=5'))
@@ -121,7 +107,6 @@ describe('the inbound handlers', () => {
       servedInternal(InboundHandlers).pipe(
         Layer.provide(
           Layer.mergeAll(
-            plans(),
             parts.events ?? stub(Events),
             parts.inspection ?? stub(Inspection),
             stub(Chats),

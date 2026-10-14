@@ -7,7 +7,7 @@ import { ResidentChange } from '../mcp.ts'
 /**
  * Whether owner admission renews resident authority before the endpoint runs (`OwnerAdmission` in `owner.ts`). Every owner
  * request renews it except changing it: a revocation must not renew first, and re-enabling renews on its own. An
- * endpoint that must not renew is annotated `false`; admission still checks the plan.
+ * endpoint that must not renew is annotated `false`.
  */
 export const RenewsResident = Context.Reference<boolean>('goblin/api/RenewsResident', { defaultValue: () => true })
 

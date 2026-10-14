@@ -19,8 +19,8 @@ const refused = () => Effect.succeed('refused' as const)
 
 /**
  * A routine's tool call in Pi session `session`: refused when the session is no routine run, or when the routine's own
- * gate says no (no plan, resident authority off, the run not executing, its tokens or today's budget spent). Anything
- * else (storage, Pi or auth D1 failing) is reported and blocks the tool as a check that failed (ADR 0026).
+ * gate says no (resident authority off, the run not executing, its tokens or today's budget spent). Anything else
+ * (storage or Pi failing) is reported and blocks the tool as a check that failed.
  */
 export const routineToolVerdict = (session: string) =>
   Effect.gen(function* () {
@@ -30,7 +30,6 @@ export const routineToolVerdict = (session: string) =>
     return 'open' as const
   }).pipe(
     Effect.catchTags({
-      SubscriptionRequired: refused,
       ResidentInactive: refused,
       Forbidden: refused,
       BudgetExhausted: refused,

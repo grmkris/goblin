@@ -6,8 +6,6 @@ import { afterEach } from 'vitest'
 import { OnboardingLive } from '../src/layers/onboarding.ts'
 import { profileOf, profileView } from '../src/mcp/first-class.ts'
 import { McpConnections, McpGrants, McpServers } from '../src/mcp/service.ts'
-import { Entitlements } from '../src/billing/gates.ts'
-import type { AccountPlan } from '../src/billing/reconcile.ts'
 import { Budget } from '../src/budget.ts'
 import { Chats } from '../src/chats/service.ts'
 import { changeOnboarding, onboardingContext, onboardingState, onboardingView } from '../src/onboarding/program.ts'
@@ -43,12 +41,11 @@ afterEach(() => {
   for (const close of closes.splice(0)) close()
 })
 
-/** What the wallet's status tool answers, and whether the account has goblin Pro (ADR 0054). */
+/** What the wallet's status tool answers. */
 type Wallet = {
   readonly dollars?: string
   readonly setup?: readonly string[]
   readonly payFrom?: typeof PAY_FROM
-  readonly pro?: boolean
 }
 
 /**
@@ -58,7 +55,7 @@ type Wallet = {
 const start = (
   servers: readonly ServerView[],
   grants: readonly Grant[],
-  { dollars = '0', setup, payFrom = PAY_FROM, pro = false }: Wallet = {},
+  { dollars = '0', setup, payFrom = PAY_FROM }: Wallet = {},
 ) => {
   const { db, close } = chatDatabase()
   closes.push(close)
@@ -87,13 +84,9 @@ const start = (
               return { content: [], structuredContent: answer }
             }),
         }),
-        // SAFETY: Start reads only whether the plan is active.
-        stub(Entitlements, {
-          state: () => Effect.succeed({ source: pro ? 'wallet' : 'none', active: pro } as AccountPlan),
-        }),
         // SAFETY: Start reads only the app's address from the instance input.
         Layer.succeed(AgentInput, { env: { APP_URL: 'https://goblin.test' } } as AgentInputs),
-        // Main is session `s1`; the day's allowance is none until the wallet holds the free plan's dollars.
+        // Main is session `s1`; the day's limit is 0, which the setup note reads as unfunded, below five dollars.
         // SAFETY: the setup note reads only main's chat id and its session from the directory.
         stub(Chats, { primary: '1', session: (chat: string) => Effect.succeed(chat === '1' ? 's1' : 's2') } as never),
         stub(Budget, {
@@ -170,41 +163,28 @@ describe('first-run Start (ADR 0048)', () => {
     }).pipe(Effect.provide(layer))
   })
 
-  it.effect(
-    'is done, untouched, once the wallet is set up and funded and Pro is on, without Mercator, and keeps that',
-    () => {
-      const { layer, reads } = start(walletOnly, walletAllowed, { dollars: '6.5', pro: true })
-      return Effect.gen(function* () {
-        const view = yield* onboardingView
-        expect(view.status).toBe('done')
-        expect(view.wallet).toMatchObject({ ready: true, gaps: [], payFrom: PAY_FROM, dollars: '6.5', funded: true })
-        expect(view.mercator).toMatchObject({ connected: false, allowed: false })
-        expect(done(view)).toEqual(['wallet'])
-        expect((yield* kept)?.status).toBe('done')
-        // Kept, the gate's answer asks no server.
-        const before = reads.length
-        expect(yield* onboardingState).toEqual({ status: 'done' })
-        expect(reads).toHaveLength(before)
-      }).pipe(Effect.provide(layer))
-    },
-  )
-
-  it.effect("stays open while a ready, funded wallet has no Pro: choosing it is where the wallet's step ends", () =>
-    Effect.gen(function* () {
+  it.effect('is done, untouched, once the wallet is set up and funded, without Mercator, and keeps that', () => {
+    const { layer, reads } = start(walletOnly, walletAllowed, { dollars: '6.5' })
+    return Effect.gen(function* () {
       const view = yield* onboardingView
-      expect(view.wallet).toMatchObject({ ready: true, dollars: '3', funded: true })
-      expect(view.status).toBe('open')
-      expect(done(view)).toEqual([])
-      expect((yield* kept)?.status).toBeUndefined()
-    }).pipe(Effect.provide(start(everything, allowed, { dollars: '3' }).layer)),
-  )
+      expect(view.status).toBe('done')
+      expect(view.wallet).toMatchObject({ ready: true, gaps: [], payFrom: PAY_FROM, dollars: '6.5', funded: true })
+      expect(view.mercator).toMatchObject({ connected: false, allowed: false })
+      expect(done(view)).toEqual(['wallet'])
+      expect((yield* kept)?.status).toBe('done')
+      // Kept, the gate's answer asks no server.
+      const before = reads.length
+      expect(yield* onboardingState).toEqual({ status: 'done' })
+      expect(reads).toHaveLength(before)
+    }).pipe(Effect.provide(layer))
+  })
 
-  it.effect('counts any dollars as funded: the wallet holds no set sum, Pro is what goblin needs', () =>
+  it.effect('counts any dollars as funded: the wallet holds no set sum', () =>
     Effect.gen(function* () {
       const view = yield* onboardingView
       expect(view.wallet).toMatchObject({ needs: '0', ready: true, funded: true })
       expect(view.status).toBe('done')
-    }).pipe(Effect.provide(start(everything, allowed, { dollars: '0.5', pro: true }).layer)),
+    }).pipe(Effect.provide(start(everything, allowed, { dollars: '0.5' }).layer)),
   )
 
   it.effect("keeps the owner's word over what it would derive, each step once, and the first kickoff", () =>
@@ -229,7 +209,7 @@ describe('first-run Start (ADR 0048)', () => {
       const view = yield* changeOnboarding({ step: 'welcome' })
       expect(view.status).toBe('done')
       expect((yield* kept)?.status).toBe('done')
-    }).pipe(Effect.provide(start(walletOnly, walletAllowed, { dollars: '6.5', pro: true }).layer)),
+    }).pipe(Effect.provide(start(walletOnly, walletAllowed, { dollars: '6.5' }).layer)),
   )
 
   it('reads an older Start\'s row: the steps it no longer has are dropped, and its "open" is derived', () => {

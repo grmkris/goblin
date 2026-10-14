@@ -3,7 +3,7 @@ import { expect } from 'vitest'
 import { Predicate, Schema } from 'effect'
 import { ApprovalView } from '@goblin/contracts'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
-import { call, grantPlan, lever, person, showing, signedIn, type Person } from './owner-requests.ts'
+import { call, lever, person, showing, signedIn, type Person } from './owner-requests.ts'
 import { answerOf } from './probe-reads.ts'
 
 const SERVER = 'apps-fixture'
@@ -69,7 +69,6 @@ const approval = (me: AgentFetch, id: string) => callOwner(me, (api) => api.mcp.
 
 export async function approvalsCase(base: string): Promise<void> {
   const owner = await person(base)
-  await grantPlan(base, owner)
   const me = signedIn(base, owner)
   await callOwner(me, (api) => api.mcp.connect({ params: { id: SERVER }, payload: {} }))
   await grant(me, true)
@@ -80,7 +79,6 @@ export async function approvalsCase(base: string): Promise<void> {
   expect(reviewed).toMatchObject({ state: 'pending', arguments: { ...args, accessToken: '[redacted]' } })
   expect(JSON.stringify(reviewed)).not.toContain('fixture-private')
   const other = await person(base)
-  await grantPlan(base, other)
   const them = signedIn(base, other)
   expect(await answerOf(them, (api) => api.mcp.approval({ params: { id: held.id } }))).toBe('NotFound')
   expect(
@@ -164,12 +162,11 @@ const seen = async (base: string, owner: Person) =>
 const joined = (messages: readonly { readonly text: string }[]) => messages.map((message) => message.text).join('\n')
 
 /**
- * An approval when nothing can pay for a turn (F1): the call runs once and the decision answers 200, while the outcome
- * is kept in the chat as an `app.mcp_outcome` entry that starts no turn; the owner's next message reads it.
+ * An approval once the day's capped tokens are spent (F1): the call runs once and the decision answers 200, while the
+ * outcome is kept in the chat as an `app.mcp_outcome` entry that starts no turn; the owner's next message reads it.
  */
 export async function approvalKeptCase(base: string): Promise<void> {
   const owner = await person(base)
-  await grantPlan(base, owner)
   const me = signedIn(base, owner)
   await callOwner(me, (api) => api.mcp.connect({ params: { id: SERVER }, payload: {} }))
   await grant(me, true)

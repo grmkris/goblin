@@ -1,6 +1,5 @@
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
-import { requirePlan } from '../billing/gates.ts'
 import { requireBudget } from '../budget.ts'
 import { BudgetExhausted, Forbidden } from '../http/errors.ts'
 import { requireResident } from '../mcp/service.ts'
@@ -8,11 +7,10 @@ import { runHandOver } from './store.ts'
 import { RoutineRuns, RoutineUsage } from './service.ts'
 
 /**
- * The dedicated routine provider resolves this before every model dispatch, including recovery and compaction: a run
- * is a hand-over, so it needs a plan with them (Pro).
+ * The dedicated routine provider resolves this before every model dispatch, including recovery and compaction: resident
+ * authority, a run still executing, and its own caps and the day's usage.
  */
 export const requireRoutine = Effect.fn('routines.requireRoutine')(function* (runId: string) {
-  yield* requirePlan('handOver')
   yield* requireResident
   const store = yield* RoutineRuns
   const at = yield* Clock.currentTimeMillis

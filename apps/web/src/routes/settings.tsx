@@ -7,7 +7,7 @@ import { memoryQuery, residentQuery, usageQuery } from '../agent/queries.ts'
 import { primeOwnerRead } from '../lib/prime.ts'
 import { routineSettingsQuery, routinesQuery } from '../routines/queries.ts'
 
-/** The settings' cards start loading before the page renders; a lapsed plan's refusals are the cards' to show. */
+/** The settings' cards start loading before the page renders. */
 export const Route = createFileRoute('/settings')({
   loader: async ({ context }) => {
     await Promise.all([
@@ -23,7 +23,7 @@ export const Route = createFileRoute('/settings')({
 })
 function SettingsPage() {
   return (
-    <OwnerGate planRequired={false}>
+    <OwnerGate>
       <PageBar title="Settings" />
       <div className="shell">
         <Settings />

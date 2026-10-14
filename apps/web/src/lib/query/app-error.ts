@@ -1,13 +1,4 @@
-import {
-  AppError,
-  type ApiCode,
-  BILLING_REFUSALS,
-  BillingRefused,
-  ErrorEnvelope,
-  codeOf,
-  failureCopy,
-  statusOf,
-} from '@goblin/contracts/api'
+import { AppError, type ApiCode, ErrorEnvelope, codeOf, failureCopy, statusOf } from '@goblin/contracts/api'
 import { onlineManager } from '@tanstack/react-query'
 import * as Option from 'effect/Option'
 import * as Predicate from 'effect/Predicate'
@@ -51,31 +42,12 @@ export const ERROR_KINDS: ErrorKindTable<ApiCode> = {
   payload_too_large: 'validation',
   resident_inactive: 'forbidden',
   budget_exhausted: 'plan_limit',
-  subscription_required: 'plan_limit',
   needs_authorization: 'forbidden',
   scope_required: 'forbidden',
   upstream_mcp: 'unavailable',
   internal: 'defect',
 }
-/** The account API's billing refusals (`BillingRefused`), pinned the same way. */
-export const BILLING_KINDS: ErrorKindTable<BillingRefused['code']> = {
-  billing_unavailable: 'unavailable',
-  already_subscribed: 'conflict',
-  checkout_limit: 'rate_limited',
-  account_missing: 'not_found',
-  no_customer: 'not_found',
-  card_disabled: 'not_found',
-  wallet_unavailable: 'unavailable',
-  subscription_unknown: 'not_found',
-  subscription_unsigned: 'conflict',
-  subscription_ended: 'conflict',
-  payment_short: 'plan_limit',
-  payment_failed: 'unavailable',
-}
-const KIND_OF_CODE: ReadonlyMap<string, ErrorKind> = new Map([
-  ...Object.entries(ERROR_KINDS),
-  ...Object.entries(BILLING_KINDS),
-])
+const KIND_OF_CODE: ReadonlyMap<string, ErrorKind> = new Map(Object.entries(ERROR_KINDS))
 const kindOf = (code: string): ErrorKind | undefined => KIND_OF_CODE.get(code)
 
 const isAppError = Schema.is(AppError)
@@ -102,20 +74,6 @@ const appView = (error: AppError): AppErrorView => {
     status,
     message: copy.message,
     recovery: copy.recovery,
-    retryable: gateway(status),
-    ref: error.ref,
-  }
-}
-
-/** A billing refusal the account API answered, with its fixed copy; a checkout set up later is worth a retry. */
-const billingView = (error: BillingRefused): AppErrorView => {
-  const { status, ...copy } = BILLING_REFUSALS[error.code]
-  return {
-    kind: kindOf(error.code) ?? kindForStatus(status),
-    code: error.code,
-    status,
-    message: copy.message,
-    recovery: 'recovery' in copy ? copy.recovery : undefined,
     retryable: gateway(status),
     ref: error.ref,
   }
@@ -171,7 +129,6 @@ export function describeError(error: unknown): AppErrorView {
   }
   if (Predicate.isTagged(error, 'SchemaError')) return { kind: 'defect', code: 'contract_drift', retryable: false }
   if (isAppError(error)) return appView(error)
-  if (error instanceof BillingRefused) return billingView(error)
   if (HttpClientError.isHttpClientError(error)) return transportView(error)
   const envelope = Schema.decodeUnknownOption(ErrorEnvelope)(error)
   const { status, ref } = Option.getOrElse(Schema.decodeUnknownOption(Answered)(error), (): Answered => ({}))
@@ -196,16 +153,6 @@ const quoting = (text: string, ref: string | undefined): string =>
 export const withRef = (text: string, failure: unknown): string => quoting(text, describeError(failure).ref)
 
 /**
- * A plan with no daily Credits, which a deployment's catalog may set (ADR 0054). Without a plan a call is refused with
- * `SubscriptionRequired` instead.
- */
-const NO_CREDITS = 'Your plan includes no model Credits.'
-
-/** A spent day that was never open: a budget refusal with no allowance at all. */
-const noCredits = (error: unknown): boolean =>
-  Predicate.isTagged(error, 'BudgetExhausted') && Predicate.hasProperty(error, 'limit') && error.limit === 0
-
-/**
  * Calm action copy, ending with the failure's reference when there is one. Typed server messages are public; exception
  * text and status codes are not.
  */
@@ -215,7 +162,6 @@ export function messageOf(
   opts: { readonly showRecovery?: boolean | undefined } = {},
 ): string {
   const view = describeError(error)
-  if (noCredits(error)) return quoting(NO_CREDITS, view.ref)
   if (view.message !== undefined)
     return quoting(
       `${view.message}${opts.showRecovery === true && view.recovery !== undefined ? ` ${view.recovery}` : ''}`,
@@ -229,7 +175,7 @@ export function messageOf(
     not_found: 'This item no longer exists.',
     conflict: 'Refresh and try again.',
     validation: 'Check the details and try again.',
-    plan_limit: 'Your plan has reached its limit. Review your plan.',
+    plan_limit: 'The daily limit is reached; it resets at 00:00 UTC.',
     rate_limited: 'Wait a moment and try again.',
     defect: 'Try again.',
     cancelled: 'Try again.',

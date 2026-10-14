@@ -10,7 +10,7 @@ import { addProposal } from '../../../src/decisions/store.ts'
 import { Resident } from '../../../src/mcp/service.ts'
 import { callOwner } from '../../owner-client.ts'
 import { decisionsFixture } from '../../decisions-services.ts'
-import { currentResident, plans, post, serve, served, unrouted } from './fixture.ts'
+import { currentResident, post, serve, served, unrouted } from './fixture.ts'
 
 const decode = Schema.decodeUnknownSync(DecisionProposal)
 
@@ -39,11 +39,7 @@ async function fixture() {
   const { fetch } = serve(
     served([DecisionsGroup], DecisionsHandlers).pipe(
       Layer.provide(
-        Layer.mergeAll(
-          Layer.succeed(Decisions, decisions),
-          Layer.succeed(Resident, currentResident().service),
-          plans(),
-        ),
+        Layer.mergeAll(Layer.succeed(Decisions, decisions), Layer.succeed(Resident, currentResident().service)),
       ),
     ),
   )

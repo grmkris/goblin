@@ -16,7 +16,6 @@ import { named } from '../mcp/labels.ts'
 import { Events, McpConnections, McpGrants, McpServers, Spending, requireResident } from '../mcp/service.ts'
 import { ruleText } from '../mcp/spend.ts'
 import type { McpConnectionSnapshot, McpRequestOptions } from '../mcp/types.ts'
-import { requirePlan } from '../billing/gates.ts'
 import { requireRoutineSession } from '../routines/authority.ts'
 import { bound } from '../runtime/boundary.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
@@ -32,10 +31,9 @@ import { prepaidJob } from '../mcp/top-up.ts'
 /** What a model's MCP tool checks before it runs: resident authority, then a routine run's own, when it is one. */
 const executionAuthority = (session: string) => Effect.andThen(requireResident, requireRoutineSession(session))
 
-/** What the manager checks again right before a model's call leaves: the plan, then the call's execution scope. */
+/** What the manager checks again right before a model's call leaves: the call's execution authority and scope. */
 const dispatchAuthority = (session: string, input: { connectionId: string; name: string }) =>
   Effect.gen(function* () {
-    yield* requirePlan()
     yield* executionAuthority(session)
     if (!(yield* (yield* Setups).scope(session)).tool(input.connectionId, input.name))
       return yield* new NotFound({ what: 'tool scope' })
@@ -212,7 +210,7 @@ type ListInput = typeof ListInput.Type
 
 /**
  * The event streams a connection's server sends, when it offers Events and its catalog can be read now; none when the
- * plan, the connection's sign-in or the server does not allow reading it, so the tools are listed all the same.
+ * connection's sign-in or the server does not allow reading it, so the tools are listed all the same.
  */
 const eventsOf = (connectionId: string) =>
   Events.use((events) => events.catalog(connectionId)).pipe(
@@ -225,7 +223,6 @@ const eventsOf = (connectionId: string) =>
       })),
     ),
     Effect.catchTags({
-      SubscriptionRequired: () => Effect.succeed(undefined),
       NeedsAuthorization: () => Effect.succeed(undefined),
       ScopeRequired: () => Effect.succeed(undefined),
       UpstreamMcp: () => Effect.succeed(undefined),

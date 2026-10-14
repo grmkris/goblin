@@ -79,7 +79,7 @@ describe('leaf tools (unit, ADR 0027)', () => {
   })
 
   it('share_back says where the note went', async () => {
-    const shared = await call(tool(threadExtension(runner(undefined, '12')), 'share_back'), {
+    const shared = await call(tool(threadExtension(runner('12')), 'share_back'), {
       note: 'the word is lantern',
     })
     expect(shared.content).toEqual([{ type: 'text', text: 'Shared with 12.' }])

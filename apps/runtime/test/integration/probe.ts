@@ -31,8 +31,6 @@ export interface Inside {
   /** The object's native schedules, and its own app job callback. */
   readonly schedules: JobSchedules
   readonly fire: (slot: JobSlot) => Promise<void>
-  /** Plan lookups: the `nth` coming one fails (0 for none), or every one fails while the outage is on. */
-  readonly plan: { readonly failAt: (nth: number) => void; readonly outage: (on: boolean) => void }
   /** The routine Events producer the agent's MCP fetch reaches for `routine-events.test`. */
   readonly producer: EventsFixture
   /** Stops the object; the next request reconstructs it from storage. */

@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest'
 import type { Part, ToolPart } from '../src/lib/parts.ts'
 import { presenceOf } from '../src/lib/presence.ts'
 import type { ConversationProjection } from '../src/lib/projection.ts'
-import { BudgetExhausted } from '@goblin/contracts/api'
-import { messageOf } from '../src/lib/query/app-error.ts'
 
 const projection = (extra: Partial<ConversationProjection> = {}): ConversationProjection => ({
   messages: [],
@@ -85,10 +83,6 @@ describe('the agent’s presence', () => {
   })
   it('settles into how the last turn ended; stopping is not an error, a cut-off answer says so', () => {
     expect(presenceOf({ ...base, exhausted: true, projection: projection() }).state).toBe('exhausted')
-    // No plan at all: goblin answers nothing until the owner picks goblin Pro (ADR 0054).
-    expect(presenceOf({ ...base, exhausted: true, planNeeded: true, projection: projection() }).label).toBe(
-      'Needs goblin Pro',
-    )
     expect(presenceOf({ ...base, projection: projection(), parts: [failure()] }).state).toBe('error')
     expect(presenceOf({ ...base, projection: projection(), parts: [failure(true)] }).state).toBe('idle')
     const cutOff: Part = { kind: 'failure', id: 'f2', failure: { text: 'Cut off', provider: false, cutOff: true } }
@@ -97,15 +91,5 @@ describe('the agent’s presence', () => {
       label: 'Cut off',
     })
     expect(presenceOf({ ...base, projection: projection() })).toEqual({ state: 'idle', label: 'Ready' })
-  })
-})
-
-describe('what a send refused by a plan with no Credits says (ADR 0054)', () => {
-  it('says the plan has none, not that the day is spent or that there is a free plan', () => {
-    const none = messageOf(new BudgetExhausted({ limit: 0, resetsAt: 86_400 }), 'send the message')
-    expect(none).toBe('Your plan includes no model Credits.')
-    expect(messageOf(new BudgetExhausted({ limit: 50, resetsAt: 86_400 }), 'send the message')).toBe(
-      "You have used today's model budget.",
-    )
   })
 })

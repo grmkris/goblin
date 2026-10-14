@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
-import { call, grantPlan, person, showing, signedIn, snapshotText, workspaceOf } from './owner-requests.ts'
+import { call, person, showing, signedIn, snapshotText, workspaceOf } from './owner-requests.ts'
 import { answerOf } from './probe-reads.ts'
 
 const APP = `import { defineApp, s } from '@goblin/app'
@@ -64,7 +64,6 @@ const say = (me: AgentFetch, thread: string, tool: string, input: unknown) =>
  */
 export async function agentAppViewCase(base: string): Promise<void> {
   const owner = await person(base)
-  await grantPlan(base, owner)
   const me = signedIn(base, owner)
   const thread = await callOwner(me, (api) => api.conversations.create({ payload: {} }))
   const apps = async () => (await workspaceOf(base, owner)).apps

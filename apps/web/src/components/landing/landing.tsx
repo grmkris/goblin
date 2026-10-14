@@ -1,28 +1,14 @@
 // goblin's public front door at `/` for a visitor who is signed out (a signed-in owner goes straight to their chat):
-// what goblin does differently, in ten seconds, that it is real (live on Base mainnet, open source), and the way in,
-// Meet your goblin. The hero is goblin's own shell at large scale with a short session playing in it; everything after
-// it is quiet: a heading, a little copy and one real visual per section. Built from the shared marketing parts in
-// @goblin/ui (also Goblin Wallet's front door), which links back here.
+// what goblin does differently, in ten seconds, that it is real (open source), and the way in, Meet your goblin. The
+// hero is goblin's own shell at large scale with a short session playing in it; everything after it is quiet: a
+// heading, a little copy and one real visual per section. Built from the shared marketing parts in @goblin/ui.
 import { type ReactNode, useEffect, useState, useSyncExternalStore } from 'react'
 import { CheckIcon, CopyIcon } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import {
-  GoblinMark,
-  MossFrame,
-  PermissionCard,
-  Section,
-  SiteBar,
-  SiteButton,
-  SiteFooter,
-  type SiteLink,
-} from '@goblin/ui'
-import type { PublicPlan } from '@goblin/contracts'
-import { healthQuery } from '../../auth/queries.ts'
+import { GoblinMark, MossFrame, Section, SiteBar, SiteButton, SiteFooter, type SiteLink } from '@goblin/ui'
 import { useSession } from '../../auth/hooks.ts'
 import { lastChannel } from '../../lib/last-channel.ts'
 import { reportUnexpected } from '../../lib/unexpected.ts'
-import { choiceOf, pricesOf } from '../../lib/pro.ts'
 import { HeroComposer, HeroSession, HeroStatus, useHeroSession } from './hero-session.tsx'
 import { ServerList } from './server-list.tsx'
 import lisbonDark from '../../assets/landing/lisbon-dark.webp'
@@ -34,18 +20,6 @@ import trivagoApp from '../../assets/landing/trivago-app.webp'
 const ELSEWHERE = { github: 'https://github.com/grmkris/goblin', x: 'https://x.com/goblin_surf' } as const
 /** Production, which every stage's page names until its own `/health` says otherwise. */
 const PRODUCTION = 'https://goblin.surf'
-const WALLET = 'https://wallet.goblin.surf'
-/** Pro's prices before `/health` answers: the defaults in apps/runtime/src/billing/plans.ts. */
-const DEFAULT_PLANS: readonly PublicPlan[] = [
-  { id: 'day', amountUsd: '1.00', periodDays: 1 },
-  { id: 'month', amountUsd: '15.00', periodDays: 30 },
-]
-/** Payments goblin made on mainnet on 12 October 2026 (README). */
-const TX = {
-  search: 'https://basescan.org/tx/0xc09ca95d5ff071d45e83d09504a4dfa1d367a289d6beabc1ba878029b39cb0fd',
-  approved: 'https://basescan.org/tx/0xe4219e53ec87f363181090b28a2e008f0bc02221dc689fb75068cb8dbab8e3dc',
-  bridge: 'https://basescan.org/tx/0x2dce04899f917d6c3e7aab58ba25ff663fe176d9ab34484b130622a6712f3e7b',
-} as const
 
 const MEET = { label: 'Meet your goblin', href: '/login?new=1' } as const satisfies SiteLink
 const SIGN_IN = { label: 'Sign in', href: '/login' } as const satisfies SiteLink
@@ -57,15 +31,6 @@ const useOrigin = (): string =>
     () => window.location.origin,
     () => PRODUCTION,
   )
-
-/** What `/health` tells anyone: Pro's prices and the Goblin Wallet's address, with production's until it answers. */
-function usePublic(): { readonly plans: readonly PublicPlan[]; readonly wallet: string } {
-  const health = useQuery(healthQuery).data
-  return {
-    plans: health === undefined || health.plans.length === 0 ? DEFAULT_PLANS : health.plans,
-    wallet: health?.walletOrigin ?? WALLET,
-  }
-}
 
 /** A session that turns out to be signed in (a check still under way when Home opened) leaves for its channel. */
 function useLeaveWhenSignedIn() {
@@ -79,7 +44,6 @@ function useLeaveWhenSignedIn() {
 
 export function Landing() {
   useLeaveWhenSignedIn()
-  const { plans, wallet } = usePublic()
   const session = useHeroSession()
   return (
     <>
@@ -87,26 +51,23 @@ export function Landing() {
         name="goblin"
         mark={<GoblinMark />}
         tone="moss"
-        links={[{ label: 'Goblin Wallet', href: wallet }]}
+        links={[{ label: 'GitHub', href: ELSEWHERE.github, external: true }]}
         signIn={SIGN_IN}
         cta={MEET}
       />
       <MossFrame
         title="Your own goblin, always on."
-        lede="A personal agent that keeps working while you're away, uses only the tools you allow, and asks before it spends."
+        lede="A personal agent that keeps working while you're away, uses only the tools you allow, and asks before it acts."
         actions={<SiteButton action={MEET} />}
-        note={`goblin Pro is ${pricesOf(plans)}, in USDC.`}
+        note="Open source. Bring your own model."
         panelLabel="# Islands"
         panelStatus={<HeroStatus stage={session.stage} />}
         panel={<HeroSession session={session} />}
         panelFooter={<HeroComposer />}
       />
       <Away />
-      <Spends plans={plans} />
       <Connect />
       <Open />
-      <Wallet wallet={wallet} />
-      <Pricing plans={plans} />
       <Close />
       <SiteFooter
         name="goblin"
@@ -115,9 +76,8 @@ export function Landing() {
         groups={[
           {
             title: 'goblin',
-            links: [MEET, SIGN_IN, { label: 'Pricing', href: '#pricing' }],
+            links: [MEET, SIGN_IN],
           },
-          { title: 'Goblin Wallet', links: [{ label: 'Open Goblin Wallet', href: wallet }] },
           {
             title: 'Follow',
             links: [
@@ -130,7 +90,6 @@ export function Landing() {
             links: [
               { label: 'Terms', href: '/terms' },
               { label: 'Privacy', href: '/privacy' },
-              { label: 'Refunds', href: '/refunds' },
             ],
           },
         ]}
@@ -195,51 +154,11 @@ function Away() {
   )
 }
 
-function Spends({ plans }: { readonly plans: readonly PublicPlan[] }) {
-  const month = plans.find((plan) => plan.id === 'month') ?? DEFAULT_PLANS[1]
-  const amount = Number(month?.amountUsd ?? '15').toFixed(2)
-  const days = String(month?.periodDays ?? 30)
-  return (
-    <Section
-      id="spends"
-      flip
-      title="It asks before it spends"
-      visual={
-        <div className="landing-permission">
-          <PermissionCard
-            title="goblin Pro, monthly"
-            asker="Asked by goblin.surf"
-            amountUsd={amount}
-            per={`every ${days} days`}
-            terms={[
-              { title: 'USDC transfers only', detail: 'Nothing else can move from your account.' },
-              { title: 'Only to goblin', detail: 'The recipient is fixed; it cannot be changed.' },
-              { title: `At most $${amount} every ${days} days`, detail: 'The first payment right after you sign.' },
-              { title: 'For 12 payments', detail: 'A year, or until you cancel.' },
-            ]}
-            footer="You sign it once in your Goblin Wallet, and cancel it there whenever you like."
-          />
-        </div>
-      }
-    >
-      <p>
-        goblin pays from a Goblin Wallet you own, in USDC on Base. You set the limits, and the chain enforces them. A
-        new recipient or a bigger amount waits for your yes.
-      </p>
-      <p>
-        <a className="landing-link" href={TX.approved} rel="noopener">
-          Live on Base mainnet
-        </a>
-        : a first payment to a new address, held until its owner approved it.
-      </p>
-    </Section>
-  )
-}
-
 function Connect() {
   return (
     <Section
       id="connect"
+      flip
       title="Connect anything by address"
       visual={
         <Shot caption="trivago's own view, running in the chat.">
@@ -294,7 +213,6 @@ function Open() {
   return (
     <Section
       id="open"
-      flip
       title="Yours, and open"
       visual={
         <figure className="landing-command">
@@ -324,93 +242,12 @@ function Open() {
   )
 }
 
-function Wallet({ wallet }: { readonly wallet: string }) {
-  return (
-    <Section
-      id="wallet"
-      title="Goblin Wallet, the wallet your goblin pays from"
-      visual={
-        <figure className="landing-shot">
-          <ul className="landing-receipts">
-            <li>
-              <b>$0.007</b>
-              <span>A web search, paid to Exa over x402 from the allowance.</span>
-              <a href={TX.search} rel="noopener">
-                Basescan
-              </a>
-            </li>
-            <li>
-              <b>$1.00</b>
-              <span>To a new address, after its owner approved it.</span>
-              <a href={TX.approved} rel="noopener">
-                Basescan
-              </a>
-            </li>
-            <li>
-              <b>$2.00</b>
-              <span>Moved from Base to Tempo, to top up Mercator.</span>
-              <a href={TX.bridge} rel="noopener">
-                Basescan
-              </a>
-            </li>
-          </ul>
-          <figcaption>Paid by goblin on Base mainnet, 12 October 2026.</figcaption>
-        </figure>
-      }
-    >
-      <p>
-        Its own app, where you fund your account with USDC, set what your agent may spend, and approve anything new. Gas
-        is paid in USDC too, so you never need ETH. Any MCP client can pay with it, within your limits.
-      </p>
-      <p>
-        <a className="landing-link" href={wallet}>
-          Open Goblin Wallet
-        </a>
-      </p>
-    </Section>
-  )
-}
-
-function Pricing({ plans }: { readonly plans: readonly PublicPlan[] }) {
-  return (
-    <Section
-      id="pricing"
-      flip
-      title="One plan, two ways to pay"
-      visual={
-        <ul className="sub-choices landing-plans">
-          {plans.map((plan) => {
-            const choice = choiceOf(plan)
-            return (
-              <li key={plan.id} className="sub-choice">
-                <div className="sub-choice-head">
-                  <h3 className="sub-choice-name">{choice.name}</h3>
-                </div>
-                <p className="sub-choice-price">
-                  <span className="sub-choice-figure">{choice.price}</span>
-                  <span className="sub-choice-per">{choice.per}</span>
-                </p>
-                <p className="sub-choice-suits">{choice.suits}</p>
-              </li>
-            )
-          })}
-        </ul>
-      }
-    >
-      <p>
-        goblin Pro includes 800 Credits of models a day, routines, hand-overs and subagents. You pay in USDC from your
-        Goblin Wallet, and cancel there.
-      </p>
-    </Section>
-  )
-}
-
 function Close() {
   return (
     <section className="landing-close" data-tone="moss" aria-labelledby="landing-close-title">
       <div className="site-width landing-close-row">
         <h2 id="landing-close-title" className="site-heading">
-          Your agent. Your apps. Your money. Your rules.
+          Your agent. Your apps. Your rules.
         </h2>
         <SiteButton action={MEET} />
       </div>

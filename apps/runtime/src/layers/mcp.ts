@@ -4,7 +4,6 @@ import type * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
-import { type Entitlements, requirePlan } from '../billing/gates.ts'
 import { Channel } from '../channel/service.ts'
 import { Forbidden, GrantDenied, attempt, attemptSync } from '../http/errors.ts'
 import { type HeldCall, McpApprovalStore, argumentsHash } from '../mcp/approvals.ts'
@@ -50,10 +49,10 @@ import { mcpReporter } from '../telemetry/report.ts'
 // with their consumers (12). Every store is made once, here, and every MCP service once over them.
 
 /**
- * The plan the agent keeps, then current resident authority: what Events check before a subscription, a sweep, a
- * dispatch or a delivery, and what ingress checks before it takes a webhook.
+ * Current resident authority: what Events check before a subscription, a sweep, a dispatch or a delivery, and what
+ * ingress checks before it takes a webhook.
  */
-const eventsAuthority = Effect.andThen(requirePlan(), requireResident)
+const eventsAuthority = requireResident
 
 /** Held calls over their one store, sealed with the credential key. */
 export const approvalsOver = (store: McpApprovalStore) =>
@@ -274,12 +273,12 @@ const consumerPorts = (
 export const McpEventsLive: Layer.Layer<
   Events,
   never,
-  AgentInput | Db | Entitlements | Resident | SingleFlight | McpConnections | McpServers | Cipher | Channel | Skills
+  AgentInput | Db | Resident | SingleFlight | McpConnections | McpServers | Cipher | Channel | Skills
 > = Layer.effect(
   Events,
   Effect.gen(function* () {
     const input = yield* AgentInput
-    const context = yield* Effect.context<AgentInput | Entitlements | Resident | Channel | Skills>()
+    const context = yield* Effect.context<AgentInput | Resident | Channel | Skills>()
     const { env, userId } = input
     const servers = yield* McpServers
     const store = new SqliteEventStore(yield* Db)

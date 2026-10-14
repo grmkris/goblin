@@ -26,7 +26,7 @@ import { PersonaRegistry } from '../../../src/personas/registry.ts'
 import { appConversations } from '../../../src/storage/schema.ts'
 import { TopicsHandlers } from '../../../src/topics/api.ts'
 import { TopicRegistry } from '../../../src/topics/registry.ts'
-import { currentResident, database, plans, serve, served, stub } from './fixture.ts'
+import { currentResident, database, serve, served, stub } from './fixture.ts'
 import { unread } from '../../fake.ts'
 
 /**
@@ -59,10 +59,10 @@ const setupServices = (retooled: number[]) =>
 
 /**
  * The organizing groups (topics, personas, organize) as the agent serves them: lane D's services over real Topic,
- * Persona, receipt and Home stores on SQLite. The gate's plan and resident authority are the only fakes. Nothing here
+ * Persona, receipt and Home stores on SQLite. The gate's resident authority is the only fake. Nothing here
  * has an open chat to stop, an agent app or an MCP App, so Pi, Stop, the apps and the MCP host are never read.
  */
-export const organizing = (options: { readonly active?: boolean } = {}) => {
+export const organizing = () => {
   const db = database()
   db.insert(appConversations).values({ chatId: '1', piSession: '1', kind: 'main', role: 'primary', createdAt: 1 }).run()
   let sessions = 100
@@ -125,7 +125,6 @@ export const organizing = (options: { readonly active?: boolean } = {}) => {
           stub(Channel),
           catalog,
           Layer.succeed(Resident, resident.service),
-          plans(options.active),
           FlowEvents.layerWith((event) => Effect.sync(() => void flows.push(event))),
         ),
       ),

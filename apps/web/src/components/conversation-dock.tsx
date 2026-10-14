@@ -6,7 +6,6 @@ import { RotateCcwIcon } from 'lucide-react'
 import { modelQuery, usageQuery } from '../agent/queries.ts'
 import { useFollowed, useStoredStates } from '../approvals/hooks.ts'
 import { useConnectionLabels } from '../mcp/hooks.ts'
-import { useBilling } from '../account/hooks.ts'
 import { openInteractions, stillOpen, waitingOnOwner } from '../lib/interactions.ts'
 import type { Part } from '../lib/parts.ts'
 import { presenceOf } from '../lib/presence.ts'
@@ -21,7 +20,6 @@ import { InteractionCards } from './interaction-cards.tsx'
 import { ModelPicker } from './model-picker.tsx'
 import { SetupButton } from './topic-setup.tsx'
 import { FinishSetupRow } from './start/setup-cards.tsx'
-import { PLAN_REFUSAL, PlanNeededCard, usePlanNeeded } from './plan-needed.tsx'
 import { UsageIndicator } from './usage-indicator.tsx'
 import type { useConversation } from './use-conversation.ts'
 
@@ -139,7 +137,7 @@ function DockCards({
 }: {
   readonly queue: Parameters<typeof QueuedMessages>[0]['inputs']
   readonly notices: readonly string[]
-  /** What goblin needs before it can answer (a plan), or the quiet way back to a skipped Start (ADR 0048). */
+  /** The quiet way back to a skipped Start (ADR 0048). */
   readonly setup: ReactNode
   readonly open: boolean
   readonly waiting: ReturnType<typeof openInteractions>
@@ -177,29 +175,15 @@ function useDockStatus(conversation: ReturnType<typeof useConversation>, parts: 
   const waiting = useMemo(() => stillOpen(asked, states), [asked, states])
   const context = useMemo(() => contextTokens(projection?.messages ?? []), [projection])
   const named = useConnectionLabels()
-  const planNeeded = usePlanNeeded()
   const presence = presenceOf({
     status,
     projection,
     parts,
     named,
     waiting: waitingOnOwner(waiting, states),
-    // No plan stops goblin (ADR 0054), and so does a spent day.
-    exhausted: planNeeded || (usage !== undefined && budgetFraction(usage) >= 1),
-    planNeeded,
+    exhausted: usage !== undefined && (budgetFraction(usage) ?? 0) >= 1,
   })
-  return { running, usage, waiting, context, presence, planNeeded }
-}
-
-/**
- * What stands before goblin can answer, in the dock, once the plan is read: without one (ADR 0054), the way to pick one
- * or to fund a day pass that could not pay; with one, the quiet way back to a skipped Start (ADR 0048). Nothing while
- * the plan is still read or could not be.
- */
-function DockSetup() {
-  const { state } = useBilling()
-  if (state === undefined) return null
-  return state.active ? <FinishSetupRow /> : <PlanNeededCard />
+  return { running, usage, waiting, context, presence }
 }
 
 /**
@@ -241,15 +225,12 @@ export function ConversationDock({
   const personas = usePersonas()
   const { projection, notice, send, stop, removeQueued, report } = conversation
   const sendOwn = withSharedContext(useSharedContext(id), send, onStartThread)
-  const { running, usage, waiting, context, presence, planNeeded } = useDockStatus(conversation, parts)
+  const { running, usage, waiting, context, presence } = useDockStatus(conversation, parts)
   return (
     <div className="chat-dock" ref={ref} data-app-cover>
       <DockCards
-        // The plan card says why goblin does not answer; the refusal would only repeat it.
-        notices={[notice, projection?.queueNotice ?? '', ...notices].filter(
-          (text) => !(planNeeded && text.startsWith(PLAN_REFUSAL)),
-        )}
-        setup={closed === undefined && <DockSetup />}
+        notices={[notice, projection?.queueNotice ?? '', ...notices]}
+        setup={closed === undefined && <FinishSetupRow />}
         open={closed === undefined}
         waiting={waiting}
         id={id}

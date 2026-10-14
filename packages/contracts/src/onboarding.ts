@@ -49,9 +49,9 @@ const OnboardingWallet = Schema.Struct({
   payFrom: Schema.optional(Schema.Struct({ address: Short, chain: Short, token: Short, held: Schema.optional(Short) })),
   /** The stablecoin dollars the wallet holds on every chain it reads; absent until its status can be read. */
   dollars: Schema.optional(Short),
-  /** The dollars Start asks the wallet to hold: `0` since goblin Pro is a subscription, not a held sum (ADR 0054). */
+  /** The dollars Start asks the wallet to hold: `0`, anything at all. */
   needs: Short,
-  /** Ready, and holding at least `needs` when that is above `0`, else anything at all (ADR 0054: no free plan). */
+  /** Ready, and holding at least `needs` when that is above `0`, else anything at all. */
   funded: Schema.Boolean,
 })
 

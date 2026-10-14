@@ -29,18 +29,7 @@ import { Skills } from '../../../src/skills/service.ts'
 import { Conversations, Moves, type ThreadAnchor } from '../../../src/chats/service.ts'
 import { appChatOperations, appConversations } from '../../../src/storage/schema.ts'
 import { callOwner } from '../../owner-client.ts'
-import {
-  currentResident,
-  type Database,
-  database,
-  json,
-  plans,
-  post,
-  serve,
-  served,
-  sqliteDb,
-  stub,
-} from './fixture.ts'
+import { currentResident, type Database, database, json, post, serve, served, sqliteDb, stub } from './fixture.ts'
 import { fake } from '../../fake.ts'
 
 const view = (id: string, extra: Partial<ConversationView> = {}): ConversationView => ({
@@ -186,7 +175,7 @@ const services = (calls: Calls, personas: readonly PersonaView[]) =>
     // No message here carries files or App context, so neither is read.
     stub(Files),
     stub(Apps),
-    stub(Budget, { require: () => Effect.void, admit: () => Effect.void }),
+    stub(Budget, { require: () => Effect.void }),
     stub(Models, { current: Effect.succeed('fixture-model') }),
     stub(RoutineRuns, { session: () => Effect.undefined }),
     stub(RoutineControl, { answer: () => Effect.succeed(false) }),
@@ -247,7 +236,6 @@ const fixture = (options: { readonly personas?: readonly PersonaView[] } = {}) =
     stub(Conversations, { ...registryReads(), ...registryWrites(db, calls) }),
     stub(Moves, { move: (chat, input) => Effect.succeed({ ...input, chat, state: 'settled', thread: NEW }) }),
     Layer.succeed(Resident, resident.service),
-    plans(),
     Layer.succeed(AgentInput, instance(harness, calls)),
   )
   // The chat directory and the chat operations as the agent builds them, over the core services and the stubs above.

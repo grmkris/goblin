@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { ResidentLive } from '../../../src/layers/core.ts'
 import { ResidentHandlers } from '../../../src/mcp/resident-api.ts'
 import { Events, Resident } from '../../../src/mcp/service.ts'
-import { type Database, database, get, plans, post, serve, served, sqliteDb, stub } from './fixture.ts'
+import { type Database, database, get, post, serve, served, sqliteDb, stub } from './fixture.ts'
 
 /** Resident authority on SQLite (lane M's layer), counting the renewals asked of it from outside. */
 const countingResident = (db: Database, renewals: number[]) =>
@@ -30,7 +30,7 @@ describe('owner admission', () => {
     const events = stub(Events, { disableServer: () => Effect.void })
     const { fetch } = serve(
       served([ResidentGroup], ResidentHandlers).pipe(
-        Layer.provide(Layer.mergeAll(countingResident(database(), renewals), events, plans())),
+        Layer.provide(Layer.mergeAll(countingResident(database(), renewals), events)),
       ),
     )
     expect((await fetch(get('/api/agent/resident'))).status).toBe(200)

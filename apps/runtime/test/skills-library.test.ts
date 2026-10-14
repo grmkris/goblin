@@ -7,8 +7,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { topicScope } from '../src/setup/scope.ts'
 import * as TestClock from 'effect/testing/TestClock'
 import { type AppError, NotFound } from '../src/http/errors.ts'
-import { Entitlements } from '../src/billing/gates.ts'
-import type { AccountPlan } from '../src/billing/reconcile.ts'
 import { mcpHost } from '../src/mcp/host.ts'
 import { skillsExtension } from '../src/pi/skills.ts'
 import { Setups } from '../src/setup/service.ts'
@@ -19,7 +17,6 @@ import { makeSkills } from '../src/skills/library.ts'
 import { Skills } from '../src/skills/service.ts'
 import { SKILLS_EXTENSION, type SkillEntry } from '../src/skills/protocol.ts'
 import { digestOf } from '../src/skills/verify.ts'
-import { fake } from './fake.ts'
 import { FixedProfiles } from './fixed-services.ts'
 import { knowledgeOver } from './knowledge-layer.ts'
 import { MemoryCredentials, MemoryGrants, MemoryLabels, MemoryRegistries } from './mcp/memory.ts'
@@ -242,11 +239,10 @@ describe("a skills library outside the Topic's setup (unit)", () => {
     const layer = Layer.mergeAll(
       knowledgeOver({ skills: library }),
       Layer.mock(Resident)({ require: () => Effect.void }),
-      Layer.mock(Entitlements)({ require: () => Effect.succeed(fake<AccountPlan>({ active: true })) }),
       Layer.mock(Setups)({ scope: (session: string) => Effect.sync(() => profiles.scope(session)) }),
     )
     const run = <A>(program: Effect.Effect<A, AppError, AgentServices>): Promise<A> =>
-      // SAFETY: skill_activate needs only the Skills, Resident, Entitlements and Setups services provided here.
+      // SAFETY: skill_activate needs only the Skills, Resident and Setups services provided here.
       Effect.runPromise(Effect.provide(program, layer) as Effect.Effect<A, AppError>)
     const activate = skillsExtension(run).tools?.find((tool) => tool.name === 'skill_activate')
     if (activate === undefined) throw new Error('skill_activate is not registered')

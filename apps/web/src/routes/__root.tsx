@@ -17,7 +17,6 @@ import { ShellNavigation } from '../components/shell/navigation.tsx'
 import { ShellFrame } from '../components/shell/shell.tsx'
 import { StartSplash } from '../components/start/splash.tsx'
 import { WorkspaceFeedProvider } from '../components/workspace-feed.tsx'
-import { useBilling } from '../account/hooks.ts'
 import { useSession } from '../auth/hooks.ts'
 import { useStartDecision } from '../onboarding/hooks.ts'
 import { startupImages } from '../lib/startup-images.ts'
@@ -60,7 +59,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   shellComponent: Document,
 })
 /** Pages that are part of signing in: no app navigation there. */
-const AUTH_PAGES = new Set(['/login', '/consent', '/subscribe', '/subscribe/success', '/terms', '/privacy', '/refunds'])
+const AUTH_PAGES = new Set(['/login', '/consent', '/terms', '/privacy'])
 
 function Root() {
   const router = useRouter()
@@ -88,7 +87,6 @@ type Place = 'start' | 'gated' | 'other'
  */
 function Shell({ children }: { readonly children: ReactNode }) {
   const { state } = useSession()
-  const billing = useBilling()
   const path = useRouterState({ select: (router) => router.location.pathname })
   // The shown matches, not the location: while Start loads, the page before it stays what is drawn, so its splash holds.
   const place = useRouterState({
@@ -111,7 +109,7 @@ function Shell({ children }: { readonly children: ReactNode }) {
         {start.kind === 'start' && <Navigate to="/start/$step" params={{ step: start.step }} replace />}
       </main>
     )
-  const enabled = state === 'signed-in' && billing.state?.active === true
+  const enabled = state === 'signed-in'
   return (
     <WorkspaceFeedProvider enabled={enabled}>
       <ShellNavigation>

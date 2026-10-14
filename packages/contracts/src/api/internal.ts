@@ -1,4 +1,3 @@
-import * as Context from 'effect/Context'
 import * as Schema from 'effect/Schema'
 import * as HttpApi from 'effect/http-api/HttpApi'
 import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
@@ -24,14 +23,8 @@ export const INTERNAL_PREFIX = '/internal'
 export const FORWARDED_HEADER = 'x-goblin-forwarded'
 
 /**
- * Whether the internal gate checks the account's plan before the endpoint runs (`InternalGate`): every internal
- * endpoint needs one except inspection, since reading your own agent never calls a model.
- */
-export const RequiresPlan = Context.Reference<boolean>('goblin/api/RequiresPlan', { defaultValue: () => true })
-
-/**
- * Admission to every internal endpoint, run by the agent before the handler: an owner forward is refused, then the
- * account's plan is checked unless the endpoint says otherwise (`RequiresPlan`). It never renews resident authority.
+ * Admission to every internal endpoint, run by the agent before the handler: an owner forward is refused. It never
+ * renews resident authority.
  * Its implementation lives in the runtime (`http/api/middleware.ts`); its error schema is every envelope.
  */
 export class InternalGate extends HttpApiMiddleware.Service<InternalGate>()('goblin/api/InternalGate', {
@@ -87,18 +80,6 @@ export const EventWebhookResult = Schema.Struct({
 export type EventWebhookResult = typeof EventWebhookResult.Type
 
 /**
- * A billing notice the Worker's renewals send the owner (ADR 0054): a reminder, a receipt, a failed or ended payment,
- * posted once per `id` in Personal and Activity. goblin's own words; nothing here comes from outside.
- */
-export const BillingNotice = Schema.Struct({
-  id: Schema.String.check(Schema.isPattern(/^billing:[\w:.-]{1,200}$/u)),
-  title: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
-  body: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(500))),
-  url: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(2048))),
-})
-export type BillingNotice = typeof BillingNotice.Type
-
-/**
  * What reaches the agent besides the owner. Paths are relative to the API's `/internal` prefix; every endpoint can
  * also answer the gate's failures, and `error` names the ones the endpoint itself produces.
  *
@@ -107,9 +88,7 @@ export type BillingNotice = typeof BillingNotice.Type
  * - `mcpEvents`: `POST /internal/mcp-events/:connectionId`, one connection's MCP Events webhook: its bytes and the
  *   headers that sign it.
  * - `inspect`: `POST /internal/inspect` with `{ query }`, /mcp's read-only inspection (ADR 0024). It answers the result
- *   of the query's kind (`InspectResult[kind]` in `../inspect.ts`), which the caller decodes; it needs no plan.
- * - `billingNotice`: `POST /internal/billing-notice`, a notice from the Worker's subscription renewals (ADR 0054); it
- *   needs no plan, since it may say that Pro ended.
+ *   of the query's kind (`InspectResult[kind]` in `../inspect.ts`), which the caller decodes.
  */
 export class InboundGroup extends HttpApiGroup.make('inbound').add(
   HttpApiEndpoint.post('ask', '/ask', {
@@ -129,11 +108,7 @@ export class InboundGroup extends HttpApiGroup.make('inbound').add(
     payload: Schema.Struct({ query: InspectQuery }),
     success: Schema.Unknown,
     error: [ApiErrors.notFound, ApiErrors.invalidInput],
-  }).annotate(RequiresPlan, false),
-  HttpApiEndpoint.post('billingNotice', '/billing-notice', {
-    payload: BillingNotice,
-    success: HttpApiSchema.NoContent,
-  }).annotate(RequiresPlan, false),
+  }),
 ) {}
 
 /** The agent's internal API, served by the agent beside `OwnerApi` and called only by the Worker. */

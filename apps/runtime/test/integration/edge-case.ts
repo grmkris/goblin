@@ -3,7 +3,7 @@ import { request as httpRequest } from 'node:http'
 import { expect } from 'vitest'
 import { eventsHookToken } from '../../src/mcp/events/route-token.ts'
 import { callOwner } from '../owner-client.ts'
-import { call, grantPlan, ownerFetch, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
+import { call, ownerFetch, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 
 const APP = 'https://goblin.test'
 const Detail = Schema.Struct({ error: Schema.Struct({ code: Schema.String, ref: Schema.optional(Schema.String) }) })
@@ -80,7 +80,6 @@ const write = (
  */
 export async function csrfCase(url: string): Promise<void> {
   const owner = await person(url)
-  await grantPlan(url, owner)
   const name = `Forged ${crypto.randomUUID().slice(0, 8)}`
   const topic = { name, operationId: crypto.randomUUID() }
   for (const headers of [
@@ -136,9 +135,8 @@ const hook = (url: string, path: string, headers: Record<string, string>, body: 
 
 /**
  * The agent's internal API from outside the Worker (`/internal/*`): nobody reaches it, signed in or not, whatever the
- * path says on the way. The Worker's own callers still do: an Events webhook with its route token reaches the agent,
- * which refuses it without a plan (402), and with one reaches ingress, which ends the subscription once resident
- * authority is off (410).
+ * path says on the way. The Worker's own callers still do: an Events webhook with its route token reaches the agent's
+ * ingress, which ends the subscription once resident authority is off (410).
  */
 export async function internalRefusalCase(url: string): Promise<void> {
   const outside = await ownerFetch(`${url}/internal/recent?limit=5`, { headers: { 'cf-ray': 'ray-internal' } })
@@ -154,8 +152,6 @@ export async function internalRefusalCase(url: string): Promise<void> {
       { 'x-mcp-subscription-id': 'remote-1', 'webhook-id': 'msg_1', 'webhook-timestamp': '0', 'webhook-signature': '' },
       '{}',
     )
-  expect(await refusalOf(await deliver())).toMatchObject({ status: 402, code: 'subscription_required' })
-  await grantPlan(url, owner)
   await callOwner(signedIn(url, owner), (api) => api.resident.set({ payload: { enabled: false } }))
   expect((await deliver()).status).toBe(410)
 }
@@ -185,7 +181,6 @@ function eventText(response: Response) {
  */
 export async function conversationEventsCase(url: string): Promise<void> {
   const owner = await person(url)
-  await grantPlan(url, owner)
   const stream = await call(url, owner, '/api/conversations/1/events')
   expect(stream.status).toBe(200)
   expect(stream.headers.get('content-type')).toBe('text/event-stream')

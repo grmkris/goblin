@@ -87,8 +87,8 @@ export const appResident = sqliteTable('app_resident', {
   revokedAt: integer('revoked_at'),
 })
 /**
- * What this agent spent on models per UTC day (`YYYY-MM-DD`): tokens, and thousandths of an estimated Token Plan
- * Credit, which the per-user budget counts (ADR 0026).
+ * The tokens this agent spent on models per UTC day (`YYYY-MM-DD`), which the daily cap counts. `milli_credits` is
+ * retired with Credits and unread until the migrations are squashed.
  */
 export const appUsageDaily = sqliteTable('app_usage_daily', {
   day: text('day').primaryKey().notNull(),

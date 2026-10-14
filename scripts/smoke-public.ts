@@ -2,8 +2,7 @@ import { internalChecks } from './smoke-edge.ts'
 
 /**
  * Production without a signed-in session: public health, admission, page, metadata, internal-route and canonical
- * redirect checks. Sign-up is invite-only, refused without the code, or open (owner, 2026-10-12: open; goblin Pro is the
- * one plan, with no free plan).
+ * redirect checks. Sign-up is invite-only, refused without the code, or open.
  */
 type Client = {
   readonly origin: string

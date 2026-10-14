@@ -1,34 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import type { BillingState, OnboardingView } from '@goblin/contracts'
+import type { OnboardingView } from '@goblin/contracts'
 import { type StartInputs, decideStart } from '../src/onboarding/hooks.ts'
 import { stateOf } from '../src/onboarding/queries.ts'
 
-const plan: BillingState = {
-  active: true,
-  source: 'override',
-  until: null,
-  dailyCredits: 800,
-  status: 'active',
-  hasCustomer: false,
-  cancelAtPeriodEnd: false,
-  mode: null,
-  plan: 'pro',
-  catalog: [],
-}
-
-/** A signed-in owner with an active plan on a page that waits for Start, Start's state not read yet. */
+/** A signed-in owner on a page that waits for Start, Start's state not read yet. */
 const inputs = (change: Partial<StartInputs> = {}): StartInputs => ({
   gated: true,
   session: 'signed-in',
-  billing: { state: plan, error: '' },
   start: { data: undefined, failed: false },
   ...change,
 })
 
 describe("the shell's Start decision (ADR 0048)", () => {
-  it('holds a gated page on the splash until the session, the plan and Start are known', () => {
+  it('holds a gated page on the splash until the session and Start are known', () => {
     expect(decideStart(inputs({ session: 'checking' }))).toEqual({ kind: 'wait' })
-    expect(decideStart(inputs({ billing: { state: undefined, error: '' } }))).toEqual({ kind: 'wait' })
     expect(decideStart(inputs())).toEqual({ kind: 'wait' })
   })
 
@@ -49,29 +34,10 @@ describe("the shell's Start decision (ADR 0048)", () => {
     expect(decideStart(inputs({ gated: false, session: 'checking' }))).toEqual({ kind: 'show' })
   })
 
-  it("leaves the page's own gate to sign in, report or subscribe, and lets the owner in when Start cannot be read", () => {
+  it("leaves the page's own gate to sign in, and lets the owner in when Start cannot be read", () => {
     expect(decideStart(inputs({ session: 'signed-out' }))).toEqual({ kind: 'show' })
     expect(decideStart(inputs({ session: 'unavailable' }))).toEqual({ kind: 'show' })
-    const done = { data: { status: 'done' as const }, failed: false }
-    expect(decideStart(inputs({ start: done, billing: { state: undefined, error: 'failed · ref 1' } }))).toEqual({
-      kind: 'show',
-    })
-    expect(decideStart(inputs({ start: done, billing: { state: { ...plan, active: false }, error: '' } }))).toEqual({
-      kind: 'show',
-    })
     expect(decideStart(inputs({ start: { data: undefined, failed: true } }))).toEqual({ kind: 'show' })
-  })
-
-  it('sends an owner without a plan to an open Start: choosing goblin Pro is one of its steps', () => {
-    const open = { data: { status: 'open' as const, step: 'wallet' as const }, failed: false }
-    expect(decideStart(inputs({ start: open, billing: { state: { ...plan, active: false }, error: '' } }))).toEqual({
-      kind: 'start',
-      step: 'wallet',
-    })
-    expect(decideStart(inputs({ start: open, billing: { state: undefined, error: '' } }))).toEqual({
-      kind: 'start',
-      step: 'wallet',
-    })
   })
 })
 

@@ -115,8 +115,6 @@ function critic(answers: Readonly<Record<string, number>>) {
     budget: Budget.of({
       today: () => Effect.die('the critic never reads the day'),
       require: () => Effect.void,
-      admit: () => Effect.die('the critic never admits a turn'),
-      open: () => Effect.die('the critic never opens a turn'),
       record: () => Effect.void,
     }),
     clef: Clef.of({

@@ -8,8 +8,6 @@ import type {
 } from '@goblin/contracts'
 import { ONBOARDING_STEPS, type OnboardingChange, type OnboardingConnect } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
-import * as Option from 'effect/Option'
-import { Entitlements } from '../billing/gates.ts'
 import { Budget } from '../budget.ts'
 import { Chats } from '../chats/service.ts'
 import { epochSeconds } from '../clock.ts'
@@ -92,7 +90,7 @@ type Wallet = {
 
 /**
  * Ready once its status reads with no setup left and an address goblin pays from; funded once ready and holding at
- * least `needs` when that is above 0, else anything at all (Start asks `0`: there is no free plan, ADR 0054).
+ * least `needs` when that is above 0, else anything at all.
  */
 const walletState = (found: Found, status: WalletStatus | null, needs: number): Wallet => {
   const dollars = status === null ? undefined : stablecoinDollars(status)
@@ -102,12 +100,11 @@ const walletState = (found: Found, status: WalletStatus | null, needs: number): 
 }
 
 /** Each step's state, in Start's order: the wallet's from the wallet, the others from what the owner did. */
-const stepsOf = (record: OnboardingRecord | undefined, wallet: Wallet, subscribed: boolean) => {
+const stepsOf = (record: OnboardingRecord | undefined, wallet: Wallet) => {
   const went = (step: OnboardingStep) => record?.steps.includes(step) === true
   const done: Record<OnboardingStep, boolean> = {
     welcome: went('welcome'),
-    // The wallet's step ends with goblin Pro chosen and signed in it (ADR 0054): without Pro goblin does not answer.
-    wallet: wallet.funded && subscribed,
+    wallet: wallet.funded,
     services: went('services'),
     goblin: record?.kickoffAt !== undefined || went('goblin'),
   }
@@ -158,20 +155,16 @@ export const onboardingView = Effect.gen(function* () {
   const grants = yield* McpGrants.use((owner) => owner.list())
   const walletFound = find(servers, grants, 'wallet')
   const mercator = find(servers, grants, 'mercator')
-  // goblin answers only with goblin Pro, a day pass or monthly paid from the wallet (ADR 0054); the wallet holds no
-  // set sum any more, so it is funded by anything it holds.
-  const plan = yield* Entitlements.use((plans) => plans.state()).pipe(Effect.option)
-  const subscribed = Option.isSome(plan) && plan.value.active
   const needs = 0
   const wallet = walletState(walletFound, yield* walletStatus(walletFound), needs)
-  const complete = wallet.funded && subscribed
+  const complete = wallet.funded
   if (record?.status === undefined && complete) yield* keepDone
   const others = servers.filter(
     (each) => each.status === 'connected' && each.profile?.id !== 'wallet' && each.profile?.id !== 'mercator',
   )
   const view: OnboardingView = {
     status: record?.status ?? (complete ? 'done' : 'open'),
-    steps: stepsOf(record, wallet, subscribed),
+    steps: stepsOf(record, wallet),
     wallet: walletOf(walletFound, wallet, needs, env.APP_URL),
     mercator: server(mercator),
     connected: others.length,

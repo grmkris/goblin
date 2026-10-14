@@ -3,7 +3,6 @@ import type { PiHarness } from 'agents/harness/pi'
 import * as Context from 'effect/Context'
 import type { AgentApps } from '../agent-apps/engine.ts'
 import type { Applied } from '../agent-model.ts'
-import type { EntitlementPolicy } from '../billing/gates.ts'
 import type { MoverPorts } from '../chats/mover.ts'
 import type { RuntimeEnv } from '../env.ts'
 import type { PersonaTurnKit } from '../organize/kit.ts'
@@ -17,7 +16,7 @@ import type { Instrument } from './instrument.ts'
 
 /**
  * What the agent's programs and services need from its Durable Object instance, as one record: its storage and env,
- * the Pi pieces its constructor made, and the callbacks into the instance (schedules, the plan policy). A program
+ * the Pi pieces its constructor made, and the callbacks into the instance (schedules). A program
  * reads it instead of taking these as arguments. Built once per runtime from the instance (agent.ts).
  */
 export interface AgentInputs {
@@ -51,7 +50,6 @@ export interface AgentInputs {
   readonly telemetry: RunTelemetry
   /** Move to thread (ADR 0034): hands the moved turn's relays to the Thread, and the boundaries tests stop at. */
   readonly moves: MoverPorts
-  readonly entitlements: EntitlementPolicy
   /** How the bridge's programs and the change handlers are wrapped (instrument.ts). */
   readonly instrument: Instrument
 }

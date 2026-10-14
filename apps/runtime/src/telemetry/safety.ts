@@ -28,7 +28,6 @@ const FAILURES: Readonly<Record<string, string>> = {
   PayloadTooLarge: 'Input exceeds the size limit.',
   ResidentInactive: 'Resident authority inactive.',
   BudgetExhausted: 'Budget exhausted.',
-  SubscriptionRequired: 'Subscription required.',
   NeedsAuthorization: 'Connection authorization required.',
   ScopeRequired: 'Connection needs more access.',
   UpstreamMcp: 'Remote MCP request failed.',
@@ -77,7 +76,6 @@ export const expectedFailure = (code: unknown): boolean => {
     'GrantDenied',
     'ResidentInactive',
     'BudgetExhausted',
-    'SubscriptionRequired',
     'capability_off',
     'not_in_topic',
   ].includes(safe)

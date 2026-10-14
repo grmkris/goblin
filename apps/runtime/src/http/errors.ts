@@ -25,7 +25,6 @@ export {
   PayloadTooLarge,
   ResidentInactive,
   ScopeRequired,
-  SubscriptionRequired,
   Unauthenticated,
   UpstreamMcp,
 } from '@goblin/contracts/api'

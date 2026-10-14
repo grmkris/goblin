@@ -23,7 +23,7 @@ import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
 import type { AgentServices } from '../src/layers/index.ts'
 import { chatDatabase, durable } from './chats-sqlite.ts'
 import { FixedProfiles } from './fixed-services.ts'
-import { plans, sqliteDb, stub } from './http/api/fixture.ts'
+import { sqliteDb, stub } from './http/api/fixture.ts'
 import { MemoryCredentials, MemoryGrants, MemoryLabels, MemoryRegistries } from './mcp/memory.ts'
 import { declaresUrlElicitation, lowLevelServer } from './mcp/low-level-server.ts'
 import { executeTool, inConversation } from './pi-tool.ts'
@@ -154,7 +154,7 @@ const host = mcpHost({
 })
 /** Resident authority that is always current. */
 const resident = stub(Resident, { require: () => Effect.void })
-/** Whether the notes server's event catalog can be read now (a plan, a signed-in connection, a server that answers). */
+/** Whether the notes server's event catalog can be read now (a signed-in connection, a server that answers). */
 const catalog = { readable: true }
 const STREAMS = Array.from({ length: 70 }, (_, index) => ({
   name: `notes.changed.${String(index)}`,
@@ -180,7 +180,7 @@ const scopes: Readonly<Record<string, SetupScope>> = {
   '9': work({ mcpServers: [{ connectionId: 'notes', tools: ['write'] }] }),
   '10': scopeOf([off('server', 'notes')], false),
 }
-/** The tools' services over the host and the fixed switches above, always resident, on an active plan. */
+/** The tools' services over the host and the fixed switches above, always resident. */
 const profiles = new FixedProfiles(scopes)
 const urlRequests = new McpUrlRequestStore(
   durable(chatDatabase().db),
@@ -209,7 +209,7 @@ const layer = host.pipe(
       sqliteDb(chatDatabase().db),
     ),
   ),
-  Layer.merge(Layer.mergeAll(resident, events, plans())),
+  Layer.merge(Layer.mergeAll(resident, events)),
 )
 const run = <A>(program: Effect.Effect<A, AppError, AgentServices>): Promise<A> =>
   // SAFETY: mcp_call and mcp_list need only the MCP, resident authority and capability services provided here.

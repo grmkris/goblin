@@ -1,6 +1,5 @@
 // First-run Start's ways back (ADR 0048): a quiet row in the chat for an owner who skipped Start with something left,
-// Settings' card and Activity's checklist. What goblin needs before it answers, a plan, is the plan card's
-// (`plan-needed.tsx`). None of them asks the model anything.
+// Settings' card and Activity's checklist. None of them asks the model anything.
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import type { OnboardingStep, OnboardingView } from '@goblin/contracts'

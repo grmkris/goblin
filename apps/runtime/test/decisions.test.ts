@@ -35,7 +35,6 @@ type Mode = 'ok' | 'budget' | 'resident' | 'unavailable' | 'malformed' | 'missin
 function critic(mode: Mode = 'ok') {
   const reported: AuxCall[] = []
   const charged: number[] = []
-  const models = new Set<string | undefined>()
   let calls = 0
   const deps: CriticDeps = {
     report: (call) => void reported.push(call),
@@ -46,13 +45,7 @@ function critic(mode: Mode = 'ok') {
     budget: Budget.of({
       today: () => Effect.die('the critic never reads the day'),
       require: () => (mode === 'budget' ? Effect.fail(new BudgetExhausted({ limit: 0, resetsAt: 0 })) : Effect.void),
-      admit: () => Effect.die('the critic never admits a turn'),
-      open: () => Effect.die('the critic never opens a turn'),
-      record: (use, _now, model) =>
-        Effect.sync(() => {
-          models.add(model)
-          charged.push(use.input)
-        }),
+      record: (use) => Effect.sync(() => void charged.push(use.input)),
     }),
     clef: Clef.of({
       available: mode !== 'unavailable',
@@ -67,7 +60,7 @@ function critic(mode: Mode = 'ok') {
   }
   const run = (judged: Judgment) => Effect.runPromise(judge(deps, judged))
   const failure = (judged: Judgment) => Effect.runPromise(Effect.flip(judge(deps, judged)))
-  return { run, failure, reported, charged, models, calls: () => calls }
+  return { run, failure, reported, charged, calls: () => calls }
 }
 
 describe('the typed decision critic (ADR 0031)', () => {
@@ -89,7 +82,6 @@ describe('the typed decision critic (ADR 0031)', () => {
     })
     expect(f.calls()).toBe(1)
     expect(f.charged).toEqual([1000])
-    expect([...f.models]).toEqual(['clef'])
     expect(f.reported[0]?.message).toMatchObject({ model: 'cloudflare/clef', stopReason: 'stop' })
     expect(JSON.stringify(f.reported)).not.toContain('useful new update')
   })

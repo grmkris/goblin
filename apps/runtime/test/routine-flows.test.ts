@@ -5,8 +5,6 @@ import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Entitlements } from '../src/billing/gates.ts'
-import type { AccountPlan } from '../src/billing/reconcile.ts'
 import { Budget } from '../src/budget.ts'
 import { ChatId, SessionId } from '../src/chats/directory.ts'
 import { Chats, Conversations, type RoutineReport } from '../src/chats/service.ts'
@@ -35,17 +33,6 @@ import { chatDatabase, durable } from './chats-sqlite.ts'
 import { stub } from './http/api/fixture.ts'
 import { EVERYTHING, PERSONAL_TOPIC } from '@goblin/contracts'
 
-const PLAN: AccountPlan = {
-  active: true,
-  plan: 'pro',
-  source: 'override',
-  billing: null,
-  until: null,
-  dailyCredits: 800,
-  status: 'active',
-  hasCustomer: false,
-  cancelAtPeriodEnd: false,
-}
 const DEFINITION: RoutineDefinition = {
   title: 'Daily',
   trigger: { kind: 'cron', expression: '0 9 * * *' },
@@ -82,13 +69,10 @@ const toPersona = (persona: number, revision: number): RoutineDefinition['handTo
 
 /**
  * The routines' programs over the real routine and Persona stores on SQLite, one confirmed active routine (handed to
- * Goblin, or to the Persona Worker with `persona`), and flow events captured. The plan and the budget answer as `gate`
+ * Goblin, or to the Persona Worker with `persona`), and flow events captured. The budget answers as `gate`
  * says; Pi's start only names the session, and the starts and reports are kept.
  */
-const fixture = (
-  gate: { plan?: Effect.Effect<AccountPlan, Internal>; budget?: Effect.Effect<void, AppError> } = {},
-  persona = false,
-) => {
+const fixture = (gate: { budget?: Effect.Effect<void, AppError> } = {}, persona = false) => {
   const { db, close } = chatDatabase()
   closes.push(close)
   const sqlite = durable(db)
@@ -121,11 +105,6 @@ const fixture = (
     Layer.succeed(Routines, routinesOf(routines)),
     Layer.succeed(RoutineRuns, routineRunsOf(runs)),
     FlowEvents.layerWith((event) => Effect.sync(() => void flows.push(event))),
-    Layer.succeed(Entitlements, {
-      state: () => Effect.succeed(PLAN),
-      require: () => gate.plan ?? Effect.succeed(PLAN),
-      payDay: () => Effect.succeed('settled'),
-    }),
     stub(Resident, { require: () => Effect.void }),
     stub(Budget, { require: () => gate.budget ?? Effect.void }),
     stub(Models, { current: Effect.succeed('model-a') }),
@@ -194,7 +173,7 @@ describe('routine flows', () => {
     const skipped = await spent.run(admit(spent.firing('routine:rt_1:2')))
     expect(skipped.state).toBe('skipped')
     expect(spent.flows).toMatchObject([{ flow: 'routine_fire', status: 'refused' }])
-    const down = fixture({ plan: Effect.fail(new Internal({ reason: 'billing storage unavailable' })) })
+    const down = fixture({ budget: Effect.fail(new Internal({ reason: 'usage storage unavailable' })) })
     await expect(down.run(admit(down.firing('routine:rt_1:3')))).rejects.toMatchObject({ _tag: 'Internal' })
     expect(down.flows).toMatchObject([{ flow: 'routine_fire', status: 'error', errorType: 'Internal' }])
   })

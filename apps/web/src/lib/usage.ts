@@ -14,6 +14,6 @@ export function contextTokens(messages: readonly ChatMessage[]): number | undefi
   return undefined
 }
 
-/** The share of today's budget spent, 0 to 1. */
-export const budgetFraction = (usage: UsageToday): number =>
-  usage.limit <= 0 ? 1 : Math.min(1, Math.max(0, usage.used / usage.limit))
+/** The share of today's capped tokens spent, 0 to 1; undefined when the deployment sets no cap. */
+export const budgetFraction = (usage: UsageToday): number | undefined =>
+  usage.limit === null ? undefined : usage.limit <= 0 ? 1 : Math.min(1, Math.max(0, usage.used / usage.limit))

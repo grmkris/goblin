@@ -1,14 +1,12 @@
 import { InternalApi } from '@goblin/contracts/internal'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
-import { postBillingNotice } from '../billing/notice.ts'
 import { Inspection } from '../inspect/service.ts'
 import { Events } from '../mcp/service.ts'
 import { askClient, recentOwnerMessages } from './program.ts'
 
 /**
  * The internal API's `inbound` group: what the Worker brings the agent after its own check (a client's bearer token, a
- * hook's route token). The internal gate has already refused an owner forward and checked the plan where the endpoint
- * needs one.
+ * hook's route token). The internal gate has already refused an owner forward.
  */
 export const InboundHandlers = HttpApiBuilder.group(InternalApi, 'inbound', (handlers) =>
   handlers
@@ -26,6 +24,5 @@ export const InboundHandlers = HttpApiBuilder.group(InternalApi, 'inbound', (han
         }),
       ),
     )
-    .handle('inspect', ({ payload }) => Inspection.use((inspection) => inspection.run(payload.query)))
-    .handle('billingNotice', ({ payload }) => postBillingNotice(payload)),
+    .handle('inspect', ({ payload }) => Inspection.use((inspection) => inspection.run(payload.query))),
 )

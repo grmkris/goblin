@@ -8,7 +8,7 @@ import { organizing } from './organizing.ts'
 
 /**
  * The owner API as the agent serves it, through the Topics group: the reference every area's test copies, over real
- * Topic and receipt stores on SQLite, with the plan and resident authority the only fakes.
+ * Topic and receipt stores on SQLite, with the resident authority the only fake.
  */
 const fixture = organizing
 
@@ -73,13 +73,6 @@ describe('the owner API served by the agent', () => {
     const archive = await fetch(json('PATCH', '/api/topics/1', { archived: true }))
     expect(archive.status).toBe(400)
     expect(await archive.json()).toMatchObject({ error: { code: 'invalid_input', reason: 'personal_topic' } })
-  })
-
-  it('admits an owner without a plan: the gate reads none, so Start and Settings work before Pro (ADR 0054)', async () => {
-    const { fetch, resident } = fixture({ active: false })
-    const response = await fetch(post('/api/topics', { name: 'Work', operationId: 'op-1' }))
-    expect(response.status).toBe(201)
-    expect(resident.renewals).toHaveLength(1)
   })
 
   it('answers every path that is no endpoint with the 404 envelope, quoting the reference', async () => {

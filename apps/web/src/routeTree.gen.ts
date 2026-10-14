@@ -15,9 +15,7 @@ import { Route as ConnectionsRouteImport } from './routes/connections'
 import { Route as ConsentRouteImport } from './routes/consent'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as RefundsRouteImport } from './routes/refunds'
 import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as SubscribeRouteImport } from './routes/subscribe'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as ThreadsRouteImport } from './routes/threads'
@@ -28,7 +26,6 @@ import { Route as CChatIdRouteImport } from './routes/c.$chatId'
 import { Route as PIdRouteImport } from './routes/p.$id'
 import { Route as StartIndexRouteImport } from './routes/start.index'
 import { Route as StartStepRouteImport } from './routes/start.$step'
-import { Route as SubscribeSuccessRouteImport } from './routes/subscribe.success'
 import { Route as ConnectionsConnectionIdAppRouteImport } from './routes/connections_.$connectionId.app'
 
 const IndexRoute = IndexRouteImport.update({
@@ -61,19 +58,9 @@ const PrivacyRoute = PrivacyRouteImport.update({
   path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RefundsRoute = RefundsRouteImport.update({
-  id: '/refunds',
-  path: '/refunds',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SubscribeRoute = SubscribeRouteImport.update({
-  id: '/subscribe',
-  path: '/subscribe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TasksRoute = TasksRouteImport.update({
@@ -126,11 +113,6 @@ const StartStepRoute = StartStepRouteImport.update({
   path: '/start/$step',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SubscribeSuccessRoute = SubscribeSuccessRouteImport.update({
-  id: '/success',
-  path: '/success',
-  getParentRoute: () => SubscribeRoute,
-} as any)
 const ConnectionsConnectionIdAppRoute =
   ConnectionsConnectionIdAppRouteImport.update({
     id: '/connections_/$connectionId/app',
@@ -145,9 +127,7 @@ export interface FileRoutesByFullPath {
   '/consent': typeof ConsentRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
-  '/refunds': typeof RefundsRoute
   '/settings': typeof SettingsRoute
-  '/subscribe': typeof SubscribeRouteWithChildren
   '/tasks': typeof TasksRoute
   '/terms': typeof TermsRoute
   '/threads': typeof ThreadsRoute
@@ -156,7 +136,6 @@ export interface FileRoutesByFullPath {
   '/c/$chatId': typeof CChatIdRoute
   '/p/$id': typeof PIdRoute
   '/start/$step': typeof StartStepRoute
-  '/subscribe/success': typeof SubscribeSuccessRoute
   '/apps/': typeof AppsIndexRoute
   '/start/': typeof StartIndexRoute
   '/connections/$connectionId/app': typeof ConnectionsConnectionIdAppRoute
@@ -168,9 +147,7 @@ export interface FileRoutesByTo {
   '/consent': typeof ConsentRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
-  '/refunds': typeof RefundsRoute
   '/settings': typeof SettingsRoute
-  '/subscribe': typeof SubscribeRouteWithChildren
   '/tasks': typeof TasksRoute
   '/terms': typeof TermsRoute
   '/threads': typeof ThreadsRoute
@@ -179,7 +156,6 @@ export interface FileRoutesByTo {
   '/c/$chatId': typeof CChatIdRoute
   '/p/$id': typeof PIdRoute
   '/start/$step': typeof StartStepRoute
-  '/subscribe/success': typeof SubscribeSuccessRoute
   '/apps': typeof AppsIndexRoute
   '/start': typeof StartIndexRoute
   '/connections/$connectionId/app': typeof ConnectionsConnectionIdAppRoute
@@ -192,9 +168,7 @@ export interface FileRoutesById {
   '/consent': typeof ConsentRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
-  '/refunds': typeof RefundsRoute
   '/settings': typeof SettingsRoute
-  '/subscribe': typeof SubscribeRouteWithChildren
   '/tasks': typeof TasksRoute
   '/terms': typeof TermsRoute
   '/threads': typeof ThreadsRoute
@@ -203,7 +177,6 @@ export interface FileRoutesById {
   '/c/$chatId': typeof CChatIdRoute
   '/p/$id': typeof PIdRoute
   '/start/$step': typeof StartStepRoute
-  '/subscribe/success': typeof SubscribeSuccessRoute
   '/apps/': typeof AppsIndexRoute
   '/start/': typeof StartIndexRoute
   '/connections_/$connectionId/app': typeof ConnectionsConnectionIdAppRoute
@@ -217,9 +190,7 @@ export interface FileRouteTypes {
     | '/consent'
     | '/login'
     | '/privacy'
-    | '/refunds'
     | '/settings'
-    | '/subscribe'
     | '/tasks'
     | '/terms'
     | '/threads'
@@ -228,7 +199,6 @@ export interface FileRouteTypes {
     | '/c/$chatId'
     | '/p/$id'
     | '/start/$step'
-    | '/subscribe/success'
     | '/apps/'
     | '/start/'
     | '/connections/$connectionId/app'
@@ -240,9 +210,7 @@ export interface FileRouteTypes {
     | '/consent'
     | '/login'
     | '/privacy'
-    | '/refunds'
     | '/settings'
-    | '/subscribe'
     | '/tasks'
     | '/terms'
     | '/threads'
@@ -251,7 +219,6 @@ export interface FileRouteTypes {
     | '/c/$chatId'
     | '/p/$id'
     | '/start/$step'
-    | '/subscribe/success'
     | '/apps'
     | '/start'
     | '/connections/$connectionId/app'
@@ -263,9 +230,7 @@ export interface FileRouteTypes {
     | '/consent'
     | '/login'
     | '/privacy'
-    | '/refunds'
     | '/settings'
-    | '/subscribe'
     | '/tasks'
     | '/terms'
     | '/threads'
@@ -274,7 +239,6 @@ export interface FileRouteTypes {
     | '/c/$chatId'
     | '/p/$id'
     | '/start/$step'
-    | '/subscribe/success'
     | '/apps/'
     | '/start/'
     | '/connections_/$connectionId/app'
@@ -287,9 +251,7 @@ export interface RootRouteChildren {
   ConsentRoute: typeof ConsentRoute
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
-  RefundsRoute: typeof RefundsRoute
   SettingsRoute: typeof SettingsRoute
-  SubscribeRoute: typeof SubscribeRouteWithChildren
   TasksRoute: typeof TasksRoute
   TermsRoute: typeof TermsRoute
   ThreadsRoute: typeof ThreadsRoute
@@ -347,25 +309,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/refunds': {
-      id: '/refunds'
-      path: '/refunds'
-      fullPath: '/refunds'
-      preLoaderRoute: typeof RefundsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/settings': {
       id: '/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/subscribe': {
-      id: '/subscribe'
-      path: '/subscribe'
-      fullPath: '/subscribe'
-      preLoaderRoute: typeof SubscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tasks': {
@@ -438,13 +386,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StartStepRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/subscribe/success': {
-      id: '/subscribe/success'
-      path: '/success'
-      fullPath: '/subscribe/success'
-      preLoaderRoute: typeof SubscribeSuccessRouteImport
-      parentRoute: typeof SubscribeRoute
-    }
     '/connections_/$connectionId/app': {
       id: '/connections_/$connectionId/app'
       path: '/connections/$connectionId/app'
@@ -455,18 +396,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface SubscribeRouteChildren {
-  SubscribeSuccessRoute: typeof SubscribeSuccessRoute
-}
-
-const SubscribeRouteChildren: SubscribeRouteChildren = {
-  SubscribeSuccessRoute: SubscribeSuccessRoute,
-}
-
-const SubscribeRouteWithChildren = SubscribeRoute._addFileChildren(
-  SubscribeRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
@@ -474,9 +403,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConsentRoute: ConsentRoute,
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
-  RefundsRoute: RefundsRoute,
   SettingsRoute: SettingsRoute,
-  SubscribeRoute: SubscribeRouteWithChildren,
   TasksRoute: TasksRoute,
   TermsRoute: TermsRoute,
   ThreadsRoute: ThreadsRoute,

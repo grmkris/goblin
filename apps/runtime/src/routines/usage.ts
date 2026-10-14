@@ -6,7 +6,6 @@ import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import { appRoutineUsageProjection } from '../storage/routines.ts'
 import type { RoutineRunStore } from './runs.ts'
 import { BACKGROUND, conversationId } from '../pi/context.ts'
-import { type CreditRates, milliCredits } from '../budget-credits.ts'
 
 const Counters = Schema.Struct({
   input: Schema.Number,
@@ -22,32 +21,28 @@ const Usage = Schema.Struct({
 
 /**
  * Project cumulative committed pi.usage, including compaction attempts, with app-only dedupe watermarks: tokens for the
- * routine's own caps, and Credits at each model's rate for the owner's daily budget (ADR 0026).
+ * routine's own caps and for the owner's daily usage.
  */
 export class RoutineUsage {
   readonly #db: DrizzleSqliteDODatabase
   readonly #runs: RoutineRunStore
-  readonly #rates: CreditRates
   readonly #harness: PiHarness
-  constructor(db: DrizzleSqliteDODatabase, runs: RoutineRunStore, rates: CreditRates, harness: PiHarness) {
+  constructor(db: DrizzleSqliteDODatabase, runs: RoutineRunStore, harness: PiHarness) {
     this.#db = db
     this.#runs = runs
-    this.#rates = rates
     this.#harness = harness
   }
   project(session: string, value: unknown, at: number): void {
     const run = this.#runs.session(session)
     if (run === undefined) return
     const usage = Schema.decodeUnknownSync(Usage)(value)
-    for (const [bucket, counters] of Object.entries(usage.models)) {
-      const model = bucket.slice(bucket.indexOf('/') + 1)
-      this.#bucket(run.id, `models:${bucket}`, counters.totalTokens, milliCredits(counters, model, this.#rates), at)
-    }
+    for (const [bucket, counters] of Object.entries(usage.models))
+      this.#bucket(run.id, `models:${bucket}`, counters.totalTokens, at)
     for (const [bucket, counters] of Object.entries(usage.tools))
-      this.#bucket(run.id, `tools:${bucket}`, counters.totalTokens, milliCredits(counters, undefined, this.#rates), at)
+      this.#bucket(run.id, `tools:${bucket}`, counters.totalTokens, at)
   }
-  /** `tokens` and `milli` are the bucket's cumulative totals; what is new since the watermark is recorded once. */
-  #bucket(runId: string, model: string, tokens: number, milli: number, at: number): void {
+  /** `tokens` is the bucket's cumulative total; what is new since the watermark is recorded once. */
+  #bucket(runId: string, model: string, tokens: number, at: number): void {
     if (!Number.isFinite(tokens) || tokens < 0) return
     this.#db.transaction(() => {
       const row = this.#db
@@ -57,14 +52,13 @@ export class RoutineUsage {
         .get()
       const delta = tokens - (row?.tokens ?? 0)
       if (delta <= 0) return
-      const credits = Math.max(0, milli - (row?.milliCredits ?? 0))
-      this.#runs.recordUsage(runId, `committed:${model}:${tokens}`, delta, credits, at)
+      this.#runs.recordUsage(runId, `committed:${model}:${tokens}`, delta, at)
       this.#db
         .insert(appRoutineUsageProjection)
-        .values({ runId, model, tokens, milliCredits: milli })
+        .values({ runId, model, tokens })
         .onConflictDoUpdate({
           target: [appRoutineUsageProjection.runId, appRoutineUsageProjection.model],
-          set: { tokens, milliCredits: milli },
+          set: { tokens },
         })
         .run()
     })

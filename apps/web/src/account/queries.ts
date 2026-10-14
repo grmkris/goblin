@@ -1,56 +1,13 @@
-import { mutationOptions, queryOptions, skipToken } from '@tanstack/react-query'
-import type { BillingId } from '@goblin/contracts'
+import { mutationOptions } from '@tanstack/react-query'
 import { account } from '../lib/api.ts'
 
 /**
- * The account's plan and its inbound clients, answered by the Worker (`AccountApi`): keys are `['account', kind]`,
- * and each change refreshes what it changed before it settles.
+ * The account's inbound clients, answered by the Worker (`AccountApi`): keys are `['account', kind]`, and each change
+ * refreshes what it changed before it settles.
  */
 const accountKeys = {
-  billing: ['account', 'billing'] as const,
   clients: ['account', 'clients'] as const,
 }
-
-/** The plan as it stands. */
-export const billingStateQuery = account.apiQuery({
-  queryKey: accountKeys.billing,
-  queryFn: (api) => api.billing.state(),
-})
-/** The plan, read only once someone is signed in; before then the key holds nothing. */
-export const signedInBillingQuery = (signedIn: boolean) =>
-  queryOptions({ queryKey: accountKeys.billing, queryFn: signedIn ? billingStateQuery.queryFn : skipToken })
-
-/** The plan after a payment, read every `pollMs` while `waiting` and it is not active yet. */
-export const awaitedBillingQuery = (waiting: boolean, pollMs: number) =>
-  queryOptions({
-    ...billingStateQuery,
-    refetchInterval: (query) => (waiting && query.state.data?.active !== true ? pollMs : false),
-  })
-
-/** Opens a Pro checkout; the page goes there, so nothing here needs refreshing. */
-export const checkoutMutation = account.apiMutation({ mutationFn: (api, _: void) => api.billing.checkout() })
-/** The payment provider's portal for an account that has paid before. */
-export const portalMutation = account.apiMutation({ mutationFn: (api, _: void) => api.billing.portal() })
-
-/** How Pro is to be paid (the day pass or monthly), and the path of this app to come back to once it is signed. */
-export interface WalletStart {
-  readonly plan: BillingId
-  readonly back: string | undefined
-}
-
-/** Asks the Goblin Wallet for Pro as a subscription signed once (ADR 0054); the page goes to sign it. */
-export const walletStartMutation = account.apiMutation({
-  mutationFn: (api, { plan, back }: WalletStart) =>
-    api.billing.walletStart({ payload: back === undefined ? { plan } : { plan, return: back } }),
-})
-/** Back from signing: the first payment, taken once; the plan is read again once it is paid. */
-export const walletConfirmMutation = mutationOptions({
-  ...account.apiMutation({
-    mutationFn: (api, subscription: string) => api.billing.walletConfirm({ payload: { subscription } }),
-  }),
-  onSuccess: (receipt, _subscription, _result, { client }) =>
-    receipt.status === 'paid' ? client.invalidateQueries({ queryKey: accountKeys.billing }) : undefined,
-})
 
 /** The MCP clients the owner let use their agent. */
 export const clientsQuery = account.apiQuery({ queryKey: accountKeys.clients, queryFn: (api) => api.clients.list() })

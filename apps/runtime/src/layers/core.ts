@@ -1,7 +1,6 @@
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
-import { Entitlements, cachedPolicy } from '../billing/gates.ts'
 import { epochSeconds } from '../clock.ts'
 import { ResidentInactive } from '../http/errors.ts'
 import {
@@ -48,15 +47,6 @@ const FlowsLive = Layer.unwrap(
   }),
 )
 
-/**
- * The account's plan as the agent checks it, an active one kept a minute (`cachedPolicy`): for the bridge, owner
- * admission and the internal gate, the MCP host and Events, and every program that reads `Entitlements` when it runs.
- */
-export const EntitlementsLive: Layer.Layer<Entitlements, never, AgentInput> = Layer.effect(
-  Entitlements,
-  AgentInput.use((input) => cachedPolicy(input.entitlements)),
-)
-
 /** Resident authority over its row in the agent's database: no state of its own. */
 export const ResidentLive: Layer.Layer<Resident, never, Db> = Layer.effect(
   Resident,
@@ -96,25 +86,15 @@ export const ResidentLive: Layer.Layer<Resident, never, Db> = Layer.effect(
 
 /**
  * What every program can read: the instance's input, its database, the change bus, Pi, the per-key lock, single
- * flights, flow events, the plan the agent keeps and resident authority. The content-free logger and failure reporter
+ * flights, flow events and resident authority. The content-free logger and failure reporter
  * (observability/) replace Effect's defaults for everything the runtime runs. None of them starts anything.
  */
 export const CoreLive = (
   input: AgentInputs,
-): Layer.Layer<
-  AgentInput | Db | Changes | PiSessions | KeyedLock | SingleFlight | FlowEvents | Entitlements | Resident
-> =>
+): Layer.Layer<AgentInput | Db | Changes | PiSessions | KeyedLock | SingleFlight | FlowEvents | Resident> =>
   ResidentLive.pipe(
     Layer.provideMerge(
-      Layer.mergeAll(
-        Db.layer,
-        Changes.layer,
-        PiSessions.layer,
-        KeyedLock.layer,
-        SingleFlight.layer,
-        FlowsLive,
-        EntitlementsLive,
-      ),
+      Layer.mergeAll(Db.layer, Changes.layer, PiSessions.layer, KeyedLock.layer, SingleFlight.layer, FlowsLive),
     ),
     Layer.provideMerge(Layer.mergeAll(Layer.succeed(AgentInput, input), LoggerLive, ReporterLive)),
   )

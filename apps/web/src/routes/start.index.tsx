@@ -23,7 +23,7 @@ function FirstOpenStep() {
 
 function StartIndex() {
   return (
-    <OwnerGate planRequired={false} pending={<StartSplash />}>
+    <OwnerGate pending={<StartSplash />}>
       <FirstOpenStep />
     </OwnerGate>
   )

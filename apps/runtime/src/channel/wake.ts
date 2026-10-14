@@ -8,7 +8,7 @@ import { resubscribeEnded } from './program.ts'
 import { onChannel } from './turns.ts'
 
 // The Telegram channel's alarms, as the agent's schedule callbacks run them: each is one program through the bridge's
-// `run` (the plan checked first), its failure reported as a content-free line.
+// `run`, its failure reported as a content-free line.
 
 /** One answer's delivery to Telegram as a flow (ADR 0024): its turn, how many messages it took, and its failure. */
 const deliveryFlow = (reply: DeliveredReply) =>

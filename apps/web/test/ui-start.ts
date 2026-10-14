@@ -30,22 +30,6 @@ const server = (connectionId: string, title: string, status: string) => ({
   source: 'config',
   profile: PROFILE(connectionId, title),
 })
-/** No plan yet: the wallet step ends with goblin Pro's two ways to pay, the day pass first (ADR 0054). */
-const PLAN = {
-  active: false,
-  source: 'none',
-  until: null,
-  dailyCredits: 0,
-  status: 'none',
-  hasCustomer: false,
-  cancelAtPeriodEnd: false,
-  mode: null,
-  plan: null,
-  catalog: [
-    { id: 'day', amountUsd: '1.00', periodDays: 1, dailyCredits: 800 },
-    { id: 'month', amountUsd: '15.00', periodDays: 30, dailyCredits: 800 },
-  ],
-}
 const SETUP_URL = 'https://wallet.goblin.surf/setup?return=https%3A%2F%2Fgoblin.surf%2Fstart%2Fwallet'
 const FUNDS_URL = 'https://wallet.goblin.surf/add-funds?return=https%3A%2F%2Fgoblin.surf%2Fstart%2Fwallet'
 const steps = (done: readonly string[]) =>
@@ -148,15 +132,12 @@ async function drive(browser: Browser, origin: string, label: string, options: B
       const json = (body: unknown) => route.fulfill({ json: body })
       if (pathname === '/api/auth/get-session')
         return json({ session: { id: 's', userId: 'u' }, user: { id: 'u', email: 'owner@example.com' } })
-      if (pathname === '/api/billing/state') return json(PLAN)
       if (pathname === '/api/onboarding') return json(screen.view)
       if (pathname === '/api/mcp/servers')
         return json([
           server('wallet', 'Goblin Wallet', screen.walletSignedIn ? 'connected' : 'needs_auth'),
           server('mercator', 'Mercator', screen.name === 'goblin' ? 'connected' : 'needs_auth'),
         ])
-      if (pathname === '/api/agent/pay')
-        return json({ mode: 'credits-then-wallet', route: 'goblin', routes: ['goblin', 'tempo'], walletReady: true })
       if (pathname === '/api/mcp/suggested')
         return json([
           {
@@ -200,8 +181,6 @@ async function drive(browser: Browser, origin: string, label: string, options: B
     }
     if (screen.name === 'wallet-ready') {
       await page.getByText('$24.50').waitFor()
-      await page.getByRole('button', { name: 'Change' }).click()
-      await page.getByText('Credits only').waitFor()
     }
     const sideways = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     assert(sideways <= 0, `${label} ${screen.name}: scrolls sideways by ${String(sideways)}px`)

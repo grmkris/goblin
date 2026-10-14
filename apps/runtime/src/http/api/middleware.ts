@@ -1,5 +1,5 @@
 import { OwnerAdmission, RenewsResident, withRef } from '@goblin/contracts/api'
-import { FORWARDED_HEADER, InternalGate, RequiresPlan } from '@goblin/contracts/internal'
+import { FORWARDED_HEADER, InternalGate } from '@goblin/contracts/internal'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
@@ -7,7 +7,6 @@ import * as Option from 'effect/Option'
 import * as HttpServerRequest from 'effect/http/HttpServerRequest'
 import type * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
-import { Entitlements } from '../../billing/gates.ts'
 import { NotFound, isAppError } from '../errors.ts'
 import { Resident } from '../../mcp/service.ts'
 import { RequestContext } from './context.ts'
@@ -37,9 +36,7 @@ const admitted = <A, E, R, E1, R1>(
 
 /**
  * Owner admission (`OwnerAdmission` in the contract): a renewal of resident authority unless the endpoint says
- * otherwise (`RenewsResident`: changing it must not renew first), then the handler. No plan is needed to reach the
- * agent: Start, Connections, Settings and billing work before there is one. What needs a plan checks it itself: a turn
- * (`Budget.admit`), a routine, a decision on a held call, a Persona's reply (ADR 0054, amended 2026-10-13).
+ * otherwise (`RenewsResident`: changing it must not renew first), then the handler.
  */
 export const OwnerAdmissionLive = Layer.effect(
   OwnerAdmission,
@@ -54,21 +51,19 @@ export const OwnerAdmissionLive = Layer.effect(
 
 /**
  * The internal gate (`InternalGate` in the contract): a request the Worker's edge forwarded for the owner is no
- * internal request, whatever its path became on the way, so it names no route (404). Then the account's plan, as the
- * agent keeps it, unless the endpoint needs none (`RequiresPlan`). Resident authority is never renewed here.
+ * internal request, whatever its path became on the way, so it names no route (404). Resident authority is never
+ * renewed here.
  */
-export const InternalGateLive = Layer.effect(
+export const InternalGateLive = Layer.succeed(
   InternalGate,
-  Effect.gen(function* () {
-    const plans = yield* Entitlements
-    const admit = (plan: boolean) =>
+  InternalGate.of((handler, names) =>
+    admitted(
+      handler,
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         if (request.headers[FORWARDED_HEADER] !== undefined) return yield* new NotFound({ what: 'route' })
-        if (plan) yield* plans.require()
-      })
-    return InternalGate.of((handler, names) =>
-      admitted(handler, admit(Context.get(names.endpoint.annotations, RequiresPlan)), names),
-    )
-  }),
+      }),
+      names,
+    ),
+  ),
 )

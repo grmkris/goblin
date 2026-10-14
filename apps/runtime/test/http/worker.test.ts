@@ -31,7 +31,7 @@ describe('the Worker', () => {
   ])('answers %s from outside with the 404 envelope, without waking an agent', async (path) => {
     const { env, asked } = deployment()
     const request = new Request(`${APP}${path}`, { method: 'POST', headers: { 'cf-ray': 'ray-internal' } })
-    const response = await worker.fetch(request, env, { waitUntil: () => undefined })
+    const response = await worker.fetch(request, env)
     expect(response.status).toBe(404)
     expect(response.headers.get('x-goblin-ref')).toBe('ray-internal')
     expect(await response.json()).toEqual({
@@ -44,9 +44,7 @@ describe('the Worker', () => {
     const { env, asked } = deployment()
     const hook = `${APP}/hooks/myagent/user-1/${'x'.repeat(43)}`
     const testEnv = { ...env, CREDENTIAL_KEY: 'Z29ibGluLXRlc3QtZml4dHVyZS1rZXkhISEhISEhISE=' }
-    const response = await worker.fetch(new Request(hook, { method: 'POST', body: '{}' }), testEnv, {
-      waitUntil: () => undefined,
-    })
+    const response = await worker.fetch(new Request(hook, { method: 'POST', body: '{}' }), testEnv)
     expect(response.status).toBe(404)
     expect(await response.json()).toMatchObject({ error: { code: 'not_found', what: 'route' } })
     expect(asked).toEqual([])

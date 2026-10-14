@@ -10,7 +10,6 @@ import { NoticeStore } from '../../src/notices/store.ts'
 import { ResidentAuthority } from '../../src/resident.ts'
 import { telegramChannel } from '../../src/channel/channel.ts'
 import { enableEvents } from '../../src/channel/store.ts'
-import { Entitlements } from '../../src/billing/gates.ts'
 import { noticesOf } from '../../src/layers/routines.ts'
 import { ResidentLive } from '../../src/layers/core.ts'
 import { SingleFlight } from '../../src/observability/single-flight.ts'
@@ -21,25 +20,13 @@ import type { Resident as ResidentService } from '../../src/mcp/service.ts'
 import { AgentInput, type AgentInputs } from '../../src/runtime/input.ts'
 
 /** What the dispatch check reads. */
-type LaneServices = Entitlements | ResidentService | ChannelService
+type LaneServices = ResidentService | ChannelService
 import { MemoryCredentials, MemoryGrants, MemoryLabels, MemoryRegistries } from '../mcp/memory.ts'
 import { appNotices } from '../../src/storage/notices.ts'
 import { runApplicationMigrations } from '../../src/storage/migrations.ts'
 import { lowLevelServer } from '../mcp/low-level-server.ts'
 import { type Probes, inAgent } from './probe.ts'
 
-const fixturePlan = () =>
-  Effect.succeed({
-    active: true,
-    plan: 'pro' as const,
-    source: 'override' as const,
-    billing: null,
-    until: null,
-    dailyCredits: 300_000,
-    status: 'fixture',
-    hasCustomer: false,
-    cancelAtPeriodEnd: false,
-  })
 function notificationHandler(calls: Record<string, unknown>[]) {
   return createMcpHandler(() => {
     const server = lowLevelServer({ name: 'notification-fixture', version: '1' }, { capabilities: { tools: {} } })
@@ -99,20 +86,13 @@ async function setupNotifications(storage: DurableObjectStorage) {
     host.pipe(Layer.provide(SingleFlight.layer)),
     ResidentLive,
   ).pipe(Layer.provide(Layer.succeed(Db, db)))
-  const plans = { state: fixturePlan, require: fixturePlan, payDay: () => Effect.succeed('settled' as const) }
   // The bridge's `local`, which the copies run their last-moment check through, over the same services.
   const input: AgentInputs = Object.assign(Object.create(null), {
     local: (program: Effect.Effect<void, AppError, LaneServices>) =>
-      Effect.runPromise(program.pipe(Effect.provide(services), Effect.provideService(Entitlements, plans))),
+      Effect.runPromise(program.pipe(Effect.provide(services))),
   })
   const deliver = () =>
-    Effect.runPromise(
-      deliverNoticeCopies.pipe(
-        Effect.provide(services),
-        Effect.provideService(Entitlements, plans),
-        Effect.provideService(AgentInput, input),
-      ),
-    )
+    Effect.runPromise(deliverNoticeCopies.pipe(Effect.provide(services), Effect.provideService(AgentInput, input)))
   return { db, notices, attempts, accepted, deliver }
 }
 

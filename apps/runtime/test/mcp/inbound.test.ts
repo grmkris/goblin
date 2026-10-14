@@ -2,7 +2,7 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 import { createMcpHandler } from '@modelcontextprotocol/server'
 import { describe, expect, it } from 'vitest'
 import type { AskResult } from '@goblin/contracts/internal'
-import { SubscriptionRequired } from '../../src/http/errors.ts'
+import { BudgetExhausted } from '../../src/http/errors.ts'
 import { type ClientAgentPort, inboundServer } from '../../src/inbound/server.ts'
 
 const connect = async (agent: ClientAgentPort) => {
@@ -51,14 +51,14 @@ describe('goblin inbound MCP server (unit)', () => {
   it('refuses ask_agent with the error that stopped it, while reading still works', async () => {
     const client = await connect({
       ask: async () => {
-        throw new SubscriptionRequired({ subscribe: '/subscribe' })
+        throw new BudgetExhausted({ limit: 2_000_000, resetsAt: 86_400 })
       },
       recent: async () => [{ role: 'user', text: 'hi' }],
     })
     try {
       const refused = await client.callTool({ name: 'ask_agent', arguments: { input: 'ping' } })
       expect(refused.isError).toBe(true)
-      expect(textOf(refused)).toEqual({ _tag: 'SubscriptionRequired', subscribe: '/subscribe' })
+      expect(textOf(refused)).toEqual({ _tag: 'BudgetExhausted', limit: 2_000_000, resetsAt: 86_400 })
       const recent = await client.callTool({ name: 'get_recent_messages', arguments: {} })
       expect(textOf(recent)).toEqual({ messages: [{ role: 'user', text: 'hi' }] })
     } finally {

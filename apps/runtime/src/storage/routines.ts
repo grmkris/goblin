@@ -82,7 +82,7 @@ export const appRoutineUsageProjection = sqliteTable(
     runId: text('run_id').notNull(),
     model: text('model').notNull(),
     tokens: integer('tokens').notNull(),
-    /** The bucket's cumulative cost so far, in thousandths of a Credit: the next delta is measured from it. */
+    /** Retired with Credits; unread until the migrations are squashed. */
     milliCredits: integer('milli_credits').notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.runId, t.model] })],

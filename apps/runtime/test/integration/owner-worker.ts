@@ -1,13 +1,10 @@
 import { authFixtureRoute, fixtureAuth } from './auth-fixture.ts'
 /** Native auth D1 + owner Agent fixture; test levers never enter the deployed Worker. */
-import { Effect, Schema } from 'effect'
+import { Schema } from 'effect'
 import runtime from '../../src/worker.ts'
 import type { RuntimeEnv } from '../../src/env.ts'
 import { refusal } from '../../src/http/api/render.ts'
 import { toAppError } from '../../src/http/errors.ts'
-import { makeBillingStore } from '../../src/billing/store.ts'
-import { liveApi } from '../../src/billing/dodo.ts'
-import { billingTestRoute } from '../../src/billing/test-route.ts'
 import { PersonalAgent } from '../../src/agent.ts'
 import { queueModel } from './queue-model.ts'
 import { approvalsProbe } from './approvals-probe.ts'
@@ -24,8 +21,8 @@ import { moveState, readRounds } from './move-probe.ts'
 import { ownerSend } from './probe-reads.ts'
 import { addUsage, utcDay } from '../../src/budget.ts'
 
-/** Thousandths of a Credit the `approvals/spent` lever adds to today: more than any fixture plan allows a day. */
-const SPENT_MILLI = 1_000_000_000
+/** Tokens the `approvals/spent` lever adds to today: more than the owner stack's daily cap (`owner-stack.ts`). */
+const SPENT_TOKENS = 1_000_000_000
 
 export class OwnerAgent extends PersonalAgent {
   readonly #mcp = new AppsMcpFixture()
@@ -96,18 +93,18 @@ export class OwnerAgent extends PersonalAgent {
       return Response.json({ released: queueModel(this).release(input) })
     }
     if (path === '/test/approvals/calls') return Response.json(this.#mcp.calls)
-    // Today's Credits spent past any plan's allowance (`spent`), and given back (`unspent`).
-    if (path === '/test/approvals/spent') return this.#spend(SPENT_MILLI)
-    if (path === '/test/approvals/unspent') return this.#spend(-SPENT_MILLI)
+    // Today's tokens spent past the deployment's cap (`spent`), and given back (`unspent`).
+    if (path === '/test/approvals/spent') return this.#spend(SPENT_TOKENS)
+    if (path === '/test/approvals/unspent') return this.#spend(-SPENT_TOKENS)
     if (path === '/test/approvals/recovery')
       return Response.json(await approvalsProbe(this.ctx.storage, this.env.CREDENTIAL_KEY))
     return super.onRequest(request)
   }
-  /** Adds `milli` thousandths of a Credit to today's usage. */
-  #spend(milli: number): Response {
+  /** Adds `tokens` to today's usage. */
+  #spend(tokens: number): Response {
     const now = Math.floor(Date.now() / 1000)
-    addUsage(drizzle(this.ctx.storage), utcDay(now).day, 0, milli, now)
-    return Response.json({ milli })
+    addUsage(drizzle(this.ctx.storage), utcDay(now).day, tokens, now)
+    return Response.json({ tokens })
   }
   /** An open report highlight in main, as the decisions would propose it, fenced on main as it is (ADR 0031). */
   #seedDecision() {
@@ -161,7 +158,7 @@ export class OwnerAgent extends PersonalAgent {
   }
 }
 export default {
-  async fetch(request: Request, env: RuntimeEnv, ctx: ExecutionContext) {
+  async fetch(request: Request, env: RuntimeEnv) {
     const url = new URL(request.url)
     const input = new Request(new URL(url.pathname + url.search, env.APP_URL), request)
     // The deployed Worker sees its own host; the MCP endpoints check it (DNS-rebinding protection).
@@ -204,15 +201,7 @@ export default {
         const { userId } = await requireUserSession(input, env)
         return env.AGENTS.getByName(userId).fetch(`https://agent/test/approvals/${url.pathname.split('/').at(-1)}`)
       }
-      if (url.pathname.startsWith('/__test/billing/'))
-        return await Effect.runPromise(
-          billingTestRoute(input, env, {
-            store: makeBillingStore(env.AUTH_DB),
-            dodo: liveApi('test_mode', 'unused', 'unused'),
-            productId: 'unused',
-          }),
-        )
-      return await runtime.fetch(input, env, ctx)
+      return await runtime.fetch(input, env)
     } catch (cause) {
       // expected: the failure is the fixture's answer, in the envelope; toAppError reports an unexpected one
       return refusal(toAppError(cause), 'owner-fixture')

@@ -2,14 +2,7 @@ import * as Schema from 'effect/Schema'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { URL as FileURL } from 'node:url'
 import { expect } from 'vitest'
-import { type NativeCase, type Phase, evict, freshName, matchCase, probeCase, probeOf } from './native-case.ts'
-
-const BudgetOutage = Schema.Struct({
-  blocked: Schema.String,
-  recovered: Schema.String,
-  failedCopy: Schema.String,
-  spentCopy: Schema.String,
-})
+import { type NativeCase, type Phase, evict, freshName, matchCase, probeOf } from './native-case.ts'
 
 const RoutineRecovery = Schema.Struct({
   instance: Schema.String,
@@ -186,19 +179,6 @@ export const routineCases = (phase: Phase): readonly NativeCase[] => [
         overshoot: 10,
         capModelRequests: 1,
       }),
-  ),
-  // While auth D1 cannot answer, the budget hook blocks a tool in main as a check that failed, never as a spent
-  // budget; once the plan reads again, the tool runs.
-  probeCase(
-    'a budget check auth D1 cannot answer blocks the tool as failed, not as a spent budget',
-    'budget-outage',
-    BudgetOutage,
-    (result) => {
-      expect(result.blocked).toContain(result.failedCopy)
-      expect(result.blocked).not.toContain(result.spentCopy)
-      expect(result.recovered).not.toContain(result.failedCopy)
-      expect(result.recovered).toContain('routines')
-    },
   ),
   matchCase(
     'main Stop preserves executing routines, caps queue one trigger and archive stops owned work',

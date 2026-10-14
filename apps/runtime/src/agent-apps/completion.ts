@@ -1,5 +1,5 @@
 import * as Effect from 'effect/Effect'
-import type { TokenUse } from '../budget-credits.ts'
+import type { TokenUse } from '../token-use.ts'
 import { Budget } from '../budget.ts'
 import { epochSeconds } from '../clock.ts'
 import { CheapModel, ModelFailed, modelFailureText } from '../memory/model.ts'
@@ -24,7 +24,7 @@ export const appCompletion: AppCompletion = (system, prompt, maxTokens) =>
     const spent: TokenUse[] = []
     const model = new CheapModel(pi.models, id, (use) => void spent.push(use), auxReporter(telemetry, 'app_llm'))
     const record = Effect.suspend(() =>
-      Effect.forEach(spent, (use) => Effect.flatMap(epochSeconds, (now) => budget.record(use, now, id))),
+      Effect.forEach(spent, (use) => Effect.flatMap(epochSeconds, (now) => budget.record(use, now))),
     )
     return yield* promised(() => appAnswer(model.complete(system, prompt, maxTokens))).pipe(Effect.ensuring(record))
   })

@@ -20,5 +20,6 @@ describe('usage for the composer and settings', () => {
     expect(budgetFraction({ used: 75_000, limit: 300_000, resetsAt: 0 })).toBe(0.25)
     expect(budgetFraction({ used: 400_000, limit: 300_000, resetsAt: 0 })).toBe(1)
     expect(budgetFraction({ used: 0, limit: 0, resetsAt: 0 })).toBe(1)
+    expect(budgetFraction({ used: 9_000_000, limit: null, resetsAt: 0 })).toBeUndefined()
   })
 })

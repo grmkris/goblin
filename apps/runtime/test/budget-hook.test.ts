@@ -1,17 +1,13 @@
 import { describe, expect, it } from '@effect/vitest'
 import type { UsageToday } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
-import { Budget } from '../src/budget.ts'
-import { type AppError, BudgetExhausted, Internal, SubscriptionRequired } from '../src/http/errors.ts'
+import { Budget, refuseSpent } from '../src/budget.ts'
+import { type AppError, BudgetExhausted, Internal } from '../src/http/errors.ts'
 import { BUDGET_BLOCKS, budgetVerdict } from '../src/pi/budget.ts'
 
 /** The hook's verdict when today's budget answers `today`, refusing a spent day as the budget does. */
 const verdictOf = (today: Effect.Effect<UsageToday, AppError>) => {
-  const spent = Effect.flatMap(today, (current) =>
-    current.used >= current.limit
-      ? Effect.fail(new BudgetExhausted({ limit: current.limit, resetsAt: current.resetsAt }))
-      : Effect.void,
-  )
+  const spent = Effect.flatMap(today, refuseSpent)
   return budgetVerdict.pipe(
     Effect.provideService(
       Budget,
@@ -19,8 +15,6 @@ const verdictOf = (today: Effect.Effect<UsageToday, AppError>) => {
         today: () => today,
         record: () => Effect.void,
         require: () => spent,
-        open: () => spent,
-        admit: () => Effect.die('a tool call never admits a turn, so it never pays a day pass'),
       }),
     ),
   )
@@ -37,15 +31,9 @@ describe('the budget hook before a tool (R1)', () => {
     }),
   )
 
-  it.effect('blocks an account without a plan as unsubscribed, not as spent', () =>
+  it.effect('fails closed as a failed check when the ledger cannot be read', () =>
     Effect.gen(function* () {
-      expect(yield* verdictOf(Effect.fail(new SubscriptionRequired({ subscribe: '/subscribe' })))).toBe('unsubscribed')
-    }),
-  )
-
-  it.effect('fails closed as a failed check when the plan or the ledger cannot be read', () =>
-    Effect.gen(function* () {
-      expect(yield* verdictOf(Effect.fail(new Internal({ reason: 'billing storage unavailable' })))).toBe('failed')
+      expect(yield* verdictOf(Effect.fail(new Internal({ reason: 'usage storage unavailable' })))).toBe('failed')
       expect(yield* verdictOf(Effect.die(new Error('D1_ERROR')))).toBe('failed')
       expect(BUDGET_BLOCKS.failed).not.toContain('used up')
       expect(BUDGET_BLOCKS.exhausted).toContain('used up')

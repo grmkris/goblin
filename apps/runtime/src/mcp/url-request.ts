@@ -3,7 +3,6 @@ import type { FlowEvent } from '@goblin/contracts/telemetry'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
-import { requirePlan } from '../billing/gates.ts'
 import { type AppError, UpstreamMcp } from '../http/errors.ts'
 import { Chats } from '../chats/service.ts'
 import { FlowEvents } from '../observability/flows.ts'
@@ -134,10 +133,8 @@ const retry = (row: UrlRequestRow, action: UrlAnswer['action']) =>
     // A top-up's transfer (ADR 0049) goes again as goblin's own `funding` call, under its record, never an approval:
     // the conversation's tool scope is the model's, so it needs current authority only.
     const topUp = yield* topUpOf(row, args)
-    // The manager checks authority again right before it sends, from inside its own guard: the plan, then the rest.
-    const authorize = yield* bound(
-      Effect.andThen(requirePlan(), topUp === undefined ? authority(row) : requireResident),
-    )
+    // The manager checks authority again right before it sends, from inside its own guard.
+    const authorize = yield* bound(topUp === undefined ? authority(row) : requireResident)
     const connections = yield* McpConnections
     const outcome = yield* connections.callModelTool(row.connectionId, row.name, args, {
       ...(topUp === undefined ? yield* approvedFrom(row) : { caller: 'funding' as const }),

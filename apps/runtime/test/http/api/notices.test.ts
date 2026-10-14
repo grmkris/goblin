@@ -10,7 +10,7 @@ import { NoticeStore } from '../../../src/notices/store.ts'
 import { Changes, makeChanges } from '../../../src/runtime/changes.ts'
 import { chatDatabase, durable } from '../../chats-sqlite.ts'
 import { callOwner } from '../../owner-client.ts'
-import { currentResident, plans, post, serve, served } from './fixture.ts'
+import { currentResident, post, serve, served } from './fixture.ts'
 
 const open: { close: () => void }[] = []
 afterEach(() => {
@@ -40,7 +40,6 @@ function fixture() {
           Layer.succeed(Notices, noticesOf(store)),
           Layer.succeed(Changes, changes),
           Layer.succeed(Resident, currentResident().service),
-          plans(),
         ),
       ),
     ),

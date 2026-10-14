@@ -2,7 +2,6 @@ import { GenerationTask, defineExtension, hook, section } from '@earendil-works/
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { requirePlan } from '../billing/gates.ts'
 import { requireBudget } from '../budget.ts'
 import { Chats, Conversations } from '../chats/service.ts'
 import { NotFound } from '../http/errors.ts'
@@ -35,7 +34,6 @@ export function threadExtension(run: RunProgram) {
         // The write carries the call's id as its request id, so a rerun finds the same note.
         replay: 'safe',
         execute: async ({ note }, api) => {
-          await run(requirePlan())
           const parent = await run(
             Effect.gen(function* () {
               const chat = yield* (yield* Chats).chatOf(String(api.conversationId))

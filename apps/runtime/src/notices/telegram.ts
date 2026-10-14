@@ -2,7 +2,6 @@ import { TELEGRAM_DM } from '@goblin/contracts'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
-import { requirePlan } from '../billing/gates.ts'
 import { channelToolName } from '../channel/tools.ts'
 import { Channel } from '../channel/service.ts'
 import { Forbidden, toAppError } from '../http/errors.ts'
@@ -21,11 +20,8 @@ const Receipt = Schema.Struct({
   id: Schema.optional(Schema.String.check(Schema.isMaxLength(200))),
   delivery: Schema.optional(Schema.String.check(Schema.isMaxLength(40))),
 })
-const authority = Effect.gen(function* () {
-  yield* requirePlan('routines')
-  yield* requireResident
-})
-/** Checked again right before the call leaves: the plan, resident authority, and that the channel is still `connectionId`. */
+const authority = requireResident
+/** Checked again right before the call leaves: resident authority, and that the channel is still `connectionId`. */
 const stillAuthorized = (connectionId: string) =>
   Effect.gen(function* () {
     yield* authority
@@ -81,7 +77,7 @@ const deliver = (row: NoticeRow) =>
       return JSON.stringify({ operationId, ...metadata })
     }).pipe(
       Effect.map((receipt): Delivery => ({ state: 'accepted', receipt })),
-      Effect.catchTags({ ResidentInactive: suppress, SubscriptionRequired: suppress, Forbidden: suppress }),
+      Effect.catchTags({ ResidentInactive: suppress, Forbidden: suppress }),
       reportFailure('notices.telegram'),
       // expected: reported above; a failed attempt is tried again with backoff and fails after five attempts.
       Effect.catch(() => Effect.succeed<Delivery>({ state: 'pending', receipt: null })),

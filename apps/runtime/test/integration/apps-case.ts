@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 import { type AgentFetch, type OwnerClient, callOwner } from '../owner-client.ts'
 import { BOARD } from './apps-mcp.ts'
-import { call, grantPlan, person, showing, signedIn, workspaceOf, type Person } from './owner-requests.ts'
+import { call, person, showing, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 import { answerOf } from './probe-reads.ts'
 
 /** What an App the owner opened sends with its calls: it is held to the App's grants, not the owner's. */
@@ -66,7 +66,6 @@ async function grantsLive(base: string, owner: Person): Promise<void> {
  */
 export async function appsCase(base: string): Promise<void> {
   const owner = await person(base)
-  await grantPlan(base, owner)
   const me = signedIn(base, owner)
   await callOwner(me, (api) => api.mcp.connect({ params: { id: 'apps-fixture' }, payload: {} }))
   await grant(me, true)

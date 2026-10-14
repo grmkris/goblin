@@ -12,7 +12,7 @@ import { appConversations } from '../../../src/storage/schema.ts'
 import { appTopics } from '../../../src/storage/topics.ts'
 import { knowledgeOver } from '../../knowledge-layer.ts'
 import { callOwner } from '../../owner-client.ts'
-import { currentResident, database, get, plans, serve, served } from './fixture.ts'
+import { currentResident, database, get, serve, served } from './fixture.ts'
 
 const remembered = (chatId: string, count: number) =>
   Array.from({ length: count }, (_, idx) => ({ chatId, idx, entryId: 11 + idx, kind: 'user' as const }))
@@ -20,7 +20,7 @@ const remembered = (chatId: string, count: number) =>
 /**
  * The memory group as the agent serves it, over real chat and memory tables on SQLite: Personal (`1`, two messages,
  * no view yet), the Garden Topic's Conversation (`70`, three messages, two summarized) and a thread under it (`71`).
- * The Memories service is lane K's layer over the legacy instances; the gate's plan and resident authority are fakes.
+ * The Memories service is lane K's layer over the legacy instances; the gate's resident authority is a fake.
  */
 const fixture = () => {
   const db = database()
@@ -46,9 +46,7 @@ const fixture = () => {
   const chats = new ChatDirectory(db)
   const { fetch } = serve(
     served([MemoryGroup], MemoryHandlers).pipe(
-      Layer.provide(
-        Layer.mergeAll(knowledgeOver({ db, chats }), Layer.succeed(Resident, currentResident().service), plans()),
-      ),
+      Layer.provide(Layer.mergeAll(knowledgeOver({ db, chats }), Layer.succeed(Resident, currentResident().service))),
     ),
   )
   return { fetch }

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   eventStatus,
-  planStatus,
   residentStatus,
   routineStatus,
   runStatus,
@@ -30,23 +29,7 @@ describe('labels', () => {
     expect(serverName({})).toBeUndefined()
   })
 
-  it('says the plan, the agent standing, a routine and a run in words', () => {
-    const paid = {
-      active: true,
-      source: 'subscription',
-      until: 1,
-      dailyCredits: 800,
-      status: 'active',
-      hasCustomer: true,
-      cancelAtPeriodEnd: false,
-      mode: 'test_mode',
-      plan: 'pro',
-      catalog: [],
-    } as const
-    expect(planStatus(paid)).toEqual({ text: 'Active', tone: 'good' })
-    expect(planStatus({ ...paid, status: 'past_due' }).tone).toBe('attention')
-    expect(planStatus({ ...paid, cancelAtPeriodEnd: true }).text).toBe('Ending')
-    expect(planStatus({ ...paid, active: false }).text).toBe('Not subscribed')
+  it('says the agent standing, a routine and a run in words', () => {
     expect(residentStatus('revoked')).toEqual({ text: 'Off', tone: 'quiet' })
     expect(routineStatus({ state: 'proposed', health: null })).toEqual({
       text: 'Waiting for your OK',

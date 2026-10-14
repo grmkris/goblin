@@ -4,7 +4,6 @@ import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { nextInt } from 'effect/Random'
-import { requirePlan } from '../billing/gates.ts'
 import { requireBudget } from '../budget.ts'
 import { Chats, Conversations } from '../chats/service.ts'
 import { Conflict, InvalidInput, attempt, toAppError } from '../http/errors.ts'
@@ -69,17 +68,16 @@ const reportFlow = (record: RoutineRun, topic: number | undefined, status: FlowS
   })
 
 /**
- * Why a firing is recorded as skipped rather than run: no plan with hand-overs (only Pro has them), resident authority
- * off, or today's budget spent. Any other failure (auth D1, storage) fails the admission and is reported, so an outage
- * never skips a firing. Only a hand-over is admitted as a run; a routine that only tells posts its notice instead.
+ * Why a firing is recorded as skipped rather than run: resident authority off, or today's capped usage spent. Any other
+ * failure (storage) fails the admission and is reported, so an outage never skips a firing. Only a hand-over is
+ * admitted as a run; a routine that only tells posts its notice instead.
  */
 export const admissionSkip = Effect.gen(function* () {
-  yield* requirePlan('handOver')
   yield* requireResident
   yield* requireBudget
 }).pipe(
   Effect.as(undefined),
-  Effect.catchTags({ SubscriptionRequired: skipAs, ResidentInactive: skipAs, BudgetExhausted: skipAs }),
+  Effect.catchTags({ ResidentInactive: skipAs, BudgetExhausted: skipAs }),
   reportFailure('routines.admit'),
 )
 

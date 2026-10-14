@@ -38,7 +38,7 @@ import {
   MemoryRegistries,
 } from '../../mcp/memory.ts'
 import { callOwner } from '../../owner-client.ts'
-import { database, get, json, plans, post, serve, served, sqliteDb, stub } from './fixture.ts'
+import { database, get, json, post, serve, served, sqliteDb, stub } from './fixture.ts'
 import { lowLevelServer } from '../../mcp/low-level-server.ts'
 import { BOARD, boardTools } from '../../mcp/notes-board.ts'
 
@@ -129,7 +129,6 @@ const fixture = async () => {
           Layer.succeed(Changes, makeChanges()),
           FlowEvents.noop,
           ResidentLive.pipe(Layer.provide(sqliteDb(db))),
-          plans(),
           // Settling a held call, skills and an owner message (agent-program.ts sendOwnerMessage) read these; no test
           // here reaches them.
           Layer.mergeAll(stub(ChatOperations), stub(Skills), stub(Chats), stub(RoutineRuns), stub(Apps), stub(Budget)),

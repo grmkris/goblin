@@ -168,7 +168,6 @@ describe('the error kinds of goblin codes', () => {
     payload_too_large: 'validation',
     resident_inactive: 'forbidden',
     budget_exhausted: 'plan_limit',
-    subscription_required: 'plan_limit',
     needs_authorization: 'forbidden',
     scope_required: 'forbidden',
     upstream_mcp: 'unavailable',

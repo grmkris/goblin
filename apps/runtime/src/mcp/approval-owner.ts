@@ -1,6 +1,5 @@
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
-import { requirePlan } from '../billing/gates.ts'
 import { sendOutcome } from '../agent-program.ts'
 import { Chats } from '../chats/service.ts'
 import { type AppError, NotFound } from '../http/errors.ts'
@@ -46,13 +45,10 @@ const continuation =
 
 /**
  * Where an owner's decision goes, as the owner API runs it: the outcome goes into the chat (`sendOutcome`, not as the
- * owner's message), after the same admission an owner request gets (the plan, then a renewal of resident authority).
+ * owner's message), after the same admission an owner request gets (a renewal of resident authority).
  */
 export const ownerContinuation = continuation(
-  Effect.andThen(
-    requirePlan(),
-    Resident.use((resident) => resident.renew()),
-  ),
+  Resident.use((resident) => resident.renew()),
   sendOutcome,
 )
 

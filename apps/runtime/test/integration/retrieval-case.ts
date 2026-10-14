@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 import * as Schema from 'effect/Schema'
 import { SourcesDetails, type TopicView } from '@goblin/contracts'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
-import { grantPlan, lever, person, showing, signedIn, type Person } from './owner-requests.ts'
+import { lever, person, showing, signedIn, type Person } from './owner-requests.ts'
 import { answerOf, ownerSnapshot } from './probe-reads.ts'
 import { waitFor } from './until.ts'
 
@@ -118,7 +118,6 @@ async function automatic(url: string, owner: Person, garden: TopicView): Promise
 export async function retrievalCase(url: string): Promise<void> {
   const owner = await person(url)
   const other = await person(url)
-  for (const who of [owner, other]) await grantPlan(url, who)
   const me = signedIn(url, owner)
   const { garden, thread } = await seed(me)
   await searches(me, garden)

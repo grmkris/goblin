@@ -47,8 +47,7 @@ export const disconnectOwnerServer = (connectionId: string) =>
  * Where an outbound sign-in comes back (`GET /api/mcp/oauth/callback`, the `mcp` group's raw `oauthCallback`: it
  * answers a redirect, not JSON). The owner lands on Connections with `connected=<connectionId>`, or with `error=` and the
  * authorization server's own error, `authorization_failed` for an incomplete callback, or the tag of the failure that
- * stopped it. Finishing is an owner request that needs no plan (Start connects the Goblin Wallet before there is one,
- * ADR 0054); as for every raw endpoint, owner admission does not renew resident authority, so finishing renews it.
+ * stopped it. As for every raw endpoint, owner admission does not renew resident authority, so finishing renews it.
  */
 export const connectCallback = (params: URLSearchParams, appUrl: string) =>
   Effect.gen(function* () {

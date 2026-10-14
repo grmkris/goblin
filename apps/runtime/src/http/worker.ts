@@ -13,11 +13,6 @@ import { handleInboundMcp } from '../inbound/route.ts'
 import { eventsHookTokenValid } from '../mcp/events/route-token.ts'
 import { EVENT_BODY_BYTES } from '../mcp/events/webhook.ts'
 import { canonicalRedirect } from './canonical.ts'
-import { billingDeps, walletBillingDeps } from '../billing/routes.ts'
-import { billingWebhook } from '../billing/webhook.ts'
-import { runBillingCron, runWalletCron } from '../billing/cron.ts'
-import { billingMode } from '../billing/gates.ts'
-import { planCatalog, publicPlans } from '../billing/plans.ts'
 
 /** Only the authenticated user ID supplies the native Agent name. */
 const agentOf = (env: RuntimeEnv, userId: string): DurableObjectStub<AgentRpc> => env.AGENTS.getByName(userId)
@@ -41,7 +36,7 @@ const edge = (): Promise<EdgeHttp> => (edgeHttp ??= runAtEdge(makeEdgeHttp))
 /**
  * POST /hooks/mcp-events/<userId>/<connectionId>/<token>: one connection's MCP Events webhook. The route token, bound
  * to the user and the connection, is checked before any agent wakes, and the raw bytes are bounded before the agent
- * checks its plan and the signature.
+ * checks its authority and the signature.
  */
 async function mcpEventsRoute(request: Request, env: RuntimeEnv, path: string, ref: string): Promise<Response> {
   const [, userId = '', connectionId = '', token = ''] =
@@ -68,33 +63,19 @@ async function mcpEventsRoute(request: Request, env: RuntimeEnv, path: string, r
 }
 
 /** The Worker's own routes past the typed API: /mcp and the hooks. Anything else, `/internal/*` included, is a 404. */
-async function workerRoute(
-  request: Request,
-  env: RuntimeEnv,
-  ctx: Pick<ExecutionContext, 'waitUntil'>,
-  ref: string,
-): Promise<Response> {
+async function workerRoute(request: Request, env: RuntimeEnv, ref: string): Promise<Response> {
   const path = new URL(request.url).pathname
   if (path === '/mcp') return handleInboundMcp(request, env)
-  if (path === '/hooks/dodo') return runAtEdge(billingWebhook(billingDeps(env), request, ctx))
   if (path.startsWith('/hooks/mcp-events/')) return mcpEventsRoute(request, env, path, ref)
   throw new NotFound({ what: 'route' })
 }
 
-/** The Goblin Wallet's origin as `/health` says it, when the deployment names a valid one. */
-const walletOriginOf = (value: string | undefined): { readonly walletOrigin: string } | undefined =>
-  value !== undefined && URL.canParse(value) ? { walletOrigin: new URL(value).origin } : undefined
-
 /**
- * The deployed Worker's handlers (`worker.ts` exports them with the agent's class): the billing cron, and every request
- * the web worker forwards (`apps/web/src/worker.ts`): health, auth, the typed API's edge, /mcp and the hooks.
+ * The deployed Worker's handler (`worker.ts` exports it with the agent's class): every request the web worker forwards
+ * (`apps/web/src/worker.ts`): health, auth, the typed API's edge, /mcp and the hooks.
  */
 export const worker = {
-  async scheduled(_event: ScheduledController, env: RuntimeEnv): Promise<void> {
-    await runAtEdge(runBillingCron(billingDeps(env)))
-    await runAtEdge(runWalletCron(walletBillingDeps(env)))
-  },
-  async fetch(request: Request, env: RuntimeEnv, ctx: Pick<ExecutionContext, 'waitUntil'>): Promise<Response> {
+  async fetch(request: Request, env: RuntimeEnv): Promise<Response> {
     const redirect = canonicalRedirect(request, env.APP_URL)
     if (redirect !== undefined) return redirect
     const url = new URL(request.url)
@@ -105,14 +86,6 @@ export const worker = {
         stage: env.STAGE,
         signup: signupMode(env.SIGNUP_MODE),
         mail: mailerOf(env) !== undefined,
-        billing: {
-          mode: env.DODO_PAYMENTS_ENVIRONMENT ?? billingMode(env),
-          configured: billingDeps(env) !== undefined,
-          wallet: walletBillingDeps(env) !== undefined,
-        },
-        // Public, for the landing page: Pro's prices, and where the Goblin Wallet is.
-        plans: publicPlans(planCatalog(env.PLAN_CATALOG)),
-        ...walletOriginOf(env.WALLET_ORIGIN),
       })
     if (url.pathname.startsWith('/.well-known/oauth-protected-resource'))
       return secured(Response.json(resourceMetadata(env)), undefined)
@@ -124,6 +97,6 @@ export const worker = {
     if (url.pathname.startsWith('/api/')) return runAtEdge((await edge()).owner(request, edgeOf(env)))
 
     // Every answer quotes the request's reference (its cf-ray), which its failure line carries too.
-    return runAtEdge((await edge()).route(request, (ref) => attempt(() => workerRoute(request, env, ctx, ref))))
+    return runAtEdge((await edge()).route(request, (ref) => attempt(() => workerRoute(request, env, ref))))
   },
 }

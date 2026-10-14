@@ -154,14 +154,8 @@ export class RoutineRuns extends Context.Service<
     readonly reported: (id: string, at: number) => Effect.Effect<void>
     /** Tokens the run and its routine's UTC day have used. */
     readonly used: (id: string, at: number) => Effect.Effect<{ readonly run: number; readonly day: number }, AppError>
-    /** One committed usage delta, once by its key: tokens for the run's caps, Credits for the daily budget. */
-    readonly recordUsage: (
-      id: string,
-      key: string,
-      tokens: number,
-      milliCredits: number,
-      at: number,
-    ) => Effect.Effect<void>
+    /** One committed usage delta, once by its key: tokens for the run's caps and the daily usage. */
+    readonly recordUsage: (id: string, key: string, tokens: number, at: number) => Effect.Effect<void>
   }
 >()('goblin/routines/RoutineRuns') {}
 

@@ -37,7 +37,7 @@ import { Changes, makeChanges } from '../../src/runtime/changes.ts'
 import { scopeOf } from '../../src/setup/scope.ts'
 import { Setups } from '../../src/setup/service.ts'
 import { chatDatabase, durable } from '../chats-sqlite.ts'
-import { plans, stub } from '../http/api/fixture.ts'
+import { stub } from '../http/api/fixture.ts'
 import { declaresUrlElicitation, lowLevelServer } from './low-level-server.ts'
 import { MemoryCredentials, MemoryGrants, MemoryLabels, MemoryRegistries } from './memory.ts'
 
@@ -182,7 +182,6 @@ const agentServices = (
     memoryNotices(kept),
     // SAFETY: the test never reads the view a kept App answers.
     stub(Apps, { register: () => Effect.succeed({} as AppView) }),
-    plans(),
   )
 
 /**

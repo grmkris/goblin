@@ -29,7 +29,7 @@ const OwnerApiRun = Schema.Struct({
   unknownThread: Refused,
   closed: Ok(Listed),
   mainUntouchable: Refused,
-  usage: Ok(Schema.Struct({ used: Schema.Number, limit: Schema.Number, resetsAt: Schema.Number })),
+  usage: Ok(Schema.Struct({ used: Schema.Number, limit: Schema.NullOr(Schema.Number), resetsAt: Schema.Number })),
   model: Ok(Schema.Struct({ current: Schema.String, default: Schema.String, options: Schema.Array(Schema.Unknown) })),
   unknownModel: Refused,
   askWhileRevoked: Refused,
@@ -53,14 +53,14 @@ async function ownerApiChecks(base: string): Promise<void> {
   expect(result.closed.value).toMatchObject({ closedBy: 'owner', closedAt: expect.any(Number) })
   expect(result.mainUntouchable.error._tag).toBe('InvalidInput')
   // A fresh agent has spent nothing today; the budget table exists after migration.
-  expect(result.usage.value).toMatchObject({ used: 0, limit: 300_000 })
+  expect(result.usage.value).toMatchObject({ used: 0, limit: null })
   expect(result.usage.value.resetsAt % 86_400).toBe(0)
   // No pick yet: the deployment default; a model the deployment does not offer is refused (app_model_choice exists).
   expect(result.model.value).toMatchObject({ current: 'storage-only', default: 'storage-only' })
   expect(result.unknownModel.error._tag).toBe('InvalidInput')
   expect(result.askWhileRevoked.error._tag).toBe('ResidentInactive')
-  // Events ingress: a transient failure of its authority check answers 503; the owner's refusal 410.
-  expect(await probeOf(base, 'events-ingress', Schema.Unknown)).toEqual({ transient: 503, revoked: 410 })
+  // Events ingress: the owner's refusal answers 410.
+  expect(await probeOf(base, 'events-ingress', Schema.Unknown)).toEqual({ revoked: 410 })
 }
 
 const Stored = Schema.Struct({ credentials: Schema.Number, grants: Schema.Number, pending: Schema.Number })

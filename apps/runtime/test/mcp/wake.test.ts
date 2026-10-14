@@ -6,21 +6,16 @@ import { mcpEventsWake } from '../../src/mcp/wake.ts'
 import { Events } from '../../src/mcp/service.ts'
 import { ReporterLive } from '../../src/observability/report.ts'
 import { AgentInput, type AgentInputs } from '../../src/runtime/input.ts'
-import { plans, stub } from '../http/api/fixture.ts'
+import { stub } from '../http/api/fixture.ts'
 
 afterEach(() => {
   vi.restoreAllMocks()
 })
 
 /**
- * The wake over Events whose sweep ends with `sweep`, on an account whose plan is `active`; `due` is when the store's
- * next work is (`null`: nothing waits).
+ * The wake over Events whose sweep ends with `sweep`; `due` is when the store's next work is (`null`: nothing waits).
  */
-const wakeWith = async (
-  sweep: Effect.Effect<void, Internal | ResidentInactive>,
-  active = true,
-  due: number | null = 0,
-) => {
+const wakeWith = async (sweep: Effect.Effect<void, Internal | ResidentInactive>, due: number | null = 0) => {
   const lines: string[] = []
   vi.spyOn(console, 'error').mockImplementation((line: string) => void lines.push(line))
   vi.spyOn(console, 'warn').mockImplementation((line: string) => void lines.push(line))
@@ -30,7 +25,6 @@ const wakeWith = async (
   const services = Layer.mergeAll(
     stub(Events, { maintain: () => sweep, nextDue: () => Effect.succeed(due ?? undefined) }),
     ReporterLive,
-    plans(active),
     Layer.succeed(AgentInput, input),
   )
   await Effect.runPromise(mcpEventsWake.pipe(Effect.provide(services)))
@@ -57,19 +51,7 @@ describe('the Events alarm (unit)', () => {
   })
 
   it('keeps no alarm after a failure when nothing waits', async () => {
-    const idle = await wakeWith(Effect.fail(new Internal({ reason: 'sweep broke' })), true, null)
+    const idle = await wakeWith(Effect.fail(new Internal({ reason: 'sweep broke' })), null)
     expect(idle.scheduled).toEqual([])
-    const lapsed = await wakeWith(Effect.void, false, null)
-    expect(lapsed.scheduled).toEqual([])
-  })
-
-  it('sweeps nothing without an active plan, and tries again in a minute', async () => {
-    const swept: number[] = []
-    const lapsed = await wakeWith(
-      Effect.sync(() => void swept.push(1)),
-      false,
-    )
-    expect(swept).toEqual([])
-    expect(lapsed).toMatchObject({ scheduled: [expect.any(Number)], failures: [] })
   })
 })

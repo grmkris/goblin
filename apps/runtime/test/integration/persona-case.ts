@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 import * as Schema from 'effect/Schema'
 import { type PersonaDefinition, type PersonaView, type UpdatePersona, WorkspaceChange } from '@goblin/contracts'
 import { type OwnerClient, callOwner } from '../owner-client.ts'
-import { grantPlan, holding, lever, person, showing, signedIn, workspaceOf, type Person } from './owner-requests.ts'
+import { holding, lever, person, showing, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 import { answerOf, ownerSnapshot } from './probe-reads.ts'
 import { until as untilWithin } from './until.ts'
 
@@ -120,7 +120,6 @@ const send = async (
 }
 const ready = async (url: string): Promise<Person> => {
   const owner = await person(url)
-  await grantPlan(url, owner)
   return owner
 }
 

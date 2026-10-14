@@ -3,7 +3,7 @@ import * as Layer from 'effect/Layer'
 import { afterEach, describe, expect, it } from 'vitest'
 import { appAnswer } from '../src/agent-apps/completion.ts'
 import { AppCodeError, problemText } from '../src/agent-apps/queue.ts'
-import { usageMilliCredits, utcDay } from '../src/budget.ts'
+import { usageTokens, utcDay } from '../src/budget.ts'
 import { CheapModelsLive } from '../src/layers/knowledge.ts'
 import { CheapModel, CheapModels, ModelFailed, modelFailureText } from '../src/memory/model.ts'
 import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
@@ -89,6 +89,6 @@ describe('the cheap models the agent starts with (unit)', () => {
     )
     expect(await models('naming').complete('system', 'user', 10)).toBe('named')
     const { day } = utcDay(Math.floor(Date.now() / 1000))
-    expect(usageMilliCredits(durable(db), day)).toBeGreaterThan(0)
+    expect(usageTokens(durable(db), day)).toBe(2)
   })
 })

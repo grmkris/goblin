@@ -1,7 +1,7 @@
 import type { Models } from '@earendil-works/pi-ai'
 import * as Context from 'effect/Context'
 import * as Schema from 'effect/Schema'
-import type { TokenUse } from '../budget-credits.ts'
+import type { TokenUse } from '../token-use.ts'
 import { nowMillis } from '../clock.ts'
 import { MODEL_PROVIDER } from '../pi/model.ts'
 import type { AuxCall, AuxPurpose } from '../telemetry/report.ts'

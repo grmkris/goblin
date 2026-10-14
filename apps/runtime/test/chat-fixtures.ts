@@ -45,10 +45,8 @@ export const portServices = ({ db, harness, budget, models, flows = FlowEvents.n
       Budget,
       Budget.of({
         today: (now) => attempt(() => budget.today(now)),
-        record: (use, now, model) => Effect.sync(() => budget.record(use, now, model)),
+        record: (use, now) => Effect.sync(() => budget.record(use, now)),
         require: (now) => attempt(() => budget.require(now)),
-        open: (now) => attempt(() => budget.require(now)),
-        admit: (now) => attempt(() => budget.require(now)),
       }),
     ),
     Layer.succeed(

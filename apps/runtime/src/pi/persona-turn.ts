@@ -25,7 +25,7 @@ import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { heldCall } from '../attention.ts'
-import { admitTurn } from '../budget.ts'
+import { requireBudget } from '../budget.ts'
 import { Conversations } from '../chats/service.ts'
 import { requireResident } from '../mcp/service.ts'
 import { FlowEvents } from '../observability/flows.ts'
@@ -254,7 +254,7 @@ const registerFork = (input: Input, fork: ConversationId) =>
  */
 const mayAnswer = Effect.gen(function* () {
   yield* requireResident
-  yield* admitTurn
+  yield* requireBudget
 })
 
 type Phase<P extends State['phase']> = PhaseHandler<Input, Extract<State, { phase: P }>, State, null, object>

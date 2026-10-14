@@ -1,7 +1,6 @@
-import { BILLING_REFUSALS, BillingRefused, Conflict, NotFound } from '@goblin/contracts/api'
+import { Conflict, NotFound } from '@goblin/contracts/api'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { account, reportCrash } from '../../src/lib/api.ts'
-import { BILLING_KINDS, describeError, messageOf } from '../../src/lib/query/app-error.ts'
 import { crashReport, crashReporter, framesOf, reportUncaught } from '../../src/lib/query/crash-report.ts'
 
 const SECRET = 'what the owner typed'
@@ -62,7 +61,6 @@ describe('a crash report', () => {
     const report = crashReporter((value) => sent.push(value))
     report(new Conflict({ reason: 'x', ref: 'ray-409' }), '/')
     report(new NotFound({ what: 'x', ref: 'ray-404' }), '/')
-    report(new BillingRefused({ code: 'checkout_limit' }), '/subscribe')
     expect(sent).toHaveLength(0)
     report(thrown('x', ['    at f (https://goblin.test/a.js:1:1)']), '/')
     expect(sent).toHaveLength(1)
@@ -132,19 +130,5 @@ describe('the account API client', () => {
       frames: ['https://goblin.test/b.js:1:1'],
       build: 'dev',
     })
-  })
-
-  it('words a billing refusal with its copy, kind and reference', () => {
-    const refused = new BillingRefused({ code: 'checkout_limit', ref: 'ray-429-abcdef' })
-    expect(describeError(refused)).toMatchObject({
-      kind: BILLING_KINDS.checkout_limit,
-      code: 'checkout_limit',
-      status: BILLING_REFUSALS.checkout_limit.status,
-      retryable: false,
-      ref: 'ray-429-abcdef',
-    })
-    expect(
-      messageOf(new BillingRefused({ code: 'billing_unavailable' }), 'start checkout', { showRecovery: true }),
-    ).toBe('Checkout is being set up. Please try again later.')
   })
 })

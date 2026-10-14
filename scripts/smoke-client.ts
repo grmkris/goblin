@@ -62,7 +62,7 @@ export class DevClient {
     return this.#run(Effect.flatMap(this.#owner, call), signal)
   }
 
-  /** One account API call (billing, inbound clients, crash reports), as `owner` runs one. */
+  /** One account API call (inbound clients, crash reports), as `owner` runs one. */
   account<A, E>(call: (api: AccountClient) => Effect.Effect<A, E>, signal?: AbortSignal): Promise<A> {
     return this.#run(Effect.flatMap(this.#account, call), signal)
   }

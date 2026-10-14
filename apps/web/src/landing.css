@@ -354,12 +354,6 @@
   outline-offset: 2px;
 }
 
-/* The permission card sits in the middle of its column, nearer the copy it illustrates. */
-.landing-permission {
-  display: flex;
-  justify-content: center;
-}
-
 /* The shelf, typeset: what each group is for, then its servers. */
 .landing-shelf {
   display: flex;
@@ -457,78 +451,7 @@
   height: 0.875rem;
 }
 
-/* Paid on mainnet: what each payment was for, its amount, and its transaction. */
-.landing-receipts {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0.25rem 1.25rem;
-  border-radius: 1.25rem;
-  background: var(--card);
-  box-shadow:
-    0 0 0 1px var(--hairline),
-    var(--shadow-1);
-  list-style: none;
-}
-.landing-receipts > li {
-  display: grid;
-  grid-template-columns: 4.75rem minmax(0, 1fr) auto;
-  align-items: baseline;
-  gap: 0.25rem 1rem;
-  padding-block: 1rem;
-}
-/* On a narrow screen the amount and its link share a line, and what it was for runs full width under them. */
-@media (max-width: 39.99rem) {
-  .landing-receipts > li {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .landing-receipts span {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-}
-.landing-receipts > li + li {
-  border-block-start: 1px solid var(--border);
-}
-.landing-receipts b {
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-.landing-receipts span {
-  color: color-mix(in oklab, var(--foreground) 80%, var(--background));
-  font-size: var(--text-15);
-  text-wrap: pretty;
-}
-.landing-receipts a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.75rem;
-  margin-block: -0.75rem;
-  color: var(--moss);
-  font-size: var(--text-13);
-  font-weight: 500;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-.landing-receipts a:focus-visible {
-  border-radius: 0.25rem;
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-
-/* The two ways to pay, in /subscribe's look (subscribe.css): three rows each here (name, price, who it suits). */
-.landing-plans > .sub-choice {
-  grid-row: span 3;
-  padding: 1.125rem;
-  border-radius: calc(var(--radius-lg) + 1.125rem);
-}
-.landing-plans .sub-choice-figure {
-  font-size: 2.75rem;
-}
-
-/* The close: the moss field again, the four promises and the way in. */
+/* The close: the moss field again, the promises and the way in. */
 .landing-close {
   background: var(--shell);
   color: var(--shell-foreground);

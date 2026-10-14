@@ -8,14 +8,12 @@ export function LegalPage({ title, children }: { readonly title: string; readonl
     <AuthShell
       size="lg"
       title={title}
-      description="Draft for review · 13 October 2026"
+      description="Draft for review · 14 October 2026"
       footer={
         <>
           <nav aria-label="Policies" className="legal-links">
             <Link to="/terms">Terms</Link>
             <Link to="/privacy">Privacy</Link>
-            <Link to="/refunds">Refunds</Link>
-            <Link to="/subscribe">goblin Pro</Link>
           </nav>
           <p>
             <Link to="/">Back to goblin</Link>

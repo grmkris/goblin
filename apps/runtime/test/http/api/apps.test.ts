@@ -17,7 +17,7 @@ import type { ApprovalRow } from '../../../src/mcp/approvals.ts'
 import { Approvals, McpConnections, McpServers, Resident, UrlRequests } from '../../../src/mcp/service.ts'
 import type { McpConnectionSnapshot } from '../../../src/mcp/types.ts'
 import { callOwner } from '../../owner-client.ts'
-import { currentResident, json, plans, post, serve, served, stub, unrouted } from './fixture.ts'
+import { currentResident, json, post, serve, served, stub, unrouted } from './fixture.ts'
 
 /** `Apps` with `overrides`; any other member dies when used, so a test names every call it expects. */
 const fakeApps = (overrides: Partial<Apps['Service']> = {}) => stub(Apps, overrides)
@@ -36,14 +36,13 @@ type OtherParts = {
 
 /**
  * The apps and agentApps groups behind the real owner gate, over `apps` and `engine` and the other parts given. The
- * gate's plan and resident authority are the only other fakes.
+ * gate's resident authority is the only other fake.
  */
 function appsServer(
   options: {
     readonly apps?: Layer.Layer<Apps>
     readonly engine?: Layer.Layer<AppEngine>
     readonly others?: OtherParts
-    readonly active?: boolean
   } = {},
 ) {
   const resident = currentResident()
@@ -64,7 +63,6 @@ function appsServer(
           stub(Approvals, others.approvals),
           stub(UrlRequests, others.urlRequests),
           Layer.succeed(Resident, resident.service),
-          plans(options.active),
         ),
       ),
     ),

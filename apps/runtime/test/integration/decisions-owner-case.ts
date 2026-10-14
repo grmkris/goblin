@@ -3,7 +3,7 @@ import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
-import { call, grantPlan, lever, ownerFetch, person, signedIn, workspaceOf } from './owner-requests.ts'
+import { call, lever, ownerFetch, person, signedIn, workspaceOf } from './owner-requests.ts'
 
 const decode = Schema.decodeUnknownSync(DecisionProposal)
 
@@ -15,7 +15,6 @@ const decode = Schema.decodeUnknownSync(DecisionProposal)
 export async function decisionsOwnerCase(base: string): Promise<void> {
   const owner = await person(base)
   const other = await person(base)
-  for (const who of [owner, other]) await grantPlan(base, who)
   const seeded = decode(await (await lever(base, owner, 'decisions/seed')).json())
   const path = `/api/decisions/${seeded.id}`
   const body = JSON.stringify({ label: 'confirm' })

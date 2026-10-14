@@ -25,39 +25,54 @@ import { budgetFraction } from '../lib/usage.ts'
 import { StatusLabel } from './status-label.tsx'
 
 /**
- * Today's spend against the daily limit, rolling as it changes. It is read again whenever a run ends, since that is
- * when a turn's spend is recorded (`lib/workspace/invalidations.ts`); a failed re-read keeps the last value and says why.
+ * Today's tokens, against the deployment's daily cap when it sets one, rolling as they change. It is read again
+ * whenever a run ends, since that is when a turn's usage is recorded (`lib/workspace/invalidations.ts`); a failed
+ * re-read keeps the last value and says why.
  */
 function UsageMeter() {
   const read = useSuspenseQuery(usageQuery)
   const usage = read.data
+  const share = budgetFraction(usage)
+  const figures = (
+    <p className="flex items-baseline gap-1.5 text-sm text-muted-foreground">
+      <Count value={usage.used} size="display" />
+      <span>
+        {usage.limit === null ? (
+          'tokens'
+        ) : (
+          <>
+            of <Count value={usage.limit} /> tokens
+          </>
+        )}
+      </span>
+      {share !== undefined && <Count value={share} percent className="ml-auto" />}
+    </p>
+  )
   return (
     <>
       {read.isRefetchError && (
         <QueryError error={read.error} action="read today's usage" onRetry={() => void read.refetch()} />
       )}
-      <Meter value={budgetFraction(usage) * 100} aria-label="Model budget used today">
-        <p className="flex items-baseline gap-1.5 text-sm text-muted-foreground">
-          <Count value={usage.used} size="display" />
-          <span>
-            of <Count value={usage.limit} /> Credits
-          </span>
-          <Count value={budgetFraction(usage)} percent className="ml-auto" />
-        </p>
-      </Meter>
+      {share === undefined ? (
+        figures
+      ) : (
+        <Meter value={share * 100} aria-label="Daily token cap used">
+          {figures}
+        </Meter>
+      )}
     </>
   )
 }
 
-/** Today's model budget: Credits spent against the daily limit (ADR 0026). */
+/** Today's model usage in tokens, against the deployment's daily cap when it sets one. */
 export function UsageCard() {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Today's usage</CardTitle>
         <CardDescription>
-          Model Credits your agent used today. Writing costs more than reading, and context the model has seen before
-          costs much less. It starts again at 00:00 UTC.
+          Tokens your agent's model calls used today, each response's input, output and cached context together. It
+          starts again at 00:00 UTC.
         </CardDescription>
       </CardHeader>
       <CardContent>

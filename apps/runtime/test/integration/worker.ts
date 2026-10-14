@@ -4,16 +4,13 @@ import * as Effect from 'effect/Effect'
 import { nextInt } from 'effect/Random'
 import { JOB_CALLBACK } from '../../src/agent-apps/jobs.ts'
 import { PersonalAgent } from '../../src/agent.ts'
-import type { EntitlementPolicy } from '../../src/billing/gates.ts'
 import { ChatDirectory } from '../../src/chats/directory.ts'
 import { canonicalRedirect } from '../../src/http/canonical.ts'
-import { Internal } from '../../src/http/errors.ts'
 import { listTables } from '../../src/storage/vendor.ts'
 import { EventsFixture } from '../mcp/events-fixture.ts'
 import { probes as agentProbes, startupCheck } from './agent-probe.ts'
 import { probes as appsJobsProbes } from './apps-jobs-probe.ts'
 import { probes as appsProbes } from './apps-probe.ts'
-import { probes as budgetProbes } from './budget-outage.ts'
 import { probes as codeRecoveryProbes } from './code-recovery-probe.ts'
 import { probes as composerProbes } from './composer-probe.ts'
 import { probes as conversationProbes } from './conversation-probe.ts'
@@ -53,7 +50,6 @@ const PROBES = registry(
   agentProbes,
   appsJobsProbes,
   appsProbes,
-  budgetProbes,
   codeRecoveryProbes,
   composerProbes,
   conversationOpsProbes,
@@ -83,22 +79,6 @@ const PROBES = registry(
   topicProbes,
 )
 
-const fixturePlan = () =>
-  Effect.succeed({
-    active: true,
-    plan: 'pro' as const,
-    source: 'override' as const,
-    billing: null,
-    until: null,
-    dailyCredits: 300_000,
-    status: 'fixture',
-    hasCustomer: false,
-    cancelAtPeriodEnd: false,
-  })
-
-/** A plan lookup while auth D1 is down (the budget outage probe). */
-const planOutage = () => Effect.fail(new Internal({ reason: 'auth D1 unavailable' }))
-
 /** The actual PersonalAgent on a scripted model (no network): every request it makes is kept for the test to read. */
 export class PersonalAgentProbe extends PersonalAgent {
   readonly seen: SeenRequest[] = []
@@ -108,10 +88,6 @@ export class PersonalAgentProbe extends PersonalAgent {
   readonly #api = { fetch: (request: Request) => this.onRequest(request) }
   /** The tables as the constructor left them, before the lifecycle's start opens Pi (its apps read `app_` ones). */
   readonly #constructed = listTables(this.ctx.storage).map(({ name }) => name)
-  /** Which coming plan lookup fails, counted down (the Events ingress probe arms it); 0 for none. */
-  #failPlanAt = 0
-  /** Set by the budget outage probe: no plan lookup succeeds (auth D1 down). */
-  #planOutage = false
 
   modelRequestCount(): number {
     return this.seen.length
@@ -120,18 +96,6 @@ export class PersonalAgentProbe extends PersonalAgent {
   override async onStart(): Promise<void> {
     await super.onStart()
     if (profileEnabled(this.env)) await permutePrimary(this.ctx.storage, this.harness)
-  }
-
-  protected override entitlementPolicy(): EntitlementPolicy {
-    const state = () => Effect.suspend(() => (this.#planOutage ? planOutage() : fixturePlan()))
-    const require = () =>
-      Effect.suspend(() => {
-        if (this.#planOutage) return planOutage()
-        return this.#failPlanAt > 0 && --this.#failPlanAt === 0
-          ? Effect.fail(new Internal({ reason: 'fixture plan lookup failed' }))
-          : fixturePlan()
-      })
-    return { state, require, payDay: () => Effect.succeed('settled' as const) }
   }
 
   protected override mcpFetch(): typeof fetch {
@@ -210,14 +174,6 @@ export class PersonalAgentProbe extends PersonalAgent {
         cancel: (id) => this.cancelSchedule(id),
       },
       fire: (slot) => this.runAppJob(slot),
-      plan: {
-        failAt: (nth) => {
-          this.#failPlanAt = nth
-        },
-        outage: (on) => {
-          this.#planOutage = on
-        },
-      },
       producer: this.#producer,
       evict: (reason) => this.ctx.abort(reason),
     }

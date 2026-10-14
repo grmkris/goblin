@@ -17,7 +17,7 @@ const agentKeys = {
   memory: (chat: ChatId | undefined) => ['agent', 'memory', chat ?? null] as const,
 }
 
-/** Today's spend and allowance in Credits (ADR 0026). */
+/** Today's model tokens and the deployment's daily cap. */
 export const usageQuery = owner.apiQuery({ queryKey: agentKeys.usage, queryFn: (api) => api.agent.usage() })
 
 /** The owner's model and the ones the deployment offers. */

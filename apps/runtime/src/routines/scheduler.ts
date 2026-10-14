@@ -1,7 +1,6 @@
 import { type RoutineDefinition, handOverOf } from '@goblin/contracts'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
-import { requirePlan } from '../billing/gates.ts'
 import * as Schema from 'effect/Schema'
 import { type AppError, Conflict, attempt, toAppError } from '../http/errors.ts'
 import { Cipher } from '../mcp/cipher.ts'
@@ -111,14 +110,9 @@ export const fire = Effect.fn('routines.fire')(function* (slot: RoutineSlot) {
   if (definition.trigger.kind === 'event') return
   const due = dueSlot(definition, slot.firedAt, now)
   const schedule = { expectedAt: slot.firedAt, nextAt: due.nextAt, missed: due.missed }
-  // A routine that hands nothing over only reminds the owner (ADR 0041): a reminder at the slot, no run. Like everything
-  // goblin does, it needs a plan (ADR 0054, amended 2026-10-13): without one the slot passes and nothing is posted.
+  // A routine that hands nothing over only reminds the owner (ADR 0041): a reminder at the slot, no run.
   if (handOverOf(definition) === undefined) {
-    const planned = yield* requirePlan('routines').pipe(
-      Effect.as(true),
-      Effect.catchTag('SubscriptionRequired', () => Effect.succeed(false)),
-    )
-    if (!due.old && planned) yield* postReminder(row, definition, due.firedAt)
+    if (!due.old) yield* postReminder(row, definition, due.firedAt)
     yield* routines.advance({ id: row.id, revision: row.revision, ...schedule }, now)
     return yield* wakeIn(1000)
   }

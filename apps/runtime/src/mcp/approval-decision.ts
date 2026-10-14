@@ -2,7 +2,6 @@ import type { ToolExecutionResult } from '@earendil-works/pi-durable'
 import type { McpOutcome } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
-import { requirePlan } from '../billing/gates.ts'
 import { type AppError, Conflict } from '../http/errors.ts'
 import { bound } from '../runtime/boundary.ts'
 import { type ApprovalRow, metUrlRequest } from './approvals.ts'
@@ -61,8 +60,8 @@ export const sendApproved = (row: ApprovalRow, request: McpRequestOptions = {}) 
             sourceCallId: row.sourceCallId,
             taskId: row.taskId,
           }
-    // The manager checks authority again right before it dispatches, from inside its own guard: the plan, then the rest.
-    const authorize = yield* bound(Effect.andThen(requirePlan(), authority(row)))
+    // The manager checks authority again right before it dispatches, from inside its own guard.
+    const authorize = yield* bound(authority(row))
     const options = {
       ...request,
       // The owner approved it, now or by their rule: their use, which holds the connection's listen stream.
@@ -73,7 +72,7 @@ export const sendApproved = (row: ApprovalRow, request: McpRequestOptions = {}) 
     const connections = yield* McpConnections
     // A prepaid server's job is funded first (ADR 0049), once the call still has its authority.
     if (row.caller === 'model' && context !== undefined && prepaidJob(row.endpoint, row.name, args) !== undefined) {
-      yield* Effect.andThen(requirePlan(), authority(row))
+      yield* authority(row)
       // No money moves for a call that would be refused: the grant and endpoint the owner reviewed still hold.
       const policy = Option.getOrUndefined(yield* (yield* McpGrants).policy(row.connectionId, row.name))
       if (

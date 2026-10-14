@@ -40,29 +40,11 @@ export interface RuntimeEnv {
   readonly MEMORY_MODEL?: string
   /** Native fixture only: tokens main runs past its memory view before a new one (`memory.ts` `FOLD_TOKENS`). */
   readonly MEMORY_FOLD_TOKENS?: string
-  /**
-   * JSON `{ default?, models?, aliases? }` of tokens per estimated Token Plan Credit by model (`budget-credits.ts`);
-   * unset, Alibaba's example rates apply to every model.
-   */
-  readonly MODEL_CREDIT_RATES?: string
+  /** The most tokens one account's model calls may use in a UTC day, a positive whole number; unset, no cap. */
+  readonly DAILY_TOKEN_CAP?: string
   /** JSON list of outbound MCP servers every account has: `[{ connectionId, endpoint, label?, issuer?, resource? }]`. */
   readonly MCP_SERVERS?: string
   /** 32 random bytes, base64: encrypts outbound OAuth credentials at rest. */
   readonly CREDENTIAL_KEY: string
   readonly STAGE?: 'local' | 'dev' | 'prod' | 'test'
-  readonly DODO_PAYMENTS_API_KEY?: string
-  readonly DODO_PAYMENTS_WEBHOOK_KEY?: string
-  readonly DODO_PAYMENTS_ENVIRONMENT?: 'test_mode' | 'live_mode'
-  readonly DODO_PRODUCT_ID?: string
-  /** `on` turns the card checkout (Dodo, ADR 0015) back on; unset or anything else, it is off (ADR 0054). */
-  readonly CARD_CHECKOUT?: string
-  /** The Goblin Wallet's origin, where the owner signs goblin Pro once (ADR 0054). */
-  readonly WALLET_ORIGIN?: string
-  /** Secret: goblin's merchant key at that wallet, the bearer of its `/api/merchant/*`. */
-  readonly WALLET_MERCHANT_KEY?: string
-  /**
-   * JSON prices of goblin Pro's two ways to pay (`billing/plans.ts`, ADR 0054): `{ day?, month? }`, each any of
-   * `amountUsd`, `periodDays` and `dailyCredits`; unset, the day pass is $1 a day and monthly $15 every 30 days.
-   */
-  readonly PLAN_CATALOG?: string
 }

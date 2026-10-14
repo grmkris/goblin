@@ -4,7 +4,7 @@
 
 const SHELF: readonly { readonly group: string; readonly servers: readonly string[] }[] = [
   { group: 'Your apps', servers: ['mysi: notes, browsers, Telegram, email, skills and terminals'] },
-  { group: 'Pay and publish', servers: ['Goblin Wallet', 'Cloudflare'] },
+  { group: 'Publish', servers: ['Cloudflare'] },
   { group: 'Travel', servers: ['Kiwi.com', 'trivago', 'Ferryhopper'] },
   { group: 'Knowledge', servers: ['Wikidata', 'Microsoft Learn', 'AWS Knowledge', 'Hugging Face'] },
   { group: 'Crypto data', servers: ['CoinGecko', 'Etherscan'] },

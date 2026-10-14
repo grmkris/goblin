@@ -43,8 +43,8 @@ export const internalCall = <A, E>(
 
 /**
  * An MCP Events webhook delivered to the agent's ingress (`/internal/mcp-events`), as the sender's answer. A failure
- * of ours, a plan lookup that failed among them, is transient: 503, so the sender keeps the subscription and retries.
- * Any other failure (no plan, a bad signature) is that failure.
+ * of ours is transient: 503, so the sender keeps the subscription and retries. Any other failure (authority off, a
+ * bad signature) is that failure.
  */
 export const deliverEvents = (
   agent: AgentFetch,

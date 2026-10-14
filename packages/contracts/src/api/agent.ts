@@ -16,7 +16,7 @@ const ChannelPick = Schema.Struct({ connectionId: NonEmptyString(64) })
  * API's `/api` prefix; every endpoint can also answer owner admission's failures, and `error` names the ones the
  * endpoint itself produces.
  *
- * - `usage`: `GET /api/agent/usage`, today's spend and allowance in Credits (ADR 0026).
+ * - `usage`: `GET /api/agent/usage`, today's model tokens and the deployment's daily cap.
  * - `model`, `chooseModel`: `GET`/`PUT /api/agent/model`. A pick moves main at once; other threads follow on their
  *   next turn. A model the deployment does not offer is invalid input.
  * - `channel`: `GET /api/agent/channel`, the connection carrying Telegram (ADR 0009), or null when it is off.

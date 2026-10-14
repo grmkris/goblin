@@ -1,6 +1,6 @@
 import * as Effect from 'effect/Effect'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Forbidden, Internal, NotFound, ResidentInactive, SubscriptionRequired } from '../../src/http/errors.ts'
+import { Forbidden, Internal, NotFound, ResidentInactive } from '../../src/http/errors.ts'
 import type { McpServerConfig } from '@goblin/contracts'
 import { type EventsOptions, makeEvents } from '../../src/mcp/events.ts'
 import { receive } from '../../src/mcp/events/ingress.ts'
@@ -23,7 +23,7 @@ afterEach(() => {
 })
 
 /** The answer of an ingress whose authority check ends with `refusal`; nothing past that check is reached. */
-const refusedBy = (refusal: Effect.Effect<never, Internal | Forbidden | ResidentInactive | SubscriptionRequired>) =>
+const refusedBy = (refusal: Effect.Effect<never, Internal | Forbidden | ResidentInactive>) =>
   Effect.runPromise(
     receive(
       // SAFETY: a refused authority check answers before the store, cipher or persistence is read.
@@ -42,7 +42,6 @@ const refusedBy = (refusal: Effect.Effect<never, Internal | Forbidden | Resident
 describe('the Events webhook ingress (unit)', () => {
   it("ends the subscription (410) only for the owner's own refusals", async () => {
     for (const refusal of [
-      new SubscriptionRequired({ subscribe: '/subscribe' }),
       new ResidentInactive({ state: 'revoked' }),
       new Forbidden({ reason: 'event connection requires authorization' }),
     ])
@@ -52,14 +51,14 @@ describe('the Events webhook ingress (unit)', () => {
   it('answers any other failure of the check 503, so the sender retries, and reports it', async () => {
     const lines: string[] = []
     vi.spyOn(console, 'error').mockImplementation((line: string) => void lines.push(line))
-    expect(await refusedBy(Effect.fail(new Internal({ reason: 'plan lookup failed' })))).toEqual({ status: 503 })
+    expect(await refusedBy(Effect.fail(new Internal({ reason: 'grant lookup failed' })))).toEqual({ status: 503 })
     expect(await refusedBy(Effect.die(new TypeError('network')))).toEqual({ status: 503 })
     const reported = lines.map((line): unknown => JSON.parse(line))
     expect(reported).toEqual([
       expect.objectContaining({ event: 'failure', where: 'mcp.events.ingress', 'error.type': 'Internal' }),
       expect.objectContaining({ event: 'failure', where: 'mcp.events.ingress', 'error.type': 'TypeError' }),
     ])
-    expect(JSON.stringify(reported)).not.toContain('plan lookup failed')
+    expect(JSON.stringify(reported)).not.toContain('grant lookup failed')
   })
 })
 

@@ -24,7 +24,7 @@ import {
   moveStopCase,
   moveTopicCase,
 } from './move-case.ts'
-import { call, grantPlan, lever, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
+import { call, lever, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 import { clientErrorsCase, conversationEventsCase, csrfCase, internalRefusalCase } from './edge-case.ts'
 
 const harness = Test.make({
@@ -46,7 +46,7 @@ harness.test(
   }),
 )
 harness.test(
-  'native: an approval with no Credits left runs once, answers 200 and keeps its outcome for the next turn',
+  "native: an approval once the day's tokens are spent runs once, answers 200 and keeps its outcome for the next turn",
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => approvalKeptCase(url)))),
 )
 harness.test(
@@ -149,7 +149,6 @@ harness.test(
 async function ownerRoutingCase(url: string): Promise<void> {
   const owner = await person(url)
   const other = await person(url)
-  for (const who of [owner, other]) await grantPlan(url, who)
   const me = signedIn(url, owner)
   const thread = await callOwner(me, (api) => api.conversations.create({ payload: {} }))
   const sentinel = `private-owner-${crypto.randomUUID()}`
@@ -185,7 +184,6 @@ if (primaryProfile === 'permuted')
       const { url } = yield* stack
       const response = yield* Effect.promise(async () => {
         const owner = await person(url)
-        await grantPlan(url, owner)
         return lever(url, owner, 'primary-profile')
       })
       expect(response.status).toBe(200)

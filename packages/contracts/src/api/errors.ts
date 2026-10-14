@@ -44,17 +44,6 @@ export class BudgetExhausted extends Schema.TaggedError<BudgetExhausted>()('Budg
   resetsAt: Schema.Number,
   ref,
 }) {}
-/**
- * What a `SubscriptionRequired` refused: `chat`, goblin itself, for an account without a plan (ADR 0054, amended
- * 2026-10-13: there is no free plan); `hand_over`, a routine handing its work to Goblin or a Persona (ADR 0012, amended
- * 2026-10-12), which a plan may leave out.
- */
-export const PlanFeature = Schema.Literals(['chat', 'hand_over'])
-export class SubscriptionRequired extends Schema.TaggedError<SubscriptionRequired>()('SubscriptionRequired', {
-  subscribe: Schema.String,
-  feature: Schema.optionalKey(PlanFeature),
-  ref,
-}) {}
 export class NeedsAuthorization extends Schema.TaggedError<NeedsAuthorization>()('NeedsAuthorization', {
   connectionId: Schema.String,
   ref,
@@ -95,7 +84,6 @@ export const AppError = Schema.Union([
   PayloadTooLarge,
   ResidentInactive,
   BudgetExhausted,
-  SubscriptionRequired,
   NeedsAuthorization,
   ScopeRequired,
   UpstreamMcp,
@@ -118,7 +106,6 @@ export const ERROR_COPY = {
   PayloadTooLarge: { message: 'That is too large.' },
   ResidentInactive: { message: 'Resident authority is off.', recovery: 'Re-enable it in Settings.' },
   BudgetExhausted: { message: "You have used today's model budget.", recovery: 'It resets at 00:00 UTC.' },
-  SubscriptionRequired: { message: 'Subscribe to Pro to use your personal agent.' },
   NeedsAuthorization: { message: 'This server needs to be connected again.' },
   ScopeRequired: {
     message: 'This connection needs more access.',
@@ -127,18 +114,6 @@ export const ERROR_COPY = {
   UpstreamMcp: { message: 'The MCP server did not respond as expected.' },
   Internal: { message: 'Something went wrong on our side.', recovery: 'Try again.' },
 } as const satisfies Record<AppErrorTag, { readonly message: string; readonly recovery?: string }>
-
-/** What a `SubscriptionRequired` for one feature says instead: what is part of Pro, and what the owner can do now. */
-const FEATURE_COPY = {
-  chat: {
-    message: 'goblin answers once you have goblin Pro.',
-    recovery: 'Pick a day pass or monthly. If a day pass could not be paid, add funds in your Goblin Wallet.',
-  },
-  hand_over: {
-    message: 'Handing an event or a schedule to goblin or a Persona is part of Pro.',
-    recovery: 'Subscribe to Pro, or have it only tell you.',
-  },
-} as const satisfies Record<typeof PlanFeature.Type, { readonly message: string; readonly recovery: string }>
 
 /** What an `UpstreamMcp` says when the server was not reached at all (a network failure, a timeout): try again. */
 const UNREACHED_COPY = { message: 'The MCP server could not be reached. Try again in a minute.' } as const
@@ -171,7 +146,6 @@ export const statusOf = (error: AppError | typeof AppError.Encoded): number =>
       PayloadTooLarge: () => 413,
       ResidentInactive: () => 409,
       BudgetExhausted: () => 429,
-      SubscriptionRequired: () => 402,
       NeedsAuthorization: () => 409,
       ScopeRequired: () => 403,
       UpstreamMcp: (upstream) => (upstream.reason === 'timeout' ? 504 : 502),
@@ -190,8 +164,6 @@ const DETAIL_FIELDS = {
   connectionId: Schema.optionalKey(Schema.String),
   name: Schema.optionalKey(Schema.String),
   state: Schema.optionalKey(Schema.String),
-  subscribe: Schema.optionalKey(Schema.String),
-  feature: Schema.optionalKey(PlanFeature),
   limit: Schema.optionalKey(Schema.Number),
   resetsAt: Schema.optionalKey(Schema.Number),
   rpcCode: Schema.optionalKey(Schema.Number),
@@ -212,17 +184,13 @@ export const codeOf = <const Tag extends string>(tag: Tag): SnakeCase<Tag> =>
 const TAG_OF_CODE: ReadonlyMap<string, string> = new Map(Object.keys(ERROR_COPY).map((tag) => [codeOf(tag), tag]))
 
 /**
- * A failure's fixed copy, as the API answers it and the web shows it: its tag's, or, for a feature the plan leaves out,
- * that feature's, or for an MCP server that was not reached, that it was not.
+ * A failure's fixed copy, as the API answers it and the web shows it: its tag's, or, for an MCP server that was not
+ * reached, that it was not.
  */
 export const failureCopy = (
   error: AppError | typeof AppError.Encoded,
 ): { readonly message: string; readonly recovery?: string } =>
-  Predicate.isTagged(error, 'SubscriptionRequired') && error.feature !== undefined
-    ? FEATURE_COPY[error.feature]
-    : unreached(error)
-      ? UNREACHED_COPY
-      : ERROR_COPY[error._tag]
+  unreached(error) ? UNREACHED_COPY : ERROR_COPY[error._tag]
 
 /** The envelope body of an encoded failure: its code and fixed copy, then its own safe fields. */
 const toWire = (encoded: typeof AppError.Encoded): ErrorEnvelope => {
@@ -294,7 +262,6 @@ const envelope = <const Members extends readonly [AppErrorClass, ...AppErrorClas
 export const ApiErrors = {
   invalidInput: envelope(400, [InvalidInput]),
   unauthenticated: envelope(401, [Unauthenticated]),
-  subscriptionRequired: envelope(402, [SubscriptionRequired]),
   forbidden: envelope(403, [Forbidden, GrantDenied, ScopeRequired]),
   notFound: envelope(404, [NotFound]),
   conflict: envelope(409, [Conflict, ResidentInactive, NeedsAuthorization]),
@@ -309,7 +276,6 @@ export const ApiErrors = {
 export const API_ERRORS = [
   ApiErrors.invalidInput,
   ApiErrors.unauthenticated,
-  ApiErrors.subscriptionRequired,
   ApiErrors.forbidden,
   ApiErrors.notFound,
   ApiErrors.conflict,

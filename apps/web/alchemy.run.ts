@@ -3,29 +3,11 @@ import * as Cloudflare from 'alchemy/Cloudflare'
 import * as Config from 'effect/Config'
 import * as Effect from 'effect/Effect'
 import * as Redacted from 'effect/Redacted'
-import * as Schema from 'effect/Schema'
-import { PlanCatalogSetting } from '@goblin/contracts'
 import { fileURLToPath } from 'node:url'
 import { stackState } from '../../scripts/alchemy-state.ts'
 import { resolveStage } from '../../scripts/stage-config.ts'
 
 const root = fileURLToPath(new URL('./', import.meta.url))
-
-/**
- * `GOBLIN_PLAN_CATALOG`, the prices of goblin Pro's day pass and monthly (ADR 0054); unset, the defaults in
- * `billing/plans.ts`. A setting that does not decode stops the deploy rather than sell at the defaults.
- */
-const planCatalog = Config.String('GOBLIN_PLAN_CATALOG').pipe(
-  Config.withDefault(''),
-  Config.mapEffect((value) =>
-    value.trim() === ''
-      ? Effect.succeed(value)
-      : Schema.decodeUnknownEffect(Schema.fromJsonString(PlanCatalogSetting))(value).pipe(
-          Effect.as(value),
-          Effect.mapError((error) => new Config.ConfigError(error)),
-        ),
-  ),
-)
 
 /** The model gateway, model choice and daily budget the Worker reads (docs/development.md). */
 const modelEnv = {
@@ -33,19 +15,8 @@ const modelEnv = {
   MODEL_ID: Config.String('GOBLIN_MODEL_ID').pipe(Config.withDefault('gemini-3.8-flash')),
   MODELS: Config.String('GOBLIN_MODELS').pipe(Config.withDefault('')),
   MODEL_KEY: Config.Redacted('GOBLIN_MODEL_KEY').pipe(Config.withDefault(Redacted.make(''))),
-  MODEL_CREDIT_RATES: Config.String('GOBLIN_MODEL_CREDIT_RATES').pipe(Config.withDefault('')),
+  DAILY_TOKEN_CAP: Config.String('GOBLIN_DAILY_TOKEN_CAP').pipe(Config.withDefault('')),
   MEMORY_MODEL: Config.String('GOBLIN_MEMORY_MODEL').pipe(Config.withDefault('')),
-}
-
-/**
- * goblin Pro paid as a USDC subscription in the Goblin Wallet, a day pass or monthly, at the catalog's prices (ADR
- * 0054); the card checkout stays off unless `on`.
- */
-const billingEnv = {
-  PLAN_CATALOG: planCatalog,
-  CARD_CHECKOUT: Config.String('GOBLIN_CARD_CHECKOUT').pipe(Config.withDefault('off')),
-  WALLET_ORIGIN: Config.String('GOBLIN_WALLET_ORIGIN').pipe(Config.withDefault('')),
-  WALLET_MERCHANT_KEY: Config.Redacted('GOBLIN_WALLET_MERCHANT_KEY').pipe(Config.withDefault(Redacted.make(''))),
 }
 
 /** What the Website build reads: a change to any of them builds again. */
@@ -77,11 +48,6 @@ export default Alchemy.Stack(
     if (mailSender === '') return yield* Effect.die(new Error('OTP login requires GOBLIN_MAIL_SENDER'))
     if (stage.name === 'dev' && signupMode === 'open')
       return yield* Effect.die(new Error('dev_sign_up_must_be_closed_or_invite_only'))
-    const billingEnvironment = yield* Config.String('DODO_PAYMENTS_ENVIRONMENT').pipe(
-      Config.withDefault(stage.name === 'prod' ? 'live_mode' : 'test_mode'),
-    )
-    if ((stage.name === 'prod') !== (billingEnvironment === 'live_mode'))
-      return yield* Effect.die(new Error('Dodo stage and billing mode must match'))
     const db = yield* Cloudflare.D1.Database('goblinAuth', {
       name: stage.resourceName('auth'),
       migrations: fileURLToPath(new URL('../../apps/runtime/migrations', import.meta.url)),
@@ -95,7 +61,6 @@ export default Alchemy.Stack(
       rootDir: root,
       main: 'src/worker.ts',
       workersDev: true,
-      crons: ['17 * * * *'],
       ...(domain === ''
         ? {}
         : {
@@ -133,13 +98,6 @@ export default Alchemy.Stack(
         ...modelEnv,
         MCP_SERVERS: Config.String('GOBLIN_MCP_SERVERS').pipe(Config.withDefault('[]')),
         CREDENTIAL_KEY: Config.Redacted('GOBLIN_CREDENTIAL_KEY'),
-        DODO_PAYMENTS_ENVIRONMENT: billingEnvironment,
-        DODO_PAYMENTS_API_KEY: Config.Redacted('DODO_PAYMENTS_API_KEY').pipe(Config.withDefault(Redacted.make(''))),
-        DODO_PAYMENTS_WEBHOOK_KEY: Config.Redacted('DODO_PAYMENTS_WEBHOOK_KEY').pipe(
-          Config.withDefault(Redacted.make('')),
-        ),
-        DODO_PRODUCT_ID: Config.Redacted('DODO_PRODUCT_ID').pipe(Config.withDefault(Redacted.make(''))),
-        ...billingEnv,
         STAGE: runtimeStage(stage.name),
         // The release SHA stage.ts sets: as a prop it changes every release, which forces the rebuild that bakes it
         // into the client bundle (the build's input hash covers files only). Unset (the local stack), crash reports

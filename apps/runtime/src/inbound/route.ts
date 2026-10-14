@@ -24,7 +24,7 @@ export const handleInboundMcp = async (request: Request, env: RuntimeEnv): Promi
     return challengeOf(env.APP_URL)
   }
   // The token's subject is the user who consented; the client talks to that user's agent only, through its internal
-  // API. Asking and reading main need a plan, which the agent checks; inspecting your own agent does not.
+  // API.
   const agent = env.AGENTS.getByName(principal.subject)
   const name = await clientName(principal.clientId, env)
   const inspect: InspectReader = (query) =>

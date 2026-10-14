@@ -3,7 +3,7 @@ import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import type { Budget } from '../budget.ts'
-import type { TokenUse } from '../budget-credits.ts'
+import type { TokenUse } from '../token-use.ts'
 import type { AppError } from '../http/errors.ts'
 import type { Resident } from '../mcp/service.ts'
 import type { AuxCall } from '../telemetry/report.ts'
@@ -100,7 +100,7 @@ const reported = (deps: CriticDeps, startedAt: number, usage: TokenUse, failed: 
 const modelAnswers = (deps: CriticDeps, item: Judgment, startedAt: number): Effect.Effect<Answers, ClefError> =>
   Effect.gen(function* () {
     const data = packet([item.case])
-    const charge = (use: TokenUse) => deps.budget.record(use, seconds(startedAt), 'clef')
+    const charge = (use: TokenUse) => deps.budget.record(use, seconds(startedAt))
     const raw = yield* deps.clef
       .evaluate(data)
       .pipe(

@@ -1,27 +1,14 @@
 import { describe, expect, it } from '@effect/vitest'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
-import { Entitlements } from '../src/billing/gates.ts'
-import type { AccountPlan } from '../src/billing/reconcile.ts'
 import { Budget } from '../src/budget.ts'
-import { type AppError, Internal, NotFound, ResidentInactive, SubscriptionRequired } from '../src/http/errors.ts'
+import { type AppError, NotFound, ResidentInactive } from '../src/http/errors.ts'
 import { Resident } from '../src/mcp/service.ts'
 import { routineToolVerdict } from '../src/pi/routine-budget.ts'
 import type { RoutineRun } from '../src/routines/runs.ts'
 import { RoutineRuns, RoutineUsage } from '../src/routines/service.ts'
 import { fake } from './fake.ts'
 
-const PLAN: AccountPlan = {
-  active: true,
-  plan: 'pro',
-  source: 'override',
-  billing: null,
-  until: null,
-  dailyCredits: 800,
-  status: 'active',
-  hasCustomer: false,
-  cancelAtPeriodEnd: false,
-}
 const DEFINITION = JSON.stringify({
   title: 'Daily',
   trigger: { kind: 'cron', expression: '0 9 * * *' },
@@ -36,7 +23,6 @@ const DEFINITION = JSON.stringify({
 })
 
 type Gate = {
-  readonly plan?: Effect.Effect<AccountPlan, Internal | SubscriptionRequired>
   readonly resident?: Effect.Effect<void, AppError>
   readonly run?: Effect.Effect<RoutineRun, AppError>
   readonly used?: number
@@ -47,11 +33,6 @@ const services = (gate: Gate = {}) => {
   const run = fake<RoutineRun>({ id: 'rr_1', state: 'running', deadlineAt: Number.MAX_SAFE_INTEGER, sessionId: null })
   const runWithDefinition = { ...run, definitionJson: DEFINITION }
   return Layer.mergeAll(
-    Layer.succeed(Entitlements, {
-      state: () => Effect.succeed(PLAN),
-      require: () => gate.plan ?? Effect.succeed(PLAN),
-      payDay: () => Effect.succeed('settled'),
-    }),
     Layer.succeed(Resident, fake<typeof Resident.Service>({ require: () => gate.resident ?? Effect.void })),
     Layer.succeed(
       RoutineRuns,
@@ -79,20 +60,14 @@ describe("a routine's tool gate (R2)", () => {
     Effect.gen(function* () {
       expect(yield* verdict('other')).toBe('refused')
       expect(yield* verdict('s1', { used: 1000 })).toBe('refused')
-      expect(yield* verdict('s1', { plan: Effect.fail(new SubscriptionRequired({ subscribe: '/subscribe' })) })).toBe(
-        'refused',
-      )
       expect(yield* verdict('s1', { resident: Effect.fail(new ResidentInactive({ state: 'revoked' })) })).toBe(
         'refused',
       )
     }),
   )
 
-  it.effect('blocks as a failed check, not a refusal, when storage or auth D1 fails', () =>
+  it.effect('blocks as a failed check, not a refusal, when storage fails', () =>
     Effect.gen(function* () {
-      expect(yield* verdict('s1', { plan: Effect.fail(new Internal({ reason: 'billing storage unavailable' })) })).toBe(
-        'failed',
-      )
       expect(yield* verdict('s1', { run: Effect.fail(new NotFound({ what: 'routine run' })) })).toBe('failed')
       expect(yield* verdict('s1', { run: Effect.die(new Error('SQLITE_BUSY')) })).toBe('failed')
     }),

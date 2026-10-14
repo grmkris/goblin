@@ -8,7 +8,7 @@ import { API_ERRORS } from './errors.ts'
 const ClientId = Schema.String.check(Schema.isPattern(/^[\w.-]{1,200}$/u))
 
 /**
- * The MCP clients the owner let use their agent (ADR 0024), served by the Worker for an account with a plan. Paths are
+ * The MCP clients the owner let use their agent (ADR 0024), served by the Worker for a signed-in account. Paths are
  * relative to the API's `/api` prefix. Each can answer any `AppError` envelope (`API_ERRORS`), the edge's admission
  * refusals among them.
  *

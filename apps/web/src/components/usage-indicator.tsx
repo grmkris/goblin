@@ -3,9 +3,10 @@ import { Count, Popover, PopoverContent, PopoverTrigger, UsageRing } from '@gobl
 import { budgetFraction } from '../lib/usage.ts'
 
 /**
- * How much of today's model budget is spent (the ring) and, in a wide pane, how full the conversation's context is.
- * The numbers roll when a turn ends rather than with every streamed token. The figures in words open on hover, or on a
- * tap where there is no hover (a phone shows the ring alone, and had no way to read them).
+ * Today's model usage and how full the conversation's context is. The ring is the share of the deployment's daily
+ * token cap spent, or, without a cap, how full the context is. The numbers roll when a turn ends rather than with every
+ * streamed token. The figures in words open on hover, or on a tap where there is no hover (a phone shows the ring
+ * alone, and had no way to read them).
  */
 export function UsageIndicator({
   usage,
@@ -18,10 +19,17 @@ export function UsageIndicator({
 }) {
   if (usage === undefined) return null
   const today = budgetFraction(usage)
-  const budget = `${Math.round(today * 100)}% of today's model budget used`
+  const budget =
+    today === undefined
+      ? `${usage.used.toLocaleString()} tokens used today`
+      : `${Math.round(today * 100)}% of today's token cap used`
   const of = contextWindow === undefined ? '' : ` of ${contextWindow.toLocaleString()}`
   const tokens = context === undefined ? undefined : `${context.toLocaleString()} tokens in context${of}`
   const label = tokens === undefined ? budget : `${budget}; ${tokens}`
+  const full =
+    context === undefined || contextWindow === undefined || contextWindow <= 0
+      ? 0
+      : Math.min(1, context / contextWindow)
   return (
     <Popover>
       <PopoverTrigger
@@ -29,9 +37,9 @@ export function UsageIndicator({
         delay={400}
         render={<button type="button" className="usage-indicator" aria-label={label} />}
       >
-        <UsageRing value={today} label={label} />
+        <UsageRing value={today ?? full} label={label} />
         <span className="usage-figures" aria-hidden>
-          <Count value={today} percent /> today
+          {today === undefined ? <Count value={usage.used} compact /> : <Count value={today} percent />} today
           {context !== undefined && (
             <>
               <span>·</span>

@@ -3,30 +3,16 @@ import * as Layer from 'effect/Layer'
 import { describe, expect, it } from 'vitest'
 import { appServices } from '../src/agent-apps/ports.ts'
 import { AppCodeError } from '../src/agent-apps/queue.ts'
-import { Entitlements } from '../src/billing/gates.ts'
-import type { AccountPlan } from '../src/billing/reconcile.ts'
 import { Budget } from '../src/budget.ts'
 import { Setups } from '../src/setup/service.ts'
 import type { SetupScope } from '../src/setup/scope.ts'
 import { Channel } from '../src/channel/service.ts'
-import { Forbidden, ResidentInactive, SubscriptionRequired } from '../src/http/errors.ts'
+import { Forbidden, ResidentInactive } from '../src/http/errors.ts'
 import { McpConnections, Resident } from '../src/mcp/service.ts'
 import type { McpCallOptions, McpConnectionSnapshot } from '../src/mcp/types.ts'
 import type { RunProgram } from '../src/runtime/bridge.ts'
 
 const complete = () => Effect.succeed('an answer')
-
-const PLAN: AccountPlan = {
-  active: true,
-  plan: 'pro',
-  source: 'override',
-  billing: null,
-  until: null,
-  dailyCredits: 800,
-  status: 'active',
-  hasCustomer: false,
-  cancelAtPeriodEnd: false,
-}
 
 /** A service of which a test fakes only the members the code under test calls. */
 const part = <S>(service: Partial<S>): S =>
@@ -34,7 +20,7 @@ const part = <S>(service: Partial<S>): S =>
   service as S
 
 /** The services an app's powers read, each the part these tests use, with what the tests change about them. */
-const world = (options: { readonly resident?: boolean; readonly plan?: boolean; readonly channel?: string } = {}) => {
+const world = (options: { readonly resident?: boolean; readonly channel?: string } = {}) => {
   const calls: { readonly connectionId: string; readonly name: string; readonly authorized: boolean }[] = []
   const scope: SetupScope = {
     editable: true,
@@ -45,13 +31,7 @@ const world = (options: { readonly resident?: boolean; readonly plan?: boolean; 
     subagents: () => true,
     app: () => true,
   }
-  const refused = Effect.fail(new SubscriptionRequired({ subscribe: '/subscribe' }))
   const services = Layer.mergeAll(
-    // The plan the host's re-check reads, as the fake `run` below checks it first.
-    Layer.succeed(
-      Entitlements,
-      part<Entitlements['Service']>({ require: () => (options.plan === false ? refused : Effect.succeed(PLAN)) }),
-    ),
     Layer.succeed(
       Resident,
       part<Resident['Service']>({
@@ -96,15 +76,10 @@ const world = (options: { readonly resident?: boolean; readonly plan?: boolean; 
       }),
     ),
   )
-  /** The bridge's `run`: the plan check, then the program over the fakes. */
+  /** The bridge's `run`: the program over the fakes. */
   const run: RunProgram = (program) =>
-    Effect.runPromise(
-      Effect.andThen(
-        options.plan === false ? refused : Effect.void,
-        // SAFETY: the powers' programs require only the services faked above.
-        program.pipe(Effect.provide(services)) as Effect.Effect<never>,
-      ),
-    )
+    // SAFETY: the powers' programs require only the services faked above.
+    Effect.runPromise(program.pipe(Effect.provide(services)) as Effect.Effect<never>)
   return { powers: appServices(run, complete), calls }
 }
 
@@ -119,11 +94,10 @@ describe("an agent app's powers over the agent's services", () => {
     expect(calls).toHaveLength(1)
   })
 
-  it('refuse an app a conversation switched off, and every power while authority or the plan lapsed', async () => {
+  it('refuse an app a conversation switched off, and every power while authority lapsed', async () => {
     await expect(world().powers.authorizeCall('no-apps', 'tally')).rejects.toBeInstanceOf(Forbidden)
     await expect(world().powers.authorizeCall(undefined, 'tally')).resolves.toBeUndefined()
     await expect(world({ resident: false }).powers.complete('', 'hi', 10)).rejects.toBeInstanceOf(ResidentInactive)
-    await expect(world({ plan: false }).powers.complete('', 'hi', 10)).rejects.toBeInstanceOf(SubscriptionRequired)
     await expect(world().powers.complete('', 'hi', 10)).resolves.toBe('an answer')
   })
 

@@ -8,7 +8,7 @@ import * as ManagedRuntime from 'effect/ManagedRuntime'
 import * as Option from 'effect/Option'
 import { afterEach } from 'vitest'
 import { Budget } from '../src/budget.ts'
-import type { TokenUse } from '../src/budget-credits.ts'
+import type { TokenUse } from '../src/token-use.ts'
 import { Clef, type ClefError, workersClef } from '../src/decisions/client.ts'
 import { makeDecisions } from '../src/decisions/live.ts'
 import type { Packet } from '../src/decisions/wire.ts'
@@ -97,7 +97,7 @@ type Switches = {
 
 /** What the fixture keeps of what the decisions did: charges, aux records, flows and the change bus's notices. */
 type Kept = {
-  readonly charged: { readonly use: TokenUse; readonly model: string | undefined }[]
+  readonly charged: TokenUse[]
   readonly reported: AuxCall[]
   readonly flows: FlowEvent[]
   readonly changed: string[]
@@ -137,7 +137,7 @@ const fakeClef = (state: Switches, unbound: boolean) =>
 const authority = (state: Switches, kept: Kept) =>
   Layer.mergeAll(
     Layer.mock(Budget)({
-      record: (use, _now, model) => Effect.sync(() => void kept.charged.push({ use, model })),
+      record: (use) => Effect.sync(() => void kept.charged.push(use)),
       require: () =>
         Effect.suspend(() =>
           state.exhausted ? Effect.fail(new BudgetExhausted({ limit: 0, resetsAt: 0 })) : Effect.void,

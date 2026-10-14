@@ -30,7 +30,6 @@ import { residentMcpExtension } from './pi/resident-mcp.ts'
 import { skillLearningExtension, skillsExtension } from './pi/skills.ts'
 import { AgentLive } from './layers/index.ts'
 import type { AgentServices } from './layers/index.ts'
-import { accountEntitlements, type EntitlementPolicy } from './billing/gates.ts'
 import { type Bridge, makeBridge, openRuntime } from './runtime/bridge.ts'
 import type { AgentInputs } from './runtime/input.ts'
 import { type Instrument, reported } from './runtime/instrument.ts'
@@ -144,10 +143,6 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     await reconcileAppJobs(this.#apps)
   }
 
-  /** Tests inject account authority here; the deployed object always reads its own account in auth D1. */
-  protected entitlementPolicy(): EntitlementPolicy {
-    return accountEntitlements(this.env, () => this.name)
-  }
   #services(): Promise<Runtime> {
     this.#runtime ??= openRuntime(ManagedRuntime.make(AgentLive(this.#input())))
     // expected: every caller awaiting the runtime gets its start failure; this only lets the next caller start again
@@ -169,7 +164,6 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       helperExtensions: this.#subagents.members(),
       scheduleReplies: () => void this.schedule(5, 'channelReplies'),
       userId: this.name,
-      entitlements: this.entitlementPolicy(),
       scheduleEvents: (at) => this.#scheduleWake('mcpEventsWake', at),
       schedulePull: () => this.schedule(0, 'channelPull'),
       mcpFetch: this.mcpFetch(),

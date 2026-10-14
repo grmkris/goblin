@@ -15,7 +15,7 @@ export type Ingress = {
   readonly wake: (at: number) => Effect.Effect<void, AppError>
   /** Whether a subscription is still current: its server offered at the same endpoint, its selector granted. */
   readonly valid: (row: Subscription) => Effect.Effect<boolean, AppError>
-  /** The plan and resident authority: whether the owner's agent may take events now. */
+  /** Resident authority: whether the owner's agent may take events now. */
   readonly authorized: Effect.Effect<void, AppError>
   readonly persist: (
     row: Subscription,
@@ -36,7 +36,6 @@ const refused = (ingress: Ingress): Effect.Effect<EventWebhookResult | undefined
   ingress.authorized.pipe(
     Effect.as(undefined),
     Effect.catchTags({
-      SubscriptionRequired: () => Effect.succeed(GONE),
       ResidentInactive: () => Effect.succeed(GONE),
       Forbidden: () => Effect.succeed(GONE),
     }),

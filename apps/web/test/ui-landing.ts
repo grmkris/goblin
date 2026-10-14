@@ -2,9 +2,8 @@
  * Local browser look at goblin's landing (`/`, signed out) against its real source components, at phone and desktop
  * widths in light and dark: the hero's session playing, waiting on its question, answered by pressing Allow or on its
  * own, and at its end; the page in full; and, under reduced motion, the session already at its question, with Allow
- * still answering it. `/health` and the session check are routed here; no account is made. It checks the way in, the
- * Goblin Wallet's address from `/health`, that a signed-in session leaves for its channel, and that nothing scrolls
- * sideways, and keeps screenshots.
+ * still answering it. `/health` and the session check are routed here; no account is made. It checks the way in, that a
+ * signed-in session leaves for its channel, and that nothing scrolls sideways, and keeps screenshots.
  *
  *   heavy bun apps/web/test/ui-landing.ts [--out <dir>]
  */
@@ -21,19 +20,7 @@ const out =
   options.out ?? path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance', `landing-${Date.now()}`)
 mkdirSync(out, { recursive: true, mode: 0o700 })
 
-const WALLET = 'https://wallet-dev.goblin.surf'
-const HEALTH = {
-  ok: true,
-  service: 'goblin',
-  stage: 'dev',
-  signup: 'invite',
-  mail: true,
-  plans: [
-    { id: 'day', amountUsd: '1.00', periodDays: 1 },
-    { id: 'month', amountUsd: '15.00', periodDays: 30 },
-  ],
-  walletOrigin: WALLET,
-}
+const HEALTH = { ok: true, service: 'goblin', stage: 'dev', signup: 'invite', mail: true }
 const errors: string[] = []
 
 /** A page of the fixture with `/health` and Better Auth's session answered: signed out unless `signedIn`. */
@@ -83,14 +70,12 @@ async function drive(browser: Browser, origin: string, label: string, context: B
   await page.waitForTimeout(600)
   await shoot('hero-done')
   await page.evaluate(() => window.scrollTo(0, 0))
-  // The way in, the wallet's address from /health, the command for this origin, and mainnet's receipts.
+  // The way in and the command for this origin.
   assert.equal(await page.getByRole('link', { name: 'Meet your goblin' }).first().getAttribute('href'), '/login?new=1')
-  assert.equal(await page.getByRole('link', { name: 'Open Goblin Wallet' }).first().getAttribute('href'), WALLET)
   assert.match(
     (await page.locator('.landing-command code').textContent()) ?? '',
     /^claude mcp add --transport http goblin http:\/\/127\.0\.0\.1:\d+\/mcp$/u,
   )
-  assert.equal(await page.locator('a[href^="https://basescan.org/tx/0x"]').count(), 4)
   assert.equal(await page.getByRole('link', { name: 'Source' }).count(), 0)
   await noSideways(page, label)
   // Below the fold the screenshots load lazily: scroll through once so the whole page has them.

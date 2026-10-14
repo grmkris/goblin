@@ -330,9 +330,9 @@ export class RoutineRunStore {
   }
   /**
    * Committed usage deltas have stable receipt keys; retries never charge the run or account twice. The run's own caps
-   * count `tokens`; the owner's daily budget counts `milliCredits` (ADR 0026).
+   * and the owner's daily usage both count `tokens`.
    */
-  recordUsage(id: string, key: string, tokens: number, milliCredits: number, at: number): void {
+  recordUsage(id: string, key: string, tokens: number, at: number): void {
     if (!Number.isFinite(tokens) || tokens <= 0) return
     this.db.transaction(() => {
       const exists = this.db
@@ -350,14 +350,10 @@ export class RoutineRunStore {
         .run()
       this.db
         .insert(appUsageDaily)
-        .values({ day: utcDay, tokens: spent, milliCredits, updatedAt: now })
+        .values({ day: utcDay, tokens: spent, updatedAt: now })
         .onConflictDoUpdate({
           target: appUsageDaily.day,
-          set: {
-            tokens: sql`${appUsageDaily.tokens} + ${spent}`,
-            milliCredits: sql`${appUsageDaily.milliCredits} + ${milliCredits}`,
-            updatedAt: now,
-          },
+          set: { tokens: sql`${appUsageDaily.tokens} + ${spent}`, updatedAt: now },
         })
         .run()
     })

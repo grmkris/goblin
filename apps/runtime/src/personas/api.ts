@@ -1,7 +1,6 @@
 import { OwnerApi } from '@goblin/contracts/api'
 import * as Effect from 'effect/Effect'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
-import { requirePlan } from '../billing/gates.ts'
 import { Resident } from '../mcp/service.ts'
 import { resumePersona } from './ask.ts'
 import { createPersona, personaDetail, updatePersona } from './program.ts'
@@ -18,7 +17,6 @@ export const PersonasHandlers = HttpApiBuilder.group(OwnerApi, 'personas', (hand
     .handle('reply', ({ payload }) =>
       Effect.gen(function* () {
         // The reply makes the Persona work again: the same admission an owner message gets.
-        yield* requirePlan()
         yield* Resident.use((resident) => resident.renew())
         yield* resumePersona(payload.fork, payload.operationId, payload.text)
         return null

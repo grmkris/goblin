@@ -9,7 +9,7 @@ import { ResidentLive } from '../../../src/layers/core.ts'
 import { ResidentHandlers } from '../../../src/mcp/resident-api.ts'
 import { Events } from '../../../src/mcp/service.ts'
 import { callOwner } from '../../owner-client.ts'
-import { database, get, plans, post, serve, served, sqliteDb, stub } from './fixture.ts'
+import { database, get, post, serve, served, sqliteDb, stub } from './fixture.ts'
 
 const fixture = () => {
   const disabled: (string | undefined)[] = []
@@ -18,7 +18,7 @@ const fixture = () => {
   })
   const { fetch } = serve(
     served([ResidentGroup], ResidentHandlers).pipe(
-      Layer.provide(Layer.mergeAll(ResidentLive.pipe(Layer.provide(sqliteDb(database()))), events, plans())),
+      Layer.provide(Layer.mergeAll(ResidentLive.pipe(Layer.provide(sqliteDb(database()))), events)),
     ),
   )
   return { fetch, disabled }

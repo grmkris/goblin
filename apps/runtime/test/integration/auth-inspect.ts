@@ -3,7 +3,7 @@ import { InspectConversations } from '@goblin/contracts/inspect'
 import { Schema } from 'effect'
 import { createHash } from 'node:crypto'
 import { expect } from 'vitest'
-import { grantPlan, type Person, person } from './owner-requests.ts'
+import { type Person, person } from './owner-requests.ts'
 
 const APP = 'https://goblin.test'
 const REDIRECT = 'http://127.0.0.1:9/callback'
@@ -171,7 +171,7 @@ async function discoveryCase(base: string) {
 
 /**
  * ADR 0024 end to end on the real Worker, D1 auth store and agents: one /mcp, whose inspection tools a client gets
- * only while the owner's consent grants `goblin:inspect`. Reading needs no plan; asking does.
+ * only while the owner's consent grants `goblin:inspect`.
  */
 export async function inspectAuthCase(base: string) {
   await discoveryCase(base)
@@ -195,13 +195,6 @@ export async function inspectAuthCase(base: string) {
     expect(Schema.is(InspectConversations)(conversations.structuredContent)).toBe(true)
     const missing = await client.callTool({ name: 'inspect_turn', arguments: { operationId: 'no-such-turn' } })
     expect(missing).toMatchObject({ isError: true, content: [{ text: '{"_tag":"NotFound","what":"turn"}' }] })
-    // Reading needs no plan; asking runs the model and does.
-    const refused = await client.callTool({ name: 'ask_agent', arguments: { input: 'hello' } })
-    expect(refused.isError).toBe(true)
-    expect(JSON.stringify(refused.content)).toContain('SubscriptionRequired')
-    const unpaid = await client.callTool({ name: 'get_recent_messages', arguments: {} })
-    expect(unpaid.isError).toBe(true)
-    expect(JSON.stringify(unpaid.content)).toContain('SubscriptionRequired')
   } finally {
     await client.close()
   }
@@ -224,8 +217,7 @@ export async function inspectAuthCase(base: string) {
   expect(inspection(await toolsOf(base, refreshed.access_token))).toEqual([])
   expect(inspection(await toolsOf(base, narrowed.access))).toEqual([])
 
-  // With a plan, reading main's newest messages works; revoking the client in Settings then ends every token.
-  await grantPlan(base, owner)
+  // Reading main's newest messages works; revoking the client in Settings then ends every token.
   const reading = await connect(base, narrowed.access)
   try {
     const recent = await reading.callTool({ name: 'get_recent_messages', arguments: { limit: 5 } })
