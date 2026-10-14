@@ -13,7 +13,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0005](0005-mcp-apps-host.md) | One live MCP App on a stage, told about its host, trusted for nothing | Accepted; its one live App superseded by 0020 |
 | [0006](0006-servers-the-owner-adds.md) | Servers the owner adds are a trust boundary, not a configuration change | Accepted |
 | [0007](0007-one-main-conversation.md) | One main conversation that never ends, with side threads and subagents | Accepted; amended by 0010, 0017, 0018 and 0032 |
-| [0008](0008-skills-from-mcp-servers.md) | Skills come from MCP servers the owner turns them on for, and the agent drafts new ones for review | Accepted |
+| [0008](0008-skills-from-mcp-servers.md) | Skills come from MCP servers the owner turns them on for, and the agent drafts new ones for review | Accepted; amended by 0063 |
 | [0009](0009-telegram-through-myagent.md) | Telegram through myagent | Accepted |
 | [0010](0010-per-conversation-capabilities-and-thread-notes.md) | Per-conversation capabilities, and main learns the names of threads started with "+" | Accepted; its per-conversation switches superseded by 0040 |
 | [0011](0011-mcp-events.md) | MCP Events consumer | Accepted |
@@ -45,12 +45,9 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0040](0040-topic-and-persona-setup.md) | Topic setup and Persona setup | Accepted |
 | [0041](0041-connections-tell-me-hand-to.md) | Connections, Tell me and Hand to | Accepted |
 | [0042](0042-mcp-2026-client.md) | MCP 2026 client: live tool lists, URL requests and step-up | Accepted |
-| [0043](0043-outside-work-through-mcp-servers.md) | Outside work comes through MCP servers, and some servers are first-class | Accepted |
-| [0044](0044-spending-rules-for-paid-tools.md) | Spending rules for paid tools | Accepted |
 | [0046](0046-production-promotion-and-public-source.md) | Daily development, deliberate production promotion and public source | Accepted |
-| [0049](0049-prepaid-servers-topped-up-from-the-wallet.md) | Prepaid servers topped up from the Goblin Wallet | Accepted |
-| [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted; amended by 0061 |
-| [0053](0053-pinned-services-and-apps-with-a-chat-bar.md) | Pinned services and Apps with a chat bar | Accepted |
+| [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted; amended by 0061 and 0063 |
+| [0053](0053-pinned-services-and-apps-with-a-chat-bar.md) | Pinned services and Apps with a chat bar | Accepted; amended by 0063 |
 | [0055](0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | Accepted |
 | [0056](0056-goblin-wallet-leaves-goblin.md) | Goblin Wallet leaves goblin | Accepted |
 | [0057](0057-goblin-pays-for-no-model-call.md) | goblin pays for no model call | Accepted |
@@ -59,3 +56,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0060](0060-suggested-access-from-tool-annotations.md) | Suggested access from tool annotations | Accepted |
 | [0061](0061-the-shelf-is-data.md) | The shelf is data | Accepted |
 | [0062](0062-short-skippable-start.md) | Short, skippable Start | Accepted |
+| [0063](0063-mcp-first-no-server-specific-code.md) | MCP-first: no server-specific code | Accepted |

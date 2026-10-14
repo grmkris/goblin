@@ -13,3 +13,6 @@ replaced it. Living docs never cite an archived ADR as current behaviour.
 | [0026](0026-daily-budget-in-credits.md) | The daily budget is estimated Token Plan Credits | [0058](../0058-no-plans-tokens-and-an-optional-cap.md) |
 | [0054](0054-pro-paid-as-a-signed-usdc-subscription.md) | Pro paid as a signed USDC subscription | [0058](../0058-no-plans-tokens-and-an-optional-cap.md) |
 | [0048](0048-first-run-start.md) | First-run Start | [0062](../0062-short-skippable-start.md) |
+| [0043](0043-outside-work-through-mcp-servers.md) | Outside work comes through MCP servers, and some servers are first-class | [0063](../0063-mcp-first-no-server-specific-code.md) |
+| [0044](0044-spending-rules-for-paid-tools.md) | Spending rules for paid tools | [0063](../0063-mcp-first-no-server-specific-code.md) |
+| [0049](0049-prepaid-servers-topped-up-from-the-wallet.md) | Prepaid servers topped up from the Goblin Wallet | [0063](../0063-mcp-first-no-server-specific-code.md) |
