@@ -100,12 +100,10 @@ describe('the agent’s presence', () => {
   })
 })
 
-describe('what a send refused by a plan with no Credits says (ADR 0047, 0054)', () => {
-  it('points at paying per call from the wallet, not at a spent day or a free plan', () => {
+describe('what a send refused by a plan with no Credits says (ADR 0054)', () => {
+  it('says the plan has none, not that the day is spent or that there is a free plan', () => {
     const none = messageOf(new BudgetExhausted({ limit: 0, resetsAt: 86_400 }), 'send the message')
-    expect(none).toBe(
-      'Your plan includes no model Credits. Choose to pay per call from your Goblin Wallet in Settings.',
-    )
+    expect(none).toBe('Your plan includes no model Credits.')
     expect(messageOf(new BudgetExhausted({ limit: 50, resetsAt: 86_400 }), 'send the message')).toBe(
       "You have used today's model budget.",
     )

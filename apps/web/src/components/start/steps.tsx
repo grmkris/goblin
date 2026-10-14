@@ -16,7 +16,6 @@ import type {
 import { Badge, Button, GoblinMark, Receipt, Textarea } from '@goblin/ui'
 import { CircleAlertIcon, CircleCheckIcon, PlusIcon, WalletIcon } from 'lucide-react'
 import { useId, useState } from 'react'
-import { payQuery } from '../../agent/queries.ts'
 import { useBilling } from '../../account/hooks.ts'
 import { messageOf } from '../../lib/query/app-error.ts'
 import { QueryBoundary } from '../../lib/query/query-boundary.tsx'
@@ -24,7 +23,6 @@ import { serverStatusQuery, serversQuery } from '../../mcp/queries.ts'
 import { startAddMutation, startPlanMutation } from '../../onboarding/queries.ts'
 import { SuggestedServers } from '../server-add.tsx'
 import { PrepaidLine } from '../first-class.tsx'
-import { PayModeChoices, payModeTitle, waysOf } from '../inference-card.tsx'
 import { ConnectServer } from './connect-server.tsx'
 
 /** Each step's name on the panel, its title, and the one line of why. */
@@ -149,27 +147,6 @@ function WalletSetup({ wallet }: { readonly wallet: OnboardingView['wallet'] }) 
   )
 }
 
-/** How goblin pays for its model now, in words, with Change opening the same choices as Settings in place. */
-function PayLine() {
-  const pay = useQuery(payQuery).data
-  const [open, setOpen] = useState(false)
-  if (pay === undefined) return null
-  const choices = waysOf(pay).length > 1
-  return (
-    <div className="start-pay">
-      <p className="start-pay-line">
-        <span>goblin pays: {payModeTitle(pay.mode)}</span>
-        {choices && (
-          <button type="button" className="start-link" aria-expanded={open} onClick={() => setOpen(!open)}>
-            {open ? 'Done' : 'Change'}
-          </button>
-        )}
-      </p>
-      {open && <PayModeChoices />}
-    </div>
-  )
-}
-
 const OFFER_NAME: Readonly<Record<BillingId, string>> = { day: 'Day pass', month: 'Monthly' }
 
 /** "$1.00 a day you use goblin", "$15.00 every 30 days": one way to pay for Pro, in words, as `lib/pro.ts` says it. */
@@ -264,7 +241,6 @@ function WalletReady({ wallet }: { readonly wallet: OnboardingView['wallet'] }) 
         )}
         {wallet.funded && billing !== undefined && <ProPlan billing={billing} />}
         {/* How each call is paid matters once Pro's Credits are there to pay first. */}
-        {hasPro(billing) && <PayLine />}
       </div>
       {!wallet.funded && wallet.fundsUrl !== undefined && (
         <SetupLink href={wallet.fundsUrl}>Add funds in your wallet</SetupLink>

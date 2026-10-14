@@ -196,10 +196,10 @@ const quoting = (text: string, ref: string | undefined): string =>
 export const withRef = (text: string, failure: unknown): string => quoting(text, describeError(failure).ref)
 
 /**
- * A plan with no daily Credits, which a deployment's catalog may set (ADR 0054): its calls are paid from the wallet or
- * not at all (ADR 0047). Without a plan a call is refused with `SubscriptionRequired` instead.
+ * A plan with no daily Credits, which a deployment's catalog may set (ADR 0054). Without a plan a call is refused with
+ * `SubscriptionRequired` instead.
  */
-const NO_CREDITS = 'Your plan includes no model Credits. Choose to pay per call from your Goblin Wallet in Settings.'
+const NO_CREDITS = 'Your plan includes no model Credits.'
 
 /** A spent day that was never open: a budget refusal with no allowance at all. */
 const noCredits = (error: unknown): boolean =>

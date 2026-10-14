@@ -2504,21 +2504,6 @@
       translate: 0 6px;
     }
   }
-  /* Beside the model while goblin's calls are paid from the owner's Goblin Wallet (ADR 0047). */
-  .pay-chip {
-    display: flex;
-    flex: none;
-    align-items: center;
-    gap: 0.25rem;
-    min-height: 1.75rem;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    white-space: nowrap;
-  }
-  .pay-chip > svg {
-    width: 0.875rem;
-    height: 0.875rem;
-  }
   /* Today's usage beside the model: the ring, and in a wide chat its figures; a tap or hover opens them in words. */
   .usage-indicator {
     display: flex;
@@ -2552,21 +2537,12 @@
     }
   }
   /*
-   * Where the chat is narrow the orb alone says what the agent does (its label is the orb's name), never a cut word, and
-   * the wallet alone says it pays per call (its words stay for a screen reader), so the usage ring keeps its room
-   * beside Send instead of sliding under it.
+   * Where the chat is narrow the orb alone says what the agent does (its label is the orb's name), never a cut word, so
+   * the usage ring keeps its room beside Send instead of sliding under it.
    */
   @container conversation (max-width: 36rem) {
     .composer-context > span:first-child > span:not([data-slot='presence-orb']) {
       display: none;
-    }
-    .pay-chip-words {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
     }
   }
   @media (min-width: 75rem) {
