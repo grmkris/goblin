@@ -113,13 +113,14 @@ const RemoteTool = Schema.Struct({
 })
 
 /**
- * An event stream as `mcp_list` shows it when asked (`events`), for `routine_propose` (ADR 0041): its name, words and
- * argument schema are the server's, untrusted data.
+ * An event stream as `mcp_list` shows it when asked (`events`), for `routine_propose` (ADR 0041): its name, words,
+ * argument schema and the shape it says each event's data has are the server's, untrusted data.
  */
 const RemoteEvent = Schema.Struct({
   name: Schema.String,
   description: Schema.optionalKey(Schema.String),
   inputSchema: Schema.Json,
+  payloadSchema: Schema.optionalKey(Schema.Json),
 })
 
 /** How many of a connection's event streams `mcp_list` shows. */
@@ -220,6 +221,8 @@ const eventsOf = (connectionId: string) =>
         ...described(event.description, false),
         // SAFETY: an event's input schema arrives as JSON, in the server's `events/list` response.
         inputSchema: event.inputSchema as Schema.Json,
+        // SAFETY: as its input schema, its payload schema arrives as JSON in the same response.
+        ...(event.payloadSchema === undefined ? {} : { payloadSchema: event.payloadSchema as Schema.Json }),
       })),
     ),
     Effect.catchTags({

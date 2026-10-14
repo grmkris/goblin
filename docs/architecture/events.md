@@ -67,9 +67,11 @@ termination stops lease refresh and surfaces health. Mail and workspace changes 
 
 The owner browses a connection's event streams before granting any (`GET /api/mcp/:id/events`, `Events.catalog`):
 resident authority and a signed-in connection are enough, no selector grant is made, and each stream says
-whether goblin can subscribe to it (poll and webhook). Descriptions are the server's claims, cut to 500 characters.
-A stream also carries what the server suggests for it, read leniently field by field from the descriptor's `title`
-and `_meta["lol.mysi/suggest"]` (`eventSuggestion`, `mcp/events/protocol.ts`; a malformed one never fails the list):
+whether goblin can subscribe to it (poll and webhook). Descriptions are the server's claims, cut to 500 characters;
+its `payloadSchema`, the shape the server says each event's data has, is passed on as it came (here and in the
+agent's `mcp_list` with `events: true`). A stream also carries what the server suggests for it, read leniently field by
+field from the descriptor's `title` and `_meta.suggest` (a key with no vendor's prefix; `eventSuggestion`,
+`mcp/events/protocol.ts`; a malformed one never fails the list):
 `title`, `summary`, `group`, `recommended`, `tellMe` and `rate` (`often`, `daily`, `rare`). They are claims that only
 pre-select in the picker; nothing is granted or confirmed by them. Through mysi an event is named
 `<service>.<event>`, as subscribed and as delivered, so the name checks at ingress and dispatch are unchanged. A

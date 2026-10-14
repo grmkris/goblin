@@ -235,10 +235,10 @@ export type EventRate = typeof EventRate.Type
 
 /**
  * One stream of events a connection's server offers (`events/list`), as the owner sees it before subscribing: its name,
- * the server's own description (a claim, for the owner's eyes), the arguments it takes, and whether goblin can
- * subscribe to it (it delivers by poll and webhook).
+ * the server's own description (a claim, for the owner's eyes), the arguments it takes, the shape it says each event's
+ * data has (`payloadSchema`), and whether goblin can subscribe to it (it delivers by poll and webhook).
  *
- * The rest is what the server suggests (its `title` and `_meta["lol.mysi/suggest"]`, ADR 0041 amended 2026-10-12): a
+ * The rest is what the server suggests (its `title` and `_meta.suggest`, ADR 0041 amended 2026-10-12): a
  * title, a line on what it is, the group it belongs to, whether it is worth setting up (`recommended`) and telling the
  * owner about (`tellMe`), and how often it happens. Claims that only pre-select: they never grant or confirm anything.
  */
@@ -246,6 +246,7 @@ export const EventStream = Schema.Struct({
   name: Schema.String,
   description: Schema.optional(Schema.String),
   inputSchema: Schema.Record(Schema.String, Schema.Unknown),
+  payloadSchema: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
   subscribable: Schema.Boolean,
   title: Schema.optional(Schema.String),
   summary: Schema.optional(Schema.String),

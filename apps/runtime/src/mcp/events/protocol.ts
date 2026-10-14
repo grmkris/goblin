@@ -22,8 +22,11 @@ export const EventDescriptor = Schema.Struct({
 })
 export type EventDescriptor = typeof EventDescriptor.Type
 
-/** Where a server puts its suggestions for one event: `_meta["lol.mysi/suggest"]` (myapps, 2026-10-12). */
-const SUGGEST = 'lol.mysi/suggest'
+/**
+ * Where a server puts its suggestions for one event: `_meta.suggest`, a key with no vendor's prefix (MCP reserves only
+ * the `mcp` and `modelcontextprotocol` ones), so any server may suggest and any client may read it.
+ */
+const SUGGEST = 'suggest'
 /** How long a suggested title, summary and group may be; the rest is cut. */
 const TITLE = 120
 const SUMMARY = 300
@@ -55,7 +58,7 @@ const flag = (value: unknown): boolean | undefined => (typeof value === 'boolean
 const isRate = Schema.is(EventRate)
 
 /**
- * The suggestions `descriptor` carries: its `_meta["lol.mysi/suggest"]` fields, the descriptor's own `title` when the
+ * The suggestions `descriptor` carries: its `_meta.suggest` fields, the descriptor's own `title` when the
  * suggestion has none. Each field is read on its own, so one malformed field drops only itself.
  */
 export function eventSuggestion(descriptor: EventDescriptor): EventSuggestion {

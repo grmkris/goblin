@@ -9,12 +9,12 @@ const descriptor = (extra: Partial<EventDescriptor>): EventDescriptor => ({
 })
 
 describe("a server's suggestions for one event (ADR 0041)", () => {
-  it('reads _meta["lol.mysi/suggest"] field by field, the title folded to one bounded line', () => {
+  it('reads _meta.suggest field by field, the title folded to one bounded line', () => {
     const suggestion = eventSuggestion(
       descriptor({
         title: 'Ignored when the suggestion has one',
         _meta: {
-          'lol.mysi/suggest': {
+          suggest: {
             title: 'Message\nreceived\u0000',
             summary: 'A message reached your bot',
             group: 'Telegram',
@@ -41,11 +41,11 @@ describe("a server's suggestions for one event (ADR 0041)", () => {
       eventSuggestion(
         descriptor({
           title: 'Question answered',
-          _meta: { 'lol.mysi/suggest': { recommended: 'yes', rate: 'hourly', group: 7, tellMe: false } },
+          _meta: { suggest: { recommended: 'yes', rate: 'hourly', group: 7, tellMe: false } },
         }),
       ),
     ).toEqual({ title: 'Question answered', tellMe: false })
     expect(eventSuggestion(descriptor({ title: 42, _meta: ['not', 'an', 'object'] }))).toEqual({})
-    expect(eventSuggestion(descriptor({ _meta: { 'lol.mysi/suggest': 'recommended' } }))).toEqual({})
+    expect(eventSuggestion(descriptor({ _meta: { suggest: 'recommended' } }))).toEqual({})
   })
 })

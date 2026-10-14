@@ -152,7 +152,7 @@ const decodeGrants = Schema.decodeUnknownSync(Schema.Array(Grant))
 const decodeTools = Schema.decodeUnknownSync(Schema.Array(ToolView))
 
 describe('the mcp group', () => {
-  it("lists a connection's event streams for the owner: bounded descriptions, subscribable only by poll and webhook", async () => {
+  it("lists a connection's event streams for the owner: bounded descriptions, the data's shape, subscribable only by poll and webhook", async () => {
     const { fetch } = await fixture()
     const response = await fetch(get('/api/mcp/notes/events'))
     expect(response.status).toBe(200)
@@ -162,7 +162,7 @@ describe('the mcp group', () => {
       { name: 'sidequest.stream', subscribable: false },
     ])
     expect(streams[0]?.description).toHaveLength(500)
-    expect(streams[0]).not.toHaveProperty('payloadSchema')
+    expect(streams[0]?.payloadSchema).toEqual({ type: 'object' })
   })
 
   it('lists the servers with their Events health, and the built-in registries', async () => {

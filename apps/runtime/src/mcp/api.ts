@@ -98,6 +98,7 @@ const events = endpoint('events')(({ params }) =>
           ? {}
           : { description: descriptor.description.slice(0, EVENT_DESCRIPTION) }),
         inputSchema: descriptor.inputSchema,
+        ...(descriptor.payloadSchema === undefined ? {} : { payloadSchema: descriptor.payloadSchema }),
         subscribable: descriptor.delivery.includes('poll') && descriptor.delivery.includes('webhook'),
         ...eventSuggestion(descriptor),
       })),
