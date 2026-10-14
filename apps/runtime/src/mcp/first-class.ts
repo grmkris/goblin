@@ -14,10 +14,7 @@ type Profile = ServerProfile & {
   readonly statusTool?: { readonly name: string; readonly read: (structured: unknown) => WalletStatus | undefined }
   /** Scopes asked for at sign-in beside those the resource offers, when its own list is too narrow for the work. */
   readonly scope?: readonly string[]
-  /**
-   * The tool that pays one MPP challenge for goblin's paid inference (ADR 0047): reached only by the `inference` caller,
-   * kept from the model by the server's App-only visibility.
-   */
+  /** The tool that pays one MPP challenge, kept from the model by the server's App-only visibility. */
   readonly payment?: { readonly tool: string }
   /**
    * The tool that tops up a prepaid server's own balance (ADR 0049): reached by the `funding` caller only, and only as a
@@ -298,7 +295,6 @@ const WALLET: Profile = {
       'add_funds',
       'add_funds_status',
       'view_state',
-      // Paid inference's payments: within the wallet's own limits, and never visible to the model (ADR 0047).
       'pay_challenge',
     ],
     ask: ['paid_fetch', 'transfer', 'swap_execute', 'bridge_execute', 'request_policy_change'],

@@ -35,10 +35,6 @@ const modelEnv = {
   MODEL_KEY: Config.Redacted('GOBLIN_MODEL_KEY').pipe(Config.withDefault(Redacted.make(''))),
   MODEL_CREDIT_RATES: Config.String('GOBLIN_MODEL_CREDIT_RATES').pipe(Config.withDefault('')),
   MEMORY_MODEL: Config.String('GOBLIN_MEMORY_MODEL').pipe(Config.withDefault('')),
-  // Inference paid per call from the owner's Goblin Wallet (ADR 0047): `tempo`, `goblin`, or none.
-  PAID_INFERENCE: Config.String('GOBLIN_PAID_INFERENCE').pipe(Config.withDefault('')),
-  MPP_RECIPIENT: Config.String('GOBLIN_MPP_RECIPIENT').pipe(Config.withDefault('')),
-  MPP_SECRET: Config.Redacted('GOBLIN_MPP_SECRET').pipe(Config.withDefault(Redacted.make(''))),
 }
 
 /**

@@ -14,10 +14,10 @@ export type ApprovalRow = typeof approvals.$inferSelect
 export type HeldCall = {
   readonly id: string
   /**
-   * Only the model or an App's call is ever held for the owner; paid inference's payments (ADR 0047) and top-ups (ADR
-   * 0049) never are: the owner's rule recorded a top-up before it goes out.
+   * Only the model or an App's call is ever held for the owner; top-ups (ADR 0049) never are: the owner's rule recorded
+   * a top-up before it goes out.
    */
-  readonly caller: Exclude<McpCaller, 'inference' | 'funding'>
+  readonly caller: Exclude<McpCaller, 'funding'>
   readonly sessionId?: string
   readonly sourceCallId?: string
   readonly taskId?: string

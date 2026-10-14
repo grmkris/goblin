@@ -30,16 +30,6 @@ export interface RuntimeEnv {
   /** `open`, `invite` (needs `SIGNUP_INVITE_CODE`) or `closed`; anything else counts as `closed`. */
   readonly SIGNUP_MODE?: string
   readonly SIGNUP_INVITE_CODE?: string
-  /**
-   * The routes of inference paid per call from the owner's Goblin Wallet a deployment sells (ADR 0047), which the
-   * owner's pay mode chooses between: comma-separated `goblin` (this deployment's own paid endpoint, every offered
-   * model) and `tempo` (Tempo's MPP proxy).
-   */
-  readonly PAID_INFERENCE?: string
-  /** Who goblin's own paid endpoint is paid to (the `goblin` route, ADR 0047): a Tempo address. */
-  readonly MPP_RECIPIENT?: string
-  /** The secret goblin's paid endpoint signs its MPP challenges with: at least 32 characters. */
-  readonly MPP_SECRET?: string
   readonly MODEL_BASE_URL: string
   /** The default model; also the first one offered. */
   readonly MODEL_ID: string

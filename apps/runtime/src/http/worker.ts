@@ -78,13 +78,6 @@ async function workerRoute(
   if (path === '/mcp') return handleInboundMcp(request, env)
   if (path === '/hooks/dodo') return runAtEdge(billingWebhook(billingDeps(env), request, ctx))
   if (path.startsWith('/hooks/mcp-events/')) return mcpEventsRoute(request, env, path, ref)
-  // goblin's own model endpoint, paid per call over MPP (ADR 0047), where the stage sells it. It is loaded on its first
-  // call: mppx and viem would otherwise be evaluated at every isolate's startup, which has a CPU limit.
-  if (path === '/v1/chat/completions') {
-    const { paidCompletion } = await import('./paid-inference.ts')
-    const paid = await paidCompletion(request, env)
-    if (paid !== undefined) return paid
-  }
   throw new NotFound({ what: 'route' })
 }
 

@@ -15,12 +15,11 @@ import type { AppError } from '../http/errors.ts'
 import type { Grant } from './grants.ts'
 export type { McpServerConfig }
 /**
- * Who makes a call: the model, an App, the owner, goblin's own paid inference paying its model call from the owner's
- * wallet (`inference`, ADR 0047: only a first-class profile's payment tool, never from model text), or goblin topping
- * up a prepaid server's own balance from the owner's wallet (`funding`, ADR 0049: only the wallet profile's funding
- * tool, only as a top-up recorded under the owner's rule, to the address the prepaid server's own status reports).
+ * Who makes a call: the model, an App, the owner, or goblin topping up a prepaid server's own balance from the owner's
+ * wallet (`funding`, ADR 0049: only the wallet profile's funding tool, only as a top-up recorded under the owner's rule,
+ * to the address the prepaid server's own status reports).
  */
-export type McpCaller = 'model' | 'app' | 'human' | 'inference' | 'funding'
+export type McpCaller = 'model' | 'app' | 'human' | 'funding'
 /**
  * Who a use of a connection is for: the owner or the model, waiting on it now (`foreground`), or work goblin does on
  * its own (`background`: Events polls, notices, agent-app jobs, the skills learner). Only foreground use holds the

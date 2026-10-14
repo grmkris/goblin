@@ -13,7 +13,6 @@ import { Entitlements } from '../billing/gates.ts'
 import { Budget } from '../budget.ts'
 import { Chats } from '../chats/service.ts'
 import { epochSeconds } from '../clock.ts'
-import { stablecoinDollars } from '../layers/budget.ts'
 import { profileOf, walletPageUrl } from '../mcp/first-class.ts'
 import { allowRecommended, serverStatus } from '../mcp/first-class-owner.ts'
 import { McpGrants, McpServers } from '../mcp/service.ts'
@@ -25,6 +24,23 @@ import type { OnboardingRecord } from './store.ts'
 // First-run Start (ADR 0048): every step's state, read from what the agent already knows (its connections and grants,
 // the wallet's own status) plus the little the owner tells it (the welcome, services, the kickoff). The wallet's setup and
 // funds are the wallet's own: Start reads what it says is left and sends the owner to its setup page.
+
+/** A decimal amount as dollars; anything unreadable is none. */
+const dollarsOf = (value: string | undefined): number => {
+  const amount = Number(value)
+  return Number.isFinite(amount) ? amount : 0
+}
+
+/**
+ * The dollars of stablecoins a Goblin Wallet holds: the total its status adds up on every chain, else what its status
+ * line's USDC and USDC.e come to, owner and agent together. A partial total counts what was read.
+ */
+export const stablecoinDollars = (status: WalletStatus): number =>
+  status.stablecoinUsd !== undefined
+    ? dollarsOf(status.stablecoinUsd)
+    : status.tokens
+        .filter((token) => token.symbol === 'USDC' || token.symbol === 'USDC.e')
+        .reduce((sum, token) => sum + dollarsOf(token.balance), 0)
 
 type Found = { readonly server: ServerView | undefined; readonly connected: boolean; readonly allowed: boolean }
 

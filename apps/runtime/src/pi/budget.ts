@@ -5,7 +5,6 @@ import { writeLine } from '../observability/logger.ts'
 import { reportAndRecover, safeErrorType } from '../observability/report.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { epochSeconds } from '../clock.ts'
-import { PAID_PROVIDER_PREFIX } from './model.ts'
 
 /** Why a tool may not run against today's budget, or `open` when it may. */
 export type BudgetVerdict = 'open' | 'exhausted' | 'unsubscribed' | 'failed'
@@ -26,8 +25,8 @@ export const BUDGET_BLOCKS: Readonly<Record<Exclude<BudgetVerdict, 'open'>, stri
  */
 export const budgetVerdict: Effect.Effect<BudgetVerdict, never, Budget> = Effect.gen(function* () {
   const budget = yield* Budget
-  // `open` refuses a spent day unless the owner's pay mode lets their wallet pay the calls (ADR 0047). It never pays a
-  // day pass's day: a routine's tool call is not the owner using goblin (ADR 0054).
+  // `open` refuses a spent day. It never pays a day pass's day: a routine's tool call is not the owner using goblin
+  // (ADR 0054).
   yield* budget.open(yield* epochSeconds)
   return 'open' as const
 }).pipe(
@@ -56,8 +55,6 @@ export function budgetExtension(local: RunProgram) {
     hooks: [
       hook(GenerationTask, {
         afterResponse: async (message) => {
-          // A call paid from the owner's wallet (ADR 0047) costs no Credits.
-          if (message.provider.startsWith(PAID_PROVIDER_PREFIX)) return
           await local(
             Effect.gen(function* () {
               const budget = yield* Budget

@@ -250,8 +250,7 @@ const registerFork = (input: Input, fork: ConversationId) =>
   })
 
 /**
- * What the fork may do before the model is asked: the owner's authority is current, and the day's budget is not spent
- * or the owner's pay mode lets their wallet pay (ADR 0047).
+ * What the fork may do before the model is asked: the owner's authority is current, and the day's budget is not spent.
  */
 const mayAnswer = Effect.gen(function* () {
   yield* requireResident

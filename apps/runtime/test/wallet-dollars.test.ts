@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { WalletStatus } from '@goblin/contracts'
-import { stablecoinDollars } from '../src/layers/budget.ts'
+import { stablecoinDollars } from '../src/onboarding/program.ts'
 
 const status = (tokens: WalletStatus['tokens']): WalletStatus => ({
   kind: 'wallet',
