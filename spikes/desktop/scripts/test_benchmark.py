@@ -50,8 +50,8 @@ class BenchmarkTests(unittest.TestCase):
             with (app / 'Contents/Info.plist').open('wb') as output:
                 plistlib.dump({'CFBundleExecutable': 'launcher'}, output)
             executable, cwd = launch_path(app)
-            self.assertEqual(executable, app / 'Contents/MacOS/launcher')
-            self.assertEqual(cwd, app)
+            self.assertEqual(executable, (app / 'Contents/MacOS/launcher').resolve())
+            self.assertEqual(cwd, app.resolve())
 
 
 if __name__ == '__main__':
