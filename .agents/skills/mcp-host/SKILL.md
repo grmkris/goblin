@@ -38,9 +38,10 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   names are mygram's or mysi's spelling, read from the connection (`telegramTools`, `telegramEvent`). Preserve sanitized
   `telegram-tg-<update>` and reply operation ids; fence old cursor writes only after both leases confirm. Hooks persist
   receipts before asynchronous dispatch; accepted submissions are distinct from external delivery.
-- The shelf (`mcp/suggested.ts`, ADR 0052) offers one mysi connection (`mysi.lol/mcp?codemode=off`, dev.mysi.lol on
-  local/dev) instead of the separate my* servers, then goblin's services, then servers that need no sign-in in groups,
-  only where Mercator does not sell the same thing; re-probe one with an `initialize` before adding it. mysi names
+- The shelf (`mcp/suggested.ts`, ADRs 0052, 0061) is data, one endpoint per entry on every deployment (`MCP_SHELF`
+  replaces or adds entries): one mysi connection (`mysi.lol/mcp?codemode=off`) instead of the separate my* servers,
+  publishing (Cloudflare), then servers that need no sign-in in groups; re-probe one with an `initialize` before
+  adding it. mysi names
   tools `<service>_<tool>` and Events `<service>.<event>`: check an app's tool or Event name only through
   `packages/contracts/src/service-names.ts`, never with a bare string. `mcp_list` lists a connection with many such
   tools by service (`service`, `query`).
@@ -70,11 +71,10 @@ itself authorize model spend, external messages, deployment or production change
   (`/hooks/mcp-events/<user>/<connection>/<token>`). Model text names one as `"<label>" (<id>)` (`named`); labels and
   notice text never enter telemetry. A connection that sends events offers them (`ServerView.events`: open, dismissed,
   done; `mcp/events/offers.ts`); `mcp_list` shows its first 64 event streams as untrusted data when asked
-  (`events: true`). A descriptor's `title` and `_meta["lol.mysi/suggest"]` are read leniently, field by field
+  (`events: true`). A descriptor's `title` and `_meta.suggest` are read leniently, field by field
   (`eventSuggestion`): suggestions that pre-select in the owner's picker and never grant or confirm a selector. `mcp_list` lists a connection's tools in brief (name, one-line description, flags that differ) and
   gives input schemas only for the tools named in `tools`: its result stays in the model's context. Its list of
-  connections puts connected ones first and names a first-class server by goblin's own `server` name, and an added
-  first-class connection is labelled from that name, so a configured connection never signed in does not win.
+  connections puts connected ones first, so a configured connection never signed in does not win.
 
 - Per-call approvals (ADR 0028): only owner-selected `askFirst` policy pauses a granted tool. Prepare the encrypted
   frozen call in Pi's beforeTool hook and terminate with a local approval marker from execution. Owner approval
@@ -97,20 +97,12 @@ itself authorize model spend, external messages, deployment or production change
   call needs, so access the owner left out with Choose access (`beginConnect(id, scope)`, `GET /api/mcp/:id/access`)
   stays out.
 
-- First-class servers (ADR 0043, `mcp/first-class.ts`): goblin's own profile, matched by exact endpoint, never by what
-  the server says. A profile carries our words, the recommended grants (free tools run, paid ones ask first), a status
-  tool decoded with goblin's own Schema (`WalletStatus`, bounded, the server's claim), an app tool, a top-up link, the
-  paid tool and its amount argument, and extra sign-in scopes (`signInScope`). Mercator is configured for every
-  account; Cloudflare's API is on the shelf for publishing Workers. A profile grants nothing by itself.
-- Spending rules (ADR 0044, `mcp/spend.ts`): per job and per day in micro-dollars, read from the paid argument as a
-  plain decimal only. A call within the rule is an approval the owner's standing rule granted at hold time, recorded
-  in `app_mcp_spend` in the same transaction; anything else asks. Agent apps, Telegram and the skills learner never
-  spend under a rule. The wallet's own limit stays the hard stop.
-- Top-ups (ADR 0049, `mcp/top-up.ts`, `mcp/fund-job.ts`): a profile's `prepaid` balance (Mercator's) is topped up from
-  the Goblin Wallet right before its paid tool goes out, under the rule kept as tool `topup`. The caller `funding`
-  reaches only the wallet profile's `funding` tool, and `heldCalls` lets it out only as the recorded top-up
-  (`assertRecordedTopUp`: operation id, amount, chain, token, destination). The address comes only from the server's
-  own status (`depositTo`), never from model text; never add another way to send a `funding` call.
+- Every server alike (ADR 0063): no code knows a server by its endpoint or name, holds a profile, recommended grants,
+  a status line, a spending rule or a top-up, or reads an amount from a call's arguments. Suggested access (ADR 0060),
+  the persisted App entrypoint (`mcp/entrypoints.ts`), Choose access's scope union and the data shelf cover every
+  server; a tool that spends is controlled by Ask first. The skill learner writes drafts to the owner's files and calls
+  no server's tool. Left for later phases: the Telegram channel's names (above) and the Apps host's MyPlan
+  question-answer message. Never add a server-specific branch: give the owner a choice that works for any server.
 
 - MCP Apps: goblin declares `io.modelcontextprotocol/ui` (`text/html;profile=mcp-app`) to every server. An App's HTML
   is read from a resource's `text` or base64 `blob` (decoded and bounded in `mcp/app-html.ts`, strict UTF-8). A call

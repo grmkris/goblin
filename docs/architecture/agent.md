@@ -25,7 +25,7 @@ it:
   MCP host (each server's endpoint binding checked, so a re-pointed server loses what it had, the credential cipher,
   held calls a restart cut off recovered); the cheap models; helper execution restored; the retained Pi filters
   retooled once; routine runs, with their usage projection subscribed to Pi's commits; main registered; the App
-  registry; every Topic Conversation given memory; skills and the learner; the Telegram channel; and Events, with the
+  registry; every Topic Conversation given memory; skills; the Telegram channel; and Events, with the
   Telegram and skills consumers registered before any delivery (the routines layer registers the routine trigger,
   before the agent runs anything). A stateful object is made once, by its step, and shared as that step's service;
   programs use the area's services.
@@ -35,10 +35,11 @@ it:
 - **One layer per area** after the start, in order: the daily token usage and picker (`Budget`, `Models`, which a
   send's admission reads), conversation (`Chats`, `ChatOperations`, `Conversations`, `Moves`), setup (`Setups`),
   knowledge (`Memories`, `Retrieval`), delegation (`Topics`, `Personas`, `Invocations`, `Receipts`, `Home`), routines
-  (`Routines`, `RoutineControl`), inspection (`Inspection`), apps (`AppEngine`, `Files`), typed decisions (`Decisions`),
-  the workspace feed (`Workspace`) and HTTP (`AgentHttp`). The MCP host's `McpConnections`, `McpServers`, `McpGrants`,
-  `Approvals` and `Cipher`, and `CheapModels`, `RoutineRuns`, `RoutineUsage`, `Apps`, `Skills`, `Learner`, `Channel` and
-  `Events`, are served by their start steps.
+  (`Routines`, `RoutineControl`), inspection (`Inspection`), apps (`AppEngine`, `Files`), the skill learner (`Learner`,
+  after the owner's files and the routines' notices it writes), typed decisions (`Decisions`), the workspace feed
+  (`Workspace`) and HTTP (`AgentHttp`). The MCP host's `McpConnections`, `McpServers`, `McpGrants`, `Approvals` and
+  `Cipher`, and `CheapModels`, `RoutineRuns`, `RoutineUsage`, `Apps`, `Skills`, `Channel` and `Events`, are served by
+  their start steps.
 
 `AgentServices`, every service a program may require, is derived from the layers, so no area edits a shared union. A
 service is a `Context.Service` tag in its area (`<area>/service.ts`) whose methods are `Effect.fn` Effects with typed
@@ -298,18 +299,18 @@ The per-conversation switches of ADR 0010 are gone. The agent's start (`RetoolLi
 (`dropSwitchesOnce`, marker `drop:conversation-switches`), keeping every subagent's, applied the Pi filter again to each
 chat that had subagents switched off, and logged the count as a `job` line (`conversation-switches-dropped`).
 
-The persona contributes two static system-prompt sections (`pi/persona.ts`): who the agent is, and that remote content
-is untrusted data. The system prompt holds only text that does not change between requests: pi-ai folds every change
+The persona contributes two static system-prompt sections (`pi/persona.ts`): who the agent is (it speaks of the
+owner's connected MCP servers in general and names none of them, ADR 0063), and that remote content is untrusted data. The system prompt holds only text that does not change between requests: pi-ai folds every change
 of it into the one leading system message, which empties the provider's prompt cache. What does change (the apps with
 their versions, members and last errors; the skills on offer) goes into one trailing `<goblin-context>` message that
 `beforeRequest` hooks add to each request (`pi/context-tail.ts`), marked as goblin's note and not the owner's. Pi
 never stores it, so everything before it stays a cacheable prefix. The `mcp_list` and `mcp_call` tools
 (`pi/resident-mcp.ts`) are how the model reaches the owner's MCP servers; both require current resident authority, and
 `mcp_call` is marked unsafe to replay. `mcp_list` lists the connections with the owner's labels (two accounts of one
-server are told apart by them; ADR 0041), connected ones first, each first-class server also under goblin's own name
-for it (`server`, ADR 0043), so a configured connection never signed in does not win over the one the owner connected. A connection's tools come in brief, since the result stays in the model's
+server are told apart by them; ADR 0041), connected ones first, so a connection never signed in does not win over the
+one the owner connected; it names no server of its own accord (ADR 0063). A connection's tools come in brief, since the result stays in the model's
 context and is paid for again on every later call: each tool's name, its description cut to one line of 160
-characters, and only the flags that differ (`granted: false`, `askFirst: true`, a paid tool's `spending`), with no
+characters, and only the flags that differ (`granted: false`, `askFirst: true`), with no
 schemas. The tools the model names in `tools` come in full, with their input schemas (the server's, untrusted data),
 and names it is not offered come back as `unknown`; the persona tells it to ask for the schemas of the tools it will
 call. Asked with `events: true`, for a connection whose server offers Events, it adds the first 64 event streams with

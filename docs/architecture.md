@@ -13,7 +13,7 @@ flowchart LR
   Worker -->|owner and internal APIs over fetch, one RPC| Agent[PersonalAgent DO]
   Agent --> Pi[(Pi tables)]
   Agent --> App[(app_* tables\nDrizzle)]
-  Agent --> MCP[MCP servers: mysi, Mercator, the shelf\nOAuth, refreshed in the DO]
+  Agent --> MCP[MCP servers the owner connects\nOAuth, refreshed in the DO]
   Agent --> Model[Model gateway]
 ```
 

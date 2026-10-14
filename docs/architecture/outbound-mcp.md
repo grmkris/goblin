@@ -7,32 +7,23 @@ Connections come from `GOBLIN_MCP_SERVERS` (JSON: `connectionId`, `endpoint`, op
 address and a connection the owner's account on it (ADR 0041): the owner may connect one server several times, each
 connection with its own id, sign-in, grants, skills switch and Events. Every connection has the owner's **label**
 (`app_mcp_labels`, `mcp/labels.ts`), one line of at most eighty characters, unique whatever its case: given when it is
-added (`AddServer.label`), else the first free name from goblin's own name for a first-class server (`Goblin Wallet
-2`) or a server on the shelf (`Kiwi.com`, `suggestedTitle`), else its server card's title (`Example`, `Example 2`),
-else its host, or the
-configured `label` (else its id) for a configured one, set once at start; `PATCH /api/mcp/:id` renames it. Every
+added (`AddServer.label`), else the first free name from the shelf's title for a server on the shelf (`Kiwi.com`,
+`suggestedTitle`), else its server card's title (`Example`, `Example 2`), else its host, or the configured `label`
+(else its id) for a configured one, set once at start; `PATCH /api/mcp/:id` renames it. Every
 connection registers with its authorization server as plain `goblin` (ADR 0062: a consent screen names the app, not
 goblin's own label); MCP has no standard "who am I", so goblin cannot show which account a sign-in reached. An added endpoint is a public https address
 (`mcp/endpoint.ts`), and its server card's title, description and icon are the server's own claims, for the owner's
 eyes only. Configured connections win on ID and cannot be removed. Removing an added connection forgets its row,
-label, endpoint binding, credentials, pending sign-ins and grants in one transaction. A server goblin supports **first-class** (ADR 0043) has goblin's own profile, matched by exact endpoint
-(`mcp/first-class.ts`, `ServerView.profile`): our title and words, the grants Review recommended access applies (free tools run
-when needed, paid ones ask first), a paid tool with the argument that holds its amount (ADR 0044), the tool that opens
-its own App, a status tool whose answer goblin decodes with its own schema (`WalletStatus`, bounded, the server's
-claim), and a top-up link of our own that the wallet line offers as Add funds while that status says funding is
-blocked (Mercator's account page; goblin's instructions send the owner there instead of retrying a job). Mercator is the first. goblin's own instructions (`pi/persona.ts`) send fresh web data and outside tasks to
-it (search, describe, quote, job, result), and a model's call to a connection the owner has not signed in to answers
-`{ kind: 'connect-required' }`, which the web shows as a Connect card; it ends the turn, counts in Needs you, and a
-Persona holds on it as on any other (`connect`). Its card is listed first. Every connected card is a summary (`server-card.tsx`): a
-first-class one shows its wallet (`GET /api/mcp/:id/status`, read from its status tool as the owner, null until that
-tool is allowed) and, until those grants are in place, Review recommended access, which lists exactly the tools that
-would run without asking and those that would ask first before one Allow (`POST /api/mcp/:id/recommended`,
-`mcp/first-class-owner.ts`); a tool the server does not list now is skipped. Manage access opens the rest: goblin's
-words in place of the server's, the paid tool's rule, events, settings and tools, the ones outside an App grouped by
-the server's own read-only claim, each row opening to its raw name, hints and whole description. A `#connection-<id>`
-link opens its card. Cloudflare's API is the second, from the shelf, for publishing a page as a
-Worker: its resource offers only `user:read account:read`, so Connect and step-up add the profile's Workers scripts
-scopes to what the server offers (`signInScope` in `owner-servers.ts`), and its `execute` asks first. Its own App opens from Open in its card's head or its pin, whatever the
+label, endpoint binding, credentials, pending sign-ins and grants in one transaction. Every server is treated alike
+([ADR 0063](../adr/0063-mcp-first-no-server-specific-code.md)): no code knows a server by its endpoint or name, and its
+words are its own claims. Outside work (search, scraping, paid services, publishing) comes from the servers the owner
+connects. A model's call to a connection the owner has not signed in to answers `{ kind: 'connect-required' }`, which
+the web shows as a Connect card; it ends the turn, counts in Needs you, and a Persona holds on it as on any other
+(`connect`). Connections lists the connections in the order they came, those to one server side by side. Every
+connected card is a summary (`server-card.tsx`): that the server sends events, and Manage access, which opens the rest:
+the server's own description (its claim), events, settings and tools, the ones outside an App grouped by the server's
+own read-only claim, each row opening to its raw name, hints and whole description. A `#connection-<id>` link opens
+its card. A server's own App opens from Open in its card's head or its pin, whatever the
 owner has allowed, `/connections/<id>/app` (`server-app.tsx`, ADR 0053): `POST /api/apps/servers` makes once (or
 reopens) the server's thread, an empty thread under Personal named after the server (thread operation
 `server-app:<connection>`), and keeps the App there (`entrypoint` on its source); the page then goes to `/a/<id>`, where
@@ -43,9 +34,7 @@ declare as their global entrypoint (`_meta["openai/ui"].entrypoints`), kept per 
 display mode is fullscreen. A frame reloads
 only for a different App (another `focus` is one); a newer result of the same call reaches the live App through the
 bridge (`deliver` in `lib/app-bridge.ts`). On its page, an App that calls a tool the owner has not allowed gets the
-same Allow card as in a conversation. Until a
-first-class server is connected, onboarding points to it: Activity's "Get started" row (`connect-offer.tsx`, Connect or
-Not now, the dismissal kept in the browser) and the empty chat's line. Connections
+same Allow card as in a conversation. Connections
 also offers a shelf of suggested servers (`mcp/suggested.ts`, ADR 0052), with source comments recording their
 connection checks, each in a group (`ServerSuggestion.group`) that the picker's Suggested tab and Start's services step
 show under its name (`server-add.tsx`): the owner's own apps through one mysi connection
@@ -75,7 +64,7 @@ its registry, name and version. The owner connects each server from the Connecti
    no sign-in starts for it, and its credentials are put back as they were (one never connected stays not connected,
    not `needs_auth`).
 2. The remote server redirects to `/api/mcp/oauth/callback`. The pending state is single-use and expires after an
-   hour (the wallet's consent includes its setup and funding); the code is exchanged and the tokens stored.
+   hour (a server's consent may have the owner set things up first); the code is exchanged and the tokens stored.
 3. Client registration and tokens are AES-GCM encrypted at rest (`GOBLIN_CREDENTIAL_KEY`, bound to server ID and
    purpose); discovery metadata is stored in plain JSON.
 
@@ -144,7 +133,7 @@ only.
 **URL requests** (`mcp/url-asks.ts`, `mcp/url-request.ts`, `app_mcp_url_requests`). Only the model's `mcp_call`
 (Goblin, a Persona, a routine run) declares URL elicitation, per request and only on a 2026 connection, and takes an
 `input_required` result back (`McpConnections.callModelTool`): its own call, and the dispatch of its held call once the
-owner (or their spending rule) approved it (`sendApproved`). The owner's console and Apps never declare it, so servers
+owner approved it (`sendApproved`). The owner's console and Apps never declare it, so servers
 answer them with a plain link. An approved dispatch that meets a URL request is spent (`completed` with no result,
 `metUrlRequest`), its `ApprovalView` names the request (`urlRequest`) and the web follows its card to the request's
 (`followUrlRequests`). The request's retry carries the approval (`answered`), which `heldCalls` checks as it checks the

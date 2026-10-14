@@ -199,24 +199,14 @@ The servers goblin suggests on Connections and Start, in groups, each in goblin'
 connects. It is data a deployment may change with `GOBLIN_MCP_SHELF` (ADRs 0052, 0061).
 _Avoid_: catalog (that is the registry search), marketplace
 
-**First-class server**:
-A server goblin knows by its own profile, matched by endpoint: our description, a recommended set of grants, a
-status line read from one of its tools, its app one tap away and, for a paid tool, a spending rule (ADR 0043).
-Mercator is one, and a connection every account starts with.
-_Avoid_: featured, partner, built-in
-
-**Spending rule**:
-The owner's limit on a paid tool of a first-class server: jobs up to an amount run without asking, until a daily
-total; anything else asks first. The server's wallet limit stays the hard stop (ADR 0044).
-_Avoid_: budget (that is the daily token cap), allowance
-
 **Skill**:
 A procedure served by an MCP server through the MCP Skills extension. The agent follows skills only from servers the
 owner turned skills on for, activates them per conversation as `<connection>:<name>`, and a skill never grants a
 permission (ADR 0008).
 
 **Skill draft**:
-A skill the agent proposed to the owner's skills library after a correction; the owner accepts or rejects it there.
+A skill the agent wrote to the owner's files (`/agent/skills/drafts/<name>.md`) after a correction, with a notice in
+the chat; what becomes of it is the owner's choice (ADR 0063).
 
 **MCP App**:
 A sandboxed `ui://` resource served through the MCP connection that answered its tool call. One live App moves
@@ -268,12 +258,12 @@ A file the owner sent with a message: its path rides with the words, and the mes
 
 **Goblin Wallet**:
 A wallet with its own MCP server and web app, a product of its own outside this repository (ADR 0056). goblin connects
-it as a first-class server.
+it like any other MCP server (ADR 0063).
 _Avoid_: agentic wallet (the earlier working name), treasury
 
 **Wallet limit**:
 A limit the wallet itself keeps for a connection: per call, per hour, per week, with an expiry, plus the allowed paid
-services and the address book. It stays the hard stop behind goblin's spending rule.
+services and the address book. goblin keeps no limit of its own beside it; Ask first is the owner's control in goblin.
 _Avoid_: budget, cap (alone)
 
 ## The agent's API and records

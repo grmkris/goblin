@@ -118,7 +118,7 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_DAILY_TOKEN_CAP` | The most model tokens one account may use in a UTC day, a positive whole number; unset or anything else, no cap (ADR 0058). Once a capped day is spent, model calls are refused until 00:00 UTC. |
 | `GOBLIN_MEMORY_MODEL` | The offered model for thread names, Topic Conversation memory summaries and skill-draft decisions. It is not selected by price; unset or not offered uses the default. |
 | `GOBLIN_SMOKE_MODEL` | Optional model for smoke turns. It must be one of the offered models; unset keeps the owner's pick. |
-| `GOBLIN_MCP_SERVERS` | JSON list of outbound servers every account starts with: `[{"connectionId":"mercator","endpoint":"https://mercator.sh/mcp/auth","label":"Mercator"}]`. Dev and prod configure Mercator (ADR 0043); each owner still signs in. |
+| `GOBLIN_MCP_SERVERS` | JSON list of outbound servers every account starts with (`[]` for none): `[{"connectionId":"notes","endpoint":"https://mcp.example.com/mcp","label":"Notes"}]`. Each owner still signs in, and grants start empty; nothing in code depends on which servers they are (ADR 0063). |
 | `GOBLIN_MCP_SHELF` | Optional JSON list of shelf entries (`id`, `title`, `description`, `endpoint`, `group`, `signIn`): one with the id of goblin's own entry replaces it, the others are added after (ADR 0061). Unset, the shelf is goblin's. |
 | `GOBLIN_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP credentials and Events secrets/envelopes; derives purpose-separated hook tokens. |
 
@@ -209,9 +209,9 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   `<service>_<tool>` (`mygram_inbox_read`), so ask the agent for one app's tools ("list my myplan tools") and it calls
   `mcp_list` with `service`. A connection made to plain `/mcp` counts as added, but lists the code tools instead.
 - **Skills.** Connect a server that offers skills, then turn on its **Use its skills** switch. The agent reads and
-  follows those procedures; their tools still need grants. To receive drafts in a library such as myskills, grant
-  `skill_draft` and `skill_draft_status` (through mysi, `myskills_skill_draft` and `myskills_skill_draft_status`), then
-  review the proposals there.
+  follows those procedures; their tools still need grants. While skills are on for some server, a correction or a
+  request to keep how something was done may become a draft in your files, `/agent/skills/drafts/<name>.md`, with a
+  notice in the chat; what becomes of it is yours.
 - **Telegram.** Bind the authorized mygram profile to the bot (in mygram, or on mysi's consent page; choose **All
   chats** to let goblin see groups), then turn on the connection's **Telegram** switch. The server must offer Events:
   goblin grants mygram's inbox, send, question, chat-list and topic-list tools (mysi's `mygram_` names) and subscribes

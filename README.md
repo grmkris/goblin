@@ -29,7 +29,8 @@ a new group waits for the owner's choice), and the answer goes back to the same 
 either spelling (ADRs 0052, 0055). The agent's `mcp_list` lists a connection with many tools, such as mysi, by
 service first.
 Owner-enabled skills libraries use update Events to invalidate their cached
-catalog; the next activation refetches, while retained activations keep their verified version.
+catalog; the next activation refetches, while retained activations keep their verified version. After a correction,
+goblin may write a new skill as a draft in the owner's files and tell them in the chat.
 
 Apps run in place in any conversation, several at once, and move to their page (`/a/<id>`, with the way back to its
 channel and goblin's composer for that conversation at the bottom) and back without reloading. The sidebar's Pinned
@@ -37,7 +38,8 @@ section holds the servers and App views the owner pins, in their order, on every
 App full screen in a thread of its own. On a phone the navigation is a drawer and a thread is a full view with a back to
 its channel. Owners can add public servers by URL, from MCP registries, or from goblin's shelf (mysi, Cloudflare to
 publish with, and servers that need no sign-in grouped by what they are for: travel, knowledge, crypto data, views in the
-chat, code), grant tools explicitly, mark individual tools **Ask first** for approval of every exact call, bring their own
+chat, code), grant tools explicitly (every server alike: no code favours one, ADR 0063), mark individual tools
+**Ask first** for approval of every exact call, bring their own
 OpenAI-compatible model endpoint and key or use the deployment's, choose among its models, and see the day's token
 usage against the deployment's optional per-account cap. The agent uses
 `ask_user` to ask questions the owner answers in their next message. The owner attaches files to a message with the

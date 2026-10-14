@@ -28,11 +28,17 @@ apart): the section lists only those, the composer offers only those, and `skill
 `skill_read` ask the scope about the one skill (`skillScope`'s `(connectionId, { name, uri })`) before anything is loaded or
 read, a cached file included. A skill outside the setup refuses with the `not-in-topic` ask.
 
-After a final answer in an owner conversation (`goblin.skill-learning`, `onYield`), the learner (`skills/learner.ts`) looks at the latest user message. On a correction
-or a request to keep how something was done, the memory model decides whether the exchange teaches a procedure. A
-procedure becomes a draft sent through an enabled library's granted `skill_draft` tool, which the owner reviews in the
-library. The Worker logs the learner outcome and conversation id without transcript or draft content. At most five in a rolling 24 hours, never the same content twice, no new draft while one for that skill is open,
-and never a rejected draft again (`app_skill_drafts`). A grant for `skill_draft_status` lets the learner refresh review
-status; a deterministic workerd test confirms a rejected draft is not submitted again for the same lesson. Draft
-payloads contain generated procedure text and brief evidence, with email- and secret-shaped strings
-scrubbed, and no transcript field. The learner's model call counts toward the budget.
+After a final answer in an owner conversation (`goblin.skill-learning`, `onYield`), the learner (`skills/learner.ts`)
+looks at the latest user message. It runs only while the owner uses skills from some server. On a correction or a
+request to keep how something was done, the memory model decides whether the exchange teaches a procedure: a new
+skill, or an improvement of one the conversation used. A procedure becomes a draft in the owner's files,
+`/agent/skills/drafts/<name>.md` (a `SKILL.md` with its name and description, then the steps), and the owner is told
+with a notice in the chat the lesson came from (`notice:skill-draft:<hash>`, label "Skill learner", what taught it as
+its body), which Activity lists ([ADR 0063](../adr/0063-mcp-first-no-server-specific-code.md)). What becomes of a
+draft is the owner's choice; the learner calls no server's tool. It writes at most five drafts in a rolling 24 hours,
+never the same content twice (`app_skill_drafts`, its log), and never over a draft still in the files: once the owner
+moved or removed it, the skill may be drafted again. The Worker logs the learner outcome and conversation id without
+transcript or draft content. A deterministic workerd test confirms an improvement is written once and the same lesson
+again is a duplicate. Drafts contain generated procedure text, with email- and secret-shaped strings scrubbed, and no
+transcript. The learner is built after the start, over the owner's files and the routines' notices (`LearnerLive`).
+The learner's model call counts toward the budget.
