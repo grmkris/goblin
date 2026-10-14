@@ -1,6 +1,6 @@
 # License and provenance
 
-Copyright 2026 grmkris. Goblin-owned code is available under the [MIT License](LICENSE). The Wallet workspaces in [apps/wallet](apps/wallet/LICENSE), [apps/wallet-web](apps/wallet-web/LICENSE) and [packages/wallet](packages/wallet/LICENSE) also declare MIT in their package manifests.
+Copyright 2026 grmkris. Goblin-owned code is available under the [MIT License](LICENSE).
 
 Some components and patterns were adapted from other projects owned by the same author. Those projects are not part of this contest submission. This notice records Goblin's ownership boundary; it does not relicense third-party code or dependencies.
 

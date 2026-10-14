@@ -123,7 +123,7 @@ and query (301 for GET/HEAD, 308 for writes). Dev sign-up must be closed or invi
 
 ## Release operation
 
-Branches: `dev` (the default) deploys dev and wallet-dev, `prod` deploys prod and Wallet production. Everything runs in
+Branches: `dev` (the default) deploys dev, `prod` deploys prod. Everything runs in
 `.github/workflows/ci.yml` on GitHub-hosted runners, each job in its own checkout.
 
 - **Check** runs on every push and pull request: `bun run check`, no secrets.
@@ -132,10 +132,8 @@ Branches: `dev` (the default) deploys dev and wallet-dev, `prod` deploys prod an
   removes them in an `always()` step. `scripts/release.py dev <sha>` requires a clean checkout at that sha, the sha to
   be the dev tip and the `Check` job of its `ci.yml` push run to have passed; it plans (no delete or replace, and no
   create of goblinAuth, Files or Web, which would mean lost state), deploys, runs the authenticated smoke, drift and the
-  D1 migration inventory (the database found by exact name through the Cloudflare API), and writes `dev.json`.
-  `scripts/wallet_release.py dev <sha>` runs only after that receipt exists: it plans (no create of the Wallet Worker),
-  deploys and smokes wallet-dev (`ok`, the stage's OAuth issuer, anonymous MCP 401) and writes `wallet-dev.json`. Both
-  receipts become the run's `dev-acceptance` artifact (90 days). Receipts go to `GOBLIN_RECEIPTS_DIR`, step logs to
+  D1 migration inventory (the database found by exact name through the Cloudflare API), and writes `dev.json`, the
+  run's `dev-acceptance` artifact (90 days). Receipts go to `GOBLIN_RECEIPTS_DIR`, step logs to
   `GOBLIN_LOG_DIR` (default `.local/receipts` and `.local/release-logs`); a failed step prints its log's last 40 lines.
 - **Promote** with `bun run promote <full-sha>` from any checkout with `gh` signed in and `.local/cloud.env`. It needs
   no prod credentials: it requires the sha to be the dev tip with a passing Check, its `dev-acceptance` receipt to be
@@ -144,38 +142,26 @@ Branches: `dev` (the default) deploys dev and wallet-dev, `prod` deploys prod an
 - **Deploy prod** runs after Check for every push to `prod`, in the `prod` environment. `release.py prod` repeats the
   provenance and acceptance checks, requires the push to fast-forward from its `before` sha and not be forced, keeps the
   first release invite-only (until the `goblin-prod` Worker serves a version), then releases as on dev with the public
-  smoke unless an operator test session is configured. `wallet_release.py prod` also requires `live:true`. Its artifact
-  is `prod-acceptance`.
+  smoke unless an operator test session is configured. Its artifact is `prod-acceptance`.
 
 GitHub secrets per environment, each a whole file (`gh secret set <name> --env <stage> < file`, never echoed):
-`GOBLIN_STAGE_ENV` (`.local/<stage>.env`), `GOBLIN_WALLET_ENV` (`wallet-<stage>.env` with only the keys the wallet
-stack reads: never `TREASURY_PRIVATE_KEY`, `PRIVY_POLICY_ADMIN_KEY`, `TEST_*` or `SPIKE_*`), `GOBLIN_CLOUD_ENV` (only
+`GOBLIN_STAGE_ENV` (`.local/<stage>.env`), `GOBLIN_CLOUD_ENV` (only
 `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`), `ALCHEMY_STATE_STORE_CREDENTIALS` (the cached
 `~/.alchemy/credentials/default/cloudflare-state-store.json`, because the Cloudflare token cannot read the Secrets
 Store to mint it) and, on dev only, `GOBLIN_SMOKE_SESSION` (`dev-session.json`). The `dev` environment admits only the
 dev branch and `prod` only prod; a pull request runs on its merge ref and reaches neither.
 
 Alchemy state for dev and prod lives in the account's shared Cloudflare state store (`scripts/alchemy-state.ts`), as
-`goblin/<stage>` and `goblin-wallet/<stage>` beside myapps' stacks. It has no lock: each stage deploys in one
+`goblin/<stage>` beside myapps' and the retired Goblin Wallet's stacks. It has no lock: each stage deploys in one
 non-cancelling concurrency group, and a deploy from the build box is break-glass (pause CI first, then
-`GOBLIN_BREAK_GLASS=1`). `scripts/state-copy.ts` moved the box's local state into it once: it touches only those four
+`GOBLIN_BREAK_GLASS=1`). `scripts/state-copy.ts` moved the box's local state into it once: it touches only those two
 stacks, refuses a non-empty destination or an unsettled record, verifies sha256 by record name and copies back with
 `--to local`. Never use Alchemy's `syncState` against this store: it deletes every stack the source lacks.
 
 The first production release is invite-only with no configured invite or owner email, so it admits nobody until the operator securely supplies those values. Its dedicated model key offers the approved five models and caps spending at $10 per 30 days. Dodo remains unconfigured in live mode. After the owner signs in with delivered OTP, grant exactly that verified production user a prod-scoped Pro override of 800 Credits/day and run authenticated prod smoke.
 
 Roll back code with a revert commit on `dev`: CI deploys it to dev with full acceptance, then `bun run promote` it.
-When prod cannot wait for that, roll the `goblin-prod` (or `goblin-wallet-prod`) Worker back to its previous version in
+When prod cannot wait for that, roll the `goblin-prod` Worker back to its previous version in
 Cloudflare (`wrangler rollback` or the dashboard) and follow with the revert, so the next deploy does not undo it. Leave
 all auth, app and vendor data intact and never run down migrations: confirm that the older code supports every additive
 schema already applied, then repeat acceptance and drift inspection.
-
-## Goblin Wallet stage
-
-`bun run dev:wallet`, `bun run plan:wallet-dev`, `bun run deploy:wallet-dev`, `bun run plan:wallet-prod` and
-`bun run deploy:wallet-prod` run `scripts/wallet-stage.ts` (`dev`, `plan:dev`, `deploy:dev`, `plan:prod`,
-`deploy:prod`; the prod deploy needs `GOBLIN_CONFIRM_PROD=1`, and a deploy outside CI `GOBLIN_BREAK_GLASS=1`). It never
-touches `scripts/stage.ts`, which `scripts/release.py` depends on. It builds `apps/wallet-web`, scrubs the environment,
-and merges `.local/cloud.env` with `.local/wallet-<stage>.env` (both must be mode 600); its dev and prod state lives in
-the Cloudflare state store as `goblin-wallet/<stage>`. The variables are listed in `docs/development.md`, "Goblin
-Wallet stages". `scripts/wallet_release.py` deploys and smokes Wallet in CI's deploy jobs without signing or spending.

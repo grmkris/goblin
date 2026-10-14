@@ -77,38 +77,9 @@ history, route a send or grant permission. Each open proposal shows in its chat 
 the dev stage binds Workers AI; elsewhere nothing is judged. See
 [ADR 0031](docs/adr/0031-typed-decisions-through-workers-ai.md).
 
-**Goblin Wallet** (ADR 0045) gives the agent money with limits its owner sets. It is a separate Worker with its own MCP
-server at `wallet.goblin.surf` (`wallet-dev.goblin.surf` for dev), built from `apps/wallet`, `apps/wallet-web` and
-`packages/wallet`, and those three are MIT-licensed. The owner signs in with Privy, funds their own address with USDC
-(Relay deposit addresses convert ETH or USDC from Base, Arbitrum or Ethereum), and upgrades the account with EIP-7702 to
-MetaMask's DeleGator. The owner then signs an ERC-7710 period allowance to an agent wallet that Privy holds under a
-signer policy. Every EVM send, the owner's upgrade included, is an ERC-4337 UserOperation bundled by Pimlico, its gas
-paid in USDC by the ERC-20 paymaster, so no account ever needs ETH (ADR 0050). The agent pays x402 services on Base and MPP services on Tempo, sends USDC, swaps
-through LI.FI and bridges through Relay, topping up just in time from the allowance. Paid inference and MPP services pay
-from the agent's own address on Tempo; the wallet App shows that address with a QR code and adds funds to it from any
-chain.
-
-Every limit names the layer that enforces it: the on-chain allowance, Privy's policy, the wallet's ledger (per call,
-hour and week) or goblin's spending rules (ADR 0044). A spend over the limit, or to a new recipient, becomes a URL
-request to the wallet's Approve page, where the owner checks the frozen terms; goblin then retries the call with the
-same operation id, which never pays twice. goblin connects the wallet like any MCP server, shows its status on the
-connection card and its dashboard App under Pinned. It also tops up Mercator's own balance from the wallet before a
-job Mercator is short for, within a rule the owner sets ($5 a top-up and $20 a day by default, ADR 0049). Try it at goblin.surf → Connections → Goblin Wallet.
-
-Proven on mainnet on 12 October 2026, from goblin dev:
-
-- goblin paid Exa $0.007 for a web search over x402, after topping up from the allowance:
-  [`0xc09ca95d…b0fd`](https://basescan.org/tx/0xc09ca95d5ff071d45e83d09504a4dfa1d367a289d6beabc1ba878029b39cb0fd).
-- A first payment to a new address waited for the owner's approval, then went out:
-  [`0xe4219e53…e3dc`](https://basescan.org/tx/0xe4219e53ec87f363181090b28a2e008f0bc02221dc689fb75068cb8dbab8e3dc).
-- Mercator ran short, so the wallet bridged 2 USDC from Base to Tempo through Relay
-  ([`0x2dce0489…3e7b`](https://basescan.org/tx/0x2dce04899f917d6c3e7aab58ba25ff663fe176d9ab34484b130622a6712f3e7b))
-  and paid Mercator 1.5 USDC.e
-  ([`0xf144e54d…2add`](https://explore.tempo.xyz/tx/0xf144e54d48fd28c1208acbb647275dbbf7fc5f335794d2e37ef79d08fcde2add)).
-
-![The wallet's App inside goblin, opened from the sidebar](docs/images/wallet/wallet-app-in-goblin.png)
-![goblin paying for a web search through the wallet](docs/images/wallet/paid-search-in-goblin.png)
-![The wallet's Approve page for a first payment to a new address](docs/images/wallet/approve-page.png)
+**Goblin Wallet**, the agent wallet built for the October 2026 hackathon, has left this repository: its source is kept
+at the tag [`hackathon-2026-10`](https://github.com/grmkris/goblin/tree/hackathon-2026-10), and goblin connects to a
+wallet like any other MCP server.
 
 Limits today: Privy runs in development mode with email sign-in, and the mainnet funds behind the demo are capped.
 Swaps and bridges quote mainnet only.

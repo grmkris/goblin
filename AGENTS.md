@@ -71,9 +71,6 @@ infrastructure. Read
 - [Web](apps/web/AGENTS.md): TanStack Start UI, conversation stream and the MCP Apps host.
 - [CLI](apps/cli/AGENTS.md): `goblin`, the terminal client of `/mcp`'s inspection tools and Workers Logs.
 - [Contracts](packages/contracts/AGENTS.md): shared runtime-validated schemas only.
-- [Wallet worker](apps/wallet/AGENTS.md): Goblin Wallet's Worker, owner API, MCP and per-owner ledger.
-- [Wallet web](apps/wallet-web/AGENTS.md): Goblin Wallet's owner console and MCP App views.
-- [Wallet](packages/wallet/AGENTS.md): the shared wallet library: chains, amounts, contract and rails.
 - [UI](packages/ui/AGENTS.md): editable local shadcn components and styling.
 - [Kit](packages/kit/AGENTS.md): drawn blocks (diagrams, charts, maps) for the chat and agent apps.
 - [App](packages/app/AGENTS.md): the agent app SDK and toolchain, run inside Dynamic Workers.

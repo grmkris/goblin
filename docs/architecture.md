@@ -2,8 +2,7 @@
 
 One Cloudflare Worker serves the web app and the API. Behind it, every user has their own `PersonalAgent` Durable
 Object, named by their user ID: it runs Pi, holds that user's outbound MCP connections and credentials, and keeps
-application state in its own SQLite. D1 holds Better Auth's account tables (users, sessions, inbound OAuth) and goblin's `app_billing_*` tables. Goblin Wallet (ADR 0045) is a second Worker beside it, with its own sign-in, storage
-and stage; see Goblin Wallet.
+application state in its own SQLite. D1 holds Better Auth's account tables (users, sessions, inbound OAuth) and goblin's `app_billing_*` tables.
 
 ```mermaid
 flowchart LR
@@ -43,4 +42,3 @@ flowchart LR
 - [Isolated memory experiments](architecture/memory-experiments.md): the bench workspace.
 - [Routines and notices](architecture/routines.md): routine definitions, runs and notices.
 - [Deferred Home dashboard](architecture/home.md): the deferred Home surface.
-- [Goblin Wallet](architecture/wallet.md): the wallet Worker.

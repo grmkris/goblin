@@ -354,19 +354,17 @@ invite-only. These settings do not authorize a production deploy.
 `smoke:prod`; a `deploy:prod` outside CI is also break-glass (`GOBLIN_BREAK_GLASS=1`). The default prod smoke is read-only: health and an anonymous protected-route probe. An operator smoke
 account's mode-600 OTP session file opts into the full flow. MCP clients authorize against the stage's origin.
 
-There are two branches: `dev` (the default; every change lands here) deploys to `dev.goblin.surf` and
-`wallet-dev.goblin.surf`, and `prod` to `goblin.surf` and `wallet.goblin.surf`. One workflow, `.github/workflows/ci.yml`,
+There are two branches: `dev` (the default; every change lands here) deploys to `dev.goblin.surf`, and `prod` to
+`goblin.surf`. One workflow, `.github/workflows/ci.yml`,
 runs on GitHub-hosted runners. Check runs on every push and pull request. A push to `dev` that passes Check runs Deploy
 dev: `scripts/release.py dev` requires that exact dev tip and its passing Check, plans without a delete, replace or
-re-create of goblinAuth, Files or Web, deploys, and verifies authenticated smoke, drift and the D1 migration inventory;
-then `scripts/wallet_release.py dev` plans, deploys and smokes wallet-dev. Their sanitized receipts are the run's
-`dev-acceptance` artifact. A superseded dev commit cannot deploy.
+re-create of goblinAuth, Files or Web, deploys, and verifies authenticated smoke, drift and the D1 migration inventory.
+Its sanitized receipt is the run's `dev-acceptance` artifact. A superseded dev commit cannot deploy.
 
 Promote with `bun run promote <full-sha>` from any checkout with `gh` signed in and `.local/cloud.env`. It deploys nothing:
 it requires that SHA's dev Check, its `dev-acceptance` receipt (authenticated, at the live dev Worker version) and a
 fast-forward, then moves `prod`. That push runs Deploy prod, which repeats those checks, refuses a forced push, and
-releases goblin prod and Wallet production. Wallet smoke requires `GET /health` with `ok:true,live:true` on prod (dev
-only `ok:true`), the stage's OAuth issuer and anonymous `POST /mcp` returning 401; these probes never sign or spend.
+releases goblin prod.
 Destructive plans still require a separate explicit reset decision.
 
 Alchemy state for dev and prod lives in the account's shared Cloudflare state store (`scripts/alchemy-state.ts`), the
@@ -383,32 +381,6 @@ the logs before use; pull requests run only Check and never reach them. See
 For the first production bootstrap, an operator supplies `GOBLIN_OWNER_EMAIL` and `GOBLIN_SIGNUP_INVITE_CODE` in the mode-600 prod environment, signs in through the real email OTP flow, and records the resulting mode-600 `prod-session.json`. The operator then applies exactly one stage-scoped Pro override of 800 Credits/day to that verified owner. Dodo stays deferred and its live keys remain unset.
 
 ## Billing development and acceptance
-
-### Pro from the Goblin Wallet (ADR 0054)
-
-Pro is a subscription the owner signs once in the Goblin Wallet; goblin's collector takes one payment a period. Per
-stage, with Kris, before the first subscription:
-
-1. Generate one merchant key (`openssl rand -hex 32`) and put it in `.local/<stage>.env` as
-   `GOBLIN_WALLET_MERCHANT_KEY` and in `.local/wallet-<stage>.env` as `WALLET_MERCHANT_GOBLIN_KEY`; set
-   `GOBLIN_WALLET_ORIGIN` to the wallet's origin.
-2. Write the collector's Privy policy and create it in Privy (it is never applied by a script):
-   `bun packages/wallet/scripts/create-collector.ts --env .local/wallet-<stage>.env --policy-out <file>`. The
-   document's owner is `PRIVY_POLICY_ADMIN_ID`; its rules allow only redeeming a delegation, the paymaster's gas
-   approval and the DeleGator upgrade, and deny export. `packages/wallet/policies/collector-base.json` is the same
-   document for review, its owner left as a placeholder.
-3. Create the collector with that policy's id:
-   `bun packages/wallet/scripts/create-collector.ts --env .local/wallet-<stage>.env --stage <stage> --policy-id <id> --out <file>`.
-   It is owned by the policy-admin key quorum, signed for by `PRIVY_SIGNER_ID` under the policy, created once per
-   stage (Privy's idempotency key), and the script writes `WALLET_COLLECTOR_WALLET_ID` and `WALLET_COLLECTOR_ADDRESS`
-   to `<file>`, mode 600. Copy both into `.local/wallet-<stage>.env`.
-4. Send the collector a small USDC float on Base (a dollar covers many collections): it pays each collection's gas in
-   USDC. Its first collection upgrades it to the DeleGator (EIP-7702) in the same operation.
-5. Deploy the wallet, then goblin. `WALLET_MERCHANT_RETURN_ORIGINS` defaults to `https://goblin.surf` on prod and
-   `https://dev.goblin.surf,http://localhost:18971` elsewhere.
-
-Collections run on Base mainnet only (`WALLET_LIVE=1`); on testnets a collection fails as `chain`. The money stays in
-the collector; only the admins can move it out.
 
 ### The card checkout (Dodo, off)
 
@@ -603,49 +575,3 @@ The model `clef` has an input-only estimated Credit rate (5,000 input tokens a C
 `GOBLIN_MODEL_CREDIT_RATES` with `output: null`; unrelated model overrides keep Clef's default. It is a conservative
 app-budget estimate, not a conversion of Workers AI dollars into Token Plan Credits. A dispatched call whose usage is
 unknown is charged its whole 65,536-token context; without the binding there is no call and no charge.
-
-## Goblin Wallet stages
-
-Goblin Wallet is a separate Worker beside goblin: `apps/wallet` (Worker and Alchemy stack `goblin-wallet`),
-`apps/wallet-web` (the Vite and React console, built to static assets) and `packages/wallet` (the shared library).
-Its stage commands are `scripts/wallet-stage.ts`, not `scripts/stage.ts`:
-
-- `bun run dev:wallet` builds `wallet-web` and runs the stack locally (placeholder Cloudflare credentials).
-- `bun run plan:wallet-dev` and `bun run deploy:wallet-dev` plan and deploy the `dev` stage
-  (`wallet-dev.goblin.surf`). Resources are named `goblin-wallet-dev[-role]`; Alchemy state lives in the shared
-  Cloudflare state store as `goblin-wallet/dev`. CI's Deploy dev deploys it after goblin; by hand, a deploy is
-  break-glass (`GOBLIN_BREAK_GLASS=1`).
-- `bun run plan:wallet-prod` and `GOBLIN_CONFIRM_PROD=1 bun run deploy:wallet-prod` do the same for the `prod` stage
-  (`wallet.goblin.surf`, `goblin-wallet-prod[-role]`), reading `.local/wallet-prod.env`.
-
-The script scrubs `CLOUDFLARE_*`, `GOBLIN_*`, `PRIVY_*`, `PIMLICO_*`, `TREASURY_*` and `WALLET_*` from the inherited
-environment, then merges the shared Cloudflare file and `.local/wallet-<stage>.env` (mode 600) into a temporary
-mode-600 file. Names below; never commit or print the values.
-
-| Variable | Used by |
-| --- | --- |
-| `PRIVY_APP_ID` | Worker (plain); served at `GET /api/config` |
-| `PRIVY_APP_SECRET` | Worker (secret) |
-| `PRIVY_AUTHORIZATION_KEY` | Worker (secret): signs Privy requests |
-| `PRIVY_AUTHORIZATION_PUBLIC_KEY` | operator: registers the key quorum in Privy |
-| `PRIVY_POLICY_ADMIN_KEY`, `PRIVY_POLICY_ADMIN_PUBLIC_KEY` | operator: policy administration |
-| `PRIVY_SIGNER_ID`, `PRIVY_POLICY_ID` | Worker (plain); optional until Privy is provisioned |
-| `PIMLICO_API_KEY` | Worker (secret): Pimlico's bundler and ERC-20 paymaster; spends nothing |
-| `TREASURY_PRIVATE_KEY`, `TREASURY_ADDRESS` | operator only: funds test wallets; never bound to the Worker |
-| `WALLET_DOMAIN`, `WALLET_ZONE_ID` | custom domain; empty domain serves on workers.dev |
-| `WALLET_RPC_URLS` | optional JSON object of chain id to RPC URL; empty uses the public RPCs |
-| `WALLET_LIVE` | `1` allows mainnet money; anything else is testnets only |
-| `WALLET_MERCHANT_GOBLIN_KEY` | Worker (secret): goblin's merchant key, the bearer of `/api/merchant/*` (ADR 0054); empty turns the merchant API off |
-| `WALLET_COLLECTOR_WALLET_ID`, `WALLET_COLLECTOR_ADDRESS` | Worker (plain): goblin's collector, from `packages/wallet/scripts/create-collector.ts`; empty until created |
-| `WALLET_MERCHANT_RETURN_ORIGINS` | Worker (plain): comma-separated origins a subscription request may return to; defaults per stage |
-| `PRIVY_POLICY_ADMIN_ID` | operator: the key quorum that owns the agent and collector policies, and the collector itself |
-
-Checks per workspace: `bun run --cwd apps/wallet test`, `bun run --cwd packages/wallet test`,
-`bun run --cwd apps/wallet-web build`. The Worker has unit tests only; there is no workerd integration test yet.
-
-`heavy bun apps/wallet-web/test/ui-landing.ts [out-dir]` renders the wallet's public landing (`/` signed out) on the
-web app's fixtures (`?fixtures=signed-out`, no Privy or API) in local Chromium: phone 390×844 and desktop 1280×800,
-light and dark, and reduced motion. It approves the hero's ask by hand, waits for an untouched one to settle itself,
-checks that a deep link keeps the plain sign-in and that no page scrolls sideways, and keeps full-page screenshots
-(default `.local/goblin-acceptance/wallet-landing-*`); this is browser fixture evidence only.
-`bun scripts/wallet-og.ts` redraws its link preview, `apps/wallet-web/public/wallet-og.png`.
