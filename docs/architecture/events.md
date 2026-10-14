@@ -26,10 +26,9 @@ the object, Standard Webhooks HMAC and five-minute freshness checks precede deco
 signed verification challenge; remote ids are cross-checked when subscribe returns. Receipts and their frozen consumer
 revisions commit in short transactions, with an already armed recovery schedule. The hook returns quickly and dispatch
 runs asynchronously. Replay wakes unfinished handlers without duplicating their accepted intent. Before any of that,
-the hook checks the agent may take events. The Worker hands the webhook to the agent's internal API (`mcpEvents`),
-whose gate refuses an account without a plan (402); then ingress checks the plan the agent keeps and resident
-authority: the owner's own refusal (revoked authority, a forbidden connection) answers 410 and the producer drops the
-subscription, and any other failure of either check (a plan lookup that failed) is reported and answers 503, so the
+the hook checks the agent may take events. The Worker hands the webhook to the agent's internal API (`mcpEvents`);
+then ingress checks resident authority: the owner's own refusal (revoked authority, a forbidden connection) answers 410
+and the producer drops the subscription, and any other failure of the check is reported and answers 503, so the
 producer retries. A subscription is dropped as invalid only when its server is gone (`NotFound`) or its grant or
 endpoint changed. A maintenance sweep keeps the next alarm only for when something is due (`SqliteEventStore.nextDue`:
 the earliest lease refresh or poll of a running subscription, or a delivery's retry); with nothing waiting, no alarm is
@@ -67,7 +66,7 @@ A listing can clear only the generation it observed, and retained activations st
 termination stops lease refresh and surfaces health. Mail and workspace changes have no installed consumer yet.
 
 The owner browses a connection's event streams before granting any (`GET /api/mcp/:id/events`, `Events.catalog`):
-the plan, resident authority and a signed-in connection are enough, no selector grant is made, and each stream says
+resident authority and a signed-in connection are enough, no selector grant is made, and each stream says
 whether goblin can subscribe to it (poll and webhook). Descriptions are the server's claims, cut to 500 characters.
 A stream also carries what the server suggests for it, read leniently field by field from the descriptor's `title`
 and `_meta["lol.mysi/suggest"]` (`eventSuggestion`, `mcp/events/protocol.ts`; a malformed one never fails the list):
@@ -86,10 +85,9 @@ Resume and Edit, which opens the routine editor and then its review), the **pick
 lists the streams by group (the server's, else the service before the first dot of a three-part name, else the
 connection), each by title (else its name in words, `message.received` → "Message received") with its summary and a
 quiet rate. While the offer is open, a recommended stream the server says to tell the owner about is picked, to Tell me
-in Personal; one it recommends without `tellMe` is handed to goblin there on Pro and left unpicked without it.
-Each picked stream has one select for where it goes: Tell me in a Topic, or (Pro) goblin acting on it in a Topic or a
-Persona acting on it (answering in Personal); without Pro those show disabled, with Get Pro
-(`/subscribe?return=<this page>`). A hand-over adds a line saying who answers where; a Tell me pick adds none, since its
+in Personal; one it recommends without `tellMe` is handed to goblin there. Each picked stream has one select for where
+it goes: Tell me in a Topic, or goblin acting on it in a Topic or a Persona acting on it (answering in Personal). A
+hand-over adds a line saying who answers where; a Tell me pick adds none, since its
 notice is the title and line its row already shows. **Advanced**
 (folded) holds each stream's filters (a nullable or optional string is a plain optional field, with the server's
 default as its hint), an instruction for a hand-over (else goblin's), Tell me and Telegram. One action, **Set up N

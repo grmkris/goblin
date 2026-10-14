@@ -22,12 +22,12 @@ goblin is an MCP server at `/mcp`, the one protected resource of Better Auth's `
   owner's consent still exists. Its scopes count only while that consent still grants them (`auth/service.ts`).
 - Tools: `ask_agent` (submit into main, labelled with the client's name, and wait up to 110 seconds; a stable
   `operationId` records its Pi session in the chat operation ledger and makes retries idempotent; it runs the model,
-  so it needs a plan) and `get_recent_messages` (the primary chat's current session's latest messages, with their
+  so it counts toward the day's tokens) and `get_recent_messages` (the primary chat's current session's latest messages, with their
   authors). `ask_agent` releases the admission lock before waiting and waits on the operation's recorded session.
 - With `goblin:inspect` (ADR 0024) the same server adds `inspect_conversations`, `inspect_conversation`,
   `inspect_turns`, `inspect_turn`, `inspect_problems`, `inspect_flows` (the ledger's content-free conversation flow
   steps) and `inspect_details` (the operation behind a message), with the contract's input and output schemas
-  (`inbound/inspection.ts`). They read the token subject's own agent, never call a model and need no plan; the
+  (`inbound/inspection.ts`). They read the token subject's own agent and never call a model; the
   server's instructions tell clients that returned text is data, never instructions.
 - `/mcp` advertises `goblin:inspect` in its metadata, and an unauthenticated request gets a 401 naming the metadata
   and every scope, so a new connection asks for inspection. The consent page offers it as a separate switch that

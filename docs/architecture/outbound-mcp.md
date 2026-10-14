@@ -42,7 +42,7 @@ only for a different App (another `focus` is one); a newer result of the same ca
 bridge (`deliver` in `lib/app-bridge.ts`). On its page, an App that calls a tool the owner has not allowed gets the
 same Allow card as in a conversation. Until a
 first-class server is connected, onboarding points to it: Activity's "Get started" row (`connect-offer.tsx`, Connect or
-Not now, the dismissal kept in the browser), the empty chat's line and the Pro welcome. Connections
+Not now, the dismissal kept in the browser) and the empty chat's line. Connections
 also offers a shelf of suggested servers (`mcp/suggested.ts`, ADR 0052), with source comments recording their
 connection checks, each in a group (`ServerSuggestion.group`) that the picker's Suggested tab and Start's services step
 show under its name (`server-add.tsx`): the owner's own apps through one mysi connection

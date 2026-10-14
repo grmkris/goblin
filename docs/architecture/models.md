@@ -4,7 +4,7 @@
 
 Typed decisions are the scoped Workers AI exception ([ADR 0031](../adr/0031-typed-decisions-through-workers-ai.md)): Clef
 judges bounded state and questions through `AI` after the rules decide what they can. It is never a chat model, and
-its calls check and charge the budget like the cheap model's (input only, 5,000 tokens per Credit by default).
+its calls check the daily cap and count their tokens like the cheap model's.
 
 Each user picks the model their agent answers with, in the composer. The deployment offers `GOBLIN_MODEL_ID` (the
 default) plus `GOBLIN_MODELS`, all served by the same LiteLLM key; `models.ts` names and groups them by route
@@ -27,26 +27,24 @@ budget (probed 2026-10-12), which is why the picker says so.
 
 Housekeeping (thread titles, main's summaries and skill-draft decisions) runs on `GOBLIN_MEMORY_MODEL`. Set it to a
 cheap offered model; the code does not choose by price. Unset or not offered, it falls back to the default
-(`models.ts`, `memory/model.ts`). Its tokens count toward the owner's daily budget like any other.
+(`models.ts`, `memory/model.ts`). Its tokens count toward the owner's daily usage like any other.
 
-## Model budget
+## Daily token usage
 
-Users share the deployment's model key, so each agent has a daily budget in estimated Alibaba Token Plan Credits,
-the unit the plan bills (ADR 0026), per UTC day: Pro's 800, or the account's operator override (`daily_credits`). A
-Pi extension (`pi/budget.ts`) records every model response's tokens in `app_usage_daily` and prices them in
-thousandths of a Credit at its model's rate (`budget-credits.ts`): by default about 5 000 fresh input, 50 000 cached
-input or 830 output tokens per Credit, Alibaba's own example, with per-model overrides and aliases in
-`GOBLIN_MODEL_CREDIT_RATES` (Gemini 3.8 Flash is priced as Qwen 3.8 Flash; Clef, `clef`, has an input-only rate
-of its own, and a Clef call whose usage is unknown is charged its whole 65,536-token context). The cheap model's calls
-(titles, memory, skill drafts, an app's `llm` power), Clef's decisions and routine runs (`routines/usage.ts`, from
-Pi's `pi.usage`) count the same way.
-Compaction summaries in main and threads are not counted yet. Once the day is spent, new turns are refused with `BudgetExhausted`: HTTP 429 from the owner API,
-or a tool error from `/mcp`. Telegram submissions check the same budget. Tool calls inside a running turn are blocked,
+Each agent counts its model tokens per UTC day ([ADR 0058](../adr/0058-no-plans-tokens-and-an-optional-cap.md)). A Pi
+extension (`pi/budget.ts`) adds every model response's tokens, input, output and cached alike, to `app_usage_daily`.
+The cheap model's calls (titles, memory, skill drafts, an app's `llm` power), Clef's decisions (a Clef call whose usage
+is unknown counts its whole 65,536-token context) and routine runs (`routines/usage.ts`, from Pi's `pi.usage`) count
+the same way. Compaction summaries in main and threads are not counted yet.
+
+Users of a deployment share its model key, so the deployment may cap each account's day with `GOBLIN_DAILY_TOKEN_CAP`
+(the Worker's `DAILY_TOKEN_CAP`, a positive whole number); unset, nothing is refused. Once a capped day is spent, new
+turns are refused with `BudgetExhausted` until 00:00 UTC: HTTP 429 from the owner API, or a tool error from `/mcp`.
+Telegram submissions, routine runs and housekeeping check the same cap. Tool calls inside a running turn are blocked,
 so a looping turn ends after one more reply. Pi reports and swallows exceptions thrown by hooks, so the in-turn lever
-is blocking tools, not throwing. Only a spent budget blocks a tool as spent: an account without a plan is told to
-subscribe, and a check that could not read the plan or the ledger blocks the tool as a failed check and is reported
-(ADR 0026, amended). The allowance is the plan's, read through the agent's `Entitlements`.
-Settings shows today's usage, and the composer shows it as a ring, re-read whenever
-a run ends. On wider screens the composer also
-shows how full the context was at the latest response, measured against the model's `contextWindow`. The model key's
-own cap stays the backstop.
+is blocking tools, not throwing. Only a spent day blocks a tool as spent: a check that could not read the ledger blocks
+the tool as a failed check and is reported. `GET /api/agent/usage` answers `{ used, limit, resetsAt }` in tokens, with
+`limit` null without a cap. Settings shows today's tokens, and the composer shows a ring, re-read whenever a run ends:
+the share of the cap used or, without a cap, how full the context was at the latest response, measured against the
+model's `contextWindow`. Where the chat is wide enough the composer also shows the day's figure and the context's
+tokens beside the ring. The model key's own cap stays the backstop.

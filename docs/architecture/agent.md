@@ -10,15 +10,15 @@ API) and the Worker's other callers through the internal one; one RPC method is 
 
 The object's constructor migrates the application tables first (synchronously, as the Agents SDK makes its own): the
 lifecycle's start opens Pi, whose apps and run ledger read them, before `onStart`, and an RPC or the runtime may come
-before either. The object builds one Effect `ManagedRuntime` lazily, on first use, from `AgentLive`
-(`layers/index.ts`). A runtime that fails to start is dropped, so the next caller starts it again; `deleteAgentData`
-closes it. What the services need from the instance (its storage and env, the Pi pieces and kits its constructor
-made, the schedules it arms, the plan policy) is one record, `AgentInput` (`runtime/input.ts`). The layers build in a
-fixed order, each over everything before it:
+before either. The object builds one Effect `ManagedRuntime` lazily, on first use, from `AgentLive` (`layers/index.ts`).
+A runtime that fails to start is dropped, so the next caller starts it again; `deleteAgentData` closes it. What the
+services need from the instance (its storage and env, the Pi pieces and kits its constructor made, the schedules it
+arms) is one record, `AgentInput` (`runtime/input.ts`). The layers build in a fixed order, each over everything before
+it:
 
 - **Core** (`layers/core.ts`): `AgentInput`, the application database (`Db`), the change bus (`Changes`), Pi's calls
   as Effects (`PiSessions`), the per-key lock (`KeyedLock`), keyed single flights (`SingleFlight`), conversation flow
-  events (`FlowEvents`), the plan the agent keeps (`Entitlements`), resident authority (`Resident`), and goblin's
+  events (`FlowEvents`), resident authority (`Resident`), and goblin's
   content-free logger and failure reporter in place of Effect's defaults (see Logs, failures and references).
 - **The start** (`layers/index.ts`): the agent's start, step by step in one fixed order, each step a layer in its
   owning area's file and built after every step before it, so each await holds up the steps after it. In order: the
@@ -32,8 +32,8 @@ fixed order, each over everything before it:
   The conversation services publish `conversations.changed` with what each write changed, from inside the write; the
   App registry and the workspace feed follow that topic. A move a restart interrupted finishes once the conversation
   layer is built (`Moves` forks its reconcile in the layer's scope), never holding up the start.
-- **One layer per area** after the start, in order: the model budget and picker (`Budget`, `Models`, which a send's
-  admission reads), conversation (`Chats`, `ChatOperations`, `Conversations`, `Moves`), setup (`Setups`),
+- **One layer per area** after the start, in order: the daily token usage and picker (`Budget`, `Models`, which a
+  send's admission reads), conversation (`Chats`, `ChatOperations`, `Conversations`, `Moves`), setup (`Setups`),
   knowledge (`Memories`, `Retrieval`), delegation (`Topics`, `Personas`, `Invocations`, `Receipts`, `Home`), routines
   (`Routines`, `RoutineControl`), inspection (`Inspection`), apps (`AppEngine`, `Files`), typed decisions (`Decisions`),
   the workspace feed (`Workspace`) and HTTP (`AgentHttp`). The MCP host's `McpConnections`, `McpServers`, `McpGrants`,
@@ -42,20 +42,20 @@ fixed order, each over everything before it:
 
 `AgentServices`, every service a program may require, is derived from the layers, so no area edits a shared union. A
 service is a `Context.Service` tag in its area (`<area>/service.ts`) whose methods are `Effect.fn` Effects with typed
-`AppError` failures. A synchronous Drizzle store is a set of functions of the agent's database (`Db`), or a plain
-class where it keeps state, wrapped once where its service is built; nothing builds a second of a stateful one. The
-Worker runs its own programs (the edge, the fresh plan reads, billing, the internal API's client) through `runAtEdge`
+`AppError` failures. A synchronous Drizzle store is a set of functions of the agent's database (`Db`), or a plain class
+where it keeps state, wrapped once where its service is built; nothing builds a second of a stateful one. The Worker
+runs its own programs (the edge, the Events webhook, the internal API's client) through `runAtEdge`
 (`http/api/edge.ts`).
 
 Inside the agent there are exactly two ways into Effect ([docs/agents/effect.md](../agents/effect.md)), and programs use
 neither: they compose. `tools/graph.ts` closes both to the files it lists (`boundaries/no-closed-import`).
 
-- **The bridge** (`runtime/bridge.ts`), for code the runtime does not own: the Pi extensions and kits, the alarms,
-  the apps engine and its Dynamic-Worker powers, and `onRequest`. `run` checks the plan (`requirePlan()`) first,
-  `local` does not (the ledger, budget records, routine gates, diagnose), and both reject with the `AppError` the
-  program failed with; `exit` returns the program's exit, which `onRequest` answers. Every program it runs reports an
-  `Internal` failure or a defect with its code location (`runtime/instrument.ts`). `agent.ts` hands the bridge to
-  what it builds; `AgentInput` does not carry it.
+- **The bridge** (`runtime/bridge.ts`), for code the runtime does not own: the Pi extensions and kits, the alarms, the
+  apps engine and its Dynamic-Worker powers, and `onRequest`. `run` (and `local`, the same, which the ledger, budget
+  records, routine gates and diagnose are handed) rejects with the `AppError` the program failed with; `exit` returns
+  the program's exit, which `onRequest` answers. Every program it runs reports an `Internal` failure or a defect with
+  its code location (`runtime/instrument.ts`). `agent.ts` hands the bridge to what it builds; `AgentInput` does not
+  carry it.
 - **`promiseWith(context)`** (`runtime/boundary.ts`), for a foreign callback wired inside a layer that must answer a
   Promise: the MCP SDK's auth provider and dispatch guards, and the skills guard. It rejects with the typed failure
   itself, so an `AppError` crosses the SDK unchanged.
@@ -315,8 +315,8 @@ schemas. The tools the model names in `tools` come in full, with their input sch
 and names it is not offered come back as `unknown`; the persona tells it to ask for the schemas of the tools it will
 call. Asked with `events: true`, for a connection whose server offers Events, it adds the first 64 event streams with
 their argument schemas (`events`, from `Events.catalog`, also untrusted), so the model can propose a routine on one;
-unasked, `sendsEvents` says there are some. A catalog the plan, the connection's sign-in or the server does not let it
-read leaves `events` out and the tools listed. A connection with more than forty tools whose names fall into services
+unasked, `sendsEvents` says there are some. A catalog the connection's sign-in or the server does not let it read
+leaves `events` out and the tools listed. A connection with more than forty tools whose names fall into services
 (the prefix before the first `_`; one mysi connection lists about 130 as `<service>_<tool>`, ADR 0052) answers an
 unfiltered listing with its `services` instead: each prefix, its tool count and its first few names, and goblin's own
 `next` line telling the model to call again with `service` (one service's tools) or `query` (every word in a tool's

@@ -56,7 +56,7 @@ Model calls go through CLIProxy and inherit `CLIPROXY_API_KEY` from the interact
 its own auth secret and credential key and opens sign-up; set them in `.local/local.env` only to override.
 
 Open the app and use **Create an account**, enter an email and the six-digit code captured under
-`apps/web/.alchemy/local/email/`. Each account gets its own agent after plan admission. Smoke uses the session from
+`apps/web/.alchemy/local/email/`. Each account gets its own agent. Smoke uses the session from
 an actual OTP login: store `{"origin":"http://localhost:18971","cookie":"<session cookie>"}` in
 `.local/local-session.json` with mode 600, then configure `GOBLIN_OWNER_EMAIL` and `GOBLIN_SMOKE_SESSION_FILE`. Never
 print or commit the cookie. Smoke validates the file origin and the authenticated owner before making agent calls.
@@ -110,15 +110,12 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_STAGE`, `GOBLIN_APP_URL` | `dev` and the Worker's HTTPS origin. |
 | `GOBLIN_DOMAIN`, `GOBLIN_ZONE_ID` | Custom hostname and its Cloudflare zone ID. |
 | `GOBLIN_SIGNUP_MODE`, `GOBLIN_SIGNUP_INVITE_CODE` | `open`, `invite` or `closed` (default), and the invite code. |
-| `GOBLIN_WALLET_ORIGIN`, `GOBLIN_WALLET_MERCHANT_KEY` | Pro paid from the Goblin Wallet (ADR 0054): the wallet's origin (`https://wallet-dev.goblin.surf` on dev) and goblin's merchant key there (a secret; the wallet holds the same value as `WALLET_MERCHANT_GOBLIN_KEY`). Without both, Subscribe with USDC says it is being set up. |
-| `GOBLIN_CARD_CHECKOUT` | `on` turns the Dodo card checkout and portal back on (ADR 0015); unset or anything else, they answer `card_disabled` and the web hides them. |
-| `GOBLIN_PLAN_CATALOG` | The prices of goblin Pro's two ways to pay (ADR 0054): JSON `{ "day"?: {…}, "month"?: {…} }`, each any of `amountUsd` (`"1.00"`, 0.01 to 999.99), `periodDays` (the day pass's is 1; monthly's 1 to 30) and `dailyCredits` (0 to 10,000). Unset, the day pass is $1 a day and monthly $15 every 30 days, both 800 Credits a day. A setting that does not decode stops the deploy. There is no free plan; `GOBLIN_FREE_DAILY_CREDITS` and `GOBLIN_FREE_WALLET_USD` are no longer read. |
 | `GOBLIN_MAIL_SENDER` | Required OTP sender on a Cloudflare Email Sending domain. |
 | `GOBLIN_OWNER_EMAIL`, `GOBLIN_SMOKE_SESSION_FILE` | Existing owner email and mode-600 OTP session JSON; only smoke reads them. |
 | `GOBLIN_BETTER_AUTH_SECRET` | Better Auth's secret. |
 | `GOBLIN_MODEL_BASE_URL`, `GOBLIN_MODEL_ID`, `GOBLIN_MODEL_KEY` | Railway LiteLLM and the dedicated capped key. Never the master key. |
 | `GOBLIN_MODELS` | More LiteLLM model names users may pick, comma-separated; `GOBLIN_MODEL_ID` stays the default. Allow each on the LiteLLM key too. |
-| `GOBLIN_MODEL_CREDIT_RATES` | JSON tokens per estimated Token Plan Credit (`{ default?, models?, aliases? }`, each rate `{ input, cached, output }`); unset, Alibaba's example rates (ADR 0026). |
+| `GOBLIN_DAILY_TOKEN_CAP` | The most model tokens one account may use in a UTC day, a positive whole number; unset or anything else, no cap (ADR 0058). Once a capped day is spent, model calls are refused until 00:00 UTC. |
 | `GOBLIN_MEMORY_MODEL` | The offered model for thread names, Topic Conversation memory summaries and skill-draft decisions. It is not selected by price; unset or not offered uses the default. |
 | `GOBLIN_SMOKE_MODEL` | Optional model for smoke turns. It must be one of the offered models; unset keeps the owner's pick. |
 | `GOBLIN_MCP_SERVERS` | JSON list of outbound servers every account starts with: `[{"connectionId":"mercator","endpoint":"https://mercator.sh/mcp/auth","label":"Mercator"}]`. Dev and prod configure Mercator (ADR 0043); each owner still signs in. |
@@ -189,8 +186,9 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   send start a thread; × goes back with the draft kept. On a server with Move, a message of yours in a channel offers
   Move to thread in its toolbar. With Personas, `@` offers them; tag two or more and choose Together or In turn.
   A strip under an answer that used other chats opens to each source.
-- **Questions, models and budget.** Answer an `ask_user` card with your next message. Pick an offered model in the
-  composer; Settings and the composer's ring show today's usage in Credits, resetting at 00:00 UTC.
+- **Questions, models and usage.** Answer an `ask_user` card with your next message. Pick an offered model in the
+  composer; Settings shows today's tokens, and the composer's ring the share of the daily token cap used (or, without
+  a cap, how full the context is), resetting at 00:00 UTC.
 - **Commands and references.** Type `/` to choose a skill, `/help`, `/stop` or `/new-thread`, and `@` to choose a
   connection, skill or helper. Arrows browse; Enter or Tab selects; Escape dismisses. Unselected tokens remain prose.
   Chips can be removed. Skill-only sends are allowed; connection hints grant nothing; helpers bring their latest
@@ -258,7 +256,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 - **Inspect your agent from a coding agent.** Start with `inspect_problems` or `inspect_turns`, then `inspect_turn`
   with an operation id (a Telegram message is `telegram-<id>`), then `inspect_conversation` for the words.
   `inspect_flows` shows how conversations moved (sends, replies, thread starts, moves, Personas, Delegates) and
-  `inspect_details` the operation behind a message. Reading needs no plan; `ask_agent` does.
+  `inspect_details` the operation behind a message. Reading never calls a model; `ask_agent` does.
 - **The `goblin` CLI** (`apps/cli`) is the same from a terminal: an MCP client of `/mcp` that asks for
   `goblin:inspect`, whose commands come from the server's tools.
 
@@ -376,44 +374,9 @@ secrets are GitHub environment secrets behind branch policies (`dev` for the dev
 the logs before use; pull requests run only Check and never reach them. See
 [ADR 0046](adr/0046-production-promotion-and-public-source.md).
 
-For the first production bootstrap, an operator supplies `GOBLIN_OWNER_EMAIL` and `GOBLIN_SIGNUP_INVITE_CODE` in the mode-600 prod environment, signs in through the real email OTP flow, and records the resulting mode-600 `prod-session.json`. The operator then applies exactly one stage-scoped Pro override of 800 Credits/day to that verified owner. Dodo stays deferred and its live keys remain unset.
-
-## Billing development and acceptance
-
-### The card checkout (Dodo, off)
-
-The card checkout is off by default: checkout and the portal answer `card_disabled` until a stage sets
-`GOBLIN_CARD_CHECKOUT=on`. To turn it on, set `DODO_PAYMENTS_ENVIRONMENT=test_mode` on local/dev and `live_mode` on
-prod. Store `DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_WEBHOOK_KEY` and `DODO_PRODUCT_ID` in the stage's mode-600 env file;
-Alchemy binds them as Worker secrets. The product is a goblin-only recurring one with no trial, priced as the stage's
-catalog prices monthly (`GOBLIN_PLAN_CATALOG`, $15 every 30 days by default). Never bind an account's master model key
-or print payment keys. Configure a separate Standard Webhooks endpoint at `/hooks/dodo` per stage.
-`/health` reports the stage billing mode and whether billing is configured; missing keys never bypass admission.
-
-The billing migration grants existing users a dev-only Pro override; a fresh database has no such users. New OTP
-signups need an operator override or test billing. Overrides grant nothing outside their configured stage. An operator can insert/update `app_billing_accounts` for a known user ID, setting `plan_override='pro'`,
-`override_stage` to the intended stage, `daily_credits` to a positive allowance in Credits (Pro's is 800) and both
-timestamps in milliseconds. `daily_tokens` is retired and no longer read.
-Remove the override to test paid access. A fresh local user also needs test billing or an explicit local override.
-
-The local billing tests run without keys or provider calls:
-
-```sh
-cd apps/runtime
-heavy bun run test:integration -t billing
-```
-
-They deploy an isolated native Worker with real auth D1 and an injected Dodo client. The fixture levers and signing
-key are reachable only from that test Worker; production imports neither. Acceptance on deployed dev is a separate
-operator step: invite/signup a new account, confirm agent routes return 402, use a test card, wait for the signed
-webhook and agent access, cancel and verify paid-through expiry, then replay a delivery. Preserve receipts without
-card data or secrets. Existing operator accounts retain access.
-
-The Credit rates are estimates, not the plan's bill; configure reviewed rates in `GOBLIN_MODEL_CREDIT_RATES`. Local
-tests prove the pricing and separate ledgers, not the provider's actual charges.
-Before prod payments, review the draft legal pages and provide operator identity, support/postal address, jurisdiction,
-refund/withdrawal policy and retention/subprocessor details. Cancel recurring billing through Dodo before account
-deletion; deletion does not itself cancel provider charges.
+For the first production bootstrap, an operator supplies `GOBLIN_OWNER_EMAIL` and `GOBLIN_SIGNUP_INVITE_CODE` in the
+mode-600 prod environment, signs in through the real email OTP flow, and records the resulting mode-600
+`prod-session.json`.
 
 ## Owner routing and Apps tests
 
@@ -460,24 +423,17 @@ and the step-up card's sign-in link and Continue, with the owner API routed in t
 
 `heavy bun apps/web/test/ui-start.ts` renders first-run Start (ADR 0048) from source in local Chromium at phone (light)
 and desktop (dark) widths: the splash, the welcome, the wallet to connect, with setup left (its own words and the link
-to its setup page) and ready (what it holds, and Change for how goblin pays), services and the kickoff, with the owner
-API routed in the page and no screen scrolling sideways. It needs `@goblin/app`'s runtime built (its own
-`build` script). Screenshots go under `.local/goblin-acceptance/start-*`; this is browser fixture evidence only.
-
-`heavy bun apps/web/test/ui-subscribe.ts` renders goblin Pro (ADR 0054) from source in local Chromium at phone (light)
-and desktop (dark) widths: `/subscribe` with the day pass and monthly side by side or stacked (no plan, on a day pass,
-a day pass that could not pay), the wallet's balance from its status and what it covers, Settings' plan card in each
-state, and the composer's no-plan card, with the owner API routed in the page. It checks the Add funds and Pick a plan
-links, that Subscribe with USDC asks for the billing pressed, and that no screen scrolls sideways. Screenshots go under
-`.local/goblin-acceptance/subscribe-*`; this is browser fixture evidence only.
+to its setup page) and ready (what it holds), services and the kickoff, with the owner API routed in the page and no
+screen scrolling sideways. It needs `@goblin/app`'s runtime built (its own `build` script). Screenshots go under
+`.local/goblin-acceptance/start-*`; this is browser fixture evidence only.
 
 `heavy bun apps/web/test/ui-landing.ts [--out <dir>]` renders goblin's landing (`/`, signed out) from source in local
 Chromium at phone and desktop widths, light and dark: the hero's session playing, waiting on its question, answered by
 Allow and on its own, and the whole page; under reduced motion the session starts at its question and Allow still
-answers it. With `/health` and the session check routed in the page, it checks the way in (`/login?new=1`), the Goblin
-Wallet's origin from `/health`, Claude Code's command for the page's origin, the mainnet links, that the Source link
-stays off, that a signed-in session leaves for its channel, and that nothing scrolls sideways. Screenshots go under
-`.local/goblin-acceptance/landing-*`; this is browser fixture evidence only.
+answers it. With `/health` and the session check routed in the page, it checks the way in (`/login?new=1`), Claude
+Code's command for the page's origin, that the Source link stays off, that a signed-in session leaves for its channel,
+and that nothing scrolls sideways. Screenshots go under `.local/goblin-acceptance/landing-*`; this is browser fixture
+evidence only.
 
 `heavy bun apps/web/test/ui-markdown.ts` renders chat Markdown from source in local Chromium at desktop and phone
 widths: a reply that settles keeps its blocks (a table keeps its element and sideways scroll), with and without
@@ -537,17 +493,15 @@ sealed metadata, one event/minute, pending coalescing, gap/poll recovery and ter
 producer or Telegram send is involved. To run just that case, use
 `GOBLIN_HARNESS_PORT=18871 heavy bun run test:integration native.test.ts -t 'signed routine Events'`.
 
-For local acceptance, start a separate `bun dev` stack with isolated Alchemy/D1/DO state and a throwaway account;
-use the local operator entitlement override, no mail and no billing provider credentials. Through the authenticated
-API/UI, confirm a near-future reminder, observe one completed run and passive main note, confirm a cron occurrence,
-restart the local process before it fires, then verify firing and next occurrence. Revoke resident authority and
-confirm a reminder yields a visible skip without token usage; check active/running and run/day token caps. Save
-redacted logs and screenshots. Local CLIProxy provider evidence is distinct from Railway LiteLLM and retained dev.
-LOCAL throwaway-account receipts verify reminder dedupe/passive acceptance, retained cron firing
-and rearm across restart, revoked-authority skip with unchanged usage, active/running caps and run/day token blocking
-using CLIProxy. The native recurring-wake regression verifies the next sweep survives the callback that scheduled it.
-Real provider billing, Telegram delivery, cron-after-deploy and real producer acceptance require separate deployed
-verification.
+For local acceptance, start a separate `bun dev` stack with isolated Alchemy/D1/DO state, a throwaway account and no
+mail. Through the authenticated API/UI, confirm a near-future reminder, observe one completed run and passive main note,
+confirm a cron occurrence, restart the local process before it fires, then verify firing and next occurrence. Revoke
+resident authority and confirm a reminder yields a visible skip without token usage; check active/running and run/day
+token caps. Save redacted logs and screenshots. Local CLIProxy provider evidence is distinct from Railway LiteLLM and
+retained dev. LOCAL throwaway-account receipts verify reminder dedupe/passive acceptance, retained cron firing and rearm
+across restart, revoked-authority skip with unchanged usage, active/running caps and run/day token blocking using
+CLIProxy. The native recurring-wake regression verifies the next sweep survives the callback that scheduled it. Telegram
+delivery, cron-after-deploy and real producer acceptance require separate deployed verification.
 
 ## Conversation and retained Home data
 
@@ -569,7 +523,5 @@ judged without Clef, and main still answering. Web unit tests cover the rows, th
 a browser run. These are local results: provider evaluation is the benchmark's (`bench/README.md`), and dev acceptance
 is separate.
 
-The model `clef` has an input-only estimated Credit rate (5,000 input tokens a Credit). Override it in
-`GOBLIN_MODEL_CREDIT_RATES` with `output: null`; unrelated model overrides keep Clef's default. It is a conservative
-app-budget estimate, not a conversion of Workers AI dollars into Token Plan Credits. A dispatched call whose usage is
-unknown is charged its whole 65,536-token context; without the binding there is no call and no charge.
+A dispatched Clef call counts its reported tokens toward the owner's day, like any model call; one whose usage is
+unknown counts its whole 65,536-token context, and without the binding there is no call and nothing is counted.

@@ -7,8 +7,8 @@ bucket, the `FLOWS` Analytics Engine dataset (`goblin-<stage>-flows`, ADR 0037),
 (Dynamic Workers, open beta, Workers Paid) and, on dev only, Workers AI as `AI` for typed decisions (ADR 0031; without
 it decisions judge nothing); it is goblin's deployment entrypoint.
 `scripts/stage.ts` builds `packages/app`'s toolchain before Alchemy runs. The local stage runs in workerd with CLIProxy; the dev stage calls Railway LiteLLM with a
-dedicated model-limited, budget-capped key. Offered models and Credit rates come from stage configuration; the per-account allowance comes from its plan or
-operator override. The key's provider caps and shared quotas are managed outside this repository; source does not prove
+dedicated model-limited, budget-capped key. Offered models and the optional daily token cap per account come from stage
+configuration. The key's provider caps and shared quotas are managed outside this repository; source does not prove
 their active values. Secrets are Worker secret bindings, never in the browser bundle. Every stage turns on Workers
 Logs (with invocation logs) and Workers Traces for every request (`scripts/stage-config.ts`); Cloudflare keeps both
 seven days. The run ledger's log lines (see Run ledger) are among them.
@@ -32,12 +32,10 @@ proves a custom-domain Origin succeeds and a foreign Origin is rejected.
 
 `dev` is the daily source branch and the default; `prod` records the deliberately promoted SHA. One workflow,
 `ci.yml`, runs on GitHub-hosted runners: Check on every push and pull request, then, for a push to `dev`, Deploy dev
-(goblin dev and wallet-dev, exact-tip deployment and authenticated acceptance, published as the `dev-acceptance`
-artifact), and for a push to `prod`, Deploy prod. `bun run promote <sha>` verifies the dev Check, that SHA's
-`dev-acceptance` receipt at the live dev Worker version and a fast-forward, then moves `prod`; Deploy prod repeats the
-checks, refuses a forced push and deploys core Goblin and the separate Wallet production Worker from the same commit.
-Wallet keeps its own stage file and Alchemy stack; health, the stage's OAuth issuer and anonymous MCP refusal establish
-its public smoke receipt.
+(exact-tip deployment and authenticated acceptance, published as the `dev-acceptance` artifact), and for a push to
+`prod`, Deploy prod. `bun run promote <sha>` verifies the dev Check, that SHA's `dev-acceptance` receipt at the live dev
+Worker version and a fast-forward, then moves `prod`; Deploy prod repeats the checks, refuses a forced push and deploys
+that commit.
 
 Alchemy state for dev and prod lives in the account's shared Cloudflare state store (`scripts/alchemy-state.ts`), which
 myapps also uses; local, test and bench stages keep local state. The store has no lock: each stage deploys through one

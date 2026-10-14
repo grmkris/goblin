@@ -6,26 +6,22 @@
 typed definition (`routine_propose`, which ends its turn), list (`routine_list`) or pause (`routine_pause`), one typed
 tool each (ADR 0027); only an authenticated owner may confirm the exact revision. The model names a Persona and,
 optionally, another Topic by name; `proposeAsked` (`routines/program.ts`) resolves them and pins the Persona's revision
-now (`topicNamed`, `personaNamed`). Routine writes require
-an exact configured Origin and `x-goblin-csrf: 1`. Edits clear confirmation and stale revisions return 409. A
-definition (ADR 0041) is a trigger, a timezone, **Tell me** (`tellMe: { on, telegram }`, Telegram only with Tell me) and
-**Hand to** (`handTo`: `none`; `goblin` with its instruction, allowed tools and budget; or `persona` with those and the
-Persona's id and the revision it pins); one that hands nothing over must tell the owner. Only a hand-over makes runs
-(`handOverOf`, `runHandOver`). Every routine needs Pro (there is no free plan, ADR 0054): propose, edit, confirm (and
-confirm again) check `requirePlan`, run admission and the run provider `requirePlan('handOver')`, and a scheduled
-reminder or a notice's Telegram copy is not sent without a plan, while pause and archive stay the owner's on any plan. Settings shows the instruction, exact
-tool pairs, timezone, budgets and Telegram policy before confirmation. Its editor (`components/routine-editor.tsx`,
-`routine-when.tsx`, `routine-hand.tsx`) asks what, where (the Topic), when, Tell me (and Telegram) and Hand to
-(nobody, Goblin or a Persona, with the instruction, tools and limits only for a hand-over); an event trigger picks a
-connection that sends events, one of its streams (by title) from `GET /api/mcp/:id/events`, and its filters through a form
-generated from the stream's input schema (`lib/schema-form.ts`, `components/schema-form.tsx`: text, a choice, a
-number, yes or no, a list of texts, required first; a nullable one optional), with raw JSON for anything a flat form
-cannot hold; a routine's card says which events it takes in words ("Every one", or each filter's title and value). Without
-Pro the editor's hand-over tabs are locked with Get Pro. A routine lives in a
-Topic, and its runs are bounded by that Topic's setup as well as its allowed tools (ADR 0040): each `RoutineView`
-carries `topic` and `outsideSetup`, the allowed tools the setup does not hold now, read live so a proposal or a
-routine's page can flag them; a run that calls one gets the words-only `not-in-topic` refusal (code `not_in_topic` in
-its ledger), and a setup edit answers the routines it leaves short.
+now (`topicNamed`, `personaNamed`). Routine writes require an exact configured Origin and `x-goblin-csrf: 1`. Edits
+clear confirmation and stale revisions return 409. A definition (ADR 0041) is a trigger, a timezone, **Tell me**
+(`tellMe: { on, telegram }`, Telegram only with Tell me) and **Hand to** (`handTo`: `none`; `goblin` with its
+instruction, allowed tools and budget; or `persona` with those and the Persona's id and the revision it pins); one that
+hands nothing over must tell the owner. Only a hand-over makes runs (`handOverOf`, `runHandOver`). Settings shows the
+instruction, exact tool pairs, timezone, budgets and Telegram policy before confirmation. Its editor
+(`components/routine-editor.tsx`, `routine-when.tsx`, `routine-hand.tsx`) asks what, where (the Topic), when, Tell me
+(and Telegram) and Hand to (nobody, Goblin or a Persona, with the instruction, tools and limits only for a hand-over);
+an event trigger picks a connection that sends events, one of its streams (by title) from `GET /api/mcp/:id/events`, and
+its filters through a form generated from the stream's input schema (`lib/schema-form.ts`, `components/schema-form.tsx`:
+text, a choice, a number, yes or no, a list of texts, required first; a nullable one optional), with raw JSON for
+anything a flat form cannot hold; a routine's card says which events it takes in words ("Every one", or each filter's
+title and value). A routine lives in a Topic, and its runs are bounded by that Topic's setup as well as its allowed
+tools (ADR 0040): each `RoutineView` carries `topic` and `outsideSetup`, the allowed tools the setup does not hold now,
+read live so a proposal or a routine's page can flag them; a run that calls one gets the words-only `not-in-topic`
+refusal (code `not_in_topic` in its ledger), and a setup edit answers the routines it leaves short.
 
 Confirmed reminders and cron schedules use native dated Agent callbacks carrying routine ID, revision and firing
 instant. A short application transaction claims each firing and advances its watermark before rearming; one newest
@@ -51,20 +47,20 @@ link (`routine: { id, run }`) under the report's request id; any other ending re
 
 Pi background Anchor/Reporter tasks create and recover an empty task-owned run conversation, registered as a thread
 without copied capability rows or an ordinary main-start note. The confirmed MCP ceiling narrows `Setups.scope`.
-A dedicated per-run model provider checks resident authority, entitlements, deadlines and committed usage before
+A dedicated per-run model provider checks resident authority, deadlines, committed usage and the day's token cap before
 every model dispatch, including compaction. MCP checks repeat at the HTTP dispatch seam after token refresh, with
 local correlation headers removed before egress. Main Stop leaves background runs alone; run Stop and archive fence
 and abort owned conversations. Questions use sealed shared interaction receipts and authenticated same-session answers.
 
-Committed `pi.usage` counters, including compaction, project into app-only cumulative watermarks and UTC-day
-receipts: tokens for the routine's own caps, Credits for the owner's daily budget. Replay does not charge twice; a model response already in flight may overshoot a cap. Settlement freezes a
-scrubbed summary and one `app.routine` parent write with a stable request ID. A routine belongs to a Topic
-(`app_routines.topic_id`, migration `20261026000500_routine_topics`, ADR 0032): the Topic of the chat whose
-`routine_propose` drafted it, or the one the owner names when they propose or edit it (`RoutineProposal.topic`,
-`RoutineEdit.topic`; it must exist and be open). Its run conversation
-sits under that Topic's Conversation and its report is written there; while the Topic is archived (archive leaves
-schedules running in v1), runs and reports go to Personal instead. A Telegram copy of a routine's notice is separate
-authorized plumbing (see Notices). Pi acceptance does not establish external delivery.
+Committed `pi.usage` counters, including compaction, project into app-only cumulative watermarks and UTC-day receipts:
+tokens for the routine's own caps and for the owner's daily usage. Replay does not charge twice; a model response
+already in flight may overshoot a cap. Settlement freezes a scrubbed summary and one `app.routine` parent write with a
+stable request ID. A routine belongs to a Topic (`app_routines.topic_id`, migration `20261026000500_routine_topics`, ADR
+0032): the Topic of the chat whose `routine_propose` drafted it, or the one the owner names when they propose or edit it
+(`RoutineProposal.topic`, `RoutineEdit.topic`; it must exist and be open). Its run conversation sits under that Topic's
+Conversation and its report is written there; while the Topic is archived (archive leaves schedules running in v1), runs
+and reports go to Personal instead. A Telegram copy of a routine's notice is separate authorized plumbing (see Notices).
+Pi acceptance does not establish external delivery.
 
 Event confirmation grants the exact connected server/name/canonical-arguments selector after authenticated review;
 its arguments must satisfy the producer descriptor schema. `routines/events.ts` binds `routine:<id>` and the current
@@ -98,8 +94,8 @@ twenty are posted, the rest kept for Activity only (as written, with no chat ent
 into one digest line ("+N more from <label> in Activity") the next hour's first notice, or the sweep, writes. Activity
 lists ten read notifications under the unread ones, and Show older adds ten more at a time. Reminders, answers and digests are not counted. Notifications older than thirty days are pruned. A notice
 the owner wants on Telegram carries its words frozen when it is claimed (`notices/telegram.ts`): each due copy is sent
-once per attempt with a stable operation id through the channel it was first tried on, escaped, after the plan,
-resident authority and that channel are checked again; losing any of them suppresses it, a failure retries with backoff
+once per attempt with a stable operation id through the channel it was first tried on, escaped, after resident
+authority and that channel are checked again; losing any of them suppresses it, a failure retries with backoff
 and fails after five attempts or fifteen minutes, and the remote receipt is kept apart. The Telegram connection's own
 events never go back to Telegram. Runs no longer carry a notification of their own. An
 occurrence more than five minutes older than the routine's confirmation, or a day old, is acknowledged and dropped,

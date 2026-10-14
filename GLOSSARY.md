@@ -105,7 +105,7 @@ verbatim. `zoom` opens a line.
 
 **Memory model**:
 The cheap offered model (`GOBLIN_MEMORY_MODEL`) for thread titles, memory summaries and skill-draft decisions; its
-tokens count toward the budget.
+tokens count toward the daily usage.
 
 ## Work on its own
 
@@ -176,7 +176,7 @@ _Avoid_: server (for the account), integration, account
 
 **mysi**:
 The owner's own my* apps (notes, browsers, Telegram, email, skills, terminals) behind one sign-in and one connection
-(ADR 0052). A product of its own, which the owner gets themselves; not part of goblin Pro.
+(ADR 0052). A product of its own, which the owner gets themselves.
 _Avoid_: myapps (the code base behind it)
 
 **Service**:
@@ -198,7 +198,7 @@ _Avoid_: featured, partner, built-in
 **Spending rule**:
 The owner's limit on a paid tool of a first-class server: jobs up to an amount run without asking, until a daily
 total; anything else asks first. The server's wallet limit stays the hard stop (ADR 0044).
-_Avoid_: budget (that is the model budget), allowance
+_Avoid_: budget (that is the daily token cap), allowance
 
 **Skill**:
 A procedure served by an MCP server through the MCP Skills extension. The agent follows skills only from servers the
@@ -257,53 +257,14 @@ A file the owner sent with a message: its path rides with the words, and the mes
 ## Goblin Wallet
 
 **Goblin Wallet**:
-The agent's wallet, its own MCP server and web app beside goblin: accounts, limits, signing and receipts. Any MCP
-client can connect it; goblin connects it as a first-class server (ADR 0045).
+A wallet with its own MCP server and web app, a product of its own outside this repository (ADR 0056). goblin connects
+it as a first-class server.
 _Avoid_: agentic wallet (the earlier working name), treasury
-
-**Owner account**:
-The owner's own EVM account, the embedded wallet Privy gives them at sign-in. It holds the funds the agent may draw on
-and is upgraded with EIP-7702 so it can grant an allowance.
-_Avoid_: main wallet, root wallet
-
-**Agent signer**:
-The wallet's signing key for the agent: a Privy server wallet the owner owns, on which Goblin Wallet is an additional
-signer bound to a policy. It never exports its key and signs only for an operation.
-_Avoid_: hot wallet, session key, bot wallet
-
-**Allowance**:
-On-chain only: the owner account's ERC-7710 delegation to the agent signer, capped per period by `ERC20PeriodTransfer`
-and expiring. Not goblin's spending rule and not the model budget.
-_Avoid_: budget, spending rule
-
-**UserOperation**:
-An ERC-4337 action from a 7702-delegated owner or agent address, sent by Pimlico's bundler instead of as a plain
-transaction. Every EVM send of the wallet is one; its gas is paid in USDC (ADR 0050).
-_Avoid_: meta-transaction, relayed transaction
-
-**Paymaster**:
-Pimlico's ERC-20 paymaster: it pays a UserOperation's gas and takes it back in USDC, up to the bound the batch
-approves. Not the wallet's treasury.
-_Avoid_: gas sponsor (nothing is sponsored; the user pays in USDC)
-
-**Access key**:
-On Tempo: a keychain key of the owner's Tempo account with a per-token periodic limit and an expiry, enforced by the
-Tempo protocol.
 
 **Wallet limit**:
 A limit the wallet itself keeps for a connection: per call, per hour, per week, with an expiry, plus the allowed paid
-services and the address book. Each limit shows the layer that enforces it: on-chain allowance, access key, signer
-policy, wallet ledger or the client's spending rule.
+services and the address book. It stays the hard stop behind goblin's spending rule.
 _Avoid_: budget, cap (alone)
-
-**Operation**:
-One spend or signature with frozen terms (amount, token, chain, recipient, service, expiry), reserved against the
-wallet limits before anything is signed and idempotent by its operation id. Payment and delivery are separate states.
-_Avoid_: transaction (an operation may be several, or none), job
-
-**Receipt**:
-What an operation leaves: its terms, the payment evidence (transaction hash or the rail's receipt), the delivery and
-the limits left.
 
 ## The agent's API and records
 
@@ -313,7 +274,7 @@ agent (ADR 0038).
 _Avoid_: RPC
 
 **Account API**:
-What the Worker answers without waking an agent: billing, inbound clients and browser crash reports.
+What the Worker answers without waking an agent: inbound clients and browser crash reports.
 
 **Internal API**:
 The typed API through which the Worker reaches an agent for anyone but the owner's browser: an inbound client's ask
@@ -348,37 +309,20 @@ _Avoid_: lock (`KeyedLock` admits one holder per key and is never held across a 
 The conversation and execution runtime. It owns transcripts, tasks, recovery and tool replay; `PiHarness` is its
 native Agents SDK adapter.
 
-## Plans and deployment
-
-**Plan**:
-goblin Pro, the one plan, without which the agent answers nothing; the agent keeps an active one for a minute (ADR
-0015, 0054).
-_Avoid_: free plan, tier (there is no free plan)
-
-**Wallet subscription**:
-Pro paid from the Goblin Wallet: a permission the owner signs once that lets goblin take at most one payment a period,
-into its collector, for a fixed number of periods; cancelling is revoking it in the wallet, and Pro runs to the end of
-the period paid (ADR 0054).
-_Avoid_: recurring payment, auto-renew (nothing is charged without the signed permission, and the owner revokes it)
-
-**Day pass**:
-Pro paid by the UTC day: the deployment's price (US$1 by default) for each day the owner uses goblin, taken by the first
-message of that day goblin answers, and nothing for an idle day (ADR 0054). The other way to pay is monthly.
-_Avoid_: daily subscription, trial
-
-**Collector**:
-goblin's own wallet that wallet subscriptions pay into, the only recipient a subscription allows (ADR 0054).
-
-**Grace**:
-The days after a failed monthly renewal while Pro continues and goblin retries the payment each day; past it the
-account loses Pro (ADR 0054). A day pass has none.
-
-**Model budget**:
-The estimated Token Plan Credits an agent may spend per UTC day (ADR 0026). Past it, new turns are refused and tools
-inside a running turn are blocked.
+## Access and deployment
 
 **Sign-up mode**:
-`open`, `invite` (an invite code is required) or `closed`.
+`open`, `invite` (an invite code is required) or `closed`: who gets an account. Every account reaches its own agent and
+everything in it (ADR 0058).
+
+**Daily usage**:
+The model tokens an account's agent spent in the current UTC day, input, output and cached alike (ADR 0058).
+_Avoid_: Credits
+
+**Daily token cap**:
+The deployment's optional limit on an account's daily usage (`GOBLIN_DAILY_TOKEN_CAP`). Once a capped day is spent, new
+turns, routine runs, housekeeping and tools inside a running turn are refused until 00:00 UTC; unset, nothing is.
+_Avoid_: allowance
 
 **Stage**:
 One deployment: `local`, `dev`, `prod` or a disposable `test_*` environment, each with its own resources and secrets.

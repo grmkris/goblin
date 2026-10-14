@@ -61,8 +61,8 @@ again, no cookies, bounded), and through the agent (`agent-apps/ports.ts`, lent 
 through the bridge's `run`) the owner's MCP
 tools under their exact grants, the cheap model within the owner's budget, Telegram through their channel, and other
 apps' actions and views (`agent-apps/reach.ts` composes each `prepare`'s `AppPowers`). Every use checks the approval
-(`app_agent_powers`), the app's daily cap (`app_agent_usage`) and, for what goes through the agent, the owner's plan
-and resident authority. A build lists the powers still waiting; the web draws them as a card under it
+(`app_agent_powers`), the app's daily cap (`app_agent_usage`) and, for what goes through the agent, resident
+authority. A build lists the powers still waiting; the web draws them as a card under it
 (`components/parts/app-powers.tsx`). A view offers files to save through the host's download offer. The agent looks
 for MCP servers with `mcp_suggest` and asks the owner to add one with `mcp_request_server` (`pi/servers.ts`), a card
 whose Add and connect runs the usual flow.

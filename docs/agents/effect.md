@@ -10,8 +10,8 @@ Programs are Effects composed with other Effects. Code outside the runtime enter
 
 - **The bridge** (`runtime/bridge.ts`), for code the runtime does not own: Pi kits, the agent-apps engine and its
   Dynamic-Worker powers, Durable Object alarms and `onRequest`. `agent.ts` hands the bridge to each of them when it
-  builds them; `AgentInput` does not carry it. `run` checks the account's plan first, `local` does not, and `exit`
-  answers the exit (`onRequest` answers a failure in the API's envelope).
+  builds them; `AgentInput` does not carry it. `run` (and `local`, the same) rejects with the program's failure, and
+  `exit` answers the exit (`onRequest` answers a failure in the API's envelope).
 - **`promiseWith(context)`** (`runtime/boundary.ts`), for a foreign callback wired inside a layer that must answer a
   Promise: the MCP SDK's auth provider (`token`, `onUnauthorized`) and dispatch guards, and the skills guard. The layer
   captures its context once (`Effect.context()`) and runs the callback's Effect with it. It rejects with the typed
@@ -28,8 +28,8 @@ A program calls neither, and never `Effect.run*`: it composes. `boundaries/no-cl
   `AppError` failures. A synchronous Drizzle store is a plain function over `Db`, wrapped once where its service is
   built. A multi-statement invariant stays inside one transaction or one `Effect.sync`.
 - `layers/core.ts` provides `AgentInput`, `Db`, `Changes`, `PiSessions`, `KeyedLock`, `SingleFlight`, `FlowEvents`,
-  `Entitlements`, `Resident`, the logger and the reporter. Each area's layer sees only the layers before it, in the
-  order `layers/index.ts` gives; that order and the start's steps are the boot contract.
+  `Resident`, the logger and the reporter. Each area's layer sees only the layers before it, in the order
+  `layers/index.ts` gives; that order and the start's steps are the boot contract.
 - A stateful object is made once, by its layer, and shared as a service; never a second instance.
 - Pi is reached through `PiSessions` (`pi/sessions.ts`): every call names its session, failures are a typed
   `PiFailure`, and interrupting a `wait` ends only the wait.
@@ -52,8 +52,8 @@ Use these instead of a local copy:
 
 - `attempt(() => promise)` and `attemptSync(() => value)` (`http/errors.ts`) turn foreign code into an Effect that
   fails with an `AppError` (an unexpected failure becomes a reported `Internal`); `isAppError` tells one apart.
-- `requirePlan()` (`billing/gates.ts`), `requireBudget` (`budget.ts`) and `requireResident` (`mcp/service.ts`) are the
-  gates a program composes before work that needs them.
+- `requireBudget` (`budget.ts`) and `requireResident` (`mcp/service.ts`) are the gates a program composes before work
+  that needs them.
 - `epochSeconds` (`clock.ts`) is the Clock's time in seconds, so tests can move it.
 - `sha256Hex` and `isRecord` (`runtime/digest.ts`).
 - `ChatOperations.tracked` records an operation's receipt, runs the work and moves the receipt on, or to `refused` with

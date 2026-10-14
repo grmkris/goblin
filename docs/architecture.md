@@ -2,7 +2,7 @@
 
 One Cloudflare Worker serves the web app and the API. Behind it, every user has their own `PersonalAgent` Durable
 Object, named by their user ID: it runs Pi, holds that user's outbound MCP connections and credentials, and keeps
-application state in its own SQLite. D1 holds Better Auth's account tables (users, sessions, inbound OAuth) and goblin's `app_billing_*` tables.
+application state in its own SQLite. D1 holds Better Auth's account tables (users, sessions, inbound OAuth).
 
 ```mermaid
 flowchart LR
@@ -32,13 +32,12 @@ flowchart LR
 - [Files](architecture/files.md): owner files in SQLite and R2.
 - [Topics, Personas and memory](architecture/topics.md): Topics, Personas, organize receipts, retrieval and Topic memory.
 - [Typed decision proposals](architecture/decisions.md): Workers AI proposals (dev only).
-- [Models](architecture/models.md): model calls and the daily budget.
+- [Models](architecture/models.md): model calls and daily token usage.
 - [Authority and inbound MCP](architecture/inbound-mcp.md): resident authority and goblin as an MCP server.
 - [MCP Events and Telegram](architecture/events.md): Events subscriptions and the Telegram channel.
 - [Run ledger](architecture/observability.md): run ledger, logs, failures and inspection.
 - [Storage](architecture/storage.md): D1, Durable Object SQLite and migrations.
 - [Infrastructure and release](architecture/infrastructure.md): Alchemy stacks, stage origins, release and public source.
-- [Plans and payments](architecture/billing.md): plans, Credits and billing.
 - [Isolated memory experiments](architecture/memory-experiments.md): the bench workspace.
 - [Routines and notices](architecture/routines.md): routine definitions, runs and notices.
 - [Deferred Home dashboard](architecture/home.md): the deferred Home surface.

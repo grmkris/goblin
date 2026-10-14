@@ -1,8 +1,8 @@
 # goblin
 
-Your own goblin, always on. Resident personal agents on Cloudflare. Each user signs up, picks goblin Pro (a $1 day pass or $15 monthly, in USDC), and gets their own agent: they talk to it in the browser,
-it keeps running, holds its own authority to use the MCP servers that user connected, and is itself an MCP server
-other tools can talk to.
+Your own goblin, always on. Resident personal agents on Cloudflare. Each user signs up and gets their own agent: they
+talk to it in the browser, it keeps running, holds its own authority to use the MCP servers that user connected, and is
+itself an MCP server other tools can talk to.
 
 The agent has one stable main chat (`/c/1`); it resolves to the current Pi session. Side threads can start empty or branch from any message of any conversation, at
 any depth; they can share a note back to where they came from, and Close stops one with everything under it until it is
@@ -37,9 +37,10 @@ section holds the servers and App views the owner pins, in their order, on every
 App full screen in a thread of its own. On a phone the navigation is a drawer and a thread is a full view with a back to
 its channel. Owners can add public servers by URL, from MCP registries, or from goblin's shelf (mysi, goblin's own
 services, and servers that need no sign-in grouped by what they are for: travel, knowledge, crypto data, views in the
-chat, code), grant tools explicitly, mark individual tools **Ask first** for approval of every exact call, choose an offered model, and see the per-account daily budget in Credits. The agent uses `ask_user`
-to ask questions the owner answers in their next message. The owner attaches files to a message with the composer's
-paperclip; the agent reads them and writes its own results beside them, kept per agent in SQLite and R2.
+chat, code), grant tools explicitly, mark individual tools **Ask first** for approval of every exact call, choose an
+offered model, and see the day's token usage against the deployment's optional per-account cap. The agent uses
+`ask_user` to ask questions the owner answers in their next message. The owner attaches files to a message with the
+composer's paperclip; the agent reads them and writes its own results beside them, kept per agent in SQLite and R2.
 
 Messages sent while Main or an ordinary thread works stay visible in a queue above its composer, oldest first,
 with their author, files and references. Sending adds a follow-up; it does not interrupt the current turn. The queue
@@ -81,9 +82,6 @@ the dev stage binds Workers AI; elsewhere nothing is judged. See
 at the tag [`hackathon-2026-10`](https://github.com/grmkris/goblin/tree/hackathon-2026-10), and goblin connects to a
 wallet like any other MCP server.
 
-Limits today: Privy runs in development mode with email sign-in, and the mainnet funds behind the demo are capped.
-Swaps and bridges quote mainnet only.
-
 Built on the Cloudflare Agents SDK (`PersonalAgent` Durable Object) with the native Pi harness (Pi Durable owns
 conversations and execution), Effect for the agent's services and its typed owner API (an Effect HttpApi each user's
 agent serves, ADR 0038), TanStack Query in the browser, Better Auth for identity, and Alchemy for infrastructure.
@@ -103,34 +101,23 @@ bun run check      # the full gate (run it through `heavy` on the build box)
 - [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
 - [Brand](brand/README.md): the mark, app tiles, lockups and social images, with their colours and public URLs.
 
-A visitor who is signed out meets goblin's landing page at `/`, which links to Goblin Wallet's own; a signed-in owner
+A visitor who is signed out meets goblin's landing page at `/`; a signed-in owner
 goes straight to their chat. The deployment stages are `dev` at `dev.goblin.surf` and `prod` at `goblin.surf`, with separate auth databases,
-secrets and dedicated LiteLLM keys. The first production release is invite-only; owner OTP bootstrap is an explicit operator step. Alchemy can attach the custom domains. CI on GitHub-hosted runners deploys every push to `dev` that passes Check to dev and wallet-dev; `bun run promote <sha>` fast-forwards `prod` to an accepted dev SHA, and CI then deploys and verifies core Goblin and Wallet production.
+secrets and dedicated LiteLLM keys. The first production release is invite-only; owner OTP bootstrap is an explicit operator step. Alchemy can attach the custom domains. CI on GitHub-hosted runners deploys every push to `dev` that passes Check to dev; `bun run promote <sha>` fast-forwards `prod` to an accepted dev SHA, and CI then deploys and verifies production.
 Alternate hosts redirect to the configured canonical origin. Dev sign-up stays closed or invite-only; prod
 supports open sign-up after sender verification. Email OTP is the sole login method, and every stage requires mail. Both stages use `hello@goblin.surf` after sender onboarding,
 with a host prefix on dev mail subjects. See [development](docs/development.md) for the production guard and smoke.
 
-goblin Pro is the one plan; there is no free plan, and goblin answers only with it. It includes 800 model Credits
-(about 2 million tokens) per account per UTC day, hand-overs to goblin or a Persona, routines and subagents. It is paid
-from the owner's Goblin Wallet as a subscription they sign once (ADR 0054): an on-chain permission that lets goblin's
-collector take at most the price a period, for 12 months, and that they cancel by revoking it in the wallet. Two ways
-to pay, at prices each stage sets (`GOBLIN_PLAN_CATALOG`):
-
-- **the day pass**, $1 for each UTC day the owner uses goblin: the first message of a day pays for it in the
-  background, an idle day costs nothing, and a day the wallet cannot pay ends Pro until the owner adds funds;
-- **monthly**, $15 every 30 days: goblin takes the first payment when the owner comes back from signing, reminds them
-  three days before each renewal, and retries a failed one each day through a seven-day grace; cancellation keeps
-  access through the paid period. A day-pass owner can move to monthly.
-
-An account without Pro still signs in, connects its wallet and chooses Pro in Start. The card checkout (Dodo) is off unless a stage turns it on. Draft terms, privacy and refund
-pages await operator review before live payments. The subscription runs on Base mainnet: production took a real $1
-day pass on 13 October 2026.
+goblin has no plans and takes no payments ([ADR 0058](docs/adr/0058-no-plans-tokens-and-an-optional-cap.md)): the
+sign-up mode decides who gets an account, and every account reaches its own agent and everything in it. Each account's
+model tokens are counted per UTC day; a deployment may cap them (`GOBLIN_DAILY_TOKEN_CAP`), and once a capped day is
+spent goblin refuses new model calls until 00:00 UTC. Draft terms and privacy pages await operator review.
 
 Several connections to one MCP server are normal: each is the owner's account there, with its own label, sign-in,
 grants and webhook (ADR 0041). A routine fires once, on a schedule or when a connection sends an event; it lives in a
 Topic and can **Tell me** (each event, reminder and answer is a notice in the Topic and a notification in Activity,
 on Telegram too if asked) and **Hand to** Goblin or a Persona pinned at its revision, with an instruction, exact tool
-pairs and budgets. Routines are part of Pro. The owner confirms
+pairs and budgets. The owner confirms
 each revision in Settings → Routines or on the connection's Events section, a picker that names each event as its
 server suggests, picks the recommended ones, sends each to a Topic (Tell me) or hands it to goblin or a Persona, and
 sets them up in one step; Goblin may propose one, never confirm it. Run now, Stop, Pause, Edit and Archive are available. Event confirmation
@@ -147,10 +134,11 @@ Main is the stable chat and composer. The dashboard surface is deferred while it
 
 goblin is the author's entry to the Colosseum Crypto World's Fair (14 September to 12 October 2026), and all of it was
 built within that window: the repository's first commit is 4 October 2026 and Goblin Wallet was built on 12 October.
-goblin draws on prior author-owned work and connects to external MCP services; those projects are not part of this
-contest submission. Built on open source and third-party services: Cloudflare Agents SDK, Pi, Effect, Alchemy,
-Privy, MetaMask Delegation Framework v1.3.0, x402, mppx, LI.FI, Relay, viem and shadcn.
-Built with AI coding agents (Claude Code, Codex).
+The submission is the tag [`hackathon-2026-10`](https://github.com/grmkris/goblin/tree/hackathon-2026-10); the wallet,
+paid inference and Pro have since left this repository. goblin draws on prior author-owned work and connects to
+external MCP services; those projects are not part of this contest submission. The submission was built on open source
+and third-party services: Cloudflare Agents SDK, Pi, Effect, Alchemy, Privy, MetaMask Delegation Framework v1.3.0,
+x402, mppx, LI.FI, Relay, viem and shadcn. Built with AI coding agents (Claude Code, Codex).
 
 Goblin-owned code is available under the [MIT License](LICENSE). Third-party terms and author-owned reuse are described
 in [NOTICE](NOTICE.md). See [ADR 0046](docs/adr/0046-production-promotion-and-public-source.md) for branches and publication.

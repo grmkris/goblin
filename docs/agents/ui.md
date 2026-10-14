@@ -6,8 +6,8 @@ transport boundary.
 
 ## Clients
 
-`lib/api.ts` has two clients: `owner` (the agent's `OwnerApi`) and `account` (the Worker's `AccountApi`: billing,
-inbound clients, crash reports). Each request carries `x-goblin-request`, the CSRF header on every write and, with
+`lib/api.ts` has two clients: `owner` (the agent's `OwnerApi`) and `account` (the Worker's `AccountApi`: inbound
+clients, crash reports). Each request carries `x-goblin-request`, the CSRF header on every write and, with
 `withOperation`, the operation id. Nothing else calls an `/api` path, except four transports: the owner's file bytes
 (`lib/files.ts`), the conversation stream (`lib/conversation-stream.ts`), the workspace stream (opened by
 `WorkspaceFeedProvider`, `components/workspace-feed.tsx`, over the same `BrowserPiEvents`, and kept by
@@ -18,8 +18,8 @@ decoded as API answers.
 
 Each feature has `src/<feature>/queries.ts`, which holds factories only: `owner.apiQuery` and `owner.apiMutation`
 options, and the feature's keys. Hooks that read or combine them live in `src/<feature>/hooks.ts` (the session in
-`auth/hooks.ts` `useSession`, the plan in `account/hooks.ts` `useBilling`, adding and connecting a server in
-`mcp/hooks.ts` `useAddAndConnect`); components never build query options inline.
+`auth/hooks.ts` `useSession`, Start's decision in `onboarding/hooks.ts` `useStartDecision`, adding and connecting a
+server in `mcp/hooks.ts` `useAddAndConnect`); components never build query options inline.
 
 Keys come from one `<feature>Keys` object whose root is the feature's name, and name every input:
 
@@ -54,8 +54,8 @@ change is `onMutate` with its rollback in `onError`.
 
 ## Reads and the gate
 
-goblin has no signed-in layout. Owner pages render inside `OwnerGate` (the web component: sign-in on the page, a
-redirect to `/subscribe` without a plan), which decides whether the visitor signs in first. Inside it, a component
+goblin has no signed-in layout. Owner pages render inside `OwnerGate` (the web component: sign-in on the page), which
+decides whether the visitor signs in first. Inside it, a component
 reads with `useSuspenseQuery` within a `QueryBoundary` (`lib/query/query-boundary.tsx`), which keeps a failure inline
 with its reference and a retry. Only an optional section reads with `useQuery` and shows `QueryError`.
 

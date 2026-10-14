@@ -7,15 +7,14 @@ in `packages/contracts/src/api`: `OwnerApi`, which each user's agent serves, `Ac
 and `errors.ts`, the failure vocabulary (`AppError`) and its envelope.
 
 **The edge** (`http/api/edge.ts`, built once per isolate). The account API's groups are answered in the Worker
-(`http/api/account.ts`): `billing` for any signed-in account, `clients` for one with a plan, and `clientErrors`, a
-browser crash report, without a session. Every other `/api/*` request is admitted in this order, then forwarded:
+(`http/api/account.ts`): `clients` for any signed-in account, and `clientErrors`, a browser crash report, without a
+session. Every other `/api/*` request is admitted in this order, then forwarded:
 
 1. a write whose `Origin` names another site is refused;
 2. the session comes from the cookie alone; a request with an `Authorization` header is refused;
 3. every write needs the app's own `Origin` and `x-goblin-csrf: 1` (`http/csrf.ts`), which the web sends on every write;
-4. the account's plan is read fresh from auth D1 (402 without one);
-5. a body is capped at 64 KiB, except file bytes, which stream through to the agent's own limits;
-6. `AGENTS.getByName(userId).fetch` gets the request with only `content-type`, `content-length`, `accept`,
+4. a body is capped at 64 KiB, except file bytes, which stream through to the agent's own limits;
+5. `AGENTS.getByName(userId).fetch` gets the request with only `content-type`, `content-length`, `accept`,
    `last-event-id`, `x-goblin-request`, `x-goblin-operation` and `x-mcp-caller`, plus the edge's reference in
    `x-goblin-ref` (the request's cf-ray, or a random id where there is none) and `x-goblin-forwarded: owner`. Cookies
    and authorization stay at the edge. Only an `/api/*` path that is not the account API's is forwarded, as the parsed
@@ -30,9 +29,9 @@ handlers of the owner and internal APIs (`http/api/groups.ts`), built once insid
 layers, never at module level.
 Each group's handlers (`HttpApiBuilder.group`) live in their area (`<area>/api.ts`) and read the agent's services
 from context. Owner admission (the `OwnerAdmission` middleware, `http/api/middleware.ts`) admits every request
-before its handler, and before its body is decoded: the plan through the agent's `Entitlements`, then a renewal of
-resident authority, except where an endpoint is annotated `RenewsResident: false` (`POST /api/agent/resident`, the
-event streams, the files group and the OAuth callback). It annotates the request's logs with `goblin.rpc`
+before its handler, and before its body is decoded: a renewal of resident authority, except where an endpoint is
+annotated `RenewsResident: false` (`POST /api/agent/resident`, the event streams, the files group and the OAuth
+callback). It annotates the request's logs with `goblin.rpc`
 (`<group>.<endpoint>`), `goblin.operation` and `ref`, and stamps `ref` on every typed failure.
 
 | Group | Paths under `/api` | Handlers |
@@ -53,7 +52,7 @@ event streams, the files group and the OAuth callback). It annotates the request
 | `workspace` | `GET /workspace/events` (SSE) | `workspace/api.ts` |
 | `files` | `GET /files`, `GET`/`PUT`/`DELETE /files/content` | `files/api.ts` |
 | `decisions` | `POST /decisions/:id` | `decisions/api.ts` |
-| account (Worker) | `billing`: `/billing/state`, `/billing/checkout`, `/billing/portal`, `/billing/wallet/start`, `/billing/wallet/confirm`; `clients`: `/clients`, `/clients/:clientId`; `clientErrors`: `/client-errors` | `http/api/account.ts` |
+| account (Worker) | `clients`: `/clients`, `/clients/:clientId`; `clientErrors`: `/client-errors` | `http/api/account.ts` |
 
 What is not JSON in and out is served through HttpApi's raw handlers, all annotated `RenewsResident: false`: the two
 event streams (SSE), the owner's file bytes (streamed both ways, never buffered), and `mcp.oauthCallback`, a redirect
@@ -63,17 +62,16 @@ no endpoint names is a 404 in the envelope.
 A failure answers the envelope `{ error: { code, message, recovery?, …safe fields, ref? } }`: `code` is the
 `AppError` tag in lower_snake_case, which the typed client decodes back into the class, `message` and `recovery` are
 fixed copy (`ERROR_COPY`), and the safe fields are the ones the UI uses (`reason`, `what`, `connectionId`, `name`,
-`state`, `subscribe`, `limit`, `resetsAt`, `rpcCode`). Of a request that does not decode, a path parameter that does
+`state`, `limit`, `resetsAt`, `rpcCode`). Of a request that does not decode, a path parameter that does
 not parse is 404, and a body, query or header that does not match is 400. A
 failure from stored data, a response that does not encode, or a defect is a 500 `Internal`, reported with its stack
 locations and never its message. The Worker's own routes (`/mcp`'s failures aside) answer the same envelope.
 
 Callers that are not the owner's browser reach the agent through its internal API (`InternalApi`, `/internal`, exported
 only from `@goblin/contracts/internal`), which the Worker calls on the agent's stub with a typed client
-(`inbound/client.ts`) after its own check of the caller (a bearer token, a hook's route token; it reads no plan of its
-own): `ask`, `recent` and `inspect` (inbound `/mcp`), and `mcpEvents` (the Events hook). Its gate (`InternalGate`,
-`http/api/middleware.ts`) refuses a request carrying the owner forward's mark and checks the plan the agent keeps unless
-the endpoint says otherwise (`RequiresPlan`: `inspect`); it never renews resident authority. One Durable Object RPC
+(`inbound/client.ts`) after its own check of the caller (a bearer token, a hook's route token): `ask`, `recent` and
+`inspect` (inbound `/mcp`), and `mcpEvents` (the Events hook). Its gate (`InternalGate`, `http/api/middleware.ts`)
+refuses a request carrying the owner forward's mark; it never renews resident authority. One Durable Object RPC
 method remains, `deleteAgentData` (account deletion): Workers RPC drops custom error classes, so it returns an encoded
 `RpcResult` (`http/rpc.ts`) that the Worker unwraps.
 
@@ -92,10 +90,10 @@ and Better Auth's client (`/api/auth`) reach `/api`. Server data follows myapps 
   invalidation.
 - The `QueryClient` is made per router (`router.tsx`): data stays fresh for 30 seconds, only a retryable failure is
   retried, and a read that finds the session gone clears the cache and goes to sign-in.
-- Owner pages render inside `OwnerGate` (sign-in on the page, `/subscribe` without a plan), not a signed-in layout. A
-  route loader may prime a read with `primeOwnerRead` (`lib/prime.ts`), which runs ahead of the gate and decides
-  nothing. Components read with `useSuspenseQuery` inside a `QueryBoundary` (`lib/query/query-boundary.tsx`), which
-  keeps a failure inline with its reference and a retry; a section that reads with `useQuery` shows `QueryError`.
+- Owner pages render inside `OwnerGate` (sign-in on the page), not a signed-in layout. A route loader may prime a
+  read with `primeOwnerRead` (`lib/prime.ts`), which runs ahead of the gate and decides nothing. Components read with
+  `useSuspenseQuery` inside a `QueryBoundary` (`lib/query/query-boundary.tsx`), which keeps a failure inline with its
+  reference and a retry; a section that reads with `useQuery` shows `QueryError`.
 - The workspace feed writes into the same cache (`lib/workspace/`): each slice (conversations, activity, apps, topics,
   personas, invocations, receipts, proposals) is a query under `['workspace', slice]` that never goes stale, filled from
   the stream's snapshot and changes, and a change that makes another feature's reads stale invalidates them through one

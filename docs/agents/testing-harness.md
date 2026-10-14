@@ -8,7 +8,7 @@ Use injected services/layers instead of module mocking. Keep harness ports confi
 Never destroy an Alchemy harness stack to resolve a port conflict; stop only processes you own.
 
 The owner API is tested by serving one group in memory with only its area's services, through the shared fixture
-(`apps/runtime/test/http/api/fixture.ts`: `served`, `serve`, `plans`, `stub`, the request builders); the Worker's
+(`apps/runtime/test/http/api/fixture.ts`: `served`, `serve`, `stub`, the request builders); the Worker's
 admission has its own unit tests (`edge.test.ts`). Those tests and the integration cases call the owner API through one
 typed client (`test/owner-client.ts`): over the agent's `fetch`, or through the real Worker signed in (`signedIn`),
 never through a Durable Object RPC method; the internal API has its own (`test/internal-client.ts`). The native suite is

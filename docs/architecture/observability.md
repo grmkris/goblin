@@ -80,7 +80,7 @@ reads a fiber's log annotations and spans only, never a log message or a cause. 
 A failure that should be seen is reported by the failure reporter (`observability/report.ts`, on Effect's
 `ErrorReporter`): one `failure` line with where it was reported (`goblin.where`), its type (its `_tag` or class name),
 the `file:line:col` locations of its stack and a severity, never its message. The typed answers an owner gets in the
-normal course (every `AppError` but `Internal`: a 404, a 409, a 402) are not reported when they arrive as failures.
+normal course (every `AppError` but `Internal`: a 404, a 409) are not reported when they arrive as failures.
 `reportFailure(where)` reports and keeps failing; `reportAndRecover(where, fallback)` reports and falls back, for a
 legitimate fallback only; `expectedFailure` marks an error to log at `Info` or not at all. Every program the bridge
 runs, every owner API request and every change handler is reported this way, and `toAppError` (`http/errors.ts`)
@@ -137,7 +137,7 @@ without changing it or calling a model. The queries are in `contracts/src/inspec
   result: the operation's timeline (with its turn when it ran one) and `related`, the operations it came from and
   led to.
 
-The agent answers them on its internal API (`POST /internal/inspect` with `{ query }`, no plan needed), which only
+The agent answers them on its internal API (`POST /internal/inspect` with `{ query }`), which only
 `/mcp` calls, for a client that holds `goblin:inspect` (see Inbound MCP). The owner's
 own app reads `details` through the owner API (`GET /api/conversations/:id/details`, the `inspect` group), for a
 message's Details sheet.

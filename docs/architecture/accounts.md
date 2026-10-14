@@ -8,9 +8,8 @@ IP per hour; sign-in permits twenty attempts per IP per five minutes. D1 holds r
 per request. `GOBLIN_SIGNUP_MODE=open` admits new addresses; `invite` requires `GOBLIN_SIGNUP_INVITE_CODE` in the
 `x-invite-code` header on both send and verify; `closed` permits only existing accounts. A successful OTP creates an
 email-verified account or signs its owner in. Password, reset, verification-link and passkey endpoints are unavailable.
-There is no free plan (ADR 0054, amended 2026-10-13): goblin answers only with goblin Pro, paid by a day pass or
-monthly. An account without it signs in and reaches its own agent (Start, Connections, Settings, billing), and every
-turn, routine and other piece of work that needs Pro is refused with `SubscriptionRequired` `feature: 'chat'`.
+The sign-up mode is the only access control: every signed-in account reaches its own agent and everything in it
+([ADR 0058](../adr/0058-no-plans-tokens-and-an-optional-cap.md)).
 
 Every stage requires a mail sender. Deployed mail uses Cloudflare Email Sending from `hello@goblin.surf`; local
 workerd captures `.eml` files through Alchemy's simulator. Better Auth 1.7.6 swallows mail callback errors, so a
@@ -36,33 +35,32 @@ rail's Home and mark link to `/`, which the cached session turns into the owner'
 deleting the account `assign('/')`, so the server's cookie check sends each to their chat or to the landing.
 
 The landing is built from `@goblin/ui`'s marketing parts (`src/marketing`: `SiteBar`, `MossFrame`, `Section`,
-`PermissionCard`, `SiteFooter`), which Goblin Wallet's own front door shares. Its hero plays one scripted session in
-goblin's panel (`hero-session.tsx`): the entrances are CSS, timed from the first paint, and the script follows the same
-animation clock for the presence orb and owns the answer to its question, which the visitor may give or which gives
-itself after about six seconds in view; under reduced motion it starts at the question. Its prices and the Goblin
-Wallet's address come from `/health` (`plans`, `walletOrigin`), production's until it answers; Claude Code's command
-names the page's own origin. The Source link waits behind a constant until the public repository is public. The head
-carries Open Graph and Twitter tags with `public/og.png` (`bun run icons`) and the canonical `https://goblin.surf/`, and
-the web Worker serves `/robots.txt` by stage: production allows everything but `/api/` and `/mcp`, other stages
-nothing. `Meet your goblin` opens `/login?new=1`, `Authentication` in create mode where sign-up is open or by invite.
+`SiteFooter`). Its hero plays one scripted session in goblin's panel (`hero-session.tsx`): the entrances are CSS, timed
+from the first paint, and the script follows the same animation clock for the presence orb and owns the answer to its
+question, which the visitor may give or which gives itself after about six seconds in view; under reduced motion it
+starts at the question. Claude Code's command names the page's own origin. The Source link waits behind a constant
+until the public repository is public. The head carries Open Graph and Twitter tags with `public/og.png`
+(`bun run icons`) and the canonical `https://goblin.surf/`, and the web Worker serves `/robots.txt` by stage:
+production allows everything but `/api/` and `/mcp`, other stages nothing. `Meet your goblin` opens `/login?new=1`,
+`Authentication` in create mode where sign-up is open or by invite.
 
 ### First-run Start
 
 ADR 0048. A signed-in owner whose Start is open meets it before the chats, and never sees the app first.
 
 **What gates.** The chat routes and Activity carry `staticData.startRequired`. The root shell (`routes/__root.tsx`,
-`onboarding/hooks.ts` `useStartDecision`) reads `GET /api/onboarding/status` as soon as someone is signed in, beside the
-plan. Until it knows, a gated page shows goblin's splash (the mark alone, as the Home Screen startup image draws it),
-not the rail, the sidebar or the workspace feed; an open Start then goes from the splash to `/start/<step>`, the first
-step still to do. The shell follows the shown matches, not the location, so the splash holds while Start loads.
-Settings, Connections and the subscribe pages are never gated, and a state that cannot be read lets the owner in.
+`onboarding/hooks.ts` `useStartDecision`) reads `GET /api/onboarding/status` as soon as someone is signed in. Until it
+knows, a gated page shows goblin's splash (the mark alone, as the Home Screen startup image draws it), not the rail,
+the sidebar or the workspace feed; an open Start then goes from the splash to `/start/<step>`, the first step still
+to do. The shell follows the shown matches, not the location, so the splash holds while Start loads. Settings and
+Connections are never gated, and a state that cannot be read lets the owner in.
 
 **The page** (`components/start`). One task per screen beside a panel in the rail's own green, which on a phone narrows
 to a band with a count and one segment per step:
 1. welcome: what goblin is (the Goblin Wallet that pays for it, goblin, more to come);
 2. the Goblin Wallet: connect it (its recommended tools allowed), then what its own status says is left, with Finish
-   setup in your wallet (its `/setup` page, which comes back here), then what it holds and how goblin pays (Change opens
-   the same choices as Settings);
+   setup in your wallet (its `/setup` page, which comes back here), then what it holds, with Add funds in your wallet
+   while it holds nothing;
 3. services: Mercator first and optional, then the other suggestions;
 4. what the owner wants goblin for. The kickoff is recorded before its message is sent.
 
@@ -85,9 +83,6 @@ Finishing narrows the panel into the rail as the chat appears.
 allows the tools and redirects to `/start/<step>` rather than Connections.
 
 **In the chat.**
-- Once billing is read and the account has no plan, the dock shows the plan card (`components/plan-needed.tsx`): Pick
-  a plan to start, or Add funds for a day pass that could not pay; the message waits in the composer. Nothing shows
-  while billing is still read.
 - A skipped Start with something left gets one quiet line back to it. Settings has a Set up goblin card.
 - In main, `pi/onboarding.ts` adds to goblin's context block, none of it read from a server: that goblin pays for
   itself from the Goblin Wallet and the wallet's setup page, the pieces not set up yet (Mercator marked optional), and

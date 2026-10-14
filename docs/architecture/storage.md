@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Agent DO SQLite | `pi_*`, `cf_agents_*` and the other vendor tables | Pi, Agents SDK. Never touched. |
 | Agent DO SQLite | `app_mcp_connections`, `app_mcp_registries`, `app_mcp_endpoints`, `app_mcp_credentials`, `app_mcp_oauth_pending`, `app_mcp_grants` | Drizzle: MCP metadata and authorization. |
-| Agent DO SQLite | `app_resident`, `app_conversations`, `app_model_choice`, `app_usage_daily`, `app_metadata` | Drizzle: agent metadata and logical chat bindings (ADR 0030). |
+| Agent DO SQLite | `app_resident`, `app_conversations`, `app_model_choice`, `app_usage_daily`, `app_metadata` | Drizzle: agent metadata and logical chat bindings (ADR 0030). `app_usage_daily` counts model tokens per UTC day; its `milli_credits` is unread until the migrations are squashed (ADR 0058). |
 | Agent DO SQLite | `app_chat_operations` | Drizzle: operation receipts per chat, pinned to their original Pi session, with kind, origin, target chat, parent operation, state and reason (`20261027000000_chat_operation_receipts`), pruned opportunistically after 30 days (ADR 0030). |
 | Agent DO SQLite | `app_conversation_capabilities`, `app_execution_exclusions` | Drizzle: a helper's exclusions, set by its spawner (ADRs 0018, 0029); the owner's per-conversation switches were deleted (ADR 0040). |
 | Agent DO SQLite | `app_persona_chats` | Drizzle: the setup a Persona answers with in a chat: its fork, frozen at the ask (ADR 0040), or a routine's run at the pinned revision (ADR 0041). |
@@ -25,7 +25,7 @@
 | Agent DO SQLite | `app_run_events` | Drizzle: the run ledger, turns, model attempts and tool calls without content, 30 days (ADR 0024). |
 | Agent DO SQLite | `app_decision_proposals`, `app_decision_labels` | Drizzle: typed decision proposals and the owner's first label of each (ADR 0031). |
 | D1 `goblinAuth` | `user`, `session`, `account`, `verification`, `jwks`, `rateLimit`, `oauth*` | Better Auth, `apps/runtime/migrations`. |
-| D1 `goblinAuth` | `app_billing_accounts`, `app_billing_subscriptions`, `app_billing_inbox`, `app_billing_checkouts`, `app_billing_wallet_subscriptions` | Drizzle: account payments, durable reconciliation and the Goblin Wallet subscriptions' renewals (ADR 0054). |
+| D1 `goblinAuth` | `app_billing_accounts`, `app_billing_subscriptions`, `app_billing_inbox`, `app_billing_checkouts`, `app_billing_wallet_subscriptions` | Unread until the migrations are squashed (ADR 0058). |
 
 The withdrawn Members feature left dormant auth D1 tables and DO columns/tables. Applied migration files and keys
 remain intact to preserve real data and migration history; the runtime no longer reads or writes that access metadata.

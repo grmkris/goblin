@@ -14,7 +14,7 @@ smoke are different evidence.
   `node:sqlite` for stores).
 - Owner API: serve one group in memory with only its area's services (`served([Group], handlers)` in
   `test/http/api/fixture.ts`), and call it through the typed client. The edge's admission (origin, session, CSRF on every write,
-  plan, body cap, header allowlist) is unit-tested in `test/http/api/edge.test.ts`. Integration probes reach the agent
+  body cap, header allowlist) is unit-tested in `test/http/api/edge.test.ts`. Integration probes reach the agent
   through `test/owner-client.ts`, the typed client over the stub's `fetch` with `x-goblin-ref`; never an RPC
   method for an owner call. The owner stack's cases go through the real Worker as a signed-in browser
   (`signedIn(base, person)` in `test/integration/owner-requests.ts`) with the same client; a refusal is asserted by its
@@ -48,10 +48,9 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
 
-- Billing native tests use a separate local D1/Worker and an injected Dodo API. Production account admission always
-  reads auth D1; only the native model-test subclass injects entitlement policy. Prove checkout alone grants nothing,
-  a signed activation opens the Agent, replay preserves the first receipt, cancellation/grace expire, and each account
-  receives its own allowance. Real Dodo keys, checkout, merchant review and deployed webhook delivery are separate gates.
+- Daily usage is tested with the deployment's cap in the agent's input, over an in-memory ledger (`budget.test.ts`)
+  and the agent's layer over SQLite (`budget-native.test.ts`): every token counts, a capped day refuses until the next
+  UTC day, and without a cap nothing is refused.
 
 - Signed routine Events use the existing native stack and official fixture, including descriptor argument validation, shared-lease retirement, escaped IDs, replay after receipt retention across a new revision, sealed metadata labelling, global spacing and pending drain. Structural labelling does not prove model injection resistance; local throwaway-account CLIProxy acceptance and real producer/dev acceptance are separate evidence.
 

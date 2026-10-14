@@ -35,8 +35,8 @@ The web app is a thin browser projection over the resident runtime. TanStack Sta
   reference and reports a defect to `/api/client-errors`; `routes/__root.tsx` reports uncaught errors and rejections
   the same way (`lib/query/crash-report.ts`, content-free, ADR 0037).
 - `/` is goblin's public landing for a visitor who is signed out (`components/landing`, built from `@goblin/ui`'s
-  marketing parts, which Goblin Wallet's front door shares); its `beforeLoad` sends a signed-in owner to their channel
-  (the session cookie on the server, the cached session in the browser, never a network wait). The root draws it
+  marketing parts); its `beforeLoad` sends a signed-in owner to their channel (the session cookie on the server, the
+  cached session in the browser, never a network wait). The root draws it
   without the shell. `heavy bun apps/web/test/ui-landing.ts` checks it in Chromium.
 - "Only visible to you" rows (`components/shell/ephemeral-slot.tsx`) are owner-only, never transcript entries or
   sends. Decision proposals fill them (`decisions/hooks.ts`, `decisions/rows.ts`, ADR 0031): a choice posts its label

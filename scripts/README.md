@@ -158,7 +158,9 @@ non-cancelling concurrency group, and a deploy from the build box is break-glass
 stacks, refuses a non-empty destination or an unsettled record, verifies sha256 by record name and copies back with
 `--to local`. Never use Alchemy's `syncState` against this store: it deletes every stack the source lacks.
 
-The first production release is invite-only with no configured invite or owner email, so it admits nobody until the operator securely supplies those values. Its dedicated model key offers the approved five models and caps spending at $10 per 30 days. Dodo remains unconfigured in live mode. After the owner signs in with delivered OTP, grant exactly that verified production user a prod-scoped Pro override of 800 Credits/day and run authenticated prod smoke.
+The first production release is invite-only with no configured invite or owner email, so it admits nobody until the
+operator securely supplies those values. Its dedicated model key offers the approved five models and caps spending at
+$10 per 30 days. After the owner signs in with delivered OTP, run authenticated prod smoke.
 
 Roll back code with a revert commit on `dev`: CI deploys it to dev with full acceptance, then `bun run promote` it.
 When prod cannot wait for that, roll the `goblin-prod` Worker back to its previous version in

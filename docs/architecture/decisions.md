@@ -17,8 +17,8 @@ routine runs never install it) hands it each answered exchange after yield. A ju
 the daily budget before any call, runs once at a time per proposal (`SingleFlight`), is fenced on the chat's current Pi
 session and epoch and a digest of the exchange, and checks them again before it keeps a proposal; a failure or an
 unavailable Clef proposes nothing and never fails the owner's turn. Only the dev stage binds `AI`; everywhere else
-(prod, the local stack, the native test stacks) the hooks do nothing at all. Each Clef call is charged to the daily
-budget as model `clef` and is one `model.aux` event of purpose `decision`; proposing, confirming and dismissing are the
+(prod, the local stack, the native test stacks) the hooks do nothing at all. Each Clef call counts its tokens toward
+the daily usage and is one `model.aux` event of purpose `decision`; proposing, confirming and dismissing are the
 flows `decision_propose`, `decision_confirm` and `decision_dismiss`.
 
 The third judgment, cross-Topic context relevance (`decisions/context.ts`), follows the same exchange: after a bounded
