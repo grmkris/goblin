@@ -1,5 +1,5 @@
 /*
- * First-run Start (components/start, ADR 0048). The panel is the rail's own green, so finishing can narrow it into the
+ * First-run Start (components/start, ADR 0062). The panel is the rail's own green, so finishing can narrow it into the
  * rail; the task is the page's plain surface. One motion of its own: the panel becoming the rail (`[data-leaving]`).
  */
 .start-root {
@@ -8,8 +8,8 @@
 }
 
 /*
- * While goblin finds out whether the owner goes to Start or the app: the mark alone, centred on the page's background,
- * as the Home Screen app's startup image draws it (scripts/app-icons.ts), so no words appear and change.
+ * While Start waits for the session or its state: the mark alone, centred on the page's background, as the Home Screen
+ * app's startup image draws it (scripts/app-icons.ts), so no words appear and change.
  */
 .start-splash {
   display: grid;
@@ -210,59 +210,6 @@
   align-items: flex-start;
   gap: 1rem;
 }
-.start-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.625rem;
-  min-height: 2.75rem;
-  font-size: var(--text-15);
-  cursor: pointer;
-}
-.start-check > input {
-  width: 1.125rem;
-  height: 1.125rem;
-  accent-color: var(--moss);
-}
-.start-link {
-  min-height: 2.75rem;
-  color: var(--muted-foreground);
-  font-size: 0.875rem;
-  text-align: left;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-.start-link:hover {
-  color: var(--foreground);
-}
-.start-review {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  width: 100%;
-}
-.start-review-lists {
-  display: grid;
-  gap: 1rem;
-  padding: 1rem;
-  border-radius: var(--radius-xl);
-  background: var(--muted);
-  font-size: 0.875rem;
-}
-@media (min-width: 40rem) {
-  .start-review-lists {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-.start-review-head {
-  margin-bottom: 0.375rem;
-  font-weight: 600;
-}
-.start-review-lists ul {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  color: var(--muted-foreground);
-}
 .start-state {
   display: flex;
   align-items: center;
@@ -282,15 +229,6 @@
 .start-state[data-done] > svg {
   color: var(--success);
 }
-/* Waiting for funds: a still dot in the attention tone, not a pulse that repeats while the owner reads. */
-.start-pulse {
-  flex: none;
-  width: 0.5rem;
-  height: 0.5rem;
-  margin-inline: 0.3125rem;
-  border-radius: 999px;
-  background: var(--attention);
-}
 .start-note {
   display: flex;
   align-items: center;
@@ -299,14 +237,15 @@
   font-size: 0.875rem;
   text-wrap: pretty;
 }
-.start-lede {
-  max-width: 34rem;
-  font-size: var(--text-15);
-  line-height: 1.5;
-  text-wrap: pretty;
+.start-note a {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.start-note a:hover {
+  color: var(--foreground);
 }
 
-/* The welcome: what goblin is made of, as three small pieces; what is still to come is drawn as a placeholder. */
+/* The welcome: what goblin is made of, as three small pieces. */
 .start-pieces {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -327,14 +266,6 @@
     0 0 0 1px var(--hairline),
     0 1px 2px oklch(0 0 0 / 0.04);
 }
-.start-pieces > li[data-soon] {
-  justify-content: center;
-  background: transparent;
-  box-shadow: none;
-  outline: 1px dashed var(--border);
-  outline-offset: -1px;
-  color: var(--muted-foreground);
-}
 .start-piece-mark {
   display: grid;
   place-items: center;
@@ -345,10 +276,6 @@
   background: color-mix(in oklch, var(--moss) 14%, transparent);
   color: var(--moss);
 }
-.start-pieces > li[data-soon] .start-piece-mark {
-  background: var(--muted);
-  color: var(--muted-foreground);
-}
 .start-piece-mark > svg {
   width: 1.125rem;
   height: 1.125rem;
@@ -356,9 +283,6 @@
 .start-piece-name {
   font-size: var(--text-15);
   font-weight: 600;
-}
-.start-pieces > li[data-soon] .start-piece-name {
-  font-weight: 500;
 }
 .start-piece-about {
   color: var(--muted-foreground);
@@ -382,57 +306,19 @@
     grid-row: span 2;
     margin-bottom: 0;
   }
-  .start-pieces > li[data-soon] .start-piece-mark {
-    grid-row: auto;
-  }
 }
 
-/* The wallet still needs setup: its own list, each line its words as plain text. */
-.start-todo {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+/* The model step: Settings' own form, as wide as the task. */
+.start-model > * {
   width: 100%;
-  padding: 1rem;
-  border-radius: var(--radius-xl);
-  background: var(--card);
-  box-shadow:
-    0 0 0 1px var(--hairline),
-    0 1px 2px oklch(0 0 0 / 0.04);
-}
-.start-todo-head {
-  font-size: var(--text-15);
-  font-weight: 600;
-}
-.start-gaps {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--text-15);
-}
-.start-gaps > li {
-  display: flex;
-  align-items: baseline;
-  gap: 0.625rem;
-  text-wrap: pretty;
-}
-.start-gap-mark {
-  flex: none;
-  width: 0.875rem;
-  height: 0.875rem;
-  border: 1.5px solid var(--border);
-  border-radius: 999px;
-  translate: 0 0.125rem;
 }
 
-/* The wallet, set up: what it holds, where it pays from, and how goblin pays. */
-.start-wallet {
+/* A server Start just connected: what goblin may use of it, and the tap that gives it the suggested access. */
+.start-connected {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  align-items: flex-start;
+  gap: 0.75rem;
   width: 100%;
   padding: 1rem 1.125rem;
   border-radius: var(--radius-xl);
@@ -441,79 +327,13 @@
     0 0 0 1px var(--hairline),
     0 1px 2px oklch(0 0 0 / 0.04);
 }
-.start-wallet-amount {
-  color: var(--muted-foreground);
-  font-size: var(--text-15);
-}
-.start-wallet-dollars {
-  color: var(--foreground);
-  font-size: 1.75rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-/* goblin Pro's two ways to pay (ADR 0054), above how each call is paid: a ruled-off group with its one action. */
-.start-plan {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  width: 100%;
-  margin-top: 0.25rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--hairline);
-}
 
-.start-pay-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: 0.75rem;
-  font-size: 0.875rem;
-}
-.start-pay-line > .start-link {
-  min-height: 2.25rem;
-}
-
-/* Services: Mercator first, raised on its own; the others under a quieter heading. */
-.start-feature {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 1.125rem;
-  border-radius: var(--radius-xl);
-  background: var(--card);
-  box-shadow:
-    0 0 0 1px var(--hairline),
-    0 2px 8px oklch(0 0 0 / 0.05);
-}
-.start-feature-head {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-}
-.start-feature-head > h2 {
-  font-size: 1.125rem;
-  font-weight: 600;
-}
-.start-feature-about {
-  max-width: 34rem;
-  color: var(--muted-foreground);
-  font-size: var(--text-15);
-  line-height: 1.5;
-  text-wrap: pretty;
-}
+/* Services: the shelf, and where any other server is added. */
 .start-more {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   width: 100%;
-}
-.start-subhead {
-  color: var(--muted-foreground);
-  font-size: 0.875rem;
-  font-weight: 500;
 }
 /* The shelf's groups sit apart from the heading above them. */
 .start-more > .shelf {

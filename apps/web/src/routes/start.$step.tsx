@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { ONBOARDING_STEPS, type OnboardingStep } from '@goblin/contracts'
+import { modelEndpointQuery } from '../agent/queries.ts'
 import { OwnerGate } from '../components/owner-gate.tsx'
 import { StartSplash } from '../components/start/splash.tsx'
 import { StartPage, type StartSearch } from '../components/start/start.tsx'
@@ -19,18 +20,20 @@ const parseReturn = (search: Record<string, unknown>): StartSearch => {
 }
 
 /**
- * One step of first-run Start (`/start/<step>`), before the chats; Start's state and the servers load first. A step
- * Start does not have goes to `/start`, which picks the first one still to do.
+ * One step of first-run Start (`/start/<step>`, ADR 0062); Start's state and the servers load first, and the model step
+ * reads where model calls go. A step Start does not have (an older Start's link) goes to `/start`, which picks the first
+ * one still to do.
  */
 export const Route = createFileRoute('/start/$step')({
   validateSearch: parseReturn,
   beforeLoad: ({ params }) => {
     if (!isStep(params.step)) throw redirect({ to: '/start' })
   },
-  loader: async ({ context }) => {
+  loader: async ({ context, params }) => {
     await Promise.all([
       primeOwnerRead(context.queryClient, onboardingQuery),
       primeOwnerRead(context.queryClient, serversQuery),
+      ...(params.step === 'model' ? [primeOwnerRead(context.queryClient, modelEndpointQuery)] : []),
     ])
   },
   component: StartRoute,

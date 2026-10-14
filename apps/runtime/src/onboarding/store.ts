@@ -5,12 +5,12 @@ import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { appOnboarding, appOnboardingConnects } from '../storage/onboarding.ts'
 
-/** Start's status once it is kept: the owner finished or skipped it, or it was found complete. */
+/** Start's status once it is kept: the owner finished or skipped it. */
 type KeptStatus = 'done' | 'skipped'
 
 /**
- * What the owner did with Start: its kept status (none while Start is derived from the servers), the steps they went
- * through, and when they sent the kickoff.
+ * What the owner did with Start: its kept status (none while it is open), the steps they went through, and when they
+ * sent the kickoff.
  */
 export type OnboardingRecord = {
   readonly status: KeptStatus | undefined
@@ -19,7 +19,6 @@ export type OnboardingRecord = {
 }
 
 const decodeStrings = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.String)))
-const decodeStep = Schema.decodeUnknownOption(OnboardingStep)
 const isStep = Schema.is(OnboardingStep)
 
 /** The steps a row records, leniently: an id Start no longer has (an older Start's) is dropped, never a failure. */
@@ -29,18 +28,15 @@ const stepsOf = (json: string): readonly OnboardingStep[] =>
     onSome: (ids) => [...new Set(ids.filter(isStep))],
   })
 
-/** Where a sign-in Start began comes back to, and whether to allow the server's recommended tools then. */
-export type StartedConnect = { readonly step: OnboardingStep; readonly recommend: boolean }
-
 /**
  * A sign-in noted longer ago than this (seconds) comes back to Connections, as any other does. An hour, as long as the
- * pending authorization lives: the wallet's consent includes its setup and funding, which can take a while.
+ * pending authorization lives.
  */
 const CONNECT_FRESH = 60 * 60
-/** `open` in the row is no kept status: Start is derived. */
+/** `open` in the row is no kept status: Start is open. */
 const decodeKept = Schema.decodeUnknownOption(Schema.Literals(['done', 'skipped']))
 
-/** Start's one row (ADR 0048). Nothing is stored until the owner acts, so an untouched Start is derived instead. */
+/** Start's one row (ADR 0062). Nothing is stored until the owner acts, so an untouched Start is open. */
 export class OnboardingStore {
   readonly #db: DrizzleSqliteDODatabase
   constructor(db: DrizzleSqliteDODatabase) {
@@ -58,9 +54,9 @@ export class OnboardingStore {
   }
 
   /**
-   * Applies the owner's change in one statement: a status (`open` forgets the kept one, so Start is derived again), a
-   * step they went through (kept once), the kickoff's time (kept from the first). Only a status changes the status: a
-   * step or the kickoff alone leaves it as it was, so going through a step never pins Start open.
+   * Applies the owner's change in one statement: a status (`open` forgets the kept one, so Start is open again), a step
+   * they went through (kept once), the kickoff's time (kept from the first). Only a status changes the status: a step
+   * or the kickoff alone leaves it as it was.
    */
   apply(change: OnboardingChange, now: number): OnboardingRecord {
     const current = this.get()
@@ -85,9 +81,10 @@ export class OnboardingStore {
     return next
   }
 
-  /** Notes that Start sent the owner to sign in to `connectionId`, replacing an earlier note for it. */
-  noteConnect(connectionId: string, started: StartedConnect, now: number): void {
-    const values = { step: started.step, recommend: started.recommend ? 1 : 0, createdAt: now }
+  /** Notes that Start sent the owner to sign in to `connectionId` from `step`, replacing an earlier note for it. */
+  noteConnect(connectionId: string, step: OnboardingStep, now: number): void {
+    // `recommend` is a column no longer read (storage/onboarding.ts).
+    const values = { step, recommend: 0, createdAt: now }
     this.#db
       .insert(appOnboardingConnects)
       .values({ connectionId, ...values })
@@ -95,14 +92,17 @@ export class OnboardingStore {
       .run()
   }
 
-  /** Takes the note for `connectionId`: it is gone afterwards, and none comes back for one older than an hour. */
-  takeConnect(connectionId: string, now: number): StartedConnect | undefined {
+  /**
+   * Takes the note for `connectionId`, the step to come back to: it is gone afterwards, and none comes back for one
+   * older than an hour or for a step Start no longer has.
+   */
+  takeConnect(connectionId: string, now: number): OnboardingStep | undefined {
     const row = this.#db
       .delete(appOnboardingConnects)
       .where(eq(appOnboardingConnects.connectionId, connectionId))
       .returning()
       .get()
     if (row === undefined || now - row.createdAt > CONNECT_FRESH) return undefined
-    return Option.getOrUndefined(Option.map(decodeStep(row.step), (step) => ({ step, recommend: row.recommend === 1 })))
+    return isStep(row.step) ? row.step : undefined
   }
 }

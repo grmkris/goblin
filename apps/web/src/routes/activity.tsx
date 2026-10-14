@@ -4,7 +4,6 @@ import { PageBar } from '../components/page-bar.tsx'
 import { ActivityPage } from '../components/shell/pages/activity-page.tsx'
 
 export const Route = createFileRoute('/activity')({
-  staticData: { startRequired: true },
   component: ActivityRoute,
 })
 function ActivityRoute() {

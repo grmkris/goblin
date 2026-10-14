@@ -1,78 +1,57 @@
-import { mutationOptions, queryOptions, skipToken } from '@tanstack/react-query'
-import type { OnboardingChange, OnboardingConnect, OnboardingState, OnboardingView } from '@goblin/contracts'
+import { mutationOptions } from '@tanstack/react-query'
+import type { OnboardingChange, OnboardingConnect, OnboardingStep, OnboardingView } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import { owner } from '../lib/api.ts'
 
-/** First-run Start (ADR 0048) on the owner API. Keys are `['onboarding', kind]`. */
+/** First-run Start (ADR 0062) on the owner API. Keys are `['onboarding', kind]`. */
 export const onboardingKeys = {
-  state: ['onboarding', 'state'] as const,
   view: ['onboarding', 'view'] as const,
 }
 
-/** Whether Start still stands before the chats, and its first open step: cheap once kept, read by the shell. */
-export const onboardingStateQuery = owner.apiQuery({
-  queryKey: onboardingKeys.state,
-  queryFn: (api) => api.onboarding.state(),
-})
-/**
- * Start's state, read only once someone is signed in (beside the plan, not after it); before then the key holds
- * nothing. A refusal never sends anyone to sign in: the page's own gate decides that.
- */
-export const signedInStartQuery = (signedIn: boolean) =>
-  queryOptions({
-    queryKey: onboardingKeys.state,
-    queryFn: signedIn ? onboardingStateQuery.queryFn : skipToken,
-    meta: { auth: 'optional' },
-  })
-
-/** Every step's state, read live from the wallet and Mercator. */
+/** Every step's state, read from the agent alone. */
 export const onboardingQuery = owner.apiQuery({
   queryKey: onboardingKeys.view,
   queryFn: (api) => api.onboarding.view(),
 })
 
-/** The gate's answer from Start's whole view: its status and, while it is open, the first step still to do. */
-export const stateOf = (view: OnboardingView): OnboardingState => {
-  const step = view.status === 'open' ? view.steps.find((each) => !each.done)?.id : undefined
-  return step === undefined ? { status: view.status } : { status: view.status, step }
-}
+/** The step Start picks up from: the first one still to do, the welcome once all are done or before Start is read. */
+export const firstOpenStep = (view: OnboardingView | undefined): OnboardingStep =>
+  view?.steps.find((step) => !step.done)?.id ?? 'welcome'
 
-/** The owner finishes or skips Start, goes through a step, or records the kickoff; the view and the gate follow. */
+/**
+ * The steps Start's ways back count as left: none once the owner finished Start, and never the welcome or the kickoff,
+ * which are no tasks to come back to.
+ */
+export const stepsLeft = (view: OnboardingView): OnboardingView['steps'] =>
+  view.status === 'done' ? [] : view.steps.filter((step) => !step.done && step.id !== 'welcome' && step.id !== 'goblin')
+
+/** The owner finishes or skips Start, goes through a step, or records the kickoff; the view follows. */
 export const changeOnboardingMutation = mutationOptions({
   ...owner.apiMutation({
     mutationFn: (api, change: OnboardingChange) => api.onboarding.change({ payload: change }),
   }),
   onSuccess: (view, _change, _result, { client }) => {
     client.setQueryData(onboardingQuery.queryKey, view)
-    client.setQueryData(onboardingStateQuery.queryKey, stateOf(view))
   },
 })
 
 /**
- * Signs the owner in to a server from Start, to come back to its step (allowing its recommended tools on the way when
- * asked): an authorization URL to send them to, or none when it connected at once, and Start reads its state again.
+ * Adds a suggested server from Start's services step and signs in to it, back to that step; nothing is allowed on the
+ * way. Answers the new connection with the authorization URL to send the owner to, or none when it connected at once.
  */
-export const startConnectMutation = mutationOptions({
+export const startAddMutation = mutationOptions({
   ...owner.apiMutation({
-    mutationFn: (api, request: OnboardingConnect) => api.onboarding.connect({ payload: request }),
+    mutationFn: (api, endpoint: string) =>
+      Effect.flatMap(api.mcp.addServer({ payload: { endpoint } }), ({ connectionId }) => {
+        const request: OnboardingConnect = { connectionId, step: 'services' }
+        return Effect.map(api.onboarding.connect({ payload: request }), (started) => ({ ...started, connectionId }))
+      }),
   }),
-  onSuccess: (started, _request, _result, { client }) =>
+  onSuccess: (started, _endpoint, _result, { client }) =>
     started.authorizationUrl === undefined
       ? Promise.all([
           client.invalidateQueries({ queryKey: onboardingKeys.view }),
           client.invalidateQueries({ queryKey: ['mcp', 'servers'] }),
         ])
       : undefined,
-})
-
-/** Adds a suggested server from Start's services step and signs in to it, back to that step; nothing allowed yet. */
-export const startAddMutation = mutationOptions({
-  ...owner.apiMutation({
-    mutationFn: (api, endpoint: string) =>
-      Effect.flatMap(api.mcp.addServer({ payload: { endpoint } }), (added) =>
-        api.onboarding.connect({ payload: { connectionId: added.connectionId, step: 'services', recommend: false } }),
-      ),
-  }),
-  onSuccess: (started, _endpoint, _result, { client }) =>
-    started.authorizationUrl === undefined ? client.invalidateQueries({ queryKey: ['mcp', 'servers'] }) : undefined,
 })

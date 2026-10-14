@@ -32,8 +32,4 @@ declare module '@tanstack/react-router' {
   interface Register {
     router: ReturnType<typeof getRouter>
   }
-  interface StaticDataRouteOption {
-    /** The page waits for first-run Start (ADR 0048): the shell sends an owner who has not been through it there. */
-    readonly startRequired?: boolean
-  }
 }

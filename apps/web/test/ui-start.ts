@@ -1,121 +1,98 @@
 /**
- * Local browser look at first-run Start (ADR 0048) against its real source components, at phone and desktop widths:
- * the splash, the welcome, the wallet's three states (connect, setup left, ready), services and the kickoff. No account
- * or model call is made; the owner API is routed here. It checks that no screen scrolls sideways and keeps screenshots.
+ * Local browser look at first-run Start (ADR 0062) against its real source components, at phone and desktop widths:
+ * the splash, the welcome, the model step on the deployment's models and on the owner's own, services before and after a
+ * server connects (with its suggested access offered, then in place), and the kickoff. No account or model call is
+ * made; the owner API is routed here. It checks that no screen scrolls sideways and keeps screenshots.
  */
 import assert from 'node:assert/strict'
 import { mkdirSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
-import { type Browser, type BrowserContextOptions, chromium } from 'playwright-core'
+import { type Browser, type BrowserContextOptions, type Page, chromium } from 'playwright-core'
 
 const STDOUT = 1
 const out = path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance', `start-${Date.now()}`)
 mkdirSync(out, { recursive: true, mode: 0o700 })
 
-const PROFILE = (id: string, title: string) => ({
-  id,
-  title,
-  description: `${title}.`,
-  offer: `so goblin can use ${title}`,
-  recommended: { run: ['status', 'search', 'quote'], ask: ['pay'] },
-  status: true,
-})
-const server = (connectionId: string, title: string, status: string) => ({
-  connectionId,
-  label: title,
-  endpoint: connectionId === 'wallet' ? 'https://wallet.goblin.surf/mcp' : 'https://mercator.sh/mcp/auth',
-  status,
-  live: status === 'connected',
-  source: 'config',
-  profile: PROFILE(connectionId, title),
-})
-const SETUP_URL = 'https://wallet.goblin.surf/setup?return=https%3A%2F%2Fgoblin.surf%2Fstart%2Fwallet'
-const FUNDS_URL = 'https://wallet.goblin.surf/add-funds?return=https%3A%2F%2Fgoblin.surf%2Fstart%2Fwallet'
+const DEPLOYMENT = { source: 'deployment', models: ['house-model', 'house-model-mini'] }
+const OWN = { source: 'owner', baseUrl: 'https://models.example/v1', keyHint: 'k3y9', models: ['own-model'] }
+const NOTES = {
+  connectionId: 'notes',
+  label: 'Notes',
+  endpoint: 'https://notes.example/mcp',
+  status: 'connected',
+  live: true,
+  source: 'added',
+}
+/** The connected server's tools: one that says it only reads, one that does not. */
+const tools = (granted: boolean) =>
+  [
+    { name: 'read_note', suggested: 'run', readOnlyHint: true },
+    { name: 'write_note', suggested: 'ask', readOnlyHint: false },
+  ].map((tool) => ({
+    ...tool,
+    description: tool.name,
+    modelVisible: true,
+    granted,
+    ...(granted && tool.suggested === 'ask' ? { askFirst: true } : {}),
+  }))
 const steps = (done: readonly string[]) =>
-  ['welcome', 'wallet', 'services', 'goblin'].map((id) => ({ id, done: done.includes(id) }))
-const wallet = (change: Record<string, unknown>) => ({
-  connectionId: 'wallet',
-  connected: true,
-  allowed: true,
-  ready: false,
-  gaps: [],
-  setupUrl: SETUP_URL,
-  fundsUrl: FUNDS_URL,
-  needs: '0',
-  funded: false,
-  ...change,
-})
-const view = (walletState: Record<string, unknown>, done: readonly string[], mercator = false) => ({
+  ['welcome', 'model', 'services', 'goblin'].map((id) => ({ id, done: done.includes(id) }))
+const view = (done: readonly string[], model = DEPLOYMENT, connected = 0) => ({
   status: 'open',
   steps: steps(done),
-  wallet: wallet(walletState),
-  mercator: { connectionId: 'mercator', connected: mercator, allowed: mercator },
-  connected: 0,
+  model,
+  connected,
   kickoff: false,
 })
 
-/** Each screen: where the page opens, Start's view, and whether the wallet is signed in. */
+/** Each screen: where the page opens, Start's view, the model endpoint, the servers and the connected one's tools. */
 const SCREENS = [
-  { name: 'splash', at: '/splash', view: view({}, []), walletSignedIn: false },
+  { name: 'splash', at: '/splash', view: view([]), servers: [], granted: false },
+  { name: 'welcome', at: '/start/welcome', view: view([]), servers: [], granted: false },
+  { name: 'model', at: '/start/model', view: view(['welcome']), servers: [], granted: false },
+  { name: 'model-own', at: '/start/model', view: view(['welcome', 'model'], OWN), servers: [], granted: false },
+  { name: 'services', at: '/start/services', view: view(['welcome', 'model']), servers: [], granted: false },
   {
-    name: 'welcome',
-    at: '/start/welcome',
-    view: view({ connected: false, allowed: false }, []),
-    walletSignedIn: false,
+    name: 'services-connected',
+    at: '/start/services?connected=notes',
+    view: view(['welcome', 'model'], DEPLOYMENT, 1),
+    servers: [NOTES],
+    granted: false,
   },
   {
-    name: 'wallet-connect',
-    at: '/start/wallet',
-    view: view({ connected: false, allowed: false, setupUrl: undefined, fundsUrl: undefined }, ['welcome']),
-    walletSignedIn: false,
-  },
-  {
-    name: 'wallet-setup',
-    at: '/start/wallet',
-    view: view(
-      {
-        gaps: [
-          'create the agent wallet',
-          "add USDC to the account on Base (the upgrade's gas is paid in USDC)",
-          'upgrade the account on Base',
-          'sign the spending allowance',
-        ],
-        dollars: '0',
-      },
-      ['welcome'],
-    ),
-    walletSignedIn: true,
-  },
-  {
-    name: 'wallet-ready',
-    at: '/start/wallet',
-    view: view(
-      {
-        ready: true,
-        funded: true,
-        dollars: '24.5',
-        payFrom: { address: `0x${'b'.repeat(40)}`, chain: 'tempo', token: 'USDC.e', held: '4.93' },
-      },
-      ['welcome', 'wallet'],
-    ),
-    walletSignedIn: true,
-  },
-  {
-    name: 'services',
-    at: '/start/services',
-    view: view({ ready: true, funded: true }, ['welcome', 'wallet']),
-    walletSignedIn: true,
+    name: 'services-suggested',
+    at: '/start/services?connected=notes',
+    view: view(['welcome', 'model'], DEPLOYMENT, 1),
+    servers: [NOTES],
+    granted: true,
   },
   {
     name: 'goblin',
     at: '/start/goblin',
-    view: view({ ready: true, funded: true }, ['welcome', 'wallet', 'services'], true),
-    walletSignedIn: true,
+    view: view(['welcome', 'model', 'services'], DEPLOYMENT, 1),
+    servers: [NOTES],
+    granted: true,
   },
 ] as const
 
 const errors: string[] = []
+
+/** Waits for what screen `name` shows: its title (the splash, its mark), and what tells its state apart. */
+async function shows(page: Page, name: (typeof SCREENS)[number]['name']): Promise<void> {
+  if (name === 'splash') return page.getByRole('status').waitFor()
+  await page.locator('#start-title').waitFor()
+  if (name === 'model') return page.getByText("Your agent uses this deployment's 2 models.").waitFor()
+  if (name === 'model-own') return page.getByText('https://models.example/v1').waitFor()
+  if (name === 'services-connected') {
+    await page.getByText('Notes is connected. goblin can use none of its tools yet.').waitFor()
+    return page.getByRole('button', { name: 'Use suggested access' }).waitFor()
+  }
+  if (name === 'services-suggested') {
+    await page.getByText('Notes is connected, with its suggested access.').waitFor()
+    assert.equal(await page.getByRole('button', { name: 'Use suggested access' }).count(), 0)
+  }
+}
 
 async function drive(browser: Browser, origin: string, label: string, options: BrowserContextOptions) {
   for (const screen of SCREENS) {
@@ -133,11 +110,9 @@ async function drive(browser: Browser, origin: string, label: string, options: B
       if (pathname === '/api/auth/get-session')
         return json({ session: { id: 's', userId: 'u' }, user: { id: 'u', email: 'owner@example.com' } })
       if (pathname === '/api/onboarding') return json(screen.view)
-      if (pathname === '/api/mcp/servers')
-        return json([
-          server('wallet', 'Goblin Wallet', screen.walletSignedIn ? 'connected' : 'needs_auth'),
-          server('mercator', 'Mercator', screen.name === 'goblin' ? 'connected' : 'needs_auth'),
-        ])
+      if (pathname === '/api/agent/model-endpoint') return json(screen.view.model)
+      if (pathname === '/api/mcp/servers') return json(screen.servers)
+      if (pathname === '/api/mcp/notes/tools') return json(tools(screen.granted))
       if (pathname === '/api/mcp/suggested')
         return json([
           {
@@ -172,16 +147,7 @@ async function drive(browser: Browser, origin: string, label: string, options: B
     })
     await page.goto(`${origin}start.html?at=${encodeURIComponent(screen.at)}`)
     await page.waitForLoadState('networkidle')
-    if (screen.name === 'splash') await page.getByRole('status').waitFor()
-    else await page.locator('#start-title').waitFor()
-    if (screen.name === 'wallet-setup') {
-      await page.getByText('Create the agent wallet').waitFor()
-      const finish = page.locator('a', { hasText: 'Finish setup in your wallet' })
-      assert.equal(await finish.getAttribute('href'), SETUP_URL)
-    }
-    if (screen.name === 'wallet-ready') {
-      await page.getByText('$24.50').waitFor()
-    }
+    await shows(page, screen.name)
     const sideways = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     assert(sideways <= 0, `${label} ${screen.name}: scrolls sideways by ${String(sideways)}px`)
     await page.screenshot({ path: path.join(out, `${label}-${screen.name}.png`), fullPage: true })

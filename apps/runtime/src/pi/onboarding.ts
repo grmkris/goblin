@@ -4,9 +4,9 @@ import type { RunProgram } from '../runtime/bridge.ts'
 import { withContext } from './context-tail.ts'
 
 /**
- * First-run Start in main (ADR 0048): before each request, what setup still misses joins goblin's context block (for
- * that request only, never the transcript), and right after the kickoff, the ask to propose Topics and Personas. A
- * failure, or nothing missing, leaves the request as it was.
+ * First-run Start in main (ADR 0062): right after the kickoff, the ask to propose Topics and Personas joins goblin's
+ * context block before each request (for that request only, never the transcript). A failure, or nothing to ask,
+ * leaves the request as it was.
  */
 export function onboardingExtension(run: RunProgram) {
   return defineExtension({

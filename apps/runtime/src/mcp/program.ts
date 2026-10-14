@@ -71,7 +71,7 @@ export const connectCallback = (params: URLSearchParams, appUrl: string) =>
       target.searchParams.set('error', failed)
       return target
     }
-    // A sign-in first-run Start began goes back to its step (ADR 0048); its tools are allowed first if the owner asked.
+    // A sign-in first-run Start began goes back to its step (ADR 0062), which offers the server's suggested access.
     const step = yield* connectedFromStart(finished.value).pipe(
       // expected: a note that cannot be read sends the owner to Connections, connected all the same
       Effect.orElseSucceed(() => undefined),

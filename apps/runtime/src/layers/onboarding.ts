@@ -5,7 +5,7 @@ import { Onboarding } from '../onboarding/service.ts'
 import { OnboardingStore } from '../onboarding/store.ts'
 import { Db } from '../runtime/db.ts'
 
-/** First-run Start's record (ADR 0048), over the agent's database. */
+/** First-run Start's record (ADR 0062), over the agent's database. */
 export const OnboardingLive = Layer.effect(
   Onboarding,
   Effect.gen(function* () {
@@ -15,8 +15,8 @@ export const OnboardingLive = Layer.effect(
       change: Effect.fn('Onboarding.change')(function* (change, now) {
         return yield* attemptSync(() => store.apply(change, now))
       }),
-      noteConnect: Effect.fn('Onboarding.noteConnect')(function* (connectionId, started, now) {
-        return yield* attemptSync(() => store.noteConnect(connectionId, started, now))
+      noteConnect: Effect.fn('Onboarding.noteConnect')(function* (connectionId, step, now) {
+        return yield* attemptSync(() => store.noteConnect(connectionId, step, now))
       }),
       takeConnect: Effect.fn('Onboarding.takeConnect')(function* (connectionId, now) {
         return yield* attemptSync(() => store.takeConnect(connectionId, now))

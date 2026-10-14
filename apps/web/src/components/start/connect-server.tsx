@@ -1,165 +1,46 @@
-// Connecting a first-class server from Start (ADR 0048): one action that signs in and comes back to the step, allowing
-// the server's recommended tools on the way unless the owner unticks it. What that allows is listed before they leave.
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { OnboardingStep, ServerView } from '@goblin/contracts'
+// A server Start just connected (ADR 0062). Connecting allows nothing: goblin can use none of its tools until the owner
+// says so. The server's suggested access (ADR 0060) is one tap away here, as on its card in Connections.
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { Button, Receipt } from '@goblin/ui'
 import { CircleAlertIcon, CircleCheckIcon } from 'lucide-react'
-import { type ReactNode, useId, useState } from 'react'
 import { messageOf } from '../../lib/query/app-error.ts'
-import { reportUnexpected } from '../../lib/unexpected.ts'
-import { allowRecommendedMutation } from '../../mcp/queries.ts'
-import { onboardingKeys, startConnectMutation } from '../../onboarding/queries.ts'
+import { allowSuggestedMutation, connectedToolsQuery, serversQuery } from '../../mcp/queries.ts'
+import { suggestedApplied } from '../tool-grants.tsx'
 
-/** A tool's name as people read it: `get_connection_status` → "get connection status". */
-const spoken = (name: string): string => name.replaceAll('_', ' ')
-
-/** What allowing the recommended tools means, listed exactly, under a disclosure. */
-function RecommendedList({ server }: { readonly server: ServerView }) {
-  const [open, setOpen] = useState(false)
-  const recommended = server.profile?.recommended
-  if (recommended === undefined) return null
-  const { run, ask } = recommended
+/** Connection `connectionId`, once it is connected: Use suggested access until it is in place. Nothing otherwise. */
+export function SuggestedAccess({ connectionId }: { readonly connectionId: string }) {
+  const server = useQuery(serversQuery).data?.find((each) => each.connectionId === connectionId)
+  const connected = server?.status === 'connected'
+  const tools = useQuery(connectedToolsQuery(connectionId, connected)).data
+  const allow = useMutation(allowSuggestedMutation)
+  if (server === undefined || !connected) return null
+  const applied = tools !== undefined && suggestedApplied(tools)
   return (
-    <div className="start-review">
-      <button type="button" className="start-link" aria-expanded={open} onClick={() => setOpen(!open)}>
-        {open ? 'Hide the list' : `Review: ${String(run.length)} run when needed, ${String(ask.length)} ask you first`}
-      </button>
-      {open && (
-        <div className="start-review-lists">
-          <div>
-            <p className="start-review-head">Run when needed</p>
-            <ul>
-              {run.map((name) => (
-                <li key={name}>{spoken(name)}</li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <p className="start-review-head">Ask you first, every time</p>
-            <ul>
-              {ask.map((name) => (
-                <li key={name}>{spoken(name)}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
+    <div className="start-connected">
+      <p className="start-state" {...(applied ? { 'data-done': true } : {})}>
+        <CircleCheckIcon aria-hidden />
+        {applied
+          ? `${server.label} is connected, with its suggested access.`
+          : `${server.label} is connected. goblin can use none of its tools yet.`}
+      </p>
+      {!applied && (
+        <Button pending={allow.isPending} disabled={tools === undefined} onClick={() => allow.mutate(connectionId)}>
+          Use suggested access
+        </Button>
       )}
-    </div>
-  )
-}
-
-function Failure({ text }: { readonly text: string }) {
-  return (
-    <Receipt tone="error">
-      <CircleAlertIcon aria-hidden />
-      <span>{text}</span>
-    </Receipt>
-  )
-}
-
-/** Signed out: Connect, with "Allow its recommended tools" ticked. Off to the sign-in, or connected at once. */
-function SignIn({
-  server,
-  step,
-  title,
-}: {
-  readonly server: ServerView
-  readonly step: OnboardingStep
-  readonly title: string
-}) {
-  const connect = useMutation(startConnectMutation)
-  const [recommend, setRecommend] = useState(true)
-  const checkbox = useId()
-  const start = () =>
-    connect.mutate(
-      { connectionId: server.connectionId, step, recommend },
-      {
-        onSuccess: ({ authorizationUrl }) => {
-          if (authorizationUrl !== undefined) window.location.assign(authorizationUrl)
-        },
-      },
-    )
-  return (
-    <div className="start-action">
-      <Button size="cta" pending={connect.isPending || connect.data?.authorizationUrl !== undefined} onClick={start}>
-        Connect {title}
-      </Button>
-      <label className="start-check" htmlFor={checkbox}>
-        <input
-          id={checkbox}
-          type="checkbox"
-          checked={recommend}
-          onChange={(event) => setRecommend(event.target.checked)}
-        />
-        <span>Allow its recommended tools</span>
-      </label>
-      <RecommendedList server={server} />
-      {connect.error !== null && <Failure text={messageOf(connect.error, `connect ${title}`)} />}
-    </div>
-  )
-}
-
-/** Connected, its tools not allowed yet: allow the recommended ones here. */
-function AllowHere({ server, title }: { readonly server: ServerView; readonly title: string }) {
-  const client = useQueryClient()
-  const allow = useMutation(allowRecommendedMutation)
-  const onClick = () =>
-    allow.mutate(server.connectionId, {
-      onSuccess: () => {
-        client.invalidateQueries({ queryKey: onboardingKeys.view }).catch(reportUnexpected)
-      },
-    })
-  return (
-    <div className="start-action">
-      <p className="start-state">
-        <CircleCheckIcon aria-hidden /> {title} is connected. Allow its recommended tools so goblin can use it.
+      <p className="start-note">
+        <span>
+          Tools that say they only read run when needed; the rest ask you first. Change any of them on its card in{' '}
+          <Link to="/connections">Connections</Link>.
+        </span>
       </p>
-      <Button size="cta" pending={allow.isPending} onClick={onClick}>
-        Allow recommended tools
-      </Button>
-      <RecommendedList server={server} />
-      {allow.error !== null && <Failure text={messageOf(allow.error, 'allow the recommended tools')} />}
-    </div>
-  )
-}
-
-/**
- * Connect `server` from step `step`. Signed out: the action. Signed in but not allowed: Allow on its own. Signed in and
- * allowed: done, with what it is now (`children`).
- */
-export function ConnectServer({
-  server,
-  step,
-  title,
-  allowed,
-  children,
-}: {
-  readonly server: ServerView | 'loading' | undefined
-  readonly step: OnboardingStep
-  readonly title: string
-  readonly allowed: boolean
-  readonly children?: ReactNode
-}) {
-  if (server === 'loading')
-    return (
-      <p role="status" className="start-note">
-        Reading your connections…
-      </p>
-    )
-  if (server === undefined)
-    return (
-      <Failure
-        text={`${title} is not offered on this goblin yet. Skip this step; you can add it later on Connections.`}
-      />
-    )
-  if (server.status !== 'connected') return <SignIn server={server} step={step} title={title} />
-  if (!allowed) return <AllowHere server={server} title={title} />
-  return (
-    <div className="start-action">
-      <p className="start-state" data-done>
-        <CircleCheckIcon aria-hidden /> {title} is connected, and its recommended tools are allowed.
-      </p>
-      {children}
+      {allow.error !== null && (
+        <Receipt tone="error">
+          <CircleAlertIcon aria-hidden />
+          <span>{messageOf(allow.error, 'use the suggested access')}</span>
+        </Receipt>
+      )}
     </div>
   )
 }

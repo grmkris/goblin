@@ -1,27 +1,25 @@
-// First-run Start (ADR 0048): one task per screen before the chats, on the rail's own green. The panel lists the steps
-// (each a link; a sign-in Start began comes back to its step), and on a phone narrows to a band with a count and one
-// segment per step; the task says why, offers one action, and shows when it is done. Finishing narrows the panel into
-// the rail as the chat appears: the one motion of the page.
+// First-run Start (ADR 0062): one task per screen, on the rail's own green, which the owner may pass by or skip; the app
+// never waits for it. The panel lists the steps (each a link; a sign-in Start began comes back to its step), and on a
+// phone narrows to a band with a count and one segment per step; the task says why and offers one action. Finishing
+// narrows the panel into the rail as the chat appears: the one motion of the page.
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { ONBOARDING_STEPS, PRIMARY_CHAT, type OnboardingStep, type OnboardingView } from '@goblin/contracts'
 import { Button, GoblinMark, Receipt } from '@goblin/ui'
-import { CheckIcon, CircleAlertIcon, CircleCheckIcon } from 'lucide-react'
+import { CheckIcon, CircleAlertIcon } from 'lucide-react'
 import { useState } from 'react'
 import { submitMutation } from '../../conversations/queries.ts'
 import { messageOf } from '../../lib/query/app-error.ts'
 import { reportUnexpected } from '../../lib/unexpected.ts'
 import { changeOnboardingMutation, onboardingQuery } from '../../onboarding/queries.ts'
 import { messageBody } from '../use-conversation.ts'
-import { GoblinStep, STEP_TEXT, ServicesStep, WalletStep, WelcomeStep } from './steps.tsx'
+import { GoblinStep, ModelStep, STEP_TEXT, ServicesStep, WelcomeStep } from './steps.tsx'
 
 /** How a sign-in Start began came back (the callback's own words): connected, or why not. */
 export type StartSearch = { readonly connected?: string; readonly error?: string; readonly ref?: string }
 
 /** How long the panel takes to become the rail (`--start-leave` in start.css). */
 const LEAVE_MS = 320
-/** How often the wallet step reads the wallet again while it is not set up and funded (ms). */
-const WALLET_POLL_MS = 10_000
 
 /** Opens the chat, after the panel has narrowed into the rail (at once when the owner asks for less motion). */
 function useLeave(): { readonly leaving: boolean; readonly leave: () => void } {
@@ -121,63 +119,47 @@ function StartPanel({
   )
 }
 
-/** What the sign-in Start began came back with, said once on the step it returned to. */
+/**
+ * A sign-in Start began that did not finish, said once on the step it returned to. One that did is the services step's
+ * own to show, with the server's suggested access.
+ */
 function ReturnNotice({ search }: { readonly search: StartSearch }) {
-  if (search.error !== undefined)
-    return (
-      <Receipt tone="error">
-        <CircleAlertIcon aria-hidden />
-        <span>
-          The sign-in did not finish ({search.error})
-          {search.ref === undefined ? '' : ` · ref ${search.ref.slice(0, 8)}`}. Try again.
-        </span>
-      </Receipt>
-    )
-  if (search.connected !== undefined)
-    return (
-      <Receipt tone="neutral">
-        <CircleCheckIcon aria-hidden />
-        <span>Connected.</span>
-      </Receipt>
-    )
-  return null
+  if (search.error === undefined) return null
+  return (
+    <Receipt tone="error">
+      <CircleAlertIcon aria-hidden />
+      <span>
+        The sign-in did not finish ({search.error}){search.ref === undefined ? '' : ` · ref ${search.ref.slice(0, 8)}`}.
+        Try again.
+      </span>
+    </Receipt>
+  )
 }
 
-/** The step's task, once Start's state is read, or what stops it. */
+/** The step's task. None waits for Start's state: that only marks the steps on the panel. */
 function StepBody({
   step,
-  read,
+  search,
   starting,
   onWelcome,
   onStart,
 }: {
   readonly step: OnboardingStep
-  readonly read: { readonly data: OnboardingView | undefined; readonly error: unknown }
+  readonly search: StartSearch
   readonly starting: boolean
   readonly onWelcome: () => void
   readonly onStart: (text: string) => void
 }) {
   if (step === 'welcome') return <WelcomeStep onContinue={onWelcome} />
-  const view = read.data
-  if (view === undefined)
-    return read.error === null ? (
-      <p role="status" className="start-note">
-        Reading your setup…
-      </p>
-    ) : (
-      <Receipt tone="error">
-        <CircleAlertIcon aria-hidden />
-        <span>{messageOf(read.error, 'read your setup')}</span>
-      </Receipt>
-    )
-  if (step === 'wallet') return <WalletStep view={view} />
-  if (step === 'services') return <ServicesStep view={view} />
-  return <GoblinStep view={view} pending={starting} onStart={onStart} />
+  if (step === 'model') return <ModelStep />
+  if (step === 'services') return <ServicesStep connected={search.connected} />
+  return <GoblinStep pending={starting} onStart={onStart} />
 }
 
 /**
- * Back on the left; on (or skip this step) on the right, filled only when it is the screen's one action. The welcome
- * has its own button, and the last step finishes instead.
+ * Back on the left, Continue on the right: filled where passing the step by is the usual way on (the model, the
+ * deployment's unless the owner brings their own), or once it has what it offers (services: a connected server). The
+ * welcome has its own button, and the last step finishes instead.
  */
 function StartNav({
   step,
@@ -200,12 +182,8 @@ function StartNav({
       <Button variant="ghost" pending={finishing} onClick={onFinish}>
         Finish without it
       </Button>
-    ) : step === 'wallet' ? (
-      <Button variant={view?.wallet.funded === true ? 'default' : 'ghost'} onClick={onNext}>
-        {view?.wallet.funded === true ? 'Continue' : 'Skip this step'}
-      </Button>
     ) : (
-      <Button variant={view?.mercator.allowed === true ? 'default' : 'outline'} onClick={onNext}>
+      <Button variant={step === 'model' || (view?.connected ?? 0) > 0 ? 'default' : 'outline'} onClick={onNext}>
         Continue
       </Button>
     )
@@ -229,12 +207,7 @@ function StartNav({
 }
 
 export function StartPage({ step, search }: { readonly step: OnboardingStep; readonly search: StartSearch }) {
-  // The wallet step reads the wallet again while it is not set up and funded, so coming back from it shows the change.
-  const read = useQuery({
-    ...onboardingQuery,
-    refetchInterval: (query) =>
-      step === 'wallet' && query.state.data?.wallet.funded !== true ? WALLET_POLL_MS : false,
-  })
+  const read = useQuery(onboardingQuery)
   const navigate = useNavigate()
   const change = useMutation(changeOnboardingMutation)
   const submit = useMutation(submitMutation)
@@ -242,8 +215,8 @@ export function StartPage({ step, search }: { readonly step: OnboardingStep; rea
   const index = ONBOARDING_STEPS.indexOf(step)
   const following = ONBOARDING_STEPS[index + 1]
   const next = () => {
-    // The welcome and services are the owner's word; the agent reads the wallet from the wallet.
-    if (step === 'welcome' || step === 'services') change.mutate({ step })
+    // Going on is the owner's word that they went through the step.
+    change.mutate({ step })
     if (following !== undefined) navigate({ to: '/start/$step', params: { step: following } }).catch(reportUnexpected)
   }
   const finish = async (kickoff?: string) => {
@@ -272,7 +245,7 @@ export function StartPage({ step, search }: { readonly step: OnboardingStep; rea
         <ReturnNotice search={search} />
         <StepBody
           step={step}
-          read={read}
+          search={search}
           starting={kicking || submit.isPending}
           onWelcome={next}
           onStart={(kickoff) => void finish(kickoff)}

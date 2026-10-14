@@ -9,7 +9,7 @@ import {
 } from '@tanstack/react-router'
 import { ONBOARDING_STEPS, type OnboardingStep } from '@goblin/contracts'
 import { StartSplash } from '../../src/components/start/splash.tsx'
-import { StartPage } from '../../src/components/start/start.tsx'
+import { StartPage, type StartSearch } from '../../src/components/start/start.tsx'
 import { withQueryClient } from './with-query-client.tsx'
 import '../../src/styles.css'
 
@@ -18,7 +18,7 @@ document.documentElement.classList.toggle('dark', matchMedia('(prefers-color-sch
 
 const isStep = (value: string): value is OnboardingStep => ONBOARDING_STEPS.some((step) => step === value)
 
-/** First-run Start's page as `/start/$step` renders it, and the splash, on a memory router (`?at=/start/wallet`). */
+/** First-run Start's page as `/start/$step` renders it, and the splash, on a memory router (`?at=/start/model`). */
 const root = createRootRoute({
   component: () => (
     <main className="start-root">
@@ -29,9 +29,12 @@ const root = createRootRoute({
 const step = createRoute({
   getParentRoute: () => root,
   path: '/start/$step',
+  // A sign-in's return, as the app's route reads it (`?connected=notes`).
+  validateSearch: (search: Record<string, unknown>): StartSearch =>
+    typeof search['connected'] === 'string' ? { connected: search['connected'] } : {},
   component: function Step() {
     const { step: id } = step.useParams()
-    return <StartPage step={isStep(id) ? id : 'welcome'} search={{}} />
+    return <StartPage step={isStep(id) ? id : 'welcome'} search={step.useSearch()} />
   },
 })
 const splash = createRoute({ getParentRoute: () => root, path: '/splash', component: StartSplash })

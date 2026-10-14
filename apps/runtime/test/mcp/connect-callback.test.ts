@@ -1,47 +1,36 @@
 import { InvalidInput } from '@goblin/contracts/api'
+import type { OnboardingStep } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import { describe, expect, it } from 'vitest'
 import { connectCallback } from '../../src/mcp/program.ts'
-import { McpConnections, McpGrants, McpServers, Resident } from '../../src/mcp/service.ts'
+import { McpServers, Resident } from '../../src/mcp/service.ts'
 import { Onboarding } from '../../src/onboarding/service.ts'
-import type { StartedConnect } from '../../src/onboarding/store.ts'
 import { stub } from '../http/api/fixture.ts'
 
 /**
- * The callback over resident authority that counts renewals, a host whose `finishConnect` is `finish`, and the note
- * first-run Start left for the sign-in (none unless `started`); the tools it allowed are counted.
+ * The callback over resident authority that counts renewals, a host whose `finishConnect` is `finish`, and the step
+ * first-run Start noted for the sign-in (none unless `started`). No grant service is reachable: the callback allows
+ * nothing.
  */
 const callback = async (
   query: string,
   finish: (state: string) => Effect.Effect<string, InvalidInput> = () => Effect.succeed('notes'),
-  started?: StartedConnect,
+  started?: OnboardingStep,
 ) => {
   const renewals: number[] = []
   const finished: string[] = []
-  const allowed: string[] = []
   const services = Layer.mergeAll(
     stub(Resident, { renew: () => Effect.sync(() => void renewals.push(1)) }),
     stub(McpServers, {
       finishConnect: (state: string) => Effect.tap(finish(state), () => Effect.sync(() => void finished.push(state))),
     }),
     stub(Onboarding, { takeConnect: () => Effect.succeed(started) }),
-    // SAFETY: allowing recommended tools reads only the server's endpoint, to find its first-class profile.
-    stub(McpConnections, { server: () => Effect.succeed({ endpoint: 'https://wallet.goblin.surf/mcp' } as never) }),
-    stub(McpGrants, {
-      setTool: (_connectionId: string, name: string) =>
-        Effect.as(
-          Effect.sync(() => void allowed.push(name)),
-          [],
-        ),
-      setAskFirst: () => Effect.succeed([]),
-      list: () => Effect.succeed([]),
-    }),
   )
   const target = await Effect.runPromise(
     connectCallback(new URLSearchParams(query), 'https://goblin.test').pipe(Effect.provide(services)),
   )
-  return { target: target.href, renewals: renewals.length, finished, allowed }
+  return { target: target.href, renewals: renewals.length, finished }
 }
 
 describe('the outbound sign-in callback', () => {
@@ -51,17 +40,16 @@ describe('the outbound sign-in callback', () => {
       target: 'https://goblin.test/connections?connected=notes',
       renewals: 1,
       finished: ['s1'],
-      allowed: [],
     })
   })
 
-  it("goes back to first-run Start's step, allowing the server's recommended tools when the owner left that ticked", async () => {
-    const allowing = await callback('state=s1&code=c1', undefined, { step: 'wallet', recommend: true })
-    expect(allowing.target).toBe('https://goblin.test/start/wallet?connected=notes')
-    expect(allowing.allowed).toContain('wallet_status')
-    expect(allowing.allowed).toContain('pay_challenge')
-    const choosing = await callback('state=s1&code=c1', undefined, { step: 'services', recommend: false })
-    expect(choosing).toMatchObject({ target: 'https://goblin.test/start/services?connected=notes', allowed: [] })
+  it('goes back to the step first-run Start noted, with the connection it finished', async () => {
+    const back = await callback('state=s1&code=c1', undefined, 'services')
+    expect(back).toEqual({
+      target: 'https://goblin.test/start/services?connected=notes',
+      renewals: 1,
+      finished: ['s1'],
+    })
   })
 
   it("answers the authorization server's error, or an incomplete callback, without finishing anything", async () => {
@@ -73,7 +61,6 @@ describe('the outbound sign-in callback', () => {
       target: 'https://goblin.test/connections?error=authorization_failed',
       renewals: 0,
       finished: [],
-      allowed: [],
     })
   })
 

@@ -1,35 +1,33 @@
-// Start's steps (ADR 0048), one task each. Each says what the step is for in one line, offers the one action that does
-// it, and shows when it is done. The wallet's setup and funds are the wallet's own: Start shows what it says is left and
-// sends the owner to its setup page; what goblin cannot read from the servers (the welcome, services, the kickoff) the
-// owner tells it.
-import { useMutation, useQuery } from '@tanstack/react-query'
-import type { OnboardingStep, OnboardingView, ServerSuggestion, ServerView } from '@goblin/contracts'
-import { Badge, Button, GoblinMark, Textarea } from '@goblin/ui'
-import { CircleCheckIcon, PlusIcon, WalletIcon } from 'lucide-react'
+// Start's steps (ADR 0062), one task each. Each says what the step is for in one line and offers the one action that
+// does it; every step can be passed by. goblin uses the deployment's models until the owner brings their own, and a
+// server connected from here gets no access until the owner gives it.
+import { useMutation } from '@tanstack/react-query'
+import type { OnboardingStep, ServerSuggestion } from '@goblin/contracts'
+import { Button, GoblinMark, Skeleton, Textarea } from '@goblin/ui'
+import { CpuIcon, PlugIcon } from 'lucide-react'
 import { useId, useState } from 'react'
 import { QueryBoundary } from '../../lib/query/query-boundary.tsx'
-import { serverStatusQuery, serversQuery } from '../../mcp/queries.ts'
 import { startAddMutation } from '../../onboarding/queries.ts'
+import { ModelEndpoint } from '../model-endpoint-card.tsx'
 import { SuggestedServers } from '../server-add.tsx'
-import { PrepaidLine } from '../first-class.tsx'
-import { ConnectServer } from './connect-server.tsx'
+import { SuggestedAccess } from './connect-server.tsx'
 
 /** Each step's name on the panel, its title, and the one line of why. */
 export const STEP_TEXT: Readonly<Record<OnboardingStep, { label: string; title: string; why: string }>> = {
   welcome: {
     label: 'Welcome',
     title: 'goblin is your own agent',
-    why: 'It works through MCP servers: services you connect and allow, tool by tool. It pays for its own model and services from your Goblin Wallet, within limits you set.',
+    why: 'It thinks with the model you choose and works through the services you connect, using only the tools you allow.',
   },
-  wallet: {
-    label: 'Goblin Wallet',
-    title: 'Set up your Goblin Wallet',
-    why: 'goblin pays for its model and outside services from it, within the limits you set there.',
+  model: {
+    label: 'Your model',
+    title: 'The model goblin thinks with',
+    why: "goblin uses this deployment's models unless you bring your own: any OpenAI-compatible endpoint and your key.",
   },
   services: {
     label: 'Services',
     title: 'How goblin reaches the outside world',
-    why: 'Each service is an MCP server you connect. goblin uses only the tools you allow, and asks before anything that costs money.',
+    why: 'Each service is an MCP server you connect. goblin can use none of its tools until you allow them.',
   },
   goblin: {
     label: 'Your goblin',
@@ -38,36 +36,11 @@ export const STEP_TEXT: Readonly<Record<OnboardingStep, { label: string; title: 
   },
 }
 
-/** The owner's connection `connectionId`, once the list is read (`loading` until then). */
-function useServer(connectionId: string | undefined): ServerView | 'loading' | undefined {
-  const servers = useQuery(serversQuery).data
-  if (servers === undefined) return 'loading'
-  return servers.find((server) => server.connectionId === connectionId)
-}
-
-/** Dollars as Start shows them: `$24.50`. */
-const dollars = (amount: string): string => `$${Number(amount).toFixed(2)}`
-
-/** A chain as people name it. */
-const CHAINS: Readonly<Record<string, string>> = {
-  tempo: 'Tempo',
-  base: 'Base',
-  arbitrum: 'Arbitrum',
-  ethereum: 'Ethereum',
-}
-
-/** What goblin is, in three pieces: the wallet that pays for it, goblin itself, and what comes later. */
+/** What goblin is, in three pieces: goblin itself, the model it thinks with, and the services it reaches. */
 export function WelcomeStep({ onContinue }: { readonly onContinue: () => void }) {
   return (
     <div className="start-action">
       <ul className="start-pieces">
-        <li>
-          <span className="start-piece-mark" aria-hidden>
-            <WalletIcon />
-          </span>
-          <span className="start-piece-name">Goblin Wallet</span>
-          <span className="start-piece-about">Pays for goblin, within your limits</span>
-        </li>
         <li>
           <span className="start-piece-mark" aria-hidden>
             <GoblinMark />
@@ -75,158 +48,64 @@ export function WelcomeStep({ onContinue }: { readonly onContinue: () => void })
           <span className="start-piece-name">goblin</span>
           <span className="start-piece-about">Your agent, right here</span>
         </li>
-        <li data-soon>
+        <li>
           <span className="start-piece-mark" aria-hidden>
-            <PlusIcon />
+            <CpuIcon />
           </span>
-          <span className="start-piece-name">More coming soon</span>
+          <span className="start-piece-name">Your model</span>
+          <span className="start-piece-about">This deployment's, or your own</span>
+        </li>
+        <li>
+          <span className="start-piece-mark" aria-hidden>
+            <PlugIcon />
+          </span>
+          <span className="start-piece-name">Your services</span>
+          <span className="start-piece-about">MCP servers you connect and allow</span>
         </li>
       </ul>
-      <p className="start-note">Outside services such as Mercator and mysi come next.</p>
       <Button size="cta" onClick={onContinue}>
-        Set up my wallet
+        Get started
       </Button>
     </div>
   )
 }
 
-/** A gap the wallet reports, as a line of the checklist: its own words, first letter capitalised, plain text only. */
-const sentence = (gap: string): string => gap.charAt(0).toUpperCase() + gap.slice(1)
-
-/** The wallet's own setup page, in this tab: it comes back to this step when the owner is done there. */
-function SetupLink({ href, children }: { readonly href: string; readonly children: string }) {
+/** Where model calls go, as Settings shows it: this deployment's models, or the owner's own endpoint and key. */
+export function ModelStep() {
   return (
-    <Button size="cta" nativeButton={false} render={<a href={href} />}>
-      <WalletIcon aria-hidden />
-      {children}
-    </Button>
-  )
-}
-
-/** Connected and allowed, but the wallet is not set up to pay yet: what it says is left, and the way to finish. */
-function WalletSetup({ wallet }: { readonly wallet: OnboardingView['wallet'] }) {
-  const why =
-    wallet.gaps.length > 0
-      ? undefined
-      : wallet.dollars === undefined
-        ? 'goblin could not read your wallet just now. It tries again by itself.'
-        : 'Your wallet has no address for goblin to pay from yet.'
-  return (
-    <div className="start-action">
-      {wallet.gaps.length > 0 && (
-        <div className="start-todo">
-          <p className="start-todo-head">Your wallet still needs:</p>
-          <ul className="start-gaps">
-            {wallet.gaps.map((gap) => (
-              <li key={gap}>
-                <span className="start-gap-mark" aria-hidden />
-                {sentence(gap)}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {why !== undefined && <p className="start-state">{why}</p>}
-      {wallet.setupUrl !== undefined && <SetupLink href={wallet.setupUrl}>Finish setup in your wallet</SetupLink>}
-      <p className="start-note" role="status">
-        <span className="start-pulse" aria-hidden />
-        This page updates by itself once the wallet is set up.
-      </p>
+    <div className="start-action start-model">
+      <QueryBoundary action="read where your model calls go" pending={<Skeleton className="h-10 w-full" />}>
+        <ModelEndpoint />
+      </QueryBoundary>
+      <p className="start-note">You can change it any time in Settings.</p>
     </div>
   )
 }
 
-/** Set up in the wallet: what it holds and where it pays from, and Add funds while it holds nothing. */
-function WalletReady({ wallet }: { readonly wallet: OnboardingView['wallet'] }) {
-  const ready = wallet.funded
-  const held = wallet.payFrom?.held
-  return (
-    <div className="start-action">
-      <div className="start-wallet" {...(ready ? { 'data-funded': true } : {})}>
-        <p className="start-state" {...(ready ? { 'data-done': true } : {})}>
-          {ready ? <CircleCheckIcon aria-hidden /> : <span className="start-pulse" aria-hidden />}
-          {ready ? 'Ready' : 'Set up. Add funds to start'}
-        </p>
-        <p className="start-wallet-amount">
-          <span className="start-wallet-dollars">{wallet.dollars === undefined ? '…' : dollars(wallet.dollars)}</span>
-          <span> in your wallet</span>
-        </p>
-        {held !== undefined && wallet.payFrom !== undefined && (
-          <p className="start-note">
-            {dollars(held)} ready to pay on {CHAINS[wallet.payFrom.chain] ?? wallet.payFrom.chain}
-          </p>
-        )}
-      </div>
-      {!wallet.funded && wallet.fundsUrl !== undefined && (
-        <SetupLink href={wallet.fundsUrl}>Add funds in your wallet</SetupLink>
-      )}
-    </div>
-  )
-}
-
-/** The Goblin Wallet: connect it, finish its setup in the wallet, then what it holds and how goblin pays. */
-export function WalletStep({ view }: { readonly view: OnboardingView }) {
-  const server = useServer(view.wallet.connectionId)
-  const { wallet } = view
-  if (!wallet.allowed)
-    return (
-      <div className="start-action">
-        <p className="start-lede">You set it up and add funds in your wallet, then come back here.</p>
-        <ConnectServer server={server} step="wallet" title="Goblin Wallet" allowed={false} />
-      </div>
-    )
-  return wallet.ready ? <WalletReady wallet={wallet} /> : <WalletSetup wallet={wallet} />
-}
-
-/** Mercator's own balance and how goblin keeps it topped up from the wallet (ADR 0049), once it is connected. */
-function MercatorBalance({ server }: { readonly server: ServerView }) {
-  const status = useQuery(serverStatusQuery(server.connectionId, true)).data
-  if (server.profile === undefined) return null
-  return <PrepaidLine connectionId={server.connectionId} profile={server.profile} wallet={status} />
-}
-
-/** Mercator first and on its own (optional), then the other services we suggest, and what is still to come. */
-export function ServicesStep({ view }: { readonly view: OnboardingView }) {
-  const mercator = useServer(view.mercator.connectionId)
+/**
+ * The servers we suggest. One that needs a sign-in comes back here (`connected`, the callback's connection); either way
+ * the one just connected offers its suggested access.
+ */
+export function ServicesStep({ connected }: { readonly connected: string | undefined }) {
   const add = useMutation(startAddMutation).mutateAsync
+  const [latest, setLatest] = useState(connected)
   const [message, setMessage] = useState('')
-  const heading = useId()
-  // A suggestion's sign-in comes back here; one that needs none is connected at once, and its tools are chosen later.
   const connectWith = async (item: ServerSuggestion): Promise<string> => {
-    const { authorizationUrl } = await add(item.endpoint)
-    if (authorizationUrl !== undefined) window.location.assign(authorizationUrl)
-    return `Added ${item.title}. Choose its tools on Connections whenever you like.`
+    const started = await add(item.endpoint)
+    if (started.authorizationUrl === undefined) setLatest(started.connectionId)
+    else window.location.assign(started.authorizationUrl)
+    return ''
   }
   return (
     <div className="start-action">
-      <section className="start-feature" aria-labelledby={`${heading}-mercator`}>
-        <div className="start-feature-head">
-          <h2 id={`${heading}-mercator`}>Mercator</h2>
-          <Badge variant="secondary">Optional</Badge>
-        </div>
-        <p className="start-feature-about">
-          Searches the web, quotes outside work for free, and runs paid jobs from its own balance, which goblin tops up
-          from your wallet.
-        </p>
-        <ConnectServer server={mercator} step="services" title="Mercator" allowed={view.mercator.allowed}>
-          {mercator !== undefined && mercator !== 'loading' && <MercatorBalance server={mercator} />}
-        </ConnectServer>
-      </section>
-      <section className="start-more" aria-labelledby={`${heading}-more`}>
-        <h2 id={`${heading}-more`} className="start-subhead">
-          Other services
-        </h2>
+      {latest !== undefined && <SuggestedAccess connectionId={latest} />}
+      <div className="start-more">
         <QueryBoundary action="show suggested services">
-          <SuggestedServers
-            exclude={['wallet', 'mercator']}
-            connectWith={connectWith}
-            onChanged={setMessage}
-            onMessage={setMessage}
-          />
+          <SuggestedServers connectWith={connectWith} onChanged={setMessage} onMessage={setMessage} />
         </QueryBoundary>
         {message !== '' && <p className="start-note">{message}</p>}
-        <p className="start-note">More coming soon.</p>
-      </section>
+        <p className="start-note">Add any other MCP server by its address in Connections.</p>
+      </div>
     </div>
   )
 }
@@ -239,11 +118,9 @@ const IDEAS = [
 ]
 
 export function GoblinStep({
-  view,
   pending,
   onStart,
 }: {
-  readonly view: OnboardingView
   readonly pending: boolean
   readonly onStart: (text: string) => void
 }) {

@@ -107,7 +107,11 @@ function EndpointForm({ onSaved }: { readonly onSaved: () => void }) {
 const served = (view: ModelEndpointView): string =>
   view.models.length === 1 ? '1 model' : `${String(view.models.length)} models`
 
-function Endpoint() {
+/**
+ * Where model calls go now, with the way to change it: the owner's own endpoint, or back to the deployment's. Shared by
+ * Settings' card and Start's model step; it suspends until the endpoint is read.
+ */
+export function ModelEndpoint() {
   const view = useSuspenseQuery(modelEndpointQuery).data
   const remove = useMutation(changeModelEndpointMutation)
   const [editing, setEditing] = useState(false)
@@ -155,7 +159,7 @@ export function ModelEndpointCard() {
       </CardHeader>
       <CardContent>
         <QueryBoundary action="read where your model calls go" pending={<Skeleton className="h-10 w-full" />}>
-          <Endpoint />
+          <ModelEndpoint />
         </QueryBoundary>
       </CardContent>
     </Card>

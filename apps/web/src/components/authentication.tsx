@@ -114,12 +114,13 @@ function codeActions(inviteCode: string, onAuthenticated: () => void) {
 /**
  * Signing in, or creating an account (`creating` opens on it, as the landing's Meet your goblin asks): an account can
  * be created only where sign-up is open or by invite, so a deployment with sign-up closed shows sign-in once it says so.
+ * `onAuthenticated` learns whether the owner signed in through creating an account.
  */
 export function Authentication({
   onAuthenticated,
   creating: startCreating = false,
 }: {
-  readonly onAuthenticated: () => void
+  readonly onAuthenticated: (created: boolean) => void
   readonly creating?: boolean
 }) {
   const config = useAuthConfig()
@@ -158,7 +159,7 @@ export function Authentication({
         form={
           <EmailSignInForm
             key={String(creating)}
-            emailCode={codeActions(creating ? inviteCode : '', onAuthenticated)}
+            emailCode={codeActions(creating ? inviteCode : '', () => onAuthenticated(creating))}
           />
         }
       />

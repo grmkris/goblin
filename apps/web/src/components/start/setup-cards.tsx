@@ -1,28 +1,27 @@
-// First-run Start's ways back (ADR 0048): a quiet row in the chat for an owner who skipped Start with something left,
-// Settings' card and Activity's checklist. None of them asks the model anything.
+// First-run Start's ways back (ADR 0062), since nothing waits for it: a quiet row in the chat while Start is not finished
+// and something is left, Settings' card and Activity's checklist. None of them asks the model anything.
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import type { OnboardingStep, OnboardingView } from '@goblin/contracts'
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@goblin/ui'
 import { CheckIcon, XIcon } from 'lucide-react'
 import { useState } from 'react'
-import { onboardingQuery } from '../../onboarding/queries.ts'
+import { firstOpenStep, onboardingQuery, stepsLeft } from '../../onboarding/queries.ts'
 import { PageSection } from '../page-section.tsx'
 
-/** The steps a skipped Start still counts as left: the welcome and the kickoff are no tasks to come back to. */
-const leftOf = (view: OnboardingView) =>
-  view.steps.filter((step) => !step.done && step.id !== 'welcome' && step.id !== 'goblin')
-
-/** Start was skipped and something is left: one quiet line back to it, which the owner can put away for this visit. */
+/**
+ * Start is not finished and something is left: one quiet line back to where it picks up, which the owner can put away
+ * for this visit.
+ */
 export function FinishSetupRow() {
   const view = useQuery(onboardingQuery).data
   const [hidden, setHidden] = useState(false)
-  if (view === undefined || hidden || view.status !== 'skipped') return null
-  const left = leftOf(view)
+  if (view === undefined || hidden) return null
+  const left = stepsLeft(view)
   if (left.length === 0) return null
   return (
     <div className="setup-row">
-      <Link className="setup-row-link" to="/start/$step" params={{ step: left[0]?.id ?? 'wallet' }}>
+      <Link className="setup-row-link" to="/start/$step" params={{ step: firstOpenStep(view) }}>
         Finish setting up goblin
         <span className="setup-row-count">{left.length} left</span>
       </Link>
@@ -36,15 +35,12 @@ export function FinishSetupRow() {
 /** Settings' way back to first-run Start: how much is left, and the step to pick up from. */
 export function SetupSettingsCard() {
   const view = useQuery(onboardingQuery).data
-  // A finished Start has nothing left, whatever optional step was passed by; an open one counts tasks only.
-  const left = view === undefined || view.status === 'done' ? [] : leftOf(view)
+  const left = view === undefined ? [] : stepsLeft(view)
   return (
     <Card>
       <CardHeader>
         <CardTitle>Set up goblin</CardTitle>
-        <CardDescription>
-          Your Goblin Wallet, the outside services goblin reaches (Mercator first), and what goblin is for.
-        </CardDescription>
+        <CardDescription>The model goblin uses, the services it reaches, and what goblin is for.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="card-body">
@@ -62,7 +58,7 @@ export function SetupSettingsCard() {
               size="sm"
               variant={left.length === 0 ? 'outline' : 'default'}
               nativeButton={false}
-              render={<Link to="/start/$step" params={{ step: left[0]?.id ?? 'wallet' }} />}
+              render={<Link to="/start/$step" params={{ step: firstOpenStep(view) }} />}
             >
               {left.length === 0 ? 'Review' : 'Continue setup'}
             </Button>
@@ -76,8 +72,8 @@ export function SetupSettingsCard() {
 /** Each step as Activity's checklist names it. */
 const STEP_NAMES: Readonly<Record<OnboardingStep, string>> = {
   welcome: 'See what goblin is',
-  wallet: 'Set up and fund your Goblin Wallet',
-  services: 'Connect outside services, Mercator first',
+  model: 'Choose the model goblin uses',
+  services: 'Connect the services goblin uses',
   goblin: 'Tell goblin what it is for',
 }
 

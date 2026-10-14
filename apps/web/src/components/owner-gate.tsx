@@ -22,8 +22,7 @@ function SessionUnavailable({ error, onRetry }: { readonly error: unknown; reado
 
 /**
  * Renders `children` for the signed-in owner, the sign-in form otherwise. `pending` is what shows while the session is
- * checked (first-run Start shows goblin's splash there). Whether a page waits for Start is the shell's to decide
- * (`staticData.startRequired`, `useStartDecision`), before anything of the app is drawn.
+ * checked (first-run Start shows goblin's splash there).
  */
 export function OwnerGate({ children, pending }: { readonly children: ReactNode; readonly pending?: ReactNode }) {
   const session = useSession()

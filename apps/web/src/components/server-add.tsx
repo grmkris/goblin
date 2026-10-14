@@ -124,17 +124,14 @@ function SuggestionRow({
 export function SuggestedServers({
   onChanged,
   onMessage,
-  exclude = [],
   connectWith,
 }: {
   readonly onChanged: (message: string) => void
   readonly onMessage: (message: string) => void
-  /** Suggestions to leave out by id, such as the ones Start asks for in steps of their own. */
-  readonly exclude?: readonly string[]
   /** How to add and sign in to a suggestion, when a page brings the owner back somewhere of its own (Start). */
   readonly connectWith?: (item: ServerSuggestion) => Promise<string>
 }) {
-  const items = useSuspenseQuery(suggestedQuery).data.filter((item) => !exclude.includes(item.id))
+  const items = useSuspenseQuery(suggestedQuery).data
   const connect = useAddAndConnect()
   const [busy, setBusy] = useState('')
   const heading = useId()

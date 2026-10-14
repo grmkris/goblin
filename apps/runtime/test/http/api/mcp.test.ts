@@ -138,7 +138,7 @@ const fixture = async () => {
           stub(PiSessions),
           stub(RoutineControl),
           stub(RoutineUsage),
-          // A sign-in first-run Start began comes back to its step (ADR 0048); none is noted here.
+          // A sign-in first-run Start began comes back to its step (ADR 0062); none is noted here.
           stub(Onboarding, { takeConnect: () => Effect.succeed(undefined) }),
         ),
       ),
