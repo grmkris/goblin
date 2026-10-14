@@ -19,7 +19,6 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0011](0011-mcp-events.md) | MCP Events consumer | Accepted |
 | [0012](0012-routines.md) | Confirmed routines and isolated run threads | Accepted |
 | [0014](0014-members-and-workspace-authority.md) | Members and workspace authority | Withdrawn |
-| [0015](0015-plans-and-payments.md) | Plans and payments | Accepted |
 | [0016](0016-workspace-layout-with-trellis.md) | Workspace layout with Trellis | Superseded by 0019, then 0036 |
 | [0017](0017-conversation-tree-and-one-close.md) | A tree of conversations, threads from anywhere, one Close | Accepted |
 | [0018](0018-subagents-nest-steer-and-close.md) | Subagents nest, steer and close | Accepted |
@@ -30,7 +29,6 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0023](0023-chat-blocks-and-one-kit.md) | Chat blocks, one kit | Accepted |
 | [0024](0024-observing-conversations.md) | Observing conversations | Accepted |
 | [0025](0025-home-surface.md) | Home surface | Accepted; web presentation deferred |
-| [0026](0026-daily-budget-in-credits.md) | The daily budget is estimated Token Plan Credits | Accepted |
 | [0027](0027-typed-tools.md) | Typed tools and one `app_call` | Accepted |
 | [0028](0028-mcp-call-approvals.md) | Owner approval for an exact MCP call | Accepted |
 | [0029](0029-composer-commands-and-references.md) | Composer commands, references and helper execution | Accepted |
@@ -54,7 +52,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0049](0049-prepaid-servers-topped-up-from-the-wallet.md) | Prepaid servers topped up from the Goblin Wallet | Accepted |
 | [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted |
 | [0053](0053-pinned-services-and-apps-with-a-chat-bar.md) | Pinned services and Apps with a chat bar | Accepted |
-| [0054](0054-pro-paid-as-a-signed-usdc-subscription.md) | Pro paid as a signed USDC subscription | Accepted |
 | [0055](0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | Accepted |
 | [0056](0056-goblin-wallet-leaves-goblin.md) | Goblin Wallet leaves goblin | Accepted |
 | [0057](0057-goblin-pays-for-no-model-call.md) | goblin pays for no model call | Accepted |
+| [0058](0058-no-plans-tokens-and-an-optional-cap.md) | No plans: access by sign-up, usage in tokens with an optional cap | Accepted |

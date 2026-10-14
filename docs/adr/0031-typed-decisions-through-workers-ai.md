@@ -20,7 +20,7 @@ the conversation working as before. A model call never holds a SQLite transactio
 judgment runs at most once at a time per proposal (`SingleFlight`), and one already kept is never judged again.
 
 Every call checks the owner's budget before dispatch and records returned usage as model `clef` into estimated Credits
-([ADR 0026](0026-daily-budget-in-credits.md)). Clef uses an explicit input-only app-budget estimate of 5,000 input
+([ADR 0026](archive/0026-daily-budget-in-credits.md)). Clef uses an explicit input-only app-budget estimate of 5,000 input
 tokens per Credit, overridable through `GOBLIN_MODEL_CREDIT_RATES` (`output: null`). Its published $0.24/M input-token
 price does not establish a USD-to-Token-Plan-Credit exchange rate. Unknown usage is charged at the bounded full
 65,536-token context reservation rather than treated as free. Each call is a `model.aux` event of purpose `decision`

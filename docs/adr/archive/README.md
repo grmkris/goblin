@@ -9,3 +9,6 @@ replaced it. Living docs never cite an archived ADR as current behaviour.
 | [0050](0050-gas-in-usdc-through-useroperations.md) | Gas in USDC through UserOperations; the relay removed | [0056](../0056-goblin-wallet-leaves-goblin.md) |
 | [0051](0051-tempo-float-refilled-from-the-base-allowance.md) | The Tempo float, refilled from the Base allowance | [0056](../0056-goblin-wallet-leaves-goblin.md) |
 | [0047](0047-inference-paid-per-call-from-the-wallet.md) | Inference paid per call from the owner's wallet | [0057](../0057-goblin-pays-for-no-model-call.md) |
+| [0015](0015-plans-and-payments.md) | Plans and payments | [0058](../0058-no-plans-tokens-and-an-optional-cap.md) |
+| [0026](0026-daily-budget-in-credits.md) | The daily budget is estimated Token Plan Credits | [0058](../0058-no-plans-tokens-and-an-optional-cap.md) |
+| [0054](0054-pro-paid-as-a-signed-usdc-subscription.md) | Pro paid as a signed USDC subscription | [0058](../0058-no-plans-tokens-and-an-optional-cap.md) |
