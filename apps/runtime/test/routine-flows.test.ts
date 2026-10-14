@@ -76,7 +76,7 @@ const fixture = (gate: { budget?: Effect.Effect<void, AppError> } = {}, persona 
   const { db, close } = chatDatabase()
   closes.push(close)
   const sqlite = durable(db)
-  const registry = new PersonaRegistry(sqlite, ['model-a', 'model-p'])
+  const registry = new PersonaRegistry(sqlite, () => ['model-a', 'model-p'])
   const worker = registry.create(
     {
       name: 'Worker',

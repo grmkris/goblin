@@ -53,7 +53,7 @@ const services = () => {
     touched: () => Effect.void,
     retitle: () => undefined,
   })
-  const personas = new PersonaRegistry(db, ['model-a'])
+  const personas = new PersonaRegistry(db, () => ['model-a'])
   const invocations = new PersonaInvocations(db)
   const receipts = new OrganizeReceipts(db, () => undefined)
   // SAFETY: with no agent apps, Home reads only the engine's (empty) app list.

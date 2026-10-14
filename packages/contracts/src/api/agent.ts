@@ -1,7 +1,7 @@
 import * as Schema from 'effect/Schema'
 import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
-import { ChannelStatus, ModelChoice, UsageToday } from '../agent.ts'
+import { ChannelStatus, ModelChoice, ModelEndpointInput, ModelEndpointView, UsageToday } from '../agent.ts'
 import { NonEmptyString } from '../ids.ts'
 import { RoutePick, TelegramChat, TelegramChats, TelegramSettings } from '../telegram.ts'
 import { ApiErrors } from './errors.ts'
@@ -18,7 +18,11 @@ const ChannelPick = Schema.Struct({ connectionId: NonEmptyString(64) })
  *
  * - `usage`: `GET /api/agent/usage`, today's model tokens and the deployment's daily cap.
  * - `model`, `chooseModel`: `GET`/`PUT /api/agent/model`. A pick moves main at once; other threads follow on their
- *   next turn. A model the deployment does not offer is invalid input.
+ *   next turn. A model the endpoint does not offer is invalid input.
+ * - `modelEndpoint`, `setModelEndpoint`, `clearModelEndpoint`: `GET`/`PUT`/`DELETE /api/agent/model-endpoint`, the
+ *   owner's own model endpoint (ADR 0059). Setting one lists its models with the key first: a URL that is not public
+ *   https, a refused key or an answer that is not a model list is invalid input. Clearing goes back to the
+ *   deployment's.
  * - `channel`: `GET /api/agent/channel`, the connection carrying Telegram (ADR 0009), or null when it is off.
  * - `enableChannel`: `PUT /api/agent/channel` grants the connection's channel tools and subscribes its Events (or the
  *   legacy doorbell). A connection that lacks a tool is invalid input.
@@ -37,6 +41,13 @@ export class AgentGroup extends HttpApiGroup.make('agent').add(
     success: ModelChoice,
     error: [ApiErrors.invalidInput],
   }),
+  HttpApiEndpoint.get('modelEndpoint', '/agent/model-endpoint', { success: ModelEndpointView }),
+  HttpApiEndpoint.put('setModelEndpoint', '/agent/model-endpoint', {
+    payload: ModelEndpointInput,
+    success: ModelEndpointView,
+    error: [ApiErrors.invalidInput],
+  }),
+  HttpApiEndpoint.delete('clearModelEndpoint', '/agent/model-endpoint', { success: ModelEndpointView }),
   HttpApiEndpoint.get('channel', '/agent/channel', { success: ChannelStatus }),
   HttpApiEndpoint.put('enableChannel', '/agent/channel', {
     payload: ChannelPick,

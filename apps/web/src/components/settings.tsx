@@ -1,19 +1,21 @@
 import { ClientsCard, DeleteAccountCard } from './account-cards.tsx'
 import { MemoryCard, ResidentCard, UsageCard } from './agent-cards.tsx'
+import { ModelEndpointCard } from './model-endpoint-card.tsx'
 import { PageSection } from './page-section.tsx'
 import { RoutinesSection } from './routines.tsx'
 import { SetupSettingsCard } from './start/setup-cards.tsx'
 
 /**
- * The owner's settings, most used first: today's usage and Start, their agent, routines, the apps that use their
- * agent, and last the account itself.
+ * The owner's settings, most used first: today's usage, Start and the model, their agent, routines, the apps that use
+ * their agent, and last the account itself.
  */
 export function Settings() {
   return (
     <div className="page-stack">
-      <PageSection id="usage" title="Usage">
+      <PageSection id="usage" title="Usage and model">
         <SetupSettingsCard />
         <UsageCard />
+        <ModelEndpointCard />
       </PageSection>
       <PageSection id="agent" title="Your agent">
         <ResidentCard />

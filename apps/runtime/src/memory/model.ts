@@ -32,8 +32,9 @@ export interface TextCompletion {
 
 /**
  * The deployment's cheap model for housekeeping nobody asked the agent for: naming threads, summarizing main into its
- * memory. It is one of the offered models (`GOBLIN_MEMORY_MODEL`), called on the same LiteLLM key, and every token
- * it spends counts toward the user's daily budget through `spent`.
+ * memory. It is one of the deployment's models (`GOBLIN_MEMORY_MODEL`), called through the model endpoint in use like
+ * any other (an owner's endpoint answers it with its own default), and every token it spends counts toward the user's
+ * daily usage through `spent`.
  */
 export class CheapModel {
   readonly #models: Models

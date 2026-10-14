@@ -69,7 +69,7 @@ const stored = (definition: PersonaDefinition) => ({
 /**
  * The owner's Personas (ADR 0033): named, versioned agent definitions. Every create and update writes a new revision
  * and bumps `revision`; an update names the revision it edits (`expectedRevision`), so two edits never silently
- * overwrite each other. A model must be one the deployment offers. A setup is stored as given: it only chooses among
+ * overwrite each other. A model must be one on offer. A setup is stored as given: it only chooses among
  * the owner's grants, which are checked when anything runs, so nothing here can grant one (ADR 0040). Archiving keeps
  * the history; an
  * archived Persona no longer answers and frees its name. All writes are synchronous in one SQLite step. The store keeps
@@ -77,10 +77,10 @@ const stored = (definition: PersonaDefinition) => ({
  */
 export class PersonaRegistry<RunResult = unknown> {
   readonly #db: SQLiteAsyncDatabase<'sync', RunResult>
-  readonly #models: readonly string[]
+  readonly #models: () => readonly string[]
 
-  /** `models`: the ids of the models this deployment offers (`modelOptions`). */
-  constructor(db: SQLiteAsyncDatabase<'sync', RunResult>, models: readonly string[]) {
+  /** `models`: the ids of the models on offer now, the model endpoint's in use (`inference/store.ts`). */
+  constructor(db: SQLiteAsyncDatabase<'sync', RunResult>, models: () => readonly string[]) {
     this.#db = db
     this.#models = models
   }
@@ -138,9 +138,9 @@ export class PersonaRegistry<RunResult = unknown> {
     return revisionView(row)
   }
 
-  /** Whether this deployment offers `model` now (a Persona's preference for a model no longer offered is ignored). */
+  /** Whether `model` is on offer now (a Persona's preference for a model no longer offered is ignored). */
   offers(model: string | undefined): boolean {
-    return model !== undefined && this.#models.includes(model)
+    return model !== undefined && this.#models().includes(model)
   }
 
   #assertName(name: string, except?: number): void {
@@ -159,7 +159,7 @@ export class PersonaRegistry<RunResult = unknown> {
   }
 
   #assertModel(model: string | undefined): void {
-    if (model !== undefined && !this.#models.includes(model)) throw new InvalidInput({ reason: 'persona_model' })
+    if (model !== undefined && !this.#models().includes(model)) throw new InvalidInput({ reason: 'persona_model' })
   }
 
   /** The definition `definition` normalizes to, checked: a clean name and an offered model. */

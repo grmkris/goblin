@@ -48,7 +48,7 @@ const fixture = () => {
   const { db, close } = chatDatabase()
   cleanups.push(close)
   db.insert(appConversations).values({ chatId: '1', piSession: '1', kind: 'main', role: 'primary', createdAt: 1 }).run()
-  const personas = new PersonaRegistry(db, ['model-a', 'model-b'])
+  const personas = new PersonaRegistry(db, () => ['model-a', 'model-b'])
   let opened = 100
   const topics = new TopicRegistry(db, {
     open: () => Effect.sync(() => String(opened++)),

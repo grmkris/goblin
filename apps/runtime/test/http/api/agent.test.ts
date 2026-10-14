@@ -20,6 +20,7 @@ import { Skills } from '../../../src/skills/service.ts'
 import { Topics } from '../../../src/topics/service.ts'
 import { ChatsLive } from '../../../src/layers/conversation.ts'
 import { ModelBudgetLive } from '../../../src/layers/budget.ts'
+import { Cipher, CredentialCipher } from '../../../src/mcp/cipher.ts'
 import { Events, McpConnections, McpGrants, McpServers, Resident } from '../../../src/mcp/service.ts'
 import { PiSessions } from '../../../src/pi/sessions.ts'
 import { Db } from '../../../src/runtime/db.ts'
@@ -57,8 +58,12 @@ const fixture = () => {
     stub(Skills),
     stub(AppEngine),
     stub(Setups),
-    // The database the lane builds its stores over, and the gate's resident authority.
+    // The database the lane builds its stores over, the cipher sealing a model key, and the gate's resident authority.
     Layer.succeed(Db, sqlite),
+    Layer.effect(
+      Cipher,
+      Effect.promise(() => CredentialCipher.fromBase64(btoa('\0'.repeat(32)))),
+    ),
     Layer.succeed(Resident, currentResident().service),
     // Choosing a model only puts the primary session on it; nothing else of Pi is reached.
     stub(PiSessions, { setModel: (session, { id }) => Effect.sync(() => void pinned.push(`${session} ${id}`)) }),
@@ -75,6 +80,8 @@ const fixture = () => {
           DAILY_TOKEN_CAP: '100000',
         },
         userId: 'owner',
+        // An owner's model endpoint: it lists one model to any key.
+        mcpFetch: async () => Response.json({ data: [{ id: 'own-model' }] }),
         schedulePull: async () => undefined,
       }),
     ),
@@ -109,6 +116,31 @@ describe('the agent group served by the agent', () => {
     expect(await refused.json()).toMatchObject({ error: { code: 'invalid_input', reason: 'model' } })
     const empty = await fetch(json('PUT', '/api/agent/model', { model: '' }))
     expect(empty.status).toBe(400)
+  })
+
+  it("sets the owner's own model endpoint, never answers its key, refuses a plain http one, and removes it", async () => {
+    const { fetch } = fixture()
+    expect(await callOwner({ fetch }, (api) => api.agent.modelEndpoint())).toEqual({
+      source: 'deployment',
+      models: ['model-a', 'model-b'],
+    })
+    const key = 'sk-own-0123456789wxyz'
+    const set = await fetch(json('PUT', '/api/agent/model-endpoint', { baseUrl: 'https://models.example/v1', key }))
+    expect(set.status).toBe(200)
+    const body = await set.text()
+    expect(body).not.toContain(key)
+    expect(JSON.parse(body)).toEqual({
+      source: 'owner',
+      baseUrl: 'https://models.example/v1',
+      keyHint: '…wxyz',
+      models: ['own-model'],
+    })
+    const choice = await callOwner({ fetch }, (api) => api.agent.model())
+    expect(choice.options.map((option) => option.id)).toEqual(['own-model'])
+    const plain = await fetch(json('PUT', '/api/agent/model-endpoint', { baseUrl: 'http://models.example', key }))
+    expect(plain.status).toBe(400)
+    const cleared = await callOwner({ fetch }, (api) => api.agent.clearModelEndpoint())
+    expect(cleared).toEqual({ source: 'deployment', models: ['model-a', 'model-b'] })
   })
 
   it('answers the channel as null while off, refuses a connection without its tools, and turns it off', async () => {

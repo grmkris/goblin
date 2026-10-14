@@ -3,6 +3,7 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator'
 import { BASE_MIGRATIONS } from './migrations/base.ts'
 import { CONVERSATION_MIGRATIONS } from './migrations/conversation.ts'
 import { DECISION_MIGRATIONS } from './migrations/decisions.ts'
+import { INFERENCE_MIGRATIONS } from './migrations/inference.ts'
 import { MCP_MIGRATIONS } from './migrations/mcp.ts'
 import { BREAK, type Migration } from './migrations/migration.ts'
 import { NOTICE_MIGRATIONS } from './migrations/notices.ts'
@@ -26,6 +27,7 @@ const MIGRATIONS: readonly Migration[] = [
   ...PAY_MIGRATIONS,
   ...SIDEBAR_MIGRATIONS,
   ...TELEGRAM_MIGRATIONS,
+  ...INFERENCE_MIGRATIONS,
 ].toSorted((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
 
 /** The migration keys in the order they apply. */

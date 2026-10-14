@@ -86,7 +86,7 @@ export const organizing = () => {
     touched: () => Effect.void,
     retitle: () => undefined,
   })
-  const personas = new PersonaRegistry(db, ['model-a', 'model-b'])
+  const personas = new PersonaRegistry(db, () => ['model-a', 'model-b'])
   const receipts = new OrganizeReceipts(
     db,
     (kind, target) => (kind.startsWith('topic.') ? topics : personas).get(Number(target)).revision,

@@ -38,7 +38,8 @@ const KNOWN: Readonly<Record<string, Known>> = {
 /** Never empty: the default model is always offered, first. */
 export type ModelOptions = readonly [ModelOption, ...ModelOption[]]
 
-const optionOf = (id: string): ModelOption => {
+/** What the picker says about model `id`: what goblin knows of it, else its own name, text only. */
+export const optionOf = (id: string): ModelOption => {
   const known = KNOWN[id]
   return known === undefined
     ? { id, label: id, route: 'Other', note: '', images: false, contextWindow: CONTEXT_WINDOW }
@@ -86,8 +87,8 @@ export class ModelChoiceStore implements ChoiceLedger {
 }
 
 /**
- * The model this user's agent answers with. A stored pick the deployment no longer offers falls back to the
- * default, so removing a model from `MODELS` never strands anyone.
+ * The model this user's agent answers with, among `options` (the endpoint's, its default first). A stored pick the
+ * endpoint no longer offers falls back to the default, so a model that goes never strands anyone.
  */
 export class ModelPicker {
   readonly #ledger: ChoiceLedger
@@ -106,7 +107,7 @@ export class ModelPicker {
     return { current: this.current(), default: this.#options[0].id, options: this.#options }
   }
 
-  /** Fails with `InvalidInput` for a model this deployment does not offer. */
+  /** Fails with `InvalidInput` for a model the endpoint does not offer. */
   choose(modelId: string, now: number): ModelChoice {
     if (!this.#options.some((option) => option.id === modelId)) throw new InvalidInput({ reason: 'model' })
     this.#ledger.set(modelId, now)
@@ -114,14 +115,14 @@ export class ModelPicker {
   }
 }
 
-/** The model the owner's agent answers with, and the owner's pick among those the deployment offers. */
+/** The model the owner's agent answers with, and the owner's pick among those its model endpoint offers. */
 export class Models extends Context.Service<
   Models,
   {
-    /** The pick when the deployment still offers it, else the default. */
-    readonly current: Effect.Effect<string>
-    readonly choice: Effect.Effect<ModelChoice>
-    /** Stores the pick (epoch seconds); `InvalidInput` for a model the deployment does not offer. */
+    /** The pick when the endpoint still offers it, else the default. */
+    readonly current: Effect.Effect<string, AppError>
+    readonly choice: Effect.Effect<ModelChoice, AppError>
+    /** Stores the pick (epoch seconds); `InvalidInput` for a model the endpoint does not offer. */
     readonly choose: (modelId: string, now: number) => Effect.Effect<ModelChoice, AppError>
   }
 >()('goblin/models/Models') {}

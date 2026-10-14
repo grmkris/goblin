@@ -63,3 +63,23 @@ export const ModelChoice = Schema.Struct({
   options: Schema.Array(ModelOption),
 })
 export type ModelChoice = typeof ModelChoice.Type
+
+/**
+ * Where the agent's model calls go (ADR 0059): the deployment's endpoint, or the owner's own OpenAI-compatible one,
+ * shown by its base URL and the last characters of its key, never the key. `models` are the ones it serves, its
+ * default first.
+ */
+export const ModelEndpointView = Schema.Struct({
+  source: Schema.Literals(['owner', 'deployment']),
+  baseUrl: Schema.optional(Schema.String),
+  keyHint: Schema.optional(Schema.String),
+  models: Schema.Array(Schema.String),
+})
+export type ModelEndpointView = typeof ModelEndpointView.Type
+
+/** The owner's own endpoint: an OpenAI-compatible base URL (`https://…/v1`) and its key. */
+export const ModelEndpointInput = Schema.Struct({
+  baseUrl: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
+  key: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
+})
+export type ModelEndpointInput = typeof ModelEndpointInput.Type

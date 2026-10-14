@@ -68,7 +68,7 @@ const fixture = () => {
     Layer.succeed(Resident, resident.service),
   )
   const { fetch } = serve(served([RoutinesGroup], RoutinesHandlers).pipe(Layer.provide(services)))
-  const personas = new PersonaRegistry(sqlite, ['model-a'])
+  const personas = new PersonaRegistry(sqlite, () => ['model-a'])
   return { fetch, calls, routines, runs, resident, personas }
 }
 

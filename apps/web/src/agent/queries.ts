@@ -1,15 +1,23 @@
 import { mutationOptions, queryOptions, skipToken } from '@tanstack/react-query'
-import type { ChatId, NewChatsDefault, RoutePick, TelegramChat, TelegramChats } from '@goblin/contracts'
+import type {
+  ChatId,
+  ModelEndpointInput,
+  NewChatsDefault,
+  RoutePick,
+  TelegramChat,
+  TelegramChats,
+} from '@goblin/contracts'
 import { owner } from '../lib/api.ts'
 import { mcpKeys } from '../mcp/queries.ts'
 
 /**
- * The agent itself, on the owner API: today's usage, its model, its Telegram channel, resident
+ * The agent itself, on the owner API: today's usage, its model and model endpoint, its Telegram channel, resident
  * authority and memory. Keys are `['agent', kind, input]`; each change settles once what it changed is fresh.
  */
 const agentKeys = {
   usage: ['agent', 'usage'] as const,
   model: ['agent', 'model'] as const,
+  endpoint: ['agent', 'model-endpoint'] as const,
   channel: ['agent', 'channel'] as const,
   chats: ['agent', 'channel', 'chats'] as const,
   chatsOf: (connectionId: string) => ['agent', 'channel', 'chats', connectionId] as const,
@@ -20,7 +28,7 @@ const agentKeys = {
 /** Today's model tokens and the deployment's daily cap. */
 export const usageQuery = owner.apiQuery({ queryKey: agentKeys.usage, queryFn: (api) => api.agent.usage() })
 
-/** The owner's model and the ones the deployment offers. */
+/** The owner's model and the ones the model endpoint in use offers. */
 export const modelQuery = owner.apiQuery({ queryKey: agentKeys.model, queryFn: (api) => api.agent.model() })
 
 /** Picks a model: shown at once, put back if the agent refuses it, then the agent's answer. */
@@ -38,6 +46,30 @@ export const chooseModelMutation = mutationOptions({
     if (result?.previous !== undefined) client.setQueryData(modelQuery.queryKey, result.previous)
   },
   onSuccess: (choice, _model, _result, { client }) => client.setQueryData(modelQuery.queryKey, choice),
+})
+
+/** Where the agent's model calls go (ADR 0059): the owner's own endpoint, its key never read back, else the deployment's. */
+export const modelEndpointQuery = owner.apiQuery({
+  queryKey: agentKeys.endpoint,
+  queryFn: (api) => api.agent.modelEndpoint(),
+})
+
+/**
+ * Sets the owner's own model endpoint, or goes back to the deployment's with null. The models on offer and today's
+ * usage (whose cap holds on the deployment's endpoint only) follow it, so both are read again.
+ */
+export const changeModelEndpointMutation = mutationOptions({
+  ...owner.apiMutation({
+    mutationFn: (api, input: ModelEndpointInput | null) =>
+      input === null ? api.agent.clearModelEndpoint() : api.agent.setModelEndpoint({ payload: input }),
+  }),
+  onSuccess: (view, _input, _result, { client }) => {
+    client.setQueryData(modelEndpointQuery.queryKey, view)
+    return Promise.all([
+      client.invalidateQueries({ queryKey: agentKeys.model }),
+      client.invalidateQueries({ queryKey: agentKeys.usage }),
+    ])
+  },
 })
 
 /** The connection carrying Telegram (ADR 0009), or null when it is off. */

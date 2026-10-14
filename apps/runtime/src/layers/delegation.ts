@@ -4,6 +4,7 @@ import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import { Conversations } from '../chats/service.ts'
 import { Home, HomeService } from '../home/service.ts'
+import { offeredModels } from '../inference/store.ts'
 import { Memories } from '../memory/service.ts'
 import { modelOptions } from '../models.ts'
 import type { KeyedLock } from '../observability/lock.ts'
@@ -68,7 +69,10 @@ const stores: Effect.Effect<DelegationStores, never, AgentInput | Db | Conversat
     )
     const personas = new PersonaRegistry(
       db,
-      modelOptions(input.env.MODELS, input.env.MODEL_ID).map((option) => option.id),
+      offeredModels(
+        db,
+        modelOptions(input.env.MODELS, input.env.MODEL_ID).map((option) => option.id),
+      ),
     )
     const receipts = new OrganizeReceipts(db, (kind, target) => {
       if (kind === 'telegram.route' || kind === 'telegram.default') return telegramRevision(db, kind, target)

@@ -1,8 +1,9 @@
-import type { Message } from '@earendil-works/pi-ai'
+import type { AssistantMessage, Message, Model, ProviderStreams } from '@earendil-works/pi-ai'
+import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream'
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import { describe, expect, it } from 'vitest'
 import { isContextOverflow } from '@earendil-works/pi-ai/utils/overflow'
-import { LITELLM_STREAMS, MAX_OUTPUT_TOKENS, MIN_ANSWER_ROOM, makePiModels } from '../src/pi/model.ts'
+import { LITELLM_STREAMS, MAX_OUTPUT_TOKENS, MIN_ANSWER_ROOM, MODEL_PROVIDER, makePiModels } from '../src/pi/model.ts'
 
 const env = { MODEL_ID: 'qwen3.8-flash', MODEL_BASE_URL: 'https://no-model-calls.invalid/v1', MODEL_KEY: 'test' }
 
@@ -41,5 +42,62 @@ describe('the output limit (unit)', () => {
     expect(request).toEqual({})
     expect(result).toMatchObject({ stopReason: 'error', model: 'qwen3.8-flash' })
     expect(isContextOverflow(result)).toBe(true)
+  })
+})
+
+/** Streams that record what each request was sent with and answer an empty message. */
+const recording = () => {
+  const sent: { id: string; baseUrl: string; apiKey: string | undefined }[] = []
+  const answer: ProviderStreams['streamSimple'] = (model, _context, options) => {
+    sent.push({ id: model.id, baseUrl: model.baseUrl, apiKey: options?.apiKey })
+    const events = createAssistantMessageEventStream()
+    const zero = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
+    const message: AssistantMessage = {
+      role: 'assistant',
+      content: [],
+      api: model.api,
+      provider: model.provider,
+      model: model.id,
+      usage: { ...zero, totalTokens: 0, cost: { ...zero, total: 0 } },
+      stopReason: 'stop',
+      timestamp: 1,
+    }
+    events.push({ type: 'done', reason: 'stop', message })
+    events.end()
+    return events
+  }
+  return { sent, streams: { stream: answer, streamSimple: answer } }
+}
+
+describe('the model endpoint each call goes to (unit)', () => {
+  const context = normalizeContext({ systemPrompt: 'Be brief.', messages: [ask('hi')] })
+
+  it('sends each call to the endpoint resolved for it, with its key and a model it serves, for any model id', async () => {
+    const { sent, streams } = recording()
+    const { models } = makePiModels(env, streams, undefined, undefined, async (id) => ({
+      baseUrl: 'https://models.example/v1',
+      apiKey: 'own-key',
+      model: id === 'own-model' ? id : 'own-default',
+    }))
+    const own = models.getModel(MODEL_PROVIDER, 'own-model')
+    const listed = models.getModel(MODEL_PROVIDER, 'qwen3.8-flash')
+    expect(own).toMatchObject({ id: 'own-model', provider: MODEL_PROVIDER })
+    expect(models.getModel('another-provider', 'own-model')).toBeUndefined()
+    // SAFETY: both ids resolve above.
+    for (const model of [own, listed] as Model<'openai-completions'>[])
+      await models.streamSimple(model, context).result()
+    expect(sent).toEqual([
+      { id: 'own-model', baseUrl: 'https://models.example/v1', apiKey: 'own-key' },
+      { id: 'own-default', baseUrl: 'https://models.example/v1', apiKey: 'own-key' },
+    ])
+  })
+
+  it('ends a call whose endpoint cannot be read as a failed response, sending nothing', async () => {
+    const { sent, streams } = recording()
+    const { models, model } = makePiModels(env, streams, undefined, undefined, async () => {
+      throw new Error('no endpoint')
+    })
+    expect(await models.streamSimple(model, context).result()).toMatchObject({ stopReason: 'error' })
+    expect(sent).toEqual([])
   })
 })

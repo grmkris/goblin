@@ -46,6 +46,7 @@ import { retrievalExtension } from './pi/retrieval.ts'
 import { type Applied } from './agent-model.ts'
 import { routinesExtension } from './pi/routines.ts'
 import { requireRoutine } from './routines/authority.ts'
+import { Inference } from './inference/service.ts'
 import type { RoutineSlot } from './routines/scheduler.ts'
 import { routineExtensions } from './routines/kit.ts'
 import type { StartRoutine } from './pi/routine-run.ts'
@@ -83,7 +84,13 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     runApplicationMigrations(ctx.storage)
     this.#bridge = makeBridge(() => this.#services(), { instrument })
     const { run } = this.#bridge
-    this.#pi = makePiModels(env, this.modelStreams(), undefined, (id) => run(requireRoutine(id)))
+    this.#pi = makePiModels(
+      env,
+      this.modelStreams(),
+      undefined,
+      (id) => run(requireRoutine(id)),
+      (modelId) => run(Inference.use((inference) => inference.served(modelId))),
+    )
     const residentTools = residentMcpExtension(run)
     const tools = [residentTools, budgetExtension(run)]
     this.#thread = threadExtension(run)
@@ -126,7 +133,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       cancel: (id) => this.cancelSchedule(id),
     }
   }
-  /** How model requests leave the object: LiteLLM. The integration harness overrides it with a scripted model. */
+  /** How model requests leave the object: chat completions. The integration harness overrides it with a scripted model. */
   protected modelStreams(): ProviderStreams {
     return LITELLM_STREAMS
   }

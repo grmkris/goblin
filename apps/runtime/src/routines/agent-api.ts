@@ -7,18 +7,24 @@ import { disableTelegram, enableTelegram } from '../channel/program.ts'
 import { Channel } from '../channel/service.ts'
 import { channelChats, channelSettings, routeChannel } from '../channel/routing.ts'
 import { Models } from '../models.ts'
+import { Inference } from '../inference/service.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { epochSeconds } from '../clock.ts'
 
 /**
- * The `agent` group: today's usage, the model, and the Telegram channel. Each handler runs its program; owner
- * admission has already admitted the request.
+ * The `agent` group: today's usage, the model and its endpoint, and the Telegram channel. Each handler runs its
+ * program; owner admission has already admitted the request.
  */
 export const AgentHandlers = HttpApiBuilder.group(OwnerApi, 'agent', (handlers) =>
   handlers
     .handle('usage', () => Effect.flatMap(epochSeconds, (now) => Budget.use((budget) => budget.today(now))))
     .handle('model', () => Models.use((models) => models.choice))
     .handle('chooseModel', ({ payload }) => chooseOwnerModel(payload.model))
+    .handle('modelEndpoint', () => Inference.use((inference) => inference.view))
+    .handle('setModelEndpoint', ({ payload }) =>
+      Effect.flatMap(epochSeconds, (now) => Inference.use((inference) => inference.setOwner(payload, now))),
+    )
+    .handle('clearModelEndpoint', () => Inference.use((inference) => inference.clearOwner))
     .handle('channel', () => Channel.use((channel) => channel.status))
     .handle('enableChannel', ({ payload }) =>
       AgentInput.use(({ schedulePull }) => enableTelegram(payload.connectionId, schedulePull)),

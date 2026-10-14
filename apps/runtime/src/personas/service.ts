@@ -35,8 +35,8 @@ export type PersonaChange = { readonly before: PersonaView; readonly after: Pers
 
 /**
  * The owner's Personas (ADR 0033): named, versioned agent definitions. Every change is a new revision of the one it
- * names (`expectedRevision`), a model must be one the deployment offers, and archiving keeps the history and frees the
- * name. Times are read inside, in epoch seconds.
+ * names (`expectedRevision`), a model must be one on offer, and archiving keeps the history and frees the name. Times
+ * are read inside, in epoch seconds.
  */
 export class Personas extends Context.Service<
   Personas,
@@ -53,7 +53,7 @@ export class Personas extends Context.Service<
     readonly detail: (id: number) => Effect.Effect<PersonaDetail, AppError>
     /** One stored revision, as an invocation froze it. */
     readonly revision: (id: number, revision: number) => Effect.Effect<PersonaRevisionView, AppError>
-    /** Whether this deployment offers `model` now. */
+    /** Whether `model` is on offer now. */
     readonly offers: (model: string | undefined) => Effect.Effect<boolean>
     /** A new Persona at revision 1, or the one `input.operationId` already made. A taken name is a `Conflict`. */
     readonly create: (input: CreatePersona, actor: PersonaActor) => Effect.Effect<MadePersona, AppError>
