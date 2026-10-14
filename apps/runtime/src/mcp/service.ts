@@ -27,7 +27,6 @@ import type { EventContext } from './events/dispatcher.ts'
 import type { SettledOffer } from './events/offers.ts'
 import type { EventDescriptor } from './events/protocol.ts'
 import type { Consumer, Receipt, Subscription } from './events/store.ts'
-import type { Stage } from './suggested.ts'
 import type { SpendRule, Spent, SpentRow } from './spend.ts'
 import type { HeldUrlRequest, UrlRequestRow } from './url-requests.ts'
 
@@ -90,7 +89,7 @@ export class McpServers extends Context.Service<
     /** One server's connection status: signed in, needing sign-in, or never connected. */
     readonly status: (connectionId: string) => Effect.Effect<ConnectionStatus>
     /** goblin's suggested servers for `stage`, each marked added when the owner already has its endpoint. */
-    readonly suggested: (stage: Stage | undefined) => Effect.Effect<readonly ServerSuggestion[]>
+    readonly suggested: () => Effect.Effect<readonly ServerSuggestion[]>
     /**
      * Adds a connection to a public https endpoint (one the owner may already have a connection to), named `label`
      * or the first free name from its server card; it starts disconnected.

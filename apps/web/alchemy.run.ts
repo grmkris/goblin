@@ -97,6 +97,7 @@ export default Alchemy.Stack(
         SIGNUP_INVITE_CODE: Config.Redacted('GOBLIN_SIGNUP_INVITE_CODE').pipe(Config.withDefault(Redacted.make(''))),
         ...modelEnv,
         MCP_SERVERS: Config.String('GOBLIN_MCP_SERVERS').pipe(Config.withDefault('[]')),
+        MCP_SHELF: Config.String('GOBLIN_MCP_SHELF').pipe(Config.withDefault('')),
         CREDENTIAL_KEY: Config.Redacted('GOBLIN_CREDENTIAL_KEY'),
         STAGE: runtimeStage(stage.name),
         // The release SHA stage.ts sets: as a prop it changes every release, which forces the rebuild that bakes it

@@ -382,7 +382,7 @@ export type ServerView = typeof ServerView.Type
  * Where a suggested server sits on the shelf (ADR 0052): the owner's own apps (mysi), goblin's own services, then the
  * servers that need no sign-in by what they are for. `apps` are servers whose answers open as MCP App views.
  */
-export const ServerGroup = Schema.Literals(['yours', 'goblin', 'travel', 'knowledge', 'crypto', 'apps', 'code'])
+export const ServerGroup = Schema.Literals(['yours', 'publish', 'travel', 'knowledge', 'crypto', 'apps', 'code'])
 export type ServerGroup = typeof ServerGroup.Type
 
 /** A server we suggest: our own description, its shelf group, whether it needs sign-in and whether the owner has it. */

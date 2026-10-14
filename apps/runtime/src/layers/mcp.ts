@@ -20,6 +20,7 @@ import { mcpHost } from '../mcp/host.ts'
 import { logEndpointsReset } from '../mcp/log.ts'
 import { RegistryStore } from '../mcp/registries.ts'
 import { ConnectionEntrypoints } from '../mcp/entrypoints.ts'
+import { shelfOf } from '../mcp/suggested.ts'
 import { ConnectionEventOffers } from '../mcp/events/offers.ts'
 import { ConnectionLabels } from '../mcp/labels.ts'
 import { AddedServerStore } from '../mcp/servers.ts'
@@ -232,6 +233,7 @@ export const McpHostLive: Layer.Layer<
       skillsEnabled: (connectionId) => skillState.enabled(connectionId),
       offers: new ConnectionEventOffers(db),
       entrypoints: new ConnectionEntrypoints(db),
+      shelf: shelfOf(env.MCP_SHELF),
       authorizeTool: heldCalls(approvals, grants, spend),
       appUrl: env.APP_URL,
       fetch: input.mcpFetch,

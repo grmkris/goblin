@@ -1,62 +1,46 @@
 // Servers we suggest, on a shelf in groups (ADR 0052): OAuth discovery is checked from a Worker, or the endpoint needs
 // no sign-in. Credential-backed acceptance is separate. Descriptions are ours, not the servers'. The shelf only adds
-// them; grants still start empty. A server that needs no sign-in is on it only for what Mercator does not already sell
-// as a paid job (web search and scraping are Mercator's).
-import type { ServerGroup, ServerSuggestion } from '@goblin/contracts'
+// them; grants still start empty. It is data: one endpoint per entry, the same on every deployment, which a deployment
+// may change or add to with `MCP_SHELF`.
+import { ServerGroup, type ServerSuggestion } from '@goblin/contracts'
+import * as Schema from 'effect/Schema'
+import { Internal } from '../http/errors.ts'
 
-export type Stage = 'local' | 'dev' | 'prod' | 'test'
+/** One server on the shelf, as `MCP_SHELF` gives one too. */
+const ShelfEntry = Schema.Struct({
+  id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
+  title: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
+  description: Schema.String.check(Schema.isMaxLength(300)),
+  endpoint: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
+  group: ServerGroup,
+  signIn: Schema.Boolean,
+})
+export type ShelfEntry = typeof ShelfEntry.Type
 
-type Suggested = {
-  readonly id: string
-  readonly title: string
-  readonly description: string
-  /** The endpoint per stage; one string for every stage. */
-  readonly endpoint: string | Readonly<Record<Stage, string>>
-  readonly group: ServerGroup
-  readonly signIn: boolean
-}
+const decodeShelf = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Array(ShelfEntry)))
 
 /**
- * Reviewed 2026-10-12: stage endpoints follow their service decisions; every server that needs no sign-in answered an
- * `initialize` without credentials that day. Live acceptance is recorded separately.
+ * Reviewed 2026-10-12: every server that needs no sign-in answered an `initialize` without credentials that day. Live
+ * acceptance is recorded separately.
  */
-const SUGGESTED: readonly Suggested[] = [
+const SHELF: readonly ShelfEntry[] = [
   {
     // One OAuth for all of the owner's my* apps; `codemode=off` keeps every app's tools listed by name
     // (`<service>_<tool>`), under the same OAuth resource as plain /mcp.
     id: 'mysi',
     title: 'mysi',
     description: 'Your my* apps in one connection: notes, browsers, Telegram, email, skills and terminals.',
-    endpoint: {
-      local: 'https://dev.mysi.lol/mcp?codemode=off',
-      dev: 'https://dev.mysi.lol/mcp?codemode=off',
-      test: 'https://mysi.lol/mcp?codemode=off',
-      prod: 'https://mysi.lol/mcp?codemode=off',
-    },
+    endpoint: 'https://mysi.lol/mcp?codemode=off',
     group: 'yours',
     signIn: true,
   },
   {
-    // Goblin's own wallet service (OAuth); its first-class profile is in first-class.ts.
-    id: 'wallet',
-    title: 'Goblin Wallet',
-    description: 'Balances, limits you set and receipts, and a wallet your agent pays for search and services from.',
-    endpoint: {
-      local: 'https://wallet-dev.goblin.surf/mcp',
-      dev: 'https://wallet-dev.goblin.surf/mcp',
-      test: 'https://wallet-dev.goblin.surf/mcp',
-      prod: 'https://wallet.goblin.surf/mcp',
-    },
-    group: 'goblin',
-    signIn: true,
-  },
-  {
-    // OAuth with dynamic registration, checked 2026-10-12; goblin's profile adds the Workers scopes (first-class.ts).
+    // OAuth with dynamic registration, checked 2026-10-12; Choose access offers its Workers scopes.
     id: 'cloudflare',
     title: 'Cloudflare',
-    description: 'Publish a page or a small app as a Worker on your Cloudflare account. Every change asks you first.',
+    description: 'Publish a page or a small app as a Worker on your Cloudflare account.',
     endpoint: 'https://mcp.cloudflare.com/mcp',
-    group: 'goblin',
+    group: 'publish',
     signIn: true,
   },
   {
@@ -196,24 +180,34 @@ const served = (endpoint: string): string => {
   }
 }
 
-/** The shelf for `stage`, each entry marked added when one of `endpoints` already serves it. */
-export function suggestions(stage: Stage | undefined, endpoints: ReadonlySet<string>): readonly ServerSuggestion[] {
+/**
+ * The deployment's shelf: goblin's, with each entry of `json` (`MCP_SHELF`, a JSON list of entries) in place of the one
+ * with its id, or added after them. A list that does not decode stops the start, as a bad `MCP_SERVERS` does.
+ */
+export const shelfOf = (json: string | undefined): readonly ShelfEntry[] => {
+  if (json === undefined || json.trim() === '') return SHELF
+  let given: readonly ShelfEntry[]
+  try {
+    given = decodeShelf(json)
+  } catch {
+    throw new Internal({ reason: 'MCP_SHELF is not a valid shelf' })
+  }
+  const byId = new Map(given.map((entry) => [entry.id, entry]))
+  const kept = SHELF.map((entry) => byId.get(entry.id) ?? entry)
+  return [...kept, ...given.filter((entry) => !SHELF.some((own) => own.id === entry.id))]
+}
+
+/** `shelf`, each entry marked added when one of `endpoints` already serves it. */
+export function suggestions(shelf: readonly ShelfEntry[], endpoints: ReadonlySet<string>): readonly ServerSuggestion[] {
   const offered = new Set([...endpoints].map(served))
-  return SUGGESTED.map(({ endpoint, ...rest }) => {
-    const url = typeof endpoint === 'string' ? endpoint : endpoint[stage ?? 'test']
-    return { ...rest, endpoint: url, added: offered.has(served(url)) }
-  })
+  return shelf.map((entry) => ({ ...entry, added: offered.has(served(entry.endpoint)) }))
 }
 
 /**
- * goblin's title for the server a suggestion reaches at `endpoint`, on any stage: the name a connection added from the
+ * goblin's title for the server a suggestion on `shelf` reaches at `endpoint`: the name a connection added from the
  * shelf starts from, where the server's own card or host would read as an address ("mcp.kiwi.com").
  */
-export function suggestedTitle(endpoint: string): string | undefined {
+export function suggestedTitle(shelf: readonly ShelfEntry[], endpoint: string): string | undefined {
   const wanted = served(endpoint)
-  return SUGGESTED.find((item) =>
-    (typeof item.endpoint === 'string' ? [item.endpoint] : Object.values(item.endpoint)).some(
-      (url) => served(url) === wanted,
-    ),
-  )?.title
+  return shelf.find((entry) => served(entry.endpoint) === wanted)?.title
 }

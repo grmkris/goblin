@@ -1,7 +1,7 @@
 // Adding the owner's own MCP servers, by URL or from the servers we suggest. A pasted URL is checked by the runtime
 // (public https only) and labelled from the server's card; it starts disconnected and is connected like any other. The
-// suggestions sit on a shelf in groups (ADR 0052): the owner's own apps through mysi, goblin's services, then servers
-// that need no sign-in by what they are for.
+// suggestions sit on a shelf in groups (ADR 0052): the owner's own apps through mysi, a service to publish with, then
+// servers that need no sign-in by what they are for.
 import { type SubmitEvent, useId, useState } from 'react'
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import type { ServerGroup, ServerSuggestion, ServerView } from '@goblin/contracts'
@@ -74,7 +74,7 @@ export function AddByAddress({
 /** The shelf's groups in the order it shows them, each under its name. */
 const GROUPS: readonly { readonly group: ServerGroup; readonly title: string }[] = [
   { group: 'yours', title: 'Your apps' },
-  { group: 'goblin', title: 'Pay and publish' },
+  { group: 'publish', title: 'Publish' },
   { group: 'travel', title: 'Travel' },
   { group: 'knowledge', title: 'Knowledge' },
   { group: 'crypto', title: 'Crypto data' },

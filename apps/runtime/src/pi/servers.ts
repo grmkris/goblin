@@ -2,7 +2,6 @@ import { defineExtension } from '@earendil-works/pi-durable'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { McpServers, requireResident } from '../mcp/service.ts'
-import type { Stage } from '../mcp/suggested.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { typedTool } from './typed-tool.ts'
 
@@ -54,7 +53,7 @@ const Found = Schema.Struct({
 })
 
 /** `mcp_suggest`: goblin's suggested servers and the owner's registries, searched by topic. */
-const suggestTool = (run: RunProgram, stage: Stage | undefined) =>
+const suggestTool = (run: RunProgram) =>
   typedTool({
     name: 'mcp_suggest',
     description:
@@ -67,9 +66,7 @@ const suggestTool = (run: RunProgram, stage: Stage | undefined) =>
         Effect.gen(function* () {
           yield* requireResident
           const servers = yield* McpServers
-          const shelf = (yield* servers.suggested(stage)).filter((entry) =>
-            matches(query, entry.title, entry.description),
-          )
+          const shelf = (yield* servers.suggested()).filter((entry) => matches(query, entry.title, entry.description))
           const { entries: found, partial } = yield* servers.catalog(query)
           return {
             trusted: false as const,
@@ -126,6 +123,6 @@ export const requestTool = typedTool({
  * The agent's search for MCP servers that would help, and its request to the owner to add one (ADR 0021). Nothing is
  * added by the agent: the owner's card adds and connects a server through the usual flow.
  */
-export function serversExtension(run: RunProgram, stage: Stage | undefined) {
-  return defineExtension({ name: 'goblin.servers', tools: [suggestTool(run, stage), requestTool] })
+export function serversExtension(run: RunProgram) {
+  return defineExtension({ name: 'goblin.servers', tools: [suggestTool(run), requestTool] })
 }

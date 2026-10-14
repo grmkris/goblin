@@ -44,6 +44,8 @@ export interface RuntimeEnv {
   readonly DAILY_TOKEN_CAP?: string
   /** JSON list of outbound MCP servers every account has: `[{ connectionId, endpoint, label?, issuer?, resource? }]`. */
   readonly MCP_SERVERS?: string
+  /** Shelf entries that replace goblin's by id or add to them, a JSON list (`mcp/suggested.ts`). */
+  readonly MCP_SHELF?: string
   /** 32 random bytes, base64: encrypts outbound OAuth credentials at rest. */
   readonly CREDENTIAL_KEY: string
   readonly STAGE?: 'local' | 'dev' | 'prod' | 'test'

@@ -5,7 +5,6 @@ import * as Option from 'effect/Option'
 import { connectedFromStart } from '../onboarding/program.ts'
 import { Changes } from '../runtime/changes.ts'
 import { Events, McpServers, Resident } from './service.ts'
-import type { Stage } from './suggested.ts'
 
 declare module '../runtime/changes.ts' {
   interface ChangeTopics {
@@ -24,7 +23,7 @@ export const ownerServers = Effect.gen(function* () {
 })
 
 /** The suggested servers the owner has not added yet. */
-export const suggestedServers = (stage: Stage | undefined) => McpServers.use((servers) => servers.suggested(stage))
+export const suggestedServers = McpServers.use((servers) => servers.suggested())
 
 /** Removes a server, its Events subscriptions first, then tells the change bus it is gone. */
 export const removeOwnerServer = (connectionId: string) =>

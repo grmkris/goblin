@@ -120,7 +120,7 @@ describe('leaf tools (unit, ADR 0027)', () => {
         },
       ],
     }
-    const suggested = await call(tool(serversExtension(runner(found), undefined), 'mcp_suggest'), { query: 'weather' })
+    const suggested = await call(tool(serversExtension(runner(found)), 'mcp_suggest'), { query: 'weather' })
     expect(suggested.details).toEqual({ structuredContent: found })
     expect(suggested.content).toEqual([{ type: 'text', text: JSON.stringify(found) }])
   })

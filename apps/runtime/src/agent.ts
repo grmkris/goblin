@@ -120,7 +120,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       retrieval,
       onboardingExtension(run),
     ]
-    const own = [serversExtension(run, env.STAGE), subagents, routinesExtension(run), this.#telemetry.diagnose]
+    const own = [serversExtension(run), subagents, routinesExtension(run), this.#telemetry.diagnose]
     const extras = [this.#thread, memory, recall, this.#personas.extension, ...routineKit.extra]
     this.harness = makePiHarness(this.#pi, [...base, ...own], extras, apps, this.#telemetry.recorder)
     this.lifecycle.use(this.harness)

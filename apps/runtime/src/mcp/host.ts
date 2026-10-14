@@ -11,6 +11,7 @@ import type { Credentials } from './credentials.ts'
 import type { Grants } from './grants.ts'
 import type { Entrypoints } from './entrypoints.ts'
 import type { EventOffers } from './events/offers.ts'
+import { type ShelfEntry, shelfOf } from './suggested.ts'
 import type { Labels } from './labels.ts'
 import type { StepReport } from './log.ts'
 import { makeManager } from './manager.ts'
@@ -48,6 +49,8 @@ export type McpHostOptions = {
   readonly toolsChanged?: McpManagerOptions['toolsChanged']
   /** Where each connection's own App entrypoint is kept; without it, a server's App is known only while connected. */
   readonly entrypoints?: Entrypoints
+  /** The servers suggested on the shelf; goblin's own without it. */
+  readonly shelf?: readonly ShelfEntry[]
 }
 
 /**
@@ -195,6 +198,7 @@ export const mcpHost = (
         labels: options.labels,
         ...(options.offers === undefined ? {} : { offers: options.offers }),
         ...(options.entrypoints === undefined ? {} : { entrypoints: options.entrypoints }),
+        shelf: options.shelf ?? shelfOf(undefined),
         random: options.random ?? (() => crypto.randomUUID().replaceAll('-', '')),
         skillsEnabled,
       })

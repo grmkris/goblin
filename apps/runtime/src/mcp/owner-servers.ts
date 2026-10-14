@@ -35,7 +35,7 @@ import { globalEntrypoint, offersEvents, offersSkills, toolAppResource, toolOffe
 import { suggestedPolicy } from './suggested-access.ts'
 import { type AddedServer, type AddedServers, MAX_ADDED_SERVERS } from './servers.ts'
 import { McpServers } from './service.ts'
-import { type Stage, suggestedTitle, suggestions } from './suggested.ts'
+import { type ShelfEntry, suggestedTitle, suggestions } from './suggested.ts'
 import type { McpConnectionSnapshot, McpServerConfig } from './types.ts'
 
 /** The failures that mean a server was not reached at all, rather than that it refused this agent. */
@@ -116,6 +116,8 @@ export type OwnerServers = {
   readonly offers?: EventOffers
   /** Each connection's own App entrypoint, kept from its last whole tool list; without it, known only while connected. */
   readonly entrypoints?: Entrypoints
+  /** The servers suggested on the shelf (`mcp/suggested.ts`). */
+  readonly shelf: readonly ShelfEntry[]
   /** Random characters for added server ids. */
   readonly random: () => string
   readonly skillsEnabled: (connectionId: string) => boolean
@@ -186,7 +188,10 @@ const addServer = (owner: OwnerServers, raw: string, label: string | undefined, 
     yield* attemptSync(() => {
       added.add({ ...server, ...claims, ...(source === undefined ? {} : { source }) }, now)
       const named =
-        profileOf(server.endpoint)?.title ?? suggestedTitle(server.endpoint) ?? claims.title ?? endpoint.hostname
+        profileOf(server.endpoint)?.title ??
+        suggestedTitle(owner.shelf, server.endpoint) ??
+        claims.title ??
+        endpoint.hostname
       labels.set(server.connectionId, label ?? labels.free(named))
     })
     yield* manager.add(server)
@@ -434,8 +439,8 @@ const finding = (owner: OwnerServers) => {
   const catalog = makeCatalog({ added: owner.registries, fetch: owner.fetch })
   const offered = Effect.map(owner.manager.servers(), (servers) => new Set(servers.map((server) => server.endpoint)))
   return {
-    suggested: Effect.fn('McpServers.suggested')(function* (stage: Stage | undefined) {
-      return suggestions(stage, yield* offered)
+    suggested: Effect.fn('McpServers.suggested')(function* () {
+      return suggestions(owner.shelf, yield* offered)
     }),
     catalog: Effect.fn('McpServers.catalog')(function* (query: string) {
       const { entries, partial } = yield* catalog.search(query.trim())

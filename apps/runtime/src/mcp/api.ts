@@ -60,7 +60,7 @@ const dismissEvents = endpoint('dismissEvents')(({ params }) =>
     null,
   ),
 )
-const suggested = endpoint('suggested')(() => AgentInput.use(({ env }) => suggestedServers(env.STAGE)))
+const suggested = endpoint('suggested')(() => suggestedServers)
 const catalog = endpoint('catalog')(({ query }) => {
   const text = query.q ?? ''
   return text.length > MAX_QUERY
