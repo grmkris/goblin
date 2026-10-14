@@ -40,7 +40,9 @@ Personal. Held messages are delivered in order once their chat has a route.
 **Answers go back in place.** A reply row (`app_channel_replies`) names the goblin chat the turn ran in, the Telegram
 chat and topic it came from, and the Persona that answers it; the answer is goblin's in that chat or the Persona
 invocation's. It goes out with `message_send { chat, threadId }`; an answer that stopped on one single-choice
-`ask_user` goes out as `question_ask` buttons in the same chat and topic, and the owner's tap comes back as their reply.
+`ask_user` goes out as `question_ask` buttons in the same chat and topic, and the owner's tap comes back as their reply:
+goblin keeps each button's label with the reply and reads the pressed button from the server's question state
+(`inbox_read { questionId }`), never from the answer entry's words, which are display text.
 goblin never adds its own name: mygram labels group messages. A chat the bot was removed from (`chat_paused`,
 `chat_left`) is marked so and takes no answers. Notices and an app's `notify` always go to the DM.
 

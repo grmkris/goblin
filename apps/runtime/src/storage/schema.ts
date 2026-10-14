@@ -228,7 +228,7 @@ export const appSkillDrafts = sqliteTable('app_skill_drafts', {
 /**
  * Turns whose answers go back to Telegram, until they are sent (ADR 0055): the goblin chat the turn ran in (none for
  * main), the Telegram chat and thread the answer goes to, and the Persona that answers instead of goblin, whose
- * invocation under the same operation id holds its answer.
+ * invocation under the same operation id holds its answer; an answer sent as buttons keeps its question and buttons.
  */
 export const appChannelReplies = sqliteTable('app_channel_replies', {
   operationId: text('operation_id').primaryKey().notNull(),
@@ -238,6 +238,9 @@ export const appChannelReplies = sqliteTable('app_channel_replies', {
   personaId: integer('persona_id'),
   createdAt: integer('created_at').notNull(),
   deliveredAt: integer('delivered_at'),
+  /** The question the answer went out as (buttons), and its buttons as JSON `[{ id, label }]`, to read a tap back. */
+  askQuestion: text('ask_question'),
+  askOptions: text('ask_options'),
 })
 
 /** Exact owner Events grants, independent of tools and remote subscription ids. */

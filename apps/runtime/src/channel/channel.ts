@@ -10,6 +10,7 @@ import { RunAttribute, type RunAttributes } from '@goblin/contracts/telemetry'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import * as Semaphore from 'effect/Semaphore'
 import { chatSession, operationSession, primaryChat } from '../chats/directory.ts'
@@ -18,7 +19,7 @@ import { writeLine } from '../observability/logger.ts'
 import { failureAttributes, outcomeOf } from '../telemetry/attributes.ts'
 import type { RunTelemetry } from '../telemetry/events.ts'
 import { expectedFailure } from '../telemetry/safety.ts'
-import { type ChatKey, type Offering, discover, resolveOffer, tapOf } from './offers.ts'
+import { type ChatKey, type Offering, answeredQuestion, discover, resolveOffer, tapOf } from './offers.ts'
 import {
   type Held,
   type RouteChoice,
@@ -35,6 +36,7 @@ import {
 } from './routes.ts'
 import { Channel } from './service.ts'
 import {
+  type AskedButtons,
   type ReplyTarget,
   carries,
   channelStatus,
@@ -42,6 +44,7 @@ import {
   disableChannel,
   enableEvents,
   inboxCursor,
+  askedButtons,
   markDelivered,
   pendingReplies,
   markEnded,
@@ -83,6 +86,8 @@ const Message = Schema.Struct({
 type Message = typeof Message.Type
 const Inbox = Schema.Struct({ messages: Schema.Array(Message), nextCursor: Schema.String })
 const isHandle = Schema.is(TelegramChatHandle)
+/** What `question_ask` answers: the question's id, once the server admitted it. */
+const decodeAsked = Schema.decodeUnknownOption(Schema.Struct({ id: Schema.optional(Schema.String) }))
 
 /** One message from the owner into a goblin Topic: where, under which operation, from whom, and its words. */
 export type Turn = {
@@ -154,16 +159,6 @@ const messageText = (message: Message) =>
   [message.text, ...(message.media ?? []).map((media) => `[attachment: ${media.kind} ${JSON.stringify(media.name)}]`)]
     .filter((part) => part !== '')
     .join('\n')
-
-/**
- * An answer to one of goblin's questions (an `ask_user` sent as buttons) as the owner's reply: the label of the button
- * they tapped, else their words.
- */
-const answerText = (message: Message) => {
-  const tap = message.trigger === 'answer' ? tapOf(message.text) : undefined
-  if (tap === undefined) return messageText(message)
-  return tap.label === '' ? tap.choice : tap.label
-}
 
 /** One line when a pull or a delivery fails: the alarm's step and the error's type, never message content. */
 export function reportChannelFailure(step: 'pull' | 'replies' | 'resubscribe' | 'offer', error: unknown): void {
@@ -368,6 +363,25 @@ const taker = (input: ChannelInput, record: Recorder, ports: ChannelPorts) => {
     })
 
   /**
+   * An entry's words as the owner's reply. An answer to one of goblin's questions it kept the buttons of (an `ask_user`
+   * sent as buttons) is read from the server: the pressed button's label, or their reply in text mode. An answer to a
+   * question goblin did not keep reads mygram's display line for the label, else its words.
+   */
+  const replyWords = (message: Message) =>
+    Effect.gen(function* () {
+      const questionId = message.questionId ?? undefined
+      const buttons = questionId === undefined ? undefined : askedButtons(db, questionId)
+      if (questionId !== undefined && buttons !== undefined) {
+        const answered = yield* answeredQuestion(ports.call, questionId)
+        const pressed = buttons.find((button) => button.id === answered?.choice)?.label
+        return pressed ?? answered?.answer ?? messageText(message)
+      }
+      const tap = message.trigger === 'answer' ? tapOf(message.text) : undefined
+      if (tap === undefined) return messageText(message)
+      return tap.label === '' ? tap.choice : tap.label
+    })
+
+  /**
    * One new entry of the inbox: from the owner and not archived, in a chat goblin can name. An answer to goblin's offer
    * sets its route and starts no turn; a chat or topic goblin has not seen is read from the server's lists first and
    * offered; then the entry is routed.
@@ -387,7 +401,7 @@ const taker = (input: ChannelInput, record: Recorder, ports: ChannelPorts) => {
       const placeholders = firstSight(db, chat, thread, now)
       yield* offer([...listed, ...placeholders, { chat, thread: 0 }], now)
       yield* route(
-        { entryId: message.id, chat, thread, text: answerText(message), trigger: message.trigger ?? null },
+        { entryId: message.id, chat, thread, text: yield* replyWords(message), trigger: message.trigger ?? null },
         now,
       )
     })
@@ -453,35 +467,35 @@ const sendAnswer = (
       [RunAttribute.pieces]: pieces.length + (question === undefined ? 0 : 1),
     }
     const place = placeArgs(reply)
-    const sends = [
-      ...pieces.map((piece, index) =>
-        ports.call('send', {
+    // Telegram carries a button as `<question>:<option id>` in 64 bytes: each button gets a short id, its label kept.
+    const buttons = (question?.options ?? []).map((option, index) => ({ id: `o${String(index)}`, label: option.label }))
+    const sends = Effect.gen(function* () {
+      for (const [index, piece] of pieces.entries())
+        yield* ports.call('send', {
           operationId: myagentId(`reply-${index}`, operationId),
           text: escapeHtml(piece),
           ...place,
-        }),
-      ),
-      ...(question === undefined
-        ? []
-        : [
-            ports.call('ask', {
-              operationId: myagentId('reply-ask', operationId),
-              question: escapeHtml(question.prompt),
-              mode: 'choice',
-              options: question.options.map((option) => ({ id: option.id, label: option.label })),
-              waitMs: 0,
-              ...place,
-            }),
-          ]),
-    ]
-    const outcome = yield* Effect.forEach(sends, (send) => send, { discard: true }).pipe(
-      Effect.as(sent[RunAttribute.delivery]),
+        })
+      if (question === undefined) return undefined
+      const asked = yield* ports.call('ask', {
+        operationId: myagentId('reply-ask', operationId),
+        question: escapeHtml(question.prompt),
+        mode: 'choice',
+        options: buttons,
+        waitMs: 0,
+        ...place,
+      })
+      const questionId = Option.getOrUndefined(decodeAsked(asked))?.id
+      return questionId === undefined ? undefined : ({ questionId, options: buttons } satisfies AskedButtons)
+    })
+    const { outcome, asked } = yield* sends.pipe(
+      Effect.map((buttonsAsked) => ({ outcome: sent[RunAttribute.delivery], asked: buttonsAsked })),
       // A chat the bot was removed from refuses the send: it is out of the chat now, and the answer is given up.
       Effect.catchTag('TelegramRefused', (refused: TelegramRefused) =>
         refused.code === 'chat_paused' || refused.code === 'chat_left'
           ? Effect.sync(() => {
               setPresence(db, reply.tgChat, refused.code === 'chat_left' ? 'left' : 'paused', now)
-              return 'given_up'
+              return { outcome: 'given_up', asked: undefined }
             })
           : Effect.fail(refused),
       ),
@@ -493,7 +507,7 @@ const sendAnswer = (
       ),
     )
     yield* record('channel.reply', ref, createdAt * 1000, { ...sent, [RunAttribute.delivery]: outcome })
-    markDelivered(db, operationId, now)
+    markDelivered(db, operationId, now, asked)
     yield* delivered({ operationId, pieces: sent[RunAttribute.pieces] })
   })
 

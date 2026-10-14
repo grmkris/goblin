@@ -3,6 +3,8 @@
 // SQLite.
 import type { ChannelStatus, NewChatsDefault, TelegramReach } from '@goblin/contracts'
 import { and, asc, eq, isNull, sql } from 'drizzle-orm'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import { appChannelReplies, appTelegramChannel } from '../storage/schema.ts'
 import { dropHeld, routeRow } from './routes.ts'
@@ -168,10 +170,32 @@ export const pendingReplies = (db: Db) =>
     .orderBy(asc(appChannelReplies.createdAt))
     .all()
 
-/** A turn's answer went to Telegram at `now`. */
-export function markDelivered(db: Db, operationId: string, now: number): void {
+/** The buttons an answer went out as: the server's question id, and each button's short id and label. */
+export type AskedButtons = {
+  readonly questionId: string
+  readonly options: readonly { readonly id: string; readonly label: string }[]
+}
+
+/** A turn's answer went to Telegram at `now`, as the buttons `asked` when it was a question. */
+export function markDelivered(db: Db, operationId: string, now: number, asked?: AskedButtons): void {
   db.update(appChannelReplies)
-    .set({ deliveredAt: now })
+    .set({
+      deliveredAt: now,
+      ...(asked === undefined ? {} : { askQuestion: asked.questionId, askOptions: JSON.stringify(asked.options) }),
+    })
     .where(and(eq(appChannelReplies.operationId, operationId), isNull(appChannelReplies.deliveredAt)))
     .run()
+}
+
+const AskOptions = Schema.fromJsonString(Schema.Array(Schema.Struct({ id: Schema.String, label: Schema.String })))
+const decodeOptions = Schema.decodeUnknownOption(AskOptions)
+
+/** The buttons goblin asked question `questionId` with, when it is one of its answers; none otherwise. */
+export function askedButtons(db: Db, questionId: string): AskedButtons['options'] | undefined {
+  const row = db
+    .select({ options: appChannelReplies.askOptions })
+    .from(appChannelReplies)
+    .where(eq(appChannelReplies.askQuestion, questionId))
+    .get()
+  return row?.options === null || row === undefined ? undefined : Option.getOrUndefined(decodeOptions(row.options))
 }

@@ -19,8 +19,9 @@ afterEach(() => {
 type Entry = Record<string, unknown> & { readonly id: string }
 
 /**
- * A channel that reads every chat, whose server lists "Trip planning" (a forum with topic 9, "Flights") and answers
- * each question with the id `q<n>`; ports that record turns and the Topics "New topic" made.
+ * A channel that reads every chat, whose server lists "Trip planning" (a forum with topic 9, "Flights"), answers each
+ * question with the id `q<n>` and keeps how the owner answered it (`pressed`); ports that record turns and the Topics
+ * "New topic" made.
  */
 const fixture = Effect.gen(function* () {
   const { db, close } = chatDatabase()
@@ -31,9 +32,19 @@ const fixture = Effect.gen(function* () {
   enableEvents(sqlite, 'mygram', 'c0', 1, { reach: 'all' })
   const inbox: Entry[] = []
   const asked: Record<string, unknown>[] = []
+  const pressed = new Map<string, { readonly choice?: string; readonly answer?: string }>()
   let questions = 0
   const call: ChannelCall = (tool, args) =>
     Effect.sync(() => {
+      const questionId = args['questionId']
+      if (tool === 'inbox' && typeof questionId === 'string') {
+        const answered = pressed.get(questionId)
+        return {
+          messages: [],
+          nextCursor: 'c1',
+          question: answered === undefined ? { status: 'pending' } : { status: 'answered', ...answered },
+        }
+      }
       if (tool === 'inbox') return { messages: inbox.splice(0), nextCursor: 'c1' }
       if (tool === 'chats')
         return {
@@ -72,7 +83,7 @@ const fixture = Effect.gen(function* () {
       Effect.sync(() => inbox.push(...entries)),
       channel.pull(ports, 2),
     )
-  return { db: sqlite, channel, ports, asked, turns, topics, pull }
+  return { db: sqlite, channel, ports, asked, pressed, turns, topics, pull }
 })
 
 const message = (id: string, extra: Record<string, unknown> = {}): Entry => ({
@@ -83,43 +94,48 @@ const message = (id: string, extra: Record<string, unknown> = {}): Entry => ({
 })
 
 describe("goblin's offers about new Telegram chats", () => {
-  it.effect('asks once in the DM about a new group, holds its messages, and routes them when the owner taps', () =>
-    Effect.gen(function* () {
-      const { db, asked, turns, topics, pull } = yield* fixture
-      yield* pull(message('g1', { chat: GROUP, trigger: 'mention' }), message('g2', { chat: GROUP }))
-      expect(asked).toEqual([
-        {
-          operationId: `telegram-offer:${GROUP}:0`,
-          question: 'I was added to <b>Trip planning</b>. Where should it go?',
-          mode: 'choice',
-          options: [
-            { id: 'topic', label: 'New topic #Trip planning' },
-            { id: 'personal', label: 'Personal' },
-            { id: 'ignore', label: 'Ignore' },
-          ],
-          chat: 'dm',
-          waitMs: 0,
-        },
-      ])
-      expect(turns).toEqual([])
-      expect(heldOf(db, GROUP)).toHaveLength(2)
-      yield* pull(
-        message('answer:q1', {
-          chat: 'dm',
-          trigger: 'answer',
-          questionId: 'q1',
-          text: 'Question q1: Kris tapped "topic" (New topic #Trip planning).',
-        }),
-      )
-      expect(topics).toEqual([`Trip planning telegram:${GROUP}:0`])
-      expect(turns.map(({ topic, operationId }) => [topic, operationId])).toEqual([
-        [7, 'telegram-g1'],
-        [7, 'telegram-g2'],
-      ])
-      expect(routeRow(db, GROUP, 0)).toMatchObject({ status: 'routed', mode: 'answer', topicId: 7, offer: 'closed' })
-      yield* pull(message('late', { chat: 'dm', trigger: 'answer', questionId: 'q1', text: 'Personal' }))
-      expect(turns).toHaveLength(2)
-    }),
+  it.effect(
+    'asks once in the DM about a new group, holds its messages, and routes them by the button the owner pressed',
+    () =>
+      Effect.gen(function* () {
+        const { db, asked, pressed, turns, topics, pull } = yield* fixture
+        yield* pull(message('g1', { chat: GROUP, trigger: 'mention' }), message('g2', { chat: GROUP }))
+        expect(asked).toEqual([
+          {
+            operationId: `telegram-offer:${GROUP}:0`,
+            question: 'I was added to <b>Trip planning</b>. Where should it go?',
+            mode: 'choice',
+            options: [
+              { id: 'topic', label: 'New topic #Trip planning' },
+              { id: 'personal', label: 'Personal' },
+              { id: 'ignore', label: 'Ignore' },
+            ],
+            chat: 'dm',
+            waitMs: 0,
+          },
+        ])
+        expect(turns).toEqual([])
+        expect(heldOf(db, GROUP)).toHaveLength(2)
+        // The server keeps the pressed button; the entry's words are display text, worded however mygram likes.
+        pressed.set('q1', { choice: 'topic' })
+        yield* pull(
+          message('answer:q1', {
+            chat: 'dm',
+            trigger: 'answer',
+            questionId: 'q1',
+            text: 'Question q1: Anna tapped "personal" (Personal).',
+            replyToOperationId: `telegram-offer:${GROUP}:0`,
+          }),
+        )
+        expect(topics).toEqual([`Trip planning telegram:${GROUP}:0`])
+        expect(turns.map(({ topic, operationId }) => [topic, operationId])).toEqual([
+          [7, 'telegram-g1'],
+          [7, 'telegram-g2'],
+        ])
+        expect(routeRow(db, GROUP, 0)).toMatchObject({ status: 'routed', mode: 'answer', topicId: 7, offer: 'closed' })
+        yield* pull(message('late', { chat: 'dm', trigger: 'answer', questionId: 'q1', text: 'Personal' }))
+        expect(turns).toHaveLength(2)
+      }),
   )
 
   it.effect('routes a new chat at once by the default, with no question', () =>
@@ -150,14 +166,15 @@ describe("goblin's offers about new Telegram chats", () => {
           ],
         }),
       ])
+      // The owner typed a button's words instead of pressing it: the question is still open on the server.
       yield* pull(message('answer:q', { chat: 'dm', questionId: routeRow(db, GROUP, 12)?.questionId, text: 'Ignore' }))
       yield* pull(message('t2', { chat: GROUP, threadId: 12 }))
       expect(turns).toHaveLength(1)
     }),
   )
 
-  it('reads the choice and the label of a tap as mygram words it', () => {
-    expect(tapOf('Question q1: Kris tapped "w" (Window).')).toEqual({ choice: 'w', label: 'Window' })
+  it("reads the choice and the label of mygram's display line for a tap, for a question goblin did not keep", () => {
+    expect(tapOf('Question q1: Anna tapped "w" (Window).')).toEqual({ choice: 'w', label: 'Window' })
     expect(tapOf('Question q1: You tapped "a \\"b\\"" (A (b)).')).toEqual({ choice: 'a "b"', label: 'A (b)' })
     expect(tapOf('just words')).toBeUndefined()
   })

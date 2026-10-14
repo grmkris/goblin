@@ -1495,11 +1495,15 @@ question id sets the route and starts no turn. A route change goes through the c
 is delivered in order. The id mapping is preserved: `tg:123` becomes `telegram-tg-123`. `app_channel_replies` keeps
 where each answer goes (the goblin chat, the Telegram chat and thread, the answering Persona); goblin's answer, or the
 Persona invocation's, goes back with `message_send { chat, threadId }`, escaped and chunked, and one that stopped on a
-single-choice `ask_user` goes as `question_ask` buttons; the owner's tap comes back as an answer entry whose button
-label is their reply. A send refused with `chat_paused` or `chat_left` marks the chat so and gives the answer up.
-Notices and an app's `notify` always go to `chat: 'dm'`. Submission acceptance is distinct from external Telegram
-completion. Disabling cleans up Events while authority is available, drops held messages and replies to send, keeps
-the routes, then tombstones locally; finite remote leases expire if authorized cleanup cannot run.
+single-choice `ask_user` goes as `question_ask` buttons with short ids (`o0`, `o1`, …; Telegram carries
+`<question>:<option>` in 64 bytes), the reply row keeping the question id and each button's label. An answer entry is
+read by structure, never by its words (mygram's display text): its `questionId` is looked up with
+`inbox_read { questionId }`, whose `choice` (or `answer`, for typed words) becomes the owner's reply as the kept label,
+and an offer's question sets the route the same way, typed words naming a button being the fallback. A send refused
+with `chat_paused` or `chat_left` marks the chat so and gives the answer up. Notices and an app's `notify` always go
+to `chat: 'dm'`. Submission acceptance is distinct from external Telegram completion. Disabling cleans up Events
+while authority is available, drops held messages and replies to send, keeps the routes, then tombstones locally;
+finite remote leases expire if authorized cleanup cannot run.
 
 The dispatcher also binds myskills' `skills.updated` and `skills.list_changed`. Turning a server's skills on subscribes
 to them only where its Events offer them to this connection; a server without them, or one that refuses its Events

@@ -103,7 +103,10 @@ export const discover = (offering: Offering, key: ChatKey, now: number) =>
     yield* offering.routeTo(key, { mode: 'answer', topic }, now)
   })
 
-/** mygram's line for a tap: `Question <id>: <name> tapped "<choice>" (<label>).` */
+/**
+ * mygram's display line for a tap, `Question <id>: <name> tapped "<choice>" (<label>).`: display text, not a contract,
+ * read only for a question goblin did not keep the buttons of.
+ */
 const TAPPED = /tapped ("(?:[^"\\]|\\.)*") \((.*)\)\.$/su
 const Quoted = Schema.fromJsonString(Schema.String)
 
@@ -115,24 +118,39 @@ export function tapOf(text: string): { readonly choice: string; readonly label: 
 }
 
 const QuestionState = Schema.Struct({
-  question: Schema.optional(Schema.Struct({ status: Schema.String, choice: Schema.optional(Schema.String) })),
+  question: Schema.optional(
+    Schema.Struct({
+      status: Schema.String,
+      choice: Schema.optional(Schema.String),
+      answer: Schema.optional(Schema.String),
+    }),
+  ),
 })
 const decodeQuestion = Schema.decodeUnknownOption(QuestionState)
 
-/** The choice the owner made on question `questionId`, as the server keeps it; none while it is open. */
-const answeredChoice = (call: ChannelCall, questionId: string) =>
-  Effect.map(call('inbox', { questionId, limit: 1 }), (read) =>
+/** How the owner answered a question, as the server keeps it: the pressed option's id, or their reply in text mode. */
+export type Answered = { readonly choice?: string; readonly answer?: string }
+
+/**
+ * How the owner answered question `questionId`, read from the server (`inbox_read { questionId }`), not from the
+ * answer entry's words, which are display text; none while it is open.
+ */
+export const answeredQuestion = (call: ChannelCall, questionId: string) =>
+  Effect.map(call('inbox', { questionId, limit: 1 }), (read): Answered | undefined =>
     Option.getOrUndefined(
       Option.flatMap(decodeQuestion(read), ({ question }) =>
-        question?.status === 'answered' ? Option.fromUndefinedOr(question.choice) : Option.none(),
+        question?.status === 'answered'
+          ? Option.some({
+              ...(question.choice === undefined ? {} : { choice: question.choice }),
+              ...(question.answer === undefined ? {} : { answer: question.answer }),
+            })
+          : Option.none(),
       ),
     ),
   )
 
-/** An offer's choice in the owner's words: a tap's, or a typed reply naming a button. */
+/** An offer's choice in the owner's typed words, when they name a button ("Personal"). */
 function typedChoice(db: DrizzleSqliteDODatabase, row: RouteRow, text: string): OfferChoice | undefined {
-  const tapped = tapOf(text)?.choice
-  if (tapped !== undefined) return isChoice(tapped) ? tapped : undefined
   const words = text.trim().toLowerCase()
   const found = offerQuestion(db, row).options.find(
     (option) => option.id === words || option.label.toLowerCase() === words,
@@ -141,7 +159,8 @@ function typedChoice(db: DrizzleSqliteDODatabase, row: RouteRow, text: string): 
 }
 
 /**
- * The owner answered goblin's offer about `row` (`questionId`): the route their choice names is set and what waited is
+ * The owner answered goblin's offer about `row` (`questionId`): the choice the server keeps for the question first (the
+ * button they pressed), else their typed words naming a button; the route it names is set and what waited is
  * delivered. An answer goblin cannot read leaves the offer open. No turn starts.
  */
 export const resolveOffer = (
@@ -151,9 +170,12 @@ export const resolveOffer = (
   now: number,
 ) =>
   Effect.gen(function* () {
-    const typed = typedChoice(offering.db, row, answer.text)
-    const kept = typed === undefined ? yield* answeredChoice(offering.call, answer.questionId) : typed
-    const choice = kept !== undefined && isChoice(kept) ? kept : undefined
+    const answered = yield* answeredQuestion(offering.call, answer.questionId)
+    const pressed = answered?.choice
+    const choice =
+      pressed !== undefined && isChoice(pressed)
+        ? pressed
+        : typedChoice(offering.db, row, answered?.answer ?? answer.text)
     if (choice === undefined) return
     const key = { chat: row.chat, thread: row.thread }
     if (choice === 'topic') {

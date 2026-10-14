@@ -31,14 +31,31 @@ const fixture = (answers: ReadonlyMap<string, Answer> = new Map(), refuse?: stri
     enableEvents(sqlite, 'mygram', 'c0', 1, { reach: 'all' })
     const inbox: Entry[] = []
     const calls: { readonly tool: string; readonly args: Record<string, unknown> }[] = []
+    // How the owner answered each question, as the server keeps it, and the id each question was asked under.
+    const pressed = new Map<string, { readonly choice?: string; readonly answer?: string }>()
+    const questions = new Map<string, string>()
     const call: ChannelCall = (tool, args) =>
       Effect.gen(function* () {
         calls.push({ tool, args })
+        const questionId = args['questionId']
+        if (tool === 'inbox' && typeof questionId === 'string') {
+          const answered = pressed.get(questionId)
+          return {
+            messages: [],
+            nextCursor: 'c',
+            question: answered === undefined ? { status: 'pending' } : { status: 'answered', ...answered },
+          }
+        }
         if (tool === 'inbox') {
           const messages = inbox.splice(0)
           return { messages, nextCursor: `c${String(calls.length)}` }
         }
         if (refuse !== undefined) return yield* new TelegramRefused({ connectionId: 'mygram', code: refuse })
+        if (tool === 'ask') {
+          const id = `q${String(questions.size + 1)}`
+          questions.set(String(args['operationId']), id)
+          return { status: 'pending', id }
+        }
         return { ok: true }
       })
     const turns: { readonly turn: Turn; readonly persona?: number }[] = []
@@ -59,7 +76,7 @@ const fixture = (answers: ReadonlyMap<string, Answer> = new Map(), refuse?: stri
         Effect.sync(() => inbox.push(...entries)),
         channel.pull(ports, 2),
       )
-    return { db: sqlite, channel, ports, calls, turns, kept, pull }
+    return { db: sqlite, channel, ports, calls, pressed, questions, turns, kept, pull }
   })
 
 const message = (id: string, extra: Record<string, unknown> = {}): Entry => ({
@@ -173,8 +190,8 @@ describe('routing Telegram chats to Topics', () => {
           question: 'Window or aisle?',
           mode: 'choice',
           options: [
-            { id: 'w', label: 'Window' },
-            { id: 'a', label: 'Aisle' },
+            { id: 'o0', label: 'Window' },
+            { id: 'o1', label: 'Aisle' },
           ],
           waitMs: 0,
           chat: GROUP,
@@ -184,7 +201,63 @@ describe('routing Telegram chats to Topics', () => {
     }),
   )
 
-  it.effect("takes the owner's tap on goblin's buttons as their reply: the button's label, in the same Topic", () =>
+  it.effect(
+    "takes the owner's press on goblin's buttons as their reply: the label goblin kept, whatever the words",
+    () =>
+      Effect.gen(function* () {
+        const question = {
+          prompt: 'Window or aisle?',
+          options: [
+            { id: 'w', label: 'Window' },
+            { id: 'a', label: 'Aisle' },
+          ],
+        }
+        const answers = new Map<string, Answer>([['telegram-t1', { text: '', question }]])
+        const { db, channel, ports, pressed, questions, turns, pull } = yield* fixture(answers)
+        seeChat(db, { chat: GROUP, thread: 0, title: 'Trip planning', kind: 'supergroup' }, 1)
+        yield* channel.route(ports, { chat: GROUP, thread: 0 }, { mode: 'answer', topic: 4 }, 'owner', 1)
+        yield* pull(message('t1', { chat: GROUP }))
+        yield* channel.deliver(ports, 3)
+        const questionId = questions.get('reply-ask-telegram-t1') ?? ''
+        pressed.set(questionId, { choice: 'o1' })
+        yield* pull(
+          message(`answer:${questionId}`, {
+            chat: GROUP,
+            trigger: 'answer',
+            questionId,
+            text: `Question ${questionId}: Anna tapped "o0" (Window).`,
+          }),
+        )
+        expect(turns.map(({ turn }) => [turn.topic, turn.text])).toEqual([
+          [4, 'text of t1'],
+          [4, 'Aisle'],
+        ])
+      }),
+  )
+
+  it.effect("takes the words the owner typed in answer to goblin's buttons as their reply", () =>
+    Effect.gen(function* () {
+      const question = {
+        prompt: 'Which day?',
+        options: [
+          { id: 'mon', label: 'Monday' },
+          { id: 'tue', label: 'Tuesday' },
+        ],
+      }
+      const answers = new Map<string, Answer>([['telegram-t1', { text: '', question }]])
+      const { db, channel, ports, pressed, questions, turns, pull } = yield* fixture(answers)
+      seeChat(db, { chat: GROUP, thread: 0, title: 'Trip planning', kind: 'supergroup' }, 1)
+      yield* channel.route(ports, { chat: GROUP, thread: 0 }, { mode: 'answer', topic: 4 }, 'owner', 1)
+      yield* pull(message('t1', { chat: GROUP }))
+      yield* channel.deliver(ports, 3)
+      const questionId = questions.get('reply-ask-telegram-t1') ?? ''
+      pressed.set(questionId, { answer: 'Wednesday, if it rains' })
+      yield* pull(message('typed', { chat: GROUP, trigger: 'answer', questionId, text: 'Wednesday, if it rains' }))
+      expect(turns.at(-1)?.turn.text).toBe('Wednesday, if it rains')
+    }),
+  )
+
+  it.effect("reads mygram's display line only for a question goblin did not keep the buttons of", () =>
     Effect.gen(function* () {
       const { db, channel, ports, turns, pull } = yield* fixture()
       seeChat(db, { chat: GROUP, thread: 0, title: 'Trip planning', kind: 'supergroup' }, 1)
@@ -194,7 +267,7 @@ describe('routing Telegram chats to Topics', () => {
           chat: GROUP,
           trigger: 'answer',
           questionId: 'q7',
-          text: 'Question q7: Kris tapped "w" (Window).',
+          text: 'Question q7: Anna tapped "w" (Window).',
         }),
       )
       expect(turns.map(({ turn }) => [turn.topic, turn.text])).toEqual([[4, 'Window']])

@@ -24,6 +24,9 @@ export const TELEGRAM_MIGRATIONS: readonly Migration[] = [
       `ALTER TABLE app_channel_replies ADD COLUMN tg_chat TEXT NOT NULL DEFAULT 'dm'`,
       'ALTER TABLE app_channel_replies ADD COLUMN tg_thread INTEGER NOT NULL DEFAULT 0',
       'ALTER TABLE app_channel_replies ADD COLUMN persona_id INTEGER',
+      'ALTER TABLE app_channel_replies ADD COLUMN ask_question TEXT',
+      'ALTER TABLE app_channel_replies ADD COLUMN ask_options TEXT',
+      'CREATE INDEX app_channel_replies_ask ON app_channel_replies (ask_question) WHERE ask_question IS NOT NULL',
       // The doorbell is gone with mygram's (ADR 0055): only Events carry the channel.
       'DROP TABLE app_channel',
     ].join(BREAK),
