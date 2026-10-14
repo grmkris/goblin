@@ -9,6 +9,16 @@ Install Xcode command line tools (`xcode-select --install`), Rust stable, Bun 1.
 Use a checkout of this branch that includes `spikes/mobile`: the companion reuses that spike's owner transport and
 Goblin's canonical Pi projection. Install the repository dependencies as well as the isolated desktop dependencies.
 
+If this worktree is still only on the build box, create a tracked handoff there and copy it to the Mac:
+
+```sh
+git archive --format=tar.gz --prefix=goblin-desktop-mvp/ -o /tmp/goblin-desktop-mvp.tar.gz HEAD
+scp /tmp/goblin-desktop-mvp.tar.gz YOUR_MAC_TARGET:~/Downloads/
+```
+
+On the Mac, unpack it and run the commands below from the extracted repository. The archive contains source and lockfiles,
+not `node_modules`, Rust targets, credentials, runtime capability files, or build artifacts.
+
 From the repository root:
 
 ```sh
