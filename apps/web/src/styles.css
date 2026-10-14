@@ -1657,11 +1657,17 @@
     margin-inline-start: auto;
   }
   /* How the channel works is read whole, not cut at two lines like a tool's purpose. */
-  .grant-about.telegram-about {
+  .grant-about.telegram-about,
+  .grant-about.telegram-ended {
     display: block;
     overflow: visible;
     -webkit-line-clamp: unset;
     text-wrap: pretty;
+  }
+  /* The server ended the channel's Events and goblin could not subscribe again: the owner has to act. */
+  .grant-about.telegram-ended {
+    margin-block-start: 0.25rem;
+    color: var(--destructive);
   }
   /*
    * The Telegram channel's chats (components/telegram-chats.tsx, ADR 0055): the New chats default, how far goblin sees,

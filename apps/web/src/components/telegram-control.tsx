@@ -58,10 +58,15 @@ export function TelegramControl({
                 <time dateTime={new Date(status.enabledAt * 1000).toISOString()}>
                   {shortDate(status.enabledAt * 1000)}
                 </time>
-                ,{status.transport === 'events' ? ' through Events.' : ' through the older doorbell.'}
+                .
               </>
             )}
           </span>
+          {here && status.ended === true && (
+            <span className="grant-about telegram-ended" role="status">
+              Telegram stopped sending goblin your messages. Turn it off and on again, or reconnect mysi.
+            </span>
+          )}
         </span>
         <Switch
           checked={here}
