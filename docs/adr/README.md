@@ -49,14 +49,12 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0042](0042-mcp-2026-client.md) | MCP 2026 client: live tool lists, URL requests and step-up | Accepted |
 | [0043](0043-outside-work-through-mcp-servers.md) | Outside work comes through MCP servers, and some servers are first-class | Accepted |
 | [0044](0044-spending-rules-for-paid-tools.md) | Spending rules for paid tools | Accepted |
-| [0045](0045-agent-wallet.md) | Goblin Wallet, an agent's wallet with limits the owner sets | Accepted |
 | [0046](0046-production-promotion-and-public-source.md) | Daily development, deliberate production promotion and public source | Accepted |
 | [0047](0047-inference-paid-per-call-from-the-wallet.md) | Inference paid per call from the owner's wallet | Accepted |
 | [0048](0048-first-run-start.md) | First-run Start | Accepted |
 | [0049](0049-prepaid-servers-topped-up-from-the-wallet.md) | Prepaid servers topped up from the Goblin Wallet | Accepted |
-| [0050](0050-gas-in-usdc-through-useroperations.md) | Gas in USDC through UserOperations; the relay removed | Accepted |
-| [0051](0051-tempo-float-refilled-from-the-base-allowance.md) | The Tempo float, refilled from the Base allowance | Accepted |
 | [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted |
 | [0053](0053-pinned-services-and-apps-with-a-chat-bar.md) | Pinned services and Apps with a chat bar | Accepted |
 | [0054](0054-pro-paid-as-a-signed-usdc-subscription.md) | Pro paid as a signed USDC subscription | Accepted |
 | [0055](0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | Accepted |
+| [0056](0056-goblin-wallet-leaves-goblin.md) | Goblin Wallet leaves goblin | Accepted |
