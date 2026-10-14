@@ -106,18 +106,6 @@ function UrlNotes({
 }
 
 /**
- * Who asks, by connection label and tool: the request's own call once it is read, since a job's top-up asks through
- * the wallet rather than the job's server (ADR 0049); the card's call until then.
- */
-function useAsker(interaction: UrlRequest, view: UrlRequestView | undefined) {
-  const labels = useConnectionLabels()
-  return {
-    connection: labels(view?.connectionId ?? interaction.connectionId),
-    name: view?.name ?? interaction.name,
-  }
-}
-
-/**
  * A server asks the owner to finish a step on its site before the call can complete (ADR 0042): its message, framed
  * as its own words; the link's host, then the full link; and a warning when the host is not the connection's own.
  * The owner opens the link themselves, in a new tab (Open leads until they have), then Done sends the call again so
@@ -125,7 +113,8 @@ function useAsker(interaction: UrlRequest, view: UrlRequestView | undefined) {
  */
 export function UrlRequestCard({ interaction }: { readonly interaction: UrlRequest }) {
   const read = useQuery(urlRequestQuery(interaction.requestId))
-  const { connection, name } = useAsker(interaction, read.data)
+  const connection = useConnectionLabels()(interaction.connectionId)
+  const { name } = interaction
   const answer = useMutation(answerUrlRequestMutation(interaction.requestId))
   const [opened, setOpened] = useState(false)
   const view = read.data

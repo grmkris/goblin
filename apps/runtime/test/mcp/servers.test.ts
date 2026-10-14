@@ -83,12 +83,12 @@ describe('servers the owner adds', () => {
     expect((await mcp.list()).find((each) => each.connectionId === 'myplan')?.label).toBe('myplan')
   })
 
-  it("names a connection to a server goblin knows by goblin's own name for it, not its card or host", async () => {
+  it('names a second connection to one server apart from the first', async () => {
     let next = 0
     const { mcp } = host(() => String(++next).padStart(6, '0'))
-    const first = await mcp.add('https://wallet-dev.goblin.surf/mcp')
-    const second = await mcp.add('https://wallet-dev.goblin.surf/mcp')
-    expect([first.label, second.label]).toEqual(['Goblin Wallet', 'Goblin Wallet 2'])
+    const first = await mcp.add('https://mcp.kiwi.com')
+    const second = await mcp.add('https://mcp.kiwi.com')
+    expect([first.label, second.label]).toEqual(['Kiwi.com', 'Kiwi.com 2'])
   })
 
   it("names a connection added from the shelf by the shelf's title, on any stage's endpoint", async () => {

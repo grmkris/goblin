@@ -19,14 +19,6 @@ import {
   ownerResource,
   setAskFirst,
 } from './approval-owner.ts'
-import {
-  allowRecommended as allowRecommendedGrants,
-  setSpending as setSpendingRule,
-  setTopUp as setTopUpRule,
-  serverStatus as statusOf,
-  spendingView,
-  topUpView,
-} from './first-class-owner.ts'
 import { allowSuggested as allowSuggestedGrants } from './suggested-access.ts'
 import { urlRequestView } from './url-request.ts'
 import { connectCallback, disconnectOwnerServer, ownerServers, removeOwnerServer, suggestedServers } from './program.ts'
@@ -106,7 +98,7 @@ const events = endpoint('events')(({ params }) =>
   ),
 )
 const decideApproval = endpoint('decideApproval')(({ params, payload }) =>
-  decideOwnerApproval(params.id, payload.allowed, payload.runUpTo),
+  decideOwnerApproval(params.id, payload.allowed),
 )
 const urlRequest = endpoint('urlRequest')(({ params }) => urlRequestView(params.id))
 const answerUrlRequest = endpoint('answerUrlRequest')(({ params, payload }) =>
@@ -125,12 +117,6 @@ const stepUp = endpoint('stepUp')(({ params, payload }) =>
   ),
 )
 const allowSuggested = endpoint('allowSuggested')(({ params }) => allowSuggestedGrants(params.id))
-const allowRecommended = endpoint('allowRecommended')(({ params }) => allowRecommendedGrants(params.id))
-const spending = endpoint('spending')(({ params }) => spendingView(params.id))
-const setSpending = endpoint('setSpending')(({ params, payload }) => setSpendingRule(params.id, payload))
-const serverStatus = endpoint('serverStatus')(({ params }) => statusOf(params.id))
-const topUp = endpoint('topUp')(({ params }) => topUpView(params.id))
-const setTopUp = endpoint('setTopUp')(({ params, payload }) => setTopUpRule(params.id, payload))
 const disconnect = endpoint('disconnect')(({ params }) => disconnectOwnerServer(params.id))
 const removeServer = endpoint('removeServer')(({ params }) => removeOwnerServer(params.id))
 const callTool = endpoint('callTool')(({ params, headers, payload }) =>
@@ -158,7 +144,7 @@ const oauthCallback = ({ request }: { readonly request: HttpServerRequest.HttpSe
   })
 
 /**
- * The `mcp` group (ADRs 0003, 0005, 0006, 0008, 0028, 0043): each handler runs its program, behind owner admission.
+ * The `mcp` group (ADRs 0003, 0005, 0006, 0008, 0028, 0060): each handler runs its program, behind owner admission.
  * A decided held call goes on to its conversation as an outcome, composed into the decision rather than sent through
  * the agent's own `submit`.
  */
@@ -189,12 +175,6 @@ export const McpHandlers = HttpApiBuilder.group(OwnerApi, 'mcp', (handlers) =>
       access,
       stepUp,
       allowSuggested,
-      allowRecommended,
-      serverStatus,
-      spending,
-      setSpending,
-      topUp,
-      setTopUp,
       disconnect,
       removeServer,
       callTool,

@@ -14,7 +14,7 @@ import { sendApproved } from '../../src/mcp/approval-decision.ts'
 import { CredentialCipher } from '../../src/mcp/cipher.ts'
 import { mcpHost } from '../../src/mcp/host.ts'
 import { settledDetails } from '../../src/mcp/kept-app.ts'
-import { Approvals, McpConnections, Resident, Spending, UrlRequests } from '../../src/mcp/service.ts'
+import { Approvals, McpConnections, Resident, UrlRequests } from '../../src/mcp/service.ts'
 import { answerUrlRequest, holdUrlRequest } from '../../src/mcp/url-request.ts'
 import { McpUrlRequestStore } from '../../src/mcp/url-requests.ts'
 import { FlowEvents } from '../../src/observability/flows.ts'
@@ -77,7 +77,6 @@ const fixture = async () => {
         Layer.succeed(UrlRequests, urlRequestsOver(urlRequests)),
         Layer.succeed(Changes, makeChanges()),
         stub(Resident, { require: () => Effect.void }),
-        stub(Spending, { record: () => Effect.succeed(true) }),
         stub(RoutineRuns, { session: () => Effect.succeed(undefined) }),
         stub(Chats, { chatOf: () => Effect.succeed(Option.some(ChatId('41'))) }),
         stub(Conversations, { requireActing: (chat) => Effect.succeed(chat), kindOf: () => Effect.succeed('main') }),

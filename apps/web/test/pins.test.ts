@@ -29,28 +29,28 @@ describe('the sidebar’s pins (ADR 0053)', () => {
     const stored = pins({
       pins: [
         { kind: 'view', appId: '7', title: 'Trip board' },
-        { kind: 'server', connectionId: 'wallet' },
+        { kind: 'server', connectionId: 'notes' },
       ],
-      seen: ['wallet', 'gone'],
+      seen: ['notes', 'gone'],
     })
-    const rows = pinnedRows(stored, [server('wallet'), server('mercator'), server('gone')], [app('7')])
+    const rows = pinnedRows(stored, [server('notes'), server('tasks'), server('gone')], [app('7')])
     expect(rows.shown.map((pin) => (pin.kind === 'server' ? pin.connectionId : pin.appId))).toEqual([
       '7',
-      'wallet',
-      'mercator',
+      'notes',
+      'tasks',
     ])
-    expect(rows.adopt).toEqual(['mercator'])
+    expect(rows.adopt).toEqual(['tasks'])
   })
 
   it('hides a pin whose server is signed out or whose App is gone, and keeps it stored', () => {
     const stored = pins({
       pins: [
-        { kind: 'server', connectionId: 'wallet' },
+        { kind: 'server', connectionId: 'notes' },
         { kind: 'view', appId: '9', title: 'Gone' },
       ],
-      seen: ['wallet'],
+      seen: ['notes'],
     })
-    const rows = pinnedRows(stored, [server('wallet', { status: 'needs_auth' })], [])
+    const rows = pinnedRows(stored, [server('notes', { status: 'needs_auth' })], [])
     expect(rows.shown).toEqual([])
     expect(rows.adopt).toEqual([])
   })
@@ -75,9 +75,9 @@ describe('the sidebar’s pins (ADR 0053)', () => {
 
   it('pins a server’s own App as its server, any other App as its view', () => {
     const own = app('4', {
-      source: { kind: 'mcp', callId: 'x', connectionId: 'wallet', tool: 'open', uri: 'ui://w', entrypoint: true },
+      source: { kind: 'mcp', callId: 'x', connectionId: 'notes', tool: 'open', uri: 'ui://w', entrypoint: true },
     })
-    expect(appPin(own, 'Wallet')).toEqual({ kind: 'server', connectionId: 'wallet' })
+    expect(appPin(own, 'Notes')).toEqual({ kind: 'server', connectionId: 'notes' })
     expect(appPin(app('5'), 'Board (2)')).toEqual({ kind: 'view', appId: '5', title: 'Board (2)' })
   })
 })

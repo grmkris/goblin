@@ -6,8 +6,8 @@ import { primeOwnerRead } from '../lib/prime.ts'
 import { serversQuery } from '../mcp/queries.ts'
 
 /**
- * A server's own App (ADRs 0043, 0053), opened from the sidebar, its card, a paid-job card or Start, which opens the
- * Goblin Wallet on Add funds (`?focus=add_funds`): its thread and App are kept, then its page shows.
+ * A server's own App (ADR 0053), opened from the sidebar, its card or Start, on one of its panels when the link names
+ * it (`?focus=<panel>`): its thread and App are kept, then its page shows.
  */
 export const Route = createFileRoute('/connections_/$connectionId/app')({
   validateSearch: parseFocus,

@@ -142,7 +142,7 @@ const activateTool = (run: RunProgram) =>
   typedTool({
     name: 'skill_activate',
     description:
-      'Load a skill listed under <skills> in the goblin-context block by its handle (for example `myskills:code-review`). Returns its verified instructions and the files it may read. Activate before following a skill.',
+      'Load a skill listed under <skills> in the goblin-context block by its handle (for example `library:code-review`). Returns its verified instructions and the files it may read. Activate before following a skill.',
     input: Schema.Struct({ skill: Handle }),
     output: Loaded,
     replay: 'safe',

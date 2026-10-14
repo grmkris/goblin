@@ -15,9 +15,8 @@ import { McpApprovalStore } from '../../src/mcp/approvals.ts'
 import { CredentialCipher } from '../../src/mcp/cipher.ts'
 import { mcpHost } from '../../src/mcp/host.ts'
 import { settledDetails } from '../../src/mcp/kept-app.ts'
-import { Approvals, Resident, Spending, UrlRequests } from '../../src/mcp/service.ts'
+import { Approvals, Resident, UrlRequests } from '../../src/mcp/service.ts'
 import { answerUrlRequest, urlRequestView } from '../../src/mcp/url-request.ts'
-import { SpendStore } from '../../src/mcp/spend.ts'
 import { McpUrlRequestStore } from '../../src/mcp/url-requests.ts'
 import { FlowEvents } from '../../src/observability/flows.ts'
 import { SingleFlight } from '../../src/observability/single-flight.ts'
@@ -65,7 +64,7 @@ const fixture = async () => {
     labels: new MemoryLabels(),
     appUrl: 'https://goblin.test',
     fetch: server.fetch,
-    authorizeTool: heldCalls(approvals, grants, new SpendStore(durable(db))),
+    authorizeTool: heldCalls(approvals, grants),
   })
   const layer = host.pipe(
     Layer.provideMerge(
@@ -76,7 +75,6 @@ const fixture = async () => {
         Layer.succeed(UrlRequests, urlRequestsOver(new McpUrlRequestStore(durable(db), cipher))),
         Layer.succeed(Changes, makeChanges()),
         stub(Resident, { require: () => Effect.void }),
-        stub(Spending, { record: () => Effect.succeed(true) }),
         stub(RoutineRuns, { session: () => Effect.succeed(undefined) }),
         stub(Chats, { chatOf: () => Effect.succeed(Option.some(ChatId('41'))) }),
         stub(Conversations, { requireActing: (chat) => Effect.succeed(chat), kindOf: () => Effect.succeed('main') }),

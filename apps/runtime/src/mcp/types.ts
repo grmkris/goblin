@@ -15,12 +15,8 @@ import type { AppError } from '../http/errors.ts'
 import type { Entrypoints } from './entrypoints.ts'
 import type { Grant } from './grants.ts'
 export type { McpServerConfig }
-/**
- * Who makes a call: the model, an App, the owner, or goblin topping up a prepaid server's own balance from the owner's
- * wallet (`funding`, ADR 0049: only the wallet profile's funding tool, only as a top-up recorded under the owner's rule,
- * to the address the prepaid server's own status reports).
- */
-export type McpCaller = 'model' | 'app' | 'human' | 'funding'
+/** Who makes a call: the model, an App, or the owner. */
+export type McpCaller = 'model' | 'app' | 'human'
 /**
  * Who a use of a connection is for: the owner or the model, waiting on it now (`foreground`), or work goblin does on
  * its own (`background`: Events polls, notices, agent-app jobs, the skills learner). Only foreground use holds the
@@ -146,11 +142,10 @@ export type UrlAnswer = {
 }
 
 /**
- * A model's call, its own or the held call the owner approved for it (`approvalId`), or goblin's top-up of a prepaid
- * server (`funding`, ADR 0049): it may meet a URL request, and its retry carries the owner's answer.
+ * A model's call, its own or the held call the owner approved for it (`approvalId`): it may meet a URL request, and its
+ * retry carries the owner's answer.
  */
 export type McpModelCallOptions = Omit<McpCallOptions, 'caller'> & {
-  readonly caller?: 'model' | 'funding'
   readonly answer?: UrlAnswer
   /** With an `answer`: the tool as it was listed when the server asked, sent to even if the server no longer lists it. */
   readonly heldTool?: Tool

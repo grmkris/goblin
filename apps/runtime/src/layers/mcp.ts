@@ -31,12 +31,9 @@ import {
   type McpGrants,
   McpServers,
   type Resident,
-  Spending,
   UrlRequests,
   requireResident,
 } from '../mcp/service.ts'
-import { SpendStore, dayOf } from '../mcp/spend.ts'
-import { assertRecordedTopUp } from '../mcp/top-up.ts'
 import type { McpManagerOptions, UrlPrompt } from '../mcp/types.ts'
 import { type HeldUrlRequest, McpUrlRequestStore } from '../mcp/url-requests.ts'
 import type { SingleFlight } from '../observability/single-flight.ts'
@@ -99,23 +96,6 @@ export const approvalsOver = (store: McpApprovalStore) =>
   })
 
 /** URL requests over their one store (ADR 0042). */
-/** The spending rules and paid calls over their store (ADR 0044). */
-export const spendingOver = (store: SpendStore) =>
-  Spending.of({
-    rule: (connectionId, tool) => Effect.sync(() => store.rule(connectionId, tool)),
-    setRule: (connectionId, tool, rule) =>
-      Effect.flatMap(Clock.currentTimeMillis, (now) => Effect.sync(() => store.setRule(connectionId, tool, rule, now))),
-    spentToday: (connectionId, tool) =>
-      Effect.flatMap(Clock.currentTimeMillis, (now) =>
-        Effect.sync(() => store.spentOn(connectionId, tool, dayOf(now))),
-      ),
-    standing: (approvalId) => Effect.sync(() => store.standing(approvalId)),
-    record: (call, rule) =>
-      Effect.flatMap(Clock.currentTimeMillis, (now) => Effect.sync(() => store.record(call, now, rule))),
-    find: (approvalId) => Effect.sync(() => store.find(approvalId)),
-    count: (connectionId, tool) => Effect.sync(() => store.count(connectionId, tool)),
-  })
-
 export const urlRequestsOver = (store: McpUrlRequestStore) =>
   UrlRequests.of({
     hold: Effect.fn('UrlRequests.hold')(function* (request: HeldUrlRequest) {
@@ -167,19 +147,13 @@ export const urlRequestsOver = (store: McpUrlRequestStore) =>
  * The owner's decision on a call by the model or an App: an ask-first tool's call goes out only as the held call the
  * owner approved, with exactly its reviewed arguments, conversation and grant version (and the retry of a URL request
  * its dispatch met, with the owner's answer, under the same); `authorize`, the caller's own check, runs after the
- * arguments are hashed and before the held call is read. goblin's top-up of a prepaid server goes out only as recorded.
+ * arguments are hashed and before the held call is read.
  */
 export const heldCalls =
-  (approvals: McpApprovalStore, grants: Grants, spend: SpendStore): NonNullable<McpManagerOptions['authorizeTool']> =>
+  (approvals: McpApprovalStore, grants: Grants): NonNullable<McpManagerOptions['authorizeTool']> =>
   (call, approvalId, dispatch, authorize) =>
     Effect.gen(function* () {
       if (call.caller === 'human') return
-      // A top-up goes out only as goblin recorded it under the owner's rule (ADR 0049): that record is their decision.
-      if (call.caller === 'funding') {
-        const operation = call.arguments['operation_id']
-        const row = typeof operation === 'string' ? spend.find(operation) : undefined
-        return yield* attemptSync(() => assertRecordedTopUp(row, call.arguments))
-      }
       const grant = { connectionId: call.connectionId, capability: 'tool' as const, name: call.name }
       const policy = grants.policy(grant)
       if (approvalId === undefined) {
@@ -201,7 +175,7 @@ export const heldCalls =
  * connections, the owner's servers and grants, and held calls.
  */
 export const McpHostLive: Layer.Layer<
-  McpConnections | McpServers | McpGrants | Approvals | UrlRequests | Spending | Cipher,
+  McpConnections | McpServers | McpGrants | Approvals | UrlRequests | Cipher,
   never,
   AgentInput | Db | SingleFlight | Changes
 > = Layer.unwrap(
@@ -221,7 +195,6 @@ export const McpHostLive: Layer.Layer<
     yield* Effect.sync(() => approvals.recover(now))
     const urlRequests = new McpUrlRequestStore(db, cipher)
     yield* Effect.sync(() => urlRequests.recover(now))
-    const spend = new SpendStore(db)
     const skillState = new SqliteSkillState(db)
     const host = mcpHost({
       servers,
@@ -234,7 +207,7 @@ export const McpHostLive: Layer.Layer<
       offers: new ConnectionEventOffers(db),
       entrypoints: new ConnectionEntrypoints(db),
       shelf: shelfOf(env.MCP_SHELF),
-      authorizeTool: heldCalls(approvals, grants, spend),
+      authorizeTool: heldCalls(approvals, grants),
       appUrl: env.APP_URL,
       fetch: input.mcpFetch,
       report: mcpReporter(input.telemetry),
@@ -244,7 +217,6 @@ export const McpHostLive: Layer.Layer<
       host,
       Layer.succeed(Approvals, approvalsOver(approvals)),
       Layer.succeed(UrlRequests, urlRequestsOver(urlRequests)),
-      Layer.succeed(Spending, spendingOver(spend)),
       Layer.succeed(Cipher, cipher),
     )
   }),

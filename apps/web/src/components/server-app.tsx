@@ -1,6 +1,6 @@
-// A connection's own App (ADRs 0043, 0053), opened from the sidebar, its card, a paid-job card or Start: goblin keeps
-// one thread for it and the App in that thread, then shows the App's page, where its tool is called as the owner and
-// the chat bar talks to that thread. The App runs in the same sandboxed frame as any MCP App and is trusted for nothing.
+// A connection's own App (ADR 0053), opened from the sidebar, its card or Start: goblin keeps one thread for it and the
+// App in that thread, then shows the App's page, where its tool is called as the owner and the chat bar talks to that
+// thread. The App runs in the same sandboxed frame as any MCP App and is trusted for nothing.
 import { useEffect, useRef } from 'react'
 import { Link, Navigate } from '@tanstack/react-router'
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
@@ -61,13 +61,13 @@ function Opening({
   )
 }
 
-/** Connection `connectionId`'s own App, when goblin knows its app tool, opened on its `focus` panel when one is named. */
+/** Connection `connectionId`'s own App, when it declares one, opened on its `focus` panel when one is named. */
 export function ServerAppPage({ connectionId, focus }: { readonly connectionId: string; readonly focus?: string }) {
   const servers = useSuspenseQuery(serversQuery).data
   const server = servers.find((each) => each.connectionId === connectionId)
-  // A profile names its app tool; a server without one may declare a global entrypoint (`ServerView.entrypoint`).
-  const tool = server?.profile?.app?.tool ?? server?.entrypoint
-  const title = server?.profile?.title ?? server?.label ?? connectionId
+  // The tool the server declares as its global entrypoint (`ServerView.entrypoint`).
+  const tool = server?.entrypoint
+  const title = server?.label ?? connectionId
   return (
     <section className="app-page" aria-label={title}>
       <PageBar title={title} />

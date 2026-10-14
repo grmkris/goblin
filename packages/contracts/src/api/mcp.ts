@@ -28,13 +28,8 @@ import {
   StepUp,
   ToolCall,
   ToolView,
-  SpendingChange,
-  SpendingView,
   UrlRequestAnswer,
-  TopUpChange,
-  TopUpView,
   UrlRequestView,
-  WalletStatus,
 } from '../mcp.ts'
 import { ApiErrors } from './errors.ts'
 import { RenewsResident } from './resident.ts'
@@ -179,50 +174,6 @@ export class McpGroup extends HttpApiGroup.make('mcp').add(
     params: { id: ConnectionParam },
     success: Schema.Array(Grant),
     error: [ApiErrors.notFound, ...REMOTE],
-  }),
-  /**
-   * `POST /api/mcp/:id/recommended`: a first-class server's recommended grants (ADR 0043), applied in one go: its free
-   * tools run when needed, its paid ones ask first. A tool the server does not list now is skipped.
-   */
-  HttpApiEndpoint.post('allowRecommended', '/mcp/:id/recommended', {
-    params: { id: ConnectionParam },
-    success: Schema.Array(Grant),
-    error: [ApiErrors.notFound, ...REMOTE],
-  }),
-  /**
-   * `GET /api/mcp/:id/status`: a first-class server's status line (ADR 0043), read from its status tool as the owner;
-   * null until its status tool is allowed, or when its answer does not fit.
-   */
-  HttpApiEndpoint.get('serverStatus', '/mcp/:id/status', {
-    params: { id: ConnectionParam },
-    success: Schema.NullOr(WalletStatus),
-    error: [ApiErrors.notFound, ...REMOTE],
-  }),
-  /** `GET /api/mcp/:id/spending`: a first-class server's paid tool and the owner's rule for it (ADR 0044). */
-  HttpApiEndpoint.get('spending', '/mcp/:id/spending', {
-    params: { id: ConnectionParam },
-    success: Schema.NullOr(SpendingView),
-    error: [ApiErrors.notFound],
-  }),
-  /** `PUT /api/mcp/:id/spending`: sets the rule (a null `perJob` removes it: every job asks first again). */
-  HttpApiEndpoint.put('setSpending', '/mcp/:id/spending', {
-    params: { id: ConnectionParam },
-    payload: SpendingChange,
-    success: Schema.NullOr(SpendingView),
-    error: [ApiErrors.notFound],
-  }),
-  /** `GET /api/mcp/:id/top-up`: how goblin tops up a prepaid server from the Goblin Wallet (ADR 0049). */
-  HttpApiEndpoint.get('topUp', '/mcp/:id/top-up', {
-    params: { id: ConnectionParam },
-    success: Schema.NullOr(TopUpView),
-    error: [ApiErrors.notFound],
-  }),
-  /** `PUT /api/mcp/:id/top-up`: sets the top-up rule. */
-  HttpApiEndpoint.put('setTopUp', '/mcp/:id/top-up', {
-    params: { id: ConnectionParam },
-    payload: TopUpChange,
-    success: Schema.NullOr(TopUpView),
-    error: [ApiErrors.notFound],
   }),
   /** `POST /api/mcp/:id/step-up`: sign in again with more access (ADR 0042); the URL to open, in a new tab. */
   HttpApiEndpoint.post('stepUp', '/mcp/:id/step-up', {

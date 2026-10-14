@@ -95,7 +95,7 @@ describe('what the agent waits on the owner for', () => {
       interactionOperation({ kind: 'approval', callId: 'g1', approvalId: 'mcp:1:g1', connectionId: 's', name: 'n' }),
     ).toBe('approval:g1')
   })
-  it('asks to connect a signed-out connection only for the call that met it (ADR 0043)', () => {
+  it('asks to connect a signed-out connection only for the call that met it (ADR 0063)', () => {
     const connect = { kind: 'connect-required', connectionId: 'myplan', name: 'document_edit' }
     expect(interactionOf(mcpCall(connect))).toEqual({
       kind: 'connect',

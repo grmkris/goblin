@@ -20,7 +20,7 @@ export type Interaction =
       readonly name: string
     }
   | { readonly kind: 'grant'; readonly callId: string; readonly connectionId: string; readonly name: string }
-  /** A call to a connection the owner has not signed in to: they connect it (ADR 0043). */
+  /** A call to a connection the owner has not signed in to: they connect it (ADR 0063). */
   | { readonly kind: 'connect'; readonly callId: string; readonly connectionId: string; readonly name: string }
   /** A call needed more access than the connection's sign-in granted: the owner signs in again (ADR 0042). */
   | {

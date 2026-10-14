@@ -113,7 +113,7 @@ export type PersonaAskData = typeof PersonaAskData.Type
 export const PersonaHold = Schema.Struct({
   /**
    * What the Persona waits on: approval of its held call, a tool to allow, a URL request to finish (`url`), a sign-in
-   * with more access (`access`, ADR 0042) or a connection to sign in to (`connect`, ADR 0043).
+   * with more access (`access`, ADR 0042) or a connection to sign in to (`connect`, ADR 0063).
    */
   kind: Schema.Literals(['approval', 'grant', 'url', 'access', 'connect']),
   /** The held call, for an approval. */

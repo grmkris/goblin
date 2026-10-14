@@ -37,14 +37,13 @@ import { StatusLabel } from './status-label.tsx'
 import { type TelegramChannel, TelegramControl, hasTelegramTools } from './telegram-control.tsx'
 import { AnotherConnection, ChooseAccess, RenameConnection } from './connection-forms.tsx'
 import { type Action, type Edit, RemoveConfirm, ServerMenu } from './server-menu.tsx'
-import { FirstClassAccess, FirstClassSummary } from './first-class.tsx'
 import { ToolGrants } from './tool-grants.tsx'
 
 /**
- * What the server behind a connection is called, beside the owner's label: goblin's own name for a first-class server,
- * else its card's title. Not the name it reports in `initialize`, which is an identifier (`coingecko_typescript_api`).
+ * What the server behind a connection is called, beside the owner's label: its card's title. Not the name it reports
+ * in `initialize`, which is an identifier (`coingecko_typescript_api`).
  */
-const serverFrom = (server: ServerView): string | undefined => server.profile?.title ?? server.title
+const serverFrom = (server: ServerView): string | undefined => server.title
 
 /** The endpoint's host, which is what tells servers apart on a card; the whole endpoint is its title. */
 function endpointHost(endpoint: string): string {
@@ -89,8 +88,8 @@ function SkillsSwitch({
           Use its skills
         </span>
         <span className="grant-about">
-          Skills are procedures your agent follows. Turn this on only for a skills library you trust, such as your own
-          through mysi. A skill never allows a tool by itself.
+          Skills are procedures your agent follows. Turn this on only for a skills library you trust. A skill never
+          allows a tool by itself.
         </span>
       </span>
       <Switch checked={enabled} disabled={pending} aria-busy={pending} aria-labelledby={id} onCheckedChange={change} />
@@ -99,8 +98,8 @@ function SkillsSwitch({
 }
 
 /**
- * What a connected server offers, behind Manage access: its own words, its paid tool's rule, its events (and what goblin
- * does with them), skills, Telegram, then its tools.
+ * What a connected server offers, behind Manage access: its own words, its events (and what goblin does with them),
+ * skills, Telegram, then its tools.
  */
 function ServerBody({
   server,
@@ -117,17 +116,12 @@ function ServerBody({
   return (
     <CardContent>
       <div className="server-body server-body-open">
-        {/* A first-class server is described in goblin's own words (ADR 0043); any other only as it claims. */}
-        {server.profile === undefined ? (
-          server.description !== undefined && (
-            <p className="server-claim">
-              <span>The server says:</span> {server.description}
-            </p>
-          )
-        ) : (
-          <p className="server-note">{server.profile.description}</p>
+        {/* A server is described only as it claims. */}
+        {server.description !== undefined && (
+          <p className="server-claim">
+            <span>The server says:</span> {server.description}
+          </p>
         )}
-        {server.profile !== undefined && <FirstClassAccess server={server} profile={server.profile} tools={tools} />}
         <ConnectionEvents server={server} />
         {settings && (
           <section className="server-part" aria-label="Settings">
@@ -246,7 +240,7 @@ function ServerHeading({
   readonly onRemove: () => void
 }) {
   const from = serverFrom(server)
-  const appTool = server.profile?.app?.tool ?? server.entrypoint
+  const appTool = server.entrypoint
   const connected = server.status === 'connected'
   const status = <StatusLabel label={serverStatus(server.status)} />
   // Where it stands is said once: beside the actions on a wide card, on the quiet line under the name on a narrow one.
@@ -340,8 +334,8 @@ function EventsLine({ server, onOpen }: { readonly server: ServerView; readonly 
 }
 
 /**
- * A connected server at a glance: its first-class line and recommended access, that it sends events, and Manage
- * access, which opens what it offers and what the agent may call. The card a #connection link names opens at once.
+ * A connected server at a glance: that it sends events, and Manage access, which opens what it offers and what the
+ * agent may call. The card a #connection link names opens at once.
  */
 function ServerSummary({
   server,
@@ -357,7 +351,6 @@ function ServerSummary({
   return (
     <CardContent>
       <div className="server-summary">
-        {server.profile !== undefined && <FirstClassSummary server={server} profile={server.profile} tools={tools} />}
         <EventsLine server={server} onOpen={onEvents} />
         <div className="server-summary-row">
           <CollapsibleTrigger render={<button type="button" className="server-toggle" />}>

@@ -8,8 +8,8 @@ export type ConnectionStatus = 'connected' | 'needs_auth' | 'disconnected'
 export type InvalidationScope = 'all' | 'client' | 'tokens' | 'verifier' | 'discovery'
 
 /**
- * Pending authorizations older than this are refused at the callback. An hour, not ten minutes: the Goblin Wallet's
- * consent now walks the owner through its setup and adding funds before it comes back (ADR 0048), which takes longer.
+ * Pending authorizations older than this are refused at the callback. An hour, not ten minutes: a server's consent may
+ * walk the owner through its own setup before it comes back, which takes longer.
  */
 export const PENDING_TTL_SECONDS = 60 * 60
 

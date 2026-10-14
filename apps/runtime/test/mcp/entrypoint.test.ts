@@ -120,8 +120,4 @@ describe('the entrypoint on the owner’s server view (unit)', () => {
     await mcp.connections.connect('plain')
     expect((await mcp.servers.list())[0]).not.toHaveProperty('entrypoint')
   })
-  it('counts a first-class profile’s App tool, live or not', async () => {
-    const mcp = await serving('wallet', 'https://wallet.goblin.surf/mcp', [tool('wallet_open')])
-    expect((await mcp.servers.list())[0]).toMatchObject({ entrypoint: 'wallet_open' })
-  })
 })

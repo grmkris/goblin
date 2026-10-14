@@ -49,9 +49,9 @@ export const openServerApp = ({ connectionId }: OpenServerApp) =>
     const server = (yield* McpServers.use((servers) => servers.list())).find(
       (each) => each.connectionId === connectionId,
     )
-    const tool = server?.profile?.app?.tool ?? server?.entrypoint
+    const tool = server?.entrypoint
     if (server === undefined || tool === undefined) return yield* new NotFound({ what: 'server app' })
-    const title = server.profile?.title ?? server.title ?? server.label
+    const title = server.title ?? server.label
     if (server.status !== 'connected') return yield* new InvalidInput({ reason: `Sign in to ${title} first` })
     const snapshot = yield* McpConnections.use((connections) => connections.connect(connectionId))
     const declared = snapshot.tools.find(({ name }) => name === tool)

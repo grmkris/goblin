@@ -7,12 +7,11 @@ import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import { type AppError, UpstreamMcp } from '../src/http/errors.ts'
 import { EVENTS_EXTENSION } from '../src/mcp/events/protocol.ts'
-import { profileOf, profileView } from '../src/mcp/first-class.ts'
 import { mcpHost } from '../src/mcp/host.ts'
 import { type SetupScope, type Exclusion, scopeOf, topicScope } from '../src/setup/scope.ts'
 import { Setups } from '../src/setup/service.ts'
 import { listedServers, residentMcpExtension } from '../src/pi/resident-mcp.ts'
-import { Events, Resident, Spending, UrlRequests } from '../src/mcp/service.ts'
+import { Events, Resident, UrlRequests } from '../src/mcp/service.ts'
 import { CredentialCipher } from '../src/mcp/cipher.ts'
 import { McpUrlRequestStore } from '../src/mcp/url-requests.ts'
 import { Chats, Conversations } from '../src/chats/service.ts'
@@ -84,22 +83,22 @@ const LARGE = {
     ]),
   ),
 }
-/** The tools of a large server, as Mercator or GitHub list theirs: sixty, each with long words and large schemas. */
+/** The tools of a large server, as a marketplace or GitHub lists theirs: sixty, each with long words and large schemas. */
 const JOBS = Array.from({ length: 60 }, (_, index) => ({
   name: `job.${String(index)}`,
   description: LONG,
   inputSchema: LARGE,
   outputSchema: LARGE,
 }))
-/** A large server: `job.0` is granted and asks first under a spending rule, `job.1` is granted, the rest are not. */
+/** A large server: `job.0` is granted and asks first, `job.1` is granted, the rest are not. */
 const jobs = createMcpHandler(() => {
   const server = lowLevelServer({ name: 'jobs', version: '1.0.0' }, { capabilities: { tools: {} } })
   server.setRequestHandler('tools/list', () => ({ tools: JOBS }))
   return server
 })
 
-/** A gateway like mysi (ADR 0052): forty-five tools of three apps, each named `<service>_<tool>`. */
-const GATEWAY = ['mygram', 'myplan', 'mytab'].flatMap((service) =>
+/** A gateway (ADR 0052): forty-five tools of three apps, each named `<service>_<tool>`. */
+const GATEWAY = ['mail', 'notes', 'tabs'].flatMap((service) =>
   Array.from({ length: 15 }, (_, index) => ({
     name: `${service}_tool_${String(index)}`,
     description: index === 3 ? `Send a message through ${service}.` : `Tool ${String(index)} of ${service}.`,
@@ -137,7 +136,7 @@ const host = mcpHost({
   servers: [
     { connectionId: 'notes', endpoint: 'https://notes.test/mcp', label: 'Notes · Mine' },
     { connectionId: 'jobs', endpoint: 'https://jobs.test/mcp', label: 'Jobs' },
-    { connectionId: 'gateway', endpoint: 'https://gateway.test/mcp', label: 'mysi' },
+    { connectionId: 'gateway', endpoint: 'https://gateway.test/mcp', label: 'Gateway' },
   ],
   credentials,
   grants: new MemoryGrants([
@@ -199,13 +198,6 @@ const layer = host.pipe(
       stub(Chats, { chatOf: () => Effect.succeed(Option.none()) }),
       stub(Conversations),
       stub(UrlRequests, { hold: (request) => Effect.promise(() => urlRequests.hold(request, 1000)) }),
-      // Only the large server's `job.0` has a spending rule.
-      stub(Spending, {
-        rule: (connectionId, tool) =>
-          Effect.succeed(
-            connectionId === 'jobs' && tool === 'job.0' ? { perJob: 5_000_000, daily: 20_000_000 } : undefined,
-          ),
-      }),
       Layer.succeed(AgentInput, instance),
       sqliteDb(chatDatabase().db),
     ),
@@ -286,7 +278,7 @@ describe('mcp_call and the owner grant (unit)', () => {
       servers: [
         { connectionId: 'notes', label: 'Notes · Mine', status: 'connected' },
         { connectionId: 'jobs', label: 'Jobs', status: 'connected' },
-        { connectionId: 'gateway', label: 'mysi', status: 'connected' },
+        { connectionId: 'gateway', label: 'Gateway', status: 'connected' },
       ],
     })
   })
@@ -334,12 +326,7 @@ describe('mcp_list keeps what the model reads small (unit)', () => {
     const shown = toolsOf(JSON.parse(text))
     expect(shown).toHaveLength(JOBS.length)
     const short = expect.stringMatching(/^Line 0 of how this job runs[^\n]*…$/u)
-    expect(shown[0]).toEqual({
-      name: 'job.0',
-      description: short,
-      askFirst: true,
-      spending: 'asks above $5 a job or past $20 today',
-    })
+    expect(shown[0]).toEqual({ name: 'job.0', description: short, askFirst: true })
     expect(shown[1]).toEqual({ name: 'job.1', description: short })
     expect(shown[2]).toEqual({ name: 'job.2', description: short, granted: false })
     for (const tool of shown) expect(String(tool['description']).length).toBeLessThanOrEqual(160)
@@ -349,13 +336,7 @@ describe('mcp_list keeps what the model reads small (unit)', () => {
       origin: 'jobs',
       trusted: false,
       tools: [
-        {
-          name: 'job.0',
-          description: LONG,
-          inputSchema: LARGE,
-          askFirst: true,
-          spending: 'asks above $5 a job or past $20 today',
-        },
+        { name: 'job.0', description: LONG, inputSchema: LARGE, askFirst: true },
         { name: 'job.1', description: LONG, inputSchema: LARGE },
       ],
       unknown: ['missing'],
@@ -373,51 +354,46 @@ describe('mcp_list by service, for a gateway of many apps (unit)', () => {
     expect(await listed({ connectionId: 'gateway' }, 7)).toEqual({
       origin: 'gateway',
       trusted: false,
-      services: ['mygram', 'myplan', 'mytab'].map((service) => ({
+      services: ['mail', 'notes', 'tabs'].map((service) => ({
         service,
         tools: 15,
         hint: `${service}_tool_0, ${service}_tool_1, ${service}_tool_2, ${service}_tool_3, …`,
       })),
       next: expect.stringContaining('`service`'),
     })
-    const gram = toolsOf(await listed({ connectionId: 'gateway', service: 'mygram_' }, 7))
-    expect(gram).toHaveLength(15)
-    for (const tool of gram) expect(String(tool['name'])).toMatch(/^mygram_/u)
-    const sends = toolsOf(await listed({ connectionId: 'gateway', service: 'myplan', query: 'send MESSAGE' }, 7))
-    expect(sends).toEqual([{ name: 'myplan_tool_3', description: 'Send a message through myplan.', granted: false }])
+    const mail = toolsOf(await listed({ connectionId: 'gateway', service: 'mail_' }, 7))
+    expect(mail).toHaveLength(15)
+    for (const tool of mail) expect(String(tool['name'])).toMatch(/^mail_/u)
+    const sends = toolsOf(await listed({ connectionId: 'gateway', service: 'notes', query: 'send MESSAGE' }, 7))
+    expect(sends).toEqual([{ name: 'notes_tool_3', description: 'Send a message through notes.', granted: false }])
   })
   it("still lists a large server's tools when their names fall into no services", async () => {
     expect(toolsOf(await listed({ connectionId: 'jobs' }, 7))).toHaveLength(JOBS.length)
   })
 })
 
+/** A connection to the notes server as the owner's list has it, by its label and where it stands. */
+const view = (connectionId: string, label: string, status: ServerView['status']): ServerView => ({
+  connectionId,
+  label,
+  endpoint: 'https://notes.example/mcp',
+  status,
+  live: false,
+  source: 'config',
+})
+
 describe('how mcp_list names the connections (unit)', () => {
-  it("puts connected ones first and gives a first-class server goblin's own name, whatever its label", () => {
-    const wallet = profileOf('https://wallet-dev.goblin.surf/mcp')
-    const view = (connectionId: string, label: string, status: ServerView['status'], first = false): ServerView => ({
-      connectionId,
-      label,
-      endpoint: 'https://wallet-dev.goblin.surf/mcp',
-      status,
-      live: false,
-      source: 'config',
-      ...(first && wallet !== undefined ? { profile: profileView(wallet) } : {}),
-    })
+  it("puts connected ones first, each by the owner's label", () => {
     expect(
       listedServers([
-        view('wallet', 'Goblin Wallet', 'disconnected', true),
-        view('notes', 'Notes', 'needs_auth'),
-        view('wallet-dev-goblin-surf-f460a8', 'wallet-dev.goblin.surf', 'connected', true),
+        view('notes', 'Notes', 'disconnected'),
+        view('drafts', 'Drafts', 'needs_auth'),
+        view('notes-example-f460a8', 'notes.example', 'connected'),
       ]),
     ).toEqual([
-      {
-        connectionId: 'wallet-dev-goblin-surf-f460a8',
-        label: 'wallet-dev.goblin.surf',
-        server: 'Goblin Wallet',
-        status: 'connected',
-      },
-      { connectionId: 'notes', label: 'Notes', status: 'needs_auth' },
-      { connectionId: 'wallet', label: 'Goblin Wallet', server: 'Goblin Wallet', status: 'disconnected' },
+      { connectionId: 'notes-example-f460a8', label: 'notes.example', status: 'connected' },
+      { connectionId: 'drafts', label: 'Drafts', status: 'needs_auth' },
+      { connectionId: 'notes', label: 'Notes', status: 'disconnected' },
     ])
   })
 })

@@ -42,8 +42,8 @@ const focusOf = (selection: AppSelection): unknown =>
   selection.kind === 'mcp' ? selection.arguments['focus'] : undefined
 
 /**
- * A server's own App: its tool called as the owner, as its card's Open always did (ADR 0043), opened on `focus` when
- * one is named; the result is the server's own.
+ * A server's own App: its entrypoint tool called as the owner, as its card's Open does (ADR 0053), opened on `focus`
+ * when one is named; the result is the server's own.
  */
 async function launchServerApp(queryClient: QueryClient, app: AppView, focus?: string): Promise<AppSelection> {
   if (app.source.kind !== 'mcp') throw new NoServerApp(app.title)

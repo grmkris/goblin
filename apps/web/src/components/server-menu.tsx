@@ -45,7 +45,7 @@ export function ServerMenu({
 }) {
   const connected = server.status === 'connected'
   const name = connectionName(server)
-  const hasApp = (server.profile?.app?.tool ?? server.entrypoint) !== undefined
+  const hasApp = server.entrypoint !== undefined
   return (
     <DropdownMenu>
       <DropdownMenuTrigger

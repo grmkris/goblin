@@ -53,8 +53,7 @@ export const toolOffered = (tool: Tool, caller: McpCaller): boolean => {
   if (!Predicate.isObject(ui) || !('visibility' in ui) || !Array.isArray(ui.visibility)) return true
   if (!ui.visibility.every(Predicate.isString)) return true
   if (caller === 'human') return true
-  // Top-ups reach a tool the wallet may keep from the model, as an App would (ADR 0049).
-  return ui.visibility.includes(caller === 'funding' ? 'app' : caller)
+  return ui.visibility.includes(caller)
 }
 
 /** A server serves skills when it declares the Skills extension together with resources (files are resources). */

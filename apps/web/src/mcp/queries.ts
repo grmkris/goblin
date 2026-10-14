@@ -24,10 +24,7 @@ export const mcpKeys = {
   catalogs: ['mcp', 'catalog'] as const,
   catalog: (q: string | undefined): readonly ['mcp', 'catalog', string | undefined] => ['mcp', 'catalog', q],
   tools: (connectionId: string) => ['mcp', 'tools', connectionId] as const,
-  status: (connectionId: string) => ['mcp', 'status', connectionId] as const,
   app: (connectionId: string, tool: string) => ['mcp', 'app', connectionId, tool] as const,
-  spending: (connectionId: string) => ['mcp', 'spending', connectionId] as const,
-  topUp: (connectionId: string) => ['mcp', 'top-up', connectionId] as const,
   events: (connectionId: string) => ['mcp', 'events', connectionId] as const,
   access: (connectionId: string) => ['mcp', 'access', connectionId] as const,
 }
@@ -255,82 +252,7 @@ export const allowSuggestedMutation = mutationOptions({
 })
 
 /**
- * A first-class server's recommended grants, applied in one go (ADR 0043): its free tools run when needed, its paid
- * ones ask first. Its tools and status line are read again.
- */
-export const allowRecommendedMutation = mutationOptions({
-  ...owner.apiMutation({
-    mutationFn: (api, connectionId: string) => api.mcp.allowRecommended({ params: { id: connectionId } }),
-  }),
-  onSuccess: (grants, connectionId, _result, { client }) => {
-    client.setQueryData(grantsQuery.queryKey, grants)
-    return Promise.all([
-      client.invalidateQueries({ queryKey: mcpKeys.tools(connectionId) }),
-      client.invalidateQueries({ queryKey: mcpKeys.status(connectionId) }),
-    ])
-  },
-})
-
-/** A first-class server's status line (its wallet), once it is connected; null until its status tool is allowed. */
-export const serverStatusQuery = (connectionId: string, connected: boolean) =>
-  queryOptions({
-    queryKey: mcpKeys.status(connectionId),
-    queryFn: connected
-      ? owner.apiQuery({
-          queryKey: mcpKeys.status(connectionId),
-          queryFn: (api) => api.mcp.serverStatus({ params: { id: connectionId } }),
-        }).queryFn
-      : skipToken,
-    staleTime: 60_000,
-  })
-
-/** A first-class server's paid tool and the owner's spending rule for it, with today's total (ADR 0044). */
-export const spendingQuery = (connectionId: string) =>
-  owner.apiQuery({
-    queryKey: mcpKeys.spending(connectionId),
-    queryFn: (api) => api.mcp.spending({ params: { id: connectionId } }),
-  })
-
-/** Sets the owner's spending rule for a paid tool; a null `perJob` makes every job ask first again. */
-export const setSpendingMutation = mutationOptions({
-  ...owner.apiMutation({
-    mutationFn: (
-      api,
-      change: { readonly connectionId: string; readonly perJob: string | null; readonly daily: string | null },
-    ) =>
-      api.mcp.setSpending({
-        params: { id: change.connectionId },
-        payload: { perJob: change.perJob, daily: change.daily },
-      }),
-  }),
-  onSuccess: (view, { connectionId }, _result, { client }) => {
-    client.setQueryData(mcpKeys.spending(connectionId), view)
-  },
-})
-
-/** How goblin tops up a prepaid server from the Goblin Wallet: the owner's rule and what it moved today (ADR 0049). */
-export const topUpQuery = (connectionId: string) =>
-  owner.apiQuery({
-    queryKey: mcpKeys.topUp(connectionId),
-    queryFn: (api) => api.mcp.topUp({ params: { id: connectionId } }),
-  })
-
-/** Sets the owner's top-up rule: up to `perTopUp` a top-up and `daily` a day without asking. */
-export const setTopUpMutation = mutationOptions({
-  ...owner.apiMutation({
-    mutationFn: (api, change: { readonly connectionId: string; readonly perTopUp: string; readonly daily: string }) =>
-      api.mcp.setTopUp({
-        params: { id: change.connectionId },
-        payload: { perTopUp: change.perTopUp, daily: change.daily },
-      }),
-  }),
-  onSuccess: (view, { connectionId }, _result, { client }) => {
-    client.setQueryData(mcpKeys.topUp(connectionId), view)
-  },
-})
-
-/**
- * A first-class server's own App, as the owner opens it (ADR 0043): its app tool called as the owner, and the `ui://`
+ * A server's own App, as the owner opens it (ADR 0053): its entrypoint tool called as the owner, and the `ui://`
  * resource that tool declares; nothing to show when the tool declares none. Read again on each open.
  */
 export const serverAppQuery = (connectionId: string, tool: string, focus?: string) => ({
@@ -342,7 +264,7 @@ export const serverAppQuery = (connectionId: string, tool: string, focus?: strin
           api.mcp.callTool({
             params: { id: connectionId },
             headers: {},
-            // An App that opens on one of its panels takes it as `focus` (the Goblin Wallet's Add funds).
+            // An App that opens on one of its panels takes it as `focus`.
             payload: focus === undefined ? { name: tool } : { name: tool, arguments: { focus } },
           }),
           api.mcp.tools({ params: { id: connectionId }, query: {} }),

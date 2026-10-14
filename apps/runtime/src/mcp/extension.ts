@@ -55,9 +55,9 @@ export const grantRequiredResult = (connectionId: string, name: string, connecti
 })
 
 /**
- * What the model gets for a call to a connection the owner has not signed in to (a connection every account starts
- * with, such as Mercator, ADR 0043): words it can relay, and a marker the web turns into an owner-only Connect card. The
- * turn ends: signing in is the owner's act, and they say when to continue.
+ * What the model gets for a call to a connection the owner has not signed in to (ADR 0063): words it can relay, and a
+ * marker the web turns into an owner-only Connect card. The turn ends: signing in is the owner's act, and they say when
+ * to continue.
  */
 export const connectRequiredResult = (connectionId: string, name: string, connection: string): ToolExecutionResult => ({
   content: [

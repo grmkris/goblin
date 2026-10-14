@@ -29,7 +29,6 @@ import type { EventOffers, SettledOffer } from './events/offers.ts'
 import type { Labels } from './labels.ts'
 import { StoredOAuthProvider } from './oauth-provider.ts'
 import type { AddedRegistries } from './registries.ts'
-import { profileOf, profileView } from './first-class.ts'
 import { makeCatalog } from './registry.ts'
 import { globalEntrypoint, offersEvents, offersSkills, toolAppResource, toolOffered } from './remote.ts'
 import { suggestedPolicy } from './suggested-access.ts'
@@ -72,17 +71,13 @@ export const offeredScope = async (endpoint: string, fetchFn: typeof fetch): Pro
   return computeScopeUnion(resource ?? server, refreshOf(server))
 }
 
-/** What goblin asks for at sign-in by default: what the server offers, and the scopes its first-class profile adds. */
-const signInScope = async (endpoint: string, fetchFn: typeof fetch): Promise<string | undefined> =>
-  computeScopeUnion(await offeredScope(endpoint, fetchFn), profileOf(endpoint)?.scope?.join(' '))
-
 /**
  * Every scope Choose access offers: the resource's list and its authorization server's together (a resource may list
- * only a narrow default while its authorization server lists every API it guards), and the profile's.
+ * only a narrow default while its authorization server lists every API it guards).
  */
 const availableScope = async (endpoint: string, fetchFn: typeof fetch): Promise<string | undefined> => {
   const { resource, server } = await publishedScopes(endpoint, fetchFn)
-  return computeScopeUnion(resource, server, profileOf(endpoint)?.scope?.join(' '))
+  return computeScopeUnion(resource, server)
 }
 
 /**
@@ -132,10 +127,7 @@ const viewOf = (
   const name = snapshot?.serverInfo?.name
   const events = snapshot !== undefined && offersEvents(snapshot)
   const offer = events ? (owner.offers?.settled(server.connectionId) ?? 'open') : undefined
-  const profile = profileOf(server.endpoint)
-  const entrypoint =
-    profile?.app?.tool ??
-    (snapshot === undefined ? owner.entrypoints?.of(server.connectionId) : globalEntrypoint(snapshot))
+  const entrypoint = snapshot === undefined ? owner.entrypoints?.of(server.connectionId) : globalEntrypoint(snapshot)
   return {
     connectionId: server.connectionId,
     label: owner.labels.of(server.connectionId) ?? server.connectionId,
@@ -150,7 +142,6 @@ const viewOf = (
     ...(claims?.title === undefined ? {} : { title: claims.title }),
     ...(claims?.description === undefined ? {} : { description: claims.description }),
     ...(claims?.icon === undefined ? {} : { icon: claims.icon }),
-    ...(profile === undefined ? {} : { profile: profileView(profile) }),
     ...(entrypoint === undefined ? {} : { entrypoint }),
   }
 }
@@ -170,8 +161,8 @@ const views = (owner: OwnerServers) =>
 
 /**
  * Adds a connection to a public https endpoint, one the owner may already have a connection to (ADR 0041). It is
- * named `label`, refused when another connection holds it, or else the first free name from goblin's own name for a
- * first-class server (ADR 0043) or a server on the shelf, else its server card's title, else its host.
+ * named `label`, refused when another connection holds it, or else the first free name from the shelf's title for it,
+ * else its server card's title, else its host.
  * It starts disconnected; the owner connects it as any other. `source` records the registry entry it came from.
  */
 const addServer = (owner: OwnerServers, raw: string, label: string | undefined, source: ServerSource | undefined) =>
@@ -187,11 +178,7 @@ const addServer = (owner: OwnerServers, raw: string, label: string | undefined, 
     const now = yield* epochSeconds
     yield* attemptSync(() => {
       added.add({ ...server, ...claims, ...(source === undefined ? {} : { source }) }, now)
-      const named =
-        profileOf(server.endpoint)?.title ??
-        suggestedTitle(owner.shelf, server.endpoint) ??
-        claims.title ??
-        endpoint.hostname
+      const named = suggestedTitle(owner.shelf, server.endpoint) ?? claims.title ?? endpoint.hostname
       labels.set(server.connectionId, label ?? labels.free(named))
     })
     yield* manager.add(server)
@@ -289,7 +276,7 @@ const beginConnect = (owner: OwnerServers, connectionId: string, chosen?: readon
     if (yield* connectsOpenly(owner, connectionId)) return {}
     const provider = new StoredOAuthProvider(owner.credentials, connectionId, owner.appUrl, { kind: 'interactive' })
     const result = yield* attempt(async () => {
-      const scope = narrowed ?? (await signInScope(server.endpoint, owner.fetch))
+      const scope = narrowed ?? (await offeredScope(server.endpoint, owner.fetch))
       return auth(provider, {
         serverUrl: server.endpoint,
         fetchFn: owner.fetch,
@@ -313,7 +300,7 @@ const beginStepUp = (owner: OwnerServers, connectionId: string, required: string
     const provider = new StoredOAuthProvider(owner.credentials, connectionId, owner.appUrl, { kind: 'interactive' })
     const result = yield* attempt(async () => {
       const held = await owner.credentials.tokens(connectionId)
-      const offered = await signInScope(server.endpoint, owner.fetch)
+      const offered = await offeredScope(server.endpoint, owner.fetch)
       const scope =
         held?.scope === undefined
           ? computeScopeUnion(offered, required)

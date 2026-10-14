@@ -26,7 +26,6 @@ import {
 import { EVENT_LIMITS } from './events/store.ts'
 import { appHtmlOf, blobBound } from './app-html.ts'
 import { offersEvents, offersSkills, toolOffered } from './remote.ts'
-import { profileOf } from './first-class.ts'
 import { refreshTools } from './tool-list.ts'
 import type { EventMethod } from './service.ts'
 import type {
@@ -73,9 +72,6 @@ const toolGuards = (
       if (authorize !== undefined) yield* authorize
       yield* granted
       const { endpoint } = yield* serverOf(manager, connectionId)
-      // A top-up reaches only the wallet's funding tool (ADR 0049), whatever else the owner granted.
-      if (caller === 'funding' && profileOf(endpoint)?.funding?.tool !== name)
-        return yield* new Forbidden({ reason: 'funding reaches only a wallet funding tool' })
       const decide = manager.options.authorizeTool
       if (decide === undefined) return
       const context = approvalContext === undefined ? {} : { approvalContext }
@@ -360,7 +356,7 @@ const requests = (manager: Manager) => ({
       manager,
       frozen,
       args,
-      { use: 'foreground', ...call, caller: call.caller ?? 'model' },
+      { use: 'foreground', ...call, caller: 'model' },
       modelCall(connectionId, answer),
     )
     if (outcome.kind === 'complete') return { kind: 'complete' as const, result: outcome.result }

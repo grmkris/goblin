@@ -1,4 +1,4 @@
-// What a Persona's answer waits on (ADRs 0041, 0042, 0043): a held call to approve, a tool to allow, a sign-in with
+// What a Persona's answer waits on (ADRs 0041, 0042, 0063): a held call to approve, a tool to allow, a sign-in with
 // more access, a connection to sign in to, or a URL request to finish. Drawn under the Persona's newest answer only, from its `app.persona` entry, never
 // from a tool result; the owner's reply goes to its fork.
 import type { PersonaHold } from '@goblin/contracts'

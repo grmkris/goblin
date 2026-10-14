@@ -88,49 +88,8 @@ export const AppGrantChange = Schema.Struct({
 export type AppGrantChange = typeof AppGrantChange.Type
 
 /** `POST /api/mcp/approvals/:id`: the owner's decision on a held call. */
-/** A dollar amount as a plain decimal: digits, then at most two after a point (ADR 0044). */
-export const Dollars = Schema.String.check(Schema.isPattern(/^\d{1,6}(?:\.\d{1,2})?$/u))
-export type Dollars = typeof Dollars.Type
-
-/**
- * The owner's decision on a held call. `runUpTo`: approve it, and from now on run this paid tool's jobs up to that much
- * without asking (ADR 0044); its daily total stays as it was, or starts at four times the amount.
- */
-export const ApprovalDecision = Schema.Struct({ allowed: Schema.Boolean, runUpTo: Schema.optional(Dollars) })
+export const ApprovalDecision = Schema.Struct({ allowed: Schema.Boolean })
 export type ApprovalDecision = typeof ApprovalDecision.Type
-
-/**
- * A first-class server's paid tool and the owner's rule for it (ADR 0044), with what it spent today (UTC): amounts in
- * dollars. No `perJob`: every job asks first.
- */
-export const SpendingView = Schema.Struct({
-  tool: Schema.String,
-  perJob: Schema.optional(Schema.String),
-  daily: Schema.optional(Schema.String),
-  spentToday: Schema.String,
-})
-export type SpendingView = typeof SpendingView.Type
-
-/** The owner's rule for a paid tool: run jobs up to `perJob` without asking, `daily` a day at most; null for none. */
-export const SpendingChange = Schema.Struct({ perJob: Schema.NullOr(Dollars), daily: Schema.NullOr(Dollars) })
-export type SpendingChange = typeof SpendingChange.Type
-
-/**
- * How goblin tops up a prepaid server's own balance from the Goblin Wallet (ADR 0049): up to `perTopUp` a top-up and
- * `daily` a day without asking, what it moved today (UTC), all in dollars, and the chain and token it moves.
- */
-export const TopUpView = Schema.Struct({
-  chain: Schema.String,
-  token: Schema.String,
-  perTopUp: Schema.String,
-  daily: Schema.String,
-  movedToday: Schema.String,
-})
-export type TopUpView = typeof TopUpView.Type
-
-/** The owner's top-up rule: up to `perTopUp` a top-up and `daily` a day without asking; above it, goblin asks. */
-export const TopUpChange = Schema.Struct({ perTopUp: Dollars, daily: Dollars })
-export type TopUpChange = typeof TopUpChange.Type
 
 /** What `POST /api/mcp/:id/connect` answers: where to send the owner's browser, when sign-in is needed. */
 export const ConnectStart = Schema.Struct({ authorizationUrl: Schema.optional(Schema.String) })
@@ -261,92 +220,6 @@ export type EventStream = typeof EventStream.Type
  * An outbound MCP server as the owner sees it. `live`: a connection is open right now. `source`: the deployment
  * configured it, or the owner added it. `title`, `description` and `icon` are the server's own claims.
  */
-/**
- * goblin's own profile of a server it supports first-class (ADR 0043), matched by endpoint, never by what the server
- * says about itself: our title and words, the grants "Allow recommended" applies, a paid tool and the argument that
- * holds its amount (ADR 0044), the tool that opens the server's own App, whether it has a status line, and where its
- * wallet is topped up.
- */
-export const ServerProfile = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  description: Schema.String,
-  /** Why to connect it, as the end of a sentence ("so goblin can …"), for onboarding's offers. */
-  offer: Schema.String,
-  /** The tools that run when needed, and those that ask first, once the owner allows the recommended set. */
-  recommended: Schema.Struct({ run: Schema.Array(Schema.String), ask: Schema.Array(Schema.String) }),
-  spend: Schema.optional(
-    Schema.Struct({ tool: Schema.String, argument: Schema.String, currency: Schema.Literal('USD') }),
-  ),
-  app: Schema.optional(Schema.Struct({ tool: Schema.String })),
-  /** It has a status line (`GET /api/mcp/:id/status`). */
-  status: Schema.Boolean,
-  /** Where the owner adds funds when its status says the wallet needs them: goblin's own https link. */
-  topUp: Schema.optional(Schema.Struct({ url: Schema.String })),
-  /**
-   * It keeps its own prepaid balance, which goblin tops up from the Goblin Wallet (ADR 0049): the chain and token the
-   * balance is in (its status reports it, and where to send it), and the default rule, in dollars: up to `perTopUp` a
-   * top-up and `daily` a day without asking.
-   */
-  prepaid: Schema.optional(
-    Schema.Struct({ chain: Schema.String, token: Schema.String, perTopUp: Schema.String, daily: Schema.String }),
-  ),
-})
-export type ServerProfile = typeof ServerProfile.Type
-
-const Readiness = Schema.Literals(['ready', 'blocked', 'not_verified'])
-const Short = Schema.String.check(Schema.isMaxLength(64))
-
-/** At most this many setup gaps a wallet reports, each at most `SETUP_GAP_LENGTH` characters. */
-export const SETUP_GAPS = 8
-export const SETUP_GAP_LENGTH = 120
-
-/**
- * What a wallet says the owner still has to set up on its own site before it can pay, in its own short phrases ("create
- * the agent wallet"): the server's claim, bounded, shown as plain text only.
- */
-export const SetupGaps = Schema.Array(Schema.String.check(Schema.isMaxLength(SETUP_GAP_LENGTH))).check(
-  Schema.isMaxLength(SETUP_GAPS),
-)
-
-/**
- * A first-class server's wallet as goblin reads it from the server's status tool (ADR 0043): whether paid work can run
- * now and whether it is funded, each token's balance, what its signed limit has left and can spend now, when the
- * limit's period ends, when the wallet's key expires and, where the server sums them, its stablecoin dollars. All of it is the server's claim, decoded by goblin and bounded.
- */
-export const WalletStatus = Schema.Struct({
-  kind: Schema.Literal('wallet'),
-  paid: Readiness,
-  funding: Readiness,
-  tokens: Schema.Array(
-    Schema.Struct({
-      symbol: Short,
-      balance: Schema.optional(Short),
-      remaining: Schema.optional(Short),
-      spendable: Schema.optional(Short),
-    }),
-  ).check(Schema.isMaxLength(8)),
-  periodEndsAt: Schema.optional(Short),
-  expiresAt: Schema.optional(Short),
-  /** The dollar stablecoins held on every chain the server read, a decimal string, when it adds them up itself. */
-  stablecoinUsd: Schema.optional(Short),
-  /** Set when a chain could not be read, so `stablecoinUsd` may be short of what is held. */
-  stablecoinUsdPartial: Schema.optional(Schema.Literal(true)),
-  /**
-   * Where the server's own payments come from, when it says so: the address to fund, its chain and token, and what it
-   * holds there (a decimal string; absent when that chain could not be read).
-   */
-  payFrom: Schema.optional(Schema.Struct({ address: Short, chain: Short, token: Short, held: Schema.optional(Short) })),
-  /**
-   * Where the server's own prepaid balance is funded (ADR 0049), when its status says so: the address, and the chain
-   * and token it takes. The balance itself is the token's in `tokens`.
-   */
-  depositTo: Schema.optional(Schema.Struct({ address: Short, chain: Short, token: Short })),
-  /** What is left to set up on the wallet's own site before it can pay (the Goblin Wallet's `setup`); absent when none. */
-  setup: Schema.optional(SetupGaps),
-})
-export type WalletStatus = typeof WalletStatus.Type
-
 export const ServerView = Schema.Struct({
   connectionId: Schema.String,
   /** The owner's name for this connection (ADR 0041). */
@@ -369,11 +242,9 @@ export const ServerView = Schema.Struct({
   eventHealth: Schema.optional(Schema.Array(EventHealth)),
   /** The owner uses this server's skills (procedures the agent follows). */
   skillsEnabled: Schema.optional(Schema.Boolean),
-  /** goblin's own profile, for a server it supports first-class (ADR 0043). */
-  profile: Schema.optional(ServerProfile),
   /**
-   * The tool that opens this connection's global entrypoint (its App, from any chat): the one a profile names, or the one
-   * the server declares in `_meta["openai/ui"].entrypoints`. Absent when it has none.
+   * The tool that opens this connection's global entrypoint (its App, from any chat): the one the server declares in
+   * `_meta["openai/ui"].entrypoints`, kept from its last whole tool list. Absent when it has none.
    */
   entrypoint: Schema.optional(Schema.String),
 })

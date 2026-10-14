@@ -9,9 +9,8 @@ import { NotFound } from '../../../src/http/errors.ts'
 import { ResidentLive } from '../../../src/layers/core.ts'
 import { McpHandlers } from '../../../src/mcp/api.ts'
 import { mcpHost } from '../../../src/mcp/host.ts'
-import { Approvals, Events, Spending, UrlRequests } from '../../../src/mcp/service.ts'
-import { SpendStore } from '../../../src/mcp/spend.ts'
-import { spendingOver, urlRequestsOver } from '../../../src/layers/mcp.ts'
+import { Approvals, Events, UrlRequests } from '../../../src/mcp/service.ts'
+import { urlRequestsOver } from '../../../src/layers/mcp.ts'
 import { CredentialCipher } from '../../../src/mcp/cipher.ts'
 import { Onboarding } from '../../../src/onboarding/service.ts'
 import { McpUrlRequestStore } from '../../../src/mcp/url-requests.ts'
@@ -27,7 +26,6 @@ import { ChatOperations, Chats, Conversations } from '../../../src/chats/service
 import { Files } from '../../../src/files/service.ts'
 import { Invocations, Personas } from '../../../src/personas/service.ts'
 import { PiSessions } from '../../../src/pi/sessions.ts'
-import { Notices } from '../../../src/notices/service.ts'
 import { RoutineControl, RoutineRuns, RoutineUsage } from '../../../src/routines/service.ts'
 import { Skills } from '../../../src/skills/service.ts'
 import {
@@ -125,7 +123,6 @@ const fixture = async () => {
           events,
           approvals,
           urlRequests,
-          Layer.succeed(Spending, spendingOver(new SpendStore(durable(db)))),
           Layer.succeed(Changes, makeChanges()),
           FlowEvents.noop,
           ResidentLive.pipe(Layer.provide(sqliteDb(db))),
@@ -133,8 +130,6 @@ const fixture = async () => {
           // here reaches them.
           Layer.mergeAll(stub(ChatOperations), stub(Skills), stub(Chats), stub(RoutineRuns), stub(Apps), stub(Budget)),
           Layer.mergeAll(stub(Setups), stub(Conversations), stub(Files), stub(Invocations), stub(Personas)),
-          // A top-up's receipt (ADR 0049) writes a notice; no test here reaches it.
-          stub(Notices),
           stub(PiSessions),
           stub(RoutineControl),
           stub(RoutineUsage),

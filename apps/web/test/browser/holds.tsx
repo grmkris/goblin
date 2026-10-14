@@ -54,8 +54,8 @@ if (root)
             kind: 'approval',
             callId: 'c4',
             approvalId: 'mcp:41:c4',
-            connectionId: 'mercator',
-            name: 'create_job',
+            connectionId: 'sq-worker',
+            name: 'submit_delivery',
           }}
         />
         <output id="answered" />

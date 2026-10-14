@@ -376,8 +376,10 @@ describe('outbound OAuth connect and refresh (unit, fixture authorization server
     }
   })
 
-  it("asks a first-class server for its profile's scopes beside the narrower list its resource offers", async () => {
-    const origin = 'https://mcp.cloudflare.com'
+  it('offers the scopes its authorization server lists beside the narrower list its resource offers', async () => {
+    // A resource that lists only a narrow default while its authorization server lists every API it guards: Choose
+    // access offers both lists, so the owner can sign in to what the work needs (the scripts scopes) and nothing wider.
+    const origin = 'https://api.example'
     const fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
       const { pathname } = new URL(new Request(input, init).url)
       if (pathname.startsWith('/.well-known/oauth-protected-resource'))
@@ -395,10 +397,18 @@ describe('outbound OAuth connect and refresh (unit, fixture authorization server
           response_types_supported: ['code'],
           code_challenge_methods_supported: ['S256'],
           token_endpoint_auth_methods_supported: ['none'],
+          scopes_supported: [
+            'user:read',
+            'account:read',
+            'workers-scripts.read',
+            'workers-scripts.write',
+            'zone:edit',
+            'offline_access',
+          ],
         })
       if (pathname === '/register') {
         const metadata: Record<string, unknown> = await new Request(input, init).json()
-        return Response.json({ ...metadata, client_id: 'cf' }, { status: 201 })
+        return Response.json({ ...metadata, client_id: 'api' }, { status: 201 })
       }
       return new Response(null, {
         status: 401,
@@ -408,14 +418,28 @@ describe('outbound OAuth connect and refresh (unit, fixture authorization server
       })
     }
     const { servers, dispose } = hostOf({
-      servers: [{ connectionId: 'cloudflare', endpoint: `${origin}/mcp` }],
+      servers: [{ connectionId: 'api', endpoint: `${origin}/mcp` }],
       credentials: new MemoryCredentials(),
       grants: new MemoryGrants(),
       fetch,
     })
     try {
-      const { authorizationUrl } = await servers.beginConnect('cloudflare')
-      expect(scopeOf(authorizationUrl)).toEqual([
+      expect((await servers.access('api')).offered).toEqual([
+        'user:read',
+        'account:read',
+        'workers-scripts.read',
+        'workers-scripts.write',
+        'zone:edit',
+        'offline_access',
+      ])
+      // By default, a sign-in asks for the resource's own list, with a refresh token.
+      expect(scopeOf((await servers.beginConnect('api')).authorizationUrl)).toEqual([
+        'account:read',
+        'offline_access',
+        'user:read',
+      ])
+      const chosen = ['user:read', 'account:read', 'workers-scripts.read', 'workers-scripts.write']
+      expect(scopeOf((await servers.beginConnect('api', chosen)).authorizationUrl)).toEqual([
         'account:read',
         'offline_access',
         'user:read',

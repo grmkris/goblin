@@ -22,21 +22,13 @@ export const approvalQuery = (id: string) =>
     refetchInterval: (query) => (awaitingApproval(query.state.data) ? 5000 : false),
   })
 
-/**
- * The owner's decision on held call `id`; its answer is the call as it now stands. `runUpTo` also sets the paid tool's
- * spending rule (ADR 0044), so the connection's spending is read again.
- */
+/** The owner's decision on held call `id`; its answer is the call as it now stands. */
 export const decideApprovalMutation = (id: string) =>
   mutationOptions({
     ...owner.apiMutation({
       mutationFn: (api, decision: ApprovalDecision) => api.mcp.decideApproval({ params: { id }, payload: decision }),
     }),
-    onSuccess: (view, decision, _result, { client }) => {
-      client.setQueryData(approvalKeys.detail(id), view)
-      if (decision.runUpTo !== undefined)
-        return client.invalidateQueries({ queryKey: ['mcp', 'spending', view.connectionId] })
-      return undefined
-    },
+    onSuccess: (view, _decision, _result, { client }) => client.setQueryData(approvalKeys.detail(id), view),
   })
 
 /** Whether a URL request still waits: on the owner, or on its retry. */

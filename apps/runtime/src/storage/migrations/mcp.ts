@@ -2,7 +2,8 @@ import { BREAK, type Migration } from './migration.ts'
 
 /**
  * The MCP 2026 client (ADR 0042, keys from `20261030000000_`), spending rules (ADR 0044) and top-ups (ADR 0049): added
- * by their own migrations, so dev keeps its data.
+ * by their own migrations, so dev keeps its data. Nothing reads or writes the spending tables since ADR 0063; they stay
+ * until the migrations are squashed.
  */
 export const MCP_MIGRATIONS: readonly Migration[] = [
   {

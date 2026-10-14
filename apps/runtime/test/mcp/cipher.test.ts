@@ -29,7 +29,7 @@ describe('credential cipher (unit)', () => {
 })
 
 describe('pending authorizations (unit, real SQLite)', () => {
-  it('lives an hour, so a consent that sets up and funds the wallet still comes back, and is taken once', async () => {
+  it('lives an hour, so a consent that walks the owner through a setup still comes back, and is taken once', async () => {
     const { db, close } = chatDatabase()
     try {
       const store = new CredentialStore(durable(db), await CredentialCipher.fromBase64(key))
