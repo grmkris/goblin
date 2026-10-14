@@ -7,7 +7,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | ADR | Decision | Status |
 | --- | --- | --- |
 | [0001](0001-runtime-and-auth-storage.md) | Native Pi runtime and identity storage | Accepted |
-| [0002](0002-stages-and-provider.md) | Isolated stages and provider planes | Accepted |
+| [0002](0002-stages-and-provider.md) | Isolated stages and provider planes | Accepted; amended by 0059 |
 | [0003](0003-resident-mcp-and-inbound-server.md) | The agent object owns MCP, holds its own authority, and serves /mcp | Accepted |
 | [0004](0004-an-agent-per-user.md) | An agent per user, with gated sign-up | Accepted |
 | [0005](0005-mcp-apps-host.md) | One live MCP App on a stage, told about its host, trusted for nothing | Accepted; its one live App superseded by 0020 |
@@ -56,3 +56,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0056](0056-goblin-wallet-leaves-goblin.md) | Goblin Wallet leaves goblin | Accepted |
 | [0057](0057-goblin-pays-for-no-model-call.md) | goblin pays for no model call | Accepted |
 | [0058](0058-no-plans-tokens-and-an-optional-cap.md) | No plans: access by sign-up, usage in tokens with an optional cap | Accepted |
+| [0059](0059-bring-your-own-model-endpoint.md) | Bring your own model endpoint | Accepted |
