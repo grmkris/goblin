@@ -129,6 +129,11 @@ shows on its next description.
 `askClient`, Telegram turns and `recentOwnerMessages` resolve `primary()`, unchanged: every inbound channel lands in
 Personal's Conversation, whatever Topic the owner used last.
 
+Amended 2026-10-13 by [ADR 0055](0055-telegram-chats-route-to-topics.md): Telegram no longer does. Each Telegram chat
+and forum topic has a route the owner chose, and its messages land in that Topic's Conversation (Personal's while the
+Topic is archived, as a routine's home does); the DM goes to Personal until the owner says otherwise. Inbound MCP
+clients still land in Personal.
+
 ## Verification
 
 Unit tests (`test/topics.test.ts`, `test/chats.test.ts`) run the real migrations in `node:sqlite` and cover idempotent

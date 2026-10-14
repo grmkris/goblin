@@ -33,7 +33,8 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   (decoded at the authenticated SDK fetch seam, which strips it) or by the `io.modelcontextprotocol/events` extension,
   which goblin declares too (ADR 0041). Signed controls have separate schemas; payloads never grant or become
   instructions.
-- Telegram (`channel/`, ADR 0009) selects Events when advertised, otherwise the legacy doorbell. Its tool and Event
+- Telegram (`channel/`, ADRs 0009, 0055) rides Events only, subscribed with `{ chat: 'all' }` when the grant reaches
+  every chat (the DM's otherwise); each chat's route is in `channel/routes.ts`. Its tool and Event
   names are mygram's or mysi's spelling, read from the connection (`telegramTools`, `telegramEvent`). Preserve sanitized
   `telegram-tg-<update>` and reply operation ids; fence old cursor writes only after both leases confirm. Hooks persist
   receipts before asynchronous dispatch; accepted submissions are distinct from external delivery.

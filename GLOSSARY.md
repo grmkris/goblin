@@ -132,9 +132,10 @@ A routine post the owner asked to be told about: listed in Activity's Notificati
 until read.
 
 **Telegram channel**:
-The one MCP connection that carries Telegram for the agent (ADRs 0009, 0011): mygram's, directly or through mysi. The
-owner's messages arrive in Main authored "Telegram", woken by a signed MCP Event or, from a server without Events, a
-**doorbell**; answers go back through mygram's send tool.
+The one MCP connection that carries Telegram for the agent (ADRs 0009, 0011, 0055): mygram's, directly or through
+mysi, woken by its signed MCP Events. Every chat the grant reaches (the owner's DM, groups, forum topics) has a
+**Telegram route**: the Topic its messages become turns in, answered by goblin or a Persona back in the same place, or
+kept as notes, or ignored; a new chat waits for the owner's choice. Answers go back through mygram's send tool.
 
 **Conversation activity**:
 What a chat is doing now: `working`, or `waiting` on its subagents.

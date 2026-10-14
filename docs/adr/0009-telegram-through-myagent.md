@@ -8,6 +8,11 @@ the old cursor is fenced and an immediate authoritative pull runs. Legacy server
 below until the announced mygram batch. Inbound `tg:<update>` identifiers keep the existing sanitized
 `telegram-tg-<update>` operation mapping; reply IDs, escaping, chunking and pending reply records stay the same.
 
+Amended 2026-10-13 by [ADR 0055](0055-telegram-chats-route-to-topics.md): one connection still carries Telegram, by the
+Events path only (the doorbell, its hook route and its secret are gone, as mygram's are). The inbox is read for every
+chat the grant reaches, and each message goes where its chat's route says, no longer always to main; each answer goes
+back to the chat and forum topic it came from.
+
 **The agent talks on Telegram through myagent, with a bot of its own.** myagent is the owner's Telegram-to-MCP
 bridge. It holds several bots, and the owner binds each authorized MCP client to one of them. goblin connects to
 myagent like any other MCP server. The owner then picks that connection under Connections, "Use for Telegram". That is

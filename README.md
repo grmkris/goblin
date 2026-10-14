@@ -23,9 +23,11 @@ Diagrams offer an explorer with zoom, pan and node connections, shared with agen
 
 Telegram comes through mygram, connected directly or through mysi, which brings the owner's own my* apps (notes,
 browsers, Telegram, email, skills, terminals) in one connection with its tools named `<app>_<tool>`. The owner turns on
-a connection's **Telegram** switch in Connections; signed MCP Events wake an authoritative inbox pull (`inbox_read`)
-into main, and replies go back with `message_send`, under either spelling (ADR 0052). A server without Events uses the
-doorbell fallback. The agent's `mcp_list` lists a connection with many tools, such as mysi, by service first.
+a connection's **Telegram** switch in Connections; signed MCP Events wake an authoritative inbox pull (`inbox_read`) of
+every chat the grant reaches, each message goes to the Topic its chat or forum topic is routed to (the DM to Personal,
+a new group waits for the owner's choice), and the answer goes back to the same place with `message_send`, under
+either spelling (ADRs 0052, 0055). The agent's `mcp_list` lists a connection with many tools, such as mysi, by
+service first.
 Owner-enabled skills libraries use update Events to invalidate their cached
 catalog; the next activation refetches, while retained activations keep their verified version.
 

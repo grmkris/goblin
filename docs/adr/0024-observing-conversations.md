@@ -41,7 +41,9 @@ Consequences:
   sink.
 - The ledger and log lines cost a few writes per model attempt and tool call; Cloudflare logs and traces keep seven
   days.
-- Telegram group chats need their own design: today mygram accepts only the owner's private chat.
+- Telegram group chats need their own design: today mygram accepts only the owner's private chat. (Designed since in
+  [ADR 0055](0055-telegram-chats-route-to-topics.md): a routed message is recorded as before, under the chat it ran
+  in, still without content.)
 
 ## Amendments
 

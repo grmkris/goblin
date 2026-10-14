@@ -124,7 +124,7 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_MEMORY_MODEL` | The offered model for thread names, Topic Conversation memory summaries and skill-draft decisions. It is not selected by price; unset or not offered uses the default. |
 | `GOBLIN_SMOKE_MODEL` | Optional model for smoke turns. It must be one of the offered models; unset keeps the owner's pick. |
 | `GOBLIN_MCP_SERVERS` | JSON list of outbound servers every account starts with: `[{"connectionId":"mercator","endpoint":"https://mercator.sh/mcp/auth","label":"Mercator"}]`. Dev and prod configure Mercator (ADR 0043); each owner still signs in. |
-| `GOBLIN_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP credentials, Events secrets/envelopes and the legacy doorbell secret; derives purpose-separated hook tokens. |
+| `GOBLIN_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP credentials and Events secrets/envelopes; derives purpose-separated hook tokens. |
 
 These are source defaults and configuration names; active dev settings and provider caps must be verified separately.
 
@@ -136,8 +136,8 @@ GOBLIN_BREAK_GLASS=1 GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-res
 bun run smoke:dev                         # acceptance; see scripts/README.md
 ```
 
-Changing `GOBLIN_CREDENTIAL_KEY` makes stored MCP credentials and the Telegram secret unreadable and changes the hook
-token; reconnect the servers and re-enable Telegram afterwards.
+Changing `GOBLIN_CREDENTIAL_KEY` makes stored MCP credentials and Events secrets unreadable and changes the hook
+tokens; reconnect the servers and re-enable Telegram afterwards.
 Changing a server's `endpoint` drops what was stored for it (credentials, grants, pending sign-ins) at each
 agent's next start; connect it again. Tokens are never carried from one host to another.
 
@@ -215,12 +215,14 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   follows those procedures; their tools still need grants. To receive drafts in a library such as myskills, grant
   `skill_draft` and `skill_draft_status` (through mysi, `myskills_skill_draft` and `myskills_skill_draft_status`), then
   review the proposals there.
-- **Telegram.** Bind the authorized mygram profile to the bot (in mygram, or on mysi's consent page), then turn on the
-  connection's **Telegram** switch. A server offering Events grants mygram's inbox and send tools (`inbox_read` and
-  `message_send`, or `mygram_inbox_read` and `mygram_message_send` through mysi) and its two exact event selectors;
-  a server without Events uses the four-tool doorbell fallback. Connections shows which transport is active. New inbox
-  messages arrive in main as **Telegram**, including answers to pending questions, and replies go back to the bot.
-  Turning it off unsubscribes and clears pending replies.
+- **Telegram.** Bind the authorized mygram profile to the bot (in mygram, or on mysi's consent page; choose **All
+  chats** to let goblin see groups), then turn on the connection's **Telegram** switch. The server must offer Events:
+  goblin grants mygram's inbox, send, question, chat-list and topic-list tools (mysi's `mygram_` names) and subscribes
+  `message.received`, `question.answered` and `chat.changed` for every chat the grant reaches, or the DM alone with a
+  "Let goblin see your groups" link. DM messages arrive in Personal as **Telegram**; a group or forum topic is offered
+  in the DM with buttons and waits until the owner routes it (Connections → mysi → Telegram → Chats, or by asking
+  goblin), then arrives in its Topic as **Telegram · <title>**, and answers go back to the same chat and topic.
+  Turning it off unsubscribes, drops held messages and pending replies, and keeps the routes.
 - **Resident authority.** Settings → Your agent → **Work while you're away** shows it and when it expires. Owner
   activity renews it for 30 days; inbound and scheduled work do not renew it. Turning it off stops all outbound MCP
   use by the agent until you turn it on again.

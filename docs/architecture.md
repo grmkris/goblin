@@ -33,7 +33,6 @@ Runtime paths below are relative to `apps/runtime/src/`; browser paths are relat
 | `/api/billing/…`, `/api/clients…`, `/api/client-errors` | The account API, answered in the Worker without waking an agent (see The owner API). |
 | `/api/*` | The owner API: admitted at the Worker's edge, then forwarded to the signed-in user's own agent (see The owner API). |
 | `/hooks/mcp-events/<userId>/<connectionId>/<token>` | One connection's signed MCP Events; the route token, bound to the user and the connection, is checked before object lookup, then the agent's internal API takes it (`mcpEvents`). |
-| `/hooks/myagent/<userId>/<token>` | The Telegram doorbell, the fallback for servers without Events; the user-bound route token is checked before object lookup, then the internal API's `doorbell`. |
 | anything else, `/internal/*` included | A 404 in the envelope: the internal API is reached only by the Worker, on the agent's stub. |
 | `/hooks/dodo` | Signed payment webhooks (see Plans and payments). |
 
@@ -108,7 +107,7 @@ locations and never its message. The Worker's own routes (`/mcp`'s failures asid
 Callers that are not the owner's browser reach the agent through its internal API (`InternalApi`, `/internal`, exported
 only from `@goblin/contracts/internal`), which the Worker calls on the agent's stub with a typed client
 (`inbound/client.ts`) after its own check of the caller (a bearer token, a hook's route token; it reads no plan of its
-own): `ask`, `recent` and `inspect` (inbound `/mcp`), `doorbell` and `mcpEvents` (the hooks). Its gate (`InternalGate`,
+own): `ask`, `recent` and `inspect` (inbound `/mcp`), and `mcpEvents` (the Events hook). Its gate (`InternalGate`,
 `http/api/middleware.ts`) refuses a request carrying the owner forward's mark and checks the plan the agent keeps unless
 the endpoint says otherwise (`RequiresPlan`: `inspect`); it never renews resident authority. One Durable Object RPC
 method remains, `deleteAgentData` (account deletion): Workers RPC drops custom error classes, so it returns an encoded
@@ -1449,17 +1448,23 @@ goblin is an MCP server at `/mcp`, the one protected resource of Better Auth's `
 
 ## MCP Events and Telegram
 
-The owner selects one Telegram connection with its **Telegram** switch (ADR 0011). If its authenticated discovery
-advertises Events (top-level `capabilities.events` or the `io.modelcontextprotocol/events` extension, ADR 0041), the
-action grants mygram's inbox and send tools and the exact Events selectors `message.received` and `question.answered`
-with `{}` arguments. Each name is the connection's own spelling (ADR 0052), decided in one place
+The owner selects one Telegram connection with its **Telegram** switch (ADRs 0011, 0055). Its authenticated discovery
+must advertise Events (top-level `capabilities.events` or the `io.modelcontextprotocol/events` extension, ADR 0041):
+the action grants mygram's inbox, send, question, chat-list and topic-list tools and the exact Events selectors
+`message.received`, `question.answered` and, once the server offers it, `chat.changed`. A read of every chat
+(`inbox_read { chat: 'all' }`) tells how far the grant reaches: when it answers, the selectors take
+`{ chat: 'all' }`; when mygram refuses it (`access_insufficient`), they take `{}` (the DM) and the channel keeps the
+widen URL the refusal carried (https only), which the mysi card shows as "Let goblin see your groups". Each name is
+the connection's own spelling (ADR 0052), decided in one place
 (`packages/contracts/src/service-names.ts`): mygram's (`inbox_read`, `message_send`, `message.received`) on a direct
 connection, mysi's (`mygram_inbox_read`, `mygram_message_send`, `mygram.message.received`) through mysi, read from the
 tools it lists and the Events its `events/list` offers. Consumers stay keyed by mygram's own event name, and every
-later call (the pull, replies, notice copies, an app's `notify`) asks the live connection's tool list for the name. Both finite webhook subscriptions must confirm before
-`app_telegram_channel` copies the checkpoint and fences old doorbell cursor writes. The channel pulls immediately;
-a failure before that fence leaves the old channel checkpoint intact. A server without Events retains the legacy
-`subscribe`/`unsubscribe` doorbell transport. Connections shows the active transport.
+later call (the pull, replies, notice copies, an app's `notify`) asks the live connection's tool list for the name.
+Every finite webhook subscription must confirm before `app_telegram_channel` copies the checkpoint and fences older
+cursor writes. The channel pulls immediately; a failure before that fence leaves the old channel checkpoint intact.
+There is no other transport: the doorbell is gone with mygram's. A subscription the server ends (a widened or revoked
+grant ends them all) is subscribed again by the next pull, with the reach the grant has then; one that cannot be
+subscribed again marks the channel `ended` for the owner instead of looping.
 
 `POST /hooks/mcp-events/<userId>/<connectionId>/<token>` verifies the token, bound to the user and the connection (each
 connection has its own URL, ADR 0041), before lookup; ingress only matches that connection's subscriptions. Inside
@@ -1476,14 +1481,25 @@ endpoint changed. A maintenance sweep keeps the next alarm only for when somethi
 the earliest lease refresh or poll of a running subscription, or a delivery's retry); with nothing waiting, no alarm is
 kept. A failed sweep is reported, then retried a minute later while something waits (`mcp/wake.ts`).
 
-`message.received` and `question.answered` both pull the authoritative inbox into the primary chat's current Pi session:
-the consumer schedules the channel's pull alarm at once (`channelPull`), as a doorbell does, and the pull runs there,
-one at a time. Telegram admission and answer readback use its operation ledger binding. `ask_user` ends its turn; the
-answer arrives as the owner's next inbox message. The existing id mapping is preserved: `tg:123` becomes
-`telegram-tg-123`, and reply operations keep their sanitization/truncation. Main's replies and subagent reports go back
-with the send tool, escaped and chunked, using `app_channel_replies`. Submission acceptance is distinct from external
-Telegram completion. Disabling cleans up Events while authority is available, then tombstones locally; finite remote
-leases expire if authorized cleanup cannot run.
+Every Telegram Event schedules the channel's pull alarm at once (`channelPull`); `chat.changed` also marks the server's
+chat list to be read again (`sync_due`). The pull runs there, one at a time: it reads `chat_list` (and each forum's
+`thread_list`) into the routes when due, then the inbox from its one cursor. Each entry names its `chat` (`dm` or an
+opaque group handle) and forum topic; an entry whose chat is not a handle is skipped, and `out` or `archive` entries
+are context only. Routing (ADR 0055, `channel/routes.ts`, `channel/channel.ts`) sends each owner message where its
+chat's or topic's route says (`app_telegram_routes`): a turn in the route's Topic, through `ChatOperations.send` or,
+for a Persona, `askPersonas`, authored `Telegram · <chat title>`; a passive `app.telegram` note (`listen`); nothing
+(`ignore`); or held (`app_telegram_held`, twenty a chat) while a new chat waits for the owner. A chat or topic seen for
+the first time is offered in the DM with `question_ask` buttons (`channel/offers.ts`, operation
+`telegram-offer:<chat>:<thread>`) or routed by the default for new chats; an answer entry carrying an open offer's
+question id sets the route and starts no turn. A route change goes through the channel between pulls, so what was held
+is delivered in order. The id mapping is preserved: `tg:123` becomes `telegram-tg-123`. `app_channel_replies` keeps
+where each answer goes (the goblin chat, the Telegram chat and thread, the answering Persona); goblin's answer, or the
+Persona invocation's, goes back with `message_send { chat, threadId }`, escaped and chunked, and one that stopped on a
+single-choice `ask_user` goes as `question_ask` buttons; the owner's tap comes back as an answer entry whose button
+label is their reply. A send refused with `chat_paused` or `chat_left` marks the chat so and gives the answer up.
+Notices and an app's `notify` always go to `chat: 'dm'`. Submission acceptance is distinct from external Telegram
+completion. Disabling cleans up Events while authority is available, drops held messages and replies to send, keeps
+the routes, then tombstones locally; finite remote leases expire if authorized cleanup cannot run.
 
 The dispatcher also binds myskills' `skills.updated` and `skills.list_changed`. Turning a server's skills on subscribes
 to them only where its Events offer them to this connection; a server without them, or one that refuses its Events

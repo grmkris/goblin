@@ -24,7 +24,7 @@ through `promiseWith` (`runtime/boundary.ts`).
 - What is not JSON in and out (the SSE streams, the owner's file bytes, the OAuth callback redirect) is an endpoint
   served through HttpApi's raw handlers, behind the same edge. One router (`AgentHttp`) serves the owner API and the
   internal API (`/internal`, `@goblin/contracts/internal`), which only the Worker calls on the stub: an inbound
-  client's ask, recent read and inspection, the doorbell and MCP Events. Its gate (`InternalGate`) refuses a request
+  client's ask, recent read and inspection, and MCP Events. Its gate (`InternalGate`) refuses a request
   carrying the edge's mark and checks the plan the agent keeps unless the endpoint is `RequiresPlan: false`; it never
   renews resident authority. A new caller that is not the owner's browser gets an internal endpoint, never an RPC
   method.
