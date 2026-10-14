@@ -266,6 +266,13 @@ export const appMcpEventOffers = sqliteTable('app_mcp_event_offers', {
   at: integer('at').notNull(),
 })
 
+/** Each connection's own App entrypoint, as its last whole tool list declared it (`mcp/entrypoints.ts`). */
+export const appMcpEntrypoints = sqliteTable('app_mcp_entrypoints', {
+  connectionId: text('connection_id').primaryKey().notNull(),
+  tool: text('tool').notNull(),
+  at: integer('at').notNull(),
+})
+
 /** Endpoint-bound finite leases. Secrets are ciphertext bound to server, subscription and purpose. */
 export const appMcpEventSubscriptions = sqliteTable(
   'app_mcp_event_subscriptions',

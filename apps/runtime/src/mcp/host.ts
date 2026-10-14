@@ -9,6 +9,7 @@ import { mcpAuth } from './auth.ts'
 import type { McpManager } from './connections.ts'
 import type { Credentials } from './credentials.ts'
 import type { Grants } from './grants.ts'
+import type { Entrypoints } from './entrypoints.ts'
 import type { EventOffers } from './events/offers.ts'
 import type { Labels } from './labels.ts'
 import type { StepReport } from './log.ts'
@@ -45,6 +46,8 @@ export type McpHostOptions = {
   readonly authorizeTool?: McpManagerOptions['authorizeTool']
   /** Told when a connection's tools change (mcp/tool-list.ts), so the owner's Connections page reads them again. */
   readonly toolsChanged?: McpManagerOptions['toolsChanged']
+  /** Where each connection's own App entrypoint is kept; without it, a server's App is known only while connected. */
+  readonly entrypoints?: Entrypoints
 }
 
 /**
@@ -149,6 +152,13 @@ const askFirstRefused =
       ? Effect.fail(new Forbidden({ reason: 'Owner approval required for this exact call' }))
       : Effect.void
 
+/** The manager's optional hooks among `options`, each only when given. */
+const managerHooks = (options: McpHostOptions) => ({
+  ...(options.report === undefined ? {} : { report: options.report }),
+  ...(options.toolsChanged === undefined ? {} : { toolsChanged: options.toolsChanged }),
+  ...(options.entrypoints === undefined ? {} : { entrypoints: options.entrypoints }),
+})
+
 /**
  * Outbound MCP for the resident agent: the connections (mcp/manager.ts) with their OAuth tokens (mcp/auth.ts), the
  * owner's servers (mcp/owner-servers.ts) and grants, all over the stores in `options`. Made once, by the agent's start
@@ -171,8 +181,7 @@ export const mcpHost = (
         skillsEnabled,
         auth: yield* mcpAuth({ credentials, appUrl: options.appUrl, fetch: options.fetch }),
         fetch: options.fetch,
-        ...(options.report === undefined ? {} : { report: options.report }),
-        ...(options.toolsChanged === undefined ? {} : { toolsChanged: options.toolsChanged }),
+        ...managerHooks(options),
       }).pipe(Effect.orDie)
       const servers = ownerServers({
         manager,
@@ -185,6 +194,7 @@ export const mcpHost = (
         ...(options.added === undefined ? {} : { added: options.added }),
         labels: options.labels,
         ...(options.offers === undefined ? {} : { offers: options.offers }),
+        ...(options.entrypoints === undefined ? {} : { entrypoints: options.entrypoints }),
         random: options.random ?? (() => crypto.randomUUID().replaceAll('-', '')),
         skillsEnabled,
       })

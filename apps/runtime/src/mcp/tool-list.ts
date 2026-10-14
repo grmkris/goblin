@@ -6,7 +6,7 @@ import { type AppError, UpstreamMcp } from '../http/errors.ts'
 import type { Connection, Manager } from './connections.ts'
 import { mapMcpError } from './errors.ts'
 import { timed } from './log.ts'
-import { bounded } from './remote.ts'
+import { bounded, globalEntrypoint } from './remote.ts'
 import type { McpConnectionSnapshot } from './types.ts'
 
 // A connection's live tool list (ADR 0042): its tools re-listed in place, and the `subscriptions/listen` stream that
@@ -36,14 +36,22 @@ const digestOf = (tools: McpConnectionSnapshot['tools']): string => {
   return `${hash.toString(16)}-${String(tools.length)}`
 }
 
-/** After a whole list: tells the manager's listener when the connection's tools differ from the last list it saw. */
+/**
+ * After a whole list: when the connection's tools differ from the last list it saw, keeps the App entrypoint they
+ * declare and tells the manager's listener.
+ */
 export const toolsListed = (manager: Manager, connection: Connection) =>
-  Effect.suspend(() => {
+  Effect.gen(function* () {
     const connectionId = connection.server.connectionId
     const digest = digestOf(connection.snapshot.tools)
-    if (manager.digests.get(connectionId) === digest) return Effect.void
+    if (manager.digests.get(connectionId) === digest) return
     manager.digests.set(connectionId, digest)
-    return manager.options.toolsChanged?.(connectionId, digest) ?? Effect.void
+    const { entrypoints, toolsChanged } = manager.options
+    if (entrypoints !== undefined) {
+      const at = yield* Clock.currentTimeMillis
+      yield* Effect.sync(() => entrypoints.set(connectionId, globalEntrypoint(connection.snapshot), at))
+    }
+    if (toolsChanged !== undefined) yield* toolsChanged(connectionId, digest)
   })
 
 /** One whole list of the connection's tools, bounded as discovery is: the snapshot with those tools. */

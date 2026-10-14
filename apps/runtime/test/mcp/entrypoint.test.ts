@@ -2,6 +2,7 @@ import type { Tool } from '@modelcontextprotocol/client'
 import { createMcpHandler } from '@modelcontextprotocol/server'
 import { afterEach, describe, expect, it } from 'vitest'
 import { globalEntrypoint, toolGlobalEntrypoint } from '../../src/mcp/remote.ts'
+import type { Entrypoints } from '../../src/mcp/entrypoints.ts'
 import type { McpConnectionSnapshot } from '../../src/mcp/types.ts'
 import { lowLevelServer } from './low-level-server.ts'
 import { hostOf } from './manager.ts'
@@ -60,8 +61,23 @@ afterEach(async () => {
   await Promise.all(made.splice(0).map((dispose) => dispose()))
 })
 
-/** A server with `tools`, signed in; the owner's list shows what it declares only once the connection is live. */
-const serving = async (connectionId: string, endpoint: string, tools: Tool[]) => {
+/** Entrypoints kept in memory, as the agent keeps them in SQLite across starts. */
+class MemoryEntrypoints implements Entrypoints {
+  readonly kept = new Map<string, string>()
+  of(connectionId: string): string | undefined {
+    return this.kept.get(connectionId)
+  }
+  set(connectionId: string, entry: string | undefined): void {
+    if (entry === undefined) this.kept.delete(connectionId)
+    else this.kept.set(connectionId, entry)
+  }
+}
+
+/**
+ * A server with `tools`, signed in; the owner's list shows what it declares once the connection is live, or what
+ * `kept` holds from an earlier start.
+ */
+const serving = async (connectionId: string, endpoint: string, tools: Tool[], kept?: Entrypoints) => {
   const handler = createMcpHandler(() => {
     const server = lowLevelServer({ name: 'fixture', version: '1.0.0' }, { capabilities: { tools: {} } })
     server.setRequestHandler('tools/list', () => ({ tools }))
@@ -74,6 +90,7 @@ const serving = async (connectionId: string, endpoint: string, tools: Tool[]) =>
     credentials,
     grants: new MemoryGrants(),
     fetch: async (input, init) => handler.fetch(new Request(input, init)),
+    ...(kept === undefined ? {} : { entrypoints: kept }),
   })
   made.push(mcp.dispose)
   return mcp
@@ -86,6 +103,17 @@ describe('the entrypoint on the owner’s server view (unit)', () => {
     expect(await entry()).toBeUndefined()
     await mcp.connections.connect('docs')
     expect(await entry()).toBe('open_home')
+  })
+  it('keeps a live server’s entrypoint for the next start, before it connects again', async () => {
+    const kept = new MemoryEntrypoints()
+    const first = await serving('docs', 'https://docs.test/mcp', [tool('open_home', entrypoints('global'))], kept)
+    await first.connections.connect('docs')
+    expect(kept.of('docs')).toBe('open_home')
+    const next = await serving('docs', 'https://docs.test/mcp', [tool('read')], kept)
+    expect((await next.servers.list())[0]).toMatchObject({ entrypoint: 'open_home' })
+    await next.connections.connect('docs')
+    expect(kept.of('docs')).toBeUndefined()
+    expect((await next.servers.list())[0]).not.toHaveProperty('entrypoint')
   })
   it('shows none for a server that declares none', async () => {
     const mcp = await serving('plain', 'https://plain.test/mcp', [tool('read')])

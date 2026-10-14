@@ -33,4 +33,10 @@ export const MCP_MIGRATIONS: readonly Migration[] = [
     tables: ['app_mcp_spend'],
     sql: 'ALTER TABLE app_mcp_spend ADD COLUMN destination TEXT',
   },
+  {
+    // A connection's own App entrypoint (ADR 0053), kept so its Open and pin outlive the connection.
+    key: '20261101000200_mcp_entrypoints',
+    tables: ['app_mcp_entrypoints'],
+    sql: 'CREATE TABLE app_mcp_entrypoints (connection_id TEXT PRIMARY KEY NOT NULL, tool TEXT NOT NULL, at INTEGER NOT NULL)',
+  },
 ]

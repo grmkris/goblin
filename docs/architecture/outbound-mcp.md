@@ -37,7 +37,10 @@ owner has allowed, `/connections/<id>/app` (`server-app.tsx`, ADR 0053): `POST /
 reopens) the server's thread, an empty thread under Personal named after the server (thread operation
 `server-app:<connection>`), and keeps the App there (`entrypoint` on its source); the page then goes to `/a/<id>`, where
 `AppHost` loads it with its app tool called as the owner (`serverAppQuery`, on the panel `?focus=` names), rendered in
-the same sandboxed frame as any MCP App and trusted for nothing. Its one display mode is fullscreen. A frame reloads
+the same sandboxed frame as any MCP App and trusted for nothing. Any server's App opens this way: the tool its tools
+declare as their global entrypoint (`_meta["openai/ui"].entrypoints`), kept per connection from its last whole tool list
+(`app_mcp_entrypoints`, `mcp/entrypoints.ts`), so Open and the pin outlive the connection and the object. Its one
+display mode is fullscreen. A frame reloads
 only for a different App (another `focus` is one); a newer result of the same call reaches the live App through the
 bridge (`deliver` in `lib/app-bridge.ts`). On its page, an App that calls a tool the owner has not allowed gets the
 same Allow card as in a conversation. Until a

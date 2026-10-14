@@ -24,6 +24,7 @@ import type { McpManager } from './connections.ts'
 import type { ConnectionStatus, Credentials } from './credentials.ts'
 import { addedConnectionId, serverClaims, userEndpoint } from './endpoint.ts'
 import type { Grants } from './grants.ts'
+import type { Entrypoints } from './entrypoints.ts'
 import type { EventOffers, SettledOffer } from './events/offers.ts'
 import type { Labels } from './labels.ts'
 import { StoredOAuthProvider } from './oauth-provider.ts'
@@ -91,6 +92,8 @@ export type OwnerServers = {
   readonly labels: Labels
   /** What the owner did with each connection's offer of events (ADR 0041); without it, every offer stays open. */
   readonly offers?: EventOffers
+  /** Each connection's own App entrypoint, kept from its last whole tool list; without it, known only while connected. */
+  readonly entrypoints?: Entrypoints
   /** Random characters for added server ids. */
   readonly random: () => string
   readonly skillsEnabled: (connectionId: string) => boolean
@@ -106,7 +109,9 @@ const viewOf = (
   const events = snapshot !== undefined && offersEvents(snapshot)
   const offer = events ? (owner.offers?.settled(server.connectionId) ?? 'open') : undefined
   const profile = profileOf(server.endpoint)
-  const entrypoint = profile?.app?.tool ?? (snapshot === undefined ? undefined : globalEntrypoint(snapshot))
+  const entrypoint =
+    profile?.app?.tool ??
+    (snapshot === undefined ? owner.entrypoints?.of(server.connectionId) : globalEntrypoint(snapshot))
   return {
     connectionId: server.connectionId,
     label: owner.labels.of(server.connectionId) ?? server.connectionId,
@@ -179,6 +184,7 @@ const removeServer = (owner: OwnerServers, connectionId: string) =>
     yield* owner.manager.remove(connectionId)
     yield* attemptSync(() => added.remove(connectionId))
     yield* Effect.sync(() => owner.offers?.remove(connectionId))
+    yield* Effect.sync(() => owner.entrypoints?.set(connectionId, undefined, 0))
   })
 
 /** A connection's credentials as they stood before an open try wrote over them. */

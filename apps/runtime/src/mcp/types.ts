@@ -12,6 +12,7 @@ import type {
 import type { McpOutcome, McpServerConfig } from '@goblin/contracts'
 import type * as Effect from 'effect/Effect'
 import type { AppError } from '../http/errors.ts'
+import type { Entrypoints } from './entrypoints.ts'
 import type { Grant } from './grants.ts'
 export type { McpServerConfig }
 /**
@@ -97,6 +98,8 @@ export type McpManagerOptions = {
    * the owner's Connections page reads them again.
    */
   readonly toolsChanged?: (connectionId: string, digest: string) => Effect.Effect<void>
+  /** Where each connection's own App entrypoint is kept, from its last whole tool list; without it, nowhere. */
+  readonly entrypoints?: Entrypoints
 }
 export type ApprovalContext = {
   readonly sessionId: string
