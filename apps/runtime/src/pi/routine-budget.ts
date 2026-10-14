@@ -33,6 +33,7 @@ export const routineToolVerdict = (session: string) =>
       ResidentInactive: refused,
       Forbidden: refused,
       BudgetExhausted: refused,
+      NoModelEndpoint: refused,
     }),
     reportAndRecover('routines.beforeTool', 'failed' as const),
   )

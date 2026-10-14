@@ -20,9 +20,10 @@ import { OnboardingStore } from '../src/onboarding/store.ts'
 import { chatDatabase, durable, sqliteDb } from './chats-sqlite.ts'
 import { stub } from './http/api/fixture.ts'
 
-const DEPLOYMENT: ModelEndpointView = { source: 'deployment', models: ['house-model'] }
+const DEPLOYMENT: ModelEndpointView = { source: 'deployment', deployment: true, models: ['house-model'] }
 const OWN: ModelEndpointView = {
   source: 'owner',
+  deployment: true,
   baseUrl: 'https://models.example/v1',
   keyHint: 'k3y9',
   models: ['own-model'],

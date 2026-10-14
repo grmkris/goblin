@@ -3,7 +3,7 @@ import type { TokenUse } from '../token-use.ts'
 import { Budget } from '../budget.ts'
 import { epochSeconds } from '../clock.ts'
 import { CheapModel, ModelFailed, modelFailureText } from '../memory/model.ts'
-import { memoryModelId, modelOptions } from '../models.ts'
+import { deploymentModelIds, memoryModelId } from '../models.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { auxReporter } from '../telemetry/report.ts'
 import type { AppCompletion } from './ports.ts'
@@ -20,7 +20,7 @@ export const appCompletion: AppCompletion = (system, prompt, maxTokens) =>
   Effect.gen(function* () {
     const { env, pi, telemetry } = yield* AgentInput
     const budget = yield* Budget
-    const id = memoryModelId(env.MEMORY_MODEL, modelOptions(env.MODELS, env.MODEL_ID))
+    const id = memoryModelId(env.MEMORY_MODEL, deploymentModelIds(env))
     const spent: TokenUse[] = []
     const model = new CheapModel(pi.models, id, (use) => void spent.push(use), auxReporter(telemetry, 'app_llm'))
     const record = Effect.suspend(() =>

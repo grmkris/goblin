@@ -41,7 +41,7 @@ export function ModelPicker({ onError }: { readonly onError: (message: string) =
       pick.mutate(model, { onError: (error) => onError(messageOf(error, 'change the model')) })
   }
   const current = choice.options.find((option) => option.id === choice.current)
-  const label = current?.label ?? choice.current
+  const label = current?.label ?? choice.current ?? ''
   return (
     <DropdownMenu>
       <DropdownMenuTrigger

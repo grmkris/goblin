@@ -14,8 +14,14 @@ const STDOUT = 1
 const out = path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance', `start-${Date.now()}`)
 mkdirSync(out, { recursive: true, mode: 0o700 })
 
-const DEPLOYMENT = { source: 'deployment', models: ['house-model', 'house-model-mini'] }
-const OWN = { source: 'owner', baseUrl: 'https://models.example/v1', keyHint: 'k3y9', models: ['own-model'] }
+const DEPLOYMENT = { source: 'deployment', deployment: true, models: ['house-model', 'house-model-mini'] }
+const OWN = {
+  source: 'owner',
+  deployment: true,
+  baseUrl: 'https://models.example/v1',
+  keyHint: 'k3y9',
+  models: ['own-model'],
+}
 const NOTES = {
   connectionId: 'notes',
   label: 'Notes',

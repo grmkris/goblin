@@ -6,7 +6,7 @@ import { firstOpenStep, stepsLeft } from '../src/onboarding/queries.ts'
 const view = (status: OnboardingView['status'], done: readonly string[]): OnboardingView => ({
   status,
   steps: ONBOARDING_STEPS.map((id) => ({ id, done: done.includes(id) })),
-  model: { source: 'deployment', models: ['house-model'] },
+  model: { source: 'deployment', deployment: true, models: ['house-model'] },
   connected: 0,
   kickoff: false,
 })

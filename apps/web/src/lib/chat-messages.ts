@@ -103,6 +103,12 @@ export type TurnFailure = {
 
 /** The provider's raw error, in a sentence the owner can act on; the first line of anything unrecognised. */
 export function failureReason(raw: string): TurnFailure {
+  // The runtime's own words when there is no model endpoint to call (ADR 0064, `inference/service.ts`).
+  if (/no model endpoint/iu.test(raw))
+    return {
+      text: 'This deployment has no model of its own. Bring your own model key in Settings, then send again.',
+      provider: false,
+    }
   if (/\b429\b|quota|rate.?limit|too many requests/iu.test(raw))
     return { text: 'The model provider refused the request: quota exceeded or rate-limited.', provider: true }
   if (/\b(?:500|502|503|504)\b|overloaded|high demand|unavailable/iu.test(raw))

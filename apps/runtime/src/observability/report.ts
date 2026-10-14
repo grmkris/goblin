@@ -77,6 +77,7 @@ export const EXPECTED_ERROR_TAGS: ReadonlySet<string> = new Set([
   'PayloadTooLarge',
   'ResidentInactive',
   'BudgetExhausted',
+  'NoModelEndpoint',
   'NeedsAuthorization',
   'ScopeRequired',
   'UpstreamMcp',

@@ -9,7 +9,7 @@ import { type MemoryEngine, activateConversations, activateMemory, memoryOf } fr
 import { CheapModel, CheapModels } from '../memory/model.ts'
 import { Memories, type MemoryLine } from '../memory/service.ts'
 import { forgetFrom, recordView, rememberedCount, rememberedThrough, viewReach } from '../memory/store.ts'
-import { memoryModelId, modelOptions } from '../models.ts'
+import { deploymentModelIds, memoryModelId } from '../models.ts'
 import { KeyedLock } from '../observability/lock.ts'
 import { piTranscripts } from '../retrieval/index.ts'
 import { Retrieval, retrievalOver } from '../retrieval/service.ts'
@@ -23,7 +23,8 @@ import { auxReporter } from '../telemetry/report.ts'
 // the transcript index over the agent's database, every catch-up on its session's turn of the agent's KeyedLock.
 
 /**
- * Start step 3: the deployment's cheap model (`GOBLIN_MEMORY_MODEL`), one per housekeeping purpose. Its tokens count in
+ * Start step 3: the deployment's cheap model (`GOBLIN_MEMORY_MODEL`; without deployment models, the default of the
+ * owner's endpoint), one per housekeeping purpose. Its tokens count in
  * the daily budget through the usage ledger, written as `Budget.record` writes it: the model reports what it spent
  * from inside its Promise, synchronously, which cannot run the Budget service's Effect. So this needs no Budget, and the
  * memory engine needs nothing built after it.
@@ -33,7 +34,7 @@ export const CheapModelsLive: Layer.Layer<CheapModels, never, AgentInput | Db> =
   Effect.gen(function* () {
     const { env, pi, telemetry } = yield* AgentInput
     const ledger = usageLedger(yield* Db)
-    const id = memoryModelId(env.MEMORY_MODEL, modelOptions(env.MODELS, env.MODEL_ID))
+    const id = memoryModelId(env.MEMORY_MODEL, deploymentModelIds(env))
     return (purpose) =>
       new CheapModel(pi.models, id, (use) => recordUse(ledger, use, nowSeconds()), auxReporter(telemetry, purpose))
   }),

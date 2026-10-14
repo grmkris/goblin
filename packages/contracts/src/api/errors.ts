@@ -44,6 +44,11 @@ export class BudgetExhausted extends Schema.TaggedError<BudgetExhausted>()('Budg
   resetsAt: Schema.Number,
   ref,
 }) {}
+/**
+ * A model call with nowhere to go (ADR 0064): the deployment has no model endpoint of its own and the owner has not
+ * brought theirs yet.
+ */
+export class NoModelEndpoint extends Schema.TaggedError<NoModelEndpoint>()('NoModelEndpoint', { ref }) {}
 export class NeedsAuthorization extends Schema.TaggedError<NeedsAuthorization>()('NeedsAuthorization', {
   connectionId: Schema.String,
   ref,
@@ -84,6 +89,7 @@ export const AppError = Schema.Union([
   PayloadTooLarge,
   ResidentInactive,
   BudgetExhausted,
+  NoModelEndpoint,
   NeedsAuthorization,
   ScopeRequired,
   UpstreamMcp,
@@ -106,6 +112,10 @@ export const ERROR_COPY = {
   PayloadTooLarge: { message: 'That is too large.' },
   ResidentInactive: { message: 'Resident authority is off.', recovery: 'Re-enable it in Settings.' },
   BudgetExhausted: { message: "You have used today's model budget.", recovery: 'It resets at 00:00 UTC.' },
+  NoModelEndpoint: {
+    message: 'This deployment has no model endpoint.',
+    recovery: 'Bring your own model key in Settings.',
+  },
   NeedsAuthorization: { message: 'This server needs to be connected again.' },
   ScopeRequired: {
     message: 'This connection needs more access.',
@@ -146,6 +156,7 @@ export const statusOf = (error: AppError | typeof AppError.Encoded): number =>
       PayloadTooLarge: () => 413,
       ResidentInactive: () => 409,
       BudgetExhausted: () => 429,
+      NoModelEndpoint: () => 409,
       NeedsAuthorization: () => 409,
       ScopeRequired: () => 403,
       UpstreamMcp: (upstream) => (upstream.reason === 'timeout' ? 504 : 502),
@@ -264,7 +275,7 @@ export const ApiErrors = {
   unauthenticated: envelope(401, [Unauthenticated]),
   forbidden: envelope(403, [Forbidden, GrantDenied, ScopeRequired]),
   notFound: envelope(404, [NotFound]),
-  conflict: envelope(409, [Conflict, ResidentInactive, NeedsAuthorization]),
+  conflict: envelope(409, [Conflict, ResidentInactive, NeedsAuthorization, NoModelEndpoint]),
   payloadTooLarge: envelope(413, [PayloadTooLarge]),
   budgetExhausted: envelope(429, [BudgetExhausted]),
   internal: envelope(500, [Internal]),

@@ -68,7 +68,8 @@ const reportFlow = (record: RoutineRun, topic: number | undefined, status: FlowS
   })
 
 /**
- * Why a firing is recorded as skipped rather than run: resident authority off, or today's capped usage spent. Any other
+ * Why a firing is recorded as skipped rather than run: resident authority off, today's capped usage spent, or no model
+ * endpoint to run it on. Any other
  * failure (storage) fails the admission and is reported, so an outage never skips a firing. Only a hand-over is
  * admitted as a run; a routine that only tells posts its notice instead.
  */
@@ -77,7 +78,7 @@ export const admissionSkip = Effect.gen(function* () {
   yield* requireBudget
 }).pipe(
   Effect.as(undefined),
-  Effect.catchTags({ ResidentInactive: skipAs, BudgetExhausted: skipAs }),
+  Effect.catchTags({ ResidentInactive: skipAs, BudgetExhausted: skipAs, NoModelEndpoint: skipAs }),
   reportFailure('routines.admit'),
 )
 

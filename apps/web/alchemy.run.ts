@@ -9,10 +9,14 @@ import { resolveStage } from '../../scripts/stage-config.ts'
 
 const root = fileURLToPath(new URL('./', import.meta.url))
 
-/** The model gateway, model choice and daily budget the Worker reads (docs/development.md). */
+/**
+ * The deployment's own model endpoint, model choice and daily budget the Worker reads (docs/development.md). All
+ * optional: without the base URL, key and default model the deployment has no endpoint, and each owner brings their
+ * own (ADR 0064). Local defaults to CLIProxy (scripts/stage.ts).
+ */
 const modelEnv = {
-  MODEL_BASE_URL: Config.String('GOBLIN_MODEL_BASE_URL').pipe(Config.withDefault('http://127.0.0.1:8317/v1')),
-  MODEL_ID: Config.String('GOBLIN_MODEL_ID').pipe(Config.withDefault('gemini-3.8-flash')),
+  MODEL_BASE_URL: Config.String('GOBLIN_MODEL_BASE_URL').pipe(Config.withDefault('')),
+  MODEL_ID: Config.String('GOBLIN_MODEL_ID').pipe(Config.withDefault('')),
   MODELS: Config.String('GOBLIN_MODELS').pipe(Config.withDefault('')),
   MODEL_KEY: Config.Redacted('GOBLIN_MODEL_KEY').pipe(Config.withDefault(Redacted.make(''))),
   DAILY_TOKEN_CAP: Config.String('GOBLIN_DAILY_TOKEN_CAP').pipe(Config.withDefault('')),

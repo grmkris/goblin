@@ -28,11 +28,18 @@ const endpointFetch =
       : new Response('no', { status: 401 })
   }
 
+/** The deployment's own model endpoint, as its settings name it. */
+const DEPLOYMENT_MODEL = {
+  MODEL_ID: 'model-a',
+  MODEL_BASE_URL: 'https://litellm.example/v1',
+  MODEL_KEY: 'deployment-key',
+}
+
 /**
  * The model endpoint, the budget and the model picker over SQLite, as the agent builds them, with the deployment's
- * `cap`; an owner endpoint is reached through `mcpFetch`.
+ * `cap`; an owner endpoint is reached through `mcpFetch`. `house: false` is a deployment without its own endpoint.
  */
-const lane = (cap?: string, mcpFetch: typeof fetch = endpointFetch([])) => {
+const lane = (cap?: string, mcpFetch: typeof fetch = endpointFetch([]), house = true) => {
   const { db, close } = chatDatabase()
   closes.push(close)
   return ModelBudgetLive.pipe(
@@ -48,9 +55,7 @@ const lane = (cap?: string, mcpFetch: typeof fetch = endpointFetch([])) => {
           AgentInput,
           Object.assign(Object.create(null), {
             env: {
-              MODEL_ID: 'model-a',
-              MODEL_BASE_URL: 'https://litellm.example/v1',
-              MODEL_KEY: 'deployment-key',
+              ...(house ? DEPLOYMENT_MODEL : {}),
               ...(cap === undefined ? {} : { DAILY_TOKEN_CAP: cap }),
             },
             userId: 'owner',
@@ -107,6 +112,7 @@ describe("the owner's own model endpoint", () => {
       const view = yield* inference.setOwner({ baseUrl: 'https://models.example/v1/', key: OWNER_KEY }, NOW)
       expect(view).toEqual({
         source: 'owner',
+        deployment: true,
         baseUrl: 'https://models.example/v1',
         keyHint: '…abcd',
         models: ['gpt-x', 'gpt-y'],
@@ -126,7 +132,7 @@ describe("the owner's own model endpoint", () => {
       yield* budget.record({ ...TOKENS, input: 9000 }, NOW)
       expect(yield* budget.today(NOW)).toMatchObject({ used: 9000, limit: null })
       yield* budget.require(NOW)
-      expect(yield* inference.clearOwner).toEqual({ source: 'deployment', models: ['model-a'] })
+      expect(yield* inference.clearOwner).toEqual({ source: 'deployment', deployment: true, models: ['model-a'] })
       expect(yield* Effect.flip(budget.require(NOW))).toMatchObject({ _tag: 'BudgetExhausted', limit: 8000 })
       expect((yield* inference.served('gpt-y')).apiKey).toBe('deployment-key')
     }).pipe(Effect.provide(lane('8000', endpointFetch(['gpt-x', 'gpt-y', 'gpt-x'])))),
@@ -141,7 +147,32 @@ describe("the owner's own model endpoint", () => {
       expect(empty).toMatchObject({ _tag: 'InvalidInput', reason: 'model_list_empty' })
       const plain = yield* Effect.flip(inference.setOwner({ baseUrl: 'http://models.example', key: OWNER_KEY }, NOW))
       expect(plain).toMatchObject({ _tag: 'InvalidInput' })
-      expect(yield* inference.view).toEqual({ source: 'deployment', models: ['model-a'] })
+      expect(yield* inference.view).toEqual({ source: 'deployment', deployment: true, models: ['model-a'] })
     }).pipe(Effect.provide(lane(undefined, endpointFetch([])))),
+  )
+})
+
+describe('a deployment without its own model endpoint (ADR 0064)', () => {
+  it.effect('refuses every model call, offers nothing and caps nothing until the owner brings their own', () =>
+    Effect.gen(function* () {
+      const inference = yield* Inference
+      const budget = yield* Budget
+      const models = yield* Models
+      expect(yield* inference.view).toEqual({ source: 'none', deployment: false, models: [] })
+      expect(yield* Effect.flip(inference.served('model-a'))).toMatchObject({ _tag: 'NoModelEndpoint' })
+      expect(yield* Effect.flip(budget.require(NOW))).toMatchObject({ _tag: 'NoModelEndpoint' })
+      expect(yield* budget.today(NOW)).toMatchObject({ limit: null })
+      expect(yield* models.choice).toEqual({ options: [] })
+      expect(yield* Effect.flip(models.current)).toMatchObject({ _tag: 'NoModelEndpoint' })
+      expect(yield* Effect.flip(models.choose('model-a', NOW))).toMatchObject({ _tag: 'NoModelEndpoint' })
+      const view = yield* inference.setOwner({ baseUrl: 'https://models.example/v1', key: OWNER_KEY }, NOW)
+      expect(view).toMatchObject({ source: 'owner', deployment: false, models: ['gpt-x'] })
+      // Any id, the memory model's placeholder too, is sent as the owner's default; the cap does not hold for it.
+      expect((yield* inference.served('default')).model).toBe('gpt-x')
+      yield* budget.require(NOW)
+      expect(yield* models.current).toBe('gpt-x')
+      expect(yield* inference.clearOwner).toEqual({ source: 'none', deployment: false, models: [] })
+      expect(yield* Effect.flip(budget.require(NOW))).toMatchObject({ _tag: 'NoModelEndpoint' })
+    }).pipe(Effect.provide(lane('8000', endpointFetch(['gpt-x']), false))),
   )
 })

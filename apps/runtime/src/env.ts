@@ -30,12 +30,16 @@ export interface RuntimeEnv {
   /** `open`, `invite` (needs `SIGNUP_INVITE_CODE`) or `closed`; anything else counts as `closed`. */
   readonly SIGNUP_MODE?: string
   readonly SIGNUP_INVITE_CODE?: string
-  readonly MODEL_BASE_URL: string
+  /**
+   * The deployment's own model endpoint (`models.ts` `deploymentEndpoint`): an OpenAI-compatible base URL, its key and
+   * the default model, all three or none (ADR 0064). Without them each owner brings their own (ADR 0059).
+   */
+  readonly MODEL_BASE_URL?: string
   /** The default model; also the first one offered. */
-  readonly MODEL_ID: string
-  /** More LiteLLM model names users may pick, comma-separated (`models.ts`). */
+  readonly MODEL_ID?: string
+  /** More model names users may pick, comma-separated (`models.ts`). */
   readonly MODELS?: string
-  readonly MODEL_KEY: string
+  readonly MODEL_KEY?: string
   /** The cheapest offered model, for thread titles and main's memory (`models.ts` `memoryModelId`). */
   readonly MEMORY_MODEL?: string
   /** Native fixture only: tokens main runs past its memory view before a new one (`memory.ts` `FOLD_TOKENS`). */

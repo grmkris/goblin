@@ -1,6 +1,7 @@
 // Start's steps (ADR 0062), one task each. Each says what the step is for in one line and offers the one action that
-// does it; every step can be passed by. goblin uses the deployment's models until the owner brings their own, and a
-// server connected from here gets no access until the owner gives it.
+// does it; every step can be passed by. goblin uses the deployment's models until the owner brings their own (on a
+// deployment without models of its own, ADR 0064, the model step says the owner's are needed), and a server
+// connected from here gets no access until the owner gives it.
 import { useMutation } from '@tanstack/react-query'
 import type { OnboardingStep, ServerSuggestion } from '@goblin/contracts'
 import { Button, GoblinMark, Skeleton, Textarea } from '@goblin/ui'
@@ -22,7 +23,7 @@ export const STEP_TEXT: Readonly<Record<OnboardingStep, { label: string; title: 
   model: {
     label: 'Your model',
     title: 'The model goblin thinks with',
-    why: "goblin uses this deployment's models unless you bring your own: any OpenAI-compatible endpoint and your key.",
+    why: "goblin uses this deployment's models, if it has any, unless you bring your own: any OpenAI-compatible endpoint and your key.",
   },
   services: {
     label: 'Services',

@@ -2,13 +2,14 @@ import type { ModelEndpointView } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as Ref from 'effect/Ref'
+import type { RuntimeEnv } from '../env.ts'
 import { Budget, dailyTokenCap, recordUse, refuseSpent, usageLedger, utcDay } from '../budget.ts'
-import { attempt, attemptSync } from '../http/errors.ts'
+import { NoModelEndpoint, attempt, attemptSync } from '../http/errors.ts'
 import { endpointBase, keyHint, listModels } from '../inference/endpoint.ts'
-import { Inference, type ResolvedEndpoint } from '../inference/service.ts'
+import { type CurrentEndpoint, Inference, type ResolvedEndpoint } from '../inference/service.ts'
 import { endpointStore } from '../inference/store.ts'
 import { Cipher } from '../mcp/cipher.ts'
-import { ModelChoiceStore, ModelPicker, type ModelOptions, Models, modelOptions, optionOf } from '../models.ts'
+import { ModelChoiceStore, ModelPicker, type ModelOptions, Models, deploymentEndpoint, optionOf } from '../models.ts'
 import { Db } from '../runtime/db.ts'
 import { AgentInput } from '../runtime/input.ts'
 
@@ -18,9 +19,23 @@ const optionsOf = (endpoint: ResolvedEndpoint): ModelOptions => {
   return [optionOf(first), ...rest.map(optionOf)]
 }
 
+/** The deployment's own endpoint as model calls use it, or `none` when it has none (ADR 0064). */
+const deploymentOf = (env: RuntimeEnv): CurrentEndpoint => {
+  const own = deploymentEndpoint(env)
+  if (own === undefined) return { source: 'none' }
+  const [first, ...rest] = own.options
+  return {
+    source: 'deployment',
+    baseUrl: own.baseUrl,
+    apiKey: own.apiKey,
+    models: [first.id, ...rest.map((o) => o.id)],
+  }
+}
+
 /**
  * The owner's model endpoint (ADR 0059) over the agent's SQLite, its key sealed with the credential cipher and bound to
- * the agent; without one, the deployment's. The endpoint in use is kept in memory until the owner changes it.
+ * the agent; without one, the deployment's, and without that (ADR 0064) none, which refuses every model call. The
+ * endpoint in use is kept in memory until the owner changes it.
  */
 const InferenceLive: Layer.Layer<Inference, never, AgentInput | Db | Cipher> = Layer.effect(
   Inference,
@@ -29,19 +44,13 @@ const InferenceLive: Layer.Layer<Inference, never, AgentInput | Db | Cipher> = L
     const store = endpointStore(yield* Db)
     const cipher = yield* Cipher
     const aad = `model-endpoint:${userId}`
-    const [first, ...rest] = modelOptions(env.MODELS, env.MODEL_ID).map((option) => option.id)
-    const deployment: ResolvedEndpoint = {
-      source: 'deployment',
-      baseUrl: env.MODEL_BASE_URL,
-      apiKey: env.MODEL_KEY,
-      models: [first ?? env.MODEL_ID, ...rest],
-    }
-    const kept = yield* Ref.make<ResolvedEndpoint | undefined>(undefined)
+    const deployment = deploymentOf(env)
+    const kept = yield* Ref.make<CurrentEndpoint | undefined>(undefined)
     const endpoint = Effect.gen(function* () {
       const known = yield* Ref.get(kept)
       if (known !== undefined) return known
       const stored = yield* Effect.sync(() => store.get())
-      const resolved: ResolvedEndpoint =
+      const resolved: CurrentEndpoint =
         stored === undefined
           ? deployment
           : {
@@ -53,15 +62,24 @@ const InferenceLive: Layer.Layer<Inference, never, AgentInput | Db | Cipher> = L
       yield* Ref.set(kept, resolved)
       return resolved
     }).pipe(Effect.withSpan('Inference.endpoint'))
-    const view = Effect.map(endpoint, (current): ModelEndpointView =>
-      current.source === 'owner'
-        ? { source: 'owner', baseUrl: current.baseUrl, keyHint: keyHint(current.apiKey), models: current.models }
-        : { source: 'deployment', models: current.models },
-    )
+    const fallback = deployment.source === 'deployment'
+    const view = Effect.map(endpoint, (current): ModelEndpointView => {
+      if (current.source === 'none') return { source: 'none', deployment: false, models: [] }
+      return current.source === 'owner'
+        ? {
+            source: 'owner',
+            deployment: fallback,
+            baseUrl: current.baseUrl,
+            keyHint: keyHint(current.apiKey),
+            models: current.models,
+          }
+        : { source: 'deployment', deployment: true, models: current.models }
+    })
     return Inference.of({
       endpoint,
       served: Effect.fn('Inference.served')(function* (modelId: string) {
         const current = yield* endpoint
+        if (current.source === 'none') return yield* new NoModelEndpoint({})
         const model = current.models.includes(modelId) ? modelId : current.models[0]
         return { baseUrl: current.baseUrl, apiKey: current.apiKey, model }
       }),
@@ -86,7 +104,8 @@ const InferenceLive: Layer.Layer<Inference, never, AgentInput | Db | Cipher> = L
 
 /**
  * Today's model usage in tokens over the agent's usage ledger, against the deployment's optional daily cap. The cap
- * holds for the deployment's endpoint only: the owner's own endpoint is theirs to pay for.
+ * holds for the deployment's endpoint only: the owner's own endpoint is theirs to pay for, and without either there is
+ * nothing to cap and nothing a model call could reach (`NoModelEndpoint`).
  */
 const BudgetLive: Layer.Layer<Budget, never, AgentInput | Db | Inference> = Layer.effect(
   Budget,
@@ -98,7 +117,7 @@ const BudgetLive: Layer.Layer<Budget, never, AgentInput | Db | Inference> = Laye
     const today = Effect.fn('Budget.today')(function* (now: number) {
       const { day, resetsAt } = utcDay(now)
       const used = yield* attemptSync(() => ledger.tokens(day))
-      const limit = (yield* inference.endpoint).source === 'owner' ? null : cap
+      const limit = (yield* inference.endpoint).source === 'deployment' ? cap : null
       return { used, limit, resetsAt }
     })
     return Budget.of({
@@ -107,24 +126,35 @@ const BudgetLive: Layer.Layer<Budget, never, AgentInput | Db | Inference> = Laye
         yield* Effect.sync(() => recordUse(ledger, use, now))
       }),
       require: Effect.fn('Budget.require')(function* (now: number) {
+        if ((yield* inference.endpoint).source === 'none') return yield* new NoModelEndpoint({})
         yield* refuseSpent(yield* today(now))
       }),
     })
   }),
 )
 
-/** The model picker over the agent's SQLite: the owner's pick among what their model endpoint offers. */
+/**
+ * The model picker over the agent's SQLite: the owner's pick among what their model endpoint offers. Without an endpoint
+ * there is nothing to pick: the choice offers nothing, and the model in use is `NoModelEndpoint`.
+ */
 const ModelsLive: Layer.Layer<Models, never, Db | Inference> = Layer.effect(
   Models,
   Effect.gen(function* () {
     const ledger = new ModelChoiceStore(yield* Db)
     const inference = yield* Inference
-    const picker = Effect.map(inference.endpoint, (endpoint) => new ModelPicker(ledger, optionsOf(endpoint)))
+    const picker = Effect.map(inference.endpoint, (endpoint) =>
+      endpoint.source === 'none' ? undefined : new ModelPicker(ledger, optionsOf(endpoint)),
+    )
+    const required = Effect.flatMap(picker, (models) =>
+      models === undefined ? Effect.fail(new NoModelEndpoint({})) : Effect.succeed(models),
+    )
     return Models.of({
-      current: Effect.map(picker, (models) => models.current()).pipe(Effect.withSpan('Models.current')),
-      choice: Effect.map(picker, (models) => models.choice()).pipe(Effect.withSpan('Models.choice')),
+      current: Effect.map(required, (models) => models.current()).pipe(Effect.withSpan('Models.current')),
+      choice: Effect.map(picker, (models) => models?.choice() ?? { options: [] }).pipe(
+        Effect.withSpan('Models.choice'),
+      ),
       choose: Effect.fn('Models.choose')(function* (modelId: string, now: number) {
-        const models = yield* picker
+        const models = yield* required
         return yield* attemptSync(() => models.choose(modelId, now))
       }),
     })

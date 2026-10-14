@@ -265,7 +265,7 @@ export const sendOutcome = (chat: string, outcome: HeldCallOutcome, operationId:
     )
     return yield* turn.pipe(
       Effect.as('turn' as const),
-      Effect.catchTag('BudgetExhausted', () =>
+      Effect.catchTag(['BudgetExhausted', 'NoModelEndpoint'], () =>
         earlier === undefined || earlier.state === 'refused'
           ? keepOutcome(chat, outcome, operationId)
           : Effect.succeed('turn' as const),

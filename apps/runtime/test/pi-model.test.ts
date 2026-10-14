@@ -3,6 +3,8 @@ import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/e
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import { describe, expect, it } from 'vitest'
 import { isContextOverflow } from '@earendil-works/pi-ai/utils/overflow'
+import { NoModelEndpoint } from '../src/http/errors.ts'
+import { NO_ENDPOINT_ANSWER, servedFailure } from '../src/inference/service.ts'
 import { LITELLM_STREAMS, MAX_OUTPUT_TOKENS, MIN_ANSWER_ROOM, MODEL_PROVIDER, makePiModels } from '../src/pi/model.ts'
 
 const env = { MODEL_ID: 'qwen3.8-flash', MODEL_BASE_URL: 'https://no-model-calls.invalid/v1', MODEL_KEY: 'test' }
@@ -98,6 +100,31 @@ describe('the model endpoint each call goes to (unit)', () => {
       throw new Error('no endpoint')
     })
     expect(await models.streamSimple(model, context).result()).toMatchObject({ stopReason: 'error' })
+    expect(sent).toEqual([])
+  })
+
+  it("offers a placeholder default without the deployment's own endpoint, answered by the owner's", async () => {
+    const { sent, streams } = recording()
+    const { models, model, options } = makePiModels({}, streams, undefined, undefined, async () => ({
+      baseUrl: 'https://models.example/v1',
+      apiKey: 'own-key',
+      model: 'own-default',
+    }))
+    expect(options.map((option) => option.id)).toEqual(['default'])
+    expect(models.getModel(MODEL_PROVIDER, 'default')).toMatchObject({ id: 'default' })
+    await models.streamSimple(model, context).result()
+    expect(sent).toEqual([{ id: 'own-default', baseUrl: 'https://models.example/v1', apiKey: 'own-key' }])
+  })
+
+  it('ends every call with the refusal in its own words while no endpoint is set', async () => {
+    const { sent, streams } = recording()
+    const { models, model } = makePiModels({}, streams, undefined, undefined, async () => {
+      throw servedFailure(new NoModelEndpoint({}))
+    })
+    expect(await models.streamSimple(model, context).result()).toMatchObject({
+      stopReason: 'error',
+      errorMessage: NO_ENDPOINT_ANSWER,
+    })
     expect(sent).toEqual([])
   })
 })

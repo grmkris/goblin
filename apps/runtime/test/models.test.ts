@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { InvalidInput } from '../src/http/errors.ts'
-import { type ChoiceLedger, ModelPicker, modelOptions } from '../src/models.ts'
+import {
+  type ChoiceLedger,
+  ModelPicker,
+  deploymentEndpoint,
+  deploymentModelIds,
+  memoryModelId,
+  modelOptions,
+} from '../src/models.ts'
 
 /** The stored pick in memory: the picker depends on the ledger, not on SQLite. */
 const ledger = (initial?: string): ChoiceLedger & { readonly stored: () => string | undefined } => {
@@ -28,6 +35,27 @@ describe('offered models (unit)', () => {
       contextWindow: 131_072,
     })
     expect(modelOptions(undefined, 'gemini-3.8-flash').map((option) => option.id)).toEqual(['gemini-3.8-flash'])
+  })
+})
+
+describe("the deployment's own model endpoint (unit)", () => {
+  const house = { MODEL_BASE_URL: 'https://models.example/v1', MODEL_ID: 'gemini-3.8-flash', MODEL_KEY: 'k' }
+
+  it('needs its base URL, key and default model, else there is none (ADR 0064)', () => {
+    expect(deploymentEndpoint({ ...house, MODELS: 'glm-5.3' })).toMatchObject({
+      baseUrl: 'https://models.example/v1',
+      apiKey: 'k',
+    })
+    expect(deploymentModelIds({ ...house, MODELS: 'glm-5.3' })).toEqual(['gemini-3.8-flash', 'glm-5.3'])
+    for (const missing of ['MODEL_BASE_URL', 'MODEL_ID', 'MODEL_KEY'] as const)
+      expect(deploymentEndpoint({ ...house, [missing]: '' })).toBeUndefined()
+    expect(deploymentModelIds({})).toEqual([])
+  })
+
+  it("writes memory with the memory model when offered, else the default, else the endpoint's own default", () => {
+    expect(memoryModelId('glm-5.3', ['gemini-3.8-flash', 'glm-5.3'])).toBe('glm-5.3')
+    expect(memoryModelId('not-offered', ['gemini-3.8-flash'])).toBe('gemini-3.8-flash')
+    expect(memoryModelId('glm-5.3', [])).toBe('default')
   })
 })
 

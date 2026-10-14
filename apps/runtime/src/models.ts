@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import * as Context from 'effect/Context'
 import type * as Effect from 'effect/Effect'
+import type { RuntimeEnv } from './env.ts'
 import { type AppError, InvalidInput } from './http/errors.ts'
 import { appModelChoice } from './storage/schema.ts'
 
@@ -47,8 +48,8 @@ export const optionOf = (id: string): ModelOption => {
 }
 
 /**
- * The models this deployment offers: `MODELS` (comma-separated LiteLLM model names) with the default `MODEL_ID`
- * always first. An unknown name is offered under its own name, text only.
+ * The models this deployment offers: `MODELS` (comma-separated model names) with the default `MODEL_ID` always
+ * first. An unknown name is offered under its own name, text only.
  */
 export function modelOptions(models: string | undefined, defaultId: string): ModelOptions {
   const more = (models ?? '').split(',').map((id) => id.trim())
@@ -56,9 +57,39 @@ export function modelOptions(models: string | undefined, defaultId: string): Mod
   return [optionOf(defaultId), ...others.map(optionOf)]
 }
 
-/** The model that names threads and writes main's memory: `GOBLIN_MEMORY_MODEL` when offered, else the default. */
-export function memoryModelId(memoryModel: string | undefined, options: ModelOptions): string {
-  return options.find((option) => option.id === memoryModel)?.id ?? options[0].id
+/** The deployment's own model endpoint: where its calls go, its key, and the models it offers, its default first. */
+export type DeploymentEndpoint = { readonly baseUrl: string; readonly apiKey: string; readonly options: ModelOptions }
+
+type DeploymentEnvironment = Partial<Pick<RuntimeEnv, 'MODEL_BASE_URL' | 'MODEL_ID' | 'MODEL_KEY' | 'MODELS'>>
+
+/**
+ * The deployment's model endpoint (ADR 0064): `MODEL_BASE_URL`, `MODEL_KEY` and the default `MODEL_ID`, all three set.
+ * Without any one of them the deployment has no endpoint, and each owner brings their own (ADR 0059).
+ */
+export function deploymentEndpoint(env: DeploymentEnvironment): DeploymentEndpoint | undefined {
+  const baseUrl = env.MODEL_BASE_URL?.trim() ?? ''
+  const defaultId = env.MODEL_ID?.trim() ?? ''
+  const apiKey = env.MODEL_KEY ?? ''
+  if (baseUrl === '' || defaultId === '' || apiKey === '') return undefined
+  return { baseUrl, apiKey, options: modelOptions(env.MODELS, defaultId) }
+}
+
+/** The ids of the models the deployment offers, its default first; none without its own endpoint. */
+export const deploymentModelIds = (env: DeploymentEnvironment): readonly string[] =>
+  deploymentEndpoint(env)?.options.map((option) => option.id) ?? []
+
+/**
+ * The model id a call names when the deployment offers none: whatever endpoint answers it serves its own default in
+ * its place (`Inference.served`), as it does for any id it does not serve.
+ */
+export const ENDPOINT_DEFAULT = 'default'
+
+/**
+ * The model that names threads and writes main's memory: `GOBLIN_MEMORY_MODEL` when offered, else the deployment's
+ * default, else (no deployment models) the default of the endpoint in use.
+ */
+export function memoryModelId(memoryModel: string | undefined, offered: readonly string[]): string {
+  return offered.find((id) => id === memoryModel) ?? offered[0] ?? ENDPOINT_DEFAULT
 }
 
 /** The user's stored pick (one row), if any. */
@@ -115,7 +146,10 @@ export class ModelPicker {
   }
 }
 
-/** The model the owner's agent answers with, and the owner's pick among those its model endpoint offers. */
+/**
+ * The model the owner's agent answers with, and the owner's pick among those its model endpoint offers. Without a model
+ * endpoint (ADR 0064) nothing is offered: `current` and `choose` fail with `NoModelEndpoint`.
+ */
 export class Models extends Context.Service<
   Models,
   {

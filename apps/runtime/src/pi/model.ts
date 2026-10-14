@@ -6,10 +6,9 @@ import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/e
 import type { AssistantMessage, Model, ProviderStreams } from '@earendil-works/pi-ai'
 import type { ModelOption } from '@goblin/contracts'
 import type { RuntimeEnv } from '../env.ts'
-import { modelOptions, optionOf } from '../models.ts'
+import { ENDPOINT_DEFAULT, type ModelOptions, deploymentEndpoint, optionOf } from '../models.ts'
 
-type ModelEnvironment = Pick<RuntimeEnv, 'MODEL_ID' | 'MODEL_BASE_URL' | 'MODEL_KEY'> &
-  Partial<Pick<RuntimeEnv, 'MODELS'>>
+type ModelEnvironment = Partial<Pick<RuntimeEnv, 'MODEL_ID' | 'MODEL_BASE_URL' | 'MODEL_KEY' | 'MODELS'>>
 
 /** Every model is served under one provider id, whichever endpoint answers it; `session.setModel` names it. */
 export const MODEL_PROVIDER = 'goblin-litellm'
@@ -122,7 +121,9 @@ const ROUTINE_PROVIDER = /^goblin-routine:(rr_[\w-]{1,100})$/u
 /**
  * Every offered model (`models.ts`), the default first; `model` is the default for new sessions. `streams` carries
  * the requests; only a test passes anything but LiteLLM's. With `resolve`, each call goes to the endpoint it names, and
- * any model id is a model of goblin's provider, which that endpoint answers with one it serves.
+ * any model id is a model of goblin's provider, which that endpoint answers with one it serves. A deployment without
+ * its own endpoint (ADR 0064) offers one placeholder, `ENDPOINT_DEFAULT`, which the owner's endpoint answers with its
+ * default; until they set one, `resolve` refuses every call.
  */
 export function makePiModels(
   env: ModelEnvironment,
@@ -131,21 +132,24 @@ export function makePiModels(
   authorizeRoutine?: (runId: string) => Promise<void>,
   resolve?: ResolveModel,
 ) {
-  const options = modelOptions(env.MODELS, env.MODEL_ID)
+  const deployment = deploymentEndpoint(env)
+  const options: ModelOptions = deployment?.options ?? [optionOf(ENDPOINT_DEFAULT)]
+  const baseUrl = deployment?.baseUrl ?? ''
+  const apiKey = deployment?.apiKey ?? ''
   const [first, ...rest] = options
-  const model = makePiModel(first, env.MODEL_BASE_URL, contextWindow)
-  const others = rest.map((option) => makePiModel(option, env.MODEL_BASE_URL, contextWindow))
+  const model = makePiModel(first, baseUrl, contextWindow)
+  const others = rest.map((option) => makePiModel(option, baseUrl, contextWindow))
   const models = createModels()
   const api = resolve === undefined ? streams : resolving(streams, resolve)
   const provider = createProvider({
     id: MODEL_PROVIDER,
     name: 'goblin model endpoint',
-    baseUrl: env.MODEL_BASE_URL,
+    baseUrl,
     models: [model, ...others],
     auth: {
       apiKey: {
         name: 'goblin model key',
-        resolve: async () => ({ auth: { apiKey: env.MODEL_KEY } }),
+        resolve: async () => ({ auth: { apiKey } }),
       },
     },
     api,
@@ -158,7 +162,7 @@ export function makePiModels(
     models.getModel = (providerId, id) =>
       listed(providerId, id) ??
       (providerId === MODEL_PROVIDER || ROUTINE_PROVIDER.test(providerId)
-        ? makePiModel(optionOf(id), env.MODEL_BASE_URL, contextWindow, providerId)
+        ? makePiModel(optionOf(id), baseUrl, contextWindow, providerId)
         : undefined)
   }
   if (authorizeRoutine !== undefined) {
@@ -170,14 +174,14 @@ export function makePiModels(
           createProvider({
             id: providerId,
             name: 'goblin routine',
-            baseUrl: env.MODEL_BASE_URL,
-            models: options.map((option) => makePiModel(option, env.MODEL_BASE_URL, contextWindow, providerId)),
+            baseUrl,
+            models: options.map((option) => makePiModel(option, baseUrl, contextWindow, providerId)),
             auth: {
               apiKey: {
                 name: 'Routine model authority',
                 resolve: async () => {
                   await authorizeRoutine(runId)
-                  return { auth: { apiKey: env.MODEL_KEY } }
+                  return { auth: { apiKey } }
                 },
               },
             },

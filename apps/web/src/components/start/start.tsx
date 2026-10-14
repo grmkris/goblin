@@ -136,6 +136,10 @@ function ReturnNotice({ search }: { readonly search: StartSearch }) {
   )
 }
 
+/** Whether going on is the usual way past `step`: Continue is filled then. */
+const passable = (step: OnboardingStep, view: OnboardingView | undefined): boolean =>
+  step === 'model' ? view?.model.source !== 'none' : (view?.connected ?? 0) > 0
+
 /** The step's task. None waits for Start's state: that only marks the steps on the panel. */
 function StepBody({
   step,
@@ -158,8 +162,9 @@ function StepBody({
 
 /**
  * Back on the left, Continue on the right: filled where passing the step by is the usual way on (the model, the
- * deployment's unless the owner brings their own), or once it has what it offers (services: a connected server). The
- * welcome has its own button, and the last step finishes instead.
+ * deployment's unless the owner brings their own), or once it has what it offers (services: a connected server). A
+ * deployment without models of its own (ADR 0064) needs the owner's, so there Continue stays quiet until they bring
+ * one, though it still goes on. The welcome has its own button, and the last step finishes instead.
  */
 function StartNav({
   step,
@@ -183,7 +188,7 @@ function StartNav({
         Finish without it
       </Button>
     ) : (
-      <Button variant={step === 'model' || (view?.connected ?? 0) > 0 ? 'default' : 'outline'} onClick={onNext}>
+      <Button variant={passable(step, view) ? 'default' : 'outline'} onClick={onNext}>
         Continue
       </Button>
     )

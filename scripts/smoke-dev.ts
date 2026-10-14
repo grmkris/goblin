@@ -408,7 +408,7 @@ async function withModel<T>(dev: DevClient, model: string | undefined, work: () 
   const choice = await dev.owner((api) => api.agent.model())
   if (!choice.options.some((option) => option.id === model)) throw new Error('smoke_model_not_offered')
   const own = choice.current
-  if (own === model) return work()
+  if (own === undefined || own === model) return work()
   await putModel(dev, model)
   try {
     return await work()

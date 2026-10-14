@@ -195,6 +195,14 @@ describe('Pi committed state projected for the chat', () => {
         provider: true,
       },
     })
+    // A deployment without its own model endpoint (ADR 0064), in the runtime's words.
+    const unset = 'This deployment has no model endpoint. Bring your own model key in Settings.'
+    expect(assistant({ stopReason: 'error', errorMessage: unset })).toMatchObject({
+      failure: {
+        text: 'This deployment has no model of its own. Bring your own model key in Settings, then send again.',
+        provider: false,
+      },
+    })
     expect(assistant({ stopReason: 'error', errorMessage: 'Bad tool schema\nstack' })).toMatchObject({
       failure: { text: 'The model call failed: Bad tool schema', provider: false },
     })

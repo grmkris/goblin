@@ -21,6 +21,7 @@ export {
   Internal,
   InvalidInput,
   NeedsAuthorization,
+  NoModelEndpoint,
   NotFound,
   PayloadTooLarge,
   ResidentInactive,

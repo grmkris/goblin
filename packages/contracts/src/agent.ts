@@ -56,10 +56,13 @@ export const ModelOption = Schema.Struct({
 })
 export type ModelOption = typeof ModelOption.Type
 
-/** The model the user's agent answers with, the deployment default, and every model on offer (default first). */
+/**
+ * The model the user's agent answers with, the endpoint's default, and every model on offer (default first). With no
+ * model endpoint (ADR 0064) nothing is on offer: `options` is empty and there is no `current` or `default`.
+ */
 export const ModelChoice = Schema.Struct({
-  current: Schema.String,
-  default: Schema.String,
+  current: Schema.optional(Schema.String),
+  default: Schema.optional(Schema.String),
   options: Schema.Array(ModelOption),
 })
 export type ModelChoice = typeof ModelChoice.Type
@@ -67,10 +70,12 @@ export type ModelChoice = typeof ModelChoice.Type
 /**
  * Where the agent's model calls go (ADR 0059): the deployment's endpoint, or the owner's own OpenAI-compatible one,
  * shown by its base URL and the last characters of its key, never the key. `models` are the ones it serves, its
- * default first.
+ * default first. `none` (ADR 0064): the deployment has no endpoint of its own and the owner has not set theirs, so no
+ * model call can be made. `deployment` says whether the deployment has one, which clearing the owner's goes back to.
  */
 export const ModelEndpointView = Schema.Struct({
-  source: Schema.Literals(['owner', 'deployment']),
+  source: Schema.Literals(['owner', 'deployment', 'none']),
+  deployment: Schema.Boolean,
   baseUrl: Schema.optional(Schema.String),
   keyHint: Schema.optional(Schema.String),
   models: Schema.Array(Schema.String),

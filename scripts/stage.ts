@@ -82,7 +82,9 @@ if (stage.local) {
   childEnv['GOBLIN_APP_URL'] = 'http://localhost:18971'
   childEnv['GOBLIN_BETTER_AUTH_SECRET'] = 'goblin-local-only-secret-not-for-cloudflare-00000000000000000'
   childEnv['GOBLIN_MODEL_KEY'] = process.env['CLIPROXY_API_KEY'] ?? ''
-  // Local-only defaults; .local/local.env values override them.
+  // Local-only defaults; .local/local.env values override them. The model endpoint is CLIProxy on this machine.
+  childEnv['GOBLIN_MODEL_BASE_URL'] = 'http://127.0.0.1:8317/v1'
+  childEnv['GOBLIN_MODEL_ID'] = 'gemini-3.8-flash'
   childEnv['GOBLIN_CREDENTIAL_KEY'] = 'Z29ibGluLWxvY2FsLW9ubHkta2V5ISEhISEhISEhISE='
   childEnv['GOBLIN_SIGNUP_MODE'] = 'open'
   childEnv['GOBLIN_MAIL_SENDER'] = 'hello@goblin.test'

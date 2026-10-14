@@ -100,12 +100,15 @@ export class Budget extends Context.Service<
     readonly today: (now: number) => Effect.Effect<UsageToday, AppError>
     /** One model response's tokens. */
     readonly record: (use: TokenUse, now: number) => Effect.Effect<void>
-    /** `BudgetExhausted` once a cap is set and today's tokens have reached it. Every model call goblin makes asks this. */
+    /**
+     * `NoModelEndpoint` while there is no model endpoint to call (ADR 0064), `BudgetExhausted` once a cap is set and
+     * today's tokens have reached it. Every model call goblin makes asks this.
+     */
     readonly require: (now: number) => Effect.Effect<void, AppError>
   }
 >()('goblin/budget/Budget') {}
 
-/** `BudgetExhausted` once the agent has spent today's capped tokens. */
+/** `BudgetExhausted` once the agent has spent today's capped tokens; `NoModelEndpoint` while it has no endpoint. */
 export const requireBudget: Effect.Effect<void, AppError, Budget> = Effect.flatMap(epochSeconds, (now) =>
   Budget.use((budget) => budget.require(now)),
 )

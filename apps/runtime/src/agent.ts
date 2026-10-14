@@ -46,7 +46,7 @@ import { retrievalExtension } from './pi/retrieval.ts'
 import { type Applied } from './agent-model.ts'
 import { routinesExtension } from './pi/routines.ts'
 import { requireRoutine } from './routines/authority.ts'
-import { Inference } from './inference/service.ts'
+import { Inference, servedFailure } from './inference/service.ts'
 import type { RoutineSlot } from './routines/scheduler.ts'
 import { routineExtensions } from './routines/kit.ts'
 import type { StartRoutine } from './pi/routine-run.ts'
@@ -89,7 +89,10 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       this.modelStreams(),
       undefined,
       (id) => run(requireRoutine(id)),
-      (modelId) => run(Inference.use((inference) => inference.served(modelId))),
+      (modelId) =>
+        run(Inference.use((inference) => inference.served(modelId))).catch((cause: unknown) => {
+          throw servedFailure(cause)
+        }),
     )
     const residentTools = residentMcpExtension(run)
     const tools = [residentTools, budgetExtension(run)]

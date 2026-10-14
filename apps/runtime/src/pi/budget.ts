@@ -7,25 +7,31 @@ import type { RunProgram } from '../runtime/bridge.ts'
 import { epochSeconds } from '../clock.ts'
 
 /** Why a tool may not run against today's budget, or `open` when it may. */
-export type BudgetVerdict = 'open' | 'exhausted' | 'failed'
+export type BudgetVerdict = 'open' | 'exhausted' | 'unconfigured' | 'failed'
 
 /** What the model is told when a tool is blocked: only a spent budget reads as spent. */
 export const BUDGET_BLOCKS: Readonly<Record<Exclude<BudgetVerdict, 'open'>, string>> = {
   exhausted:
     "Today's model budget is used up, so this tool was not run. Tell the user, and that the budget resets at 00:00 UTC.",
+  unconfigured:
+    'No model endpoint is set any more, so this tool was not run. Tell the user to bring their own model key in Settings.',
   failed: "Today's model budget could not be checked, so this tool was not run. Tell the user, then try again later.",
 }
 
 /**
- * Today's budget as a tool sees it: spent (`BudgetExhausted` or used up), or open. Anything else (the ledger failing) is
- * reported and fails closed as a check that failed, never as a spent budget.
+ * Today's budget as a tool sees it: spent (`BudgetExhausted` or used up), no endpoint left to call (`NoModelEndpoint`,
+ * the owner took theirs away mid-turn), or open. Anything else (the ledger failing) is reported and fails closed as a
+ * check that failed, never as a spent budget.
  */
 export const budgetVerdict: Effect.Effect<BudgetVerdict, never, Budget> = Effect.gen(function* () {
   const budget = yield* Budget
   yield* budget.require(yield* epochSeconds)
   return 'open' as const
 }).pipe(
-  Effect.catchTag('BudgetExhausted', () => Effect.succeed('exhausted' as const)),
+  Effect.catchTags({
+    BudgetExhausted: () => Effect.succeed('exhausted' as const),
+    NoModelEndpoint: () => Effect.succeed('unconfigured' as const),
+  }),
   reportAndRecover('budget.beforeTool', 'failed' as const),
 )
 

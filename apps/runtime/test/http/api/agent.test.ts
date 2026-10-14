@@ -77,6 +77,8 @@ const fixture = () => {
           CREDENTIAL_KEY: 'unused',
           MODELS: 'model-b',
           MODEL_ID: 'model-a',
+          MODEL_BASE_URL: 'https://no-model-calls.invalid/v1',
+          MODEL_KEY: 'unused',
           DAILY_TOKEN_CAP: '100000',
         },
         userId: 'owner',
@@ -122,6 +124,7 @@ describe('the agent group served by the agent', () => {
     const { fetch } = fixture()
     expect(await callOwner({ fetch }, (api) => api.agent.modelEndpoint())).toEqual({
       source: 'deployment',
+      deployment: true,
       models: ['model-a', 'model-b'],
     })
     const key = 'sk-own-0123456789wxyz'
@@ -131,6 +134,7 @@ describe('the agent group served by the agent', () => {
     expect(body).not.toContain(key)
     expect(JSON.parse(body)).toEqual({
       source: 'owner',
+      deployment: true,
       baseUrl: 'https://models.example/v1',
       keyHint: '…wxyz',
       models: ['own-model'],
@@ -140,7 +144,7 @@ describe('the agent group served by the agent', () => {
     const plain = await fetch(json('PUT', '/api/agent/model-endpoint', { baseUrl: 'http://models.example', key }))
     expect(plain.status).toBe(400)
     const cleared = await callOwner({ fetch }, (api) => api.agent.clearModelEndpoint())
-    expect(cleared).toEqual({ source: 'deployment', models: ['model-a', 'model-b'] })
+    expect(cleared).toEqual({ source: 'deployment', deployment: true, models: ['model-a', 'model-b'] })
   })
 
   it('answers the channel as null while off, refuses a connection without its tools, and turns it off', async () => {

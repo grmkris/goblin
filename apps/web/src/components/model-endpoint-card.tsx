@@ -1,5 +1,6 @@
 // The Settings card for where the agent's model calls go (ADR 0059): the deployment's models, or the owner's own
-// OpenAI-compatible endpoint and key. The key is written once and never read back; the card shows its last characters.
+// OpenAI-compatible endpoint and key; a deployment without models of its own (ADR 0064) needs the owner's. The key is
+// written once and never read back; the card shows its last characters.
 import { type SubmitEvent, useState } from 'react'
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import type { ModelEndpointView } from '@goblin/contracts'
@@ -108,13 +109,25 @@ const served = (view: ModelEndpointView): string =>
   view.models.length === 1 ? '1 model' : `${String(view.models.length)} models`
 
 /**
- * Where model calls go now, with the way to change it: the owner's own endpoint, or back to the deployment's. Shared by
- * Settings' card and Start's model step; it suspends until the endpoint is read.
+ * Where model calls go now, with the way to change it: the owner's own endpoint, or back to the deployment's. Without
+ * either, the agent cannot answer, which it says first. Shared by Settings' card and Start's model step; it suspends
+ * until the endpoint is read.
  */
 export function ModelEndpoint() {
   const view = useSuspenseQuery(modelEndpointQuery).data
   const remove = useMutation(changeModelEndpointMutation)
   const [editing, setEditing] = useState(false)
+  if (view.source === 'none')
+    return (
+      <div className="card-body">
+        <Alert>
+          <AlertDescription>
+            This deployment has no models of its own. Bring your own endpoint and key so your agent can answer.
+          </AlertDescription>
+        </Alert>
+        <EndpointForm onSaved={() => setEditing(false)} />
+      </div>
+    )
   if (view.source === 'deployment')
     return (
       <div className="card-body">
@@ -122,7 +135,8 @@ export function ModelEndpoint() {
         <EndpointForm onSaved={() => setEditing(false)} />
       </div>
     )
-  const failure = remove.error === null ? '' : messageOf(remove.error, "go back to this deployment's models")
+  const leave = view.deployment ? "Use this deployment's models" : 'Stop using this endpoint'
+  const failure = remove.error === null ? '' : messageOf(remove.error, leave.toLowerCase())
   return (
     <div className="card-body">
       <p className="text-sm text-muted-foreground">
@@ -133,7 +147,7 @@ export function ModelEndpoint() {
           {editing ? 'Keep this endpoint' : 'Change'}
         </Button>
         <Button variant="outline" size="sm" pending={remove.isPending} onClick={() => remove.mutate(null)}>
-          Use this deployment's models
+          {leave}
         </Button>
       </div>
       {failure !== '' && (
@@ -154,7 +168,7 @@ export function ModelEndpointCard() {
         <CardTitle>Model</CardTitle>
         <CardDescription>
           Bring your own model: your agent sends every model call to your endpoint with your key, and the models it
-          lists are the ones you pick from. Without one, it uses the models this deployment offers.
+          lists are the ones you pick from. Without one, it uses the models this deployment offers, if it has any.
         </CardDescription>
       </CardHeader>
       <CardContent>

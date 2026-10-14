@@ -42,6 +42,7 @@ export const ERROR_KINDS: ErrorKindTable<ApiCode> = {
   payload_too_large: 'validation',
   resident_inactive: 'forbidden',
   budget_exhausted: 'plan_limit',
+  no_model_endpoint: 'forbidden',
   needs_authorization: 'forbidden',
   scope_required: 'forbidden',
   upstream_mcp: 'unavailable',
