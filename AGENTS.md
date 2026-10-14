@@ -10,6 +10,8 @@ infrastructure. Read
 ## Work and ownership
 
 - Work on `dev` (the default branch; there is no `main`). CI on GitHub-hosted runners deploys every push to `dev` that passes Check; `bun run promote <sha>` fast-forwards `prod`, which CI deploys. A deploy or destroy of dev or prod by hand is break-glass (`GOBLIN_BREAK_GLASS=1`). Commit each coherent, green change separately as it lands; never batch unrelated changes.
+- Prod is frozen at tag `hackathon-2026-10` until the hackathon's judging ends (owner, 2026-10-14): never promote or
+  deploy prod by hand until the owner lifts the freeze; the cleanup in progress lands on `dev` only.
 - Other agents share this checkout. Preserve edits you did not make and `.spec.md.swo`. Never stash, reset, restore
   or delete foreign files. Stage exact owned paths or hunks, never `git add .` or `git add -A`.
 - A red gate in a file you did not touch may be someone's mid-edit: check `git status`/`git diff` before fixing it.
