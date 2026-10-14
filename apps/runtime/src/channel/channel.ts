@@ -6,18 +6,20 @@
 // owner's choice. Each answer goes back to the chat and topic its message came from. The rows are channel/store.ts and
 // channel/routes.ts; the server's tools are channel/tools.ts.
 import { type ChannelStatus, TELEGRAM_AUTHOR, TELEGRAM_DM, TelegramChatHandle } from '@goblin/contracts'
-import { RunAttribute, type RunAttributes } from '@goblin/contracts/telemetry'
+import { RunAttribute } from '@goblin/contracts/telemetry'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import * as Semaphore from 'effect/Semaphore'
-import { chatSession, operationSession, primaryChat } from '../chats/directory.ts'
 import { type AppError, InvalidInput, toAppError } from '../http/errors.ts'
 import { writeLine } from '../observability/logger.ts'
+import { type LedgerInput, deliverReady, turnLedger } from '../sources/delivery.ts'
+import { deliverHeld } from '../sources/held.ts'
+import { chunks, operationIdOf } from '../sources/text.ts'
+import type { Answer, ReplyRef, Turn } from '../sources/turns.ts'
 import { failureAttributes, outcomeOf } from '../telemetry/attributes.ts'
-import type { RunTelemetry } from '../telemetry/events.ts'
 import { expectedFailure } from '../telemetry/safety.ts'
 import { type ChatKey, type Offering, answeredQuestion, discover, resolveOffer, tapOf } from './offers.ts'
 import {
@@ -63,8 +65,6 @@ import { type ChannelCall, type TelegramRefused, refusedAsUpstream } from './too
 const MAX_PAGES = 50
 /** Pages of 100 read at most to find the end of the inbox when the channel is turned on. */
 const MAX_HISTORY_PAGES = 200
-/** How long a turn's answer is waited for before it is given up. */
-const REPLY_DAYS = 1
 /** Telegram's limit is 4096 characters of HTML; plain text is cut well below it so escaping cannot push it over. */
 const CHUNK = 3500
 
@@ -89,26 +89,6 @@ const isHandle = Schema.is(TelegramChatHandle)
 /** What `question_ask` answers: the question's id, once the server admitted it. */
 const decodeAsked = Schema.decodeUnknownOption(Schema.Struct({ id: Schema.optional(Schema.String) }))
 
-/** One message from the owner into a goblin Topic: where, under which operation, from whom, and its words. */
-export type Turn = {
-  readonly topic: number
-  readonly operationId: string
-  readonly author: string
-  readonly text: string
-}
-
-/** A single-choice question an answer ended on, as Telegram buttons can ask it. */
-export type AskedChoice = {
-  readonly prompt: string
-  readonly options: readonly { readonly id: string; readonly label: string }[]
-}
-
-/** How a turn ended for Telegram: its words, and the question with buttons it asked when it stopped on one. */
-export type Answer = { readonly text: string; readonly question?: AskedChoice }
-
-/** Which turn an answer belongs to: its operation, the goblin chat it ran in and the Persona that answers it. */
-export type ReplyRef = { readonly operationId: string; readonly chatId?: string; readonly personaId?: number }
-
 /** What the channel needs from the agent: the channel server's tools, the Topics, and the end of a turn. */
 export interface ChannelPorts {
   /** A tool of the channel server; its structured result. */
@@ -132,27 +112,9 @@ export interface ChannelPorts {
 /** One answer's delivery to Telegram: the turn's operation id, how many messages it took, and why it failed if it did. */
 export type DeliveredReply = { readonly operationId: string; readonly pieces: number; readonly errorType?: string }
 
-/** An operation id mygram accepts (letters, digits, `_` and `-`, at most 100). */
-const myagentId = (prefix: string, id: string) => `${prefix}-${id.replaceAll(/[^\w-]/gu, '-')}`.slice(0, 100)
-
 /** Plain text as Telegram HTML. */
 export const escapeHtml = (text: string) =>
   text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-
-/** `text` in pieces Telegram accepts, split at paragraph or line breaks where it can. */
-export function chunks(text: string): readonly string[] {
-  const pieces: string[] = []
-  let rest = text.trim()
-  while (rest.length > CHUNK) {
-    const window = rest.slice(0, CHUNK)
-    const cut = Math.max(window.lastIndexOf('\n\n'), window.lastIndexOf('\n'))
-    const at = cut > CHUNK / 2 ? cut : CHUNK
-    pieces.push(rest.slice(0, at).trim())
-    rest = rest.slice(at).trim()
-  }
-  if (rest !== '') pieces.push(rest)
-  return pieces
-}
 
 /** An inbox entry as the words a Topic receives: its text, then its attachments by kind and name (untrusted names). */
 const messageText = (message: Message) =>
@@ -186,37 +148,13 @@ const readToEnd = Effect.fn('Channel.readToEnd')(function* (call: ChannelCall, c
 })
 
 /** What the channel is made over: the agent's database and its run ledger. */
-export interface ChannelInput {
-  readonly db: DrizzleSqliteDODatabase
-  readonly telemetry: RunTelemetry | undefined
+export type ChannelInput = LedgerInput & {
   /** Asks the agent to send the answers that are ready (a schedule of its own). */
   readonly wake: () => void
 }
 
-/** One message in, one answer out, in the run ledger (ADR 0024), by the turn's operation id and the chat it ran in. */
-const recorder =
-  ({ db, telemetry }: ChannelInput) =>
-  (
-    kind: 'channel.received' | 'channel.reply',
-    turn: { readonly operationId: string; readonly chatId: string | undefined },
-    startedAt: number,
-    extra: RunAttributes,
-  ) =>
-    Effect.flatMap(Clock.currentTimeMillis, (endedAt) =>
-      Effect.sync(() => {
-        const chat = turn.chatId ?? primaryChat
-        telemetry?.record({
-          id: `${kind === 'channel.received' ? 'channel' : 'reply'}:${turn.operationId}`,
-          kind,
-          status: RunAttribute.errorType in extra ? 'error' : 'ok',
-          conversationId: operationSession(db, chat, turn.operationId) ?? chatSession(db, chat),
-          operationId: turn.operationId,
-          startedAt,
-          endedAt,
-          attributes: { [RunAttribute.channel]: 'telegram', ...extra },
-        })
-      }),
-    )
+/** One message in, one answer out, in the run ledger (ADR 0024), attributed to Telegram (sources/delivery.ts). */
+const recorder = (input: ChannelInput) => turnLedger(input, 'telegram')
 type Recorder = ReturnType<typeof recorder>
 
 /** Where to start reading `connectionId`'s inbox: the stored cursor when it already carries the channel, else its end. */
@@ -279,7 +217,7 @@ const router = (input: ChannelInput, record: Recorder, ports: ChannelPorts) => {
       const effective = effectiveRoute(db, chat, thread)
       if (effective.mode === 'hold') return yield* Effect.sync(() => hold(db, held, now))
       if (effective.mode === 'ignore') return
-      const operationId = myagentId('telegram', held.entryId)
+      const operationId = operationIdOf('telegram', held.entryId)
       const turn = {
         topic: effective.topic,
         operationId,
@@ -316,12 +254,13 @@ const router = (input: ChannelInput, record: Recorder, ports: ChannelPorts) => {
       const ready = heldOf(db, chat).filter((held) => effectiveRoute(db, held.chat, held.thread).mode !== 'hold')
       if (ready.length === 0) return
       const dropped = effectiveRoute(db, chat, 0).mode === 'hold' ? 0 : takeDropped(db, chat)
-      let note = dropped === 0 ? '' : `(${String(dropped)} earlier messages were not kept while this chat waited.)\n`
-      for (const held of ready) {
-        yield* route(held, now, note)
-        release(db, held.entryId)
-        note = ''
-      }
+      yield* deliverHeld(
+        ready,
+        dropped,
+        'chat',
+        (held, note) => route(held, now, note),
+        (held) => release(db, held.entryId),
+      )
     })
 
   /** Sets `key`'s route as the owner chose it (an offer's answer, the default for new chats) and delivers what waited. */
@@ -461,7 +400,7 @@ const sendAnswer = (
     const status = routeRow(db, reply.tgChat, 0)?.status
     const out = status === 'paused' || status === 'left'
     const question = out ? undefined : answer?.question
-    const pieces = out || question !== undefined ? [] : chunks(answer?.text ?? '')
+    const pieces = out || question !== undefined ? [] : chunks(answer?.text ?? '', CHUNK)
     const sent = {
       [RunAttribute.delivery]: answer === undefined || out ? 'given_up' : 'sent',
       [RunAttribute.pieces]: pieces.length + (question === undefined ? 0 : 1),
@@ -472,13 +411,13 @@ const sendAnswer = (
     const sends = Effect.gen(function* () {
       for (const [index, piece] of pieces.entries())
         yield* ports.call('send', {
-          operationId: myagentId(`reply-${index}`, operationId),
+          operationId: operationIdOf(`reply-${index}`, operationId),
           text: escapeHtml(piece),
           ...place,
         })
       if (question === undefined) return undefined
       const asked = yield* ports.call('ask', {
-        operationId: myagentId('reply-ask', operationId),
+        operationId: operationIdOf('reply-ask', operationId),
         question: escapeHtml(question.prompt),
         mode: 'choice',
         options: buttons,
@@ -511,7 +450,7 @@ const sendAnswer = (
     yield* delivered({ operationId, pieces: sent[RunAttribute.pieces] })
   })
 
-/** Sends every answer that is ready; true while some are still running. */
+/** Sends every answer that is ready, or gives it up after a day; true while some are still running. */
 const deliver = (
   input: ChannelInput,
   record: Recorder,
@@ -519,19 +458,25 @@ const deliver = (
   now: number,
   delivered: (reply: DeliveredReply) => Effect.Effect<void>,
 ) =>
-  Effect.gen(function* () {
-    let waiting = false
-    for (const reply of pendingReplies(input.db)) {
-      const answer = yield* ports.answer({
+  Effect.suspend(() =>
+    deliverReady(
+      pendingReplies(input.db).map((reply) => ({
         operationId: reply.operationId,
+        createdAt: reply.createdAt,
         ...(reply.chatId === null ? {} : { chatId: reply.chatId }),
         ...(reply.personaId === null ? {} : { personaId: reply.personaId }),
-      })
-      if (answer === undefined && now - reply.createdAt < REPLY_DAYS * 86_400) waiting = true
-      else yield* sendAnswer(input, record, ports, { reply, answer, now }, delivered)
-    }
-    return waiting
-  })
+        reply,
+      })),
+      now,
+      ({ operationId, chatId, personaId }) =>
+        ports.answer({
+          operationId,
+          ...(chatId === undefined ? {} : { chatId }),
+          ...(personaId === undefined ? {} : { personaId }),
+        }),
+      ({ reply }, answer) => sendAnswer(input, record, ports, { reply, answer, now }, delivered),
+    ),
+  )
 
 /**
  * The agent's Telegram channel over its rows (channel/store.ts, channel/routes.ts): turning it on and off, the routes,

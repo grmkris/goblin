@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
-  HELD_LIMIT,
   allRoutes,
   closeOffer,
   dropHeld,
@@ -18,6 +17,7 @@ import {
   setRoute,
   takeDropped,
 } from '../src/channel/routes.ts'
+import { HELD_LIMIT } from '../src/sources/held.ts'
 import { chatDatabase, durable } from './chats-sqlite.ts'
 
 const closes: (() => void)[] = []

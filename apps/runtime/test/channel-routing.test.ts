@@ -1,11 +1,12 @@
 import { describe, expect, it } from '@effect/vitest'
 import * as Effect from 'effect/Effect'
 import { afterEach } from 'vitest'
-import { type Answer, type ChannelPorts, type Turn, telegramChannel } from '../src/channel/channel.ts'
+import { type ChannelPorts, telegramChannel } from '../src/channel/channel.ts'
 import { routeRow, seeChat } from '../src/channel/routes.ts'
 import { enableEvents, pendingReplies } from '../src/channel/store.ts'
 import { type ChannelCall, TelegramRefused } from '../src/channel/tools.ts'
 import { registerPrimary } from '../src/chats/directory.ts'
+import type { Answer, Turn } from '../src/sources/turns.ts'
 import { chatDatabase, durable } from './chats-sqlite.ts'
 
 const GROUP = 'g_trip0000000000000'

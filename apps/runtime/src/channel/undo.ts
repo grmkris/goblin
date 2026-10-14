@@ -1,17 +1,17 @@
 // Undo of a Telegram route or of the new-chats default (ADRs 0033, 0055): the receipt's `before` put back through the
-// channel. A route goes back with no delivery: what a chat holds waits only while it has no route, and a receipt's
-// change always leaves one.
+// channel (sources/undo.ts). A route goes back with no delivery: what a chat holds waits only while it has no route,
+// and a receipt's change always leaves one.
 import { NewChatsDefault, TelegramRoute } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { epochSeconds } from '../clock.ts'
-import { Conflict, InvalidInput } from '../http/errors.ts'
+import { InvalidInput } from '../http/errors.ts'
+import { undoRoute } from '../sources/undo.ts'
 import type { RouteChoice } from './routes.ts'
 import { Channel } from './service.ts'
 
 const RouteSnapshot = Schema.Struct({ route: Schema.NullOr(TelegramRoute) })
 const DefaultSnapshot = Schema.Struct({ newChats: NewChatsDefault })
-const schema = () => new InvalidInput({ reason: 'schema' })
 
 /** A route receipt's target, `<chat>:<thread>`, as its key. */
 const keyOf = (target: string) => {
@@ -33,16 +33,15 @@ export const undoTelegram = (receipt: {
   Effect.gen(function* () {
     const channel = yield* Channel
     if ((yield* channel.status) === null) return yield* new InvalidInput({ reason: 'telegram_off' })
-    if ((yield* channel.revision(receipt.kind, receipt.target)) !== receipt.afterRevision)
-      return yield* new Conflict({ reason: 'touched' })
-    if (receipt.kind === 'telegram.default') {
-      const { newChats } = yield* Schema.decodeUnknownEffect(DefaultSnapshot)(receipt.before).pipe(
-        Effect.mapError(schema),
+    const current = yield* channel.revision(receipt.kind, receipt.target)
+    if (receipt.kind === 'telegram.default')
+      return yield* undoRoute(receipt, current, DefaultSnapshot, ({ newChats }) =>
+        Effect.asVoid(channel.newChats(newChats)),
       )
-      yield* channel.newChats(newChats)
-      return
-    }
-    const { route } = yield* Schema.decodeUnknownEffect(RouteSnapshot)(receipt.before).pipe(Effect.mapError(schema))
-    const choice: RouteChoice = route ?? { mode: 'inherit' }
-    yield* channel.restore(keyOf(receipt.target), choice, yield* epochSeconds)
+    yield* undoRoute(receipt, current, RouteSnapshot, ({ route }) =>
+      Effect.flatMap(epochSeconds, (now) => {
+        const choice: RouteChoice = route ?? { mode: 'inherit' }
+        return Effect.asVoid(channel.restore(keyOf(receipt.target), choice, now))
+      }),
+    )
   })

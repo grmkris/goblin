@@ -10,6 +10,7 @@ import {
 } from '@goblin/contracts'
 import { and, asc, count, eq, inArray, notInArray, sql } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
+import { holdNewest } from '../sources/held.ts'
 import { appTelegramHeld, appTelegramRoutes } from '../storage/telegram.ts'
 
 type Db = DrizzleSqliteDODatabase
@@ -22,9 +23,6 @@ export type Effective = TelegramRoute | { readonly mode: 'hold' }
 
 /** A route as the owner or the agent sets it, or `inherit`: a forum topic follows its chat. */
 export type RouteChoice = TelegramRoute | { readonly mode: 'inherit' }
-
-/** How many messages a waiting chat keeps; older ones are dropped and counted. */
-export const HELD_LIMIT = 20
 
 /** The DM's own route when the owner never chose one: Personal, answered by goblin. */
 const DM_ROUTE: TelegramRoute = { mode: 'answer', topic: PERSONAL_TOPIC }
@@ -253,24 +251,30 @@ export type Held = {
  * counted on the chat's row. Holding the same entry again changes nothing.
  */
 export function hold(db: Db, held: Held, now: number): void {
-  db.transaction(() => {
-    db.insert(appTelegramHeld)
-      .values({ ...held, heldAt: now })
-      .onConflictDoNothing()
-      .run()
-    const kept = db
-      .select({ entryId: appTelegramHeld.entryId })
-      .from(appTelegramHeld)
-      .where(eq(appTelegramHeld.chat, held.chat))
-      .orderBy(sql`rowid DESC`)
-      .all()
-    const dropped = kept.slice(HELD_LIMIT).map(({ entryId }) => entryId)
-    if (dropped.length === 0) return
-    db.delete(appTelegramHeld).where(inArray(appTelegramHeld.entryId, dropped)).run()
-    db.update(appTelegramRoutes)
-      .set({ heldDropped: sql`${appTelegramRoutes.heldDropped} + ${dropped.length}` })
-      .where(and(eq(appTelegramRoutes.chat, held.chat), eq(appTelegramRoutes.thread, 0)))
-      .run()
+  holdNewest(db, {
+    put: () =>
+      db
+        .insert(appTelegramHeld)
+        .values({ ...held, heldAt: now })
+        .onConflictDoNothing()
+        .run(),
+    newestFirst: () =>
+      db
+        .select({ entryId: appTelegramHeld.entryId })
+        .from(appTelegramHeld)
+        .where(eq(appTelegramHeld.chat, held.chat))
+        .orderBy(sql`rowid DESC`)
+        .all()
+        .map(({ entryId }) => entryId),
+    drop: (dropped) => {
+      db.delete(appTelegramHeld)
+        .where(inArray(appTelegramHeld.entryId, [...dropped]))
+        .run()
+      db.update(appTelegramRoutes)
+        .set({ heldDropped: sql`${appTelegramRoutes.heldDropped} + ${dropped.length}` })
+        .where(and(eq(appTelegramRoutes.chat, held.chat), eq(appTelegramRoutes.thread, 0)))
+        .run()
+    },
   })
 }
 
