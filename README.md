@@ -37,8 +37,9 @@ section holds the servers and App views the owner pins, in their order, on every
 App full screen in a thread of its own. On a phone the navigation is a drawer and a thread is a full view with a back to
 its channel. Owners can add public servers by URL, from MCP registries, or from goblin's shelf (mysi, goblin's own
 services, and servers that need no sign-in grouped by what they are for: travel, knowledge, crypto data, views in the
-chat, code), grant tools explicitly, mark individual tools **Ask first** for approval of every exact call, choose an
-offered model, and see the day's token usage against the deployment's optional per-account cap. The agent uses
+chat, code), grant tools explicitly, mark individual tools **Ask first** for approval of every exact call, bring their own
+OpenAI-compatible model endpoint and key or use the deployment's, choose among its models, and see the day's token
+usage against the deployment's optional per-account cap. The agent uses
 `ask_user` to ask questions the owner answers in their next message. The owner attaches files to a message with the
 composer's paperclip; the agent reads them and writes its own results beside them, kept per agent in SQLite and R2.
 

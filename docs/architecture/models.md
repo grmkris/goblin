@@ -6,14 +6,29 @@ Typed decisions are the scoped Workers AI exception ([ADR 0031](../adr/0031-type
 judges bounded state and questions through `AI` after the rules decide what they can. It is never a chat model, and
 its calls check the daily cap and count their tokens like the cheap model's.
 
-Each user picks the model their agent answers with, in the composer. The deployment offers `GOBLIN_MODEL_ID` (the
-default) plus `GOBLIN_MODELS`, all served by the same LiteLLM key; `models.ts` names and groups them by route
-(Google, Alibaba Cloud), because quota runs out per route. The pick is one row in `app_model_choice`; without one, or
-when the deployment stops offering it, the default applies. Pi stores one model per conversation, set when it is
-created, so before each turn the agent sets it (`PiSessions.setModel`) for the conversation the turn runs in,
-skipping it when that conversation already has the model. Every offered model is registered with
-Pi's `Models` under the one `goblin-litellm` provider. A failed model call shows its reason in the chat, and a
-quota or outage failure points at the picker.
+Model calls go to one OpenAI-compatible endpoint ([ADR 0059](../adr/0059-bring-your-own-model-endpoint.md)): the
+owner's own, set in Settings, else the deployment's. The deployment's is `GOBLIN_MODEL_BASE_URL` with
+`GOBLIN_MODEL_KEY`, offering `GOBLIN_MODEL_ID` (the default) plus `GOBLIN_MODELS`. The owner's is one row in
+`app_model_endpoint` (`inference/store.ts`): its base URL, its key sealed by the credential cipher with the agent's id
+as additional data, and the models it listed when it was set (`inference/endpoint.ts` checks the URL as an added
+server's, then reads `GET <base>/models` with the key). `Inference` (`inference/service.ts`, built in
+`layers/budget.ts`) resolves the endpoint in use and keeps it in memory until the owner changes it; the owner API
+(`GET`, `PUT`, `DELETE /api/agent/model-endpoint`) answers its base URL, its models and the key's last four characters,
+never the key.
+
+Pi sees one provider, `goblin-litellm`, that serves every model id (`pi/model.ts`). Each request is resolved when it is
+made: `Inference.served` gives the endpoint, its key and a model it serves (the id asked for when the endpoint lists
+it, else its first), so turns, threads, subagents, Personas, routine runs, the memory model and an app's `llm` power
+all follow the owner's endpoint, and a model id a conversation stored before a switch still answers. A call whose
+endpoint cannot be read ends as a failed response.
+
+Each user picks the model their agent answers with, in the composer, among the models of the endpoint in use;
+`models.ts` names and groups known ids by route (Google, Alibaba Cloud), because quota runs out per route, and offers
+an unknown one under its own name, text only. The pick is one row in `app_model_choice`; without one, or when the
+endpoint stops offering it, its default applies. Pi stores one model per conversation, set when it is created, so
+before each turn the agent sets it (`PiSessions.setModel`) for the conversation the turn runs in, skipping it when that
+conversation already has the model. A failed model call shows its reason in the chat, and a quota or outage failure
+points at the picker.
 
 Every response may run to 32 768 tokens (`MAX_OUTPUT_TOKENS`, `pi/model.ts`): reasoning models spend part of it
 thinking. pi-ai sends the limit on every request, less whatever the context leaves short of the window, so Pi
@@ -38,7 +53,8 @@ is unknown counts its whole 65,536-token context) and routine runs (`routines/us
 the same way. Compaction summaries in main and threads are not counted yet.
 
 Users of a deployment share its model key, so the deployment may cap each account's day with `GOBLIN_DAILY_TOKEN_CAP`
-(the Worker's `DAILY_TOKEN_CAP`, a positive whole number); unset, nothing is refused. Once a capped day is spent, new
+(the Worker's `DAILY_TOKEN_CAP`, a positive whole number); unset, or while the owner uses their own endpoint, nothing
+is refused. Once a capped day is spent, new
 turns are refused with `BudgetExhausted` until 00:00 UTC: HTTP 429 from the owner API, or a tool error from `/mcp`.
 Telegram submissions, routine runs and housekeeping check the same cap. Tool calls inside a running turn are blocked,
 so a looping turn ends after one more reply. Pi reports and swallows exceptions thrown by hooks, so the in-turn lever

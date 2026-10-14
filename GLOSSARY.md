@@ -103,6 +103,11 @@ The owner can Undo it while nothing has touched the target since.
 A Conversation's memory as the model reads it: one-line summaries of older messages, followed by the newest exchange
 verbatim. `zoom` opens a line.
 
+**Model endpoint**:
+Where the agent's model calls go: the owner's own OpenAI-compatible endpoint and key, set in Settings and sealed in the
+agent, else the deployment's (ADR 0059). The models it lists are the ones the owner picks from.
+_Avoid_: provider, inference plan
+
 **Memory model**:
 The cheap offered model (`GOBLIN_MEMORY_MODEL`) for thread titles, memory summaries and skill-draft decisions; its
 tokens count toward the daily usage.
