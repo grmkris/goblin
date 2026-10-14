@@ -60,6 +60,8 @@ infrastructure. Read
 - Tests are meaningful and bounded: real integrations for happy paths, injected services instead of module mocking.
 - Keep README, architecture, development docs and skills in step with code changes. Keep historical evidence outside
   the living documentation tree.
+- Never amend an ADR in place. A changed decision is a new ADR that names what it supersedes; a fully replaced ADR moves
+  to `docs/adr/archive/`, and `docs/adr/README.md` keeps each one's status.
 
 ## Workspace map
 
