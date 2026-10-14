@@ -63,8 +63,9 @@ const widenLink = (url: string | undefined): { readonly widenUrl?: string } => {
 type Reach = { readonly reach: TelegramReach; readonly widenUrl?: string }
 
 /**
- * How far the grant reaches: a read of every chat answers `all`; a refusal answers `dm`, with the URL that widens the
- * grant when the server named one. Any other failure fails.
+ * How far the grant reaches: a read of every chat answers `all`; a refusal (or an RPC error, from a server that does
+ * not know `chat`) answers `dm`, with the URL that widens the grant when the server named one. A transport failure
+ * fails.
  */
 const reachOf = (call: ChannelCall) =>
   call('inbox', { ...ALL, limit: 1 }).pipe(
@@ -74,6 +75,11 @@ const reachOf = (call: ChannelCall) =>
         reach: 'dm',
         ...(refused.code === 'access_insufficient' ? widenLink(refused.widenUrl) : {}),
       }),
+    ),
+    Effect.catchTag('UpstreamMcp', (error) =>
+      // expected: a server that answers the read of every chat with an RPC error (an older mygram that does not know
+      // `chat`) still carries the DM; any other failure of the server fails the switch.
+      error.reason === 'remote-rpc' ? Effect.succeed<Reach>({ reach: 'dm' }) : Effect.fail(error),
     ),
   )
 

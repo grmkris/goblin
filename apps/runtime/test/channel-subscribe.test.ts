@@ -21,8 +21,11 @@ afterEach(() => {
 const TOOLS = ['mygram_inbox_read', 'mygram_message_send', 'mygram_question_ask', 'mygram_chat_list']
 const EVENTS = ['mygram.message.received', 'mygram.question.answered', 'mygram.chat.changed']
 
-/** What the server answers a read of every chat: the inbox's end, or a refusal of a grant that reaches the DM only. */
-type Reach = 'all' | 'dm'
+/**
+ * What the server answers a read of every chat: the inbox's end, a refusal of a grant that reaches the DM only, or an
+ * RPC error from a server that does not know `chat`.
+ */
+type Reach = 'all' | 'dm' | 'old'
 
 /**
  * mysi with mygram behind it (its `mygram_` and `mygram.` spellings), offering Events, with a grant that reaches `reach`;
@@ -56,22 +59,24 @@ const world = (reach: Reach, refuseAll = false) =>
         snapshot: () => Effect.succeedSome(snapshot),
         connect: () => Effect.succeed(snapshot),
         callTool: (_connectionId, name, args) =>
-          Effect.succeed<McpToolResult>(
-            name === 'mygram_inbox_read' && args['chat'] === 'all' && reach === 'dm'
-              ? {
-                  isError: true,
-                  content: [
-                    {
-                      type: 'text',
-                      text: JSON.stringify({
-                        code: 'access_insufficient',
-                        widenUrl: 'https://dev.mysi.lol/consent/widen?grant=g',
-                      }),
-                    },
-                  ],
-                }
-              : { content: [], structuredContent: { messages: [], nextCursor: 'end' } },
-          ),
+          reach === 'old' && args['chat'] === 'all'
+            ? Effect.fail(new UpstreamMcp({ connectionId: 'mysi', reason: 'remote-rpc', code: -32602 }))
+            : Effect.succeed<McpToolResult>(
+                name === 'mygram_inbox_read' && args['chat'] === 'all' && reach === 'dm'
+                  ? {
+                      isError: true,
+                      content: [
+                        {
+                          type: 'text',
+                          text: JSON.stringify({
+                            code: 'access_insufficient',
+                            widenUrl: 'https://dev.mysi.lol/consent/widen?grant=g',
+                          }),
+                        },
+                      ],
+                    }
+                  : { content: [], structuredContent: { messages: [], nextCursor: 'end' } },
+              ),
       }),
       Layer.mock(McpGrants, {
         setTool: (_id, name) =>
@@ -128,6 +133,15 @@ describe('turning the Telegram channel on (unit)', () => {
       const { services, subscribed } = yield* world('dm')
       const status = yield* enableTelegram('mysi', async () => undefined).pipe(Effect.provide(services))
       expect(status).toMatchObject({ reach: 'dm', widenUrl: 'https://dev.mysi.lol/consent/widen?grant=g' })
+      expect(subscribed.map(({ args }) => args)).toEqual(['{}', '{}', '{}'])
+    }),
+  )
+
+  it.effect('carries the DM alone through a server that does not know a read of every chat', () =>
+    Effect.gen(function* () {
+      const { services, subscribed } = yield* world('old')
+      const status = yield* enableTelegram('mysi', async () => undefined).pipe(Effect.provide(services))
+      expect(status).toMatchObject({ reach: 'dm' })
       expect(subscribed.map(({ args }) => args)).toEqual(['{}', '{}', '{}'])
     }),
   )
