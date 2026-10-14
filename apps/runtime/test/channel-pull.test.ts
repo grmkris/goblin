@@ -56,6 +56,7 @@ const fixture = Effect.gen(function* () {
         return { chatId: '1' }
       }),
     keep: () => Effect.void,
+    topic: () => Effect.die('no Topic is made here'),
     answer: () => Effect.succeed(undefined),
   }
   return { channel, ports, opened, reads, submitted, most: () => most }

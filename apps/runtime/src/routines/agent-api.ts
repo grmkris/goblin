@@ -29,7 +29,7 @@ export const AgentHandlers = HttpApiBuilder.group(OwnerApi, 'agent', (handlers) 
       AgentInput.use(({ schedulePull }) => enableTelegram(payload.connectionId, schedulePull)),
     )
     .handle('disableChannel', () => disableTelegram)
-    .handle('channelChats', () => channelChats())
+    .handle('channelChats', () => channelChats)
     .handle('routeChannel', ({ payload }) => routeChannel(payload))
     .handle('channelSettings', ({ payload }) => channelSettings(payload.newChats)),
 )

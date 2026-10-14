@@ -17,9 +17,7 @@ import { epochSeconds } from '../clock.ts'
 import { type AppError, InvalidInput, NotFound } from '../http/errors.ts'
 import { Personas } from '../personas/service.ts'
 import { Db } from '../runtime/db.ts'
-import { createTopic, topicNamed } from '../topics/program.ts'
 import { Topics } from '../topics/service.ts'
-import type { ChannelPorts } from './channel.ts'
 import {
   type RouteChoice,
   type RouteRow,
@@ -30,8 +28,8 @@ import {
   routeRow,
   seeChat,
 } from './routes.ts'
+import { topicFor, topicOperation } from './places.ts'
 import { Channel } from './service.ts'
-import { type Discovered, syncChats } from './sync.ts'
 import { onChannel } from './turns.ts'
 
 /**
@@ -113,51 +111,24 @@ const seeDm = (db: DrizzleSqliteDODatabase, now: number) => {
 }
 
 /**
- * `GET /api/agent/channel/chats`: the server's chat list read into the routes (`syncChats`), then every chat and topic
- * with its route. `discovered` hears the chats and topics seen for the first time.
+ * `GET /api/agent/channel/chats`: the server's chat list read into the routes (each chat and topic new in it offered to
+ * the owner), then every chat and topic with its route.
  */
-export const channelChats = (
-  discovered: (found: readonly Discovered[], ports: ChannelPorts) => Effect.Effect<void, AppError> = () => Effect.void,
-) =>
-  Effect.gen(function* () {
-    const status = yield* channelOn
-    const db = yield* Db
-    const now = yield* epochSeconds
-    seeDm(db, now)
-    const synced = yield* onChannel((_channel, ports) =>
-      Effect.gen(function* () {
-        const sync = yield* syncChats(db, ports.call, now)
-        yield* discovered(sync.discovered, ports)
-        return sync.synced
-      }),
-    )
-    return chatsView(
-      db,
-      (yield* (yield* Channel).status) ?? status,
-      Option.getOrElse(synced, () => false),
-    )
-  })
-
-/**
- * The Topic a route's "New topic" makes, named after its chat or topic: the one this operation already made, or an
- * active Topic of that name. A Topic made for the same chat before and archived since is made again.
- */
-export const topicFor = (name: string, operationId: string, actor: 'owner' | 'agent') =>
-  Effect.gen(function* () {
-    const clean = name.trim().slice(0, 80) === '' ? 'Telegram' : name.trim().slice(0, 80)
-    const made = yield* createTopic({ name: clean, operationId }, { actor }).pipe(
-      Effect.catchTag('Conflict', () => topicNamed(clean)),
-    )
-    if (made.archivedAt === undefined) return made.id
-    const again = yield* createTopic(
-      { name: clean, operationId: `${operationId}:${String(made.revision)}` },
-      { actor },
-    ).pipe(Effect.catchTag('Conflict', () => topicNamed(clean)))
-    return again.id
-  })
-
-/** The deterministic operation of the Topic a chat's or topic's "New topic" makes. */
-export const topicOperation = (chat: string, thread: number) => `telegram:${chat}:${String(thread)}`
+export const channelChats = Effect.gen(function* () {
+  const status = yield* channelOn
+  const db = yield* Db
+  const now = yield* epochSeconds
+  seeDm(db, now)
+  // Without resident authority goblin reads no server: the list is goblin's own rows.
+  const synced = yield* onChannel((channel, ports) => channel.sync(ports, now)).pipe(
+    Effect.catchTag('ResidentInactive', () => Effect.succeed(Option.none<boolean>())),
+  )
+  return chatsView(
+    db,
+    (yield* (yield* Channel).status) ?? status,
+    Option.getOrElse(synced, () => false),
+  )
+})
 
 /** `topic` while it is active; `NotFound` otherwise. */
 const activeTopic = (topic: number) =>

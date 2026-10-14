@@ -31,6 +31,7 @@ const fixture = (sends: ChannelCall) =>
       call: sends,
       submit: () => Effect.die('nothing is routed here'),
       keep: () => Effect.void,
+      topic: () => Effect.die('no Topic is made here'),
       answer: () => Effect.succeed({ text: 'The plants are watered.' }),
     }
     const delivered: DeliveredReply[] = []

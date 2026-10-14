@@ -8,6 +8,12 @@ import { PERSONAL_TOPIC } from '@goblin/contracts'
 import { primaryChat } from '../src/chats/directory.ts'
 import { ChatOperations, Conversations } from '../src/chats/service.ts'
 import { Invocations, Personas } from '../src/personas/service.ts'
+import { AppEngine } from '../src/agent-apps/service.ts'
+import { Receipts } from '../src/organize/service.ts'
+import { Skills } from '../src/skills/service.ts'
+import { McpConnections, McpGrants, McpServers } from '../src/mcp/service.ts'
+import { Setups } from '../src/setup/service.ts'
+import { Topics } from '../src/topics/service.ts'
 import { ChatsLive } from '../src/layers/conversation.ts'
 import { Models, type ModelPicker } from '../src/models.ts'
 import { FlowEvents } from '../src/observability/flows.ts'
@@ -66,6 +72,15 @@ export const portServices = ({ db, harness, budget, models, flows = FlowEvents.n
     }),
     Layer.mock(Personas, { active: Effect.succeed([]) }),
     Layer.mock(Invocations, {}),
+    // No probe makes a Topic for a new chat.
+    Layer.mock(Topics, {}),
+    Layer.mock(Receipts, {}),
+    Layer.mock(Setups, {}),
+    Layer.mock(AppEngine, {}),
+    Layer.mock(Skills, {}),
+    Layer.mock(McpConnections, {}),
+    Layer.mock(McpServers, {}),
+    Layer.mock(McpGrants, {}),
   )
   return Layer.mergeAll(
     ChatsLive.pipe(Layer.provide(Layer.succeed(Db, db))),
@@ -74,5 +89,6 @@ export const portServices = ({ db, harness, budget, models, flows = FlowEvents.n
     pi,
     topics,
     input,
+    flows,
   )
 }

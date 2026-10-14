@@ -238,7 +238,13 @@ async function exercise(state: Awaited<ReturnType<typeof setup>>) {
   // The first message's turn answered; the second still runs: one reply goes out, one waits.
   const waiting = await Effect.runPromise(
     channel.deliver(
-      { call: state.call, submit: () => Effect.die('no message is routed here'), keep: () => Effect.void, answer },
+      {
+        call: state.call,
+        submit: () => Effect.die('no message is routed here'),
+        keep: () => Effect.void,
+        topic: () => Effect.die('no Topic is made here'),
+        answer,
+      },
       Math.floor(first / 1000),
     ),
   )

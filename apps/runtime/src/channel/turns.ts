@@ -16,11 +16,23 @@ import { type PiFailure, PiSessions } from '../pi/sessions.ts'
 import { askedChoice, askedText, cutOff } from '../pi/transcript.ts'
 import type { AgentInput } from '../runtime/input.ts'
 import type { Answer, ChannelPorts, ReplyRef, Turn } from './channel.ts'
+import { topicFor } from './places.ts'
 import { Channel } from './service.ts'
 import { type ChannelCall, channelTool } from './tools.ts'
 
+/** What making a Topic for a route reads: the Topics, their receipts and flows, and what a setup may hold. */
+type TopicServices = Effect.Services<ReturnType<typeof topicFor>>
+
 /** What the ports' programs read, captured once when the ports are made. */
-type PortServices = Chats | ChatOperations | Conversations | PiSessions | Personas | Invocations | AgentInput
+type PortServices =
+  | Chats
+  | ChatOperations
+  | Conversations
+  | PiSessions
+  | Personas
+  | Invocations
+  | AgentInput
+  | TopicServices
 
 /** What Telegram adds to an answer that reached the output limit, as the web transcript's receipt says. */
 const CUT_OFF = '(Cut off at the output limit. Ask it to continue.)'
@@ -141,6 +153,8 @@ export const channelPorts = (call: ChannelCall) =>
     call,
     submit: (turn, persona) => Effect.provideContext(submitTurn(turn, persona), context),
     keep: (turn) => Effect.provideContext(keepTurn(turn), context),
+    // The owner chose "New topic" (an offer's tap, or the default for new chats).
+    topic: (title, operationId) => Effect.provideContext(topicFor(title, operationId, 'owner'), context),
     answer: (reply) => Effect.provideContext(answerOf(reply), context),
   }))
 

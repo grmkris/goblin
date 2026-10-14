@@ -16,6 +16,7 @@ import { ChatOperations, Conversations } from '../../../src/chats/service.ts'
 import { FlowEvents } from '../../../src/observability/flows.ts'
 import { Receipts } from '../../../src/organize/service.ts'
 import { Invocations, Personas } from '../../../src/personas/service.ts'
+import { Setups } from '../../../src/setup/service.ts'
 import { Skills } from '../../../src/skills/service.ts'
 import { Topics } from '../../../src/topics/service.ts'
 import { ChatsLive } from '../../../src/layers/conversation.ts'
@@ -61,6 +62,7 @@ const fixture = () => {
     stub(FlowEvents),
     stub(Skills),
     stub(AppEngine),
+    stub(Setups),
     // The database the lane builds its stores over, and the gate's resident authority and plan.
     Layer.succeed(Db, sqlite),
     Layer.succeed(Resident, currentResident().service),

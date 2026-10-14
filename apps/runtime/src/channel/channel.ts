@@ -18,11 +18,14 @@ import { writeLine } from '../observability/logger.ts'
 import { failureAttributes, outcomeOf } from '../telemetry/attributes.ts'
 import type { RunTelemetry } from '../telemetry/events.ts'
 import { expectedFailure } from '../telemetry/safety.ts'
+import { type ChatKey, type Offering, discover, resolveOffer } from './offers.ts'
 import {
   type Held,
+  type RouteChoice,
   effectiveRoute,
   heldOf,
   hold,
+  offerOf,
   release,
   routeRow,
   seeChat,
@@ -114,6 +117,8 @@ export interface ChannelPorts {
   ) => Effect.Effect<{ readonly chatId: string; readonly persona?: number }, AppError>
   /** The owner's Telegram message kept in the Topic with no turn (idempotent by operation id). */
   readonly keep: (turn: Turn) => Effect.Effect<void, AppError>
+  /** The Topic a route's "New topic" makes for a chat or topic named `title` (idempotent by operation id). */
+  readonly topic: (title: string, operationId: string) => Effect.Effect<number, AppError>
   /** How a turn ended, once it has; undefined while it runs. */
   readonly answer: (reply: ReplyRef) => Effect.Effect<Answer | undefined, AppError>
 }
@@ -234,15 +239,25 @@ function authorOf(db: DrizzleSqliteDODatabase, chat: string, thread: number): st
  * Makes sure goblin knows the chat and topic a message came from: one it had not seen is recorded with what it can tell
  * of it until the server's lists say more, and a chat the bot was out of is in it again.
  */
-const firstSight = (db: DrizzleSqliteDODatabase, chat: string, thread: number, now: number): void => {
+const firstSight = (db: DrizzleSqliteDODatabase, chat: string, thread: number, now: number): ChatKey[] => {
   const known = routeRow(db, chat, 0)
   const dm = chat === TELEGRAM_DM
   const kind = known?.kind ?? (dm ? 'private' : 'group')
-  if (known === undefined) seeChat(db, { chat, thread: 0, title: dm ? 'Telegram' : 'Telegram group', kind }, now)
-  else if (known.status === 'paused' || known.status === 'left') setPresence(db, chat, 'active', now)
-  if (thread > 0 && routeRow(db, chat, thread) === undefined)
+  const created: ChatKey[] = []
+  if (known === undefined) {
+    seeChat(db, { chat, thread: 0, title: dm ? 'Telegram' : 'Telegram group', kind }, now)
+    created.push({ chat, thread: 0 })
+  } else if (known.status === 'paused' || known.status === 'left') setPresence(db, chat, 'active', now)
+  if (thread > 0 && routeRow(db, chat, thread) === undefined) {
     seeChat(db, { chat, thread, title: `Topic ${String(thread)}`, kind }, now)
+    created.push({ chat, thread })
+  }
+  return created
 }
+
+/** Whether goblin has never seen `chat`, or its forum topic `thread`. */
+const unseen = (db: DrizzleSqliteDODatabase, chat: string, thread: number) =>
+  routeRow(db, chat, 0) === undefined || (thread > 0 && routeRow(db, chat, thread) === undefined)
 
 /**
  * The channel's routing over its rows and ports: each message from the owner goes where its chat's (or topic's) route
@@ -303,30 +318,81 @@ const router = (input: ChannelInput, record: Recorder, ports: ChannelPorts) => {
       }
     })
 
-  /** One new entry of the inbox: from the owner and not archived, in a chat goblin can name, then routed. */
+  /** Sets `key`'s route as the owner chose it (an offer's answer, the default for new chats) and delivers what waited. */
+  const routeTo = (key: ChatKey, choice: RouteChoice, now: number) =>
+    Effect.gen(function* () {
+      if (setRoute(db, key, choice, 'owner', now) === undefined) return
+      if (choice.mode !== 'inherit' || key.thread === 0) yield* releaseHeld(key.chat, now)
+    })
+
+  return { route, releaseHeld, routeTo }
+}
+
+/**
+ * What the channel does with each new inbox entry, over the router: an answer to an offer sets a route, a chat or topic
+ * goblin has not seen is read from the server's lists and offered, then the entry is routed.
+ */
+const taker = (input: ChannelInput, record: Recorder, ports: ChannelPorts) => {
+  const { db } = input
+  const { route, routeTo } = router(input, record, ports)
+  const offering: Offering = { db, call: ports.call, topic: ports.topic, routeTo }
+
+  /** A chat or topic new to goblin, offered to the owner or routed by the default; a failure is reported, not fatal. */
+  const offer = (keys: readonly ChatKey[], now: number) =>
+    Effect.forEach(
+      keys,
+      (key) =>
+        discover(offering, key, now).pipe(
+          Effect.catch((error) => Effect.sync(() => reportChannelFailure('offer', error))),
+        ),
+      { discard: true },
+    )
+
+  /** The server's chat list read into the routes, and each chat and topic new in it offered; whether it was read. */
+  const sync = (now: number) =>
+    Effect.gen(function* () {
+      const listed = yield* syncChats(db, ports.call, now)
+      yield* offer(listed.discovered, now)
+      return listed.synced
+    })
+
+  /**
+   * One new entry of the inbox: from the owner and not archived, in a chat goblin can name. An answer to goblin's offer
+   * sets its route and starts no turn; a chat or topic goblin has not seen is read from the server's lists first and
+   * offered; then the entry is routed.
+   */
   const take = (message: Message, now: number) =>
     Effect.gen(function* () {
       if (message.direction !== 'in' || message.delivery === 'archive') return
       const { chat, thread } = placeOf(message)
       if (!isHandle(chat) || !Number.isSafeInteger(thread) || thread < 0) return
-      yield* Effect.sync(() => firstSight(db, chat, thread, now))
+      const questionId = message.questionId ?? undefined
+      const offered = questionId === undefined ? undefined : offerOf(db, questionId)
+      if (questionId !== undefined && offered !== undefined) {
+        if (offered.offer === 'open') yield* resolveOffer(offering, offered, { text: message.text, questionId }, now)
+        return
+      }
+      const listed = unseen(db, chat, thread) ? (yield* syncChats(db, ports.call, now)).discovered : []
+      const placeholders = firstSight(db, chat, thread, now)
+      yield* offer([...listed, ...placeholders, { chat, thread: 0 }], now)
       yield* route(
         { entryId: message.id, chat, thread, text: messageText(message), trigger: message.trigger ?? null },
         now,
       )
     })
 
-  return { route, releaseHeld, take }
+  return { take, sync }
 }
 
 /**
  * Reads the server's chat list when it is due (the channel was turned on, or a chat changed), then the inbox from the
  * cursor, routing each new message from the owner; the cursor follows each page.
  */
-const pullPages = (input: ChannelInput, take: ReturnType<typeof router>['take'], ports: ChannelPorts, now: number) =>
+const pullPages = (input: ChannelInput, routing: ReturnType<typeof taker>, ports: ChannelPorts, now: number) =>
   Effect.gen(function* () {
     const { db } = input
-    if (takeSyncDue(db) && !(yield* syncChats(db, ports.call, now)).synced) markSyncDue(db)
+    const { take, sync } = routing
+    if (takeSyncDue(db) && !(yield* sync(now))) markSyncDue(db)
     for (let page = 0; page < MAX_PAGES; page += 1) {
       const status = channelStatus(db)
       if (status === null) return
@@ -468,7 +534,7 @@ export const telegramChannel = (input: ChannelInput): Effect.Effect<Channel['Ser
         }),
       pull: (ports, now) =>
         serial
-          .withPermit(pullPages(input, router(input, record, ports).take, ports, now))
+          .withPermit(pullPages(input, taker(input, record, ports), ports, now))
           .pipe(refusedAsUpstream, Effect.withSpan('Channel.pull')),
       route: (ports, key, choice, by, now) =>
         serial
@@ -482,6 +548,10 @@ export const telegramChannel = (input: ChannelInput): Effect.Effect<Channel['Ser
             }),
           )
           .pipe(refusedAsUpstream, Effect.withSpan('Channel.route')),
+      sync: (ports, now) =>
+        serial
+          .withPermit(taker(input, record, ports).sync(now))
+          .pipe(refusedAsUpstream, Effect.withSpan('Channel.sync')),
       newChats: (value) => Effect.sync(() => setNewChats(db, value) !== undefined),
       deliver: (ports, now, delivered = () => Effect.void) =>
         deliver(input, record, ports, now, delivered).pipe(refusedAsUpstream, Effect.withSpan('Channel.deliver')),

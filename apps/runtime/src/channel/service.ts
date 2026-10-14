@@ -59,6 +59,11 @@ export class Channel extends Context.Service<
       by: 'owner' | 'agent',
       now: number,
     ) => Effect.Effect<{ readonly before: RouteRow; readonly after: RouteRow } | undefined, AppError>
+    /**
+     * Reads the server's chat list into the routes and offers each chat and topic new in it, between pulls; whether the
+     * list could be read.
+     */
+    readonly sync: (ports: ChannelPorts, now: number) => Effect.Effect<boolean, AppError>
     /** What goblin does with a chat it has not seen; false while the channel is off. */
     readonly newChats: (value: NewChatsDefault) => Effect.Effect<boolean>
     /** Sends every answer that is ready, telling `delivered` about each; true while some are still running. */

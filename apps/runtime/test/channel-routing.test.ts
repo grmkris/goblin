@@ -51,6 +51,7 @@ const fixture = (answers: ReadonlyMap<string, Answer> = new Map(), refuse?: stri
           return { chatId: String(turn.topic * 10), ...(persona === undefined ? {} : { persona }) }
         }),
       keep: (turn) => Effect.sync(() => void kept.push(turn)),
+      topic: () => Effect.die('no Topic is made here'),
       answer: ({ operationId }) => Effect.succeed(answers.get(operationId)),
     }
     const pull = (...entries: Entry[]) =>
@@ -162,7 +163,7 @@ describe('routing Telegram chats to Topics', () => {
       yield* pull(message('t1', { chat: GROUP, threadId: 9 }), message('t2', { chat: GROUP }))
       expect(yield* channel.deliver(ports, 3)).toBe(false)
       const sent = calls
-        .filter(({ tool }) => tool === 'send' || tool === 'ask')
+        .filter(({ args }) => String(args['operationId']).startsWith('reply-'))
         .map(({ tool, args }) => ({ tool, ...args }))
       expect(sent).toEqual([
         { tool: 'send', operationId: 'reply-0-telegram-t1', text: 'Booked.', chat: GROUP, threadId: 9 },
