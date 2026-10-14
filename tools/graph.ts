@@ -122,36 +122,9 @@ export const nodes: readonly Node[] = [
     },
   },
   {
-    dir: 'apps/wallet',
-    name: '@goblin/wallet-worker',
-    role: 'Goblin Wallet Worker: owner API, inbound MCP, OAuth and the per-owner ledger Durable Object',
-    runtime: 'cloud',
-    mayImport: ['@goblin/wallet'],
-  },
-  {
-    dir: 'apps/wallet-web',
-    name: '@goblin/wallet-web',
-    role: 'Goblin Wallet owner console and MCP App views, built as static assets',
-    runtime: 'browser',
-    mayImport: ['@goblin/ui', '@goblin/wallet'],
-    forbids: Object.fromEntries(
-      ['privy', 'signer', 'x402', 'tempo', 'lifi', 'bridge', 'bundler'].map((module) => [
-        `@goblin/wallet/${module}`,
-        'server signing and Privy app credentials never enter the browser bundle',
-      ]),
-    ),
-  },
-  {
     dir: 'packages/contracts',
     name: '@goblin/contracts',
     role: 'runtime-independent cross-runtime schemas and contracts',
-    runtime: 'shared',
-    mayImport: [],
-  },
-  {
-    dir: 'packages/wallet',
-    name: '@goblin/wallet',
-    role: 'runtime-independent Goblin Wallet library: chains, amounts, contract and rails',
     runtime: 'shared',
     mayImport: [],
   },

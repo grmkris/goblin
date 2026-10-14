@@ -18,11 +18,6 @@
     "deploy:dev": "bun scripts/stage.ts deploy:dev",
     "plan:dev": "bun scripts/stage.ts plan:dev",
     "destroy:dev": "bun scripts/stage.ts destroy:dev",
-    "dev:wallet": "bun scripts/wallet-stage.ts dev",
-    "plan:wallet-dev": "bun scripts/wallet-stage.ts plan:dev",
-    "deploy:wallet-dev": "bun scripts/wallet-stage.ts deploy:dev",
-    "plan:wallet-prod": "bun scripts/wallet-stage.ts plan:prod",
-    "deploy:wallet-prod": "bun scripts/wallet-stage.ts deploy:prod",
     "smoke:dev": "bun --env-file .local/dev.env scripts/smoke-dev.ts",
     "ui:acceptance": "bun scripts/ui-acceptance.ts",
     "smoke:local": "GOBLIN_STAGE=local GOBLIN_APP_URL=http://localhost:18971 bun --env-file .local/local.env scripts/smoke-dev.ts",
@@ -76,7 +71,7 @@
     "check:chat-ids": "bun tools/check-chat-ids.ts",
     "check:spikes": "bun run --cwd spikes/coding typecheck && bun run --cwd spikes/coding test --path-ignore-patterns=test/verifier.test.ts && bun run --cwd spikes/coding-cf typecheck",
     "promote": "python3 scripts/promote.py",
-    "test:release": "python3 -B scripts/release_test.py && python3 -B scripts/promote_test.py && python3 -B scripts/wallet_release_test.py && python3 -B scripts/ci_credentials_test.py"
+    "test:release": "python3 -B scripts/release_test.py && python3 -B scripts/promote_test.py && python3 -B scripts/ci_credentials_test.py"
   },
   "devDependencies": {
     "@shadcn/lint": "0.2.0",

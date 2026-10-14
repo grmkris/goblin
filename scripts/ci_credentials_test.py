@@ -19,7 +19,6 @@ def secrets(stage):
         'GOBLIN_STAGE_ENV': 'GOBLIN_APP_URL=https://dev.goblin.example\nGOBLIN_SIGNUP_MODE=invite\n'
                             'GOBLIN_SMOKE_SESSION_FILE=/home/operator/.local/dev-session.json\n'
                             'GOBLIN_CREDENTIAL_KEY="credential-key-fixture"\n',
-        'GOBLIN_WALLET_ENV': 'WALLET_DOMAIN=wallet-dev.goblin.example\nPRIVY_APP_SECRET=privy-secret-fixture\n',
         'GOBLIN_CLOUD_ENV': f'CLOUDFLARE_API_TOKEN={TOKEN}\nCLOUDFLARE_ACCOUNT_ID={ACCOUNT}\n',
         'ALCHEMY_STATE_STORE_CREDENTIALS': json.dumps(STORE),
     }
@@ -56,7 +55,7 @@ class CredentialsTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.local('').stat().st_mode & 0o777, 0o700)
         self.assertEqual(self.store().parent.stat().st_mode & 0o777, 0o700)
-        for path in [self.local('dev.env'), self.local('wallet-dev.env'), self.local('cloud.env'),
+        for path in [self.local('dev.env'), self.local('cloud.env'),
                      self.local('dev-session.json'), self.store()]:
             self.assertEqual(path.stat().st_mode & 0o777, 0o600, path)
         self.assertEqual(json.loads(self.store().read_text()), STORE)
@@ -73,13 +72,13 @@ class CredentialsTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         lines = result.stdout.splitlines()
         masked = {line.removeprefix('::add-mask::') for line in lines if line.startswith('::add-mask::')}
-        for value in ['https://dev.goblin.example', 'credential-key-fixture', 'wallet-dev.goblin.example',
-                      'privy-secret-fixture', TOKEN, ACCOUNT, STORE['url'], 'store-bearer-fixture',
+        for value in ['https://dev.goblin.example', 'credential-key-fixture',
+                      TOKEN, ACCOUNT, STORE['url'], 'store-bearer-fixture',
                       'session-cookie-fixture', 'second-line-fixture', '/home/operator/.local/dev-session.json']:
             self.assertIn(value, masked)
         self.assertNotIn('invite', masked)
         self.assertNotIn('accountId', masked)
-        self.assertEqual(lines[-1], 'dev: materialized GOBLIN_STAGE_ENV, GOBLIN_WALLET_ENV, GOBLIN_CLOUD_ENV, '
+        self.assertEqual(lines[-1], 'dev: materialized GOBLIN_STAGE_ENV, GOBLIN_CLOUD_ENV, '
                                     'ALCHEMY_STATE_STORE_CREDENTIALS, GOBLIN_SMOKE_SESSION')
         self.assertTrue(all(line.startswith('::add-mask::') for line in lines[:-1]))
         self.assertEqual(result.stderr, '')
@@ -94,7 +93,7 @@ class CredentialsTest(unittest.TestCase):
         self.assertEqual(self.run_script('dev', '--cleanup').returncode, 0)
 
     def test_a_missing_required_secret_writes_nothing(self):
-        for stage, missing in [('dev', 'GOBLIN_SMOKE_SESSION'), ('prod', 'GOBLIN_WALLET_ENV'),
+        for stage, missing in [('dev', 'GOBLIN_SMOKE_SESSION'), ('prod', 'GOBLIN_CLOUD_ENV'),
                                ('prod', 'ALCHEMY_STATE_STORE_CREDENTIALS')]:
             given = secrets(stage)
             del given[missing]
@@ -110,8 +109,6 @@ class CredentialsTest(unittest.TestCase):
 
     def test_refuses_secrets_the_deploy_must_not_hold(self):
         cases = [
-            ('GOBLIN_WALLET_ENV', 'TREASURY_PRIVATE_KEY=0xfixture-treasury-key\n', 'wallet_env_carries_forbidden_key'),
-            ('GOBLIN_WALLET_ENV', 'TEST_OWNER_KEY=fixture-test-key\n', 'wallet_env_carries_forbidden_key'),
             ('GOBLIN_CLOUD_ENV', f'CLOUDFLARE_API_TOKEN={TOKEN}\nCLOUDFLARE_ACCOUNT_ID={ACCOUNT}\nOTHER_KEY=x\n',
              'cloud_env_must_hold_exactly'),
             ('ALCHEMY_STATE_STORE_CREDENTIALS', json.dumps(STORE | {'accountId': 'b' * 32}),
@@ -121,11 +118,10 @@ class CredentialsTest(unittest.TestCase):
         ]
         for key, value, reason in cases:
             given = secrets('dev')
-            given[key] = given[key] + value if key == 'GOBLIN_WALLET_ENV' else value
+            given[key] = value
             result = self.run_script('dev', **given)
             self.assertNotEqual(result.returncode, 0, key)
             self.assertIn(reason, result.stderr)
-            self.assertNotIn('fixture-treasury-key', result.stderr)
             self.assertFalse((self.directory / '.local').exists())
 
 

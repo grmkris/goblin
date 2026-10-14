@@ -34,7 +34,7 @@ jobs:
         working-directory: spikes/coding-cf
       - run: bun run check
 
-  # Every green push to dev deploys goblin dev and Goblin Wallet dev. The stage's secrets live in the `dev` environment,
+  # Every green push to dev deploys goblin dev. The stage's secrets live in the `dev` environment,
   # which only the dev branch may use. Alchemy state is the shared Cloudflare state store, which has no lock: one deploy
   # per stage at a time, and a running one is never cancelled.
   deploy-dev:
@@ -66,7 +66,6 @@ jobs:
       - name: Materialize dev credentials
         env:
           GOBLIN_STAGE_ENV: ${{ secrets.GOBLIN_STAGE_ENV }}
-          GOBLIN_WALLET_ENV: ${{ secrets.GOBLIN_WALLET_ENV }}
           GOBLIN_CLOUD_ENV: ${{ secrets.GOBLIN_CLOUD_ENV }}
           GOBLIN_SMOKE_SESSION: ${{ secrets.GOBLIN_SMOKE_SESSION }}
           ALCHEMY_STATE_STORE_CREDENTIALS: ${{ secrets.ALCHEMY_STATE_STORE_CREDENTIALS }}
@@ -76,11 +75,6 @@ jobs:
           GOBLIN_RECEIPTS_DIR: ${{ runner.temp }}/receipts
           GOBLIN_LOG_DIR: ${{ runner.temp }}/release-logs
         run: python3 -B scripts/release.py dev "$GITHUB_SHA"
-      - name: Release Goblin Wallet dev
-        env:
-          GOBLIN_RECEIPTS_DIR: ${{ runner.temp }}/receipts
-          GOBLIN_LOG_DIR: ${{ runner.temp }}/release-logs
-        run: python3 -B scripts/wallet_release.py dev "$GITHUB_SHA"
       # The sanitized receipts: Deploy prod requires this artifact of the same sha.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -94,7 +88,7 @@ jobs:
         if: always()
         run: python3 -B scripts/ci_credentials.py dev --cleanup
 
-  # A push to prod (`bun run promote <sha>`) deploys goblin prod and Goblin Wallet prod, only for a sha with current
+  # A push to prod (`bun run promote <sha>`) deploys goblin prod, only for a sha with current
   # authenticated dev acceptance, fast-forwarded and not force-pushed (scripts/release.py).
   deploy-prod:
     name: Deploy prod
@@ -127,7 +121,6 @@ jobs:
       - name: Materialize prod credentials
         env:
           GOBLIN_STAGE_ENV: ${{ secrets.GOBLIN_STAGE_ENV }}
-          GOBLIN_WALLET_ENV: ${{ secrets.GOBLIN_WALLET_ENV }}
           GOBLIN_CLOUD_ENV: ${{ secrets.GOBLIN_CLOUD_ENV }}
           ALCHEMY_STATE_STORE_CREDENTIALS: ${{ secrets.ALCHEMY_STATE_STORE_CREDENTIALS }}
         run: python3 -B scripts/ci_credentials.py prod
@@ -136,11 +129,6 @@ jobs:
           GOBLIN_RECEIPTS_DIR: ${{ runner.temp }}/receipts
           GOBLIN_LOG_DIR: ${{ runner.temp }}/release-logs
         run: python3 -B scripts/release.py prod "$GITHUB_SHA"
-      - name: Release Goblin Wallet prod
-        env:
-          GOBLIN_RECEIPTS_DIR: ${{ runner.temp }}/receipts
-          GOBLIN_LOG_DIR: ${{ runner.temp }}/release-logs
-        run: python3 -B scripts/wallet_release.py prod "$GITHUB_SHA"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: prod-acceptance

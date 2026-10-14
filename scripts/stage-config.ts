@@ -9,7 +9,7 @@ const OBSERVABILITY = {
   traces: { enabled: true, headSamplingRate: 1, persist: true },
 }
 
-/** `app` prefixes every physical name: goblin's are `goblin-<stage>…`, the wallet's `goblin-wallet-<stage>…`. */
+/** `app` prefixes every physical name: `goblin-<stage>…`. */
 export function resolveStage(name: string, app = 'goblin') {
   if (name !== 'local' && name !== 'dev' && name !== 'prod' && !/^test_[a-z0-9_-]+$/u.test(name))
     throw new Error('unsupported_stage')

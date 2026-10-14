@@ -2,15 +2,15 @@
  * One-off move of a goblin stack's Alchemy state between a local state root and the account's Cloudflare state store
  * (scripts/alchemy-state.ts), record by record, and the proof that both sides hold the same records.
  *
- *   bun scripts/state-copy.ts --stack goblin|goblin-wallet --stage dev|prod [--to cloudflare|local] [--verify-only]
+ *   bun scripts/state-copy.ts --stack goblin --stage dev|prod [--to cloudflare|local] [--verify-only]
  *                              [--local-root <dir>]
  *
  * `--to cloudflare` (the default) copies the local root into the store; `--to local` copies the store back into an
- * empty local root (the rollback). `--local-root` names the `state` directory (default `apps/web/.alchemy/state` for
- * goblin, `apps/wallet/.alchemy/state` for goblin-wallet). Cloudflare credentials come from the mode-600
+ * empty local root (the rollback). `--local-root` names the `state` directory (default `apps/web/.alchemy/state`).
+ * Cloudflare credentials come from the mode-600
  * `GOBLIN_CLOUD_ENV_FILE` (default `.local/cloud.env`).
  *
- * It touches only `goblin/{dev,prod}` and `goblin-wallet/{dev,prod}`, refuses a destination that holds any record or
+ * It touches only `goblin/{dev,prod}`, refuses a destination that holds any record or
  * output for that stack and stage, and refuses any source record that is not `created` or `updated`. It prints record
  * names with OK or MISMATCH, never a value: records carry secrets. It never uses Alchemy's `syncState`, which deletes
  * every destination stack missing from the source, and the store is shared with myapps.
@@ -26,7 +26,7 @@ import { parseArgs } from 'node:util'
 import { canonical } from './drift-attributes.ts'
 
 /** The only stacks and stages this script may touch, and the workspace whose `.alchemy/state` is a stack's default. */
-const STACKS: Readonly<Record<string, string>> = { goblin: 'apps/web', 'goblin-wallet': 'apps/wallet' }
+const STACKS: Readonly<Record<string, string>> = { goblin: 'apps/web' }
 const STAGES: ReadonlyArray<string> = ['dev', 'prod']
 
 export class StateCopyError extends Data.TaggedError('StateCopyError')<{ readonly reason: string }> {}
@@ -145,7 +145,7 @@ const reportFailure = (error: unknown): void => {
 }
 
 const usage =
-  'usage: bun scripts/state-copy.ts --stack goblin|goblin-wallet --stage dev|prod [--to cloudflare|local] ' +
+  'usage: bun scripts/state-copy.ts --stack goblin --stage dev|prod [--to cloudflare|local] ' +
   '[--verify-only] [--local-root <dir>]'
 
 const main = Effect.gen(function* () {

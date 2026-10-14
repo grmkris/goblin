@@ -10,9 +10,6 @@ from pathlib import Path
 import sys
 
 LOCAL = Path('.local')
-# The wallet deploy needs none of these, and a public deploy job must never hold them.
-WALLET_FORBIDDEN = ('TREASURY_PRIVATE_KEY', 'PRIVY_POLICY_ADMIN_KEY')
-WALLET_FORBIDDEN_PREFIXES = ('TEST_', 'SPIKE_')
 CLOUD_KEYS = {'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID'}
 
 
@@ -25,7 +22,6 @@ def store_credentials():
 def secrets(stage):
     """(environment variable, destination, kind) for every secret the stage's deploy job materializes."""
     entries = [('GOBLIN_STAGE_ENV', LOCAL / (stage + '.env'), 'env'),
-               ('GOBLIN_WALLET_ENV', LOCAL / ('wallet-' + stage + '.env'), 'env'),
                ('GOBLIN_CLOUD_ENV', LOCAL / 'cloud.env', 'env'),
                ('ALCHEMY_STATE_STORE_CREDENTIALS', store_credentials(), 'json')]
     if stage == 'dev':
@@ -73,9 +69,6 @@ def validate(stage, given):
     cloud = env_values(given['GOBLIN_CLOUD_ENV'])
     if set(cloud) != CLOUD_KEYS or not all(cloud.values()):
         raise RuntimeError('cloud_env_must_hold_exactly_CLOUDFLARE_API_TOKEN_and_CLOUDFLARE_ACCOUNT_ID')
-    for key in env_values(given['GOBLIN_WALLET_ENV']):
-        if key in WALLET_FORBIDDEN or key.startswith(WALLET_FORBIDDEN_PREFIXES):
-            raise RuntimeError('wallet_env_carries_forbidden_key: ' + key)
     store = json.loads(given['ALCHEMY_STATE_STORE_CREDENTIALS'])
     fields = ['url', 'authToken', 'accountId']
     if not isinstance(store, dict) or not all(isinstance(store.get(key), str) and store[key] for key in fields):
