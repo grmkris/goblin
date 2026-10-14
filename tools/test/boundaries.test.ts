@@ -113,8 +113,8 @@ tester.run('no-closed-import', noClosedImport, {
       errors: [{ messageId: 'closed' }],
     },
     {
-      code: "export * from '../../apps/runtime/src/runtime/boundary.ts'",
-      filename: at('bench/src/a.ts'),
+      code: "export * from '../../runtime/src/runtime/boundary.ts'",
+      filename: at('apps/cli/src/a.ts'),
       errors: [{ messageId: 'closed' }],
     },
   ],

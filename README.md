@@ -100,7 +100,6 @@ bun run check      # the full gate (run it through `heavy` on the build box)
   conversations, memory, skills, Telegram and MCP Apps.
 - [Development](docs/development.md): local setup, the dev stage, connecting servers, adding goblin to Claude Code.
 - [Next](docs/next.md): remaining acceptance and write approvals.
-- [Memory benchmarks](bench/README.md): real Claude/Hermes recall campaigns, persistent checkpoints, shared CLIProxy budgets and blinded review.
 - [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
 - [Brand](brand/README.md): the mark, app tiles, lockups and social images, with their colours and public URLs.
 

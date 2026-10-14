@@ -2,7 +2,7 @@
 
 Accepted 2026-10-09 with the owner (Topics spec §4, round 4). Builds on ADRs 0024 (no content in telemetry), 0027
 (typed tools), 0030 (logical chats) and 0032 (Topics). The evidence is the retrieval spike in
-[`bench/retrieval-report.md`](../../bench/retrieval-report.md).
+[`bench/retrieval-report.md`](https://github.com/grmkris/goblin/blob/hackathon-2026-10/bench/retrieval-report.md).
 
 goblin can find relevant earlier messages in the owner's other chats, in any active Topic, and an answer that used
 them can show a compact source strip: the Topic, the chat, the message range and when it was retrieved. Transcripts

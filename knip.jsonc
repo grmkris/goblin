@@ -32,28 +32,9 @@
       "entry": ["client.mts!"],
       "project": ["**/*.ts", "**/*.mts"],
     },
-    "spikes/coding": {
-      "entry": ["scripts/approval-code.ts!"],
-      "project": ["scripts/**/*.ts", "test/**/*.ts"],
-    },
-    "spikes/coding-cf": {
-      "entry": [
-        "src/index.ts!",
-        "runner/server.ts!",
-        "scripts/stack.ts!",
-        "scripts/tunnel.ts!",
-        "scripts/benchmark.ts!",
-        "scripts/isolation.ts!",
-        "scripts/image-receipt.ts!",
-      ],
-      "project": ["src/**/*.ts", "runner/**/*.ts", "scripts/**/*.ts"],
-    },
     "tools": {
       "entry": ["*.ts!", "oxlint/*.ts!"],
       "ignoreDependencies": ["@effect/tsgo"],
-    },
-    "bench": {
-      "entry": ["scripts/stack.ts!", "worker/worker.ts!"],
     },
     "apps/runtime": {
       "entry": ["test/provider-probe.ts!"],

@@ -77,5 +77,3 @@ infrastructure. Read
 - [Kit](packages/kit/AGENTS.md): drawn blocks (diagrams, charts, maps) for the chat and agent apps.
 - [App](packages/app/AGENTS.md): the agent app SDK and toolchain, run inside Dynamic Workers.
 - [Tools](tools/AGENTS.md): quality gates, import graph and docs checks.
-
-- [Bench](bench/AGENTS.md): reproducible native memory experiments and private run artifacts.

@@ -122,8 +122,8 @@
             }
           },
           {
-            // These loaders scrub the stage environment or force local-only placeholder cloud credentials.
-            "include": ["scripts/stage.ts", "bench/scripts/local.ts"],
+            // The stage loader scrubs the inherited environment.
+            "include": ["scripts/stage.ts"],
             "options": { "diagnosticSeverity": { "processEnv": "off", "processEnvInEffect": "off" } }
           }
         ]

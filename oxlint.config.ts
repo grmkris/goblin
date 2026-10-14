@@ -143,8 +143,6 @@ export default defineConfig({
       files: ['**/vitest*.config.ts', '**/vite.config.ts', 'scripts/stage.ts'],
       rules: { 'goblin/no-process-env': 'off' },
     },
-    // The isolated benchmark stack must replace ambient cloud credentials with local placeholders and restore them.
-    { files: ['bench/scripts/local.ts'], rules: { 'goblin/no-process-env': 'off' } },
     // shadcn's design-system rules on the web views and the shadcn package: theme tokens, no raw colours, inline
     // styles, unknown or computed classes, and a component restyled only in its layout. The kit draws with its own
     // stylesheet.
@@ -187,15 +185,7 @@ export default defineConfig({
     // from flowing through; tests and one-shot tooling (scripts, config files) poke at untyped JSON, provider responses
     // and mocks, where an inferred `any` is the honest type.
     {
-      files: [
-        '**/test/**',
-        '**/*.test.ts',
-        '**/*.test.tsx',
-        '**/*.config.ts',
-        'scripts/**',
-        'bench/scripts/**',
-        'spikes/**/scripts/**',
-      ],
+      files: ['**/test/**', '**/*.test.ts', '**/*.test.tsx', '**/*.config.ts', 'scripts/**'],
       rules: {
         'typescript/no-unsafe-argument': 'off',
         'typescript/no-unsafe-assignment': 'off',
@@ -213,7 +203,7 @@ export default defineConfig({
         'max-lines': ['error', { max: 1000, skipBlankLines: true, skipComments: true }],
       },
     },
-    // `console` is the interface of the CLI, tooling, operator, build and spike scripts, and tests; the runtime writes
+    // `console` is the interface of the CLI, tooling, operator and build scripts, and tests; the runtime writes
     // through its logger.
     {
       files: [
@@ -221,9 +211,7 @@ export default defineConfig({
         'apps/cli/**',
         'tools/**',
         'scripts/**',
-        'bench/scripts/**',
         'packages/*/scripts/**',
-        'spikes/**/scripts/**',
         '**/test/**',
         '**/*.test.ts',
         '**/*.test.tsx',

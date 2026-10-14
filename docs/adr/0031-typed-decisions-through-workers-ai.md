@@ -2,7 +2,7 @@
 
 Accepted 2026-10-09 with the owner. Builds on ADRs 0002 (stages and provider), 0024 (no content in telemetry), 0026
 (daily budget in Credits), 0035 (cross-Topic retrieval) and 0038 (typed owner API). The evidence is the v4 decision
-benchmark in [`bench/reports/decisions-decisions-20261009-v4.md`](../../bench/reports/decisions-decisions-20261009-v4.md).
+benchmark in [`bench/reports/decisions-decisions-20261009-v4.md`](https://github.com/grmkris/goblin/blob/hackathon-2026-10/bench/reports/decisions-decisions-20261009-v4.md).
 
 goblin evaluates bounded candidates with Cloudflare Clef through the Workers AI `AI` binding. This is a scoped exception
 to [ADR 0002](0002-stages-and-provider.md): conversational and housekeeping models still use Railway LiteLLM in deployed

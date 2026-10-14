@@ -28,10 +28,6 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun install --frozen-lockfile
         working-directory: scripts/fixtures/mcp-app
-      - run: bun install --frozen-lockfile
-        working-directory: spikes/coding
-      - run: bun install --frozen-lockfile
-        working-directory: spikes/coding-cf
       - run: bun run check
 
   # Every green push to dev deploys goblin dev. The stage's secrets live in the `dev` environment,

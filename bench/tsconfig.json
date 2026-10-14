@@ -1,8 +1,0 @@
-{
-  "extends": "../tsconfig.base.json",
-  "compilerOptions": {
-    "types": ["bun", "node", "@cloudflare/workers-types"],
-    "erasableSyntaxOnly": true
-  },
-  "include": ["src/**/*.ts", "worker/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"]
-}

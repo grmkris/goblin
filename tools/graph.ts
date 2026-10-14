@@ -44,15 +44,6 @@ export const runtimeAllows: Readonly<Record<Runtime, readonly (keyof typeof runt
 }
 export const nodes: readonly Node[] = [
   {
-    dir: 'bench',
-    name: '@goblin/bench',
-    role: 'bounded native memory benchmark and experiment workspace',
-    runtime: 'tooling',
-    mayImport: ['@goblin/runtime'],
-    zones: { test: 'test', worker: 'cloud' },
-    seam: { consumer: 'developers and CI', reason: 'benchmark runner is intentionally outside deployed applications' },
-  },
-  {
     dir: 'apps/cli',
     name: '@goblin/cli',
     role: "the goblin terminal client: an MCP client of the Worker's /mcp with inspection, and Workers Logs",

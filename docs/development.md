@@ -2,20 +2,6 @@
 
 Requirements are Bun `1.4.2` and Node.js 22.
 
-The [memory benchmark workspace](../bench/README.md) runs isolated native Pi experiments with a keyless provider by
-default. `bun run bench:plan` previews the GLM/DeepSeek matrix; `bun run bench:run --manifest
-bench/experiments/native-smoke.json --run smoke-01` starts its own local relay and workerd. Live calls require
-`--live` and the separate mode-600 provider configuration. Runs, resume evidence and reports stay in `.local/bench/`.
-`bench:import` and `bench:canary` freeze a real Claude session and six manually grounded probes; the resulting
-six-arm, 36-answer manifest requires live CLIProxy inference and append-only semantic review before its scores count.
-Native pressure and API transport capacity are separate manifest settings; failed checkpoint builds block dependent
-episodes, and their usage stays charged when a new trial is prepared.
-`bench:recall` prepares the four-arm DeepSeek recall iteration from the frozen real corpus without inference. It runs
-cutoff 22 first and requires an explicit `bench:resume --live --until-cutoff 32` after the durable operational gate.
-`bench:review-packet` exports blinded original answers; `bench:review-votes` imports independent machine/human votes
-and human adjudication. Reports show strict and semantic results, memory/search effects, shared construction, reader
-efficiency and remaining stage budgets. See the benchmark runbook for the exact limits and commands.
-
 ## MCP Events
 
 The workerd fixture advertises Events (top-level `capabilities.events`, or the SEP-3415 extension), sends verification
@@ -521,8 +507,7 @@ decoding, stale results, authority, budget and unknown usage, and context releva
 owner's decisions case run the real service over the object's SQLite and Pi with the probe's own Clef: a report judged
 once per relay, the first label kept and replayed, a stale result discarded, no call once the budget is spent, nothing
 judged without Clef, and main still answering. Web unit tests cover the rows, the label call and the feed's slice, not
-a browser run. These are local results: provider evaluation is the benchmark's (`bench/README.md`), and dev acceptance
-is separate.
+a browser run. These are local results; dev acceptance is separate.
 
 A dispatched Clef call counts its reported tokens toward the owner's day, like any model call; one whose usage is
 unknown counts its whole 65,536-token context, and without the binding there is no call and nothing is counted.
