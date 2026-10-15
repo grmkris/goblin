@@ -9,7 +9,6 @@ import {
   registerMovedThread,
   requireMove,
   respawnHelpers,
-  retireSwaps,
   saveRelays,
   settleMove,
   turnMoved,
@@ -109,37 +108,5 @@ describe('the moves store (ADR 0034)', () => {
     expect(activeMove(db, '1')).toBeUndefined()
     expect(unfinishedMoves(db)).toEqual([])
     expect(db.select().from(appChatMoves).all()).toHaveLength(2)
-  })
-
-  it('reads a running-turn swap an agent still holds as refused, never finishes it, and frees its chat', () => {
-    const { db } = fixture()
-    const swap = { chatId: '1', messageEntry: 50, mode: 'swap', createdAt: 1, updatedAt: 1 } as const
-    db.insert(appChatMoves)
-      .values([
-        { ...swap, operationId: 'op-swapped', state: 'swapped', threadChat: '70' },
-        { ...swap, chatId: '60', operationId: 'op-forked', state: 'forked' },
-        { ...swap, chatId: '61', operationId: 'op-done', state: 'settled', threadChat: '71' },
-      ])
-      .run()
-    const unsupported = { state: 'refused', reason: 'unsupported' }
-    expect(moveReceipt(requireMove(db, 'op-swapped'))).toEqual({
-      operationId: 'op-swapped',
-      chat: '1',
-      thread: '70',
-      ...unsupported,
-    })
-    expect(moveReceipt(requireMove(db, 'op-forked'))).toMatchObject(unsupported)
-    expect(moveReceipt(requireMove(db, 'op-done'))).toEqual({
-      operationId: 'op-done',
-      chat: '61',
-      thread: '71',
-      state: 'settled',
-    })
-    expect(unfinishedMoves(db)).toEqual([])
-    expect(retireSwaps(db, 9)).toBe(2)
-    expect(requireMove(db, 'op-swapped')).toMatchObject({ ...unsupported, updatedAt: 9 })
-    expect(requireMove(db, 'op-done').state).toBe('settled')
-    beginMove(db, { operation: 'op-new', chat: '1', source: '41', entry: 52, end: 55, now: 10 })
-    expect(activeMove(db, '1')?.operationId).toBe('op-new')
   })
 })

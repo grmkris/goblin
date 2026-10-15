@@ -43,7 +43,6 @@ import {
   registerMovedThread,
   requireMove,
   respawnHelpers,
-  retireSwaps,
   saveRelays,
   settleMove,
   turnMoved,
@@ -310,18 +309,14 @@ const moveOnce = Effect.fn('Moves.moveOnce')(function* (mover: Mover, chat: stri
   if (existing !== undefined && (existing.chatId !== chat || existing.messageEntry !== input.entry))
     return yield* new Conflict({ reason: 'operation_used' })
   const row = existing ?? (yield* mover.operations.withChat(chat, begin(mover, chat, input)))
-  if (row.state !== 'refused' && row.mode === 'settled') yield* finish(mover, row.operationId)
+  if (row.state !== 'refused') yield* finish(mover, row.operationId)
   return moveReceipt(yield* attemptSync(() => requireMove(db, row.operationId)))
 })
 
-/** Finishes every move a restart interrupted, and refuses a swap that never settled. */
+/** Finishes every move a restart interrupted. */
 const reconcile = (mover: Mover) =>
   Effect.gen(function* () {
-    const now = yield* epochSeconds
-    const unfinished = yield* attemptSync(() => {
-      retireSwaps(mover.db, now)
-      return unfinishedMoves(mover.db)
-    })
+    const unfinished = yield* attemptSync(() => unfinishedMoves(mover.db))
     for (const row of unfinished)
       yield* finish(mover, row.operationId).pipe(reportAndRecover('move.reconcile', undefined))
   }).pipe(reportAndRecover('moves.reconcile', undefined), Effect.withSpan('Moves.reconcile'))
