@@ -1,27 +1,65 @@
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
-import { describe, expect, it } from 'vitest'
+import * as Exit from 'effect/Exit'
+import { afterEach, describe, expect, it } from 'vitest'
 import { appServices } from '../src/agent-apps/ports.ts'
 import { AppCodeError } from '../src/agent-apps/queue.ts'
 import { Budget } from '../src/budget.ts'
 import { Setups } from '../src/setup/service.ts'
 import type { SetupScope } from '../src/setup/scope.ts'
-import { Channel } from '../src/channel/service.ts'
 import { Forbidden, ResidentInactive } from '../src/http/errors.ts'
 import { McpConnections, Resident } from '../src/mcp/service.ts'
-import type { McpCallOptions, McpConnectionSnapshot } from '../src/mcp/types.ts'
+import type { McpCallOptions } from '../src/mcp/types.ts'
 import type { RunProgram } from '../src/runtime/bridge.ts'
+import { Db } from '../src/runtime/db.ts'
+import { appNotifySink } from '../src/storage/sources.ts'
+import { chatDatabase, durable } from './chats-sqlite.ts'
 
 const complete = () => Effect.succeed('an answer')
+
+const open: { close: () => void }[] = []
+afterEach(() => {
+  for (const database of open.splice(0)) database.close()
+})
 
 /** A service of which a test fakes only the members the code under test calls. */
 const part = <S>(service: Partial<S>): S =>
   // SAFETY: the powers call only the members each fake gives, and every test names the calls it expects.
   service as S
 
-/** The services an app's powers read, each the part these tests use, with what the tests change about them. */
-const world = (options: { readonly resident?: boolean; readonly channel?: string } = {}) => {
-  const calls: { readonly connectionId: string; readonly name: string; readonly authorized: boolean }[] = []
+/** The owner's own chat on a messaging server: Notify me via, its words and operation id as whole values. */
+const SINK = {
+  connectionId: 'chat',
+  tool: 'message_send',
+  arguments: { chat: 'dm', text: '{{text}}', op: '{{operationId}}' },
+}
+
+/** What a test changes about the world: authority, Notify me via, the server refusing, and what a call does first. */
+type WorldOptions = {
+  readonly resident?: boolean
+  readonly sink?: typeof SINK
+  readonly forbid?: boolean
+  readonly onCall?: (db: ReturnType<typeof durable>) => void
+}
+
+/**
+ * The services an app's powers read, each the part these tests use, with what the tests change about them. The
+ * server's tool runs the host's last-moment check (`authorize`) first and fails as it does; `refuse` answers an error.
+ */
+const world = (options: WorldOptions = {}) => {
+  const calls: {
+    readonly connectionId: string
+    readonly name: string
+    readonly args: Record<string, unknown>
+    readonly authorized: boolean
+  }[] = []
+  const database = chatDatabase()
+  open.push(database)
+  const db = durable(database.db)
+  if (options.sink !== undefined)
+    db.insert(appNotifySink)
+      .values({ ...options.sink, id: 1, arguments: JSON.stringify(options.sink.arguments), updatedAt: 1 })
+      .run()
   const scope: SetupScope = {
     editable: true,
     server: () => true,
@@ -47,30 +85,18 @@ const world = (options: { readonly resident?: boolean; readonly channel?: string
       }),
     ),
     Layer.succeed(Budget, part<Budget['Service']>({ require: () => Effect.void })),
-    Layer.succeed(
-      Channel,
-      part<Channel['Service']>({
-        status: Effect.succeed(options.channel === undefined ? null : { connectionId: options.channel, enabledAt: 1 }),
-      }),
-    ),
+    Layer.succeed(Db, db),
     Layer.succeed(
       McpConnections,
       part<McpConnections['Service']>({
-        // The channel's server lists mygram's own tools: the send tool is `message_send`.
-        connect: () =>
-          Effect.succeed(
-            part<McpConnectionSnapshot>({
-              tools: ['inbox_read', 'message_send'].map((name) => ({ name, inputSchema: { type: 'object' as const } })),
-            }),
-          ),
-        callTool: (connectionId: string, name: string, _args: unknown, call?: McpCallOptions) =>
+        callTool: (connectionId: string, name: string, args: Record<string, unknown>, call?: McpCallOptions) =>
           Effect.gen(function* () {
-            const authorized = yield* (call?.authorize ?? Effect.void).pipe(
-              Effect.as(true),
-              // expected: a refused re-check is what the test reads, as `authorized: false`
-              Effect.orElseSucceed(() => false),
-            )
-            calls.push({ connectionId, name, authorized })
+            options.onCall?.(db)
+            const check = yield* Effect.exit(call?.authorize ?? Effect.void)
+            calls.push({ connectionId, name, args, authorized: Exit.isSuccess(check) })
+            if (Exit.isFailure(check)) return yield* Effect.failCause(check.cause)
+            if (options.forbid === true)
+              return yield* new Forbidden({ reason: 'Owner approval required for this exact call' })
             return { content: [], isError: name === 'refuse' }
           }),
       }),
@@ -87,7 +113,7 @@ describe("an agent app's powers over the agent's services", () => {
   it('call a tool once authority and the conversation allow it, and check again right before it leaves', async () => {
     const { powers, calls } = world()
     await powers.tool({ connectionId: 'notes', name: 'write', args: {}, session: '7' })
-    expect(calls).toEqual([{ connectionId: 'notes', name: 'write', authorized: true }])
+    expect(calls).toEqual([{ connectionId: 'notes', name: 'write', args: {}, authorized: true }])
     await expect(powers.tool({ connectionId: 'notes', name: 'off', args: {}, session: '7' })).rejects.toBeInstanceOf(
       Forbidden,
     )
@@ -101,14 +127,50 @@ describe("an agent app's powers over the agent's services", () => {
     await expect(world().powers.complete('', 'hi', 10)).resolves.toBe('an answer')
   })
 
-  it("say why a job waits, and hand Telegram's refusals back as the app's own error", async () => {
+  it('say why a job waits', async () => {
     expect(await world({ resident: false }).powers.blocked()).toBe(
       'waiting for the owner (ResidentInactive — state: revoked)',
     )
     expect(await world().powers.blocked()).toBeUndefined()
-    await expect(world().powers.notify('op-1', 'hi')).rejects.toBeInstanceOf(AppCodeError)
-    const { powers, calls } = world({ channel: 'telegram' })
-    await powers.notify('op-1', '<b>')
-    expect(calls).toEqual([{ connectionId: 'telegram', name: 'message_send', authorized: true }])
+  })
+})
+
+describe("an agent app's notify power through Notify me via (ADR 0070)", () => {
+  it("fills the sink with the app's words as written and its operation id, checking again before it leaves", async () => {
+    const { powers, calls } = world({ sink: SINK })
+    await powers.notify('app-tally-op-1', '<b>Done</b> & dusted')
+    expect(calls).toEqual([
+      {
+        connectionId: 'chat',
+        name: 'message_send',
+        args: { chat: 'dm', text: '<b>Done</b> & dusted', op: 'app-tally-op-1' },
+        authorized: true,
+      },
+    ])
+  })
+
+  it('says to set Notify me via while there is none, and nothing is sent', async () => {
+    const { powers, calls } = world()
+    await expect(powers.notify('op-1', 'hi')).rejects.toThrow('set Notify me via in Settings')
+    expect(calls).toEqual([])
+  })
+
+  it("hands the sink's refusals back as the app's own error, and stops while authority lapsed", async () => {
+    await expect(world({ sink: { ...SINK, tool: 'refuse' } }).powers.notify('op-1', 'hi')).rejects.toThrow(
+      'Notify me via refused the message',
+    )
+    await expect(world({ sink: SINK, forbid: true }).powers.notify('op-1', 'hi')).rejects.toBeInstanceOf(AppCodeError)
+    const lapsed = world({ sink: SINK, resident: false })
+    await expect(lapsed.powers.notify('op-1', 'hi')).rejects.toBeInstanceOf(ResidentInactive)
+    expect(lapsed.calls).toEqual([])
+  })
+
+  it('refuses at the last moment a sink the owner changed on the way', async () => {
+    const { powers, calls } = world({
+      sink: SINK,
+      onCall: (db) => void db.update(appNotifySink).set({ updatedAt: 2 }).run(),
+    })
+    await expect(powers.notify('op-1', 'hi')).rejects.toBeInstanceOf(AppCodeError)
+    expect(calls).toEqual([{ connectionId: 'chat', name: 'message_send', args: expect.any(Object), authorized: false }])
   })
 })

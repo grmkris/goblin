@@ -20,7 +20,10 @@ export const AgentAppJob = Schema.Struct({
 })
 export type AgentAppJob = typeof AgentAppJob.Type
 
-/** A power an agent app asks for (ADR 0021): a host to fetch from, an MCP tool, another app, model calls, Telegram. */
+/**
+ * A power an agent app asks for (ADR 0021): a host to fetch from, an MCP tool, another app, model calls, a message to the
+ * owner through Notify me via (`notify`, ADR 0070).
+ */
 export const AppPowerKind = Schema.Literals(['egress', 'tool', 'app', 'llm', 'notify'])
 export const AppPower = Schema.Struct({
   kind: AppPowerKind,

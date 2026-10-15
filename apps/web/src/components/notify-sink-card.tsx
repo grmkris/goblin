@@ -243,8 +243,9 @@ export function NotifySinkCard() {
       <CardHeader>
         <CardTitle>Notify me via</CardTitle>
         <CardDescription>
-          A tool of one of your connections that goblin can send you notices with, like a message to your own chat. It
-          is goblin’s own call, under the access you give that tool.
+          A tool of one of your connections that goblin can send you notices with, like a message to your own chat:
+          routines you ask to “Also send” and apps that message you use it. It is goblin’s own call, under the access
+          you give that tool.
         </CardDescription>
       </CardHeader>
       <CardContent>

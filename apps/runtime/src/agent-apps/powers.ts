@@ -14,7 +14,7 @@ export type PowerPorts = {
   readonly tool: (tool: string, args: Record<string, unknown>) => Promise<unknown>
   /** One completion on the deployment's cheap model, within the app's daily tokens. */
   readonly llm: (prompt: string, options: { readonly system?: string; readonly maxTokens?: number }) => Promise<string>
-  /** A Telegram message to the owner, within the app's daily notifications. */
+  /** A message to the owner through Notify me via (ADR 0070), within the app's daily notifications. */
   readonly notify: (text: string) => Promise<void>
   /** An action or view of another approved app: the state after the action, or the view's value. */
   readonly app: (target: string, member: string, input: unknown) => Promise<unknown>

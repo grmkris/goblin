@@ -1,21 +1,22 @@
-import { TELEGRAM_DM } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
 import { requireBudget } from '../budget.ts'
 import { Setups } from '../setup/service.ts'
-import { channelToolName } from '../channel/tools.ts'
-import { Channel } from '../channel/service.ts'
 import { Forbidden } from '../http/errors.ts'
 import type { AgentServices } from '../layers/index.ts'
 import { McpConnections, requireResident } from '../mcp/service.ts'
 import { bound } from '../runtime/boundary.ts'
 import type { Bridge, RunProgram } from '../runtime/bridge.ts'
 import { Changes } from '../runtime/changes.ts'
+import { notifySink, sendThroughSink, sinkRevision } from '../sources/notify.ts'
 import { appCompletion } from './completion.ts'
 import type { AppPorts } from './engine.ts'
 import { AppCodeError, appLock, problemText, thrownOf } from './queue.ts'
 
-/** What agent apps reach through their agent (ADR 0021): the owner's MCP tools, the cheap model and Telegram. */
+/**
+ * What agent apps reach through their agent (ADR 0021): the owner's MCP tools, the cheap model and a message to the owner
+ * through Notify me via (ADR 0070).
+ */
 export type AppServices = {
   readonly authorizeCall: (session: string | undefined, app: string) => Promise<void>
   /** One of the owner's MCP tools, called as the agent: the owner's exact grant is checked by the host, live. */
@@ -27,7 +28,7 @@ export type AppServices = {
   }) => Promise<unknown>
   /** One completion on the deployment's cheap model, counted toward the owner's daily budget. */
   readonly complete: (system: string, prompt: string, maxTokens: number) => Promise<string>
-  /** A message to the owner on their Telegram channel; `op` makes a retry send it once. */
+  /** A message to the owner through Notify me via; `op` makes a retry send it once to a server that honours it. */
   readonly notify: (op: string, text: string) => Promise<void>
   /** Why the agent may not act on its own now (the owner's plan, or resident authority), or undefined if it may. */
   readonly blocked: () => Promise<string | undefined>
@@ -40,8 +41,30 @@ export type AppCompletion = (
   maxTokens: number,
 ) => Effect.Effect<string, unknown, AgentServices>
 
-/** Telegram's HTML mode reads `<`, `>` and `&`; an app's text is shown as written. */
-const escaped = (text: string) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+/**
+ * An app's message to the owner through Notify me via (ADR 0070), its words as written (the sink's server formats them):
+ * resident authority first, and again with the sink right before the call leaves. With no sink, a sink that changed
+ * on the way, a tool set to Ask first or a server that refuses, the app's own error says so.
+ */
+const notifyOwner = (op: string, text: string) =>
+  Effect.gen(function* () {
+    yield* requireResident
+    const sink = yield* notifySink
+    if (sink === undefined)
+      return yield* Effect.fail(new AppCodeError('notify: the owner has not set Notify me via in Settings'))
+    const revision = yield* sinkRevision(sink)
+    const result = yield* sendThroughSink({ revision, text, operationId: op, timeout: 5000 }).pipe(
+      Effect.catchTag('Forbidden', () =>
+        Effect.fail(
+          new AppCodeError(
+            'notify: Notify me via may not send on its own now (its tool asks first, or the setting changed)',
+          ),
+        ),
+      ),
+    )
+    if (result.isError === true)
+      return yield* Effect.fail(new AppCodeError('notify: Notify me via refused the message'))
+  })
 
 /**
  * The services an agent app's powers use, over the agent's own services. Each is a call from the app's isolate, so it
@@ -84,29 +107,7 @@ export function appServices(run: RunProgram, complete: AppCompletion): AppServic
     },
     complete: (system, prompt, maxTokens) =>
       settled(requireResident.pipe(Effect.andThen(requireBudget), Effect.andThen(complete(system, prompt, maxTokens)))),
-    notify: (op, text) =>
-      settled(
-        Effect.gen(function* () {
-          yield* requireResident
-          const connectionId = (yield* Channel.use((channel) => channel.status))?.connectionId
-          if (connectionId === undefined)
-            return yield* Effect.fail(new AppCodeError('notify: the owner has no Telegram channel connected'))
-          const recheck = yield* bound(requireResident)
-          const result = yield* McpConnections.use((connections) =>
-            Effect.flatMap(channelToolName(connections, connectionId, 'send'), (send) =>
-              connections.callTool(
-                connectionId,
-                send,
-                // An app tells the owner in their DM, never in a group (ADR 0055).
-                { operationId: op, text: escaped(text), chat: TELEGRAM_DM },
-                { caller: 'model', timeout: 5000, authorize: recheck },
-              ),
-            ),
-          )
-          if (result.isError === true)
-            return yield* Effect.fail(new AppCodeError('notify: the channel refused the message'))
-        }),
-      ),
+    notify: (op, text) => settled(notifyOwner(op, text)),
     blocked: () =>
       run(requireResident).then(
         () => undefined,

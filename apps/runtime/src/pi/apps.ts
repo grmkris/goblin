@@ -21,7 +21,8 @@ const GUIDE = [
   'app with a `view.tsx` (topic `ui`) shows the owner a live UI in chat and as a page. Before you write or change a',
   '`view.tsx`, read `app_docs` topic `ui` and follow its Design rules: give each section room. Use `useHost()`',
   'from `@goblin/app` for its surface and available room. An app',
-  "reaches the internet, the owner's MCP tools, a model, Telegram or other apps only with powers the owner approves",
+  "reaches the internet, the owner's MCP tools, a model, the owner (through their Notify me via) or other apps only",
+  'with powers the owner approves',
   '(topic `powers`), and runs an action on its own with `schedules` (topic `schedules`). When a task needs a service',
   'the owner has not connected, look with `mcp_suggest` and ask them with `mcp_request_server`.',
   "`code_run` runs a one-off JavaScript snippet over the owner's files for calculations; it keeps nothing. The owner",
@@ -48,7 +49,7 @@ const docsTool = (apps: AgentApps) =>
   typedTool({
     name: 'app_docs',
     description:
-      'Read how to write an app: topic "core" (start here), "ui" (its view), "powers" (fetch, tools, model, Telegram, other apps), "schedules", "files" or "examples".',
+      'Read how to write an app: topic "core" (start here), "ui" (its view), "powers" (fetch, tools, model, notify, other apps), "schedules", "files" or "examples".',
     input: Schema.Struct({ topic: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(40))) }),
     output: Schema.Struct({ docs: Schema.String }),
     replay: 'safe',

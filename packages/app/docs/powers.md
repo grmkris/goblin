@@ -14,7 +14,7 @@ export default defineApp({
     tools: ['myplan/list_tasks'], // the owner's MCP tools, as "<server>/<tool>"
     apps: ['reading-list'], // other apps this one calls
     llm: true, // ctx.llm.complete
-    notify: true, // ctx.notify (Telegram)
+    notify: true, // ctx.notify (through the owner's Notify me via)
   },
   actions: {
     refresh: {
@@ -42,7 +42,8 @@ export default defineApp({
   (`{ content, structuredContent }`). The owner must also allow that tool itself, as for your own calls.
 - `await ctx.llm.complete(prompt, { system, maxTokens })` returns the model's text: a small, cheap model, at most 1,024
   tokens an answer and 20,000 a day per app. Ask for JSON in the prompt if you need structure.
-- `await ctx.notify(text)` sends the owner a Telegram message (at most 1,000 characters, 10 a day per app).
+- `await ctx.notify(text)` sends the owner a message through the tool they chose as Notify me via in Settings (their
+  own chat, say; at most 1,000 characters, 10 a day per app). It fails, with the reason, while they have set none.
 - `await ctx.apps.call('reading-list', 'add', input)` runs another app's action and returns its state;
   `ctx.apps.view('reading-list', 'unread', input)` returns one of its views.
 
