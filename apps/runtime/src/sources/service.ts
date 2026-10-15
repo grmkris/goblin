@@ -1,6 +1,7 @@
 import type {
   SourcePage,
   SourceProposal,
+  SourceReplyResultChange,
   SourceRoutePick,
   SourceRouteView,
   SourceRoutes,
@@ -30,6 +31,8 @@ export class Sources extends Context.Service<
     ) => Effect.Effect<SourceView, AppError>
     /** The owner confirms the exact revision: its event and tools are granted, it is subscribed and bound. */
     readonly confirm: (id: string, revision: number) => Effect.Effect<SourceView, AppError>
+    /** Owner edits reply-result rules at an exact revision; a new proposal must be confirmed. */
+    readonly replyResult: (id: string, change: SourceReplyResultChange) => Effect.Effect<SourceView, AppError>
     /** The owner refuses the exact revision. */
     readonly refuse: (id: string, revision: number) => Effect.Effect<SourceView, AppError>
     /** Sets where one conversation goes and delivers what it held, with an organizing receipt; the route after. */

@@ -4,6 +4,7 @@
 import {
   ArgumentsTemplate,
   NotifySinkPolicy,
+  SinkResultRules,
   type NotifySink,
   type SourceKeyValues,
   type SourceNewKeys,
@@ -24,6 +25,16 @@ export type FactNames = { readonly event: string; readonly newKeys: (newKeys: So
 /** A pointer and the value it is compared with, in words: `/from/isOwner` is `true`. */
 const matchWords = (match: { readonly pointer: string; readonly equals: unknown }): string =>
   `${match.pointer === '' ? 'the message' : match.pointer} is ${JSON.stringify(match.equals)}`
+
+const resultWords = (reply: NonNullable<SourceSetup['reply']>): string => {
+  if (reply.result === undefined) return 'structured results are not classified (unknown outcomes stay stopped)'
+  const rules = [
+    `accepted when ${matchWords(reply.result.accepted)}`,
+    ...(reply.result.retryable === undefined ? [] : [`retryable when ${matchWords(reply.result.retryable)}`]),
+    ...(reply.result.rejected === undefined ? [] : [`rejected when ${matchWords(reply.result.rejected)}`]),
+  ]
+  return `results: ${rules.join('; ')}${reply.result.retryAt === undefined ? '' : `; retry no earlier than ${reply.result.retryAt}`}`
+}
 
 /** How a setup reads its messages, in words. */
 function readWords(read: SourceSetup['read']): string {
@@ -73,7 +84,7 @@ export function setupFacts(setup: SourceSetup, names: FactNames): readonly Fact[
       text:
         reply === undefined
           ? 'Not sent back'
-          : `Sent back with ${reply.tool}, in pieces of at most ${reply.maxChars.toLocaleString()} characters`,
+          : `Sent back with ${reply.tool}, in pieces of at most ${reply.maxChars.toLocaleString()} characters; ${resultWords(reply)}`,
     },
     { term: 'New conversations', text: names.newKeys(setup.newKeys) },
   ]
@@ -126,6 +137,7 @@ export function sinkFromSource(source: SourceView, values: SourceKeyValues): Sin
       connectionId: source.connectionId,
       tool: reply.tool,
       arguments: args,
+      ...(reply.result === undefined ? {} : { result: reply.result }),
       echo: source.setup.wake,
     }),
   })
@@ -134,3 +146,7 @@ export function sinkFromSource(source: SourceView, values: SourceKeyValues): Sin
 /** Delivery and echo rules, as reviewed by the owner in Settings. */
 export const sinkPolicy = (text: string): NotifySinkPolicy | undefined =>
   Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(NotifySinkPolicy))(text))
+
+/** Reviewed reply-result rules, or null to remove them; invalid JSON cannot be saved. */
+export const replyResultRules = (text: string): SinkResultRules | null | undefined =>
+  Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.NullOr(SinkResultRules)))(text))

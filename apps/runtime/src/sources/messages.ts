@@ -176,6 +176,8 @@ const send = (
     const reply = {
       operationId,
       sourceId: source.row.id,
+      sourceRevision: source.row.revision,
+      sourceBinding: source.row.binding,
       key: route.key,
       chatId: submitted.chatId,
       personaId: submitted.persona ?? null,

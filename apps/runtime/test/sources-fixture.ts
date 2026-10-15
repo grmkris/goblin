@@ -4,6 +4,7 @@ import { afterEach } from 'vitest'
 import { registerPrimary } from '../src/chats/directory.ts'
 import { UpstreamMcp } from '../src/http/errors.ts'
 import type { EventDescriptor } from '../src/mcp/events/protocol.ts'
+import type { McpToolResult } from '../src/mcp/connections/types.ts'
 import { loaded, sourceEngine } from '../src/sources/engine.ts'
 import type { SourceNotice, SourcePorts } from '../src/sources/types.ts'
 import { patchSource, propose } from '../src/sources/store.ts'
@@ -74,6 +75,11 @@ export const PAYLOAD_SETUP: SourceSetup = {
     tool: 'message_send',
     arguments: { chat: '{{key.chat}}', threadId: '{{key.thread}}', text: '{{text}}', operationId: '{{operationId}}' },
     maxChars: 100,
+    result: {
+      accepted: { pointer: '/status', equals: 'accepted' },
+      retryable: { pointer: '/status', equals: 'retryable' },
+      rejected: { pointer: '/status', equals: 'rejected' },
+    },
   },
   newKeys: { to: 'held' },
 }
@@ -116,6 +122,7 @@ export const NEW_TOPIC = 9
 export const sourceWorld = (
   options: {
     readonly answer?: (tool: string, args: Record<string, unknown>) => unknown
+    readonly sendResult?: (args: Record<string, unknown>) => McpToolResult
     readonly answers?: ReadonlyMap<string, Answer>
   } = {},
 ) =>
@@ -138,6 +145,15 @@ export const sourceWorld = (
           seen.calls.push({ tool, args })
           if (state.failing) return Effect.fail(new UpstreamMcp({ connectionId, reason: 'transport' }))
           return Effect.succeed(options.answer?.(tool, args) ?? { ok: true })
+        }),
+      send: (connectionId, tool, args, authorize) =>
+        Effect.gen(function* () {
+          yield* authorize
+          seen.calls.push({ tool, args })
+          if (state.failing) return yield* new UpstreamMcp({ connectionId, reason: 'transport' })
+          return (
+            options.sendResult?.(args) ?? { isError: false, content: [], structuredContent: { status: 'accepted' } }
+          )
         }),
       submit: (turn, persona) =>
         Effect.sync(() => {

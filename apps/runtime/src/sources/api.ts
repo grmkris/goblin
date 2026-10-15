@@ -12,6 +12,7 @@ export const SourcesHandlers = HttpApiBuilder.group(OwnerApi, 'sources', (handle
   handlers
     .handle('list', () => Sources.use((sources) => sources.list))
     .handle('confirm', ({ params, payload }) => Sources.use((sources) => sources.confirm(params.id, payload.revision)))
+    .handle('replyResult', ({ params, payload }) => Sources.use((sources) => sources.replyResult(params.id, payload)))
     .handle('refuse', ({ params, payload }) => Sources.use((sources) => sources.refuse(params.id, payload.revision)))
     .handle('routes', ({ params }) => Sources.use((sources) => sources.routes(params.id)))
     .handle('route', ({ params, payload }) =>

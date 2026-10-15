@@ -28,6 +28,7 @@ import { usePersonas, useTopics } from '../lib/workspace/hooks.ts'
 import { eventsQuery, serversQuery } from '../mcp/queries.ts'
 import { type SourceChange, changeSourceMutation } from '../sources/queries.ts'
 import { StatusLabel } from './status-label.tsx'
+import { SourceReplyRules } from './source-reply-rules.tsx'
 
 /** Why a change to a Source was refused, in words the owner can act on; else the calm generic line. */
 export function sourceRefusal(failure: unknown, action: string): string {
@@ -138,6 +139,9 @@ export function SourceReview({ source }: { readonly source: SourceView }) {
           {source.health !== undefined && <p className="server-note">{source.health}</p>}
           {source.state === 'proposed' && <p className="server-note">{CONFIRM_NOTE}</p>}
           <ExactSetup source={source} />
+          {source.setup.reply !== undefined && source.state !== 'refused' && (
+            <SourceReplyRules key={`${source.id}:${String(source.revision)}`} source={source} />
+          )}
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>

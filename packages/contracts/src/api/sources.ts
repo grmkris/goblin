@@ -7,6 +7,7 @@ import {
   SourceId,
   SourcePage,
   SourceRevision,
+  SourceReplyResultChange,
   SourceRoutePick,
   SourceRouteView,
   SourceRoutes,
@@ -43,6 +44,12 @@ export class SourcesGroup extends HttpApiGroup.make('sources').add(
     payload: SourceRevision,
     success: SourceView,
     error: [ApiErrors.notFound, ApiErrors.conflict],
+  }),
+  HttpApiEndpoint.put('replyResult', '/sources/:id/reply-result', {
+    params,
+    payload: SourceReplyResultChange,
+    success: SourceView,
+    error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput],
   }),
   HttpApiEndpoint.get('routes', '/sources/:id/routes', {
     params,

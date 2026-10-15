@@ -10,6 +10,7 @@ import { chatSession } from '../../src/chats/directory.ts'
 import { propose, routeRows, sourceRow } from '../../src/sources/store.ts'
 import { appNotices } from '../../src/storage/notices.ts'
 import { appTopics } from '../../src/storage/topics.ts'
+import { appSourceReplies } from '../../src/storage/sources.ts'
 import { callOwner } from '../owner-client.ts'
 import { connectEventsServer } from './events-server.ts'
 import { type Inside, type Probes, inAgent } from './probe.ts'
@@ -49,6 +50,11 @@ const SETUP: SourceSetup = {
     tool: 'message_send',
     arguments: { chat: '{{key.chat}}', text: '{{text}}', operationId: '{{operationId}}' },
     maxChars: 3500,
+    result: {
+      accepted: { pointer: '/status', equals: 'accepted' },
+      retryable: { pointer: '/status', equals: 'retryable' },
+      rejected: { pointer: '/status', equals: 'rejected' },
+    },
   },
   newKeys: { to: 'topic-per-key' },
 }
@@ -243,4 +249,62 @@ async function droppedSourcesProbe(inside: Inside) {
   }
 }
 
-export const probes: Probes = { sources: inAgent(sourcesProbe), 'sources-drop': inAgent(droppedSourcesProbe) }
+/** Wait for every outcome fixture turn before asking the Source alarm to dispatch. */
+async function settleOutcomeTurns({ agent }: Inside, db: DrizzleSqliteDODatabase, statuses: readonly string[]) {
+  for (const row of routeRows(db, SOURCE)) {
+    const topic = db
+      .select()
+      .from(appTopics)
+      .where(eq(appTopics.id, row.topicId ?? 0))
+      .get()
+    if (topic === undefined) throw new Error('no outcome Topic')
+    const status = statuses.find((value) => row.key === JSON.stringify([value]))
+    await agent.settle(topic.chatId, `source-${SOURCE}-${status ?? ''}`)
+  }
+}
+
+/** Real MCP envelopes retain their structured outcomes through the host; only retryable resumes its frozen call. */
+async function replyOutcomesProbe(inside: Inside) {
+  const { agent, producer: fixture } = inside
+  fixture.replyResult = (args) => ({ content: [], isError: false, structuredContent: { status: args['chat'] } })
+  const statuses = ['accepted', 'retryable', 'rejected', 'unknown']
+  const { db } = await confirmAndDeliver(
+    inside,
+    SETUP,
+    statuses.map((status) => entry(status, 'owner', 'Reply once', { chat: status })),
+  )
+  await waitFor(
+    () => routeRows(db, SOURCE).length,
+    (count) => count === statuses.length,
+    'all outcome routes',
+  )
+  await settleOutcomeTurns(inside, db, statuses)
+  await agent.sourcesWake()
+  const rows = () =>
+    db
+      .select()
+      .from(appSourceReplies)
+      .all()
+      .toSorted((a, b) => a.operationId.localeCompare(b.operationId))
+  await waitFor(rows, (all) => all.every((row) => row.outcome !== null || row.attempts === 1), 'classified outcomes')
+  const before = rows().map(({ outcome, attempts, nextPiece }) => ({ outcome, attempts, nextPiece }))
+  const sends = () => fixture.toolCalls.filter(({ name }) => name === 'message_send')
+  const retry = sends().find((call) => call.arguments?.['chat'] === 'retryable')
+  fixture.replyResult = () => ({ content: [], isError: false, structuredContent: { status: 'accepted' } })
+  db.update(appSourceReplies).set({ nextAt: 0 }).where(eq(appSourceReplies.attempts, 1)).run()
+  await agent.sourcesWake()
+  await waitFor(rows, (all) => all.every((row) => row.outcome !== null), 'terminal replies')
+  await agent.sourcesWake()
+  return {
+    before,
+    after: rows().map(({ outcome }) => outcome),
+    sends: sends().length,
+    stableRetry: JSON.stringify(sends().at(-1)) === JSON.stringify(retry),
+  }
+}
+
+export const probes: Probes = {
+  sources: inAgent(sourcesProbe),
+  'sources-drop': inAgent(droppedSourcesProbe),
+  'source-reply-outcomes': inAgent(replyOutcomesProbe),
+}

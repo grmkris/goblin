@@ -13,7 +13,7 @@ import {
   sourcesToReview,
   waitingConversations,
 } from '../src/lib/source-routes.ts'
-import { setupFacts, sinkArguments, sinkFromSource, sinkPolicy } from '../src/lib/source-setup.ts'
+import { replyResultRules, setupFacts, sinkArguments, sinkFromSource, sinkPolicy } from '../src/lib/source-setup.ts'
 
 const topic = (id: number, name: string, archivedAt?: number): TopicView => ({
   id,
@@ -53,6 +53,11 @@ const SETUP: SourceSetup = {
     tool: 'message_send',
     arguments: { chat: '{{key.chat}}', text: '{{text}}', operationId: '{{operationId}}' },
     maxChars: 3500,
+    result: {
+      accepted: { pointer: '/status', equals: 'accepted' },
+      retryable: { pointer: '/status', equals: 'retryable' },
+      rejected: { pointer: '/status', equals: 'rejected' },
+    },
   },
   newKeys: { to: 'held' },
 }
@@ -93,7 +98,9 @@ describe('a Source in words (ADR 0066)', () => {
       'New conversations',
     ])
     expect(facts[2]?.text).toBe('When /from/isOwner is true: those become your own turns')
-    expect(facts[5]?.text).toBe('Sent back with message_send, in pieces of at most 3,500 characters')
+    expect(facts[5]?.text).toBe(
+      'Sent back with message_send, in pieces of at most 3,500 characters; results: accepted when /status is "accepted"; retryable when /status is "retryable"; rejected when /status is "rejected"',
+    )
     expect(facts[6]?.text).toBe('held')
   })
 
@@ -209,6 +216,7 @@ describe('Notify me via', () => {
       connectionId: 'chat',
       tool: 'message_send',
       arguments: { chat: 'dm', text: '{{text}}', operationId: '{{operationId}}' },
+      result: SETUP.reply?.result,
       echo: SETUP.wake,
     })
     const { reply: _reply, ...silent } = SETUP
@@ -224,5 +232,15 @@ describe('Notify me via', () => {
     expect(sinkArguments('{"text":"{{key.chat}}"}', notice)).toHaveProperty('problem')
     expect(sinkArguments('[1]', notice)).toEqual({ problem: 'The arguments must be a JSON object.' })
     expect(sinkArguments('{', notice)).toEqual({ problem: 'The arguments are not JSON.' })
+  })
+})
+
+describe('Source reply result rules', () => {
+  it('reads only valid rules or an explicit clear', () => {
+    expect(replyResultRules(JSON.stringify(SETUP.reply?.result))).toEqual(SETUP.reply?.result)
+    expect(replyResultRules('null')).toBeNull()
+    expect(replyResultRules('{}')).toBeUndefined()
+    expect(replyResultRules('{"accepted":{"pointer":"bad","equals":true}}')).toBeUndefined()
+    expect(replyResultRules('invalid')).toBeUndefined()
   })
 })

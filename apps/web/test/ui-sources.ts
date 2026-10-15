@@ -35,6 +35,11 @@ const PROPOSED = {
     tool: 'message_send',
     arguments: { chat: '{{key.chat}}', text: '{{text}}', operationId: '{{operationId}}' },
     maxChars: 3500,
+    result: {
+      accepted: { pointer: '/status', equals: 'accepted' },
+      retryable: { pointer: '/status', equals: 'retryable' },
+      rejected: { pointer: '/status', equals: 'rejected' },
+    },
   },
 }
 const STREAMS = [
@@ -121,6 +126,16 @@ async function serve(page: Page, label: string, sources: Map<string, Json>) {
     return route.fulfill({ json: { ...body, label: 'Chat', updatedAt: 2 } })
   })
   await page.route('**/api/sources', (route) => route.fulfill({ json: { sources: [...sources.values()] } }))
+  await page.route('**/api/sources/*/reply-result', (route) => {
+    const id = new URL(route.request().url()).pathname.split('/').at(-2) ?? ''
+    // SAFETY: this fixture receives the typed owner API mutation from the reply rules editor.
+    const body = route.request().postDataJSON() as { readonly revision: number; readonly result: unknown }
+    assert.equal(body.revision, 1)
+    assert.deepEqual(body.result, SETUP.reply?.result)
+    const updated = { ...sources.get(id), revision: 2, state: 'proposed', setup: SETUP }
+    sources.set(id, updated)
+    return route.fulfill({ json: updated })
+  })
   await page.route('**/api/sources/*/confirm', (route) => {
     const id = new URL(route.request().url()).pathname.split('/').at(-2) ?? ''
     confirms.push(route.request().postDataJSON())
@@ -162,8 +177,17 @@ async function connection(browser: Browser, origin: string, label: string, optio
   await page.getByText('When /from/isOwner is true: those become your own turns').waitFor()
   await page.getByText('Sent back with message_send, in pieces of at most 3,500 characters').waitFor()
   await page.getByText('Held until you choose where they go').waitFor()
+  await page.getByRole('button', { name: 'Edit reply result rules' }).click()
+  await page.getByLabel('Reply result rules', { exact: true }).fill('{invalid')
+  assert(
+    await page.getByRole('button', { name: 'Save for review' }).isDisabled(),
+    `${label}: invalid rules can be saved`,
+  )
+  await page.getByLabel('Reply result rules', { exact: true }).fill(JSON.stringify(SETUP.reply?.result, null, 2))
   await noSidewaysScroll(page, label)
   await page.screenshot({ path: path.join(out, `${label}-review.png`), fullPage: true })
+  await page.getByRole('button', { name: 'Save for review' }).click()
+  await page.getByText('Exact setup, revision 2').waitFor()
   await page.getByRole('button', { name: 'Confirm' }).click()
   await page.getByText('This Source changed since you read it. Review its current revision below.').waitFor()
   await page.getByRole('button', { name: 'Confirm' }).click()
@@ -222,6 +246,11 @@ async function settings(browser: Browser, origin: string, label: string, options
   await page.getByLabel('Which conversation notices go to').selectOption({ label: 'chat dm' })
   assert.equal(await page.getByLabel('Tool').inputValue(), 'message_send', `${label}: tool not copied`)
   assert.match(await page.getByLabel('Arguments').inputValue(), /"chat": "dm"/u, `${label}: key not filled`)
+  assert.deepEqual(
+    JSON.parse(await page.getByLabel('Delivery and echo rules').inputValue()).result,
+    SETUP.reply?.result,
+    `${label}: result rules not copied`,
+  )
   const policy = {
     result: {
       accepted: { pointer: '/status', equals: 'sent' },
@@ -255,7 +284,7 @@ try {
     await settings(browser, origin, label, options)
   }
   assert.deepEqual(errors, [])
-  assert.deepEqual(confirms, [{ revision: 1 }, { revision: 1 }, { revision: 1 }, { revision: 1 }])
+  assert.deepEqual(confirms, [{ revision: 2 }, { revision: 2 }, { revision: 2 }, { revision: 2 }])
   assert.deepEqual(routes.slice(0, 2), [
     { key: '["g_team"]', route: { to: 'topic', topic: 2 } },
     { key: '["g_team"]', route: { to: 'persona', persona: 7, topic: 2 } },

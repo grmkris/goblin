@@ -5,6 +5,7 @@ import { sign } from '../../src/mcp/events/webhook.ts'
 import { EVENTS_EXTENSION, type EventEnvelope } from '../../src/mcp/events/protocol.ts'
 import { SKILLS_EXTENSION, type SkillEntry } from '../../src/skills/protocol.ts'
 import { lowLevelServer } from './low-level-server.ts'
+import type { CallToolResult } from '@modelcontextprotocol/client'
 
 const Params = Schema.toStandardSchemaV1(Schema.Record(Schema.String, Schema.Unknown))
 const Subscribe = Schema.Struct({
@@ -31,6 +32,11 @@ export class EventsFixture {
   readonly calls: string[] = []
   readonly toolCalls: { readonly name: string; readonly arguments: Record<string, unknown> }[] = []
   readonly inbox: InboxEntry[] = []
+  replyResult: (args: Record<string, unknown>) => CallToolResult = () => ({
+    content: [],
+    isError: false,
+    structuredContent: { status: 'accepted' },
+  })
   skills: readonly SkillEntry[] = []
   readonly files = new Map<string, string>()
   inputSchema: Record<string, unknown> = { type: 'object' }
@@ -62,6 +68,7 @@ export class EventsFixture {
     server.setRequestHandler('tools/call', (request) => {
       this.calls.push(request.params.name)
       this.toolCalls.push({ name: request.params.name, arguments: { ...request.params.arguments } })
+      if (request.params.name === 'message_send') return this.replyResult({ ...request.params.arguments })
       const content =
         request.params.name === 'inbox_read'
           ? { messages: request.params.arguments?.cursor === this.cursor ? [] : this.inbox, nextCursor: this.cursor }

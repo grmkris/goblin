@@ -564,3 +564,11 @@ Code completion and local fixtures do not close this gate. After the dev reset, 
    an unrelated event on the same MySI connection, and a sink save invalidating an old pending copy.
 5. Retain redacted operation ids and received-message evidence. Record model acceptance, MCP acceptance and actual
    external receipt separately. Any missing access or unavailable producer remains an open acceptance item.
+
+
+Source reply outcome rules (ADR 0072) are covered by `sources-replies.test.ts`, `sources-engine.test.ts` and
+`sources-program.test.ts`: frozen calls, per-piece progress, explicit retryability, uncertainty, reconstruction,
+waiting limits and revision review. The native `source-reply-outcomes` canary carries accepted/retryable/rejected/unknown
+structured results through the MCP host and verifies a stable retry. The Source browser walk edits result rules,
+requires a new confirmation and copies those rules into Notify me via at desktop and 390px widths. These are local
+proofs; reconnecting MySI, confirming the deployed Source and Telegram DM/group/photo checks remain live acceptance.

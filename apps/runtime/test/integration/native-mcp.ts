@@ -51,6 +51,23 @@ async function skillsRestartChecks(base: string): Promise<void> {
 /** MCP Events (signed event delivery, replay, gaps, refresh and cleanup), a Source end to end and the skills cache. */
 export const cases: readonly NativeCase[] = [
   matchCase(
+    'a Source classifies structured reply outcomes and retries only the frozen retryable call [canary]',
+    'source-reply-outcomes',
+    (result) => {
+      expect(result).toEqual({
+        before: [
+          { outcome: 'accepted', attempts: 0, nextPiece: 1 },
+          { outcome: 'rejected', attempts: 0, nextPiece: 0 },
+          { outcome: null, attempts: 1, nextPiece: 0 },
+          { outcome: 'unknown', attempts: 0, nextPiece: 0 },
+        ],
+        after: ['accepted', 'rejected', 'accepted', 'unknown'],
+        sends: 5,
+        stableRetry: true,
+      })
+    },
+  ),
+  matchCase(
     "a Source makes the owner's message a turn in its chat's own Topic, someone else's a notice, and answers once [canary]",
     'sources',
     (result) =>

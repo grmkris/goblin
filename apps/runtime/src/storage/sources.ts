@@ -24,6 +24,7 @@ export const appSourceSetups = sqliteTable('app_source_setups', {
   endpoint: text('endpoint'),
   grantVersion: text('grant_version'),
   binding: integer('binding'),
+  lastBinding: integer('last_binding').notNull().default(0),
   cursor: text('cursor'),
   pullDue: integer('pull_due', { mode: 'boolean' }).notNull().default(false),
   resubscribeDue: integer('resubscribe_due', { mode: 'boolean' }).notNull().default(false),
@@ -80,24 +81,30 @@ export const appSourceHeld = sqliteTable(
 
 /**
  * The answers a Source owes (ADR 0066): the turn's operation, its conversation, the goblin chat it ran in and the
- * Persona that answers it. A failed send is tried again at `next_at`, `attempts` counting; it is `sent`, or `given_up`
- * after five failures or a day with no answer.
+ * Persona that answers it. Frozen calls acknowledge each piece; only explicit retryable results get another attempt.
+ * Terminal rows remain due until their idempotent report and owner notice are recorded.
  */
 export const appSourceReplies = sqliteTable(
   'app_source_replies',
   {
     operationId: text('operation_id').primaryKey().notNull(),
     sourceId: text('source_id').notNull(),
+    sourceRevision: integer('source_revision').notNull(),
+    sourceBinding: integer('source_binding'),
     key: text('key').notNull(),
     chatId: text('chat_id'),
     personaId: integer('persona_id'),
+    plan: text('plan'),
+    nextPiece: integer('next_piece').notNull().default(0),
+    dispatching: integer('dispatching', { mode: 'boolean' }).notNull().default(false),
+    reported: integer('reported', { mode: 'boolean' }).notNull().default(false),
     attempts: integer('attempts').notNull().default(0),
     nextAt: integer('next_at').notNull().default(0),
-    outcome: text('outcome', { enum: ['sent', 'given_up'] }),
+    outcome: text('outcome', { enum: ['accepted', 'rejected', 'unknown', 'given_up'] }),
     createdAt: integer('created_at').notNull(),
     settledAt: integer('settled_at'),
   },
-  (table) => [index('app_source_replies_due').on(table.outcome, table.nextAt)],
+  (table) => [index('app_source_replies_due').on(table.reported, table.nextAt)],
 )
 
 /**

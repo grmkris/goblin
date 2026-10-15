@@ -6,6 +6,7 @@
 import {
   type SourceNewKeys,
   type SourceProposal,
+  type SourceReplyResultChange,
   type SourceRoute,
   type SourceRoutePick,
   type SourceRouteView,
@@ -28,6 +29,7 @@ import { activationRefused } from '../routines/events.ts'
 import { sha256Hex } from '../runtime/digest.ts'
 import { Db } from '../runtime/db.ts'
 import { AgentInput } from '../runtime/input.ts'
+import { patchCurrentSource, reserveBinding } from './binding.ts'
 import { type SourceEngine, loaded } from './engine.ts'
 import { keyWords } from './messages.ts'
 import { activePersona, activeTopic, personaWords, topicWords } from './places.ts'
@@ -192,9 +194,29 @@ const holds = ({ row, setup }: Loaded) =>
     Effect.catchTag('NotFound', () => Effect.succeed(false)),
   )
 
-/** A new binding of `row`'s subscription: the Clock's time, always after the one before. */
-const nextBinding = (row: SourceRow) =>
-  Effect.map(Clock.currentTimeMillis, (now) => Math.max(now, (row.binding ?? 0) + 1))
+/** Claim one unique binding attempt without holding a transaction across any connection wait. */
+const reservedBinding = (row: SourceRow) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+    const now = yield* Clock.currentTimeMillis
+    const reserved = reserveBinding(db, row, now)
+    if (reserved === undefined) return yield* new Conflict({ reason: 'stale' })
+    return reserved
+  })
+
+/** Retire only this attempt's consumer. A lease shared with other consumers remains theirs. */
+const retireBinding = (id: string, binding: number) =>
+  Events.use((events) => events.unsubscribe({ consumerId: consumerOf(id), revision: binding })).pipe(
+    // expected: an ended subscription needs no cleanup; a remote cleanup failure lapses with its lease.
+    Effect.ignore,
+  )
+
+/** A failure after activation (for example, refreshing Activity) must not retire the binding already committed. */
+const retireUnbound = (id: string, binding: number) =>
+  Effect.gen(function* () {
+    const current = sourceRow(yield* Db, id)
+    if (current?.binding !== binding) yield* retireBinding(id, binding)
+  })
 
 /** A new Source's id: `src_` and 16 hex digits. */
 const newId = Effect.map(Effect.all([Random.nextIntBetween(0, 2 ** 31), Random.nextIntBetween(0, 2 ** 31)]), (parts) =>
@@ -237,7 +259,7 @@ export const proposeSource = Effect.fn('sources.propose')(function* (
  * Binds `row` as it is now: its event and tools granted, its event subscribed under a new binding (the one before it
  * ended), a tool read started at the end of what is there, and the endpoint and grants it is bound to kept.
  */
-const bind = (engine: SourceEngine, ports: SourcePorts, row: SourceRow) =>
+const bindReserved = (engine: SourceEngine, ports: SourcePorts, row: SourceRow) =>
   Effect.gen(function* () {
     yield* requireResident
     const source = yield* loaded(row)
@@ -248,7 +270,7 @@ const bind = (engine: SourceEngine, ports: SourcePorts, row: SourceRow) =>
     yield* events.grant(row.connectionId, setup.wake.event, setup.wake.arguments, true)
     for (const tool of toolsOf(setup)) yield* grants.setTool(row.connectionId, tool, true)
     const cursor = setup.read.from === 'tool' ? yield* engine.startCursor(source, ports) : null
-    const binding = yield* nextBinding(row)
+    const binding = row.lastBinding
     yield* events.subscribe({
       consumerId: consumerOf(row.id),
       revision: binding,
@@ -259,9 +281,9 @@ const bind = (engine: SourceEngine, ports: SourcePorts, row: SourceRow) =>
     })
     const bound = yield* boundOf(row.connectionId, setup)
     const now = yield* epochSeconds
-    const after = patchSource(
+    const after = patchCurrentSource(
       yield* Db,
-      row.id,
+      row,
       {
         state: 'active',
         paused: null,
@@ -276,12 +298,19 @@ const bind = (engine: SourceEngine, ports: SourcePorts, row: SourceRow) =>
       },
       now,
     )
+    if (after === undefined) return yield* new Conflict({ reason: 'stale' })
     if (row.binding !== null && row.binding !== binding)
       // expected: a binding the server already ended has nothing left to end.
       yield* Effect.ignore(events.unsubscribe({ consumerId: consumerOf(row.id), revision: row.binding }))
     // A Source on the connection's events answers its offer (ADR 0041): Activity stops asking.
     yield* (yield* McpServers).settleEvents(row.connectionId, 'done')
-    return after ?? row
+    return after
+  })
+
+const bind = (engine: SourceEngine, ports: SourcePorts, original: SourceRow) =>
+  Effect.gen(function* () {
+    const row = yield* reservedBinding(original)
+    return yield* bindReserved(engine, ports, row).pipe(Effect.onError(() => retireUnbound(row.id, row.lastBinding)))
   })
 
 /** The owner confirms revision `revision` of proposal `id`: it is bound and starts. A stale revision is a conflict. */
@@ -308,16 +337,52 @@ const unbind = (row: SourceRow) =>
     if (row.binding === null) return
     // expected: an ended subscription, or one the server cannot clean up now, lapses with its lease.
     yield* Effect.ignore((yield* Events).unsubscribe({ consumerId: consumerOf(row.id), revision: row.binding }))
-    patchSource(yield* Db, row.id, { binding: null }, yield* epochSeconds)
+    patchCurrentSource(yield* Db, row, { binding: null }, yield* epochSeconds)
   })
+
+/** Editing reply-result rules stops the Source and creates a new exact revision for confirmation. */
+export const changeSourceReplyResult = Effect.fn('sources.replyResult')(function* (
+  id: string,
+  change: SourceReplyResultChange,
+) {
+  const row = yield* found(id)
+  if (row.revision !== change.revision) return yield* new Conflict({ reason: 'stale' })
+  if (row.state === 'refused') return yield* new Conflict({ reason: 'source_refused' })
+  const { setup } = yield* loaded(row)
+  if (setup.reply === undefined) return yield* new InvalidInput({ reason: 'source has no reply tool' })
+  const { result: _previous, ...reply } = setup.reply
+  const updated = { ...setup, reply: { ...reply, ...(change.result === null ? {} : { result: change.result }) } }
+  const now = yield* epochSeconds
+  const after = patchCurrentSource(
+    yield* Db,
+    row,
+    {
+      setup: JSON.stringify(updated),
+      revision: row.revision + 1,
+      state: 'proposed',
+      paused: null,
+      health: null,
+      confirmedAt: null,
+      binding: null,
+    },
+    now,
+  )
+  if (after === undefined) return yield* new Conflict({ reason: 'stale' })
+  if (row.binding !== null)
+    // expected: the old exact subscription may already have ended; cleanup cannot revive a proposal.
+    yield* Effect.ignore((yield* Events).unsubscribe({ consumerId: consumerOf(id), revision: row.binding }))
+  ;(yield* AgentInput).scheduleSources(1)
+  return yield* sourceView(after)
+})
 
 /** Pauses `row`: by the owner, or for their review with `health` saying why. Its subscription ends at the next wake. */
 const markPaused = (row: SourceRow, paused: 'owner' | 'review', health: string | null) =>
   Effect.gen(function* () {
     const db = yield* Db
-    const after = patchSource(db, row.id, { state: 'paused', paused, health }, yield* epochSeconds)
+    const after = patchCurrentSource(db, row, { state: 'paused', paused, health }, yield* epochSeconds)
+    if (after === undefined) return yield* new Conflict({ reason: 'stale' })
     ;(yield* AgentInput).scheduleSources(1)
-    return after ?? row
+    return after
   })
 
 /** The owner pauses Source `id`: nothing is read or answered until they resume it. */
@@ -477,9 +542,10 @@ const live = (row: SourceRow) =>
  */
 const resubscribe = (source: Loaded) =>
   Effect.gen(function* () {
-    const { row, setup } = source
+    const { setup } = source
+    const row = yield* reservedBinding(source.row)
     const events = yield* Events
-    const binding = yield* nextBinding(row)
+    const binding = row.lastBinding
     const subscribed = yield* events
       .subscribe({
         consumerId: consumerOf(row.id),
@@ -490,18 +556,23 @@ const resubscribe = (source: Loaded) =>
         handlerKey: SOURCE_HANDLER,
       })
       .pipe(
+        Effect.onError(() => retireUnbound(row.id, binding)),
         Effect.as(true),
         // expected: a refusal the owner must act on is told to them as the Source's review, not retried.
         Effect.catchIf(activationRefused, () => Effect.as(markPaused(row, 'review', ENDED), false)),
       )
     if (!subscribed) return
     const now = yield* epochSeconds
-    patchSource(
+    const after = patchCurrentSource(
       yield* Db,
-      row.id,
+      row,
       { binding, resubscribeDue: false, pullDue: setup.read.from === 'tool', health: null },
       now,
     )
+    if (after === undefined) {
+      yield* retireBinding(row.id, binding)
+      return yield* new Conflict({ reason: 'stale' })
+    }
     if (row.binding !== null)
       // expected: the old binding's subscription already ended; this only retires the consumer's row.
       yield* Effect.ignore(events.unsubscribe({ consumerId: consumerOf(row.id), revision: row.binding }))

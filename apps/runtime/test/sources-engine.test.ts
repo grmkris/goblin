@@ -294,16 +294,18 @@ describe("a Source's answers going back (ADR 0066)", () => {
     }),
   )
 
-  it.effect('waits while the turn runs, tries a failed send again later, and gives up with a notice after five', () =>
+  it.effect('waits while the turn runs and retries only explicit retryable results, giving up after five', () =>
     Effect.gen(function* () {
       const answers = new Map<string, { text: string }>()
-      const { db, engine, ports, seen, state, active } = yield* sourceWorld({ answers })
+      const { db, engine, ports, seen, active } = yield* sourceWorld({
+        answers,
+        sendResult: () => ({ content: [], isError: false, structuredContent: { status: 'retryable' } }),
+      })
       const source = yield* active({ ...PAYLOAD_SETUP, newKeys: { to: 'topic', topic: 4 } })
       yield* engine.takeEvent(source, event('e1', message('m1')), ports)
       expect(yield* engine.deliver(ports)).toBe(true)
       expect(seen.calls).toEqual([])
       answers.set('source-src_00000000000000a1-m1', { text: 'Done.' })
-      state.failing = true
       for (let attempt = 1; attempt <= REPLY_TRIES; attempt += 1) {
         yield* engine.deliver(ports)
         expect(seen.calls).toHaveLength(attempt)
@@ -314,9 +316,9 @@ describe("a Source's answers going back (ADR 0066)", () => {
       expect(dueReplies(db, 86_400)).toEqual([])
       expect(seen.notices).toEqual([
         expect.objectContaining({
-          id: 'notice:source-src_00000000000000a1-m1:given-up',
+          id: 'notice:source-src_00000000000000a1-m1:given_up',
           topic: 4,
-          title: "goblin's answer could not be sent back to Chat after 5 tries",
+          title: "goblin's answer to Chat stopped after its retry or waiting limit.",
         }),
       ])
     }),

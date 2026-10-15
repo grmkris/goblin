@@ -166,6 +166,16 @@ export const SourceRead = Schema.Union([
 ])
 export type SourceRead = typeof SourceRead.Type
 
+/** The owner-reviewed meanings of a tool's structured result. Unmatched or conflicting rules mean unknown. */
+export const SinkResultRules = Schema.Struct({
+  accepted: SourceMatch,
+  retryable: Schema.optionalKey(SourceMatch),
+  rejected: Schema.optionalKey(SourceMatch),
+  /** An epoch-millisecond lower bound on the next attempt, only read after a retryable match. */
+  retryAt: Schema.optionalKey(JsonPointer),
+})
+export type SinkResultRules = typeof SinkResultRules.Type
+
 /** The longest piece of an answer a reply may be cut to, and the shortest. */
 const MAX_CHARS = { minimum: 100, maximum: 20_000 }
 
@@ -177,6 +187,8 @@ export const SourceReply = Schema.Struct({
   tool: RemoteName,
   arguments: ArgumentsTemplate,
   maxChars: Schema.Int.check(Schema.isBetween(MAX_CHARS)),
+  /** Owner-reviewed meanings of the reply tool's structured result; unmatched results are unknown. */
+  result: Schema.optionalKey(SinkResultRules),
 })
 export type SourceReply = typeof SourceReply.Type
 
@@ -349,18 +361,12 @@ export type SourceProposal = typeof SourceProposal.Type
 export const SourceRevision = Schema.Struct({ revision: Schema.Int })
 export type SourceRevision = typeof SourceRevision.Type
 
+/** Editing reply-result rules creates a new proposal for the owner to confirm; null clears the rules. */
+export const SourceReplyResultChange = Schema.Struct({ revision: Schema.Int, result: Schema.NullOr(SinkResultRules) })
+export type SourceReplyResultChange = typeof SourceReplyResultChange.Type
+
 /** The placeholders a notice copy's arguments may use. */
 export const notifyPlaceholder = (name: string) => name === 'text' || name === 'operationId'
-
-/** The owner-reviewed meanings of a tool's structured result. Unmatched or conflicting rules mean unknown. */
-export const SinkResultRules = Schema.Struct({
-  accepted: SourceMatch,
-  retryable: Schema.optionalKey(SourceMatch),
-  rejected: Schema.optionalKey(SourceMatch),
-  /** An epoch-millisecond lower bound on the next attempt, only read after a retryable match. */
-  retryAt: Schema.optionalKey(JsonPointer),
-})
-export type SinkResultRules = typeof SinkResultRules.Type
 
 /** Optional settings for interpreting delivery and suppressing an exact stream's echoes on this connection. */
 export const NotifySinkPolicy = Schema.Struct({

@@ -350,7 +350,10 @@ export function waitingOf(db: Db, sourceId: string): readonly SourceWaiting[] {
 /** Remembers a turn whose answer goes back through its Source; whether it was new. */
 export function trackReply(
   db: Db,
-  reply: Pick<ReplyRow, 'operationId' | 'sourceId' | 'key' | 'chatId' | 'personaId'>,
+  reply: Pick<
+    ReplyRow,
+    'operationId' | 'sourceId' | 'sourceRevision' | 'sourceBinding' | 'key' | 'chatId' | 'personaId'
+  >,
   now: number,
 ): boolean {
   const written = db
@@ -367,7 +370,7 @@ export const dueReplies = (db: Db, now: number): readonly ReplyRow[] =>
   db
     .select()
     .from(appSourceReplies)
-    .where(and(isNull(appSourceReplies.outcome), lte(appSourceReplies.nextAt, now)))
+    .where(and(eq(appSourceReplies.reported, false), lte(appSourceReplies.nextAt, now)))
     .orderBy(asc(appSourceReplies.createdAt))
     .all()
 
@@ -376,23 +379,28 @@ export function nextReply(db: Db): number | undefined {
   return db
     .select({ nextAt: appSourceReplies.nextAt })
     .from(appSourceReplies)
-    .where(isNull(appSourceReplies.outcome))
+    .where(eq(appSourceReplies.reported, false))
     .orderBy(asc(appSourceReplies.nextAt))
     .get()?.nextAt
 }
 
 /** An answer went out, or was given up, at `now`. */
-export function settleReply(db: Db, operationId: string, outcome: 'sent' | 'given_up', now: number): void {
+export function settleReply(db: Db, operationId: string, outcome: NonNullable<ReplyRow['outcome']>, now: number): void {
   db.update(appSourceReplies)
-    .set({ outcome, settledAt: now })
+    .set({ outcome, settledAt: now, nextAt: now, dispatching: false })
     .where(and(eq(appSourceReplies.operationId, operationId), isNull(appSourceReplies.outcome)))
     .run()
+}
+
+/** Reporting can be retried independently of dispatch, using the same ledger and notice ids. */
+export function reportedReply(db: Db, operationId: string): void {
+  db.update(appSourceReplies).set({ reported: true }).where(eq(appSourceReplies.operationId, operationId)).run()
 }
 
 /** A try of an answer failed: it is tried again at `nextAt`, `attempts` counting. */
 export function retryReply(db: Db, operationId: string, attempts: number, nextAt: number): void {
   db.update(appSourceReplies)
-    .set({ attempts, nextAt })
+    .set({ attempts, nextAt, dispatching: false })
     .where(and(eq(appSourceReplies.operationId, operationId), isNull(appSourceReplies.outcome)))
     .run()
 }

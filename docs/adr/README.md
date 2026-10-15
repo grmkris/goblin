@@ -57,9 +57,10 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0063](0063-mcp-first-no-server-specific-code.md) | MCP-first: no server-specific code | Accepted |
 | [0064](0064-openid-connect-and-config-driven-deployment.md) | OpenID Connect sign-in and config-driven deployment | Accepted; amended by 0067 |
 | [0065](0065-files-from-mcp-content.md) | Files from MCP content | Accepted |
-| [0066](0066-sources.md) | Sources: any MCP server's events carry the owner's own messages, by a setup the owner confirms | Accepted; amended by 0068 |
+| [0066](0066-sources.md) | Sources: any MCP server's events carry the owner's own messages, by a setup the owner confirms | Accepted; amended by 0068 and 0072 |
 | [0067](0067-no-home-surface-and-no-typed-decisions.md) | No Home surface and no typed decisions | Accepted |
 | [0068](0068-events-use-their-standard-fields-only.md) | Events use their standard fields only | Accepted |
 | [0069](0069-external-messages-use-sources.md) | External messages use Sources; the built-in Telegram channel is removed | Accepted |
 | [0070](0070-notices-and-files-leave-through-the-owners-tools.md) | Notices and files leave through the owner's own tools: Notify me via and file links | Accepted; amended by 0071 |
 | [0071](0071-sink-delivery-rules-and-event-identity.md) | Sink delivery rules and exact event identity | Accepted |
+| [0072](0072-source-reply-result-outcomes.md) | Source reply result outcomes and durable piece progress | Accepted |

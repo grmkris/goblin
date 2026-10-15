@@ -103,21 +103,35 @@ the web read the Sources and their route tables again (`lib/workspace/invalidati
 
 ## Answers back
 
-A turn of a Source with a reply is owed in `app_source_replies` and the alarm is set. Each alarm sends what is due
-(`sources/replies.ts`, over `deliverReady`, `sources/delivery.ts`): an answer still running waits (a day at most, then
-it is given up); a settled one (goblin's, or the Persona invocation's) goes out through the reply tool in pieces of
-`maxChars` (`chunks`), each piece with its own operation id (`reply-<n>-<turn's operation>`), so a retry never sends one
-twice to a server that honours them. The call is goblin's own under the owner's grant (`caller: 'model'`): an
-Ask-first reply tool refuses it. A failed send is tried again after a minute, doubling to an hour, and given up after
-five tries with a notice to the owner. A paused Source keeps what it owes until it runs again or the day is out. Each
-delivery is a `source_delivery` flow and a `source.reply` line; ids and counts only.
+A turn of a Source with a reply is owed in `app_source_replies` and the alarm is set. Before the first dispatch,
+`sources/reply-plan.ts` freezes its reply text as calls cut to `maxChars`, arguments, operation ids
+(`reply-<n>-<turn's operation>`), connection, tool, reviewed setup and result rules. Every accepted piece advances a
+durable `next_piece` before the next dispatch. Retries and reconstruction use these frozen calls without needing the
+original Pi answer. A dispatch intent without a recorded result becomes terminal unknown, never an automatic resend.
+
+The full MCP result is interpreted with the owner's `reply.result` rules ([ADR 0072](../adr/0072-source-reply-result-outcomes.md)).
+One matching rule means accepted, retryable or rejected; `isError` is rejected. Missing, conflicting or unmatched rules
+mean unknown. A transport failure is unknown. Accepted means tool acceptance, not external delivery. Only retryable
+results permit another attempt, after local backoff and `retryAt`, at most five tries within a day of the original
+message. The same day limit applies while a Source is inactive with its binding intact or its answer is not ready. Retiring
+the binding (including owner Pause) rejects pending calls tied to that old binding. A future `retryAt` beyond that
+deadline causes expiry without an early dispatch. Terminal failures remain due for idempotent reporting until their owner notice succeeds; each delivery records ids,
+counts and its outcome in the `source_delivery` flow and `source.reply` ledger, never content.
+
+Calls run as goblin under current resident authority and the owner's exact grant. Immediately before dispatch, the
+Source must still be active with the original revision, binding and setup. The owner can edit reply rules from the
+Source review card. `PUT /api/sources/:id/reply-result` requires the shown revision and creates an unconfirmed proposal;
+only Confirm starts it again. Binding attempts reserve a unique durable `lastBinding` value and activate through
+a compare-and-set against the reviewed revision, setup, state and reservation after network waits. A stale confirm,
+resume, cleanup or resubscribe cannot overwrite a newer edit or binding. An entirely acknowledged plan can settle accepted after restart even if that setup has
+since changed, because no further call is made.
 
 ## Notify me via
 
 `app_notify_sink` keeps one setting (`NotifySink`): a connection, a tool it offers and arguments whose whole string
 values may be `{{text}}` (required) and `{{operationId}}`. `PUT /api/notify-sink` grants the tool, as the owner chose
 it; `GET` reads it with the connection's label; `DELETE` clears it. Settings → Notify me via sets it, and copies a
-confirmed Source's reply template with one of its conversations' keys filled in.
+confirmed Source's reply template and result rules with one of its conversations' keys filled in.
 
 Two things send through it (ADR 0070, `sendThroughSink` in `sources/notify.ts`): a routine's notice copies
 (`tellMe.copy`, [routines.md](routines.md)) and an agent app's `notify` power ([agent-apps.md](agent-apps.md)). Each
@@ -140,6 +154,7 @@ wake selector for review too. Settings keeps both policies in its Delivery and e
 | --- | --- |
 | `GET /api/sources` | Every Source with the conversations waiting for a route. |
 | `POST /api/sources/:id/confirm`, `/refuse` | The exact revision (`SourceRevision`); a stale one is 409. |
+| `PUT /api/sources/:id/reply-result` | Edit result rules into a new proposal (`SourceReplyResultChange`); a stale revision is 409. |
 | `GET /api/sources/:id/routes`, `PUT` | The route table; one conversation's route (`SourceRoutePick`). |
 | `POST /api/sources/:id/pause`, `/resume`, `DELETE /api/sources/:id` | Pause, bind again, remove. |
 | `GET`, `PUT`, `DELETE /api/notify-sink` | Notify me via. |

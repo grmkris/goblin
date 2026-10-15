@@ -192,6 +192,13 @@ const labelOf = (connectionId: string) =>
 /** The Sources' ports over the agent's services, captured once. */
 export const sourcePorts = Effect.map(Effect.context<PortServices>(), (context): SourcePorts => ({
   call: (connectionId, tool, args) => Effect.provideContext(callTool(connectionId, tool, args), context),
+  send: (connectionId, tool, args, authorize) =>
+    Effect.provideContext(
+      McpConnections.use((connections) =>
+        connections.callTool(connectionId, tool, args, { caller: 'model', authorize }),
+      ),
+      context,
+    ),
   submit: (turn, persona) => Effect.provideContext(submitTurn(SOURCE, turn, persona), context),
   keep: (turn) => Effect.provideContext(keepTurn(SOURCE, turn), context),
   answer: (reply) => Effect.provideContext(answerOf(SOURCE, reply), context),
