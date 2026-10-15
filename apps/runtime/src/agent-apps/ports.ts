@@ -9,6 +9,7 @@ import { bound } from '../runtime/boundary.ts'
 import type { Bridge, RunProgram } from '../runtime/bridge.ts'
 import { Changes } from '../runtime/changes.ts'
 import { notifySink, sendThroughSink, sinkRevision } from '../sources/notify.ts'
+import { sinkOutcome } from '../sources/sink-result.ts'
 import { appCompletion } from './completion.ts'
 import type { AppPorts } from './engine.ts'
 import { AppCodeError, appLock, problemText, thrownOf } from './queue.ts'
@@ -62,8 +63,16 @@ const notifyOwner = (op: string, text: string) =>
         ),
       ),
     )
-    if (result.isError === true)
-      return yield* Effect.fail(new AppCodeError('notify: Notify me via refused the message'))
+    switch (sinkOutcome(result, sink.result)) {
+      case 'accepted':
+        return
+      case 'retryable':
+        return yield* Effect.fail(new AppCodeError('notify: Notify me via asked for a retry'))
+      case 'rejected':
+        return yield* Effect.fail(new AppCodeError('notify: Notify me via refused the message'))
+      case 'unknown':
+        return yield* Effect.fail(new AppCodeError('notify: Notify me via returned an unknown delivery outcome'))
+    }
   })
 
 /**

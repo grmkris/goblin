@@ -58,6 +58,10 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   owner's grant, with resident authority and the sink's revision checked again right before the call leaves. A file
   goes to a server as a `file_link` URL in a tool's arguments (MCP has no upload); the receiving tool's grant and Ask
   first decide whether it is sent.
+  Result predicates in the owner's sink setting decide accepted, retryable or rejected outcomes (ADR 0071); absent,
+  unmatched or conflicting predicates mean unknown and never authorize an automatic retry. Echo suppression matches
+  an exact event name and canonical arguments on the connection, not the connection alone. Every save gets a fresh
+  revision, including an identical save in the same second.
 - The shelf (`mcp/servers/shelf.ts`, ADRs 0052, 0061) is data, one endpoint per entry on every deployment (`MCP_SHELF`
   replaces or adds entries): one mysi connection (`mysi.lol/mcp?codemode=off`) instead of the separate my* servers,
   publishing (Cloudflare), then servers that need no sign-in in groups; re-probe one with an `initialize` before

@@ -3,6 +3,8 @@
 // draw it.
 import {
   ArgumentsTemplate,
+  NotifySinkPolicy,
+  type NotifySink,
   type SourceKeyValues,
   type SourceNewKeys,
   type SourceSetup,
@@ -82,11 +84,7 @@ export const keyPlaceholders = (values: SourceKeyValues): Readonly<Record<string
   Object.fromEntries(Object.entries(values).map(([name, value]) => [`key.${name}`, value]))
 
 /** What "Notify me via" sends a notice with: a connection's tool and its arguments with `{{text}}` in them. */
-export type SinkDraft = {
-  readonly connectionId: string
-  readonly tool: string
-  readonly arguments: ArgumentsTemplate
-}
+export type SinkDraft = NotifySink
 
 const decodeArguments = Schema.decodeUnknownOption(ArgumentsTemplate)
 
@@ -124,6 +122,15 @@ export function sinkFromSource(source: SourceView, values: SourceKeyValues): Sin
   const filled = decodeArguments(fillTemplate(reply.arguments, keyPlaceholders(values)))
   return Option.match(filled, {
     onNone: () => undefined,
-    onSome: (args) => ({ connectionId: source.connectionId, tool: reply.tool, arguments: args }),
+    onSome: (args) => ({
+      connectionId: source.connectionId,
+      tool: reply.tool,
+      arguments: args,
+      echo: source.setup.wake,
+    }),
   })
 }
+
+/** Delivery and echo rules, as reviewed by the owner in Settings. */
+export const sinkPolicy = (text: string): NotifySinkPolicy | undefined =>
+  Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(NotifySinkPolicy))(text))

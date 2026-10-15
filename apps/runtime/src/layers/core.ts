@@ -1,4 +1,5 @@
 import * as Clock from 'effect/Clock'
+import type * as Crypto from 'effect/Crypto'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import { epochSeconds } from '../clock.ts'
@@ -22,6 +23,7 @@ import { PiSessions } from '../pi/sessions.ts'
 import { enableResident, renewResident, residentStatus, revokeResident } from '../resident.ts'
 import { Changes } from '../runtime/changes.ts'
 import { Db } from '../runtime/db.ts'
+import { CryptoLive } from '../runtime/crypto.ts'
 import { AgentInput, type AgentInputs } from '../runtime/input.ts'
 import { flowRunEvent } from '../telemetry/events.ts'
 import type { Apps } from '../apps/service.ts'
@@ -91,12 +93,14 @@ export const ResidentLive: Layer.Layer<Resident, never, Db> = Layer.effect(
  */
 export const CoreLive = (
   input: AgentInputs,
-): Layer.Layer<AgentInput | Db | Changes | PiSessions | KeyedLock | SingleFlight | FlowEvents | Resident> =>
+): Layer.Layer<
+  AgentInput | Db | Changes | PiSessions | KeyedLock | SingleFlight | FlowEvents | Resident | Crypto.Crypto
+> =>
   ResidentLive.pipe(
     Layer.provideMerge(
       Layer.mergeAll(Db.layer, Changes.layer, PiSessions.layer, KeyedLock.layer, SingleFlight.layer, FlowsLive),
     ),
-    Layer.provideMerge(Layer.mergeAll(Layer.succeed(AgentInput, input), LoggerLive, ReporterLive)),
+    Layer.provideMerge(Layer.mergeAll(Layer.succeed(AgentInput, input), LoggerLive, ReporterLive, CryptoLive)),
   )
 
 /** What the start's steps provide (layers/index.ts). */

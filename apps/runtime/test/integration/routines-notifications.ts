@@ -69,16 +69,6 @@ async function setupNotifications(storage: DurableObjectStorage) {
   const db = drizzle(storage)
   const notices = new NoticeStore(db)
   enableResident(db, Math.floor(Date.now() / 1000))
-  // Notify me via: the owner's own chat on the fixture's server, the words and the operation id as whole values.
-  db.insert(appNotifySink)
-    .values({
-      id: 1,
-      connectionId: 'chat',
-      tool: 'message_send',
-      arguments: JSON.stringify({ chat: 'dm', text: '{{text}}', operationId: '{{operationId}}' }),
-      updatedAt: 1,
-    })
-    .run()
   const credentials = new MemoryCredentials()
   await credentials.saveTokens('chat', { access_token: 'keyless-fixture', token_type: 'bearer' }, 1)
   const attempts: Record<string, unknown>[] = []
@@ -90,6 +80,17 @@ async function setupNotifications(storage: DurableObjectStorage) {
     host.pipe(Layer.provide(SingleFlight.layer)),
     ResidentLive,
   ).pipe(Layer.provideMerge(Layer.succeed(Db, db)))
+  db.insert(appNotifySink)
+    .values({
+      id: 1,
+      connectionId: 'chat',
+      tool: 'message_send',
+      arguments: JSON.stringify({ chat: 'dm', text: '{{text}}', operationId: '{{operationId}}' }),
+      policy: JSON.stringify({ result: { accepted: { pointer: '/delivery', equals: 'accepted' } } }),
+      revision: '1',
+      updatedAt: 1,
+    })
+    .run()
   // The bridge's `local`, which the copies run their last-moment check through, over the same services.
   const input: AgentInputs = Object.assign(Object.create(null), {
     local: (program: Effect.Effect<void, AppError, LaneServices>) =>
@@ -141,7 +142,7 @@ async function routineNotificationProbe(storage: DurableObjectStorage) {
   await deliver()
   return {
     offCalls,
-    frozenSink: failed?.copySink?.startsWith('1:'),
+    frozenSink: failed?.copySink?.includes(':1:') === true,
     retryState: failed?.copyState,
     attempts: attempts.length,
     stableBytes: JSON.stringify(attempts[0]) === JSON.stringify(attempts[1]),

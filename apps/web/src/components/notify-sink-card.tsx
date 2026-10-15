@@ -26,21 +26,22 @@ import {
 import { messageOf } from '../lib/query/app-error.ts'
 import { QueryBoundary } from '../lib/query/query-boundary.tsx'
 import { keyWords } from '../lib/source-routes.ts'
-import { type SinkDraft, sinkArguments, sinkFromSource } from '../lib/source-setup.ts'
+import { type SinkDraft, sinkArguments, sinkFromSource, sinkPolicy } from '../lib/source-setup.ts'
 import { connectedToolsQuery, serversQuery } from '../mcp/queries.ts'
 import { notifySinkQuery, setNotifySinkMutation } from '../notify/queries.ts'
 import { sourceRoutesQuery, sourcesQuery } from '../sources/queries.ts'
 
 /** What the form holds: a connection, one of its tools, and the arguments as the owner writes them. */
-type Draft = { readonly connectionId: string; readonly tool: string; readonly args: string }
+type Draft = { readonly connectionId: string; readonly tool: string; readonly args: string; readonly policy: string }
 
-const EMPTY: Draft = { connectionId: '', tool: '', args: '{\n  "text": "{{text}}"\n}' }
+const EMPTY: Draft = { connectionId: '', tool: '', args: '{\n  "text": "{{text}}"\n}', policy: '{}' }
 
 /** A sink as the form holds it. */
 const draftOf = (sink: SinkDraft): Draft => ({
   connectionId: sink.connectionId,
   tool: sink.tool,
   args: JSON.stringify(sink.arguments, null, 2),
+  policy: JSON.stringify({ result: sink.result, echo: sink.echo }, null, 2),
 })
 
 /**
@@ -152,13 +153,14 @@ function SinkForm({ initial, onSaved }: { readonly initial: Draft; readonly onSa
   const [draft, setDraft] = useState(initial)
   const saving = useMutation(setNotifySinkMutation)
   const parsed = sinkArguments(draft.args, notifyPlaceholder)
+  const policy = sinkPolicy(draft.policy)
   const problem = 'problem' in parsed ? parsed.problem : undefined
-  const ready = draft.connectionId !== '' && draft.tool !== '' && problem === undefined
+  const ready = draft.connectionId !== '' && draft.tool !== '' && problem === undefined && policy !== undefined
   function save(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault()
-    if (!('template' in parsed) || !ready) return
+    if (!('template' in parsed) || !ready || policy === undefined) return
     saving.mutate(
-      { connectionId: draft.connectionId, tool: draft.tool, arguments: parsed.template },
+      { connectionId: draft.connectionId, tool: draft.tool, arguments: parsed.template, ...policy },
       { onSuccess: onSaved },
     )
   }
@@ -178,6 +180,21 @@ function SinkForm({ initial, onSaved }: { readonly initial: Draft; readonly onSa
           <FieldDescription>
             {problem ??
               'JSON. Each notice’s words go where "{{text}}" is; "{{operationId}}" gives each one its own id. Nothing is put inside other text.'}
+          </FieldDescription>
+        </Field>
+        <Field data-invalid={policy === undefined}>
+          <FieldLabel htmlFor="notify-policy">Delivery and echo rules</FieldLabel>
+          <Textarea
+            id="notify-policy"
+            spellCheck={false}
+            aria-invalid={policy === undefined}
+            value={draft.policy}
+            onChange={(event) => setDraft({ ...draft, policy: event.target.value })}
+          />
+          <FieldDescription>
+            {policy === undefined
+              ? 'Use a JSON object with result rules and, optionally, an echo event and its arguments.'
+              : 'Result rules compare a structured result pointer with a value: accepted, retryable, or rejected. Unmatched results stay unknown and are not retried. Echo names the exact event and arguments to keep from copying back.'}
           </FieldDescription>
         </Field>
         {saving.error !== null && (
@@ -212,7 +229,7 @@ function NotifySink() {
       <p className="text-sm text-muted-foreground">
         Notices go to <strong>{view.label}</strong> with <code>{view.tool}</code>:
       </p>
-      <JsonView value={view.arguments} />
+      <JsonView value={{ arguments: view.arguments, result: view.result, echo: view.echo }} />
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="outline" size="sm" onClick={() => setEditing(!editing)}>
           {editing ? 'Keep it' : 'Change'}
@@ -226,12 +243,7 @@ function NotifySink() {
           <AlertDescription>{messageOf(clearing.error, 'clear where notices go')}</AlertDescription>
         </Alert>
       )}
-      {editing && (
-        <SinkForm
-          initial={draftOf({ connectionId: view.connectionId, tool: view.tool, arguments: view.arguments })}
-          onSaved={() => setEditing(false)}
-        />
-      )}
+      {editing && <SinkForm initial={draftOf(view)} onSaved={() => setEditing(false)} />}
     </div>
   )
 }

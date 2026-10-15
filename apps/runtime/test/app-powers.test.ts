@@ -39,6 +39,7 @@ type WorldOptions = {
   readonly resident?: boolean
   readonly sink?: typeof SINK
   readonly forbid?: boolean
+  readonly status?: string
   readonly onCall?: (db: ReturnType<typeof durable>) => void
 }
 
@@ -58,7 +59,19 @@ const world = (options: WorldOptions = {}) => {
   const db = durable(database.db)
   if (options.sink !== undefined)
     db.insert(appNotifySink)
-      .values({ ...options.sink, id: 1, arguments: JSON.stringify(options.sink.arguments), updatedAt: 1 })
+      .values({
+        ...options.sink,
+        id: 1,
+        arguments: JSON.stringify(options.sink.arguments),
+        policy: JSON.stringify({
+          result: {
+            accepted: { pointer: '/status', equals: 'sent' },
+            retryable: { pointer: '/status', equals: 'retryable' },
+            rejected: { pointer: '/status', equals: 'rejected' },
+          },
+        }),
+        updatedAt: 1,
+      })
       .run()
   const scope: SetupScope = {
     editable: true,
@@ -97,7 +110,7 @@ const world = (options: WorldOptions = {}) => {
             if (Exit.isFailure(check)) return yield* Effect.failCause(check.cause)
             if (options.forbid === true)
               return yield* new Forbidden({ reason: 'Owner approval required for this exact call' })
-            return { content: [], isError: name === 'refuse' }
+            return { content: [], isError: name === 'refuse', structuredContent: { status: options.status ?? 'sent' } }
           }),
       }),
     ),
@@ -164,6 +177,13 @@ describe("an agent app's notify power through Notify me via (ADR 0070)", () => {
     await expect(lapsed.powers.notify('op-1', 'hi')).rejects.toBeInstanceOf(ResidentInactive)
     expect(lapsed.calls).toEqual([])
   })
+
+  it.each(['retryable', 'rejected', 'unknown', 'unrecognised'])(
+    'does not claim delivery for a %s result',
+    async (status) => {
+      await expect(world({ sink: SINK, status }).powers.notify('same-op', 'hi')).rejects.toBeInstanceOf(AppCodeError)
+    },
+  )
 
   it('refuses at the last moment a sink the owner changed on the way', async () => {
     const { powers, calls } = world({

@@ -9,6 +9,7 @@ import { Notices } from '../notices/service.ts'
 import { type DigestDue, KEPT_NOTICES, NOTICE_WINDOW, type NewNotice, type NoticeRow } from '../notices/store.ts'
 import { type NoticeText, noticeForModel, noticeOfEvent } from '../notices/text.ts'
 import { notifySink } from '../sources/notify.ts'
+import { sinkEcho, sinkEventSelector } from '../sources/sink-echo.ts'
 import { Routines } from './service.ts'
 import { type RoutineRow, definitionOf } from './store.ts'
 
@@ -32,16 +33,16 @@ const copyText = (label: string, text: NoticeText): string =>
 
 /**
  * The copy a routine's notice carries, when its Tell me asks for one and Notify me via is set: none for a notice of an
- * event that came from the sink's own connection (`from`), which would only echo it back there.
+ * event whose exact connection and selector the owner chose as the sink's echo (`from`).
  */
 const copyOf = Effect.fn('routines.noticeCopy')(function* (
   definition: RoutineDefinition,
   words: () => string,
-  from?: string,
+  from?: { readonly connectionId: string; readonly eventSelector: string },
 ) {
   if (!definition.tellMe.copy) return {}
   const sink = yield* notifySink
-  return sink === undefined || sink.connectionId === from ? {} : { copyText: words() }
+  return sink === undefined || (from !== undefined && sinkEcho(sink, from)) ? {} : { copyText: words() }
 })
 
 /** Writes notice `id`'s entry into the chat it was claimed for, once, and marks it written. */
@@ -107,6 +108,7 @@ export const postEventNotice = Effect.fn('routines.eventNotice')(function* (
 ) {
   if (definition.trigger.kind !== 'event') return
   const { connectionId } = definition.trigger
+  const eventSelector = sinkEventSelector({ event: definition.trigger.name, arguments: definition.trigger.arguments })
   const label = yield* labelOf(connectionId)
   const text = noticeOfEvent(event.name, event.data, label)
   const id = `notice:${row.id}:${encodeURIComponent(event.eventId)}`
@@ -114,11 +116,12 @@ export const postEventNotice = Effect.fn('routines.eventNotice')(function* (
     ...(yield* base(row, id, event.occurredAt)),
     source: 'event',
     connectionId,
+    eventSelector,
     label,
     title: text.title,
     body: text.body ?? null,
     url: text.url ?? null,
-    ...(yield* copyOf(definition, () => copyText(label, text), connectionId)),
+    ...(yield* copyOf(definition, () => copyText(label, text), { connectionId, eventSelector })),
   }
   yield* post(notice, true)
 })

@@ -9,6 +9,7 @@ import { type AppError, Forbidden, ResidentInactive, UpstreamMcp } from '../../s
 import { noticesOf } from '../../src/layers/routines.ts'
 import { McpConnections, Resident } from '../../src/mcp/service.ts'
 import type { McpCallOptions, McpToolResult } from '../../src/mcp/connections/types.ts'
+import { sinkEventSelector } from '../../src/sources/sink-echo.ts'
 import { deliverNoticeCopies } from '../../src/notices/copies.ts'
 import { Notices } from '../../src/notices/service.ts'
 import { NoticeStore } from '../../src/notices/store.ts'
@@ -25,6 +26,13 @@ afterEach(() => {
 
 /** The owner's own chat on a messaging server, with the words and the operation id as whole values. */
 const SINK = { chat: 'dm', text: '{{text}}', operationId: '{{operationId}}' }
+const RULES = {
+  accepted: { pointer: '/status', equals: 'sent' },
+  retryable: { pointer: '/status', equals: 'retryable' },
+  rejected: { pointer: '/status', equals: 'rejected' },
+  retryAt: '/retryAt',
+}
+const ECHO = { event: 'mygram.message.received', arguments: { chat: 'dm' } }
 
 /** What one call through the sink answers: the server's result, or a failure. */
 type Answer = McpToolResult | AppError
@@ -41,10 +49,19 @@ const world = () => {
   const notices = new NoticeStore(db)
   const resident = { on: true }
   const calls: { readonly connectionId: string; readonly tool: string; readonly args: Record<string, unknown> }[] = []
-  const answers: Answer[] = [{ content: [], structuredContent: { id: 'remote-1', delivery: 'accepted', extra: 1 } }]
+  const answers: Answer[] = [
+    { content: [], structuredContent: { id: 'remote-1', delivery: 'accepted', status: 'sent', extra: 1 } },
+  ]
   const hooks: { beforeCheck: () => void } = { beforeCheck: () => undefined }
-  const setSink = (connectionId: string, args: unknown, updatedAt: number) => {
-    const row = { id: 1, connectionId, tool: 'message_send', arguments: JSON.stringify(args), updatedAt }
+  const setSink = (connectionId: string, args: unknown, updatedAt: number, tool = 'message_send') => {
+    const row = {
+      id: 1,
+      connectionId,
+      tool,
+      arguments: JSON.stringify(args),
+      policy: JSON.stringify({ result: RULES, echo: ECHO }),
+      updatedAt,
+    }
     db.insert(appNotifySink).values(row).onConflictDoUpdate({ target: appNotifySink.id, set: row }).run()
   }
   setSink('chat', SINK, 1)
@@ -67,7 +84,11 @@ const world = () => {
     }),
   )
   /** A written notice of routine `id`, from `connectionId`, with a copy saying `Sidequest: Picked <safe>`. */
-  const notice = (id: string, connectionId: string | null = 'sidequest') =>
+  const notice = (
+    id: string,
+    connectionId: string | null = 'sidequest',
+    wake = { event: 'sidequest.inbox', arguments: {} },
+  ) =>
     Effect.flatMap(Clock.currentTimeMillis, (at) =>
       Effect.sync(() => {
         notices.claim(
@@ -78,6 +99,7 @@ const world = () => {
             chatId: '1',
             entryRequestId: id,
             connectionId,
+            eventSelector: sinkEventSelector(wake),
             label: 'Sidequest',
             title: 'Picked <safe>',
             body: null,
@@ -190,7 +212,7 @@ describe("a notice's copy through Notify me via (ADR 0070)", () => {
       answers.splice(0, answers.length, { content: [], isError: true })
       yield* notice('refused')
       yield* deliver
-      yield* notice('echo', 'chat')
+      yield* notice('echo', 'chat', ECHO)
       yield* deliver
       const states = db.select({ id: appNotices.id, state: appNotices.copyState }).from(appNotices).all()
       expect(Object.fromEntries(states.map((row) => [row.id, row.state]))).toEqual({
@@ -202,6 +224,51 @@ describe("a notice's copy through Notify me via (ADR 0070)", () => {
       // Only the tool that may not send and the one that refused were reached; nothing left for the others.
       expect(calls).toHaveLength(2)
       expect(notices.get('echo')?.copyAttempts).toBe(1)
+    }),
+  )
+
+  it.effect('keeps retryable, rejected and unknown structured results apart, and respects retryAt', () =>
+    Effect.gen(function* () {
+      const { notices, calls, answers, notice, deliver } = world()
+      answers.splice(0, answers.length, { content: [], structuredContent: { status: 'retryable', retryAt: 120_000 } })
+      yield* notice('retry')
+      yield* deliver
+      expect(notices.get('retry')).toMatchObject({ copyState: 'pending', copyNextAt: 120_000 })
+      yield* TestClock.adjust('30 seconds')
+      expect(yield* deliver).toBe(false)
+      answers.splice(0, answers.length, { content: [], structuredContent: { status: 'sent' } })
+      yield* TestClock.adjust('90 seconds')
+      yield* deliver
+      expect(notices.get('retry')).toMatchObject({ copyState: 'accepted', copyAttempts: 2 })
+      expect(calls[1]?.args).toEqual(calls[0]?.args)
+      for (const status of ['rejected', 'unknown', 'surprise']) {
+        answers.splice(0, answers.length, { content: [], structuredContent: { status } })
+        yield* notice(status)
+        yield* deliver
+        expect(notices.get(status)?.copyState).toBe(status === 'rejected' ? 'suppressed' : 'unknown')
+      }
+      const attempts = calls.length
+      yield* TestClock.adjust('10 minutes')
+      expect(yield* deliver).toBe(false)
+      expect(calls).toHaveLength(attempts)
+    }),
+  )
+
+  it.effect('suppresses only the configured stream on a multiplexed MySI connection', () =>
+    Effect.gen(function* () {
+      const { notices, calls, setSink, notice, deliver } = world()
+      setSink('mysi', SINK, 1, 'mygram_message_send')
+      yield* notice('sidequest', 'mysi', { event: 'sidequest.inbox', arguments: {} })
+      yield* notice('mygram-dm', 'mysi', ECHO)
+      yield* notice('mygram-group', 'mysi', { event: ECHO.event, arguments: { chat: 'group' } })
+      yield* notice('other-connection', 'another-mysi', ECHO)
+      yield* deliver
+      expect(notices.get('sidequest')?.copyState).toBe('accepted')
+      expect(notices.get('mygram-dm')?.copyState).toBe('suppressed')
+      expect(notices.get('mygram-group')?.copyState).toBe('accepted')
+      expect(notices.get('other-connection')?.copyState).toBe('accepted')
+      expect(calls).toHaveLength(3)
+      expect(calls.every((call) => call.connectionId === 'mysi' && call.tool === 'mygram_message_send')).toBe(true)
     }),
   )
 

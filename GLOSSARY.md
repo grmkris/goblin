@@ -174,7 +174,7 @@ _Avoid_: owner message, on its own
 
 **Notify me via**:
 The owner's choice of one connection's tool, with a `{{text}}` template, that sends goblin's notices to them elsewhere
-(their own chat, say; ADRs 0066, 0070; `NotifySink` in the code): a routine's notice copies and an agent app's `notify`
+(their own chat, say; ADRs 0066, 0070, 0071; `NotifySink` in the code): a routine's notice copies and an agent app's `notify`
 go through it, as goblin's own call under the owner's grant of that tool.
 
 **Conversation activity**:

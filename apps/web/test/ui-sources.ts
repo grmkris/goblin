@@ -163,7 +163,7 @@ async function connection(browser: Browser, origin: string, label: string, optio
   await page.getByRole('button', { name: 'Confirm' }).click()
   await page.getByText('Turn Telegram off on this connection first').waitFor()
   await page.getByRole('button', { name: 'Confirm' }).click()
-  await page.getByText('On', { exact: true }).waitFor()
+  await page.getByRole('button', { name: 'Conversations' }).waitFor()
   await page.getByRole('button', { name: 'Conversations' }).click()
   await page.getByText('chat g_team', { exact: true }).waitFor()
   await page.getByText('2 messages waiting').waitFor()
@@ -199,7 +199,7 @@ async function activity(browser: Browser, origin: string, label: string, options
   await page.screenshot({ path: path.join(out, `${label}-activity.png`), fullPage: true })
   await page.getByLabel('Where “chat g_team” goes').selectOption({ label: '#Team' })
   await page.getByLabel('Who answers in “chat g_team”').selectOption({ label: '@Guide answers' })
-  await page.getByRole('button', { name: 'Set up' }).click()
+  await page.locator('button').filter({ hasText: 'Set up' }).click()
   await page.getByText('New conversation “chat g_team” on Messages from Chat').waitFor({ state: 'detached' })
   await page.close()
 }
@@ -213,6 +213,16 @@ async function settings(browser: Browser, origin: string, label: string, options
   await page.getByLabel('Which conversation notices go to').selectOption({ label: 'chat dm' })
   assert.equal(await page.getByLabel('Tool').inputValue(), 'message_send', `${label}: tool not copied`)
   assert.match(await page.getByLabel('Arguments').inputValue(), /"chat": "dm"/u, `${label}: key not filled`)
+  const policy = {
+    result: {
+      accepted: { pointer: '/status', equals: 'sent' },
+      retryable: { pointer: '/status', equals: 'retryable' },
+      rejected: { pointer: '/status', equals: 'rejected' },
+      retryAt: '/retryAt',
+    },
+    echo: { event: 'message.received', arguments: { chat: 'all' } },
+  }
+  await page.getByLabel('Delivery and echo rules').fill(JSON.stringify(policy, null, 2))
   await noSidewaysScroll(page, label)
   await page.screenshot({ path: path.join(out, `${label}-notify.png`), fullPage: true })
   await page.getByRole('button', { name: 'Save' }).click()
@@ -245,6 +255,13 @@ try {
     connectionId: 'chat',
     tool: 'message_send',
     arguments: { chat: 'dm', text: '{{text}}', operationId: '{{operationId}}' },
+    result: {
+      accepted: { pointer: '/status', equals: 'sent' },
+      retryable: { pointer: '/status', equals: 'retryable' },
+      rejected: { pointer: '/status', equals: 'rejected' },
+      retryAt: '/retryAt',
+    },
+    echo: { event: 'message.received', arguments: { chat: 'all' } },
   })
   writeSync(STDOUT, `${JSON.stringify({ ok: true, out, routes: routes.length })}\n`)
 } finally {

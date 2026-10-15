@@ -123,9 +123,18 @@ Two things send through it (ADR 0070, `sendThroughSink` in `sources/notify.ts`):
 (`tellMe.copy`, [routines.md](routines.md)) and an agent app's `notify` power ([agent-apps.md](agent-apps.md)). Each
 send fills the template with the words as written and its operation id, and is goblin's own call under the owner's
 grant of the tool (`caller: 'model'`, so a tool set to Ask first refuses it). Resident authority and the sink's
-revision (`sinkRevision`: when it was set and a digest of what it says) are checked before the call and again right
-before it leaves, so a sink changed or cleared on the way refuses it. A notice of an event from the sink's own
-connection gets no copy.
+revision (`sinkRevision`: a fresh UUID per save, its time, and a digest of all its settings) are checked before the call and again right
+before it leaves, so even an identical same-second save or clear/recreation refuses the old call.
+
+The owner reviews `result` rules that compare pointers in the structured result with scalar values: accepted,
+retryable or rejected. A missing or unmatched rule, or conflicting matches, leaves delivery unconfirmed (`unknown`)
+and never automatically retries; `isError` rejects the message. Retryable results retain the same operation id and
+respect optional `retryAt` in epoch milliseconds as well as local backoff. The app's notify power returns an error
+for any outcome except accepted. No server-specific result vocabulary is assumed ([ADR 0071](../adr/0071-sink-delivery-rules-and-event-identity.md)).
+
+Optional `echo` names one event and its exact arguments on the same connection. Only that stream is suppressed;
+unrelated services sharing a connection still get notice copies. Copying a Source's reply into Settings copies its
+wake selector for review too. Settings keeps both policies in its Delivery and echo rules field.
 
 | Route | Purpose |
 | --- | --- |

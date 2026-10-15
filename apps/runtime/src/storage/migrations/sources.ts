@@ -21,7 +21,7 @@ export const SOURCE_MIGRATIONS: readonly Migration[] = [
   {
     key: '20261102000200_notify_sink',
     tables: ['app_notify_sink'],
-    sql: 'CREATE TABLE app_notify_sink (id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1), connection_id TEXT NOT NULL, tool TEXT NOT NULL, arguments TEXT NOT NULL, updated_at INTEGER NOT NULL)',
+    sql: `CREATE TABLE app_notify_sink (id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1), connection_id TEXT NOT NULL, tool TEXT NOT NULL, arguments TEXT NOT NULL, policy TEXT NOT NULL DEFAULT '{}', revision TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL)`,
   },
   {
     key: '20261102000300_source_parity',

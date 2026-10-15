@@ -12,7 +12,7 @@ import {
   sourcesToReview,
   waitingConversations,
 } from '../src/lib/source-routes.ts'
-import { setupFacts, sinkArguments, sinkFromSource } from '../src/lib/source-setup.ts'
+import { setupFacts, sinkArguments, sinkFromSource, sinkPolicy } from '../src/lib/source-setup.ts'
 
 const topic = (id: number, name: string, archivedAt?: number): TopicView => ({
   id,
@@ -169,11 +169,21 @@ describe('what Activity offers from Sources', () => {
 const notice = (name: string) => name === 'text' || name === 'operationId'
 
 describe('Notify me via', () => {
+  it('keeps delivery rules and the exact echo selector through the settings JSON', () => {
+    const policy = {
+      result: { accepted: { pointer: '/status', equals: 'sent' }, retryAt: '/retryAt' },
+      echo: { event: 'chat.message', arguments: { chat: 'dm' } },
+    }
+    expect(sinkPolicy(JSON.stringify(policy))).toEqual(policy)
+    expect(sinkPolicy('invalid')).toBeUndefined()
+    expect(sinkPolicy('{"result": {"accepted": {"pointer": "not/a/pointer", "equals": true}}}')).toBeUndefined()
+  })
   it("copies a Source's reply with one conversation's key filled in, keeping the notice's own placeholders", () => {
     expect(sinkFromSource(source(), { chat: 'dm' })).toEqual({
       connectionId: 'chat',
       tool: 'message_send',
       arguments: { chat: 'dm', text: '{{text}}', operationId: '{{operationId}}' },
+      echo: SETUP.wake,
     })
     const { reply: _reply, ...silent } = SETUP
     expect(sinkFromSource(source({ setup: silent }), { chat: 'dm' })).toBeUndefined()

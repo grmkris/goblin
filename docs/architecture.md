@@ -40,3 +40,5 @@ flowchart LR
 - [Storage](architecture/storage.md): D1, Durable Object SQLite and migrations.
 - [Infrastructure and release](architecture/infrastructure.md): Alchemy stacks, stage origins, release and public source.
 - [Routines and notices](architecture/routines.md): routine definitions, runs and notices.
+
+Notify me via delivery rules and exact echo selectors are documented with [Sources](architecture/sources.md) (ADR 0071).

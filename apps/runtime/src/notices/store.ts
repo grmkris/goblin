@@ -8,12 +8,20 @@ export type NoticeRow = typeof appNotices.$inferSelect
 /** A notice to claim: everything but the state the store keeps for it, and the words of its copy when it has one. */
 export type NewNotice = Omit<
   NoticeRow,
-  'readAt' | 'writtenAt' | 'copyState' | 'copyText' | 'copyAttempts' | 'copyNextAt' | 'copyReceipt' | 'copySink'
-> & { readonly copyText?: string }
+  | 'readAt'
+  | 'writtenAt'
+  | 'copyState'
+  | 'copyText'
+  | 'copyAttempts'
+  | 'copyNextAt'
+  | 'copyReceipt'
+  | 'copySink'
+  | 'eventSelector'
+> & { readonly copyText?: string; readonly eventSelector?: string }
 
 /** How an attempt at a notice's copy through Notify me via ended (ADR 0070). */
 export type CopyOutcome = {
-  readonly state: 'pending' | 'accepted' | 'suppressed' | 'failed'
+  readonly state: 'pending' | 'accepted' | 'suppressed' | 'failed' | 'unknown'
   readonly receipt: string | null
   readonly nextAt: number
   readonly attempt: number

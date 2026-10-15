@@ -15,6 +15,8 @@ export const appNotices = sqliteTable(
     chatId: text('chat_id').notNull(),
     entryRequestId: text('entry_request_id').notNull(),
     connectionId: text('connection_id'),
+    /** Canonical event selector, retained so a multiplexed connection cannot suppress unrelated notices. */
+    eventSelector: text('event_selector'),
     label: text('label').notNull(),
     title: text('title').notNull(),
     body: text('body'),
@@ -24,7 +26,7 @@ export const appNotices = sqliteTable(
     readAt: integer('read_at'),
     /** When its entry was written into the chat; a notice claimed but not yet written is written by the sweep. */
     writtenAt: integer('written_at'),
-    copyState: text('telegram_state', { enum: ['none', 'pending', 'accepted', 'suppressed', 'failed'] })
+    copyState: text('telegram_state', { enum: ['none', 'pending', 'accepted', 'suppressed', 'failed', 'unknown'] })
       .notNull()
       .default('none'),
     copyText: text('telegram_text'),

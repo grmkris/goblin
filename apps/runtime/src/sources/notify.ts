@@ -2,32 +2,49 @@
 // elsewhere (their own chat on a messaging server), with whole-leaf `{{text}}` and `{{operationId}}` placeholders. Set
 // here and kept in `app_notify_sink`; setting it grants its tool, as the owner chose it. A routine's notice copies and
 // an agent app's `notify` power send through it (ADR 0070), as goblin's own call under that grant.
-import { ArgumentsTemplate, type NotifySink, type NotifySinkView, fillTemplate } from '@goblin/contracts'
+import {
+  ArgumentsTemplate,
+  NotifySinkPolicy,
+  type NotifySink,
+  type NotifySinkView,
+  fillTemplate,
+} from '@goblin/contracts'
 import { eq } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import * as Effect from 'effect/Effect'
+import * as Crypto from 'effect/Crypto'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { epochSeconds } from '../clock.ts'
-import { Forbidden, InvalidInput } from '../http/errors.ts'
+import { Forbidden, InvalidInput, attemptSync, toAppError } from '../http/errors.ts'
 import { McpConnections, McpGrants, McpServers, requireResident } from '../mcp/service.ts'
 import { bound } from '../runtime/boundary.ts'
 import { Db } from '../runtime/db.ts'
 import { isRecord, sha256Hex } from '../runtime/digest.ts'
 import { appNotifySink } from '../storage/sources.ts'
+import { sinkEventSelector } from './sink-echo.ts'
 
 const decodeArguments = Schema.decodeUnknownOption(Schema.fromJsonString(ArgumentsTemplate))
+const decodePolicy = Schema.decodeUnknownOption(Schema.fromJsonString(NotifySinkPolicy))
 
 /** The sink as it is kept: the owner's choice and when they made it (seconds). */
-type KeptSink = NotifySink & { readonly updatedAt: number }
+type KeptSink = NotifySink & { readonly updatedAt: number; readonly revision: string }
 
 /** The sink as it is kept, or none while the owner has not chosen one (or its row does not decode). */
 function notifySinkRow(db: DrizzleSqliteDODatabase): KeptSink | undefined {
   const row = db.select().from(appNotifySink).where(eq(appNotifySink.id, 1)).get()
   if (row === undefined) return undefined
   const args = Option.getOrUndefined(decodeArguments(row.arguments))
-  if (args === undefined) return undefined
-  return { connectionId: row.connectionId, tool: row.tool, arguments: args, updatedAt: row.updatedAt }
+  const policy = Option.getOrUndefined(decodePolicy(row.policy))
+  if (args === undefined || policy === undefined) return undefined
+  return {
+    connectionId: row.connectionId,
+    tool: row.tool,
+    arguments: args,
+    updatedAt: row.updatedAt,
+    revision: row.revision,
+    ...policy,
+  }
 }
 
 /** `GET /api/notify-sink`: the sink with its connection's label, or null. */
@@ -43,6 +60,8 @@ export const notifySinkView = Effect.gen(function* () {
  * otherwise); its tool is granted, as the owner chose it. The sink as it is now.
  */
 export const setNotifySink = Effect.fn('sources.setNotifySink')(function* (sink: NotifySink) {
+  const echo = sink.echo
+  if (echo !== undefined) yield* attemptSync(() => sinkEventSelector(echo))
   const snapshot = yield* (yield* McpConnections).connect(sink.connectionId)
   if (!snapshot.tools.some((tool) => tool.name === sink.tool))
     return yield* new InvalidInput({ reason: `The connection does not offer the tool ${sink.tool}.` })
@@ -54,6 +73,10 @@ export const setNotifySink = Effect.fn('sources.setNotifySink')(function* (sink:
     tool: sink.tool,
     arguments: JSON.stringify(sink.arguments),
     updatedAt: yield* epochSeconds,
+    revision: yield* (yield* Crypto.Crypto).randomUUIDv4.pipe(
+      Effect.mapError((cause) => toAppError(cause, 'sources.sinkRevision')),
+    ),
+    policy: JSON.stringify({ result: sink.result, echo: sink.echo }),
   }
   db.insert(appNotifySink).values(row).onConflictDoUpdate({ target: appNotifySink.id, set: row }).run()
   return yield* notifySinkView
@@ -69,13 +92,15 @@ export const clearNotifySink = Effect.gen(function* () {
 export const notifySink = Db.useSync(notifySinkRow)
 
 /**
- * The sink's revision: when it was set and a digest of what it says, so a copy frozen on one notices any change since,
+ * The sink's revision: a fresh UUID per save, when it was set, and a digest of all its settings, so a copy notices any change,
  * a save of the same choice included (ADR 0070).
  */
 export const sinkRevision = (sink: KeptSink) =>
   Effect.map(
-    Effect.promise(() => sha256Hex(JSON.stringify([sink.connectionId, sink.tool, sink.arguments]))),
-    (digest) => `${String(sink.updatedAt)}:${digest.slice(0, 16)}`,
+    Effect.promise(() =>
+      sha256Hex(JSON.stringify([sink.connectionId, sink.tool, sink.arguments, sink.result, sink.echo])),
+    ),
+    (digest) => `${String(sink.updatedAt)}:${sink.revision}:${digest.slice(0, 16)}`,
   )
 
 /**

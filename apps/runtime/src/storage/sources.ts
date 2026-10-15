@@ -110,5 +110,7 @@ export const appNotifySink = sqliteTable('app_notify_sink', {
   connectionId: text('connection_id').notNull(),
   tool: text('tool').notNull(),
   arguments: text('arguments').notNull(),
+  policy: text('policy').notNull().default('{}'),
+  revision: text('revision').notNull().default(''),
   updatedAt: integer('updated_at').notNull(),
 })

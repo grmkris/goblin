@@ -39,7 +39,14 @@ const world = (sink?: string) => {
   const db = durable(database.db)
   if (sink !== undefined)
     db.insert(appNotifySink)
-      .values({ id: 1, connectionId: sink, tool: 'message_send', arguments: '{"text":"{{text}}"}', updatedAt: 1 })
+      .values({
+        id: 1,
+        connectionId: sink,
+        tool: 'message_send',
+        arguments: '{"text":"{{text}}"}',
+        policy: JSON.stringify({ echo: { event: 'sidequest.inbox', arguments: {} } }),
+        updatedAt: 1,
+      })
       .run()
   const notices = new NoticeStore(db)
   const routines = new RoutineStore(db, 'owner')

@@ -352,7 +352,29 @@ export type SourceRevision = typeof SourceRevision.Type
 /** The placeholders a notice copy's arguments may use. */
 export const notifyPlaceholder = (name: string) => name === 'text' || name === 'operationId'
 
-const NotifySinkFields = { connectionId: NonEmptyString(200), tool: RemoteName, arguments: ArgumentsTemplate }
+/** The owner-reviewed meanings of a tool's structured result. Unmatched or conflicting rules mean unknown. */
+export const SinkResultRules = Schema.Struct({
+  accepted: SourceMatch,
+  retryable: Schema.optionalKey(SourceMatch),
+  rejected: Schema.optionalKey(SourceMatch),
+  /** An epoch-millisecond lower bound on the next attempt, only read after a retryable match. */
+  retryAt: Schema.optionalKey(JsonPointer),
+})
+export type SinkResultRules = typeof SinkResultRules.Type
+
+/** Optional settings for interpreting delivery and suppressing an exact stream's echoes on this connection. */
+export const NotifySinkPolicy = Schema.Struct({
+  result: Schema.optionalKey(SinkResultRules),
+  echo: Schema.optionalKey(SourceWake),
+})
+export type NotifySinkPolicy = typeof NotifySinkPolicy.Type
+
+const NotifySinkFields = {
+  connectionId: NonEmptyString(200),
+  tool: RemoteName,
+  arguments: ArgumentsTemplate,
+  ...NotifySinkPolicy.fields,
+}
 
 /**
  * "Notify me via" (ADR 0066): one tool of one connection that copies goblin's notices to the owner elsewhere (their own

@@ -28,6 +28,9 @@ every chat the grant reaches, each message goes to the Topic its chat or forum t
 a new group waits for the owner's choice), and the answer goes back to the same place with `message_send`, under
 either spelling (ADRs 0052, 0055). The agent's `mcp_list` lists a connection with many tools, such as mysi, by
 service first.
+Notify me via uses owner-reviewed delivery rules and an exact event selector to prevent echoes on shared connections.
+Unconfirmed delivery stays unknown and is not retried automatically.
+
 Any connection whose events carry the owner's own messages (a chat app, mail) can become a **Source** the owner
 confirms: which messages are theirs, which Topic or Persona each conversation goes to, and how goblin's answer goes back
 (ADR 0066).
