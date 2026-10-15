@@ -12,15 +12,25 @@ const Subscribe = Schema.Struct({
   delivery: Schema.Struct({ mode: Schema.Literal('webhook'), url: Schema.String, secret: Schema.String }),
 })
 
+/** One message of the fixture's inbox: its id, words and direction, and whatever else a test gives it. */
+type InboxEntry = {
+  readonly id: string
+  readonly text: string
+  readonly direction: string
+  readonly [field: string]: unknown
+}
+
 /**
  * A producer of the draft Events profile. It declares Events as top-level `capabilities.events`, or with `spelling`
- * `extension` as the SEP-3415 `io.modelcontextprotocol/events` extension; `payloadSchema` may be left out.
+ * `extension` as the SEP-3415 `io.modelcontextprotocol/events` extension; `payloadSchema` may be left out. Its
+ * `inbox_read` lists the inbox after a cursor, and every tool call is kept with its arguments (`toolCalls`).
  */
 export class EventsFixture {
   readonly subscriptions = new Map<string, { secret: string; url: string }>()
   readonly journal: { eventId: string; name: string; timestamp: string; data: unknown; cursor: string }[] = []
   readonly calls: string[] = []
-  readonly inbox: { id: string; text: string; direction: string }[] = []
+  readonly toolCalls: { readonly name: string; readonly arguments: Record<string, unknown> }[] = []
+  readonly inbox: InboxEntry[] = []
   skills: readonly SkillEntry[] = []
   readonly files = new Map<string, string>()
   inputSchema: Record<string, unknown> = { type: 'object' }
@@ -51,6 +61,7 @@ export class EventsFixture {
     }))
     server.setRequestHandler('tools/call', (request) => {
       this.calls.push(request.params.name)
+      this.toolCalls.push({ name: request.params.name, arguments: { ...request.params.arguments } })
       const content =
         request.params.name === 'inbox_read'
           ? { messages: request.params.arguments?.cursor === this.cursor ? [] : this.inbox, nextCursor: this.cursor }

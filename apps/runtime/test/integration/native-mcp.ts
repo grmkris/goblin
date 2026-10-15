@@ -48,8 +48,41 @@ async function skillsRestartChecks(base: string): Promise<void> {
   writeFileSync(path, JSON.stringify({ environment: 'local-workerd-do-restart', before, after }, null, 2))
 }
 
-/** MCP Events (signed Telegram delivery, replay, gaps, refresh and cleanup) and the skills cache. */
+/** MCP Events (signed Telegram delivery, replay, gaps, refresh and cleanup), a Source end to end and the skills cache. */
 export const cases: readonly NativeCase[] = [
+  matchCase(
+    "a Source makes the owner's message a turn in its chat's own Topic, someone else's a notice, and answers once [canary]",
+    'sources',
+    (result) =>
+      expect(result).toMatchObject({
+        confirmed: 'active',
+        received: 204,
+        routes: [{ route: 'topic', title: 'Trip planning', updatedBy: 'default' }],
+        topic: 'Trip planning',
+        settled: 'done',
+        turns: [
+          {
+            author: true,
+            words: 'Book the ferry for Friday',
+            files: [
+              {
+                path: expect.stringMatching(/^\/agent\/received\/[^/]+\/\d{4}-\d{2}-\d{2}\/image\.png$/u),
+                mimeType: 'image/png',
+              },
+            ],
+          },
+        ],
+        stored: [{ name: 'image.png', whole: true }],
+        notice: { inTopic: true, titled: true },
+        replies: [
+          {
+            chat: 'c1',
+            text: expect.stringMatching(/^echo: /u),
+            operationId: 'reply-0-source-src_00000000000000c1-m1',
+          },
+        ],
+      }),
+  ),
   matchCase(
     'Events discovery, challenge, signed Telegram, replay, gap, refresh, termination and cleanup [canary]',
     'events',
