@@ -88,7 +88,7 @@ export const RunAttribute = {
   /** Shared transport discovery belongs to the connection; caller waits carry their own explicit scope. */
   sharedConnection: 'goblin.mcp.shared_connection',
   source: 'goblin.source',
-  /** What a model call outside a turn was for: `naming`, `memory`, `skill`, `app_llm`, `retrieval` or `decision`. */
+  /** What a model call outside a turn was for: `naming`, `memory`, `skill`, `app_llm` or `retrieval`. */
   purpose: 'goblin.purpose',
   channel: 'goblin.channel',
   /** The channel's own id for the message (mygram's inbox id). */
@@ -125,7 +125,7 @@ export const RunAttribute = {
 
 /**
  * The conversation flows that record a `flow` event: how people and agents move through conversations (replies, "+",
- * start thread, move, Personas, Delegates, Topics, routines, Telegram, decision proposals, URL requests and step-ups),
+ * start thread, move, Personas, Delegates, Topics, routines, Telegram, URL requests and step-ups),
  * plus browser crashes.
  */
 export const FlowName = Schema.Literals([
@@ -155,9 +155,6 @@ export const FlowName = Schema.Literals([
   'source',
   /** goblin's answer went back through a Source's reply tool, or was given up. */
   'source_delivery',
-  'decision_propose',
-  'decision_confirm',
-  'decision_dismiss',
   'client_error',
   /** A model's MCP call met a URL request and is held for the owner (ADR 0042). */
   'url_request',

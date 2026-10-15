@@ -18,7 +18,6 @@ export const featuresOf = (env: RuntimeEnv): DeploymentFeatures => ({
   largeFiles: env.FILES !== undefined,
   agentApps: env.LOADER !== undefined,
   flows: env.FLOWS !== undefined,
-  decisions: env.AI !== undefined,
 })
 
 /** `GET /health`: what the deployment is and offers, from its settings alone (no request reaches a binding). */

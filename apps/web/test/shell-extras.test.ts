@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { EphemeralMessage, PersonaView, SourcesDetails, SourceUse } from '@goblin/contracts'
+import { PersonaView, SourcesDetails, SourceUse } from '@goblin/contracts'
 import { Schema } from 'effect'
-import { ephemeralPlaces } from '../src/lib/ephemeral.ts'
 import { activePersonas, taggedPersonas } from '../src/lib/personas.ts'
 import { sourcePlaces, sourceTopics, sourcesOf } from '../src/lib/sources.ts'
 
@@ -29,16 +28,6 @@ const use = (inputEntry: number | undefined, topicName = 'Japan', mode = 'auto')
     mode,
     sources: [source(topicName, '20', 4)],
     retrievedAt: 100,
-  })
-const owner = (id: string, afterEntry?: number, createdAt = 1) =>
-  Schema.decodeUnknownSync(EphemeralMessage)({
-    id,
-    chat: '1',
-    ...(afterEntry !== undefined && { afterEntry }),
-    title: 'Save this as a decision?',
-    body: 'You settled on Kyoto.',
-    actions: [{ id: 'accept', label: 'Save', tone: 'primary' }],
-    createdAt,
   })
 const persona = (id: number, name: string, archivedAt?: number) =>
   Schema.decodeUnknownSync(PersonaView)({
@@ -82,19 +71,6 @@ describe('the source strip', () => {
 
   it('leaves a search_chats call, which draws its own strip, and a use naming no input without a place', () => {
     expect(sourcePlaces(PARTS, [use(3, 'Japan', 'tool'), use(undefined)]).size).toBe(0)
-  })
-})
-
-describe('owner-only messages', () => {
-  it('show after the last part of the entry they follow, or at the end, in order of creation', () => {
-    const placed = ephemeralPlaces(PARTS, [
-      owner('late', undefined, 9),
-      owner('a', 4, 2),
-      owner('b', 4, 1),
-      owner('lost', 99),
-    ])
-    expect(placed.after.get('4:0:text')?.map(({ id }) => id)).toEqual(['b', 'a'])
-    expect(placed.end.map(({ id }) => id)).toEqual(['lost', 'late'])
   })
 })
 

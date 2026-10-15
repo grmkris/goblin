@@ -2,7 +2,6 @@ import type {
   AppView,
   ConversationActivity,
   ConversationView,
-  DecisionProposal,
   NotificationView,
   OrganizeReceipt,
   PersonaInvocationView,
@@ -24,8 +23,7 @@ export type Activity = Readonly<Record<string, ConversationActivity>>
  * The workspace as the feed tells it, one slice each, each kept in the Query cache under `['workspace', slice]`: the
  * owner's conversations, oldest first; what each one that is not idle is doing; their kept Apps, oldest first; the
  * Topics and Personas; the Persona answers still on their way (and the newest settled ones); the latest organizing
- * receipts, newest first; the decision proposals still open or confirmed, oldest first; and the newest
- * notifications, newest first.
+ * receipts, newest first; and the newest notifications, newest first.
  */
 export type Slices = {
   readonly conversations: readonly ConversationView[]
@@ -35,7 +33,6 @@ export type Slices = {
   readonly personas: readonly PersonaView[]
   readonly invocations: readonly PersonaInvocationView[]
   readonly receipts: readonly OrganizeReceipt[]
-  readonly proposals: readonly DecisionProposal[]
   readonly notifications: readonly NotificationView[]
   /** Each connection's tool list as the feed last named it (a digest), by connection id: a change means read it again. */
   readonly tools: Readonly<Record<string, string>>
@@ -52,7 +49,6 @@ export const SLICE_NAMES: readonly Slice[] = [
   'personas',
   'invocations',
   'receipts',
-  'proposals',
   'notifications',
   'tools',
   'sidebar',
@@ -66,7 +62,6 @@ export const EMPTY_WORKSPACE: Slices = {
   personas: [],
   invocations: [],
   receipts: [],
-  proposals: [],
   notifications: [],
   tools: {},
   sidebar: EMPTY_SIDEBAR,
@@ -103,17 +98,6 @@ const keptInvocations = (invocations: readonly PersonaInvocationView[]) => {
   const settled = invocations.filter((each) => !answering(each))
   const dropped = new Set(settled.toSorted((a, b) => b.createdAt - a.createdAt).slice(KEPT))
   return dropped.size === 0 ? invocations : invocations.filter((each) => !dropped.has(each))
-}
-
-/** A proposal the slice keeps: open, or confirmed (as the server's snapshot keeps it); dismissed and stale ones go. */
-const kept = (proposal: DecisionProposal) => proposal.state === 'open' || proposal.state === 'confirmed'
-const oldestProposal = (a: DecisionProposal, b: DecisionProposal) =>
-  a.createdAt - b.createdAt || a.id.localeCompare(b.id)
-
-/** `proposals` with `proposal` as it is now: in place of the one with its id, or added; gone once settled away. */
-function withProposal(proposals: readonly DecisionProposal[], proposal: DecisionProposal) {
-  const others = proposals.filter((each) => each.id !== proposal.id)
-  return kept(proposal) ? [...others, proposal].toSorted(oldestProposal) : others
 }
 
 /** What conversation `id` is doing now; undefined while it is idle. */
@@ -173,10 +157,6 @@ const SLICES: { readonly [K in Slice]: SliceOf<Slices[K]> } = {
     apply: (value, change) =>
       change.type === 'receipt' ? upsertBy(value, change.receipt, same, newestReceipt).slice(0, KEPT) : value,
   },
-  proposals: {
-    read: (snapshot) => (snapshot.proposals ?? []).filter(kept).toSorted(oldestProposal),
-    apply: (value, change) => (change.type === 'proposal' ? withProposal(value, change.proposal) : value),
-  },
   notifications: {
     read: (snapshot) => (snapshot.notifications ?? []).toSorted(newestNotification).slice(0, KEPT_NOTIFICATIONS),
     apply: (value, change) =>
@@ -216,7 +196,6 @@ export const fromSnapshot = (snapshot: WorkspaceSnapshot): Slices => ({
   personas: sliceOf('personas', snapshot),
   invocations: sliceOf('invocations', snapshot),
   receipts: sliceOf('receipts', snapshot),
-  proposals: sliceOf('proposals', snapshot),
   notifications: sliceOf('notifications', snapshot),
   tools: sliceOf('tools', snapshot),
   sidebar: sliceOf('sidebar', snapshot),
@@ -236,7 +215,6 @@ export const applyChanges = (slices: Slices, changes: readonly WorkspaceChange[]
   personas: sliceAfter('personas', slices.personas, changes),
   invocations: sliceAfter('invocations', slices.invocations, changes),
   receipts: sliceAfter('receipts', slices.receipts, changes),
-  proposals: sliceAfter('proposals', slices.proposals, changes),
   notifications: sliceAfter('notifications', slices.notifications, changes),
   tools: sliceAfter('tools', slices.tools, changes),
   sidebar: sliceAfter('sidebar', slices.sidebar, changes),

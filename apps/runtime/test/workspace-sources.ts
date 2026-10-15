@@ -27,7 +27,7 @@ const pi = Object.assign(Object.create(null) as Harness, {
     }),
 })
 
-/** The workspace feed's sources but the decisions, the notices and the change bus, each empty, over Personal `1`. */
+/** The workspace feed's sources but the notices and the change bus, each empty, over Personal `1`. */
 export const emptySources = Layer.mergeAll(
   // SAFETY: Personal's chat id, as the chat directory brands it.
   stub(Chats, { primary: '1' as ChatId, isHidden: () => Effect.succeed(false) }),

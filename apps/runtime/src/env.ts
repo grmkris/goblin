@@ -1,6 +1,5 @@
 import type { RpcResult } from './http/rpc.ts'
 import type { MailBinding } from './auth/mail.ts'
-import type { DecisionsBinding } from './decisions/client.ts'
 
 /**
  * The Agent DO's RPC, what is left of it: account erasure. The owner reaches the agent through its typed API and the
@@ -26,8 +25,6 @@ export interface RuntimeEnv {
    * Optional (ADR 0064): without it the agent has no app or `code_run` tools.
    */
   readonly LOADER?: WorkerLoader
-  /** Workers AI, for typed decisions through Clef alone (ADR 0031); only the dev stage binds it. */
-  readonly AI?: DecisionsBinding
   readonly APP_URL: string
   readonly BETTER_AUTH_SECRET: string
   /** Cloudflare Email Sending; with `MAIL_SENDER` it turns on email verification (`auth/mail.ts`). */

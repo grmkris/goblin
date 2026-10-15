@@ -8,7 +8,6 @@ import type {
   AppView,
   ConversationActivity,
   ConversationView,
-  DecisionProposal,
   NotificationView,
   OrganizeReceipt,
   PersonaInvocationView,
@@ -81,14 +80,6 @@ export const useInvocations = (): readonly PersonaInvocationView[] =>
 /** The latest organizing receipts, newest first. */
 export const useReceipts = (): readonly OrganizeReceipt[] =>
   useSlice(workspaceQueries.receipts, EMPTY_WORKSPACE.receipts, whole)
-
-/** The decision proposals still open or confirmed, oldest first, or what `select` takes from them. */
-export function useProposals(): readonly DecisionProposal[]
-export function useProposals<T>(select: (proposals: readonly DecisionProposal[]) => T): T
-export function useProposals<T>(select?: (proposals: readonly DecisionProposal[]) => T) {
-  const pick: (proposals: readonly DecisionProposal[]) => T | readonly DecisionProposal[] = select ?? whole
-  return useSlice(workspaceQueries.proposals, EMPTY_WORKSPACE.proposals, pick)
-}
 
 /** The newest notifications (ADR 0041), newest first: Tell me's notices, digests and answers. */
 export const useNotifications = (): readonly NotificationView[] =>

@@ -1,14 +1,12 @@
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Decisions } from '../../src/decisions/service.ts'
 import { noticesOf } from '../../src/layers/routines.ts'
 import { Notices } from '../../src/notices/service.ts'
 import { NoticeStore } from '../../src/notices/store.ts'
 import { Changes, makeChanges } from '../../src/runtime/changes.ts'
 import { WorkspaceLive } from '../../src/workspace/live.ts'
 import { chatDatabase, durable } from '../chats-sqlite.ts'
-import { stub } from '../http/api/fixture.ts'
 import { emptySources, feedEvents } from '../workspace-sources.ts'
 
 const open: { close: () => void }[] = []
@@ -38,7 +36,6 @@ function feed() {
   const sources = Layer.mergeAll(
     Layer.succeed(Notices, noticesOf(store)),
     Layer.succeed(Changes, makeChanges()),
-    stub(Decisions, { list: Effect.succeed([]) }),
     emptySources,
   )
   return { store, layer: Layer.provideMerge(WorkspaceLive, sources) }

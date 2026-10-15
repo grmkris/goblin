@@ -42,7 +42,6 @@ import { runApplicationMigrations } from './storage/migrations.ts'
 import { nowSeconds } from './clock.ts'
 import { type MovePhase } from './chats/mover.ts'
 import { budgetExtension } from './pi/budget.ts'
-import { decisionsExtension } from './pi/decisions.ts'
 import { onboardingExtension } from './pi/onboarding.ts'
 import { retrievalExtension } from './pi/retrieval.ts'
 import { type Applied } from './agent-model.ts'
@@ -127,10 +126,9 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     ])
     const subagents = this.#subagents.extension
     const retrieval = retrievalExtension(run)
-    const learning = [skillLearningExtension(run), decisionsExtension(run, env.AI !== undefined)]
     const base = [
       ...execution,
-      ...learning,
+      skillLearningExtension(run),
       ...appsExtension(apps, run, appsRun),
       organize,
       telegramExtension(run),

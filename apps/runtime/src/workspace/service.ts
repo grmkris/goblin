@@ -10,8 +10,8 @@ export type WorkspaceEvent =
 
 /**
  * The owner's workspace as one live feed: every conversation and what each is doing, Apps, Topics, Personas,
- * invocations, receipts and decision proposals, so a client needs no polling and no stream per conversation to draw
- * the tree. A client that reconnects starts again from a fresh snapshot.
+ * invocations, receipts, notifications and the sidebar's pins, so a client needs no polling and no stream per
+ * conversation to draw the tree. A client that reconnects starts again from a fresh snapshot.
  */
 export class Workspace extends Context.Service<
   Workspace,

@@ -1,5 +1,5 @@
 import * as Schema from 'effect/Schema'
-import { ChatId, EntryId, NonEmptyString, OperationId, PersonaId } from './ids.ts'
+import { ChatId, EntryId, OperationId, PersonaId } from './ids.ts'
 
 /**
  * `POST /api/conversations/:id/move`: move the owner's message `entry` and the turn it started into a new Thread.
@@ -57,24 +57,3 @@ export const Attention = Schema.Struct({
   persona: Schema.optional(PersonaId),
 })
 export type Attention = typeof Attention.Type
-
-/**
- * A message only the owner sees, shown in a chat after `afterEntry` and never part of its transcript: a suggestion the
- * owner can act on or dismiss. Each action has a stable id the runtime understands.
- */
-export const EphemeralMessage = Schema.Struct({
-  id: Schema.String,
-  chat: ChatId,
-  afterEntry: Schema.optional(EntryId),
-  title: Schema.String.check(Schema.isMaxLength(120)),
-  body: Schema.String.check(Schema.isMaxLength(2000)),
-  actions: Schema.Array(
-    Schema.Struct({
-      id: NonEmptyString(40),
-      label: NonEmptyString(40),
-      tone: Schema.Literals(['primary', 'neutral', 'danger']),
-    }),
-  ).check(Schema.isMaxLength(3)),
-  createdAt: Schema.Number,
-})
-export type EphemeralMessage = typeof EphemeralMessage.Type

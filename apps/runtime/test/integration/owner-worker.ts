@@ -11,8 +11,7 @@ import { approvalsProbe } from './approvals-probe.ts'
 import { requireUserSession } from '../../src/auth/index.ts'
 import { AppsMcpFixture } from './apps-mcp.ts'
 import { permutePrimary, profileEnabled } from './primary-profile.ts'
-import { ChatDirectory, chatRow, registerPrimary } from '../../src/chats/directory.ts'
-import { addProposal } from '../../src/decisions/store.ts'
+import { ChatDirectory } from '../../src/chats/directory.ts'
 import { drizzle } from 'drizzle-orm/durable-sqlite'
 import { unwrap } from '../../src/http/rpc.ts'
 import { askResult } from '../internal-client.ts'
@@ -77,7 +76,6 @@ export class OwnerAgent extends PersonalAgent {
       return Response.json(unwrap(await askResult(self, 'topics-client', input, operationId, 5000)))
     }
     if (path.startsWith('/test/move/')) return this.#moveProbe(path, request)
-    if (path === '/test/decisions/seed') return Response.json(this.#seedDecision())
     if (path === '/test/queue/held') return Response.json({ inputs: queueModel(this).held() })
     if (path === '/test/queue/seen') return Response.json({ requests: queueModel(this).requests() })
     if (path === '/test/retrieval/excerpts')
@@ -105,24 +103,6 @@ export class OwnerAgent extends PersonalAgent {
     const now = Math.floor(Date.now() / 1000)
     addUsage(drizzle(this.ctx.storage), utcDay(now).day, tokens, now)
     return Response.json({ tokens })
-  }
-  /** An open report highlight in main, as the decisions would propose it, fenced on main as it is (ADR 0031). */
-  #seedDecision() {
-    const db = drizzle(this.ctx.storage)
-    registerPrimary(db, Math.floor(Date.now() / 1000))
-    const proposal = {
-      id: 'dp_report_owner',
-      chatId: '1',
-      kind: 'attention-triage',
-      subject: 'owner-report',
-      state: 'open',
-      probability: 0.85,
-      provider: 'cloudflare/clef',
-      createdAt: 1,
-      payload: { type: 'highlight', relayId: 'owner-report', text: `Private report for ${this.name}` },
-    } as const
-    const fence = { session: new ChatDirectory(db).session('1'), epoch: chatRow(db, '1')?.epoch ?? 0 }
-    return addProposal(db, proposal, fence).proposal
   }
   /** Move to thread probes (ADR 0034): arm a restart, read model attempts, rows and Pi sessions, time reads. */
   async #moveProbe(path: string, request: Request): Promise<Response> {
@@ -180,10 +160,6 @@ export default {
       if (url.pathname === '/__test/retrieval/excerpts') {
         const { userId } = await requireUserSession(input, env)
         return env.AGENTS.getByName(userId).fetch('https://agent/test/retrieval/excerpts')
-      }
-      if (url.pathname === '/__test/decisions/seed') {
-        const { userId } = await requireUserSession(input, env)
-        return env.AGENTS.getByName(userId).fetch('https://agent/test/decisions/seed')
       }
       if (url.pathname.startsWith('/__test/move/')) {
         const { userId } = await requireUserSession(input, env)

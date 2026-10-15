@@ -22,14 +22,13 @@ export type SignupMode = typeof SignupMode.Type
 
 /**
  * What this deployment has of the parts it may go without (ADR 0064), each a binding of its own: files over 128 KiB
- * (an R2 bucket; smaller ones stay in the agent), agent apps and `code_run` (Dynamic Workers), flow metrics (Analytics
- * Engine) and typed decisions (Workers AI).
+ * (an R2 bucket; smaller ones stay in the agent), agent apps and `code_run` (Dynamic Workers) and flow metrics
+ * (Analytics Engine).
  */
 export const DeploymentFeatures = Schema.Struct({
   largeFiles: Schema.Boolean,
   agentApps: Schema.Boolean,
   flows: Schema.Boolean,
-  decisions: Schema.Boolean,
 })
 export type DeploymentFeatures = typeof DeploymentFeatures.Type
 

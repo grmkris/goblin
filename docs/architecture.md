@@ -31,7 +31,6 @@ flowchart LR
 - [Agent apps](architecture/agent-apps.md): apps goblin builds in Dynamic Workers.
 - [Files](architecture/files.md): owner files in SQLite and R2.
 - [Topics, Personas and memory](architecture/topics.md): Topics, Personas, organize receipts, retrieval and Topic memory.
-- [Typed decision proposals](architecture/decisions.md): Workers AI proposals (dev only).
 - [Models](architecture/models.md): model calls and daily token usage.
 - [Authority and inbound MCP](architecture/inbound-mcp.md): resident authority and goblin as an MCP server.
 - [MCP Events and Telegram](architecture/events.md): Events subscriptions and the Telegram channel.

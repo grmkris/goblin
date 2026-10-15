@@ -34,7 +34,7 @@ afterEach(() => {
 describe('the public health', () => {
   it('reads the sign-up mode and the ways to sign in, and anything unsaid as off', async () => {
     vi.stubGlobal('location', new URL('http://app.test/'))
-    const features = { largeFiles: true, agentApps: false, flows: true, decisions: false }
+    const features = { largeFiles: true, agentApps: false, flows: true }
     answering(() =>
       Response.json({
         ok: true,

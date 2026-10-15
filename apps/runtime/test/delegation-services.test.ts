@@ -9,7 +9,6 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Apps } from '../src/apps/service.ts'
 import type { ChatId } from '../src/chats/directory.ts'
 import { Chats, Conversations } from '../src/chats/service.ts'
-import { Decisions } from '../src/decisions/service.ts'
 import { delegationServices } from '../src/layers/delegation.ts'
 import { KeyedLock } from '../src/observability/lock.ts'
 import { OrganizeReceipts } from '../src/organize/receipts.ts'
@@ -76,7 +75,6 @@ const services = () => {
     stub(Chats, { primary: '1' as ChatId, isHidden: () => Effect.succeed(false) }),
     stub(Conversations, { list: Effect.succeed([]) }),
     stub(Apps, { list: Effect.succeed([]) }),
-    stub(Decisions, { list: Effect.succeed([]) }),
     stub(Notices, { views: Effect.succeed([]) }),
     stub(Sidebar, { read: Effect.succeed({ revision: 0, pins: [], seen: [] }) }),
     stub(PiSessions, { pi: Effect.succeed(pi) }),

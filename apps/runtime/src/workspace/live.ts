@@ -11,7 +11,6 @@ import type * as Scope from 'effect/Scope'
 import * as Stream from 'effect/Stream'
 import { Apps } from '../apps/service.ts'
 import { Chats, Conversations } from '../chats/service.ts'
-import { Decisions } from '../decisions/service.ts'
 import { type AppError, attempt, toAppError } from '../http/errors.ts'
 import { reportAndRecover, reportFailure } from '../observability/report.ts'
 import { Receipts } from '../organize/service.ts'
@@ -35,7 +34,6 @@ type Sources = {
   readonly personas: Personas['Service']
   readonly invocations: Invocations['Service']
   readonly receipts: Receipts['Service']
-  readonly decisions: Decisions['Service']
   readonly notices: Notices['Service']
   readonly sidebar: Sidebar['Service']
 }
@@ -49,7 +47,6 @@ const sources = Effect.gen(function* () {
     personas: yield* Personas,
     invocations: yield* Invocations,
     receipts: yield* Receipts,
-    decisions: yield* Decisions,
     notices: yield* Notices,
     sidebar: yield* Sidebar,
   } satisfies Sources
@@ -71,21 +68,13 @@ const describe = ({ chats, conversations }: Sources, ids: readonly string[]) =>
       views.flatMap((view) => (Option.isNone(view) ? [] : [{ type: 'conversation', conversation: view.value }])),
   )
 
-/** The owner's decisions, sidebar pins and connections' tool lists, as `followTopics` follows the rest. */
+/** The owner's sidebar pins and connections' tool lists, as `followTopics` follows the rest. */
 const followOwnerState = (
   changes: Changes['Service'],
   read: Sources,
   follow: (where: string, changed: Effect.Effect<readonly WorkspaceChange[], AppError>) => Effect.Effect<void>,
 ) =>
   Effect.all([
-    changes.on('decisions.changed', ({ ids }) =>
-      follow(
-        'workspace.decisions',
-        each(ids, (id) =>
-          Effect.map(read.decisions.view(id), (proposal): WorkspaceChange => ({ type: 'proposal', proposal })),
-        ),
-      ),
-    ),
     changes.on('mcp.tools', ({ connectionId, digest }) =>
       follow('workspace.tools', Effect.succeed([{ type: 'tools', connectionId, digest }])),
     ),
@@ -218,18 +207,7 @@ const taskGraph = (
 export const WorkspaceLive: Layer.Layer<
   Workspace,
   never,
-  | Changes
-  | PiSessions
-  | Chats
-  | Conversations
-  | Apps
-  | Topics
-  | Personas
-  | Invocations
-  | Receipts
-  | Decisions
-  | Notices
-  | Sidebar
+  Changes | PiSessions | Chats | Conversations | Apps | Topics | Personas | Invocations | Receipts | Notices | Sidebar
 > = Layer.effect(
   Workspace,
   Effect.gen(function* () {
@@ -261,7 +239,6 @@ export const WorkspaceLive: Layer.Layer<
         personas: yield* read.personas.list,
         invocations: yield* read.invocations.live,
         receipts: yield* read.receipts.list(),
-        proposals: yield* read.decisions.list,
         notifications: yield* read.notices.views,
         sidebar: yield* read.sidebar.read,
       }
