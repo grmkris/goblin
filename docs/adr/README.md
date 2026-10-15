@@ -6,10 +6,10 @@ status; a partly replaced ADR stays here and names what replaced which part.
 
 | ADR | Decision | Status |
 | --- | --- | --- |
-| [0001](0001-runtime-and-auth-storage.md) | Native Pi runtime and identity storage | Accepted |
-| [0002](0002-stages-and-provider.md) | Isolated stages and provider planes | Accepted; amended by 0059 |
+| [0001](0001-runtime-and-auth-storage.md) | Native Pi runtime and identity storage | Accepted; amended by 0064 |
+| [0002](0002-stages-and-provider.md) | Isolated stages and provider planes | Accepted; amended by 0059 and 0064 |
 | [0003](0003-resident-mcp-and-inbound-server.md) | The agent object owns MCP, holds its own authority, and serves /mcp | Accepted |
-| [0004](0004-an-agent-per-user.md) | An agent per user, with gated sign-up | Accepted |
+| [0004](0004-an-agent-per-user.md) | An agent per user, with gated sign-up | Accepted; amended by 0064 |
 | [0005](0005-mcp-apps-host.md) | One live MCP App on a stage, told about its host, trusted for nothing | Accepted; its one live App superseded by 0020 |
 | [0006](0006-servers-the-owner-adds.md) | Servers the owner adds are a trust boundary, not a configuration change | Accepted |
 | [0007](0007-one-main-conversation.md) | One main conversation that never ends, with side threads and subagents | Accepted; amended by 0010, 0017, 0018 and 0032 |
@@ -52,8 +52,9 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0056](0056-goblin-wallet-leaves-goblin.md) | Goblin Wallet leaves goblin | Accepted |
 | [0057](0057-goblin-pays-for-no-model-call.md) | goblin pays for no model call | Accepted |
 | [0058](0058-no-plans-tokens-and-an-optional-cap.md) | No plans: access by sign-up, usage in tokens with an optional cap | Accepted |
-| [0059](0059-bring-your-own-model-endpoint.md) | Bring your own model endpoint | Accepted |
+| [0059](0059-bring-your-own-model-endpoint.md) | Bring your own model endpoint | Accepted; amended by 0064 |
 | [0060](0060-suggested-access-from-tool-annotations.md) | Suggested access from tool annotations | Accepted |
 | [0061](0061-the-shelf-is-data.md) | The shelf is data | Accepted |
 | [0062](0062-short-skippable-start.md) | Short, skippable Start | Accepted |
 | [0063](0063-mcp-first-no-server-specific-code.md) | MCP-first: no server-specific code | Accepted |
+| [0064](0064-openid-connect-and-config-driven-deployment.md) | OpenID Connect sign-in and config-driven deployment | Accepted |
