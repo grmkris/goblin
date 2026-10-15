@@ -54,6 +54,37 @@ export const topicFor = (title: string, operationId: string, actor: 'owner' | 'a
     return again.id
   })
 
+/**
+ * A Topic belonging to this operation alone. A display name never identifies a Source conversation: a collision gets
+ * a numbered name, and only the operation id can replay an existing Topic. The registry checks the name again under
+ * its create lock, so a concurrent create that takes a candidate is retried with the next name.
+ */
+const distinctTopic = (title: string, operationId: string, fallback: string) =>
+  Effect.gen(function* () {
+    const base = topicName(title.replaceAll(/\s+/gu, ' '), fallback)
+    for (let number = 1; ; number += 1) {
+      const suffix = number === 1 ? '' : ` (${String(number)})`
+      const name = `${base.slice(0, 80 - suffix.length).trimEnd()}${suffix}`
+      const made = yield* createTopic({ name, operationId }, { actor: 'agent' }).pipe(
+        Effect.catchTag('Conflict', (conflict) =>
+          conflict.reason === 'topic_name_taken' ? Effect.succeed(undefined) : Effect.fail(conflict),
+        ),
+      )
+      if (made !== undefined) return made
+    }
+  })
+
+/** A new Source conversation's own Topic; archived interrupted creates get a new Topic under a derived operation. */
+export const sourceTopicFor = (title: string, operationId: string, fallback: string) =>
+  Effect.gen(function* () {
+    let operation = operationId
+    for (;;) {
+      const made = yield* distinctTopic(title, operation, fallback)
+      if (made.archivedAt === undefined) return made.id
+      operation = `${operation}:${String(made.revision)}`
+    }
+  })
+
 /** A Persona in words: `@<name>`, `@Persona` for one that is gone. */
 export const personaWords = (persona: number) =>
   Effect.gen(function* () {

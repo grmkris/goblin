@@ -24,12 +24,12 @@ import type { PiSessions } from '../pi/sessions.ts'
 import { writeNotice } from '../routines/notices.ts'
 import type { Changes } from '../runtime/changes.ts'
 import type { AgentInput } from '../runtime/input.ts'
-import { topicFor } from './places.ts'
+import { sourceTopicFor } from './places.ts'
 import type { SourceNotice, SourcePorts } from './types.ts'
 import { type TurnOrigin, answerOf, keepTurn, submitTurn } from './turns.ts'
 
 /** What making a Topic for a conversation reads: the Topics, their receipts and flows. */
-type TopicServices = Effect.Services<ReturnType<typeof topicFor>>
+type TopicServices = Effect.Services<ReturnType<typeof sourceTopicFor>>
 
 /** What the ports' programs read, captured once when the ports are made. */
 export type PortServices =
@@ -109,7 +109,9 @@ const receive = (connectionId: string, blocks: readonly unknown[]) =>
     const read = blocks.map((block) => Option.getOrUndefined(decodeAttachment(block)))
     const content = read.flatMap((block) => (block === undefined ? [] : [keptBlock(block)]))
     const unread = read.length - content.length
-    const received = [...(yield* materialize(connectionId, { content }, { images: ownerSeesImages })).values()]
+    const kept = yield* materialize(connectionId, { content }, { images: ownerSeesImages, text: 'file' })
+    const received = [...kept.values()]
+    const skipped = content.length - kept.size
     return {
       connectionId,
       files: received.flatMap((each) => (each.kind === 'file' ? [each.file] : [])),
@@ -118,10 +120,18 @@ const receive = (connectionId: string, blocks: readonly unknown[]) =>
           each.kind !== 'note' ? [] : [each.link === undefined ? each.note : `${each.note} (${each.link.uri})`],
         ),
         ...(unread === 0 ? [] : [`could not read ${String(unread)} of its attachments: not MCP content`]),
+        ...(skipped === 0 ? [] : [`could not keep ${String(skipped)} of its attachments: not a file`]),
       ],
       images: received.flatMap((each) => (each.kind === 'file' && each.image !== undefined ? [each.image] : [])),
     } satisfies KeptAttachments
-  }).pipe(reportAndRecover('sources.receive', { connectionId, files: [], notes: [], images: [] }))
+  }).pipe(
+    reportAndRecover('sources.receive', {
+      connectionId,
+      files: [],
+      notes: ['could not keep the attachments: receiving failed'],
+      images: [],
+    }),
+  )
 
 const TextBlock = Schema.Struct({ type: Schema.Literal('text'), text: Schema.String })
 const decodeText = Schema.decodeUnknownOption(TextBlock)
@@ -189,6 +199,5 @@ export const sourcePorts = Effect.map(Effect.context<PortServices>(), (context):
   label: (connectionId) => Effect.provideContext(labelOf(connectionId), context),
   receive: (connectionId, blocks) => Effect.provideContext(receive(connectionId, blocks), context),
   // goblin makes it for the setup the owner confirmed (`newKeys: topic-per-key`).
-  topic: (name, fallback, operationId) =>
-    Effect.provideContext(topicFor(name, operationId, 'agent', fallback), context),
+  topic: (name, fallback, operationId) => Effect.provideContext(sourceTopicFor(name, operationId, fallback), context),
 }))

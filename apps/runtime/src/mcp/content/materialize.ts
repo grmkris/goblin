@@ -89,6 +89,8 @@ export const NOTHING_RECEIVED: Materialized = new Map()
 type MaterializeOptions<R = never> = {
   /** Whether the model reading the result sees images, asked only when a kept file is a small image. */
   readonly images: Effect.Effect<boolean, never, R>
+  /** Keep even short embedded text as a file when the caller carries file references rather than inline content. */
+  readonly text?: 'file'
   /** The caller stopped waiting: a fetch under way is aborted. */
   readonly signal?: AbortSignal
 }
@@ -138,12 +140,12 @@ const appResource = (uri: string): boolean => uri.startsWith('ui://')
  * Whether goblin keeps `block` as a file: a link, audio, or an embedded resource that is a blob or long text; never an
  * App's own resource.
  */
-const keepable = (block: ContentBlock): block is Keepable =>
+const keepable = (block: ContentBlock, text: 'file' | undefined): block is Keepable =>
   (block.type === 'resource_link' && !appResource(block.uri)) ||
   block.type === 'audio' ||
   (block.type === 'resource' &&
     !appResource(block.resource.uri) &&
-    ('blob' in block.resource || block.resource.text.length > LARGE_TEXT))
+    ('blob' in block.resource || text === 'file' || block.resource.text.length > LARGE_TEXT))
 
 /** A URL, or none for text that is not one. */
 const urlOf = (raw: string, base?: URL): URL | undefined => {
@@ -442,7 +444,7 @@ export const materialize = Effect.fn('mcp.materialize')(function* <R = never>(
   options: MaterializeOptions<R>,
 ) {
   const received = new Map<number, Received>()
-  const blocks = result.content.flatMap((block, index) => (keepable(block) ? [{ block, index }] : []))
+  const blocks = result.content.flatMap((block, index) => (keepable(block, options.text) ? [{ block, index }] : []))
   if (blocks.length === 0) return received
   const label = (yield* McpServers.use((servers) => servers.labels())).get(connectionId) ?? connectionId
   const day = DateTime.formatIsoDateUtc(yield* DateTime.now)

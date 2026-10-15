@@ -57,7 +57,14 @@ export const cases: readonly NativeCase[] = [
       expect(result).toMatchObject({
         confirmed: 'active',
         received: 204,
-        routes: [{ route: 'topic', title: 'Trip planning', updatedBy: 'default' }],
+        routes: [
+          { route: 'topic', title: 'Trip planning', updatedBy: 'default' },
+          { route: 'topic', title: 'Trip planning', updatedBy: 'default' },
+        ],
+        distinctTopics: true,
+        secondTopic: 'Trip planning (2)',
+        secondSettled: 'done',
+        secondTurns: [{ author: true, words: 'Different chat, same title', files: [] }],
         topic: 'Trip planning',
         settled: 'done',
         turns: [
@@ -69,10 +76,18 @@ export const cases: readonly NativeCase[] = [
                 path: expect.stringMatching(/^\/agent\/received\/[^/]+\/\d{4}-\d{2}-\d{2}\/image\.png$/u),
                 mimeType: 'image/png',
               },
+              {
+                path: expect.stringMatching(/^\/agent\/received\/[^/]+\/\d{4}-\d{2}-\d{2}\/ferry\.md$/u),
+                mimeType: 'text/markdown',
+              },
             ],
           },
         ],
-        stored: [{ name: 'image.png', whole: true }],
+        stored: [
+          { name: 'ferry.md', whole: true },
+          { name: 'image.png', whole: true },
+        ],
+        noteKept: true,
         notice: { inTopic: true, titled: true },
         replies: [
           {
@@ -80,7 +95,22 @@ export const cases: readonly NativeCase[] = [
             text: expect.stringMatching(/^echo: /u),
             operationId: 'reply-0-source-src_00000000000000c1-m1',
           },
+          {
+            chat: 'c2',
+            text: expect.stringMatching(/^echo: /u),
+            operationId: 'reply-0-source-src_00000000000000c1-m4',
+          },
         ],
+      }),
+  ),
+  matchCase(
+    'a Source drops foreign messages before creating or retitling its routes and Topics [canary]',
+    'sources-drop',
+    (result) =>
+      expect(result).toEqual({
+        routes: [{ key: '["c1"]', title: 'Trip planning' }],
+        topics: ['Personal', 'Trip planning'],
+        notices: 0,
       }),
   ),
   matchCase(

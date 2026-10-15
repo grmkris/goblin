@@ -268,6 +268,8 @@ const take = (context: EngineContext, source: Loaded, item: unknown, itemId: str
   Effect.gen(function* () {
     const { row, setup } = source
     if (setup.read.direction !== undefined && !matches(item, setup.read.direction)) return
+    const owner = speaks(item, setup.speaksForMe)
+    if (!owner && setup.others === 'drop') return
     const conversation = conversationOf(item, setup.key, setup.read.title)
     const found = valueAt(item, setup.read.text)
     const text = typeof found === 'string' ? found : ''
@@ -275,13 +277,13 @@ const take = (context: EngineContext, source: Loaded, item: unknown, itemId: str
     if (conversation === undefined || (text.trim() === '' && blocks.length === 0)) return
     const route = yield* routeFor(context, source, conversation, ports)
     const target = routeOf(route)
-    if (speaks(item, setup.speaksForMe)) {
+    if (owner) {
       if (target.to === 'ignore') return
       const kept = blocks.length === 0 ? undefined : yield* ports.receive(row.connectionId, blocks)
       const held = { sourceId: row.id, itemId, key: conversation.key, text, kept }
       return yield* send(context, source, route, { held, note: '' }, ports)
     }
-    if (setup.others === 'drop' || target.to === 'ignore') return
+    if (target.to === 'ignore') return
     const notice = yield* noticeOf(source, conversation, target, itemId, text)
     yield* ports.notice(notice(yield* ports.label(row.connectionId)))
   })

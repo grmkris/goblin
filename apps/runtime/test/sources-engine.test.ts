@@ -95,6 +95,30 @@ describe('a Source reading the owner messages from its events (ADR 0066)', () =>
     }),
   )
 
+  it.effect('dropped foreign messages neither create Topics nor create or retitle routes', () =>
+    Effect.gen(function* () {
+      const { db, engine, ports, seen, active } = yield* sourceWorld()
+      const source = yield* active({
+        ...PAYLOAD_SETUP,
+        others: 'drop',
+        read: { ...PAYLOAD_SETUP.read, title: '/chatTitle', attachments: '/attachments' },
+        newKeys: { to: 'topic-per-key' },
+      })
+      const other = { from: { isOwner: false }, chatTitle: 'Not the owner', attachments: [{ type: 'image' }] }
+      yield* engine.takeEvent(source, event('e1', message('foreign-first', { ...other, chat: 'g_trip' })), ports)
+      expect(routeRow(db, source.row.id, GROUP)).toBeUndefined()
+      expect(seen.topics).toEqual([])
+      yield* engine.takeEvent(source, event('e2', message('owner', { chatTitle: 'My conversation' })), ports)
+      const before = routeRow(db, source.row.id, DM)
+      yield* engine.takeEvent(source, event('e3', message('foreign-known', other)), ports)
+      expect(routeRow(db, source.row.id, DM)).toEqual(before)
+      expect(seen.topics).toHaveLength(1)
+      expect(seen.turns).toHaveLength(1)
+      expect(seen.received).toEqual([])
+      expect(seen.notices).toEqual([])
+    }),
+  )
+
   it.effect(
     'holds a new conversation until the owner routes it, then delivers what it held in order; Undo puts it back',
     () =>

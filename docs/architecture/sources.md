@@ -63,9 +63,11 @@ control marks the Source to be subscribed again; a `gap` pulls a tool read again
 Each message (`sources/messages.ts`) is read by the setup alone: skipped unless it is incoming (`direction`), keyed and
 has words or attachments. Its conversation is named by the text at `read.title` (one line, at most 80 characters), and
 the route keeps the newest name a message gave. A conversation seen for the first time gets a route from `newKeys`
-(`app_source_routes`, `updated_by` `default`); with `topic-per-key` goblin makes it a Topic of its own (`topicFor`,
+(`app_source_routes`, `updated_by` `default`); with `topic-per-key` goblin makes it a Topic of its own (`sourceTopicFor`,
 `sources/places.ts`, by operation `source-topic:<source>:<digest of the key>`), named after its title, else its values,
-else the connection's label; a Topic that cannot be made leaves it held, reported. A message the speaks-for-me rule matches is the owner's: in a Topic it becomes a turn
+else the connection's label. If two keys have the same title, later Topics receive a numbered suffix; the operation id
+remains the identity for retries. A Topic that cannot be made leaves it held, reported. A message whose speaks-for-me
+rule does not match is dropped before route or Topic creation when `others: drop`; otherwise it becomes a notice. A message the speaks-for-me rule matches is the owner's: in a Topic it becomes a turn
 (`ChatOperations.send` through `submitTurn`, `sources/turns.ts`, receipt `source` from origin `source`, flow `source`
 via `mcp`), with a Persona it is that Persona's ask in the Topic (`askPersonas`), with `listen` a passive `app.source`
 note, with `ignore` nothing, and with `held` it waits in `app_source_held` (the twenty newest; the rest are counted and
@@ -81,7 +83,8 @@ route's Topic, or Personal; it never starts a turn, and what it brought is never
 The owner's own message's attachments are kept before it is routed, held or not, since a link may not last: the ports
 read each block at `read.attachments` (a link, an image or audio with its bytes, or an embedded resource) and keep it
 with `materialize` (`mcp/content/materialize.ts`, ADR 0065) under `/agent/received/<connection>/<day>/`, an image as an embedded
-blob named `image`. The turn names the kept files after its words as untrusted references from the connection
+blob named `image`. Short embedded text also becomes a file, even below an ordinary tool result's inline threshold.
+The turn names the kept files after its words as untrusted references from the connection
 (`ReceivedBlock`: `received`, and a `notReceived` note for each block not kept or not MCP content), and a kept image of
 at most 256 KiB is shown inline when the owner's model takes images. A held message keeps the files' references
 (`app_source_held.files`), not the images; a Persona's ask carries the references only. A message with attachments and
@@ -143,6 +146,7 @@ notice, a conversation named by its title and given a Topic of its own, attachme
 conversation routed and undone, an answer in pieces once, retries and the give-up notice, a terminated subscription
 made again and a changed grant pausing the Source. The workerd canary (`test/integration/sources-probe.ts`, in the
 native suite) runs a Source end to end on the real agent over the official Events producer: confirmed, a signed
-webhook, a tool read from its cursor, the owner's message (with a photo kept under `/agent/received`) a marked turn in a
-Topic made for its chat, someone else's an untrusted notice, and the answer sent once under its operation id. The
-browser walk is `apps/web/test/ui-sources.ts`. None of it is deployed-stage evidence.
+webhook, a tool read from its cursor, the owner's message (with a photo and UTF-8 text attachment kept under
+`/agent/received`) a marked turn in a Topic made for its chat, a same-title second chat in a separate Topic, someone
+else's an untrusted notice, and each answer sent once under its operation id. Another canary verifies that
+`others: drop` creates no foreign route or Topic and cannot retitle an existing route. The browser walk is `apps/web/test/ui-sources.ts`. None of it is deployed-stage evidence.
