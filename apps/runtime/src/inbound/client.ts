@@ -1,10 +1,11 @@
 import { type EventWebhookResult, InternalApi } from '@goblin/contracts/internal'
 import * as Effect from 'effect/Effect'
+import * as Stream from 'effect/Stream'
 import * as FetchHttpClient from 'effect/http/FetchHttpClient'
 import * as HttpClient from 'effect/http/HttpClient'
 import * as HttpClientRequest from 'effect/http/HttpClientRequest'
 import * as HttpApiClient from 'effect/http-api/HttpApiClient'
-import { type AppError, isAppError, toAppError } from '../http/errors.ts'
+import { type AppError, NotFound, isAppError, toAppError } from '../http/errors.ts'
 import type { EventWebhook } from '../mcp/events.ts'
 
 /** The part of an agent's Durable Object stub the internal API is called through. */
@@ -66,3 +67,34 @@ export const deliverEvents = (
       }),
     ref,
   ).pipe(Effect.catchTag('Internal', () => Effect.succeed({ status: 503 } as const)))
+
+/** A file link the agent will not serve: a link says no more than that it leads nowhere. */
+const gone = () => Effect.fail(new NotFound({ what: 'file' }))
+
+/**
+ * The owner file a checked file link names (`/internal/files/linked`, ADR 0070): its bytes as they stream from the
+ * agent, and the type and name its answer carries. Anything the agent refuses (the file is gone, resident authority
+ * lapsed) is `NotFound`.
+ */
+export const linkedFile = (
+  agent: AgentFetch,
+  path: string,
+  ref?: string,
+): Effect.Effect<
+  { readonly body: ReadableStream<Uint8Array>; readonly type?: string; readonly disposition?: string },
+  AppError
+> =>
+  internalCall(
+    agent,
+    (api) => api.inbound.linkedFile({ query: { path }, responseMode: 'decoded-and-response' }),
+    ref,
+  ).pipe(
+    Effect.map(([body, answer]) => ({
+      body: Stream.toReadableStream(body),
+      ...(answer.headers['content-type'] === undefined ? {} : { type: answer.headers['content-type'] }),
+      ...(answer.headers['content-disposition'] === undefined
+        ? {}
+        : { disposition: answer.headers['content-disposition'] }),
+    })),
+    Effect.catchTags({ NotFound: gone, InvalidInput: gone, ResidentInactive: gone, Forbidden: gone }),
+  )

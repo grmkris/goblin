@@ -3,10 +3,12 @@ import { InternalApi } from '@goblin/contracts/internal'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as HttpServer from 'effect/http/HttpServer'
+import * as HttpServerResponse from 'effect/http/HttpServerResponse'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { describe, expect, it } from 'vitest'
 import { ChatOperations, Chats, Conversations } from '../../../src/chats/service.ts'
 import { Channel } from '../../../src/channel/service.ts'
+import { Files } from '../../../src/files/service.ts'
 import { routeNames } from '../../../src/http/api/context.ts'
 import { InternalGateLive } from '../../../src/http/api/middleware.ts'
 import { AgentHttp } from '../../../src/http/api/server.ts'
@@ -44,7 +46,8 @@ const recording = () => {
       .handle('ask', ({ payload }) => mark('ask', { status: 'running' as const, operationId: payload.operationId }))
       .handle('recent', () => mark('recent', []))
       .handle('mcpEvents', () => mark('mcpEvents', { status: 204 as const }))
-      .handle('inspect', () => mark('inspect', { conversations: [] })),
+      .handle('inspect', () => mark('inspect', { conversations: [] }))
+      .handleRaw('linkedFile', () => mark('linkedFile', HttpServerResponse.text('bytes'))),
   )
   return { ran, handlers }
 }
@@ -117,6 +120,7 @@ describe('the inbound handlers', () => {
             stub(Conversations),
             stub(Notices),
             stub(Changes),
+            stub(Files),
             Layer.succeed(Resident, currentResident().service),
           ),
         ),
