@@ -9,8 +9,6 @@ import {
 } from '../src/chats/receipts.ts'
 import { chatDatabase } from './chats-sqlite.ts'
 
-const BEFORE_RECEIPTS = '20261026000500_routine_topics'
-
 const cleanups: (() => void)[] = []
 afterEach(() => {
   for (const close of cleanups.splice(0)) close()
@@ -24,19 +22,13 @@ const database = (range: Parameters<typeof chatDatabase>[0] = {}) => {
 const send = { kind: 'send', origin: 'owner' } as const
 
 describe('chat operation receipts (unit)', () => {
-  it('reads a row admitted before receipts had kinds as a legacy admission, its session kept', () => {
-    const { db, sqlite, migrate } = database({ through: BEFORE_RECEIPTS })
+  it('refuses to read a row with no kind or state of its own: every admission writes both', () => {
+    const { db, sqlite } = database()
     sqlite.exec(
-      "INSERT INTO app_chat_operations (chat_id, operation_id, session_id, admitted_at) VALUES ('1', 'old', '41', 10)",
+      "INSERT INTO app_chat_operations (chat_id, operation_id, session_id, admitted_at) VALUES ('1', 'bare', '41', 10)",
     )
-    migrate({ after: BEFORE_RECEIPTS })
-    const legacy = { chat: '1', operationId: 'old', session: '41', admittedAt: 10, kind: 'legacy', state: 'admitted' }
-    expect(receiptOf(db, 'old')).toEqual(legacy)
-    expect(admitReceipt(db, { chat: '1', operationId: 'old', receipt: send, session: () => '43', now: 11 })).toEqual({
-      session: '41',
-      existing: true,
-    })
-    expect(receiptIn(db, '1', 'old')).toEqual(legacy)
+    expect(() => receiptOf(db, 'bare')).toThrow(expect.objectContaining({ _tag: 'Internal' }))
+    expect(() => receiptIn(db, '1', 'bare')).toThrow(expect.objectContaining({ _tag: 'Internal' }))
   })
 
   it('records what an operation is before Pi sees it, and a replay finds its first receipt and session', () => {

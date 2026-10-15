@@ -42,9 +42,8 @@ export type RecorderLedger = {
 export type ReceiptSource = { readonly kind: string; readonly origin?: string | undefined }
 
 /**
- * Where a turn came from when its operation has no receipt (a row admitted before receipts had kinds, or a turn no
- * chat admits), by the operation id each source gives its submissions: a Persona's answer is
- * `persona:<operation>:<persona>` (pi/persona-turn.ts). Everything else is `direct`.
+ * Where a turn came from when no chat admitted its operation, by the operation id each source gives its submissions:
+ * a Persona's answer is `persona:<operation>:<persona>` (pi/persona-turn.ts). Everything else is `direct`.
  */
 const SOURCES: readonly (readonly [string, string])[] = [
   ['telegram-', 'telegram'],
@@ -69,7 +68,7 @@ const RECEIPT_SOURCES: Readonly<Record<string, string>> = {
  * passive write's receipt starts no turn of its own, so it falls back too.
  */
 export const sourceOf = (operationId: string, receipt?: ReceiptSource): string =>
-  receipt === undefined || receipt.kind === 'legacy' || receipt.kind.startsWith('write:')
+  receipt === undefined || receipt.kind.startsWith('write:')
     ? (SOURCES.find(([prefix]) => operationId.startsWith(prefix))?.[1] ?? 'direct')
     : (RECEIPT_SOURCES[receipt.kind] ?? 'direct')
 

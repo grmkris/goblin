@@ -1,6 +1,7 @@
 import { and, asc, eq, lt, ne } from 'drizzle-orm'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Schema from 'effect/Schema'
+import { Internal } from '../http/errors.ts'
 import { appChatOperations } from '../storage/chat-operations.ts'
 
 type Database<RunResult> = SQLiteAsyncDatabase<'sync', RunResult>
@@ -30,9 +31,6 @@ export const OPERATION_KINDS = [
 
 /** What an operation in a chat is: one of `OPERATION_KINDS`, or `write:<entry kind>` for a passive write. */
 export type OperationKind = (typeof OPERATION_KINDS)[number] | `write:${string}`
-/** A receipt's kind: its operation's, or `legacy` for one admitted before receipts had kinds. */
-export type ReceiptKind = OperationKind | 'legacy'
-
 /** Who started an operation. */
 export const ReceiptOrigin = Schema.Literals(['owner', 'client', 'telegram', 'source', 'agent', 'routine', 'system'])
 export type ReceiptOrigin = typeof ReceiptOrigin.Type
@@ -60,7 +58,7 @@ export type Receipt = {
   readonly operationId: string
   readonly session: string
   readonly admittedAt: number
-  readonly kind: ReceiptKind
+  readonly kind: OperationKind
   readonly origin?: ReceiptOrigin
   readonly targetChat?: string
   readonly parentOp?: string
@@ -75,20 +73,28 @@ const isOperationKind = (value: string): value is OperationKind => value.startsW
 const isOrigin = Schema.is(ReceiptOrigin)
 const isState = Schema.is(ReceiptState)
 
-/** A stored receipt. A row admitted before receipts had kinds reads as a `legacy` one, `admitted` and nothing more. */
-export const decodeReceipt = (row: Row): Receipt => ({
-  chat: row.chatId,
-  operationId: row.operationId,
-  session: row.sessionId,
-  admittedAt: row.admittedAt,
-  kind: row.kind !== null && isOperationKind(row.kind) ? row.kind : 'legacy',
-  ...(row.origin !== null && isOrigin(row.origin) ? { origin: row.origin } : {}),
-  ...(row.targetChat === null ? {} : { targetChat: row.targetChat }),
-  ...(row.parentOp === null ? {} : { parentOp: row.parentOp }),
-  state: row.state !== null && isState(row.state) ? row.state : 'admitted',
-  ...(row.reason === null ? {} : { reason: row.reason }),
-  ...(row.settledAt === null ? {} : { settledAt: row.settledAt }),
-})
+/**
+ * A stored receipt, as `admitReceipt` wrote it and `advanceReceipt` moved it on. A row without a kind or a state
+ * of its own is not one of them: `Internal`.
+ */
+export const decodeReceipt = (row: Row): Receipt => {
+  const { kind, state } = row
+  if (kind === null || !isOperationKind(kind) || state === null || !isState(state))
+    throw new Internal({ reason: 'receipt_unreadable' })
+  return {
+    chat: row.chatId,
+    operationId: row.operationId,
+    session: row.sessionId,
+    admittedAt: row.admittedAt,
+    kind,
+    ...(row.origin !== null && isOrigin(row.origin) ? { origin: row.origin } : {}),
+    ...(row.targetChat === null ? {} : { targetChat: row.targetChat }),
+    ...(row.parentOp === null ? {} : { parentOp: row.parentOp }),
+    state,
+    ...(row.reason === null ? {} : { reason: row.reason }),
+    ...(row.settledAt === null ? {} : { settledAt: row.settledAt }),
+  }
+}
 
 /** The receipt `operationId` has in `chat`, if it was admitted there. */
 export function receiptIn<RunResult>(db: Database<RunResult>, chat: string, operationId: string): Receipt | undefined {

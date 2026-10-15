@@ -346,10 +346,8 @@ describe('run telemetry (unit)', () => {
     expect(sourceOf('op-2', { kind: 'telegram', origin: 'telegram' })).toBe('telegram')
     expect(sourceOf('op-3', { kind: 'routine_input', origin: 'routine' })).toBe('routine')
     expect(sourceOf('op-4', { kind: 'subagent_report', origin: 'agent' })).toBe('subagent_report')
-    // The owner's own send, whatever its id looks like; a row from before receipts had kinds, and a passive write's
-    // receipt, fall back to the prefix.
+    // The owner's own send, whatever its id looks like; a passive write's receipt falls back to the prefix.
     expect(sourceOf('telegram-lookalike', { kind: 'send', origin: 'owner' })).toBe('direct')
-    expect(sourceOf('telegram-tg-1', { kind: 'legacy' })).toBe('telegram')
     expect(sourceOf('persona:owner:op-3:2', { kind: 'write:app.note', origin: 'system' })).toBe('persona')
   })
 
