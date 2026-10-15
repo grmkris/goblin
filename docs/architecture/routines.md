@@ -8,12 +8,12 @@ tool each (ADR 0027); only an authenticated owner may confirm the exact revision
 optionally, another Topic by name; `proposeAsked` (`routines/program.ts`) resolves them and pins the Persona's revision
 now (`topicNamed`, `personaNamed`). Routine writes require an exact configured Origin and `x-goblin-csrf: 1`. Edits
 clear confirmation and stale revisions return 409. A definition (ADR 0041) is a trigger, a timezone, **Tell me**
-(`tellMe: { on, telegram }`, Telegram only with Tell me) and **Hand to** (`handTo`: `none`; `goblin` with its
+(`tellMe: { on, copy }`, a copy through Notify me via only with Tell me, ADR 0070) and **Hand to** (`handTo`: `none`; `goblin` with its
 instruction, allowed tools and budget; or `persona` with those and the Persona's id and the revision it pins); one that
 hands nothing over must tell the owner. Only a hand-over makes runs (`handOverOf`, `runHandOver`). Settings shows the
-instruction, exact tool pairs, timezone, budgets and Telegram policy before confirmation. Its editor
+instruction, exact tool pairs, timezone, budgets and whether notices are copied before confirmation. Its editor
 (`components/routine-editor.tsx`, `routine-when.tsx`, `routine-hand.tsx`) asks what, where (the Topic), when, Tell me
-(and Telegram) and Hand to (nobody, Goblin or a Persona, with the instruction, tools and limits only for a hand-over);
+(and "Also send to <label>", the sink's connection, offered only while Notify me via is set) and Hand to (nobody, Goblin or a Persona, with the instruction, tools and limits only for a hand-over);
 an event trigger picks a connection that sends events, one of its streams (by title) from `GET /api/mcp/:id/events`, and
 its filters through a form generated from the stream's input schema (`lib/schema-form.ts`, `components/schema-form.tsx`:
 text, a choice, a number, yes or no, a list of texts, required first; a nullable one optional), with raw JSON for
@@ -59,7 +59,8 @@ stable request ID. A routine belongs to a Topic (`app_routines.topic_id`, migrat
 0032): the Topic of the chat whose `routine_propose` drafted it, or the one the owner names when they propose or edit it
 (`RoutineProposal.topic`, `RoutineEdit.topic`; it must exist and be open). Its run conversation sits under that Topic's
 Conversation and its report is written there; while the Topic is archived (archive leaves schedules running in v1), runs
-and reports go to Personal instead. A Telegram copy of a routine's notice is separate authorized plumbing (see Notices).
+and reports go to Personal instead. A copy of a routine's notice through Notify me via is separate authorized plumbing
+(see Notices).
 Pi acceptance does not establish external delivery.
 
 Event confirmation grants the exact connected server/name/canonical-arguments selector after authenticated review;
@@ -87,17 +88,22 @@ told, is a notification pointing at its report (`notice-report:<run>`), except f
 that hands nothing over cannot be run by hand (`nothing_to_run`).
 
 `app_notices` (`notices/store.ts`) keeps every notification: its entry's request id and chat, the label and text, the
-owner's read mark and the Telegram copy's outbox state. A notice is kept once by its id (`notice:<routine>:<eventId>`,
+owner's read mark and the outbox state of its copy through Notify me via. A notice is kept once by its id (`notice:<routine>:<eventId>`,
 `notice:<routine>:<slot>`), so a replayed delivery posts nothing again; a notice claimed but not written (a write cut
 short) is written by the routines' sweep. An event's notice is counted into its routine's hour (`app_notice_windows`):
-twenty are posted, the rest kept for Activity only (as written, with no chat entry and no Telegram copy) and counted
+twenty are posted, the rest kept for Activity only (as written, with no chat entry and no copy) and counted
 into one digest line ("+N more from <label> in Activity") the next hour's first notice, or the sweep, writes. Activity
 lists ten read notifications under the unread ones, and Show older adds ten more at a time. Reminders, answers and digests are not counted, nor is the skill learner's notice of a draft it wrote (`notice:skill-draft:<hash>`, see Skills). Notifications older than thirty days are pruned. A notice
-the owner wants on Telegram carries its words frozen when it is claimed (`notices/telegram.ts`): each due copy is sent
-once per attempt with a stable operation id through the channel it was first tried on, escaped, after resident
-authority and that channel are checked again; losing any of them suppresses it, a failure retries with backoff
-and fails after five attempts or fifteen minutes, and the remote receipt is kept apart. The Telegram connection's own
-events never go back to Telegram. Runs no longer carry a notification of their own. An
+of a routine with `tellMe.copy`, while Notify me via is set, carries its words frozen when it is claimed
+(ADR 0070, `notices/copies.ts`): each due copy is sent once per attempt, with a stable operation id
+(`notice-<digest>`), through the sink as it was at its first attempt (its revision: when it was set and a digest of
+what it says), the template filled with the words as written (`fillTemplate`, no escaping), as goblin's own call
+under the owner's grant of the tool (`caller: 'model'`). Resident authority and the sink are checked again right
+before the call leaves; losing either, a sink changed or cleared since, a tool set to Ask first or the server's
+refusal suppresses it, any other failure retries with backoff and fails after five attempts or fifteen minutes, and
+the remote receipt is kept apart. The outbox's SQL columns keep their first names (`telegram_*`) until
+the migrations are squashed; Drizzle calls them `copy*`. An event from the sink's own connection never goes back to it
+(the echo rule, checked at the claim and at the first attempt). Runs no longer carry a notification of their own. An
 occurrence more than five minutes older than the routine's confirmation, or a day old, is acknowledged and dropped,
 so a producer that replays its backlog on a fresh subscription neither notifies nor runs. `app.notice`, `app.routine`
 and `app.persona` entries count as replies, so a routine's posts leave its chat unread.

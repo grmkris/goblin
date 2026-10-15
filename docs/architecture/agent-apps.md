@@ -61,7 +61,9 @@ Beyond its state and files, an app reaches only the powers it declares and the o
 under it, so a deployment on a shared platform domain leaves its neighbours reachable; redirects checked
 again, no cookies, bounded), and through the agent (`agent-apps/ports.ts`, lent by `agent.ts` with the engine, each call entering it
 through the bridge's `run`) the owner's MCP
-tools under their exact grants, the cheap model within the owner's budget, Telegram through their channel, and other
+tools under their exact grants, the cheap model within the owner's budget, a message to the owner through Notify me via
+(`ctx.notify`, ADR 0070: the sink's template filled with the words as written and the call's operation id, resident
+authority and the sink checked again right before it leaves, and an app error that says so with no sink set), and other
 apps' actions and views (`agent-apps/reach.ts` composes each `prepare`'s `AppPowers`). Every use checks the approval
 (`app_agent_powers`), the app's daily cap (`app_agent_usage`) and, for what goes through the agent, resident
 authority. A build lists the powers still waiting; the web draws them as a card under it

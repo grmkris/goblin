@@ -24,7 +24,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0018](0018-subagents-nest-steer-and-close.md) | Subagents nest, steer and close | Accepted |
 | [0019](0019-panes-for-everything.md) | Panes for everything | Superseded by 0036 |
 | [0020](0020-durable-apps-one-iframe-per-instance.md) | Durable Apps, one iframe per instance | Accepted; amended by 0067 |
-| [0021](0021-agent-apps.md) | Agent apps | Accepted |
+| [0021](0021-agent-apps.md) | Agent apps | Accepted; amended by 0070 |
 | [0022](0022-owner-files-shell-and-r2.md) | The owner's files, in Shell's Workspace and R2 | Accepted; amended by 0065 |
 | [0023](0023-chat-blocks-and-one-kit.md) | Chat blocks, one kit | Accepted |
 | [0024](0024-observing-conversations.md) | Observing conversations | Accepted |
@@ -41,7 +41,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0038](0038-typed-owner-api-served-by-the-agent.md) | Typed owner API served by the agent | Accepted |
 | [0039](0039-chat-markdown-through-streamdown.md) | Chat Markdown through Streamdown, and what a reply may load | Accepted |
 | [0040](0040-topic-and-persona-setup.md) | Topic setup and Persona setup | Accepted; amended by 0067 |
-| [0041](0041-connections-tell-me-hand-to.md) | Connections, Tell me and Hand to | Accepted; amended by 0066 |
+| [0041](0041-connections-tell-me-hand-to.md) | Connections, Tell me and Hand to | Accepted; amended by 0066 and 0070 |
 | [0042](0042-mcp-2026-client.md) | MCP 2026 client: live tool lists, URL requests and step-up | Accepted |
 | [0046](0046-production-promotion-and-public-source.md) | Daily development, deliberate production promotion and public source | Accepted |
 | [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted; amended by 0061 and 0063 |
@@ -59,3 +59,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0065](0065-files-from-mcp-content.md) | Files from MCP content | Accepted |
 | [0066](0066-sources.md) | Sources: any MCP server's events carry the owner's own messages, by a setup the owner confirms | Accepted |
 | [0067](0067-no-home-surface-and-no-typed-decisions.md) | No Home surface and no typed decisions | Accepted |
+| [0070](0070-notices-and-files-leave-through-the-owners-tools.md) | Notices and files leave through the owner's own tools: Notify me via and file links | Accepted |

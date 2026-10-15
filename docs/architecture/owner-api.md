@@ -68,8 +68,8 @@ locations and never its message. The Worker's own routes (`/mcp`'s failures asid
 
 Callers that are not the owner's browser reach the agent through its internal API (`InternalApi`, `/internal`, exported
 only from `@goblin/contracts/internal`), which the Worker calls on the agent's stub with a typed client
-(`inbound/client.ts`) after its own check of the caller (a bearer token, a hook's route token): `ask`, `recent` and
-`inspect` (inbound `/mcp`), and `mcpEvents` (the Events hook). Its gate (`InternalGate`, `http/api/middleware.ts`)
+(`inbound/client.ts`) after its own check of the caller (a bearer token, a hook's route token, a file link's token):
+`ask`, `recent` and `inspect` (inbound `/mcp`), `mcpEvents` (the Events hook) and `linkedFile` (a file link, ADR 0070). Its gate (`InternalGate`, `http/api/middleware.ts`)
 refuses a request carrying the owner forward's mark; it never renews resident authority. One Durable Object RPC
 method remains, `deleteAgentData` (account deletion): Workers RPC drops custom error classes, so it returns an encoded
 `RpcResult` (`http/rpc.ts`) that the Worker unwraps.

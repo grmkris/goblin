@@ -9,9 +9,9 @@ enter the workerd bundle.
   in its group in `packages/contracts/src/api` and a handler in its area's `api.ts`, served by the agent
   (`http/api/server.ts`) behind the Worker's edge (`http/api/edge.ts`) and owner admission (`OwnerAdmission`,
   `http/api/middleware.ts`). Never add a Durable Object RPC method or a Worker route for the owner. The Worker's other
-  callers (inbound `/mcp`, the hooks) use the internal API (`@goblin/contracts/internal`, behind `InternalGate`,
-  called through `inbound/client.ts`); the one RPC method left, `deleteAgentData`, returns an encoded result
-  (`http/rpc.ts`), because Workers RPC drops error classes.
+  callers (inbound `/mcp`, the hooks, file links) use the internal API (`@goblin/contracts/internal`, behind
+  `InternalGate`, called through `inbound/client.ts`); the one RPC method left, `deleteAgentData`, returns an encoded
+  result (`http/rpc.ts`), because Workers RPC drops error classes.
 - **Composition.** Services are `Context.Service` tags in `<area>/service.ts`, built by their area's layer in
   `layers/` over the core layer (`layers/core.ts`). `layers/index.ts` orders the start's steps, which are the boot
   contract (keep their order and every await), then the area layers. A stateful object is made once, by its layer,

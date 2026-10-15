@@ -94,8 +94,15 @@ delivery is a `source_delivery` flow and a `channel.reply` line with channel `so
 `app_notify_sink` keeps one setting (`NotifySink`): a connection, a tool it offers and arguments whose whole string
 values may be `{{text}}` (required) and `{{operationId}}`. `PUT /api/notify-sink` grants the tool, as the owner chose
 it; `GET` reads it with the connection's label; `DELETE` clears it. Settings → Notify me via sets it, and copies a
-confirmed Source's reply template with one of its conversations' keys filled in. The routines' Telegram notice copies
-move to it when the channel goes (P7).
+confirmed Source's reply template with one of its conversations' keys filled in.
+
+Two things send through it (ADR 0070, `sendThroughSink` in `sources/notify.ts`): a routine's notice copies
+(`tellMe.copy`, [routines.md](routines.md)) and an agent app's `notify` power ([agent-apps.md](agent-apps.md)). Each
+send fills the template with the words as written and its operation id, and is goblin's own call under the owner's
+grant of the tool (`caller: 'model'`, so a tool set to Ask first refuses it). Resident authority and the sink's
+revision (`sinkRevision`: when it was set and a digest of what it says) are checked before the call and again right
+before it leaves, so a sink changed or cleared on the way refuses it. A notice of an event from the sink's own
+connection gets no copy.
 
 | Route | Purpose |
 | --- | --- |

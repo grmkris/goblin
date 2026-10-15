@@ -50,6 +50,11 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   the endpoint and its tools' grant versions; a change pauses it for review. Only messages the confirmed speaks-for-me
   rule matches become owner turns, with no more authority than the app's; everything else stays untrusted data.
   Replies are goblin's calls under the owner's grant (`caller: 'model'`), one operation id a piece.
+- Notify me via (`sources/notify.ts`, ADRs 0066, 0070) is the one way goblin's own notices leave: a routine's notice
+  copies and the apps' `notify` power fill its whole-value template (`sendThroughSink`), as goblin's call under the
+  owner's grant, with resident authority and the sink's revision checked again right before the call leaves. A file
+  goes to a server as a `file_link` URL in a tool's arguments (MCP has no upload); the receiving tool's grant and Ask
+  first decide whether it is sent.
 - The shelf (`mcp/suggested.ts`, ADRs 0052, 0061) is data, one endpoint per entry on every deployment (`MCP_SHELF`
   replaces or adds entries): one mysi connection (`mysi.lol/mcp?codemode=off`) instead of the separate my* servers,
   publishing (Cloudflare), then servers that need no sign-in in groups; re-probe one with an `initialize` before

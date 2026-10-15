@@ -23,9 +23,9 @@ through `promiseWith` (`runtime/boundary.ts`).
 - What is not JSON in and out (the SSE streams, the owner's file bytes, the OAuth callback redirect) is an endpoint
   served through HttpApi's raw handlers, behind the same edge. One router (`AgentHttp`) serves the owner API and the
   internal API (`/internal`, `@goblin/contracts/internal`), which only the Worker calls on the stub: an inbound
-  client's ask, recent read and inspection, and MCP Events. Its gate (`InternalGate`) refuses a request
-  carrying the edge's mark; it never renews resident authority. A new caller that is not the owner's browser gets an internal endpoint, never an RPC
-  method.
+  client's ask, recent read and inspection, MCP Events, and the file a file link names (ADR 0070). Its gate
+  (`InternalGate`) refuses a request carrying the edge's mark; it never renews resident authority. A new caller that is
+  not the owner's browser gets an internal endpoint, never an RPC method.
 - Workers RPC drops custom error classes. The one RPC method left (`deleteAgentData`) returns `RpcResult`
   (`http/rpc.ts`) and the Worker unwraps it; both APIs answer their error envelope instead.
 - Run programs through the bridge, which `agent.ts` hands to the kits, alarms and apps engine it builds: `run` runs a

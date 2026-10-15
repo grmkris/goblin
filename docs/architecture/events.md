@@ -13,7 +13,8 @@ the connection's own spelling (ADR 0052), decided in one place
 (`packages/contracts/src/service-names.ts`): mygram's (`inbox_read`, `message_send`, `message.received`) on a direct
 connection, mysi's (`mygram_inbox_read`, `mygram_message_send`, `mygram.message.received`) through mysi, read from the
 tools it lists and the Events its `events/list` offers. Consumers stay keyed by mygram's own event name, and every
-later call (the pull, replies, notice copies, an app's `notify`) asks the live connection's tool list for the name.
+later call (the pull, replies) asks the live connection's tool list for the name. Notice copies and an app's `notify`
+no longer use the channel: they go through Notify me via ([sources.md](sources.md), ADR 0070).
 Every finite webhook subscription must confirm before `app_telegram_channel` copies the checkpoint and fences older
 cursor writes. The channel pulls immediately; a failure before that fence leaves the old channel checkpoint intact.
 There is no other transport: the doorbell is gone with mygram's. A subscription the server ends (a widened or revoked
@@ -53,8 +54,7 @@ single-choice `ask_user` goes as `question_ask` buttons with short ids (`o0`, `o
 read by structure, never by its words (mygram's display text): its `questionId` is looked up with
 `inbox_read { questionId }`, whose `choice` (or `answer`, for typed words) becomes the owner's reply as the kept label,
 and an offer's question sets the route the same way, typed words naming a button being the fallback. A send refused
-with `chat_paused` or `chat_left` marks the chat so and gives the answer up. Notices and an app's `notify` always go
-to `chat: 'dm'`. Submission acceptance is distinct from external Telegram completion. Disabling cleans up Events
+with `chat_paused` or `chat_left` marks the chat so and gives the answer up. Submission acceptance is distinct from external Telegram completion. Disabling cleans up Events
 while authority is available, drops held messages and replies to send, keeps the routes, then tombstones locally;
 finite remote leases expire if authorized cleanup cannot run.
 
