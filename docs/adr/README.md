@@ -25,7 +25,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0019](0019-panes-for-everything.md) | Panes for everything | Superseded by 0036 |
 | [0020](0020-durable-apps-one-iframe-per-instance.md) | Durable Apps, one iframe per instance | Accepted |
 | [0021](0021-agent-apps.md) | Agent apps | Accepted |
-| [0022](0022-owner-files-shell-and-r2.md) | The owner's files, in Shell's Workspace and R2 | Accepted |
+| [0022](0022-owner-files-shell-and-r2.md) | The owner's files, in Shell's Workspace and R2 | Accepted; amended by 0065 |
 | [0023](0023-chat-blocks-and-one-kit.md) | Chat blocks, one kit | Accepted |
 | [0024](0024-observing-conversations.md) | Observing conversations | Accepted |
 | [0025](0025-home-surface.md) | Home surface | Accepted; web presentation deferred |
@@ -58,4 +58,5 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0062](0062-short-skippable-start.md) | Short, skippable Start | Accepted |
 | [0063](0063-mcp-first-no-server-specific-code.md) | MCP-first: no server-specific code | Accepted |
 | [0064](0064-openid-connect-and-config-driven-deployment.md) | OpenID Connect sign-in and config-driven deployment | Accepted |
+| [0065](0065-files-from-mcp-content.md) | Files from MCP content | Accepted |
 | [0066](0066-sources.md) | Sources: any MCP server's events carry the owner's own messages, by a setup the owner confirms | Accepted |
