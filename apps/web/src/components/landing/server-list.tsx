@@ -3,7 +3,7 @@
 // a picture of it for visitors, so it reads nothing from the server.
 
 const SHELF: readonly { readonly group: string; readonly servers: readonly string[] }[] = [
-  { group: 'Your apps', servers: ['mysi: notes, browsers, Telegram, email, skills and terminals'] },
+  { group: 'Your apps', servers: ['mysi: notes, browsers, messaging, email, skills and terminals'] },
   { group: 'Publish', servers: ['Cloudflare'] },
   { group: 'Travel', servers: ['Kiwi.com', 'trivago', 'Ferryhopper'] },
   { group: 'Knowledge', servers: ['Wikidata', 'Microsoft Learn', 'AWS Knowledge', 'Hugging Face'] },

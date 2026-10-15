@@ -13,7 +13,7 @@ const wordsOf = (part: string): string =>
 
 /**
  * An event's name in words: `message.received` reads "Message received". Through a gateway an event is named
- * `<service>.<event>` (`mygram.message.received`), so a name of three parts or more drops its service.
+ * `<service>.<event>`, so a name of three parts or more drops its service.
  */
 export function eventWords(name: string): string {
   const parts = name.split('.').filter((part) => part !== '')
