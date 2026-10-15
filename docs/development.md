@@ -351,6 +351,8 @@ There are two branches: `dev` (the default; every change lands here) deploys to 
 runs on GitHub-hosted runners. Check runs on every push and pull request. A push to `dev` that passes Check runs Deploy
 dev: `scripts/release.py dev` requires that exact dev tip and its passing Check, plans without a delete, replace or
 re-create of goblinAuth, Files or Web, deploys, and verifies authenticated smoke, drift and the D1 migration inventory.
+The smoke runs up to three times, four minutes apart: right after a deploy the agents' Durable Objects still run the
+old code for some minutes.
 Its sanitized receipt is the run's `dev-acceptance` artifact. A superseded dev commit cannot deploy.
 
 Promote with `bun run promote <full-sha>` from any checkout with `gh` signed in and `.local/cloud.env`. It deploys nothing:

@@ -2,9 +2,10 @@
 from pathlib import Path
 import tempfile
 import unittest
+import release
 from release import (acceptance_run, directories, pick_database, prod_push, require_check,
                      require_clean_checkout, require_dev, require_existing, require_fast_forward, require_ref,
-                     require_signup, resources, safe_plan, tail, failure_reason)
+                     require_signup, resources, safe_plan, smoke_until_settled, tail, failure_reason)
 
 A, B = "a" * 40, "b" * 40
 
@@ -106,6 +107,24 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(failure_reason('{\n  "status": "failed",\n  "reason": "client_build_mismatch",\n  "steps": []\n}'),
                          "client_build_mismatch")
         self.assertIsNone(failure_reason("plain deploy output\nno json here"))
+
+    def test_the_smoke_tries_again_while_the_deploy_settles_and_its_last_failure_stands(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            logs, counter, waits = Path(temporary), Path(temporary) / "count", []
+
+            def failing(times):
+                # A smoke that fails `times` times, then passes.
+                counter.write_text(str(times))
+                return ["python3", "-c", f"from pathlib import Path; p = Path({str(counter)!r}); n = int(p.read_text()); "
+                        "p.write_text(str(n - 1)); raise SystemExit(1 if n > 0 else 0)"]
+
+            log_of = lambda attempt: logs / f"smoke-{attempt}.log"
+            self.assertEqual(smoke_until_settled(failing(2), {}, log_of, waits.append), "")
+            self.assertEqual(waits, [release.SMOKE_WAIT_SECONDS] * 2)
+            waits.clear()
+            with self.assertRaises(RuntimeError):
+                smoke_until_settled(failing(release.SMOKE_TRIES), {}, log_of, waits.append)
+            self.assertEqual(len(waits), release.SMOKE_TRIES - 1)
 
     def test_only_the_first_prod_release_must_be_invite_only(self):
         require_signup({"GOBLIN_SIGNUP_MODE": "invite"}, False)

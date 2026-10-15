@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -241,6 +242,24 @@ def execute(command, env, log):
     return log.read_text()
 
 
+# Right after a deploy the agents' Durable Objects run the old code for some minutes, and a request may meet one being
+# replaced (a closed socket, or an answer the new contract cannot read): the smoke tries again before the release fails.
+SMOKE_TRIES = 3
+SMOKE_WAIT_SECONDS = 240
+
+
+def smoke_until_settled(command, env, log_of, wait=time.sleep):
+    """Runs the smoke up to SMOKE_TRIES times, `log_of(try)` naming each try's log; the last failure stands."""
+    for attempt in range(1, SMOKE_TRIES + 1):
+        try:
+            return execute(command, env, log_of(attempt))
+        except RuntimeError:
+            if attempt == SMOKE_TRIES:
+                raise
+            print(f"smoke failed; trying again in {SMOKE_WAIT_SECONDS} s ({attempt + 1} of {SMOKE_TRIES})", flush=True)
+            wait(SMOKE_WAIT_SECONDS)
+
+
 def require_release_checkout(sha):
     if run(["git", "rev-parse", "HEAD"]).strip() != sha:
         raise RuntimeError("release_checkout_sha_mismatch")
@@ -280,8 +299,8 @@ def release(stage, sha):
     print(stage + ": deployed; verifying smoke and drift", flush=True)
     # The smoke's flows check reads Analytics Engine with the stage's Cloudflare credentials.
     smoke_env = env | {key: config[key] for key in ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]}
-    execute(["bun", "--env-file", str(LOCAL / (stage + ".env")), "scripts/smoke-dev.ts"],
-            smoke_env, logs / f"{prefix}-smoke.log")
+    smoke_until_settled(["bun", "--env-file", str(LOCAL / (stage + ".env")), "scripts/smoke-dev.ts"], smoke_env,
+                        lambda attempt: logs / (f"{prefix}-smoke.log" if attempt == 1 else f"{prefix}-smoke-{attempt}.log"))
     drift = execute(["bun", "run", "drift:" + stage], env, logs / f"{prefix}-drift.log")
     if not any(line.startswith("{") and json.loads(line).get("drift") == "verified" for line in drift.splitlines()):
         raise RuntimeError("drift_not_clean")
