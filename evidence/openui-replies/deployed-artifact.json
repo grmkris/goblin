@@ -1,0 +1,15 @@
+{
+  "url": "https://goblin-openui-spike-preview.kristjan-grm11775.workers.dev",
+  "status": 200,
+  "entry": "index-D2yVUwOX.js",
+  "sha256": "c046461c88a69770e8486ef9b6e61b291854fdaf79bb48a1f42402b09bff9d7c",
+  "bytes": 1188259,
+  "htmlMatchesBuild": true,
+  "entryMatchesBuild": true,
+  "headers": {
+    "content-security-policy": "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff",
+    "x-robots-tag": "noindex, nofollow"
+  }
+}

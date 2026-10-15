@@ -14,6 +14,8 @@ Quoted and closed replies disable their controls. Streaming, invalid source and 
 HTML-like text remains inert, the development inspector stays absent, and no external requests occur.
 Light/dark screenshots were inspected. This is local Chromium evidence, not a signed-in deployed conversation.
 
+The [deployed receipt](deployed-browser.json) records 22 checks with zero failures at desktop and phone widths after the final theme fix. The live HTML and entry JavaScript match the Alchemy build byte for byte; the [artifact record](deployed-artifact.json) gives the 1,188,259-byte entry hash and security headers.
+
 ## Local repository gates
 
 `heavy bun run check:fast` passed all 1,797 unit tests across eight test workspaces. The full gate reported zero
