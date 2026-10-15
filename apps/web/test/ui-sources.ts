@@ -103,6 +103,7 @@ const sinks: unknown[] = []
 
 /** The owner API for one page: servers, events, tools, Sources (changed by each step) and Notify me via. */
 async function serve(page: Page, label: string, sources: Map<string, Json>) {
+  const routeRows = new Map<string, Json>(ROUTES.map((row) => [row.key, row]))
   page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`))
   // Only the owner API: the fixture's own modules live under paths with `/api/` in them too.
   await page.route(
@@ -135,14 +136,17 @@ async function serve(page: Page, label: string, sources: Map<string, Json>) {
   })
   await page.route('**/api/sources/*/routes', (route) => {
     const id = new URL(route.request().url()).pathname.split('/').at(-2) ?? ''
-    if (route.request().method() === 'GET') return route.fulfill({ json: { source: sources.get(id), routes: ROUTES } })
+    if (route.request().method() === 'GET')
+      return route.fulfill({ json: { source: sources.get(id), routes: [...routeRows.values()] } })
     // SAFETY: the route select sends the owner API's SourceRoutePick.
     const pick = route.request().postDataJSON() as { readonly key: string; readonly route: unknown }
     routes.push(pick)
     const current = sources.get(id)
     if (current !== undefined) sources.set(id, { ...current, waiting: [] })
-    const row = ROUTES.find((each) => each.key === pick.key)
-    return route.fulfill({ json: { ...row, route: pick.route, held: 0, revision: 1, updatedBy: 'owner' } })
+    const row = routeRows.get(pick.key)
+    const updated = { ...row, route: pick.route, held: 0, revision: 1, updatedBy: 'owner' }
+    routeRows.set(pick.key, updated)
+    return route.fulfill({ json: updated })
   })
 }
 
@@ -169,6 +173,11 @@ async function connection(browser: Browser, origin: string, label: string, optio
   await page.getByText('2 messages waiting').waitFor()
   await page.getByLabel('Where “chat g_team” goes').selectOption({ label: '#Team' })
   await page.waitForFunction(() => document.querySelector('[aria-busy="true"]') === null)
+  assert.equal(
+    await page.getByLabel('Where “chat g_team” goes').inputValue(),
+    'answer:2',
+    `${label}: route was not saved`,
+  )
   await noSidewaysScroll(page, label)
   await page.screenshot({ path: path.join(out, `${label}-routes.png`), fullPage: true })
   await page.close()

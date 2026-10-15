@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { EVERYTHING, type SourceSetup, type SourceView, type TopicView } from '@goblin/contracts'
+import { EVERYTHING, type PersonaView, type SourceSetup, type SourceView, type TopicView } from '@goblin/contracts'
+import { responderOptions } from '../src/lib/route-choice.ts'
 import {
   choiceOfRoute,
   conversationName,
@@ -27,6 +28,19 @@ const topic = (id: number, name: string, archivedAt?: number): TopicView => ({
   createdAt: 1,
 })
 const TOPICS = [topic(1, 'Personal'), topic(2, 'Travel'), topic(3, 'Old', 5)]
+
+const persona = (id: number, name: string, archivedAt?: number): PersonaView => ({
+  id,
+  name,
+  avatar: { glyph: name[0] ?? 'P', hue: 120 },
+  role: 'Helps',
+  instructions: 'Help.',
+  setup: { mcpServers: [], skills: [], apps: [] },
+  revision: 1,
+  createdAt: 1,
+  updatedAt: 1,
+  ...(archivedAt !== undefined && { archivedAt }),
+})
 
 /** An inbox-style setup: a message event, keyed by chat, the owner's when `/from/isOwner` is true, answered back. */
 const SETUP: SourceSetup = {
@@ -128,6 +142,18 @@ describe('a Source in words (ADR 0066)', () => {
 })
 
 describe("a Source's route select", () => {
+  it('offers goblin or a live Persona to answer, and preserves an archived choice', () => {
+    const personas = [persona(7, 'Guide'), persona(8, 'Retired', 5)]
+    expect(responderOptions(personas, 'goblin')).toEqual([
+      { value: 'goblin', text: 'goblin answers' },
+      { value: 'persona:7', text: '@Guide answers' },
+    ])
+    expect(responderOptions(personas, 'persona:8').at(-1)).toEqual({
+      value: 'persona:8',
+      text: '@Retired (archived) answers',
+    })
+  })
+
   it('turns every route into a choice and back', () => {
     for (const route of [
       { to: 'topic', topic: 2 },
