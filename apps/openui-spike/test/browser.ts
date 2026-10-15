@@ -86,12 +86,20 @@ try {
     await page.getByRole('button', { name: 'Use dark theme' }).click()
     await page.waitForFunction(() => document.documentElement.classList.contains('dark'))
     const foreground = await page.locator('.spike-intro h1').evaluate((node) => getComputedStyle(node).color)
-    for (const selector of ['.spike-renderer h2', '.spike-renderer dd:first-of-type']) {
-      const colors = await page
-        .locator(selector)
-        .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).color))
-      assert(colors.length > 0 && colors.every((color) => color === foreground), 'Dark reply text follows the theme')
-    }
+    const headingColors = await page
+      .locator('.spike-renderer h2')
+      .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).color))
+    assert(
+      headingColors.length > 0 && headingColors.every((color) => color === foreground),
+      'Dark reply headings follow the theme',
+    )
+    const metricColors = await page
+      .locator('.spike-renderer dd:first-of-type')
+      .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).color))
+    assert(
+      metricColors.length > 0 && metricColors.every((color) => color === foreground),
+      'Dark reply metrics follow the theme',
+    )
     checks.push(`${label}: dark headings and metric values use the foreground color`)
     await page.screenshot({ path: resolve(output, `${label}-dark.png`), fullPage: true })
     if (width === 390) {
