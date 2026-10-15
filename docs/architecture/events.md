@@ -73,13 +73,12 @@ termination stops lease refresh and surfaces health. Mail and workspace changes 
 
 The owner browses a connection's event streams before granting any (`GET /api/mcp/:id/events`, `Events.catalog`):
 resident authority and a signed-in connection are enough, no selector grant is made, and each stream says
-whether goblin can subscribe to it (poll and webhook). Descriptions are the server's claims, cut to 500 characters;
-its `payloadSchema`, the shape the server says each event's data has, is passed on as it came (here and in the
-agent's `mcp_list` with `events: true`). A stream also carries what the server suggests for it, read leniently field by
-field from the descriptor's `title` and `_meta.suggest` (a key with no vendor's prefix; `eventSuggestion`,
-`mcp/events/protocol.ts`; a malformed one never fails the list):
-`title`, `summary`, `group`, `recommended`, `tellMe` and `rate` (`often`, `daily`, `rare`). They are claims that only
-pre-select in the picker; nothing is granted or confirmed by them. Through mysi an event is named
+whether goblin can subscribe to it (poll and webhook). goblin reads a descriptor's standard fields only (ADR 0068):
+`name`, `title`, `description`, `inputSchema`, `payloadSchema` and `delivery`, never its `_meta` (`eventWords`,
+`mcp/events/protocol.ts`). The title is folded to one line of at most 120 characters (one that is not text is left out,
+and never fails the list) and the description cut to 500; both are the server's claims, for the owner's eyes. Its
+`payloadSchema`, the shape the server says each event's data has, is passed on as it came (here and in the agent's
+`mcp_list` with `events: true`). Nothing a server says picks, grants or confirms an event. Through mysi an event is named
 `<service>.<event>`, as subscribed and as delivered, so the name checks at ingress and dispatch are unchanged. A
 subscription the Telegram channel consumes is marked `telegram: true` in the connection's Events health.
 
@@ -90,11 +89,10 @@ a dismissal never undoes `done`. The connection's card shows an **Events** secti
 the offer while open, what is set up ("`<title>` → #Topic", "→ goblin, in #Topic" or "→ @Persona", with Pause or
 Resume and Edit, which opens the routine editor and then its review), the **picker** for the rest
 (`components/event-picker.tsx`, `lib/event-setup.ts`, `lib/events.ts`), and the subscriptions' health. The picker
-lists the streams by group (the server's, else the service before the first dot of a three-part name, else the
-connection), each by title (else its name in words, `message.received` → "Message received") with its summary and a
-quiet rate. While the offer is open, a recommended stream the server says to tell the owner about is picked, to Tell me
-in Personal; one it recommends without `tellMe` is handed to goblin there. Each picked stream has one select for where
-it goes: Tell me in a Topic, or goblin acting on it in a Topic or a Persona acting on it (answering in Personal). A
+lists the streams grouped by the service a gateway names them by (the part before the first dot of a name of three
+parts or more, mysi's `<service>.<event>`), else flat, each by its title (else its name in words, `message.received` →
+"Message received") with its description. Nothing is picked until the owner picks it; a picked stream goes to Tell me
+in Personal until they choose otherwise. Each picked stream has one select for where it goes: Tell me in a Topic, or goblin acting on it in a Topic or a Persona acting on it (answering in Personal). A
 hand-over adds a line saying who answers where; a Tell me pick adds none, since its
 notice is the title and line its row already shows. **Advanced**
 (folded) holds each stream's filters (a nullable or optional string is a plain optional field, with the server's

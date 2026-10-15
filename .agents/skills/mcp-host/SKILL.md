@@ -49,7 +49,10 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   wake selector and the read and reply tools, subscribes `source:<id>` (handler `source-wake`) and binds the Source to
   the endpoint and its tools' grant versions; a change pauses it for review. Only messages the confirmed speaks-for-me
   rule matches become owner turns, with no more authority than the app's; everything else stays untrusted data.
-  Replies are goblin's calls under the owner's grant (`caller: 'model'`), one operation id a piece.
+  Replies are goblin's calls under the owner's grant (`caller: 'model'`), one operation id a piece. No server suggests a
+  setup: only the agent's `source_propose` proposes one (ADR 0068). A `title` pointer names a conversation, `newKeys`
+  may give each new one a Topic of its own (`topic-per-key`), a message's `attachments` (MCP content blocks) are kept
+  with `materialize`, and an owner turn's content carries goblin's `ownTurn` mark after the words.
 - Notify me via (`sources/notify.ts`, ADRs 0066, 0070) is the one way goblin's own notices leave: a routine's notice
   copies and the apps' `notify` power fill its whole-value template (`sendThroughSink`), as goblin's call under the
   owner's grant, with resident authority and the sink's revision checked again right before the call leaves. A file
@@ -87,8 +90,9 @@ itself authorize model spend, external messages, deployment or production change
   (`/hooks/mcp-events/<user>/<connection>/<token>`). Model text names one as `"<label>" (<id>)` (`named`); labels and
   notice text never enter telemetry. A connection that sends events offers them (`ServerView.events`: open, dismissed,
   done; `mcp/events/offers.ts`); `mcp_list` shows its first 64 event streams as untrusted data when asked
-  (`events: true`). A descriptor's `title` and `_meta.suggest` are read leniently, field by field
-  (`eventSuggestion`): suggestions that pre-select in the owner's picker and never grant or confirm a selector. `mcp_list` lists a connection's tools in brief (name, one-line description, flags that differ) and
+  (`events: true`). goblin reads a descriptor's standard fields only (`name`, `title`, `description`, `inputSchema`,
+  `payloadSchema`, `delivery`; ADR 0068), never its `_meta`: the title and description (`eventWords`) are claims for
+  the owner's eyes, and nothing a server says picks, grants or confirms a selector. `mcp_list` lists a connection's tools in brief (name, one-line description, flags that differ) and
   gives input schemas only for the tools named in `tools`: its result stays in the model's context. Its list of
   connections puts connected ones first, so a configured connection never signed in does not win.
 

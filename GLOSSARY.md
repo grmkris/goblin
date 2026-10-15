@@ -157,14 +157,20 @@ _Avoid_: channel, integration, bridge
 **Source setup**:
 The five facts of a Source, confirmed at an exact revision: the event that wakes it, the key that names a
 conversation (JSON pointers into a message), which messages are the owner speaking (the speaks-for-me rule; anyone
-else's are notices or dropped), how the content is read (the event's data, or a tool from a cursor) and, optionally,
-the tool an answer goes back with; plus where a new conversation goes. Bound to the connection's endpoint and the
-grants of its tools: a change of either pauses it for review.
+else's are notices or dropped), how the content is read (the event's data, or a tool from a cursor, with optional
+pointers to the conversation's title and the message's attachments) and, optionally, the tool an answer goes back
+with; plus where a new conversation goes (a route, or a new Topic of its own). Only the agent proposes one. Bound to
+the connection's endpoint and the grants of its tools: a change of either pauses it for review.
 
 **Route**:
 Where one conversation of a Source goes: turns in a Topic answered by goblin or a Persona, notes in a Topic with no
 turn, nowhere, or held (the twenty newest) until the owner chooses. A change leaves an organize receipt with Undo.
 _Avoid_: mapping, binding
+
+**Own turn**:
+The owner's message that came from elsewhere and that goblin marks as theirs after its words (a Source's message the
+speaks-for-me rule matched): the web treats it as a turn the owner took. Nothing in the words can mark one.
+_Avoid_: owner message, on its own
 
 **Notify me via**:
 The owner's choice of one connection's tool, with a `{{text}}` template, that sends goblin's notices to them elsewhere

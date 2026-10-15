@@ -15,12 +15,16 @@ Five facts and a default (`SourceSetup`):
   is the JSON of their values in order (`["dm",null]`), at most 512 characters.
 - `speaksForMe`: `{ all: true }` or `{ pointer, equals }`; `others` says what becomes of anyone else's message
   (`notice`, an untrusted notice to the owner, or `drop`).
-- `read`: `{ from: 'payload', items?, id?, text, direction? }` reads the event's data (a list at `items`, else the data
-  is one message; without `id` a message is known by the event's id and its place); `{ from: 'tool', tool, arguments,
-  items, cursor, id, text, direction? }` calls a tool from a cursor, `"{{cursor}}"` a whole argument value.
+- `read`: `{ from: 'payload', items?, id?, text, title?, attachments?, direction? }` reads the event's data (a list at
+  `items`, else the data is one message; without `id` a message is known by the event's id and its place);
+  `{ from: 'tool', tool, arguments, items, cursor, id, text, title?, attachments?, direction? }` calls a tool from a
+  cursor, `"{{cursor}}"` a whole argument value. `title` points at the conversation's name (a chat's title);
+  `attachments` at a list of MCP content blocks (`resource_link`, `image`, `resource`, `audio`), shaped as a tool
+  result's content is, that the message brought.
 - `reply` (optional): `{ tool, arguments, maxChars }`, its arguments using `"{{key.<name>}}"`, `"{{text}}"` (required) and
   `"{{operationId}}"`.
-- `newKeys`: the route a conversation seen for the first time takes (`held` unless the setup says otherwise).
+- `newKeys`: what a conversation seen for the first time gets (`held` unless the setup says otherwise): a route, or
+  `{ to: 'topic-per-key' }`, a new Topic of its own answered by goblin.
 
 Templates fill whole string values only (`placeholdersOf`, `fillTemplate`, `templateProblem`): a string that holds `{{`
 and is not one placeholder is refused, and an unknown placeholder too; the contract checks a setup's templates when it
@@ -30,14 +34,13 @@ webhook), the read and reply tools, and every pointer against the event's `paylo
 that lists its properties without `additionalProperties` says a pointer to any other is absent; one that says nothing
 lets it be).
 
-A server may suggest a setup on an event as `_meta.suggest.source` (`eventSuggestion`, `mcp/events/protocol.ts`): its
-key, speaks-for-me rule and read must hold for there to be one, and a reply, a rule for others, a route for new
-conversations or arguments that do not hold are left out on their own. It reaches the owner as `EventStream.source`.
+No server suggests a setup (ADR 0068): goblin reads an event's standard fields only, never its `_meta`. The agent
+proposes one from the event's `payloadSchema`, the tools' schemas and the server's skill.
 
 ## Proposing and confirming
 
-A proposal comes from the owner (Connections, from a server's suggestion: `POST /api/sources`) or the agent
-(`source_propose`, `pi/sources.ts`, which ends its turn and leaves a review card in the chat). `proposeSource`
+A proposal comes from the agent only (`source_propose`, `pi/sources.ts`, which ends its turn and leaves a review card
+in the chat; the card is also on the connection's card, `components/connection-sources.tsx`). `proposeSource`
 (`sources/program.ts`) checks it and keeps it as revision 1 in `app_source_setups`; the same operation finds the same
 proposal. Only the owner's `confirm` of that exact revision binds it (`bind`): resident authority is checked, the wake
 selector is granted (`Events.grant`) and the read and reply tools (`McpGrants.setTool`), a tool read is started at the
@@ -58,25 +61,42 @@ Sources' alarm (`sourcesWake`, `sources/wake.ts`), a page at a time from the sto
 control marks the Source to be subscribed again; a `gap` pulls a tool read again.
 
 Each message (`sources/messages.ts`) is read by the setup alone: skipped unless it is incoming (`direction`), keyed and
-has words. A conversation seen for the first time gets a route from `newKeys` (`app_source_routes`, `updated_by`
-`default`). A message the speaks-for-me rule matches is the owner's: in a Topic it becomes a turn
+has words or attachments. Its conversation is named by the text at `read.title` (one line, at most 80 characters), and
+the route keeps the newest name a message gave. A conversation seen for the first time gets a route from `newKeys`
+(`app_source_routes`, `updated_by` `default`); with `topic-per-key` goblin makes it a Topic of its own (`topicFor`,
+`sources/places.ts`, by operation `source-topic:<source>:<digest of the key>`), named after its title, else its values,
+else the connection's label; a Topic that cannot be made leaves it held, reported. A message the speaks-for-me rule matches is the owner's: in a Topic it becomes a turn
 (`ChatOperations.send` through `submitTurn`, `sources/turns.ts`, receipt `source` from origin `source`, flow `source`
 via `mcp`), with a Persona it is that Persona's ask in the Topic (`askPersonas`), with `listen` a passive `app.source`
 note, with `ignore` nothing, and with `held` it waits in `app_source_held` (the twenty newest; the rest are counted and
 the count goes before the first one delivered). The turn's operation is `source-<source>-<message id>` (a long id as
 its digest), so the same message is the same operation. Its author is the connection's label and the conversation's
-values (`Chat · chat dm`). Anyone else's message is a notice (`app.notice`, framed as untrusted data from the
-connection, counted into the Source's hour of twenty) in the route's Topic, or Personal; it never starts a turn.
+title, else its values (`Chat · Trip planning`, `Chat · chat dm`). Its content carries goblin's mark after the words,
+`{"ownTurn":{"via":"source"}}` (`OwnTurnMark`, the origin its receipt names), which the web reads to treat it as the
+owner's own turn (a scroll anchor and a row of the turn map, which names the connection); the words are one block
+before it, so nothing they say can add one. A passive note (`listen`) carries no mark. Anyone else's message is a
+notice (`app.notice`, framed as untrusted data from the connection, counted into the Source's hour of twenty) in the
+route's Topic, or Personal; it never starts a turn, and what it brought is never fetched.
+
+The owner's own message's attachments are kept before it is routed, held or not, since a link may not last: the ports
+read each block at `read.attachments` (a link, an image or audio with its bytes, or an embedded resource) and keep it
+with `materialize` (`mcp/content.ts`, ADR 0065) under `/agent/received/<connection>/<day>/`, an image as an embedded
+blob named `image`. The turn names the kept files after its words as untrusted references from the connection
+(`ReceivedBlock`: `received`, and a `notReceived` note for each block not kept or not MCP content), and a kept image of
+at most 256 KiB is shown inline when the owner's model takes images. A held message keeps the files' references
+(`app_source_held.files`), not the images; a Persona's ask carries the references only. A message with attachments and
+no words is a turn that says so. A message read again after a failure may keep its files again.
 
 ## Routes
 
-The route table (`GET /api/sources/:id/routes`) lists each conversation, its values, its route, what it holds and its
-revision. `PUT /api/sources/:id/routes` and the agent's `source_route` (only on the owner's direct request) set one
+The route table (`GET /api/sources/:id/routes`) lists each conversation, its values, its title, its route, what it
+holds and its revision; the route table and Activity's offer name a conversation by its title, else its values. `PUT /api/sources/:id/routes` and the agent's `source_route` (only on the owner's direct request) set one
 through the engine's permit, deliver what it held in order, and leave an organize receipt `source.route`
 (`<source>:<key>`) whose Undo puts the route back with no delivery while its revision is the one the change left
 (`undoSourceRoute`, `sources/undo.ts`). `source_routes` lists every Source's conversations in words for the agent.
 `SourceView.waiting` carries the conversations held for a route; Activity offers each one with a route select and
-lists Sources paused for review with Resume.
+lists Sources paused for review with Resume. A `source.route` receipt the workspace feed brings, new or undone, makes
+the web read the Sources and their route tables again (`lib/workspace/invalidations.ts`).
 
 ## Answers back
 
@@ -107,7 +127,6 @@ connection gets no copy.
 | Route | Purpose |
 | --- | --- |
 | `GET /api/sources` | Every Source with the conversations waiting for a route. |
-| `POST /api/sources` | A proposal (`SourceProposal`), 201; the same operation finds it again. |
 | `POST /api/sources/:id/confirm`, `/refuse` | The exact revision (`SourceRevision`); a stale one is 409. |
 | `GET /api/sources/:id/routes`, `PUT` | The route table; one conversation's route (`SourceRoutePick`). |
 | `POST /api/sources/:id/pause`, `/resume`, `DELETE /api/sources/:id` | Pause, bind again, remove. |
@@ -116,9 +135,14 @@ connection gets no copy.
 ## Storage and tests
 
 Migration `20261102000100_sources` adds `app_source_setups`, `app_source_routes`, `app_source_held` and
-`app_source_replies`; `20261102000200_notify_sink` adds `app_notify_sink` (`storage/sources.ts`). Unit tests run the
-real migrations in `node:sqlite` with the engine's ports and the MCP host faked (`test/sources-*.test.ts`): pointers
-against schemas and template leaves, the lenient suggestion, confirm granting and subscribing, an owner message as a
-turn in the routed Topic, someone else's as a notice, a held conversation routed and undone, an answer in pieces once,
-retries and the give-up notice, a terminated subscription made again and a changed grant pausing the Source. The
+`app_source_replies`; `20261102000200_notify_sink` adds `app_notify_sink`; `20261102000300_source_parity` adds each
+conversation's `title` and a held message's `files` (`storage/sources.ts`). Unit tests run the real migrations in
+`node:sqlite` with the engine's ports and the MCP host faked (`test/sources-*.test.ts`): pointers against schemas and
+template leaves, confirm granting and subscribing, an owner message as a turn in the routed Topic, someone else's as a
+notice, a conversation named by its title and given a Topic of its own, attachments kept and held by reference, a held
+conversation routed and undone, an answer in pieces once, retries and the give-up notice, a terminated subscription
+made again and a changed grant pausing the Source. The workerd canary (`test/integration/sources-probe.ts`, in the
+native suite) runs a Source end to end on the real agent over the official Events producer: confirmed, a signed
+webhook, a tool read from its cursor, the owner's message (with a photo kept under `/agent/received`) a marked turn in a
+Topic made for its chat, someone else's an untrusted notice, and the answer sent once under its operation id. The
 browser walk is `apps/web/test/ui-sources.ts`. None of it is deployed-stage evidence.

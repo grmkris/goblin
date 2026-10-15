@@ -398,10 +398,10 @@ right on a desktop and from the bottom on a phone, in light and dark: Everything
 touch rows of 44px, no sideways scroll, and Save as the owner API's compare-and-set answered with a routine left short.
 Screenshots go under `.local/goblin-acceptance/setup-*`; this is browser fixture evidence only.
 
-`heavy bun apps/web/test/ui-events.ts` renders a connection's Events (ADR 0041) from source in local Chromium at desktop
-and phone widths, light and dark: the open offer, the picker with the server's titles, groups and rate, the
-recommended event picked already, an event the Telegram channel takes, a filter the server requires asked for in
-Advanced, a hand-over to a Persona, and both events set up in one step (each proposed, then confirmed), with the owner
+`heavy bun apps/web/test/ui-events.ts` renders a connection's Events (ADR 0041, ADR 0068) from source in local Chromium
+at desktop and phone widths, light and dark: the open offer, the picker with the events' titles and descriptions grouped
+by service, nothing picked until the owner picks it, an event the Telegram channel takes, a filter the server requires
+asked for in Advanced, a hand-over to a Persona, and both events set up in one step (each proposed, then confirmed), with the owner
 API routed in the page and the proposals it receives checked. Screenshots go under
 `.local/goblin-acceptance/events-*`; this is browser fixture evidence only.
 
