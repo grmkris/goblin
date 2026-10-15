@@ -10,7 +10,6 @@ import {
   agentAppName,
   appList,
   appOrigin,
-  appPlacement,
   appView,
   closeWithConversations,
   findCall,
@@ -45,9 +44,6 @@ export const appsOver = (
     list: attemptSync(() => appList(db, agents)).pipe(Effect.withSpan('Apps.list')),
     view: Effect.fn('Apps.view')(function* (id: string) {
       return yield* attemptSync(() => appView(db, agents, id))
-    }),
-    placement: Effect.fn('Apps.placement')(function* (id: string) {
-      return yield* attemptSync(() => appPlacement(db, id))
     }),
     register: Effect.fn('Apps.register')(function* (session: string, callId: string, origin: AppOrigin) {
       const now = yield* epochSeconds

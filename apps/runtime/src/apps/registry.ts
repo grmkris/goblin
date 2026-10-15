@@ -10,7 +10,7 @@ import type { PiSessions } from '../pi/sessions.ts'
 import type { AgentAppInfo } from '../agent-apps/engine.ts'
 import { appConversations, appRegistry } from '../storage/schema.ts'
 import { isRecord } from '../runtime/digest.ts'
-import type { AppPlacement, AppSharing } from './service.ts'
+import type { AppSharing } from './service.ts'
 
 type Row = typeof appRegistry.$inferSelect
 
@@ -104,12 +104,6 @@ function rowOf(db: ChatDb, id: string): Row {
     : undefined
   if (row === undefined) throw new NotFound({ what: 'app' })
   return row
-}
-
-/** Lightweight placement metadata for Home validation; unlike `appList`, this never resolves an agent view. */
-export function appPlacement(db: ChatDb, id: string): AppPlacement {
-  const row = rowOf(db, id)
-  return { source: row.source, closed: row.closedAt !== null, tool: row.tool, title: row.title }
 }
 
 /** One App as it is now; `NotFound` when there is none. */

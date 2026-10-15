@@ -228,6 +228,4 @@ Use Recharts or react-leaflet directly for what the kit does not draw; on a reac
 
 An app has one live frame shared by its chat and page. `useHost()` from `@goblin/app` follows the current surface (`inline` or `page`) and available width and height. Inline height requests are bounded by the host; a page fills its pane. Opening a page and returning to chat preserves React state and the action bridge.
 
-Home dashboard presentation is deferred. Do not offer to place new apps there: saved layouts are retained by the runtime, but currently have no browser surface.
-
 For a live inbox or calendar view, declare the exact connected tool in `uses.tools`, refresh it with a `{ action: 'refresh', every: '15m' }` schedule, validate and bound the response in `prepare`, and retain the last good state when a refresh fails. Show freshness and the last error; the complete example is in the `app_docs` `examples` topic. The owner must connect the real server and approve the app power.

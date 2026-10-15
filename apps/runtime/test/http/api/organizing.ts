@@ -4,13 +4,11 @@ import type { FlowEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
-import type { AgentApps } from '../../../src/agent-apps/engine.ts'
 import { Chats, Conversations } from '../../../src/chats/service.ts'
 import { RoutineControl, RoutineRuns } from '../../../src/routines/service.ts'
 import { AgentInput } from '../../../src/runtime/input.ts'
 import { PiSessions } from '../../../src/pi/sessions.ts'
 import { Apps } from '../../../src/apps/service.ts'
-import { HomeService } from '../../../src/home/service.ts'
 import { delegationServices } from '../../../src/layers/delegation.ts'
 import { KeyedLock } from '../../../src/observability/lock.ts'
 import { Changes, makeChanges } from '../../../src/runtime/changes.ts'
@@ -60,7 +58,7 @@ const setupServices = (retooled: number[]) =>
 
 /**
  * The organizing groups (topics, personas, organize) as the agent serves them: lane D's services over real Topic,
- * Persona, receipt and Home stores on SQLite. The gate's resident authority is the only fake. Nothing here
+ * Persona and receipt stores on SQLite. The gate's resident authority is the only fake. Nothing here
  * has an open chat to stop, an agent app or an MCP App, so Pi, Stop, the apps and the MCP host are never read.
  */
 export const organizing = () => {
@@ -92,9 +90,6 @@ export const organizing = () => {
     db,
     (kind, target) => (kind.startsWith('topic.') ? topics : personas).get(Number(target)).revision,
   )
-  // SAFETY: with no agent apps, Home reads only the engine's (empty) app list and never an App placement or its info.
-  const engine = Object.assign(Object.create(null) as AgentApps, { store: { apps: () => [] } })
-  const home = new HomeService(db, engine)
   // Current, counting the gate's renewals; the organizing programs ask it only to `require` itself.
   const resident = currentResident()
   // A Topic created here has no open chat, so an archive (an Undo of its creation) reads only `openIn`.
@@ -102,7 +97,7 @@ export const organizing = () => {
   const flows: FlowEvent[] = []
   const retooled: number[] = []
   const catalog = setupServices(retooled)
-  const lane = delegationServices({ topics, personas, invocations: unread, receipts, home }).pipe(
+  const lane = delegationServices({ topics, personas, invocations: unread, receipts }).pipe(
     Layer.provide(Layer.merge(KeyedLock.layer, Layer.succeed(Changes, makeChanges()))),
   )
   const { fetch } = serve(
@@ -132,5 +127,5 @@ export const organizing = () => {
       ),
     ),
   )
-  return { fetch, resident, topics, personas, receipts, home, flows, retooled }
+  return { fetch, resident, topics, personas, receipts, flows, retooled }
 }

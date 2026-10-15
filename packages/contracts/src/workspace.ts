@@ -2,7 +2,6 @@ import * as Schema from 'effect/Schema'
 import { AppView } from './apps.ts'
 import { ConversationActivity, ConversationView } from './conversations.ts'
 import { DecisionProposal } from './decisions.ts'
-import { HomeLayout } from './home.ts'
 import { NotificationView } from './notices.ts'
 import { PersonaInvocationView, PersonaView } from './personas.ts'
 import { SidebarPins } from './sidebar.ts'
@@ -14,7 +13,6 @@ export const WorkspaceSnapshot = Schema.Struct({
   conversations: Schema.Array(ConversationView),
   activity: Schema.Array(ConversationActivity),
   apps: Schema.Array(AppView),
-  home: Schema.optional(HomeLayout),
   topics: Schema.optional(Schema.Array(TopicView)),
   personas: Schema.optional(Schema.Array(PersonaView)),
   /** Persona answers not yet settled, so a reload still shows who is answering. */
@@ -32,7 +30,6 @@ export type WorkspaceSnapshot = typeof WorkspaceSnapshot.Type
 
 /** One change the workspace feed sends after its snapshot: a conversation or App as it is now, or what one is doing. */
 export const WorkspaceChange = Schema.Union([
-  Schema.Struct({ type: Schema.Literal('home'), home: HomeLayout }),
   Schema.Struct({ type: Schema.Literal('conversation'), conversation: ConversationView }),
   Schema.Struct({ type: Schema.Literal('activity'), activity: ConversationActivity }),
   Schema.Struct({ type: Schema.Literal('app'), app: AppView }),

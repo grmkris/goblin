@@ -7,7 +7,6 @@ import { RolledBack } from '../agent-apps/rollback.ts'
 import { problemText } from '../agent-apps/queue.ts'
 import { ScriptResult, runScript } from '../agent-apps/script.ts'
 import { withContext } from './context-tail.ts'
-import { homeExtension } from './home.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { reportAndRecover } from '../observability/report.ts'
 import { Setups } from '../setup/service.ts'
@@ -21,7 +20,7 @@ const GUIDE = [
   'change one with `app_build`; for small fixes send `edits`. If a build fails, read its problems and fix them. An',
   'app with a `view.tsx` (topic `ui`) shows the owner a live UI in chat and as a page. Before you write or change a',
   '`view.tsx`, read `app_docs` topic `ui` and follow its Design rules: give each section room. Use `useHost()`',
-  'from `@goblin/app` for its surface and available room. The Home dashboard is deferred; do not offer tiles there. An app',
+  'from `@goblin/app` for its surface and available room. An app',
   "reaches the internet, the owner's MCP tools, a model, Telegram or other apps only with powers the owner approves",
   '(topic `powers`), and runs an action on its own with `schedules` (topic `schedules`). When a task needs a service',
   'the owner has not connected, look with `mcp_suggest` and ask them with `mcp_request_server`.',
@@ -137,8 +136,8 @@ const codeTool = (apps: AgentApps) =>
   })
 
 /**
- * Owner app and Home management, on main and threads (ADR 0021). Without Dynamic Workers (`buildable` false, ADR 0064)
- * no app can be built or run, so only Home is left.
+ * Owner app management, on main and threads (ADR 0021). Without Dynamic Workers (`buildable` false, ADR 0064) no app
+ * can be built or run, so there is none.
  */
 export function appsExtension(apps: AgentApps, run: RunProgram, buildable = true) {
   const extension = defineExtension({
@@ -146,10 +145,10 @@ export function appsExtension(apps: AgentApps, run: RunProgram, buildable = true
     sections: [section('apps', () => GUIDE)],
     tools: [docsTool(apps), buildTool(apps, run), inspectTool(apps), rollbackTool(apps)],
   })
-  return buildable ? [extension, homeExtension(run)] : [homeExtension(run)]
+  return buildable ? [extension] : []
 }
 
-/** Execution shared with helpers, without app or Home management. */
+/** Execution shared with helpers, without app management. */
 export function appExecutionExtension(apps: AgentApps, run: RunProgram) {
   return defineExtension({
     name: 'goblin.app-execution',

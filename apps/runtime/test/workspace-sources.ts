@@ -7,7 +7,6 @@ import * as Stream from 'effect/Stream'
 import { Apps } from '../src/apps/service.ts'
 import type { ChatId } from '../src/chats/directory.ts'
 import { Chats, Conversations } from '../src/chats/service.ts'
-import { Home } from '../src/home/service.ts'
 import { Receipts } from '../src/organize/service.ts'
 import { Invocations, Personas } from '../src/personas/service.ts'
 import { PiSessions } from '../src/pi/sessions.ts'
@@ -34,7 +33,6 @@ export const emptySources = Layer.mergeAll(
   stub(Chats, { primary: '1' as ChatId, isHidden: () => Effect.succeed(false) }),
   stub(Conversations, { list: Effect.succeed([]) }),
   stub(Apps, { list: Effect.succeed([]) }),
-  stub(Home, { layout: Effect.succeed({ revision: 0, tiles: [] }) }),
   stub(Topics, { list: Effect.succeed([]) }),
   stub(Personas, { list: Effect.succeed([]) }),
   stub(Invocations, { live: Effect.succeed([]) }),

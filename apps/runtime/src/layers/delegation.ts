@@ -3,7 +3,6 @@ import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import { Conversations } from '../chats/service.ts'
-import { Home, HomeService } from '../home/service.ts'
 import { offeredModels } from '../inference/store.ts'
 import { Memories } from '../memory/service.ts'
 import { deploymentModelIds } from '../models.ts'
@@ -22,41 +21,38 @@ import { topicPorts } from '../topics/ports.ts'
 import { TopicRegistry } from '../topics/registry.ts'
 import { Topics } from '../topics/service.ts'
 
-/** The delegation stores, one each per agent: Topics, Personas, the invocations, receipts and Home, on SQLite. */
+/** The delegation stores, one each per agent: Topics, Personas, the invocations and receipts, on SQLite. */
 export type DelegationStores = {
   readonly topics: TopicRegistry
   readonly personas: PersonaRegistry
   readonly invocations: PersonaInvocations
   readonly receipts: OrganizeReceipts
-  readonly home: HomeService
 }
 
 /**
- * The delegation services over `stores`: Topics (creates serialized by the per-key lock), Personas, the invocations,
- * receipts and Home, each telling the change bus what its writes changed.
+ * The delegation services over `stores`: Topics (creates serialized by the per-key lock), Personas, the invocations
+ * and receipts, each telling the change bus what its writes changed.
  */
 export const delegationServices = (
   stores: DelegationStores,
-): Layer.Layer<Topics | Personas | Invocations | Receipts | Home, never, KeyedLock | Changes> =>
+): Layer.Layer<Topics | Personas | Invocations | Receipts, never, KeyedLock | Changes> =>
   Layer.effectContext(
     Effect.gen(function* () {
       const topics = yield* Topics.make(stores.topics)
       const personas = yield* Personas.make(stores.personas)
       const receipts = yield* Receipts.make(stores.receipts)
       const invocations = yield* Invocations.make(stores.invocations)
-      const home = yield* Home.make(stores.home)
       return Context.mergeAll(
         Topics.context(topics),
         Personas.context(personas),
         Invocations.context(invocations),
         Receipts.context(receipts),
-        Home.context(home),
       )
     }),
   )
 
 /**
- * The agent's own delegation stores, each made here once: Topics, Personas, the invocations, receipts and Home. A
+ * The agent's own delegation stores, each made here once: Topics, Personas, the invocations and receipts. A
  * Topic's Conversation is made, written and told about through the conversation services, listed with Personal's
  * switches inside the Topic's own transaction, and its memory turned on through Memories.
  */
@@ -79,14 +75,13 @@ const stores: Effect.Effect<DelegationStores, never, AgentInput | Db | Conversat
         return undefined
       }
     })
-    const home = new HomeService(db, input.agentApps)
-    return { topics, personas, invocations: new PersonaInvocations(db), receipts, home } satisfies DelegationStores
+    return { topics, personas, invocations: new PersonaInvocations(db), receipts } satisfies DelegationStores
   },
 )
 
-/** Delegation, Topics, Personas, organizing and Home. */
+/** Delegation, Topics, Personas and organizing. */
 export const DelegationLive: Layer.Layer<
-  Topics | Personas | Invocations | Receipts | Home,
+  Topics | Personas | Invocations | Receipts,
   never,
   AgentInput | Db | KeyedLock | Changes | Conversations | Memories
 > = Layer.unwrap(Effect.map(stores, delegationServices))

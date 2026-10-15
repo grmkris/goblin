@@ -13,7 +13,6 @@ import type { AppError } from '../http/errors.ts'
 import { AppEngine } from '../agent-apps/service.ts'
 import { InvalidInput, NotFound } from '../http/errors.ts'
 import { Chats, Conversations } from '../chats/service.ts'
-import { Home } from '../home/service.ts'
 import { settledDetails } from '../mcp/kept-app.ts'
 import { toolAppResource } from '../mcp/remote.ts'
 import { McpConnections, McpServers } from '../mcp/service.ts'
@@ -133,6 +132,5 @@ export const deleteAgentApp = (name: string, input: DeleteAgentApp) =>
     if (input.confirm !== name) return yield* new InvalidInput({ reason: `type ${name} to delete it` })
     yield* AppEngine.use((engine) => engine.remove(name))
     yield* Apps.use((apps) => apps.removeAgent(name))
-    yield* Home.use((home) => home.appRemoved)
     return { deleted: name }
   })

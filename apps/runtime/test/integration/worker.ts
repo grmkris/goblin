@@ -18,7 +18,6 @@ import { probes as decisionsProbes } from './decisions-probe.ts'
 import { probes as ingressProbes } from './events-ingress-case.ts'
 import { probes as eventsProbes } from './events-probe.ts'
 import { probes as filesProbes } from './files-probe.ts'
-import { probes as homeProbes } from './home-probe.ts'
 import { inboundHostProbe } from './inbound-host.ts'
 import { probes as inboxProbes } from './inbox-app-probe.ts'
 import { probes as lifecycleProbes } from './lifecycle-probe.ts'
@@ -58,7 +57,6 @@ const PROBES = registry(
   delegationProbes,
   eventsProbes,
   filesProbes,
-  homeProbes,
   inboxProbes,
   ingressProbes,
   lifecycleProbes,

@@ -3,7 +3,6 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 import { drizzle } from 'drizzle-orm/durable-sqlite'
 import { agentApps } from '../../src/agent-apps/engine.ts'
 import { type AgentAppsPort, agentAppChanged, agentAppId, agentAppName, appList } from '../../src/apps/registry.ts'
-import { HomeService } from '../../src/home/service.ts'
 import type { RuntimeEnv } from '../../src/env.ts'
 import { memorySchedules, probePorts } from './apps-jobs-probe.ts'
 import { InboxMcpFixture } from './inbox-mcp.ts'
@@ -61,15 +60,6 @@ async function inboxAppProbe(storage: DurableObjectStorage, env: RuntimeEnv, own
   await fire()
   const lastGood = apps.snapshot('inbox-glance')
   const id = agentAppId(db, 'inbox-glance') ?? ''
-  const home = new HomeService(drizzle(storage), apps)
-  const placed = home.edit(
-    {
-      operationId: 'inbox-home',
-      expectedRevision: 0,
-      ops: [{ kind: 'add', tile: { id: 'inbox', kind: 'app', appId: id, size: 'medium' } }],
-    },
-    'agent',
-  )
   const launch = apps.launch(agentAppName(db, id))
   await client.close()
   return {
@@ -79,7 +69,6 @@ async function inboxAppProbe(storage: DurableObjectStorage, env: RuntimeEnv, own
     refreshed,
     lastGood,
     job: apps.jobs.list('inbox-glance')[0],
-    placed,
     app: appList(db, sources)[0],
     launch,
   }

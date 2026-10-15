@@ -3,7 +3,6 @@ import type { Extension, ToolRegistration } from '@earendil-works/pi-durable'
 import { describe, expect, it } from 'vitest'
 import { askingExtension } from '../src/pi/ask-user.ts'
 import { filesExtension } from '../src/pi/files.ts'
-import { homeExtension } from '../src/pi/home.ts'
 import type { RunProgram } from '../src/runtime/bridge.ts'
 import { serversExtension } from '../src/pi/servers.ts'
 import { skillsExtension } from '../src/pi/skills.ts'
@@ -36,39 +35,7 @@ const call = (registration: ToolRegistration, args: Arguments) => {
   return executeTool(registration, checked, inConversation(3, { callId: 'tc_1' }))
 }
 
-const layout = {
-  revision: 2,
-  tiles: [{ id: 't1', size: 'medium', kind: 'note', title: 'Hi', markdown: 'x', placedBy: 'owner' }],
-}
-const edit = { operationId: 'op1', expectedRevision: 2, ops: [{ kind: 'remove', id: 't1' }] }
-
 describe('leaf tools (unit, ADR 0027)', () => {
-  it('home_edit asks the owner about their tiles and ends the turn, and receipts an applied edit', async () => {
-    const asked = await call(
-      tool(homeExtension(runner({ kind: 'owner-required', layout, tileIds: ['t1'] })), 'home_edit'),
-      edit,
-    )
-    expect(asked.control).toEqual({ terminate: true })
-    expect(asked.details).toMatchObject({ kind: 'home-owner-required', edit })
-    expect(JSON.stringify(asked.content)).toContain('May I change these owner-placed Home tiles?')
-
-    const applied = { kind: 'applied', operationId: 'op1', layout, tileIds: ['t1'], message: 'Removed a note.' }
-    const done = await call(tool(homeExtension(runner(applied)), 'home_edit'), edit)
-    expect(done.control).toBeUndefined()
-    expect(done.details).toMatchObject({
-      kind: 'home-receipt',
-      operationId: 'op1',
-      tileIds: ['t1'],
-      message: 'Removed a note.',
-    })
-
-    // Undo is the owner's: the agent's edit drops `undoOf`.
-    const owner = { kind: 'owner-required', layout, tileIds: ['t1'] }
-    const undo = await call(tool(homeExtension(runner(owner)), 'home_edit'), { ...edit, undoOf: 'op0' })
-    expect(undo.details).toMatchObject({ edit })
-    expect(JSON.stringify(undo.details)).not.toContain('undoOf')
-  })
-
   it('files_read returns a part of the text and where the next one starts', async () => {
     const entry = { path: '/agent/a.md', name: 'a.md', kind: 'file', size: 9, mimeType: 'text/markdown', updatedAt: 1 }
     const read = await call(tool(filesExtension(runner({ entry, text: 'hello', next: 5 })), 'files_read'), {

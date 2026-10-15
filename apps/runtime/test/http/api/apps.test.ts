@@ -12,7 +12,6 @@ import { AppsHandlers } from '../../../src/apps/api.ts'
 import type { AppOrigin } from '../../../src/apps/registry.ts'
 import { Apps } from '../../../src/apps/service.ts'
 import { Chats, Conversations } from '../../../src/chats/service.ts'
-import { Home } from '../../../src/home/service.ts'
 import type { ApprovalRow } from '../../../src/mcp/approvals.ts'
 import { Approvals, McpConnections, McpServers, Resident, UrlRequests } from '../../../src/mcp/service.ts'
 import type { McpConnectionSnapshot } from '../../../src/mcp/types.ts'
@@ -29,7 +28,6 @@ const fakeEngine = (overrides: Partial<AppEngine['Service']> = {}) => stub(AppEn
 type OtherParts = {
   readonly conversations?: Pick<Conversations['Service'], 'require' | 'requireOpen' | 'kindOf'>
   readonly connections?: Pick<McpConnections['Service'], 'connect'>
-  readonly home?: Pick<Home['Service'], 'appRemoved'>
   readonly approvals?: Pick<Approvals['Service'], 'result'>
   readonly urlRequests?: Pick<UrlRequests['Service'], 'result'>
 }
@@ -59,7 +57,6 @@ function appsServer(
           // Opening a server's own App (ADR 0053) reads these; no test here reaches it.
           stub(McpServers),
           stub(Chats),
-          stub(Home, others.home),
           stub(Approvals, others.approvals),
           stub(UrlRequests, others.urlRequests),
           Layer.succeed(Resident, resident.service),
@@ -329,7 +326,6 @@ const agentApps = (seen: string[] = []) => ({
       requireOpen: (id: string) => Effect.succeed(id),
       kindOf: (id: string) => Effect.succeed(id === '8' ? ('subagent' as const) : ('main' as const)),
     },
-    home: { appRemoved: Effect.sync(() => void seen.push('home.appRemoved')) },
   },
 })
 
@@ -365,7 +361,7 @@ describe('the agentApps group served by the agent', () => {
     expect(seen).toEqual(['engine.change tally pause', 'engine.moveHome tally 9'])
   })
 
-  it('deletes one only once its name is typed: its engine rows, its App, then Home is told', async () => {
+  it('deletes one only once its name is typed: its engine rows, then its App', async () => {
     const seen: string[] = []
     const { fetch } = appsServer(agentApps(seen))
     const refused = await fetch(json('DELETE', '/api/agent-apps/tally', { confirm: 'nope' }))
@@ -375,7 +371,7 @@ describe('the agentApps group served by the agent', () => {
     const deleted = await fetch(json('DELETE', '/api/agent-apps/tally', { confirm: 'tally' }))
     expect(deleted.status).toBe(200)
     expect(await deleted.json()).toEqual({ deleted: 'tally' })
-    expect(seen).toEqual(['engine.remove tally', 'apps.removeAgent tally', 'home.appRemoved'])
+    expect(seen).toEqual(['engine.remove tally', 'apps.removeAgent tally'])
   })
 
   it('answers a name that is not one as 404, and any other method as no route', async () => {

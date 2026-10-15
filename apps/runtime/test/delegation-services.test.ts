@@ -6,12 +6,10 @@ import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
 import * as Stream from 'effect/Stream'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { AgentApps } from '../src/agent-apps/engine.ts'
 import { Apps } from '../src/apps/service.ts'
 import type { ChatId } from '../src/chats/directory.ts'
 import { Chats, Conversations } from '../src/chats/service.ts'
 import { Decisions } from '../src/decisions/service.ts'
-import { Home, HomeService } from '../src/home/service.ts'
 import { delegationServices } from '../src/layers/delegation.ts'
 import { KeyedLock } from '../src/observability/lock.ts'
 import { OrganizeReceipts } from '../src/organize/receipts.ts'
@@ -56,9 +54,6 @@ const services = () => {
   const personas = new PersonaRegistry(db, () => ['model-a'])
   const invocations = new PersonaInvocations(db)
   const receipts = new OrganizeReceipts(db, () => undefined)
-  // SAFETY: with no agent apps, Home reads only the engine's (empty) app list.
-  const engine = Object.assign(Object.create(null) as AgentApps, { store: { apps: () => [] } })
-  const home = new HomeService(db, engine)
   const watching = { count: 0 }
   // SAFETY: the feed reads the watch's first graph, starts it and stops it; the graph stays empty.
   const watch = Object.assign(Object.create(null) as TaskGraphWatch, {
@@ -73,7 +68,7 @@ const services = () => {
       return watch
     },
   })
-  const lane = delegationServices({ topics, personas, invocations, receipts, home }).pipe(
+  const lane = delegationServices({ topics, personas, invocations, receipts }).pipe(
     Layer.provideMerge(Layer.merge(KeyedLock.layer, Layer.succeed(Changes, makeChanges()))),
   )
   const sources = Layer.mergeAll(
@@ -105,7 +100,6 @@ describe("lane D's services over their stores", () => {
       const personas = yield* Personas
       const invocations = yield* Invocations
       const receipts = yield* Receipts
-      const home = yield* Home
       return {
         topics: (yield* topics.list).map((topic) => topic.name),
         missingTopic: yield* Effect.flip(topics.get(99)),
@@ -117,7 +111,6 @@ describe("lane D's services over their stores", () => {
         invocation: yield* invocations.get('op-1', 1),
         receipts: yield* receipts.list(),
         missingReceipt: yield* Effect.flip(receipts.get('org_none')),
-        home: yield* home.read,
       }
     })
     const result = await Effect.runPromise(program.pipe(Effect.provide(services().layer)))
@@ -131,7 +124,6 @@ describe("lane D's services over their stores", () => {
     expect(Option.isNone(result.invocation)).toBe(true)
     expect(result.receipts).toEqual([])
     expect(result.missingReceipt).toMatchObject({ _tag: 'NotFound', what: 'receipt' })
-    expect(result.home).toEqual({ layout: { revision: 0, tiles: [] }, apps: [] })
   })
 
   it('tells the workspace feed what each write changed, each as it is now, after its snapshot', async () => {
@@ -140,7 +132,7 @@ describe("lane D's services over their stores", () => {
       const opened = yield* Deferred.make<number>()
       const feed = yield* (yield* Workspace).stream.pipe(
         Stream.tap(() => Deferred.succeed(opened, watching.count)),
-        Stream.take(5),
+        Stream.take(4),
         Stream.runCollect,
         Effect.forkChild,
       )
@@ -156,14 +148,6 @@ describe("lane D's services over their stores", () => {
         after: { name: 'Garden' },
         afterRevision: 1,
       })
-      yield* (yield* Home).edit(
-        {
-          operationId: 'home-1',
-          expectedRevision: 0,
-          ops: [{ kind: 'add', tile: { kind: 'note', id: 'n', size: 'small', title: 'N', markdown: '' } }],
-        },
-        'owner',
-      )
       const events: readonly WorkspaceEvent[] = yield* Fiber.join(feed)
       return { topic: made.topic.id, receipt: receipt.id, events, watchedWhileOpen }
     })
@@ -177,7 +161,6 @@ describe("lane D's services over their stores", () => {
       expect.objectContaining({ type: 'topic', topic: expect.objectContaining({ id: made.topic, name: 'Garden' }) }),
       expect.objectContaining({ type: 'persona', persona: expect.objectContaining({ name: 'Scout' }) }),
       expect.objectContaining({ type: 'receipt', receipt: expect.objectContaining({ id: made.receipt }) }),
-      expect.objectContaining({ type: 'home', home: expect.objectContaining({ revision: 1 }) }),
     ])
   })
 

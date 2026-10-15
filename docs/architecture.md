@@ -41,4 +41,3 @@ flowchart LR
 - [Storage](architecture/storage.md): D1, Durable Object SQLite and migrations.
 - [Infrastructure and release](architecture/infrastructure.md): Alchemy stacks, stage origins, release and public source.
 - [Routines and notices](architecture/routines.md): routine definitions, runs and notices.
-- [Deferred Home dashboard](architecture/home.md): the deferred Home surface.

@@ -134,7 +134,7 @@ type SliceOf<T> = {
   readonly apply: (value: T, change: WorkspaceChange) => T
 }
 
-/** Home changes are read by their own view; every other change kind belongs to exactly one slice. */
+/** Every change kind belongs to exactly one slice. */
 const SLICES: { readonly [K in Slice]: SliceOf<Slices[K]> } = {
   conversations: {
     read: (snapshot) => snapshot.conversations.toSorted(oldestFirst),

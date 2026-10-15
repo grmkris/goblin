@@ -48,7 +48,6 @@ const Proof = Schema.Struct({
   refreshed: Snapshot,
   lastGood: Snapshot,
   job: Schema.Unknown,
-  placed: Schema.Unknown,
   app: Schema.Unknown,
   launch: Schema.Unknown,
 })
@@ -76,9 +75,5 @@ harness.test(
       writeFileSync(receipt, JSON.stringify({ environment: 'local-workerd-fixture', pass: true, ...proof }), {
         mode: 0o600,
       })
-    expect(proof.placed).toMatchObject({
-      kind: 'applied',
-      layout: { tiles: [expect.objectContaining({ kind: 'app', placedBy: 'agent' })] },
-    })
   }),
 )

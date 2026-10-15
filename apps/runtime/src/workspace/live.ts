@@ -12,7 +12,6 @@ import * as Stream from 'effect/Stream'
 import { Apps } from '../apps/service.ts'
 import { Chats, Conversations } from '../chats/service.ts'
 import { Decisions } from '../decisions/service.ts'
-import { Home } from '../home/service.ts'
 import { type AppError, attempt, toAppError } from '../http/errors.ts'
 import { reportAndRecover, reportFailure } from '../observability/report.ts'
 import { Receipts } from '../organize/service.ts'
@@ -32,7 +31,6 @@ type Sources = {
   readonly chats: Chats['Service']
   readonly conversations: Conversations['Service']
   readonly apps: Apps['Service']
-  readonly home: Home['Service']
   readonly topics: Topics['Service']
   readonly personas: Personas['Service']
   readonly invocations: Invocations['Service']
@@ -47,7 +45,6 @@ const sources = Effect.gen(function* () {
     chats: yield* Chats,
     conversations: yield* Conversations,
     apps: yield* Apps,
-    home: yield* Home,
     topics: yield* Topics,
     personas: yield* Personas,
     invocations: yield* Invocations,
@@ -74,7 +71,7 @@ const describe = ({ chats, conversations }: Sources, ids: readonly string[]) =>
       views.flatMap((view) => (Option.isNone(view) ? [] : [{ type: 'conversation', conversation: view.value }])),
   )
 
-/** The owner's decisions, Home layout, sidebar pins and connections' tool lists, as `followTopics` follows the rest. */
+/** The owner's decisions, sidebar pins and connections' tool lists, as `followTopics` follows the rest. */
 const followOwnerState = (
   changes: Changes['Service'],
   read: Sources,
@@ -91,12 +88,6 @@ const followOwnerState = (
     ),
     changes.on('mcp.tools', ({ connectionId, digest }) =>
       follow('workspace.tools', Effect.succeed([{ type: 'tools', connectionId, digest }])),
-    ),
-    changes.on('home.changed', () =>
-      follow(
-        'workspace.home',
-        Effect.map(read.home.layout, (home): WorkspaceChange[] => [{ type: 'home', home }]),
-      ),
     ),
     changes.on('sidebar.changed', () =>
       follow(
@@ -232,7 +223,6 @@ export const WorkspaceLive: Layer.Layer<
   | Chats
   | Conversations
   | Apps
-  | Home
   | Topics
   | Personas
   | Invocations
@@ -267,7 +257,6 @@ export const WorkspaceLive: Layer.Layer<
         conversations: yield* read.conversations.list,
         activity: [...activity.values()],
         apps: yield* read.apps.list,
-        home: yield* read.home.layout,
         topics: yield* read.topics.list,
         personas: yield* read.personas.list,
         invocations: yield* read.invocations.live,

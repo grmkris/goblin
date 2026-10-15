@@ -13,14 +13,6 @@ declare module '../runtime/changes.ts' {
   }
 }
 
-/** What Home reads of an App before placing it: never an agent app's view. */
-export type AppPlacement = {
-  readonly source: 'mcp' | 'agent'
-  readonly closed: boolean
-  readonly tool: string | null
-  readonly title: string
-}
-
 /** Where an open App comes from, for what it shares with the owner's message: an MCP App's server, or the agent app. */
 export type AppSharing = { readonly connectionId: string } | { readonly app: string }
 
@@ -36,8 +28,6 @@ export class Apps extends Context.Service<
     readonly list: Effect.Effect<readonly AppView[], AppError>
     /** One App as it is now; `NotFound` when there is none. */
     readonly view: (id: string) => Effect.Effect<AppView, AppError>
-    /** An App's source, whether it is closed, its tool and its title; `NotFound` when there is none. */
-    readonly placement: (id: string) => Effect.Effect<AppPlacement, AppError>
     /** Keeps the App of call `callId` in `session`; the same call keeps the same App, reopened if it was closed. */
     readonly register: (session: string, callId: string, origin: AppOrigin) => Effect.Effect<AppView, AppError>
     /** Keeps a server's own App in its thread's `session` (ADR 0053), reopened if it was closed. */

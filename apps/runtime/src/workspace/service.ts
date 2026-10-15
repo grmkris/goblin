@@ -9,7 +9,7 @@ export type WorkspaceEvent =
   | { readonly event: 'change'; readonly data: readonly WorkspaceChange[] }
 
 /**
- * The owner's workspace as one live feed: every conversation and what each is doing, Apps, Home, Topics, Personas,
+ * The owner's workspace as one live feed: every conversation and what each is doing, Apps, Topics, Personas,
  * invocations, receipts and decision proposals, so a client needs no polling and no stream per conversation to draw
  * the tree. A client that reconnects starts again from a fresh snapshot.
  */

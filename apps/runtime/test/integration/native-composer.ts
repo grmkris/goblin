@@ -45,7 +45,7 @@ async function composerChecks(base: string): Promise<void> {
       'subagent_config',
     ]),
   )
-  for (const ownerOnly of ['ask_user', 'home_edit', 'routine_propose', 'app_build', 'recall'])
+  for (const ownerOnly of ['ask_user', 'routine_propose', 'app_build', 'recall'])
     expect(result.tools).not.toContain(ownerOnly)
 }
 
