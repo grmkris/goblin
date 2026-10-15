@@ -26,6 +26,14 @@ The first attempt passed all 76 ordinary workerd tests, then passed 69 of 70 per
 75 of 76 ordinary workerd tests and stopped there. Neither attempt reached the final build stage. The test and its
 limits were not changed; the final PR's complete CI run on a fresh GitHub runner is the merge gate.
 
+## GitHub CI
+
+[The complete check at `057fa1c5`](https://github.com/grmkris/goblin/actions/runs/38820562680) passed on a fresh
+GitHub runner: 22 release-script checks, 1,797 unit tests, 76 ordinary workerd tests, 70 permuted workerd tests and
+all three production builds. Lint, Effect and Knip reported zero findings or collection failures. No tests were
+failed or skipped; the dev/prod deployment jobs were intentionally skipped for this pull request.
+The chained-move test completed in 8.9 and 9.3 seconds in those suites without any test or timeout changes.
+
 ## Scope
 
 Pi's transcript, execution, authority and owner API are unchanged. The public preview has no accounts, model
