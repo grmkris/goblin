@@ -8,6 +8,12 @@ export const EVENTS_EXTENSION = 'io.modelcontextprotocol/events'
 /** Draft MCP Triggers & Events profile selected by goblin. */
 const EventName = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))
 /**
+ * How a server says it can deliver an event. Modes goblin does not know (a newer draft's `push`) are kept as they came
+ * and ignored: goblin subscribes only to a stream that offers both poll and webhook.
+ */
+const DeliveryMode = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))
+
+/**
  * One event a server offers. `title` and `_meta` are read leniently (`eventSuggestion`): whatever they hold, a malformed
  * one never fails the list.
  */
@@ -17,7 +23,7 @@ export const EventDescriptor = Schema.Struct({
   description: Schema.optional(Schema.String),
   inputSchema: Schema.Record(Schema.String, Schema.Unknown),
   payloadSchema: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
-  delivery: Schema.Array(Schema.Literals(['poll', 'webhook'])),
+  delivery: Schema.Array(DeliveryMode),
   _meta: Schema.optional(Schema.Unknown),
 })
 export type EventDescriptor = typeof EventDescriptor.Type

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { type EventDescriptor, eventSuggestion } from '../../src/mcp/events/protocol.ts'
+import * as Schema from 'effect/Schema'
+import { type EventDescriptor, EventsListResult, eventSuggestion } from '../../src/mcp/events/protocol.ts'
 
 const descriptor = (extra: Partial<EventDescriptor>): EventDescriptor => ({
   name: 'mygram.message.received',
@@ -47,5 +48,15 @@ describe("a server's suggestions for one event (ADR 0041)", () => {
     ).toEqual({ title: 'Question answered', tellMe: false })
     expect(eventSuggestion(descriptor({ title: 42, _meta: ['not', 'an', 'object'] }))).toEqual({})
     expect(eventSuggestion(descriptor({ _meta: { suggest: 'recommended' } }))).toEqual({})
+  })
+})
+
+describe('an event list with delivery modes goblin does not know', () => {
+  it('decodes, keeping the modes it knows usable', () => {
+    const decoded = Schema.decodeUnknownSync(EventsListResult)({
+      events: [{ name: 'notes.changed', inputSchema: {}, delivery: ['poll', 'webhook', 'push'] }],
+    })
+    expect(decoded.events[0]?.delivery).toEqual(['poll', 'webhook', 'push'])
+    expect(decoded.events[0]?.delivery.includes('webhook')).toBe(true)
   })
 })
