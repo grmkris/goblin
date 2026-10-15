@@ -129,6 +129,50 @@ tokens; reconnect the servers and re-enable Telegram afterwards.
 Changing a server's `endpoint` drops what was stored for it (credentials, grants, pending sign-ins) at each
 agent's next start; connect it again. Tokens are never carried from one host to another.
 
+## Reset dev
+
+Dev contains disposable test data. A reset erases its accounts, sessions, conversations, files, routines, grants and
+connection credentials. Preserve the setup checklist below and any separately requested exports before starting.
+The production stage is independent; the hackathon freeze keeps it at `hackathon-2026-10` until the owner lifts it.
+
+Finish and commit the entire reset release first. Install the root and browser fixture dependencies exactly as CI does
+(`bun install --frozen-lockfile`, then the same command in `scripts/fixtures/mcp-app`), and run `heavy bun run check`
+on that commit. Use a clean checkout for the release; preserve other agents' working files in their own checkout.
+Keep Alchemy pinned to the version shared with myapps. A reset changes only `goblin/dev`; never use Alchemy's
+`syncState` on the account's shared state store.
+
+1. Record the release SHA, the current dev Worker version and a checklist of the connections, Sources, notice sink,
+   model choice and routines to recreate. Keep account details and tokens in private notes or mode-600 files. Notify
+   the owners of test routines affected by the reset through the agreed coordination channel.
+2. Pause automatic delivery with `gh workflow disable ci.yml --repo grmkris/goblin`. Inspect the workflow runs and
+   wait for any active Deploy dev job to finish; disabling the workflow does not stop one already running. Ensure
+   no other operator is deploying or destroying the stage. Keep the reset commit local until recreation succeeds.
+3. Check the stage's mode-600 `.local/dev.env`, `.local/cloud.env` and state-store credentials without printing them.
+   Keep signup invite-only or closed, with a working path for the operator to create the replacement smoke account.
+   Run `bun run plan:dev` and verify the target is the dev stack.
+4. From the checked commit, run `GOBLIN_BREAK_GLASS=1 bun run destroy:dev -- --confirm-reset`, then
+   `GOBLIN_BREAK_GLASS=1 bun run deploy:dev`. Both commands must succeed. If recreation fails, keep CI paused and
+   investigate the failed resource before retrying; do not copy or delete unrelated stacks' state.
+5. Check `/health` and the served build SHA. Create the operator account through the real sign-up and one-time-code
+   flow, then save its session as `.local/dev-session.json` with mode 600. The old session is invalid. Set
+   `GOBLIN_OWNER_EMAIL` and `GOBLIN_SMOKE_SESSION_FILE` in the private dev configuration, and update the GitHub
+   environment secret without echoing it:
+   `gh secret set GOBLIN_SMOKE_SESSION --repo grmkris/goblin --env dev < .local/dev-session.json`.
+   Update `GOBLIN_STAGE_ENV` through the same file-input mechanism if its configuration changed.
+6. Run authenticated `bun run smoke:dev` and `bun run drift:dev`. Reconnect and grant any services required by the
+   smoke, or record their explicit skips. Smoke's model calls require a configured endpoint. A public health check
+   alone is not authenticated acceptance.
+7. Re-enable `ci.yml` with `gh workflow enable ci.yml --repo grmkris/goblin`, then push the checked dev commit. CI must
+   pass Check and Deploy dev for that exact SHA. Its `dev-acceptance` receipt must name that SHA and live Worker
+   version, authenticated smoke, verified drift and the migration filenames present in `apps/runtime/migrations`.
+   Re-enabling a workflow does not replay a push made while it was disabled.
+
+Recreate the owner's setup in a separate attended session: sign in, reconnect MySI, review the exact tools and Events
+granted, confirm the Source's owner rule, key/title/read/reply mappings and routing, and configure Notify me via with
+its result rules. Then exercise DM, group, photo, outbound file and routine-copy delivery. Record local tests,
+deployed smoke and these live checks separately. The code and reset release can finish before that live session;
+until it runs, real provider and Telegram delivery remain unverified.
+
 ## Using it
 
 - **Tool details.** Open a tool line in a conversation to inspect Input and Output. JSON branches fold, long strings
