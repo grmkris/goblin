@@ -3,6 +3,26 @@
 Goblin code is integrated on `dev` at `677c349c`. The full `heavy bun run check` passed on that commit.
 This is local code and fixture evidence. No push, stage reset, deployment or production promotion was performed.
 
+## Source reply follow-up at `25f03956`
+
+The reply tool's structured outcome now follows owner-reviewed accepted, retryable and rejected rules. Unmatched
+results and uncertain transport outcomes stop without automatic replay. Calls, chunk boundaries and result rules
+are frozen before dispatch; accepted pieces and an in-flight intent survive reconstruction. Retry windows are
+bounded, and terminal reports recover independently of sending. The owner can edit reply result rules, which makes
+a new proposal requiring confirmation. Notify me via copies the rules.
+
+Source binding attempts have a persistent counter and conditional updates after asynchronous waits. A delayed
+confirmation, alarm or unbind cannot overwrite a newer Source decision. Unicode chunk boundaries preserve code
+points (`525680b4`).
+
+Scoped validation: 31 runtime tests, 13 web tests, four native Source cases (45 unrelated cases filtered out), and
+browser checks at desktop and 390px. The binding files passed type, Effect, lint and format checks. These results
+do not replace a full gate on the final integrated commit. Review found related races in the underlying Events
+consumer binding and shared subscription cleanup; that follow-up and the Mygram producer lane remain in progress.
+
+A read-only dev check found healthy invite-only service and a successful CI run for `6c04e812`; this is the older
+deployed release, not evidence of the cleanup release being deployed.
+
 ## Integrated behavior
 
 - External messages use owner-confirmed Sources. The built-in Telegram transport, settings, routing and telemetry
