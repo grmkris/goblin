@@ -16,7 +16,7 @@ import {
   isTelegramSend,
   NOTHING,
 } from '@goblin/contracts'
-import { and, eq, inArray, notInArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import {
   appHelperExclusions,
@@ -443,46 +443,6 @@ export const routinesOutside = (db: Db, topic: number, setup: TopicSetup) =>
       return outside.length === 0 ? [] : [{ id: routine.id, title: definition.title, outside }]
     })
 
-/** How many switch rows `dropSwitchesOnce` deleted: servers, tools, libraries and subagents, and apps. */
-export type DroppedSwitches = { readonly switches: number; readonly apps: number }
-
-/**
- * Deletes the owner's per-conversation switches once (ADR 0040): every row of a chat that is not a subagent, whose
- * rows are its spawner's exclusions and stay. A chat that had subagents switched off gets its Pi filter applied again
- * after the rows are gone, so it follows its Topic's setup. Answers what was deleted, or nothing when it already ran.
- * A filter that fails to apply is left narrower, never wider; a change of the Topic's subagents applies it again.
- */
-export const dropSwitchesOnce = async (
-  retooling: Retooling,
-  marker: string,
-  now: number,
-): Promise<DroppedSwitches | undefined> => {
-  const { db, subagentTools, retool } = retooling
-  if (marked(db, marker)) return undefined
-  const helpers = db
-    .select({ chat: appConversations.chatId })
-    .from(appConversations)
-    .where(eq(appConversations.kind, 'subagent'))
-  const switches = appHelperExclusions
-  const apps = appExecutionExclusions
-  const dropped = db.transaction((tx) => {
-    const owned = tx.select().from(switches).where(notInArray(switches.sessionId, helpers)).all()
-    const ownedApps = tx.select().from(apps).where(notInArray(apps.sessionId, helpers)).all()
-    tx.delete(switches).where(notInArray(switches.sessionId, helpers)).run()
-    tx.delete(apps).where(notInArray(apps.sessionId, helpers)).run()
-    const subagentsOff = owned.filter((row) => row.kind === 'subagents').map((row) => row.sessionId)
-    return { counts: { switches: owned.length, apps: ownedApps.length }, subagentsOff }
-  })
-  const filtered = new Set(filteredChats(db))
-  for (const chat of new Set(dropped.subagentsOff))
-    if (filtered.has(chat)) await retool(chatSession(db, chat), piToolsFor(db, subagentTools, chat))
-  db.insert(appMetadata)
-    .values({ id: marker, value: JSON.stringify({ at: now, ...dropped.counts }) })
-    .onConflictDoNothing()
-    .run()
-  return dropped.counts
-}
-
 /** The scope and a helper's exclusions as one object over a database, for the probes and test fixtures. Programs use
  * `Setups`. */
 export class SetupScopes {
@@ -523,9 +483,5 @@ export class SetupScopes {
 
   async retoolOnce(marker: string, now: number): Promise<void> {
     await retoolOnce(this.#retooling, marker, now)
-  }
-
-  async dropSwitchesOnce(marker: string, now: number): Promise<DroppedSwitches | undefined> {
-    return dropSwitchesOnce(this.#retooling, marker, now)
   }
 }

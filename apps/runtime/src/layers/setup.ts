@@ -8,7 +8,6 @@ import {
   appAllowed,
   sessionScope,
   configureHelper,
-  dropSwitchesOnce,
   piToolsFor,
   retoolOnce,
   retoolTopic,
@@ -18,7 +17,6 @@ import {
 import { Setups } from '../setup/service.ts'
 import { epochSeconds } from '../clock.ts'
 import { attempt } from '../http/errors.ts'
-import { logEvent } from '../observability/logger.ts'
 import { BACKGROUND, conversationId } from '../pi/context.ts'
 import { Db } from '../runtime/db.ts'
 import { AgentInput } from '../runtime/input.ts'
@@ -38,18 +36,12 @@ const retooling: Effect.Effect<Retooling, never, AgentInput | Db> = Effect.gen(f
   return { db: yield* Db, subagentTools, retool: retool(harness) }
 })
 
-/**
- * Start step 5: the current complete delegation tool set is applied to the retained Pi filters, once; then the owner's
- * per-conversation switches are deleted, once (ADR 0040), with how many in one `job` line.
- */
+/** Start step 5: the current complete delegation tool set is applied to the retained Pi filters, once. */
 export const RetoolLive: Layer.Layer<never, never, AgentInput | Db> = Layer.effectDiscard(
   Effect.gen(function* () {
     const pi = yield* retooling
     const now = yield* epochSeconds
     yield* Effect.promise(() => retoolOnce(pi, 'retool:subagent-config', now))
-    const dropped = yield* Effect.promise(() => dropSwitchesOnce(pi, 'drop:conversation-switches', now))
-    if (dropped !== undefined)
-      yield* logEvent('info', 'job', { kind: 'conversation-switches-dropped', count: dropped.switches + dropped.apps })
   }),
 )
 

@@ -8,7 +8,7 @@ import { expect } from 'vitest'
 import { chatSession } from '../../src/chats/directory.ts'
 import { SetupScopes } from '../../src/setup/scope.ts'
 import { runApplicationMigrations } from '../../src/storage/migrations.ts'
-import { appHelperExclusions, appConversations } from '../../src/storage/schema.ts'
+import { appConversations } from '../../src/storage/schema.ts'
 import { appTopics } from '../../src/storage/topics.ts'
 import { type NativeCase, probeOf } from './native-case.ts'
 import { type Probes, inAgent } from './probe.ts'
@@ -24,7 +24,7 @@ const WORK = {
 /**
  * Topic setups on the real SQLite store (ADR 0040): Personal holds everything; a thread of the Topic "Scopes" holds its setup,
  * read live; a subagent two levels down is bounded by it and by its spawner's exclusions; one whose spawner is
- * unknown (or an unknown session, or a cycle) may use nothing. Then the owner's old switches are dropped once.
+ * unknown (or an unknown session, or a cycle) may use nothing. Then the stored Pi filters are applied again once.
  */
 async function scopeProbe(storage: DurableObjectStorage) {
   runApplicationMigrations(storage)
@@ -118,14 +118,7 @@ async function scopeProbe(storage: DurableObjectStorage) {
   const once = retooled.slice(configured.length).toSorted()
   await profiles.retoolOnce('retool:probe', 6)
   const again = retooled.length - configured.length - once.length
-  // An owner switch left from before setups goes; the helper's exclusions stay.
-  db.insert(appHelperExclusions)
-    .values({ sessionId: '900', kind: 'subagents', connectionId: '', name: '', offAt: 1 })
-    .run()
-  const dropped = await profiles.dropSwitchesOnce('drop:probe', 7)
-  const droppedAgain = await profiles.dropSwitchesOnce('drop:probe', 8)
-  const helperKept = view('902').skills
-  return { ...before, allServers, configured, once, again, dropped, droppedAgain: droppedAgain ?? null, helperKept }
+  return { ...before, allServers, configured, once, again }
 }
 
 export const probes: Probes = { scopes: inAgent(({ storage }) => scopeProbe(storage)) }
@@ -152,16 +145,12 @@ const Scopes = Schema.Struct({
   configured: Schema.Array(Schema.String),
   once: Schema.Array(Schema.String),
   again: Schema.Number,
-  dropped: Schema.Struct({ switches: Schema.Number, apps: Schema.Number }),
-  droppedAgain: Schema.Null,
-  helperKept: Schema.Boolean,
 })
 const closed = { editable: false, mail: false, send: false, read: false, write: false, skills: false, subagents: false }
 
 /**
  * Every chat works with its Topic's setup, read live; a subagent is bounded by every chat above it and its spawner's
- * exclusions; stored tool filters are applied again once (`SetupScopes.retoolOnce`), and the owner's old
- * switches are dropped once (`dropSwitchesOnce`).
+ * exclusions; stored tool filters are applied again once (`SetupScopes.retoolOnce`).
  */
 async function scopeChecks(base: string): Promise<void> {
   const result = await probeOf(base, 'scopes', Scopes)
@@ -179,9 +168,6 @@ async function scopeChecks(base: string): Promise<void> {
   expect(result.once).toContain('900')
   expect(result.once).not.toContain(PRIMARY_CHAT)
   expect(result.again).toBe(0)
-  expect(result.dropped).toEqual({ switches: 1, apps: 0 })
-  expect(result.droppedAgain).toBeNull()
-  expect(result.helperKept).toBe(false)
 }
 
 export const cases: readonly NativeCase[] = [
