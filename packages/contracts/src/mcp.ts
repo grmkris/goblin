@@ -1,5 +1,6 @@
 import * as Schema from 'effect/Schema'
 import { NonEmptyString } from './ids.ts'
+import { SourceSuggestion } from './sources.ts'
 
 /** A server id as the owner's requests name it: configured ids and the ones added servers get. */
 const ConnectionIdField = NonEmptyString(64)
@@ -213,6 +214,8 @@ export const EventStream = Schema.Struct({
   recommended: Schema.optional(Schema.Boolean),
   tellMe: Schema.optional(Schema.Boolean),
   rate: Schema.optional(EventRate),
+  /** What the server suggests for a Source on this event (ADR 0066), for the owner to review; a claim. */
+  source: Schema.optional(SourceSuggestion),
 })
 export type EventStream = typeof EventStream.Type
 

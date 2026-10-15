@@ -14,6 +14,7 @@ export const OPERATION_KINDS = [
   'send',
   'ask_client',
   'telegram',
+  'source',
   'persona_ask',
   'start',
   'reply',
@@ -33,7 +34,7 @@ export type OperationKind = (typeof OPERATION_KINDS)[number] | `write:${string}`
 export type ReceiptKind = OperationKind | 'legacy'
 
 /** Who started an operation. */
-export const ReceiptOrigin = Schema.Literals(['owner', 'client', 'telegram', 'agent', 'routine', 'system'])
+export const ReceiptOrigin = Schema.Literals(['owner', 'client', 'telegram', 'source', 'agent', 'routine', 'system'])
 export type ReceiptOrigin = typeof ReceiptOrigin.Type
 
 /**

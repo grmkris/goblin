@@ -25,7 +25,7 @@ export type Turn = {
 }
 
 /** A single-choice question an answer ended on, as buttons can ask it. */
-export type AskedChoice = {
+type AskedChoice = {
   readonly prompt: string
   readonly options: readonly { readonly id: string; readonly label: string }[]
 }
@@ -67,7 +67,7 @@ const turnSession = (chat: string, operationId: string, receipt: TurnOrigin['rec
  * owner when it stopped on a question (with its buttons when it was one single choice), and whether it was cut off;
  * none while it runs (it has not settled within 200 ms).
  */
-export const goblinAnswer = (chat: string, operationId: string, receipt: TurnOrigin['receipt']) =>
+const goblinAnswer = (chat: string, operationId: string, receipt: TurnOrigin['receipt']) =>
   Effect.gen(function* () {
     const session = yield* turnSession(chat, operationId, receipt)
     const settled = yield* settledWithin(session, operationId, 200)
@@ -86,7 +86,7 @@ export const goblinAnswer = (chat: string, operationId: string, receipt: TurnOri
 const decodeAnswer = Schema.decodeUnknownOption(PersonaAnswerData)
 
 /** How `persona`'s answer to `operationId` ended: its words once it answered, a line when it could not; none before. */
-export const personaAnswer = (operationId: string, persona: number) =>
+const personaAnswer = (operationId: string, persona: number) =>
   Effect.gen(function* () {
     const found = yield* (yield* Invocations).get(operationId, persona)
     if (Option.isNone(found)) return undefined

@@ -1,0 +1,98 @@
+import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+
+/**
+ * The owner's Sources (ADR 0066): one row each, its setup (`SourceSetup` JSON) at `revision`, proposed by the owner or
+ * the agent (`operation_id` makes a proposal idempotent). `state` is `proposed` until the owner confirms that revision
+ * (or `refused`), `active` once its event is subscribed, `paused` by the owner or for their review (`paused`), with
+ * `health` saying why. A confirmed Source is bound to the connection's endpoint and a digest of its tools' grants
+ * (`endpoint`, `grant_version`), and its event is subscribed under consumer `source:<id>` at revision `binding`.
+ * `cursor` is where a tool read goes on from; `pull_due` and `resubscribe_due` are the work its alarm owes. Times are
+ * epoch seconds.
+ */
+export const appSourceSetups = sqliteTable('app_source_setups', {
+  id: text('id').primaryKey().notNull(),
+  operationId: text('operation_id').unique(),
+  connectionId: text('connection_id').notNull(),
+  title: text('title').notNull(),
+  setup: text('setup').notNull(),
+  revision: integer('revision').notNull(),
+  state: text('state', { enum: ['proposed', 'active', 'paused', 'refused'] }).notNull(),
+  paused: text('paused', { enum: ['owner', 'review'] }),
+  health: text('health'),
+  proposedBy: text('proposed_by', { enum: ['owner', 'agent'] }).notNull(),
+  chatId: text('chat_id'),
+  endpoint: text('endpoint'),
+  grantVersion: text('grant_version'),
+  binding: integer('binding'),
+  cursor: text('cursor'),
+  pullDue: integer('pull_due', { mode: 'boolean' }).notNull().default(false),
+  resubscribeDue: integer('resubscribe_due', { mode: 'boolean' }).notNull().default(false),
+  confirmedAt: integer('confirmed_at'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+/**
+ * Where each conversation of a Source goes (ADR 0066), by its key (`key`, the JSON of its values in the setup's order;
+ * `key_values` names them). `route` is `topic` or `persona` (turns in `topic_id`, answered by goblin or `persona_id`),
+ * `listen` (notes in `topic_id`), `ignore` or `held`. `held_dropped` counts the held messages dropped past the twenty
+ * kept; `revision` counts route changes, so Undo can tell whether anything touched it.
+ */
+export const appSourceRoutes = sqliteTable(
+  'app_source_routes',
+  {
+    sourceId: text('source_id').notNull(),
+    key: text('key').notNull(),
+    keyValues: text('key_values').notNull(),
+    route: text('route', { enum: ['topic', 'persona', 'listen', 'ignore', 'held'] }).notNull(),
+    topicId: integer('topic_id'),
+    personaId: integer('persona_id'),
+    heldDropped: integer('held_dropped').notNull().default(0),
+    revision: integer('revision').notNull().default(0),
+    updatedBy: text('updated_by', { enum: ['owner', 'agent', 'default'] }),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.sourceId, table.key] })],
+)
+
+/**
+ * The owner's messages a conversation holds while it waits for a route (ADR 0066), at most twenty a conversation,
+ * delivered in order once it has one: the message's id, its conversation and its words.
+ */
+export const appSourceHeld = sqliteTable(
+  'app_source_held',
+  {
+    sourceId: text('source_id').notNull(),
+    itemId: text('item_id').notNull(),
+    key: text('key').notNull(),
+    text: text('text').notNull(),
+    heldAt: integer('held_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.sourceId, table.itemId] }),
+    index('app_source_held_key').on(table.sourceId, table.key),
+  ],
+)
+
+/**
+ * The answers a Source owes (ADR 0066): the turn's operation, its conversation, the goblin chat it ran in and the
+ * Persona that answers it. A failed send is tried again at `next_at`, `attempts` counting; it is `sent`, or `given_up`
+ * after five failures or a day with no answer.
+ */
+export const appSourceReplies = sqliteTable(
+  'app_source_replies',
+  {
+    operationId: text('operation_id').primaryKey().notNull(),
+    sourceId: text('source_id').notNull(),
+    key: text('key').notNull(),
+    chatId: text('chat_id'),
+    personaId: integer('persona_id'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAt: integer('next_at').notNull().default(0),
+    outcome: text('outcome', { enum: ['sent', 'given_up'] }),
+    createdAt: integer('created_at').notNull(),
+    settledAt: integer('settled_at'),
+  },
+  (table) => [index('app_source_replies_due').on(table.outcome, table.nextAt)],
+)

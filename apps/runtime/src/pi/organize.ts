@@ -55,7 +55,7 @@ const chatOf = (api: { readonly conversationId: unknown }) =>
   Chats.use((chats) => chats.chatOf(String(api.conversationId))).pipe(Effect.map(Option.getOrUndefined))
 
 /** Who made the change: the agent, from this chat, under this call (a rerun finds its receipt). */
-const byAgent = (api: { readonly conversationId: unknown; readonly callId: string }) =>
+export const byAgent = (api: { readonly conversationId: unknown; readonly callId: string }) =>
   Effect.gen(function* () {
     const chat = yield* chatOf(api)
     return { actor: 'agent' as const, operationId: operationOf(api), ...(chat === undefined ? {} : { chat }) }

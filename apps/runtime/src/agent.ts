@@ -8,6 +8,8 @@ import type { AgentRpcMethods, RuntimeEnv } from './env.ts'
 import { failureOf, toAppError } from './http/errors.ts'
 import { channelPull, channelReplies } from './channel/wake.ts'
 import { telegramExtension } from './pi/telegram.ts'
+import { sourcesExtension } from './pi/sources.ts'
+import { sourcesWake } from './sources/wake.ts'
 import { type RpcResult, encodeExit } from './http/rpc.ts'
 import { filesExtension } from './pi/files.ts'
 import { type AgentApps, agentApps } from './agent-apps/engine.ts'
@@ -132,6 +134,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       ...appsExtension(apps, run, appsRun),
       organize,
       telegramExtension(run),
+      sourcesExtension(run),
       retrieval,
       onboardingExtension(run),
     ]
@@ -162,6 +165,8 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     // Reconstruct lease and receipt recovery without opening Pi or waiting on outbound network calls.
     await this.#scheduleWake('mcpEventsWake', Date.now() + 1000)
     await this.#scheduleWake('routinesWake', Date.now() + 1000)
+    // The Sources' subscriptions and the answers they owe are looked at again after a restart.
+    await this.schedule(1, 'sourcesWake')
     await reconcileAppJobs(this.#apps)
   }
 
@@ -188,6 +193,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       userId: this.name,
       scheduleEvents: (at) => this.#scheduleWake('mcpEventsWake', at),
       schedulePull: () => this.schedule(0, 'channelPull'),
+      scheduleSources: (seconds) => void this.schedule(seconds, 'sourcesWake'),
       mcpFetch: this.mcpFetch(),
       agentApps: this.#apps,
       telemetry: this.#telemetry.telemetry,
@@ -246,6 +252,11 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
   }
   async channelReplies(): Promise<void> {
     await channelReplies(this.#bridge.run, (seconds) => this.schedule(seconds, 'channelReplies'))
+  }
+
+  /** The Sources' alarm (sources/wake.ts, ADR 0066): each Source tended and the answers due sent. */
+  async sourcesWake(): Promise<void> {
+    await sourcesWake(this.#bridge.run, (seconds) => this.schedule(seconds, 'sourcesWake'))
   }
 
   /** Erases the agent: its files in R2 first (a failure leaves everything to retry), then services and storage. */

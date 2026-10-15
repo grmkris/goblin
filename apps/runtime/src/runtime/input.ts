@@ -43,6 +43,8 @@ export interface AgentInputs {
   readonly scheduleEvents: (at: number) => Promise<void>
   /** Schedules the Telegram pull alarm (channelPull) at once: what a doorbell or a Telegram event asks for. */
   readonly schedulePull: () => Promise<unknown>
+  /** Schedules the Sources' alarm (sourcesWake) in `seconds` (ADR 0066). */
+  readonly scheduleSources: (seconds: number) => void
   readonly mcpFetch: typeof fetch
   /** The agent's apps, made before Pi opened (their tools are Pi's). */
   readonly agentApps: AgentApps

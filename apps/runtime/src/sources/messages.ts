@@ -1,0 +1,301 @@
+// A Source's messages coming in (ADR 0066), over its rows (sources/store.ts) and the agent's ports. Each message read
+// from an event's data or a tool's result is keyed into a conversation; the owner's own messages (those the confirmed
+// speaks-for-me rule matches) go where that conversation's route says: a turn in a Topic answered by goblin or a
+// Persona, a note kept there, nothing, or held until the owner routes it. Everything else stays untrusted data: a
+// notice to the owner, or nothing.
+import {
+  type SourceKeyPart,
+  type SourceKeyValues,
+  type SourceRoute,
+  type SourceScalar,
+  type SpeaksForMe,
+  fillTemplate,
+} from '@goblin/contracts'
+import { RunAttribute } from '@goblin/contracts/telemetry'
+import * as Clock from 'effect/Clock'
+import * as Effect from 'effect/Effect'
+import { type AppError, InvalidInput } from '../http/errors.ts'
+import { routineSummary } from '../routines/summary.ts'
+import { isRecord, sha256Hex } from '../runtime/digest.ts'
+import { failureAttributes } from '../telemetry/attributes.ts'
+import { deliverHeld } from './held.ts'
+import { valueAt } from './pointer.ts'
+import {
+  type Held,
+  type RouteBy,
+  type RouteRow,
+  checkpoint,
+  heldOf,
+  hold,
+  release,
+  routeOf,
+  routeRow,
+  seeKey,
+  setRoute,
+  sourceRow,
+  takeDropped,
+  trackReply,
+  valuesOf,
+} from './store.ts'
+import { operationIdOf } from './text.ts'
+import type { EngineContext, Loaded, SourcePorts } from './types.ts'
+
+/** Pages read at most per pull of a tool read. */
+const MAX_PAGES = 50
+/** Pages read at most to find where a tool read starts when a Source is confirmed. */
+const MAX_HISTORY_PAGES = 200
+/** The longest an item id goes into an operation id as it is; a longer one goes as its digest. */
+const ITEM_ID = 64
+/** How long the owner reads of someone else's message in a notice. */
+const NOTICE_BODY = 1200
+
+/** Whether `value` is a plain value a key part or a speaks-for-me rule compares. */
+const isScalar = (value: unknown): value is SourceScalar =>
+  value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+
+/** A plain value at `pointer`, `null` when there is none; none when it is a list or an object. */
+const scalarAt = (item: unknown, pointer: string): SourceScalar | undefined => {
+  const value = valueAt(item, pointer) ?? null
+  return isScalar(value) ? value : undefined
+}
+
+/** Whether `item` matches: its value at `pointer` equals `equals`. */
+const matches = (item: unknown, match: { readonly pointer: string; readonly equals: SourceScalar }) =>
+  scalarAt(item, match.pointer) === match.equals
+
+/** Whether the owner is the one speaking in `item`, by the rule they confirmed. */
+const speaks = (item: unknown, rule: SpeaksForMe) => ('all' in rule ? true : matches(item, rule))
+
+/** A message's conversation: its key (the JSON of its parts' values in order) and its values by name. */
+type Conversation = { readonly key: string; readonly values: SourceKeyValues }
+
+/** `item`'s conversation by the setup's key; none when a part is a list or an object, or the key is too long. */
+function conversationOf(item: unknown, parts: readonly SourceKeyPart[]): Conversation | undefined {
+  const values: Record<string, SourceScalar> = {}
+  const ordered: SourceScalar[] = []
+  for (const part of parts) {
+    const value = scalarAt(item, part.pointer)
+    if (value === undefined) return undefined
+    values[part.name] = value
+    ordered.push(value)
+  }
+  const key = JSON.stringify(ordered)
+  return key.length > 512 ? undefined : { key, values }
+}
+
+/** A conversation's values in words: "chat dm, thread 3", leaving out the parts it does not have. */
+export const keyWords = (values: SourceKeyValues): string =>
+  Object.entries(values)
+    .filter(([, value]) => value !== null && value !== '')
+    .map(([name, value]) => `${name} ${String(value)}`)
+    .join(', ')
+
+/** The operation of the turn a message makes: one per Source and message, a long message id as its digest. */
+const turnOperation = (sourceId: string, itemId: string) =>
+  Effect.map(itemId.length <= ITEM_ID ? Effect.succeed(itemId) : Effect.promise(() => sha256Hex(itemId)), (id) =>
+    operationIdOf('source', `${sourceId}-${id.slice(0, ITEM_ID)}`),
+  )
+
+/** The Topic a route puts notes and notices in; none for one that goes nowhere yet. */
+export const topicOf = (route: SourceRoute): number | undefined => ('topic' in route ? route.topic : undefined)
+
+/** Someone else's words, scrubbed of credentials and controls and cut to a notice's body. */
+const noticeBody = (text: string) => routineSummary(text.replaceAll(/[\s\p{Cc}]+/gu, ' ').trim()).slice(0, NOTICE_BODY)
+
+/** A template filled as an argument record; anything else (a template is always one) is no arguments. */
+export const asArguments = (value: unknown): Record<string, unknown> => (isRecord(value) ? value : {})
+
+/** One owner message to where its conversation's route says; `note` goes before its words. */
+const send = (
+  context: EngineContext,
+  source: Loaded,
+  route: RouteRow,
+  { held, note }: { readonly held: Held; readonly note: string },
+  ports: SourcePorts,
+) =>
+  Effect.gen(function* () {
+    const { db, record } = context
+    const target = routeOf(route)
+    const now = yield* Clock.currentTimeMillis
+    if (target.to === 'held') return yield* Effect.sync(() => hold(db, held, Math.floor(now / 1000)))
+    if (target.to === 'ignore') return
+    const operationId = yield* turnOperation(source.row.id, held.itemId)
+    const label = yield* ports.label(source.row.connectionId)
+    const where = keyWords(valuesOf(route))
+    const turn = {
+      topic: target.topic,
+      operationId,
+      author: where === '' ? label : `${label} · ${where}`,
+      text: `${note}${held.text}`,
+    }
+    if (target.to === 'listen') return yield* ports.keep(turn)
+    const attributes = { [RunAttribute.channelMessage]: operationId }
+    const failed = (error: AppError) =>
+      record('channel.received', { operationId, chatId: undefined }, now, {
+        ...attributes,
+        ...failureAttributes(error),
+      })
+    const persona = target.to === 'persona' ? target.persona : undefined
+    const submitted = yield* ports.submit(turn, persona).pipe(Effect.tapError(failed))
+    yield* record('channel.received', { operationId, chatId: submitted.chatId }, now, attributes)
+    if (source.setup.reply === undefined) return
+    const reply = {
+      operationId,
+      sourceId: source.row.id,
+      key: route.key,
+      chatId: submitted.chatId,
+      personaId: submitted.persona ?? null,
+    }
+    if (trackReply(db, reply, Math.floor(now / 1000))) context.wake(5)
+  })
+
+/** What `key` held while it waited, delivered in order once it has a route; how many were dropped goes first. */
+const releaseHeld = (context: EngineContext, source: Loaded, key: string, ports: SourcePorts) =>
+  Effect.gen(function* () {
+    const { db } = context
+    const route = routeRow(db, source.row.id, key)
+    if (route === undefined || route.route === 'held') return
+    const ready = heldOf(db, source.row.id, key)
+    if (ready.length === 0) return
+    yield* deliverHeld(
+      ready,
+      takeDropped(db, source.row.id, key),
+      'conversation',
+      (held, note) => send(context, source, route, { held, note }, ports),
+      (held) => release(db, held.sourceId, held.itemId),
+    )
+  })
+
+/** Someone else's message as a notice to the owner, where its conversation's route puts notes. */
+const noticeOf = (source: Loaded, conversation: Conversation, target: SourceRoute, itemId: string, text: string) =>
+  Effect.gen(function* () {
+    const { row } = source
+    const operationId = yield* turnOperation(row.id, itemId)
+    const where = keyWords(conversation.values)
+    const body = noticeBody(text)
+    return (label: string) => ({
+      id: `notice:${operationId}`,
+      sourceId: row.id,
+      connectionId: row.connectionId,
+      label,
+      topic: topicOf(target),
+      title: where === '' ? `Someone else wrote in ${label}` : `Someone else wrote in ${label}, ${where}`,
+      ...(body === '' ? {} : { body }),
+    })
+  })
+
+/**
+ * One message: incoming (by `read.direction`), in a conversation goblin can key, with words. A conversation seen for
+ * the first time takes the setup's `newKeys`. The owner's own message goes where its route says; anyone else's is a
+ * notice to the owner, or nothing.
+ */
+const take = (context: EngineContext, source: Loaded, item: unknown, itemId: string, ports: SourcePorts) =>
+  Effect.gen(function* () {
+    const { row, setup } = source
+    if (setup.read.direction !== undefined && !matches(item, setup.read.direction)) return
+    const conversation = conversationOf(item, setup.key)
+    const text = valueAt(item, setup.read.text)
+    if (conversation === undefined || typeof text !== 'string' || text.trim() === '') return
+    const now = Math.floor((yield* Clock.currentTimeMillis) / 1000)
+    const route = seeKey(context.db, { sourceId: row.id, ...conversation }, setup.newKeys, now).row
+    if (speaks(item, setup.speaksForMe))
+      return yield* send(
+        context,
+        source,
+        route,
+        { held: { sourceId: row.id, itemId, key: conversation.key, text }, note: '' },
+        ports,
+      )
+    const target = routeOf(route)
+    if (setup.others === 'drop' || target.to === 'ignore') return
+    const notice = yield* noticeOf(source, conversation, target, itemId, text)
+    yield* ports.notice(notice(yield* ports.label(row.connectionId)))
+  })
+
+/** The id of a message: its own (a plain value at `pointer`), else `fallback`. */
+const itemIdOf = (item: unknown, pointer: string | undefined, fallback: string) => {
+  const id = pointer === undefined ? undefined : scalarAt(item, pointer)
+  return id === undefined || id === null || id === '' ? fallback : String(id)
+}
+
+/** The messages of an event's data: the list `read.items` points at, or the data as one message. */
+export const takeEvent = (
+  context: EngineContext,
+  source: Loaded,
+  event: { readonly eventId: string; readonly data: unknown },
+  ports: SourcePorts,
+) =>
+  Effect.gen(function* () {
+    const { read } = source.setup
+    if (read.from !== 'payload') return
+    const found = read.items === undefined ? [event.data] : valueAt(event.data, read.items)
+    const items: readonly unknown[] = Array.isArray(found) ? found : []
+    for (const [index, item] of items.entries())
+      yield* take(context, source, item, itemIdOf(item, read.id, `${event.eventId}:${String(index)}`), ports)
+  })
+
+/** One page of a tool read: its messages, the cursor after them, and where each message's id is. */
+type Page = { readonly items: readonly unknown[]; readonly next: string | undefined; readonly id: string }
+
+/** One page of a tool read from `cursor`: its messages and the cursor after them (none when it names none). */
+const readPage = (source: Loaded, cursor: string | null, ports: SourcePorts): Effect.Effect<Page, AppError> =>
+  Effect.gen(function* () {
+    const { read } = source.setup
+    if (read.from !== 'tool') return yield* new InvalidInput({ reason: 'source reads no tool' })
+    const args = asArguments(fillTemplate(read.arguments, { cursor: cursor ?? undefined }))
+    const result = yield* ports.call(source.row.connectionId, read.tool, args)
+    const found = valueAt(result, read.items)
+    const next = valueAt(result, read.cursor)
+    return {
+      items: Array.isArray(found) ? found : [],
+      next: typeof next === 'string' && next !== '' ? next : undefined,
+      id: read.id,
+    }
+  })
+
+/**
+ * A tool read from the Source's cursor, a page at a time, each message taken and the cursor following each page, while
+ * the Source is active at the binding it started with.
+ */
+export const pull = (context: EngineContext, source: Loaded, ports: SourcePorts) =>
+  Effect.gen(function* () {
+    for (let count = 0; count < MAX_PAGES; count += 1) {
+      const row = sourceRow(context.db, source.row.id)
+      if (row?.state !== 'active' || row.binding !== source.row.binding) return
+      const page = yield* readPage(source, row.cursor, ports)
+      for (const item of page.items) {
+        const id = itemIdOf(item, page.id, '')
+        if (id !== '') yield* take(context, source, item, id, ports)
+      }
+      if (page.next === undefined) return
+      checkpoint(context.db, row.id, row.binding, page.next)
+      if (page.items.length === 0 || page.next === row.cursor) return
+    }
+  })
+
+/** Where a tool read starts when the Source is confirmed: the cursor after its last message, so history stays. */
+export const startCursor = (source: Loaded, ports: SourcePorts) =>
+  Effect.gen(function* () {
+    let cursor: string | null = null
+    for (let count = 0; count < MAX_HISTORY_PAGES; count += 1) {
+      const page: Page = yield* readPage(source, cursor, ports)
+      if (page.next === undefined || page.next === cursor) return page.next ?? cursor
+      cursor = page.next
+      if (page.items.length === 0) return cursor
+    }
+    return yield* new InvalidInput({ reason: 'the source has too much history to start from its end' })
+  })
+
+/** Where one conversation goes now, as who chose it. */
+export type RouteChange = { readonly key: string; readonly target: SourceRoute; readonly by: RouteBy }
+
+/** Sets where `key` goes, as `by` chose it, and delivers what it held. The rows before and after. */
+export const route = (context: EngineContext, source: Loaded, change: RouteChange, ports: SourcePorts) =>
+  Effect.gen(function* () {
+    const { key, target, by } = change
+    const now = Math.floor((yield* Clock.currentTimeMillis) / 1000)
+    const changed = setRoute(context.db, { sourceId: source.row.id, key }, target, by, now)
+    if (changed === undefined) return undefined
+    yield* releaseHeld(context, source, key, ports)
+    return changed
+  })

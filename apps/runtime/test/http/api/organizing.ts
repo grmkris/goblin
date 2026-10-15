@@ -18,6 +18,7 @@ import { McpConnections, McpGrants, McpServers, Resident } from '../../../src/mc
 import { AppEngine } from '../../../src/agent-apps/service.ts'
 import { Setups } from '../../../src/setup/service.ts'
 import { Skills } from '../../../src/skills/service.ts'
+import { Sources } from '../../../src/sources/service.ts'
 import { FlowEvents } from '../../../src/observability/flows.ts'
 import { OrganizeHandlers } from '../../../src/organize/api.ts'
 import { PersonasHandlers } from '../../../src/personas/api.ts'
@@ -121,8 +122,9 @@ export const organizing = () => {
           stub(RoutineControl),
           stub(Apps),
           stub(McpConnections, { snapshot: () => Effect.succeed(Option.none()) }),
-          // Only a Telegram receipt's Undo reaches the channel.
+          // Only a Telegram receipt's Undo reaches the channel, and only a Source's route receipt the Sources.
           stub(Channel),
+          stub(Sources),
           catalog,
           Layer.succeed(Resident, resident.service),
           FlowEvents.layerWith((event) => Effect.sync(() => void flows.push(event))),

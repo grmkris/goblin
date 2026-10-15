@@ -23,6 +23,7 @@ import { AgentInput } from '../src/runtime/input.ts'
 import { RoutineControl, RoutineRuns } from '../src/routines/service.ts'
 import { Setups } from '../src/setup/service.ts'
 import { Skills } from '../src/skills/service.ts'
+import { Sources } from '../src/sources/service.ts'
 import { Topics } from '../src/topics/service.ts'
 import { chatDatabase, durable } from './chats-sqlite.ts'
 import { stub } from './http/api/fixture.ts'
@@ -74,6 +75,8 @@ const world = Effect.gen(function* () {
     FlowEvents.noop,
     stub(Skills),
     stub(AppEngine),
+    // Only a Source's route receipt reaches the Sources.
+    stub(Sources),
   )
   return { db: sqlite, services, store }
 })

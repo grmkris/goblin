@@ -12,7 +12,7 @@ import type { Answer, ReplyRef } from './turns.ts'
 const REPLY_WINDOW = 86_400
 
 /** An answer owed: the turn it belongs to, and when its message came in (epoch seconds). */
-export type Owed = ReplyRef & { readonly createdAt: number }
+type Owed = ReplyRef & { readonly createdAt: number }
 
 /**
  * Sends every answer of `owed` that is ready, in order: `answer` reads how its turn ended, and `send` sends it, or gives

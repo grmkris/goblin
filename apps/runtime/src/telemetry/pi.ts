@@ -48,6 +48,7 @@ export type ReceiptSource = { readonly kind: string; readonly origin?: string | 
  */
 const SOURCES: readonly (readonly [string, string])[] = [
   ['telegram-', 'telegram'],
+  ['source-', 'source'],
   ['routine-input:', 'routine'],
   ['routine-report:', 'routine_report'],
   ['subagent-report:', 'subagent_report'],
@@ -57,6 +58,7 @@ const SOURCES: readonly (readonly [string, string])[] = [
 /** A turn's source by its receipt's kind; an input of any other kind (the owner's own) is `direct`. */
 const RECEIPT_SOURCES: Readonly<Record<string, string>> = {
   telegram: 'telegram',
+  source: 'source',
   routine_input: 'routine',
   subagent_report: 'subagent_report',
   ask_client: 'client',

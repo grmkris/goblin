@@ -151,6 +151,10 @@ export const FlowName = Schema.Literals([
   'routine_fire',
   'routine_report',
   'telegram_delivery',
+  /** The owner's message from a Source became a turn (ADR 0066). */
+  'source',
+  /** goblin's answer went back through a Source's reply tool, or was given up. */
+  'source_delivery',
   'decision_propose',
   'decision_confirm',
   'decision_dismiss',

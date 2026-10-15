@@ -8,7 +8,7 @@ import * as Effect from 'effect/Effect'
 export const HELD_LIMIT = 20
 
 /** One place's held messages as their table keeps them. */
-export type HeldShelf = {
+type HeldShelf = {
   /** Keeps one more message; holding the same one again changes nothing. */
   readonly put: () => void
   /** The ids of every message the place holds, newest first. */

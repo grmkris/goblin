@@ -23,6 +23,7 @@ import { AppEngine } from '../src/agent-apps/service.ts'
 import { McpConnections, McpGrants, McpServers } from '../src/mcp/service.ts'
 import { Setups } from '../src/setup/service.ts'
 import { Skills } from '../src/skills/service.ts'
+import { Sources } from '../src/sources/service.ts'
 import { Invocations, Personas } from '../src/personas/service.ts'
 import { Topics } from '../src/topics/service.ts'
 import { appConversations } from '../src/storage/schema.ts'
@@ -330,6 +331,7 @@ type Provided =
   | PiSessions
   | FlowEvents
   | Channel
+  | Sources
 const run = <A, E>(layer: Layer.Layer<Provided>, program: Effect.Effect<A, E, Provided>) =>
   Effect.runPromise(Effect.provide(program, layer))
 const fails = <A, E>(layer: Layer.Layer<Provided>, program: Effect.Effect<A, E, Provided>) =>
@@ -373,8 +375,9 @@ describe('organize receipts and Undo', () => {
       Layer.succeed(McpConnections, unread),
       Layer.succeed(Skills, unread),
       Layer.succeed(AppEngine, unread),
-      // Only a Telegram receipt's Undo reaches the channel.
+      // Only a Telegram receipt's Undo reaches the channel, and only a Source's route receipt the Sources.
       Layer.succeed(Channel, unread),
+      Layer.succeed(Sources, unread),
       FlowEvents.noop,
     ).pipe(Layer.provide(Layer.merge(KeyedLock.layer, Layer.succeed(Changes, makeChanges()))))
     return { ...parts, layer }

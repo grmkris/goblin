@@ -1,4 +1,17 @@
-import { EventRate } from '@goblin/contracts'
+import {
+  EventRate,
+  SourceKey,
+  SourceOthers,
+  SourceRead,
+  SourceReply,
+  SourceRoute,
+  type SourceSuggestion,
+  SpeaksForMe,
+  readPlaceholder,
+  replyPlaceholder,
+  templateProblem,
+} from '@goblin/contracts'
+import * as Option from 'effect/Option'
 import * as Predicate from 'effect/Predicate'
 import * as Schema from 'effect/Schema'
 
@@ -50,6 +63,7 @@ export type EventSuggestion = {
   readonly recommended?: boolean
   readonly tellMe?: boolean
   readonly rate?: EventRate
+  readonly source?: SourceSuggestion
 }
 
 const fieldsOf = (value: unknown): { readonly [key: PropertyKey]: unknown } =>
@@ -63,6 +77,41 @@ const line = (value: unknown, max: number): string | undefined => {
 const flag = (value: unknown): boolean | undefined => (typeof value === 'boolean' ? value : undefined)
 const isRate = Schema.is(EventRate)
 
+/** `value` as `schema` decodes it, or none. */
+const decoded = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): S['Type'] | undefined =>
+  Option.getOrUndefined(Schema.decodeUnknownOption(schema)(value))
+
+const SuggestedArguments = Schema.Record(Schema.String, Schema.Json)
+
+/**
+ * What a server suggests for a Source on one event (`_meta.suggest.source`, ADR 0066), read field by field: without a
+ * key, a speaks-for-me rule and a read that hold there is none; a reply, a rule for others, a route for new
+ * conversations or arguments that do not hold are left out on their own.
+ */
+function sourceSuggestion(value: unknown): SourceSuggestion | undefined {
+  const fields = fieldsOf(value)
+  const key = decoded(SourceKey, fields['key'])
+  const speaksForMe = decoded(SpeaksForMe, fields['speaksForMe'])
+  const read = decoded(SourceRead, fields['read'])
+  if (key === undefined || speaksForMe === undefined || read === undefined) return undefined
+  if (read.from === 'tool' && templateProblem(read.arguments, readPlaceholder, ['cursor']) !== undefined)
+    return undefined
+  const reply = decoded(SourceReply, fields['reply'])
+  const replies = reply !== undefined && templateProblem(reply.arguments, replyPlaceholder(key), ['text']) === undefined
+  const args = decoded(SuggestedArguments, fields['arguments'])
+  const others = decoded(SourceOthers, fields['others'])
+  const newKeys = decoded(SourceRoute, fields['newKeys'])
+  return {
+    key,
+    speaksForMe,
+    read,
+    ...(replies ? { reply } : {}),
+    ...(args === undefined ? {} : { arguments: args }),
+    ...(others === undefined ? {} : { others }),
+    ...(newKeys === undefined ? {} : { newKeys }),
+  }
+}
+
 /**
  * The suggestions `descriptor` carries: its `_meta.suggest` fields, the descriptor's own `title` when the
  * suggestion has none. Each field is read on its own, so one malformed field drops only itself.
@@ -75,6 +124,7 @@ export function eventSuggestion(descriptor: EventDescriptor): EventSuggestion {
   const recommended = flag(suggest['recommended'])
   const tellMe = flag(suggest['tellMe'])
   const rate = suggest['rate']
+  const source = sourceSuggestion(suggest['source'])
   return {
     ...(title === undefined ? {} : { title }),
     ...(summary === undefined ? {} : { summary }),
@@ -82,6 +132,7 @@ export function eventSuggestion(descriptor: EventDescriptor): EventSuggestion {
     ...(recommended === undefined ? {} : { recommended }),
     ...(tellMe === undefined ? {} : { tellMe }),
     ...(isRate(rate) ? { rate } : {}),
+    ...(source === undefined ? {} : { source }),
   }
 }
 export const EventsListResult = Schema.Struct({

@@ -111,7 +111,7 @@ const FINISH_REASONS = new Set(['stop', 'toolUse', 'length', 'error', 'aborted']
 const finiteText = (value: unknown, values: ReadonlySet<string>, fallback: string): string =>
   typeof value === 'string' && values.has(value) ? value : fallback
 
-const ORIGINS = Schema.Literals(['owner', 'client', 'telegram', 'agent', 'routine', 'system'])
+const ORIGINS = Schema.Literals(['owner', 'client', 'telegram', 'source', 'agent', 'routine', 'system'])
 const COUNT = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 /** Flow attributes keep only a value of their closed set or id shape; anything else is dropped, never coerced. */
 const FLOW_VALUES: Readonly<Record<string, (value: unknown) => boolean>> = {

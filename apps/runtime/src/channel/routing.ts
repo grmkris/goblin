@@ -16,9 +16,8 @@ import * as Option from 'effect/Option'
 import { epochSeconds } from '../clock.ts'
 import { type AppError, InvalidInput, NotFound } from '../http/errors.ts'
 import { Receipts } from '../organize/service.ts'
-import { Personas } from '../personas/service.ts'
 import { Db } from '../runtime/db.ts'
-import { Topics } from '../topics/service.ts'
+import { activePersona, activeTopic, personaWords, topicWords } from '../sources/places.ts'
 import {
   type RouteChoice,
   type RouteRow,
@@ -131,22 +130,6 @@ export const channelChats = Effect.gen(function* () {
   )
 })
 
-/** `topic` while it is active; `NotFound` otherwise. */
-const activeTopic = (topic: number) =>
-  Effect.gen(function* () {
-    const found = yield* (yield* Topics).get(topic)
-    if (found.archivedAt !== undefined) return yield* new NotFound({ what: 'topic' })
-    return found.id
-  })
-
-/** `persona` while it is active; `NotFound` otherwise. */
-const activePersona = (persona: number) =>
-  Effect.gen(function* () {
-    const active = yield* (yield* Personas).active
-    if (!active.some((each) => each.id === persona)) return yield* new NotFound({ what: 'persona' })
-    return persona
-  })
-
 /** A pick as the route it sets: a Topic made for "New topic", each named Topic and Persona checked active. */
 export const choiceOf = (pick: RoutePick, actor: 'owner' | 'agent') =>
   Effect.gen(function* () {
@@ -180,12 +163,10 @@ export const routeWords = (route: TelegramRoute | undefined, inherited = false) 
   Effect.gen(function* () {
     if (route === undefined) return inherited ? 'follows its chat' : "waits for the owner's choice"
     if (route.mode === 'ignore') return 'ignored'
-    const topic = yield* (yield* Topics).get(route.topic).pipe(Effect.option)
-    const place = `#${Option.match(topic, { onNone: () => 'Personal', onSome: ({ name }) => name })}`
+    const place = yield* topicWords(route.topic)
     if (route.mode === 'listen') return `kept as notes in ${place}`
     if (route.persona === undefined) return `answered by goblin in ${place}`
-    const persona = yield* (yield* Personas).get(route.persona).pipe(Effect.option)
-    return `answered by @${Option.match(persona, { onNone: () => 'Persona', onSome: ({ name }) => name })} in ${place}`
+    return `answered by ${yield* personaWords(route.persona)} in ${place}`
   })
 
 /** A chat or topic by name, for a receipt: "Trip planning", or "Flights" in "Trip planning". */

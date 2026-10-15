@@ -16,6 +16,7 @@ import { Invocations, Personas } from '../personas/service.ts'
 import { restoreHelperExecution } from '../pi/helper-execution.ts'
 import type { Changes } from '../runtime/changes.ts'
 import { Db } from '../runtime/db.ts'
+import { routeRevision } from '../sources/store.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { topicPorts } from '../topics/ports.ts'
 import { TopicRegistry } from '../topics/registry.ts'
@@ -70,6 +71,7 @@ const stores: Effect.Effect<DelegationStores, never, AgentInput | Db | Conversat
     const personas = new PersonaRegistry(db, offeredModels(db, deploymentModelIds(input.env)))
     const receipts = new OrganizeReceipts(db, (kind, target) => {
       if (kind === 'telegram.route' || kind === 'telegram.default') return telegramRevision(db, kind, target)
+      if (kind === 'source.route') return routeRevision(db, target)
       try {
         return (kind.startsWith('topic.') ? topics : personas).get(Number(target)).revision
       } catch {

@@ -98,18 +98,17 @@ const askEntry = (
 }
 
 /**
- * The owner tagged Personas (in the app, or through a Telegram route that a Persona answers, `from`): each answers
- * once, attributed, in this chat, and Goblin does not (ADR 0033). Admitted
- * once per operation (`ChatOperations.admit`, under the chat's lock): record who was asked, write the ask into the
- * chat as a passive `app.persona_ask` entry (no run starts) and create one Persona turn per Persona. Nothing here
- * waits for a model.
+ * The owner tagged Personas (in the app, or through a Telegram or Source route that a Persona answers, `from`): each
+ * answers once, attributed, in this chat, and Goblin does not (ADR 0033). Admitted once per operation
+ * (`ChatOperations.admit`, under the chat's lock): record who was asked, write the ask into the chat as a passive
+ * `app.persona_ask` entry (no run starts) and create one Persona turn per Persona. Nothing here waits for a model.
  */
 export const askPersonas = (
   input: Ask,
   ids: readonly number[],
   order: 'parallel' | 'sequence',
   content: string | TextContent[],
-  from: { readonly via: 'app' | 'telegram' } = { via: 'app' },
+  from: { readonly via: 'app' | 'telegram' | 'mcp' } = { via: 'app' },
 ) =>
   Effect.gen(function* () {
     const invocations = yield* Invocations
@@ -121,7 +120,10 @@ export const askPersonas = (
     const admission = {
       chat: input.thread,
       operationId: input.operationId,
-      receipt: { kind: 'persona_ask', origin: from.via === 'telegram' ? 'telegram' : 'owner' },
+      receipt: {
+        kind: 'persona_ask',
+        origin: from.via === 'telegram' ? 'telegram' : from.via === 'mcp' ? 'source' : 'owner',
+      },
       flow: { flow: 'persona_ask', via: from.via, actor: 'owner', count: frozen.length, personaOrder: order },
     } as const
     return yield* (yield* ChatOperations).admit(admission, (admitted) =>

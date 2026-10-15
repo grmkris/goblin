@@ -13,6 +13,7 @@ import { editTopicSetup, updateTopic } from '../topics/program.ts'
 import { Topics } from '../topics/service.ts'
 import { withFlow } from '../observability/flows.ts'
 import { undoTelegram } from '../channel/undo.ts'
+import { Sources } from '../sources/service.ts'
 import { Receipts } from './service.ts'
 
 const TopicBefore = Schema.NullOr(Schema.Struct({ name: Schema.String, archived: Schema.Boolean }))
@@ -50,6 +51,10 @@ export const undoReceipt = (id: string) => {
     if (stored.undoneAt !== undefined) return yield* new Conflict({ reason: 'undone' })
     if (stored.kind === 'telegram.route' || stored.kind === 'telegram.default') {
       yield* undoTelegram({ ...stored, kind: stored.kind })
+      return yield* receipts.markUndone(id)
+    }
+    if (stored.kind === 'source.route') {
+      yield* (yield* Sources).undo(stored)
       return yield* receipts.markUndone(id)
     }
     const target = Number(stored.target)
