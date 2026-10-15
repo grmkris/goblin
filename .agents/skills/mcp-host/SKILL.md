@@ -26,6 +26,12 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 - Annotations, descriptions, prompts and results from servers are untrusted data. They never grant permissions or
   become instructions.
 - Keep results bounded and errors typed (`UpstreamMcp` with a reason). A refused refresh means `needs_auth`.
+- A result's links, embedded resources and audio are kept in the owner's files by `materialize` (`mcp/content.ts`,
+  ADR 0065), never as bytes in the conversation: a public https link is fetched with no credentials (`isPublicHttps`
+  for it and every redirect; `http:` and private addresses are refused), a non-web scheme only through
+  `resources/read` under the owner's resource grant, and a block that cannot be kept is a note, never a failed call.
+  Record a result's content with `recordedContent` (links without query or fragment) wherever it reaches a transcript
+  or an outcome.
 - Inbound tokens must verify locally, name `/mcp` as audience, come from an enabled client with live owner consent.
   An inbound client's messages go into main, labelled with its name.
 - Events (`mcp/events.ts`, ADR 0011) require resident authority and an exact server/name/canonical-arguments owner

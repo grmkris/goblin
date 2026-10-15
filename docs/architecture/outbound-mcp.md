@@ -86,6 +86,22 @@ is `UpstreamMcp` `timeout`, a caller who stopped waiting `cancelled` (`mcp/error
 Neither drops the connection; a second timeout in a row does. A call that timed out or lost its connection may still
 have run, so `mcp_call` tells the model to check the server's state before calling it again.
 
+**Files from results** ([ADR 0065](../adr/0065-files-from-mcp-content.md), `mcp/content.ts`). After a model's `mcp_call`
+completes, `materialize` keeps each `resource_link`, embedded blob, embedded text over 16 K characters and `audio` block
+of its result (never an App's own `ui://` resource) in the owner's files, at most eight, one at a time, under
+`/agent/received/<connection label, slugged>/<YYYY-MM-DD>/` with a name that replaces nothing there. A public https link
+is fetched with no credentials (never the connection's token): the link and each of at most three redirects must pass
+`isPublicHttps` (`mcp/endpoint.ts`, the rule for added servers), the body is counted as it arrives and abandoned past
+25 MiB, and all of it has thirty seconds. A link of another scheme is read with `resources/read` on the same connection,
+under the owner's grant for that exact resource (bounded at 1 MiB, as every resource result); without the grant it stays
+a reference. `http:` and private addresses are refused. The model reads
+`{ receivedFile: { path, name, mimeType, size } }` in the block's place, with a copy of a PNG, JPEG, GIF or WebP of at
+most 256 KiB when its Pi model takes images; a block that could not be kept is a note in goblin's words
+(`notReceived`), and the call goes on. The details (`mcpResultDetails`) and a held call's outcome (`outcomeResult`)
+record every link without its query and fragment, so a signed URL reaches no transcript, and a kept block without its
+bytes; the details add `received`, goblin's own list of the files, which the web shows as chips under the call. Any
+other block the model cannot read is passed on as `unsupportedMcpContent`.
+
 Grants are per discovered tool (`app_mcp_grants`), toggled by the owner. A tool grant also grants its `ui://` App
 resource. An App's switch (`PUT /api/mcp/app-grants`, `McpGrants.setApp`) grants an App as a whole: exactly the
 tools that declare its `ui://` resource, including the ones only the App may call, and the resource itself.

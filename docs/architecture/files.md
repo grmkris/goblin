@@ -13,3 +13,9 @@ each write; a body longer than it declared stores nothing. The composer's paperc
 gets the owner's words, then one block listing each file's path, name, size and type, then any App context
 (`pi/content.ts`). The web reads that block back into chips under the message (`lib/app-context.ts`), only when every
 block after the words is one it knows. Deleting the account deletes the R2 prefix before the object's storage.
+
+goblin itself writes under `/agent/received/` ([ADR 0065](../adr/0065-files-from-mcp-content.md), `mcp/content.ts`):
+the files a model's MCP call hands over in its result (links, embedded blobs and long text, audio), in a folder per
+connection (its label, slugged) and day (UTC), under a name that replaces nothing there, within the same limits. The
+model reads each file's path, name, type and size in the block's place; the call shows each as a chip
+(`ReceivedFiles` in `attachments.tsx`, read from the result's `received`). Outbound MCP describes how they are fetched.

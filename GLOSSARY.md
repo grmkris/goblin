@@ -277,6 +277,10 @@ agent writes only `/agent`.
 **Attachment**:
 A file the owner sent with a message: its path rides with the words, and the message shows it.
 
+**Received file**:
+A file goblin kept from an MCP tool result (ADR 0065): a link, an embedded resource or audio, written under
+`/agent/received/<connection>/<day>/`. The model reads its path in the block's place, and the call shows it as a chip.
+
 ## Goblin Wallet
 
 **Goblin Wallet**:
