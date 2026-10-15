@@ -2,7 +2,13 @@ import { defineConfig, type OxlintOverride } from 'oxlint'
 import { agentIgnorePatterns } from './tools/vendored.ts'
 
 /** Where React runs, and the plugins its files are linted with. */
-const REACT_FILES = ['apps/web/**', 'packages/ui/**', 'packages/kit/**', 'packages/app/src/ui/**']
+const REACT_FILES = [
+  'apps/web/**',
+  'apps/openui-spike/**',
+  'packages/ui/**',
+  'packages/kit/**',
+  'packages/app/src/ui/**',
+]
 const REACT_PLUGINS: OxlintOverride['plugins'] = ['typescript', 'unicorn', 'oxc', 'import', 'react']
 /** The React Compiler's checks of the Rules of React (oxlint's port): refs, purity, effects, memoisation, syntax. */
 const RULES_OF_REACT = [

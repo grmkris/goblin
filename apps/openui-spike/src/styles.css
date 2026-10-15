@@ -1,0 +1,183 @@
+@import '@goblin/ui/styles.css';
+@import '@goblin/kit/kit.css';
+@source './';
+
+body {
+  margin: 0;
+}
+.spike-page {
+  min-block-size: 100svh;
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+}
+.spike-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem clamp(1rem, 4vw, 3rem);
+  border-block-end: 1px solid var(--border);
+}
+.spike-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.spike-main {
+  max-inline-size: 90rem;
+  margin-inline: auto;
+  padding: clamp(1rem, 3vw, 2.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+.spike-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-inline-size: 48rem;
+}
+.spike-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(20rem, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+.spike-preview {
+  min-inline-size: 0;
+  overflow: clip;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--card);
+}
+.spike-preview-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border-block-end: 1px solid var(--border);
+}
+.spike-conversation {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: clamp(1rem, 3vw, 2rem);
+}
+.spike-request {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-inline-start: 2px solid var(--moss);
+  padding-inline-start: 1rem;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+.spike-renderer {
+  min-block-size: 12rem;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+.spike-stays {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 1rem;
+}
+.spike-stays [data-slot='card'] {
+  display: flex;
+  flex-direction: column;
+}
+.spike-stays [data-slot='card-footer'] {
+  margin-block-start: auto;
+}
+.spike-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+  gap: 1.5rem;
+}
+.spike-receipt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border-block-start: 1px solid var(--border);
+  background: var(--muted);
+}
+.spike-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-inline-size: 0;
+}
+.spike-source {
+  min-block-size: 26rem;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  tab-size: 2;
+}
+.spike-json {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+  line-height: 1.65;
+  max-block-size: 24rem;
+  overflow-y: auto;
+}
+.spike-prompt {
+  border-block-start: 1px solid var(--border);
+  padding-block-start: 1rem;
+}
+.spike-prompt summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding-block: 0.5rem;
+}
+.spike-prompt[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.spike-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  justify-content: space-between;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+.spike-page a:focus-visible,
+.spike-page summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+
+@media (max-width: 56rem) {
+  .spike-workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .spike-tabs {
+    display: flex;
+    inline-size: 100%;
+  }
+  .spike-tabs [role='tab'] {
+    flex: 1;
+    min-inline-size: 0;
+    font-size: 0.8125rem;
+  }
+  .spike-page input,
+  .spike-page select,
+  .spike-page textarea {
+    font-size: 1rem;
+  }
+  .spike-page button,
+  .spike-page [role='tab'] {
+    min-block-size: 2.75rem;
+  }
+}

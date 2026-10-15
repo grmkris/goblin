@@ -1,0 +1,29 @@
+{
+  "url": "https://goblin-openui-spike-preview.kristjan-grm11775.workers.dev",
+  "checks": [
+    "desktop: reactive filter and local action",
+    "desktop: empty filter state",
+    "desktop hotels: fits viewport",
+    "desktop: form values reach action receipt",
+    "desktop form: fits viewport",
+    "desktop: renders before stream completes",
+    "desktop: invalid source shown without breaking last reply",
+    "desktop: source edits render",
+    "desktop dashboard: fits viewport",
+    "desktop: reload resets to documented default",
+    "phone: reactive filter and local action",
+    "phone: empty filter state",
+    "phone hotels: fits viewport",
+    "phone: form values reach action receipt",
+    "phone form: fits viewport",
+    "phone: renders before stream completes",
+    "phone: invalid source shown without breaking last reply",
+    "phone: source edits render",
+    "phone dashboard: fits viewport",
+    "phone: input text avoids Safari zoom",
+    "phone: reload resets to documented default",
+    "no page errors or external requests"
+  ],
+  "passed": 22,
+  "failed": 0
+}

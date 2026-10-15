@@ -71,6 +71,10 @@
       // `vite.react.ts` holds the build's React plugins, which the Vite configs import.
       "project": ["src/**/*.{ts,tsx,css}!", "vite.react.ts", "test/**/*.{ts,tsx}"],
     },
+    "apps/openui-spike": {
+      "entry": ["alchemy.run.ts!"],
+      "project": ["src/**/*.{ts,tsx,css}!", "test/**/*.ts"],
+    },
     "packages/kit": {
       "project": ["src/**/*.{ts,tsx}!", "test/**/*.ts"],
     },

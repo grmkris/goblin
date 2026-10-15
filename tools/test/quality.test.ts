@@ -19,10 +19,13 @@ describe('goblin quality tooling', () => {
     expect(placementOf(path.resolve(repoRoot, 'apps/runtime/src/agent.ts'))?.runtime).toBe('cloud')
     expect(placementOf(path.resolve(repoRoot, 'apps/web/src/main.tsx'))?.runtime).toBe('browser')
     expect(placementOf(path.resolve(repoRoot, 'apps/web/test/agent.test.ts'))?.runtime).toBe('test')
+    expect(placementOf(path.resolve(repoRoot, 'apps/openui-spike/src/main.tsx'))?.runtime).toBe('browser')
+    expect(placementOf(path.resolve(repoRoot, 'apps/openui-spike/alchemy.run.ts'))?.runtime).toBe('tooling')
     expect(placementOf(path.resolve(repoRoot, 'packages/contracts/src/index.ts'))?.runtime).toBe('shared')
     expect(placementOf(path.resolve(repoRoot, 'packages/kit/src/map.tsx'))?.runtime).toBe('browser')
     expect(placementOf(path.resolve(repoRoot, 'apps/cli/src/main.ts'))?.runtime).toBe('daemon')
     expect(nodes.map((node) => node.name)).toEqual([
+      '@goblin/openui-spike',
       '@goblin/cli',
       '@goblin/runtime',
       '@goblin/web',

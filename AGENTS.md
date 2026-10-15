@@ -70,6 +70,7 @@ infrastructure. Read
 
 - [Runtime](apps/runtime/AGENTS.md): native agent, Effect services, MCP host, auth and runtime tests.
 - [Web](apps/web/AGENTS.md): TanStack Start UI, conversation stream and the MCP Apps host.
+- [OpenUI spike](apps/openui-spike/AGENTS.md): isolated interactive-reply playground and its public preview Worker.
 - [CLI](apps/cli/AGENTS.md): `goblin`, the terminal client of `/mcp`'s inspection tools and Workers Logs.
 - [Contracts](packages/contracts/AGENTS.md): shared runtime-validated schemas only.
 - [UI](packages/ui/AGENTS.md): editable local shadcn components and styling.

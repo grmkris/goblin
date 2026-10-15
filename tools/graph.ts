@@ -44,6 +44,14 @@ export const runtimeAllows: Readonly<Record<Runtime, readonly (keyof typeof runt
 }
 export const nodes: readonly Node[] = [
   {
+    dir: 'apps/openui-spike',
+    name: '@goblin/openui-spike',
+    role: 'isolated fixture playground for OpenUI with Goblin components',
+    runtime: 'browser',
+    mayImport: ['@goblin/kit', '@goblin/ui'],
+    zones: { 'alchemy.run.ts': 'tooling', 'vite.config.ts': 'tooling' },
+  },
+  {
     dir: 'apps/cli',
     name: '@goblin/cli',
     role: "the goblin terminal client: an MCP client of the Worker's /mcp with inspection, and Workers Logs",

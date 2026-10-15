@@ -1,5 +1,9 @@
 # Development
 
+The isolated [OpenUI playground](../apps/openui-spike/README.md) explores interactive replies with synthetic data.
+It has its own Alchemy stack and public Worker preview; it has no model or account bindings. Its dependencies are
+not imported by the main web app. See its README for local checks and preview deployment.
+
 Requirements are Bun `1.4.2` and Node.js 22.
 
 ## MCP Events
