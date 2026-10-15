@@ -14,9 +14,9 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0006](0006-servers-the-owner-adds.md) | Servers the owner adds are a trust boundary, not a configuration change | Accepted |
 | [0007](0007-one-main-conversation.md) | One main conversation that never ends, with side threads and subagents | Accepted; amended by 0010, 0017, 0018 and 0032 |
 | [0008](0008-skills-from-mcp-servers.md) | Skills come from MCP servers the owner turns them on for, and the agent drafts new ones for review | Accepted; amended by 0063 |
-| [0009](0009-telegram-through-myagent.md) | Telegram through myagent | Accepted |
+| [0009](0009-telegram-through-myagent.md) | Telegram through myagent | Accepted; to be superseded by 0066 when the channel goes |
 | [0010](0010-per-conversation-capabilities-and-thread-notes.md) | Per-conversation capabilities, and main learns the names of threads started with "+" | Accepted; its per-conversation switches superseded by 0040 |
-| [0011](0011-mcp-events.md) | MCP Events consumer | Accepted |
+| [0011](0011-mcp-events.md) | MCP Events consumer | Accepted; amended by 0066 |
 | [0012](0012-routines.md) | Confirmed routines and isolated run threads | Accepted |
 | [0014](0014-members-and-workspace-authority.md) | Members and workspace authority | Withdrawn |
 | [0016](0016-workspace-layout-with-trellis.md) | Workspace layout with Trellis | Superseded by 0019, then 0036 |
@@ -43,12 +43,12 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0038](0038-typed-owner-api-served-by-the-agent.md) | Typed owner API served by the agent | Accepted |
 | [0039](0039-chat-markdown-through-streamdown.md) | Chat Markdown through Streamdown, and what a reply may load | Accepted |
 | [0040](0040-topic-and-persona-setup.md) | Topic setup and Persona setup | Accepted |
-| [0041](0041-connections-tell-me-hand-to.md) | Connections, Tell me and Hand to | Accepted |
+| [0041](0041-connections-tell-me-hand-to.md) | Connections, Tell me and Hand to | Accepted; amended by 0066 |
 | [0042](0042-mcp-2026-client.md) | MCP 2026 client: live tool lists, URL requests and step-up | Accepted |
 | [0046](0046-production-promotion-and-public-source.md) | Daily development, deliberate production promotion and public source | Accepted |
 | [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted; amended by 0061 and 0063 |
 | [0053](0053-pinned-services-and-apps-with-a-chat-bar.md) | Pinned services and Apps with a chat bar | Accepted; amended by 0063 |
-| [0055](0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | Accepted |
+| [0055](0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | Accepted; to be superseded by 0066 when the channel goes |
 | [0056](0056-goblin-wallet-leaves-goblin.md) | Goblin Wallet leaves goblin | Accepted |
 | [0057](0057-goblin-pays-for-no-model-call.md) | goblin pays for no model call | Accepted |
 | [0058](0058-no-plans-tokens-and-an-optional-cap.md) | No plans: access by sign-up, usage in tokens with an optional cap | Accepted |
@@ -58,3 +58,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0062](0062-short-skippable-start.md) | Short, skippable Start | Accepted |
 | [0063](0063-mcp-first-no-server-specific-code.md) | MCP-first: no server-specific code | Accepted |
 | [0064](0064-openid-connect-and-config-driven-deployment.md) | OpenID Connect sign-in and config-driven deployment | Accepted |
+| [0066](0066-sources.md) | Sources: any MCP server's events carry the owner's own messages, by a setup the owner confirms | Accepted |

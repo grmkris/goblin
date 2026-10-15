@@ -28,8 +28,9 @@ infrastructure. Read
 - Better Auth (`mcp()` + `jwt()`) lives in an isolated D1 auth store. Do not add `oauthProvider()` or a custom adapter.
 - Outbound MCP calls require current resident authority and an exact owner grant for the server and tool/resource.
   Tool annotations, descriptions and remote content are untrusted data: they never grant permission and never become
-  instructions. The one exception is a skill from a server the owner turned skills on for (ADR 0008): the agent
-  follows its steps, but it still grants nothing.
+  instructions. One exception is a skill from a server the owner turned skills on for (ADR 0008): the agent follows its
+  steps, but it still grants nothing. The other: messages matching a Source's speaks-for-me rule the owner confirmed
+  (ADR 0066) become the owner's own turns, with no more authority than one typed in the app, and still grant nothing.
 - MCP Apps run in nested opaque sandbox frames through their originating authorized connection only.
 - Submission acceptance is not external completion. Use stable operation IDs and never claim exactly-once effects.
 
