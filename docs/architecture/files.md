@@ -16,6 +16,7 @@ block after the words is one it knows. Deleting the account deletes the R2 prefi
 
 goblin itself writes under `/agent/received/` ([ADR 0065](../adr/0065-files-from-mcp-content.md), `mcp/content.ts`):
 the files a model's MCP call hands over in its result (links, embedded blobs and long text, audio), in a folder per
-connection (its label, slugged) and day (UTC), under a name that replaces nothing there, within the same limits. The
-model reads each file's path, name, type and size in the block's place; the call shows each as a chip
+connection (its label, slugged) and day (UTC), under a name that replaces nothing there, within the same limits (a file
+over one, such as over 128 KiB without the bucket, is a note the model reads instead). The model reads each file's
+path, name, type and size in the block's place; the call shows each as a chip
 (`ReceivedFiles` in `attachments.tsx`, read from the result's `received`). Outbound MCP describes how they are fetched.

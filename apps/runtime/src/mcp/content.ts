@@ -353,12 +353,20 @@ const bytesOf = (connectionId: string, block: Keepable, fetcher: typeof fetch, s
     return yield* readLinked(connectionId, block.uri)
   })
 
-/** Why a kept file could not be written, in goblin's words. */
+/** A size for people: KiB below a MiB, else MiB. */
+const sized = (bytes: number): string =>
+  bytes < 1024 * 1024 ? `${String(Math.round(bytes / 1024))} KiB` : `${String(Math.round(bytes / (1024 * 1024)))} MiB`
+
+/**
+ * Why a kept file could not be written, in goblin's words: the owner's storage is full, or the file is larger than one
+ * file may be here (a deployment without the files bucket keeps none over 128 KiB, ADR 0064).
+ */
 const unwritable = (error: AppError): NotKept =>
   new NotKept({
     reason: Match.value(error).pipe(
       Match.tags({
-        PayloadTooLarge: () => "the owner's files are full",
+        PayloadTooLarge: ({ limit }) =>
+          limit === FILE_LIMITS.totalBytes ? "the owner's files are full" : `it is larger than ${sized(limit)}`,
         InvalidInput: (invalid) =>
           invalid.reason === 'too many files' ? "the owner's files hold too many files" : 'it could not be saved',
       }),

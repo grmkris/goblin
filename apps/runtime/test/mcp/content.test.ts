@@ -49,6 +49,8 @@ const web = (routes: Readonly<Record<string, () => Response>>) => {
 const CSV = 'quarter,revenue\nq3,42\n'
 const csv = () => new Response(CSV, { headers: { 'content-type': 'text/csv; charset=utf-8' } })
 const redirect = (location: string) => () => new Response(null, { status: 302, headers: { location } })
+/** A 200 KiB file: more than a deployment without the files bucket keeps. */
+const big = () => new Response('x'.repeat(200 * 1024), { headers: { 'content-type': 'text/csv' } })
 /** A response that says it is larger than 25 MiB, whatever it holds. */
 const declared = () => new Response('tiny', { headers: { 'content-length': String(26 * 1024 * 1024) } })
 
@@ -273,7 +275,7 @@ describe('files from MCP content (unit)', () => {
   })
 
   it('never replaces a file already in the folder, and keeps at most eight files of one result', async () => {
-    const { fetcher } = web({ 'https://cdn.example.com/a.csv': csv })
+    const { fetcher } = web({ 'https://cdn.example.com/a.csv': csv, 'https://cdn.example.com/big.csv': big })
     const { keep, files } = await fixture(fetcher, { [`${FOLDER}/a.csv`]: 'mine' })
     const received = await keep(Array.from({ length: 9 }, () => link('https://cdn.example.com/a.csv', 'a.csv')))
     expect([...received.values()].slice(0, 3).map((item) => item.kind === 'file' && item.file.name)).toEqual([
@@ -289,6 +291,13 @@ describe('files from MCP content (unit)', () => {
     expect((await keep([link('https://cdn.example.com/a.csv', 'a.csv')])).get(0)).toEqual({
       kind: 'note',
       note: "could not fetch a.csv: the owner's files are full",
+    })
+    // A deployment without the files bucket keeps no file over 128 KiB (ADR 0064).
+    files.state.full = false
+    files.state.fileLimit = 128 * 1024
+    expect((await keep([link('https://cdn.example.com/big.csv', 'big.csv')])).get(0)).toEqual({
+      kind: 'note',
+      note: 'could not fetch big.csv: it is larger than 128 KiB',
     })
   })
 

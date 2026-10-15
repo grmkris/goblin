@@ -20,14 +20,15 @@ const entryOf = (path: string, { bytes, mimeType }: Stored): FileEntry => ({
 /**
  * The owner's files in memory, held to the store's rules (a path `FILE_PATH` accepts, the agent writing only under
  * `/agent`): what each directory lists and what was written, by path. A store `full` refuses every write as over its
- * limit. Only listing and writing are served.
+ * limit, and one with a `fileLimit` (a deployment without the files bucket) any larger file. Only listing and writing
+ * are served.
  */
 export function memoryFiles(held: Readonly<Record<string, string>> = {}) {
   const encoder = new TextEncoder()
   const written = new Map<string, Stored>(
     Object.entries(held).map(([path, text]) => [path, { bytes: encoder.encode(text), mimeType: 'text/plain' }]),
   )
-  const state = { full: false }
+  const state: { full: boolean; fileLimit?: number } = { full: false }
   const layer = stub(Files, {
     list: (dir) =>
       Effect.sync(() => ({
@@ -41,6 +42,8 @@ export function memoryFiles(held: Readonly<Record<string, string>> = {}) {
       attemptSync(() => {
         mayWrite(caller, filePath(path))
         if (state.full) throw new PayloadTooLarge({ limit: FILE_LIMITS.totalBytes })
+        if (state.fileLimit !== undefined && size > state.fileLimit)
+          throw new PayloadTooLarge({ limit: state.fileLimit })
         if (!(body instanceof Uint8Array) || body.byteLength !== size) throw new Error('the test writes bytes only')
         const file = { bytes: body, mimeType }
         written.set(path, file)
