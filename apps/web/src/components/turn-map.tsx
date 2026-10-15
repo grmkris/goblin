@@ -16,8 +16,8 @@ import { type RefObject, useEffect, useEffectEvent, useRef, useState } from 'rea
 import { currentTurn, markPositions, viewportBand } from '../lib/turn-map.ts'
 import { glide } from '../lib/motion.ts'
 
-/** One turn the owner took, as the map lists it. */
-export type Turn = { readonly id: string; readonly label: string; readonly telegram: boolean }
+/** One turn the owner took, as the map lists it: where it came from when it was not typed here (`via`). */
+export type Turn = { readonly id: string; readonly label: string; readonly via?: string }
 
 /** The scroller keeps this much of the previous turn above a turn it pins (`scrollPreviousItemPeek`). */
 const PEEK = 64
@@ -173,7 +173,7 @@ function TurnList({
             >
               <span className="turn-map-number">{index + 1}</span>
               <span className="turn-map-label">{turn.label === '' ? 'Message' : turn.label}</span>
-              {turn.telegram && <span className="turn-map-via">Telegram</span>}
+              {turn.via !== undefined && <span className="turn-map-via">{turn.via}</span>}
             </button>
           </li>
         ))}

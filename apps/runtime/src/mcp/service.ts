@@ -19,15 +19,15 @@ import * as Effect from 'effect/Effect'
 import type * as Option from 'effect/Option'
 import type * as Schema from 'effect/Schema'
 import type { AppError } from '../http/errors.ts'
-import type { ApprovalRow, HeldCall } from './approvals.ts'
-import type { CredentialCipher } from './cipher.ts'
-import type { ConnectionStatus } from './credentials.ts'
-import type { EventWebhook, EventWebhookResult, SubscribeConsumer } from './events.ts'
+import type { ApprovalRow, HeldCall } from './approvals/approvals.ts'
+import type { CredentialCipher } from './oauth/cipher.ts'
+import type { ConnectionStatus } from './oauth/credentials.ts'
+import type { EventWebhook, EventWebhookResult, SubscribeConsumer } from './events/engine.ts'
 import type { EventContext } from './events/dispatcher.ts'
 import type { SettledOffer } from './events/offers.ts'
 import type { EventDescriptor } from './events/protocol.ts'
 import type { Consumer, Receipt, Subscription } from './events/store.ts'
-import type { HeldUrlRequest, UrlRequestRow } from './url-requests.ts'
+import type { HeldUrlRequest, UrlRequestRow } from './url-requests/url-requests.ts'
 
 declare module '../runtime/changes.ts' {
   interface ChangeTopics {
@@ -45,7 +45,7 @@ import type {
   McpToolResult,
   SkillRequestOptions,
   UrlPrompt,
-} from './types.ts'
+} from './connections/types.ts'
 import type { SkillEntry } from '../skills/protocol.ts'
 
 // The MCP area's services (ADRs 0003, 0006, 0011, 0028). Each method is one Effect with the area's typed failures;

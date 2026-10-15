@@ -47,13 +47,13 @@ describe("a Topic's seed from the discussion (ADR 0032)", () => {
 
   it("names another author's message, and seeds from the brief and the excerpt, or not at all", async () => {
     const authored = user(5, [
-      { type: 'text', text: '[from Telegram]' },
+      { type: 'text', text: '[from Chat]' },
       { type: 'text', text: 'plan the trip' },
     ])
-    expect(latestOwnerExcerpt('1', [authored])?.excerpt).toBe('Telegram: plan the trip')
+    expect(latestOwnerExcerpt('1', [authored])?.excerpt).toBe('Chat: plan the trip')
     expect(await discussionSeed(conversation([authored]), '1', 'Trips')).toEqual({
       brief: 'Trips',
-      sources: [{ chat: '1', entryStart: 5, entryEnd: 5, excerpt: 'Telegram: plan the trip' }],
+      sources: [{ chat: '1', entryStart: 5, entryEnd: 5, excerpt: 'Chat: plan the trip' }],
     })
     expect(await discussionSeed(conversation([]), '1', undefined)).toBeUndefined()
     expect(await discussionSeed(conversation([]), '1', 'Only a brief')).toEqual({ brief: 'Only a brief', sources: [] })

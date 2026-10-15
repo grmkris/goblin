@@ -2,6 +2,7 @@ import { defineExtension, section } from '@earendil-works/pi-durable'
 import { FileEntry, FileListing } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
+import { fileLink } from '../files/link.ts'
 import { Files } from '../files/service.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { typedTool } from './typed-tool.ts'
@@ -18,7 +19,8 @@ const isText = (entry: FileEntry): boolean => TEXT_TYPES.test(entry.mimeType) ||
 const GUIDE = [
   "The owner's files: `/uploads` holds what they uploaded or attached to a message (you read them, never write them),",
   '`/agent` is yours to write: reports, data and results the owner may want to keep. A message with attachments names',
-  'their paths; read one with `files_read` before answering about it. Say the path of anything you write.',
+  'their paths; read one with `files_read` before answering about it. Say the path of anything you write. To hand a',
+  "file to one of the owner's tools that takes a URL (sending a photo or a document), make a link with `file_link`.",
 ].join(' ')
 
 const Path = Schema.String.check(Schema.isMaxLength(512))
@@ -31,7 +33,19 @@ const FilePart = Schema.Struct({
   note: Schema.optionalKey(Schema.String),
 })
 
-/** `files_list`, `files_read`, `files_write` and `files_delete` over the owner's files (ADR 0022). */
+/** What `file_link` answers: the link, when it stops working, and the file it leads to. */
+const FileLink = Schema.Struct({
+  url: Schema.String,
+  expiresAt: Schema.String,
+  name: Schema.String,
+  mimeType: Schema.String,
+  size: Schema.Number,
+})
+
+/**
+ * `files_list`, `files_read`, `files_write` and `files_delete` over the owner's files (ADR 0022), and `file_link`, a
+ * short-lived link to one of them (ADR 0070).
+ */
 export function filesExtension(run: RunProgram) {
   return defineExtension({
     name: 'goblin.files',
@@ -80,6 +94,15 @@ export function filesExtension(run: RunProgram) {
             Files.use((files) => files.write('agent', path, content, mimeType ?? 'text/plain; charset=utf-8', size)),
           )
         },
+      }),
+      typedTool({
+        name: 'file_link',
+        description:
+          "A link to one of the owner's files, for a tool that takes a file by URL (a photo or a document to send): an https URL that works for 15 minutes and serves only that file, with its name, type and size. Making it sends nothing; passing it to a tool is that tool's call, under its own access and Ask first, so only pass it where the owner wants the file to go.",
+        input: Schema.Struct({ path: Path }),
+        output: FileLink,
+        replay: 'safe',
+        execute: async ({ path }) => run(fileLink(path)),
       }),
       typedTool({
         name: 'files_delete',

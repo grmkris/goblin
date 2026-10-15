@@ -665,7 +665,7 @@
   .file-chip[data-state='failed'] > svg {
     color: var(--destructive);
   }
-  /* Who wrote a message into the conversation when it was not the owner here: Telegram, an MCP client, a subagent. */
+  /* Who wrote a message into the conversation when it was not the owner here: a Source, an MCP client, a subagent. */
   .message-author {
     align-self: flex-end;
     margin-bottom: -0.25rem;
@@ -1386,11 +1386,6 @@
     font-weight: 500;
     overflow-wrap: anywhere;
   }
-  .event-rate {
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    font-weight: 400;
-  }
   .event-pick-about {
     color: var(--muted-foreground);
     font-size: var(--text-13);
@@ -1541,9 +1536,9 @@
     flex: 1 1 100%;
     min-width: 0;
     padding-block: 0.25rem;
-    container: telegram-route / inline-size;
+    container: source-route / inline-size;
   }
-  .telegram-chat-list > .telegram-chat + .telegram-chat {
+  .source-conversation-list > .source-conversation + .source-conversation {
     border-block-start: 1px solid var(--hairline);
   }
   /* Settings' Notify me via: the Source to copy from and its conversation side by side, under each other on a phone. */
@@ -1556,90 +1551,17 @@
     flex: 1 1 12rem;
     min-width: 0;
   }
-  /* How the channel works is read whole, not cut at two lines like a tool's purpose. */
-  .grant-about.telegram-about,
-  .grant-about.telegram-ended {
-    display: block;
-    overflow: visible;
-    -webkit-line-clamp: unset;
-    text-wrap: pretty;
-  }
-  /* The server ended the channel's Events and goblin could not subscribe again: the owner has to act. */
-  .grant-about.telegram-ended {
-    margin-block-start: 0.25rem;
-    color: var(--destructive);
-  }
-  /*
-   * The Telegram channel's chats (components/telegram-chats.tsx, ADR 0055): the New chats default, how far goblin sees,
-   * then a row per chat with its forum topics hanging from it on a thin rail, as Telegram nests them. A row's state shows
-   * only when it is not the usual one. On a wide card the route selects keep one column at the row's end, where it goes
-   * then who answers; on a narrow one they go under the words, each the full width.
-   */
-  .telegram-chats {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    padding-block-end: 0.5rem;
-    container: telegram-route / inline-size;
-  }
-  .telegram-setting {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem 0.75rem;
-    padding-block: 0.5rem;
-  }
-  .telegram-setting > .grant-text {
-    flex: 1 1 14rem;
-  }
-  .telegram-setting > [data-slot='native-select-wrapper'] {
-    flex: 0 0 14rem;
-  }
-  .telegram-reach {
-    margin: 0;
-    padding-block-end: 0.25rem;
-    color: var(--muted-foreground);
-    font-size: var(--text-13);
-    line-height: 1.45;
-    text-wrap: pretty;
-  }
-  .telegram-widen {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    min-height: 1.5rem;
-  }
-  @media (pointer: coarse) {
-    .telegram-widen {
-      min-height: 2.75rem;
-    }
-  }
-  .telegram-widen > svg {
-    width: 0.8125rem;
-    height: 0.8125rem;
-  }
-  .telegram-chat-list,
-  .telegram-topics {
+  .source-conversation-list {
     display: flex;
     flex-direction: column;
     margin: 0;
     padding: 0;
     list-style: none;
   }
-  .telegram-chat-list {
+  .source-conversation-list {
     border-block-start: 1px solid var(--hairline);
   }
-  .telegram-chat-group + .telegram-chat-group {
-    border-block-start: 1px solid var(--hairline);
-  }
-  .telegram-topics {
-    margin-block-end: 0.5rem;
-    margin-inline-start: 0.375rem;
-    padding-inline-start: 0.875rem;
-    border-inline-start: 1px solid var(--hairline);
-  }
-  .telegram-chat {
+  .source-conversation {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -1648,35 +1570,25 @@
     padding-block: 0.5rem;
     font-size: 0.875rem;
   }
-  .telegram-topics .telegram-chat {
-    padding-block: 0.375rem;
-  }
-  .telegram-chat-text {
+  .source-conversation-text {
     display: flex;
     flex: 1 1 12rem;
     flex-direction: column;
     gap: 0.125rem;
     min-width: 0;
   }
-  .telegram-chat-title {
+  .source-conversation-title {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
     gap: 0.125rem 0.625rem;
     font-weight: 500;
   }
-  .telegram-chat-name {
+  .source-conversation-name {
     min-width: 0;
     overflow-wrap: anywhere;
   }
-  .telegram-chat-heading {
-    margin: 0;
-    padding-block: 0.625rem 0.25rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    overflow-wrap: anywhere;
-  }
-  .telegram-chat-meta {
+  .source-conversation-meta {
     color: var(--muted-foreground);
     font-size: var(--text-13);
     line-height: 1.45;
@@ -1684,50 +1596,49 @@
     text-wrap: pretty;
   }
   /* Where it goes (14rem), then who answers (11rem): the same column on every row, empty where no one answers. */
-  .telegram-route {
+  .source-route {
     display: flex;
     flex: 0 0 25.375rem;
     gap: 0.375rem;
     min-width: 0;
     max-width: 100%;
   }
-  .telegram-route > [data-slot='native-select-wrapper'] {
+  .source-route > [data-slot='native-select-wrapper'] {
     flex: 0 0 14rem;
     min-width: 0;
   }
-  .telegram-route > [data-slot='native-select-wrapper'] + [data-slot='native-select-wrapper'] {
+  .source-route > [data-slot='native-select-wrapper'] + [data-slot='native-select-wrapper'] {
     flex-basis: 11rem;
   }
-  .telegram-route select {
+  .source-route select {
     text-overflow: ellipsis;
   }
-  @container telegram-route (width < 38rem) {
-    .telegram-route {
+  @container source-route (width < 38rem) {
+    .source-route {
       flex: 1 1 100%;
       flex-wrap: wrap;
     }
-    .telegram-route > [data-slot='native-select-wrapper'],
-    .telegram-setting > [data-slot='native-select-wrapper'] {
+    .source-route > [data-slot='native-select-wrapper'] {
       flex: 1 1 100%;
       width: 100%;
     }
   }
   /*
-   * A Telegram offer in Activity: its words in the row, then where it goes, Not now and Set up under them, past the
+   * A Source offer in Activity: its words in the row, then where it goes, Not now and Set up under them, past the
    * row's mark. Its title wraps, so a long chat name is read whole. On a phone the selects take the width and the
    * buttons follow on their own line.
    */
-  .telegram-offer {
+  .source-offer {
     flex-wrap: wrap;
     row-gap: 0.5rem;
-    container: telegram-route / inline-size;
+    container: source-route / inline-size;
   }
-  .telegram-offer .list-row-title,
-  .telegram-offer .list-row-meta {
+  .source-offer .list-row-title,
+  .source-offer .list-row-meta {
     overflow-wrap: anywhere;
     white-space: normal;
   }
-  .telegram-offer-pick {
+  .source-offer-pick {
     display: flex;
     flex: 1 1 100%;
     flex-wrap: wrap;
@@ -1735,18 +1646,18 @@
     gap: 0.5rem;
     padding-inline-start: 2.5rem;
   }
-  .telegram-offer-pick > .row-actions {
+  .source-offer-pick > .row-actions {
     margin-inline-start: auto;
   }
   /* An offer has room: its selects are as wide as what they say, so a new Topic's name is read whole. */
-  @container telegram-route (width >= 38rem) {
-    .telegram-offer-pick > .telegram-route,
-    .telegram-offer-pick > .telegram-route > [data-slot='native-select-wrapper'] {
+  @container source-route (width >= 38rem) {
+    .source-offer-pick > .source-route,
+    .source-offer-pick > .source-route > [data-slot='native-select-wrapper'] {
       flex: 0 1 auto;
     }
   }
-  @container telegram-route (width < 38rem) {
-    .telegram-offer-pick {
+  @container source-route (width < 38rem) {
+    .source-offer-pick {
       padding-inline-start: 0;
     }
   }

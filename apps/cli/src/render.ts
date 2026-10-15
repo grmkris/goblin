@@ -20,14 +20,14 @@ const duration = (event: { readonly startedAt: number; readonly endedAt?: number
   event.endedAt === undefined ? 'open' : `${event.endedAt - event.startedAt}ms`
 const text = (value: unknown) => (typeof value === 'string' || typeof value === 'number' ? String(value) : '')
 
-/** What an event was about: its tool, model or channel, and why it ended as it did. */
+/** What an event was about: its tool, model or source, and why it ended as it did. */
 function detail(event: RunEvent): string {
   const attributes = event.attributes
   const subject =
     text(attributes[RunAttribute.toolName]) ||
     text(attributes[RunAttribute.requestModel]) ||
     text(attributes[RunAttribute.mcpServer]) ||
-    text(attributes[RunAttribute.channel])
+    text(attributes[RunAttribute.source])
   const why =
     text(attributes[RunAttribute.error]) ||
     text(attributes[RunAttribute.blockedReason]) ||

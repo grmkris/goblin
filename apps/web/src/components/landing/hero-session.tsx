@@ -161,7 +161,7 @@ export function HeroSession({ session }: { readonly session: ReturnType<typeof u
       </li>
       <li className="hero-final" data-shown={stage === 'done' ? '' : undefined} aria-hidden={stage !== 'done'}>
         <span data-variant="allowed" data-current={answer !== 'declined' ? '' : undefined}>
-          Watching it. I'll message you on Telegram if it drops below <span className="tabular-nums">€50</span>.
+          Watching it. I'll message you if it drops below <span className="tabular-nums">€50</span>.
         </span>
         <span data-variant="declined" data-current={answer === 'declined' ? '' : undefined}>
           Okay, I won't watch it. Ask me again any time.

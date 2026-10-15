@@ -23,16 +23,16 @@ Diagrams offer an explorer with zoom, pan and node connections, shared with agen
 can show small forms, choices and dashboards using Goblin's components. Their buttons send visible choices and
 form values as ordinary follow-up messages; they grant no tool permissions. Field edits reset on reload.
 
-Telegram comes through mygram, connected directly or through mysi, which brings the owner's own my* apps (notes,
-browsers, Telegram, email, skills, terminals) in one connection with its tools named `<app>_<tool>`. The owner turns on
-a connection's **Telegram** switch in Connections; signed MCP Events wake an authoritative inbox pull (`inbox_read`) of
-every chat the grant reaches, each message goes to the Topic its chat or forum topic is routed to (the DM to Personal,
-a new group waits for the owner's choice), and the answer goes back to the same place with `message_send`, under
-either spelling (ADRs 0052, 0055). The agent's `mcp_list` lists a connection with many tools, such as mysi, by
-service first.
 Any connection whose events carry the owner's own messages (a chat app, mail) can become a **Source** the owner
-confirms: which messages are theirs, which Topic or Persona each conversation goes to, and how goblin's answer goes back
-(ADR 0066).
+confirms: which messages are theirs, which Topic or Persona each conversation goes to, and how goblin's answer goes
+back (ADRs 0066, 0069). Telegram can come through Mygram, directly or through MySI, using that same reviewed Source
+setup. MySI brings the owner's my* apps in one connection, and `mcp_list` lists its tools by service. Goblin has no
+built-in Telegram switch, transport or routing rules.
+
+**Notify me via** sends a routine's notice copies and an app's notifications through the owner's chosen tool.
+Owner-reviewed delivery rules distinguish accepted, retryable, rejected and unknown results; an exact event selector
+prevents echoes on shared connections. Unconfirmed delivery stays unknown and is not retried automatically.
+
 Owner-enabled skills libraries use update Events to invalidate their cached
 catalog; the next activation refetches, while retained activations keep their verified version. After a correction,
 goblin may write a new skill as a draft in the owner's files and tell them in the chat.
@@ -63,11 +63,11 @@ into the current conversation. Helpers share live execution capabilities and can
 The agent builds apps for its owner from ordinary conversation (ADR 0021): small programs goblin runs in Cloudflare
 Dynamic Workers, with durable state, actions and views that become the agent's tools, an optional live UI drawn with
 goblin's components, charts, maps and diagrams, schedules that run on their own, and powers (the web,
-the owner's MCP tools, a cheap model, Telegram, other apps) that each wait for the owner's Allow. The Apps page lists them; an app can
+the owner's MCP tools, a cheap model, notifications, other apps) that each wait for the owner's Allow. The Apps page lists them; an app can
 fill the workspace with its conversation docked beside it, roll back to an earlier version, or be deleted.
 
 Every turn can be seen end to end (ADR 0024). Beside Pi's own record, each agent keeps a 30-day run ledger of how its
-turns ran: model attempts, tool calls, retries, MCP steps, Telegram replies, timings, tokens and errors, never content.
+turns ran: model attempts, tool calls, retries, MCP steps, Source replies, timings, tokens and errors, never content.
 Workers Logs and Traces carry the same ids. A coding agent reads the owner's conversations and any turn's timeline
 through the read-only inspection tools of goblin's one MCP endpoint, `/mcp` (when the owner grants `goblin:inspect`), or
 the `goblin` CLI (`apps/cli`), and the agent answers "why did that fail?" with its own `diagnose` tool.
@@ -75,7 +75,7 @@ Diagnostics focus on work needing attention; `problems --all` includes expected 
 Successful background model completions stay out of problems; their failures remain visible.
 Private error details stay in conversation inspection; logs and traces carry fixed summaries.
 The ledger also records how conversations move, content-free (ADR 0037): sends, threads, moves, share-backs, closes
-and Stops, Personas, Delegates, Topics, organize Undo, routines and Telegram deliveries. A message's
+and Stops, Personas, Delegates, Topics, organize Undo, routines and Source deliveries. A message's
 Details shows what ran behind it, every failure the app shows quotes a reference (`… · ref 7f3a9c12`) that
 `goblin lookup` finds in the Worker's logs, and `goblin stats` sums flows across every agent of a stage from Workers
 Analytics Engine, under hashed agent ids.
@@ -96,7 +96,7 @@ bun run check      # the full gate (run it through `heavy` on the build box)
 ```
 
 - [Architecture](docs/architecture.md): how the Worker, the agent object, Pi, MCP and auth fit together, including
-  conversations, memory, skills, Telegram and MCP Apps.
+  conversations, memory, skills, Sources and MCP Apps.
 - [Development](docs/development.md): local setup, the dev stage, connecting servers, adding goblin to Claude Code.
 - [Next](docs/next.md): remaining acceptance and write approvals.
 - [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
@@ -121,11 +121,11 @@ spent goblin refuses new model calls until 00:00 UTC. Draft terms and privacy pa
 Several connections to one MCP server are normal: each is the owner's account there, with its own label, sign-in,
 grants and webhook (ADR 0041). A routine fires once, on a schedule or when a connection sends an event; it lives in a
 Topic and can **Tell me** (each event, reminder and answer is a notice in the Topic and a notification in Activity,
-on Telegram too if asked) and **Hand to** Goblin or a Persona pinned at its revision, with an instruction, exact tool
+through Notify me via too if asked) and **Hand to** Goblin or a Persona pinned at its revision, with an instruction, exact tool
 pairs and budgets. The owner confirms
-each revision in Settings → Routines or on the connection's Events section, a picker that names each event as its
-server suggests, picks the recommended ones, sends each to a Topic (Tell me) or hands it to goblin or a Persona, and
-sets them up in one step; Goblin may propose one, never confirm it. Run now, Stop, Pause, Edit and Archive are available. Event confirmation
+each revision in Settings → Routines or on the connection's Events section, a picker that names each event by its own
+title, sends each one the owner picks to a Topic (Tell me) or hands it to goblin or a Persona, and sets them up in one
+step; Goblin may propose one, never confirm it. Run now, Stop, Pause, Edit and Archive are available. Event confirmation
 authorizes the exact connection, event name and JSON filters; event text reaches the model only as framed untrusted
 data, and controls never start a model turn. A Persona's ask-first call or tool to allow waits under its answer for
 the owner, and their decision resumes it. See [the routines decision](docs/adr/0012-routines.md) and

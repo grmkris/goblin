@@ -1,24 +1,8 @@
-# MCP Events and Telegram
+# MCP Events
 
-## MCP Events and Telegram
-
-The owner selects one Telegram connection with its **Telegram** switch (ADRs 0011, 0055). Its authenticated discovery
-must advertise Events (top-level `capabilities.events` or the `io.modelcontextprotocol/events` extension, ADR 0041):
-the action grants mygram's inbox, send, question, chat-list and topic-list tools and the exact Events selectors
-`message.received`, `question.answered` and, once the server offers it, `chat.changed`. A read of every chat
-(`inbox_read { chat: 'all' }`) tells how far the grant reaches: when it answers, the selectors take
-`{ chat: 'all' }`; when mygram refuses it (`access_insufficient`), they take `{}` (the DM) and the channel keeps the
-widen URL the refusal carried (https only), which the mysi card shows as "Let goblin see your groups". Each name is
-the connection's own spelling (ADR 0052), decided in one place
-(`packages/contracts/src/service-names.ts`): mygram's (`inbox_read`, `message_send`, `message.received`) on a direct
-connection, mysi's (`mygram_inbox_read`, `mygram_message_send`, `mygram.message.received`) through mysi, read from the
-tools it lists and the Events its `events/list` offers. Consumers stay keyed by mygram's own event name, and every
-later call (the pull, replies, notice copies, an app's `notify`) asks the live connection's tool list for the name.
-Every finite webhook subscription must confirm before `app_telegram_channel` copies the checkpoint and fences older
-cursor writes. The channel pulls immediately; a failure before that fence leaves the old channel checkpoint intact.
-There is no other transport: the doorbell is gone with mygram's. A subscription the server ends (a widened or revoked
-grant ends them all) is subscribed again by the next pull, with the reach the grant has then; one that cannot be
-subscribed again marks the channel `ended` for the owner instead of looping.
+Any connected server that advertises Events can offer streams for Sources, routines and skill invalidation.
+Selectors are granted explicitly; a server name or a subscription already in use grants nothing. Sources carry
+messages and answers through owner-reviewed mappings ([sources.md](sources.md), ADRs 0066, 0069).
 
 `POST /hooks/mcp-events/<userId>/<connectionId>/<token>` verifies the token, bound to the user and the connection (each
 connection has its own URL, ADR 0041), before lookup; ingress only matches that connection's subscriptions. Inside
@@ -32,37 +16,24 @@ and the producer drops the subscription, and any other failure of the check is r
 producer retries. A subscription is dropped as invalid only when its server is gone (`NotFound`) or its grant or
 endpoint changed. A maintenance sweep keeps the next alarm only for when something is due (`SqliteEventStore.nextDue`:
 the earliest lease refresh or poll of a running subscription, or a delivery's retry); with nothing waiting, no alarm is
-kept. A failed sweep is reported, then retried a minute later while something waits (`mcp/wake.ts`).
-
-Every Telegram Event schedules the channel's pull alarm at once (`channelPull`); `chat.changed` also marks the server's
-chat list to be read again (`sync_due`). The pull runs there, one at a time: it reads `chat_list` (and each forum's
-`thread_list`) into the routes when due, then the inbox from its one cursor. Each entry names its `chat` (`dm` or an
-opaque group handle) and forum topic; an entry whose chat is not a handle is skipped, and `out` or `archive` entries
-are context only. Routing (ADR 0055, `channel/routes.ts`, `channel/channel.ts`) sends each owner message where its
-chat's or topic's route says (`app_telegram_routes`): a turn in the route's Topic, through `ChatOperations.send` or,
-for a Persona, `askPersonas`, authored `Telegram · <chat title>`; a passive `app.telegram` note (`listen`); nothing
-(`ignore`); or held (`app_telegram_held`, twenty a chat) while a new chat waits for the owner. A chat or topic seen for
-the first time is offered in the DM with `question_ask` buttons (`channel/offers.ts`, operation
-`telegram-offer:<chat>:<thread>`) or routed by the default for new chats; an answer entry carrying an open offer's
-question id sets the route and starts no turn. A route change goes through the channel between pulls, so what was held
-is delivered in order. The id mapping is preserved: `tg:123` becomes `telegram-tg-123`. `app_channel_replies` keeps
-where each answer goes (the goblin chat, the Telegram chat and thread, the answering Persona); goblin's answer, or the
-Persona invocation's, goes back with `message_send { chat, threadId }`, escaped and chunked, and one that stopped on a
-single-choice `ask_user` goes as `question_ask` buttons with short ids (`o0`, `o1`, …; Telegram carries
-`<question>:<option>` in 64 bytes), the reply row keeping the question id and each button's label. An answer entry is
-read by structure, never by its words (mygram's display text): its `questionId` is looked up with
-`inbox_read { questionId }`, whose `choice` (or `answer`, for typed words) becomes the owner's reply as the kept label,
-and an offer's question sets the route the same way, typed words naming a button being the fallback. A send refused
-with `chat_paused` or `chat_left` marks the chat so and gives the answer up. Notices and an app's `notify` always go
-to `chat: 'dm'`. Submission acceptance is distinct from external Telegram completion. Disabling cleans up Events
-while authority is available, drops held messages and replies to send, keeps the routes, then tombstones locally;
-finite remote leases expire if authorized cleanup cannot run.
+kept. A failed sweep is reported, then retried a minute later while something waits (`mcp/events/wake.ts`).
 
 Sources ([sources.md](sources.md), ADR 0066) are the Events consumers any connection can have: each confirmed Source
 subscribes its wake event under consumer `source:<id>` (handler `source-wake`, registered by `SourcesLive` before the
 agent runs anything), reads the owner's messages from the event's data or by a tool from a cursor, and answers through
-its reply tool; nothing in it names a server. The Telegram channel's connection cannot carry one until the channel is
-off.
+its reply tool; nothing in it names a server. Multiple consumers can share a connection and exact selector without
+introducing service-specific ownership.
+
+Consumer revisions advance monotonically in the store: an older discovery that finishes late cannot retire a newer
+binding. The last consumer tombstones its lease before remote cleanup starts. Each replacement lease adds a fresh,
+opaque `goblin_generation` query value to the connection's authenticated callback URL (ADR 0073). The value grants
+nothing; the authenticated hook path and signed delivery checks stay required. Since producers address subscriptions
+by selector and complete callback URL, late subscribe or unsubscribe requests for an old generation cannot remove or
+replace its successor. Failed cleanup can lapse at the producer's finite TTL without blocking immediate rebind.
+Lease generation checks also fence asynchronous subscribe, poll and verification responses at their durable write,
+including after encryption or alarm waits. Retirement finishes queued deliveries, and dispatch rechecks after
+decrypting and between handlers, so an old gap or termination cannot change the next lease. A terminated lease is only
+replaced by an explicit subscribe, with a fresh generation. No transaction spans a remote wait.
 
 The dispatcher also binds myskills' `skills.updated` and `skills.list_changed`. Turning a server's skills on subscribes
 to them only where its Events offer them to this connection; a server without them, or one that refuses its Events
@@ -73,15 +44,13 @@ termination stops lease refresh and surfaces health. Mail and workspace changes 
 
 The owner browses a connection's event streams before granting any (`GET /api/mcp/:id/events`, `Events.catalog`):
 resident authority and a signed-in connection are enough, no selector grant is made, and each stream says
-whether goblin can subscribe to it (poll and webhook). Descriptions are the server's claims, cut to 500 characters;
-its `payloadSchema`, the shape the server says each event's data has, is passed on as it came (here and in the
-agent's `mcp_list` with `events: true`). A stream also carries what the server suggests for it, read leniently field by
-field from the descriptor's `title` and `_meta.suggest` (a key with no vendor's prefix; `eventSuggestion`,
-`mcp/events/protocol.ts`; a malformed one never fails the list):
-`title`, `summary`, `group`, `recommended`, `tellMe` and `rate` (`often`, `daily`, `rare`). They are claims that only
-pre-select in the picker; nothing is granted or confirmed by them. Through mysi an event is named
-`<service>.<event>`, as subscribed and as delivered, so the name checks at ingress and dispatch are unchanged. A
-subscription the Telegram channel consumes is marked `telegram: true` in the connection's Events health.
+whether goblin can subscribe to it (poll and webhook). goblin reads a descriptor's standard fields only (ADR 0068):
+`name`, `title`, `description`, `inputSchema`, `payloadSchema` and `delivery`, never its `_meta` (`eventWords`,
+`mcp/events/protocol.ts`). The title is folded to one line of at most 120 characters (one that is not text is left out,
+and never fails the list) and the description cut to 500; both are the server's claims, for the owner's eyes. Its
+`payloadSchema`, the shape the server says each event's data has, is passed on as it came (here and in the agent's
+`mcp_list` with `events: true`). Nothing a server says picks, grants or confirms an event. Through mysi an event is named
+`<service>.<event>`, as subscribed and as delivered, so the name checks at ingress and dispatch are unchanged. Subscription health describes the lease, grant and last receipt without a service-specific flag.
 
 A connection that sends events **offers** them (ADR 0041): `ServerView.events` is `open` until the owner sets up a
 routine on it (`done`, recorded when an event routine on it is confirmed) or dismisses it
@@ -90,18 +59,17 @@ a dismissal never undoes `done`. The connection's card shows an **Events** secti
 the offer while open, what is set up ("`<title>` → #Topic", "→ goblin, in #Topic" or "→ @Persona", with Pause or
 Resume and Edit, which opens the routine editor and then its review), the **picker** for the rest
 (`components/event-picker.tsx`, `lib/event-setup.ts`, `lib/events.ts`), and the subscriptions' health. The picker
-lists the streams by group (the server's, else the service before the first dot of a three-part name, else the
-connection), each by title (else its name in words, `message.received` → "Message received") with its summary and a
-quiet rate. While the offer is open, a recommended stream the server says to tell the owner about is picked, to Tell me
-in Personal; one it recommends without `tellMe` is handed to goblin there. Each picked stream has one select for where
-it goes: Tell me in a Topic, or goblin acting on it in a Topic or a Persona acting on it (answering in Personal). A
+lists the streams grouped by the service a gateway names them by (the part before the first dot of a name of three
+parts or more, mysi's `<service>.<event>`), else flat, each by its title (else its name in words, `message.received` →
+"Message received") with its description. Nothing is picked until the owner picks it; a picked stream goes to Tell me
+in Personal until they choose otherwise. Each picked stream has one select for where it goes: Tell me in a Topic, or goblin acting on it in a Topic or a Persona acting on it (answering in Personal). A
 hand-over adds a line saying who answers where; a Tell me pick adds none, since its
 notice is the title and line its row already shows. **Advanced**
 (folded) holds each stream's filters (a nullable or optional string is a plain optional field, with the server's
-default as its hint), an instruction for a hand-over (else goblin's), Tell me and Telegram. One action, **Set up N
+default as its hint), an instruction for a hand-over (else goblin's), Tell me and its optional Notify me via copy. One action, **Set up N
 events**, proposes and then confirms each stream's own routine in turn (`setUpEventsMutation`), so each confirmation
-grants exactly its selector; a filter the server requires and that is empty stops it and opens Advanced. A stream the
-Telegram channel already takes says "Already arrives through Telegram" instead of being offered. A quiet line states the
+grants exactly its selector; a filter the server requires and that is empty stops it and opens Advanced. Every stream remains selectable until a routine is configured for it; another consumer is not a service-specific
+exclusion. A quiet line states the
 limits: one run a minute, 20 notices an hour then a digest, events from before setup dropped. Activity lists each open
 offer ("Set up events for `<label>`", linking to its card, with Not now); it is not counted in the rail's badge.
 

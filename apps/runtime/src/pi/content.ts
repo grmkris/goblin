@@ -1,5 +1,12 @@
-import type { TextContent } from '@earendil-works/pi-ai'
-import { type Attachment, type McpOutcome, type TopicSeedData, authorTag } from '@goblin/contracts'
+import type { ImageContent, TextContent } from '@earendil-works/pi-ai'
+import {
+  type Attachment,
+  type McpOutcome,
+  type OwnTurnVia,
+  type ReceivedBlock,
+  type TopicSeedData,
+  authorTag,
+} from '@goblin/contracts'
 import type { ResolvedSelections } from '../composer.ts'
 
 /** What an open App shared, with where it comes from: an MCP App's server, or the agent app it is. */
@@ -45,13 +52,54 @@ export function ownerContent(
 }
 
 /**
- * A message someone other than the owner's browser wrote into a conversation (Telegram, an MCP client, a subagent):
+ * A message someone other than the owner's browser wrote into a conversation (Source, an MCP client, a subagent):
  * the author's tag in a block of its own, then their words. The model reads both; the web shows the author.
  */
 export function authoredContent(author: string, text: string): TextContent[] {
   return [
     { type: 'text', text: authorTag(author) },
     { type: 'text', text },
+  ]
+}
+
+/**
+ * What goblin kept of a message's attachments (ADR 0065): the files it wrote under `/agent/received`, a note for each
+ * one it could not keep, and small copies of its images for a model that sees them, all from `connectionId`.
+ */
+export type KeptAttachments = {
+  readonly connectionId: string
+  readonly files: readonly Attachment[]
+  readonly notes: readonly string[]
+  readonly images: readonly { readonly data: string; readonly mimeType: string }[]
+}
+
+/** The block that names the files a message brought, as untrusted references from their connection; none for none. */
+function receivedBlock(kept: KeptAttachments): TextContent[] {
+  if (kept.files.length === 0 && kept.notes.length === 0) return []
+  const block: ReceivedBlock = {
+    origin: { connectionId: kept.connectionId, trust: 'untrusted' },
+    received: kept.files,
+    ...(kept.notes.length === 0 ? {} : { notReceived: kept.notes }),
+  }
+  return [{ type: 'text', text: JSON.stringify(block) }]
+}
+
+/**
+ * A message from elsewhere (`authoredContent`) with what goblin adds after its words: its mark as the owner's own turn
+ * (`own`, ADR 0066), then the files it brought as untrusted references from their connection, and small copies of its
+ * images, which pi-ai shows only to a model that takes images.
+ */
+export function messageContent(
+  author: string,
+  text: string,
+  added: { readonly own?: OwnTurnVia; readonly kept?: KeptAttachments },
+): (TextContent | ImageContent)[] {
+  const { own, kept } = added
+  return [
+    ...authoredContent(author, text),
+    ...(own === undefined ? [] : [{ type: 'text' as const, text: JSON.stringify({ ownTurn: { via: own } }) }]),
+    ...(kept === undefined ? [] : receivedBlock(kept)),
+    ...(kept?.images ?? []).map((image): ImageContent => ({ type: 'image', ...image })),
   ]
 }
 

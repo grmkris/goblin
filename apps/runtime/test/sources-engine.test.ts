@@ -6,7 +6,7 @@ import { REPLY_TRIES } from '../src/sources/replies.ts'
 import { undoSourceRoute } from '../src/sources/program.ts'
 import { dueReplies, heldOf, patchSource, routeRow } from '../src/sources/store.ts'
 import { Db } from '../src/runtime/db.ts'
-import { INBOX_READ, PAYLOAD_SETUP, message, sourceWorld } from './sources-fixture.ts'
+import { INBOX_READ, NEW_TOPIC, PAYLOAD_SETUP, keptFile, message, sourceWorld } from './sources-fixture.ts'
 
 const DM = '["dm",null]'
 const GROUP = '["g_trip",null]'
@@ -95,6 +95,30 @@ describe('a Source reading the owner messages from its events (ADR 0066)', () =>
     }),
   )
 
+  it.effect('dropped foreign messages neither create Topics nor create or retitle routes', () =>
+    Effect.gen(function* () {
+      const { db, engine, ports, seen, active } = yield* sourceWorld()
+      const source = yield* active({
+        ...PAYLOAD_SETUP,
+        others: 'drop',
+        read: { ...PAYLOAD_SETUP.read, title: '/chatTitle', attachments: '/attachments' },
+        newKeys: { to: 'topic-per-key' },
+      })
+      const other = { from: { isOwner: false }, chatTitle: 'Not the owner', attachments: [{ type: 'image' }] }
+      yield* engine.takeEvent(source, event('e1', message('foreign-first', { ...other, chat: 'g_trip' })), ports)
+      expect(routeRow(db, source.row.id, GROUP)).toBeUndefined()
+      expect(seen.topics).toEqual([])
+      yield* engine.takeEvent(source, event('e2', message('owner', { chatTitle: 'My conversation' })), ports)
+      const before = routeRow(db, source.row.id, DM)
+      yield* engine.takeEvent(source, event('e3', message('foreign-known', other)), ports)
+      expect(routeRow(db, source.row.id, DM)).toEqual(before)
+      expect(seen.topics).toHaveLength(1)
+      expect(seen.turns).toHaveLength(1)
+      expect(seen.received).toEqual([])
+      expect(seen.notices).toEqual([])
+    }),
+  )
+
   it.effect(
     'holds a new conversation until the owner routes it, then delivers what it held in order; Undo puts it back',
     () =>
@@ -171,6 +195,70 @@ describe('a Source reading the owner messages from its events (ADR 0066)', () =>
   )
 })
 
+describe("a Source's conversations, named and given Topics of their own (ADR 0066)", () => {
+  it.effect('names a conversation by its title pointer, on its route and its turns, keeping the newest one', () =>
+    Effect.gen(function* () {
+      const { db, engine, ports, seen, active } = yield* sourceWorld()
+      const read = { ...PAYLOAD_SETUP.read, title: '/chatTitle' }
+      const source = yield* active({ ...PAYLOAD_SETUP, read, newKeys: { to: 'topic', topic: 4 } })
+      yield* engine.takeEvent(source, event('e1', message('m1', { chatTitle: 'Trip\nplanning' })), ports)
+      expect(routeRow(db, source.row.id, DM)).toMatchObject({ title: 'Trip planning' })
+      yield* engine.takeEvent(source, event('e2', message('m2', { chatTitle: 'Trip to Tartu' })), ports)
+      expect(routeRow(db, source.row.id, DM)).toMatchObject({ title: 'Trip to Tartu' })
+      expect(seen.turns.map(({ turn }) => turn.author)).toEqual(['Chat · Trip planning', 'Chat · Trip to Tartu'])
+    }),
+  )
+
+  it.effect('gives each new conversation a Topic of its own, named after its title or else its values, once', () =>
+    Effect.gen(function* () {
+      const { db, engine, ports, seen, active } = yield* sourceWorld()
+      const read = { ...PAYLOAD_SETUP.read, title: '/chatTitle' }
+      const source = yield* active({ ...PAYLOAD_SETUP, read, newKeys: { to: 'topic-per-key' } })
+      const trip = { chat: 'g_trip', chatTitle: 'Trip planning' }
+      yield* engine.takeEvent(source, event('e1', message('m1', trip)), ports)
+      yield* engine.takeEvent(source, event('e2', message('m2', trip)), ports)
+      yield* engine.takeEvent(source, event('e3', message('m3')), ports)
+      expect(seen.topics.map(({ name, fallback }) => [name, fallback])).toEqual([
+        ['Trip planning', 'Chat'],
+        ['chat dm', 'Chat'],
+      ])
+      expect(seen.topics[0]?.operationId).toMatch(/^source-topic:src_00000000000000a1:[0-9a-f]{32}$/u)
+      expect(routeRow(db, source.row.id, GROUP)).toMatchObject({
+        route: 'topic',
+        topicId: NEW_TOPIC,
+        updatedBy: 'default',
+      })
+      expect(seen.turns.map(({ turn }) => turn.topic)).toEqual([NEW_TOPIC, NEW_TOPIC, NEW_TOPIC])
+    }),
+  )
+})
+
+describe("a Source's attachments (ADR 0066, ADR 0065)", () => {
+  const photo = { type: 'resource_link', uri: 'https://files.example.com/p.jpg?sig=x', name: 'p.jpg' }
+
+  it.effect(
+    "keeps the owner's attachments first, holds their references while the conversation waits, and fetches nothing of anyone else's",
+    () =>
+      Effect.gen(function* () {
+        const { db, engine, ports, seen, active } = yield* sourceWorld()
+        const source = yield* active({ ...PAYLOAD_SETUP, read: { ...PAYLOAD_SETUP.read, attachments: '/attachments' } })
+        yield* engine.takeEvent(source, event('e1', message('m1', { text: '', attachments: [photo] })), ports)
+        const other = message('m2', { from: { isOwner: false }, attachments: [photo] })
+        yield* engine.takeEvent(source, event('e2', other), ports)
+        yield* engine.takeEvent(source, event('e3', message('m3', { text: '', attachments: 'not a list' })), ports)
+        expect(seen.received).toEqual([{ connectionId: 'chat', blocks: [photo] }])
+        const held = { connectionId: 'chat', files: [keptFile(0)], notes: [], images: [] }
+        expect(heldOf(db, source.row.id, DM)).toEqual([expect.objectContaining({ itemId: 'm1', text: '', kept: held })])
+        yield* engine.route(source, { key: DM, target: { to: 'topic', topic: 4 }, by: 'owner' }, ports)
+        yield* engine.takeEvent(source, event('e4', message('m4', { attachments: [photo] })), ports)
+        expect(seen.turns.map(({ turn }) => [turn.text, turn.kept])).toEqual([
+          ['(Sent without words; what it brought is below.)', held],
+          ['text of m4', { ...held, images: [{ data: 'aGk=', mimeType: 'image/png' }] }],
+        ])
+      }),
+  )
+})
+
 describe("a Source's answers going back (ADR 0066)", () => {
   it.effect('sends an answer in pieces of maxChars, each with its own operation id, once', () =>
     Effect.gen(function* () {
@@ -206,16 +294,18 @@ describe("a Source's answers going back (ADR 0066)", () => {
     }),
   )
 
-  it.effect('waits while the turn runs, tries a failed send again later, and gives up with a notice after five', () =>
+  it.effect('waits while the turn runs and retries only explicit retryable results, giving up after five', () =>
     Effect.gen(function* () {
       const answers = new Map<string, { text: string }>()
-      const { db, engine, ports, seen, state, active } = yield* sourceWorld({ answers })
+      const { db, engine, ports, seen, active } = yield* sourceWorld({
+        answers,
+        sendResult: () => ({ content: [], isError: false, structuredContent: { status: 'retryable' } }),
+      })
       const source = yield* active({ ...PAYLOAD_SETUP, newKeys: { to: 'topic', topic: 4 } })
       yield* engine.takeEvent(source, event('e1', message('m1')), ports)
       expect(yield* engine.deliver(ports)).toBe(true)
       expect(seen.calls).toEqual([])
       answers.set('source-src_00000000000000a1-m1', { text: 'Done.' })
-      state.failing = true
       for (let attempt = 1; attempt <= REPLY_TRIES; attempt += 1) {
         yield* engine.deliver(ports)
         expect(seen.calls).toHaveLength(attempt)
@@ -226,9 +316,9 @@ describe("a Source's answers going back (ADR 0066)", () => {
       expect(dueReplies(db, 86_400)).toEqual([])
       expect(seen.notices).toEqual([
         expect.objectContaining({
-          id: 'notice:source-src_00000000000000a1-m1:given-up',
+          id: 'notice:source-src_00000000000000a1-m1:given_up',
           topic: 4,
-          title: "goblin's answer could not be sent back to Chat after 5 tries",
+          title: "goblin's answer to Chat stopped after its retry or waiting limit.",
         }),
       ])
     }),

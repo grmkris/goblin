@@ -106,7 +106,7 @@ async function routineToPersona(url: string, owner: Person, me: AgentFetch, runn
     title: 'Board check',
     timezone: 'UTC',
     trigger: { kind: 'cron', expression: '0 9 * * *' },
-    tellMe: { on: false, telegram: false },
+    tellMe: { on: false, copy: false },
     handTo: {
       kind: 'persona',
       persona: runner.id,

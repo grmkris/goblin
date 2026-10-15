@@ -38,11 +38,7 @@ export interface AgentInputs {
   readonly routineSchedules: RoutineSchedules
   /** Starts a routine run's Pi work: the routines kit's, made before Pi opened (routines/kit.ts). */
   readonly startRoutine: StartRoutine
-  /** Schedules the Telegram replies alarm. */
-  readonly scheduleReplies: () => void
   readonly scheduleEvents: (at: number) => Promise<void>
-  /** Schedules the Telegram pull alarm (channelPull) at once: what a doorbell or a Telegram event asks for. */
-  readonly schedulePull: () => Promise<unknown>
   /** Schedules the Sources' alarm (sourcesWake) in `seconds` (ADR 0066). */
   readonly scheduleSources: (seconds: number) => void
   readonly mcpFetch: typeof fetch

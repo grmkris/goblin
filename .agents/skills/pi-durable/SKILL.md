@@ -32,12 +32,12 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   as `Harness.open` returns. A listener runs inside Pi's commit: if it throws, Pi faults the user's task, so guard it,
   keep it synchronous and never call Session APIs from it. Hooks do not pair reliably (no `afterTool` for a blocked
   call, no `afterResponse` after an abort) and subagents and routine runs keep their own extension lists.
-- The static `pi/reply-ui.ts` guidance describes interactive web replies (ADR 0068). Keep it aligned with the browser component grammar; it grants no authority and adds no Pi extension state.
+- The static `pi/reply-ui.ts` guidance describes interactive web replies (ADR 0074). Keep it aligned with the browser component grammar; it grants no authority and adds no Pi extension state.
 - Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
 - Extensions take the agent's bridge (`runtime/bridge.ts`) as their way into its services: `run`. A hook calls it; a
   program never calls it from inside an Effect. New Effect code reaches Pi through `PiSessions` (`pi/sessions.ts`): every call
   names its session, failures are a typed `PiFailure`, and interrupting a `wait` ends only the wait.
-- Owner, inbound and Telegram submissions admit `(chat, operationId)` through `ChatOperations.send` before calling
+- Owner, inbound and Source submissions admit `(chat, operationId)` through `ChatOperations.send` before calling
   Pi. The operation's receipt pins the Pi session it was admitted to, so a retry submits there again; the per-chat lock
   covers admission only and is released before model execution or waiting. `PiSessions.wait` resolves through that
   binding. Nothing rebinds a chat (ADR 0030): Move to thread forks a new Thread instead. The application ledger prunes
@@ -91,8 +91,8 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   native profile for unit/local workerd proof.
 - Topics (ADR 0032): a Topic's Conversation is a **new** `sessions.create()` session configured explicitly (extension
   list and Personal's tool filter), never a fork of Personal. Threads, "+" threads and subagents inherit their
-  parent's `topic_id`; a "+" thread announces itself in its Topic's Conversation (`conversationAbove`). Inbound,
-  Telegram and `recentOwnerMessages` keep resolving the primary chat. Archive stops a Topic's chats through the owner's
+  parent's `topic_id`; a "+" thread announces itself in its Topic's Conversation (`conversationAbove`).
+  Inbound clients and `recentOwnerMessages` keep resolving the primary chat; Sources use their confirmed routes. Archive stops a Topic's chats through the owner's
   Stop, never a background abort of a Conversation, and refuses new work until Restore, which restarts nothing.
 - Start thread (ADR 0034, `chats/thread-heads.ts`): a Thread is made once per owner operation (`origin_op`), forked at
   the chat's newest entry outside a running turn (`pi/turns.ts`, never inside one), then `app.thread_head` goes into
@@ -139,8 +139,8 @@ itself authorize model spend, external messages, deployment or production change
 - Project committed `pi.usage` through app-only cumulative watermarks and stable UTC-day receipts. Passive reports use
   the actual parent `Conversation.submit` write API; acceptance starts no main model turn. Sealed questions resume the
   same run, release executing slots while waiting, and retain the single-routine lock. Run Stop/archive fence and abort
-  owned work; main Stop spares background runs. Frozen Telegram copies of notices and their remote receipts are
-  separate from Pi acceptance. Local workerd evidence and retained-dev acceptance remain distinct.
+  owned work; main Stop spares background runs. Frozen copies of notices through Notify me via (ADR 0070) and their
+  remote receipts are separate from Pi acceptance. Local workerd evidence and retained-dev acceptance remain distinct.
 - A routine handed to a Persona (ADR 0041) runs in its own run conversation with the Persona's text in the context tail
   (`markPersona`, `personaText(…, 'routine')`), never a Topic fork; its completed answer is the Persona's `app.persona`
   entry with the routine's link. A Persona turn that stops on goblin's own approval or grant marker writes its hold

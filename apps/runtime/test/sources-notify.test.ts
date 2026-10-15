@@ -4,9 +4,10 @@ import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as Schema from 'effect/Schema'
 import { McpConnections, McpGrants, McpServers } from '../src/mcp/service.ts'
-import type { McpConnectionSnapshot } from '../src/mcp/types.ts'
+import type { McpConnectionSnapshot } from '../src/mcp/connections/types.ts'
 import { Db } from '../src/runtime/db.ts'
-import { clearNotifySink, notifySinkView, setNotifySink } from '../src/sources/notify.ts'
+import { CryptoLive } from '../src/runtime/crypto.ts'
+import { clearNotifySink, notifySink, notifySinkView, setNotifySink, sinkRevision } from '../src/sources/notify.ts'
 import { fake } from './fake.ts'
 import { stub } from './http/api/fixture.ts'
 import { sourceWorld } from './sources-fixture.ts'
@@ -33,6 +34,7 @@ describe('Notify me via (ADR 0066)', () => {
         tools: [{ name: 'message_send', inputSchema: { type: 'object' } }],
       })
       const services = Layer.mergeAll(
+        CryptoLive,
         Layer.succeed(Db, db),
         stub(McpConnections, { connect: () => Effect.succeed(snapshot) }),
         stub(McpGrants, { setTool: (id, name) => Effect.sync(() => (granted.push(`${id}:${name}`), [])) }),
@@ -41,8 +43,27 @@ describe('Notify me via (ADR 0066)', () => {
       expect(yield* notifySinkView.pipe(Effect.provide(services))).toBeNull()
       expect(yield* setNotifySink(DM).pipe(Effect.provide(services))).toMatchObject({ ...DM, label: 'Chat' })
       expect(granted).toEqual(['chat:message_send'])
+      const first = yield* notifySink.pipe(Effect.provide(services))
+      if (first === undefined) throw new Error('missing sink')
+      const firstRevision = yield* sinkRevision(first)
+      yield* setNotifySink(DM).pipe(Effect.provide(services))
+      const second = yield* notifySink.pipe(Effect.provide(services))
+      if (second === undefined) throw new Error('missing sink')
+      expect(second.updatedAt).toBe(first.updatedAt)
+      expect(yield* sinkRevision(second)).not.toBe(firstRevision)
+      yield* clearNotifySink.pipe(Effect.provide(services))
+      yield* setNotifySink(DM).pipe(Effect.provide(services))
+      const third = yield* notifySink.pipe(Effect.provide(services))
+      if (third === undefined) throw new Error('missing sink')
+      expect(yield* sinkRevision(third)).not.toBe(firstRevision)
       const unknown = yield* Effect.flip(setNotifySink({ ...DM, tool: 'mail_send' }).pipe(Effect.provide(services)))
       expect(unknown).toMatchObject({ _tag: 'InvalidInput' })
+      const oversized = yield* Effect.flip(
+        setNotifySink({ ...DM, echo: { event: 'chat.received', arguments: { data: 'x'.repeat(17_000) } } }).pipe(
+          Effect.provide(services),
+        ),
+      )
+      expect(oversized).toMatchObject({ _tag: 'InvalidInput' })
       expect(yield* notifySinkView.pipe(Effect.provide(services))).toMatchObject({ tool: 'message_send' })
       yield* clearNotifySink.pipe(Effect.provide(services))
       expect(yield* notifySinkView.pipe(Effect.provide(services))).toBeNull()

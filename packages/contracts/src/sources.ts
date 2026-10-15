@@ -124,12 +124,25 @@ export type SpeaksForMe = typeof SpeaksForMe.Type
 export const SourceOthers = Schema.Literals(['notice', 'drop'])
 export type SourceOthers = typeof SourceOthers.Type
 
-/** Where a message's parts are: its id (for a message read again), its words, and what marks it incoming. */
+/**
+ * Where a message's parts are: its id (for a message read again), its words, its conversation's name, what it brought
+ * and what marks it incoming.
+ */
 const MessagePointers = {
   /** The message's own id; without it, an event's message is known by the event's id. */
   id: Schema.optionalKey(JsonPointer),
   /** The message's words. */
   text: JsonPointer,
+  /**
+   * Its conversation's name as the server gives it (a chat's title): shown on the conversation's route and given to a
+   * Topic made for it. The newest one a message carries wins.
+   */
+  title: Schema.optionalKey(JsonPointer),
+  /**
+   * What the message brought: a list of MCP content blocks (`resource_link`, `image`, `resource`, `audio`), shaped as a
+   * tool result's content is. goblin keeps each one in the owner's files (ADR 0065) and the turn names the files.
+   */
+  attachments: Schema.optionalKey(JsonPointer),
   /** Only messages whose value here equals this are read (an inbox that lists sent messages too). */
   direction: Schema.optionalKey(SourceMatch),
 }
@@ -153,6 +166,16 @@ export const SourceRead = Schema.Union([
 ])
 export type SourceRead = typeof SourceRead.Type
 
+/** The owner-reviewed meanings of a tool's structured result. Unmatched or conflicting rules mean unknown. */
+export const SinkResultRules = Schema.Struct({
+  accepted: SourceMatch,
+  retryable: Schema.optionalKey(SourceMatch),
+  rejected: Schema.optionalKey(SourceMatch),
+  /** An epoch-millisecond lower bound on the next attempt, only read after a retryable match. */
+  retryAt: Schema.optionalKey(JsonPointer),
+})
+export type SinkResultRules = typeof SinkResultRules.Type
+
 /** The longest piece of an answer a reply may be cut to, and the shortest. */
 const MAX_CHARS = { minimum: 100, maximum: 20_000 }
 
@@ -164,22 +187,38 @@ export const SourceReply = Schema.Struct({
   tool: RemoteName,
   arguments: ArgumentsTemplate,
   maxChars: Schema.Int.check(Schema.isBetween(MAX_CHARS)),
+  /** Owner-reviewed meanings of the reply tool's structured result; unmatched results are unknown. */
+  result: Schema.optionalKey(SinkResultRules),
 })
 export type SourceReply = typeof SourceReply.Type
+
+const ToTopic = Schema.Struct({ to: Schema.Literal('topic'), topic: TopicId })
+const ToPersona = Schema.Struct({ to: Schema.Literal('persona'), persona: PersonaId, topic: TopicId })
+const ToListen = Schema.Struct({ to: Schema.Literal('listen'), topic: TopicId })
+const ToIgnore = Schema.Struct({ to: Schema.Literal('ignore') })
+const ToHeld = Schema.Struct({ to: Schema.Literal('held') })
 
 /**
  * Where one conversation's owner messages go: turns in a Topic answered by goblin (`topic`) or by a Persona there
  * (`persona`), passive notes in a Topic with no turn (`listen`), nothing (`ignore`), or kept until the owner routes it
  * (`held`).
  */
-export const SourceRoute = Schema.Union([
-  Schema.Struct({ to: Schema.Literal('topic'), topic: TopicId }),
-  Schema.Struct({ to: Schema.Literal('persona'), persona: PersonaId, topic: TopicId }),
-  Schema.Struct({ to: Schema.Literal('listen'), topic: TopicId }),
-  Schema.Struct({ to: Schema.Literal('ignore') }),
-  Schema.Struct({ to: Schema.Literal('held') }),
-])
+export const SourceRoute = Schema.Union([ToTopic, ToPersona, ToListen, ToIgnore, ToHeld])
 export type SourceRoute = typeof SourceRoute.Type
+
+/**
+ * What becomes of a conversation seen for the first time: a route, or a new Topic of its own answered by goblin
+ * (`topic-per-key`), named after the conversation's title, else its key's values.
+ */
+export const SourceNewKeys = Schema.Union([
+  ToTopic,
+  ToPersona,
+  ToListen,
+  ToIgnore,
+  ToHeld,
+  Schema.Struct({ to: Schema.Literal('topic-per-key') }),
+])
+export type SourceNewKeys = typeof SourceNewKeys.Type
 
 /** The placeholders a read's tool arguments may use. */
 export const readPlaceholder = (name: string) => name === 'cursor'
@@ -210,24 +249,9 @@ export const SourceSetup = Schema.Struct({
   others: SourceOthers,
   read: SourceRead,
   reply: Schema.optionalKey(SourceReply),
-  newKeys: SourceRoute,
+  newKeys: SourceNewKeys,
 }).check(Schema.makeFilter((setup) => setupProblem(setup) ?? true))
 export type SourceSetup = typeof SourceSetup.Type
-
-/**
- * What a server suggests for a Source on one of its events (`_meta.suggest.source`, read leniently field by field):
- * the setup's facts without the event, which is the one it is suggested on. A claim for the owner to review.
- */
-export const SourceSuggestion = Schema.Struct({
-  arguments: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
-  key: SourceKey,
-  speaksForMe: SpeaksForMe,
-  others: Schema.optionalKey(SourceOthers),
-  read: SourceRead,
-  reply: Schema.optionalKey(SourceReply),
-  newKeys: Schema.optionalKey(SourceRoute),
-})
-export type SourceSuggestion = typeof SourceSuggestion.Type
 
 /** A Source's id: `src_` and 16 to 32 lowercase hex digits. */
 export const SourceId = Schema.String.check(Schema.isPattern(/^src_[0-9a-f]{16,32}$/u))
@@ -262,8 +286,13 @@ export type SourceBound = typeof SourceBound.Type
 export const SourceState = Schema.Literals(['proposed', 'active', 'paused', 'refused'])
 export type SourceState = typeof SourceState.Type
 
-/** A conversation waiting for the owner's route: its key, its values and how many messages it holds. */
-export const SourceWaiting = Schema.Struct({ key: SourceKeyId, values: SourceKeyValues, held: Schema.Int })
+/** A conversation waiting for the owner's route: its key, its values, its title and how many messages it holds. */
+export const SourceWaiting = Schema.Struct({
+  key: SourceKeyId,
+  values: SourceKeyValues,
+  title: Schema.optional(Schema.String),
+  held: Schema.Int,
+})
 export type SourceWaiting = typeof SourceWaiting.Type
 
 /**
@@ -295,13 +324,14 @@ export const SourcePage = Schema.Struct({ sources: Schema.Array(SourceView) })
 export type SourcePage = typeof SourcePage.Type
 
 /**
- * One conversation of a Source and where it goes: its key and values, its route, how many messages it holds, and who
- * set the route last (`default` for the setup's `newKeys`). `revision` counts route changes, so Undo can tell whether
- * anything touched it.
+ * One conversation of a Source and where it goes: its key and values, its title (the server's name for it, by the
+ * setup's `read.title`), its route, how many messages it holds, and who set the route last (`default` for the setup's
+ * `newKeys`). `revision` counts route changes, so Undo can tell whether anything touched it.
  */
 export const SourceRouteView = Schema.Struct({
   key: SourceKeyId,
   values: SourceKeyValues,
+  title: Schema.optional(Schema.String),
   route: SourceRoute,
   held: Schema.Int,
   revision: Schema.Int,
@@ -316,8 +346,8 @@ export const SourceRoutes = Schema.Struct({ source: SourceView, routes: Schema.A
 export type SourceRoutes = typeof SourceRoutes.Type
 
 /**
- * `POST /api/sources`: the owner proposes a Source on `connectionId` (from what its server suggests); the same
- * operation finds the same proposal. Nothing runs until they confirm its revision.
+ * A proposal of a Source on `connectionId`, as the agent's `source_propose` makes it (ADR 0068: no server suggests
+ * one); the same operation finds the same proposal. Nothing runs until the owner confirms its revision.
  */
 export const SourceProposal = Schema.Struct({
   connectionId: NonEmptyString(200),
@@ -331,10 +361,26 @@ export type SourceProposal = typeof SourceProposal.Type
 export const SourceRevision = Schema.Struct({ revision: Schema.Int })
 export type SourceRevision = typeof SourceRevision.Type
 
+/** Editing reply-result rules creates a new proposal for the owner to confirm; null clears the rules. */
+export const SourceReplyResultChange = Schema.Struct({ revision: Schema.Int, result: Schema.NullOr(SinkResultRules) })
+export type SourceReplyResultChange = typeof SourceReplyResultChange.Type
+
 /** The placeholders a notice copy's arguments may use. */
 export const notifyPlaceholder = (name: string) => name === 'text' || name === 'operationId'
 
-const NotifySinkFields = { connectionId: NonEmptyString(200), tool: RemoteName, arguments: ArgumentsTemplate }
+/** Optional settings for interpreting delivery and suppressing an exact stream's echoes on this connection. */
+export const NotifySinkPolicy = Schema.Struct({
+  result: Schema.optionalKey(SinkResultRules),
+  echo: Schema.optionalKey(SourceWake),
+})
+export type NotifySinkPolicy = typeof NotifySinkPolicy.Type
+
+const NotifySinkFields = {
+  connectionId: NonEmptyString(200),
+  tool: RemoteName,
+  arguments: ArgumentsTemplate,
+  ...NotifySinkPolicy.fields,
+}
 
 /**
  * "Notify me via" (ADR 0066): one tool of one connection that copies goblin's notices to the owner elsewhere (their own

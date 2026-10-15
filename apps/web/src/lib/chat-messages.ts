@@ -38,10 +38,12 @@ export type ChatMessage =
       /** The owner's files this message carried. */
       readonly attachments?: readonly Attachment[]
       readonly selections?: readonly ComposerOption[]
-      /** Who wrote it, when not the owner in this browser: Telegram, an MCP client, a subagent. */
+      /** Who wrote it, when not the owner in this browser: a Source, an MCP client, a subagent. */
       readonly author?: string
       /** How a held call ended, when this is its outcome (from its connection). */
       readonly outcome?: McpOutcome
+      /** The owner's own turn that came from elsewhere (a Source's), by goblin's mark. */
+      readonly own?: true
       /** The outcome was kept for the agent's next turn (`app.mcp_outcome`): nothing could pay for one then. */
       readonly kept?: true
       /** The thread a note shared into main came from. */
@@ -207,6 +209,22 @@ function assistantMessage(message: Record<string, unknown>, id: string, content:
   }
 }
 
+/**
+ * A user message as the transcript shows it: its words and what `sharedContext` read with them (each field only when it
+ * has one), and the thread a shared note came from.
+ */
+function userMessage(message: Record<string, unknown>, id: string, thread: string | undefined): ChatMessage {
+  const { context, ...shared } = sharedContext(message.content)
+  return {
+    id,
+    role: 'user',
+    ...shared,
+    ...(context.length === 0 ? {} : { context }),
+    ...(thread === undefined ? {} : { thread }),
+    ...stamped(message),
+  }
+}
+
 /** The messages one of Pi's messages makes: `id` is the transcript's, `thread` the thread a shared note came from. */
 export function entryMessage(message: Record<string, unknown>, id: string, thread?: string): ChatMessage[] {
   const content = text(message.content)
@@ -224,28 +242,6 @@ export function entryMessage(message: Record<string, unknown>, id: string, threa
       },
     ]
   if (message.role === 'assistant') return [assistantMessage(message, id, content)]
-  if (message.role === 'user') {
-    const shared = sharedContext(message.content)
-    const context = shared.context.length === 0 ? {} : { context: shared.context }
-    const attachments = shared.attachments === undefined ? {} : { attachments: shared.attachments }
-    const selections = shared.selections === undefined ? {} : { selections: shared.selections }
-    const author = shared.author === undefined ? {} : { author: shared.author }
-    const outcome = shared.outcome === undefined ? {} : { outcome: shared.outcome }
-    const from = thread === undefined ? {} : { thread }
-    return [
-      {
-        id,
-        role: 'user',
-        text: shared.text,
-        ...context,
-        ...attachments,
-        ...selections,
-        ...author,
-        ...outcome,
-        ...from,
-        ...stamped(message),
-      },
-    ]
-  }
+  if (message.role === 'user') return [userMessage(message, id, thread)]
   return []
 }

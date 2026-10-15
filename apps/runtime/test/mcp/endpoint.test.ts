@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addedConnectionId, serverClaims, userEndpoint } from '../../src/mcp/endpoint.ts'
+import { addedConnectionId, serverClaims, userEndpoint } from '../../src/mcp/servers/endpoint.ts'
 
 const reason = (raw: string): string => {
   try {

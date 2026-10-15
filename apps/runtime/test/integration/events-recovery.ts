@@ -1,6 +1,5 @@
 import * as Effect from 'effect/Effect'
-import { attempt } from '../../src/http/errors.ts'
-import { makeEvents } from '../../src/mcp/events.ts'
+import { makeEvents } from '../../src/mcp/events/engine.ts'
 import { installEventConsumers } from '../../src/mcp/events/consumers.ts'
 import { SqliteEventStore } from '../../src/mcp/events/store.ts'
 import { makeSkills } from '../../src/skills/library.ts'
@@ -24,14 +23,11 @@ async function skillVersion(state: EventsProbeState, version: string) {
 
 /** Signed Events drive the installed Skills consumer, persisted generations and immutable retained activations. */
 export async function eventsSkillsProbe(state: EventsProbeState) {
-  const { skillState, fixture, events, channel, run } = state
+  const { skillState, fixture, events, run } = state
   const library = await run(makeSkills(skillState))
   await run(library.setEnabled('mygram', true))
   await run(
     installEventConsumers(events, {
-      channel: channel.status,
-      pull: attempt(state.pull),
-      chatsChanged: channel.chatsChanged,
       skills: { enabled: library.enabled, invalidate: library.invalidate },
     }),
   )

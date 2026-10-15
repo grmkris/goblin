@@ -5,7 +5,7 @@ import { NODE_BYTES, byteLength } from './tree.ts'
 const COMPACT = [
   'You write the memory of goblin, an AI agent that works for one owner in one endless conversation, through tools',
   'and subagents. Each message has a kind: user (the owner\'s words; one that starts with a "[from …]" line was written',
-  "by someone else on the owner's behalf: an MCP client, a channel such as Telegram, a subagent's report or a note",
+  "by someone else on the owner's behalf: an MCP client, a Source, a subagent's report or a note",
   'shared from a side thread; a "[thread started: …]" line names a side thread the owner opened, whose content',
   "goblin cannot see), talk (goblin's replies, with its tool calls as tool: lines) and echo (tool results).",
   '',

@@ -1,5 +1,6 @@
 import {
   PERSONAL_TOPIC,
+  type SourceNewKeys,
   SourceKey,
   SourceKeyId,
   SourceOthers,
@@ -50,6 +51,9 @@ const AskedRoute = Schema.Union([
 ])
 type AskedRoute = typeof AskedRoute.Type
 
+/** Where new conversations go, as the model names it: a route, or each in a new Topic of its own. */
+const AskedNewKeys = Schema.Union([AskedRoute, Schema.Struct({ to: Schema.Literal('topic-per-key') })])
+
 /** A Source as the model proposes it: its name and the five facts, with places by name. */
 const Asked = Schema.Struct({
   connectionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
@@ -60,7 +64,7 @@ const Asked = Schema.Struct({
   others: SourceOthers,
   read: SourceRead,
   reply: Schema.optionalKey(SourceReply),
-  newKeys: Schema.optionalKey(AskedRoute),
+  newKeys: Schema.optionalKey(AskedNewKeys),
 })
 
 const Proposed = Schema.Struct({ sourceId: Schema.String, revision: Schema.Int, title: Schema.String })
@@ -90,7 +94,7 @@ const proposeTool = (run: RunProgram) =>
   typedTool({
     name: 'source_propose',
     description:
-      "Propose a Source on a connection that sends events: messages the owner writes elsewhere (a chat app, mail) come in as the owner's own turns and your answers go back. Give: `wake` (`{ event, arguments }`, one of the connection's events from mcp_list with `events: true`); `key` (named RFC 6901 pointers into a message that identify its conversation, e.g. `[{ name: 'chat', pointer: '/chat' }]`); `speaksForMe` (`{ all: true }`, or `{ pointer, equals }` saying which messages are the owner's, e.g. `{ pointer: '/from/isOwner', equals: true }`); `others` (`notice` or `drop`, for anyone else's message); `read` (`{ from: 'payload', items?, id?, text, direction? }` to read the event's data, or `{ from: 'tool', tool, arguments, items, cursor, id, text, direction? }` to call a tool from a cursor, with `\"{{cursor}}\"` as a whole argument value); optional `reply` (`{ tool, arguments, maxChars }`, arguments whose whole string values may be `\"{{key.<name>}}\"`, `\"{{text}}\"` (required) and `\"{{operationId}}\"`; never put a placeholder inside other text); optional `newKeys` (where a conversation seen first goes: `{ to: 'held' }` (default), `ignore`, `{ to: 'topic' | 'listen', topic }` or `{ to: 'persona', persona, topic? }` by name). Pointers are checked against the server's schemas. Proposing does not start it: the owner reviews and confirms the exact setup, which ends this turn.",
+      "Propose a Source on a connection that sends events: messages the owner writes elsewhere (a chat app, mail) come in as the owner's own turns and your answers go back. Give: `wake` (`{ event, arguments }`, one of the connection's events from mcp_list with `events: true`); `key` (named RFC 6901 pointers into a message that identify its conversation, e.g. `[{ name: 'chat', pointer: '/chat' }]`); `speaksForMe` (`{ all: true }`, or `{ pointer, equals }` saying which messages are the owner's, e.g. `{ pointer: '/from/isOwner', equals: true }`); `others` (`notice` or `drop`, for anyone else's message); `read` (`{ from: 'payload', items?, id?, text, title?, attachments?, direction? }` to read the event's data, or `{ from: 'tool', tool, arguments, items, cursor, id, text, title?, attachments?, direction? }` to call a tool from a cursor, with `\"{{cursor}}\"` as a whole argument value; `title` points at the conversation's name, e.g. a chat's title, and `attachments` at a list of MCP content blocks (`resource_link`, `image`, `resource`, `audio`) a message brought, which goblin keeps in the owner's files); optional `reply` (`{ tool, arguments, maxChars, result? }`, result has accepted and optional retryable/rejected rules of `{ pointer, equals }` into structuredContent, and optional retryAt pointer to epoch milliseconds; only one matching rule determines the outcome, unknown results stop without retrying; arguments whose whole string values may be `\"{{key.<name>}}\"`, `\"{{text}}\"` (required) and `\"{{operationId}}\"`; never put a placeholder inside other text); optional `newKeys` (where a conversation seen first goes: `{ to: 'held' }` (default), `ignore`, `{ to: 'topic' | 'listen', topic }`, `{ to: 'persona', persona, topic? }` by name, or `{ to: 'topic-per-key' }` for a new Topic of its own, named after its title). Pointers are checked against the server's schemas. Proposing does not start it: the owner reviews and confirms the exact setup, which ends this turn.",
     input: Asked,
     output: Proposed,
     replay: 'safe',
@@ -99,7 +103,8 @@ const proposeTool = (run: RunProgram) =>
       return run(
         Effect.gen(function* () {
           const { connectionId, title, newKeys, ...facts } = asked
-          const route = yield* routeOfAsked(newKeys ?? { to: 'held' })
+          const route: SourceNewKeys =
+            newKeys?.to === 'topic-per-key' ? newKeys : yield* routeOfAsked(newKeys ?? { to: 'held' })
           const setup = yield* decodeSetup({ ...facts, newKeys: route }).pipe(
             Effect.mapError((issue) => new InvalidInput({ reason: issue.message })),
           )
@@ -161,7 +166,7 @@ const routesTool = (run: RunProgram) =>
                 Effect.forEach(routes, (route) =>
                   Effect.map(routeWords(route.route), (goesTo) => ({
                     key: route.key,
-                    conversation: keyWords(route.values),
+                    conversation: route.title ?? keyWords(route.values),
                     goesTo,
                     held: route.held,
                   })),

@@ -33,7 +33,7 @@ flowchart LR
 - [Topics, Personas and memory](architecture/topics.md): Topics, Personas, organize receipts, retrieval and Topic memory.
 - [Models](architecture/models.md): model calls and daily token usage.
 - [Authority and inbound MCP](architecture/inbound-mcp.md): resident authority and goblin as an MCP server.
-- [MCP Events and Telegram](architecture/events.md): Events subscriptions and the Telegram channel.
+- [MCP Events](architecture/events.md): signed subscriptions, consumers and the event picker.
 - [Sources](architecture/sources.md): any connection's events as the owner's own messages, routed to Topics and answered
   back.
 - [Run ledger](architecture/observability.md): run ledger, logs, failures and inspection.
@@ -41,4 +41,6 @@ flowchart LR
 - [Infrastructure and release](architecture/infrastructure.md): Alchemy stacks, stage origins, release and public source.
 - [Routines and notices](architecture/routines.md): routine definitions, runs and notices.
 
-Interactive `openui` replies use the existing Markdown and owner-message paths; see [chat blocks](architecture/chat-blocks.md) and [ADR 0068](adr/0068-interactive-replies.md).
+Notify me via delivery rules and exact echo selectors are documented with [Sources](architecture/sources.md) (ADR 0071).
+
+Interactive `openui` replies use the existing Markdown and owner-message paths; see [chat blocks](architecture/chat-blocks.md) and [ADR 0074](adr/0074-interactive-replies.md).

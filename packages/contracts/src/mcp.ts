@@ -1,6 +1,5 @@
 import * as Schema from 'effect/Schema'
 import { NonEmptyString } from './ids.ts'
-import { SourceSuggestion } from './sources.ts'
 
 /** A server id as the owner's requests name it: configured ids and the ones added servers get. */
 const ConnectionIdField = NonEmptyString(64)
@@ -180,8 +179,6 @@ export const EventHealth = Schema.Struct({
   status: Schema.String,
   refreshBefore: Schema.NullOr(Schema.Number),
   lastReceiptAt: Schema.NullOr(Schema.Number),
-  /** goblin's Telegram channel takes this subscription's events (ADR 0041): a routine on it would only repeat them. */
-  telegram: Schema.optional(Schema.Literal(true)),
 })
 export type EventHealth = typeof EventHealth.Type
 
@@ -189,33 +186,19 @@ export type EventHealth = typeof EventHealth.Type
 export const RenameConnection = Schema.Struct({ label: ConnectionLabel })
 export type RenameConnection = typeof RenameConnection.Type
 
-/** How often a server says one of its events happens, as a hint for the owner. */
-export const EventRate = Schema.Literals(['often', 'daily', 'rare'])
-export type EventRate = typeof EventRate.Type
-
 /**
- * One stream of events a connection's server offers (`events/list`), as the owner sees it before subscribing: its name,
- * the server's own description (a claim, for the owner's eyes), the arguments it takes, the shape it says each event's
- * data has (`payloadSchema`), and whether goblin can subscribe to it (it delivers by poll and webhook).
- *
- * The rest is what the server suggests (its `title` and `_meta.suggest`, ADR 0041 amended 2026-10-12): a
- * title, a line on what it is, the group it belongs to, whether it is worth setting up (`recommended`) and telling the
- * owner about (`tellMe`), and how often it happens. Claims that only pre-select: they never grant or confirm anything.
+ * One stream of events a connection's server offers (`events/list`), as the owner sees it before subscribing, by its
+ * standard fields only (ADR 0068): its name, its title and description (the server's claims, for the owner's eyes), the
+ * arguments it takes, the shape it says each event's data has (`payloadSchema`), and whether goblin can subscribe to it
+ * (it delivers by poll and webhook). Nothing is picked, granted or confirmed by them.
  */
 export const EventStream = Schema.Struct({
   name: Schema.String,
+  title: Schema.optional(Schema.String),
   description: Schema.optional(Schema.String),
   inputSchema: Schema.Record(Schema.String, Schema.Unknown),
   payloadSchema: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
   subscribable: Schema.Boolean,
-  title: Schema.optional(Schema.String),
-  summary: Schema.optional(Schema.String),
-  group: Schema.optional(Schema.String),
-  recommended: Schema.optional(Schema.Boolean),
-  tellMe: Schema.optional(Schema.Boolean),
-  rate: Schema.optional(EventRate),
-  /** What the server suggests for a Source on this event (ADR 0066), for the owner to review; a claim. */
-  source: Schema.optional(SourceSuggestion),
 })
 export type EventStream = typeof EventStream.Type
 

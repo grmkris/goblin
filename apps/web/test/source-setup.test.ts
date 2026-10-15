@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { EVERYTHING, type EventStream, type SourceSetup, type SourceView, type TopicView } from '@goblin/contracts'
+import { EVERYTHING, type PersonaView, type SourceSetup, type SourceView, type TopicView } from '@goblin/contracts'
+import { responderOptions } from '../src/lib/route-choice.ts'
 import {
   choiceOfRoute,
+  conversationName,
   keyWords,
+  newKeysWords,
   routeOfChoice,
   routeWords,
   sourceRouteOptions,
@@ -10,7 +13,7 @@ import {
   sourcesToReview,
   waitingConversations,
 } from '../src/lib/source-routes.ts'
-import { proposalOf, setupFacts, sinkArguments, sinkFromSource } from '../src/lib/source-setup.ts'
+import { replyResultRules, setupFacts, sinkArguments, sinkFromSource, sinkPolicy } from '../src/lib/source-setup.ts'
 
 const topic = (id: number, name: string, archivedAt?: number): TopicView => ({
   id,
@@ -26,6 +29,19 @@ const topic = (id: number, name: string, archivedAt?: number): TopicView => ({
 })
 const TOPICS = [topic(1, 'Personal'), topic(2, 'Travel'), topic(3, 'Old', 5)]
 
+const persona = (id: number, name: string, archivedAt?: number): PersonaView => ({
+  id,
+  name,
+  avatar: { glyph: name[0] ?? 'P', hue: 120 },
+  role: 'Helps',
+  instructions: 'Help.',
+  setup: { mcpServers: [], skills: [], apps: [] },
+  revision: 1,
+  createdAt: 1,
+  updatedAt: 1,
+  ...(archivedAt !== undefined && { archivedAt }),
+})
+
 /** An inbox-style setup: a message event, keyed by chat, the owner's when `/from/isOwner` is true, answered back. */
 const SETUP: SourceSetup = {
   wake: { event: 'message.received', arguments: {} },
@@ -37,6 +53,11 @@ const SETUP: SourceSetup = {
     tool: 'message_send',
     arguments: { chat: '{{key.chat}}', text: '{{text}}', operationId: '{{operationId}}' },
     maxChars: 3500,
+    result: {
+      accepted: { pointer: '/status', equals: 'accepted' },
+      retryable: { pointer: '/status', equals: 'retryable' },
+      rejected: { pointer: '/status', equals: 'rejected' },
+    },
   },
   newKeys: { to: 'held' },
 }
@@ -61,10 +82,12 @@ describe('a Source in words (ADR 0066)', () => {
     expect(keyWords({ chat: 'dm', thread: 3 })).toBe('chat dm · thread 3')
     expect(keyWords({ chat: 'dm', thread: null })).toBe('chat dm')
     expect(keyWords({})).toBe('A conversation')
+    expect(conversationName({ values: { chat: 'c1' }, title: 'Trip planning' })).toBe('Trip planning')
+    expect(conversationName({ values: { chat: 'c1' } })).toBe('chat c1')
   })
 
   it('says each fact of a setup, with every pointer and tool as it is', () => {
-    const facts = setupFacts(SETUP, { event: 'Message received', route: (route) => route.to })
+    const facts = setupFacts(SETUP, { event: 'Message received', newKeys: (newKeys) => newKeys.to })
     expect(facts.map((fact) => fact.term)).toEqual([
       'Wakes on',
       'Conversations',
@@ -75,8 +98,27 @@ describe('a Source in words (ADR 0066)', () => {
       'New conversations',
     ])
     expect(facts[2]?.text).toBe('When /from/isOwner is true: those become your own turns')
-    expect(facts[5]?.text).toBe('Sent back with message_send, in pieces of at most 3,500 characters')
+    expect(facts[5]?.text).toBe(
+      'Sent back with message_send, in pieces of at most 3,500 characters; results: accepted when /status is "accepted"; retryable when /status is "retryable"; rejected when /status is "rejected"',
+    )
     expect(facts[6]?.text).toBe('held')
+  })
+
+  it("names a setup's title and attachments pointers, and a new Topic for each new conversation", () => {
+    const setup: SourceSetup = {
+      ...SETUP,
+      read: { from: 'payload', text: '/text', title: '/chatTitle', attachments: '/attachments' },
+      newKeys: { to: 'topic-per-key' },
+    }
+    const facts = setupFacts(setup, {
+      event: 'Message received',
+      newKeys: (newKeys) => newKeysWords(newKeys, TOPICS, []),
+    })
+    expect(facts[4]?.text).toBe(
+      "From the event's data: the event is one message, its words at /text, its conversation's name at /chatTitle, what it brought at /attachments, kept in your files",
+    )
+    expect(facts[6]?.text).toBe('Each in a new Topic of its own, named after it, answered by goblin')
+    expect(newKeysWords({ to: 'listen', topic: 2 }, TOPICS, [])).toBe('Kept as notes in #Travel')
   })
 
   it('says where each route sends a conversation', () => {
@@ -107,6 +149,18 @@ describe('a Source in words (ADR 0066)', () => {
 })
 
 describe("a Source's route select", () => {
+  it('offers goblin or a live Persona to answer, and preserves an archived choice', () => {
+    const personas = [persona(7, 'Guide'), persona(8, 'Retired', 5)]
+    expect(responderOptions(personas, 'goblin')).toEqual([
+      { value: 'goblin', text: 'goblin answers' },
+      { value: 'persona:7', text: '@Guide answers' },
+    ])
+    expect(responderOptions(personas, 'persona:8').at(-1)).toEqual({
+      value: 'persona:8',
+      text: '@Retired (archived) answers',
+    })
+  })
+
   it('turns every route into a choice and back', () => {
     for (const route of [
       { to: 'topic', topic: 2 },
@@ -147,36 +201,23 @@ describe('what Activity offers from Sources', () => {
 /** The placeholders a notice's arguments may use. */
 const notice = (name: string) => name === 'text' || name === 'operationId'
 
-describe('proposals and Notify me via', () => {
-  it("makes the proposal a server's suggestion on an event describes", () => {
-    const stream: EventStream = {
-      name: 'chat.message.received',
-      inputSchema: { type: 'object' },
-      subscribable: true,
-      title: 'Messages',
-      source: { arguments: { chat: 'all' }, key: SETUP.key, speaksForMe: { all: true }, read: SETUP.read },
+describe('Notify me via', () => {
+  it('keeps delivery rules and the exact echo selector through the settings JSON', () => {
+    const policy = {
+      result: { accepted: { pointer: '/status', equals: 'sent' }, retryAt: '/retryAt' },
+      echo: { event: 'chat.message', arguments: { chat: 'dm' } },
     }
-    expect(proposalOf(stream, 'chat', 'Chat', 'op-1')).toEqual({
-      connectionId: 'chat',
-      title: 'Messages from Chat',
-      operationId: 'op-1',
-      setup: {
-        wake: { event: 'chat.message.received', arguments: { chat: 'all' } },
-        key: SETUP.key,
-        speaksForMe: { all: true },
-        others: 'notice',
-        read: SETUP.read,
-        newKeys: { to: 'held' },
-      },
-    })
-    expect(proposalOf({ ...stream, source: undefined }, 'chat', 'Chat', 'op-1')).toBeUndefined()
+    expect(sinkPolicy(JSON.stringify(policy))).toEqual(policy)
+    expect(sinkPolicy('invalid')).toBeUndefined()
+    expect(sinkPolicy('{"result": {"accepted": {"pointer": "not/a/pointer", "equals": true}}}')).toBeUndefined()
   })
-
   it("copies a Source's reply with one conversation's key filled in, keeping the notice's own placeholders", () => {
     expect(sinkFromSource(source(), { chat: 'dm' })).toEqual({
       connectionId: 'chat',
       tool: 'message_send',
       arguments: { chat: 'dm', text: '{{text}}', operationId: '{{operationId}}' },
+      result: SETUP.reply?.result,
+      echo: SETUP.wake,
     })
     const { reply: _reply, ...silent } = SETUP
     expect(sinkFromSource(source({ setup: silent }), { chat: 'dm' })).toBeUndefined()
@@ -191,5 +232,15 @@ describe('proposals and Notify me via', () => {
     expect(sinkArguments('{"text":"{{key.chat}}"}', notice)).toHaveProperty('problem')
     expect(sinkArguments('[1]', notice)).toEqual({ problem: 'The arguments must be a JSON object.' })
     expect(sinkArguments('{', notice)).toEqual({ problem: 'The arguments are not JSON.' })
+  })
+})
+
+describe('Source reply result rules', () => {
+  it('reads only valid rules or an explicit clear', () => {
+    expect(replyResultRules(JSON.stringify(SETUP.reply?.result))).toEqual(SETUP.reply?.result)
+    expect(replyResultRules('null')).toBeNull()
+    expect(replyResultRules('{}')).toBeUndefined()
+    expect(replyResultRules('{"accepted":{"pointer":"bad","equals":true}}')).toBeUndefined()
+    expect(replyResultRules('invalid')).toBeUndefined()
   })
 })

@@ -38,7 +38,7 @@ describe('flow attributes', () => {
     const text = 'Please move my notes about the divorce into a thread'
     const kept = {
       [RunAttribute.flow]: 'reply',
-      [RunAttribute.flowVia]: 'telegram',
+      [RunAttribute.flowVia]: 'mcp',
       [RunAttribute.flowStatus]: 'refused',
       [RunAttribute.actor]: 'persona',
       [RunAttribute.origin]: 'routine',

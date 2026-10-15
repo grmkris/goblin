@@ -7,7 +7,7 @@ Where planned features attach, plus the remaining cleanup. Each new feature need
 Confirmed reminders, cron and MCP Events now run in fresh Pi conversations, report passively to main and obey
 resident authority, current grants and confirmed scope. Settings provides exact revision review, caps and run
 history. [ADR 0012](adr/0012-routines.md) records native fixtures and the remaining deployed acceptance. Real
-producer Events, Railway provider accounting and Telegram completion need separate receipts; local fixtures do
+producer Events, Railway provider accounting and external message completion need separate receipts; local fixtures do
 not establish them.
 
 ## Connections, Tell me and Hand to acceptance
@@ -27,8 +27,6 @@ operation reconciliation require fresh owner connections and separate deployed a
 
 ## Smaller items
 
-- `app_metadata` is still created by the base migration, but nothing reads or writes it (its `AppMetadata` service,
-  used only by the integration test worker, is gone); drop it when the migrations are squashed.
 - A production stage is live at `https://goblin.surf`: its own D1, credential key, files bucket and capped model key; nothing is shared with dev. The first public release is invite-only and owner OTP/bootstrap remains an operator step.
 - Dev is live at `https://dev.goblin.surf`: its fresh auth D1 and PersonalAgent namespace were verified empty before
   bootstrap, the owner signed in with delivered OTP from `hello@goblin.surf` (SPF, DKIM and DMARC passed), and signup
@@ -40,3 +38,12 @@ operation reconciliation require fresh owner connections and separate deployed a
   Acceptance was recorded on 2026-10-06; the previous dev resources were retired afterwards. Suggested outbound MCP
   connections remain disconnected and ungranted, so live acceptance proves inbound MCP and models; outbound calls
   await fresh owner connections and grants.
+
+## Sources and notification live acceptance
+
+The legacy Telegram transport is removed (ADR 0069); Mygram uses the same owner-confirmed Source setup as any other
+server. Code/local fixture completion is separate from live acceptance. After resetting disposable dev, restore the
+model endpoint, reconnect MySI, confirm the Source and configure Notify me via. The owner session in
+[Development](development.md#deferred-mysi-and-mygram-live-acceptance) covers Telegram DM, group and photo replies,
+non-owner handling, replay, and exact echo suppression on the shared connection. Keep this gate open until those
+external receipts exist; preserve the reset/setup checklist rather than dev conversations or files.

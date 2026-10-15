@@ -14,7 +14,7 @@ import {
   type OrganizeReceipt,
   type WorkspaceSnapshot,
 } from '@goblin/contracts'
-import { channelChatsKey, usageQuery } from '../src/agent/queries.ts'
+import { usageQuery } from '../src/agent/queries.ts'
 import { agentAppQuery, agentAppsQuery } from '../src/agent-apps/queries.ts'
 import { conversationKeys } from '../src/conversations/queries.ts'
 import type { PiEventSource, ReconnectScheduler } from '../src/lib/conversation-stream.ts'
@@ -33,6 +33,7 @@ import { readNotificationsMutation } from '../src/notices/queries.ts'
 import { mcpKeys } from '../src/mcp/queries.ts'
 import { personaKeys } from '../src/personas/queries.ts'
 import { routinesQuery } from '../src/routines/queries.ts'
+import { sourceKeys } from '../src/sources/queries.ts'
 
 const view = (id: string, extra: Partial<ConversationView> = {}): ConversationView => ({
   id,
@@ -618,14 +619,12 @@ describe('what goes stale with a feed change', () => {
     expect(staleAfter(present(changed), same)).toEqual([])
   })
 
-  it('is a Telegram route or default that changed: the chats list; another receipt changes nothing read', () => {
-    const route: OrganizeReceipt = { ...receipt('r2', 2), kind: 'telegram.route', target: 'g_trip:0' }
+  it("is a Source's conversation route that changed: the Sources and their routes, again when it is undone", () => {
+    const route: OrganizeReceipt = { ...receipt('r5', 5), kind: 'source.route', target: 'src_0123456789abcdef:["c1"]' }
     const routed = applyChanges(before, [{ type: 'receipt', receipt: route }])
-    expect(staleAfter(present(before), routed)).toEqual([channelChatsKey])
-    const undone = applyChanges(routed, [{ type: 'receipt', receipt: { ...route, undoneAt: 3 } }])
-    expect(staleAfter(present(routed), undone)).toEqual([channelChatsKey])
-    const renamed = applyChanges(before, [{ type: 'receipt', receipt: receipt('r4', 4) }])
-    expect(staleAfter(present(before), renamed)).toEqual([])
+    expect(staleAfter(present(before), routed)).toEqual([sourceKeys.all])
+    const undone = applyChanges(routed, [{ type: 'receipt', receipt: { ...route, undoneAt: 6 } }])
+    expect(staleAfter(present(routed), undone)).toEqual([sourceKeys.all])
   })
 
   it('is read again through the cache when the feed sends it', () => {

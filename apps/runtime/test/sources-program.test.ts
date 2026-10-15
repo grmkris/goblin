@@ -1,20 +1,24 @@
 import { describe, expect, it } from '@effect/vitest'
 import * as Effect from 'effect/Effect'
+import * as Deferred from 'effect/Deferred'
+import * as Fiber from 'effect/Fiber'
 import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
-import { Channel } from '../src/channel/service.ts'
 import type { EventContext } from '../src/mcp/events/dispatcher.ts'
 import type { Consumer, Receipt, Subscription } from '../src/mcp/events/store.ts'
 import { Events, McpConnections, McpGrants, McpServers, Resident } from '../src/mcp/service.ts'
-import type { McpConnectionSnapshot } from '../src/mcp/types.ts'
+import type { McpConnectionSnapshot } from '../src/mcp/connections/types.ts'
 import { Personas } from '../src/personas/service.ts'
 import { Db } from '../src/runtime/db.ts'
 import { AgentInput } from '../src/runtime/input.ts'
 import {
   SOURCE_HANDLER,
   confirmSource,
+  changeSourceReplyResult,
   consumeSourceEvent,
   proposeSource,
+  pauseSource,
+  resumeSource,
   wakeSources,
 } from '../src/sources/program.ts'
 import { sourceRow } from '../src/sources/store.ts'
@@ -34,6 +38,11 @@ type Calls = {
   readonly settled: string[]
 }
 
+type EventWaits = {
+  readonly subscribe?: (revision: number) => Effect.Effect<void>
+  readonly unsubscribe?: (revision: number) => Effect.Effect<void>
+}
+
 /** The chat server's connection: `message.received`, its inbox and its send tool. */
 const SNAPSHOT: McpConnectionSnapshot = {
   config: { connectionId: 'chat', endpoint: 'https://chat.example/mcp' },
@@ -48,13 +57,13 @@ const SNAPSHOT: McpConnectionSnapshot = {
 }
 
 /** Events that record each grant, subscription and unsubscription, and answer each lease's status from `leases`. */
-const fakeEvents = (calls: Calls, leases: Map<string, Subscription['status']>) => {
+const fakeEvents = (calls: Calls, leases: Map<string, Subscription['status']>, waits: EventWaits) => {
   const consumers = new Map<string, Consumer>()
   return stub(Events, {
     catalog: () => Effect.succeed([MESSAGE_RECEIVED]),
     grant: (_id, name, args) => Effect.sync(() => void calls.grants.push(`${name}:${JSON.stringify(args)}`)),
     subscribe: (input) =>
-      Effect.sync(() => {
+      Effect.gen(function* () {
         calls.subscribed.push({ consumerId: input.consumerId, revision: input.revision, handlerKey: input.handlerKey })
         const subscriptionId = `sub-${String(input.revision)}`
         leases.set(subscriptionId, 'active')
@@ -62,11 +71,13 @@ const fakeEvents = (calls: Calls, leases: Map<string, Subscription['status']>) =
           input.consumerId,
           fake<Consumer>({ consumerId: input.consumerId, revision: input.revision, subscriptionId }),
         )
+        yield* waits.subscribe?.(input.revision) ?? Effect.void
         return { subscriptionId, status: 'active' }
       }),
     unsubscribe: ({ revision }) =>
-      Effect.sync(() => {
+      Effect.gen(function* () {
         calls.unsubscribed.push(revision)
+        yield* waits.unsubscribe?.(revision) ?? Effect.void
         return { retired: true, remoteCleanup: true }
       }),
     activeConsumer: (consumerId) => Effect.succeed(Option.fromUndefinedOr(consumers.get(consumerId))),
@@ -95,10 +106,9 @@ const fakeHost = (calls: Calls, versions: ReadonlyMap<string, string>) =>
   )
 
 /**
- * The world a Source is confirmed and kept bound in, over fakes of the MCP host and Events, with Topic 4 open and, when
- * `telegram` names it, the Telegram channel on that connection.
+ * The world a Source is confirmed and kept bound in, over fakes of the MCP host and Events, with Topic 4 open.
  */
-const programWorld = (options: { readonly telegram?: string } = {}) =>
+const programWorld = (waits: EventWaits = {}) =>
   Effect.gen(function* () {
     const world = yield* sourceWorld()
     const calls: Calls = { grants: [], tools: [], subscribed: [], unsubscribed: [], scheduled: [], settled: [] }
@@ -107,14 +117,12 @@ const programWorld = (options: { readonly telegram?: string } = {}) =>
       ['inbox_read', 'v1'],
     ])
     const leases = new Map<string, Subscription['status']>()
-    const channel = options.telegram === undefined ? null : { connectionId: options.telegram, enabledAt: 1 }
     const services = Layer.mergeAll(
       Layer.succeed(Db, world.db),
       stub(AgentInput, { scheduleSources: (seconds) => void calls.scheduled.push(seconds) }),
       stub(Resident, { require: () => Effect.void }),
-      stub(Channel, { status: Effect.succeed(channel === null ? null : { ...channel, transport: 'events' as const }) }),
       fakeHost(calls, versions),
-      fakeEvents(calls, leases),
+      fakeEvents(calls, leases, waits),
       stub(Topics, { get: () => Effect.succeed(fake<TopicView>({ id: 4, name: 'Travel', revision: 1 })) }),
       stub(Personas, { active: Effect.succeed([]) }),
     )
@@ -146,6 +154,56 @@ const PROPOSAL = {
 }
 
 describe('proposing and confirming a Source (ADR 0066)', () => {
+  it.effect('an older confirmation cannot activate edited rules or retire the newer confirmed binding', () =>
+    Effect.gen(function* () {
+      const entered = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      let subscriptions = 0
+      const { db, engine, ports, calls, run } = yield* programWorld({
+        subscribe: () =>
+          ++subscriptions === 1
+            ? Effect.andThen(Deferred.succeed(entered, undefined), Deferred.await(release))
+            : Effect.void,
+      })
+      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-confirm-race' }, { actor: 'owner' }))
+      const first = yield* Effect.forkChild(Effect.flip(run(confirmSource(engine, ports, proposed.id, 1))))
+      yield* Deferred.await(entered)
+      const result = { accepted: { pointer: '/ok', equals: true } }
+      yield* run(changeSourceReplyResult(proposed.id, { revision: 1, result }))
+      expect(sourceRow(db, proposed.id)).toMatchObject({ state: 'proposed', revision: 2, binding: null })
+      yield* run(confirmSource(engine, ports, proposed.id, 2))
+      const newer = sourceRow(db, proposed.id)?.binding
+      yield* Deferred.succeed(release, undefined)
+      expect(yield* Fiber.join(first)).toMatchObject({ _tag: 'Conflict', reason: 'stale' })
+      expect(sourceRow(db, proposed.id)).toMatchObject({ state: 'active', revision: 2, binding: newer })
+      expect(calls.subscribed).toHaveLength(2)
+      expect(calls.subscribed[0]?.revision).not.toBe(newer)
+      expect(calls.unsubscribed).toEqual([calls.subscribed[0]?.revision])
+      expect(calls.unsubscribed).not.toContain(newer)
+    }),
+  )
+
+  it.effect('editing reply rules retires the binding and requires confirmation of the new exact revision', () =>
+    Effect.gen(function* () {
+      const { db, engine, ports, calls, run } = yield* programWorld()
+      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-rules' }, { actor: 'owner' }))
+      yield* run(confirmSource(engine, ports, proposed.id, 1))
+      const binding = sourceRow(db, proposed.id)?.binding
+      const result = { accepted: { pointer: '/ok', equals: true } }
+      const changed = yield* run(changeSourceReplyResult(proposed.id, { revision: 1, result }))
+      expect(changed).toMatchObject({ revision: 2, state: 'proposed', setup: { reply: { result } } })
+      expect(sourceRow(db, proposed.id)).toMatchObject({ binding: null, confirmedAt: null })
+      expect(calls.unsubscribed).toEqual([binding])
+      expect(calls.subscribed).toHaveLength(1)
+      expect(yield* Effect.flip(run(confirmSource(engine, ports, proposed.id, 1)))).toMatchObject({ _tag: 'Conflict' })
+      expect(
+        yield* Effect.flip(run(changeSourceReplyResult(proposed.id, { revision: 1, result: null }))),
+      ).toMatchObject({ _tag: 'Conflict' })
+      const cleared = yield* run(changeSourceReplyResult(proposed.id, { revision: 2, result: null }))
+      expect(cleared.setup.reply?.result).toBeUndefined()
+      expect(cleared.revision).toBe(3)
+    }),
+  )
   it.effect("refuses a proposal whose pointer the server's schema does not have", () =>
     Effect.gen(function* () {
       const { run } = yield* programWorld()
@@ -184,21 +242,60 @@ describe('proposing and confirming a Source (ADR 0066)', () => {
       expect(calls.settled).toEqual(['chat:done'])
     }),
   )
-
-  it.effect('refuses to confirm on the connection that carries the Telegram channel', () =>
-    Effect.gen(function* () {
-      const { engine, ports, calls, run } = yield* programWorld({ telegram: 'chat' })
-      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-1' }, { actor: 'owner' }))
-      expect(yield* Effect.flip(run(confirmSource(engine, ports, proposed.id, 1)))).toMatchObject({
-        _tag: 'InvalidInput',
-        reason: 'telegram_on',
-      })
-      expect(calls.subscribed).toEqual([])
-    }),
-  )
 })
 
 describe('keeping a Source bound (ADR 0066)', () => {
+  it.effect('a delayed unbind cannot clear the binding made by a newer resume', () =>
+    Effect.gen(function* () {
+      const entered = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      let cleanups = 0
+      const { db, engine, ports, calls, run } = yield* programWorld({
+        unsubscribe: () =>
+          ++cleanups === 1
+            ? Effect.andThen(Deferred.succeed(entered, undefined), Deferred.await(release))
+            : Effect.void,
+      })
+      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-unbind-race' }, { actor: 'owner' }))
+      yield* run(confirmSource(engine, ports, proposed.id, 1))
+      const original = sourceRow(db, proposed.id)?.binding
+      const pausing = yield* Effect.forkChild(run(pauseSource(proposed.id)))
+      yield* Deferred.await(entered)
+      yield* run(resumeSource(engine, ports, proposed.id))
+      const newer = sourceRow(db, proposed.id)?.binding
+      expect(newer).not.toBe(original)
+      yield* Deferred.succeed(release, undefined)
+      yield* Fiber.join(pausing)
+      expect(sourceRow(db, proposed.id)).toMatchObject({ state: 'active', binding: newer })
+      expect(calls.unsubscribed).not.toContain(newer)
+    }),
+  )
+
+  it.effect('an alarm subscription cannot overwrite a Source revision edited while it waits', () =>
+    Effect.gen(function* () {
+      const entered = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      let subscriptions = 0
+      const { db, engine, ports, calls, leases, run } = yield* programWorld({
+        subscribe: () =>
+          ++subscriptions === 2
+            ? Effect.andThen(Deferred.succeed(entered, undefined), Deferred.await(release))
+            : Effect.void,
+      })
+      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-alarm-race' }, { actor: 'owner' }))
+      yield* run(confirmSource(engine, ports, proposed.id, 1))
+      const original = sourceRow(db, proposed.id)?.binding
+      leases.set(`sub-${String(original)}`, 'terminated')
+      const waking = yield* Effect.forkChild(run(wakeSources(engine, ports, () => Effect.void)))
+      yield* Deferred.await(entered)
+      yield* run(changeSourceReplyResult(proposed.id, { revision: 1, result: null }))
+      yield* Deferred.succeed(release, undefined)
+      yield* Fiber.join(waking)
+      expect(sourceRow(db, proposed.id)).toMatchObject({ state: 'proposed', revision: 2, binding: null })
+      expect(calls.unsubscribed).toContain(calls.subscribed[1]?.revision)
+    }),
+  )
+
   it.effect('takes an owner message from an event, and subscribes again when the server ends the subscription', () =>
     Effect.gen(function* () {
       const { db, engine, ports, seen, calls, leases, run } = yield* programWorld()

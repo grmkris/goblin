@@ -38,8 +38,7 @@ A program calls neither, and never `Effect.run*`: it composes. `boundaries/no-cl
 
 - **`KeyedLock`** (`observability/lock.ts`) admits one holder per key, first come first served: a chat's lock, a
   thread operation (`thread-op:<op>`), the app lock. It is held for admission only, never across a network or model
-  wait. Effect's `Semaphore` is not FIFO; use it only where order does not matter (the Telegram pull's
-  `Semaphore(1)`).
+  wait. Effect's `Semaphore` is not FIFO; use it only where order does not matter.
 - **`SingleFlight`** (`observability/single-flight.ts`) runs one keyed piece of work at a time across waits: a token
   refresh, a connect, a move's remaining steps, a title being named. `run(key, effect)` joins the run in flight or starts
   it in the layer's scope, so interrupting the first caller does not cancel it; `skip(key, effect)` answers at once when

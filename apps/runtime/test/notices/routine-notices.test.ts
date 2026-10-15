@@ -2,16 +2,17 @@ import { PERSONAL_TOPIC, type RoutineDefinition } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Channel } from '../../src/channel/service.ts'
 import { type NoticePost, Conversations } from '../../src/chats/service.ts'
 import { noticesOf, routinesOf } from '../../src/layers/routines.ts'
 import { McpServers } from '../../src/mcp/service.ts'
+import { Db } from '../../src/runtime/db.ts'
 import { Notices } from '../../src/notices/service.ts'
 import { Changes, makeChanges } from '../../src/runtime/changes.ts'
 import { NoticeStore } from '../../src/notices/store.ts'
 import { notifyReport, postEventNotice, postReminder } from '../../src/routines/notices.ts'
 import { Routines } from '../../src/routines/service.ts'
 import { RoutineStore } from '../../src/routines/store.ts'
+import { appNotifySink } from '../../src/storage/sources.ts'
 import { chatDatabase, durable } from '../chats-sqlite.ts'
 import { stub } from '../http/api/fixture.ts'
 
@@ -24,18 +25,29 @@ const EVENT: RoutineDefinition = {
   title: 'Picked',
   trigger: { kind: 'event', connectionId: 'sidequest', name: 'sidequest.inbox', arguments: {} },
   timezone: 'UTC',
-  tellMe: { on: true, telegram: true },
+  tellMe: { on: true, copy: true },
   handTo: { kind: 'none' },
 }
 
 /**
- * The notice programs over real notices and routines on SQLite, a home chat `5`, a labelled connection, and Telegram on
- * `telegram` when given.
+ * The notice programs over real notices and routines on SQLite, a home chat `5`, a labelled connection, and Notify me
+ * via on connection `sink` when given.
  */
-const world = (telegram?: string) => {
+const world = (sink?: string) => {
   const database = chatDatabase()
   open.push(database)
   const db = durable(database.db)
+  if (sink !== undefined)
+    db.insert(appNotifySink)
+      .values({
+        id: 1,
+        connectionId: sink,
+        tool: 'message_send',
+        arguments: '{"text":"{{text}}"}',
+        policy: JSON.stringify({ echo: { event: 'sidequest.inbox', arguments: {} } }),
+        updatedAt: 1,
+      })
+      .run()
   const notices = new NoticeStore(db)
   const routines = new RoutineStore(db, 'owner')
   const posted: NoticePost[] = []
@@ -48,9 +60,7 @@ const world = (telegram?: string) => {
       postNotice: (notice) => Effect.sync(() => void posted.push(notice)),
     }),
     stub(McpServers, { labels: () => Effect.succeed(new Map([['sidequest', 'Sidequest · Worker']])) }),
-    stub(Channel, {
-      status: Effect.succeed(telegram === undefined ? null : { connectionId: telegram, enabledAt: 1 }),
-    }),
+    Layer.succeed(Db, db),
   )
   const row = routines.propose(EVENT, 'op-1', 'rt_1', 1000, PERSONAL_TOPIC).routine
   const stored = routines.get(row.id)
@@ -58,14 +68,14 @@ const world = (telegram?: string) => {
     notices,
     posted,
     stored,
-    run: <A, E>(program: Effect.Effect<A, E, Notices | Routines | Conversations | McpServers | Channel | Changes>) =>
+    run: <A, E>(program: Effect.Effect<A, E, Notices | Routines | Conversations | McpServers | Db | Changes>) =>
       Effect.runPromise(Effect.provide(program, layer)),
   }
 }
 
 describe("a routine's notices (ADR 0041)", () => {
   it("posts an event's notice once, attributed to the connection and framed for the model", async () => {
-    const { run, posted, notices, stored } = world()
+    const { run, posted, notices, stored } = world('chat')
     const event = { eventId: 'evt-1', name: 'sidequest.inbox', data: { title: 'You were picked' }, occurredAt: 2000 }
     await run(postEventNotice(stored, EVENT, event))
     await run(postEventNotice(stored, EVENT, event))
@@ -80,7 +90,11 @@ describe("a routine's notices (ADR 0041)", () => {
       },
     })
     expect(posted[0]?.text).toContain('untrusted data')
-    expect(notices.get('notice:rt_1:evt-1')).toMatchObject({ telegramState: 'pending', writtenAt: expect.any(Number) })
+    expect(notices.get('notice:rt_1:evt-1')).toMatchObject({
+      copyState: 'pending',
+      copyText: 'Sidequest · Worker: You were picked',
+      writtenAt: expect.any(Number),
+    })
   })
 
   it("posts a schedule's reminder from the routine, and points an answer's notification at its report", async () => {
@@ -104,19 +118,18 @@ describe("a routine's notices (ADR 0041)", () => {
       writtenAt: expect.any(Number),
     })
     await run(
-      notifyReport(
-        stored,
-        { ...handing, tellMe: { on: false, telegram: false } },
-        { runId: 'rr_2', text: 'x', at: 5000 },
-      ),
+      notifyReport(stored, { ...handing, tellMe: { on: false, copy: false } }, { runId: 'rr_2', text: 'x', at: 5000 }),
     )
     expect(notices.get('notice-report:rr_2')).toBeUndefined()
   })
 
-  it("never sends the Telegram connection's own events back to Telegram", async () => {
-    const { run, notices, stored } = world('sidequest')
+  it("never sends the sink's own connection's events back to it, and copies nothing without a sink", async () => {
+    const echoing = world('sidequest')
     const event = { eventId: 'evt-9', name: 'sidequest.inbox', data: { title: 'Echo' }, occurredAt: 2000 }
-    await run(postEventNotice(stored, EVENT, event))
-    expect(notices.get('notice:rt_1:evt-9')?.telegramState).toBe('none')
+    await echoing.run(postEventNotice(echoing.stored, EVENT, event))
+    expect(echoing.notices.get('notice:rt_1:evt-9')).toMatchObject({ copyState: 'none', copyText: null })
+    const unset = world()
+    await unset.run(postEventNotice(unset.stored, EVENT, event))
+    expect(unset.notices.get('notice:rt_1:evt-9')).toMatchObject({ copyState: 'none', writtenAt: expect.any(Number) })
   })
 })

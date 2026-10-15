@@ -8,7 +8,7 @@ number of threads. `app_topics` holds them (`storage/topics.ts`); Personal is To
 1) puts every chat in one. `role` is `primary` for Personal's Conversation, `conversation` for another Topic's; both
 keep `kind = 'main'`. `Chats` answers `isConversation`, `topicOf`, `conversationOf(topic)` and
 `conversationAbove(chat)` (functions of the database in `chats/directory.ts`); `primary` stays Personal's
-Conversation, where Telegram and inbound MCP clients land.
+Conversation, where inbound MCP clients land; Sources use the route the owner confirmed.
 
 Each Topic has a **setup** ([ADR 0040](../adr/0040-topic-and-persona-setup.md)): its MCP servers, skills and agent apps,
 each `all` or a list, and whether its chats may start subagents (`TopicSetup`, `packages/contracts/src/setup.ts`).

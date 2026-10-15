@@ -1,68 +1,160 @@
-import { describe, expect, it } from 'vitest'
+import { is } from 'drizzle-orm'
+import { SQLiteColumn } from 'drizzle-orm/sqlite-core'
+import { afterEach, describe, expect, it } from 'vitest'
 import { MIGRATIONS } from '../src/storage/migrations.ts'
+import { assertApplicationTable } from '../src/storage/vendor.ts'
+import { chatDatabase } from './chats-sqlite.ts'
+import { declaredTables } from './migration-schema.ts'
 
-/**
- * Every key a deployed agent may have applied, in order. Drizzle records applied migrations by key, so a key that
- * changed or moved would run again or never. Until launch goblin is greenfield (ADR 0041): a migration may be edited in
- * place or removed, and the release that does it resets dev first; keep this list equal to the migrations.
- */
-const APPLIED = [
-  '20261004000000_initial',
-  '20261005000000_resident_mcp_host',
-  '20261006000000_model_budget',
-  '20261007000000_model_choice',
-  '20261008000000_mcp_endpoints',
-  '20261009000000_mcp_added_servers',
-  '20261010000000_mcp_registries',
-  '20261011000000_conversations',
-  '20261012000000_memory',
-  '20261013000000_skills',
-  '20261014000000_skill_drafts',
-  '20261015000000_channel',
-  '20261016000000_thread_notes',
-  '20261016000100_conversation_capabilities',
-  '20261016000200_mcp_events',
-  '20261016000210_routines',
-  '20261016000211_routine_usage_projection',
-  '20261016000212_routine_event_spacing',
-  '20261017000000_conversation_tree',
-  '20261017000001_members_phase_b',
-  '20261017000100_conversation_read_mark',
-  '20261017000234_members_readers',
-  '20261017000300_apps',
-  '20261018000000_agent_apps',
-  '20261018000100_app_registry',
-  '20261018000200_agent_app_views',
-  '20261018000300_agent_app_powers',
-  '20261018000400_agent_app_jobs',
-  '20261019000000_run_events',
-  '20261020000000_operator_reads',
-  '20261021000000_home',
-  '20261022000100_usage_credits',
-  '20261023000000_mcp_ask_first',
-  '20261024000000_helper_app_exclusions',
-  '20261025000000_logical_chats',
-  '20261026000000_topics',
-  '20261026000100_chat_memory',
-  '20261026000150_organize_receipts',
-  '20261026000200_personas',
-  '20261026000300_transcript_index',
-  '20261026000350_thread_heads',
-  '20261026000400_chat_moves',
-  '20261026000500_routine_topics',
-  '20261026000600_decisions',
+const databases: ReturnType<typeof chatDatabase>[] = []
+afterEach(() => {
+  for (const database of databases.splice(0)) database.close()
+})
+const database = () => {
+  const value = chatDatabase()
+  databases.push(value)
+  return value.sqlite
+}
+
+const indexSnapshot = (sqlite: ReturnType<typeof database>, name: string) =>
+  sqlite
+    .prepare(`PRAGMA index_list("${name}")`)
+    .all()
+    .map((row) => ({
+      columns: sqlite
+        .prepare(`PRAGMA index_info("${String(row['name'])}")`)
+        .all()
+        .map((column) => column['name']),
+      unique: Boolean(row['unique']),
+      partial: Boolean(row['partial']),
+    }))
+
+// SQLite creates these for the one application-owned virtual table; Drizzle has no FTS5 declaration.
+const FTS = [
+  'app_transcript_fts',
+  'app_transcript_fts_config',
+  'app_transcript_fts_data',
+  'app_transcript_fts_docsize',
+  'app_transcript_fts_idx',
 ]
 
-/** The migration keys in the order they apply. */
-const keys = MIGRATIONS.map((migration) => migration.key)
-
-describe('application migrations (unit)', () => {
-  it('keeps every applied key, in order, ahead of any new one', () => {
-    expect(keys.slice(0, APPLIED.length)).toEqual(APPLIED)
+describe('fresh application baseline', () => {
+  it('creates exactly the live application tables and declares its complete ownership', async () => {
+    const sqlite = database()
+    const tables = await declaredTables()
+    const names = sqlite
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name GLOB 'app_*' ORDER BY name")
+      .all()
+      .map(({ name }) => name)
+    expect(names).toEqual([...tables.keys(), ...FTS].toSorted())
+    expect(MIGRATIONS.map(({ key }) => key)).toEqual(['20261015000000_baseline'])
+    expect(MIGRATIONS[0].tables.toSorted()).toEqual([...tables.keys(), 'app_transcript_fts'].toSorted())
+    for (const name of MIGRATIONS[0].tables) expect(() => assertApplicationTable(name)).not.toThrow()
   })
 
-  it('applies in key order with no key twice', () => {
-    expect(keys).toEqual(keys.toSorted())
-    expect(new Set(keys).size).toBe(keys.length)
+  it('matches every live column, SQL type, nullability and default', async () => {
+    const sqlite = database()
+    for (const [name, table] of await declaredTables()) {
+      const actual = sqlite
+        .prepare(`PRAGMA table_info("${name}")`)
+        .all()
+        .map((column) => ({
+          name: column['name'],
+          type: String(column['type']).toLowerCase(),
+          notNull: Boolean(column['notnull'] || column['pk']),
+          default: column['dflt_value'],
+        }))
+        .toSorted((a, b) => String(a.name).localeCompare(String(b.name)))
+      const expected = table.columns
+        .map((column) => ({
+          name: column.name,
+          type: column.getSQLType(),
+          notNull: column.notNull || column.primary,
+          default:
+            column.default === undefined
+              ? null
+              : typeof column.default === 'string'
+                ? `'${column.default.replaceAll("'", "''")}'`
+                : String(Number(column.default)),
+        }))
+        .toSorted((a, b) => a.name.localeCompare(b.name))
+      expect(actual, name).toEqual(expected)
+    }
+  })
+
+  it('preserves declared primary keys and indexes, including uniqueness', async () => {
+    const sqlite = database()
+    for (const [name, table] of await declaredTables()) {
+      const primary = sqlite
+        .prepare(`PRAGMA table_info("${name}")`)
+        .all()
+        .filter((column) => Number(column['pk']) > 0)
+        .toSorted((a, b) => Number(a['pk']) - Number(b['pk']))
+        .map((column) => column['name'])
+      const declaredPrimary = table.primaryKeys.flatMap((key) => key.columns.map((column) => column.name))
+      expect(primary, name).toEqual(
+        declaredPrimary.length > 0
+          ? declaredPrimary
+          : table.columns.filter((column) => column.primary).map((column) => column.name),
+      )
+      const indexes = indexSnapshot(sqlite, name)
+      const declared = table.indexes.map(({ config }) => ({
+        columns: config.columns.map((column) => {
+          expect(is(column, SQLiteColumn), `${name} index expression needs explicit verification`).toBe(true)
+          return is(column, SQLiteColumn) ? column.name : undefined
+        }),
+        unique: config.unique,
+        partial: config.where !== undefined,
+      }))
+      for (const column of table.columns.filter((each) => each.isUnique))
+        declared.push({ columns: [column.name], unique: true, partial: false })
+      for (const index of declared) expect(indexes, name).toContainEqual(index)
+    }
+  })
+
+  it('keeps seeded defaults and partial uniqueness constraints', () => {
+    const sqlite = database()
+    expect(sqlite.prepare('SELECT id, name, chat_id, setup FROM app_topics').get()).toEqual({
+      id: 1,
+      name: 'Personal',
+      chat_id: '1',
+      setup: '{"mcpServers":"all","skills":"all","apps":"all","subagents":true}',
+    })
+    expect(sqlite.prepare('SELECT * FROM app_routine_settings').get()).toEqual({
+      id: 1,
+      timezone: 'UTC',
+      max_active: 20,
+      max_running: 2,
+    })
+    const topic = sqlite.prepare(
+      "INSERT INTO app_topics (id, name, chat_id, created_by, created_at, updated_at) VALUES (?, ?, ?, 'owner', 1, 1)",
+    )
+    topic.run(2, 'Trips', '2')
+    expect(() => topic.run(3, 'TRIPS', '3')).toThrow()
+    sqlite.exec('UPDATE app_topics SET archived_at = 1 WHERE id = 2')
+    expect(() => topic.run(3, 'TRIPS', '3')).not.toThrow()
+    const move = sqlite.prepare(
+      "INSERT INTO app_chat_moves (operation_id, chat_id, message_entry, state, created_at, updated_at) VALUES (?, '1', 1, ?, 1, 1)",
+    )
+    move.run('first', 'requested')
+    expect(() => move.run('second', 'forked')).toThrow()
+    sqlite.exec("UPDATE app_chat_moves SET state = 'settled' WHERE operation_id = 'first'")
+    expect(() => move.run('second', 'forked')).not.toThrow()
+    expect(() => move.run('retired', 'swapped')).toThrow()
+  })
+
+  it('maintains FTS5 on insert, update and delete', () => {
+    const sqlite = database()
+    const matches = (query: string) =>
+      sqlite.prepare('SELECT rowid FROM app_transcript_fts WHERE app_transcript_fts MATCH ?').all(query)
+    sqlite.exec(
+      "INSERT INTO app_transcript_excerpts (entry_id, session_id, chat_id, role, at, text) VALUES (1, 'pi-session', '1', 'user', 1, 'orchard')",
+    )
+    expect(matches('orchard')).toEqual([{ rowid: 1 }])
+    sqlite.exec("UPDATE app_transcript_excerpts SET text = 'harbor' WHERE entry_id = 1")
+    expect(matches('orchard')).toEqual([])
+    expect(matches('harbor')).toEqual([{ rowid: 1 }])
+    sqlite.exec('DELETE FROM app_transcript_excerpts WHERE entry_id = 1')
+    expect(matches('harbor')).toEqual([])
   })
 })

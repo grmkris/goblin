@@ -150,7 +150,7 @@ separate "send to" model beside routines (routines stay the one engine).
 
 ## Amended 2026-10-13: Telegram routes are not routines
 
-[ADR 0055](0055-telegram-chats-route-to-topics.md) routes each Telegram chat to a Topic. A route is not a routine: it
+[ADR 0055](archive/0055-telegram-chats-route-to-topics.md) routes each Telegram chat to a Topic. A route is not a routine: it
 hands no work over and has no instruction, budget or Tell me. It is a conversation that answers back in place: the
 owner's message is a turn in the Topic, answered by goblin or a Persona, and the answer goes back to the same chat and
 topic. The channel's Events (`message.received`, `question.answered`, `chat.changed`) say "Already arrives through

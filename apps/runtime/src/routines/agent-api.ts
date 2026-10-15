@@ -3,16 +3,12 @@ import * as Effect from 'effect/Effect'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { chooseOwnerModel } from '../agent-model.ts'
 import { Budget } from '../budget.ts'
-import { disableTelegram, enableTelegram } from '../channel/program.ts'
-import { Channel } from '../channel/service.ts'
-import { channelChats, channelSettings, routeChannel } from '../channel/routing.ts'
 import { Models } from '../models.ts'
 import { Inference } from '../inference/service.ts'
-import { AgentInput } from '../runtime/input.ts'
 import { epochSeconds } from '../clock.ts'
 
 /**
- * The `agent` group: today's usage, the model and its endpoint, and the Telegram channel. Each handler runs its
+ * The `agent` group: today's usage, the model and its endpoint. Each handler runs its
  * program; owner admission has already admitted the request.
  */
 export const AgentHandlers = HttpApiBuilder.group(OwnerApi, 'agent', (handlers) =>
@@ -24,13 +20,5 @@ export const AgentHandlers = HttpApiBuilder.group(OwnerApi, 'agent', (handlers) 
     .handle('setModelEndpoint', ({ payload }) =>
       Effect.flatMap(epochSeconds, (now) => Inference.use((inference) => inference.setOwner(payload, now))),
     )
-    .handle('clearModelEndpoint', () => Inference.use((inference) => inference.clearOwner))
-    .handle('channel', () => Channel.use((channel) => channel.status))
-    .handle('enableChannel', ({ payload }) =>
-      AgentInput.use(({ schedulePull }) => enableTelegram(payload.connectionId, schedulePull)),
-    )
-    .handle('disableChannel', () => disableTelegram)
-    .handle('channelChats', () => channelChats)
-    .handle('routeChannel', ({ payload }) => routeChannel(payload))
-    .handle('channelSettings', ({ payload }) => channelSettings(payload.newChats)),
+    .handle('clearModelEndpoint', () => Inference.use((inference) => inference.clearOwner)),
 )

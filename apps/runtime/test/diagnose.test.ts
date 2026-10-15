@@ -37,7 +37,7 @@ const turn: RunEvent = {
   operationId: 'op-1',
   startedAt: at,
   endedAt: at + 500,
-  attributes: { [RunAttribute.source]: 'telegram', [RunAttribute.reason]: 'faulted' },
+  attributes: { [RunAttribute.source]: 'source', [RunAttribute.reason]: 'faulted' },
 }
 const call: RunEvent = {
   id: 'tool:t1',
@@ -71,11 +71,9 @@ describe('diagnose (unit, ADR 0024)', () => {
       problems: [
         { kind: 'error', status: 'error', [RunAttribute.taskKind]: 'subagent.relay' },
         { kind: 'tool.call', status: 'blocked', ms: 100, [RunAttribute.errorType]: 'GrantDenied' },
-        { kind: 'turn.submitted', status: 'error', ms: 500, [RunAttribute.source]: 'telegram' },
+        { kind: 'turn.submitted', status: 'error', ms: 500, [RunAttribute.source]: 'source' },
       ],
-      turns: [
-        { operationId: 'op-1', status: 'error', source: 'telegram', toolCalls: 1, failedToolCalls: 1, errors: 1 },
-      ],
+      turns: [{ operationId: 'op-1', status: 'error', source: 'source', toolCalls: 1, failedToolCalls: 1, errors: 1 }],
     })
   })
 

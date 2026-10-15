@@ -24,6 +24,7 @@ export const appSourceSetups = sqliteTable('app_source_setups', {
   endpoint: text('endpoint'),
   grantVersion: text('grant_version'),
   binding: integer('binding'),
+  lastBinding: integer('last_binding').notNull().default(0),
   cursor: text('cursor'),
   pullDue: integer('pull_due', { mode: 'boolean' }).notNull().default(false),
   resubscribeDue: integer('resubscribe_due', { mode: 'boolean' }).notNull().default(false),
@@ -34,7 +35,7 @@ export const appSourceSetups = sqliteTable('app_source_setups', {
 
 /**
  * Where each conversation of a Source goes (ADR 0066), by its key (`key`, the JSON of its values in the setup's order;
- * `key_values` names them). `route` is `topic` or `persona` (turns in `topic_id`, answered by goblin or `persona_id`),
+ * `key_values` names them) and its `title` (the server's name for it, the newest a message carried). `route` is `topic` or `persona` (turns in `topic_id`, answered by goblin or `persona_id`),
  * `listen` (notes in `topic_id`), `ignore` or `held`. `held_dropped` counts the held messages dropped past the twenty
  * kept; `revision` counts route changes, so Undo can tell whether anything touched it.
  */
@@ -44,6 +45,7 @@ export const appSourceRoutes = sqliteTable(
     sourceId: text('source_id').notNull(),
     key: text('key').notNull(),
     keyValues: text('key_values').notNull(),
+    title: text('title'),
     route: text('route', { enum: ['topic', 'persona', 'listen', 'ignore', 'held'] }).notNull(),
     topicId: integer('topic_id'),
     personaId: integer('persona_id'),
@@ -58,7 +60,8 @@ export const appSourceRoutes = sqliteTable(
 
 /**
  * The owner's messages a conversation holds while it waits for a route (ADR 0066), at most twenty a conversation,
- * delivered in order once it has one: the message's id, its conversation and its words.
+ * delivered in order once it has one: the message's id, its conversation, its words, and the files goblin kept of its
+ * attachments (`files`, JSON: their references and notes; ADR 0065).
  */
 export const appSourceHeld = sqliteTable(
   'app_source_held',
@@ -67,6 +70,7 @@ export const appSourceHeld = sqliteTable(
     itemId: text('item_id').notNull(),
     key: text('key').notNull(),
     text: text('text').notNull(),
+    files: text('files'),
     heldAt: integer('held_at').notNull(),
   },
   (table) => [
@@ -77,24 +81,30 @@ export const appSourceHeld = sqliteTable(
 
 /**
  * The answers a Source owes (ADR 0066): the turn's operation, its conversation, the goblin chat it ran in and the
- * Persona that answers it. A failed send is tried again at `next_at`, `attempts` counting; it is `sent`, or `given_up`
- * after five failures or a day with no answer.
+ * Persona that answers it. Frozen calls acknowledge each piece; only explicit retryable results get another attempt.
+ * Terminal rows remain due until their idempotent report and owner notice are recorded.
  */
 export const appSourceReplies = sqliteTable(
   'app_source_replies',
   {
     operationId: text('operation_id').primaryKey().notNull(),
     sourceId: text('source_id').notNull(),
+    sourceRevision: integer('source_revision').notNull(),
+    sourceBinding: integer('source_binding'),
     key: text('key').notNull(),
     chatId: text('chat_id'),
     personaId: integer('persona_id'),
+    plan: text('plan'),
+    nextPiece: integer('next_piece').notNull().default(0),
+    dispatching: integer('dispatching', { mode: 'boolean' }).notNull().default(false),
+    reported: integer('reported', { mode: 'boolean' }).notNull().default(false),
     attempts: integer('attempts').notNull().default(0),
     nextAt: integer('next_at').notNull().default(0),
-    outcome: text('outcome', { enum: ['sent', 'given_up'] }),
+    outcome: text('outcome', { enum: ['accepted', 'rejected', 'unknown', 'given_up'] }),
     createdAt: integer('created_at').notNull(),
     settledAt: integer('settled_at'),
   },
-  (table) => [index('app_source_replies_due').on(table.outcome, table.nextAt)],
+  (table) => [index('app_source_replies_due').on(table.reported, table.nextAt)],
 )
 
 /**
@@ -107,5 +117,7 @@ export const appNotifySink = sqliteTable('app_notify_sink', {
   connectionId: text('connection_id').notNull(),
   tool: text('tool').notNull(),
   arguments: text('arguments').notNull(),
+  policy: text('policy').notNull().default('{}'),
+  revision: text('revision').notNull().default(''),
   updatedAt: integer('updated_at').notNull(),
 })

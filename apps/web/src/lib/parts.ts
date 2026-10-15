@@ -5,7 +5,6 @@ import {
   type NoticeData,
   type PersonaAnswerData,
   type PersonaTag,
-  TELEGRAM_AUTHOR,
   type TopicSeedData,
 } from '@goblin/contracts'
 import type { SharedContext } from './app-context.ts'
@@ -77,6 +76,8 @@ export type Part =
       readonly author?: string
       /** How a held call ended, when this is its outcome: one quiet row, not a message (`outcome-row.tsx`). */
       readonly outcome?: McpOutcome
+      /** The owner's own turn that came from elsewhere (a Source's message, ADR 0066), by goblin's mark. */
+      readonly own?: true
       /**
        * The outcome waits for the agent's next turn: it was kept because nothing could pay for one, and nothing came
        * after it yet (`conversation-parts.ts`).
@@ -161,13 +162,23 @@ const DRAWN = new Set<Part['kind']>([
 ])
 
 /**
- * A turn the owner took: words typed in this app or sent from Telegram. Messages from an MCP client, a subagent's
- * report, a routine's note and a thread's share-back carry another author and are not turns. In a subagent's or a
- * routine's own conversation the message that starts each run has no author, so it is that conversation's turn.
+ * A turn the owner took: words typed in this app, or that came through a Source and goblin marked
+ * as theirs (`own`). Messages from an MCP client, a subagent's report, a routine's note and a thread's share-back carry
+ * another author and are not turns. In a subagent's or a routine's own conversation the message that starts each run
+ * has no author, so it is that conversation's turn.
  */
 export function isOwnTurn(part: Part): part is Extract<Part, { readonly kind: 'user' | 'persona-ask' }> {
   if (part.kind === 'persona-ask') return true
-  return part.kind === 'user' && (part.author === undefined || part.author === TELEGRAM_AUTHOR)
+  return part.kind === 'user' && (part.author === undefined || part.own === true)
+}
+
+/**
+ * Where the owner's turn came from, for the turn map: the connection a Source's message came through (its
+ * author's first part, `<label> · <conversation>`); none for one typed here.
+ */
+export function turnVia(part: Part): string | undefined {
+  if (part.kind !== 'user' || part.author === undefined) return undefined
+  return part.own === true ? part.author.split(' · ')[0] : undefined
 }
 
 /**
@@ -208,6 +219,7 @@ const sameUser = (a: UserPart, b: UserPart) =>
   a.selections === b.selections &&
   a.author === b.author &&
   a.outcome === b.outcome &&
+  a.own === b.own &&
   a.kept === b.kept &&
   a.thread === b.thread &&
   a.at === b.at

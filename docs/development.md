@@ -16,7 +16,7 @@ Standard Webhooks headers. Run the fixture from `apps/runtime`:
 heavy bun run test:integration -t Events
 ```
 
-It covers signed Telegram delivery into main, replay, signature/timestamp rejection, gaps, early refresh, shared
+It covers signed Events delivery to registered consumers, replay, signature/timestamp rejection, gaps, early refresh, shared
 consumer cleanup, durable skill invalidation, retained skill versions, failed-handler reconstruction and pending-receipt
 retention. Unit tests independently verify HMAC bytes. A live mygram round-trip is a separate
 deployed acceptance gate. The fixture's throwaway conformance vector is handed to the producer orchestrator; never use
@@ -86,7 +86,7 @@ composition:
 GOBLIN_HARNESS_PORT=19101 heavy bun run --cwd apps/runtime test:integration:permuted
 ```
 
-The profile runs the owner, helper, routine, Telegram, memory and related native cases; owner and inbound proofs check
+The profile runs the owner, helper, routine, Sources, memory and related native cases; owner and inbound proofs check
 the non-root session and an empty root transcript. The root `heavy bun run check` includes that profile. These are unit
 and local workerd results only; they do not establish deployed-stage, live-provider, Telegram-service or remote
 eviction acceptance.
@@ -129,9 +129,53 @@ bun run smoke:dev                         # acceptance; see scripts/README.md
 ```
 
 Changing `GOBLIN_CREDENTIAL_KEY` makes stored MCP credentials and Events secrets unreadable and changes the hook
-tokens; reconnect the servers and re-enable Telegram afterwards.
+tokens; reconnect the servers, confirm Sources and configure Notify me via afterwards.
 Changing a server's `endpoint` drops what was stored for it (credentials, grants, pending sign-ins) at each
 agent's next start; connect it again. Tokens are never carried from one host to another.
+
+## Reset dev
+
+Dev contains disposable test data. A reset erases its accounts, sessions, conversations, files, routines, grants and
+connection credentials. Preserve the setup checklist below and any separately requested exports before starting.
+The production stage is independent; the hackathon freeze keeps it at `hackathon-2026-10` until the owner lifts it.
+
+Finish and commit the entire reset release first. Install the root and browser fixture dependencies exactly as CI does
+(`bun install --frozen-lockfile`, then the same command in `scripts/fixtures/mcp-app`), and run `heavy bun run check`
+on that commit. Use a clean checkout for the release; preserve other agents' working files in their own checkout.
+Keep Alchemy pinned to the version shared with myapps. A reset changes only `goblin/dev`; never use Alchemy's
+`syncState` on the account's shared state store.
+
+1. Record the release SHA, the current dev Worker version and a checklist of the connections, Sources, notice sink,
+   model choice and routines to recreate. Keep account details and tokens in private notes or mode-600 files. Notify
+   the owners of test routines affected by the reset through the agreed coordination channel.
+2. Pause automatic delivery with `gh workflow disable ci.yml --repo grmkris/goblin`. Inspect the workflow runs and
+   wait for any active Deploy dev job to finish; disabling the workflow does not stop one already running. Ensure
+   no other operator is deploying or destroying the stage. Keep the reset commit local until recreation succeeds.
+3. Check the stage's mode-600 `.local/dev.env`, `.local/cloud.env` and state-store credentials without printing them.
+   Keep signup invite-only or closed, with a working path for the operator to create the replacement smoke account.
+   Run `bun run plan:dev` and verify the target is the dev stack.
+4. From the checked commit, run `GOBLIN_BREAK_GLASS=1 bun run destroy:dev -- --confirm-reset`, then
+   `GOBLIN_BREAK_GLASS=1 bun run deploy:dev`. Both commands must succeed. If recreation fails, keep CI paused and
+   investigate the failed resource before retrying; do not copy or delete unrelated stacks' state.
+5. Check `/health` and the served build SHA. Create the operator account through the real sign-up and one-time-code
+   flow, then save its session as `.local/dev-session.json` with mode 600. The old session is invalid. Set
+   `GOBLIN_OWNER_EMAIL` and `GOBLIN_SMOKE_SESSION_FILE` in the private dev configuration, and update the GitHub
+   environment secret without echoing it:
+   `gh secret set GOBLIN_SMOKE_SESSION --repo grmkris/goblin --env dev < .local/dev-session.json`.
+   Update `GOBLIN_STAGE_ENV` through the same file-input mechanism if its configuration changed.
+6. Run authenticated `bun run smoke:dev` and `bun run drift:dev`. Reconnect and grant any services required by the
+   smoke, or record their explicit skips. Smoke's model calls require a configured endpoint. A public health check
+   alone is not authenticated acceptance.
+7. Re-enable `ci.yml` with `gh workflow enable ci.yml --repo grmkris/goblin`, then push the checked dev commit. CI must
+   pass Check and Deploy dev for that exact SHA. Its `dev-acceptance` receipt must name that SHA and live Worker
+   version, authenticated smoke, verified drift and the migration filenames present in `apps/runtime/migrations`.
+   Re-enabling a workflow does not replay a push made while it was disabled.
+
+Recreate the owner's setup in a separate attended session: sign in, reconnect MySI, review the exact tools and Events
+granted, confirm the Source's owner rule, key/title/read/reply mappings and routing, and configure Notify me via with
+its result rules. Then exercise DM, group, photo, outbound file and routine-copy delivery. Record local tests,
+deployed smoke and these live checks separately. The code and reset release can finish before that live session;
+until it runs, real provider and Telegram delivery remain unverified.
 
 ## Using it
 
@@ -142,7 +186,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   searches the MCP registries; add your own under Registries searched. **By address** takes any MCP address (public
   https only). Servers without sign-in connect directly; the suggestions mark DeepWiki, Context7 and Cloudflare Docs
   this way. Remove, in a server's ··· menu, asks first and takes its sign-in and grants with it. To suggest another server, check that it connects from a Worker,
-  then add it to `apps/runtime/src/mcp/suggested.ts` with its endpoint for each stage.
+  then add it to `apps/runtime/src/mcp/servers/shelf.ts` with its endpoint for each stage.
 - **Connect a server.** Connections → Connect. You sign in at the remote server and approve; you come back
   connected. Servers that answer without sign-in connect directly. Then turn on the tools the agent may use, one by one
   or with Allow all; None turns them all off. Nothing is granted by default. A server marked **Needs sign-in** needs a
@@ -199,7 +243,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   clears selection, then closes. Agent-app views share the kit; see `app_docs` topic `ui`. Local browser acceptance:
   build the app runtime with `heavy bun run --cwd packages/app build`, then run `heavy bun apps/web/test/ui-diagram.ts`.
 - **mysi.** The shelf's first suggestion is one mysi connection for the owner's own apps (MyPlan, MyTab, MyGram,
-  MyInbox, MySkills, MyTmux): `https://mysi.lol/mcp?codemode=off` (`apps/runtime/src/mcp/suggested.ts`, ADRs 0052 and
+  MyInbox, MySkills, MyTmux): `https://mysi.lol/mcp?codemode=off` (`apps/runtime/src/mcp/servers/shelf.ts`, ADRs 0052 and
   0061); a deployment against mysi's dev sets `GOBLIN_MCP_SHELF` to point the `mysi` entry at `dev.mysi.lol`. mysi is a product of its own with a free tier; the
   owner signs up there and chooses which apps the connection reaches on mysi's consent page. Its tools are
   `<service>_<tool>` (`mygram_inbox_read`), so ask the agent for one app's tools ("list my myplan tools") and it calls
@@ -208,14 +252,13 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   follows those procedures; their tools still need grants. While skills are on for some server, a correction or a
   request to keep how something was done may become a draft in your files, `/agent/skills/drafts/<name>.md`, with a
   notice in the chat; what becomes of it is yours.
-- **Telegram.** Bind the authorized mygram profile to the bot (in mygram, or on mysi's consent page; choose **All
-  chats** to let goblin see groups), then turn on the connection's **Telegram** switch. The server must offer Events:
-  goblin grants mygram's inbox, send, question, chat-list and topic-list tools (mysi's `mygram_` names) and subscribes
-  `message.received`, `question.answered` and `chat.changed` for every chat the grant reaches, or the DM alone with a
-  "Let goblin see your groups" link. DM messages arrive in Personal as **Telegram**; a group or forum topic is offered
-  in the DM with buttons and waits until the owner routes it (Connections → mysi → Telegram → Chats, or by asking
-  goblin), then arrives in its Topic as **Telegram · <title>**, and answers go back to the same chat and topic.
-  Turning it off unsubscribes, drops held messages and pending replies, and keeps the routes.
+- **Mygram through a Source.** Connect MySI with Mygram included and the required chat access, or Mygram directly.
+  Ask goblin to propose a Source from the connected event and tool schemas. Review the exact event selector, cursor
+  read, message keys, incoming direction, owner rule, title/attachment pointers, reply template and new-conversation
+  route on the Source card, then confirm its revision. Route held conversations in Connections → Sources or Activity.
+  The same path handles DMs, groups and forum topics; no built-in Telegram switch or hard-coded tool names remain.
+  Configure **Notify me via** separately for routine copies and app notifications, reviewing its result and echo rules.
+  Real MySI authorization and Telegram DM/group/photo acceptance remain the separate owner session described below.
 - **Resident authority.** Settings → Your agent → **Work while you're away** shows it and when it expires. Owner
   activity renews it for 30 days; inbound and scheduled work do not renew it. Turning it off stops all outbound MCP
   use by the agent until you turn it on again.
@@ -251,7 +294,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   the consent page (it starts off), the read-only inspection tools (ADR 0024). Revoke it under Settings → Apps that use your agent. A connection made before inspection joined `/mcp`
   gets those tools after reconnecting once (in Claude Code: `/mcp` → goblin → Clear authentication).
 - **Inspect your agent from a coding agent.** Start with `inspect_problems` or `inspect_turns`, then `inspect_turn`
-  with an operation id (a Telegram message is `telegram-<id>`), then `inspect_conversation` for the words.
+  with an operation id (a Source message is `source-<source>-<message>`), then `inspect_conversation` for the words.
   `inspect_flows` shows how conversations moved (sends, replies, thread starts, moves, Personas, Delegates) and
   `inspect_details` the operation behind a message. Reading never calls a model; `ask_agent` does.
 - **The `goblin` CLI** (`apps/cli`) is the same from a terminal: an MCP client of `/mcp` that asks for
@@ -263,11 +306,11 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   bun run goblin problems --since 6h
   bun run goblin problems --all --since 6h # expected waits and recovered model attempts too
   bun run goblin turns
-  bun run goblin turn telegram-<id>     # one turn end to end
+  bun run goblin turn <operation-id>     # one turn end to end
   bun run goblin conversation 1         # main's entries, in full
   bun run goblin flows --chat 12        # how a chat's conversation moved, content-free
   bun run goblin details --operation <id> # what happened behind one message, and its related operations
-  bun run goblin logs telegram-<id>     # Workers Logs lines that mention an id
+  bun run goblin logs <operation-id>     # Workers Logs lines that mention an id
   bun run goblin lookup 7f3a9c12        # a reference the app showed: its log lines, then its operation's details
   bun run goblin stats --since 24h      # flow totals across every agent of the stage (Analytics Engine)
   ```
@@ -402,20 +445,12 @@ right on a desktop and from the bottom on a phone, in light and dark: Everything
 touch rows of 44px, no sideways scroll, and Save as the owner API's compare-and-set answered with a routine left short.
 Screenshots go under `.local/goblin-acceptance/setup-*`; this is browser fixture evidence only.
 
-`heavy bun apps/web/test/ui-events.ts` renders a connection's Events (ADR 0041) from source in local Chromium at desktop
-and phone widths, light and dark: the open offer, the picker with the server's titles, groups and rate, the
-recommended event picked already, an event the Telegram channel takes, a filter the server requires asked for in
-Advanced, a hand-over to a Persona, and both events set up in one step (each proposed, then confirmed), with the owner
+`heavy bun apps/web/test/ui-events.ts` renders a connection's Events (ADR 0041, ADR 0068) from source in local Chromium
+at desktop and phone widths, light and dark: the open offer, the picker with the events' titles and descriptions grouped
+by service, nothing picked until the owner picks it, an event with an existing subscription, a filter the server requires
+asked for in Advanced, a hand-over to a Persona, and both events set up in one step (each proposed, then confirmed), with the owner
 API routed in the page and the proposals it receives checked. Screenshots go under
 `.local/goblin-acceptance/events-*`; this is browser fixture evidence only.
-
-`heavy bun apps/web/test/ui-telegram.ts` renders the Telegram channel's chats (ADR 0055) from source in local Chromium
-at phone width in light and desk width in dark: the Chats list in mysi's card (the private chat and its topic, a waiting
-group and its topic, a group goblin routed, a paused and a left one), a route and who answers picked and shown at once,
-a refused pick put back with a calm line, the New chats default, the line and link while goblin sees only the private
-chat, and Activity's offers (Not now kept across a reload, Set up making a new Topic), with no sideways scroll and the
-owner API routed in the page. Screenshots go under `.local/goblin-acceptance/telegram-*`; this is browser fixture
-evidence only.
 
 `heavy bun apps/web/test/ui-holds.ts` renders the MCP 2026 owner cards (ADR 0042) from source in local Chromium at
 desktop and phone widths, light and dark: a URL request on the connection's own host and one elsewhere (flagged), its
@@ -492,7 +527,7 @@ correlated questions, late answers, main Stop, two-running cap, burst collapse, 
 keyless fixture tests establish local behavior. The signed routine Events case shares the native stack and official
 fixture producer: exact descriptor filters, raw signatures, shared leases, escaped run IDs, replay across revisions,
 sealed metadata, one event/minute, pending coalescing, gap/poll recovery and termination/reconfirmation. No live MCP
-producer or Telegram send is involved. To run just that case, use
+producer or external message send is involved. To run just that case, use
 `GOBLIN_HARNESS_PORT=18871 heavy bun run test:integration native.test.ts -t 'signed routine Events'`.
 
 For local acceptance, start a separate `bun dev` stack with isolated Alchemy/D1/DO state, a throwaway account and no
@@ -502,7 +537,7 @@ resident authority and confirm a reminder yields a visible skip without token us
 token caps. Save redacted logs and screenshots. Local CLIProxy provider evidence is distinct from Railway LiteLLM and
 retained dev. LOCAL throwaway-account receipts verify reminder dedupe/passive acceptance, retained cron firing and rearm
 across restart, revoked-authority skip with unchanged usage, active/running caps and run/day token blocking using
-CLIProxy. The native recurring-wake regression verifies the next sweep survives the callback that scheduled it. Telegram
+CLIProxy. The native recurring-wake regression verifies the next sweep survives the callback that scheduled it. External message
 delivery, cron-after-deploy and real producer acceptance require separate deployed verification.
 
 ## Main and the inbox example
@@ -510,6 +545,37 @@ delivery, cron-after-deploy and real producer acceptance require separate deploy
 Check Main with an empty transcript and existing history at desktop and phone widths: the composer remains reachable and the latest exchange is the landing point. Apps open in their tool rows or as their own pages; moving between page and chat preserves the single iframe and action bridge. Installed iPhone behavior remains an owner device check.
 
 The no-auth inbox fixture builds the `app_docs` example in Dynamic Workers and drives the native job callback through 15-minute slots. It checks newest-five validation, freshness and last-good retention after an invalid response. Run it from `apps/runtime` with `heavy bun run test:integration test/integration/inbox.test.ts`. Real MyInbox sign-in, app-power approval and message freshness on dev are separate owner steps.
+
+### Notify sink acceptance
+
+Notify me via's delivery rules and echo selector are owner-reviewed settings (ADR 0071). The runtime unit tests
+`sources-notify.test.ts`, `sink-result.test.ts`, `notices/copies.test.ts` and `app-powers.test.ts` cover same-second
+revisions, result predicates, unknown outcomes and shared connections. The local native routine-notifications case
+exercises frozen notice retries through the MCP host; `bun apps/web/test/ui-sources.ts` checks Settings at desktop and
+390px phone widths. These checks do not prove a deployed provider delivered a message.
+
+### Deferred MySI and Mygram live acceptance
+
+Code completion and local fixtures do not close this gate. After the dev reset, schedule a 15–30 minute owner session:
+
+1. Sign in to Goblin dev, configure its model endpoint if needed, reconnect MySI and authorize Mygram with the intended
+   DM/group/topic access. Keep credentials and personal identifiers out of committed evidence.
+2. Propose and review the Source against the live schemas, including owner identity, incoming direction, chat/thread
+   keys, cursor read, titles, attachments and reply arguments. Confirm the exact revision and desired routes.
+3. Send a DM, a group message and a photo; verify the routed Topic, the owner-turn mark, kept attachment and reply back
+   to the same place. Include a non-owner message and replay to confirm their distinct behavior.
+4. Configure Notify me via with the live structured-result mapping and exact echo selector. Verify a routine copy,
+   an unrelated event on the same MySI connection, and a sink save invalidating an old pending copy.
+5. Retain redacted operation ids and received-message evidence. Record model acceptance, MCP acceptance and actual
+   external receipt separately. Any missing access or unavailable producer remains an open acceptance item.
+
+
+Source reply outcome rules (ADR 0072) are covered by `sources-replies.test.ts`, `sources-engine.test.ts` and
+`sources-program.test.ts`: frozen calls, per-piece progress, explicit retryability, uncertainty, reconstruction,
+waiting limits and revision review. The native `source-reply-outcomes` canary carries accepted/retryable/rejected/unknown
+structured results through the MCP host and verifies a stable retry. The Source browser walk edits result rules,
+requires a new confirmation and copies those rules into Notify me via at desktop and 390px widths. These are local
+proofs; reconnecting MySI, confirming the deployed Source and Telegram DM/group/photo checks remain live acceptance.
 
 ## Interactive reply checks
 

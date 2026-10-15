@@ -2,7 +2,7 @@ import { CLIENT_CAPABILITIES_META_KEY, createMcpHandler } from '@modelcontextpro
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
-import { CLIENT_CAPABILITIES } from '../../src/mcp/remote.ts'
+import { CLIENT_CAPABILITIES } from '../../src/mcp/connections/remote.ts'
 import { managerOf } from './manager.ts'
 import { MemoryGrants } from './memory.ts'
 import { lowLevelServer } from './low-level-server.ts'

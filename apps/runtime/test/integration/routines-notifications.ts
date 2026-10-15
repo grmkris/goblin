@@ -3,26 +3,24 @@ import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import { drizzle } from 'drizzle-orm/durable-sqlite'
 import { eq } from 'drizzle-orm'
-import { mcpHost } from '../../src/mcp/host.ts'
-import { deliverNoticeCopies } from '../../src/notices/telegram.ts'
+import { mcpHost } from '../../src/mcp/connections/host.ts'
+import { deliverNoticeCopies } from '../../src/notices/copies.ts'
 import { Notices } from '../../src/notices/service.ts'
 import { NoticeStore } from '../../src/notices/store.ts'
 import { enableResident } from '../../src/resident.ts'
-import { telegramChannel } from '../../src/channel/channel.ts'
-import { enableEvents } from '../../src/channel/store.ts'
 import { noticesOf } from '../../src/layers/routines.ts'
 import { ResidentLive } from '../../src/layers/core.ts'
 import { SingleFlight } from '../../src/observability/single-flight.ts'
 import { Db } from '../../src/runtime/db.ts'
 import type { AppError } from '../../src/http/errors.ts'
-import { Channel as ChannelService } from '../../src/channel/service.ts'
 import type { Resident as ResidentService } from '../../src/mcp/service.ts'
 import { AgentInput, type AgentInputs } from '../../src/runtime/input.ts'
 
 /** What the dispatch check reads. */
-type LaneServices = ResidentService | ChannelService
+type LaneServices = ResidentService | Db
 import { MemoryCredentials, MemoryGrants, MemoryLabels, MemoryRegistries } from '../mcp/memory.ts'
 import { appNotices } from '../../src/storage/notices.ts'
+import { appNotifySink } from '../../src/storage/sources.ts'
 import { runApplicationMigrations } from '../../src/storage/migrations.ts'
 import { lowLevelServer } from '../mcp/low-level-server.ts'
 import { type Probes, inAgent } from './probe.ts'
@@ -48,10 +46,10 @@ function notificationHost(
 ) {
   const handler = notificationHandler(accepted)
   return mcpHost({
-    servers: [{ connectionId: 'mygram', endpoint: 'https://notification.test/mcp' }],
+    servers: [{ connectionId: 'chat', endpoint: 'https://notification.test/mcp' }],
     appUrl: 'https://goblin.test',
     credentials,
-    grants: new MemoryGrants([{ connectionId: 'mygram', capability: 'tool', name: 'message_send' }]),
+    grants: new MemoryGrants([{ connectionId: 'chat', capability: 'tool', name: 'message_send' }]),
     registries: new MemoryRegistries(),
     labels: new MemoryLabels(),
     fetch: async (input, init) => {
@@ -71,20 +69,28 @@ async function setupNotifications(storage: DurableObjectStorage) {
   const db = drizzle(storage)
   const notices = new NoticeStore(db)
   enableResident(db, Math.floor(Date.now() / 1000))
-  const channel = telegramChannel({ db, telemetry: undefined, wake: () => undefined })
-  enableEvents(db, 'mygram', '', Math.floor(Date.now() / 1000), { reach: 'dm' })
   const credentials = new MemoryCredentials()
-  await credentials.saveTokens('mygram', { access_token: 'keyless-fixture', token_type: 'bearer' }, 1)
+  await credentials.saveTokens('chat', { access_token: 'keyless-fixture', token_type: 'bearer' }, 1)
   const attempts: Record<string, unknown>[] = []
   const accepted: Record<string, unknown>[] = []
   const host = notificationHost(credentials, attempts, accepted)
-  // The services the Telegram copies read, over these instances as the agent's layers build them.
+  // The services the copies read, over these instances as the agent's layers build them.
   const services = Layer.mergeAll(
     Layer.succeed(Notices, noticesOf(notices)),
-    Layer.effect(ChannelService, channel),
     host.pipe(Layer.provide(SingleFlight.layer)),
     ResidentLive,
-  ).pipe(Layer.provide(Layer.succeed(Db, db)))
+  ).pipe(Layer.provideMerge(Layer.succeed(Db, db)))
+  db.insert(appNotifySink)
+    .values({
+      id: 1,
+      connectionId: 'chat',
+      tool: 'message_send',
+      arguments: JSON.stringify({ chat: 'dm', text: '{{text}}', operationId: '{{operationId}}' }),
+      policy: JSON.stringify({ result: { accepted: { pointer: '/delivery', equals: 'accepted' } } }),
+      revision: '1',
+      updatedAt: 1,
+    })
+    .run()
   // The bridge's `local`, which the copies run their last-moment check through, over the same services.
   const input: AgentInputs = Object.assign(Object.create(null), {
     local: (program: Effect.Effect<void, AppError, LaneServices>) =>
@@ -95,8 +101,8 @@ async function setupNotifications(storage: DurableObjectStorage) {
   return { db, notices, attempts, accepted, deliver }
 }
 
-/** A written notice of routine `id`, with a Telegram copy when `telegram`. */
-function writtenNotice(notices: NoticeStore, id: string, telegram: boolean) {
+/** A written notice of routine `id`, with a copy through Notify me via when `copy`. */
+function writtenNotice(notices: NoticeStore, id: string, copy: boolean) {
   const at = Date.now()
   notices.claim(
     {
@@ -112,7 +118,7 @@ function writtenNotice(notices: NoticeStore, id: string, telegram: boolean) {
       url: null,
       at,
       createdAt: at,
-      ...(telegram ? { telegramText: 'Sidequest: Picked <safe>' } : {}),
+      ...(copy ? { copyText: 'Sidequest: Picked <safe>' } : {}),
     },
     true,
   )
@@ -130,20 +136,20 @@ async function routineNotificationProbe(storage: DurableObjectStorage) {
   const on = writtenNotice(notices, 'notice-on', true)
   await deliver()
   const failed = notices.get(on)
-  db.update(appNotices).set({ telegramNextAt: 0 }).where(eq(appNotices.id, on)).run()
+  db.update(appNotices).set({ copyNextAt: 0 }).where(eq(appNotices.id, on)).run()
   await deliver()
   const delivered = notices.get(on)
   await deliver()
   return {
     offCalls,
-    frozenServer: failed?.telegramConnectionId,
-    retryState: failed?.telegramState,
+    frozenSink: failed?.copySink?.includes(':1:') === true,
+    retryState: failed?.copyState,
     attempts: attempts.length,
     stableBytes: JSON.stringify(attempts[0]) === JSON.stringify(attempts[1]),
-    escaped: attempts[0]?.['text'],
+    sent: { chat: attempts[0]?.['chat'], text: attempts[0]?.['text'] },
     accepted: accepted.length,
-    state: delivered?.telegramState,
-    metadata: JSON.parse(delivered?.telegramReceipt ?? '{}'),
+    state: delivered?.copyState,
+    metadata: JSON.parse(delivered?.copyReceipt ?? '{}'),
   }
 }
 

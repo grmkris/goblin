@@ -197,7 +197,7 @@ export type FollowScenario = (typeof FOLLOW_SCENARIOS)[number]
  * answer. `tool-storm`: three rounds of thinking and four parallel tool calls that finish one after another, then the
  * answer: a turn of the kind that fills a screen with rows. `long-first`: the answer is already longer than the screen
  * when its first batch arrives. `dock`: the baseline while the composer grows (a queued message, an attachment) partway
- * through. `same-batch`: the owner's turn and more than a screen of its reply arrive together (a Telegram turn, a queued
+ * through. `same-batch`: the owner's turn and more than a screen of its reply arrive together (a Source turn, a queued
  * one starting). `resnapshot`: the tab comes back from the background and the stream starts again from a snapshot that
  * already holds the turn and a long partial reply, which then keeps streaming.
  */

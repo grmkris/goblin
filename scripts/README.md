@@ -44,8 +44,9 @@ is measured on the opened panel itself. All visible text fields are checked for 
 or range has no text to size); the code input uses 18px. The hybrid context verifies touch behavior with a fine primary pointer.
 
 `heavy bun apps/web/test/ui-local.ts` runs the source components in a local Vite fixture without an account or model
-call. It covers editable primitives, composer Return behavior, full Home note reading with focus return, synthetic
-keyboard/pinch-zoom handling, failed attachment retry/remove/send blocking, and Home feedback under reduced motion.
+call. It covers editable primitives and composer Return behavior across touch, desktop and hybrid pointers,
+failed attachment retry/remove/send blocking, component styles and Thoughts closure under reduced motion,
+and conversation-feed render isolation.
 Its private receipts and screenshots go under `.local/goblin-acceptance/local-*`.
 
 ## Smoke
@@ -85,8 +86,7 @@ owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
    does; without them, or with a token that cannot read Analytics Engine, the receipt says why it was skipped.
 
 Inbound turns run in main as `goblin-smoke`. The threads are archived, the app deleted and the client revoked through
-`finally` cleanup; their history and the subagent remain. If Telegram is on, main's replies are
-also queued for delivery there. Cleanup requests can themselves fail.
+`finally` cleanup; their history and the subagent remain. Cleanup requests can themselves fail.
 
 On success the script writes `.local/smoke-<stage>-receipt.json` (mode 600) and prints it. A failure prints its reason
 and completed HTTP steps but writes no new receipt; an older file may remain. Receipts contain model/server names,
@@ -110,7 +110,8 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 | `utc`, `status`, `steps`               | Completion timestamp, `passed` and HTTP steps with status and the answer's ref (`goblin lookup <ref>`).        |
 
 Not covered here: the owner's Connect flow (it needs the owner at the remote server's consent screen), rendering
-MCP Apps, the browser UI, thread branching, memory-summary quality, skills, and Telegram hook/inbox acceptance.
+MCP Apps, the browser UI, thread branching, memory-summary quality, skills, and live Source message/reply or notice
+delivery. Those use the separate [attended acceptance checklist](../docs/development.md#deferred-mysi-and-mygram-live-acceptance).
 
 Prod commands use `.local/prod.env` and require `GOBLIN_CONFIRM_PROD=1` in the calling shell:
 `bun run plan:prod`, `bun run deploy:prod` (break-glass outside CI), `bun run smoke:prod`.

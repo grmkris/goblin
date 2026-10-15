@@ -3,7 +3,7 @@
 // revision shown, never something a tool's text or a server's suggestion does.
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { SourceView } from '@goblin/contracts'
-import { Conflict, InvalidInput } from '@goblin/contracts/api'
+import { Conflict } from '@goblin/contracts/api'
 import {
   Alert,
   AlertDescription,
@@ -22,20 +22,16 @@ import {
 import { ChevronRightIcon } from 'lucide-react'
 import { eventTitle, eventWords } from '../lib/events.ts'
 import { messageOf, withRef } from '../lib/query/app-error.ts'
-import { routeWords, sourceStatus } from '../lib/source-routes.ts'
+import { newKeysWords, sourceStatus } from '../lib/source-routes.ts'
 import { setupFacts } from '../lib/source-setup.ts'
 import { usePersonas, useTopics } from '../lib/workspace/hooks.ts'
 import { eventsQuery, serversQuery } from '../mcp/queries.ts'
 import { type SourceChange, changeSourceMutation } from '../sources/queries.ts'
 import { StatusLabel } from './status-label.tsx'
+import { SourceReplyRules } from './source-reply-rules.tsx'
 
 /** Why a change to a Source was refused, in words the owner can act on; else the calm generic line. */
 export function sourceRefusal(failure: unknown, action: string): string {
-  if (failure instanceof InvalidInput && failure.reason === 'telegram_on')
-    return withRef(
-      'Turn Telegram off on this connection first: one connection carries either the Telegram channel or Sources.',
-      failure,
-    )
   if (failure instanceof Conflict)
     return withRef('This Source changed since you read it. Review its current revision below.', failure)
   return messageOf(failure, action)
@@ -112,7 +108,7 @@ export function SourceReview({ source }: { readonly source: SourceView }) {
   const topics = useTopics()
   const personas = usePersonas()
   const event = useEventTitle(source)
-  const facts = setupFacts(source.setup, { event, route: (route) => routeWords(route, topics, personas) })
+  const facts = setupFacts(source.setup, { event, newKeys: (newKeys) => newKeysWords(newKeys, topics, personas) })
   const pending = changing.isPending ? changing.variables.action : undefined
   const error = changing.error === null ? '' : sourceRefusal(changing.error, 'change this Source')
   return (
@@ -123,7 +119,7 @@ export function SourceReview({ source }: { readonly source: SourceView }) {
         </CardTitle>
         <CardDescription>
           <span className="routine-title">
-            A Source on {source.label}, {source.proposedBy === 'agent' ? 'proposed by goblin' : 'from its suggestion'}
+            A Source on {source.label}, {source.proposedBy === 'agent' ? 'proposed by goblin' : 'proposed by you'}
           </span>
         </CardDescription>
         <CardAction>
@@ -143,6 +139,9 @@ export function SourceReview({ source }: { readonly source: SourceView }) {
           {source.health !== undefined && <p className="server-note">{source.health}</p>}
           {source.state === 'proposed' && <p className="server-note">{CONFIRM_NOTE}</p>}
           <ExactSetup source={source} />
+          {source.setup.reply !== undefined && source.state !== 'refused' && (
+            <SourceReplyRules key={`${source.id}:${String(source.revision)}`} source={source} />
+          )}
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>

@@ -2,7 +2,7 @@ import type { ConversationId } from '@earendil-works/pi-durable'
 import * as Context from 'effect/Context'
 import type * as Effect from 'effect/Effect'
 import type { AppError } from '../http/errors.ts'
-import type { SkillRequestOptions } from '../mcp/types.ts'
+import type { SkillRequestOptions } from '../mcp/connections/types.ts'
 import type { LearnOutcome } from './learner.ts'
 import type { Activated, Catalog, SkillFile } from './library.ts'
 

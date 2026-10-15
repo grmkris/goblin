@@ -46,7 +46,6 @@ export type ReceiptSource = { readonly kind: string; readonly origin?: string | 
  * a Persona's answer is `persona:<operation>:<persona>` (pi/persona-turn.ts). Everything else is `direct`.
  */
 const SOURCES: readonly (readonly [string, string])[] = [
-  ['telegram-', 'telegram'],
   ['source-', 'source'],
   ['routine-input:', 'routine'],
   ['routine-report:', 'routine_report'],
@@ -56,7 +55,6 @@ const SOURCES: readonly (readonly [string, string])[] = [
 ]
 /** A turn's source by its receipt's kind; an input of any other kind (the owner's own) is `direct`. */
 const RECEIPT_SOURCES: Readonly<Record<string, string>> = {
-  telegram: 'telegram',
   source: 'source',
   routine_input: 'routine',
   subagent_report: 'subagent_report',

@@ -3,7 +3,7 @@ import * as Effect from 'effect/Effect'
 import type { AppError } from '../http/errors.ts'
 import { Events } from '../mcp/service.ts'
 import { confirmEvents, consumeEvent, reconcileEvents } from './events.ts'
-import { deliverNoticeCopies } from '../notices/telegram.ts'
+import { deliverNoticeCopies } from '../notices/copies.ts'
 import { sweepNotices } from './notices.ts'
 import {
   DEADLINE_REACHED,
@@ -26,8 +26,8 @@ const reconcileRoutines = Effect.andThen(reconcileSchedules, reconcileEvents)
 
 /**
  * The routines' sweep: runs past their deadline stopped and admitted ones started, ended runs reported, the notices'
- * share (digests owed, writes cut short) and their Telegram copies when due, the next sweep set by the nearest
- * deadline, then reconciliation.
+ * share (digests owed, writes cut short) and their copies through Notify me via when due, the next sweep set by the
+ * nearest deadline, then reconciliation.
  */
 const maintainRoutines = Effect.gen(function* () {
   const runs = yield* RoutineRuns

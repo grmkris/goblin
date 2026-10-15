@@ -147,6 +147,7 @@ function userPart(message: Extract<ChatMessage, { role: 'user' }>): Part {
     ...(message.selections && { selections: message.selections }),
     ...(message.author !== undefined && { author: message.author }),
     ...(message.outcome !== undefined && { outcome: message.outcome }),
+    ...(message.own === true && { own: true as const }),
     ...(message.kept === true && { kept: true as const }),
     ...(message.thread !== undefined && { thread: message.thread }),
     ...(message.timestamp !== undefined && { at: message.timestamp }),

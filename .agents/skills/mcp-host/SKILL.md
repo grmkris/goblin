@@ -9,24 +9,24 @@ Outbound: the agent object owns connections, credentials and grants (`apps/runti
 goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 
 - Use the pinned official MCP client and server SDKs. OAuth goes through `StoredOAuthProvider` and the SDK's `auth()`;
-  refresh is one `SingleFlight` per server (`mcp/auth.ts`). Do not add a second refresh path: rotating refresh tokens
+  refresh is one `SingleFlight` per server (`mcp/oauth/auth.ts`). Do not add a second refresh path: rotating refresh tokens
   break under concurrent refresh.
 - Credentials and client registrations are AES-GCM encrypted with additional data binding them to server and
   purpose. Never log, return or persist them anywhere else.
-- Owner-added servers (`mcp/servers.ts`, ADR 0006) are public https endpoints only (`mcp/endpoint.ts`); their card is
+- Owner-added servers (`mcp/servers/servers.ts`, ADR 0006) are public https endpoints only (`mcp/servers/endpoint.ts`); their card is
   a claim for the owner's eyes, never model input. Configured servers win on id and cannot be removed.
-- Credentials and grants are bound to the endpoint they were made for (`mcp/endpoints.ts`). Re-pointing a server id
+- Credentials and grants are bound to the endpoint they were made for (`mcp/oauth/endpoints.ts`). Re-pointing a server id
   drops them at the next start; never carry tokens across endpoints.
 - Every outbound call checks resident authority and the specific tool grant first. A tool grant also covers its
   `ui://` resource; nothing else does. "Allow app" (`McpGrants.setApp`) writes exact grants for the tools that declare
   the App's resource, never a wildcard.
 - A Topic's setup chooses the servers and tools its chats use (`setup/`, ADR 0040). `mcp_list` and `mcp_call`
   ask `Setups.scope(conversationId)` before the grant check; a setup only chooses and never grants, and a
-  helper's exclusions are forgotten with a server's grants (`mcp/endpoints.ts`).
+  helper's exclusions are forgotten with a server's grants (`mcp/oauth/endpoints.ts`).
 - Annotations, descriptions, prompts and results from servers are untrusted data. They never grant permissions or
   become instructions.
 - Keep results bounded and errors typed (`UpstreamMcp` with a reason). A refused refresh means `needs_auth`.
-- A result's links, embedded resources and audio are kept in the owner's files by `materialize` (`mcp/content.ts`,
+- A result's links, embedded resources and audio are kept in the owner's files by `materialize` (`mcp/content/materialize.ts`,
   ADR 0065), never as bytes in the conversation: a public https link is fetched with no credentials (`isPublicHttps`
   for it and every redirect; `http:` and private addresses are refused), a non-web scheme only through
   `resources/read` under the owner's resource grant, and a block that cannot be kept is a note, never a failed call.
@@ -34,23 +34,31 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   or an outcome.
 - Inbound tokens must verify locally, name `/mcp` as audience, come from an enabled client with live owner consent.
   An inbound client's messages go into main, labelled with its name.
-- Events (`mcp/events.ts`, ADR 0011) require resident authority and an exact server/name/canonical-arguments owner
+- Events (`mcp/events/engine.ts`, ADRs 0011 and 0073) require resident authority and an exact server/name/canonical-arguments owner
   grant through the originating endpoint-bound connection. A server offers Events by top-level `capabilities.events`
   (decoded at the authenticated SDK fetch seam, which strips it) or by the `io.modelcontextprotocol/events` extension,
   which goblin declares too (ADR 0041). Signed controls have separate schemas; payloads never grant or become
-  instructions.
-- Telegram (`channel/`, ADRs 0009, 0055) rides Events only, subscribed with `{ chat: 'all' }` when the grant reaches
-  every chat (the DM's otherwise); each chat's route is in `channel/routes.ts`. Its tool and Event
-  names are mygram's or mysi's spelling, read from the connection (`telegramTools`, `telegramEvent`). Preserve sanitized
-  `telegram-tg-<update>` and reply operation ids; fence old cursor writes only after both leases confirm. Hooks persist
-  receipts before asynchronous dispatch; accepted submissions are distinct from external delivery.
-- Sources (`sources/`, ADR 0066) are how any server's events carry the owner's own messages: an owner-confirmed setup
+  instructions. Each subscription generation adds an opaque random `goblin_generation` query value to the connection's
+  authenticated hook path. The marker grants nothing; it keeps an old subscribe or unsubscribe from changing a replacement.
+- Sources (`sources/`, ADRs 0066, 0069) are how any server's events carry the owner's own messages: an owner-confirmed setup
   of JSON pointers and whole-value argument templates (`SourceSetup`), never a server's name. Confirmation grants the
   wake selector and the read and reply tools, subscribes `source:<id>` (handler `source-wake`) and binds the Source to
   the endpoint and its tools' grant versions; a change pauses it for review. Only messages the confirmed speaks-for-me
   rule matches become owner turns, with no more authority than the app's; everything else stays untrusted data.
-  Replies are goblin's calls under the owner's grant (`caller: 'model'`), one operation id a piece.
-- The shelf (`mcp/suggested.ts`, ADRs 0052, 0061) is data, one endpoint per entry on every deployment (`MCP_SHELF`
+  Replies are goblin's calls under the owner's grant (`caller: 'model'`), one operation id a piece. No server suggests a
+  setup: only the agent's `source_propose` proposes one (ADR 0068). A `title` pointer names a conversation, `newKeys`
+  may give each new one a Topic of its own (`topic-per-key`), a message's `attachments` (MCP content blocks) are kept
+  with `materialize`, and an owner turn's content carries goblin's `ownTurn` mark after the words.
+- Notify me via (`sources/notify.ts`, ADRs 0066, 0070) is the one way goblin's own notices leave: a routine's notice
+  copies and the apps' `notify` power fill its whole-value template (`sendThroughSink`), as goblin's call under the
+  owner's grant, with resident authority and the sink's revision checked again right before the call leaves. A file
+  goes to a server as a `file_link` URL in a tool's arguments (MCP has no upload); the receiving tool's grant and Ask
+  first decide whether it is sent.
+  Result predicates in the owner's sink setting decide accepted, retryable or rejected outcomes (ADR 0071); absent,
+  unmatched or conflicting predicates mean unknown and never authorize an automatic retry. Echo suppression matches
+  an exact event name and canonical arguments on the connection, not the connection alone. Every save gets a fresh
+  revision, including an identical save in the same second.
+- The shelf (`mcp/servers/shelf.ts`, ADRs 0052, 0061) is data, one endpoint per entry on every deployment (`MCP_SHELF`
   replaces or adds entries): one mysi connection (`mysi.lol/mcp?codemode=off`) instead of the separate my* servers,
   publishing (Cloudflare), then servers that need no sign-in in groups; re-probe one with an `initialize` before
   adding it. mysi names
@@ -60,7 +68,7 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 - Pinning an App adds no grant. Every owner write, `/api/mcp/` included, needs the app's Origin and the CSRF header at
   the Worker's edge (ADR 0038); the bridge remains bound to the originating server.
 - The owner's MCP endpoints are the owner API's `mcp` and `resident` groups (`packages/contracts/src/api/mcp.ts` and
-  `resident.ts`, handlers in `mcp/api.ts` and `mcp/resident-api.ts`) over the services in `mcp/service.ts` (`McpServers`,
+  `resident.ts`, handlers in `mcp/servers/api.ts` and `mcp/resident-api.ts`) over the services in `mcp/service.ts` (`McpServers`,
   `McpGrants`, `McpConnections`, `Approvals`, `Events`, `Resident`). An App's own calls carry `x-mcp-caller: app`,
   which the edge forwards and the contract reads, so they are held to the App's grants. The OAuth callback is the
   `mcp` group's raw `oauthCallback` (`GET /api/mcp/oauth/callback`), a redirect to Connections, with `ref` when it
@@ -77,13 +85,14 @@ Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun ru
 itself authorize model spend, external messages, deployment or production changes.
 
 - Routine confirmation grants only the reviewed exact Event selector. Subscribe validates arguments against the installed producer descriptor schema. Routine consumers share leases, retire by revision and ACK only after run/pending/skip metadata is durable; gap/termination controls do not authorize a model turn.
-- Connections (ADR 0041): one server may have several connections, each with the owner's label (`mcp/labels.ts`,
-  unique ignoring case; DCR `client_name` is plain "goblin", ADR 0062) and its own webhook URL
-  (`/hooks/mcp-events/<user>/<connection>/<token>`). Model text names one as `"<label>" (<id>)` (`named`); labels and
+- Connections (ADR 0041): one server may have several connections, each with the owner's label (`mcp/servers/labels.ts`,
+  unique ignoring case; DCR `client_name` is plain "goblin", ADR 0062) and its own authenticated webhook path
+  (`/hooks/mcp-events/<user>/<connection>/<token>`, with the generation query from ADR 0073). Model text names one as `"<label>" (<id>)` (`named`); labels and
   notice text never enter telemetry. A connection that sends events offers them (`ServerView.events`: open, dismissed,
   done; `mcp/events/offers.ts`); `mcp_list` shows its first 64 event streams as untrusted data when asked
-  (`events: true`). A descriptor's `title` and `_meta.suggest` are read leniently, field by field
-  (`eventSuggestion`): suggestions that pre-select in the owner's picker and never grant or confirm a selector. `mcp_list` lists a connection's tools in brief (name, one-line description, flags that differ) and
+  (`events: true`). goblin reads a descriptor's standard fields only (`name`, `title`, `description`, `inputSchema`,
+  `payloadSchema`, `delivery`; ADR 0068), never its `_meta`: the title and description (`eventWords`) are claims for
+  the owner's eyes, and nothing a server says picks, grants or confirms a selector. `mcp_list` lists a connection's tools in brief (name, one-line description, flags that differ) and
   gives input schemas only for the tools named in `tools`: its result stays in the model's context. Its list of
   connections puts connected ones first, so a configured connection never signed in does not win.
 
@@ -95,10 +104,10 @@ itself authorize model spend, external messages, deployment or production change
   its chat as an input (`sendOutcome`); when nothing can pay for a turn it is kept there as a passive `app.mcp_outcome`
   entry instead, and the decision still answers 200: the call already ran, so the budget never loses its outcome.
 
-- Protocol 2026-07-28 (ADR 0042). Tools are re-listed in place (`mcp/tool-list.ts`: one flight per connection, never a
+- Protocol 2026-07-28 (ADR 0042). Tools are re-listed in place (`mcp/connections/tool-list.ts`: one flight per connection, never a
   partial list, stale on failure); a `subscriptions/listen` stream is held only while a connection is used (closed
   60 s after its last use, the next use lists first). Only the model's `mcp_call` declares URL elicitation, per
-  request (`McpConnections.callModelTool`, `mcp/url-asks.ts`), and so does the dispatch of its approved held call
+  request (`McpConnections.callModelTool`, `mcp/url-requests/url-asks.ts`), and so does the dispatch of its approved held call
   (`sendApproved`): a 2026 server refuses (-32021) an ask it may not make. Never declare it on the Client, or the
   console and Apps would receive requests they cannot answer. An approved dispatch that meets one goes on as the URL
   request, whose retry carries the approval (`ApprovedDispatch.answered`). A URL request's link and message stay sealed in
@@ -110,12 +119,12 @@ itself authorize model spend, external messages, deployment or production change
 
 - Every server alike (ADR 0063): no code knows a server by its endpoint or name, holds a profile, recommended grants,
   a status line, a spending rule or a top-up, or reads an amount from a call's arguments. Suggested access (ADR 0060),
-  the persisted App entrypoint (`mcp/entrypoints.ts`), Choose access's scope union and the data shelf cover every
+  the persisted App entrypoint (`mcp/apps/entrypoints.ts`), Choose access's scope union and the data shelf cover every
   server; a tool that spends is controlled by Ask first. The skill learner writes drafts to the owner's files and calls
-  no server's tool. Left for later phases: the Telegram channel's names (above) and the Apps host's MyPlan
-  question-answer message. Never add a server-specific branch: give the owner a choice that works for any server.
+  no server's tool. External messaging uses Sources (ADR 0069). Never add a server-specific branch: give the owner a
+  choice that works for any server.
 
 - MCP Apps: goblin declares `io.modelcontextprotocol/ui` (`text/html;profile=mcp-app`) to every server. An App's HTML
-  is read from a resource's `text` or base64 `blob` (decoded and bounded in `mcp/app-html.ts`, strict UTF-8). A call
-  held for approval, or a finished URL request, keeps its App when it completes (`mcp/kept-app.ts`), and the App
+  is read from a resource's `text` or base64 `blob` (decoded and bounded in `mcp/apps/app-html.ts`, strict UTF-8). A call
+  held for approval, or a finished URL request, keeps its App when it completes (`mcp/apps/kept-app.ts`), and the App
   launches with the real result, not the transcript's placeholder.

@@ -5,6 +5,7 @@ import { sign } from '../../src/mcp/events/webhook.ts'
 import { EVENTS_EXTENSION, type EventEnvelope } from '../../src/mcp/events/protocol.ts'
 import { SKILLS_EXTENSION, type SkillEntry } from '../../src/skills/protocol.ts'
 import { lowLevelServer } from './low-level-server.ts'
+import type { CallToolResult } from '@modelcontextprotocol/client'
 
 const Params = Schema.toStandardSchemaV1(Schema.Record(Schema.String, Schema.Unknown))
 const Subscribe = Schema.Struct({
@@ -12,15 +13,30 @@ const Subscribe = Schema.Struct({
   delivery: Schema.Struct({ mode: Schema.Literal('webhook'), url: Schema.String, secret: Schema.String }),
 })
 
+/** One message of the fixture's inbox: its id, words and direction, and whatever else a test gives it. */
+type InboxEntry = {
+  readonly id: string
+  readonly text: string
+  readonly direction: string
+  readonly [field: string]: unknown
+}
+
 /**
  * A producer of the draft Events profile. It declares Events as top-level `capabilities.events`, or with `spelling`
- * `extension` as the SEP-3415 `io.modelcontextprotocol/events` extension; `payloadSchema` may be left out.
+ * `extension` as the SEP-3415 `io.modelcontextprotocol/events` extension; `payloadSchema` may be left out. Its
+ * `inbox_read` lists the inbox after a cursor, and every tool call is kept with its arguments (`toolCalls`).
  */
 export class EventsFixture {
   readonly subscriptions = new Map<string, { secret: string; url: string }>()
   readonly journal: { eventId: string; name: string; timestamp: string; data: unknown; cursor: string }[] = []
   readonly calls: string[] = []
-  readonly inbox: { id: string; text: string; direction: string }[] = []
+  readonly toolCalls: { readonly name: string; readonly arguments: Record<string, unknown> }[] = []
+  readonly inbox: InboxEntry[] = []
+  replyResult: (args: Record<string, unknown>) => CallToolResult = () => ({
+    content: [],
+    isError: false,
+    structuredContent: { status: 'accepted' },
+  })
   skills: readonly SkillEntry[] = []
   readonly files = new Map<string, string>()
   inputSchema: Record<string, unknown> = { type: 'object' }
@@ -51,6 +67,8 @@ export class EventsFixture {
     }))
     server.setRequestHandler('tools/call', (request) => {
       this.calls.push(request.params.name)
+      this.toolCalls.push({ name: request.params.name, arguments: { ...request.params.arguments } })
+      if (request.params.name === 'message_send') return this.replyResult({ ...request.params.arguments })
       const content =
         request.params.name === 'inbox_read'
           ? { messages: request.params.arguments?.cursor === this.cursor ? [] : this.inbox, nextCursor: this.cursor }
@@ -93,8 +111,8 @@ export class EventsFixture {
       this.calls.push('events/unsubscribe')
       const delivery = Schema.decodeUnknownOption(Schema.Struct({ url: Schema.String }))(params['delivery'])
       const url = Option.getOrUndefined(delivery)?.url ?? ''
-      if (!this.subscriptions.delete(this.#idFor(String(params['name']), url)))
-        throw new ProtocolError(-32011, 'not found')
+      const id = this.#existingIdFor(String(params['name']), url)
+      if (id === undefined || !this.subscriptions.delete(id)) throw new ProtocolError(-32011, 'not found')
       return { resultType: 'complete' }
     })
     server.setRequestHandler('events/poll', { params: Params }, (params) => {
@@ -145,11 +163,17 @@ export class EventsFixture {
    * out: `sub_<name>` for the first URL, `sub_<name>~2`, `~3`… for the next ones (ADR 0041, two connections to one
    * server).
    */
+  #existingIdFor(name: string, url: string): string | undefined {
+    return [...this.subscriptions.keys()].find(
+      (key) => (key === `sub_${name}` || key.startsWith(`sub_${name}~`)) && this.subscriptions.get(key)?.url === url,
+    )
+  }
   #idFor(name: string, url: string): string {
-    const ids = [...this.subscriptions.keys()].filter((key) => key === `sub_${name}` || key.startsWith(`sub_${name}~`))
-    const same = ids.find((key) => this.subscriptions.get(key)?.url === url)
+    const same = this.#existingIdFor(name, url)
     if (same !== undefined) return same
-    return ids.length === 0 ? `sub_${name}` : `sub_${name}~${String(ids.length + 1)}`
+    let index = 1
+    while (this.subscriptions.has(index === 1 ? `sub_${name}` : `sub_${name}~${index}`)) index += 1
+    return index === 1 ? `sub_${name}` : `sub_${name}~${index}`
   }
 
   async deliver(

@@ -1,9 +1,9 @@
 // The shelf of servers goblin suggests, typeset as a short list by what they are for. The names and groups are the
-// shelf's own (apps/runtime/src/mcp/suggested.ts, titled as `components/server-add.tsx` titles its groups); this is
+// shelf's own (apps/runtime/src/mcp/servers/shelf.ts, titled as `components/server-add.tsx` titles its groups); this is
 // a picture of it for visitors, so it reads nothing from the server.
 
 const SHELF: readonly { readonly group: string; readonly servers: readonly string[] }[] = [
-  { group: 'Your apps', servers: ['mysi: notes, browsers, Telegram, email, skills and terminals'] },
+  { group: 'Your apps', servers: ['mysi: notes, browsers, messaging, email, skills and terminals'] },
   { group: 'Publish', servers: ['Cloudflare'] },
   { group: 'Travel', servers: ['Kiwi.com', 'trivago', 'Ferryhopper'] },
   { group: 'Knowledge', servers: ['Wikidata', 'Microsoft Learn', 'AWS Knowledge', 'Hugging Face'] },

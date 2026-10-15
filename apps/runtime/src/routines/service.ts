@@ -9,7 +9,7 @@ import type {
 import * as Context from 'effect/Context'
 import type * as Effect from 'effect/Effect'
 import type { AppError } from '../http/errors.ts'
-import type { CredentialCipher } from '../mcp/cipher.ts'
+import type { CredentialCipher } from '../mcp/oauth/cipher.ts'
 import type { appRoutineSettings } from '../storage/routines.ts'
 import type { Firing, RoutineRun } from './runs.ts'
 import type { RoutineSlot } from './scheduler.ts'
@@ -109,7 +109,7 @@ export class Routines extends Context.Service<
 
 /**
  * Each routine run's application metadata: its admission, its Pi session, its questions to the owner, its usage, its
- * report and its Telegram notification. Pi owns the run itself; no transaction here spans an await.
+ * report and its notification. Pi owns the run itself; no transaction here spans an await.
  */
 export class RoutineRuns extends Context.Service<
   RoutineRuns,

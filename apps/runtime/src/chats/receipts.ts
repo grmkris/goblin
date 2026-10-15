@@ -14,7 +14,6 @@ export const RECEIPT_RETENTION = 30 * 24 * 60 * 60
 export const OPERATION_KINDS = [
   'send',
   'ask_client',
-  'telegram',
   'source',
   'persona_ask',
   'start',
@@ -32,7 +31,7 @@ export const OPERATION_KINDS = [
 /** What an operation in a chat is: one of `OPERATION_KINDS`, or `write:<entry kind>` for a passive write. */
 export type OperationKind = (typeof OPERATION_KINDS)[number] | `write:${string}`
 /** Who started an operation. */
-export const ReceiptOrigin = Schema.Literals(['owner', 'client', 'telegram', 'source', 'agent', 'routine', 'system'])
+export const ReceiptOrigin = Schema.Literals(['owner', 'client', 'source', 'agent', 'routine', 'system'])
 export type ReceiptOrigin = typeof ReceiptOrigin.Type
 
 /**

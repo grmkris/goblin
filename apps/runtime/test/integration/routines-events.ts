@@ -1,33 +1,24 @@
 import { PERSONAL_TOPIC, PRIMARY_CHAT, type RoutineDefinition, type RoutineEdit } from '@goblin/contracts'
 import type { PersonalAgent } from '../../src/agent.ts'
-import { drizzle } from 'drizzle-orm/durable-sqlite'
-import * as Effect from 'effect/Effect'
-import * as Exit from 'effect/Exit'
-import { deliverEvents } from '../../src/inbound/client.ts'
-import { AddedServerStore } from '../../src/mcp/servers.ts'
-import { CredentialCipher } from '../../src/mcp/cipher.ts'
-import { CredentialStore } from '../../src/mcp/credentials.ts'
-import { bindEndpoints } from '../../src/mcp/endpoints.ts'
 import { RoutineStore } from '../../src/routines/store.ts'
 import { RoutineRunStore } from '../../src/routines/runs.ts'
 import { appRoutineRuns, appRoutines } from '../../src/storage/routines.ts'
 import { SqliteEventStore } from '../../src/mcp/events/store.ts'
-import { runApplicationMigrations } from '../../src/storage/migrations.ts'
 import type { EventsFixture } from '../mcp/events-fixture.ts'
+import { connectEventsServer } from './events-server.ts'
 import type { SeenRequest } from './model.ts'
 import { changeRefused, changeRoutine, editRoutine, proposeRoutine } from './routines-owner.ts'
 import { type Probes, inAgent } from './probe.ts'
 import { waitFor } from './until.ts'
 import { withHandOver } from '../routine-definition.ts'
 
-const KEY = 'Z29ibGluLXRlc3QtZml4dHVyZS1rZXkhISEhISEhISE='
 const includesPublicTokens = (metadata: string, modelData: string) =>
   ['0x123', '0x456'].every((token) => metadata.includes(token) && modelData.includes(token))
 const definition: RoutineDefinition = {
   title: 'Native event routine',
   timezone: 'UTC',
   trigger: { kind: 'event', connectionId: 'routine-events', name: 'message.received', arguments: {} },
-  tellMe: { on: false, telegram: false },
+  tellMe: { on: false, copy: false },
   handTo: {
     kind: 'goblin',
     instruction: 'Return a short notification summary.',
@@ -50,38 +41,12 @@ const wait = (store: RoutineRunStore, id: string, count: number) =>
     3000,
   )
 async function setup(storage: DurableObjectStorage, agent: PersonalAgent, fixture: EventsFixture) {
-  runApplicationMigrations(storage)
-  const db = drizzle(storage)
-  const cipher = await CredentialCipher.fromBase64(KEY)
-  const server = {
-    connectionId: 'routine-events',
-    endpoint: 'https://routine-events.test/mcp',
-    title: 'Events fixture',
-  }
-  new AddedServerStore(db).add(server, 1)
-  bindEndpoints(db, [server], 1)
-  await new CredentialStore(db, cipher).saveTokens(
-    server.connectionId,
-    { access_token: 'keyless-fixture', token_type: 'bearer' },
-    1,
+  const { db, cipher } = await connectEventsServer(
+    storage,
+    { fetch: (internal) => agent.onRequest(internal) },
+    fixture,
+    { connectionId: 'routine-events', title: 'Events fixture' },
   )
-  fixture.receiver = async (request) => {
-    const delivered = deliverEvents(
-      { fetch: (internal) => agent.onRequest(internal) },
-      {
-        connectionId: 'routine-events',
-        body: new Uint8Array(await request.arrayBuffer()),
-        id: request.headers.get('webhook-id') ?? '',
-        timestamp: request.headers.get('webhook-timestamp') ?? '',
-        signature: request.headers.get('webhook-signature') ?? '',
-        subscriptionId: request.headers.get('x-mcp-subscription-id') ?? '',
-      },
-    )
-    const result = await Effect.runPromiseExit(delivered)
-    return Exit.isSuccess(result)
-      ? new Response(result.value.response ?? null, { status: result.value.status })
-      : new Response(null, { status: 400 })
-  }
   return {
     db,
     routines: new RoutineStore(db, agent.name),
@@ -91,7 +56,7 @@ async function setup(storage: DurableObjectStorage, agent: PersonalAgent, fixtur
   }
 }
 
-/** Official MCP producer, signed ingress, real Agent/Pi/SQLite and keyless model; no provider or Telegram send. */
+/** Official MCP producer, signed ingress, real Agent/Pi/SQLite and keyless model; no provider or Source send. */
 /** The owner's edit that puts an event routine back in draft, with other instructions. */
 const changedDraft = (original: RoutineDefinition, revision: number): RoutineEdit => ({
   revision,

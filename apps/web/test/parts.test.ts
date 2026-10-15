@@ -3,6 +3,7 @@ import { conversationParts } from '../src/lib/conversation-parts.ts'
 import {
   elapsedMs,
   isOwnTurn,
+  turnVia,
   type Part,
   partKey,
   samePart,
@@ -253,13 +254,21 @@ const user = (author?: string): Part => ({
 })
 
 describe("the owner's own turns", () => {
-  it('counts what the owner typed here or sent from Telegram', () => {
+  it('counts what the owner typed here and requires an own-turn mark for attributed messages', () => {
     expect(isOwnTurn(user())).toBe(true)
-    expect(isOwnTurn(user('Telegram'))).toBe(true)
+    expect(isOwnTurn(user('Chat · Trip planning'))).toBe(false)
   })
   it('leaves out messages from an MCP client, a subagent, a routine or a thread', () => {
     for (const author of ['Claude Code', 'subagent scout', 'Routine', 'thread "Car search"'])
       expect(isOwnTurn(user(author))).toBe(false)
+  })
+  it("counts a Source's message goblin marked as theirs, and says where it came from", () => {
+    const source: Part = { kind: 'user', id: 's', text: 'Book the ferry', author: 'Chat · Trip planning', own: true }
+    expect(isOwnTurn(source)).toBe(true)
+    expect(turnVia(source)).toBe('Chat')
+    expect(turnVia(user('Chat · Trip planning'))).toBeUndefined()
+    expect(turnVia(user())).toBeUndefined()
+    expect(turnVia(user('Claude Code'))).toBeUndefined()
   })
   it('is never a reply', () => {
     expect(isOwnTurn({ kind: 'text', id: 't', text: 'hi', live: false })).toBe(false)

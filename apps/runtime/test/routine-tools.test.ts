@@ -23,7 +23,7 @@ const definition = {
   title: 'Morning brief',
   trigger: { kind: 'cron', expression: '0 8 * * *' },
   timezone: 'Europe/Tallinn',
-  tellMe: { on: true, telegram: true },
+  tellMe: { on: true, copy: true },
   handTo: {
     kind: 'goblin',
     instruction: 'Summarize my calendar.',
@@ -58,7 +58,7 @@ describe('routine tools (unit, ADR 0027)', () => {
       validateToolArguments(propose, { type: 'toolCall', id: 'c', name: 'routine_propose', arguments: args })
     const asked = { ...definition, topic: 'Work', handTo: { ...definition.handTo, kind: 'persona', persona: 'Worker' } }
     expect(validate(asked)).toEqual(asked)
-    const told = { ...definition, tellMe: { on: true, telegram: false }, handTo: { kind: 'none' } }
+    const told = { ...definition, tellMe: { on: true, copy: false }, handTo: { kind: 'none' } }
     expect(validate(told)).toEqual(told)
     expect(() => validate({ ...asked, handTo: { ...asked.handTo, persona: 7 } })).toThrow('Validation failed')
   })

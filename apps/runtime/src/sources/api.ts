@@ -11,8 +11,8 @@ import { Sources } from './service.ts'
 export const SourcesHandlers = HttpApiBuilder.group(OwnerApi, 'sources', (handlers) =>
   handlers
     .handle('list', () => Sources.use((sources) => sources.list))
-    .handle('propose', ({ payload }) => Sources.use((sources) => sources.propose(payload, { actor: 'owner' })))
     .handle('confirm', ({ params, payload }) => Sources.use((sources) => sources.confirm(params.id, payload.revision)))
+    .handle('replyResult', ({ params, payload }) => Sources.use((sources) => sources.replyResult(params.id, payload)))
     .handle('refuse', ({ params, payload }) => Sources.use((sources) => sources.refuse(params.id, payload.revision)))
     .handle('routes', ({ params }) => Sources.use((sources) => sources.routes(params.id)))
     .handle('route', ({ params, payload }) =>

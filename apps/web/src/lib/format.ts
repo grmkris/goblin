@@ -7,9 +7,6 @@ export const pad = (value: number): string => String(value).padStart(2, '0')
 /** This browser's IANA timezone ("Europe/Tallinn"). */
 export const browserZone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone
 
-/** A date as the locale writes it in short ("10/10/2026"); `ms` is epoch milliseconds. */
-export const shortDate = (ms: number): string => new Date(ms).toLocaleDateString()
-
 /** A day and month in words ("10 October"); `ms` is epoch milliseconds. */
 export const dayAndMonth = (ms: number): string =>
   new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'long' })

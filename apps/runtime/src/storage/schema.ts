@@ -18,7 +18,7 @@ export const appMcpGrants = sqliteTable(
 )
 
 /**
- * The endpoint each server id's credentials and grants were made for (mcp/endpoints.ts). Kept apart from the
+ * The endpoint each server id's credentials and grants were made for (mcp/oauth/endpoints.ts). Kept apart from the
  * credentials, which a disconnect deletes, so grants stay bound too.
  */
 export const appMcpEndpoints = sqliteTable('app_mcp_endpoints', {
@@ -27,14 +27,14 @@ export const appMcpEndpoints = sqliteTable('app_mcp_endpoints', {
   boundAt: integer('bound_at').notNull(),
 })
 
-/** The owner's name for each connection, configured or added (mcp/labels.ts, ADR 0041); unique whatever its case. */
+/** The owner's name for each connection, configured or added (mcp/servers/labels.ts, ADR 0041); unique whatever its case. */
 export const appMcpLabels = sqliteTable('app_mcp_labels', {
   connectionId: text('connection_id').primaryKey().notNull(),
   label: text('label').notNull(),
 })
 
 /**
- * Servers the owner added (mcp/servers.ts), beside the deployment's configured ones. Title, description and icon are
+ * Servers the owner added (mcp/servers/servers.ts), beside the deployment's configured ones. Title, description and icon are
  * the server's own claims from its card or registry entry; `source` records where it was found.
  */
 export const appMcpConnections = sqliteTable('app_mcp_connections', {
@@ -47,14 +47,14 @@ export const appMcpConnections = sqliteTable('app_mcp_connections', {
   createdAt: integer('created_at').notNull(),
 })
 
-/** MCP registries the owner added to search (mcp/registries.ts), after the built-in ones. */
+/** MCP registries the owner added to search (mcp/servers/registries.ts), after the built-in ones. */
 export const appMcpRegistries = sqliteTable('app_mcp_registries', {
   url: text('url').primaryKey().notNull(),
   title: text('title').notNull(),
   addedAt: integer('added_at').notNull(),
 })
 
-/** Outbound OAuth state per server. `client_info` and `tokens` are AES-GCM ciphertext (mcp/credentials.ts). */
+/** Outbound OAuth state per server. `client_info` and `tokens` are AES-GCM ciphertext (mcp/oauth/credentials.ts). */
 export const appMcpCredentials = sqliteTable('app_mcp_credentials', {
   connectionId: text('connection_id').primaryKey().notNull(),
   status: text('status', { enum: ['connected', 'needs_auth'] }).notNull(),
@@ -80,14 +80,10 @@ export const appResident = sqliteTable('app_resident', {
   expiresAt: integer('expires_at').notNull(),
   revokedAt: integer('revoked_at'),
 })
-/**
- * The tokens this agent spent on models per UTC day (`YYYY-MM-DD`), which the daily cap counts. `milli_credits` is
- * retired with Credits and unread until the migrations are squashed.
- */
+/** The tokens this agent spent on models per UTC day (`YYYY-MM-DD`), which the daily cap counts. */
 export const appUsageDaily = sqliteTable('app_usage_daily', {
   day: text('day').primaryKey().notNull(),
   tokens: integer('tokens').notNull(),
-  milliCredits: integer('milli_credits').notNull().default(0),
   updatedAt: integer('updated_at').notNull(),
 })
 
@@ -141,8 +137,6 @@ export const appChatMoves = sqliteTable('app_chat_moves', {
   forkSession: text('fork_session'),
   messageEntry: integer('message_entry').notNull(),
   cutEntry: integer('cut_entry'),
-  // Always `settled`, the one kind of move; the column goes when the migrations are squashed.
-  mode: text('mode', { enum: ['settled'] }).notNull(),
   state: text('state', { enum: ['requested', 'forked', 'settled', 'refused'] }).notNull(),
   reason: text('reason'),
   relays: text('relays'),
@@ -219,24 +213,6 @@ export const appSkillDrafts = sqliteTable('app_skill_drafts', {
   updatedAt: integer('updated_at').notNull(),
 })
 
-/**
- * Turns whose answers go back to Telegram, until they are sent (ADR 0055): the goblin chat the turn ran in (none for
- * main), the Telegram chat and thread the answer goes to, and the Persona that answers instead of goblin, whose
- * invocation under the same operation id holds its answer; an answer sent as buttons keeps its question and buttons.
- */
-export const appChannelReplies = sqliteTable('app_channel_replies', {
-  operationId: text('operation_id').primaryKey().notNull(),
-  chatId: text('chat_id'),
-  tgChat: text('tg_chat').notNull().default('dm'),
-  tgThread: integer('tg_thread').notNull().default(0),
-  personaId: integer('persona_id'),
-  createdAt: integer('created_at').notNull(),
-  deliveredAt: integer('delivered_at'),
-  /** The question the answer went out as (buttons), and its buttons as JSON `[{ id, label }]`, to read a tap back. */
-  askQuestion: text('ask_question'),
-  askOptions: text('ask_options'),
-})
-
 /** Exact owner Events grants, independent of tools and remote subscription ids. */
 export const appMcpEventGrants = sqliteTable(
   'app_mcp_event_grants',
@@ -260,7 +236,7 @@ export const appMcpEventOffers = sqliteTable('app_mcp_event_offers', {
   at: integer('at').notNull(),
 })
 
-/** Each connection's own App entrypoint, as its last whole tool list declared it (`mcp/entrypoints.ts`). */
+/** Each connection's own App entrypoint, as its last whole tool list declared it (`mcp/apps/entrypoints.ts`). */
 export const appMcpEntrypoints = sqliteTable('app_mcp_entrypoints', {
   connectionId: text('connection_id').primaryKey().notNull(),
   tool: text('tool').notNull(),
@@ -342,31 +318,6 @@ export const appEventConsumerReceipts = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.subscriptionId, t.webhookId, t.consumerId, t.revision] })],
 )
-
-/**
- * The Telegram channel (channel/channel.ts): at most one row, the connection whose Events carry it and its inbox
- * cursor; what goblin does with a chat it has not seen (`new_chats`, ADR 0055); and how far the grant reaches (`reach`),
- * with the URL that widens a DM-only grant to all the bot's chats.
- */
-export const appTelegramChannel = sqliteTable('app_telegram_channel', {
-  id: integer('id').primaryKey().notNull(),
-  connectionId: text('connection_id').notNull(),
-  inboxCursor: text('inbox_cursor').notNull(),
-  enabledAt: integer('enabled_at').notNull(),
-  newChats: text('new_chats', { enum: ['ask', 'topic', 'personal'] })
-    .notNull()
-    .default('ask'),
-  reach: text('reach', { enum: ['dm', 'all'] })
-    .notNull()
-    .default('dm'),
-  widenUrl: text('widen_url'),
-  /** Counts changes of `new_chats`, so Undo can tell whether anything touched it. */
-  settingsRevision: integer('settings_revision').notNull().default(0),
-  /** The server's chat list is to be read again at the next pull (turned on, or a chat changed). */
-  syncDue: integer('sync_due', { mode: 'boolean' }).notNull().default(true),
-  /** The server ended the channel's Events and goblin could not subscribe again: the owner's attention is needed. */
-  ended: integer('ended', { mode: 'boolean' }).notNull().default(false),
-})
 
 /** A newer invalidation cannot be cleared by an older listing response. */
 export const appSkillCatalogState = sqliteTable('app_skill_catalog_state', {
@@ -532,8 +483,7 @@ export const appAgentJobs = sqliteTable(
 /**
  * Every App the workspace shows (ADRs 0020, 0021), one id space for both kinds: an MCP App kept from a tool call
  * (`source = 'mcp'`: call, server, tool, resource; `entry_id` is where the call sits in Pi, once found), or an agent
- * app (`'agent'`: its name). It records where an App comes from and what to call it, never a grant. The retired
- * `app_apps` table, its earlier MCP-only form, was copied here with the same ids and is no longer read.
+ * app (`'agent'`: its name). It records where an App comes from and what to call it, never a grant.
  */
 export const appRegistry = sqliteTable(
   'app_registry',

@@ -1,8 +1,9 @@
 // A Source's messages coming in (ADR 0066), over its rows (sources/store.ts) and the agent's ports. Each message read
-// from an event's data or a tool's result is keyed into a conversation; the owner's own messages (those the confirmed
-// speaks-for-me rule matches) go where that conversation's route says: a turn in a Topic answered by goblin or a
-// Persona, a note kept there, nothing, or held until the owner routes it. Everything else stays untrusted data: a
-// notice to the owner, or nothing.
+// from an event's data or a tool's result is keyed into a conversation (named by its title when the setup reads one); a
+// conversation seen first takes the setup's `newKeys`, a Topic of its own included. The owner's own messages (those the
+// confirmed speaks-for-me rule matches) go where that conversation's route says, with their attachments kept in the
+// owner's files (ADR 0065): a turn in a Topic answered by goblin or a Persona, a note kept there, nothing, or held until
+// the owner routes it. Everything else stays untrusted data: a notice to the owner, or nothing.
 import {
   type SourceKeyPart,
   type SourceKeyValues,
@@ -15,6 +16,7 @@ import { RunAttribute } from '@goblin/contracts/telemetry'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import { type AppError, InvalidInput } from '../http/errors.ts'
+import { reportAndRecover } from '../observability/report.ts'
 import { routineSummary } from '../routines/summary.ts'
 import { isRecord, sha256Hex } from '../runtime/digest.ts'
 import { failureAttributes } from '../telemetry/attributes.ts'
@@ -24,13 +26,14 @@ import {
   type Held,
   type RouteBy,
   type RouteRow,
+  addKey,
   checkpoint,
   heldOf,
   hold,
+  knownKey,
   release,
   routeOf,
   routeRow,
-  seeKey,
   setRoute,
   sourceRow,
   takeDropped,
@@ -48,6 +51,10 @@ const MAX_HISTORY_PAGES = 200
 const ITEM_ID = 64
 /** How long the owner reads of someone else's message in a notice. */
 const NOTICE_BODY = 1200
+/** How long a conversation's title may be, as a route shows it and a Topic is named. */
+const TITLE = 80
+/** What a turn says in place of the owner's words when their message brought only attachments. */
+const ONLY_ATTACHMENTS = '(Sent without words; what it brought is below.)'
 
 /** Whether `value` is a plain value a key part or a speaks-for-me rule compares. */
 const isScalar = (value: unknown): value is SourceScalar =>
@@ -66,11 +73,30 @@ const matches = (item: unknown, match: { readonly pointer: string; readonly equa
 /** Whether the owner is the one speaking in `item`, by the rule they confirmed. */
 const speaks = (item: unknown, rule: SpeaksForMe) => ('all' in rule ? true : matches(item, rule))
 
-/** A message's conversation: its key (the JSON of its parts' values in order) and its values by name. */
-type Conversation = { readonly key: string; readonly values: SourceKeyValues }
+/** A message's conversation: its key (the JSON of its parts' values in order), its values by name, and its title. */
+type Conversation = { readonly key: string; readonly values: SourceKeyValues; readonly title?: string | undefined }
 
-/** `item`'s conversation by the setup's key; none when a part is a list or an object, or the key is too long. */
-function conversationOf(item: unknown, parts: readonly SourceKeyPart[]): Conversation | undefined {
+/** The text at `pointer` as a conversation's title: one line, controls folded, at most 80 characters; none when empty. */
+const titleAt = (item: unknown, pointer: string | undefined): string | undefined => {
+  const value = pointer === undefined ? undefined : valueAt(item, pointer)
+  if (typeof value !== 'string') return undefined
+  const folded = value
+    .replaceAll(/[\s\p{Cc}]+/gu, ' ')
+    .trim()
+    .slice(0, TITLE)
+    .trim()
+  return folded === '' ? undefined : folded
+}
+
+/**
+ * `item`'s conversation by the setup's key, named by its `title` pointer; none when a part is a list or an object, or
+ * the key is too long.
+ */
+function conversationOf(
+  item: unknown,
+  parts: readonly SourceKeyPart[],
+  title: string | undefined,
+): Conversation | undefined {
   const values: Record<string, SourceScalar> = {}
   const ordered: SourceScalar[] = []
   for (const part of parts) {
@@ -80,7 +106,7 @@ function conversationOf(item: unknown, parts: readonly SourceKeyPart[]): Convers
     ordered.push(value)
   }
   const key = JSON.stringify(ordered)
-  return key.length > 512 ? undefined : { key, values }
+  return key.length > 512 ? undefined : { key, values, title: titleAt(item, title) }
 }
 
 /** A conversation's values in words: "chat dm, thread 3", leaving out the parts it does not have. */
@@ -89,6 +115,12 @@ export const keyWords = (values: SourceKeyValues): string =>
     .filter(([, value]) => value !== null && value !== '')
     .map(([name, value]) => `${name} ${String(value)}`)
     .join(', ')
+
+/** A conversation in words: its title when the server gave one, else its values. */
+const conversationWords = (conversation: {
+  readonly values: SourceKeyValues
+  readonly title?: string | null | undefined
+}) => conversation.title ?? keyWords(conversation.values)
 
 /** The operation of the turn a message makes: one per Source and message, a long message id as its digest. */
 const turnOperation = (sourceId: string, itemId: string) =>
@@ -121,27 +153,31 @@ const send = (
     if (target.to === 'ignore') return
     const operationId = yield* turnOperation(source.row.id, held.itemId)
     const label = yield* ports.label(source.row.connectionId)
-    const where = keyWords(valuesOf(route))
+    const where = conversationWords({ values: valuesOf(route), title: route.title })
+    const words = held.text.trim() === '' ? ONLY_ATTACHMENTS : held.text
     const turn = {
       topic: target.topic,
       operationId,
       author: where === '' ? label : `${label} · ${where}`,
-      text: `${note}${held.text}`,
+      text: `${note}${words}`,
+      ...(held.kept === undefined ? {} : { kept: held.kept }),
     }
     if (target.to === 'listen') return yield* ports.keep(turn)
-    const attributes = { [RunAttribute.channelMessage]: operationId }
+    const attributes = { [RunAttribute.sourceMessage]: operationId }
     const failed = (error: AppError) =>
-      record('channel.received', { operationId, chatId: undefined }, now, {
+      record('source.received', { operationId, chatId: undefined }, now, {
         ...attributes,
         ...failureAttributes(error),
       })
     const persona = target.to === 'persona' ? target.persona : undefined
     const submitted = yield* ports.submit(turn, persona).pipe(Effect.tapError(failed))
-    yield* record('channel.received', { operationId, chatId: submitted.chatId }, now, attributes)
+    yield* record('source.received', { operationId, chatId: submitted.chatId }, now, attributes)
     if (source.setup.reply === undefined) return
     const reply = {
       operationId,
       sourceId: source.row.id,
+      sourceRevision: source.row.revision,
+      sourceBinding: source.row.binding,
       key: route.key,
       chatId: submitted.chatId,
       personaId: submitted.persona ?? null,
@@ -171,7 +207,7 @@ const noticeOf = (source: Loaded, conversation: Conversation, target: SourceRout
   Effect.gen(function* () {
     const { row } = source
     const operationId = yield* turnOperation(row.id, itemId)
-    const where = keyWords(conversation.values)
+    const where = conversationWords(conversation)
     const body = noticeBody(text)
     return (label: string) => ({
       id: `notice:${operationId}`,
@@ -184,30 +220,72 @@ const noticeOf = (source: Loaded, conversation: Conversation, target: SourceRout
     })
   })
 
+/** The operation of the Topic a conversation's `topic-per-key` makes: one per Source and conversation key. */
+const topicOperation = (sourceId: string, key: string) =>
+  Effect.map(
+    Effect.promise(() => sha256Hex(key)),
+    (digest) => `source-topic:${sourceId}:${digest.slice(0, 32)}`,
+  )
+
 /**
- * One message: incoming (by `read.direction`), in a conversation goblin can key, with words. A conversation seen for
- * the first time takes the setup's `newKeys`. The owner's own message goes where its route says; anyone else's is a
- * notice to the owner, or nothing.
+ * The route a conversation seen for the first time takes: the setup's `newKeys`, or with `topic-per-key` a new Topic of
+ * its own, named after its title (else its values, else the connection), answered by goblin. A Topic that cannot be
+ * made leaves it held for the owner, reported.
+ */
+const firstRoute = (source: Loaded, conversation: Conversation, ports: SourcePorts) =>
+  Effect.gen(function* () {
+    const { newKeys } = source.setup
+    if (newKeys.to !== 'topic-per-key') return newKeys
+    const label = yield* ports.label(source.row.connectionId)
+    const operationId = yield* topicOperation(source.row.id, conversation.key)
+    return yield* ports.topic(conversationWords(conversation), label, operationId).pipe(
+      Effect.map((topic): SourceRoute => ({ to: 'topic', topic })),
+      reportAndRecover('sources.topic', { to: 'held' } satisfies SourceRoute),
+    )
+  })
+
+/** A conversation's route: the one it has (its title kept up to date), or the one it takes when goblin first sees it. */
+const routeFor = (context: EngineContext, source: Loaded, conversation: Conversation, ports: SourcePorts) =>
+  Effect.gen(function* () {
+    const seen = { sourceId: source.row.id, ...conversation }
+    const known = knownKey(context.db, seen)
+    if (known !== undefined) return known
+    const first = yield* firstRoute(source, conversation, ports)
+    return addKey(context.db, seen, first, Math.floor((yield* Clock.currentTimeMillis) / 1000))
+  })
+
+/** The attachments at the setup's `read.attachments` pointer of `item`: a list of MCP content blocks, else none. */
+const attachmentsOf = (item: unknown, pointer: string | undefined): readonly unknown[] => {
+  const found = pointer === undefined ? undefined : valueAt(item, pointer)
+  return Array.isArray(found) ? found : []
+}
+
+/**
+ * One message: incoming (by `read.direction`), in a conversation goblin can key, with words or attachments. A
+ * conversation seen for the first time takes the setup's `newKeys`. The owner's own message goes where its route says,
+ * its attachments kept in the owner's files first (held or not, as a link may not last); anyone else's is a notice to
+ * the owner, or nothing, and what it brought is never fetched.
  */
 const take = (context: EngineContext, source: Loaded, item: unknown, itemId: string, ports: SourcePorts) =>
   Effect.gen(function* () {
     const { row, setup } = source
     if (setup.read.direction !== undefined && !matches(item, setup.read.direction)) return
-    const conversation = conversationOf(item, setup.key)
-    const text = valueAt(item, setup.read.text)
-    if (conversation === undefined || typeof text !== 'string' || text.trim() === '') return
-    const now = Math.floor((yield* Clock.currentTimeMillis) / 1000)
-    const route = seeKey(context.db, { sourceId: row.id, ...conversation }, setup.newKeys, now).row
-    if (speaks(item, setup.speaksForMe))
-      return yield* send(
-        context,
-        source,
-        route,
-        { held: { sourceId: row.id, itemId, key: conversation.key, text }, note: '' },
-        ports,
-      )
+    const owner = speaks(item, setup.speaksForMe)
+    if (!owner && setup.others === 'drop') return
+    const conversation = conversationOf(item, setup.key, setup.read.title)
+    const found = valueAt(item, setup.read.text)
+    const text = typeof found === 'string' ? found : ''
+    const blocks = attachmentsOf(item, setup.read.attachments)
+    if (conversation === undefined || (text.trim() === '' && blocks.length === 0)) return
+    const route = yield* routeFor(context, source, conversation, ports)
     const target = routeOf(route)
-    if (setup.others === 'drop' || target.to === 'ignore') return
+    if (owner) {
+      if (target.to === 'ignore') return
+      const kept = blocks.length === 0 ? undefined : yield* ports.receive(row.connectionId, blocks)
+      const held = { sourceId: row.id, itemId, key: conversation.key, text, kept }
+      return yield* send(context, source, route, { held, note: '' }, ports)
+    }
+    if (target.to === 'ignore') return
     const notice = yield* noticeOf(source, conversation, target, itemId, text)
     yield* ports.notice(notice(yield* ports.label(row.connectionId)))
   })

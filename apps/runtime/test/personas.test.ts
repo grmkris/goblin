@@ -10,7 +10,6 @@ import { FlowEvents } from '../src/observability/flows.ts'
 import { KeyedLock } from '../src/observability/lock.ts'
 import { Changes, makeChanges } from '../src/runtime/changes.ts'
 import { OrganizeReceipts } from '../src/organize/receipts.ts'
-import { Channel } from '../src/channel/service.ts'
 import { undoReceipt } from '../src/organize/program.ts'
 import { addressedTo } from '../src/personas/ask.ts'
 import { PersonaInvocations } from '../src/personas/invocations.ts'
@@ -289,12 +288,12 @@ describe('what a Persona turn changes in its fork', () => {
       addressedTo(
         ['A'],
         [
-          { type: 'text', text: '[from Telegram · Trip planning]' },
+          { type: 'text', text: '[from Chat · Trip planning]' },
           { type: 'text', text: 'hello' },
         ],
       ),
     ).toEqual([
-      { type: 'text', text: '[from Telegram · Trip planning]' },
+      { type: 'text', text: '[from Chat · Trip planning]' },
       { type: 'text', text: '[to @A] hello' },
     ])
     expect(
@@ -330,7 +329,6 @@ type Provided =
   | AppEngine
   | PiSessions
   | FlowEvents
-  | Channel
   | Sources
 const run = <A, E>(layer: Layer.Layer<Provided>, program: Effect.Effect<A, E, Provided>) =>
   Effect.runPromise(Effect.provide(program, layer))
@@ -375,8 +373,7 @@ describe('organize receipts and Undo', () => {
       Layer.succeed(McpConnections, unread),
       Layer.succeed(Skills, unread),
       Layer.succeed(AppEngine, unread),
-      // Only a Telegram receipt's Undo reaches the channel, and only a Source's route receipt the Sources.
-      Layer.succeed(Channel, unread),
+      // Only a Source's route receipt reaches the Sources.
       Layer.succeed(Sources, unread),
       FlowEvents.noop,
     ).pipe(Layer.provide(Layer.merge(KeyedLock.layer, Layer.succeed(Changes, makeChanges()))))

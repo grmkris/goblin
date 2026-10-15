@@ -15,4 +15,5 @@ Runtime paths below are relative to `apps/runtime/src/`; browser paths are relat
 | `/api/clients…`, `/api/client-errors` | The account API, answered in the Worker without waking an agent (see The owner API). |
 | `/api/*` | The owner API: admitted at the Worker's edge, then forwarded to the signed-in user's own agent (see The owner API). |
 | `/hooks/mcp-events/<userId>/<connectionId>/<token>` | One connection's signed MCP Events; the route token, bound to the user and the connection, is checked before object lookup, then the agent's internal API takes it (`mcpEvents`). |
+| `/files/link/<token>/<name>` | One owner file handed to a server (`file_link`, ADR 0070): GET only; the token (user, path, expiry within fifteen minutes, HMAC under a purpose-derived key) is checked in constant time before object lookup, then the agent it names serves that file through its internal API (`linkedFile`) as an attachment, never cached; anything else is a 404. |
 | anything else, `/internal/*` included | A 404 in the envelope: the internal API is reached only by the Worker, on the agent's stub. |

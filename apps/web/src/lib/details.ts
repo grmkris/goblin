@@ -34,10 +34,10 @@ function labelOf(event: RunEvent): string {
       return named('Tool', attribute(event, RunAttribute.toolName))
     case 'compaction':
       return 'Context compacted'
-    case 'channel.received':
-      return named('Received from', attribute(event, RunAttribute.channel))
-    case 'channel.reply':
-      return named('Replied on', attribute(event, RunAttribute.channel))
+    case 'source.received':
+      return named('Received from', attribute(event, RunAttribute.source))
+    case 'source.reply':
+      return named('Replied on', attribute(event, RunAttribute.source))
     case 'recovery':
       return 'Recovered'
     case 'mcp.request':

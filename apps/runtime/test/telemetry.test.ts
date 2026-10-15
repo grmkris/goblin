@@ -15,9 +15,9 @@ import { PiRunRecorder, sourceOf } from '../src/telemetry/pi.ts'
 import { auxReporter, mcpReporter } from '../src/telemetry/report.ts'
 import { CheapModel } from '../src/memory/model.ts'
 import { MODEL_PROVIDER } from '../src/pi/model.ts'
-import { type StepReport, timed } from '../src/mcp/log.ts'
+import { type StepReport, timed } from '../src/mcp/connections/log.ts'
 import type { McpStep } from '../src/telemetry/report.ts'
-import { grantRequiredResult } from '../src/mcp/extension.ts'
+import { grantRequiredResult } from '../src/mcp/connections/extension.ts'
 import { NeedsAuthorization, NotFound, UpstreamMcp } from '../src/http/errors.ts'
 import { CollectedRuns } from './telemetry-sink.ts'
 
@@ -301,7 +301,7 @@ describe('run telemetry (unit)', () => {
         kind: 'tool.call',
         status: 'error',
         conversationId: '1',
-        operationId: 'telegram-12',
+        operationId: 'source-12',
         taskId: 't1',
         startedAt: 10,
         endedAt: 250,
@@ -317,7 +317,7 @@ describe('run telemetry (unit)', () => {
         status: 'error',
         agent: 'user-1',
         conversation: '1',
-        operation: 'telegram-12',
+        operation: 'source-12',
         task: 't1',
         id: 'tool:t1',
         ms: 240,
@@ -332,7 +332,7 @@ describe('run telemetry (unit)', () => {
   })
 
   it('names where a turn came from by its operation id', () => {
-    expect(sourceOf('telegram-tg-123')).toBe('telegram')
+    expect(sourceOf('source-message-123')).toBe('source')
     expect(sourceOf('routine-input:rr_1:op')).toBe('routine')
     expect(sourceOf('subagent-report:7')).toBe('subagent_report')
     expect(sourceOf('subagent:7')).toBe('subagent')
@@ -344,11 +344,11 @@ describe('run telemetry (unit)', () => {
 
   it("names where a turn came from by its operation's receipt first (O2), its prefix only without one", () => {
     expect(sourceOf('op-1', { kind: 'ask_client', origin: 'client' })).toBe('client')
-    expect(sourceOf('op-2', { kind: 'telegram', origin: 'telegram' })).toBe('telegram')
+    expect(sourceOf('op-2', { kind: 'source', origin: 'source' })).toBe('source')
     expect(sourceOf('op-3', { kind: 'routine_input', origin: 'routine' })).toBe('routine')
     expect(sourceOf('op-4', { kind: 'subagent_report', origin: 'agent' })).toBe('subagent_report')
     // The owner's own send, whatever its id looks like; a passive write's receipt falls back to the prefix.
-    expect(sourceOf('telegram-lookalike', { kind: 'send', origin: 'owner' })).toBe('direct')
+    expect(sourceOf('source-lookalike', { kind: 'send', origin: 'owner' })).toBe('direct')
     expect(sourceOf('persona:owner:op-3:2', { kind: 'write:app.note', origin: 'system' })).toBe('persona')
   })
 

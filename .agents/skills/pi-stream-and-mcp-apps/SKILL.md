@@ -24,7 +24,7 @@ conversation outside it.
   chart and map fences. Keep open streaming fences, invalid specs and drawing failures as code; Streamdown says which
   block's fence is still open. Keep its renderers plain (`PLAIN`) and its rehype plugins explicit. Snapshots name when they were true. Agent-app views share the kit through its import allowlist and frame
   bundles. Figures are read-only and grant no app power. Verify light/dark, narrow chats and reduced motion.
-- Complete `openui` fences share `RichBlock` and the lazy `parts/openui/` interpreter (ADR 0068). Keep its grammar
+- Complete `openui` fences share `RichBlock` and the lazy `parts/openui/` interpreter (ADR 0074). Keep its grammar
   bounded and its fields local. Buttons submit only visible labels and mounted form values through `ReplySend` to
   `useConversation.send`; no hidden action, network provider or grant. Quoted and closed chats disable controls.
   Keep the runtime grammar (`pi/reply-ui.ts`) and browser library in step. Verify with `test/ui-openui.ts` and the

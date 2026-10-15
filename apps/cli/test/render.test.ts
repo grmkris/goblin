@@ -5,9 +5,9 @@ import { statsLine, statsQuery } from '../src/stats.ts'
 
 const AT = Date.UTC(2026, 9, 6, 10, 0, 0)
 const turn = {
-  operationId: 'telegram-12',
+  operationId: 'source-12',
   conversationId: '1',
-  source: 'telegram',
+  source: 'source',
   status: 'error',
   reason: 'model_error',
   startedAt: AT,
@@ -23,7 +23,7 @@ const event = (kind: string, status: string, attributes: Record<string, string |
   id: `${kind}-${status}`,
   kind,
   status,
-  operationId: 'telegram-12',
+  operationId: 'source-12',
   startedAt: AT,
   endedAt: AT + 250,
   attributes,
@@ -41,7 +41,7 @@ describe('goblin output (unit)', () => {
       coverage: { complete: false, gaps: ['Some events have not ended.'] },
     })
     expect(text.split('\n')).toEqual([
-      '2026-10-06 10:00:00  error        telegram         2 calls (1 failed)  1 tools (1 failed)  120/30 tok  telegram-12  model_error',
+      '2026-10-06 10:00:00  error        source           2 calls (1 failed)  1 tools (1 failed)  120/30 tok  source-12  model_error',
       'Pi: unanswered (model_error)',
       '',
       '2026-10-06 10:00:00  model.attempt    error          250ms  gpt-test  rate limited',
@@ -92,12 +92,12 @@ describe('goblin output (unit)', () => {
   })
 
   it("asks Workers Logs for one Worker's lines that mention an id", () => {
-    expect(logsQuery({ worker: 'goblin-dev', needle: 'telegram-12', from: 1, to: 2 })).toMatchObject({
+    expect(logsQuery({ worker: 'goblin-dev', needle: 'source-12', from: 1, to: 2 })).toMatchObject({
       view: 'events',
       timeframe: { from: 1, to: 2 },
       parameters: {
         filters: [{ key: '$metadata.service', operation: 'eq', type: 'string', value: 'goblin-dev' }],
-        needle: { value: 'telegram-12' },
+        needle: { value: 'source-12' },
       },
     })
     expect(
@@ -123,7 +123,7 @@ describe('goblin output (unit)', () => {
     expect(details.split('\n')).toEqual([
       'No turn: the steps of this operation',
       '',
-      `2026-10-06 10:00:00  flow             blocked        250ms    telegram-12`,
+      `2026-10-06 10:00:00  flow             blocked        250ms    source-12`,
       '',
       'Related:',
       '  send  owner:op-8  chat 1  ok',

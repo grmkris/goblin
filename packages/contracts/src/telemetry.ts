@@ -11,8 +11,8 @@ export const RunEventKind = Schema.Literals([
   'model.aux',
   'tool.call',
   'compaction',
-  'channel.received',
-  'channel.reply',
+  'source.received',
+  'source.reply',
   'recovery',
   'mcp.request',
   'error',
@@ -90,12 +90,11 @@ export const RunAttribute = {
   source: 'goblin.source',
   /** What a model call outside a turn was for: `naming`, `memory`, `skill`, `app_llm` or `retrieval`. */
   purpose: 'goblin.purpose',
-  channel: 'goblin.channel',
-  /** The channel's own id for the message (mygram's inbox id). */
-  channelMessage: 'goblin.channel.message',
-  /** `sent`, or `given_up` when the turn never answered within the channel's window. */
+  /** The Source's operation id for the message. */
+  sourceMessage: 'goblin.source.message',
+  /** `sent`, or `given_up` when the turn never answered within the Source's window. */
   delivery: 'goblin.delivery',
-  pieces: 'goblin.channel.pieces',
+  pieces: 'goblin.source.pieces',
   compactionReason: 'goblin.compaction.reason',
   taskKind: 'goblin.task.kind',
   /** `restarted` for an event the object's restart cut short; `resumed` for one that finished after it. */
@@ -109,7 +108,7 @@ export const RunAttribute = {
   flowVia: 'goblin.flow.via',
   flowStatus: 'goblin.flow.status',
   actor: 'goblin.actor',
-  /** Who an operation's receipt says started it: `owner`, `client`, `telegram`, `agent`, `routine` or `system`. */
+  /** Who an operation's receipt says started it: `owner`, `client`, `source`, `agent`, `routine` or `system`. */
   origin: 'goblin.origin',
   /** Logical chat ids (ADR 0030), never a Pi session id. */
   chat: 'goblin.chat',
@@ -125,13 +124,12 @@ export const RunAttribute = {
 
 /**
  * The conversation flows that record a `flow` event: how people and agents move through conversations (replies, "+",
- * start thread, move, Personas, Delegates, Topics, routines, Telegram, URL requests and step-ups),
+ * start thread, move, Personas, Delegates, Topics, routines, Sources, URL requests and step-ups),
  * plus browser crashes.
  */
 export const FlowName = Schema.Literals([
   'send',
   'ask_client',
-  'telegram',
   'persona_ask',
   'persona_answer',
   'start',
@@ -150,7 +148,6 @@ export const FlowName = Schema.Literals([
   'organize_undo',
   'routine_fire',
   'routine_report',
-  'telegram_delivery',
   /** The owner's message from a Source became a turn (ADR 0066). */
   'source',
   /** goblin's answer went back through a Source's reply tool, or was given up. */
@@ -172,7 +169,7 @@ export const FlowName = Schema.Literals([
 export type FlowName = typeof FlowName.Type
 
 /** The surface a flow came in through. */
-export const FlowVia = Schema.Literals(['app', 'mcp', 'telegram', 'tool', 'schedule', 'system'])
+export const FlowVia = Schema.Literals(['app', 'mcp', 'tool', 'schedule', 'system'])
 export type FlowVia = typeof FlowVia.Type
 
 /** Who acted. */

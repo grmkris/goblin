@@ -1,132 +1,191 @@
+import { getSchema } from 'better-auth/db'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { createAuth } from '../src/auth/options.ts'
+import type { RuntimeEnv } from '../src/env.ts'
 
 const DIR = fileURLToPath(new URL('../migrations', import.meta.url).href)
 const migrations = readdirSync(DIR)
   .filter((name) => name.endsWith('.sql'))
   .toSorted()
-const apply = (db: DatabaseSync, names: readonly string[]) => {
-  for (const name of names) db.exec(readFileSync(join(DIR, name), 'utf8'))
+const APP = 'https://goblin.test'
+const NOW = '2026-10-15T00:00:00.000Z'
+const SCOPES = ['openid', 'profile', 'email', 'offline_access', 'goblin:inspect']
+const databases: DatabaseSync[] = []
+afterEach(() => {
+  for (const db of databases.splice(0)) db.close()
+})
+
+/** Better Auth recognizes node:sqlite itself; this fixture supplies the exact deployed options and real baseline. */
+const fixture = () => {
+  const db = new DatabaseSync(':memory:')
+  databases.push(db)
+  for (const name of migrations) db.exec(readFileSync(join(DIR, name), 'utf8'))
+  const env: RuntimeEnv = Object.assign(Object.create(null), {
+    APP_URL: APP,
+    BETTER_AUTH_SECRET: 'baseline-fixture-secret-at-least-32-characters',
+    AUTH_DB: db,
+  })
+  return { db, auth: createAuth(env, env.AUTH_DB) }
 }
-const NOW = '2026-10-06T00:00:00.000Z'
 
-describe('auth store migrations (unit)', () => {
-  it('lets clients registered before one /mcp ask for inspection, and retires the old resources', () => {
-    const inspection = migrations.findIndex((name) => name.startsWith('0009_mcp_inspection_scope'))
-    expect(inspection).toBeGreaterThan(0)
-    const db = new DatabaseSync(':memory:')
-    apply(db, migrations.slice(0, inspection))
-    const client = db.prepare(
-      'INSERT INTO oauthClient (id, clientId, scopes, redirectUris, createdAt) VALUES (?, ?, ?, ?, ?)',
-    )
-    client.run('1', 'old', '["openid","profile","email","offline_access"]', '[]', NOW)
-    client.run('2', 'between', '["openid","offline_access","goblin:inspect","goblin:operator"]', '[]', NOW)
-    client.run('3', 'unset', null, '[]', NOW)
-    const resource = db.prepare('INSERT INTO oauthResource (id, identifier, name) VALUES (?, ?, ?)')
-    for (const [id, path] of [
-      ['r1', '/mcp'],
-      ['r2', '/mcp/inspect'],
-      ['r3', '/mcp/operator'],
-    ] as const)
-      resource.run(id, `https://dev.goblin.surf${path}`, path)
-    db.prepare('INSERT INTO oauthClientResource (id, clientId, resourceId) VALUES (?, ?, ?)').run(
-      'l1',
-      'between',
-      'https://dev.goblin.surf/mcp/inspect',
-    )
+/** The indexes actually enforcing constraints, including implicit primary-key and unique indexes. */
+const indexes = (db: DatabaseSync, table: string) =>
+  db
+    .prepare('SELECT name, "unique" AS isUnique FROM pragma_index_list(?)')
+    .all(table)
+    .map((index) => ({
+      unique: index['isUnique'] === 1,
+      columns: db
+        .prepare('SELECT name FROM pragma_index_info(?) ORDER BY seqno')
+        .all(String(index['name']))
+        .map((row) => row['name']),
+    }))
 
-    apply(db, migrations.slice(inspection))
+const SQL_TYPES: Readonly<Record<string, string>> = {
+  string: 'TEXT',
+  'string[]': 'TEXT',
+  'number[]': 'TEXT',
+  json: 'TEXT',
+  number: 'INTEGER',
+  boolean: 'INTEGER',
+  date: 'DATE',
+}
 
-    const scopes = db.prepare('SELECT clientId, scopes FROM oauthClient ORDER BY id').all()
-    expect(scopes).toEqual([
-      { clientId: 'old', scopes: '["openid","profile","email","offline_access","goblin:inspect"]' },
-      { clientId: 'between', scopes: '["openid","offline_access","goblin:inspect"]' },
-      { clientId: 'unset', scopes: null },
-    ])
-    expect(db.prepare('SELECT identifier FROM oauthResource').all()).toEqual([
-      { identifier: 'https://dev.goblin.surf/mcp' },
-    ])
-    expect(db.prepare('SELECT COUNT(*) AS links FROM oauthClientResource').get()).toEqual({ links: 0 })
+/** Compare the SQL to the installed Better Auth schema, not to a second manually maintained column list. */
+function checkTable(db: DatabaseSync, table: string, schema: ReturnType<typeof getSchema>[string]) {
+  const columns = db.prepare('SELECT name, UPPER(type) AS type, "notnull", pk FROM pragma_table_info(?)').all(table)
+  expect(columns, table).toEqual([
+    { name: 'id', type: 'TEXT', notnull: 1, pk: 1 },
+    ...Object.entries(schema.fields).map(([name, field]) => ({
+      name,
+      type: field.bigint === true ? 'BIGINT' : typeof field.type === 'string' ? SQL_TYPES[field.type] : 'TEXT',
+      notnull: field.required === false ? 0 : 1,
+      pk: 0,
+    })),
+  ])
+  const expectedIndexes = [
+    { unique: true, columns: ['id'] },
+    ...Object.entries(schema.fields).flatMap(([name, field]) => [
+      ...(field.unique === true ? [{ unique: true, columns: [name] }] : []),
+      ...(field.index === true ? [{ unique: false, columns: [name] }] : []),
+    ]),
+    ...(schema.indexes ?? []).map(({ unique, columns: indexColumns }) => ({
+      unique: unique ?? false,
+      columns: indexColumns,
+    })),
+  ]
+  expect(indexes(db, table), table).toEqual(expect.arrayContaining(expectedIndexes))
+  expect(indexes(db, table), table).toHaveLength(expectedIndexes.length)
+  const references = Object.entries(schema.fields).flatMap(([name, field]) =>
+    field.references === undefined
+      ? []
+      : [
+          {
+            from: name,
+            table: field.references.model,
+            to: field.references.field,
+            on_delete: (field.references.onDelete ?? 'cascade').toUpperCase(),
+          },
+        ],
+  )
+  const actual = db.prepare('SELECT "from", "table", "to", on_delete FROM pragma_foreign_key_list(?)').all(table)
+  expect(actual, table).toEqual(expect.arrayContaining(references))
+  expect(actual, table).toHaveLength(references.length)
+}
+
+/** A registered public client, exactly as an MCP client registers against the real provider. */
+const registration = (auth: ReturnType<typeof createAuth>, changes: Record<string, unknown> = {}) =>
+  auth.handler(
+    new Request(`${APP}/api/auth/oauth2/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: APP },
+      body: JSON.stringify({
+        client_name: 'baseline-fixture',
+        redirect_uris: ['http://127.0.0.1:9/callback'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        ...changes,
+      }),
+    }),
+  )
+
+describe('auth D1 baseline', () => {
+  it('contains exactly the configured Better Auth schema, including columns, indexes and foreign keys', async () => {
+    expect(migrations).toEqual(['0000_baseline.sql'])
+    const { db, auth } = fixture()
+    await auth.$context
+    const schema = getSchema(auth.options)
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+      .all()
+      .map((row) => row['name'])
+    expect(tables).toEqual(Object.keys(schema).toSorted())
+    for (const [table, fields] of Object.entries(schema)) checkTable(db, table, fields)
+    expect(tables).toContain('rateLimit')
+    expect(tables.some((name) => String(name).startsWith('app_'))).toBe(false)
   })
 
-  it('carries daily token overrides over as Credits, at 2,500 tokens per Credit', () => {
-    const credits = migrations.findIndex((name) => name.startsWith('0010_daily_credits'))
-    expect(credits).toBeGreaterThan(0)
-    const db = new DatabaseSync(':memory:')
-    apply(db, migrations.slice(0, credits))
-    const user = db.prepare(
-      'INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, 1, ?, ?)',
-    )
-    const account = db.prepare(
-      "INSERT INTO app_billing_accounts (user_id, plan_override, override_stage, daily_tokens, created_at, updated_at) VALUES (?, 'pro', 'dev', ?, 0, 0)",
-    )
-    for (const [id, tokens] of [
-      ['pro', 2_000_000],
-      ['unlimited', 1_000_000_000_000],
-      ['tiny', 17],
-      ['plain', null],
-    ] as const) {
-      user.run(id, id, `${id}@goblin.test`, NOW, NOW)
-      account.run(id, tokens)
-    }
-
-    apply(db, migrations.slice(credits))
-
-    expect(db.prepare('SELECT user_id, daily_credits FROM app_billing_accounts ORDER BY user_id').all()).toEqual([
-      { user_id: 'plain', daily_credits: null },
-      { user_id: 'pro', daily_credits: 800 },
-      { user_id: 'tiny', daily_credits: 1 },
-      { user_id: 'unlimited', daily_credits: 400_000_000 },
-    ])
-  })
-
-  it('keys wallet subscriptions by subscription, keeps the ones before as monthly, and lets a day pass beside one', () => {
-    const billing = migrations.findIndex((name) => name.startsWith('0012_wallet_billing'))
-    expect(billing).toBeGreaterThan(0)
-    const db = new DatabaseSync(':memory:')
-    apply(db, migrations.slice(0, billing))
-    db.prepare('INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, 1, ?, ?)').run(
-      'u1',
-      'u1',
-      'u1@goblin.test',
-      NOW,
-      NOW,
-    )
-    db.prepare(
-      `INSERT INTO app_billing_wallet_subscriptions (user_id, subscription_id, status, amount_usd, period_days, starts_at,
-        period, paid_through, next_attempt_at, created_at, updated_at) VALUES ('u1', 'sub_m', 'active', '10.00', 30, 5,
-        1, 50, 50, 5, 6)`,
-    ).run()
-
-    apply(db, migrations.slice(billing))
-
-    expect(
+  it('enforces unique identities and client-resource pairs, and cascades deleted account authority', async () => {
+    const { db, auth } = fixture()
+    await auth.$context
+    db.exec(`
+      INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt)
+        VALUES ('u1', 'Owner', 'owner@example.test', 1, '${NOW}', '${NOW}');
+      INSERT INTO session (id, expiresAt, token, createdAt, updatedAt, userId)
+        VALUES ('s1', '${NOW}', 'token-1', '${NOW}', '${NOW}', 'u1');
+      INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]');
+      INSERT INTO oauthClientResource (id, clientId, resourceId) VALUES ('l1', 'client-1', '${APP}/mcp');
+      INSERT INTO oauthConsent (id, clientId, userId, scopes, createdAt, updatedAt)
+        VALUES ('consent-1', 'client-1', 'u1', '["goblin:inspect"]', '${NOW}', '${NOW}');
+      INSERT INTO oauthRefreshToken (id, token, clientId, sessionId, userId, expiresAt, createdAt, scopes)
+        VALUES ('refresh-1', 'refresh-token-1', 'client-1', 's1', 'u1', '${NOW}', '${NOW}', '["goblin:inspect"]');
+      INSERT INTO oauthAccessToken (id, token, clientId, userId, refreshId, expiresAt, createdAt, scopes)
+        VALUES ('access-1', 'access-token-1', 'client-1', 'u1', 'refresh-1', '${NOW}', '${NOW}', '["goblin:inspect"]');
+      INSERT INTO rateLimit (id, key, count, lastRequest) VALUES ('limit-1', 'ip:1', 1, 100);
+    `)
+    expect(() =>
       db
-        .prepare(
-          'SELECT subscription_id, user_id, billing, status, amount_usd, period, paid_through FROM app_billing_wallet_subscriptions',
-        )
-        .all(),
-    ).toEqual([
-      {
-        subscription_id: 'sub_m',
-        user_id: 'u1',
-        billing: 'month',
-        status: 'active',
-        amount_usd: '10.00',
-        period: 1,
-        paid_through: 50,
-      },
+        .prepare('INSERT INTO oauthClientResource (id, clientId, resourceId) VALUES (?, ?, ?)')
+        .run('l2', 'client-1', `${APP}/mcp`),
+    ).toThrow()
+    expect(() =>
+      db
+        .prepare('INSERT INTO rateLimit (id, key, count, lastRequest) VALUES (?, ?, ?, ?)')
+        .run('limit-2', 'ip:1', 2, 200),
+    ).toThrow()
+    expect(() =>
+      db
+        .prepare('INSERT INTO session (id, expiresAt, token, createdAt, updatedAt, userId) VALUES (?, ?, ?, ?, ?, ?)')
+        .run('s2', NOW, 'token-2', NOW, NOW, 'missing'),
+    ).toThrow()
+    db.exec("DELETE FROM session WHERE id = 's1'")
+    expect(db.prepare('SELECT sessionId FROM oauthRefreshToken').get()).toEqual({ sessionId: null })
+    db.exec("DELETE FROM user WHERE id = 'u1'")
+    for (const table of ['oauthConsent', 'oauthRefreshToken', 'oauthAccessToken'])
+      expect(db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get(), table).toEqual({ count: 0 })
+    db.exec("DELETE FROM oauthClient WHERE id = 'c1'")
+    expect(db.prepare('SELECT COUNT(*) AS count FROM oauthClientResource').get()).toEqual({ count: 0 })
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+  })
+
+  it('registers current clients for one /mcp resource with inspection available and no pre-granted consent', async () => {
+    const { db, auth } = fixture()
+    const response = await registration(auth)
+    expect(response.status, await response.clone().text()).toBe(201)
+    const client = db.prepare('SELECT scopes, skipConsent FROM oauthClient').get()
+    expect(JSON.parse(String(client?.['scopes']))).toEqual(SCOPES)
+    expect(client?.['skipConsent']).not.toBe(1)
+    expect(db.prepare('SELECT identifier, allowedScopes FROM oauthResource').all()).toEqual([
+      { identifier: `${APP}/mcp`, allowedScopes: JSON.stringify(SCOPES) },
     ])
-    const insert = db.prepare(
-      `INSERT INTO app_billing_wallet_subscriptions (subscription_id, user_id, billing, status, amount_usd, period_days,
-        starts_at, created_at, updated_at) VALUES (?, 'u1', ?, ?, '1.00', 1, 0, 7, 7)`,
-    )
-    insert.run('sub_d', 'day', 'superseded')
-    expect(() => insert.run('sub_x', 'week', 'active')).toThrow()
-    expect(() => insert.run('sub_y', 'day', 'free')).toThrow()
-    expect(db.prepare('SELECT COUNT(*) AS rows FROM app_billing_wallet_subscriptions').get()).toEqual({ rows: 2 })
+    expect(db.prepare('SELECT COUNT(*) AS count FROM oauthConsent').get()).toEqual({ count: 0 })
+    const refused = await registration(auth, { scope: 'goblin:operator' })
+    expect(refused.status, await refused.clone().text()).toBe(400)
+    expect(db.prepare('SELECT COUNT(*) AS count FROM oauthClient').get()).toEqual({ count: 1 })
   })
 })

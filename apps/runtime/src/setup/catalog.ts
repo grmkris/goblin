@@ -11,7 +11,7 @@ import * as Option from 'effect/Option'
 import { AppEngine } from '../agent-apps/service.ts'
 import { InvalidInput } from '../http/errors.ts'
 import { McpConnections, McpGrants, McpServers } from '../mcp/service.ts'
-import { toolOffered } from '../mcp/remote.ts'
+import { toolOffered } from '../mcp/connections/remote.ts'
 import { Skills } from '../skills/service.ts'
 
 /**

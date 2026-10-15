@@ -6,22 +6,12 @@ import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import type { Applied } from '../../../src/agent-model.ts'
 import { recordUse, usageLedger } from '../../../src/budget.ts'
-import { telegramChannel } from '../../../src/channel/channel.ts'
-import { Channel } from '../../../src/channel/service.ts'
 import { registerPrimary } from '../../../src/chats/directory.ts'
 import { AgentHandlers } from '../../../src/routines/agent-api.ts'
-import { AppEngine } from '../../../src/agent-apps/service.ts'
-import { ChatOperations, Conversations } from '../../../src/chats/service.ts'
-import { FlowEvents } from '../../../src/observability/flows.ts'
-import { Receipts } from '../../../src/organize/service.ts'
-import { Invocations, Personas } from '../../../src/personas/service.ts'
-import { Setups } from '../../../src/setup/service.ts'
-import { Skills } from '../../../src/skills/service.ts'
-import { Topics } from '../../../src/topics/service.ts'
 import { ChatsLive } from '../../../src/layers/conversation.ts'
 import { ModelBudgetLive } from '../../../src/layers/budget.ts'
-import { Cipher, CredentialCipher } from '../../../src/mcp/cipher.ts'
-import { Events, McpConnections, McpGrants, McpServers, Resident } from '../../../src/mcp/service.ts'
+import { Cipher, CredentialCipher } from '../../../src/mcp/oauth/cipher.ts'
+import { Resident } from '../../../src/mcp/service.ts'
 import { PiSessions } from '../../../src/pi/sessions.ts'
 import { Db } from '../../../src/runtime/db.ts'
 import { AgentInput } from '../../../src/runtime/input.ts'
@@ -38,27 +28,6 @@ const fixture = () => {
   const pinned: string[] = []
   const applied: Applied = new Map()
   const legacy = Layer.mergeAll(
-    Layer.effect(
-      Channel,
-      // The channel's status and disable read and clear its tables only.
-      telegramChannel({ db: sqlite, telemetry: undefined, wake: () => undefined }),
-    ),
-    // The channel's tools: the server offers none, so turning the channel on is refused before anything is granted.
-    stub(McpServers, { tools: () => Effect.succeed([]), list: () => Effect.succeed([]) }),
-    stub(McpConnections, { snapshot: () => Effect.succeedNone }),
-    stub(McpGrants),
-    stub(Events, { activeConsumer: () => Effect.succeedNone }),
-    // Routes reach Topics, Personas and their chats only while the channel is on; these are never used here.
-    stub(Topics),
-    stub(Personas),
-    stub(Invocations),
-    stub(Receipts),
-    stub(ChatOperations),
-    stub(Conversations),
-    stub(FlowEvents),
-    stub(Skills),
-    stub(AppEngine),
-    stub(Setups),
     // The database the lane builds its stores over, the cipher sealing a model key, and the gate's resident authority.
     Layer.succeed(Db, sqlite),
     Layer.effect(
@@ -85,7 +54,6 @@ const fixture = () => {
         userId: 'owner',
         // An owner's model endpoint: it lists one model to any key.
         mcpFetch: async () => Response.json({ data: [{ id: 'own-model' }] }),
-        schedulePull: async () => undefined,
       }),
     ),
   )
@@ -148,33 +116,18 @@ describe('the agent group served by the agent', () => {
     expect(cleared).toEqual({ source: 'deployment', deployment: true, models: ['model-a', 'model-b'] })
   })
 
-  it('answers the channel as null while off, refuses a connection without its tools, and turns it off', async () => {
+  it('does not expose the retired channel routes', async () => {
     const { fetch } = fixture()
-    const status = await fetch(json('GET', '/api/agent/channel'))
-    expect(status.status).toBe(200)
-    expect(await status.text()).toBe('null')
-    const refused = await fetch(json('PUT', '/api/agent/channel', { connectionId: 'myagent' }))
-    expect(refused.status).toBe(400)
-    expect(await refused.json()).toMatchObject({
-      error: { code: 'invalid_input', reason: "myagent does not offer Telegram's inbox_read and message_send" },
-    })
-    const off = await fetch(json('DELETE', '/api/agent/channel'))
-    expect(off.status).toBe(200)
-    expect(await off.text()).toBe('null')
-    expect(await callOwner({ fetch }, (api) => api.agent.channel())).toBeNull()
-  })
-
-  it('refuses the Chats list, a route and the new-chats default while the channel is off', async () => {
-    const { fetch } = fixture()
-    const chats = await fetch(json('GET', '/api/agent/channel/chats'))
-    expect(chats.status).toBe(400)
-    expect(await chats.json()).toMatchObject({ error: { code: 'invalid_input', reason: 'telegram_off' } })
-    const route = await fetch(json('PUT', '/api/agent/channel/routes', { chat: 'g_abc', mode: 'ignore' }))
-    expect(route.status).toBe(400)
-    expect(await route.json()).toMatchObject({ error: { reason: 'telegram_off' } })
-    const settings = await fetch(json('PUT', '/api/agent/channel/settings', { newChats: 'topic' }))
-    expect(settings.status).toBe(400)
-    const unnamed = await fetch(json('PUT', '/api/agent/channel/routes', { chat: 'g_abc', mode: 'answer' }))
-    expect(unnamed.status).toBe(400)
+    for (const [method, path] of [
+      ['GET', '/api/agent/channel'],
+      ['PUT', '/api/agent/channel'],
+      ['DELETE', '/api/agent/channel'],
+      ['GET', '/api/agent/channel/chats'],
+      ['PUT', '/api/agent/channel/routes'],
+      ['PUT', '/api/agent/channel/settings'],
+    ] as const) {
+      const response = await fetch(json(method, path))
+      expect(response.status, `${method} ${path}`).toBe(404)
+    }
   })
 })

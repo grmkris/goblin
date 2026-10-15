@@ -19,7 +19,7 @@ export function powerText(power: Pick<AppPower, 'kind' | 'target'>): string {
     case 'llm':
       return 'Ask a model (it counts toward your daily usage)'
     case 'notify':
-      return 'Message you on Telegram (at most 10 a day)'
+      return 'Message you through Notify me via (at most 10 a day)'
   }
 }
 

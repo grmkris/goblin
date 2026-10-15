@@ -57,8 +57,9 @@ async function install(page: Page) {
         id: 8,
         mode: 'followUp',
         content: [
-          { type: 'text', text: '[from Telegram]' },
+          { type: 'text', text: '[from Chat · Trip planning]' },
           { type: 'text', text: 'phone message' },
+          { type: 'text', text: JSON.stringify({ ownTurn: { via: 'source' } }) },
         ],
       },
     ],
@@ -188,7 +189,7 @@ async function matrix(origin: string, page: Page, label: string, dark: boolean) 
   assert.equal(fixture.reads(), 1, 'full and inline share one initial content read')
   assert(await full.getByRole('link', { name: 'notes.txt' }).isVisible())
   assert(await full.getByLabel('Selected references').getByText('@Notes').isVisible())
-  assert(await full.getByText('Telegram · Follow-up').isVisible())
+  assert(await full.getByText('Chat · Trip planning · Follow-up').isVisible())
   const summary = full.getByLabel('Expand queued message 1')
   await summary.focus()
   await summary.press('Enter')

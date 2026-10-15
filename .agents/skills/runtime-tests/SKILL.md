@@ -58,7 +58,8 @@ itself authorize model spend, external messages, deployment or production change
 
 - Owner API/Apps tests use real auth D1 and PersonalAgent with a deterministic model and official injected MCP
   transport. Verify two-account isolation with forged selectors, removed access endpoints, per-call Apps and live
-  grants. Applied dormant migrations remain intact.
+  grants. Fresh application baselines and reapplication preserve populated vendor state; dev resets before a changed
+  baseline is released.
 
 - The no-auth inbox fixture builds the documented app, advances 15-minute job slots, and keeps five validated messages and last-good data. Browser receipts render the native-built view through a controlled feed; they do not prove a real signed-in inbox.
 - Auth fixtures inject mail capture and use actual OTP endpoints against native D1. No capture endpoint ships in the deployed Worker. Verify closed/invite policy at send and sign-in, hashing, expiry, attempts, replay, rate limits, mail-failure cleanup and fresh-session deletion.
@@ -69,3 +70,7 @@ itself authorize model spend, external messages, deployment or production change
   Keep assertions for frozen arguments and operationKey, redacted review, refusal, second-account isolation, changed
   grants/scopes, routine/subagent holds, alternate App refusal and reconstruction without dispatch replay. Real
   Sidequest hiring and provider-side operation reconciliation remain separate acceptance.
+
+- Source native canaries cover signed ingress, cursor reads, own-turn marking, photo/text files, routing, replies and
+  replay. The Events suite covers transport and consumer recovery without a service-specific channel. MySI reconnect
+  and Telegram DM/group/photo receipts are a deferred live owner gate, not established by those fixtures (ADR 0069).

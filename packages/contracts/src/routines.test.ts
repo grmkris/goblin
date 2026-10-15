@@ -18,26 +18,26 @@ const decodes = (value: unknown): boolean => Option.isSome(Schema.decodeUnknownO
 
 describe('a routine tells, hands over, or both (ADR 0041)', () => {
   it('takes Tell me alone, a hand-over alone, or both', () => {
-    expect(decodes({ ...BASE, tellMe: { on: true, telegram: false }, handTo: { kind: 'none' } })).toBe(true)
-    expect(decodes({ ...BASE, tellMe: { on: false, telegram: false }, handTo: GOBLIN })).toBe(true)
-    expect(decodes({ ...BASE, tellMe: { on: true, telegram: true }, handTo: GOBLIN })).toBe(true)
+    expect(decodes({ ...BASE, tellMe: { on: true, copy: false }, handTo: { kind: 'none' } })).toBe(true)
+    expect(decodes({ ...BASE, tellMe: { on: false, copy: false }, handTo: GOBLIN })).toBe(true)
+    expect(decodes({ ...BASE, tellMe: { on: true, copy: true }, handTo: GOBLIN })).toBe(true)
   })
 
-  it('refuses a routine that does nothing, and Telegram without Tell me', () => {
-    expect(decodes({ ...BASE, tellMe: { on: false, telegram: false }, handTo: { kind: 'none' } })).toBe(false)
-    expect(decodes({ ...BASE, tellMe: { on: false, telegram: true }, handTo: GOBLIN })).toBe(false)
+  it('refuses a routine that does nothing, and a copy without Tell me', () => {
+    expect(decodes({ ...BASE, tellMe: { on: false, copy: false }, handTo: { kind: 'none' } })).toBe(false)
+    expect(decodes({ ...BASE, tellMe: { on: false, copy: true }, handTo: GOBLIN })).toBe(false)
   })
 
   it('names the hand-over only when the work is given to someone', () => {
     const told = Schema.decodeUnknownSync(RoutineDefinition)({
       ...BASE,
-      tellMe: { on: true, telegram: false },
+      tellMe: { on: true, copy: false },
       handTo: { kind: 'none' },
     })
     expect(handOverOf(told)).toBeUndefined()
     const handed = Schema.decodeUnknownSync(RoutineDefinition)({
       ...BASE,
-      tellMe: { on: false, telegram: false },
+      tellMe: { on: false, copy: false },
       handTo: GOBLIN,
     })
     expect(handOverOf(handed)?.instruction).toBe(GOBLIN.instruction)

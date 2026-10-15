@@ -1,33 +1,26 @@
-import type { PiHarness } from 'agents/harness/pi'
-import { chatSession, primaryChat, registerPrimary } from '../../src/chats/directory.ts'
 import { drizzle } from 'drizzle-orm/durable-sqlite'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
 import * as Layer from 'effect/Layer'
-import * as ManagedRuntime from 'effect/ManagedRuntime'
 import * as TestClock from 'effect/testing/TestClock'
-import { telegramChannel } from '../../src/channel/channel.ts'
-import { type ChannelCall, channelTool } from '../../src/channel/tools.ts'
-import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import { RunTelemetry } from '../../src/telemetry/events.ts'
 import { mcpReporter } from '../../src/telemetry/report.ts'
-import { CredentialCipher } from '../../src/mcp/cipher.ts'
-import { GrantDenied, attempt } from '../../src/http/errors.ts'
-import { type EventsOptions, makeEvents } from '../../src/mcp/events.ts'
+import { CredentialCipher } from '../../src/mcp/oauth/cipher.ts'
+import { GrantDenied } from '../../src/http/errors.ts'
+import { type EventsOptions, makeEvents } from '../../src/mcp/events/engine.ts'
 import { SqliteEventStore } from '../../src/mcp/events/store.ts'
-import { makeManager } from '../../src/mcp/manager.ts'
-import { offersEvents } from '../../src/mcp/remote.ts'
+import { makeManager } from '../../src/mcp/connections/manager.ts'
+import { offersEvents } from '../../src/mcp/connections/remote.ts'
 import { McpConnections } from '../../src/mcp/service.ts'
 import { SingleFlight } from '../../src/observability/single-flight.ts'
-import { channelPorts } from '../../src/channel/turns.ts'
 import { runApplicationMigrations } from '../../src/storage/migrations.ts'
 import { appEventDeliveries } from '../../src/storage/schema.ts'
-import { portServices } from '../chat-fixtures.ts'
 import { EventsFixture } from '../mcp/events-fixture.ts'
 import { CollectedRuns } from '../telemetry-sink.ts'
 import type { EventEnvelope } from '../../src/mcp/events/protocol.ts'
 import { SqliteSkillState } from '../../src/skills/store.ts'
 import { eventsSkillsProbe, eventsRecoveryProbe } from './events-recovery.ts'
+import { eventsRaceProbe } from './events-races.ts'
 import { servicesOf } from '../mcp/runtime.ts'
 import { type Probes, inAgent } from './probe.ts'
 
@@ -40,10 +33,9 @@ const occurrence = (fixture: EventsFixture, eventId: string): EventEnvelope => (
   cursor: fixture.cursor,
 })
 
-async function setup(storage: DurableObjectStorage, harness: PiHarness) {
+async function setup(storage: DurableObjectStorage) {
   runApplicationMigrations(storage)
   const db = drizzle(storage)
-  registerPrimary(db, 1)
   const store = new SqliteEventStore(db)
   const skillState = new SqliteSkillState(db)
   const cipher = await CredentialCipher.fromBase64(KEY)
@@ -70,7 +62,6 @@ async function setup(storage: DurableObjectStorage, harness: PiHarness) {
   const { run } = services
   await run(TestClock.setTime(fixture.now))
   const connections = await run(McpConnections)
-  const channel = await Effect.runPromise(telegramChannel({ db, telemetry, wake: () => undefined }))
   const eventOptions: EventsOptions = {
     connections,
     store,
@@ -103,29 +94,12 @@ async function setup(storage: DurableObjectStorage, harness: PiHarness) {
     if (Exit.isFailure(exit)) return new Response(null, { status: 400 })
     return new Response(exit.value.response ?? null, { status: exit.value.status })
   }
-  const operations: string[] = []
-  /** A tool of the channel server, as the channel calls it, on the probe's clock. */
-  const call: ChannelCall = (name, args) => attempt(() => run(channelTool(connections, 'mygram')(name, args)))
-  const portRuntime = ManagedRuntime.make(portServices({ db, harness }))
-  const ports = await portRuntime.runPromise(channelPorts(call))
-  const pull = () =>
-    Effect.runPromise(
-      channel.pull(
-        {
-          ...ports,
-          submit: (turn, persona) =>
-            Effect.andThen(
-              Effect.sync(() => void operations.push(turn.operationId)),
-              ports.submit(turn, persona),
-            ),
-          answer: () => Effect.succeed(undefined),
-        },
-        Math.floor(fixture.now / 1000),
-      ),
-    )
+  const delivered: string[] = []
   await run(
-    events.register('telegram-inbox', ({ envelope }) =>
-      'type' in envelope && envelope.type === 'terminated' ? Effect.void : attempt(pull),
+    events.register('fixture-message', ({ consumer, envelope }) =>
+      Effect.sync(() => {
+        if ('eventId' in envelope) delivered.push(`${consumer.consumerId}:${envelope.eventId}`)
+      }),
     ),
   )
   return {
@@ -135,37 +109,34 @@ async function setup(storage: DurableObjectStorage, harness: PiHarness) {
     cipher,
     fixture,
     connections,
-    channel,
     events,
     eventOptions,
     skillState,
     run,
     dispose: services.dispose,
-    call,
     /** Moves the fixture's clock and the agent's together. */
     clock: async (at: number) => {
       fixture.now = at
       await run(TestClock.setTime(at))
     },
     wakes,
-    operations,
-    pull,
+    delivered,
   }
 }
 
 export type EventsProbeState = Awaited<ReturnType<typeof setup>>
 
-async function subscribeTelegram(state: Awaited<ReturnType<typeof setup>>) {
+async function subscribeMessages(state: Awaited<ReturnType<typeof setup>>) {
   for (const name of ['message.received', 'question.answered']) {
     state.store.grant('mygram', name, '{}', true, state.fixture.now)
     await state.run(
       state.events.subscribe({
-        consumerId: `telegram:${name}`,
+        consumerId: `fixture:${name}`,
         revision: 1,
         connectionId: 'mygram',
         name,
         arguments: {},
-        handlerKey: 'telegram-inbox',
+        handlerKey: 'fixture-message',
       }),
     )
   }
@@ -176,23 +147,15 @@ async function subscribeTelegram(state: Awaited<ReturnType<typeof setup>>) {
       connectionId: 'mygram',
       name: 'message.received',
       arguments: {},
-      handlerKey: 'telegram-inbox',
+      handlerKey: 'fixture-message',
     }),
-  )
-  await Effect.runPromise(
-    state.channel.enableEvents('mygram', '0', Math.floor(state.fixture.now / 1000), { reach: 'dm' }),
   )
 }
 
-/** The first message's turn answered; the second still runs. */
-const answer = ({ operationId }: { readonly operationId: string }) =>
-  Effect.succeed(operationId === 'telegram-tg-123' ? { text: 'hello back' } : undefined)
-
 async function exercise(state: Awaited<ReturnType<typeof setup>>) {
-  const { fixture, events, store, channel, operations, run } = state
+  const { fixture, events, store, delivered, run } = state
   const first = fixture.now
   fixture.cursor = '1'
-  fixture.inbox.push({ id: 'tg:123', text: 'Events fixture hello', direction: 'in' })
   const envelope = occurrence(fixture, 'evt_1')
   const received = await fixture.deliver('sub_message.received', envelope, 'evt_1')
   await run(events.dispatch())
@@ -205,7 +168,6 @@ async function exercise(state: Awaited<ReturnType<typeof setup>>) {
     timestamp: String(Math.floor(first / 1000) - 301),
   })
   fixture.cursor = '2'
-  fixture.inbox.splice(0, fixture.inbox.length, { id: 'tg:124', text: 'Recovered gap answer', direction: 'in' })
   fixture.journal.push({
     eventId: 'evt_2',
     name: 'message.received',
@@ -226,31 +188,16 @@ async function exercise(state: Awaited<ReturnType<typeof setup>>) {
   )
   await run(events.maintain())
   const terminated = store.selector('mygram', 'message.received', '{}')?.status
-  const cleanup = await run(events.unsubscribe({ consumerId: 'telegram:message.received', revision: 1 }))
+  const cleanup = await run(events.unsubscribe({ consumerId: 'fixture:message.received', revision: 1 }))
   const sharedPreserved = fixture.subscriptions.has('sub_message.received')
   await run(events.unsubscribe({ consumerId: 'second-consumer', revision: 1 }))
-  await run(events.unsubscribe({ consumerId: 'telegram:question.answered', revision: 1 }))
-  // The first message's turn answered; the second still runs: one reply goes out, one waits.
-  const waiting = await Effect.runPromise(
-    channel.deliver(
-      {
-        call: state.call,
-        submit: () => Effect.die('no message is routed here'),
-        keep: () => Effect.void,
-        topic: () => Effect.die('no Topic is made here'),
-        answer,
-      },
-      Math.floor(first / 1000),
-    ),
-  )
-  await Effect.runPromise(channel.disable)
+  await run(events.unsubscribe({ consumerId: 'fixture:question.answered', revision: 1 }))
   return {
-    waiting,
     received: received.status,
     replayed: replayed.status,
     bad: bad.status,
     old: old.status,
-    operations,
+    delivered: delivered.toSorted(),
     refreshedEarly,
     terminated,
     cleanup,
@@ -265,45 +212,27 @@ async function exercise(state: Awaited<ReturnType<typeof setup>>) {
   }
 }
 
-/** The channel's run events, and how the inbox calls to the server went (ADR 0024). */
-const runSummary = (events: readonly RunEvent[]) => ({
-  channel: events
-    .filter((event) => event.kind === 'channel.received' || event.kind === 'channel.reply')
-    .map((event) => ({
-      kind: event.kind,
-      status: event.status,
-      operationId: event.operationId,
-      delivery: event.attributes[RunAttribute.delivery],
-      message: event.attributes[RunAttribute.channelMessage],
-    })),
-  inbox: events.filter(
-    (event) =>
-      event.kind === 'mcp.request' && event.attributes[RunAttribute.mcpTool] === 'inbox_read' && event.status === 'ok',
-  ).length,
-})
-
-/** Real workerd SQLite + official MCP transport + native PiHarness. No model/provider/network traffic. */
-async function eventsProbe(storage: DurableObjectStorage, harness: PiHarness) {
-  const state = await setup(storage, harness)
+/** Real workerd SQLite + official MCP transport. No model/provider/network traffic. */
+async function eventsProbe(storage: DurableObjectStorage) {
+  const state = await setup(storage)
   try {
-    await subscribeTelegram(state)
+    await subscribeMessages(state)
     const discovered = offersEvents(await state.run(state.connections.connect('mygram')))
     const result = await exercise(state)
     const skills = await eventsSkillsProbe(state)
     const recovery = await eventsRecoveryProbe(state)
-    const messages = await harness.messages({ session: chatSession(state.db, primaryChat) })
+    const races = await eventsRaceProbe(state)
     return {
       ...result,
       discovered,
       skills,
       recovery,
-      messageCount: messages.length,
+      races,
       scheduledRecovery: state.wakes.length > 0,
-      runs: runSummary(state.runs.events()),
     }
   } finally {
     await state.dispose()
   }
 }
 
-export const probes: Probes = { events: inAgent(({ storage, harness }) => eventsProbe(storage, harness)) }
+export const probes: Probes = { events: inAgent(({ storage }) => eventsProbe(storage)) }

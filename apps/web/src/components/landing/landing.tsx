@@ -144,7 +144,7 @@ function Away() {
           <dd>It checks trivago at 07:30 every day, or wakes when a service you connected sends an event.</dd>
         </div>
         <div>
-          <dt>Telegram</dt>
+          <dt>Sources</dt>
           <dd>It tells you when the price drops, and your reply comes straight back to it.</dd>
         </div>
         <div>
@@ -231,7 +231,7 @@ function Open({ origin }: { readonly origin: string | undefined }) {
     >
       <p>
         Everyone gets their own agent on Cloudflare, with its own memory and its own keys to the services they connect.
-        Reach yours from the web, from Telegram, or from Claude Code and any other MCP client.
+        Reach yours from the web, through connected Sources, or from Claude Code and any other MCP client.
       </p>
       <p>
         Open source, MIT:{' '}

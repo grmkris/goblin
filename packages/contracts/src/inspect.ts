@@ -107,7 +107,7 @@ export const InspectEntry = Schema.Struct({
   id: Schema.Number,
   kind: Schema.String,
   role: Schema.optional(Schema.String),
-  /** Who wrote a user message, when it was not the owner in the app (an MCP client, Telegram). */
+  /** Who wrote a user message, when it was not the owner in the app (an MCP client, Source). */
   author: Schema.optional(Schema.String),
   text: Schema.optional(Schema.String),
   /** An answer's visible thinking, before its text and calls (redacted thinking is left out). */

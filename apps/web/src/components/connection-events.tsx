@@ -125,7 +125,7 @@ function OfferNote({ server }: { readonly server: ServerView }) {
   )
 }
 
-/** The routines on a connection's events, and the event names the Telegram channel already takes. */
+/** The routines on a connection's events, and the event names they already take. */
 function useConnectionRoutines(server: ServerView) {
   const routines = (useQuery(routinesQuery).data?.routines ?? []).filter(
     ({ definition: { trigger } }) => trigger.kind === 'event' && trigger.connectionId === server.connectionId,
@@ -133,10 +133,7 @@ function useConnectionRoutines(server: ServerView) {
   const named = new Set(
     routines.flatMap(({ definition: { trigger } }) => (trigger.kind === 'event' ? [trigger.name] : [])),
   )
-  const telegram = new Set(
-    (server.eventHealth ?? []).filter((health) => health.telegram === true).map((health) => health.name),
-  )
-  return { routines, named, telegram }
+  return { routines, named }
 }
 
 /** Where a connection's Events are on its card, for the card summary's Set up. */
@@ -149,7 +146,7 @@ export const eventsAnchor = (connectionId: string): string => `events-${connecti
  */
 export function ConnectionEvents({ server }: { readonly server: ServerView }) {
   const streams = useQuery(eventsQuery(server.events === undefined ? undefined : server.connectionId))
-  const { routines, named, telegram } = useConnectionRoutines(server)
+  const { routines, named } = useConnectionRoutines(server)
   const timezone = useQuery(routineSettingsQuery).data?.timezone ?? 'UTC'
   const [editing, setEditing] = useState<RoutineView>()
   const [saved, setSaved] = useState<RoutineView>()
@@ -196,7 +193,7 @@ export function ConnectionEvents({ server }: { readonly server: ServerView }) {
         />
       )}
       {saved !== undefined && <RoutineReview routine={routines.find((each) => each.id === saved.id) ?? saved} />}
-      <EventPicker server={server} streams={offered.filter((stream) => !named.has(stream.name))} telegram={telegram} />
+      <EventPicker server={server} streams={offered.filter((stream) => !named.has(stream.name))} />
       <EventsHealthList events={server.eventHealth ?? []} />
     </section>
   )

@@ -29,7 +29,7 @@ const ROUTINE: RoutineView = {
     title: 'Daily',
     timezone: 'UTC',
     trigger: { kind: 'cron', expression: '0 8 * * *' },
-    tellMe: { on: false, telegram: false },
+    tellMe: { on: false, copy: false },
     handTo: {
       kind: 'goblin',
       instruction: 'Summarize the day.',

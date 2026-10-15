@@ -2,7 +2,7 @@ import type { EntryRecord } from '@earendil-works/pi-durable'
 import { DelegateResultData, PersonaAnswerData, type RetrievalSource, TopicSeedData, authorOf } from '@goblin/contracts'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { redactSecretText } from '../mcp/redaction.ts'
+import { redactSecretText } from '../mcp/oauth/redaction.ts'
 import { capped } from '../memory/log.ts'
 import { textBlocks } from '../pi/transcript.ts'
 

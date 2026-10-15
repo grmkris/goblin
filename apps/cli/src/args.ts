@@ -17,7 +17,7 @@ export class UsageError extends Data.TaggedError('UsageError')<{ readonly messag
   }
 }
 
-/** `goblin turn telegram-12 --json --since=1h`: `--name value`, `--name=value` and the switches above. */
+/** `goblin turn source-12 --json --since=1h`: `--name value`, `--name=value` and the switches above. */
 export function parseArgs(argv: readonly string[]): Args {
   const words: string[] = []
   const flags = new Map<string, string | true>()

@@ -1,5 +1,4 @@
 import * as Schema from 'effect/Schema'
-import { NewChatsDefault, TelegramReach } from './telegram.ts'
 
 export const ResidentStatus = Schema.Struct({
   state: Schema.Literals(['active', 'expired', 'revoked', 'never']),
@@ -23,26 +22,6 @@ export type UsageToday = typeof UsageToday.Type
 /** Main's memory: the messages it remembers, and how many of them its newest view summarizes. */
 export const MemoryStatus = Schema.Struct({ messages: Schema.Number, summarized: Schema.Number })
 export type MemoryStatus = typeof MemoryStatus.Type
-
-/**
- * The Telegram channel: the connection that carries it, or null when it is off. `reach` is how far its grant sees (the
- * DM only, or all the bot's chats); with `dm`, `widenUrl` is where the owner lets goblin see their groups. `newChats`
- * is what goblin does with a chat it has not seen before (ADR 0055). `ended` is true when the server ended the
- * channel's Events (a revoked or changed grant) and goblin could not subscribe again: the owner turns Telegram off and
- * on, or reconnects the server.
- */
-export const ChannelStatus = Schema.NullOr(
-  Schema.Struct({
-    connectionId: Schema.String,
-    enabledAt: Schema.Number,
-    transport: Schema.optional(Schema.Literals(['events', 'doorbell'])),
-    reach: Schema.optional(TelegramReach),
-    widenUrl: Schema.optional(Schema.String),
-    newChats: Schema.optional(NewChatsDefault),
-    ended: Schema.optional(Schema.Boolean),
-  }),
-)
-export type ChannelStatus = typeof ChannelStatus.Type
 
 /** A model the deployment offers. `route` groups models by provider route, because quotas are per route. */
 export const ModelOption = Schema.Struct({

@@ -57,7 +57,7 @@ the first Topic and holds Main.
 A Topic's one long-lived chat. It never closes and keeps a memory instead of an ever-longer context.
 
 **Main**:
-Personal's Conversation, chat `1`. The owner's browser, inbound clients and Telegram talk in it, each message from
+Personal's Conversation, chat `1`. The owner's browser and inbound clients talk in it, each message from
 anyone but the owner's browser labelled with its author.
 _Avoid_: root session
 
@@ -127,7 +127,7 @@ reports back passively.
 
 **Tell me**:
 A routine's choice to notify the owner of everything it posts: an event's notice, a reminder, the answer of whoever it
-handed to. Optionally also on Telegram.
+handed to. Optionally each one is also sent on through **Notify me via** (its **copy**, ADR 0070).
 
 **Hand to**:
 Who a routine gives the work to: nobody, Goblin, or a Persona pinned at the revision the owner confirmed, each with
@@ -142,12 +142,6 @@ _Avoid_: alert, ping
 A routine post the owner asked to be told about: listed in Activity's Notifications, counted in the Activity badge
 until read.
 
-**Telegram channel**:
-The one MCP connection that carries Telegram for the agent (ADRs 0009, 0011, 0055): mygram's, directly or through
-mysi, woken by its signed MCP Events. Every chat the grant reaches (the owner's DM, groups, forum topics) has a
-**Telegram route**: the Topic its messages become turns in, answered by goblin or a Persona back in the same place, or
-kept as notes, or ignored; a new chat waits for the owner's choice. Answers go back through mygram's send tool.
-
 **Source**:
 An MCP connection whose events carry the owner's own messages into goblin and goblin's answers back, by a **Source
 setup** the owner confirmed (ADR 0066). Any server that sends events can be one (a chat app, mail); none is known by
@@ -157,18 +151,25 @@ _Avoid_: channel, integration, bridge
 **Source setup**:
 The five facts of a Source, confirmed at an exact revision: the event that wakes it, the key that names a
 conversation (JSON pointers into a message), which messages are the owner speaking (the speaks-for-me rule; anyone
-else's are notices or dropped), how the content is read (the event's data, or a tool from a cursor) and, optionally,
-the tool an answer goes back with; plus where a new conversation goes. Bound to the connection's endpoint and the
-grants of its tools: a change of either pauses it for review.
+else's are notices or dropped), how the content is read (the event's data, or a tool from a cursor, with optional
+pointers to the conversation's title and the message's attachments) and, optionally, the tool an answer goes back
+with; plus where a new conversation goes (a route, or a new Topic of its own). Only the agent proposes one. Bound to
+the connection's endpoint and the grants of its tools: a change of either pauses it for review.
 
 **Route**:
 Where one conversation of a Source goes: turns in a Topic answered by goblin or a Persona, notes in a Topic with no
 turn, nowhere, or held (the twenty newest) until the owner chooses. A change leaves an organize receipt with Undo.
 _Avoid_: mapping, binding
 
-**Notify sink**:
-The owner's "Notify me via": one connection's tool, with a `{{text}}` template, that copies goblin's notices to them
-elsewhere.
+**Own turn**:
+The owner's message that came from elsewhere and that goblin marks as theirs after its words (a Source's message the
+speaks-for-me rule matched): the web treats it as a turn the owner took. Nothing in the words can mark one.
+_Avoid_: owner message, on its own
+
+**Notify me via**:
+The owner's choice of one connection's tool, with a `{{text}}` template, that sends goblin's notices to them elsewhere
+(their own chat, say; ADRs 0066, 0070, 0071; `NotifySink` in the code): a routine's notice copies and an agent app's `notify`
+go through it, as goblin's own call under the owner's grant of that tool.
 
 **Conversation activity**:
 What a chat is doing now: `working`, or `waiting` on its subagents.
@@ -246,8 +247,8 @@ One build of an agent app. One is active; earlier ones can be rolled back to, an
 The number of an agent app's state, one more with every change an action commits.
 
 **Power**:
-Something an agent app reaches beyond its state and files (a host, an MCP tool, the model, Telegram, another app); it
-declares it, and the owner approves it.
+Something an agent app reaches beyond its state and files (a host, an MCP tool, the model, a message to the owner
+through Notify me via, another app); it declares it, and the owner approves it.
 
 **Schedule**:
 An agent app's action that runs on its own, every 15 minutes to daily.
@@ -269,6 +270,11 @@ A file the owner sent with a message: its path rides with the words, and the mes
 **Received file**:
 A file goblin kept from an MCP tool result (ADR 0065): a link, an embedded resource or audio, written under
 `/agent/received/<connection>/<day>/`. The model reads its path in the block's place, and the call shows it as a chip.
+
+**File link**:
+A short-lived https URL on goblin's own origin to one of the owner's files (`file_link`, ADR 0070), for a tool that
+takes a file by URL: it works for fifteen minutes and serves only that file. Sending it is the receiving tool's call.
+_Avoid_: share link, public link
 
 ## Goblin Wallet
 

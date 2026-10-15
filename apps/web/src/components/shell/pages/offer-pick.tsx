@@ -3,8 +3,7 @@ import { Button } from '@goblin/ui'
 
 /**
  * What an Activity offer to route something shows under its words: where it goes (`select`), then Not now, which
- * leaves it waiting, and Set up, which routes it (disabled while nothing is picked). A Telegram chat's offer and a
- * Source's waiting conversation both end this way.
+ * leaves it waiting, and Set up, which routes it (disabled while nothing is picked).
  */
 export function OfferPick({
   select,
@@ -20,7 +19,7 @@ export function OfferPick({
   readonly onSetUp: () => void
 }) {
   return (
-    <span className="telegram-offer-pick">
+    <span className="source-offer-pick">
       {select}
       <span className="row-actions">
         <Button variant="ghost" size="sm" disabled={pending} onClick={onNotNow}>

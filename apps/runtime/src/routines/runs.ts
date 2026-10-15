@@ -11,7 +11,7 @@ import {
   appInteractions,
   appRoutineAnswers,
 } from '../storage/routines.ts'
-import type { CredentialCipher } from '../mcp/cipher.ts'
+import type { CredentialCipher } from '../mcp/oauth/cipher.ts'
 import type { QuestionSpec } from '@goblin/contracts'
 import { appUsageDaily } from '../storage/schema.ts'
 import { RoutineStore, runHandOver } from './store.ts'

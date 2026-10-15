@@ -43,8 +43,8 @@ it ([ADR 0058](../adr/0058-no-plans-tokens-and-an-optional-cap.md)).
 The browser's OAuth provider client carries an MCP client's authorization query through either sign-in to consent: a
 provider's sign-in keeps it in the sign-in's state and the callback goes on to the authorization.
 
-The agent a request reaches derives from the session's user ID or the inbound token's subject. The Telegram hook
-verifies a token bound to its user ID before selecting an agent. Deleting an account requires a sign-in from the last
+The agent a request reaches derives from the session's user ID or the inbound token's subject. The MCP Events hook
+verifies a token bound to its user ID and connection before selecting an agent. Deleting an account requires a sign-in from the last
 600 seconds, with an explicit Settings confirmation. It first erases the user's agent through `Agent.destroy()`:
 Pi, Agents and application tables, its alarm and isolate. Only then does Better Auth delete the user and D1 cascade
 sessions, consents and tokens. Agent-erasure failure leaves the account intact for retry. Outbound OAuth tokens are
@@ -98,7 +98,7 @@ the agent alone: a step is done once the owner went through it, the model step a
 are connected. A step id an older Start had is dropped when the row is read.
 
 **Sign-ins.** `POST /api/onboarding/connect` notes the step against the connection (`app_onboarding_connects`, an
-hour). The OAuth callback (`mcp/program.ts` `connectCallback`) takes the note and redirects to `/start/<step>` rather
+hour). The OAuth callback (`mcp/servers/program.ts` `connectCallback`) takes the note and redirects to `/start/<step>` rather
 than Connections. Nothing is allowed on the way.
 
 **Ways back** (`start/setup-cards.tsx`). While Start is not finished and the model or services step is left, the chat

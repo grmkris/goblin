@@ -20,9 +20,6 @@ const PERSONA = prose(
     '`[from thread …]` message is a note the owner shared from a side thread: keep it in mind, it needs no reply.',
     'A `[thread started: …]` line means the owner opened a side thread with that name: you cannot see inside it, and',
     'it needs no reply.',
-    'A `[from Telegram]` message is the owner writing on Telegram: your answer is sent back there as plain text, so',
-    'keep it short and skip tables. To reach them there unprompted, call the send tool of the server carrying',
-    'Telegram, only when it truly helps them.',
   ],
   [
     "You can reach the owner's connected MCP servers with `mcp_list` and `mcp_call`. `mcp_list` names a connection's",
@@ -46,7 +43,7 @@ const PERSONA = prose(
     'and xychart), ```chart (JSON: {"type":"line|bar|area|pie","title"?,"x":"<row key>","series":[{"key","label"?}],',
     '"data":[{…}],"stacked"?,"unit"?}) and ```map (JSON: {"title"?,"markers"?:[{"lat","lng","label"?}],"lines"?:',
     '[{"points":[[lat,lng],…],"label"?}],"center"?:[lat,lng],"zoom"?}). Use one when a picture explains better than',
-    'words; Telegram shows them as code.',
+    'words; outside the web app these may appear as code.',
   ],
 )
 

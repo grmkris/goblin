@@ -4,9 +4,9 @@ import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as TestClock from 'effect/testing/TestClock'
 import { describe, expect, it } from 'vitest'
-import { type Materialized, materialize } from '../../src/mcp/content.ts'
-import { mcpModelResult } from '../../src/mcp/extension.ts'
-import { mcpHost } from '../../src/mcp/host.ts'
+import { type Materialized, materialize } from '../../src/mcp/content/materialize.ts'
+import { mcpModelResult } from '../../src/mcp/connections/extension.ts'
+import { mcpHost } from '../../src/mcp/connections/host.ts'
 import { SingleFlight } from '../../src/observability/single-flight.ts'
 import { AgentInput, type AgentInputs } from '../../src/runtime/input.ts'
 import { memoryFiles } from '../memory-files.ts'
@@ -77,10 +77,13 @@ const fixture = async (fetcher: typeof fetch, held: Readonly<Record<string, stri
     Layer.provideMerge(Layer.mergeAll(SingleFlight.layer, TestClock.layer())),
     Layer.merge(Layer.mergeAll(files.layer, Layer.succeed(AgentInput, input))),
   )
-  const keep = (content: CallToolResult['content'], images = false): Promise<Materialized> =>
+  const keep = (content: CallToolResult['content'], images = false, text?: 'file'): Promise<Materialized> =>
     Effect.runPromise(
       Effect.provide(
-        Effect.andThen(TestClock.setTime(NOON), materialize('docs', { content }, { images: Effect.succeed(images) })),
+        Effect.andThen(
+          TestClock.setTime(NOON),
+          materialize('docs', { content }, { images: Effect.succeed(images), ...(text === undefined ? {} : { text }) }),
+        ),
         layer,
       ),
     )
@@ -229,6 +232,34 @@ describe('files from MCP content (unit)', () => {
       note: 'could not fetch notes.txt: the owner has not allowed reading it',
       link: { uri: 'docs://private/notes.txt', name: 'notes.txt' },
     })
+    expect(sent).toEqual([])
+  })
+
+  it('keeps short and empty embedded text as files for a reader that carries attachments by reference', async () => {
+    const { fetcher, sent } = web({})
+    const { keep, files } = await fixture(fetcher)
+    const text = 'Ferry at 8 — bring café supplies.'
+    const content: CallToolResult['content'] = [
+      { type: 'resource', resource: { uri: 'notes://trip/short.md', mimeType: 'text/markdown', text } },
+      { type: 'resource', resource: { uri: 'notes://trip/empty.txt', mimeType: 'text/plain', text: '' } },
+    ]
+    const received = await keep(content, false, 'file')
+    expect([...received.values()]).toEqual([
+      {
+        kind: 'file',
+        file: {
+          path: `${FOLDER}/short.md`,
+          name: 'short.md',
+          size: new TextEncoder().encode(text).length,
+          mimeType: 'text/markdown',
+        },
+      },
+      {
+        kind: 'file',
+        file: { path: `${FOLDER}/empty.txt`, name: 'empty.txt', size: 0, mimeType: 'text/plain' },
+      },
+    ])
+    expect(new TextDecoder().decode(files.written.get(`${FOLDER}/short.md`)?.bytes)).toBe(text)
     expect(sent).toEqual([])
   })
 

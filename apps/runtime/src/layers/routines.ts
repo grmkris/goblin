@@ -2,8 +2,6 @@ import * as Clock from 'effect/Clock'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
-import { telegramChannel } from '../channel/channel.ts'
-import { Channel } from '../channel/service.ts'
 import { attempt, attemptSync } from '../http/errors.ts'
 import { type RoutineControlServices, makeRoutineControl } from '../routines/control.ts'
 import type { RoutineRunStore } from '../routines/runs.ts'
@@ -70,9 +68,9 @@ export const noticesOf = (store: NoticeStore) =>
     digestsDue: trySync('Notices.digestsDue', store.digestsDue.bind(store)),
     unwritten: sync('Notices.unwritten', store.unwritten.bind(store)),
     prune: trySync('Notices.prune', store.prune.bind(store)),
-    telegramDue: sync('Notices.telegramDue', store.telegramDue.bind(store)),
-    claimTelegram: sync('Notices.claimTelegram', store.claimTelegram.bind(store)),
-    telegramDone: sync('Notices.telegramDone', store.telegramDone.bind(store)),
+    copiesDue: sync('Notices.copiesDue', store.copiesDue.bind(store)),
+    claimCopy: sync('Notices.claimCopy', store.claimCopy.bind(store)),
+    copyDone: sync('Notices.copyDone', store.copyDone.bind(store)),
     views: Effect.flatMap(Clock.currentTimeMillis, (now) =>
       Effect.sync(() => store.recent(now - KEPT_NOTICES, 100).map(notificationOf)),
     ),
@@ -122,20 +120,10 @@ export const RoutineRunsLive: Layer.Layer<RoutineRuns | RoutineUsage, never, Age
   }),
 )
 
-/** Start step 10: the Telegram channel, the one instance, over the agent's database, with its pull's own semaphore. */
-export const ChannelLive: Layer.Layer<Channel, never, AgentInput | Db> = Layer.effect(
-  Channel,
-  Effect.gen(function* () {
-    const { scheduleReplies, telemetry } = yield* AgentInput
-    const db = yield* Db
-    return yield* telegramChannel({ db, telemetry, wake: scheduleReplies })
-  }),
-)
-
 /**
  * The owner's routines and their runtime, after the start: the routine store, built once here over the agent's SQLite
  * and wrapped as `Routines`, and the native `RoutineControl` over it, which registers the routine trigger with Events.
- * Routine runs (start step 5) and the Telegram channel (10) are start steps above.
+ * Routine runs (start step 5) are a start step above.
  */
 export const RoutinesLive: Layer.Layer<
   Routines | RoutineControl | Notices,

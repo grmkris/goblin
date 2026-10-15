@@ -60,7 +60,7 @@ export type PointContext = { readonly stage: string; readonly build: string }
  * - `blobs: [flow, via, actor, origin, status, errorType, stage, build, personaOrder]`
  * - `doubles: [1, count, ms, depth]`, where `depth` is 1 for a step another operation caused, else 0.
  *
- * `origin` is the operation receipt's (owner, client, telegram, …) and stays empty until flow steps carry it.
+ * `origin` is the operation receipt's (owner, client, source, …) and stays empty until flow steps carry it.
  */
 export const flowPoint = (event: FlowEvent, agent: string, context: PointContext): AnalyticsEngineDataPoint => ({
   indexes: [agent],

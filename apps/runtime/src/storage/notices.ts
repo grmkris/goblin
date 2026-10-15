@@ -2,8 +2,8 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 /**
  * Every notification a routine posted (ADR 0041): its notices, and the answers it was told to notify. It indexes the
- * entry in the routine's home chat for Activity, keeps the owner's read mark, and is the outbox of its Telegram copy.
- * The text is the producer's, frozen as it was posted.
+ * entry in the routine's home chat for Activity, keeps the owner's read mark, and is the outbox of its copy through
+ * Notify me via (ADR 0070). The text is the producer's, frozen as it was posted.
  */
 export const appNotices = sqliteTable(
   'app_notices',
@@ -14,6 +14,8 @@ export const appNotices = sqliteTable(
     chatId: text('chat_id').notNull(),
     entryRequestId: text('entry_request_id').notNull(),
     connectionId: text('connection_id'),
+    /** Canonical event selector, retained so a multiplexed connection cannot suppress unrelated notices. */
+    eventSelector: text('event_selector'),
     label: text('label').notNull(),
     title: text('title').notNull(),
     body: text('body'),
@@ -23,15 +25,15 @@ export const appNotices = sqliteTable(
     readAt: integer('read_at'),
     /** When its entry was written into the chat; a notice claimed but not yet written is written by the sweep. */
     writtenAt: integer('written_at'),
-    telegramState: text('telegram_state', { enum: ['none', 'pending', 'accepted', 'suppressed', 'failed'] })
+    copyState: text('copy_state', { enum: ['none', 'pending', 'accepted', 'suppressed', 'failed', 'unknown'] })
       .notNull()
       .default('none'),
-    telegramText: text('telegram_text'),
-    telegramAttempts: integer('telegram_attempts').notNull().default(0),
-    telegramNextAt: integer('telegram_next_at').notNull().default(0),
-    telegramReceipt: text('telegram_receipt'),
-    /** The Telegram connection its first attempt went through; a channel changed since suppresses it. */
-    telegramConnectionId: text('telegram_connection_id'),
+    copyText: text('copy_text'),
+    copyAttempts: integer('copy_attempts').notNull().default(0),
+    copyNextAt: integer('copy_next_at').notNull().default(0),
+    copyReceipt: text('copy_receipt'),
+    /** The revision of Notify me via its first attempt went through; a sink changed or cleared since suppresses it. */
+    copySink: text('copy_sink_revision'),
     createdAt: integer('created_at').notNull(),
   },
   (table) => [index('app_notices_at').on(table.at), index('app_notices_routine').on(table.routineId, table.at)],

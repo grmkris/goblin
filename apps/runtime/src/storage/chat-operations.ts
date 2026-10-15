@@ -2,8 +2,8 @@ import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 /**
  * What happens in a chat by operation (ADR 0030). Pi deduplicates per session; a chat's admission remembers the session
- * an operation was first admitted to, so a replay keeps it. The receipt columns (`20261027000000_chat_operation_receipts`)
- * say what the operation was, who started it, what it led to and how it ended; every admission writes them.
+ * an operation was first admitted to, so a replay keeps it. The receipt says what the operation was, who started it,
+ * what it led to and how it ended; every admission writes it.
  */
 export const appChatOperations = sqliteTable(
   'app_chat_operations',

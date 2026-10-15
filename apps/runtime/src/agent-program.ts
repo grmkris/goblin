@@ -23,7 +23,7 @@ import { RoutineControl, RoutineRuns } from './routines/service.ts'
 import { AgentInput } from './runtime/input.ts'
 import { conversationId } from './pi/context.ts'
 import { PiSessions, fromPi } from './pi/sessions.ts'
-import type { HeldCallOutcome } from './mcp/types.ts'
+import type { HeldCallOutcome } from './mcp/connections/types.ts'
 import { type SharedContext, outcomeContent, ownerContent } from './pi/content.ts'
 import { askPersonas } from './personas/ask.ts'
 

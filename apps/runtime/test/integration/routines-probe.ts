@@ -18,7 +18,7 @@ const definition: RoutineDefinition = {
   title: 'Morning plan',
   trigger: { kind: 'cron', expression: '0 9 * * 1-5' },
   timezone: 'Europe/Berlin',
-  tellMe: { on: false, telegram: false },
+  tellMe: { on: false, copy: false },
   handTo: {
     kind: 'goblin',
     instruction: 'Summarize my priorities.',

@@ -12,7 +12,6 @@ import { Personas } from '../personas/service.ts'
 import { editTopicSetup, updateTopic } from '../topics/program.ts'
 import { Topics } from '../topics/service.ts'
 import { withFlow } from '../observability/flows.ts'
-import { undoTelegram } from '../channel/undo.ts'
 import { Sources } from '../sources/service.ts'
 import { Receipts } from './service.ts'
 
@@ -49,10 +48,6 @@ export const undoReceipt = (id: string) => {
     const personas = yield* Personas
     const stored = yield* receipts.get(id)
     if (stored.undoneAt !== undefined) return yield* new Conflict({ reason: 'undone' })
-    if (stored.kind === 'telegram.route' || stored.kind === 'telegram.default') {
-      yield* undoTelegram({ ...stored, kind: stored.kind })
-      return yield* receipts.markUndone(id)
-    }
     if (stored.kind === 'source.route') {
       yield* (yield* Sources).undo(stored)
       return yield* receipts.markUndone(id)

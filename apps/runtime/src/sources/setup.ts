@@ -18,6 +18,8 @@ const messagePointers = (setup: SourceSetup): readonly (readonly [string, string
   ...('pointer' in setup.speaksForMe ? [['speaksForMe', setup.speaksForMe.pointer] as const] : []),
   ['read.text', setup.read.text],
   ...(setup.read.id === undefined ? [] : [['read.id', setup.read.id] as const]),
+  ...(setup.read.title === undefined ? [] : [['read.title', setup.read.title] as const]),
+  ...(setup.read.attachments === undefined ? [] : [['read.attachments', setup.read.attachments] as const]),
   ...(setup.read.direction === undefined ? [] : [['read.direction', setup.read.direction.pointer] as const]),
 ]
 
@@ -33,6 +35,18 @@ function messageSchema(setup: SourceSetup, event: EventDescriptor, tool: Offered
 /** What the owner reads of a tool the connection does not offer. */
 const missing = (name: string) => `The connection does not offer the tool ${name}.`
 
+/** Result pointers are checked against the reply tool's structured output schema when it declares one. */
+function resultProblems(reply: SourceSetup['reply'], offered: Offered): readonly string[] {
+  if (reply?.result === undefined) return []
+  const schema = offered.tools.find((each) => each.name === reply.tool)?.outputSchema
+  return Object.entries(reply.result).flatMap(([name, rule]) => {
+    const pointer = typeof rule === 'string' ? rule : rule.pointer
+    return schemaAt(schema, pointer).at === 'absent'
+      ? [`reply.result.${name} points at ${pointer}, which the tool's output schema does not have.`]
+      : []
+  })
+}
+
 /** Why the setup's tools do not hold: each one the connection does not offer, and a read cursor its schema lacks. */
 function toolProblems(setup: SourceSetup, offered: Offered): readonly string[] {
   const toolNamed = (name: string) => offered.tools.find((each) => each.name === name)
@@ -45,7 +59,7 @@ function toolProblems(setup: SourceSetup, offered: Offered): readonly string[] {
       problems.push(`read.cursor points at ${read.cursor}, which the tool's output schema does not have.`)
   }
   if (reply !== undefined && toolNamed(reply.tool) === undefined) problems.push(missing(reply.tool))
-  return problems
+  return [...problems, ...resultProblems(reply, offered)]
 }
 
 /** Why the setup's pointers into a message do not hold where the server's schema says what a message is. */

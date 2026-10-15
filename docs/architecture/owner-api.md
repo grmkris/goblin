@@ -42,9 +42,9 @@ callback). It annotates the request's logs with `goblin.rpc`
 | `setup` | `GET /setup/catalog` | `setup/api.ts` |
 | `personas` | `/personas`, `/personas/:id` | `personas/api.ts` |
 | `organize` | `/organize/:id/undo` | `organize/api.ts` |
-| `mcp` | `/mcp/servers`, `/mcp/suggested`, `/mcp/catalog`, `/mcp/registries`, `/mcp/registries/remove`, `/mcp/grants`, `/mcp/ask-first`, `/mcp/skills`, `/mcp/app-grants`, `/mcp/approvals/:id`, `/mcp/url-requests/:id`, `/mcp/oauth/callback`, and `/mcp/:id/` `tools`, `events`, `connect`, `step-up`, `disconnect`, `remove`, `tools/call`, `resources/read` | `mcp/api.ts` |
+| `mcp` | `/mcp/servers`, `/mcp/suggested`, `/mcp/catalog`, `/mcp/registries`, `/mcp/registries/remove`, `/mcp/grants`, `/mcp/ask-first`, `/mcp/skills`, `/mcp/app-grants`, `/mcp/approvals/:id`, `/mcp/url-requests/:id`, `/mcp/oauth/callback`, and `/mcp/:id/` `tools`, `events`, `connect`, `step-up`, `disconnect`, `remove`, `tools/call`, `resources/read` | `mcp/servers/api.ts` |
 | `resident` | `/agent/resident` | `mcp/resident-api.ts` |
-| `agent` | `/agent/usage`, `/agent/model`, `/agent/channel` | `routines/agent-api.ts` |
+| `agent` | `/agent/usage`, `/agent/model`, `/agent/model-endpoint` | `routines/agent-api.ts` |
 | `memory` | `/agent/memory` | `memory/api.ts` |
 | `routines` | `/routines`, `/routines/settings`, `/routines/:id`, and under it `confirm`, `pause`, `run`, `runs` | `routines/api.ts` |
 | `apps` | `/apps`, `/apps/:id`, and under it `launch`, `state`, `call`, `diagnostics` | `apps/api.ts` |
@@ -68,8 +68,8 @@ locations and never its message. The Worker's own routes (`/mcp`'s failures asid
 
 Callers that are not the owner's browser reach the agent through its internal API (`InternalApi`, `/internal`, exported
 only from `@goblin/contracts/internal`), which the Worker calls on the agent's stub with a typed client
-(`inbound/client.ts`) after its own check of the caller (a bearer token, a hook's route token): `ask`, `recent` and
-`inspect` (inbound `/mcp`), and `mcpEvents` (the Events hook). Its gate (`InternalGate`, `http/api/middleware.ts`)
+(`inbound/client.ts`) after its own check of the caller (a bearer token, a hook's route token, a file link's token):
+`ask`, `recent` and `inspect` (inbound `/mcp`), `mcpEvents` (the Events hook) and `linkedFile` (a file link, ADR 0070). Its gate (`InternalGate`, `http/api/middleware.ts`)
 refuses a request carrying the owner forward's mark; it never renews resident authority. One Durable Object RPC
 method remains, `deleteAgentData` (account deletion): Workers RPC drops custom error classes, so it returns an encoded
 `RpcResult` (`http/rpc.ts`) that the Worker unwraps.

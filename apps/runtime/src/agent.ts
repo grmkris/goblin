@@ -6,8 +6,6 @@ import * as Exit from 'effect/Exit'
 import * as ManagedRuntime from 'effect/ManagedRuntime'
 import type { AgentRpcMethods, RuntimeEnv } from './env.ts'
 import { failureOf, toAppError } from './http/errors.ts'
-import { channelPull, channelReplies } from './channel/wake.ts'
-import { telegramExtension } from './pi/telegram.ts'
 import { sourcesExtension } from './pi/sources.ts'
 import { sourcesWake } from './sources/wake.ts'
 import { type RpcResult, encodeExit } from './http/rpc.ts'
@@ -16,7 +14,7 @@ import { type AgentApps, agentApps } from './agent-apps/engine.ts'
 import { appPorts } from './agent-apps/ports.ts'
 import { JOB_CALLBACK, type JobSchedules, type JobSlot } from './agent-apps/jobs.ts'
 import { reconcileAppJobs, runAppJob } from './agent-apps/wake.ts'
-import { mcpEventsWake } from './mcp/wake.ts'
+import { mcpEventsWake } from './mcp/events/wake.ts'
 import { routineSchedulePorts, routinesWake, runRoutine, runRoutineDeadline } from './routines/wake.ts'
 import { appsExtension, appExecutionExtension } from './pi/apps.ts'
 import { serversExtension } from './pi/servers.ts'
@@ -60,7 +58,7 @@ const instrument: Instrument = reported
 /**
  * The resident agent. Pi (through the native PiHarness) owns conversations; the services in `layers/` own MCP
  * connections, credentials, grants and resident authority. The owner reaches it through its typed API and the Worker's
- * other callers (an inbound client, myagent, MCP Events) through the internal one, both over `fetch` (`onRequest`);
+ * other callers (an inbound client, MCP Events) through the internal one, both over `fetch` (`onRequest`);
  * the one RPC method left erases the account.
  */
 export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods {
@@ -131,7 +129,6 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       skillLearningExtension(run),
       ...appsExtension(apps, run, appsRun),
       organize,
-      telegramExtension(run),
       sourcesExtension(run),
       retrieval,
       onboardingExtension(run),
@@ -187,10 +184,8 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       memory: this.#memory,
       subagentTools: this.#subagents.tools,
       helperExtensions: this.#subagents.members(),
-      scheduleReplies: () => void this.schedule(5, 'channelReplies'),
       userId: this.name,
       scheduleEvents: (at) => this.#scheduleWake('mcpEventsWake', at),
-      schedulePull: () => this.schedule(0, 'channelPull'),
       scheduleSources: (seconds) => void this.schedule(seconds, 'sourcesWake'),
       mcpFetch: this.mcpFetch(),
       agentApps: this.#apps,
@@ -242,14 +237,6 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
   /** An agent app's job is due (ADR 0021). */
   async runAppJob(slot: JobSlot): Promise<void> {
     await runAppJob(this.#apps, slot)
-  }
-
-  /** The Telegram channel's alarms (channel/wake.ts): one pull, and the ready answers sent. */
-  async channelPull(): Promise<void> {
-    await channelPull(this.#bridge.run)
-  }
-  async channelReplies(): Promise<void> {
-    await channelReplies(this.#bridge.run, (seconds) => this.schedule(seconds, 'channelReplies'))
   }
 
   /** The Sources' alarm (sources/wake.ts, ADR 0066): each Source tended and the answers due sent. */

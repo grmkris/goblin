@@ -1,9 +1,10 @@
-// The places a route sends the owner's messages to, shared by the Telegram channel and Sources: a Topic that is open
-// and a Persona that is active, and each named in words for a receipt or the agent.
+// The places a Source route sends the owner's messages: an open Topic and an active Persona,
+// each named in words for a receipt or the agent.
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { NotFound } from '../http/errors.ts'
 import { Personas } from '../personas/service.ts'
+import { createTopic } from '../topics/program.ts'
 import { Topics } from '../topics/service.ts'
 
 /** `topic` while it is active; `NotFound` otherwise. */
@@ -27,6 +28,43 @@ export const topicWords = (topic: number) =>
   Effect.gen(function* () {
     const found = yield* (yield* Topics).get(topic).pipe(Effect.option)
     return `#${Option.match(found, { onNone: () => 'Personal', onSome: ({ name }) => name })}`
+  })
+
+/** A conversation's title as a Topic's name: at most 80 characters, `fallback` when it has none. */
+const topicName = (title: string, fallback: string) => {
+  const clean = title.trim().slice(0, 80).trim()
+  return clean === '' ? fallback.slice(0, 80) : clean
+}
+
+/**
+ * A Topic belonging to this operation alone. A display name never identifies a Source conversation: a collision gets
+ * a numbered name, and only the operation id can replay an existing Topic. The registry checks the name again under
+ * its create lock, so a concurrent create that takes a candidate is retried with the next name.
+ */
+const distinctTopic = (title: string, operationId: string, fallback: string) =>
+  Effect.gen(function* () {
+    const base = topicName(title.replaceAll(/\s+/gu, ' '), fallback)
+    for (let number = 1; ; number += 1) {
+      const suffix = number === 1 ? '' : ` (${String(number)})`
+      const name = `${base.slice(0, 80 - suffix.length).trimEnd()}${suffix}`
+      const made = yield* createTopic({ name, operationId }, { actor: 'agent' }).pipe(
+        Effect.catchTag('Conflict', (conflict) =>
+          conflict.reason === 'topic_name_taken' ? Effect.succeed(undefined) : Effect.fail(conflict),
+        ),
+      )
+      if (made !== undefined) return made
+    }
+  })
+
+/** A new Source conversation's own Topic; archived interrupted creates get a new Topic under a derived operation. */
+export const sourceTopicFor = (title: string, operationId: string, fallback: string) =>
+  Effect.gen(function* () {
+    let operation = operationId
+    for (;;) {
+      const made = yield* distinctTopic(title, operation, fallback)
+      if (made.archivedAt === undefined) return made.id
+      operation = `${operation}:${String(made.revision)}`
+    }
   })
 
 /** A Persona in words: `@<name>`, `@Persona` for one that is gone. */

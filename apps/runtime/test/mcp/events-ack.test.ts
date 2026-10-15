@@ -1,7 +1,7 @@
 import * as Effect from 'effect/Effect'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Conflict } from '../../src/http/errors.ts'
-import { makeEvents } from '../../src/mcp/events.ts'
+import { makeEvents } from '../../src/mcp/events/engine.ts'
 import { SqliteEventStore } from '../../src/mcp/events/store.ts'
 import { SingleFlight } from '../../src/observability/single-flight.ts'
 import { appEventConsumerReceipts, appUsageDaily } from '../../src/storage/schema.ts'

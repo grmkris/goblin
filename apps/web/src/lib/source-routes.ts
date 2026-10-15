@@ -1,10 +1,11 @@
 // Where a Source's conversations go (ADR 0066): a conversation key in words, a route in words, the route select's
 // choices and options, where a Source stands, and what Activity offers. Pure, so the route table and Activity only draw
-// it. The select's choice is the Telegram chats' (`place`, `responder`), so both lists read alike.
+// it. The select names the Topic and responder separately.
 import {
   PERSONAL_TOPIC,
   type PersonaView,
   type SourceKeyValues,
+  type SourceNewKeys,
   type SourceRoute,
   type SourceView,
   type SourceWaiting,
@@ -18,7 +19,7 @@ import {
   offeredTopics,
   responderPersona,
   topicWords,
-} from './telegram-chats.ts'
+} from './route-choice.ts'
 
 /** A conversation key in words, its parts in order: "chat dm · thread 3"; parts with no value are left out. */
 export function keyWords(values: SourceKeyValues): string {
@@ -27,6 +28,12 @@ export function keyWords(values: SourceKeyValues): string {
     .map(([name, value]) => `${name} ${String(value)}`)
   return parts.length === 0 ? 'A conversation' : parts.join(' · ')
 }
+
+/** A conversation as a list names it: its title (the server's name for it) when it has one, else its key in words. */
+export const conversationName = (conversation: {
+  readonly values: SourceKeyValues
+  readonly title?: string | undefined
+}): string => conversation.title ?? keyWords(conversation.values)
 
 /** A Topic by name for a sentence: `#Name`, `#Personal` for one goblin does not list. */
 const topicName = (id: number, topics: readonly TopicView[]): string =>
@@ -49,6 +56,16 @@ export function routeWords(route: SourceRoute, topics: readonly TopicView[], per
       return 'Held until you choose where they go'
   }
 }
+
+/** Where a conversation seen for the first time goes, in words: a route, or a new Topic of its own. */
+export const newKeysWords = (
+  newKeys: SourceNewKeys,
+  topics: readonly TopicView[],
+  personas: readonly PersonaView[],
+): string =>
+  newKeys.to === 'topic-per-key'
+    ? 'Each in a new Topic of its own, named after it, answered by goblin'
+    : routeWords(newKeys, topics, personas)
 
 /** The select's choice for a route: `answer:<topic>` (with who answers), `listen:<topic>`, `ignore` or `held`. */
 export function choiceOfRoute(route: SourceRoute): RouteChoice {

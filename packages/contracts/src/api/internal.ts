@@ -4,8 +4,10 @@ import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import * as HttpApiMiddleware from 'effect/http-api/HttpApiMiddleware'
 import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
+import { FilePath } from '../files.ts'
 import { InspectQuery } from '../inspect.ts'
 import { API_ERRORS, ApiErrors } from './errors.ts'
+import { Bytes } from './stream.ts'
 
 /**
  * The agent's internal API: what reaches the owner's agent from the Worker on behalf of someone other than the owner's
@@ -89,6 +91,9 @@ export type EventWebhookResult = typeof EventWebhookResult.Type
  *   headers that sign it.
  * - `inspect`: `POST /internal/inspect` with `{ query }`, /mcp's read-only inspection (ADR 0024). It answers the result
  *   of the query's kind (`InspectResult[kind]` in `../inspect.ts`), which the caller decodes.
+ * - `linkedFile`: `GET /internal/files/linked?path=`, the owner file a file link names (ADR 0070), once the Worker has
+ *   checked the link's token: its bytes as an attachment, with its type and name in the answer's headers. It needs
+ *   current resident authority and never renews it.
  */
 export class InboundGroup extends HttpApiGroup.make('inbound').add(
   HttpApiEndpoint.post('ask', '/ask', {
@@ -108,6 +113,11 @@ export class InboundGroup extends HttpApiGroup.make('inbound').add(
     payload: Schema.Struct({ query: InspectQuery }),
     success: Schema.Unknown,
     error: [ApiErrors.notFound, ApiErrors.invalidInput],
+  }),
+  HttpApiEndpoint.get('linkedFile', '/files/linked', {
+    query: { path: FilePath },
+    success: Bytes,
+    error: [ApiErrors.notFound, ApiErrors.invalidInput, ApiErrors.conflict],
   }),
 ) {}
 

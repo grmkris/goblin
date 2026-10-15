@@ -7,9 +7,9 @@ borrowed browser session. Resident authority (`app_resident`, the `Resident` ser
 window on every owner API request except changing it (`POST /api/agent/resident`), the event streams, the files and
 the OAuth callback; the internal API (inbound calls and hooks) never renews it. Turning
 it off in Settings ("Work while you're away") sticks: activity does not re-enable it, only the explicit toggle does.
-Model MCP tools, skills, inbound `ask_agent` and scheduled Telegram pulls and replies require current authority. The
+Model MCP tools, skills, inbound `ask_agent` and scheduled Source pulls and replies require current authority. The
 owner's own `mcp` endpoints are renewed like the rest and do not call `requireResident`; their tool and resource calls
-still check exact grants (`mcp/api.ts`, `pi/resident-mcp.ts`, `pi/skills.ts`).
+still check exact grants (`mcp/servers/api.ts`, `pi/resident-mcp.ts`, `pi/skills.ts`).
 
 ## Inbound MCP
 
@@ -32,8 +32,9 @@ goblin is an MCP server at `/mcp`, the one protected resource of Better Auth's `
 - `/mcp` advertises `goblin:inspect` in its metadata, and an unauthenticated request gets a 401 naming the metadata
   and every scope, so a new connection asks for inspection. The consent page offers it as a separate switch that
   starts off; unless the owner turns it on, Allow grants the rest without `goblin:inspect`
-  (`apps/web/src/lib/consent-scope.ts`). Clients
-  connected before inspection joined `/mcp` get it after reconnecting once; migration
-  `0009_mcp_inspection_scope` lets clients registered earlier ask for it.
+  (`apps/web/src/lib/consent-scope.ts`). `auth/options.ts` configures the one `/mcp` resource and its allowed scopes;
+  Better Auth creates or merges that configuration at runtime. The auth store starts from `0000_baseline.sql`
+  after the disposable dev reset, with no retired inspection or operator resource to carry forward. New clients
+  may request inspection, but only the owner's consent grants it.
 - Revoking a client in Settings deletes your consent to it and revokes its refresh tokens for you (`auth/clients.ts`);
   its next call gets a 401. Consenting again without `goblin:inspect` ends inspection for tokens already issued.

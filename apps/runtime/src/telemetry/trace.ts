@@ -19,7 +19,7 @@ const text = (value: RunAttributes[string] | undefined) => (typeof value === 'st
 
 /**
  * The OpenTelemetry GenAI span a run event becomes, or none: a model call is `chat {model}`, a tool call is
- * `execute_tool {tool}`. Turns, MCP steps and channel events stay in the ledger and logs; they span invocations.
+ * `execute_tool {tool}`. Turns, MCP steps and Source events stay in the ledger and logs; they span invocations.
  */
 export function spanNameOf(event: RunEvent): string | undefined {
   if (event.kind === 'model.attempt' || event.kind === 'model.aux')

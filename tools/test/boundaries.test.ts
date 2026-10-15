@@ -72,11 +72,14 @@ tester.run('no-closed-import', noClosedImport, {
     { code: "import { makeBridge } from './runtime/bridge.ts'", filename: at('apps/runtime/src/agent.ts') },
     { code: "import type { RunProgram } from '../runtime/bridge.ts'", filename: at('apps/runtime/src/pi/thread.ts') },
     { code: "import type { RunProgram } from '../src/runtime/bridge.ts'", filename: at('apps/runtime/test/a.test.ts') },
-    { code: "import { promiseWith } from '../runtime/boundary.ts'", filename: at('apps/runtime/src/mcp/auth.ts') },
+    {
+      code: "import { promiseWith } from '../../runtime/boundary.ts'",
+      filename: at('apps/runtime/src/mcp/oauth/auth.ts'),
+    },
     // Only promiseWith is closed in boundary.ts.
     {
-      code: "import { bound } from '../runtime/boundary.ts'",
-      filename: at('apps/runtime/src/mcp/approval-decision.ts'),
+      code: "import { bound } from '../../runtime/boundary.ts'",
+      filename: at('apps/runtime/src/mcp/approvals/approval-decision.ts'),
     },
     // Another module of the same name elsewhere is not the bridge.
     { code: "import { x } from './bridge.ts'", filename: at('apps/runtime/src/chats/a.ts') },

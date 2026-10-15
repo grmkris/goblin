@@ -1,11 +1,12 @@
 import type { QueryKey } from '@tanstack/react-query'
 import type { AppView, OrganizeReceipt } from '@goblin/contracts'
-import { channelChatsKey, usageQuery } from '../../agent/queries.ts'
+import { usageQuery } from '../../agent/queries.ts'
 import { agentAppQuery, agentAppsQuery } from '../../agent-apps/queries.ts'
 import { conversationKeys } from '../../conversations/queries.ts'
 import { mcpKeys } from '../../mcp/queries.ts'
 import { personaKeys } from '../../personas/queries.ts'
 import { routinesQuery } from '../../routines/queries.ts'
+import { sourceKeys } from '../../sources/queries.ts'
 import { type Activity, type Slice, type Slices, activityOf } from './slices.ts'
 
 /** The slices as the cache holds them: undefined for one no snapshot or change has written yet. */
@@ -50,15 +51,23 @@ function toolEdges(before: Readonly<Record<string, string>>, after: Readonly<Rec
     .map((connectionId) => mcpKeys.tools(connectionId))
 }
 
-/**
- * A Telegram route or new-chats default that changed (by the agent, an answer in Telegram, or an Undo): the chats list,
- * in the Telegram card and Activity's offers.
- */
-function telegramEdges(before: readonly OrganizeReceipt[], after: readonly OrganizeReceipt[]): QueryKey[] {
-  if (before === after) return []
+/** Whether the feed brought an organizing receipt of a kind `matches` that it did not hold: a new one, or one undone. */
+function receiptCame(
+  before: readonly OrganizeReceipt[],
+  after: readonly OrganizeReceipt[],
+  matches: (kind: string) => boolean,
+): boolean {
+  if (before === after) return false
   const was = new Set(before)
-  return after.some((receipt) => receipt.kind.startsWith('telegram.') && !was.has(receipt)) ? [channelChatsKey] : []
+  return after.some((receipt) => matches(receipt.kind) && !was.has(receipt))
 }
+
+/**
+ * A Source's conversation route that changed (by the owner, the agent's `source_route`, or an Undo): every read of the
+ * Sources, the list Activity offers from and each route table.
+ */
+const sourceEdges = (before: readonly OrganizeReceipt[], after: readonly OrganizeReceipt[]): QueryKey[] =>
+  receiptCame(before, after, (kind) => kind === 'source.route') ? [sourceKeys.all] : []
 
 /**
  * The one map from what the feed changed to the server reads that went stale with it. `before` is the cache as it was
@@ -70,7 +79,7 @@ function telegramEdges(before: readonly OrganizeReceipt[], after: readonly Organ
  * - A Persona changed: the Persona reads, what composers can tag, and the routines (one handed to it may wait to be
  *   confirmed again).
  * - A connection's tools changed (the server said so, or a list came back different): its tool list.
- * - A Telegram route or the new-chats default changed (its organizing receipt came or was undone): the chats list.
+ * - A Source's conversation route changed (its organizing receipt came or was undone): the Sources and their routes.
  */
 export function staleAfter(before: Cached, after: Cached): readonly QueryKey[] {
   const { activity, apps, personas, receipts, tools } = after
@@ -81,6 +90,6 @@ export function staleAfter(before: Cached, after: Cached): readonly QueryKey[] {
       ? []
       : [personaKeys.all, conversationKeys.composers, routinesQuery.queryKey]),
     ...(before.tools === undefined || tools === undefined ? [] : toolEdges(before.tools, tools)),
-    ...(before.receipts === undefined || receipts === undefined ? [] : telegramEdges(before.receipts, receipts)),
+    ...(before.receipts === undefined || receipts === undefined ? [] : sourceEdges(before.receipts, receipts)),
   ]
 }

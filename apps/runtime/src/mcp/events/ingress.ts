@@ -2,12 +2,12 @@ import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import { type AppError, InvalidInput, attemptSync } from '../../http/errors.ts'
 import { reportAndRecover } from '../../observability/report.ts'
-import type { CredentialCipher } from '../cipher.ts'
+import type { CredentialCipher } from '../oauth/cipher.ts'
 import { secretAad } from './client.ts'
 import { challengeResponse, decodeEnvelope, isOccurrence, verifyWebhook } from './webhook.ts'
 import type { EventEnvelope } from './protocol.ts'
 import type { SqliteEventStore, Subscription } from './store.ts'
-import type { EventWebhook, EventWebhookResult } from '../events.ts'
+import type { EventWebhook, EventWebhookResult } from './engine.ts'
 
 export type Ingress = {
   readonly store: SqliteEventStore
@@ -87,7 +87,7 @@ const accepts = (ingress: Ingress, row: Subscription, input: EventWebhook, envel
     if (!input.id.startsWith(`msg_${envelope.type}_`)) throw new InvalidInput({ reason: 'event control id' })
     if (row.remoteId === null) {
       if (envelope.type !== 'verification') return false
-      ingress.store.patch(row.id, { remoteId: input.subscriptionId })
+      return ingress.store.patchLive(row, { remoteId: input.subscriptionId })
     }
     return true
   })

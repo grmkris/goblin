@@ -48,10 +48,90 @@ async function skillsRestartChecks(base: string): Promise<void> {
   writeFileSync(path, JSON.stringify({ environment: 'local-workerd-do-restart', before, after }, null, 2))
 }
 
-/** MCP Events (signed Telegram delivery, replay, gaps, refresh and cleanup) and the skills cache. */
+/** MCP Events (signed event delivery, replay, gaps, refresh and cleanup), a Source end to end and the skills cache. */
 export const cases: readonly NativeCase[] = [
   matchCase(
-    'Events discovery, challenge, signed Telegram, replay, gap, refresh, termination and cleanup [canary]',
+    'a Source classifies structured reply outcomes and retries only the frozen retryable call [canary]',
+    'source-reply-outcomes',
+    (result) => {
+      expect(result).toEqual({
+        before: [
+          { outcome: 'accepted', attempts: 0, nextPiece: 1 },
+          { outcome: 'rejected', attempts: 0, nextPiece: 0 },
+          { outcome: null, attempts: 1, nextPiece: 0 },
+          { outcome: 'unknown', attempts: 0, nextPiece: 0 },
+        ],
+        after: ['accepted', 'rejected', 'accepted', 'unknown'],
+        sends: 5,
+        stableRetry: true,
+      })
+    },
+  ),
+  matchCase(
+    "a Source makes the owner's message a turn in its chat's own Topic, someone else's a notice, and answers once [canary]",
+    'sources',
+    (result) =>
+      expect(result).toMatchObject({
+        confirmed: 'active',
+        received: 204,
+        routes: [
+          { route: 'topic', title: 'Trip planning', updatedBy: 'default' },
+          { route: 'topic', title: 'Trip planning', updatedBy: 'default' },
+        ],
+        distinctTopics: true,
+        secondTopic: 'Trip planning (2)',
+        secondSettled: 'done',
+        secondTurns: [{ author: true, words: 'Different chat, same title', files: [] }],
+        topic: 'Trip planning',
+        settled: 'done',
+        turns: [
+          {
+            author: true,
+            words: 'Book the ferry for Friday',
+            files: [
+              {
+                path: expect.stringMatching(/^\/agent\/received\/[^/]+\/\d{4}-\d{2}-\d{2}\/image\.png$/u),
+                mimeType: 'image/png',
+              },
+              {
+                path: expect.stringMatching(/^\/agent\/received\/[^/]+\/\d{4}-\d{2}-\d{2}\/ferry\.md$/u),
+                mimeType: 'text/markdown',
+              },
+            ],
+          },
+        ],
+        stored: [
+          { name: 'ferry.md', whole: true },
+          { name: 'image.png', whole: true },
+        ],
+        noteKept: true,
+        notice: { inTopic: true, titled: true },
+        replies: [
+          {
+            chat: 'c1',
+            text: expect.stringMatching(/^echo: /u),
+            operationId: 'reply-0-source-src_00000000000000c1-m1',
+          },
+          {
+            chat: 'c2',
+            text: expect.stringMatching(/^echo: /u),
+            operationId: 'reply-0-source-src_00000000000000c1-m4',
+          },
+        ],
+      }),
+  ),
+  matchCase(
+    'a Source drops foreign messages before creating or retitling its routes and Topics [canary]',
+    'sources-drop',
+    (result) =>
+      expect(result).toEqual({
+        routes: [{ key: '["c1"]', title: 'Trip planning' }],
+        topics: ['Personal', 'Trip planning'],
+        notices: 0,
+      }),
+  ),
+  matchCase(
+    'Events discovery, challenge, signed event delivery, replay, gap, refresh, termination and cleanup [canary]',
     'events',
     (result) =>
       expect(result).toMatchObject({
@@ -60,16 +140,12 @@ export const cases: readonly NativeCase[] = [
         replayed: 204,
         bad: 400,
         old: 400,
-        operations: ['telegram-tg-123', 'telegram-tg-124'],
-        waiting: true,
-        runs: {
-          channel: [
-            { kind: 'channel.received', status: 'ok', operationId: 'telegram-tg-123', message: 'tg:123' },
-            { kind: 'channel.received', status: 'ok', operationId: 'telegram-tg-124', message: 'tg:124' },
-            { kind: 'channel.reply', status: 'ok', operationId: 'telegram-tg-123', delivery: 'sent' },
-          ],
-          inbox: expect.any(Number),
-        },
+        delivered: [
+          'fixture:message.received:evt_1',
+          'fixture:message.received:evt_2',
+          'second-consumer:evt_1',
+          'second-consumer:evt_2',
+        ],
         refreshedEarly: true,
         terminated: 'terminated',
         cleanup: { retired: true, remoteCleanup: true },
@@ -79,6 +155,16 @@ export const cases: readonly NativeCase[] = [
         scheduledRecovery: true,
         skills: { first: true, second: true, retained: true, dirty: 1, replayDirty: 1, refreshed: 1, terminated: true },
         recovery: { interrupted: true, pendingRetained: true, accepted: true, stableOperation: true, processed: true },
+        races: {
+          staleConsumer: true,
+          cleanupWait: true,
+          stalePoll: true,
+          terminatedPoll: true,
+          staleControlRetire: true,
+          staleControlReplace: true,
+          cleanupRecovery: true,
+          inFlightSubscribe: true,
+        },
       }),
   ),
   probeCase(

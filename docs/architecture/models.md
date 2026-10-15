@@ -22,7 +22,7 @@ endpoint cannot be read ends as a failed response.
 **No endpoint at all.** A deployment without its own endpoint offers one placeholder model, `default`
 (`ENDPOINT_DEFAULT`), which the owner's endpoint answers with its own default once they set one. Until then the
 endpoint in use is `none`: `Inference.served` and `Budget.require` refuse with `NoModelEndpoint` (409, "This deployment
-has no model endpoint. Bring your own model key in Settings."), so a send, a Telegram message, a routine firing
+has no model endpoint. Bring your own model key in Settings."), so a send, a Source message, a routine firing
 (recorded skipped), housekeeping and an app's `llm` power are refused before any call, and a call already under way
 ends with those words (`inference/service.ts` `servedFailure`), which the chat shows as the notice to bring a key. The
 model view's `source` is `none`, the picker offers nothing (`ModelChoice` without `current`), Start's model step and
@@ -43,7 +43,7 @@ context from the last answer's usage, its thinking included, so one long reasoni
 single token: below `MIN_ANSWER_ROOM` (4 096) goblin's stream sends nothing and fails as a context overflow, which Pi
 compacts and retries once. An answer that reaches the limit ends with `stopReason: 'length'`: the chat shows "Cut off
 at the output limit" under what it wrote (or, when it wrote nothing but thinking, says so and points at the picker),
-and Telegram adds the same line. glm-5.3 on the Token Plan thinks until the limit on hard prompts and ignores a thinking
+and Source replies carry the same line. glm-5.3 on the Token Plan thinks until the limit on hard prompts and ignores a thinking
 budget (probed 2026-10-12), which is why the picker says so.
 
 Housekeeping (thread titles, main's summaries and skill-draft decisions) runs on `GOBLIN_MEMORY_MODEL`. Set it to a
@@ -62,7 +62,7 @@ Users of a deployment share its model key, so the deployment may cap each accoun
 (the Worker's `DAILY_TOKEN_CAP`, a positive whole number); unset, while the owner uses their own endpoint, or without
 a deployment endpoint, nothing is refused for tokens. Once a capped day is spent, new
 turns are refused with `BudgetExhausted` until 00:00 UTC: HTTP 429 from the owner API, or a tool error from `/mcp`.
-Telegram submissions, routine runs and housekeeping check the same cap. Tool calls inside a running turn are blocked,
+Source submissions, routine runs and housekeeping check the same cap. Tool calls inside a running turn are blocked,
 so a looping turn ends after one more reply. Pi reports and swallows exceptions thrown by hooks, so the in-turn lever
 is blocking tools, not throwing. Only a spent day blocks a tool as spent: a check that could not read the ledger blocks
 the tool as a failed check and is reported. `GET /api/agent/usage` answers `{ used, limit, resetsAt }` in tokens, with

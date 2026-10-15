@@ -15,7 +15,7 @@ const definition: RoutineDefinition = {
   title: 'Native dated reminder',
   timezone: 'UTC',
   trigger: { kind: 'once', at: '2030-01-01T00:00:00Z' },
-  tellMe: { on: false, telegram: false },
+  tellMe: { on: false, copy: false },
   handTo: {
     kind: 'goblin',
     instruction: 'Return a short reminder.',

@@ -20,6 +20,7 @@ import { sanitizeAttributes } from '../telemetry/safety.ts'
 const LOG_EVENTS = [
   'client_error',
   'failure',
+  'file-link',
   'flow',
   'http.failure',
   'job',

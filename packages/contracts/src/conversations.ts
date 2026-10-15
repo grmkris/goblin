@@ -1,6 +1,6 @@
 import * as Schema from 'effect/Schema'
 import { ComposerSelections } from './composer.ts'
-import { FilePath } from './files.ts'
+import { FilePath, ReceivedFiles } from './files.ts'
 import { AppId, ChatId, EntryId, NonEmptyString, OperationId, TopicId } from './ids.ts'
 import { Attention } from './threads.ts'
 
@@ -174,7 +174,7 @@ export type CreateConversation = typeof CreateConversation.Type
 const AUTHOR_TAG = /^\[from ([^\]\n]{1,80})\]$/u
 
 /**
- * Who wrote a message into a conversation when it was not the owner's own browser (Telegram, an MCP client, a
+ * Who wrote a message into a conversation when it was not the owner's own browser (Source, an MCP client, a
  * subagent): its content starts with a text block holding only this tag. The model reads it as written.
  */
 export const authorTag = (author: string): string => `[from ${author.replaceAll(/[\]\n]/gu, ' ').slice(0, 80)}]`
@@ -182,5 +182,27 @@ export const authorTag = (author: string): string => `[from ${author.replaceAll(
 /** The author named by a leading tag block, if that is what the block is. */
 export const authorOf = (block: string): string | undefined => AUTHOR_TAG.exec(block)?.[1]
 
-/** The author of a message the owner sent from Telegram: their own words, from their phone. */
-export const TELEGRAM_AUTHOR = 'Telegram'
+/**
+ * Where the owner's own turn that came from elsewhere came from, as its receipt's origin says: `source`, a Source's
+ * message the speaks-for-me rule the owner confirmed matched (ADR 0066).
+ */
+export const OwnTurnVia = Schema.Literal('source')
+export type OwnTurnVia = typeof OwnTurnVia.Type
+
+/**
+ * The block goblin writes after the words of the owner's own turn that came from elsewhere,
+ * `{"ownTurn":{"via":"source"}}`: the web shows such a message as the owner's turn. The words are one block before it,
+ * so nothing they say can add one.
+ */
+export const OwnTurnMark = Schema.Struct({ ownTurn: Schema.Struct({ via: OwnTurnVia }) })
+
+/**
+ * The files a message from elsewhere brought, as goblin kept them in the owner's files (ADR 0065), and a note for each
+ * one it could not keep: untrusted data from the connection `origin` names, written by goblin after the words.
+ */
+export const ReceivedBlock = Schema.Struct({
+  origin: Schema.Struct({ connectionId: Schema.String, trust: Schema.Literal('untrusted') }),
+  received: ReceivedFiles,
+  notReceived: Schema.optional(Schema.Array(Schema.String)),
+})
+export type ReceivedBlock = typeof ReceivedBlock.Type

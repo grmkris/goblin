@@ -12,8 +12,9 @@ import { type AppError, BudgetExhausted, Internal } from '../src/http/errors.ts'
 import { noticesOf, routineRunsOf, routinesOf } from '../src/layers/routines.ts'
 import { Notices } from '../src/notices/service.ts'
 import { Changes, makeChanges } from '../src/runtime/changes.ts'
+import { Db } from '../src/runtime/db.ts'
 import { NoticeStore } from '../src/notices/store.ts'
-import { Cipher } from '../src/mcp/cipher.ts'
+import { Cipher } from '../src/mcp/oauth/cipher.ts'
 import { Resident } from '../src/mcp/service.ts'
 import { Models } from '../src/models.ts'
 import { FlowEvents } from '../src/observability/flows.ts'
@@ -37,7 +38,7 @@ const DEFINITION: RoutineDefinition = {
   title: 'Daily',
   trigger: { kind: 'cron', expression: '0 9 * * *' },
   timezone: 'UTC',
-  tellMe: { on: false, telegram: false },
+  tellMe: { on: false, copy: false },
   handTo: {
     kind: 'goblin',
     instruction: 'Report.',
@@ -135,6 +136,8 @@ const fixture = (gate: { budget?: Effect.Effect<void, AppError> } = {}, persona 
     stub(Conversations, { reportRoutine: (report) => Effect.sync(() => void reports.push(report)) }),
     stub(RoutineUsage, { snapshot: () => Effect.void }),
     Layer.succeed(Notices, noticesOf(new NoticeStore(sqlite))),
+    // A report's notification reads Notify me via, which these routines never set.
+    Layer.succeed(Db, sqlite),
     Layer.succeed(Changes, changes),
     Layer.succeed(Personas, personas),
     stub(AgentInput, {

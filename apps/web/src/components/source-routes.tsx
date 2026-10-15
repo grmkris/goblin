@@ -1,15 +1,15 @@
 // A Source's conversations (ADR 0066): a row per conversation key with what it holds and where its messages go, saved
-// as soon as it is picked. The select is the Telegram chats' (PlaceSelects): a Topic answered by goblin or a Persona,
+// as soon as it is picked. The select names a Topic answered by goblin or a Persona,
 // notes in a Topic, Hold or Ignore.
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { SourceRouteView, SourceView } from '@goblin/contracts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { QueryError } from '../lib/query/query-boundary.tsx'
-import { choiceOfRoute, keyWords, routeOfChoice, sourceRouteOptions } from '../lib/source-routes.ts'
-import { type RouteChoice, waitingWords } from '../lib/telegram-chats.ts'
+import { choiceOfRoute, conversationName, routeOfChoice, sourceRouteOptions } from '../lib/source-routes.ts'
+import { type RouteChoice, waitingWords } from '../lib/route-choice.ts'
 import { routeSourceMutation, sourceRoutesQuery } from '../sources/queries.ts'
 import { StatusLabel } from './status-label.tsx'
-import { PlaceSelects, type RoutePlaces, useRoutePlaces } from './telegram-chats.tsx'
+import { PlaceSelects, type RoutePlaces, useRoutePlaces } from './route-select.tsx'
 
 /** Where a Source's conversation goes: the place select over the Topics, and who answers when it is answered. */
 export function SourceRouteSelect({
@@ -53,19 +53,19 @@ function RouteRow({
 }) {
   const routing = useMutation(routeSourceMutation)
   const choice = choiceOfRoute(routing.isPending ? routing.variables.route : view.route)
-  const name = keyWords(view.values)
+  const name = conversationName(view)
   const waiting = view.route.to === 'held' ? waitingWords(view.held) : undefined
   const meta = setBy(view)
   return (
-    <li className="telegram-chat" aria-busy={routing.isPending}>
-      <span className="telegram-chat-text">
-        <span className="telegram-chat-title">
-          <span className="telegram-chat-name">{name}</span>
+    <li className="source-conversation" aria-busy={routing.isPending}>
+      <span className="source-conversation-text">
+        <span className="source-conversation-title">
+          <span className="source-conversation-name">{name}</span>
           {waiting !== undefined && <StatusLabel label={{ text: waiting, tone: 'attention' }} />}
         </span>
-        {meta !== undefined && <span className="telegram-chat-meta">{meta}</span>}
+        {meta !== undefined && <span className="source-conversation-meta">{meta}</span>}
         {routing.error !== null && (
-          <span className="telegram-chat-meta" role="alert">
+          <span className="source-conversation-meta" role="alert">
             {messageOf(routing.error, `change where “${name}” goes`)}
           </span>
         )}
@@ -100,7 +100,7 @@ export function SourceRoutes({ source }: { readonly source: SourceView }) {
     )
   if (routes.length === 0) return <p className="server-note">No conversation has written yet.</p>
   return (
-    <ul className="telegram-chat-list" aria-label={`Conversations of ${source.title}`}>
+    <ul className="source-conversation-list" aria-label={`Conversations of ${source.title}`}>
       {routes.map((view) => (
         <RouteRow key={view.key} source={source} view={view} places={places} />
       ))}

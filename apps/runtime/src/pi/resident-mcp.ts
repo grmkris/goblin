@@ -25,20 +25,25 @@ import {
 } from '../http/errors.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { describeError } from '../telemetry/attributes.ts'
-import { materialize } from '../mcp/content.ts'
-import { offersEvents, toolOffered } from '../mcp/remote.ts'
-import { connectRequiredResult, grantRequiredResult, mcpModelResult, scopeRequiredResult } from '../mcp/extension.ts'
-import { named } from '../mcp/labels.ts'
+import { materialize } from '../mcp/content/materialize.ts'
+import { offersEvents, toolOffered } from '../mcp/connections/remote.ts'
+import {
+  connectRequiredResult,
+  grantRequiredResult,
+  mcpModelResult,
+  scopeRequiredResult,
+} from '../mcp/connections/extension.ts'
+import { named } from '../mcp/servers/labels.ts'
 import { Events, McpConnections, McpGrants, McpServers, requireResident } from '../mcp/service.ts'
-import type { McpConnectionSnapshot, McpRequestOptions } from '../mcp/types.ts'
+import type { McpConnectionSnapshot, McpRequestOptions } from '../mcp/connections/types.ts'
 import { requireRoutineSession } from '../routines/authority.ts'
 import { bound } from '../runtime/boundary.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { outsideScopeResult, mcpOff } from './setup.ts'
 import { ReadyResult, typedTool } from './typed-tool.ts'
-import { McpCallInput, holdModelCall, approvalResult } from '../mcp/approval-request.ts'
-import { keepModelApp } from '../mcp/kept-app.ts'
-import { holdUrlRequest } from '../mcp/url-request.ts'
+import { McpCallInput, holdModelCall, approvalResult } from '../mcp/approvals/approval-request.ts'
+import { keepModelApp } from '../mcp/apps/kept-app.ts'
+import { holdUrlRequest } from '../mcp/url-requests/url-request.ts'
 
 /** The Pi context a tool's execution runs in. */
 type ToolContext = Parameters<ToolRegistration['execute']>[2]

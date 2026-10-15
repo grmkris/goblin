@@ -274,7 +274,7 @@ const approvalOf = (built: Awaited<ReturnType<ReturnType<typeof agentApps>['buil
 /**
  * Agent app powers (ADR 0021): a build lists what the owner has not approved; nothing runs before they approve; an
  * approved host is fetched while unapproved hosts, redirects off the list and goblin's own domain are refused; a
- * revocation takes effect at once; one app reads another it may; the model, Telegram and MCP tools go through the
+ * revocation takes effect at once; one app reads another it may; the model, Source and MCP tools go through the
  * agent's services within the app's caps.
  */
 async function appsPowersProbe(storage: DurableObjectStorage, env: RuntimeEnv, owner: string) {

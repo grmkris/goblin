@@ -1,7 +1,7 @@
 /**
  * Local browser acceptance of Sources (ADR 0066) against real source components, at phone width in light and desk width
- * in dark: on a connection's card, the event its server suggests a Source on, Set up (proposed for review), the review
- * card's facts, a confirm refused while Telegram rides the connection and then confirmed at the exact revision, and
+ * in dark: on a connection's card, a Source the agent proposed (no server suggests one, ADR 0068), the review card's
+ * facts, a stale revision refused and then confirmed at the exact revision, and
  * the Source's conversations with a route picked; Activity's waiting conversation (set up to a Persona) and a Source
  * paused for review; Settings' Notify me via filled from the Source's answers and saved. No account or model call is
  * made; the owner API is routed here.
@@ -26,9 +26,8 @@ const CHAT = {
   events: 'open',
 }
 
-/** What the chat server suggests for a Source on its messages: keyed by chat, the owner's when they say so. */
-const SUGGESTION = {
-  arguments: { chat: 'all' },
+/** What the agent proposed for a Source on the chat server's messages: keyed by chat, the owner's when they say so. */
+const PROPOSED = {
   key: [{ name: 'chat', pointer: '/chat' }],
   speaksForMe: { pointer: '/from/isOwner', equals: true },
   read: { from: 'payload', text: '/text' },
@@ -36,6 +35,11 @@ const SUGGESTION = {
     tool: 'message_send',
     arguments: { chat: '{{key.chat}}', text: '{{text}}', operationId: '{{operationId}}' },
     maxChars: 3500,
+    result: {
+      accepted: { pointer: '/status', equals: 'accepted' },
+      retryable: { pointer: '/status', equals: 'retryable' },
+      rejected: { pointer: '/status', equals: 'rejected' },
+    },
   },
 }
 const STREAMS = [
@@ -44,7 +48,6 @@ const STREAMS = [
     inputSchema: { type: 'object', properties: { chat: { type: 'string' } } },
     subscribable: true,
     title: 'Messages',
-    source: SUGGESTION,
   },
 ]
 const TOOLS = [{ name: 'message_send', suggested: 'ask', modelVisible: true, granted: true }]
@@ -60,7 +63,7 @@ const sourceOf = (id: string, setup: unknown, state: string, fields: Json = {}):
   setup,
   revision: 1,
   state,
-  proposedBy: 'owner',
+  proposedBy: 'agent',
   waiting: [],
   createdAt: 1,
   updatedAt: 1,
@@ -69,7 +72,13 @@ const sourceOf = (id: string, setup: unknown, state: string, fields: Json = {}):
 
 const ACTIVE = 'src_00000000000000aa'
 const REVIEW = 'src_00000000000000bb'
-const SETUP = { ...SUGGESTION, wake: { event: 'message.received', arguments: { chat: 'all' } }, others: 'notice' }
+const SETUP = {
+  ...PROPOSED,
+  wake: { event: 'message.received', arguments: { chat: 'all' } },
+  others: 'notice',
+  newKeys: { to: 'held' },
+}
+const PROPOSAL = 'src_00000000000000cc'
 const ROUTES = [
   {
     key: '["dm"]',
@@ -93,13 +102,13 @@ const ROUTES = [
 ]
 
 const errors: string[] = []
-const proposals: unknown[] = []
 const confirms: unknown[] = []
 const routes: unknown[] = []
 const sinks: unknown[] = []
 
 /** The owner API for one page: servers, events, tools, Sources (changed by each step) and Notify me via. */
 async function serve(page: Page, label: string, sources: Map<string, Json>) {
+  const routeRows = new Map<string, Json>(ROUTES.map((row) => [row.key, row]))
   page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`))
   // Only the owner API: the fixture's own modules live under paths with `/api/` in them too.
   await page.route(
@@ -116,23 +125,25 @@ async function serve(page: Page, label: string, sources: Map<string, Json>) {
     sinks.push(body)
     return route.fulfill({ json: { ...body, label: 'Chat', updatedAt: 2 } })
   })
-  await page.route('**/api/sources', (route) => {
-    if (route.request().method() === 'GET') return route.fulfill({ json: { sources: [...sources.values()] } })
-    // SAFETY: Set up sends the owner API's SourceProposal.
-    const body = route.request().postDataJSON() as { readonly setup: unknown }
-    proposals.push(body)
-    const proposed = sourceOf('src_00000000000000cc', body.setup, 'proposed')
-    sources.set('src_00000000000000cc', proposed)
-    return route.fulfill({ status: 201, json: proposed })
+  await page.route('**/api/sources', (route) => route.fulfill({ json: { sources: [...sources.values()] } }))
+  await page.route('**/api/sources/*/reply-result', (route) => {
+    const id = new URL(route.request().url()).pathname.split('/').at(-2) ?? ''
+    // SAFETY: this fixture receives the typed owner API mutation from the reply rules editor.
+    const body = route.request().postDataJSON() as { readonly revision: number; readonly result: unknown }
+    assert.equal(body.revision, 1)
+    assert.deepEqual(body.result, SETUP.reply?.result)
+    const updated = { ...sources.get(id), revision: 2, state: 'proposed', setup: SETUP }
+    sources.set(id, updated)
+    return route.fulfill({ json: updated })
   })
   await page.route('**/api/sources/*/confirm', (route) => {
     const id = new URL(route.request().url()).pathname.split('/').at(-2) ?? ''
     confirms.push(route.request().postDataJSON())
-    // The first confirm finds Telegram riding the connection; the owner turns it off and confirms again.
+    // A stale review is refused; the owner reads the current setup and confirms its revision.
     if (confirms.length % 2 === 1)
       return route.fulfill({
-        status: 400,
-        json: { error: { code: 'invalid_input', message: 'Check the details.', reason: 'telegram_on' } },
+        status: 409,
+        json: { error: { code: 'conflict', message: 'The source changed.', reason: 'source_revision' } },
       })
     const confirmed = { ...sources.get(id), state: 'active', confirmedAt: 2 }
     sources.set(id, confirmed)
@@ -140,14 +151,17 @@ async function serve(page: Page, label: string, sources: Map<string, Json>) {
   })
   await page.route('**/api/sources/*/routes', (route) => {
     const id = new URL(route.request().url()).pathname.split('/').at(-2) ?? ''
-    if (route.request().method() === 'GET') return route.fulfill({ json: { source: sources.get(id), routes: ROUTES } })
+    if (route.request().method() === 'GET')
+      return route.fulfill({ json: { source: sources.get(id), routes: [...routeRows.values()] } })
     // SAFETY: the route select sends the owner API's SourceRoutePick.
     const pick = route.request().postDataJSON() as { readonly key: string; readonly route: unknown }
     routes.push(pick)
     const current = sources.get(id)
     if (current !== undefined) sources.set(id, { ...current, waiting: [] })
-    const row = ROUTES.find((each) => each.key === pick.key)
-    return route.fulfill({ json: { ...row, route: pick.route, held: 0, revision: 1, updatedBy: 'owner' } })
+    const row = routeRows.get(pick.key)
+    const updated = { ...row, route: pick.route, held: 0, revision: 1, updatedBy: 'owner' }
+    routeRows.set(pick.key, updated)
+    return route.fulfill({ json: updated })
   })
 }
 
@@ -158,24 +172,36 @@ const noSidewaysScroll = async (page: Page, label: string) => {
 
 async function connection(browser: Browser, origin: string, label: string, options: BrowserContextOptions) {
   const page = await browser.newPage(options)
-  await serve(page, label, new Map())
+  await serve(page, label, new Map([[PROPOSAL, sourceOf(PROPOSAL, SETUP, 'proposed')]]))
   await page.goto(`${origin}sources.html?at=/connections`)
-  await page.getByText('Chat suggests carrying your messages here as a Source.').waitFor()
-  await page.getByRole('button', { name: 'Set up' }).click()
   await page.getByText('When /from/isOwner is true: those become your own turns').waitFor()
   await page.getByText('Sent back with message_send, in pieces of at most 3,500 characters').waitFor()
   await page.getByText('Held until you choose where they go').waitFor()
+  await page.getByRole('button', { name: 'Edit reply result rules' }).click()
+  await page.getByLabel('Reply result rules', { exact: true }).fill('{invalid')
+  assert(
+    await page.getByRole('button', { name: 'Save for review' }).isDisabled(),
+    `${label}: invalid rules can be saved`,
+  )
+  await page.getByLabel('Reply result rules', { exact: true }).fill(JSON.stringify(SETUP.reply?.result, null, 2))
   await noSidewaysScroll(page, label)
   await page.screenshot({ path: path.join(out, `${label}-review.png`), fullPage: true })
+  await page.getByRole('button', { name: 'Save for review' }).click()
+  await page.getByText('Exact setup, revision 2').waitFor()
   await page.getByRole('button', { name: 'Confirm' }).click()
-  await page.getByText('Turn Telegram off on this connection first').waitFor()
+  await page.getByText('This Source changed since you read it. Review its current revision below.').waitFor()
   await page.getByRole('button', { name: 'Confirm' }).click()
-  await page.getByText('On', { exact: true }).waitFor()
+  await page.getByRole('button', { name: 'Conversations' }).waitFor()
   await page.getByRole('button', { name: 'Conversations' }).click()
   await page.getByText('chat g_team', { exact: true }).waitFor()
   await page.getByText('2 messages waiting').waitFor()
   await page.getByLabel('Where “chat g_team” goes').selectOption({ label: '#Team' })
   await page.waitForFunction(() => document.querySelector('[aria-busy="true"]') === null)
+  assert.equal(
+    await page.getByLabel('Where “chat g_team” goes').inputValue(),
+    'answer:2',
+    `${label}: route was not saved`,
+  )
   await noSidewaysScroll(page, label)
   await page.screenshot({ path: path.join(out, `${label}-routes.png`), fullPage: true })
   await page.close()
@@ -206,7 +232,7 @@ async function activity(browser: Browser, origin: string, label: string, options
   await page.screenshot({ path: path.join(out, `${label}-activity.png`), fullPage: true })
   await page.getByLabel('Where “chat g_team” goes').selectOption({ label: '#Team' })
   await page.getByLabel('Who answers in “chat g_team”').selectOption({ label: '@Guide answers' })
-  await page.getByRole('button', { name: 'Set up' }).click()
+  await page.locator('button').filter({ hasText: 'Set up' }).click()
   await page.getByText('New conversation “chat g_team” on Messages from Chat').waitFor({ state: 'detached' })
   await page.close()
 }
@@ -220,6 +246,21 @@ async function settings(browser: Browser, origin: string, label: string, options
   await page.getByLabel('Which conversation notices go to').selectOption({ label: 'chat dm' })
   assert.equal(await page.getByLabel('Tool').inputValue(), 'message_send', `${label}: tool not copied`)
   assert.match(await page.getByLabel('Arguments').inputValue(), /"chat": "dm"/u, `${label}: key not filled`)
+  assert.deepEqual(
+    JSON.parse(await page.getByLabel('Delivery and echo rules').inputValue()).result,
+    SETUP.reply?.result,
+    `${label}: result rules not copied`,
+  )
+  const policy = {
+    result: {
+      accepted: { pointer: '/status', equals: 'sent' },
+      retryable: { pointer: '/status', equals: 'retryable' },
+      rejected: { pointer: '/status', equals: 'rejected' },
+      retryAt: '/retryAt',
+    },
+    echo: { event: 'message.received', arguments: { chat: 'all' } },
+  }
+  await page.getByLabel('Delivery and echo rules').fill(JSON.stringify(policy, null, 2))
   await noSidewaysScroll(page, label)
   await page.screenshot({ path: path.join(out, `${label}-notify.png`), fullPage: true })
   await page.getByRole('button', { name: 'Save' }).click()
@@ -243,8 +284,7 @@ try {
     await settings(browser, origin, label, options)
   }
   assert.deepEqual(errors, [])
-  assert.equal(proposals.length, 2)
-  assert.deepEqual(confirms, [{ revision: 1 }, { revision: 1 }, { revision: 1 }, { revision: 1 }])
+  assert.deepEqual(confirms, [{ revision: 2 }, { revision: 2 }, { revision: 2 }, { revision: 2 }])
   assert.deepEqual(routes.slice(0, 2), [
     { key: '["g_team"]', route: { to: 'topic', topic: 2 } },
     { key: '["g_team"]', route: { to: 'persona', persona: 7, topic: 2 } },
@@ -253,6 +293,13 @@ try {
     connectionId: 'chat',
     tool: 'message_send',
     arguments: { chat: 'dm', text: '{{text}}', operationId: '{{operationId}}' },
+    result: {
+      accepted: { pointer: '/status', equals: 'sent' },
+      retryable: { pointer: '/status', equals: 'retryable' },
+      rejected: { pointer: '/status', equals: 'rejected' },
+      retryAt: '/retryAt',
+    },
+    echo: { event: 'message.received', arguments: { chat: 'all' } },
   })
   writeSync(STDOUT, `${JSON.stringify({ ok: true, out, routes: routes.length })}\n`)
 } finally {

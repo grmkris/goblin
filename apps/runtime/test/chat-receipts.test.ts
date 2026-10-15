@@ -13,8 +13,8 @@ const cleanups: (() => void)[] = []
 afterEach(() => {
   for (const close of cleanups.splice(0)) close()
 })
-const database = (range: Parameters<typeof chatDatabase>[0] = {}) => {
-  const opened = chatDatabase(range)
+const database = () => {
+  const opened = chatDatabase()
   cleanups.push(opened.close)
   return opened
 }

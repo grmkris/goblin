@@ -1,7 +1,6 @@
 import { SourceSetup } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
-import { eventSuggestion } from '../src/mcp/events/protocol.ts'
 import { schemaAt, valueAt } from '../src/sources/pointer.ts'
 import { setupProblems } from '../src/sources/setup.ts'
 import { INBOX_READ, MESSAGE_RECEIVED, PAYLOAD_SETUP } from './sources-fixture.ts'
@@ -25,10 +24,6 @@ const reply = (args: Record<string, unknown>) => ({
   ...PAYLOAD_SETUP,
   reply: { tool: 'message_send', arguments: args, maxChars: 100 },
 })
-
-/** What `message.received` suggests when its `_meta.suggest.source` is `source`. */
-const suggest = (source: unknown) =>
-  eventSuggestion({ ...MESSAGE_RECEIVED, _meta: { suggest: { title: 'Messages', source } } })
 
 describe('JSON pointers (RFC 6901)', () => {
   it('reads values through objects and arrays, with ~0 and ~1 escapes', () => {
@@ -98,22 +93,5 @@ describe("a Source's setup (ADR 0066)", () => {
     expect(
       accepts({ ...PAYLOAD_SETUP, read: { ...TOOL_READ, arguments: { cursor: '{{cursor}}', text: '{{text}}' } } }),
     ).toBe(false)
-  })
-})
-
-describe("a server's suggested Source, read leniently (ADR 0066)", () => {
-  it('carries the facts that hold, leaving out a reply that does not', () => {
-    const { wake: _, newKeys: __, ...facts } = PAYLOAD_SETUP
-    expect(suggest(facts).source).toEqual(facts)
-    const badReply = { ...facts, reply: { ...facts.reply, arguments: { text: 'Hi {{text}}' } } }
-    const { reply: ___, ...withoutReply } = facts
-    expect(suggest(badReply).source).toEqual(withoutReply)
-  })
-
-  it('suggests none without a key, a speaks-for-me rule and a read that hold, and keeps the rest of the suggestion', () => {
-    expect(suggest({ key: 'chat', speaksForMe: { all: true }, read: PAYLOAD_SETUP.read })).toEqual({
-      title: 'Messages',
-    })
-    expect(suggest('not an object').source).toBeUndefined()
   })
 })
