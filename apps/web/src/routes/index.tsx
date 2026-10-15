@@ -6,12 +6,11 @@ import { Landing } from '../components/landing/landing.tsx'
 import { sessionQuery } from '../auth/queries.ts'
 import { lastChannel } from '../lib/last-channel.ts'
 import { hasSessionCookie, homeFor } from '../lib/home.ts'
+import { deploymentOrigin } from '../lib/origin.ts'
 
 const TITLE = 'goblin: your own agent, always on'
 const DESCRIPTION =
   "Your own goblin, always on. A personal agent that keeps working while you're away, uses only the tools you allow, and asks before it spends."
-const CANONICAL = 'https://goblin.surf/'
-const IMAGE = 'https://goblin.surf/og.png'
 
 /** On the server: whether the request carries Better Auth's session cookie. */
 const requestHasSession = createServerOnlyFn(() => hasSessionCookie(getCookie))
@@ -34,26 +33,37 @@ export const Route = createFileRoute('/')({
     const home = homeFor(signedIn, server ? PRIMARY_CHAT : lastChannel())
     if (home !== undefined) throw redirect({ to: '/c/$chatId', params: { chatId: home }, statusCode: 307 })
   },
-  head: () => ({
-    meta: [
-      { title: TITLE },
-      { name: 'description', content: DESCRIPTION },
-      { property: 'og:type', content: 'website' },
-      { property: 'og:site_name', content: 'goblin' },
-      { property: 'og:url', content: CANONICAL },
-      { property: 'og:title', content: TITLE },
-      { property: 'og:description', content: DESCRIPTION },
-      { property: 'og:image', content: IMAGE },
-      { property: 'og:image:width', content: '1200' },
-      { property: 'og:image:height', content: '630' },
-      { property: 'og:image:alt', content: 'goblin: your own goblin, always on.' },
-      { name: 'twitter:card', content: 'summary_large_image' },
-      { name: 'twitter:site', content: '@goblin_surf' },
-      { name: 'twitter:title', content: TITLE },
-      { name: 'twitter:description', content: DESCRIPTION },
-      { name: 'twitter:image', content: IMAGE },
-    ],
-    links: [{ rel: 'canonical', href: CANONICAL }],
-  }),
-  component: Landing,
+  head: () => {
+    // The deployment's own address, whoever deploys it.
+    const origin = deploymentOrigin()
+    const canonical = `${origin}/`
+    const image = `${origin}/og.png`
+    return {
+      meta: [
+        { title: TITLE },
+        { name: 'description', content: DESCRIPTION },
+        { property: 'og:type', content: 'website' },
+        { property: 'og:site_name', content: 'goblin' },
+        { property: 'og:url', content: canonical },
+        { property: 'og:title', content: TITLE },
+        { property: 'og:description', content: DESCRIPTION },
+        { property: 'og:image', content: image },
+        { property: 'og:image:width', content: '1200' },
+        { property: 'og:image:height', content: '630' },
+        { property: 'og:image:alt', content: 'goblin: your own goblin, always on.' },
+        { name: 'twitter:card', content: 'summary_large_image' },
+        { name: 'twitter:site', content: '@goblin_surf' },
+        { name: 'twitter:title', content: TITLE },
+        { name: 'twitter:description', content: DESCRIPTION },
+        { name: 'twitter:image', content: image },
+      ],
+      links: [{ rel: 'canonical', href: canonical }],
+    }
+  },
+  component: Home,
 })
+
+/** The landing on the deployment's own origin, which the server reads from its request (`lib/origin.ts`). */
+function Home() {
+  return <Landing origin={deploymentOrigin()} />
+}

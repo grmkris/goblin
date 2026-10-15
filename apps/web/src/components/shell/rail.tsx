@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { GoblinMark } from '@goblin/ui'
 import {
@@ -13,7 +13,7 @@ import {
   SettingsIcon,
 } from 'lucide-react'
 import { railCounts } from '../../lib/rail.ts'
-import { signOutMutation } from '../../auth/queries.ts'
+import { healthQuery, signOutMutation } from '../../auth/queries.ts'
 import {
   useActivities,
   useApps,
@@ -61,6 +61,8 @@ export function Rail() {
     notifications: useNotifications(),
   })
   const signingOut = useMutation(signOutMutation)
+  // A deployment without agent apps (ADR 0064) has no Apps page to offer; until /health says so, it is offered.
+  const apps = useQuery(healthQuery).data?.features?.agentApps !== false
   return (
     <nav className="shell-rail" aria-label="Places">
       <Link to="/" className="rail-brand" aria-label="goblin home">
@@ -79,9 +81,11 @@ export function Rail() {
         <Stop label="Tasks" icon={<ListChecksIcon aria-hidden />} count={counts.tasks} />
       </Link>
       <span className="rail-spacer" />
-      <Link to="/apps" className="rail-item" aria-current={current(at('/apps'))}>
-        <Stop label="Apps" icon={<LayoutGridIcon aria-hidden />} />
-      </Link>
+      {apps && (
+        <Link to="/apps" className="rail-item" aria-current={current(at('/apps'))}>
+          <Stop label="Apps" icon={<LayoutGridIcon aria-hidden />} />
+        </Link>
+      )}
       <Link to="/connections" className="rail-item" aria-current={current(at('/connections'))}>
         <Stop label="Connections" icon={<PlugIcon aria-hidden />} />
       </Link>

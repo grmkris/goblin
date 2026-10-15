@@ -109,15 +109,27 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     })
     this.#apps = apps
     this.#telemetry = agentTelemetry(ctx.storage, () => this.name, run)
-    const execution = [...tools, skillsExtension(run), filesExtension(run), appExecutionExtension(apps, run)]
-    this.#subagents = subagentsExtension(run, (self) => [personaExtension, ...execution, ...apps.extensions(), self])
+    // Without Dynamic Workers (ADR 0064) the agent is given no app or `code_run` tools: nothing could run them.
+    const appsRun = env.LOADER !== undefined
+    const execution = [
+      ...tools,
+      skillsExtension(run),
+      filesExtension(run),
+      ...(appsRun ? [appExecutionExtension(apps, run)] : []),
+    ]
+    this.#subagents = subagentsExtension(run, (self) => [
+      personaExtension,
+      ...execution,
+      ...(appsRun ? apps.extensions() : []),
+      self,
+    ])
     const subagents = this.#subagents.extension
     const retrieval = retrievalExtension(run)
     const learning = [skillLearningExtension(run), decisionsExtension(run, env.AI !== undefined)]
     const base = [
       ...execution,
       ...learning,
-      ...appsExtension(apps, run),
+      ...appsExtension(apps, run, appsRun),
       organize,
       telegramExtension(run),
       retrieval,

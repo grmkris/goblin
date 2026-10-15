@@ -34,16 +34,19 @@ afterEach(() => {
 describe('the public health', () => {
   it('reads the sign-up mode and the ways to sign in, and anything unsaid as off', async () => {
     vi.stubGlobal('location', new URL('http://app.test/'))
+    const features = { largeFiles: true, agentApps: false, flows: true, decisions: false }
     answering(() =>
       Response.json({
         ok: true,
         signup: 'invite',
         signIn: [{ method: 'email' }, { method: 'oidc', label: 'Sign in with mysi' }],
+        features,
       }),
     )
     expect(await testQueryClient().query(healthQuery)).toEqual({
       signup: 'invite',
       methods: { email: true, oidc: { label: 'Sign in with mysi' } },
+      features,
     })
     answering(() => Response.json({ ok: true, signup: 'open', signIn: [{ method: 'oidc', label: 'Use Okta' }] }))
     expect(await testQueryClient().query(healthQuery)).toEqual({

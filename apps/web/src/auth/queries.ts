@@ -1,5 +1,5 @@
 import { mutationOptions, queryOptions } from '@tanstack/react-query'
-import { OIDC_PROVIDER_ID, SignInMethod, SignupMode } from '@goblin/contracts'
+import { DeploymentFeatures, OIDC_PROVIDER_ID, SignInMethod, SignupMode } from '@goblin/contracts'
 import { Data, Option, Schema } from 'effect'
 import { requestId } from '../lib/api.ts'
 import { authClient, redirectOf } from '../lib/auth-client.ts'
@@ -89,6 +89,7 @@ export const sessionQuery = queryOptions({
 const Health = Schema.Struct({
   signup: Schema.optional(SignupMode),
   signIn: Schema.optional(Schema.Array(SignInMethod)),
+  features: Schema.optional(DeploymentFeatures),
 })
 const decodeHealth = Schema.decodeUnknownOption(Health)
 
@@ -104,7 +105,10 @@ const methodsOf = (listed: readonly SignInMethod[]): SignInMethods => {
   }
 }
 
-/** How sign-up works here and the ways to sign in, anything the Worker does not say reading as off. */
+/**
+ * How sign-up works here and the ways to sign in, anything the Worker does not say reading as off; and the optional
+ * features, unknown (`undefined`) when it does not say.
+ */
 export const healthQuery = queryOptions({
   queryKey: authKeys.health,
   queryFn: async ({ signal }) => {
@@ -120,6 +124,7 @@ export const healthQuery = queryOptions({
     return {
       signup: health.signup ?? 'closed',
       methods: methodsOf(health.signIn ?? []),
+      ...(health.features === undefined ? {} : { features: health.features }),
     }
   },
   meta: { auth: 'optional' },

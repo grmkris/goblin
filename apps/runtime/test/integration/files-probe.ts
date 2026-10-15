@@ -1,6 +1,6 @@
 import { FileStore } from '../../src/files/store.ts'
 import { callOwner } from '../owner-client.ts'
-import { type Probes, type ProbeStub, inAgent, inWorker } from './probe.ts'
+import { type Probes, type ProbeStub, filesBucket, inAgent, inWorker } from './probe.ts'
 
 const KIB = 1024
 
@@ -109,6 +109,6 @@ async function filesSequence(agent: ProbeStub, bucket: R2Bucket, owner: string) 
 }
 
 export const probes: Probes = {
-  'files-store': inAgent(({ storage, env, name }) => filesStoreProbe(storage.sql, env.FILES, name)),
-  'files-sequence': inWorker(({ agent, env, name }) => filesSequence(agent, env.FILES, name)),
+  'files-store': inAgent(({ storage, env, name }) => filesStoreProbe(storage.sql, filesBucket(env), name)),
+  'files-sequence': inWorker(({ agent, env, name }) => filesSequence(agent, filesBucket(env), name)),
 }

@@ -9,7 +9,7 @@ import { type AppRunner, appLock } from '../../src/agent-apps/queue.ts'
 import type { RuntimeEnv } from '../../src/env.ts'
 import { KeyedLock } from '../../src/observability/lock.ts'
 import { type AgentFetch, type OwnerClient, callOwner } from '../owner-client.ts'
-import { type Probes, inAgent } from './probe.ts'
+import { type Probes, filesBucket, inAgent } from './probe.ts'
 
 /** A runtime with only the per-key lock, for the apps engines a probe makes outside an agent's own runtime. */
 const probeRuntime = ManagedRuntime.make(KeyedLock.layer)
@@ -269,7 +269,7 @@ async function appsJobsProbe(
     ...(await failures(bench)),
     ...(await releases(bench, agent.fire)),
     summary: bench.apps.summary(),
-    ...(await management(bench, agent, env.FILES, owner)),
+    ...(await management(bench, agent, filesBucket(env), owner)),
   }
   for (const id of await bench.armed()) await schedules.cancel(id)
   return result

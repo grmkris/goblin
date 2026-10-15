@@ -58,6 +58,12 @@ export type Probes = Readonly<Record<string, Probe>>
 export const inAgent = (run: (inside: Inside) => unknown): Probe => ({ where: 'agent', run })
 export const inWorker = (run: (outside: Outside) => Promise<unknown>): Probe => ({ where: 'worker', run })
 
+/** The files bucket, which every native stack binds (a deployment may not, ADR 0064). */
+export const filesBucket = (env: Pick<RuntimeEnv, 'FILES'>): R2Bucket => {
+  if (env.FILES === undefined) throw new Error('the native stacks bind FILES')
+  return env.FILES
+}
+
 /** Every module's probes as one record; a name two modules claim is a fixture bug, refused at load. */
 export function registry(...modules: readonly Probes[]): Probes {
   const all: Record<string, Probe> = {}

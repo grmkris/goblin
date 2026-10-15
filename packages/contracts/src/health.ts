@@ -21,8 +21,21 @@ export const SignupMode = Schema.Literals(['open', 'invite', 'closed'])
 export type SignupMode = typeof SignupMode.Type
 
 /**
- * `GET /health`, public: that the Worker answers, its stage label, how sign-up works and the ways to sign in. Nothing
- * about any account.
+ * What this deployment has of the parts it may go without (ADR 0064), each a binding of its own: files over 128 KiB
+ * (an R2 bucket; smaller ones stay in the agent), agent apps and `code_run` (Dynamic Workers), flow metrics (Analytics
+ * Engine) and typed decisions (Workers AI).
+ */
+export const DeploymentFeatures = Schema.Struct({
+  largeFiles: Schema.Boolean,
+  agentApps: Schema.Boolean,
+  flows: Schema.Boolean,
+  decisions: Schema.Boolean,
+})
+export type DeploymentFeatures = typeof DeploymentFeatures.Type
+
+/**
+ * `GET /health`, public: that the Worker answers, its stage label, how sign-up works, the ways to sign in and the
+ * optional features. Nothing about any account.
  */
 export const Health = Schema.Struct({
   ok: Schema.Literal(true),
@@ -30,5 +43,6 @@ export const Health = Schema.Struct({
   stage: Schema.optional(Schema.String),
   signup: SignupMode,
   signIn: Schema.Array(SignInMethod),
+  features: DeploymentFeatures,
 })
 export type Health = typeof Health.Type

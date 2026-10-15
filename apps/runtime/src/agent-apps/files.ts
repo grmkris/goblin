@@ -5,6 +5,8 @@ import { slugOf } from './names.ts'
 const MIB = 1024 * 1024
 /** One app's files (ADR 0022): text, 1 MiB a write, 64 MiB and 2,000 files in all. */
 export const APP_FILE_LIMITS = { writeBytes: MIB, totalBytes: 64 * MIB, files: 2000 } as const
+/** Files larger than this live in R2; without the bucket (ADR 0064) no write may be larger. */
+const INLINE_BYTES = 128 * 1024
 
 /** At most eight segments of letters, digits, spaces and `_ . ( ) -`, none of them only dots. */
 const APP_FILE_PATH = /^(?:\/(?!\.+(?:\/|$))[\p{L}\p{N}_ .()-]{1,80}){1,8}$/u
@@ -16,18 +18,20 @@ const checked = (path: string): string => {
 
 /**
  * One app's own files: Shell's Workspace in the namespace `app_<name>` of the agent's SQLite, larger files in R2 under
- * the agent's prefix, so erasing the account erases them too.
+ * the agent's prefix, so erasing the account erases them too. Without the bucket every file stays in SQLite.
  */
 export class AppFiles {
   readonly #workspace: Workspace
+  readonly #writeBytes: number
 
-  constructor(sql: SqlStorage, bucket: R2Bucket, owner: () => string, app: string) {
+  constructor(sql: SqlStorage, bucket: R2Bucket | undefined, owner: () => string, app: string) {
+    this.#writeBytes = bucket === undefined ? INLINE_BYTES : APP_FILE_LIMITS.writeBytes
     this.#workspace = new Workspace({
       sql,
       namespace: `app_${slugOf(app)}`,
-      r2: bucket,
+      ...(bucket === undefined ? {} : { r2: bucket }),
       name: () => `agents/${owner()}`,
-      inlineThreshold: 128 * 1024,
+      inlineThreshold: INLINE_BYTES,
     })
   }
 
@@ -38,7 +42,7 @@ export class AppFiles {
   async write(path: string, text: string): Promise<void> {
     const target = checked(path)
     const size = new TextEncoder().encode(text).byteLength
-    if (size > APP_FILE_LIMITS.writeBytes) throw new PayloadTooLarge({ limit: APP_FILE_LIMITS.writeBytes })
+    if (size > this.#writeBytes) throw new PayloadTooLarge({ limit: this.#writeBytes })
     const [info, existing] = await Promise.all([this.#workspace.getWorkspaceInfo(), this.#workspace.stat(target)])
     const replaced = existing?.type === 'file' ? existing.size : 0
     if (info.totalBytes - replaced + size > APP_FILE_LIMITS.totalBytes)

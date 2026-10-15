@@ -1,4 +1,4 @@
-import type { Health, SignInMethod } from '@goblin/contracts'
+import type { DeploymentFeatures, Health, SignInMethod } from '@goblin/contracts'
 import type { RuntimeEnv } from '../env.ts'
 import { mailerOf } from '../auth/mail.ts'
 import { oidcProviderOf } from '../auth/oidc.ts'
@@ -13,6 +13,14 @@ export const signInMethods = (env: RuntimeEnv): readonly SignInMethod[] => {
   ]
 }
 
+/** The optional bindings the deployment has (ADR 0064). */
+export const featuresOf = (env: RuntimeEnv): DeploymentFeatures => ({
+  largeFiles: env.FILES !== undefined,
+  agentApps: env.LOADER !== undefined,
+  flows: env.FLOWS !== undefined,
+  decisions: env.AI !== undefined,
+})
+
 /** `GET /health`: what the deployment is and offers, from its settings alone (no request reaches a binding). */
 export const healthOf = (env: RuntimeEnv): Health => ({
   ok: true,
@@ -20,4 +28,5 @@ export const healthOf = (env: RuntimeEnv): Health => ({
   ...(env.STAGE === undefined ? {} : { stage: env.STAGE }),
   signup: signupMode(env.SIGNUP_MODE),
   signIn: signInMethods(env),
+  features: featuresOf(env),
 })

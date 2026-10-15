@@ -295,6 +295,7 @@ describe('the provider settings and what /health says (unit)', () => {
       stage: 'dev',
       signup: 'invite',
       signIn: [{ method: 'email' }, { method: 'oidc', label: 'Sign in with Example' }],
+      features: { largeFiles: false, agentApps: false, flows: false, decisions: false },
     })
     expect(healthOf(deployment(db, { OIDC_CLIENT_SECRET: '' })).signIn).toEqual([])
   })

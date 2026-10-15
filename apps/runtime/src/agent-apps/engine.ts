@@ -25,8 +25,10 @@ import { AppToolset } from './toolset.ts'
 
 export type AgentAppsDeps = {
   readonly storage: DurableObjectStorage
-  readonly loader: WorkerLoader
-  readonly bucket: R2Bucket
+  /** Dynamic Workers; without them (ADR 0064) every isolate is refused and the agent is given no app tools. */
+  readonly loader: WorkerLoader | undefined
+  /** The files bucket; without it every app file stays in SQLite. */
+  readonly bucket: R2Bucket | undefined
   /** The owner's user id (the agent's name), read when files are first touched. */
   readonly owner: () => string
   readonly now: () => number
@@ -35,7 +37,7 @@ export type AgentAppsDeps = {
   readonly ownerFiles: FileStore
   /** How an app's `ctx.fetch` reaches the internet (tests replace it). */
   readonly fetch: Send
-  /** goblin's own URL: an app never fetches from its domain. */
+  /** goblin's own URL: an app never fetches from its host. */
   readonly appUrl: string
   /** The agent object's native schedules, which run the apps' jobs. */
   readonly schedules: JobSchedules

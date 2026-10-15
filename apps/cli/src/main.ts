@@ -25,7 +25,7 @@ const HELP = `goblin: your goblin agent from the terminal, as an MCP client of /
   goblin ask_agent <message>   ask your agent in its main conversation
   goblin logout
 
-  --origin URL   default https://dev.goblin.surf (or GOBLIN_ORIGIN)
+  --origin URL   your goblin's address (or GOBLIN_ORIGIN); required
   --json         print the tool's structured result
   --open         open the sign-in page in a browser
   --port N       the sign-in callback's loopback port (default 18979)`

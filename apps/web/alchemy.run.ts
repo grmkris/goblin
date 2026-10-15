@@ -46,6 +46,13 @@ const oidcEnv = Effect.gen(function* () {
   }
 })
 
+/** An optional binding's switch (ADR 0064): on unless it says `off`. goblin's own stages keep every binding. */
+const switchedOn = (name: string) =>
+  Config.String(name).pipe(
+    Config.withDefault('on'),
+    Config.map((value) => value.trim().toLowerCase() !== 'off'),
+  )
+
 /** What the Website build reads: a change to any of them builds again. */
 const BUILD_INPUTS = [
   'src/**',
@@ -82,9 +89,16 @@ export default Alchemy.Stack(
       name: stage.resourceName('auth'),
       migrations: fileURLToPath(new URL('../../apps/runtime/migrations', import.meta.url)),
     })
-    const files = yield* Cloudflare.R2.Bucket('Files', { name: stage.resourceName('files') })
+    // Files over 128 KiB (ADR 0022); without the bucket every file stays in the agent's SQLite, none larger.
+    const files = (yield* switchedOn('GOBLIN_LARGE_FILES'))
+      ? { FILES: yield* Cloudflare.R2.Bucket('Files', { name: stage.resourceName('files') }) }
+      : {}
     // Conversation flows across every agent, one point per operation with a hashed agent id (ADR 0037).
-    const flows = yield* Cloudflare.AnalyticsEngine.Dataset('Flows', { dataset: stage.resourceName('flows') })
+    const flows = (yield* switchedOn('GOBLIN_FLOWS'))
+      ? { FLOWS: yield* Cloudflare.AnalyticsEngine.Dataset('Flows', { dataset: stage.resourceName('flows') }) }
+      : {}
+    // Dynamic Workers for agent apps and `code_run` (ADR 0021): open beta, Workers Paid.
+    const loader = (yield* switchedOn('GOBLIN_AGENT_APPS')) ? { LOADER: Cloudflare.WorkerLoader() } : {}
     const agents = Cloudflare.DurableObject('PersonalAgent', { className: 'PersonalAgent' })
     const web = yield* Cloudflare.Website.Vite('Web', {
       name: stage.workerName,
@@ -110,9 +124,9 @@ export default Alchemy.Stack(
       env: {
         AGENTS: agents,
         AUTH_DB: db,
-        FILES: files,
-        FLOWS: flows,
-        LOADER: Cloudflare.WorkerLoader(),
+        ...files,
+        ...flows,
+        ...loader,
         // Workers AI for typed decisions through Clef (ADR 0031), on dev only: elsewhere decisions judge nothing.
         ...(stage.name === 'dev' ? { AI: Cloudflare.Workers.AI() } : {}),
         APP_URL: appUrl,

@@ -33,8 +33,11 @@ const BARRED = new Set(['cookie', 'host', 'content-length', 'connection', 'trans
 /** Response headers an app reads. */
 const READABLE = new Set(['content-type', 'content-language', 'etag', 'last-modified', 'location', 'retry-after'])
 
-/** The registrable part of goblin's own host (`goblin.surf` for `dev.goblin.surf`): an app never reaches it. */
-const ownDomain = (appUrl: string) => new URL(appUrl).hostname.split('.').slice(-2).join('.')
+/**
+ * The deployment's own host (`APP_URL`'s, ADR 0064): an app never reaches it, nor anything under it. Only that host:
+ * a deployment on a shared platform domain (`goblin.example.workers.dev`) leaves its neighbours reachable.
+ */
+const ownHost = (appUrl: string) => new URL(appUrl).hostname
 
 /** Why `raw` is not a URL this app may fetch, or the URL. */
 function checked(raw: string, approved: (host: string) => boolean, own: string): URL {
@@ -105,7 +108,7 @@ function outgoing(init: EgressRequest): { readonly method: string; readonly body
 }
 
 /**
- * One fetch for an app's `prepare`: https to an exact approved host, never goblin's own domain, redirects followed by
+ * One fetch for an app's `prepare`: https to an exact approved host, never goblin's own host, redirects followed by
  * hand and each one checked again, no cookies either way, bounded in size and time. Its failures are the app's.
  */
 export async function egress(
@@ -115,7 +118,7 @@ export async function egress(
   policy: { readonly approved: (host: string) => boolean; readonly appUrl: string },
 ): Promise<EgressResponse> {
   let { method, body } = outgoing(init)
-  const own = ownDomain(policy.appUrl)
+  const own = ownHost(policy.appUrl)
   const signal = AbortSignal.timeout(EGRESS_LIMITS.ms)
   let url = checked(raw, policy.approved, own)
   for (let hop = 0; ; hop += 1) {

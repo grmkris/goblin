@@ -18,18 +18,19 @@ import trivagoApp from '../../assets/landing/trivago-app.webp'
 
 /** goblin's public homes: its source on GitHub and its account on X. */
 const ELSEWHERE = { github: 'https://github.com/grmkris/goblin', x: 'https://x.com/goblin_surf' } as const
-/** Production, which every stage's page names until its own `/health` says otherwise. */
-const PRODUCTION = 'https://goblin.surf'
 
 const MEET = { label: 'Meet your goblin', href: '/login?new=1' } as const satisfies SiteLink
 const SIGN_IN = { label: 'Sign in', href: '/login' } as const satisfies SiteLink
 
-/** This page's own origin once it runs in a browser (the dev stage's on dev); production's while rendered on the server. */
-const useOrigin = (): string =>
+/**
+ * This deployment's own origin: the page's in the browser, and while rendered on the server the one its route read
+ * from the request (`lib/origin.ts`, ADR 0064), so both say the same.
+ */
+const useOrigin = (rendered: string | undefined): string =>
   useSyncExternalStore(
     () => () => undefined,
     () => window.location.origin,
-    () => PRODUCTION,
+    () => rendered ?? '',
   )
 
 /** A session that turns out to be signed in (a check still under way when Home opened) leaves for its channel. */
@@ -42,7 +43,8 @@ function useLeaveWhenSignedIn() {
   }, [state, navigate])
 }
 
-export function Landing() {
+/** The landing, with `origin` the deployment's own as its route read it (for the server's render). */
+export function Landing({ origin }: { readonly origin?: string | undefined } = {}) {
   useLeaveWhenSignedIn()
   const session = useHeroSession()
   return (
@@ -67,7 +69,7 @@ export function Landing() {
       />
       <Away />
       <Connect />
-      <Open />
+      <Open origin={origin} />
       <Close />
       <SiteFooter
         name="goblin"
@@ -208,8 +210,8 @@ function CopyCommand({ command }: { readonly command: string }) {
   )
 }
 
-function Open() {
-  const command = `claude mcp add --transport http goblin ${useOrigin()}/mcp`
+function Open({ origin }: { readonly origin: string | undefined }) {
+  const command = `claude mcp add --transport http goblin ${useOrigin(origin)}/mcp`
   return (
     <Section
       id="open"

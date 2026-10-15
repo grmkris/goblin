@@ -58,20 +58,21 @@ function capped(stream: ReadableStream<Uint8Array>, limit: number): ReadableStre
 
 /**
  * The owner's files: `@cloudflare/shell`'s Workspace over the agent's SQLite (its `cf_workspace_files` tables), with
- * files over 128 KiB in the stage's R2 bucket under `agents/<user>/`. Quotas are checked before every write.
+ * files over 128 KiB in the stage's R2 bucket under `agents/<user>/`. Without the bucket (ADR 0064) every file stays in
+ * SQLite and none may be larger. Quotas are checked before every write.
  */
 export class FileStore {
   readonly #workspace: Workspace
-  readonly #bucket: R2Bucket
+  readonly #bucket: R2Bucket | undefined
   readonly #owner: () => string
 
-  constructor(sql: SqlStorage, bucket: R2Bucket, owner: () => string) {
+  constructor(sql: SqlStorage, bucket: R2Bucket | undefined, owner: () => string) {
     this.#bucket = bucket
     this.#owner = owner
     this.#workspace = new Workspace({
       sql,
       namespace: 'files',
-      r2: bucket,
+      ...(bucket === undefined ? {} : { r2: bucket }),
       name: () => `agents/${owner()}`,
       inlineThreshold: INLINE_BYTES,
     })
@@ -141,11 +142,13 @@ export class FileStore {
 
   /** Deletes every R2 object of this agent's files (account deletion); SQLite goes with the agent's storage. */
   async purge(): Promise<void> {
+    const bucket = this.#bucket
+    if (bucket === undefined) return
     const prefix = `agents/${this.#owner()}/`
     let cursor: string | undefined
     do {
-      const page = await this.#bucket.list({ prefix, ...(cursor === undefined ? {} : { cursor }) })
-      if (page.objects.length > 0) await this.#bucket.delete(page.objects.map((object) => object.key))
+      const page = await bucket.list({ prefix, ...(cursor === undefined ? {} : { cursor }) })
+      if (page.objects.length > 0) await bucket.delete(page.objects.map((object) => object.key))
       cursor = page.truncated ? page.cursor : undefined
     } while (cursor !== undefined)
   }
@@ -153,6 +156,7 @@ export class FileStore {
   async #admit(path: string, size: number): Promise<void> {
     if (!Number.isSafeInteger(size) || size < 0) throw new InvalidInput({ reason: 'file size' })
     if (size > FILE_LIMITS.fileBytes) throw new PayloadTooLarge({ limit: FILE_LIMITS.fileBytes })
+    if (this.#bucket === undefined && size > INLINE_BYTES) throw new PayloadTooLarge({ limit: INLINE_BYTES })
     const [info, existing] = await Promise.all([this.#workspace.getWorkspaceInfo(), this.#workspace.stat(path)])
     const replaced = existing?.type === 'file' ? existing.size : 0
     if (info.totalBytes - replaced + size > FILE_LIMITS.totalBytes)

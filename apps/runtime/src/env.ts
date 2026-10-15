@@ -15,11 +15,17 @@ export type AgentRpc = AgentRpcMethods & Rpc.DurableObjectBranded
 export interface RuntimeEnv {
   readonly AGENTS: DurableObjectNamespace<AgentRpc>
   readonly AUTH_DB: D1Database
-  /** The owner's larger files (over 128 KiB), under `agents/<user>/` (ADR 0022). */
-  readonly FILES: R2Bucket
+  /**
+   * The owner's larger files (over 128 KiB), under `agents/<user>/` (ADR 0022). Optional (ADR 0064): without it every
+   * file stays in the agent's SQLite and none may be larger.
+   */
+  readonly FILES?: R2Bucket
   readonly FLOWS?: AnalyticsEngineDataset
-  /** Dynamic Workers: every agent app release, the app transpiler and `code_run` scripts run in one (ADR 0021). */
-  readonly LOADER: WorkerLoader
+  /**
+   * Dynamic Workers: every agent app release, the app transpiler and `code_run` scripts run in one (ADR 0021).
+   * Optional (ADR 0064): without it the agent has no app or `code_run` tools.
+   */
+  readonly LOADER?: WorkerLoader
   /** Workers AI, for typed decisions through Clef alone (ADR 0031); only the dev stage binds it. */
   readonly AI?: DecisionsBinding
   readonly APP_URL: string

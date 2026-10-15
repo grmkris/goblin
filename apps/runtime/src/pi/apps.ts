@@ -136,14 +136,17 @@ const codeTool = (apps: AgentApps) =>
     execute: async ({ code }) => runScript(apps.isolates, apps.ownerFiles, code),
   })
 
-/** Owner app and Home management, on main and threads (ADR 0021). */
-export function appsExtension(apps: AgentApps, run: RunProgram) {
+/**
+ * Owner app and Home management, on main and threads (ADR 0021). Without Dynamic Workers (`buildable` false, ADR 0064)
+ * no app can be built or run, so only Home is left.
+ */
+export function appsExtension(apps: AgentApps, run: RunProgram, buildable = true) {
   const extension = defineExtension({
     name: 'goblin.apps',
     sections: [section('apps', () => GUIDE)],
     tools: [docsTool(apps), buildTool(apps, run), inspectTool(apps), rollbackTool(apps)],
   })
-  return [extension, homeExtension(run)]
+  return buildable ? [extension, homeExtension(run)] : [homeExtension(run)]
 }
 
 /** Execution shared with helpers, without app or Home management. */

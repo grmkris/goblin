@@ -1,5 +1,5 @@
 import * as Data from 'effect/Data'
-import { Internal } from '../http/errors.ts'
+import { Forbidden, Internal } from '../http/errors.ts'
 
 /** The compatibility date every app isolate runs with: the Worker's own. */
 const COMPATIBILITY_DATE = '2026-09-25'
@@ -104,14 +104,15 @@ const modulesOf = (modules: Modules) =>
 /**
  * The agent's Dynamic Workers (ADR 0021): every app release, the transpiler, the style compiler and one-off scripts run
  * in an isolate of their own with no network (`globalOutbound: null`), no bindings and a CPU limit. Each is cached by an
- * id that names its exact code. Calls wait for one of eight slots and give up after their wall time.
+ * id that names its exact code. Calls wait for one of eight slots and give up after their wall time. A deployment
+ * without Dynamic Workers (ADR 0064) has no loader: every isolate is refused as `Forbidden`.
  */
 export class Isolates {
-  readonly #loader: WorkerLoader
+  readonly #loader: WorkerLoader | undefined
   #busy = 0
   readonly #waiting: (() => void)[] = []
 
-  constructor(loader: WorkerLoader) {
+  constructor(loader: WorkerLoader | undefined) {
     this.#loader = loader
   }
 
@@ -178,6 +179,7 @@ export class Isolates {
   }
 
   #worker(id: string, mainModule: string, modules: () => Modules, cpuMs: number): WorkerStub {
+    if (this.#loader === undefined) throw new Forbidden({ reason: 'agent_apps_unavailable' })
     return this.#loader.get(id, () => ({
       compatibilityDate: COMPATIBILITY_DATE,
       mainModule,
