@@ -20,7 +20,7 @@ import { ResidentGroup } from './resident.ts'
 import { RoutinesGroup } from './routines.ts'
 import { SetupGroup } from './setup.ts'
 import { SidebarGroup } from './sidebar.ts'
-import { SourcesGroup } from './sources.ts'
+import { NotifyGroup, SourcesGroup } from './sources.ts'
 import { TopicsGroup } from './topics.ts'
 import { WorkspaceGroup } from './workspace.ts'
 
@@ -58,6 +58,7 @@ export class OwnerApi extends HttpApi.make('goblin-owner')
     OnboardingGroup,
     SidebarGroup,
     SourcesGroup,
+    NotifyGroup,
   )
   .prefix('/api')
   .middleware(OwnerAdmission) {}

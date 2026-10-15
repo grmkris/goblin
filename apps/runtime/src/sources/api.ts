@@ -1,6 +1,7 @@
 import { OwnerApi } from '@goblin/contracts/api'
 import * as Effect from 'effect/Effect'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
+import { clearNotifySink, notifySinkView, setNotifySink } from './notify.ts'
 import { Sources } from './service.ts'
 
 /**
@@ -20,4 +21,12 @@ export const SourcesHandlers = HttpApiBuilder.group(OwnerApi, 'sources', (handle
     .handle('pause', ({ params }) => Sources.use((sources) => sources.pause(params.id)))
     .handle('resume', ({ params }) => Sources.use((sources) => sources.resume(params.id)))
     .handle('remove', ({ params }) => Sources.use((sources) => sources.remove(params.id))),
+)
+
+/** The `notify` group (ADR 0066): "Notify me via", read, set and cleared by the owner. */
+export const NotifyHandlers = HttpApiBuilder.group(OwnerApi, 'notify', (handlers) =>
+  handlers
+    .handle('get', () => notifySinkView)
+    .handle('set', ({ payload }) => setNotifySink(payload))
+    .handle('clear', () => clearNotifySink),
 )

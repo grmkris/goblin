@@ -96,3 +96,16 @@ export const appSourceReplies = sqliteTable(
   },
   (table) => [index('app_source_replies_due').on(table.outcome, table.nextAt)],
 )
+
+/**
+ * "Notify me via" (ADR 0066): the one row of the owner's choice of a connection's tool and its arguments template
+ * (JSON, `{{text}}` and `{{operationId}}` as whole values) that copies goblin's notices to them; set at `updated_at`
+ * (epoch seconds).
+ */
+export const appNotifySink = sqliteTable('app_notify_sink', {
+  id: integer('id').primaryKey().notNull(),
+  connectionId: text('connection_id').notNull(),
+  tool: text('tool').notNull(),
+  arguments: text('arguments').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})

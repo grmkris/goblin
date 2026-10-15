@@ -3,6 +3,8 @@ import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
 import {
+  NotifySink,
+  NotifySinkView,
   SourceId,
   SourcePage,
   SourceProposal,
@@ -77,4 +79,23 @@ export class SourcesGroup extends HttpApiGroup.make('sources').add(
     success: Schema.Null,
     error: [ApiErrors.notFound],
   }),
+) {}
+
+/**
+ * "Notify me via" (ADR 0066): the one tool goblin copies its notices to the owner with. Paths are relative to the API's
+ * `/api` prefix.
+ *
+ * - `get`: `GET /api/notify-sink`, the setting with its connection's label, or null.
+ * - `set`: `PUT /api/notify-sink`, on a connection the owner has and a tool it offers now; the tool is granted, as the
+ *   owner chose it.
+ * - `clear`: `DELETE /api/notify-sink`, answered with null; the tool's grant stays.
+ */
+export class NotifyGroup extends HttpApiGroup.make('notify').add(
+  HttpApiEndpoint.get('get', '/notify-sink', { success: NotifySinkView }),
+  HttpApiEndpoint.put('set', '/notify-sink', {
+    payload: NotifySink,
+    success: NotifySinkView,
+    error: [ApiErrors.notFound, ApiErrors.invalidInput, ApiErrors.conflict, ApiErrors.upstream],
+  }),
+  HttpApiEndpoint.delete('clear', '/notify-sink', { success: Schema.Null }),
 ) {}

@@ -2,8 +2,8 @@ import { BREAK, type Migration } from './migration.ts'
 
 /**
  * Sources (ADR 0066, keys from `20261102000`): the setups the owner confirms on any connection that sends events, where
- * each conversation goes, what waits for a route and the answers owed. Added by their own migration, so dev and prod
- * keep their data.
+ * each conversation goes, what waits for a route and the answers owed; then "Notify me via". Added by their own
+ * migrations, so dev and prod keep their data.
  */
 export const SOURCE_MIGRATIONS: readonly Migration[] = [
   {
@@ -17,5 +17,10 @@ export const SOURCE_MIGRATIONS: readonly Migration[] = [
       `CREATE TABLE app_source_replies (operation_id TEXT PRIMARY KEY NOT NULL, source_id TEXT NOT NULL, key TEXT NOT NULL, chat_id TEXT, persona_id INTEGER, attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL DEFAULT 0, outcome TEXT CHECK (outcome IN ('sent', 'given_up')), created_at INTEGER NOT NULL, settled_at INTEGER)`,
       'CREATE INDEX app_source_replies_due ON app_source_replies (outcome, next_at)',
     ].join(BREAK),
+  },
+  {
+    key: '20261102000200_notify_sink',
+    tables: ['app_notify_sink'],
+    sql: 'CREATE TABLE app_notify_sink (id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1), connection_id TEXT NOT NULL, tool TEXT NOT NULL, arguments TEXT NOT NULL, updated_at INTEGER NOT NULL)',
   },
 ]

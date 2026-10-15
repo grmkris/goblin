@@ -331,6 +331,26 @@ export type SourceProposal = typeof SourceProposal.Type
 export const SourceRevision = Schema.Struct({ revision: Schema.Int })
 export type SourceRevision = typeof SourceRevision.Type
 
+/** The placeholders a notice copy's arguments may use. */
+export const notifyPlaceholder = (name: string) => name === 'text' || name === 'operationId'
+
+const NotifySinkFields = { connectionId: NonEmptyString(200), tool: RemoteName, arguments: ArgumentsTemplate }
+
+/**
+ * "Notify me via" (ADR 0066): one tool of one connection that copies goblin's notices to the owner elsewhere (their own
+ * chat on a messaging server), its arguments with `{{text}}` (required) and `{{operationId}}` as whole string values.
+ */
+export const NotifySink = Schema.Struct(NotifySinkFields).check(
+  Schema.makeFilter((sink) => templateProblem(sink.arguments, notifyPlaceholder, ['text']) ?? true),
+)
+export type NotifySink = typeof NotifySink.Type
+
+/** `GET /api/notify-sink`: the setting with its connection's label and when it was set (epoch seconds), or null. */
+export const NotifySinkView = Schema.NullOr(
+  Schema.Struct({ ...NotifySinkFields, label: Schema.String, updatedAt: Schema.Number }),
+)
+export type NotifySinkView = typeof NotifySinkView.Type
+
 /** `PUT /api/sources/:id/routes`: where one conversation goes now. */
 export const SourceRoutePick = Schema.Struct({ key: SourceKeyId, route: SourceRoute })
 export type SourceRoutePick = typeof SourceRoutePick.Type
