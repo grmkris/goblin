@@ -1,8 +1,8 @@
 /*
- * The marketing pages (goblin's `/` and Goblin Wallet's `/`): the shared parts in `src/marketing`. One content width
- * with safe-area gutters, a type scale set in Geist alone (weight, size and tracking carry the hierarchy; tracking
- * tightens as type grows), the moss field the hero is made of, and the controls on it. Hover only shifts colour and only
- * where something hovers; a press answers at once. Colours are the theme's tokens, so light and dark follow the app.
+ * The marketing page (goblin's `/`): the shared parts in `src/marketing`. One content width with safe-area gutters, a
+ * type scale set in Geist alone (weight, size and tracking carry the hierarchy; tracking tightens as type grows), the
+ * moss field the hero is made of, and the controls on it. Hover only shifts colour and only where something hovers; a
+ * press answers at once. Colours are the theme's tokens, so light and dark follow the app.
  *
  * Classes for an app's own marketing parts: `site-width` (the content column), `site-display` (the one headline),
  * `site-heading` (a section's heading), `site-body` (running copy).

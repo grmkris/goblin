@@ -7,7 +7,7 @@ import { cn } from '../lib/cn'
 import { type SiteAction, type SiteLink, SiteButton } from './site-button.tsx'
 
 export interface SiteBarProps {
-  /** The product's name beside its mark, as it is written ("goblin", "Goblin Wallet"). */
+  /** The product's name beside its mark, as it is written ("goblin"). */
   readonly name: string
   readonly mark: ReactNode
   /** Where the mark leads: the page's own top. */

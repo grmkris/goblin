@@ -114,7 +114,7 @@ function ToolRow({
   )
 }
 
-/** An App's name from its `ui://` resource: "ui://goblin-wallet/dashboard" is the Dashboard App. */
+/** An App's name from its `ui://` resource: "ui://notes/dashboard" is the Dashboard App. */
 function appName(uri: string): string {
   const last =
     uri
