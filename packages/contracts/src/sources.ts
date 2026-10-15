@@ -214,21 +214,6 @@ export const SourceSetup = Schema.Struct({
 }).check(Schema.makeFilter((setup) => setupProblem(setup) ?? true))
 export type SourceSetup = typeof SourceSetup.Type
 
-/**
- * What a server suggests for a Source on one of its events (`_meta.suggest.source`, read leniently field by field):
- * the setup's facts without the event, which is the one it is suggested on. A claim for the owner to review.
- */
-export const SourceSuggestion = Schema.Struct({
-  arguments: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
-  key: SourceKey,
-  speaksForMe: SpeaksForMe,
-  others: Schema.optionalKey(SourceOthers),
-  read: SourceRead,
-  reply: Schema.optionalKey(SourceReply),
-  newKeys: Schema.optionalKey(SourceRoute),
-})
-export type SourceSuggestion = typeof SourceSuggestion.Type
-
 /** A Source's id: `src_` and 16 to 32 lowercase hex digits. */
 export const SourceId = Schema.String.check(Schema.isPattern(/^src_[0-9a-f]{16,32}$/u))
 export type SourceId = typeof SourceId.Type
@@ -316,8 +301,8 @@ export const SourceRoutes = Schema.Struct({ source: SourceView, routes: Schema.A
 export type SourceRoutes = typeof SourceRoutes.Type
 
 /**
- * `POST /api/sources`: the owner proposes a Source on `connectionId` (from what its server suggests); the same
- * operation finds the same proposal. Nothing runs until they confirm its revision.
+ * A proposal of a Source on `connectionId`, as the agent's `source_propose` makes it (ADR 0068: no server suggests
+ * one); the same operation finds the same proposal. Nothing runs until the owner confirms its revision.
  */
 export const SourceProposal = Schema.Struct({
   connectionId: NonEmptyString(200),

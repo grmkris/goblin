@@ -1,7 +1,6 @@
 import { type QueryClient, mutationOptions, queryOptions, skipToken } from '@tanstack/react-query'
-import type { SourceProposal, SourceRoute } from '@goblin/contracts'
+import type { SourceRoute } from '@goblin/contracts'
 import { owner } from '../lib/api.ts'
-import { withOperation } from '../lib/query/api-query.ts'
 import { mcpKeys } from '../mcp/queries.ts'
 
 /**
@@ -37,15 +36,6 @@ export const sourceRoutesQuery = (id: string | undefined) =>
 
 /** Every read of the Sources, the list and each route table: what a change touched. */
 const sourcesChanged = (client: QueryClient) => client.invalidateQueries({ queryKey: sourceKeys.all })
-
-/** Proposes a Source from what a server suggests; it runs only once the owner confirms its revision. */
-export const proposeSourceMutation = mutationOptions({
-  ...owner.apiMutation({
-    mutationFn: (api, proposal: SourceProposal) =>
-      withOperation(proposal.operationId)(api.sources.propose({ payload: proposal })),
-  }),
-  onSuccess: (_source, _proposal, _result, { client }) => sourcesChanged(client),
-})
 
 /**
  * What the owner does to a Source: confirm or refuse the exact revision they reviewed, pause, resume (bound again to

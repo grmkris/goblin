@@ -1,13 +1,11 @@
 import * as Schema from 'effect/Schema'
 import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
-import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
 import {
   NotifySink,
   NotifySinkView,
   SourceId,
   SourcePage,
-  SourceProposal,
   SourceRevision,
   SourceRoutePick,
   SourceRouteView,
@@ -22,9 +20,8 @@ const params = { id: SourceId }
  * The owner's Sources (ADR 0066). Paths are relative to the API's `/api` prefix; every endpoint can also answer owner
  * admission's failures, and `error` names the ones the endpoint itself produces.
  *
- * - `list`: `GET /api/sources`, every Source with the conversations waiting for a route.
- * - `propose`: `POST /api/sources`, 201 with the proposal (the same operation finds it again); nothing runs until the
- *   owner confirms its revision.
+ * - `list`: `GET /api/sources`, every Source with the conversations waiting for a route. A Source is proposed only by
+ *   the agent's `source_propose` (ADR 0068); the owner confirms or refuses its exact revision here.
  * - `confirm`, `refuse`: `POST /api/sources/:id/confirm|refuse` with the exact revision; confirming grants its event and
  *   tools, subscribes and binds it to the connection's endpoint and those grants. A stale revision is a conflict; the
  *   connection carrying Telegram is refused (`telegram_on`) until the channel is turned off.
@@ -36,11 +33,6 @@ const params = { id: SourceId }
  */
 export class SourcesGroup extends HttpApiGroup.make('sources').add(
   HttpApiEndpoint.get('list', '/sources', { success: SourcePage }),
-  HttpApiEndpoint.post('propose', '/sources', {
-    payload: SourceProposal,
-    success: SourceView.pipe(HttpApiSchema.status(201)),
-    error: [ApiErrors.notFound, ApiErrors.invalidInput],
-  }),
   HttpApiEndpoint.post('confirm', '/sources/:id/confirm', {
     params,
     payload: SourceRevision,

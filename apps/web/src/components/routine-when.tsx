@@ -16,7 +16,7 @@ import {
   TabsTrigger,
 } from '@goblin/ui'
 import { browserZone } from '../lib/format.ts'
-import { eventSummary, eventTitle, eventWords } from '../lib/events.ts'
+import { eventTitle, eventWords } from '../lib/events.ts'
 import { connectionName } from '../lib/labels.ts'
 import { localInput, localInstant } from '../lib/local-time.ts'
 import { messageOf } from '../lib/query/app-error.ts'
@@ -185,9 +185,7 @@ function EventFields({ kit }: { readonly kit: WhenKit }) {
               <NativeSelectOption value={event.name}>{eventWords(event.name)}</NativeSelectOption>
             )}
           </NativeSelect>
-          {stream !== undefined && eventSummary(stream) !== undefined && (
-            <FieldDescription>{eventSummary(stream)}</FieldDescription>
-          )}
+          {stream?.description !== undefined && <FieldDescription>{stream.description}</FieldDescription>}
           {unread !== '' && <FieldDescription role="alert">{unread}</FieldDescription>}
         </Field>
       )}

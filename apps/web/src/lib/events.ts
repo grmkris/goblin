@@ -1,6 +1,7 @@
-// What a connection's events are called and how they group (ADR 0041): the server's suggested words when it gives
-// them (claims, shown as text), else words made from the event's name. Also the filters a routine keeps, in words.
-import type { EventRate, EventStream, ServerView } from '@goblin/contracts'
+// What a connection's events are called and how they group (ADR 0041, ADR 0068): the event's own title when the server
+// gives one (a claim, shown as text), else words made from its name; grouped by the service a gateway names it by. Also
+// the filters a routine keeps, in words.
+import type { EventStream, ServerView } from '@goblin/contracts'
 import { Predicate } from 'effect'
 
 /** The words of a name's part: `message_received` and `messageReceived` both read "message received". */
@@ -25,22 +26,17 @@ export function eventWords(name: string): string {
 export const eventTitle = (stream: Pick<EventStream, 'name' | 'title'>): string =>
   stream.title ?? eventWords(stream.name)
 
-/** One line on what an event is: the server's summary, else its description. */
-export const eventSummary = (stream: Pick<EventStream, 'summary' | 'description'>): string | undefined =>
-  stream.summary ?? stream.description
-
 /**
- * The group an event belongs to: the server's, else the service a gateway names it by (the part before its first dot,
- * for a name of three parts or more), else the connection.
+ * The group an event belongs to: the service a gateway names it by (`<service>.<event>`, the part before the first dot
+ * of a name of three parts or more), else the connection, whose streams are then listed flat.
  */
-export function eventGroup(stream: Pick<EventStream, 'name' | 'group'>, server: Pick<ServerView, 'label'>): string {
-  if (stream.group !== undefined) return stream.group
+export function eventGroup(stream: Pick<EventStream, 'name'>, server: Pick<ServerView, 'label'>): string {
   const parts = stream.name.split('.')
   return parts.length > 2 && parts[0] !== undefined && parts[0] !== '' ? parts[0] : server.label
 }
 
 /** A connection's streams by group, in the order the server lists them. */
-export function eventGroups<Stream extends Pick<EventStream, 'name' | 'group'>>(
+export function eventGroups<Stream extends Pick<EventStream, 'name'>>(
   streams: readonly Stream[],
   server: Pick<ServerView, 'label'>,
 ): readonly { readonly group: string; readonly streams: readonly Stream[] }[] {
@@ -50,13 +46,6 @@ export function eventGroups<Stream extends Pick<EventStream, 'name' | 'group'>>(
     groups.set(group, [...(groups.get(group) ?? []), stream])
   }
   return [...groups].map(([group, members]) => ({ group, streams: members }))
-}
-
-/** How often the server says an event happens, as a quiet hint. */
-export const RATE_WORDS: Readonly<Record<EventRate, string>> = {
-  often: 'Often',
-  daily: 'About daily',
-  rare: 'Rarely',
 }
 
 /** One filter's value in words: text as it is, yes or no, a list joined, anything else as JSON. */

@@ -23,7 +23,7 @@ export class Sources extends Context.Service<
     readonly list: Effect.Effect<SourcePage, AppError>
     /** A Source and every conversation it has seen. */
     readonly routes: (id: string) => Effect.Effect<SourceRoutes, AppError>
-    /** A proposal, by the owner (from a server's suggestion) or the agent; the same operation finds the same one. */
+    /** A proposal (the agent's `source_propose`, ADR 0068); the same operation finds the same one. */
     readonly propose: (
       proposal: SourceProposal,
       by: { readonly actor: 'owner' | 'agent'; readonly chat?: string },

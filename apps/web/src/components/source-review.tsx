@@ -123,7 +123,7 @@ export function SourceReview({ source }: { readonly source: SourceView }) {
         </CardTitle>
         <CardDescription>
           <span className="routine-title">
-            A Source on {source.label}, {source.proposedBy === 'agent' ? 'proposed by goblin' : 'from its suggestion'}
+            A Source on {source.label}, {source.proposedBy === 'agent' ? 'proposed by goblin' : 'proposed by you'}
           </span>
         </CardDescription>
         <CardAction>

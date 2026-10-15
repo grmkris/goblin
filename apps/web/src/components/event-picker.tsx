@@ -1,6 +1,7 @@
-// Picking a connection's events (ADR 0041, amended 2026-10-12): each event the server offers in its group, with its
-// own words, the ones the server recommends picked already, where each goes (a Topic, or a hand-over to goblin or a
-// Persona), Advanced for filters, an instruction and Tell me, and one action that sets them all up.
+// Picking a connection's events (ADR 0041, amended by ADR 0068): each event the server offers, grouped by the service a
+// gateway names it by, with its own title and description, none picked until the owner picks it, where each goes (a
+// Topic, or a hand-over to goblin or a Persona), Advanced for filters, an instruction and Tell me, and one action that
+// sets them all up.
 import { useId, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { EventStream, PersonaView, ServerView, TopicView } from '@goblin/contracts'
@@ -28,10 +29,9 @@ import {
   routeKey,
   routeOf,
   setUpOf,
-  suggestedRoute,
   TELL_MAIN,
 } from '../lib/event-setup.ts'
-import { RATE_WORDS, eventGroups, eventSummary, eventTitle } from '../lib/events.ts'
+import { eventGroups, eventTitle } from '../lib/events.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { usePersonas, useTopics } from '../lib/workspace/hooks.ts'
 import { routineSettingsQuery, setUpEventsMutation } from '../routines/queries.ts'
@@ -120,7 +120,7 @@ function Preview({ choice, places }: { readonly choice: EventChoice; readonly pl
   return <p className="event-preview">{answerWords(choice.route, places)}</p>
 }
 
-/** One event the owner can pick: its title, its line, how often it comes, and, once picked, where it goes. */
+/** One event the owner can pick: its title, its description, and, once picked, where it goes. */
 function PickRow({
   stream,
   choice,
@@ -135,18 +135,15 @@ function PickRow({
   readonly onRoute: (route: EventRoute) => void
 }) {
   const title = eventTitle(stream)
-  const summary = eventSummary(stream)
+  const about = stream.description
   return (
     <li className="event-pick" data-picked={choice !== undefined}>
       <div className="event-pick-head">
         <label className="event-pick-label">
           <input type="checkbox" checked={choice !== undefined} onChange={(event) => onPick(event.target.checked)} />
           <span className="event-pick-text">
-            <span className="event-pick-title">
-              {title}
-              {stream.rate !== undefined && <span className="event-rate">{RATE_WORDS[stream.rate]}</span>}
-            </span>
-            {summary !== undefined && <span className="event-pick-about">{summary}</span>}
+            <span className="event-pick-title">{title}</span>
+            {about !== undefined && <span className="event-pick-about">{about}</span>}
           </span>
         </label>
         {choice !== undefined && <RouteSelect title={title} route={choice.route} places={places} onRoute={onRoute} />}
@@ -227,32 +224,24 @@ function AdvancedFor({
 
 /**
  * The picker's state: the events that can be picked (subscribable, not set up yet, not already through Telegram), the
- * picks (the server's recommendations until the owner changes one, while the offer is open), and one step that sets
- * them all up.
+ * owner's picks (none until they pick one: nothing a server says picks an event, ADR 0068), and one step that sets them
+ * all up.
  */
 function useEventPicks(server: ServerView, available: readonly EventStream[], places: Places) {
-  const [touched, setTouched] = useState<Choices>()
+  const [picked, setPicked] = useState<Choices>(() => new Map())
   const [problem, setProblem] = useState('')
   const [advanced, setAdvanced] = useState(false)
   const timezone = useQuery(routineSettingsQuery).data?.timezone ?? 'UTC'
   const setting = useMutation(setUpEventsMutation)
-  const suggested = new Map<string, EventChoice>()
-  if (touched === undefined && server.events === 'open')
-    for (const stream of available) {
-      const route = suggestedRoute(stream)
-      if (route !== undefined) suggested.set(stream.name, choiceFor(stream, route))
-    }
-  const choices: Choices = new Map(
-    [...(touched ?? suggested)].filter(([name]) => available.some((stream) => stream.name === name)),
-  )
+  const choices: Choices = new Map([...picked].filter(([name]) => available.some((stream) => stream.name === name)))
   const change = (next: Choices) => {
     setProblem('')
     setting.reset()
-    setTouched(next)
+    setPicked(next)
   }
-  const pick = (stream: EventStream, picked: boolean) => {
+  const pick = (stream: EventStream, on: boolean) => {
     const next = new Map(choices)
-    if (picked) next.set(stream.name, choiceFor(stream, suggestedRoute(stream) ?? TELL_MAIN))
+    if (on) next.set(stream.name, choiceFor(stream, TELL_MAIN))
     else next.delete(stream.name)
     change(next)
   }
@@ -272,7 +261,7 @@ function useEventPicks(server: ServerView, available: readonly EventStream[], pl
       return
     }
     const requests = made.flatMap((each) => ('problem' in each ? [] : [{ ...each, operationId: crypto.randomUUID() }]))
-    setting.mutate(requests, { onSuccess: () => setTouched(new Map()) })
+    setting.mutate(requests, { onSuccess: () => setPicked(new Map()) })
   }
   const error = problem || (setting.error === null ? '' : messageOf(setting.error, 'set up these events'))
   return { choices, pick, update, setUp, error, pending: setting.isPending, advanced, setAdvanced }
@@ -323,9 +312,9 @@ const LIMITS =
   'At most one run a minute. Past 20 notices an hour, the rest wait in Activity behind one line. Events from before you set one up are dropped.'
 
 /**
- * A connection's events to pick (ADR 0041): grouped as the server groups them, the recommended ones picked already, each
- * routed in one select, Advanced folded away, and Set up for all of them at once. Setting up proposes and confirms
- * each event's own routine, so it grants exactly that event with those filters.
+ * A connection's events to pick (ADR 0041, ADR 0068): grouped by the service a gateway names them by (flat otherwise),
+ * none picked until the owner picks one, each routed in one select, Advanced folded away, and Set up for all of them at
+ * once. Setting up proposes and confirms each event's own routine, so it grants exactly that event with those filters.
  */
 export function EventPicker({
   server,

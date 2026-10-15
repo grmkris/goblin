@@ -52,16 +52,6 @@ export const handsOver = (route: EventRoute): boolean => route.kind !== 'tell'
 /** Tell me in the main conversation (Personal): where an event goes until the owner says otherwise. */
 export const TELL_MAIN: EventRoute = { kind: 'tell', topic: PERSONAL_TOPIC }
 
-/**
- * Where a stream goes when the picker opens, from the server's suggestion, or none when it is not picked: a recommended
- * event the server says to tell the owner about goes to Personal; one it recommends without telling (work for the
- * agent) is handed to goblin there. Without a suggestion nothing is picked.
- */
-export function suggestedRoute(stream: EventStream): EventRoute | undefined {
-  if (stream.recommended !== true) return undefined
-  return stream.tellMe === true ? TELL_MAIN : { kind: 'goblin', topic: PERSONAL_TOPIC }
-}
-
 /** The filters a fresh choice starts with: none, or what to fix first when the server's schema requires one. */
 const startingFilters = (stream: EventStream): FormResult => {
   const fields = formFields(stream.inputSchema)
@@ -70,14 +60,13 @@ const startingFilters = (stream: EventStream): FormResult => {
 
 /**
  * A fresh choice for `stream` going `route`: no filters (so a filter the server requires asks to be filled in),
- * goblin's instruction, and Tell me for a hand-over as the server suggests (an event it recommends without `tellMe` is
- * work for the agent, not a notice), else on.
+ * goblin's instruction, and Tell me on.
  */
 export const choiceFor = (stream: EventStream, route: EventRoute): EventChoice => ({
   route,
   filters: startingFilters(stream),
   instruction: '',
-  tellMe: stream.tellMe ?? stream.recommended !== true,
+  tellMe: true,
   copy: false,
 })
 

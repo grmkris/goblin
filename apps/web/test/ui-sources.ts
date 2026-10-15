@@ -1,7 +1,7 @@
 /**
  * Local browser acceptance of Sources (ADR 0066) against real source components, at phone width in light and desk width
- * in dark: on a connection's card, the event its server suggests a Source on, Set up (proposed for review), the review
- * card's facts, a confirm refused while Telegram rides the connection and then confirmed at the exact revision, and
+ * in dark: on a connection's card, a Source the agent proposed (no server suggests one, ADR 0068), the review card's
+ * facts, a confirm refused while Telegram rides the connection and then confirmed at the exact revision, and
  * the Source's conversations with a route picked; Activity's waiting conversation (set up to a Persona) and a Source
  * paused for review; Settings' Notify me via filled from the Source's answers and saved. No account or model call is
  * made; the owner API is routed here.
@@ -26,9 +26,8 @@ const CHAT = {
   events: 'open',
 }
 
-/** What the chat server suggests for a Source on its messages: keyed by chat, the owner's when they say so. */
-const SUGGESTION = {
-  arguments: { chat: 'all' },
+/** What the agent proposed for a Source on the chat server's messages: keyed by chat, the owner's when they say so. */
+const PROPOSED = {
   key: [{ name: 'chat', pointer: '/chat' }],
   speaksForMe: { pointer: '/from/isOwner', equals: true },
   read: { from: 'payload', text: '/text' },
@@ -44,7 +43,6 @@ const STREAMS = [
     inputSchema: { type: 'object', properties: { chat: { type: 'string' } } },
     subscribable: true,
     title: 'Messages',
-    source: SUGGESTION,
   },
 ]
 const TOOLS = [{ name: 'message_send', suggested: 'ask', modelVisible: true, granted: true }]
@@ -60,7 +58,7 @@ const sourceOf = (id: string, setup: unknown, state: string, fields: Json = {}):
   setup,
   revision: 1,
   state,
-  proposedBy: 'owner',
+  proposedBy: 'agent',
   waiting: [],
   createdAt: 1,
   updatedAt: 1,
@@ -69,7 +67,13 @@ const sourceOf = (id: string, setup: unknown, state: string, fields: Json = {}):
 
 const ACTIVE = 'src_00000000000000aa'
 const REVIEW = 'src_00000000000000bb'
-const SETUP = { ...SUGGESTION, wake: { event: 'message.received', arguments: { chat: 'all' } }, others: 'notice' }
+const SETUP = {
+  ...PROPOSED,
+  wake: { event: 'message.received', arguments: { chat: 'all' } },
+  others: 'notice',
+  newKeys: { to: 'held' },
+}
+const PROPOSAL = 'src_00000000000000cc'
 const ROUTES = [
   {
     key: '["dm"]',
@@ -93,7 +97,6 @@ const ROUTES = [
 ]
 
 const errors: string[] = []
-const proposals: unknown[] = []
 const confirms: unknown[] = []
 const routes: unknown[] = []
 const sinks: unknown[] = []
@@ -116,15 +119,7 @@ async function serve(page: Page, label: string, sources: Map<string, Json>) {
     sinks.push(body)
     return route.fulfill({ json: { ...body, label: 'Chat', updatedAt: 2 } })
   })
-  await page.route('**/api/sources', (route) => {
-    if (route.request().method() === 'GET') return route.fulfill({ json: { sources: [...sources.values()] } })
-    // SAFETY: Set up sends the owner API's SourceProposal.
-    const body = route.request().postDataJSON() as { readonly setup: unknown }
-    proposals.push(body)
-    const proposed = sourceOf('src_00000000000000cc', body.setup, 'proposed')
-    sources.set('src_00000000000000cc', proposed)
-    return route.fulfill({ status: 201, json: proposed })
-  })
+  await page.route('**/api/sources', (route) => route.fulfill({ json: { sources: [...sources.values()] } }))
   await page.route('**/api/sources/*/confirm', (route) => {
     const id = new URL(route.request().url()).pathname.split('/').at(-2) ?? ''
     confirms.push(route.request().postDataJSON())
@@ -158,10 +153,8 @@ const noSidewaysScroll = async (page: Page, label: string) => {
 
 async function connection(browser: Browser, origin: string, label: string, options: BrowserContextOptions) {
   const page = await browser.newPage(options)
-  await serve(page, label, new Map())
+  await serve(page, label, new Map([[PROPOSAL, sourceOf(PROPOSAL, SETUP, 'proposed')]]))
   await page.goto(`${origin}sources.html?at=/connections`)
-  await page.getByText('Chat suggests carrying your messages here as a Source.').waitFor()
-  await page.getByRole('button', { name: 'Set up' }).click()
   await page.getByText('When /from/isOwner is true: those become your own turns').waitFor()
   await page.getByText('Sent back with message_send, in pieces of at most 3,500 characters').waitFor()
   await page.getByText('Held until you choose where they go').waitFor()
@@ -243,7 +236,6 @@ try {
     await settings(browser, origin, label, options)
   }
   assert.deepEqual(errors, [])
-  assert.equal(proposals.length, 2)
   assert.deepEqual(confirms, [{ revision: 1 }, { revision: 1 }, { revision: 1 }, { revision: 1 }])
   assert.deepEqual(routes.slice(0, 2), [
     { key: '["g_team"]', route: { to: 'topic', topic: 2 } },

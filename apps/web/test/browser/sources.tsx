@@ -15,7 +15,7 @@ import { ActivityPage } from '../../src/components/shell/pages/activity-page.tsx
 import { withQueryClient } from './with-query-client.tsx'
 import '../../src/styles.css'
 
-/** A chat server's connection, connected and sending events, one of which it suggests a Source on (ADR 0066). */
+/** A chat server's connection, connected and sending events, with a Source the agent proposed on it (ADR 0066). */
 const CHAT: ServerView = {
   connectionId: 'chat',
   label: 'Chat',

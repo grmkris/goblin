@@ -1,5 +1,5 @@
-// Sources proposed, confirmed, bound and kept bound (ADR 0066). A proposal (the owner's, from what a server suggests, or
-// the agent's `source_propose`) is checked against what the connection offers now; only the owner's confirmation of its
+// Sources proposed, confirmed, bound and kept bound (ADR 0066). A proposal (the agent's `source_propose`; no server
+// suggests one, ADR 0068) is checked against what the connection offers now; only the owner's confirmation of its
 // exact revision grants its event and tools, subscribes it (consumer `source:<id>`) and binds it to the connection's
 // endpoint and those grants. A Source whose endpoint or grants changed since pauses for the owner's review; one whose
 // subscription the server ended is subscribed again while they did not.
@@ -201,8 +201,8 @@ const newId = Effect.map(Effect.all([Random.nextIntBetween(0, 2 ** 31), Random.n
 )
 
 /**
- * A proposal of a Source on `connectionId`, by the owner (from what its server suggests) or the agent: checked against
- * what the connection offers now, kept as revision 1 for the owner to confirm. The same operation finds the same one.
+ * A proposal of a Source on `connectionId` (the agent's `source_propose`, ADR 0068): checked against what the connection
+ * offers now, kept as revision 1 for the owner to confirm. The same operation finds the same one.
  */
 export const proposeSource = Effect.fn('sources.propose')(function* (
   proposal: SourceProposal,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EVERYTHING, type EventStream, type SourceSetup, type SourceView, type TopicView } from '@goblin/contracts'
+import { EVERYTHING, type SourceSetup, type SourceView, type TopicView } from '@goblin/contracts'
 import {
   choiceOfRoute,
   keyWords,
@@ -10,7 +10,7 @@ import {
   sourcesToReview,
   waitingConversations,
 } from '../src/lib/source-routes.ts'
-import { proposalOf, setupFacts, sinkArguments, sinkFromSource } from '../src/lib/source-setup.ts'
+import { setupFacts, sinkArguments, sinkFromSource } from '../src/lib/source-setup.ts'
 
 const topic = (id: number, name: string, archivedAt?: number): TopicView => ({
   id,
@@ -147,31 +147,7 @@ describe('what Activity offers from Sources', () => {
 /** The placeholders a notice's arguments may use. */
 const notice = (name: string) => name === 'text' || name === 'operationId'
 
-describe('proposals and Notify me via', () => {
-  it("makes the proposal a server's suggestion on an event describes", () => {
-    const stream: EventStream = {
-      name: 'chat.message.received',
-      inputSchema: { type: 'object' },
-      subscribable: true,
-      title: 'Messages',
-      source: { arguments: { chat: 'all' }, key: SETUP.key, speaksForMe: { all: true }, read: SETUP.read },
-    }
-    expect(proposalOf(stream, 'chat', 'Chat', 'op-1')).toEqual({
-      connectionId: 'chat',
-      title: 'Messages from Chat',
-      operationId: 'op-1',
-      setup: {
-        wake: { event: 'chat.message.received', arguments: { chat: 'all' } },
-        key: SETUP.key,
-        speaksForMe: { all: true },
-        others: 'notice',
-        read: SETUP.read,
-        newKeys: { to: 'held' },
-      },
-    })
-    expect(proposalOf({ ...stream, source: undefined }, 'chat', 'Chat', 'op-1')).toBeUndefined()
-  })
-
+describe('Notify me via', () => {
   it("copies a Source's reply with one conversation's key filled in, keeping the notice's own placeholders", () => {
     expect(sinkFromSource(source(), { chat: 'dm' })).toEqual({
       connectionId: 'chat',

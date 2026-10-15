@@ -1,11 +1,9 @@
 // A Source's setup in the owner's words (ADR 0066): the five facts a review shows before the owner confirms the exact
-// revision, the proposal a server's suggestion makes, and a "Notify me via" copied from a confirmed Source's reply. Pure,
-// so the review card and Settings only draw it.
+// revision, and a "Notify me via" copied from a confirmed Source's reply. Pure, so the review card and Settings only
+// draw it.
 import {
   ArgumentsTemplate,
-  type EventStream,
   type SourceKeyValues,
-  type SourceProposal,
   type SourceRoute,
   type SourceSetup,
   type SourceView,
@@ -13,7 +11,7 @@ import {
   templateProblem,
 } from '@goblin/contracts'
 import { Option, Schema } from 'effect'
-import { eventTitle, filtersInWords } from './events.ts'
+import { filtersInWords } from './events.ts'
 
 /** One fact of a review: what it is about, and what the setup says in words. */
 export type Fact = { readonly term: string; readonly text: string }
@@ -72,38 +70,6 @@ export function setupFacts(setup: SourceSetup, names: FactNames): readonly Fact[
     },
     { term: 'New conversations', text: names.route(setup.newKeys) },
   ]
-}
-
-/** A Source's name for one of a connection's events: "<event title> from <label>", cut to 80 characters. */
-export const sourceTitle = (stream: Pick<EventStream, 'name' | 'title'>, label: string): string =>
-  `${eventTitle(stream)} from ${label}`.slice(0, 80)
-
-/**
- * The proposal the server's suggestion on `stream` makes for `connectionId` (labelled `label`), under `operationId`:
- * its facts as they came, a held start for new conversations and notices of others unless it says otherwise. None for a
- * stream with no suggestion.
- */
-export function proposalOf(
-  stream: EventStream,
-  connectionId: string,
-  label: string,
-  operationId: string,
-): SourceProposal | undefined {
-  const suggestion = stream.source
-  if (suggestion === undefined) return undefined
-  const { arguments: filters, others, newKeys, reply, ...facts } = suggestion
-  return {
-    connectionId,
-    title: sourceTitle(stream, label),
-    operationId,
-    setup: {
-      ...facts,
-      wake: { event: stream.name, arguments: filters ?? {} },
-      others: others ?? 'notice',
-      newKeys: newKeys ?? { to: 'held' },
-      ...(reply === undefined ? {} : { reply }),
-    },
-  }
 }
 
 /** A conversation's key values as the placeholders a reply names them by: `{ 'key.chat': 'dm' }`. */
