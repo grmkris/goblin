@@ -24,7 +24,8 @@ const WORK = {
 /**
  * Topic setups on the real SQLite store (ADR 0040): Personal holds everything; a thread of the Topic "Scopes" holds its setup,
  * read live; a subagent two levels down is bounded by it and by its spawner's exclusions; one whose spawner is
- * unknown (or an unknown session, or a cycle) may use nothing. Then the stored Pi filters are applied again once.
+ * unknown (or an unknown session, or a cycle) may use nothing. Then a change of the Topic's subagents applies its
+ * chats' Pi filters again.
  */
 async function scopeProbe(storage: DurableObjectStorage) {
   runApplicationMigrations(storage)
@@ -112,13 +113,11 @@ async function scopeProbe(storage: DurableObjectStorage) {
   setup({ ...WORK, mcpServers: 'all' })
   const allServers = view('900')
   setup({ ...WORK, subagents: false })
-  // Once per marker: every owner chat whose filter removes the subagent tools now, Persona forks and routines aside.
+  // Every chat of the Topic whose filter follows its setup, Persona forks and routine runs aside; no other Topic's.
   const configured = [...retooled]
-  await profiles.retoolOnce('retool:probe', 5)
-  const once = retooled.slice(configured.length).toSorted()
-  await profiles.retoolOnce('retool:probe', 6)
-  const again = retooled.length - configured.length - once.length
-  return { ...before, allServers, configured, once, again }
+  await profiles.retoolTopic(90)
+  const topic = retooled.slice(configured.length).toSorted()
+  return { ...before, allServers, configured, topic }
 }
 
 export const probes: Probes = { scopes: inAgent(({ storage }) => scopeProbe(storage)) }
@@ -143,14 +142,13 @@ const Scopes = Schema.Struct({
   fromSubagent: Scope,
   allServers: Scope,
   configured: Schema.Array(Schema.String),
-  once: Schema.Array(Schema.String),
-  again: Schema.Number,
+  topic: Schema.Array(Schema.String),
 })
 const closed = { editable: false, mail: false, send: false, read: false, write: false, skills: false, subagents: false }
 
 /**
  * Every chat works with its Topic's setup, read live; a subagent is bounded by every chat above it and its spawner's
- * exclusions; stored tool filters are applied again once (`SetupScopes.retoolOnce`).
+ * exclusions; a change of the Topic's subagents applies the Pi filter of its chats again (`SetupScopes.retoolTopic`).
  */
 async function scopeChecks(base: string): Promise<void> {
   const result = await probeOf(base, 'scopes', Scopes)
@@ -165,9 +163,8 @@ async function scopeChecks(base: string): Promise<void> {
   expect(result.fromSubagent).toEqual(thread)
   expect(result.allServers).toEqual({ ...thread, mail: true, send: true, write: true })
   expect(result.configured).toEqual(['901'])
-  expect(result.once).toContain('900')
-  expect(result.once).not.toContain(PRIMARY_CHAT)
-  expect(result.again).toBe(0)
+  expect(result.topic).toEqual(expect.arrayContaining(['800', '900', '901']))
+  expect(result.topic).not.toContain(PRIMARY_CHAT)
 }
 
 export const cases: readonly NativeCase[] = [

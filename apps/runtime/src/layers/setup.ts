@@ -9,7 +9,6 @@ import {
   sessionScope,
   configureHelper,
   piToolsFor,
-  retoolOnce,
   retoolTopic,
   routinesOutside,
   syncPi,
@@ -21,8 +20,7 @@ import { BACKGROUND, conversationId } from '../pi/context.ts'
 import { Db } from '../runtime/db.ts'
 import { AgentInput } from '../runtime/input.ts'
 
-// What each chat may use, as functions of the agent's database (setup/scope.ts). The retools are a step of
-// the agent's start (layers/index.ts); `SetupsLive` serves the scope after the start.
+// What each chat may use, as functions of the agent's database (setup/scope.ts), served by `SetupsLive`.
 
 /** Sets a conversation's Pi tool filter (where subagents are switched off), leaving its extensions as they are. */
 const retool = (harness: PiHarness) => async (session: string, tools: PiTools) => {
@@ -35,15 +33,6 @@ const retooling: Effect.Effect<Retooling, never, AgentInput | Db> = Effect.gen(f
   const { subagentTools, harness } = yield* AgentInput
   return { db: yield* Db, subagentTools, retool: retool(harness) }
 })
-
-/** Start step 5: the current complete delegation tool set is applied to the retained Pi filters, once. */
-export const RetoolLive: Layer.Layer<never, never, AgentInput | Db> = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const pi = yield* retooling
-    const now = yield* epochSeconds
-    yield* Effect.promise(() => retoolOnce(pi, 'retool:subagent-config', now))
-  }),
-)
 
 /** What each chat may use, over the agent's database, applied to Pi through its harness. */
 export const SetupsLive: Layer.Layer<Setups, never, AgentInput | Db> = Layer.effect(

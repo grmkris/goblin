@@ -18,13 +18,7 @@ import {
 } from '@goblin/contracts'
 import { and, eq, inArray } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
-import {
-  appHelperExclusions,
-  appExecutionExclusions,
-  appConversations,
-  appMetadata,
-  appTelegramChannel,
-} from '../storage/schema.ts'
+import { appHelperExclusions, appExecutionExclusions, appConversations, appTelegramChannel } from '../storage/schema.ts'
 import { appRoutineRuns, appRoutines } from '../storage/routines.ts'
 import { appPersonaChats } from '../storage/personas.ts'
 import { appTopics } from '../storage/topics.ts'
@@ -387,27 +381,6 @@ const filteredChats = (db: Db): readonly string[] =>
     .filter((row) => row.role !== 'persona' && row.run === null)
     .map((row) => row.chat)
 
-const marked = (db: Db, marker: string): boolean =>
-  db.select().from(appMetadata).where(eq(appMetadata.id, marker)).get() !== undefined
-
-/**
- * Applies every filtering conversation's tool filter to Pi again, once per `marker`. Pi keeps a filter as tool
- * names, so one stored before the tools it names changed (`subagent` became the `subagent_*` tools) removes nothing
- * until it is applied again. The marker is written after every conversation is done, so a failure retries them all.
- */
-export const retoolOnce = async (retooling: Retooling, marker: string, now: number): Promise<void> => {
-  const { db, subagentTools, retool } = retooling
-  if (marked(db, marker)) return
-  for (const chat of filteredChats(db)) {
-    const tools = piToolsFor(db, subagentTools, chat)
-    if (tools !== null) await retool(chatSession(db, chat), tools)
-  }
-  db.insert(appMetadata)
-    .values({ id: marker, value: String(now) })
-    .onConflictDoNothing()
-    .run()
-}
-
 /**
  * Applies the Pi filter again to every chat of `topic` whose filter follows its scope, after its setup's subagents
  * changed (ADR 0040). One that fails to apply is left as it was; the next change applies it again.
@@ -481,7 +454,7 @@ export class SetupScopes {
     await syncPi(this.#retooling, session)
   }
 
-  async retoolOnce(marker: string, now: number): Promise<void> {
-    await retoolOnce(this.#retooling, marker, now)
+  async retoolTopic(topic: number): Promise<void> {
+    await retoolTopic(this.#retooling, topic)
   }
 }

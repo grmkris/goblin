@@ -4,7 +4,7 @@ import { Inspection } from '../inspect/service.ts'
 import type { AgentInputs } from '../runtime/input.ts'
 import { AppRegistryLive, AppsLive } from './apps.ts'
 import { ModelBudgetLive } from './budget.ts'
-import { SetupsLive, RetoolLive } from './setup.ts'
+import { SetupsLive } from './setup.ts'
 import { ConversationLive, PrimaryChatLive } from './conversation.ts'
 import { CoreLive } from './core.ts'
 import { DelegationLive, HelperExecutionLive } from './delegation.ts'
@@ -32,8 +32,6 @@ const then =
  * 3. The cheap models, which the memories (9) and the skill learner (after the start) are built over.
  * 4. Helper execution. Awaits Pi: every registered helper goes on with the execution extensions the agent has now,
  *    also after the object was rebuilt.
- * 5. Retooling. Awaits Pi: every conversation's stored tool filter is applied to Pi again, once (a marker records it),
- *    so a filter stored before the delegation tools changed names them as they are now.
  * 6. Routine runs. Awaits the usage projection's subscription to Pi's commits, made after a snapshot of each live
  *    run, so nothing after it can commit to Pi unseen.
  * 7. Main registered, before anything reads the chat directory for it.
@@ -50,7 +48,6 @@ const start = (input: AgentInputs) =>
     then(McpHostLive), // 2
     then(CheapModelsLive), // 3
     then(HelperExecutionLive), // 4
-    then(RetoolLive), // 5
     then(RoutineRunsLive), // 6
     then(PrimaryChatLive), // 7
     then(AppRegistryLive), // 8
