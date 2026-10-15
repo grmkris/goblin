@@ -3,7 +3,7 @@
 // revision shown, never something a tool's text or a server's suggestion does.
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { SourceView } from '@goblin/contracts'
-import { Conflict, InvalidInput } from '@goblin/contracts/api'
+import { Conflict } from '@goblin/contracts/api'
 import {
   Alert,
   AlertDescription,
