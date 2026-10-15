@@ -3,6 +3,7 @@ import { Agent } from 'agents'
 import { PiHarness } from 'agents/harness/pi'
 import * as Effect from 'effect/Effect'
 import { nextInt } from 'effect/Random'
+import { baselinePreservation } from './baseline-probe.ts'
 import { FIXTURE_INPUT, fixtureModels, model } from './model.ts'
 import { type Probe, type Probes, inWorker } from './probe.ts'
 import { skillsCacheProbe, skillsLearnerDraftProbe, skillsPersistedRead } from './skills-probe.ts'
@@ -24,6 +25,7 @@ export class NativeLifecycleProbe extends Agent {
   override async onRequest(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const operationId = url.searchParams.get('operationId') ?? 'missing-fixture-operation'
+    if (url.pathname === '/baseline') return Response.json(baselinePreservation(this.ctx.storage))
     if (url.pathname === '/skills-draft')
       return Response.json(await skillsLearnerDraftProbe(this.ctx.storage, this.harness))
     if (url.pathname === '/skills-write') {
@@ -56,6 +58,7 @@ const step = (path: string): Probe =>
   })
 
 export const probes: Probes = {
+  'lifecycle-baseline': step('/baseline'),
   'lifecycle-sessions': step('/sessions'),
   'lifecycle-submit': step('/submit'),
   'lifecycle-wait': step('/wait'),

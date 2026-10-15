@@ -31,29 +31,6 @@ const log = (chatId: string, entries: readonly number[]) =>
 const node = (chatId: string, level: number, idx: number) => ({ chatId, level, idx, text: `${level}:${idx}`, bytes: 3 })
 
 describe('per-Topic memory (ADR 0032)', () => {
-  it("copies Main's agent-wide memory into chat 1, every idx, entry and node unchanged", () => {
-    const { sqlite, migrate, db, close } = chatDatabase({ through: '20261026000000_topics' })
-    cleanups.push(close)
-    sqlite.exec(`INSERT INTO app_memory_log (idx, entry_id, kind) VALUES (0, 11, 'user'), (1, 12, 'talk'), (2, 15, 'echo');
-      INSERT INTO app_memory_nodes (level, idx, text, bytes) VALUES (0, 0, 'user: hi', 8), (0, 1, 'talk: hello', 11),
-        (1, 0, 'greeting', 8);
-      INSERT INTO app_memory_state (id, origin_entry, view_through) VALUES (1, 10, 1);`)
-    migrate({ after: '20261026000000_topics' })
-    expect(db.select().from(appChatMemoryLog).all()).toEqual([
-      { chatId: '1', idx: 0, entryId: 11, kind: 'user' },
-      { chatId: '1', idx: 1, entryId: 12, kind: 'talk' },
-      { chatId: '1', idx: 2, entryId: 15, kind: 'echo' },
-    ])
-    expect(db.select().from(appChatMemoryNodes).all()).toEqual([
-      { chatId: '1', level: 0, idx: 0, text: 'user: hi', bytes: 8 },
-      { chatId: '1', level: 0, idx: 1, text: 'talk: hello', bytes: 11 },
-      { chatId: '1', level: 1, idx: 0, text: 'greeting', bytes: 8 },
-    ])
-    expect(db.select().from(appChatMemoryState).all()).toEqual([{ chatId: '1', originEntry: 10, viewThrough: 1 }])
-    // The old tables stay, unread.
-    expect(sqlite.prepare('SELECT count(*) AS n FROM app_memory_log').get()).toEqual({ n: 3 })
-  })
-
   it("keeps two Topics' memories apart and truncates one without touching the other", () => {
     const { db, close } = chatDatabase()
     cleanups.push(close)

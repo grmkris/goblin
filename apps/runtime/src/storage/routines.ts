@@ -82,8 +82,6 @@ export const appRoutineUsageProjection = sqliteTable(
     runId: text('run_id').notNull(),
     model: text('model').notNull(),
     tokens: integer('tokens').notNull(),
-    /** Retired with Credits; unread until the migrations are squashed. */
-    milliCredits: integer('milli_credits').notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.runId, t.model] })],
 )

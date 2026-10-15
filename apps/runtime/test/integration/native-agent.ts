@@ -103,6 +103,33 @@ const Evidence = Schema.Struct({
   messages: Schema.Array(Schema.Unknown),
 })
 
+const Baseline = Schema.Struct({
+  applicationBefore: Schema.Number,
+  vendorTables: Schema.Array(Schema.String),
+  vendorRows: Schema.Number,
+  firstPreserved: Schema.Boolean,
+  secondPreserved: Schema.Boolean,
+  tokens: Schema.Number,
+  migrations: Schema.Number,
+})
+
+/** The fresh baseline and its reapplication preserve an already populated native Pi/Agents store. */
+async function baselineChecks(base: string): Promise<void> {
+  const get = lifecycle(base, freshName('baseline'), crypto.randomUUID())
+  expect(await get('submit', MessageReceipt)).toMatchObject({ accepted: true })
+  expect(await get('wait', Operation)).toMatchObject({ status: 'done' })
+  const result = await get('baseline', Baseline)
+  expect(result).toMatchObject({
+    applicationBefore: 0,
+    firstPreserved: true,
+    secondPreserved: true,
+    tokens: 17,
+    migrations: 1,
+  })
+  expect(result.vendorTables).toEqual(expect.arrayContaining(['pi_entries', 'pi_submissions', 'cf_agents_jobs']))
+  expect(result.vendorRows).toBeGreaterThan(0)
+}
+
 const lifecycleEvidencePath = new FileURL('../../.alchemy/goblin-native-lifecycle.json', import.meta.url)
 
 /** The lifecycle object `name`'s steps, each under operation `operationId`. */
@@ -209,14 +236,15 @@ async function inboundHostChecks(base: string): Promise<void> {
 
 /** The agent itself: its start, its owner API by stub, endpoint binding, deletion, the Pi lifecycle and the edges. */
 export const agentCases = (phase: Phase): readonly NativeCase[] => [
+  { title: 'fresh baseline and reapplication preserve populated vendor state [canary]', run: baselineChecks },
   probeCase(
-    'actual PersonalAgent startup and additive app migration preserve vendor schemas',
+    'actual PersonalAgent startup and application baseline preserve vendor schemas',
     'startup',
     Startup,
     (result) => {
       expect(result.snapshot).toMatchObject({ type: 'snapshot', entries: [] })
       expect(result.after).toEqual(result.before)
-      expect(JSON.stringify(result.after)).toContain('app_metadata')
+      expect(JSON.stringify(result.after)).toContain('app_usage_daily')
       expect(JSON.stringify(result.after)).toContain('pi_submissions')
       expect(JSON.stringify(result.after)).toContain('cf_agents_jobs')
     },

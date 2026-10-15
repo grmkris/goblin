@@ -80,14 +80,10 @@ export const appResident = sqliteTable('app_resident', {
   expiresAt: integer('expires_at').notNull(),
   revokedAt: integer('revoked_at'),
 })
-/**
- * The tokens this agent spent on models per UTC day (`YYYY-MM-DD`), which the daily cap counts. `milli_credits` is
- * retired with Credits and unread until the migrations are squashed.
- */
+/** The tokens this agent spent on models per UTC day (`YYYY-MM-DD`), which the daily cap counts. */
 export const appUsageDaily = sqliteTable('app_usage_daily', {
   day: text('day').primaryKey().notNull(),
   tokens: integer('tokens').notNull(),
-  milliCredits: integer('milli_credits').notNull().default(0),
   updatedAt: integer('updated_at').notNull(),
 })
 
@@ -141,8 +137,6 @@ export const appChatMoves = sqliteTable('app_chat_moves', {
   forkSession: text('fork_session'),
   messageEntry: integer('message_entry').notNull(),
   cutEntry: integer('cut_entry'),
-  // Always `settled`, the one kind of move; the column goes when the migrations are squashed.
-  mode: text('mode', { enum: ['settled'] }).notNull(),
   state: text('state', { enum: ['requested', 'forked', 'settled', 'refused'] }).notNull(),
   reason: text('reason'),
   relays: text('relays'),
@@ -217,24 +211,6 @@ export const appSkillDrafts = sqliteTable('app_skill_drafts', {
   status: text('status', { enum: ['open', 'accepted', 'rejected'] }).notNull(),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
-})
-
-/**
- * Turns whose answers go back to Telegram, until they are sent (ADR 0055): the goblin chat the turn ran in (none for
- * main), the Telegram chat and thread the answer goes to, and the Persona that answers instead of goblin, whose
- * invocation under the same operation id holds its answer; an answer sent as buttons keeps its question and buttons.
- */
-export const appChannelReplies = sqliteTable('app_channel_replies', {
-  operationId: text('operation_id').primaryKey().notNull(),
-  chatId: text('chat_id'),
-  tgChat: text('tg_chat').notNull().default('dm'),
-  tgThread: integer('tg_thread').notNull().default(0),
-  personaId: integer('persona_id'),
-  createdAt: integer('created_at').notNull(),
-  deliveredAt: integer('delivered_at'),
-  /** The question the answer went out as (buttons), and its buttons as JSON `[{ id, label }]`, to read a tap back. */
-  askQuestion: text('ask_question'),
-  askOptions: text('ask_options'),
 })
 
 /** Exact owner Events grants, independent of tools and remote subscription ids. */
@@ -342,31 +318,6 @@ export const appEventConsumerReceipts = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.subscriptionId, t.webhookId, t.consumerId, t.revision] })],
 )
-
-/**
- * The Telegram channel (channel/channel.ts): at most one row, the connection whose Events carry it and its inbox
- * cursor; what goblin does with a chat it has not seen (`new_chats`, ADR 0055); and how far the grant reaches (`reach`),
- * with the URL that widens a DM-only grant to all the bot's chats.
- */
-export const appTelegramChannel = sqliteTable('app_telegram_channel', {
-  id: integer('id').primaryKey().notNull(),
-  connectionId: text('connection_id').notNull(),
-  inboxCursor: text('inbox_cursor').notNull(),
-  enabledAt: integer('enabled_at').notNull(),
-  newChats: text('new_chats', { enum: ['ask', 'topic', 'personal'] })
-    .notNull()
-    .default('ask'),
-  reach: text('reach', { enum: ['dm', 'all'] })
-    .notNull()
-    .default('dm'),
-  widenUrl: text('widen_url'),
-  /** Counts changes of `new_chats`, so Undo can tell whether anything touched it. */
-  settingsRevision: integer('settings_revision').notNull().default(0),
-  /** The server's chat list is to be read again at the next pull (turned on, or a chat changed). */
-  syncDue: integer('sync_due', { mode: 'boolean' }).notNull().default(true),
-  /** The server ended the channel's Events and goblin could not subscribe again: the owner's attention is needed. */
-  ended: integer('ended', { mode: 'boolean' }).notNull().default(false),
-})
 
 /** A newer invalidation cannot be cleared by an older listing response. */
 export const appSkillCatalogState = sqliteTable('app_skill_catalog_state', {
@@ -532,8 +483,7 @@ export const appAgentJobs = sqliteTable(
 /**
  * Every App the workspace shows (ADRs 0020, 0021), one id space for both kinds: an MCP App kept from a tool call
  * (`source = 'mcp'`: call, server, tool, resource; `entry_id` is where the call sits in Pi, once found), or an agent
- * app (`'agent'`: its name). It records where an App comes from and what to call it, never a grant. The retired
- * `app_apps` table, its earlier MCP-only form, was copied here with the same ids and is no longer read.
+ * app (`'agent'`: its name). It records where an App comes from and what to call it, never a grant.
  */
 export const appRegistry = sqliteTable(
   'app_registry',
