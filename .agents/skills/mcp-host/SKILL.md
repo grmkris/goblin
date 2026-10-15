@@ -34,11 +34,12 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   or an outcome.
 - Inbound tokens must verify locally, name `/mcp` as audience, come from an enabled client with live owner consent.
   An inbound client's messages go into main, labelled with its name.
-- Events (`mcp/events/engine.ts`, ADR 0011) require resident authority and an exact server/name/canonical-arguments owner
+- Events (`mcp/events/engine.ts`, ADRs 0011 and 0073) require resident authority and an exact server/name/canonical-arguments owner
   grant through the originating endpoint-bound connection. A server offers Events by top-level `capabilities.events`
   (decoded at the authenticated SDK fetch seam, which strips it) or by the `io.modelcontextprotocol/events` extension,
   which goblin declares too (ADR 0041). Signed controls have separate schemas; payloads never grant or become
-  instructions.
+  instructions. Each subscription generation adds an opaque random `goblin_generation` query value to the connection's
+  authenticated hook path. The marker grants nothing; it keeps an old subscribe or unsubscribe from changing a replacement.
 - Sources (`sources/`, ADRs 0066, 0069) are how any server's events carry the owner's own messages: an owner-confirmed setup
   of JSON pointers and whole-value argument templates (`SourceSetup`), never a server's name. Confirmation grants the
   wake selector and the read and reply tools, subscribes `source:<id>` (handler `source-wake`) and binds the Source to
@@ -85,8 +86,8 @@ itself authorize model spend, external messages, deployment or production change
 
 - Routine confirmation grants only the reviewed exact Event selector. Subscribe validates arguments against the installed producer descriptor schema. Routine consumers share leases, retire by revision and ACK only after run/pending/skip metadata is durable; gap/termination controls do not authorize a model turn.
 - Connections (ADR 0041): one server may have several connections, each with the owner's label (`mcp/servers/labels.ts`,
-  unique ignoring case; DCR `client_name` is plain "goblin", ADR 0062) and its own webhook URL
-  (`/hooks/mcp-events/<user>/<connection>/<token>`). Model text names one as `"<label>" (<id>)` (`named`); labels and
+  unique ignoring case; DCR `client_name` is plain "goblin", ADR 0062) and its own authenticated webhook path
+  (`/hooks/mcp-events/<user>/<connection>/<token>`, with the generation query from ADR 0073). Model text names one as `"<label>" (<id>)` (`named`); labels and
   notice text never enter telemetry. A connection that sends events offers them (`ServerView.events`: open, dismissed,
   done; `mcp/events/offers.ts`); `mcp_list` shows its first 64 event streams as untrusted data when asked
   (`events: true`). goblin reads a descriptor's standard fields only (`name`, `title`, `description`, `inputSchema`,

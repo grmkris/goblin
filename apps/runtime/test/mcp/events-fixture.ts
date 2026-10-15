@@ -111,8 +111,8 @@ export class EventsFixture {
       this.calls.push('events/unsubscribe')
       const delivery = Schema.decodeUnknownOption(Schema.Struct({ url: Schema.String }))(params['delivery'])
       const url = Option.getOrUndefined(delivery)?.url ?? ''
-      if (!this.subscriptions.delete(this.#idFor(String(params['name']), url)))
-        throw new ProtocolError(-32011, 'not found')
+      const id = this.#existingIdFor(String(params['name']), url)
+      if (id === undefined || !this.subscriptions.delete(id)) throw new ProtocolError(-32011, 'not found')
       return { resultType: 'complete' }
     })
     server.setRequestHandler('events/poll', { params: Params }, (params) => {
@@ -163,11 +163,17 @@ export class EventsFixture {
    * out: `sub_<name>` for the first URL, `sub_<name>~2`, `~3`… for the next ones (ADR 0041, two connections to one
    * server).
    */
+  #existingIdFor(name: string, url: string): string | undefined {
+    return [...this.subscriptions.keys()].find(
+      (key) => (key === `sub_${name}` || key.startsWith(`sub_${name}~`)) && this.subscriptions.get(key)?.url === url,
+    )
+  }
   #idFor(name: string, url: string): string {
-    const ids = [...this.subscriptions.keys()].filter((key) => key === `sub_${name}` || key.startsWith(`sub_${name}~`))
-    const same = ids.find((key) => this.subscriptions.get(key)?.url === url)
+    const same = this.#existingIdFor(name, url)
     if (same !== undefined) return same
-    return ids.length === 0 ? `sub_${name}` : `sub_${name}~${String(ids.length + 1)}`
+    let index = 1
+    while (this.subscriptions.has(index === 1 ? `sub_${name}` : `sub_${name}~${index}`)) index += 1
+    return index === 1 ? `sub_${name}` : `sub_${name}~${index}`
   }
 
   async deliver(

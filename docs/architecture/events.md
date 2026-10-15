@@ -24,6 +24,17 @@ agent runs anything), reads the owner's messages from the event's data or by a t
 its reply tool; nothing in it names a server. Multiple consumers can share a connection and exact selector without
 introducing service-specific ownership.
 
+Consumer revisions advance monotonically in the store: an older discovery that finishes late cannot retire a newer
+binding. The last consumer tombstones its lease before remote cleanup starts. Each replacement lease adds a fresh,
+opaque `goblin_generation` query value to the connection's authenticated callback URL (ADR 0073). The value grants
+nothing; the authenticated hook path and signed delivery checks stay required. Since producers address subscriptions
+by selector and complete callback URL, late subscribe or unsubscribe requests for an old generation cannot remove or
+replace its successor. Failed cleanup can lapse at the producer's finite TTL without blocking immediate rebind.
+Lease generation checks also fence asynchronous subscribe, poll and verification responses at their durable write,
+including after encryption or alarm waits. Retirement finishes queued deliveries, and dispatch rechecks after
+decrypting and between handlers, so an old gap or termination cannot change the next lease. A terminated lease is only
+replaced by an explicit subscribe, with a fresh generation. No transaction spans a remote wait.
+
 The dispatcher also binds myskills' `skills.updated` and `skills.list_changed`. Turning a server's skills on subscribes
 to them only where its Events offer them to this connection; a server without them, or one that refuses its Events
 (Sidequest's setup-only connection), still turns on, and its listing refreshes on its `ttlMs`. Their payload is

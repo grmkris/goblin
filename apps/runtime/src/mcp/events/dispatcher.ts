@@ -45,16 +45,19 @@ export const makeDispatcher = (store: SqliteEventStore, cipher: CredentialCipher
         cipher.decrypt(row.envelope, envelopeAad(subscription, row.webhookId)),
       )
       const envelope = yield* Effect.try(() => decodeEnvelope(JSON.parse(plain)))
+      if (!store.pendingDelivery(subscription, row)) return
       if ('type' in envelope && envelope.type === 'gap')
-        store.patch(subscription.id, { status: 'catching_up', cursor: envelope.cursor, nextPollAt: now })
+        store.patchLive(subscription, { status: 'catching_up', cursor: envelope.cursor, nextPollAt: now })
       if ('type' in envelope && envelope.type === 'terminated')
-        store.patch(subscription.id, {
+        store.patchLive(subscription, {
           status: 'terminated',
           nextRefreshAt: Number.MAX_SAFE_INTEGER,
           lastError: `terminated:${envelope.error?.code ?? 'unknown'}`,
         })
-      for (const receipt of store.snapshots(row.subscriptionId, row.webhookId))
+      for (const receipt of store.snapshots(row.subscriptionId, row.webhookId)) {
+        if (!store.pendingDelivery(subscription, row)) return
         yield* handle(subscription, envelope, receipt, now)
+      }
       yield* Effect.sync(() => store.finish(row.subscriptionId, row.webhookId, now))
     }).pipe(
       // expected: whatever stopped it (a handler's failure or defect included), the delivery stays queued and is retried

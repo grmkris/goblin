@@ -1,6 +1,6 @@
-import { and, asc, count, eq, gte, isNull, lt, lte, ne, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, isNull, lt, lte, ne, or, sql } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
-import { InvalidInput } from '../../http/errors.ts'
+import { Conflict, InvalidInput } from '../../http/errors.ts'
 import {
   appEventConsumerReceipts as receipts,
   appEventDeliveries as deliveries,
@@ -13,6 +13,7 @@ export type Subscription = typeof subscriptions.$inferSelect
 export type Consumer = typeof consumers.$inferSelect
 export type Receipt = typeof receipts.$inferSelect
 export type Delivery = typeof deliveries.$inferSelect
+const CLEANUP_PENDING = 'cleanup_pending'
 export const EVENT_LIMITS = {
   ttlMs: 3_600_000,
   minTtlMs: 300_000,
@@ -151,6 +152,67 @@ export class SqliteEventStore {
   save(row: Subscription): void {
     this.db.insert(subscriptions).values(row).onConflictDoUpdate({ target: subscriptions.id, set: row }).run()
   }
+  /** Encryption and alarm waits may not overwrite a lease changed while a replacement was prepared. */
+  savePrepared(row: Subscription, previous: Subscription | undefined): boolean {
+    if (previous === undefined)
+      return this.db.insert(subscriptions).values(row).onConflictDoNothing().returning().all().length === 1
+    return this.db.transaction((tx) => {
+      const changed =
+        tx
+          .update(subscriptions)
+          .set(row)
+          .where(
+            and(
+              eq(subscriptions.id, previous.id),
+              eq(subscriptions.secret, previous.secret),
+              eq(subscriptions.status, previous.status),
+              eq(subscriptions.updatedAt, previous.updatedAt),
+            ),
+          )
+          .returning()
+          .all().length === 1
+      if (changed)
+        tx.update(deliveries)
+          .set({ processedAt: row.updatedAt })
+          .where(and(eq(deliveries.subscriptionId, row.id), isNull(deliveries.processedAt)))
+          .run()
+      return changed
+    })
+  }
+
+  /** Only the same live lease generation may accept an asynchronous response. */
+  patchLive(row: Subscription, patch: Partial<Subscription>): boolean {
+    return (
+      this.db
+        .update(subscriptions)
+        .set(patch)
+        .where(
+          and(
+            eq(subscriptions.id, row.id),
+            eq(subscriptions.secret, row.secret),
+            ne(subscriptions.status, 'tombstone'),
+            ne(subscriptions.status, 'terminated'),
+          ),
+        )
+        .returning()
+        .all().length === 1
+    )
+  }
+  /** Cleanup completion cannot change a later generation's cleanup status or state. */
+  cleaned(row: Subscription, now: number): void {
+    this.db
+      .update(subscriptions)
+      .set({ lastError: null, updatedAt: now })
+      .where(
+        and(
+          eq(subscriptions.id, row.id),
+          eq(subscriptions.secret, row.secret),
+          eq(subscriptions.status, 'tombstone'),
+          eq(subscriptions.lastError, CLEANUP_PENDING),
+        ),
+      )
+      .run()
+  }
   patch(id: string, patch: Partial<Subscription>): void {
     this.db.update(subscriptions).set(patch).where(eq(subscriptions.id, id)).run()
   }
@@ -175,8 +237,26 @@ export class SqliteEventStore {
       .where(and(eq(consumers.consumerId, consumerId), eq(consumers.revision, revision)))
       .get()
   }
-  bind(row: Consumer): void {
-    this.db.transaction((tx) => {
+  bind(row: Consumer, lease: Subscription): boolean {
+    return this.db.transaction((tx) => {
+      const latest = tx
+        .select()
+        .from(consumers)
+        .where(eq(consumers.consumerId, row.consumerId))
+        .orderBy(desc(consumers.revision))
+        .get()
+      const current = tx.select().from(subscriptions).where(eq(subscriptions.id, lease.id)).get()
+      if (
+        current?.secret !== lease.secret ||
+        current.status === 'tombstone' ||
+        (latest !== undefined &&
+          (latest.revision > row.revision ||
+            (latest.revision === row.revision &&
+              (latest.state !== 'active' ||
+                latest.subscriptionId !== row.subscriptionId ||
+                latest.handlerKey !== row.handlerKey))))
+      )
+        return false
       tx.update(consumers)
         .set({ state: 'retiring', retiredAt: row.createdAt })
         .where(and(eq(consumers.consumerId, row.consumerId), eq(consumers.state, 'active')))
@@ -185,6 +265,7 @@ export class SqliteEventStore {
         .values(row)
         .onConflictDoUpdate({ target: [consumers.consumerId, consumers.revision], set: row })
         .run()
+      return true
     })
   }
   retire(consumerId: string, revision: number, now: number): void {
@@ -199,6 +280,49 @@ export class SqliteEventStore {
         .run()
     })
   }
+  /** Retires a consumer and marks its last shared lease before any unsubscribe wait. */
+  retireForCleanup(consumerId: string, revision: number, now: number): Subscription | undefined {
+    return this.db.transaction((tx) => {
+      const binding = tx
+        .select()
+        .from(consumers)
+        .where(and(eq(consumers.consumerId, consumerId), eq(consumers.revision, revision)))
+        .get()
+      if (binding === undefined) return undefined
+      tx.update(consumers)
+        .set({ state: 'retiring', retiredAt: now })
+        .where(and(eq(consumers.consumerId, consumerId), eq(consumers.revision, revision)))
+        .run()
+      tx.update(receipts)
+        .set({ state: 'retired', acceptedAt: now })
+        .where(and(eq(receipts.consumerId, consumerId), eq(receipts.revision, revision), eq(receipts.state, 'pending')))
+        .run()
+      const lease = tx.select().from(subscriptions).where(eq(subscriptions.id, binding.subscriptionId)).get()
+      if (lease === undefined || lease.status === 'tombstone') return undefined
+      const active = tx
+        .select()
+        .from(consumers)
+        .where(and(eq(consumers.subscriptionId, lease.id), eq(consumers.state, 'active')))
+        .limit(1)
+        .get()
+      if (active !== undefined) return undefined
+      // Frozen deliveries belong to this retired generation, including controls with no remaining receipts.
+      tx.update(deliveries)
+        .set({ processedAt: now })
+        .where(and(eq(deliveries.subscriptionId, lease.id), isNull(deliveries.processedAt)))
+        .run()
+      tx.update(subscriptions)
+        .set({
+          status: 'tombstone',
+          lastError: CLEANUP_PENDING,
+          nextRefreshAt: Number.MAX_SAFE_INTEGER,
+          updatedAt: now,
+        })
+        .where(eq(subscriptions.id, lease.id))
+        .run()
+      return lease
+    })
+  }
   delivery(subscriptionId: string, webhookId: string): Delivery | undefined {
     return this.db
       .select()
@@ -206,9 +330,31 @@ export class SqliteEventStore {
       .where(and(eq(deliveries.subscriptionId, subscriptionId), eq(deliveries.webhookId, webhookId)))
       .get()
   }
+  /** A dispatcher that crossed a decrypt/handler wait must still belong to the same unprocessed generation. */
+  pendingDelivery(lease: Subscription, row: Delivery): boolean {
+    const current = this.get(lease.id)
+    return (
+      current?.secret === lease.secret &&
+      current.status !== 'tombstone' &&
+      this.delivery(row.subscriptionId, row.webhookId)?.processedAt === null
+    )
+  }
   /** Receipt plus frozen consumer snapshot commit atomically; replay never regenerates that snapshot. */
-  receive(row: typeof deliveries.$inferInsert): boolean {
+  receiveLive(lease: Subscription, row: typeof deliveries.$inferInsert): boolean {
+    return this.receive(row, lease)
+  }
+  receive(row: typeof deliveries.$inferInsert, lease?: Subscription): boolean {
     return this.db.transaction((tx) => {
+      if (lease !== undefined) {
+        const current = tx.select().from(subscriptions).where(eq(subscriptions.id, lease.id)).get()
+        if (
+          row.subscriptionId !== lease.id ||
+          current?.secret !== lease.secret ||
+          current.status === 'tombstone' ||
+          current.status === 'terminated'
+        )
+          throw new Conflict({ reason: 'event lease changed' })
+      }
       if (
         tx
           .select()

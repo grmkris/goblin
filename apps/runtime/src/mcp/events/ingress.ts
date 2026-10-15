@@ -87,7 +87,7 @@ const accepts = (ingress: Ingress, row: Subscription, input: EventWebhook, envel
     if (!input.id.startsWith(`msg_${envelope.type}_`)) throw new InvalidInput({ reason: 'event control id' })
     if (row.remoteId === null) {
       if (envelope.type !== 'verification') return false
-      ingress.store.patch(row.id, { remoteId: input.subscriptionId })
+      return ingress.store.patchLive(row, { remoteId: input.subscriptionId })
     }
     return true
   })

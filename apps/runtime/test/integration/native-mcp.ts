@@ -155,6 +155,16 @@ export const cases: readonly NativeCase[] = [
         scheduledRecovery: true,
         skills: { first: true, second: true, retained: true, dirty: 1, replayDirty: 1, refreshed: 1, terminated: true },
         recovery: { interrupted: true, pendingRetained: true, accepted: true, stableOperation: true, processed: true },
+        races: {
+          staleConsumer: true,
+          cleanupWait: true,
+          stalePoll: true,
+          terminatedPoll: true,
+          staleControlRetire: true,
+          staleControlReplace: true,
+          cleanupRecovery: true,
+          inFlightSubscribe: true,
+        },
       }),
   ),
   probeCase(

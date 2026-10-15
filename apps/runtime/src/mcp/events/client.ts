@@ -1,7 +1,15 @@
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
-import { type AppError, GrantDenied, InvalidInput, UpstreamMcp, attempt, attemptSync } from '../../http/errors.ts'
+import {
+  type AppError,
+  Conflict,
+  GrantDenied,
+  InvalidInput,
+  UpstreamMcp,
+  attempt,
+  attemptSync,
+} from '../../http/errors.ts'
 import type { CredentialCipher } from '../oauth/cipher.ts'
 import type { McpConnections } from '../service.ts'
 import { canonicalArguments, EVENT_LIMITS, type SqliteEventStore, type Subscription } from './store.ts'
@@ -24,6 +32,16 @@ export const envelopeAad = (row: Pick<Subscription, 'id' | 'connectionId'>, webh
   `events:${row.connectionId}:${row.id}:delivery:${webhookId}`
 const makeSecret = (): string => `whsec_${btoa(String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(32))))}`
 const makeSubscriptionId = (): string => crypto.randomUUID()
+const generationOf = (callback: string): string => {
+  const url = new URL(callback)
+  url.searchParams.set('goblin_generation', crypto.randomUUID())
+  return url.toString()
+}
+const callbackBase = (callback: string): string => {
+  const url = new URL(callback)
+  url.searchParams.delete('goblin_generation')
+  return url.toString()
+}
 
 /** What the Events requests go through: the connections, the durable intents and the agent's own identity. */
 export type EventClient = {
@@ -42,20 +60,33 @@ export type EventClient = {
 }
 
 /** One Events request for `row`'s selector, through its server's connection. */
-const request = <S extends Schema.ConstraintDecoder<unknown>>(
-  client: EventClient,
-  row: Pick<Subscription, 'connectionId' | 'name' | 'argumentsJson'>,
-  method: 'events/list' | 'events/poll' | 'events/subscribe' | 'events/unsubscribe',
-  params: Record<string, unknown>,
-  schema: S,
-) =>
-  client.connections.events(
-    row.connectionId,
-    method,
-    params,
-    schema,
-    client.authorize(row.connectionId, row.name, row.argumentsJson),
+const request = <S extends Schema.ConstraintDecoder<unknown>>(input: {
+  readonly client: EventClient
+  readonly row: Pick<Subscription, 'connectionId' | 'name' | 'argumentsJson'>
+  readonly method: 'events/list' | 'events/poll' | 'events/subscribe' | 'events/unsubscribe'
+  readonly params: Record<string, unknown>
+  readonly schema: S
+  readonly guard?: Effect.Effect<void, AppError>
+}) =>
+  input.client.connections.events(
+    input.row.connectionId,
+    input.method,
+    input.params,
+    input.schema,
+    Effect.andThen(
+      input.client.authorize(input.row.connectionId, input.row.name, input.row.argumentsJson),
+      input.guard ?? Effect.void,
+    ),
   )
+
+/** Connection/credential waits cannot send work for a lease that was retired or replaced meanwhile. */
+const currentLease = (client: EventClient, row: Subscription) =>
+  Effect.suspend(() => {
+    const current = client.store.get(row.id)
+    return current?.secret === row.secret && current.status !== 'tombstone' && current.status !== 'terminated'
+      ? Effect.void
+      : Effect.fail(new Conflict({ reason: 'event lease changed' }))
+  })
 
 /** Every page of a connection's `events/list` under `authorize`, up to the page bound. */
 const pagesOf = (client: EventClient, connectionId: string, authorize: Effect.Effect<void, AppError>) =>
@@ -98,18 +129,20 @@ export const prepareEvents = (
     const { endpoint } = yield* client.connections.server(connectionId)
     const callback = yield* client.callback(connectionId)
     const current = store.selector(connectionId, name, argumentsJson)
+    const now = yield* Clock.currentTimeMillis
     if (
       current !== undefined &&
       current.endpoint === endpoint &&
       current.principal === principal &&
-      current.callbackUrl === callback &&
-      current.status !== 'tombstone'
+      callbackBase(current.callbackUrl) === callbackBase(callback) &&
+      current.status !== 'tombstone' &&
+      current.status !== 'terminated'
     )
       return current
     if (store.count() >= EVENT_LIMITS.subscriptions && (current === undefined || current.status === 'tombstone'))
       return yield* new InvalidInput({ reason: 'too many event subscriptions' })
-    const now = yield* Clock.currentTimeMillis
     const binding = { id: current?.id ?? (yield* Effect.sync(makeSubscriptionId)), connectionId }
+    const generationCallback = yield* attemptSync(() => generationOf(callback))
     const secret = yield* attempt(() => cipher.encrypt(makeSecret(), secretAad(binding)))
     const row: Subscription = {
       ...binding,
@@ -117,7 +150,7 @@ export const prepareEvents = (
       argumentsJson,
       endpoint,
       principal,
-      callbackUrl: callback,
+      callbackUrl: generationCallback,
       remoteId: null,
       secret,
       previousSecret: null,
@@ -134,7 +167,8 @@ export const prepareEvents = (
     }
     // Arm a recovery wake before the durable intent. A crash after commit is repaired by this alarm or startup.
     yield* client.wake(now + Math.min(ttlMs, 60_000))
-    yield* Effect.sync(() => store.save(row))
+    if (!(yield* Effect.sync(() => store.savePrepared(row, current))))
+      return yield* new Conflict({ reason: 'event lease changed' })
     return row
   })
 
@@ -143,14 +177,15 @@ export const subscribeEvents = (client: EventClient, row: Subscription, ttlMs: n
   Effect.gen(function* () {
     const { store, cipher } = client
     const now = yield* Clock.currentTimeMillis
-    if (row.remoteId === null) store.patch(row.id, { status: 'pending', updatedAt: now })
+    yield* currentLease(client, row)
+    if (row.remoteId === null) store.patchLive(row, { status: 'pending', updatedAt: now })
     const secret = yield* attempt(() => cipher.decrypt(row.secret, secretAad(row)))
     const args = yield* argumentsOf(row)
-    const result = yield* request(
+    const result = yield* request({
       client,
       row,
-      'events/subscribe',
-      {
+      method: 'events/subscribe',
+      params: {
         name: row.name,
         arguments: args,
         delivery: { mode: 'webhook', url: row.callbackUrl, secret },
@@ -158,8 +193,9 @@ export const subscribeEvents = (client: EventClient, row: Subscription, ttlMs: n
         ttlMs: Math.min(EVENT_LIMITS.maxTtlMs, Math.max(EVENT_LIMITS.minTtlMs, ttlMs)),
         maxAgeMs: 7 * 86_400_000,
       },
-      EventsSubscribeResult,
-    )
+      schema: EventsSubscribeResult,
+      guard: currentLease(client, row),
+    })
     const refreshBefore = Date.parse(result.refreshBefore)
     if (!Number.isFinite(refreshBefore) || refreshBefore <= now || refreshBefore > now + EVENT_LIMITS.maxTtlMs)
       return yield* new UpstreamMcp({ connectionId: row.connectionId, reason: 'remote-rpc' })
@@ -171,7 +207,7 @@ export const subscribeEvents = (client: EventClient, row: Subscription, ttlMs: n
     const nextRefreshAt = Math.max(now + 1000, refreshBefore - margin - (jitter % 1000))
     const status = result.truncated === true || result.deliveryStatus?.active === false ? 'catching_up' : 'active'
     yield* client.wake(Math.min(nextRefreshAt, now + 300_000))
-    store.patch(row.id, {
+    const written = store.patchLive(row, {
       remoteId: result.id,
       refreshBefore,
       nextRefreshAt,
@@ -180,6 +216,7 @@ export const subscribeEvents = (client: EventClient, row: Subscription, ttlMs: n
       lastError: null,
       updatedAt: now,
     })
+    if (!written) return yield* new Conflict({ reason: 'event lease changed' })
     const saved = store.get(row.id)
     if (saved === undefined) return yield* new InvalidInput({ reason: 'event intent missing' })
     return saved
@@ -188,25 +225,32 @@ export const subscribeEvents = (client: EventClient, row: Subscription, ttlMs: n
 /** The occurrences after `row`'s cursor, one page. */
 export const pollEvents = (client: EventClient, row: Subscription) =>
   Effect.flatMap(argumentsOf(row), (args) =>
-    request(
+    request({
       client,
       row,
-      'events/poll',
-      { name: row.name, arguments: args, cursor: row.cursor, maxEvents: EVENT_LIMITS.page, maxAgeMs: 7 * 86_400_000 },
-      EventsPollResult,
-    ),
+      method: 'events/poll',
+      params: {
+        name: row.name,
+        arguments: args,
+        cursor: row.cursor,
+        maxEvents: EVENT_LIMITS.page,
+        maxAgeMs: 7 * 86_400_000,
+      },
+      schema: EventsPollResult,
+      guard: currentLease(client, row),
+    }),
   )
 
 /** Ends `row`'s remote subscription; one the server no longer knows (-32011) is already gone. */
 export const unsubscribeEvents = (client: EventClient, row: Subscription): Effect.Effect<void, AppError> =>
   Effect.flatMap(argumentsOf(row), (args) =>
-    request(
+    request({
       client,
       row,
-      'events/unsubscribe',
-      { name: row.name, arguments: args, delivery: { mode: 'webhook', url: row.callbackUrl } },
-      EventsUnsubscribeResult,
-    ),
+      method: 'events/unsubscribe',
+      params: { name: row.name, arguments: args, delivery: { mode: 'webhook', url: row.callbackUrl } },
+      schema: EventsUnsubscribeResult,
+    }),
   ).pipe(
     Effect.asVoid,
     Effect.catchTag('UpstreamMcp', (error) => (error.code === -32011 ? Effect.void : Effect.fail(error))),

@@ -3,7 +3,7 @@ import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/client/valida
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
-import { type AppError, InvalidInput, attempt, attemptSync } from '../../http/errors.ts'
+import { type AppError, Conflict, InvalidInput, attempt, attemptSync } from '../../http/errors.ts'
 import { SingleFlight } from '../../observability/single-flight.ts'
 import {
   type EventClient,
@@ -71,7 +71,7 @@ const persist = (engine: Engine, row: Subscription, id: string, body: Uint8Array
     const now = yield* Clock.currentTimeMillis
     yield* engine.wake(now + 1000)
     yield* attemptSync(() => {
-      store.receive({
+      store.receiveLive(row, {
         subscriptionId: row.id,
         webhookId: id,
         kind: isOccurrence(envelope) ? 'occurrence' : envelope.type,
@@ -82,7 +82,7 @@ const persist = (engine: Engine, row: Subscription, id: string, body: Uint8Array
         challengeResponse: response ?? null,
         challengeUntil: response === undefined ? null : now + 300_000,
       })
-      store.patch(row.id, {
+      store.patchLive(row, {
         lastReceiptAt: now,
         updatedAt: now,
         ...(isOccurrence(envelope) && envelope.cursor !== undefined ? { cursor: envelope.cursor } : {}),
@@ -120,17 +120,21 @@ const subscribe = (engine: Engine, input: SubscribeConsumer) =>
       return yield* new InvalidInput({ reason: 'event arguments do not match its descriptor' })
     const row = yield* prepareEvents(engine, input.connectionId, input.name, input.arguments)
     const now = yield* Clock.currentTimeMillis
-    yield* Effect.sync(() =>
-      store.bind({
-        consumerId: input.consumerId,
-        revision: input.revision,
-        subscriptionId: row.id,
-        handlerKey: input.handlerKey,
-        state: 'active',
-        createdAt: now,
-        retiredAt: null,
-      }),
+    const bound = yield* Effect.sync(() =>
+      store.bind(
+        {
+          consumerId: input.consumerId,
+          revision: input.revision,
+          subscriptionId: row.id,
+          handlerKey: input.handlerKey,
+          state: 'active',
+          createdAt: now,
+          retiredAt: null,
+        },
+        row,
+      ),
     )
+    if (!bound) return yield* new Conflict({ reason: 'event consumer or lease changed' })
     const active = row.status === 'active' ? row : yield* subscribeEvents(engine, row)
     return { subscriptionId: active.id, status: active.status }
   })
@@ -139,25 +143,17 @@ const subscribe = (engine: Engine, input: SubscribeConsumer) =>
 const retire = (engine: Engine, input: Binding) =>
   Effect.gen(function* () {
     const { store } = engine
-    const binding = store.consumer(input.consumerId, input.revision)
-    if (binding === undefined) return { retired: true, remoteCleanup: true }
-    const row = store.get(binding.subscriptionId)
     const now = yield* Clock.currentTimeMillis
-    store.retire(input.consumerId, input.revision, now)
-    if (row === undefined || store.bindings(binding.subscriptionId).length > 0)
-      return { retired: true, remoteCleanup: true }
+    // Retire before the remote wait. A replacement generation has its own callback URL.
+    const row = yield* attemptSync(() => store.retireForCleanup(input.consumerId, input.revision, now))
+    if (row === undefined) return { retired: true, remoteCleanup: true }
     const remoteCleanup = yield* Effect.andThen(engine.authority, unsubscribeEvents(engine, row)).pipe(
       Effect.as(true),
       // expected: without authority the remote subscription lapses at its finite TTL; cleanup never renews it.
       Effect.catch(() => Effect.succeed(false)),
     )
     const later = yield* Clock.currentTimeMillis
-    store.patch(row.id, {
-      status: 'tombstone',
-      nextRefreshAt: Number.MAX_SAFE_INTEGER,
-      updatedAt: later,
-      lastError: remoteCleanup ? null : 'cleanup_pending',
-    })
+    if (remoteCleanup) store.cleaned(row, later)
     yield* engine.wake(later + 1000)
     return { retired: true, remoteCleanup }
   })
@@ -181,7 +177,7 @@ const acceptPoll = (engine: Engine, row: Subscription, result: EventsPollResult,
       const gap = { type: 'gap' as const, cursor: result.cursor }
       yield* persist(engine, row, `msg_gap_poll_${now}`, new TextEncoder().encode(JSON.stringify(gap)), gap)
     }
-    engine.store.patch(row.id, {
+    engine.store.patchLive(row, {
       cursor: result.cursor,
       status: 'active',
       nextPollAt: now + (result.hasMore ? 1000 : Math.max(1000, Math.min(300_000, result.nextPollMs ?? 300_000))),
@@ -194,7 +190,7 @@ const reconcile = (engine: Engine, initial: Subscription, now: number) =>
   Effect.gen(function* () {
     if (initial.status === 'tombstone' || initial.status === 'terminated') return
     if (!(yield* valid(engine, initial))) {
-      engine.store.patch(initial.id, { status: 'tombstone', lastError: 'grant_or_endpoint_changed' })
+      engine.store.patchLive(initial, { status: 'tombstone', lastError: 'grant_or_endpoint_changed' })
       return
     }
     yield* Effect.gen(function* () {
@@ -206,7 +202,7 @@ const reconcile = (engine: Engine, initial: Subscription, now: number) =>
       // expected: the row records the failure as catching_up and the next sweep, a minute on, tries again.
       Effect.catch(() =>
         Effect.sync(() =>
-          engine.store.patch(initial.id, {
+          engine.store.patchLive(initial, {
             status: 'catching_up',
             lastError: 'reconnect_or_poll_required',
             nextRefreshAt: now + 60_000,

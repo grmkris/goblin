@@ -20,6 +20,7 @@ import { CollectedRuns } from '../telemetry-sink.ts'
 import type { EventEnvelope } from '../../src/mcp/events/protocol.ts'
 import { SqliteSkillState } from '../../src/skills/store.ts'
 import { eventsSkillsProbe, eventsRecoveryProbe } from './events-recovery.ts'
+import { eventsRaceProbe } from './events-races.ts'
 import { servicesOf } from '../mcp/runtime.ts'
 import { type Probes, inAgent } from './probe.ts'
 
@@ -220,11 +221,13 @@ async function eventsProbe(storage: DurableObjectStorage) {
     const result = await exercise(state)
     const skills = await eventsSkillsProbe(state)
     const recovery = await eventsRecoveryProbe(state)
+    const races = await eventsRaceProbe(state)
     return {
       ...result,
       discovered,
       skills,
       recovery,
+      races,
       scheduledRecovery: state.wakes.length > 0,
     }
   } finally {
