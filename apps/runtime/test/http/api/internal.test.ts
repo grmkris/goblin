@@ -7,7 +7,6 @@ import * as HttpServerResponse from 'effect/http/HttpServerResponse'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { describe, expect, it } from 'vitest'
 import { ChatOperations, Chats, Conversations } from '../../../src/chats/service.ts'
-import { Channel } from '../../../src/channel/service.ts'
 import { Files } from '../../../src/files/service.ts'
 import { routeNames } from '../../../src/http/api/context.ts'
 import { InternalGateLive } from '../../../src/http/api/middleware.ts'
@@ -115,7 +114,6 @@ describe('the inbound handlers', () => {
             stub(Chats),
             stub(ChatOperations),
             stub(PiSessions),
-            stub(Channel),
             stub(AgentInput),
             stub(Conversations),
             stub(Notices),

@@ -18,9 +18,9 @@ const NOW = 1_000_000_000
 
 describe('goblin command lines (unit)', () => {
   it('splits a command line into words and flags', () => {
-    expect(parseArgs(['turn', 'telegram-12', '--json', '--since=6h', '--origin', 'http://localhost:18971'])).toEqual({
+    expect(parseArgs(['turn', 'source-12', '--json', '--since=6h', '--origin', 'http://localhost:18971'])).toEqual({
       command: 'turn',
-      positionals: ['telegram-12'],
+      positionals: ['source-12'],
       flags: new Map<string, string | true>([
         ['json', true],
         ['since', '6h'],
@@ -35,7 +35,7 @@ describe('goblin command lines (unit)', () => {
   })
 
   it("reads a tool's arguments against its own schema", () => {
-    expect(argumentsFor(turn, parseArgs(['turn', 'telegram-12']), NOW)).toEqual({ operationId: 'telegram-12' })
+    expect(argumentsFor(turn, parseArgs(['turn', 'source-12']), NOW)).toEqual({ operationId: 'source-12' })
     expect(argumentsFor(turn, parseArgs(['turn', '--operation-id', 'op-1', '--json']), NOW)).toEqual({
       operationId: 'op-1',
     })

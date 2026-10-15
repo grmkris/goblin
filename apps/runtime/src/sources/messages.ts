@@ -163,15 +163,15 @@ const send = (
       ...(held.kept === undefined ? {} : { kept: held.kept }),
     }
     if (target.to === 'listen') return yield* ports.keep(turn)
-    const attributes = { [RunAttribute.channelMessage]: operationId }
+    const attributes = { [RunAttribute.sourceMessage]: operationId }
     const failed = (error: AppError) =>
-      record('channel.received', { operationId, chatId: undefined }, now, {
+      record('source.received', { operationId, chatId: undefined }, now, {
         ...attributes,
         ...failureAttributes(error),
       })
     const persona = target.to === 'persona' ? target.persona : undefined
     const submitted = yield* ports.submit(turn, persona).pipe(Effect.tapError(failed))
-    yield* record('channel.received', { operationId, chatId: submitted.chatId }, now, attributes)
+    yield* record('source.received', { operationId, chatId: submitted.chatId }, now, attributes)
     if (source.setup.reply === undefined) return
     const reply = {
       operationId,

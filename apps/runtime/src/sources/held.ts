@@ -1,6 +1,5 @@
-// Messages held while the place they came from waits for the owner's route, shared by the Telegram channel and
-// Sources: the twenty newest of a place are kept and the rest counted, and once it has a route they are delivered in
-// order, the count of those dropped told before the first.
+// A Source keeps the twenty newest messages while their conversation waits for the owner's route. Once routed,
+// they are delivered in order, with the number of older messages dropped reported before the first.
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import * as Effect from 'effect/Effect'
 

@@ -1,5 +1,5 @@
-// The words of a message as they leave goblin through a server's tool, shared by the Telegram channel and Sources: an
-// operation id a server accepts, and an answer cut into the pieces the server takes.
+// A Source answer leaving goblin through a server's tool: an operation id the server accepts
+// and the answer cut into pieces the server takes.
 
 /** An operation id servers accept: `<prefix>-<id>`, each character but letters, digits, `_` and `-` as `-`, at most 100. */
 export const operationIdOf = (prefix: string, id: string) => `${prefix}-${id.replaceAll(/[^\w-]/gu, '-')}`.slice(0, 100)

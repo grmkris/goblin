@@ -1,10 +1,10 @@
-// The places a route sends the owner's messages to, shared by the Telegram channel and Sources: a Topic that is open
-// and a Persona that is active, and each named in words for a receipt or the agent.
+// The places a Source route sends the owner's messages: an open Topic and an active Persona,
+// each named in words for a receipt or the agent.
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { NotFound } from '../http/errors.ts'
 import { Personas } from '../personas/service.ts'
-import { createTopic, topicNamed } from '../topics/program.ts'
+import { createTopic } from '../topics/program.ts'
 import { Topics } from '../topics/service.ts'
 
 /** `topic` while it is active; `NotFound` otherwise. */
@@ -35,24 +35,6 @@ const topicName = (title: string, fallback: string) => {
   const clean = title.trim().slice(0, 80).trim()
   return clean === '' ? fallback.slice(0, 80) : clean
 }
-
-/**
- * The Topic made for a conversation (a Telegram route's "New topic", a Source's new conversation), named after it, as
- * `actor` asked: the one this operation already made, or an active Topic of that name. A Topic made for the same
- * conversation before and archived since is made again.
- */
-export const topicFor = (title: string, operationId: string, actor: 'owner' | 'agent', fallback: string) =>
-  Effect.gen(function* () {
-    const name = topicName(title, fallback)
-    const made = yield* createTopic({ name, operationId }, { actor }).pipe(
-      Effect.catchTag('Conflict', () => topicNamed(name)),
-    )
-    if (made.archivedAt === undefined) return made.id
-    const again = yield* createTopic({ name, operationId: `${operationId}:${String(made.revision)}` }, { actor }).pipe(
-      Effect.catchTag('Conflict', () => topicNamed(name)),
-    )
-    return again.id
-  })
 
 /**
  * A Topic belonging to this operation alone. A display name never identifies a Source conversation: a collision gets

@@ -174,16 +174,13 @@ export type CreateConversation = typeof CreateConversation.Type
 const AUTHOR_TAG = /^\[from ([^\]\n]{1,80})\]$/u
 
 /**
- * Who wrote a message into a conversation when it was not the owner's own browser (Telegram, an MCP client, a
+ * Who wrote a message into a conversation when it was not the owner's own browser (Source, an MCP client, a
  * subagent): its content starts with a text block holding only this tag. The model reads it as written.
  */
 export const authorTag = (author: string): string => `[from ${author.replaceAll(/[\]\n]/gu, ' ').slice(0, 80)}]`
 
 /** The author named by a leading tag block, if that is what the block is. */
 export const authorOf = (block: string): string | undefined => AUTHOR_TAG.exec(block)?.[1]
-
-/** The author of a message the owner sent from Telegram: their own words, from their phone. */
-export const TELEGRAM_AUTHOR = 'Telegram'
 
 /**
  * Where the owner's own turn that came from elsewhere came from, as its receipt's origin says: `source`, a Source's

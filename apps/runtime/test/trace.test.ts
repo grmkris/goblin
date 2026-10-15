@@ -32,7 +32,7 @@ const event = (overrides: Partial<RunEvent>): RunEvent => ({
   kind: 'model.attempt',
   status: 'started',
   conversationId: '1',
-  operationId: 'telegram-12',
+  operationId: 'source-12',
   startedAt: 10,
   attributes: { [RunAttribute.requestModel]: 'gpt-test' },
   ...overrides,
@@ -45,7 +45,7 @@ describe('run events as trace spans (unit, ADR 0024)', () => {
       'execute_tool mcp_call',
     )
     expect(spanNameOf(event({ kind: 'turn.submitted' }))).toBeUndefined()
-    expect(spanNameOf(event({ kind: 'channel.reply' }))).toBeUndefined()
+    expect(spanNameOf(event({ kind: 'source.reply' }))).toBeUndefined()
   })
 
   it('writes each call as one span when it ends, with its attributes, real timing and status', () => {
@@ -67,7 +67,7 @@ describe('run events as trace spans (unit, ADR 0024)', () => {
           'gen_ai.conversation.id': '1',
           'goblin.error': 'Unclassified failure.',
           'goblin.status': 'error',
-          'goblin.operation': 'telegram-12',
+          'goblin.operation': 'source-12',
           'goblin.started_at': 10,
           'goblin.duration_ms': 1_240,
         },

@@ -112,7 +112,7 @@ export function cutOff(entries: readonly EntryRecord[]): boolean {
 const AskDetails = Schema.Struct({ kind: Schema.Literal('question'), questions: Schema.Array(QuestionSpec) })
 const decodeAsk = Schema.decodeUnknownOption(AskDetails)
 
-/** A single-choice question, as Telegram buttons can ask it. */
+/** A single-choice question, with its options. */
 type Choice = {
   readonly prompt: string
   readonly options: readonly { readonly id: string; readonly label: string }[]

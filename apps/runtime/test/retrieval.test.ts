@@ -304,12 +304,12 @@ describe('retrieval helpers', () => {
     const rows = [1, 2, 3].map((id) => ({
       entryId: id,
       role: 'user',
-      author: id === 2 ? 'Telegram' : null,
+      author: id === 2 ? 'Chat' : null,
       text: `${id} `.repeat(900),
     }))
     const text = excerptOf(rows, new Set([2]))
     expect(text.length).toBeLessThanOrEqual(EXCERPT_CHARS)
-    expect(text).toContain('user (Telegram): 2 2')
+    expect(text).toContain('user (Chat): 2 2')
   })
   it('accepts only an exact, consistent selection of offered ids', () => {
     const allowed = new Set([1, 2, 3])

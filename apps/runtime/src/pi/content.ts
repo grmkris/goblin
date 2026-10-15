@@ -52,7 +52,7 @@ export function ownerContent(
 }
 
 /**
- * A message someone other than the owner's browser wrote into a conversation (Telegram, an MCP client, a subagent):
+ * A message someone other than the owner's browser wrote into a conversation (Source, an MCP client, a subagent):
  * the author's tag in a block of its own, then their words. The model reads both; the web shows the author.
  */
 export function authoredContent(author: string, text: string): TextContent[] {

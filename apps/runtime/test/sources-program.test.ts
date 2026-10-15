@@ -2,7 +2,6 @@ import { describe, expect, it } from '@effect/vitest'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
-import { Channel } from '../src/channel/service.ts'
 import type { EventContext } from '../src/mcp/events/dispatcher.ts'
 import type { Consumer, Receipt, Subscription } from '../src/mcp/events/store.ts'
 import { Events, McpConnections, McpGrants, McpServers, Resident } from '../src/mcp/service.ts'
@@ -95,10 +94,9 @@ const fakeHost = (calls: Calls, versions: ReadonlyMap<string, string>) =>
   )
 
 /**
- * The world a Source is confirmed and kept bound in, over fakes of the MCP host and Events, with Topic 4 open and, when
- * `telegram` names it, the Telegram channel on that connection.
+ * The world a Source is confirmed and kept bound in, over fakes of the MCP host and Events, with Topic 4 open.
  */
-const programWorld = (options: { readonly telegram?: string } = {}) =>
+const programWorld = () =>
   Effect.gen(function* () {
     const world = yield* sourceWorld()
     const calls: Calls = { grants: [], tools: [], subscribed: [], unsubscribed: [], scheduled: [], settled: [] }
@@ -107,12 +105,10 @@ const programWorld = (options: { readonly telegram?: string } = {}) =>
       ['inbox_read', 'v1'],
     ])
     const leases = new Map<string, Subscription['status']>()
-    const channel = options.telegram === undefined ? null : { connectionId: options.telegram, enabledAt: 1 }
     const services = Layer.mergeAll(
       Layer.succeed(Db, world.db),
       stub(AgentInput, { scheduleSources: (seconds) => void calls.scheduled.push(seconds) }),
       stub(Resident, { require: () => Effect.void }),
-      stub(Channel, { status: Effect.succeed(channel === null ? null : { ...channel, transport: 'events' as const }) }),
       fakeHost(calls, versions),
       fakeEvents(calls, leases),
       stub(Topics, { get: () => Effect.succeed(fake<TopicView>({ id: 4, name: 'Travel', revision: 1 })) }),
@@ -182,18 +178,6 @@ describe('proposing and confirming a Source (ADR 0066)', () => {
       ])
       expect(sourceRow(db, proposed.id)?.binding).toBe(calls.subscribed[0]?.revision)
       expect(calls.settled).toEqual(['chat:done'])
-    }),
-  )
-
-  it.effect('refuses to confirm on the connection that carries the Telegram channel', () =>
-    Effect.gen(function* () {
-      const { engine, ports, calls, run } = yield* programWorld({ telegram: 'chat' })
-      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-1' }, { actor: 'owner' }))
-      expect(yield* Effect.flip(run(confirmSource(engine, ports, proposed.id, 1)))).toMatchObject({
-        _tag: 'InvalidInput',
-        reason: 'telegram_on',
-      })
-      expect(calls.subscribed).toEqual([])
     }),
   )
 })

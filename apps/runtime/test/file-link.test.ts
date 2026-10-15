@@ -6,7 +6,6 @@ import * as HttpServer from 'effect/http/HttpServer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import * as TestClock from 'effect/testing/TestClock'
 import { ChatOperations, Chats, Conversations } from '../src/chats/service.ts'
-import { Channel } from '../src/channel/service.ts'
 import type { RuntimeEnv } from '../src/env.ts'
 import { fileLink } from '../src/files/link.ts'
 import { FILE_LINK_SECONDS, fileLinkClaims, fileLinkToken } from '../src/files/link-token.ts'
@@ -146,7 +145,6 @@ const agent = (current = true) => {
         stub(Chats),
         stub(ChatOperations),
         stub(PiSessions),
-        stub(Channel),
         stub(AgentInput),
         stub(Conversations),
         stub(Notices),

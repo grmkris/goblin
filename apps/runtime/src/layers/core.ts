@@ -27,7 +27,6 @@ import { CryptoLive } from '../runtime/crypto.ts'
 import { AgentInput, type AgentInputs } from '../runtime/input.ts'
 import { flowRunEvent } from '../telemetry/events.ts'
 import type { Apps } from '../apps/service.ts'
-import type { Channel } from '../channel/service.ts'
 import type { Cipher } from '../mcp/oauth/cipher.ts'
 import type { CheapModels } from '../memory/model.ts'
 import type { RoutineUsage } from '../routines/service.ts'
@@ -115,7 +114,6 @@ type StartServices =
   | CheapModels
   | Skills
   | RoutineUsage
-  | Channel
   | Apps
 
 /**

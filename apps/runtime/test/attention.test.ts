@@ -114,7 +114,7 @@ describe('attention (A5, ADR 0032)', () => {
       .values([
         { app: 'tracker', kind: 'egress', target: 'api.example', requestedBy: 'r2' },
         { app: 'tracker', kind: 'llm', target: 'cheap', requestedBy: 'r2', approvedAt: 5 },
-        { app: 'tracker', kind: 'notify', target: 'telegram', requestedBy: 'r1' },
+        { app: 'tracker', kind: 'notify', target: 'notify-sink', requestedBy: 'r1' },
         { app: 'other', kind: 'egress', target: 'api.example', requestedBy: 'r2' },
       ])
       .run()

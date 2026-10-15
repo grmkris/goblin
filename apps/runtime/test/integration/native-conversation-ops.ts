@@ -6,7 +6,7 @@ import { drizzle } from 'drizzle-orm/durable-sqlite'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
-import { channelPorts } from '../../src/channel/turns.ts'
+import { submitTurn } from '../../src/sources/turns.ts'
 import { registerPrimary } from '../../src/chats/directory.ts'
 import { FlowEvents } from '../../src/observability/flows.ts'
 import { runApplicationMigrations } from '../../src/storage/migrations.ts'
@@ -77,10 +77,10 @@ async function sendFlowsSequence(agent: AgentFetch) {
 }
 
 /**
- * The owner's Telegram message into main through the channel's submit port, twice under one operation id, over the
+ * The owner's Source message into main through the Source submit path, twice under one operation id, over the
  * probe's own SQLite and Pi, with the flows it records.
  */
-async function telegramFlowsProbe(storage: DurableObjectStorage, harness: PiHarness) {
+async function sourceFlowsProbe(storage: DurableObjectStorage, harness: PiHarness) {
   runApplicationMigrations(storage)
   const db = drizzle(storage)
   registerPrimary(db, 1)
@@ -91,15 +91,21 @@ async function telegramFlowsProbe(storage: DurableObjectStorage, harness: PiHarn
     flows: FlowEvents.layerWith((event) => Effect.sync(() => void recorded.push(event))),
   })
   const twice = Effect.gen(function* () {
-    const ports = yield* channelPorts(() => Effect.void)
+    const origin = {
+      receipt: { kind: 'source', origin: 'source' },
+      flow: { flow: 'source', via: 'mcp' },
+      persona: { via: 'mcp' },
+      note: 'app.source',
+      own: 'source',
+    } as const
     const turn = {
       topic: PERSONAL_TOPIC,
-      operationId: 'telegram-flow',
-      author: 'Telegram',
-      text: 'hello from telegram',
+      operationId: 'source-flow',
+      author: 'Chat',
+      text: 'hello from source',
     }
-    yield* ports.submit(turn)
-    yield* ports.submit(turn)
+    yield* submitTurn(origin, turn, undefined)
+    yield* submitTurn(origin, turn, undefined)
   })
   await Effect.runPromise(Effect.provide(twice, services))
   return { flows: recorded }
@@ -109,7 +115,7 @@ export const probes: Probes = {
   'c4-double': inWorker(({ agent }) => doubleCreateSequence(agent)),
   'start-order': inWorker(({ agent }) => startOrderSequence(agent)),
   'send-flows': inWorker(({ agent }) => sendFlowsSequence(agent)),
-  'telegram-flows': inAgent(({ storage, harness }) => telegramFlowsProbe(storage, harness)),
+  'source-flows': inAgent(({ storage, harness }) => sourceFlowsProbe(storage, harness)),
 }
 
 const Thread = Schema.Struct({ id: Schema.String, kind: Schema.String })
@@ -123,9 +129,9 @@ const StartOrder = Schema.Struct({
   ask: Schema.Struct({ order: Schema.String, personas: Schema.Array(Schema.Struct({ name: Schema.String })) }),
 })
 const SendFlows = Schema.Struct({ flows: Ok(Schema.Struct({ flows: Schema.Array(FlowRecord) })) })
-const TelegramFlows = Schema.Struct({ flows: Schema.Array(Schema.Unknown) })
+const SourceFlows = Schema.Struct({ flows: Schema.Array(Schema.Unknown) })
 
-/** A send and a Telegram message each record one flow row per run: `ok`, then `replayed` for the same operation. */
+/** A send and a Source message each record one flow row per run: `ok`, then `replayed` for the same operation. */
 async function flowRows(base: string): Promise<void> {
   const sent = await probeOf(base, 'send-flows', SendFlows)
   const sends = sent.flows.value.flows.filter(({ flow, operationId }) => flow === 'send' && operationId === 'flow-send')
@@ -136,10 +142,10 @@ async function flowRows(base: string): Promise<void> {
     ]),
   )
   expect(sends).toHaveLength(2)
-  const telegram = await probeOf(base, 'telegram-flows', TelegramFlows)
-  expect(telegram.flows).toEqual([
-    expect.objectContaining({ flow: 'telegram', via: 'telegram', actor: 'owner', chat: PRIMARY_CHAT, status: 'ok' }),
-    expect.objectContaining({ flow: 'telegram', operationId: 'telegram-flow', status: 'replayed' }),
+  const source = await probeOf(base, 'source-flows', SourceFlows)
+  expect(source.flows).toEqual([
+    expect.objectContaining({ flow: 'source', via: 'mcp', actor: 'owner', chat: PRIMARY_CHAT, status: 'ok' }),
+    expect.objectContaining({ flow: 'source', operationId: 'source-flow', status: 'replayed' }),
   ])
 }
 
@@ -165,7 +171,7 @@ export const cases: readonly NativeCase[] = [
     },
   },
   {
-    title: 'a send and a Telegram message each record their flow row, a repeat of either as replayed [canary]',
+    title: 'a send and a Source message each record their flow row, a repeat of either as replayed [canary]',
     run: flowRows,
   },
 ]

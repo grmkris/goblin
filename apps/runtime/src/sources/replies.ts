@@ -1,6 +1,7 @@
 // A Source's answers going back (ADR 0066): once the turn a message made has settled, its answer goes out through the
-// reply tool in pieces of `maxChars`, each with its own operation id (so a retry never sends one twice), to the
-// conversation it came from. A failed send is tried again later; after five tries it is given up with a notice.
+// reply tool in pieces of `maxChars`, each with a stable operation id so the producer can deduplicate retries.
+// Successful MCP acceptance does not prove external delivery or exactly-once effects. A failed send is tried again
+// later; after five tries it is given up with a notice.
 import { type SourceKeyValues, fillTemplate } from '@goblin/contracts'
 import { RunAttribute } from '@goblin/contracts/telemetry'
 import * as Clock from 'effect/Clock'
@@ -81,7 +82,7 @@ const sendReply = (
     const setup = row === undefined ? undefined : setupOf(row)
     if (row === undefined || setup?.reply === undefined || answer === undefined) {
       settleReply(db, reply.operationId, 'given_up', now)
-      yield* record('channel.reply', ref, reply.createdAt * 1000, { [RunAttribute.delivery]: 'given_up' })
+      yield* record('source.reply', ref, reply.createdAt * 1000, { [RunAttribute.delivery]: 'given_up' })
       return yield* delivered({ operationId: reply.operationId, pieces: 0 })
     }
     // A paused Source keeps what it owes until it runs again, or the day is out: it is looked at again in a while.
@@ -102,12 +103,12 @@ const sendReply = (
     )
     yield* sends.pipe(
       Effect.andThen(Effect.sync(() => settleReply(db, reply.operationId, 'sent', now))),
-      Effect.andThen(record('channel.reply', ref, reply.createdAt * 1000, sent)),
+      Effect.andThen(record('source.reply', ref, reply.createdAt * 1000, sent)),
       Effect.andThen(delivered({ operationId: reply.operationId, pieces: pieces.length })),
       // expected: a failed send is recorded and tried again later, and given up with a notice after five tries.
       Effect.catch((error) =>
         Effect.all([
-          record('channel.reply', ref, reply.createdAt * 1000, { ...sent, ...failureAttributes(error) }),
+          record('source.reply', ref, reply.createdAt * 1000, { ...sent, ...failureAttributes(error) }),
           delivered({ operationId: reply.operationId, pieces: pieces.length, errorType: outcomeOf(error) }),
           failedTry(context, reply, row.connectionId, ports, now),
         ]),

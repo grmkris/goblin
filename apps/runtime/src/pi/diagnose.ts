@@ -113,6 +113,6 @@ const diagnoseTool = (run: RunProgram) =>
       run(operationId === undefined ? recentDiagnosis(hours ?? 24, all === true) : turnDiagnosis(operationId)),
   })
 
-/** The resident agent's read-only self-diagnosis, for its main conversation (where Telegram and clients talk). */
+/** The resident agent's read-only self-diagnosis, for its main conversation (where Source and clients talk). */
 export const diagnoseExtension = (run: RunProgram) =>
   defineExtension({ name: 'goblin.diagnose', tools: [diagnoseTool(run)] })

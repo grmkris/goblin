@@ -22,7 +22,7 @@ const TOOLS: Readonly<Record<InspectKind, { readonly title: string; readonly des
   turns: {
     title: 'Recent turns',
     description:
-      'Recent turns, newest first, one line each: where it came from (direct, telegram, routine, subagent), how it ended, model attempts, tool calls, failures and tokens.',
+      'Recent turns, newest first, one line each: where it came from (direct, source, routine, subagent), how it ended, model attempts, tool calls, failures and tokens.',
   },
   turn: {
     title: 'One turn end to end',
@@ -37,7 +37,7 @@ const TOOLS: Readonly<Record<InspectKind, { readonly title: string; readonly des
   flows: {
     title: 'Conversation flows',
     description:
-      'How people and agents moved through conversations, newest first and content-free: sends, replies, thread starts, moves, Personas, Delegates, Topics, routines and Telegram. Each step says which flow, how it came in, who acted, its chat and operation ids, counts, timing and how it ended (ok, replayed, refused, error). Filter by `chat` or `flow`.',
+      'How people and agents moved through conversations, newest first and content-free: sends, replies, thread starts, moves, Personas, Delegates, Topics, routines and Source. Each step says which flow, how it came in, who acted, its chat and operation ids, counts, timing and how it ended (ok, replayed, refused, error). Filter by `chat` or `flow`.',
   },
   details: {
     title: 'Details of one operation',

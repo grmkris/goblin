@@ -48,7 +48,7 @@ async function skillsRestartChecks(base: string): Promise<void> {
   writeFileSync(path, JSON.stringify({ environment: 'local-workerd-do-restart', before, after }, null, 2))
 }
 
-/** MCP Events (signed Telegram delivery, replay, gaps, refresh and cleanup), a Source end to end and the skills cache. */
+/** MCP Events (signed event delivery, replay, gaps, refresh and cleanup), a Source end to end and the skills cache. */
 export const cases: readonly NativeCase[] = [
   matchCase(
     "a Source makes the owner's message a turn in its chat's own Topic, someone else's a notice, and answers once [canary]",
@@ -114,7 +114,7 @@ export const cases: readonly NativeCase[] = [
       }),
   ),
   matchCase(
-    'Events discovery, challenge, signed Telegram, replay, gap, refresh, termination and cleanup [canary]',
+    'Events discovery, challenge, signed event delivery, replay, gap, refresh, termination and cleanup [canary]',
     'events',
     (result) =>
       expect(result).toMatchObject({
@@ -123,16 +123,12 @@ export const cases: readonly NativeCase[] = [
         replayed: 204,
         bad: 400,
         old: 400,
-        operations: ['telegram-tg-123', 'telegram-tg-124'],
-        waiting: true,
-        runs: {
-          channel: [
-            { kind: 'channel.received', status: 'ok', operationId: 'telegram-tg-123', message: 'tg:123' },
-            { kind: 'channel.received', status: 'ok', operationId: 'telegram-tg-124', message: 'tg:124' },
-            { kind: 'channel.reply', status: 'ok', operationId: 'telegram-tg-123', delivery: 'sent' },
-          ],
-          inbox: expect.any(Number),
-        },
+        delivered: [
+          'fixture:message.received:evt_1',
+          'fixture:message.received:evt_2',
+          'second-consumer:evt_1',
+          'second-consumer:evt_2',
+        ],
         refreshedEarly: true,
         terminated: 'terminated',
         cleanup: { retired: true, remoteCleanup: true },

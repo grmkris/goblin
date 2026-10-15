@@ -19,7 +19,6 @@ import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { type DelegateResultData, type HelperExclusion, HelperExclusions } from '@goblin/contracts'
-import { Channel } from '../channel/service.ts'
 import { ChatOperations, Chats, Conversations } from '../chats/service.ts'
 import { attempt } from '../http/errors.ts'
 import { requireResident } from '../mcp/service.ts'
@@ -27,7 +26,6 @@ import { FlowEvents } from '../observability/flows.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { authoredContent } from './content.ts'
 import { BACKGROUND, entryId, conversationId as piConversationId } from './context.ts'
-import { epochSeconds } from '../clock.ts'
 
 /**
  * The task that carries one message to a subagent and its answer back to the spawner. While one is live in a
@@ -387,17 +385,15 @@ export function relayTask(run: RunProgram): Relay {
 const register = (session: string, parent: string, name: string, exclusions: readonly HelperExclusion[]) =>
   Conversations.use((conversations) => conversations.registerSubagent(session, parent, name, exclusions))
 
-/** Main's answer to its own subagent's report goes to Telegram too when the channel is on (channel/channel.ts). */
+/** Records the synthesized answer to a primary conversation's delegated report. */
 const track = (requestId: string, parentOp: string | undefined) =>
   Effect.gen(function* () {
     const chats = yield* Chats
-    const now = yield* epochSeconds
     yield* (yield* ChatOperations).record(chats.primary, requestId, {
       kind: 'subagent_report',
       origin: 'agent',
       ...(parentOp === undefined ? {} : { parentOp }),
     })
-    yield* (yield* Channel).track(requestId, now)
   })
 
 /** A subagent whose job is done closes, with everything under it, unless the owner keeps it open. */

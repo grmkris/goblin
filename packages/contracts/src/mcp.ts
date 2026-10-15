@@ -179,8 +179,6 @@ export const EventHealth = Schema.Struct({
   status: Schema.String,
   refreshBefore: Schema.NullOr(Schema.Number),
   lastReceiptAt: Schema.NullOr(Schema.Number),
-  /** goblin's Telegram channel takes this subscription's events (ADR 0041): a routine on it would only repeat them. */
-  telegram: Schema.optional(Schema.Literal(true)),
 })
 export type EventHealth = typeof EventHealth.Type
 

@@ -50,8 +50,6 @@
       // A hand-run probe of a model provider, not part of the agent.
       "entry": ["test/provider-probe.ts"],
       "project": ["src/**/*.ts!", "test/**/*.ts"],
-      // The Telegram channel is being deleted (cleanup plan); only its tests use `closeOffer`. Drop this with it.
-      "ignoreIssues": { "src/channel/routes.ts": ["exports"] },
     },
     "apps/cli": {
       "project": ["src/**/*.ts!", "test/**/*.ts"],

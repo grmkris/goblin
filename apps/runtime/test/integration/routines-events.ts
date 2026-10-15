@@ -56,7 +56,7 @@ async function setup(storage: DurableObjectStorage, agent: PersonalAgent, fixtur
   }
 }
 
-/** Official MCP producer, signed ingress, real Agent/Pi/SQLite and keyless model; no provider or Telegram send. */
+/** Official MCP producer, signed ingress, real Agent/Pi/SQLite and keyless model; no provider or Source send. */
 /** The owner's edit that puts an event routine back in draft, with other instructions. */
 const changedDraft = (original: RoutineDefinition, revision: number): RoutineEdit => ({
   revision,

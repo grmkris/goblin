@@ -62,7 +62,6 @@ export const nodes: readonly Node[] = [
         importers: [
           'src/agent.ts',
           'src/agent-apps/ports.ts',
-          'src/channel/wake.ts',
           'src/organize/kit.ts',
           'src/pi/apps.ts',
           'src/pi/budget.ts',
@@ -82,7 +81,6 @@ export const nodes: readonly Node[] = [
           'src/pi/sources.ts',
           'src/pi/subagent-relay.ts',
           'src/pi/subagents.ts',
-          'src/pi/telegram.ts',
           'src/pi/thread.ts',
           'src/routines/kit.ts',
           'src/routines/wake.ts',

@@ -1,5 +1,5 @@
-// Undo of a route's organizing receipt (ADR 0033), shared by the Telegram channel and Sources: the receipt's `before`
-// put back, only while nothing touched the route since the change it records.
+// Undo of a Source route's organizing receipt (ADR 0033): restore its previous state only while nothing
+// has touched the route since the recorded change.
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { Conflict, InvalidInput } from '../http/errors.ts'

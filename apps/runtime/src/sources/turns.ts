@@ -1,6 +1,5 @@
-// The owner's messages from outside goblin as turns, shared by the Telegram channel and Sources: a message becomes a
-// turn in its Topic's Conversation (answered by goblin or a Persona) or a passive note there, through the one
-// admission sequence, and how each turn ended is read back for the answer that goes out again.
+// A Source message becomes a turn in its Topic's Conversation, answered by goblin or a Persona, or a passive note.
+// Turns use the one admission sequence; their settlement is read back for the answer sent to the Source.
 import type { TextContent } from '@earendil-works/pi-ai'
 import { type OwnTurnVia, PersonaAnswerData } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'

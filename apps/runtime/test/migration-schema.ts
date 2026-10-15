@@ -8,7 +8,7 @@ export async function declaredTables() {
   const directory = new URL('../src/storage/', import.meta.url)
   const tables = new Map<string, ReturnType<typeof getTableConfig>>()
   for (const file of readdirSync(fileURLToPath(directory))) {
-    if (!file.endsWith('.ts') || file === 'migrations.ts' || file === 'vendor.ts' || file === 'telegram.ts') continue
+    if (!file.endsWith('.ts') || file === 'migrations.ts' || file === 'vendor.ts') continue
     const module: Record<string, unknown> = await import(new URL(file, directory).href)
     for (const value of Object.values(module)) {
       if (!is(value, SQLiteTable)) continue

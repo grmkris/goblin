@@ -1,5 +1,5 @@
-// Answers owed to the places the owner's messages came from, shared by the Telegram channel and Sources: each waits for
-// its turn to end, a day at most, then goes out; and the run ledger's line for each message in and each answer out.
+// Answers owed to Source conversations: each waits for its turn to end, a day at most, then goes out.
+// The run ledger records each message in and each answer out.
 import { RunAttribute, type RunAttributes } from '@goblin/contracts/telemetry'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import * as Clock from 'effect/Clock'
@@ -57,12 +57,12 @@ export type LedgerInput = {
 
 /**
  * One message in, one answer out, in the run ledger (ADR 0024), by the turn's operation id and the chat it ran in,
- * attributed to `channel` (`telegram`, `source`). Ids and counts only, never content.
+ * attributed to the Source path. Ids and counts only, never content.
  */
 export const turnLedger =
-  ({ db, telemetry }: LedgerInput, channel: string) =>
+  ({ db, telemetry }: LedgerInput) =>
   (
-    kind: 'channel.received' | 'channel.reply',
+    kind: 'source.received' | 'source.reply',
     turn: { readonly operationId: string; readonly chatId: string | undefined },
     startedAt: number,
     extra: RunAttributes,
@@ -71,14 +71,14 @@ export const turnLedger =
       Effect.sync(() => {
         const chat = turn.chatId ?? primaryChat
         telemetry?.record({
-          id: `${kind === 'channel.received' ? 'channel' : 'reply'}:${turn.operationId}`,
+          id: `${kind === 'source.received' ? 'source' : 'reply'}:${turn.operationId}`,
           kind,
           status: RunAttribute.errorType in extra ? 'error' : 'ok',
           conversationId: operationSession(db, chat, turn.operationId) ?? chatSession(db, chat),
           operationId: turn.operationId,
           startedAt,
           endedAt,
-          attributes: { [RunAttribute.channel]: channel, ...extra },
+          attributes: { [RunAttribute.source]: 'source', ...extra },
         })
       }),
     )

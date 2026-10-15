@@ -45,7 +45,7 @@ const valueForFlag = (args: Args, name: string, schema: unknown, now: number): u
 
 /**
  * The tool's arguments from the command line, read against its own input schema: required properties in order take
- * the positional words (`goblin turn telegram-12`) and every property takes its flag (`--operation-id`, `--since 6h`).
+ * the positional words (`goblin turn source-12`) and every property takes its flag (`--operation-id`, `--since 6h`).
  * Unknown flags and missing required values are usage errors.
  */
 export function argumentsFor(tool: ToolInfo, args: Args, now: number): Record<string, unknown> {

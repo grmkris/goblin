@@ -1,6 +1,6 @@
 import type { AssistantMessage, Message } from '@earendil-works/pi-ai'
 import type { EntryRecord } from '@earendil-works/pi-durable'
-import { authorTag, TELEGRAM_AUTHOR } from '@goblin/contracts'
+import { authorTag } from '@goblin/contracts'
 import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import { describe, expect, it } from 'vitest'
 import { inspectEntry, summarize } from '../src/inspect/inspector.ts'
@@ -39,7 +39,7 @@ describe('inspectEntry', () => {
       entry('pi.user', {
         role: 'user',
         content: [
-          { type: 'text', text: authorTag(TELEGRAM_AUTHOR) },
+          { type: 'text', text: authorTag('Chat') },
           { type: 'text', text: 'what is on today?' },
         ],
         timestamp: 500,
@@ -49,7 +49,7 @@ describe('inspectEntry', () => {
       id: 7,
       kind: 'pi.user',
       role: 'user',
-      author: TELEGRAM_AUTHOR,
+      author: 'Chat',
       text: 'what is on today?',
       at: 500,
     })
@@ -136,7 +136,7 @@ const event = (
 describe('summarize', () => {
   it('counts attempts, calls and failures, and sums tokens', () => {
     const turn = event('turn.submitted', 'error', {
-      [RunAttribute.source]: 'telegram',
+      [RunAttribute.source]: 'source',
       [RunAttribute.reason]: 'model_error',
     })
     const summary = summarize(turn, [
@@ -150,7 +150,7 @@ describe('summarize', () => {
     expect(summary).toEqual({
       operationId: 'op-1',
       conversationId: '1',
-      source: 'telegram',
+      source: 'source',
       status: 'error',
       reason: 'model_error',
       startedAt: 10,

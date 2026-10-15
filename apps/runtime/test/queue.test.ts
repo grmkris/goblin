@@ -56,7 +56,7 @@ describe('queued content from real Pi (in memory, keyless fixture)', () => {
       )
       const second = await root.submit({ type: 'input', content, requestId: 'second' }, BACKGROUND)
       const third = await root.submit({ type: 'input', content, requestId: 'third' }, BACKGROUND)
-      const authored = authoredContent('Telegram', 'from phone')
+      const authored = authoredContent('Chat', 'from phone')
       const fourth = await root.submit({ type: 'input', content: authored, requestId: 'fourth' }, BACKGROUND)
       await root.submit({ type: 'write', entry: { kind: 'fixture.note' }, requestId: 'passive' }, BACKGROUND)
       const before = await queuedInputs(pi, String(root.id))

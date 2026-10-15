@@ -22,12 +22,12 @@ export const loaded = (row: SourceRow): Effect.Effect<Loaded, AppError> =>
 
 /**
  * The Sources' engine over the agent's database: reading messages, routing them and sending the answers owed. Reads,
- * pulls and route changes take one permit (`Semaphore(1)`, as the Telegram channel's do; order between Sources does
+ * pulls and route changes take one permit (`Semaphore(1)`; order between Sources does
  * not matter), so a message is never held after its conversation's held messages were delivered.
  */
 export const sourceEngine = (input: EngineInput) =>
   Effect.map(Semaphore.make(1), (serial) => {
-    const context: EngineContext = { db: input.db, record: turnLedger(input, 'source'), wake: input.wake }
+    const context: EngineContext = { db: input.db, record: turnLedger(input), wake: input.wake }
     return {
       takeEvent: (source: Loaded, event: { readonly eventId: string; readonly data: unknown }, ports: SourcePorts) =>
         serial.withPermit(takeEvent(context, source, event, ports)).pipe(Effect.withSpan('Sources.takeEvent')),

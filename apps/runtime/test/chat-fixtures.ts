@@ -21,7 +21,7 @@ import { PiSessions } from '../src/pi/sessions.ts'
 import { Db } from '../src/runtime/db.ts'
 import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
 
-/** A probe's own instances, which the Telegram ports' programs read (channel/turns.ts). */
+/** A probe's own instances, which the Source ports' programs read (sources/turns.ts). */
 type PortInstances = {
   readonly db: Db['Service']
   readonly harness: PiHarness
@@ -38,7 +38,7 @@ const PROBE_MODEL = {
 }
 
 /**
- * The services the Telegram ports' programs read, over a probe's own instances: the chat directory and admission over
+ * The services the Source ports' programs read, over a probe's own instances: the chat directory and admission over
  * its database (each chat's lock in `KeyedLock`), the budget and model picker as the agent builds them over it
  * (`ModelBudgetLive`, with the probe's model settings), and Pi as its sessions. Flows go to `flows`, else nowhere.
  */

@@ -4,7 +4,6 @@ import type * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
-import { Channel } from '../channel/service.ts'
 import { Forbidden, GrantDenied, attempt, attemptSync } from '../http/errors.ts'
 import { type HeldCall, McpApprovalStore, argumentsHash } from '../mcp/approvals/approvals.ts'
 import { Cipher, CredentialCipher } from '../mcp/oauth/cipher.ts'
@@ -39,13 +38,13 @@ import { type HeldUrlRequest, McpUrlRequestStore } from '../mcp/url-requests/url
 import type { SingleFlight } from '../observability/single-flight.ts'
 import { Changes } from '../runtime/changes.ts'
 import { Db } from '../runtime/db.ts'
-import { AgentInput, type AgentInputs } from '../runtime/input.ts'
+import { AgentInput } from '../runtime/input.ts'
 import { SqliteSkillState } from '../skills/store.ts'
 import { Skills } from '../skills/service.ts'
 import { mcpReporter } from '../telemetry/report.ts'
 
 // The MCP layers, both steps of the agent's start in its order (layers/index.ts): the MCP host (step 2) and Events
-// with their consumers (11). Every store is made once, here, and every MCP service once over them.
+// with their consumers (10). Every store is made once, here, and every MCP service once over them.
 
 /**
  * Current resident authority: what Events check before a subscription, a sweep, a dispatch or a delivery, and what
@@ -223,16 +222,9 @@ export const McpHostLive: Layer.Layer<
 )
 
 /**
- * What the Telegram and skills consumers reach, read when an event arrives: the channel and skills services of the
- * start (steps 9 and 10, before Events), and the agent's Telegram pull, scheduled at once.
+ * What the skills consumer reaches when an event arrives, built before Events in start step 9.
  */
-const consumerPorts = (
-  { schedulePull }: AgentInputs,
-  context: Context.Context<Channel | Skills>,
-): EventConsumerPorts => ({
-  channel: Channel.use((channel) => channel.status).pipe(Effect.provideContext(context)),
-  pull: Effect.asVoid(attempt(schedulePull)),
-  chatsChanged: Channel.use((channel) => channel.chatsChanged).pipe(Effect.provideContext(context)),
+const consumerPorts = (context: Context.Context<Skills>): EventConsumerPorts => ({
   skills: {
     enabled: (connectionId) =>
       Skills.use((skills) => skills.enabled(connectionId)).pipe(Effect.provideContext(context)),
@@ -242,19 +234,19 @@ const consumerPorts = (
 })
 
 /**
- * Start step 11: the one Events engine over the host's connections and its event store, with the Telegram and skills
- * consumers registered before any delivery can reach it (the routine trigger is registered by `RoutinesLive`, before
+ * Start step 10: the one Events engine over the host's connections and its event store, with the skills
+ * consumer registered before any delivery can reach it (the routine trigger is registered by `RoutinesLive`, before
  * the agent runs anything).
  */
 export const McpEventsLive: Layer.Layer<
   Events,
   never,
-  AgentInput | Db | Resident | SingleFlight | McpConnections | McpServers | Cipher | Channel | Skills
+  AgentInput | Db | Resident | SingleFlight | McpConnections | McpServers | Cipher | Skills
 > = Layer.effect(
   Events,
   Effect.gen(function* () {
     const input = yield* AgentInput
-    const context = yield* Effect.context<AgentInput | Resident | Channel | Skills>()
+    const context = yield* Effect.context<AgentInput | Resident | Skills>()
     const { env, userId } = input
     const servers = yield* McpServers
     const store = new SqliteEventStore(yield* Db)
@@ -290,7 +282,7 @@ export const McpEventsLive: Layer.Layer<
           if (!store.allows(connectionId, name, argumentsJson)) return yield* new GrantDenied({ connectionId, name })
         }),
     })
-    yield* installEventConsumers(events, consumerPorts(input, context))
+    yield* installEventConsumers(events, consumerPorts(context))
     return events
   }),
 )

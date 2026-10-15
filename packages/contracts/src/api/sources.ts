@@ -23,8 +23,7 @@ const params = { id: SourceId }
  * - `list`: `GET /api/sources`, every Source with the conversations waiting for a route. A Source is proposed only by
  *   the agent's `source_propose` (ADR 0068); the owner confirms or refuses its exact revision here.
  * - `confirm`, `refuse`: `POST /api/sources/:id/confirm|refuse` with the exact revision; confirming grants its event and
- *   tools, subscribes and binds it to the connection's endpoint and those grants. A stale revision is a conflict; the
- *   connection carrying Telegram is refused (`telegram_on`) until the channel is turned off.
+ *   tools, subscribes and binds it to the connection's endpoint and those grants. A stale revision is a conflict.
  * - `routes`: `GET /api/sources/:id/routes`, every conversation it has seen and where it goes.
  * - `route`: `PUT /api/sources/:id/routes` sets where one conversation goes and delivers what it held, with an
  *   organizing receipt the owner can undo.

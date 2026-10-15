@@ -11,7 +11,7 @@ import { DelegationLive, HelperExecutionLive } from './delegation.ts'
 import { ActivateMemoriesLive, CheapModelsLive, KnowledgeLive } from './knowledge.ts'
 import { McpEventsLive, McpHostLive } from './mcp.ts'
 import { OnboardingLive } from './onboarding.ts'
-import { ChannelLive, RoutineRunsLive, RoutinesLive } from './routines.ts'
+import { RoutineRunsLive, RoutinesLive } from './routines.ts'
 import { LearnerLive, SkillsLive } from './skills.ts'
 import { SourcesLive } from './sources.ts'
 import { WorkspaceLive } from '../workspace/live.ts'
@@ -39,8 +39,7 @@ const then =
  * 8. Memories. Awaits every Topic Conversation without memory being given it (a fresh agent's Personal, registered
  *    at 6, or a Topic whose activation a crash cut short).
  * 9. Skills, over the host's connections.
- * 10. The Telegram channel.
- * 11. Events. Awaits the hook token, then registers the Telegram and skills consumers (9, 10) before any delivery
+ * 10. Events. Awaits the hook token, then registers the skills consumer (9) before any delivery
  *     can reach the engine.
  */
 const start = (input: AgentInputs) =>
@@ -53,8 +52,7 @@ const start = (input: AgentInputs) =>
     then(AppRegistryLive), // 7
     then(ActivateMemoriesLive), // 8
     then(SkillsLive), // 9
-    then(ChannelLive), // 10
-    then(McpEventsLive), // 11
+    then(McpEventsLive), // 10
   )
 
 /**

@@ -18,7 +18,6 @@ import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import * as Random from 'effect/Random'
 import * as Schema from 'effect/Schema'
-import { Channel } from '../channel/service.ts'
 import { epochSeconds } from '../clock.ts'
 import { Conflict, InvalidInput, NotFound, attemptSync } from '../http/errors.ts'
 import type { EventContext } from '../mcp/events/dispatcher.ts'
@@ -236,14 +235,11 @@ export const proposeSource = Effect.fn('sources.propose')(function* (
 
 /**
  * Binds `row` as it is now: its event and tools granted, its event subscribed under a new binding (the one before it
- * ended), a tool read started at the end of what is there, and the endpoint and grants it is bound to kept. Refused
- * as `telegram_on` while the connection carries the Telegram channel.
+ * ended), a tool read started at the end of what is there, and the endpoint and grants it is bound to kept.
  */
 const bind = (engine: SourceEngine, ports: SourcePorts, row: SourceRow) =>
   Effect.gen(function* () {
     yield* requireResident
-    if ((yield* (yield* Channel).status)?.connectionId === row.connectionId)
-      return yield* new InvalidInput({ reason: 'telegram_on' })
     const source = yield* loaded(row)
     const { setup } = source
     yield* checkedSetup(row.connectionId, setup)

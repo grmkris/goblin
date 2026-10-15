@@ -13,12 +13,11 @@ import {
   hasSkill,
   hasTool,
   holds,
-  isTelegramSend,
   NOTHING,
 } from '@goblin/contracts'
 import { and, eq, inArray } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
-import { appHelperExclusions, appExecutionExclusions, appConversations, appTelegramChannel } from '../storage/schema.ts'
+import { appHelperExclusions, appExecutionExclusions, appConversations } from '../storage/schema.ts'
 import { appRoutineRuns, appRoutines } from '../storage/routines.ts'
 import { appPersonaChats } from '../storage/personas.ts'
 import { appTopics } from '../storage/topics.ts'
@@ -225,15 +224,12 @@ const routineScope = (db: Db, scope: SetupScope, runId: string): SetupScope => {
   if (run === undefined) return CLOSED
   const definition = definitionOf(run)
   const allowedTools = handOverOf(definition)?.allowedTools ?? []
-  const channel = db.select().from(appTelegramChannel).get()
   return {
     editable: false,
     ...(scope.topic === undefined ? {} : { topic: scope.topic }),
     server: (id) => scope.server(id) && allowedTools.some((tool) => tool.connectionId === id),
     tool: (id, name) =>
-      scope.tool(id, name) &&
-      (definition.tellMe.copy || channel?.connectionId !== id || !isTelegramSend(name)) &&
-      allowedTools.some((tool) => tool.connectionId === id && tool.name === name),
+      scope.tool(id, name) && allowedTools.some((tool) => tool.connectionId === id && tool.name === name),
     skills: () => false,
     skill: () => false,
     subagents: () => false,
