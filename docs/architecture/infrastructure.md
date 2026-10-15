@@ -6,6 +6,18 @@
 bucket, the `FLOWS` Analytics Engine dataset (`goblin-<stage>-flows`, ADR 0037), the `LOADER` Worker Loader
 (Dynamic Workers, open beta, Workers Paid) and, on dev only, Workers AI as `AI` for typed decisions (ADR 0031; without
 it decisions judge nothing); it is goblin's deployment entrypoint.
+
+What a deployment does comes from its configuration, never from its stage's name
+([ADR 0064](../adr/0064-openid-connect-and-config-driven-deployment.md)); the runtime reads `STAGE` only as a label
+(mail subjects, robots, telemetry tags). Alchemy refuses a deploy only when it has no way in: neither
+`GOBLIN_MAIL_SENDER` (the `MAIL` binding) nor a whole OpenID Connect provider (`GOBLIN_OIDC_ISSUER`,
+`GOBLIN_OIDC_CLIENT_ID` and the secret `GOBLIN_OIDC_CLIENT_SECRET`; half of one is refused too). The model endpoint is
+optional (`GOBLIN_MODEL_*`), and so are three bindings, each on unless its switch says `off`: `GOBLIN_LARGE_FILES`
+(the `FILES` bucket; without it files up to 128 KiB stay in the agent's SQLite and a larger one is refused as too
+large), `GOBLIN_AGENT_APPS` (the `LOADER`; without it the agent has no app or `code_run` tools, an app view or job
+that needs an isolate is refused, and the rail has no Apps) and `GOBLIN_FLOWS` (the dataset; without it no flow point
+is written and `goblin stats` has nothing to read). None is needed for the agent to start, and `/health` lists what
+the deployment has (`features`). goblin's own stages keep every binding.
 `scripts/stage.ts` builds `packages/app`'s toolchain before Alchemy runs. The local stage runs in workerd with CLIProxy; the dev stage calls Railway LiteLLM with a
 dedicated model-limited, budget-capped key. Offered models and the optional daily token cap per account come from stage
 configuration. The key's provider caps and shared quotas are managed outside this repository; source does not prove

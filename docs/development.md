@@ -38,8 +38,11 @@ mkdir -p .local && cp .env.example .local/local.env && chmod 600 .local/local.en
 bun dev                 # Alchemy runs the Worker in local workerd on http://localhost:18971
 ```
 
-Model calls go through CLIProxy and inherit `CLIPROXY_API_KEY` from the interactive shell. The local stage supplies
-its own auth secret and credential key and opens sign-up; set them in `.local/local.env` only to override.
+Model calls go through CLIProxy and inherit `CLIPROXY_API_KEY` from the interactive shell (without it the local stack
+has no model endpoint of its own, and each account brings one in Settings). The local stage supplies its own auth
+secret, credential key, mail sender and CLIProxy model settings and opens sign-up; set them in `.local/local.env` only
+to override. To try sign-in through an OpenID Connect provider, set `GOBLIN_OIDC_ISSUER`, `GOBLIN_OIDC_CLIENT_ID` and
+`GOBLIN_OIDC_CLIENT_SECRET` there, with `http://localhost:18971/api/auth/callback/oidc` allowed at the provider.
 
 Open the app and use **Create an account**, enter an email and the six-digit code captured under
 `apps/web/.alchemy/local/email/`. Each account gets its own agent. Smoke uses the session from
@@ -96,10 +99,12 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_STAGE`, `GOBLIN_APP_URL` | `dev` and the Worker's HTTPS origin. |
 | `GOBLIN_DOMAIN`, `GOBLIN_ZONE_ID` | Custom hostname and its Cloudflare zone ID. |
 | `GOBLIN_SIGNUP_MODE`, `GOBLIN_SIGNUP_INVITE_CODE` | `open`, `invite` or `closed` (default), and the invite code. |
-| `GOBLIN_MAIL_SENDER` | Required OTP sender on a Cloudflare Email Sending domain. |
+| `GOBLIN_MAIL_SENDER` | The sign-in code sender, on a Cloudflare Email Sending domain. A deployment needs it, an OpenID Connect provider, or both (ADR 0064). |
+| `GOBLIN_OIDC_ISSUER`, `GOBLIN_OIDC_CLIENT_ID`, `GOBLIN_OIDC_CLIENT_SECRET` | Optional, all three or none: sign-in through an OpenID Connect provider (discovery from the issuer, PKCE, `openid email profile`). The provider must allow the redirect URI `<GOBLIN_APP_URL>/api/auth/callback/oidc`. The secret is bound as a secret. |
+| `GOBLIN_OIDC_LABEL` | The provider button's words, such as `Sign in with mysi`; unset, "Sign in with" the issuer's host. |
 | `GOBLIN_OWNER_EMAIL`, `GOBLIN_SMOKE_SESSION_FILE` | Existing owner email and mode-600 OTP session JSON; only smoke reads them. |
 | `GOBLIN_BETTER_AUTH_SECRET` | Better Auth's secret. |
-| `GOBLIN_MODEL_BASE_URL`, `GOBLIN_MODEL_ID`, `GOBLIN_MODEL_KEY` | Railway LiteLLM and the dedicated capped key. Never the master key. |
+| `GOBLIN_MODEL_BASE_URL`, `GOBLIN_MODEL_ID`, `GOBLIN_MODEL_KEY` | Optional, all three or none: the deployment's own model endpoint (dev and prod: Railway LiteLLM and the dedicated capped key, never the master key). Without them each owner brings their own in Settings, and until they do every model call is refused with `NoModelEndpoint` (ADR 0064). |
 | `GOBLIN_MODELS` | More LiteLLM model names users may pick, comma-separated; `GOBLIN_MODEL_ID` stays the default. Allow each on the LiteLLM key too. |
 | `GOBLIN_DAILY_TOKEN_CAP` | The most model tokens one account may use in a UTC day, a positive whole number; unset or anything else, no cap (ADR 0058). Once a capped day is spent, model calls are refused until 00:00 UTC. |
 | `GOBLIN_MEMORY_MODEL` | The offered model for thread names, Topic Conversation memory summaries and skill-draft decisions. It is not selected by price; unset or not offered uses the default. |
@@ -107,6 +112,7 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_MCP_SERVERS` | JSON list of outbound servers every account starts with (`[]` for none): `[{"connectionId":"notes","endpoint":"https://mcp.example.com/mcp","label":"Notes"}]`. Each owner still signs in, and grants start empty; nothing in code depends on which servers they are (ADR 0063). |
 | `GOBLIN_MCP_SHELF` | Optional JSON list of shelf entries (`id`, `title`, `description`, `endpoint`, `group`, `signIn`): one with the id of goblin's own entry replaces it, the others are added after (ADR 0061). Unset, the shelf is goblin's. |
 | `GOBLIN_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP credentials and Events secrets/envelopes; derives purpose-separated hook tokens. |
+| `GOBLIN_LARGE_FILES`, `GOBLIN_AGENT_APPS`, `GOBLIN_FLOWS` | Optional bindings, each on unless `off` (ADR 0064): the `FILES` bucket (without it files up to 128 KiB stay in the agent and larger ones are refused), the `LOADER` for agent apps and `code_run` (without it the agent has no app tools and the rail no Apps), the `FLOWS` dataset (without it no flow metrics). Dev and prod keep all three. |
 
 These are source defaults and configuration names; active dev settings and provider caps must be verified separately.
 
@@ -248,6 +254,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   `goblin:inspect`, whose commands come from the server's tools.
 
   ```sh
+  export GOBLIN_ORIGIN=https://dev.goblin.surf   # which goblin: required, there is no default
   bun run goblin login                  # once: prints the sign-in URL; approve in a browser
   bun run goblin problems --since 6h
   bun run goblin problems --all --since 6h # expected waits and recovered model attempts too
@@ -268,7 +275,8 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   are sanitized too. Successful background model calls, including bounded memory completions ending in `length`,
   are excluded from both problem views; actual background failures remain. These changes need no schema migration.
 
-  `--origin` (or `GOBLIN_ORIGIN`) picks the stage, default `https://dev.goblin.surf`. Credentials live in
+  `--origin` (or `GOBLIN_ORIGIN`) names the deployment and is required: there is no default (ADR 0064); goblin's own
+  daily instance is `https://dev.goblin.surf`, the local stack `http://localhost:18971`. Credentials live in
   `~/.config/goblin/credentials.json` (mode 600). The sign-in redirects to `http://127.0.0.1:18979/callback`; when the
   browser is on another machine, paste the URL it lands on into the prompt. `goblin logs`, `goblin lookup` and
   `goblin stats` read Cloudflare with your own `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` and the stage
@@ -330,8 +338,9 @@ Unit tests, local workerd and the deployed dev stage are separate kinds of evide
 `.local/prod.env` is mode 600, with fresh auth and credential secrets. Fill its model key with a dedicated Railway
 LiteLLM virtual key; never the master key. Set `GOBLIN_DOMAIN=goblin.surf` and
 `GOBLIN_APP_URL=https://goblin.surf`; dev uses `dev.goblin.surf` for both. Set `GOBLIN_MAIL_SENDER=hello@goblin.surf`
-only after Cloudflare Email Sending verifies the sender. Every stage requires OTP mail; dev must stay closed or
-invite-only. These settings do not authorize a production deploy.
+only after Cloudflare Email Sending verifies the sender. A deploy needs mail, an OpenID Connect provider or both
+(ADR 0064); goblin's own dev and prod use mail, and dev must stay closed or invite-only. These settings do not
+authorize a production deploy.
 
 `GOBLIN_CONFIRM_PROD=1 bun run plan:prod` previews, and the same explicit guard protects `deploy:prod` and
 `smoke:prod`; a `deploy:prod` outside CI is also break-glass (`GOBLIN_BREAK_GLASS=1`). The default prod smoke is read-only: health and an anonymous protected-route probe. An operator smoke

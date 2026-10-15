@@ -40,8 +40,9 @@ its channel. Owners can add public servers by URL, from MCP registries, or from 
 publish with, and servers that need no sign-in grouped by what they are for: travel, knowledge, crypto data, views in the
 chat, code), grant tools explicitly (every server alike: no code favours one, ADR 0063), mark individual tools
 **Ask first** for approval of every exact call, bring their own
-OpenAI-compatible model endpoint and key or use the deployment's, choose among its models, and see the day's token
-usage against the deployment's optional per-account cap. The agent uses
+OpenAI-compatible model endpoint and key or use the deployment's (a deployment may have none, and then each owner
+brings one), choose among its models, and see the day's token usage against the deployment's optional per-account cap.
+The agent uses
 `ask_user` to ask questions the owner answers in their next message. The owner attaches files to a message with the
 composer's paperclip; the agent reads them and writes its own results beside them, kept per agent in SQLite and R2.
 
@@ -107,8 +108,12 @@ A visitor who is signed out meets goblin's landing page at `/`; a signed-in owne
 goes straight to their chat. The deployment stages are `dev` at `dev.goblin.surf` and `prod` at `goblin.surf`, with separate auth databases,
 secrets and dedicated LiteLLM keys. The first production release is invite-only; owner OTP bootstrap is an explicit operator step. Alchemy can attach the custom domains. CI on GitHub-hosted runners deploys every push to `dev` that passes Check to dev; `bun run promote <sha>` fast-forwards `prod` to an accepted dev SHA, and CI then deploys and verifies production.
 Alternate hosts redirect to the configured canonical origin. Dev sign-up stays closed or invite-only; prod
-supports open sign-up after sender verification. Email OTP is the sole login method, and every stage requires mail. Both stages use `hello@goblin.surf` after sender onboarding,
-with a host prefix on dev mail subjects. See [development](docs/development.md) for the production guard and smoke.
+supports open sign-up after sender verification. People sign in by emailed code, through the deployment's OpenID
+Connect provider, or both ([ADR 0064](docs/adr/0064-openid-connect-and-config-driven-deployment.md)); a deployment
+needs at least one, and `/health` lists what it offers. Both stages send codes from `hello@goblin.surf` after sender
+onboarding, with a host prefix on dev mail subjects. Everything a deployment differs by is configuration, never its
+stage's name: its origin, mail, provider, model endpoint and the optional bindings (large files, agent apps, flow
+metrics). See [development](docs/development.md) for the settings, the production guard and smoke.
 
 goblin has no plans and takes no payments ([ADR 0058](docs/adr/0058-no-plans-tokens-and-an-optional-cap.md)): the
 sign-up mode decides who gets an account, and every account reaches its own agent and everything in it. Each account's

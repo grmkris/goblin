@@ -2,19 +2,46 @@
 
 ## Accounts
 
-Email OTP is the sole login method. A six-digit code expires after 600 seconds, permits five attempts and is stored
-hashed in Better Auth's verification table. Sending is limited to one code per address per minute and ten sends per
-IP per hour; sign-in permits twenty attempts per IP per five minutes. D1 holds rate limits because auth is created
-per request. `GOBLIN_SIGNUP_MODE=open` admits new addresses; `invite` requires `GOBLIN_SIGNUP_INVITE_CODE` in the
-`x-invite-code` header on both send and verify; `closed` permits only existing accounts. A successful OTP creates an
-email-verified account or signs its owner in. Password, reset, verification-link and passkey endpoints are unavailable.
-The sign-up mode is the only access control: every signed-in account reaches its own agent and everything in it
-([ADR 0058](../adr/0058-no-plans-tokens-and-an-optional-cap.md)).
+There are two ways in ([ADR 0064](../adr/0064-openid-connect-and-config-driven-deployment.md)): an emailed code when
+the deployment can send mail, and the deployment's OpenID Connect provider when one is configured. `/health` lists the
+ones it offers (`signIn`), and the sign-in page shows the provider's button first, then the email form. A deployment
+needs at least one: Alchemy refuses a deploy with neither. Password, reset, verification-link and passkey endpoints
+are unavailable.
 
-Every stage requires a mail sender. Deployed mail uses Cloudflare Email Sending from `hello@goblin.surf`; local
-workerd captures `.eml` files through Alchemy's simulator. Better Auth 1.7.6 swallows mail callback errors, so a
-request-scoped delivery flag and after hook erase an undelivered code and return 503. No account or session is created
-by sending a code. The browser's OAuth provider client carries the authorization query through OTP login to consent.
+**Emailed codes.** A six-digit code expires after 600 seconds, permits five attempts and is stored hashed in Better
+Auth's verification table. Sending is limited to one code per address per minute and ten sends per IP per hour;
+sign-in permits twenty attempts per IP per five minutes. D1 holds rate limits because auth is created per request. A
+successful code creates an email-verified account or signs its owner in. Mail uses Cloudflare Email Sending
+(`GOBLIN_MAIL_SENDER`; goblin's own stages send from `hello@goblin.surf`); local workerd captures `.eml` files through
+Alchemy's simulator. Better Auth 1.7.6 swallows mail callback errors, so a request-scoped delivery flag and after hook
+erase an undelivered code and return 503. No account or session is created by sending a code.
+
+**The deployment's provider** (`auth/oidc.ts`). `GOBLIN_OIDC_ISSUER`, `GOBLIN_OIDC_CLIENT_ID` and
+`GOBLIN_OIDC_CLIENT_SECRET` (a secret binding) together turn on Better Auth's `genericOAuth` plugin with one provider,
+`oidc`, labelled `GOBLIN_OIDC_LABEL` ("Sign in with mysi"; unset, "Sign in with" the issuer's host). It discovers the
+provider at `<issuer>/.well-known/openid-configuration` and needs its signing keys there (every ID token is verified
+and bound to the sign-in's nonce), sends PKCE, and asks for `openid email profile`. A generic provider is one of Better
+Auth's social providers, so it uses the core routes `/api/auth/sign-in/social` and `/api/auth/callback/oidc`, the
+redirect URI the provider must allow; nothing it adds sits under the MCP provider's `/oauth2/*`. Building it reads the
+discovery document, so `handleAuth` builds it only for those two routes (`AuthNeeds.provider`); everything else,
+`getSession` included, builds Better Auth without it. The sign-in may not bring its own ID token or scopes, and
+twenty start per IP per five minutes. goblin keeps none of the provider's tokens (an account row is written without
+them and never refreshed), signing out leaves the provider's session alone, and linking or unlinking a provider by
+hand and the token endpoints answer 404.
+
+**Sign-up.** `GOBLIN_SIGNUP_MODE=open` admits new accounts; `invite` requires `GOBLIN_SIGNUP_INVITE_CODE` in the
+`x-invite-code` header (on a code's send and verify, or when a provider's sign-in starts); `closed` permits only
+existing accounts. For a provider's sign-in the Worker decides when it starts, over whatever the browser asked, and
+Better Auth keeps the answer in the sign-in's stored state (`disableImplicitSignUp` with `requestSignUp`); a refused one
+comes back to `/login?error=signup_disabled`. A provider's account is created only for an email the provider says is
+verified (`validateUserInfo`, else `email_not_verified`), and it joins an existing account with the same email only when
+the provider says the email is verified and the account's own is verified too (else `account_not_linked`); no provider
+is trusted past that. So whoever signs in by code and by the provider with the same verified email reaches one
+account. The sign-up mode is the only access control: every signed-in account reaches its own agent and everything in
+it ([ADR 0058](../adr/0058-no-plans-tokens-and-an-optional-cap.md)).
+
+The browser's OAuth provider client carries an MCP client's authorization query through either sign-in to consent: a
+provider's sign-in keeps it in the sign-in's state and the callback goes on to the authorization.
 
 The agent a request reaches derives from the session's user ID or the inbound token's subject. The Telegram hook
 verifies a token bound to its user ID before selecting an agent. Deleting an account requires a sign-in from the last
@@ -40,7 +67,8 @@ from the first paint, and the script follows the same animation clock for the pr
 question, which the visitor may give or which gives itself after about six seconds in view; under reduced motion it
 starts at the question. Claude Code's command names the page's own origin. The Source link waits behind a constant
 until the public repository is public. The head carries Open Graph and Twitter tags with `public/og.png`
-(`bun run icons`) and the canonical `https://goblin.surf/`, and the web Worker serves `/robots.txt` by stage:
+(`bun run icons`) and the canonical URL, both on the deployment's own origin (`lib/origin.ts`: `APP_URL`, which the
+canonical redirect makes every page request's origin, ADR 0064), and the web Worker serves `/robots.txt` by stage:
 production allows everything but `/api/` and `/mcp`, other stages nothing. `Meet your goblin` opens `/login?new=1`,
 `Authentication` in create mode where sign-up is open or by invite.
 

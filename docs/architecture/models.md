@@ -7,9 +7,10 @@ judges bounded state and questions through `AI` after the rules decide what they
 its calls check the daily cap and count their tokens like the cheap model's.
 
 Model calls go to one OpenAI-compatible endpoint ([ADR 0059](../adr/0059-bring-your-own-model-endpoint.md)): the
-owner's own, set in Settings, else the deployment's. The deployment's is `GOBLIN_MODEL_BASE_URL` with
-`GOBLIN_MODEL_KEY`, offering `GOBLIN_MODEL_ID` (the default) plus `GOBLIN_MODELS`. The owner's is one row in
-`app_model_endpoint` (`inference/store.ts`): its base URL, its key sealed by the credential cipher with the agent's id
+owner's own, set in Settings, else the deployment's when it has one. The deployment's is `GOBLIN_MODEL_BASE_URL` with
+`GOBLIN_MODEL_KEY`, offering `GOBLIN_MODEL_ID` (the default) plus `GOBLIN_MODELS`; all three or none (`models.ts`
+`deploymentEndpoint`, [ADR 0064](../adr/0064-openid-connect-and-config-driven-deployment.md)). The owner's is one row
+in `app_model_endpoint` (`inference/store.ts`): its base URL, its key sealed by the credential cipher with the agent's id
 as additional data, and the models it listed when it was set (`inference/endpoint.ts` checks the URL as an added
 server's, then reads `GET <base>/models` with the key). `Inference` (`inference/service.ts`, built in
 `layers/budget.ts`) resolves the endpoint in use and keeps it in memory until the owner changes it; the owner API
@@ -21,6 +22,15 @@ made: `Inference.served` gives the endpoint, its key and a model it serves (the 
 it, else its first), so turns, threads, subagents, Personas, routine runs, the memory model and an app's `llm` power
 all follow the owner's endpoint, and a model id a conversation stored before a switch still answers. A call whose
 endpoint cannot be read ends as a failed response.
+
+**No endpoint at all.** A deployment without its own endpoint offers one placeholder model, `default`
+(`ENDPOINT_DEFAULT`), which the owner's endpoint answers with its own default once they set one. Until then the
+endpoint in use is `none`: `Inference.served` and `Budget.require` refuse with `NoModelEndpoint` (409, "This deployment
+has no model endpoint. Bring your own model key in Settings."), so a send, a Telegram message, a routine firing
+(recorded skipped), housekeeping and an app's `llm` power are refused before any call, and a call already under way
+ends with those words (`inference/service.ts` `servedFailure`), which the chat shows as the notice to bring a key. The
+model view's `source` is `none`, the picker offers nothing (`ModelChoice` without `current`), Start's model step and
+Settings' card ask for the owner's endpoint, and no cap applies.
 
 Each user picks the model their agent answers with, in the composer, among the models of the endpoint in use;
 `models.ts` names and groups known ids by route (Google, Alibaba Cloud), because quota runs out per route, and offers
@@ -41,8 +51,9 @@ and Telegram adds the same line. glm-5.3 on the Token Plan thinks until the limi
 budget (probed 2026-10-12), which is why the picker says so.
 
 Housekeeping (thread titles, main's summaries and skill-draft decisions) runs on `GOBLIN_MEMORY_MODEL`. Set it to a
-cheap offered model; the code does not choose by price. Unset or not offered, it falls back to the default
-(`models.ts`, `memory/model.ts`). Its tokens count toward the owner's daily usage like any other.
+cheap offered model; the code does not choose by price. Unset or not offered, it falls back to the default, and
+without deployment models to the default of the owner's endpoint (`models.ts` `memoryModelId`, `memory/model.ts`). Its
+tokens count toward the owner's daily usage like any other.
 
 ## Daily token usage
 
@@ -53,8 +64,8 @@ is unknown counts its whole 65,536-token context) and routine runs (`routines/us
 the same way. Compaction summaries in main and threads are not counted yet.
 
 Users of a deployment share its model key, so the deployment may cap each account's day with `GOBLIN_DAILY_TOKEN_CAP`
-(the Worker's `DAILY_TOKEN_CAP`, a positive whole number); unset, or while the owner uses their own endpoint, nothing
-is refused. Once a capped day is spent, new
+(the Worker's `DAILY_TOKEN_CAP`, a positive whole number); unset, while the owner uses their own endpoint, or without
+a deployment endpoint, nothing is refused for tokens. Once a capped day is spent, new
 turns are refused with `BudgetExhausted` until 00:00 UTC: HTTP 429 from the owner API, or a tool error from `/mcp`.
 Telegram submissions, routine runs and housekeeping check the same cap. Tool calls inside a running turn are blocked,
 so a looping turn ends after one more reply. Pi reports and swallows exceptions thrown by hooks, so the in-turn lever

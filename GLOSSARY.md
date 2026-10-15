@@ -110,7 +110,8 @@ verbatim. `zoom` opens a line.
 
 **Model endpoint**:
 Where the agent's model calls go: the owner's own OpenAI-compatible endpoint and key, set in Settings and sealed in the
-agent, else the deployment's (ADR 0059). The models it lists are the ones the owner picks from.
+agent, else the deployment's (ADR 0059). The models it lists are the ones the owner picks from. A deployment may have
+none of its own (ADR 0064); then every model call is refused (`NoModelEndpoint`) until the owner brings theirs.
 _Avoid_: provider, inference plan
 
 **Memory model**:
@@ -311,9 +312,19 @@ native Agents SDK adapter.
 
 ## Access and deployment
 
+**Sign-in method**:
+A way into an account (ADR 0064): an emailed code, or the deployment's identity provider (OpenID Connect, its button
+labelled by the deployment). `/health` lists the ones a deployment offers; it needs at least one.
+_Avoid_: login provider, SSO
+
+**Identity provider**:
+The deployment's OpenID Connect provider (`GOBLIN_OIDC_*`), such as mysi or a company's IdP: one more way to sign in,
+under the same sign-up mode. goblin keeps none of its tokens. Not to be confused with goblin's own OAuth provider, which
+signs in MCP clients to `/mcp`.
+
 **Sign-up mode**:
-`open`, `invite` (an invite code is required) or `closed`: who gets an account. Every account reaches its own agent and
-everything in it (ADR 0058).
+`open`, `invite` (an invite code is required) or `closed`: who gets an account, by either sign-in method. Every account
+reaches its own agent and everything in it (ADR 0058).
 
 **Daily usage**:
 The model tokens an account's agent spent in the current UTC day, input, output and cached alike (ADR 0058).
@@ -326,6 +337,12 @@ _Avoid_: allowance
 
 **Stage**:
 One deployment: `local`, `dev`, `prod` or a disposable `test_*` environment, each with its own resources and secrets.
+At runtime the stage is a label only (mail subjects, robots, telemetry tags); what a deployment does comes from its
+configuration (ADR 0064).
+
+**Optional feature**:
+A part a deployment may go without, each a binding of its own: large files (an R2 bucket), agent apps (Dynamic
+Workers), flow metrics (Analytics Engine) and typed decisions (Workers AI). `/health` lists which it has (`features`).
 
 **CLIProxy / LiteLLM**:
 The model gateways: CLIProxy for local work on the build box, Railway LiteLLM for deployed stages, each with its own

@@ -10,7 +10,8 @@ release's `describe()` in the release's isolate, checks the manifest (`agent-app
 runs `state.migrate`. Only then does the release become active, as one transaction (`agent-apps/store.ts`); a failed
 build is kept with its problems and changes nothing that runs. Every app release, the transpiler and `code_run` run
 through `agent-apps/isolates.ts` over the `LOADER` binding: no network, no bindings, a CPU limit, at most eight calls
-at once, and wall timeouts.
+at once, and wall timeouts. A deployment without it (`GOBLIN_AGENT_APPS=off`, ADR 0064) gives the agent no app or
+`code_run` tools, refuses any isolate (`Forbidden`, `agent_apps_unavailable`) and drops Apps from the rail.
 
 A call (`agent-apps/dispatch.ts`) checks its input against the member's schema; an action's `prepare` runs once
 with a read-only state snapshot and the app's powers (its own files in Shell's namespace `app_<name>`, a log line),
@@ -56,7 +57,8 @@ Inline agent app views have a borderless host surface and a quiet toolbar for pa
 owns its canvas styling. External MCP Apps retain their framed host surface.
 
 Beyond its state and files, an app reaches only the powers it declares and the owner approves (ADR 0021):
-`ctx.fetch` to exact `egress` hosts (`agent-apps/egress.ts`: https on 443, never goblin's own domain, redirects checked
+`ctx.fetch` to exact `egress` hosts (`agent-apps/egress.ts`: https on 443, never the deployment's own host or anything
+under it, so a deployment on a shared platform domain leaves its neighbours reachable; redirects checked
 again, no cookies, bounded), and through the agent (`agent-apps/ports.ts`, lent by `agent.ts` with the engine, each call entering it
 through the bridge's `run`) the owner's MCP
 tools under their exact grants, the cheap model within the owner's budget, Telegram through their channel, and other
