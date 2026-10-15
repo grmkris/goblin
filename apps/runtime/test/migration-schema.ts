@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 export async function declaredTables() {
   const directory = new URL('../src/storage/', import.meta.url)
   const tables = new Map<string, ReturnType<typeof getTableConfig>>()
-  for (const file of readdirSync(fileURLToPath(directory))) {
+  for (const file of readdirSync(fileURLToPath(directory.href))) {
     if (!file.endsWith('.ts') || file === 'migrations.ts' || file === 'vendor.ts') continue
     const module: Record<string, unknown> = await import(new URL(file, directory).href)
     for (const value of Object.values(module)) {
