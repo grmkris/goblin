@@ -109,7 +109,7 @@ export class Routines extends Context.Service<
 
 /**
  * Each routine run's application metadata: its admission, its Pi session, its questions to the owner, its usage, its
- * report and its Telegram notification. Pi owns the run itself; no transaction here spans an await.
+ * report and its notification. Pi owns the run itself; no transaction here spans an await.
  */
 export class RoutineRuns extends Context.Service<
   RoutineRuns,

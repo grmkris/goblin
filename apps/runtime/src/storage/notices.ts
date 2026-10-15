@@ -2,8 +2,9 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 /**
  * Every notification a routine posted (ADR 0041): its notices, and the answers it was told to notify. It indexes the
- * entry in the routine's home chat for Activity, keeps the owner's read mark, and is the outbox of its Telegram copy.
- * The text is the producer's, frozen as it was posted.
+ * entry in the routine's home chat for Activity, keeps the owner's read mark, and is the outbox of its copy through
+ * Notify me via (ADR 0070). The text is the producer's, frozen as it was posted. The copy's columns keep their first
+ * names (`telegram_*`) until the migrations are squashed.
  */
 export const appNotices = sqliteTable(
   'app_notices',
@@ -23,15 +24,15 @@ export const appNotices = sqliteTable(
     readAt: integer('read_at'),
     /** When its entry was written into the chat; a notice claimed but not yet written is written by the sweep. */
     writtenAt: integer('written_at'),
-    telegramState: text('telegram_state', { enum: ['none', 'pending', 'accepted', 'suppressed', 'failed'] })
+    copyState: text('telegram_state', { enum: ['none', 'pending', 'accepted', 'suppressed', 'failed'] })
       .notNull()
       .default('none'),
-    telegramText: text('telegram_text'),
-    telegramAttempts: integer('telegram_attempts').notNull().default(0),
-    telegramNextAt: integer('telegram_next_at').notNull().default(0),
-    telegramReceipt: text('telegram_receipt'),
-    /** The Telegram connection its first attempt went through; a channel changed since suppresses it. */
-    telegramConnectionId: text('telegram_connection_id'),
+    copyText: text('telegram_text'),
+    copyAttempts: integer('telegram_attempts').notNull().default(0),
+    copyNextAt: integer('telegram_next_at').notNull().default(0),
+    copyReceipt: text('telegram_receipt'),
+    /** The revision of Notify me via its first attempt went through; a sink changed or cleared since suppresses it. */
+    copySink: text('telegram_connection_id'),
     createdAt: integer('created_at').notNull(),
   },
   (table) => [index('app_notices_at').on(table.at), index('app_notices_routine').on(table.routineId, table.at)],

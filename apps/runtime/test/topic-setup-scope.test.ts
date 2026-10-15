@@ -31,7 +31,7 @@ const DEFINITION = JSON.stringify({
   title: 'Daily',
   trigger: { kind: 'cron', expression: '0 9 * * *' },
   timezone: 'UTC',
-  tellMe: { on: false, telegram: false },
+  tellMe: { on: false, copy: false },
   handTo: {
     kind: 'goblin',
     instruction: 'Report.',

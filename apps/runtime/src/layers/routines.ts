@@ -70,9 +70,9 @@ export const noticesOf = (store: NoticeStore) =>
     digestsDue: trySync('Notices.digestsDue', store.digestsDue.bind(store)),
     unwritten: sync('Notices.unwritten', store.unwritten.bind(store)),
     prune: trySync('Notices.prune', store.prune.bind(store)),
-    telegramDue: sync('Notices.telegramDue', store.telegramDue.bind(store)),
-    claimTelegram: sync('Notices.claimTelegram', store.claimTelegram.bind(store)),
-    telegramDone: sync('Notices.telegramDone', store.telegramDone.bind(store)),
+    copiesDue: sync('Notices.copiesDue', store.copiesDue.bind(store)),
+    claimCopy: sync('Notices.claimCopy', store.claimCopy.bind(store)),
+    copyDone: sync('Notices.copyDone', store.copyDone.bind(store)),
     views: Effect.flatMap(Clock.currentTimeMillis, (now) =>
       Effect.sync(() => store.recent(now - KEPT_NOTICES, 100).map(notificationOf)),
     ),

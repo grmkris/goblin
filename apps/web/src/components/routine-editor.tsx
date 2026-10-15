@@ -45,7 +45,7 @@ const defaults = (timezone: string): RoutineDefinition => ({
   title: '',
   timezone,
   trigger: { kind: 'once', at: '' },
-  tellMe: { on: true, telegram: false },
+  tellMe: { on: true, copy: false },
   handTo: { kind: 'none' },
 })
 
@@ -80,7 +80,7 @@ function useHand(initial: RoutineDefinition, startTopic: number) {
   const { handTo } = initial
   const [topic, setTopic] = useState(startTopic)
   const [tellMe, setTellMe] = useState(initial.tellMe.on)
-  const [telegram, setTelegram] = useState(initial.tellMe.telegram)
+  const [copy, setCopy] = useState(initial.tellMe.copy)
   const [hand, setHand] = useState<HandKind>(handTo.kind)
   const [persona, setPersona] = useState(handTo.kind === 'persona' ? handTo.persona : undefined)
   const handOver = handOverOf(initial) ?? GOBLIN
@@ -94,8 +94,8 @@ function useHand(initial: RoutineDefinition, startTopic: number) {
     setTopic,
     tellMe,
     setTellMe,
-    telegram,
-    setTelegram,
+    copy,
+    setCopy,
     hand,
     setHand,
     persona,
@@ -163,7 +163,7 @@ function useRoutineEditor({ timezone, routine, draft, topic, onSaved }: EditorPr
       title: field('title'),
       timezone: field('timezone'),
       trigger,
-      tellMe: { on: hand.tellMe, telegram: hand.tellMe && hand.telegram },
+      tellMe: { on: hand.tellMe, copy: hand.tellMe && hand.copy },
       handTo,
     }
     saving.mutate(

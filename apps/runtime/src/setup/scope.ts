@@ -232,7 +232,7 @@ const routineScope = (db: Db, scope: SetupScope, runId: string): SetupScope => {
     server: (id) => scope.server(id) && allowedTools.some((tool) => tool.connectionId === id),
     tool: (id, name) =>
       scope.tool(id, name) &&
-      (definition.tellMe.telegram || channel?.connectionId !== id || !isTelegramSend(name)) &&
+      (definition.tellMe.copy || channel?.connectionId !== id || !isTelegramSend(name)) &&
       allowedTools.some((tool) => tool.connectionId === id && tool.name === name),
     skills: () => false,
     skill: () => false,

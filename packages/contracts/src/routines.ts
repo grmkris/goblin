@@ -49,9 +49,12 @@ export type RoutineHandTo = typeof RoutineHandTo.Type
 /** A hand-over: the routine gives its work to someone, with an instruction, tools and limits. */
 export type RoutineHandOver = Exclude<RoutineHandTo, { readonly kind: 'none' }>
 
-/** Whether the owner is told of what the routine posts (ADR 0041), and on Telegram too; Telegram needs Tell me. */
-export const RoutineTellMe = Schema.Struct({ on: Schema.Boolean, telegram: Schema.Boolean }).check(
-  Schema.makeFilter((tellMe) => !tellMe.telegram || tellMe.on || 'Telegram needs Tell me on.'),
+/**
+ * Whether the owner is told of what the routine posts (ADR 0041), and whether each notification is also sent through
+ * Notify me via (`copy`, ADR 0070); a copy needs Tell me.
+ */
+export const RoutineTellMe = Schema.Struct({ on: Schema.Boolean, copy: Schema.Boolean }).check(
+  Schema.makeFilter((tellMe) => !tellMe.copy || tellMe.on || 'A copy needs Tell me on.'),
 )
 export type RoutineTellMe = typeof RoutineTellMe.Type
 

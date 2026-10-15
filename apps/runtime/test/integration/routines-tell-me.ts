@@ -30,7 +30,7 @@ const told = (connectionId: string): RoutineDefinition => ({
   title: `Messages for ${connectionId}`,
   timezone: 'UTC',
   trigger: { kind: 'event', connectionId, name: 'message.received', arguments: {} },
-  tellMe: { on: true, telegram: false },
+  tellMe: { on: true, copy: false },
   handTo: { kind: 'none' },
 })
 

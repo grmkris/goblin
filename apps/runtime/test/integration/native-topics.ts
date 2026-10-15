@@ -74,7 +74,7 @@ async function topicRoutineSequence(agent: ProbeStub) {
     title: 'Errand check',
     timezone: 'UTC',
     trigger: { kind: 'once', at: new Date(Date.now() + 3_600_000).toISOString() },
-    tellMe: { on: false, telegram: false },
+    tellMe: { on: false, copy: false },
     handTo: {
       kind: 'goblin',
       instruction: 'Return a short reminder.',

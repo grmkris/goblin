@@ -1,6 +1,7 @@
 // What a routine does when it fires (ADR 0041), as its editor asks it: where it lives and posts, whether it tells the
-// owner (and on Telegram), and whom it hands the work to — nobody, Goblin, or a Persona — with the instruction, the
-// tools and the limits a hand-over carries.
+// owner (and sends each notification on through Notify me via, ADR 0070), and whom it hands the work to — nobody,
+// Goblin, or a Persona — with the instruction, the tools and the limits a hand-over carries.
+import { useQuery } from '@tanstack/react-query'
 import type { PersonaView, RoutineHandOver, TopicView } from '@goblin/contracts'
 import {
   Field,
@@ -15,6 +16,7 @@ import {
   TabsTrigger,
   Textarea,
 } from '@goblin/ui'
+import { notifySinkQuery } from '../notify/queries.ts'
 import { EditorPart } from './editor-part.tsx'
 
 type Tool = { readonly connectionId: string; readonly name: string }
@@ -31,8 +33,8 @@ export type HandKit = {
   readonly setTopic: (topic: number) => void
   readonly tellMe: boolean
   readonly setTellMe: (on: boolean) => void
-  readonly telegram: boolean
-  readonly setTelegram: (on: boolean) => void
+  readonly copy: boolean
+  readonly setCopy: (on: boolean) => void
   readonly hand: HandKind
   readonly setHand: (hand: HandKind) => void
   readonly personas: readonly PersonaView[]
@@ -92,9 +94,43 @@ export function SwitchRow({
   )
 }
 
-/** Tell me: every post of the routine is a notification in Activity, and on Telegram too if the owner wants. */
+/**
+ * "Also send to <where>": each notification sent on through Notify me via too (ADR 0070), named by its connection's
+ * label; off, with a hint, while the owner has set none (a copy already asked for can still be turned off). Also the
+ * event picker's Advanced.
+ */
+export function CopyRow({
+  id,
+  told,
+  checked,
+  onChange,
+}: {
+  readonly id: string
+  readonly told: boolean
+  readonly checked: boolean
+  readonly onChange: (on: boolean) => void
+}) {
+  const sink = useQuery(notifySinkQuery).data
+  const label = sink?.label
+  return (
+    <SwitchRow
+      id={`${id}-copy`}
+      name={label === undefined ? 'Also send elsewhere' : `Also send to ${label}`}
+      about={
+        label === undefined
+          ? 'Set Notify me via in Settings to send each notification on.'
+          : 'Each notification, through Notify me via in Settings.'
+      }
+      checked={told && checked}
+      disabled={!told || (label === undefined && !checked)}
+      onChange={onChange}
+    />
+  )
+}
+
+/** Tell me: every post of the routine is a notification in Activity, and sent on through Notify me via if wanted. */
 export function TellMeFields({ kit }: { readonly kit: HandKit }) {
-  const { id, tellMe, setTellMe, telegram, setTelegram } = kit
+  const { id, tellMe, setTellMe, copy, setCopy } = kit
   return (
     <EditorPart title="Tell me">
       <ul className="grant-list">
@@ -105,17 +141,10 @@ export function TellMeFields({ kit }: { readonly kit: HandKit }) {
           checked={tellMe}
           onChange={(on) => {
             setTellMe(on)
-            if (!on) setTelegram(false)
+            if (!on) setCopy(false)
           }}
         />
-        <SwitchRow
-          id={`${id}-telegram`}
-          name="On Telegram too"
-          about="Through the connection you use for Telegram, if you have one."
-          checked={telegram}
-          disabled={!tellMe}
-          onChange={setTelegram}
-        />
+        <CopyRow id={id} told={tellMe} checked={copy} onChange={setCopy} />
       </ul>
     </EditorPart>
   )

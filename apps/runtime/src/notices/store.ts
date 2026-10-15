@@ -5,21 +5,14 @@ import { appNotices, appNoticeWindows } from '../storage/notices.ts'
 
 /** A notice as the store keeps it. */
 export type NoticeRow = typeof appNotices.$inferSelect
-/** A notice to claim: everything but the state the store keeps for it. */
+/** A notice to claim: everything but the state the store keeps for it, and the words of its copy when it has one. */
 export type NewNotice = Omit<
   NoticeRow,
-  | 'readAt'
-  | 'writtenAt'
-  | 'telegramState'
-  | 'telegramText'
-  | 'telegramAttempts'
-  | 'telegramNextAt'
-  | 'telegramReceipt'
-  | 'telegramConnectionId'
-> & { readonly telegramText?: string }
+  'readAt' | 'writtenAt' | 'copyState' | 'copyText' | 'copyAttempts' | 'copyNextAt' | 'copyReceipt' | 'copySink'
+> & { readonly copyText?: string }
 
-/** How a Telegram copy's attempt ended. */
-export type TelegramOutcome = {
+/** How an attempt at a notice's copy through Notify me via ended (ADR 0070). */
+export type CopyOutcome = {
   readonly state: 'pending' | 'accepted' | 'suppressed' | 'failed'
   readonly receipt: string | null
   readonly nextAt: number
@@ -27,8 +20,8 @@ export type TelegramOutcome = {
 }
 
 /**
- * How many notices a routine posts in its chat (and to Telegram) in an hour; the rest are kept in Activity only and
- * one digest line counts them (ADR 0041).
+ * How many notices a routine posts in its chat (and copies through Notify me via) in an hour; the rest are kept in
+ * Activity only and one digest line counts them (ADR 0041).
  */
 export const NOTICE_CAP = 20
 export const NOTICE_WINDOW = 3_600_000
@@ -69,7 +62,7 @@ export class NoticeStore {
   /**
    * Keeps `notice` once: a notice already claimed (a replayed delivery) is not kept or counted again. A `capped` one
    * (an event's) is counted into its routine's hour and posted while the hour has room; past it, it is folded: kept for
-   * Activity as written already (no chat entry) and without a Telegram copy, and counted into the hour's digest. A new
+   * Activity as written already (no chat entry) and without a copy, and counted into the hour's digest. A new
    * hour reports the digest the last one owes. Reminders, answers and digests are not counted.
    */
   claim(notice: NewNotice, capped: boolean): Claim {
@@ -79,7 +72,7 @@ export class NoticeStore {
       const keep = () =>
         tx
           .insert(appNotices)
-          .values({ ...notice, telegramState: notice.telegramText === undefined ? 'none' : 'pending' })
+          .values({ ...notice, copyState: notice.copyText === undefined ? 'none' : 'pending' })
           .run()
       if (!capped) {
         keep()
@@ -110,7 +103,7 @@ export class NoticeStore {
         return { posted: true }
       }
       tx.insert(appNotices)
-        .values({ ...notice, telegramState: 'none', writtenAt: notice.createdAt })
+        .values({ ...notice, copyState: 'none', writtenAt: notice.createdAt })
         .run()
       return { posted: false, folded: true }
     })
@@ -164,30 +157,31 @@ export class NoticeStore {
       .run()
   }
 
-  /** Written notices whose Telegram copy is due: pending, and not waiting for a retry. */
-  telegramDue(at: number): readonly NoticeRow[] {
+  /** Written notices whose copy is due: pending, and not waiting for a retry. */
+  copiesDue(at: number): readonly NoticeRow[] {
     return this.#db
       .select()
       .from(appNotices)
-      .where(
-        and(eq(appNotices.telegramState, 'pending'), lte(appNotices.telegramNextAt, at), gte(appNotices.writtenAt, 0)),
-      )
+      .where(and(eq(appNotices.copyState, 'pending'), lte(appNotices.copyNextAt, at), gte(appNotices.writtenAt, 0)))
       .limit(50)
       .all()
   }
 
-  /** Claims attempt `attempts + 1` of a Telegram copy through `connectionId`; false when another attempt holds it. */
-  claimTelegram(id: string, attempts: number, connectionId: string | null, at: number): boolean {
+  /**
+   * Claims attempt `attempts + 1` of a copy through the sink at revision `sink` (null: there is none); false when
+   * another attempt holds it.
+   */
+  claimCopy(id: string, attempts: number, sink: string | null, at: number): boolean {
     return (
       this.#db
         .update(appNotices)
-        .set({ telegramConnectionId: connectionId, telegramAttempts: attempts + 1, telegramNextAt: at + 30_000 })
+        .set({ copySink: sink, copyAttempts: attempts + 1, copyNextAt: at + 30_000 })
         .where(
           and(
             eq(appNotices.id, id),
-            eq(appNotices.telegramState, 'pending'),
-            eq(appNotices.telegramAttempts, attempts),
-            lte(appNotices.telegramNextAt, at),
+            eq(appNotices.copyState, 'pending'),
+            eq(appNotices.copyAttempts, attempts),
+            lte(appNotices.copyNextAt, at),
           ),
         )
         .returning({ id: appNotices.id })
@@ -196,11 +190,11 @@ export class NoticeStore {
   }
 
   /** Records how attempt `outcome.attempt` ended. */
-  telegramDone(id: string, outcome: TelegramOutcome): void {
+  copyDone(id: string, outcome: CopyOutcome): void {
     this.#db
       .update(appNotices)
-      .set({ telegramState: outcome.state, telegramReceipt: outcome.receipt, telegramNextAt: outcome.nextAt })
-      .where(and(eq(appNotices.id, id), eq(appNotices.telegramAttempts, outcome.attempt)))
+      .set({ copyState: outcome.state, copyReceipt: outcome.receipt, copyNextAt: outcome.nextAt })
+      .where(and(eq(appNotices.id, id), eq(appNotices.copyAttempts, outcome.attempt)))
       .run()
   }
 

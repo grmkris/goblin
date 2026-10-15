@@ -138,16 +138,16 @@ export const routineCases = (phase: Phase): readonly NativeCase[] => [
       }),
   ),
   matchCase(
-    "a notice's Telegram copy: frozen channel and bytes, retried once, its remote receipt kept apart (ADR 0041)",
+    "a notice's copy through Notify me via: frozen sink and bytes, retried once, its remote receipt kept apart (ADR 0070)",
     'routine-notifications',
     (result) =>
       expect(result).toMatchObject({
         offCalls: 0,
-        frozenServer: 'mygram',
+        frozenSink: true,
         retryState: 'pending',
         attempts: 2,
         stableBytes: true,
-        escaped: 'Sidequest: Picked &lt;safe&gt;',
+        sent: { chat: 'dm', text: 'Sidequest: Picked <safe>' },
         accepted: 1,
         state: 'accepted',
         metadata: { id: 'fixture-remote-id', delivery: 'accepted' },

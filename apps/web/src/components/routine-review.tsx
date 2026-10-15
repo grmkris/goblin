@@ -63,7 +63,7 @@ function useStreamOf(definition: RoutineDefinition) {
 
 /** Whether a routine tells the owner, in words (ADR 0041). */
 const tellMeOf = (tellMe: RoutineDefinition['tellMe']): string =>
-  !tellMe.on ? 'Off' : tellMe.telegram ? 'In Activity, and on Telegram' : 'In Activity'
+  !tellMe.on ? 'Off' : tellMe.copy ? 'In Activity, and through Notify me via' : 'In Activity'
 
 /** Who a routine hands its work to, in words: Goblin, or the Persona by name at the pinned revision. */
 function useHandedTo(definition: RoutineDefinition): string | undefined {

@@ -2,13 +2,13 @@ import { type NoticeData, type RoutineDefinition, handOverOf } from '@goblin/con
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
-import { Channel } from '../channel/service.ts'
 import { Conversations } from '../chats/service.ts'
 import { Changes } from '../runtime/changes.ts'
 import { McpServers } from '../mcp/service.ts'
 import { Notices } from '../notices/service.ts'
 import { type DigestDue, KEPT_NOTICES, NOTICE_WINDOW, type NewNotice, type NoticeRow } from '../notices/store.ts'
 import { type NoticeText, noticeForModel, noticeOfEvent } from '../notices/text.ts'
+import { notifySink } from '../sources/notify.ts'
 import { Routines } from './service.ts'
 import { type RoutineRow, definitionOf } from './store.ts'
 
@@ -23,9 +23,26 @@ const noticeData = (row: NoticeRow, source: NoticeData['source']): NoticeData =>
   ...(row.url === null ? {} : { url: row.url }),
 })
 
-/** The words a notice's Telegram copy says: who it is from, its title and its link, frozen when it is claimed. */
-const telegramText = (label: string, text: NoticeText): string =>
+/**
+ * The words a notice's copy through Notify me via says (ADR 0070): who it is from, its title and its link, frozen when
+ * it is claimed. The sink's server formats them; goblin escapes nothing.
+ */
+const copyText = (label: string, text: NoticeText): string =>
   [`${label}: ${text.title}`, text.body, text.url].filter((part) => part !== undefined).join('\n')
+
+/**
+ * The copy a routine's notice carries, when its Tell me asks for one and Notify me via is set: none for a notice of an
+ * event that came from the sink's own connection (`from`), which would only echo it back there.
+ */
+const copyOf = Effect.fn('routines.noticeCopy')(function* (
+  definition: RoutineDefinition,
+  words: () => string,
+  from?: string,
+) {
+  if (!definition.tellMe.copy) return {}
+  const sink = yield* notifySink
+  return sink === undefined || sink.connectionId === from ? {} : { copyText: words() }
+})
 
 /** Writes notice `id`'s entry into the chat it was claimed for, once, and marks it written. */
 export const writeNotice = Effect.fn('routines.writeNotice')(function* (id: string) {
@@ -92,8 +109,6 @@ export const postEventNotice = Effect.fn('routines.eventNotice')(function* (
   const { connectionId } = definition.trigger
   const label = yield* labelOf(connectionId)
   const text = noticeOfEvent(event.name, event.data, label)
-  // The Telegram connection's own events never go back to Telegram.
-  const echo = (yield* Channel.use((channel) => channel.status))?.connectionId === connectionId
   const id = `notice:${row.id}:${encodeURIComponent(event.eventId)}`
   const notice: NewNotice = {
     ...(yield* base(row, id, event.occurredAt)),
@@ -103,7 +118,7 @@ export const postEventNotice = Effect.fn('routines.eventNotice')(function* (
     title: text.title,
     body: text.body ?? null,
     url: text.url ?? null,
-    ...(definition.tellMe.telegram && !echo ? { telegramText: telegramText(label, text) } : {}),
+    ...(yield* copyOf(definition, () => copyText(label, text), connectionId)),
   }
   yield* post(notice, true)
 })
@@ -124,7 +139,7 @@ export const postReminder = Effect.fn('routines.reminder')(function* (
     title: definition.title,
     body: null,
     url: null,
-    ...(definition.tellMe.telegram ? { telegramText: telegramText(definition.title, text) } : {}),
+    ...(yield* copyOf(definition, () => copyText(definition.title, text))),
   }
   yield* postUncounted(notice)
 })
@@ -149,7 +164,7 @@ export const notifyReport = Effect.fn('routines.notifyReport')(function* (
     title: report.text.split('\n')[0]?.slice(0, 200) ?? definition.title,
     body: null,
     url: null,
-    ...(definition.tellMe.telegram ? { telegramText: `${definition.title}: ${report.text.slice(0, 500)}` } : {}),
+    ...(yield* copyOf(definition, () => `${definition.title}: ${report.text.slice(0, 500)}`)),
   }
   const notices = yield* Notices
   const claim = yield* notices.claim(notice, false)

@@ -42,10 +42,10 @@ describe('notices and their hour (ADR 0041)', () => {
   it('posts twenty an hour, keeps the rest for Activity only, and owes their digest when the next hour starts', () => {
     const notices = store()
     for (let index = 0; index < NOTICE_CAP + 5; index++) notices.claim(notice(`n${String(index)}`, T + index), true)
-    // The five past the cap are kept as written (no chat entry), so Activity lists them, with no Telegram copy.
+    // The five past the cap are kept as written (no chat entry), so Activity lists them, with no copy.
     const folded = notices.recent(0, 100)
     expect(folded.map((row) => row.id)).toEqual(['n24', 'n23', 'n22', 'n21', 'n20'])
-    expect(folded.every((row) => row.telegramState === 'none')).toBe(true)
+    expect(folded.every((row) => row.copyState === 'none')).toBe(true)
     expect(notices.unwritten()).toHaveLength(NOTICE_CAP)
     expect(notices.claim(notice('next', T + NOTICE_WINDOW + 1), true)).toEqual({
       posted: true,
@@ -84,10 +84,10 @@ describe('notices and their hour (ADR 0041)', () => {
     expect(notices.recent(0, 10).map((row) => row.id)).toEqual(['new'])
   })
 
-  it('keeps a Telegram copy pending only for a notice that has one', () => {
+  it('keeps a copy pending only for a notice that has one', () => {
     const notices = store()
     notices.claim({ ...notice('quiet', T), routineId: 'a' }, true)
-    notices.claim({ ...notice('loud', T), routineId: 'b', telegramText: 'Sidequest: loud' }, true)
-    expect([notices.get('quiet')?.telegramState, notices.get('loud')?.telegramState]).toEqual(['none', 'pending'])
+    notices.claim({ ...notice('loud', T), routineId: 'b', copyText: 'Sidequest: loud' }, true)
+    expect([notices.get('quiet')?.copyState, notices.get('loud')?.copyState]).toEqual(['none', 'pending'])
   })
 })

@@ -176,7 +176,7 @@ try {
           name: 'sidequest.worker.requests',
           arguments: { agentId: 'w-1' },
         },
-        tellMe: { on: true, telegram: false },
+        tellMe: { on: true, copy: false },
         handTo: {
           kind: 'persona',
           persona: 7,
@@ -193,7 +193,7 @@ try {
         title: 'Sidequest inbox from Sidequest · Worker',
         timezone: 'Europe/Tallinn',
         trigger: { kind: 'event', connectionId: 'sq-worker', name: 'sidequest.inbox', arguments: {} },
-        tellMe: { on: true, telegram: false },
+        tellMe: { on: true, copy: false },
         handTo: { kind: 'none' },
       },
     },

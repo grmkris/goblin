@@ -29,7 +29,8 @@ export type EventChoice = {
   readonly instruction: string
   /** Tell me for a hand-over (a route to a Topic always tells). */
   readonly tellMe: boolean
-  readonly telegram: boolean
+  /** Each notification sent on through Notify me via too (ADR 0070). */
+  readonly copy: boolean
 }
 
 /** A route as one select value: `tell:1`, `goblin:2`, `persona:7`. */
@@ -77,7 +78,7 @@ export const choiceFor = (stream: EventStream, route: EventRoute): EventChoice =
   filters: startingFilters(stream),
   instruction: '',
   tellMe: stream.tellMe ?? stream.recommended !== true,
-  telegram: false,
+  copy: false,
 })
 
 /** A hand-over's limits as the picker sets them; the full editor changes them later. */
@@ -118,13 +119,13 @@ export function setUpOf(
         title,
         timezone,
         trigger,
-        tellMe: { on: true, telegram: choice.telegram },
+        tellMe: { on: true, copy: choice.copy },
         handTo: { kind: 'none' },
       },
     }
   const instruction = choice.instruction.trim() || defaultInstruction(stream, server)
   const handOver = { instruction: instruction.slice(0, 12_000), allowedTools: [], budget: BUDGET }
-  const tellMe = { on: choice.tellMe, telegram: choice.tellMe && choice.telegram }
+  const tellMe = { on: choice.tellMe, copy: choice.tellMe && choice.copy }
   if (route.kind === 'goblin')
     return {
       topic: route.topic,

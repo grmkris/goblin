@@ -27,7 +27,7 @@ const definition: RoutineDefinition = {
   title: 'Native event routine',
   timezone: 'UTC',
   trigger: { kind: 'event', connectionId: 'routine-events', name: 'message.received', arguments: {} },
-  tellMe: { on: false, telegram: false },
+  tellMe: { on: false, copy: false },
   handTo: {
     kind: 'goblin',
     instruction: 'Return a short notification summary.',

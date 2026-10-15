@@ -7,7 +7,7 @@ const at = (iso: string) => Date.parse(iso)
 const reminder: RoutineDefinition = {
   title: 'Reminder',
   timezone: 'Europe/Berlin',
-  tellMe: { on: false, telegram: false },
+  tellMe: { on: false, copy: false },
   handTo: {
     kind: 'goblin',
     instruction: 'Remind me.',

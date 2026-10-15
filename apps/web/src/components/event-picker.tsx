@@ -35,7 +35,7 @@ import { RATE_WORDS, eventGroups, eventSummary, eventTitle } from '../lib/events
 import { messageOf } from '../lib/query/app-error.ts'
 import { usePersonas, useTopics } from '../lib/workspace/hooks.ts'
 import { routineSettingsQuery, setUpEventsMutation } from '../routines/queries.ts'
-import { SwitchRow } from './routine-hand.tsx'
+import { CopyRow, SwitchRow } from './routine-hand.tsx'
 import { SchemaForm } from './schema-form.tsx'
 
 type Choices = ReadonlyMap<string, EventChoice>
@@ -217,16 +217,9 @@ function AdvancedFor({
           }
           checked={told}
           disabled={choice.route.kind === 'tell'}
-          onChange={(on) => onChange({ tellMe: on, ...(on ? {} : { telegram: false }) })}
+          onChange={(on) => onChange({ tellMe: on, ...(on ? {} : { copy: false }) })}
         />
-        <SwitchRow
-          id={`${id}-telegram`}
-          name="On Telegram too"
-          about="Through the connection you use for Telegram, if you have one."
-          checked={told && choice.telegram}
-          disabled={!told}
-          onChange={(on) => onChange({ telegram: on })}
-        />
+        <CopyRow id={id} told={told} checked={choice.copy} onChange={(on) => onChange({ copy: on })} />
       </ul>
     </fieldset>
   )

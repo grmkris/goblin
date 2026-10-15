@@ -15,7 +15,7 @@ const question: RoutineDefinition = {
   title: 'Native question',
   trigger: { kind: 'once', at: '2030-01-01T00:00:00Z' },
   timezone: 'UTC',
-  tellMe: { on: false, telegram: false },
+  tellMe: { on: false, copy: false },
   handTo: {
     kind: 'goblin',
     instruction: 'call ask_user {"questions":[{"id":"choice","prompt":"What should I use?","kind":"text"}]}',
