@@ -1,5 +1,33 @@
 # Cleanup code checkpoint — 2026-10-15
 
+## Dev delivery — 2026-10-16
+
+The runtime cleanup is deployed on dev at `018774d0b07190381fb589638fb88cccf2c70135`.
+[CI run 38822661513](https://github.com/grmkris/goblin/actions/runs/38822661513) passed Check and Deploy dev. Its
+acceptance receipt names that SHA, authenticated smoke, verified drift and `0000_baseline.sql`. The disposable dev
+stack was reset and recreated from the checked commit; a fresh operator signed in through the real email-code flow.
+The private setup checklist is preserved. Production remains frozen.
+
+The final full gate passed with 1,766 unit tests, 80 standard native tests and 74 alternate-primary native tests,
+zero lint/Effect/Knip findings, and a successful build. An initial alternate-primary run hit the existing chained-move
+test's 60-second timeout; the unchanged full-gate retry passed, with no timeout or assertion relaxed.
+
+Authenticated dev smoke verified files, API admission, inbound MCP and revocation, model turns, threads, sharing,
+subagent reporting, memory, flows and agent-app creation/run/deletion. No external MCP server was connected on the
+fresh account, so its resident-tool probe was explicitly skipped. This is not MySI or Telegram acceptance.
+
+The local cross-project probe passed against Mygram `3d0880a22`: per-entry photo bytes and image materialization,
+DM and forum-topic keys, initial and continued cursors, Unicode-safe 3,500-unit plain-text chunks, reply outcomes,
+retry timestamps and failed-photo text resources. It uses the real producer and consumer modules with a synthetic
+fetch. Mygram's final integration checks and coordinated dev release remain separate.
+
+The deployed UI matrix exposed an outdated acceptance selector: the usage popup now describes a token cap or tokens
+used today. The popup opens correctly; the script is updated to check those current descriptions. Its final rerun is
+recorded in the follow-up receipt. The separately deferred owner session still needs MySI reconnect, Source review
+and real DM/group/photo, outbound-file and routine-copy delivery.
+
+## Original local checkpoint
+
 Goblin code is integrated on `dev` at `677c349c`. The full `heavy bun run check` passed on that commit.
 This is local code and fixture evidence. No push, stage reset, deployment or production promotion was performed.
 
