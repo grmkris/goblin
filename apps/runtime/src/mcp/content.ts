@@ -12,8 +12,8 @@ import type {
   ResourceLink,
 } from '@modelcontextprotocol/client'
 import { type Attachment, FILE_LIMITS, fileName, freeFileName } from '@goblin/contracts'
-import * as Clock from 'effect/Clock'
 import * as Data from 'effect/Data'
+import * as DateTime from 'effect/DateTime'
 import * as Effect from 'effect/Effect'
 import * as Match from 'effect/Match'
 import { Files } from '../files/service.ts'
@@ -437,7 +437,7 @@ export const materialize = Effect.fn('mcp.materialize')(function* <R = never>(
   const blocks = result.content.flatMap((block, index) => (keepable(block) ? [{ block, index }] : []))
   if (blocks.length === 0) return received
   const label = (yield* McpServers.use((servers) => servers.labels())).get(connectionId) ?? connectionId
-  const day = new Date(yield* Clock.currentTimeMillis).toISOString().slice(0, 10)
+  const day = DateTime.formatIsoDateUtc(yield* DateTime.now)
   const keeping: Keeping<R> = {
     connectionId,
     folder: `/agent/received/${folderName(label)}/${day}`,
