@@ -2,7 +2,7 @@
 
 ## Models
 
-Typed decisions are the scoped Workers AI exception ([ADR 0031](../adr/0031-typed-decisions-through-workers-ai.md)): Clef
+Typed decisions are the scoped Workers AI exception ([ADR 0031](../adr/archive/0031-typed-decisions-through-workers-ai.md)): Clef
 judges bounded state and questions through `AI` after the rules decide what they can. It is never a chat model, and
 its calls check the daily cap and count their tokens like the cheap model's.
 

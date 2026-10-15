@@ -5,7 +5,7 @@ Accepted 2026-10-09 with the owner. Builds on ADRs 0002 (stages and provider), 0
 benchmark in [`bench/reports/decisions-decisions-20261009-v4.md`](https://github.com/grmkris/goblin/blob/hackathon-2026-10/bench/reports/decisions-decisions-20261009-v4.md).
 
 goblin evaluates bounded candidates with Cloudflare Clef through the Workers AI `AI` binding. This is a scoped exception
-to [ADR 0002](0002-stages-and-provider.md): conversational and housekeeping models still use Railway LiteLLM in deployed
+to [ADR 0002](../0002-stages-and-provider.md): conversational and housekeeping models still use Railway LiteLLM in deployed
 stages. Clef is not a chat model choice and never generates a reply, a title or an instruction. Only the dev stage binds
 `AI` (`apps/web/alchemy.run.ts`). A stage without it (prod, the local stack, the native test stacks) has an unavailable
 Clef, and there the decisions judge nothing at all, rules included: the owner chats' hooks make no call and no proposal.
@@ -20,12 +20,12 @@ the conversation working as before. A model call never holds a SQLite transactio
 judgment runs at most once at a time per proposal (`SingleFlight`), and one already kept is never judged again.
 
 Every call checks the owner's budget before dispatch and records returned usage as model `clef` into estimated Credits
-([ADR 0026](archive/0026-daily-budget-in-credits.md)). Clef uses an explicit input-only app-budget estimate of 5,000 input
+([ADR 0026](0026-daily-budget-in-credits.md)). Clef uses an explicit input-only app-budget estimate of 5,000 input
 tokens per Credit, overridable through `GOBLIN_MODEL_CREDIT_RATES` (`output: null`). Its published $0.24/M input-token
 price does not establish a USD-to-Token-Plan-Credit exchange rate. Unknown usage is charged at the bounded full
 65,536-token context reservation rather than treated as free. Each call is a `model.aux` event of purpose `decision`
 and model `cloudflare/clef`, with content-free timings, outcome and token counters
-([ADR 0024](0024-observing-conversations.md)); proposing, confirming and dismissing are the content-free flows
+([ADR 0024](../0024-observing-conversations.md)); proposing, confirming and dismissing are the content-free flows
 `decision_propose`, `decision_confirm` and `decision_dismiss`. State, questions, answers and proposal payloads never
 enter telemetry.
 
@@ -47,7 +47,7 @@ message that automatic retrieval did not already give it, each judged relevant o
 ## The owner's label
 
 The signed-in owner confirms or dismisses each proposal with `POST /api/decisions/:id` (the `decisions` group of the
-owner API, [ADR 0038](0038-typed-owner-api-served-by-the-agent.md)), which derives the agent from the session user; no
+owner API, [ADR 0038](../0038-typed-owner-api-served-by-the-agent.md)), which derives the agent from the session user; no
 endpoint accepts an agent selector. Application-owned `app_decision_proposals` and `app_decision_labels` (migration
 `20261026000600_decisions`) keep the outcome and its provider and probability. The first label wins: the same label
 again answers the same proposal, the other one is a conflict, and a proposal whose chat moved on cannot be confirmed

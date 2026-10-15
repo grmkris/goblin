@@ -16,3 +16,5 @@ replaced it. Living docs never cite an archived ADR as current behaviour.
 | [0043](0043-outside-work-through-mcp-servers.md) | Outside work comes through MCP servers, and some servers are first-class | [0063](../0063-mcp-first-no-server-specific-code.md) |
 | [0044](0044-spending-rules-for-paid-tools.md) | Spending rules for paid tools | [0063](../0063-mcp-first-no-server-specific-code.md) |
 | [0049](0049-prepaid-servers-topped-up-from-the-wallet.md) | Prepaid servers topped up from the Goblin Wallet | [0063](../0063-mcp-first-no-server-specific-code.md) |
+| [0025](0025-home-surface.md) | Home surface | [0067](../0067-no-home-surface-and-no-typed-decisions.md) |
+| [0031](0031-typed-decisions-through-workers-ai.md) | Typed decisions through Workers AI | [0067](../0067-no-home-surface-and-no-typed-decisions.md) |

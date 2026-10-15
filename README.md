@@ -83,7 +83,7 @@ undecided cases. They propose a highlight, a thread draft, or earlier work from 
 to confirm or dismiss, keep that label, and leave chat working when decisions are unavailable. They never move
 history, route a send or grant permission. Each open proposal shows in its chat as an "Only visible to you" row. Only
 the dev stage binds Workers AI; elsewhere nothing is judged. See
-[ADR 0031](docs/adr/0031-typed-decisions-through-workers-ai.md).
+[ADR 0031](docs/adr/archive/0031-typed-decisions-through-workers-ai.md).
 
 **Goblin Wallet**, the agent wallet built for the October 2026 hackathon, has left this repository: its source is kept
 at the tag [`hackathon-2026-10`](https://github.com/grmkris/goblin/tree/hackathon-2026-10), and goblin connects to a
