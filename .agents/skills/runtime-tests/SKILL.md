@@ -58,7 +58,8 @@ itself authorize model spend, external messages, deployment or production change
 
 - Owner API/Apps tests use real auth D1 and PersonalAgent with a deterministic model and official injected MCP
   transport. Verify two-account isolation with forged selectors, removed access endpoints, per-call Apps and live
-  grants. Applied dormant migrations remain intact.
+  grants. Fresh application baselines and reapplication preserve populated vendor state; dev resets before a changed
+  baseline is released.
 
 - The no-auth inbox fixture builds the documented app, advances 15-minute job slots, and keeps five validated messages and last-good data. Browser receipts render the native-built view through a controlled feed; they do not prove a real signed-in inbox.
 - Auth fixtures inject mail capture and use actual OTP endpoints against native D1. No capture endpoint ships in the deployed Worker. Verify closed/invite policy at send and sign-in, hashing, expiry, attempts, replay, rate limits, mail-failure cleanup and fresh-session deletion.

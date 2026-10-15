@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config'
 import integration from './vitest.integration.config.ts'
 
-/** Rerun the real owner, helper, routine, Telegram and memory cases on a non-root primary binding. */
+/** Rerun the real owner, helper, routine, Source and memory cases on a non-root primary binding. */
 export default defineConfig({
   test: {
     ...integration.test,
