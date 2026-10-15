@@ -58,6 +58,12 @@ to `chat: 'dm'`. Submission acceptance is distinct from external Telegram comple
 while authority is available, drops held messages and replies to send, keeps the routes, then tombstones locally;
 finite remote leases expire if authorized cleanup cannot run.
 
+Sources ([sources.md](sources.md), ADR 0066) are the Events consumers any connection can have: each confirmed Source
+subscribes its wake event under consumer `source:<id>` (handler `source-wake`, registered by `SourcesLive` before the
+agent runs anything), reads the owner's messages from the event's data or by a tool from a cursor, and answers through
+its reply tool; nothing in it names a server. The Telegram channel's connection cannot carry one until the channel is
+off.
+
 The dispatcher also binds myskills' `skills.updated` and `skills.list_changed`. Turning a server's skills on subscribes
 to them only where its Events offer them to this connection; a server without them, or one that refuses its Events
 (Sidequest's setup-only connection), still turns on, and its listing refreshes on its `ttlMs`. Their payload is

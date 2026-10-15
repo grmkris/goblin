@@ -38,6 +38,12 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   names are mygram's or mysi's spelling, read from the connection (`telegramTools`, `telegramEvent`). Preserve sanitized
   `telegram-tg-<update>` and reply operation ids; fence old cursor writes only after both leases confirm. Hooks persist
   receipts before asynchronous dispatch; accepted submissions are distinct from external delivery.
+- Sources (`sources/`, ADR 0066) are how any server's events carry the owner's own messages: an owner-confirmed setup
+  of JSON pointers and whole-value argument templates (`SourceSetup`), never a server's name. Confirmation grants the
+  wake selector and the read and reply tools, subscribes `source:<id>` (handler `source-wake`) and binds the Source to
+  the endpoint and its tools' grant versions; a change pauses it for review. Only messages the confirmed speaks-for-me
+  rule matches become owner turns, with no more authority than the app's; everything else stays untrusted data.
+  Replies are goblin's calls under the owner's grant (`caller: 'model'`), one operation id a piece.
 - The shelf (`mcp/suggested.ts`, ADRs 0052, 0061) is data, one endpoint per entry on every deployment (`MCP_SHELF`
   replaces or adds entries): one mysi connection (`mysi.lol/mcp?codemode=off`) instead of the separate my* servers,
   publishing (Cloudflare), then servers that need no sign-in in groups; re-probe one with an `initialize` before

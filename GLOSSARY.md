@@ -148,6 +148,28 @@ mysi, woken by its signed MCP Events. Every chat the grant reaches (the owner's 
 **Telegram route**: the Topic its messages become turns in, answered by goblin or a Persona back in the same place, or
 kept as notes, or ignored; a new chat waits for the owner's choice. Answers go back through mygram's send tool.
 
+**Source**:
+An MCP connection whose events carry the owner's own messages into goblin and goblin's answers back, by a **Source
+setup** the owner confirmed (ADR 0066). Any server that sends events can be one (a chat app, mail); none is known by
+name. Its conversations each have a **Route**.
+_Avoid_: channel, integration, bridge
+
+**Source setup**:
+The five facts of a Source, confirmed at an exact revision: the event that wakes it, the key that names a
+conversation (JSON pointers into a message), which messages are the owner speaking (the speaks-for-me rule; anyone
+else's are notices or dropped), how the content is read (the event's data, or a tool from a cursor) and, optionally,
+the tool an answer goes back with; plus where a new conversation goes. Bound to the connection's endpoint and the
+grants of its tools: a change of either pauses it for review.
+
+**Route**:
+Where one conversation of a Source goes: turns in a Topic answered by goblin or a Persona, notes in a Topic with no
+turn, nowhere, or held (the twenty newest) until the owner chooses. A change leaves an organize receipt with Undo.
+_Avoid_: mapping, binding
+
+**Notify sink**:
+The owner's "Notify me via": one connection's tool, with a `{{text}}` template, that copies goblin's notices to them
+elsewhere.
+
 **Conversation activity**:
 What a chat is doing now: `working`, or `waiting` on its subagents.
 _Avoid_: activity, on its own
