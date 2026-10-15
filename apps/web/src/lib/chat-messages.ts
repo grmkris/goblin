@@ -38,7 +38,7 @@ export type ChatMessage =
       /** The owner's files this message carried. */
       readonly attachments?: readonly Attachment[]
       readonly selections?: readonly ComposerOption[]
-      /** Who wrote it, when not the owner in this browser: Telegram, an MCP client, a subagent. */
+      /** Who wrote it, when not the owner in this browser: a Source, an MCP client, a subagent. */
       readonly author?: string
       /** How a held call ended, when this is its outcome (from its connection). */
       readonly outcome?: McpOutcome

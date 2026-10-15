@@ -23,7 +23,6 @@ import { connectionName } from '../lib/labels.ts'
 import { PageSection } from './page-section.tsx'
 import { ServerCard } from './server-card.tsx'
 import { ServerPicker } from './server-picker.tsx'
-import { useTelegramChannel } from './telegram-control.tsx'
 import { ToolConsole } from './tool-console.tsx'
 import { glide } from '../lib/motion.ts'
 
@@ -101,7 +100,6 @@ function Servers({
   readonly onMessage: (text: string) => void
 }) {
   const { data: servers, refetch } = useSuspenseQuery(serversQuery)
-  const channel = useTelegramChannel(onMessage)
   // A server's card reads the list again after something changed it out of sight (its sign-in, its tools).
   const reload = useCallback(() => void refetch(), [refetch])
   return (
@@ -121,14 +119,7 @@ function Servers({
     >
       {servers.length === 0 && <NoServers onAdd={onAdd} />}
       {byServer(servers).map((server) => (
-        <ServerCard
-          key={server.connectionId}
-          server={server}
-          onReload={reload}
-          onDone={onDone}
-          onMessage={onMessage}
-          channel={channel}
-        />
+        <ServerCard key={server.connectionId} server={server} onReload={reload} onDone={onDone} onMessage={onMessage} />
       ))}
     </PageSection>
   )

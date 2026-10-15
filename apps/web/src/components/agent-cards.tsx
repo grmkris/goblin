@@ -125,7 +125,7 @@ function ResidentHeader({ id, action }: { readonly id: string; readonly action: 
       <CardTitle id={id}>Work while you're away</CardTitle>
       <CardDescription>
         Lets your agent use the tools you allowed when you are not watching: for apps you connected, routines and
-        Telegram. It lasts 30 days from your last visit and renews whenever you use goblin.
+        Sources. It lasts 30 days from your last visit and renews whenever you use goblin.
       </CardDescription>
       <CardAction>{action}</CardAction>
     </CardHeader>

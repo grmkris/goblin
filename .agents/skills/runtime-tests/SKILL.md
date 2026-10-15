@@ -69,3 +69,7 @@ itself authorize model spend, external messages, deployment or production change
   Keep assertions for frozen arguments and operationKey, redacted review, refusal, second-account isolation, changed
   grants/scopes, routine/subagent holds, alternate App refusal and reconstruction without dispatch replay. Real
   Sidequest hiring and provider-side operation reconciliation remain separate acceptance.
+
+- Source native canaries cover signed ingress, cursor reads, own-turn marking, photo/text files, routing, replies and
+  replay. The Events suite covers transport and consumer recovery without a service-specific channel. MySI reconnect
+  and Telegram DM/group/photo receipts are a deferred live owner gate, not established by those fixtures (ADR 0069).

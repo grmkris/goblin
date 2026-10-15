@@ -100,7 +100,7 @@ function TopicSetupEditor({ topic, onClose }: { readonly topic: TopicView; reado
 
 /**
  * Where a Topic's setup is edited: a panel from the right on a wide screen, a sheet from the bottom on a phone. It says
- * whose setup it is and that it applies to every chat of the Topic, Telegram and connected clients too for Personal.
+ * whose setup it is and that it applies to every chat of the Topic, Source messages and connected clients included.
  */
 export function TopicSetupDrawer({
   topic,
@@ -114,7 +114,7 @@ export function TopicSetupDrawer({
   const narrow = useIsMobile()
   const description =
     topic.personal === true
-      ? 'What every chat of Personal works with, Telegram and connected clients included.'
+      ? 'What every chat of Personal works with, Source messages and connected clients included.'
       : `What every chat of #${topic.name} works with.`
   const contents = (
     <>

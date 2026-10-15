@@ -2,9 +2,9 @@
 
 A **Source** ([ADR 0066](../adr/0066-sources.md)) is an MCP connection whose events carry the owner's own messages into
 goblin, and goblin's answers back, by a setup the owner confirmed at an exact revision. Nothing in it names a server:
-the setup is JSON pointers and argument templates (`SourceSetup`, `packages/contracts/src/sources.ts`). The Telegram
-channel ([events.md](events.md)) runs beside it until P7 makes Telegram one Source among others; a connection carries
-one or the other (confirming a Source on the channel's connection is refused as `telegram_on`).
+the setup is JSON pointers and argument templates (`SourceSetup`, `packages/contracts/src/sources.ts`). All external
+message transport, including Mygram through MySI, uses this path (ADR 0069). There is no built-in channel or competing
+connection switch.
 
 ## The setup
 
@@ -110,7 +110,7 @@ it is given up); a settled one (goblin's, or the Persona invocation's) goes out 
 twice to a server that honours them. The call is goblin's own under the owner's grant (`caller: 'model'`): an
 Ask-first reply tool refuses it. A failed send is tried again after a minute, doubling to an hour, and given up after
 five tries with a notice to the owner. A paused Source keeps what it owes until it runs again or the day is out. Each
-delivery is a `source_delivery` flow and a `channel.reply` line with channel `source`; ids and counts only.
+delivery is a `source_delivery` flow and a `source.reply` line; ids and counts only.
 
 ## Notify me via
 
@@ -146,9 +146,8 @@ wake selector for review too. Settings keeps both policies in its Delivery and e
 
 ## Storage and tests
 
-Migration `20261102000100_sources` adds `app_source_setups`, `app_source_routes`, `app_source_held` and
-`app_source_replies`; `20261102000200_notify_sink` adds `app_notify_sink`; `20261102000300_source_parity` adds each
-conversation's `title` and a held message's `files` (`storage/sources.ts`). Unit tests run the real migrations in
+The application baseline creates `app_source_setups`, `app_source_routes`, `app_source_held`, `app_source_replies`
+and `app_notify_sink`, including conversation titles and held-message file references (`storage/sources.ts`). Unit tests run the real migrations in
 `node:sqlite` with the engine's ports and the MCP host faked (`test/sources-*.test.ts`): pointers against schemas and
 template leaves, confirm granting and subscribing, an owner message as a turn in the routed Topic, someone else's as a
 notice, a conversation named by its title and given a Topic of its own, attachments kept and held by reference, a held

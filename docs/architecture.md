@@ -33,7 +33,7 @@ flowchart LR
 - [Topics, Personas and memory](architecture/topics.md): Topics, Personas, organize receipts, retrieval and Topic memory.
 - [Models](architecture/models.md): model calls and daily token usage.
 - [Authority and inbound MCP](architecture/inbound-mcp.md): resident authority and goblin as an MCP server.
-- [MCP Events and Telegram](architecture/events.md): Events subscriptions and the Telegram channel.
+- [MCP Events](architecture/events.md): signed subscriptions, consumers and the event picker.
 - [Sources](architecture/sources.md): any connection's events as the owner's own messages, routed to Topics and answered
   back.
 - [Run ledger](architecture/observability.md): run ledger, logs, failures and inspection.

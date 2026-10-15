@@ -1,6 +1,6 @@
 // Where a Source's conversations go (ADR 0066): a conversation key in words, a route in words, the route select's
 // choices and options, where a Source stands, and what Activity offers. Pure, so the route table and Activity only draw
-// it. The select's choice is the Telegram chats' (`place`, `responder`), so both lists read alike.
+// it. The select names the Topic and responder separately.
 import {
   PERSONAL_TOPIC,
   type PersonaView,
@@ -19,7 +19,7 @@ import {
   offeredTopics,
   responderPersona,
   topicWords,
-} from './telegram-chats.ts'
+} from './route-choice.ts'
 
 /** A conversation key in words, its parts in order: "chat dm · thread 3"; parts with no value are left out. */
 export function keyWords(values: SourceKeyValues): string {

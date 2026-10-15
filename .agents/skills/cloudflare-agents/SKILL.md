@@ -38,7 +38,7 @@ through `promiseWith` (`runtime/boundary.ts`).
 - Inbound user authentication, the agent's resident authority and outbound MCP authorization are three separate
   things. Check them at the boundary that owns them.
 - Conversation routes carry stable logical chat ids. Resolve a chat through `Chats` before reaching Pi, and admit owner,
-  inbound or Telegram operations through its recorded session. Nothing rebinds a chat: Move to thread forks a new
+  inbound or Source operations through its recorded session. Nothing rebinds a chat: Move to thread forks a new
   Thread, and a running Pi turn never moves. Keep the Agent shell thin while services own this
   resolution and the application operation ledger. [ADR 0030](../../../docs/adr/0030-logical-chats-over-pi-sessions.md)
   defines intentionally Pi-keyed records and the unit/local workerd proof; the test-only permuted primary binding

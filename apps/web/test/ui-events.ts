@@ -1,7 +1,7 @@
 /**
  * Local browser acceptance of a connection's Events (ADR 0041, amended by ADR 0068) against real source components, at
  * desktop and phone widths in light and dark: the open offer, the picker with the events' titles and descriptions
- * grouped by service, nothing picked until the owner picks it, an event the Telegram channel takes, a filter the server
+ * grouped by service, nothing picked until the owner picks it, an event with an existing subscription, a filter the server
  * requires asked for in Advanced, a hand-over to a Persona, and both events set up in one step (each proposed, then
  * confirmed). No account or model call is made; the owner API is routed here.
  */
@@ -25,13 +25,12 @@ const WORKER = {
   events: 'open',
   eventHealth: [
     {
-      subscriptionId: 'sub-telegram',
+      subscriptionId: 'sub-existing',
       name: 'sidequest.worker.messages',
       granted: true,
       status: 'active',
       refreshBefore: null,
       lastReceiptAt: null,
-      telegram: true,
     },
   ],
 }
@@ -116,7 +115,10 @@ async function drive(browser: Browser, origin: string, label: string, options: B
   await page.goto(`${origin}events.html`)
   await page.getByText('Sidequest · Worker sends events').waitFor()
   await page.getByText('Quote requests').first().waitFor()
-  await page.getByText('Already arrives through Telegram.').waitFor()
+  assert(
+    !(await page.getByRole('checkbox', { name: 'Messages', exact: true }).isChecked()),
+    `${label}: existing subscription selected an event`,
+  )
   await page.getByText('A hirer asks you for a quote.').waitFor()
   // Nothing a server says picks an event (ADR 0068): the owner picks each one.
   assert(!(await page.getByRole('checkbox', { name: /Quote requests/u }).isChecked()), `${label}: picked already`)

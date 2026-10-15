@@ -14,7 +14,7 @@ import {
   type OrganizeReceipt,
   type WorkspaceSnapshot,
 } from '@goblin/contracts'
-import { channelChatsKey, usageQuery } from '../src/agent/queries.ts'
+import { usageQuery } from '../src/agent/queries.ts'
 import { agentAppQuery, agentAppsQuery } from '../src/agent-apps/queries.ts'
 import { conversationKeys } from '../src/conversations/queries.ts'
 import type { PiEventSource, ReconnectScheduler } from '../src/lib/conversation-stream.ts'
@@ -617,16 +617,6 @@ describe('what goes stale with a feed change', () => {
     const same = applyChanges(changed, [{ type: 'tools', connectionId: 'sq', digest: 'a1-4' }])
     expect(same.tools).toBe(changed.tools)
     expect(staleAfter(present(changed), same)).toEqual([])
-  })
-
-  it('is a Telegram route or default that changed: the chats list; another receipt changes nothing read', () => {
-    const route: OrganizeReceipt = { ...receipt('r2', 2), kind: 'telegram.route', target: 'g_trip:0' }
-    const routed = applyChanges(before, [{ type: 'receipt', receipt: route }])
-    expect(staleAfter(present(before), routed)).toEqual([channelChatsKey])
-    const undone = applyChanges(routed, [{ type: 'receipt', receipt: { ...route, undoneAt: 3 } }])
-    expect(staleAfter(present(routed), undone)).toEqual([channelChatsKey])
-    const renamed = applyChanges(before, [{ type: 'receipt', receipt: receipt('r4', 4) }])
-    expect(staleAfter(present(before), renamed)).toEqual([])
   })
 
   it("is a Source's conversation route that changed: the Sources and their routes, again when it is undone", () => {

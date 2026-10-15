@@ -153,18 +153,6 @@ function PickRow({
   )
 }
 
-/** An event the Telegram channel already brings in: named, with why it is not offered again. */
-function TelegramRow({ stream }: { readonly stream: EventStream }) {
-  return (
-    <li className="event-pick" data-static>
-      <span className="event-pick-text">
-        <span className="event-pick-title">{eventTitle(stream)}</span>
-        <span className="event-pick-about">Already arrives through Telegram.</span>
-      </span>
-    </li>
-  )
-}
-
 /** Advanced for one picked event: its filters from the server's schema, the handler's instruction, Tell me. */
 function AdvancedFor({
   server,
@@ -223,7 +211,7 @@ function AdvancedFor({
 }
 
 /**
- * The picker's state: the events that can be picked (subscribable, not set up yet, not already through Telegram), the
+ * The picker's state: the events that can be picked (subscribable and not set up yet), the
  * owner's picks (none until they pick one: nothing a server says picks an event, ADR 0068), and one step that sets them
  * all up.
  */
@@ -319,17 +307,13 @@ const LIMITS =
 export function EventPicker({
   server,
   streams,
-  telegram,
 }: {
   readonly server: ServerView
   /** The events that can be set up here: subscribable, with no routine on them yet. */
   readonly streams: readonly EventStream[]
-  /** The names of the events the Telegram channel already brings in. */
-  readonly telegram: ReadonlySet<string>
 }) {
   const places = usePlaces()
-  const available = streams.filter((stream) => !telegram.has(stream.name))
-  const picks = useEventPicks(server, available, places)
+  const picks = useEventPicks(server, streams, places)
   const groups = eventGroups(streams, server)
   const count = picks.choices.size
   if (streams.length === 0) return null
@@ -339,30 +323,26 @@ export function EventPicker({
         <div key={group} className="event-group">
           {groups.length > 1 && <h4 className="event-group-title">{group}</h4>}
           <ul className="event-picks">
-            {members.map((stream) =>
-              telegram.has(stream.name) ? (
-                <TelegramRow key={stream.name} stream={stream} />
-              ) : (
-                <PickRow
-                  key={stream.name}
-                  stream={stream}
-                  choice={picks.choices.get(stream.name)}
-                  places={places}
-                  onPick={(picked) => picks.pick(stream, picked)}
-                  onRoute={(route) => picks.update(stream.name, { route })}
-                />
-              ),
-            )}
+            {members.map((stream) => (
+              <PickRow
+                key={stream.name}
+                stream={stream}
+                choice={picks.choices.get(stream.name)}
+                places={places}
+                onPick={(picked) => picks.pick(stream, picked)}
+                onRoute={(route) => picks.update(stream.name, { route })}
+              />
+            ))}
           </ul>
         </div>
       ))}
-      {count > 0 && <AdvancedSection server={server} streams={available} picks={picks} />}
+      {count > 0 && <AdvancedSection server={server} streams={streams} picks={picks} />}
       {picks.error !== '' && (
         <Alert variant="destructive">
           <AlertDescription>{picks.error}</AlertDescription>
         </Alert>
       )}
-      {available.length > 0 && (
+      {streams.length > 0 && (
         <div className="event-picker-foot">
           <Button type="button" size="sm" pending={picks.pending} disabled={count === 0} onClick={picks.setUp}>
             {count === 0 ? 'Set up' : `Set up ${String(count)} ${count === 1 ? 'event' : 'events'}`}

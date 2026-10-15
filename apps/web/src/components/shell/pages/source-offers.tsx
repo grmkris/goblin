@@ -17,13 +17,13 @@ import {
   waitingConversations,
   waitingKey,
 } from '../../../lib/source-routes.ts'
-import { type RouteChoice, waitingWords } from '../../../lib/telegram-chats.ts'
+import { type RouteChoice, waitingWords } from '../../../lib/route-choice.ts'
 import { changeSourceMutation, routeSourceMutation, sourcesQuery } from '../../../sources/queries.ts'
 import { PageSection } from '../../page-section.tsx'
 import { connectionAnchor } from '../../server-card.tsx'
 import { sourceRefusal } from '../../source-review.tsx'
 import { SourceRouteSelect } from '../../source-routes.tsx'
-import { type RoutePlaces, useRoutePlaces } from '../../telegram-chats.tsx'
+import { type RoutePlaces, useRoutePlaces } from '../../route-select.tsx'
 import { RowContents } from './chat-link.tsx'
 import { OfferPick } from './offer-pick.tsx'
 
@@ -47,7 +47,7 @@ function WaitingRow({
   // expected: a refusal shows why in place of the row's line, and the row stays
   const error = routing.error === null ? '' : sourceRefusal(routing.error, `set up “${name}”`)
   return (
-    <li className="list-row telegram-offer" data-static>
+    <li className="list-row source-offer" data-static>
       <RowContents
         mark={<InboxIcon aria-hidden />}
         title={`New conversation “${name}” on ${item.source.title}`}

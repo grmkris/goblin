@@ -14,7 +14,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0006](0006-servers-the-owner-adds.md) | Servers the owner adds are a trust boundary, not a configuration change | Accepted |
 | [0007](0007-one-main-conversation.md) | One main conversation that never ends, with side threads and subagents | Accepted; amended by 0010, 0017, 0018 and 0032 |
 | [0008](0008-skills-from-mcp-servers.md) | Skills come from MCP servers the owner turns them on for, and the agent drafts new ones for review | Accepted; amended by 0063 |
-| [0009](0009-telegram-through-myagent.md) | Telegram through myagent | Accepted; to be superseded by 0066 when the channel goes |
+| [0009](archive/0009-telegram-through-myagent.md) | Telegram through myagent | Superseded by 0066 and 0069 |
 | [0010](0010-per-conversation-capabilities-and-thread-notes.md) | Per-conversation capabilities, and main learns the names of threads started with "+" | Accepted; its per-conversation switches superseded by 0040 |
 | [0011](0011-mcp-events.md) | MCP Events consumer | Accepted; amended by 0066 |
 | [0012](0012-routines.md) | Confirmed routines and isolated run threads | Accepted |
@@ -46,7 +46,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0046](0046-production-promotion-and-public-source.md) | Daily development, deliberate production promotion and public source | Accepted |
 | [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted; amended by 0061 and 0063 |
 | [0053](0053-pinned-services-and-apps-with-a-chat-bar.md) | Pinned services and Apps with a chat bar | Accepted; amended by 0063 |
-| [0055](0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | Accepted; to be superseded by 0066 when the channel goes |
+| [0055](archive/0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | Superseded by 0066 and 0069 |
 | [0056](0056-goblin-wallet-leaves-goblin.md) | Goblin Wallet leaves goblin | Accepted |
 | [0057](0057-goblin-pays-for-no-model-call.md) | goblin pays for no model call | Accepted |
 | [0058](0058-no-plans-tokens-and-an-optional-cap.md) | No plans: access by sign-up, usage in tokens with an optional cap | Accepted |
@@ -60,5 +60,6 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0066](0066-sources.md) | Sources: any MCP server's events carry the owner's own messages, by a setup the owner confirms | Accepted; amended by 0068 |
 | [0067](0067-no-home-surface-and-no-typed-decisions.md) | No Home surface and no typed decisions | Accepted |
 | [0068](0068-events-use-their-standard-fields-only.md) | Events use their standard fields only | Accepted |
+| [0069](0069-external-messages-use-sources.md) | External messages use Sources; the built-in Telegram channel is removed | Accepted |
 | [0070](0070-notices-and-files-leave-through-the-owners-tools.md) | Notices and files leave through the owner's own tools: Notify me via and file links | Accepted; amended by 0071 |
 | [0071](0071-sink-delivery-rules-and-event-identity.md) | Sink delivery rules and exact event identity | Accepted |

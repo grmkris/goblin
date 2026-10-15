@@ -44,7 +44,7 @@ callback). It annotates the request's logs with `goblin.rpc`
 | `organize` | `/organize/:id/undo` | `organize/api.ts` |
 | `mcp` | `/mcp/servers`, `/mcp/suggested`, `/mcp/catalog`, `/mcp/registries`, `/mcp/registries/remove`, `/mcp/grants`, `/mcp/ask-first`, `/mcp/skills`, `/mcp/app-grants`, `/mcp/approvals/:id`, `/mcp/url-requests/:id`, `/mcp/oauth/callback`, and `/mcp/:id/` `tools`, `events`, `connect`, `step-up`, `disconnect`, `remove`, `tools/call`, `resources/read` | `mcp/servers/api.ts` |
 | `resident` | `/agent/resident` | `mcp/resident-api.ts` |
-| `agent` | `/agent/usage`, `/agent/model`, `/agent/channel` | `routines/agent-api.ts` |
+| `agent` | `/agent/usage`, `/agent/model`, `/agent/model-endpoint` | `routines/agent-api.ts` |
 | `memory` | `/agent/memory` | `memory/api.ts` |
 | `routines` | `/routines`, `/routines/settings`, `/routines/:id`, and under it `confirm`, `pause`, `run`, `runs` | `routines/api.ts` |
 | `apps` | `/apps`, `/apps/:id`, and under it `launch`, `state`, `call`, `diagnostics` | `apps/api.ts` |

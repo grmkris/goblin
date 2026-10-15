@@ -120,7 +120,7 @@ describe('who reported', () => {
   it('names the subagent a report came from, and nobody for any other author', () => {
     expect(reporterOf('subagent venues')).toBe('venues')
     expect(reporterOf('subagent ')).toBeUndefined()
-    expect(reporterOf('Telegram')).toBeUndefined()
+    expect(reporterOf('Chat · Trip planning')).toBeUndefined()
     expect(reporterOf(undefined)).toBeUndefined()
   })
 })
@@ -151,7 +151,7 @@ describe('subagent calls', () => {
   })
 })
 
-const said = (id: string, author?: string): Part => ({
+const said = (id: string, author?: string): Extract<Part, { kind: 'user' }> => ({
   kind: 'user',
   id,
   text: 'hi',
@@ -164,7 +164,7 @@ describe('Move to thread', () => {
     const ask: Part = { kind: 'persona-ask', id: '9:0', text: 'and you?', personas: [], order: 'parallel' }
     expect(movableEntry([said('3:0'), answer('4:0:text'), said('7:0'), answer('8:0:text'), ask])).toBe(7)
     expect(movableEntry([said('3:0'), said('5:0', 'Routine')])).toBe(3)
-    expect(movableEntry([said('3:0'), said('6:0', 'Telegram')])).toBe(6)
+    expect(movableEntry([said('3:0'), { ...said('6:0', 'Chat · Trip planning'), own: true }])).toBe(6)
   })
 
   it('is offered on nothing before the owner wrote, or on a message not yet written to the chat', () => {

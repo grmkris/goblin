@@ -102,7 +102,7 @@ function SubagentReport({
 }
 
 /**
- * A message in the user column: the owner's own, or one labelled with who wrote it (Telegram, an MCP client, a thread
+ * A message in the user column: the owner's own, or one labelled with who wrote it (a Source, an MCP client, a thread
  * sharing a note). A subagent's report is not in that column: it reads as the subagent reporting back. The files it
  * carried sit under it; what an open App shared with it shows as a quiet note, never as their words.
  */

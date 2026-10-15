@@ -25,9 +25,8 @@ it:
   MCP host (each server's endpoint binding checked, so a re-pointed server loses what it had, the credential cipher,
   held calls a restart cut off recovered); the cheap models; helper execution restored; routine runs, with their
   usage projection subscribed to Pi's commits; main registered; the App
-  registry; every Topic Conversation given memory; skills; the Telegram channel; and Events, with the
-  Telegram and skills consumers registered before any delivery (the routines layer registers the routine trigger,
-  before the agent runs anything). A stateful object is made once, by its step, and shared as that step's service;
+  registry; every Topic Conversation given memory; skills; and Events. The skills consumer is registered during
+  start; the routines and Sources layers register their consumers before the agent runs anything. A stateful object is made once, by its step, and shared as that step's service;
   programs use the area's services. No step rewrites data an older version left: goblin is greenfield (ADR 0067).
   The conversation services publish `conversations.changed` with what each write changed, from inside the write; the
   App registry and the workspace feed follow that topic. A move a restart interrupted finishes once the conversation
@@ -35,10 +34,10 @@ it:
 - **One layer per area** after the start, in order: the daily token usage and picker (`Budget`, `Models`, which a
   send's admission reads), conversation (`Chats`, `ChatOperations`, `Conversations`, `Moves`), setup (`Setups`),
   knowledge (`Memories`, `Retrieval`), delegation (`Topics`, `Personas`, `Invocations`, `Receipts`), routines
-  (`Routines`, `RoutineControl`), inspection (`Inspection`), apps (`AppEngine`, `Files`), the skill learner (`Learner`,
+  (`Routines`, `RoutineControl`), Sources (`Sources`), inspection (`Inspection`), apps (`AppEngine`, `Files`), the skill learner (`Learner`,
   after the owner's files and the routines' notices it writes), the workspace feed
   (`Workspace`) and HTTP (`AgentHttp`). The MCP host's `McpConnections`, `McpServers`, `McpGrants`, `Approvals` and
-  `Cipher`, and `CheapModels`, `RoutineRuns`, `RoutineUsage`, `Apps`, `Skills`, `Channel` and `Events`, are served by
+  `Cipher`, and `CheapModels`, `RoutineRuns`, `RoutineUsage`, `Apps`, `Skills` and `Events`, are served by
   their start steps.
 
 `AgentServices`, every service a program may require, is derived from the layers, so no area edits a shared union. A
@@ -65,8 +64,7 @@ Erasing the agent disposes its runtime, whose layers' finalizers close every MCP
 - `KeyedLock` (`observability/lock.ts`): mutual exclusion per key, strictly first come, first served (Effect's
   `Semaphore` wakes waiters in no fixed order). It is held for admission only, never across a model call or another
   wait. Topic creates, retrieval catch-up, an agent app's state changes, chat admission (`chat:<id>`, which the mover
-  and every passive write take too) and a thread operation (`thread-op:<op>`) take it. The Telegram pull, whose order
-  does not matter, is serialised by the channel's own `Semaphore(1)`.
+  and every passive write take too) and a thread operation (`thread-op:<op>`) take it.
 - `SingleFlight` (`observability/single-flight.ts`): one keyed run at a time across waits, forked in the layer's scope
   so interrupting its first caller does not cancel it. `run` joins every caller to it: an MCP token refresh
   (`mcp.refresh:<server>`) and connect (`mcp.connect:<server>`), a skills listing (`skills.listing:<server>`) and a
@@ -255,13 +253,13 @@ the complete send and marks its chip. `/new-thread` transfers the draft and port
 thread's draft in the panel.
 
 **Chat admission** ([ADR 0030](../adr/0030-logical-chats-over-pi-sessions.md), `chats/operations.ts`): every input into a
-chat (the owner's message, an inbound client's ask, the owner's Telegram message) takes one admission sequence,
+chat (the owner's message, an inbound client's ask, the owner's Source message) takes one admission sequence,
 `ChatOperations.send`: within the budget, under the chat's lock (`KeyedLock`), the chat open, its **receipt** recorded
 in `app_chat_operations` with the selected Pi session, a routine's waiting question answered, the session on the
 owner's model, then Pi's submit (or the subagent relay), the receipt moved on to `submitted` (or `refused` with the
 failure's type), and one flow event. A Persona ask takes the same admission (`ChatOperations.admit`). A retry uses the
 recorded session; the receipt alone proves no Pi acceptance, so a retry still submits the same operation for Pi to
-deduplicate. A receipt (`chats/receipts.ts`) says what the operation was (`kind`: send, ask_client, telegram,
+deduplicate. A receipt (`chats/receipts.ts`) says what the operation was (`kind`: send, ask_client, source,
 persona_ask, start, reply, empty, move, `write:<entry kind>` for a passive write…), who started it (`origin`), the
 chat it made (`target_chat`), the operation that led to it (`parent_op`), how it ended (`state`, `reason`,
 `settled_at`); every admission writes its kind and state, so a row without them reads as `Internal`, and `receiptOf`
@@ -288,7 +286,7 @@ connection) and return an error result (`pi/setup.ts`, `outsideScopeResult`): wh
 details `{ kind: 'not-in-topic', target, topic }` (`NotInTopic`) that ask the owner to add it to the Topic, and Goblin
 waits; in a subagent, a Persona or a routine the result has words only. The ask shows in the chat's `attention`. The
 owner's console and an App view and job calls carry no conversation. Agent-initiated app calls carry their
-conversation through nested apps and MCP powers, so its scope is checked live at dispatch; Telegram and inbound clients
+conversation through nested apps and MCP powers, so its scope is checked live at dispatch; Sources use their routed Topic, and inbound clients
 talk in Personal's Conversation, so Personal's setup covers them.
 
 The per-conversation switches of ADR 0010 are gone; the only rows of their tables are a subagent's exclusions.
@@ -349,13 +347,13 @@ grants) saved as a new revision with the revision it was read at (`PATCH /api/pe
 reload), Archive or Restore, and its revisions. `/p/new` creates one (one operation id per visit). Connections and Settings are columns of titled sections (`PageSection`)
 whose states read in words (`lib/labels.ts`), never the raw value the runtime sends. The workspace fills the page beside it. The transcript scrolls in a `MessageScroller` (from `@shadcn/react`, patched with upstream fixes that are not
 released yet; `bun run check:patches` proves the patch is installed). Each of
-the owner's turns (typed in the app or sent from Telegram, `isOwnTurn` in `lib/parts.ts`) is a scroll anchor; a
+the owner's turns (typed in the app or marked as the owner through a Source, `isOwnTurn` in `lib/parts.ts`) is a scroll anchor; a
 message from an MCP client, a subagent, a routine or a thread's share-back arrives without moving the view. Until its
 snapshot arrives a chat shows nothing. Conversations open at their end. A turn map in the transcript's right gutter
 (`components/turn-map.tsx`) marks each of the owner's turns where it sits, with a band for what is on screen; hovering it
 lists the turns and a click jumps to one. Without a fine pointer, or in a narrow window, an edge tab opens the list as a
 bottom drawer that a swipe down closes. A new turn of the owner's pins near the top while its reply fits beneath it; once the turn is answered
-past the fold, whether the reply grew there or arrived with it (a snapshot after the tab was away, a Telegram turn),
+past the fold, whether the reply grew there or arrived with it (a snapshot after the tab was away, a Source turn),
 the view follows the bottom. It follows a streaming reply only while the reader is at the end, and otherwise offers a
 jump back. A message just sent shows at once, before the stream confirms it (`lib/echo.ts`; the server's entry takes
 its row), and a `Thinking…` row stands in after it and after every tool result until the model's thinking, answer or

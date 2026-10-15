@@ -96,14 +96,15 @@ into one digest line ("+N more from <label> in Activity") the next hour's first 
 lists ten read notifications under the unread ones, and Show older adds ten more at a time. Reminders, answers and digests are not counted, nor is the skill learner's notice of a draft it wrote (`notice:skill-draft:<hash>`, see Skills). Notifications older than thirty days are pruned. A notice
 of a routine with `tellMe.copy`, while Notify me via is set, carries its words frozen when it is claimed
 (ADR 0070, `notices/copies.ts`): each due copy is sent once per attempt, with a stable operation id
-(`notice-<digest>`), through the sink as it was at its first attempt (its revision: when it was set and a digest of
-what it says), the template filled with the words as written (`fillTemplate`, no escaping), as goblin's own call
+(`notice-<digest>`), through the sink as it was at its first attempt (a fresh revision per save and a digest of
+all settings), the template filled with the words as written (`fillTemplate`, no escaping), as goblin's own call
 under the owner's grant of the tool (`caller: 'model'`). Resident authority and the sink are checked again right
-before the call leaves; losing either, a sink changed or cleared since, a tool set to Ask first or the server's
-refusal suppresses it, any other failure retries with backoff and fails after five attempts or fifteen minutes, and
-the remote receipt is kept apart. The outbox's SQL columns keep their first names (`telegram_*`) until
-the migrations are squashed; Drizzle calls them `copy*`. An event from the sink's own connection never goes back to it
-(the echo rule, checked at the claim and at the first attempt). Runs no longer carry a notification of their own. An
+before the call leaves. Losing either, a changed or cleared sink, an ask-first tool or an explicit rejection suppresses
+it. Owner-reviewed result predicates distinguish accepted, retryable, rejected and unknown (ADR 0071): unknown
+outcomes are terminal and never retried automatically. Explicit retries and transport failures retain the stable
+operation id, use bounded backoff and fail after five attempts or fifteen minutes; the remote receipt stays separate
+from acceptance. Echo suppression requires the same connection and exact configured event selector. Unrelated
+services multiplexed on a connection still receive copies. Runs no longer carry a notification of their own. An
 occurrence more than five minutes older than the routine's confirmation, or a day old, is acknowledged and dropped,
 so a producer that replays its backlog on a fresh subscription neither notifies nor runs. `app.notice`, `app.routine`
 and `app.persona` entries count as replies, so a routine's posts leave its chat unread.

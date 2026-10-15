@@ -7,7 +7,7 @@ borrowed browser session. Resident authority (`app_resident`, the `Resident` ser
 window on every owner API request except changing it (`POST /api/agent/resident`), the event streams, the files and
 the OAuth callback; the internal API (inbound calls and hooks) never renews it. Turning
 it off in Settings ("Work while you're away") sticks: activity does not re-enable it, only the explicit toggle does.
-Model MCP tools, skills, inbound `ask_agent` and scheduled Telegram pulls and replies require current authority. The
+Model MCP tools, skills, inbound `ask_agent` and scheduled Source pulls and replies require current authority. The
 owner's own `mcp` endpoints are renewed like the rest and do not call `requireResident`; their tool and resource calls
 still check exact grants (`mcp/servers/api.ts`, `pi/resident-mcp.ts`, `pi/skills.ts`).
 

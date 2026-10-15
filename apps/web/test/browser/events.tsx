@@ -7,7 +7,7 @@ import '../../src/styles.css'
 
 /**
  * Sidequest's worker connection, connected and sending events the owner has not set up yet (ADR 0041), one of which
- * goblin's Telegram channel already takes.
+ * an existing subscription already takes.
  */
 const WORKER: ServerView = {
   connectionId: 'sq-worker',
@@ -19,13 +19,12 @@ const WORKER: ServerView = {
   events: 'open',
   eventHealth: [
     {
-      subscriptionId: 'sub-telegram',
+      subscriptionId: 'sub-existing',
       name: 'sidequest.worker.messages',
       granted: true,
       status: 'active',
       refreshBefore: null,
       lastReceiptAt: null,
-      telegram: true,
     },
   ],
 }

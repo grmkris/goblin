@@ -1,6 +1,6 @@
 import type { QueryKey } from '@tanstack/react-query'
 import type { AppView, OrganizeReceipt } from '@goblin/contracts'
-import { channelChatsKey, usageQuery } from '../../agent/queries.ts'
+import { usageQuery } from '../../agent/queries.ts'
 import { agentAppQuery, agentAppsQuery } from '../../agent-apps/queries.ts'
 import { conversationKeys } from '../../conversations/queries.ts'
 import { mcpKeys } from '../../mcp/queries.ts'
@@ -63,13 +63,6 @@ function receiptCame(
 }
 
 /**
- * A Telegram route or new-chats default that changed (by the agent, an answer in Telegram, or an Undo): the chats list,
- * in the Telegram card and Activity's offers.
- */
-const telegramEdges = (before: readonly OrganizeReceipt[], after: readonly OrganizeReceipt[]): QueryKey[] =>
-  receiptCame(before, after, (kind) => kind.startsWith('telegram.')) ? [channelChatsKey] : []
-
-/**
  * A Source's conversation route that changed (by the owner, the agent's `source_route`, or an Undo): every read of the
  * Sources, the list Activity offers from and each route table.
  */
@@ -86,7 +79,6 @@ const sourceEdges = (before: readonly OrganizeReceipt[], after: readonly Organiz
  * - A Persona changed: the Persona reads, what composers can tag, and the routines (one handed to it may wait to be
  *   confirmed again).
  * - A connection's tools changed (the server said so, or a list came back different): its tool list.
- * - A Telegram route or the new-chats default changed (its organizing receipt came or was undone): the chats list.
  * - A Source's conversation route changed (its organizing receipt came or was undone): the Sources and their routes.
  */
 export function staleAfter(before: Cached, after: Cached): readonly QueryKey[] {
@@ -98,7 +90,6 @@ export function staleAfter(before: Cached, after: Cached): readonly QueryKey[] {
       ? []
       : [personaKeys.all, conversationKeys.composers, routinesQuery.queryKey]),
     ...(before.tools === undefined || tools === undefined ? [] : toolEdges(before.tools, tools)),
-    ...(before.receipts === undefined || receipts === undefined ? [] : telegramEdges(before.receipts, receipts)),
     ...(before.receipts === undefined || receipts === undefined ? [] : sourceEdges(before.receipts, receipts)),
   ]
 }

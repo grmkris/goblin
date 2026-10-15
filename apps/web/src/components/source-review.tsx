@@ -31,11 +31,6 @@ import { StatusLabel } from './status-label.tsx'
 
 /** Why a change to a Source was refused, in words the owner can act on; else the calm generic line. */
 export function sourceRefusal(failure: unknown, action: string): string {
-  if (failure instanceof InvalidInput && failure.reason === 'telegram_on')
-    return withRef(
-      'Turn Telegram off on this connection first: one connection carries either the Telegram channel or Sources.',
-      failure,
-    )
   if (failure instanceof Conflict)
     return withRef('This Source changed since you read it. Review its current revision below.', failure)
   return messageOf(failure, action)

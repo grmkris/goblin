@@ -88,7 +88,7 @@ function sharedBlock(
 
 /**
  * A user message's parts as the runtime wrote them (`pi/content.ts`): an optional author tag block (a message from
- * Telegram, a Source, an MCP client or a subagent), the words, then the attached files and App context blocks, and for
+ * a Source, an MCP client or a subagent), the words, then the attached files and App context blocks, and for
  * a message from elsewhere goblin's mark that it is the owner's own turn (`own`). Only blocks after the words count,
  * and only when every one of them is one of those, so nothing anyone typed is ever read as either.
  */

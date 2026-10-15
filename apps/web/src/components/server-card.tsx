@@ -1,5 +1,5 @@
 // One of the owner's connections (ADR 0041): its name, the server it reaches, where it stands and its actions (Open for
-// its App), then once connected a summary, and behind Manage access its words, events, Sources, skills, Telegram channel
+// its App), then once connected a summary, and behind Manage access its words, events, Sources, skills
 // and tools. A server's title and description are its own claims.
 import { useEffect, useId, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -35,7 +35,6 @@ import { ConnectionEvents, eventsAnchor } from './connection-events.tsx'
 import { ConnectionSources } from './connection-sources.tsx'
 import { AppTile } from './apps/app-tile.tsx'
 import { StatusLabel } from './status-label.tsx'
-import { type TelegramChannel, TelegramControl, hasTelegramTools } from './telegram-control.tsx'
 import { AnotherConnection, ChooseAccess, RenameConnection } from './connection-forms.tsx'
 import { type Action, type Edit, RemoveConfirm, ServerMenu } from './server-menu.tsx'
 import { ToolGrants } from './tool-grants.tsx'
@@ -100,20 +99,19 @@ function SkillsSwitch({
 
 /**
  * What a connected server offers, behind Manage access: its own words, its events (and what goblin does with them),
- * its Sources (ADR 0066), skills, Telegram, then its tools.
+ * its Sources (ADR 0066), skills, then its tools.
  */
 function ServerBody({
   server,
   tools,
   failure,
   onMessage,
-  channel,
 }: Omit<ServerCardProps, 'onDone'> & {
   readonly tools: readonly ToolView[] | undefined
   /** Why its tools could not be read, if they could not, and a way to read them again. */
   readonly failure: { readonly error: unknown; readonly retry: () => void }
 }) {
-  const settings = server.skillsOffered === true || server.skillsEnabled === true || hasTelegramTools(tools ?? [])
+  const settings = server.skillsOffered === true || server.skillsEnabled === true
   return (
     <CardContent>
       <div className="server-body server-body-open">
@@ -127,12 +125,7 @@ function ServerBody({
         <ConnectionSources server={server} />
         {settings && (
           <section className="server-part" aria-label="Settings">
-            {(server.skillsOffered === true || server.skillsEnabled === true) && (
-              <SkillsSwitch server={server} onMessage={onMessage} />
-            )}
-            {tools !== undefined && hasTelegramTools(tools) && (
-              <TelegramControl connectionId={server.connectionId} channel={channel} />
-            )}
+            <SkillsSwitch server={server} onMessage={onMessage} />
           </section>
         )}
         {failure.error !== null ? (
@@ -155,7 +148,6 @@ type ServerCardProps = {
   readonly onMessage: (message: string) => void
   /** Something done, said where the page tells the owner (another connection added). */
   readonly onDone: (message: string) => void
-  readonly channel: TelegramChannel
 }
 
 /** Connect, Disconnect and Look for new tools, with which of them is under way. */
@@ -366,7 +358,7 @@ function ServerSummary({
   )
 }
 
-export function ServerCard({ server, onReload, onMessage, onDone, channel }: ServerCardProps) {
+export function ServerCard({ server, onReload, onMessage, onDone }: ServerCardProps) {
   const { tools, error, retry } = useServerTools(server)
   const { pending, act } = useServerActions(server, onMessage)
   const [removing, setRemoving] = useState(false)
@@ -424,7 +416,6 @@ export function ServerCard({ server, onReload, onMessage, onDone, channel }: Ser
               failure={{ error, retry }}
               onReload={onReload}
               onMessage={onMessage}
-              channel={channel}
             />
           </CollapsibleContent>
         </Collapsible>

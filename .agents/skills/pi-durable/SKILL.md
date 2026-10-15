@@ -36,7 +36,7 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
 - Extensions take the agent's bridge (`runtime/bridge.ts`) as their way into its services: `run`. A hook calls it; a
   program never calls it from inside an Effect. New Effect code reaches Pi through `PiSessions` (`pi/sessions.ts`): every call
   names its session, failures are a typed `PiFailure`, and interrupting a `wait` ends only the wait.
-- Owner, inbound and Telegram submissions admit `(chat, operationId)` through `ChatOperations.send` before calling
+- Owner, inbound and Source submissions admit `(chat, operationId)` through `ChatOperations.send` before calling
   Pi. The operation's receipt pins the Pi session it was admitted to, so a retry submits there again; the per-chat lock
   covers admission only and is released before model execution or waiting. `PiSessions.wait` resolves through that
   binding. Nothing rebinds a chat (ADR 0030): Move to thread forks a new Thread instead. The application ledger prunes
@@ -90,8 +90,8 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   native profile for unit/local workerd proof.
 - Topics (ADR 0032): a Topic's Conversation is a **new** `sessions.create()` session configured explicitly (extension
   list and Personal's tool filter), never a fork of Personal. Threads, "+" threads and subagents inherit their
-  parent's `topic_id`; a "+" thread announces itself in its Topic's Conversation (`conversationAbove`). Inbound,
-  Telegram and `recentOwnerMessages` keep resolving the primary chat. Archive stops a Topic's chats through the owner's
+  parent's `topic_id`; a "+" thread announces itself in its Topic's Conversation (`conversationAbove`).
+  Inbound clients and `recentOwnerMessages` keep resolving the primary chat; Sources use their confirmed routes. Archive stops a Topic's chats through the owner's
   Stop, never a background abort of a Conversation, and refuses new work until Restore, which restarts nothing.
 - Start thread (ADR 0034, `chats/thread-heads.ts`): a Thread is made once per owner operation (`origin_op`), forked at
   the chat's newest entry outside a running turn (`pi/turns.ts`, never inside one), then `app.thread_head` goes into

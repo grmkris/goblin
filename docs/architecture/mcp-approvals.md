@@ -18,4 +18,4 @@ A tool that spends is a tool like any other ([ADR 0063](../adr/0063-mcp-first-no
 reads no amount from a call's arguments and keeps no limit of its own. Ask first is how the owner controls one, and a
 server's own limits stay its own. Every held call's card is the same: the exact arguments, Refuse and Approve once
 (`components/approval-card.tsx`, `ApprovalDecision`). Only the model's calls in a conversation reach the hold step;
-work goblin does on its own (agent apps, the Telegram channel) is refused an ask-first tool.
+work goblin does on its own (agent apps, Source replies) is refused an ask-first tool.

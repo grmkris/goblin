@@ -57,7 +57,7 @@ the first Topic and holds Main.
 A Topic's one long-lived chat. It never closes and keeps a memory instead of an ever-longer context.
 
 **Main**:
-Personal's Conversation, chat `1`. The owner's browser, inbound clients and Telegram talk in it, each message from
+Personal's Conversation, chat `1`. The owner's browser and inbound clients talk in it, each message from
 anyone but the owner's browser labelled with its author.
 _Avoid_: root session
 
@@ -141,12 +141,6 @@ _Avoid_: alert, ping
 **Notification**:
 A routine post the owner asked to be told about: listed in Activity's Notifications, counted in the Activity badge
 until read.
-
-**Telegram channel**:
-The one MCP connection that carries Telegram for the agent (ADRs 0009, 0011, 0055): mygram's, directly or through
-mysi, woken by its signed MCP Events. Every chat the grant reaches (the owner's DM, groups, forum topics) has a
-**Telegram route**: the Topic its messages become turns in, answered by goblin or a Persona back in the same place, or
-kept as notes, or ignored; a new chat waits for the owner's choice. Answers go back through mygram's send tool.
 
 **Source**:
 An MCP connection whose events carry the owner's own messages into goblin and goblin's answers back, by a **Source

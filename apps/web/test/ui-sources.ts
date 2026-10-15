@@ -1,7 +1,7 @@
 /**
  * Local browser acceptance of Sources (ADR 0066) against real source components, at phone width in light and desk width
  * in dark: on a connection's card, a Source the agent proposed (no server suggests one, ADR 0068), the review card's
- * facts, a confirm refused while Telegram rides the connection and then confirmed at the exact revision, and
+ * facts, a stale revision refused and then confirmed at the exact revision, and
  * the Source's conversations with a route picked; Activity's waiting conversation (set up to a Persona) and a Source
  * paused for review; Settings' Notify me via filled from the Source's answers and saved. No account or model call is
  * made; the owner API is routed here.
@@ -123,11 +123,11 @@ async function serve(page: Page, label: string, sources: Map<string, Json>) {
   await page.route('**/api/sources/*/confirm', (route) => {
     const id = new URL(route.request().url()).pathname.split('/').at(-2) ?? ''
     confirms.push(route.request().postDataJSON())
-    // The first confirm finds Telegram riding the connection; the owner turns it off and confirms again.
+    // A stale review is refused; the owner reads the current setup and confirms its revision.
     if (confirms.length % 2 === 1)
       return route.fulfill({
-        status: 400,
-        json: { error: { code: 'invalid_input', message: 'Check the details.', reason: 'telegram_on' } },
+        status: 409,
+        json: { error: { code: 'conflict', message: 'The source changed.', reason: 'source_revision' } },
       })
     const confirmed = { ...sources.get(id), state: 'active', confirmedAt: 2 }
     sources.set(id, confirmed)
@@ -161,7 +161,7 @@ async function connection(browser: Browser, origin: string, label: string, optio
   await noSidewaysScroll(page, label)
   await page.screenshot({ path: path.join(out, `${label}-review.png`), fullPage: true })
   await page.getByRole('button', { name: 'Confirm' }).click()
-  await page.getByText('Turn Telegram off on this connection first').waitFor()
+  await page.getByText('This Source changed since you read it. Review its current revision below.').waitFor()
   await page.getByRole('button', { name: 'Confirm' }).click()
   await page.getByRole('button', { name: 'Conversations' }).waitFor()
   await page.getByRole('button', { name: 'Conversations' }).click()

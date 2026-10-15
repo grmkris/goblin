@@ -39,12 +39,7 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   (decoded at the authenticated SDK fetch seam, which strips it) or by the `io.modelcontextprotocol/events` extension,
   which goblin declares too (ADR 0041). Signed controls have separate schemas; payloads never grant or become
   instructions.
-- Telegram (`channel/`, ADRs 0009, 0055) rides Events only, subscribed with `{ chat: 'all' }` when the grant reaches
-  every chat (the DM's otherwise); each chat's route is in `channel/routes.ts`. Its tool and Event
-  names are mygram's or mysi's spelling, read from the connection (`telegramTools`, `telegramEvent`). Preserve sanitized
-  `telegram-tg-<update>` and reply operation ids; fence old cursor writes only after both leases confirm. Hooks persist
-  receipts before asynchronous dispatch; accepted submissions are distinct from external delivery.
-- Sources (`sources/`, ADR 0066) are how any server's events carry the owner's own messages: an owner-confirmed setup
+- Sources (`sources/`, ADRs 0066, 0069) are how any server's events carry the owner's own messages: an owner-confirmed setup
   of JSON pointers and whole-value argument templates (`SourceSetup`), never a server's name. Confirmation grants the
   wake selector and the read and reply tools, subscribes `source:<id>` (handler `source-wake`) and binds the Source to
   the endpoint and its tools' grant versions; a change pauses it for review. Only messages the confirmed speaks-for-me
@@ -125,8 +120,8 @@ itself authorize model spend, external messages, deployment or production change
   a status line, a spending rule or a top-up, or reads an amount from a call's arguments. Suggested access (ADR 0060),
   the persisted App entrypoint (`mcp/apps/entrypoints.ts`), Choose access's scope union and the data shelf cover every
   server; a tool that spends is controlled by Ask first. The skill learner writes drafts to the owner's files and calls
-  no server's tool. Left for later phases: the Telegram channel's names (above) and the Apps host's MyPlan
-  question-answer message. Never add a server-specific branch: give the owner a choice that works for any server.
+  no server's tool. External messaging uses Sources (ADR 0069). Never add a server-specific branch: give the owner a
+  choice that works for any server.
 
 - MCP Apps: goblin declares `io.modelcontextprotocol/ui` (`text/html;profile=mcp-app`) to every server. An App's HTML
   is read from a resource's `text` or base64 `blob` (decoded and bounded in `mcp/apps/app-html.ts`, strict UTF-8). A call

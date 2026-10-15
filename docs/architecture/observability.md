@@ -10,7 +10,7 @@ and `LiveDoc`; the synchronous listener never calls Pi or awaits it. Final-answe
 a run. The ledger supplies exact submission/task correlation when a cache entry is gone:
 
 - **Turn:** an input submission from admission to settlement, by its operation id. Its source comes from the id's
-  prefix (`telegram-`, `routine-input:`, `subagent:`, `persona:`, …; anything else is `direct`, the owner or an MCP
+  prefix (`source-`, `routine-input:`, `subagent:`, `persona:`, …; anything else is `direct`, the owner or an MCP
   client). An unanswered turn keeps Pi's reason.
 - **Model attempt:** a generation task entering `request`, ended by the assistant entry it appends (or the task's
   fault): model, finish reason, input, output, cache and reasoning tokens, fixed error summaries, cutoff and
@@ -29,14 +29,14 @@ Outside Pi, the agent's services report to the same telemetry (`telemetry/report
   tool, outcome code (`UpstreamMcp:timeout`), expected blocked waits and duration (`mcp/connections/log.ts`). Resident callers pass
   explicit conversation/task metadata, stripped before SDK dispatch; shared connection discovery is marked without
   attributing it to a turn. Reporter failures cannot change or retry the call.
-- **Telegram** (`channel.received`, `channel.reply`): each inbox message by mygram id and its turn's operation id; each
+- **Sources** (`source.received`, `source.reply`): each message by its Source id and turn's operation id; each
   answer `sent` in pieces, or `given_up` after a day.
 - **Flow steps** (`flow`, ADR 0037): one content-free step of a conversation flow, recorded where it happens through
   `FlowEvents.record` or `withFlow` (`observability/flows.ts`), which never fails the flow it describes. The agent
-  records every flow `FlowName` names: an owner's send, a client's ask and a Telegram message as they are admitted, a
+  records every flow `FlowName` names: an owner's send, a client's ask and a Source message as they are admitted, a
   thread started (`start`, `reply`, `empty`), a move, a share-back, a close and a Stop, a Persona's ask and answer, a
   Delegate's spawn and report, a thread's announcement, a Topic created or archived, an organize Undo, a routine
-  firing and report, a Telegram delivery (and the Worker a browser crash). The operation id has its own column and
+  firing and report, a Source delivery (and the Worker a browser crash). The operation id has its own column and
   the operation that caused it is
   `goblin.operation.parent`; the rest are allowlisted ids and closed classes. A `refused` step is stored `blocked`,
   an `error` step `error`. Ledger reads skip a row of a kind they do not know.
@@ -56,7 +56,7 @@ info log lines and an unset trace status. At start the agent marks whatever the 
 `started` as interrupted and logs one `recovery` event; an event that ends after a restart says it resumed. Pi faults
 the user's task if a commit listener throws, so the recorder and every sink are guarded and only log their own
 failures. Verified with in-memory Pi (`test/telemetry.test.ts`) and local workerd (`native-telemetry.ts`, the
-Telegram Events probe). Compaction summaries' model calls are not recorded yet.
+Source Events probe). Compaction summaries' model calls are not recorded yet.
 
 The agent builds these pieces with `runTelemetry(storage, name, sinks)` (`telemetry/run.ts`, from
 `telemetry/agent.ts`): its ledger, log and recorder. The recorder is attached and `recorder.restore(harness)` awaited
@@ -142,7 +142,7 @@ own app reads `details` through the owner API (`GET /api/conversations/:id/detai
 message's Details sheet.
 
 The agent reads itself too: main has a `diagnose` tool (`pi/diagnose.ts`, wired by `telemetry/agent.ts`), so the
-owner can ask in Telegram why something failed. Without an operation id it returns the last day's problems and turns;
+owner can ask through a Source why something failed. Without an operation id it returns the last day's problems and turns;
 with one, that turn's timeline. Each event comes in a line (kind, status, timing, tool or model, error), never
 content, and the result is marked untrusted because its private details can come from remote servers. It grants nothing. A conversation
 that is not in `app_conversations` (a routine's run) has no entries page; its turns and events are still in the ledger.
