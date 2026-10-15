@@ -12,7 +12,7 @@ import { inspectAuthCase } from './auth-inspect.ts'
 const harness = Test.make({
   providers: Cloudflare.providers(),
   state: Alchemy.localState(),
-  stage: 'test_auth',
+  stage: `test_auth_${process.pid}`,
   dev: true,
 })
 const stack = harness.beforeAll(harness.deploy(Stack))

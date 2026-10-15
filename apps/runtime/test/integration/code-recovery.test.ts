@@ -9,7 +9,7 @@ import Stack from './stack.ts'
 const harness = Test.make({
   providers: Cloudflare.providers(),
   state: Alchemy.localState(),
-  stage: 'test_native_code_recovery',
+  stage: `test_native_code_recovery_${process.pid}`,
   dev: true,
 })
 const stack = harness.beforeAll(
