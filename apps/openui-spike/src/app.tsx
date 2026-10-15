@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Renderer, type ActionEvent, type OpenUIError } from '@openuidev/react-lang'
+import { ChatMarkdown, ReplySend, library, maxSourceLength, programProblems } from '@goblin/web/replies'
 import {
   Alert,
   AlertDescription,
@@ -17,17 +17,12 @@ import {
 } from '@goblin/ui'
 import { Check, Code, Moon, Play, RotateCcw, Sun } from 'lucide-react'
 import { examples, type Example } from './examples.ts'
-import { library } from './library.tsx'
-import { maxSourceLength, programProblems } from './program.ts'
 
-const modelPrompt = library.prompt({
-  preamble: 'Compose a useful reply using Goblin components.',
-  additionalRules: ['Write root first. Use synthetic data. No queries or mutations.'],
-})
+const componentReference = JSON.stringify(library.toJSONSchema(), null, 2)
 
 type Playback = { source: string; shown: number; playing: boolean; revision: number }
 
-/** Chunk replay uses the actual incremental renderer; it never claims to call a model. */
+/** Replay follows the real Markdown fence path, from unfinished code to the complete interactive reply. */
 function usePlayback(source: string) {
   const [playback, setPlayback] = useState<Playback>({ source, shown: source.length, playing: false, revision: 0 })
   useEffect(() => {
@@ -45,7 +40,7 @@ function usePlayback(source: string) {
   return { playback, setPlayback }
 }
 
-function Receipt({ action }: { readonly action: ActionEvent | undefined }) {
+function Receipt({ action }: { readonly action: string | undefined }) {
   return (
     <section className="spike-receipt" aria-label="Local action receipt" aria-live="polite">
       <div className="flex items-center gap-2 text-sm font-medium">
@@ -58,10 +53,8 @@ function Receipt({ action }: { readonly action: ActionEvent | undefined }) {
         </p>
       ) : (
         <>
-          <p className="text-sm">{action.humanFriendlyMessage || action.type}</p>
-          <pre className="spike-json">
-            {JSON.stringify({ type: action.type, params: action.params, formState: action.formState }, null, 2)}
-          </pre>
+          <p className="text-sm">{action.split('\n')[0]}</p>
+          <pre className="spike-json">{action}</pre>
         </>
       )}
       <p className="text-xs text-muted-foreground">Kept in this tab only. No message is sent and no booking is made.</p>
@@ -72,14 +65,12 @@ function Receipt({ action }: { readonly action: ActionEvent | undefined }) {
 function usePlayground(example: Example) {
   const [source, setSource] = useState<string>(example.source)
   const [problems, setProblems] = useState<string[]>([])
-  const [runtimeErrors, setRuntimeErrors] = useState<OpenUIError[]>([])
-  const [action, setAction] = useState<ActionEvent>()
+  const [action, setAction] = useState<string>()
   const { playback, setPlayback } = usePlayback(example.source)
   const render = (stream: boolean) => {
     const errors = programProblems(source)
     setProblems(errors)
     if (errors.length > 0) return
-    setRuntimeErrors([])
     setAction(undefined)
     setPlayback((current) => ({
       source,
@@ -92,7 +83,6 @@ function usePlayground(example: Example) {
   const reset = () => {
     setSource(example.source)
     setProblems([])
-    setRuntimeErrors([])
     setAction(undefined)
     setPlayback((current) => ({
       source: example.source,
@@ -105,8 +95,6 @@ function usePlayground(example: Example) {
     source,
     setSource,
     problems,
-    runtimeErrors,
-    setRuntimeErrors,
     action,
     setAction,
     playback,
@@ -118,7 +106,7 @@ function usePlayground(example: Example) {
 
 function Playground({ example }: { readonly example: Example }) {
   const state = usePlayground(example)
-  const { playback, action, setAction, runtimeErrors, setRuntimeErrors } = state
+  const { playback, action, setAction } = state
   return (
     <div className="spike-workbench">
       <section className="spike-preview" aria-label="Reply preview">
@@ -136,21 +124,19 @@ function Playground({ example }: { readonly example: Example }) {
             goblin
           </div>
           <div className="spike-renderer" data-streaming={playback.playing}>
-            <Renderer
-              key={playback.revision}
-              library={library}
-              response={playback.source.slice(0, playback.shown)}
-              isStreaming={playback.playing}
-              onAction={setAction}
-              onError={setRuntimeErrors}
-            />
+            <ReplySend
+              value={async (message) => {
+                setAction(message)
+                return true
+              }}
+            >
+              <ChatMarkdown
+                key={playback.revision}
+                text={'```openui\n' + playback.source.slice(0, playback.shown) + (playback.playing ? '' : '\n```')}
+                live={playback.playing}
+              />
+            </ReplySend>
           </div>
-          {!playback.playing && runtimeErrors.length > 0 && (
-            <Alert variant="destructive">
-              <AlertTitle>The reply needs a correction</AlertTitle>
-              <AlertDescription>{runtimeErrors.map((error) => error.message).join(' ')}</AlertDescription>
-            </Alert>
-          )}
           <p className="text-xs text-muted-foreground">{example.hint}</p>
         </div>
         <Receipt action={action} />
@@ -177,7 +163,7 @@ function SourceEditor({ state }: { readonly state: ReturnType<typeof usePlaygrou
         </Button>
       </div>
       <p className="text-sm leading-relaxed text-muted-foreground">
-        These examples replay saved OpenUI output through Goblin’s components. Edit the source to try a different reply.
+        These examples use the same reply renderer as Goblin chat. Edit the source to try a different reply.
       </p>
       <FieldGroup>
         <Field>
@@ -218,11 +204,11 @@ function SourceEditor({ state }: { readonly state: ReturnType<typeof usePlaygrou
         </Alert>
       )}
       <details className="spike-prompt">
-        <summary>Component library and model prompt</summary>
+        <summary>Component library reference</summary>
         <p className="text-xs text-muted-foreground">
-          Generated from the same ten components the preview allows. This spike makes no model calls.
+          Generated from the same ten components the preview allows. This preview makes no model calls.
         </p>
-        <pre className="spike-json">{modelPrompt}</pre>
+        <pre className="spike-json">{componentReference}</pre>
       </details>
     </aside>
   )
@@ -231,15 +217,18 @@ function SourceEditor({ state }: { readonly state: ReturnType<typeof usePlaygrou
 export function App() {
   const [selected, setSelected] = useState<string>(examples[0].id)
   const [dark, setDark] = useState(false)
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark)
+  }, [dark])
   const example = examples.find((item) => item.id === selected) ?? examples[0]
   return (
-    <div className={dark ? 'dark spike-page' : 'spike-page'}>
+    <div className="spike-page">
       <header className="spike-header">
         <a href="https://github.com/grmkris/goblin" className="spike-brand" target="_blank" rel="noreferrer">
           <GoblinMark className="size-7" />
           <span>goblin</span>
         </a>
-        <Badge variant="outline">OpenUI spike</Badge>
+        <Badge variant="outline">OpenUI preview</Badge>
         <Button
           className="ml-auto"
           variant="ghost"

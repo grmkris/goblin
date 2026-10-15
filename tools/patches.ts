@@ -23,6 +23,12 @@ export interface PatchSpec {
 
 export const PATCHES: readonly PatchSpec[] = [
   {
+    key: '@openuidev/react-lang@1.0.1',
+    entry: '@openuidev/react-lang',
+    from: 'apps/web/src',
+    source: 'patches/openui/inspector.diff',
+  },
+  {
     key: '@shadcn/react@0.3.1',
     entry: '@shadcn/react/message-scroller',
     from: 'packages/ui/src',

@@ -59,3 +59,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0065](0065-files-from-mcp-content.md) | Files from MCP content | Accepted |
 | [0066](0066-sources.md) | Sources: any MCP server's events carry the owner's own messages, by a setup the owner confirms | Accepted |
 | [0067](0067-no-home-surface-and-no-typed-decisions.md) | No Home surface and no typed decisions | Accepted |
+| [0068](0068-interactive-replies.md) | Interactive replies are ordinary owner follow-ups | Accepted |

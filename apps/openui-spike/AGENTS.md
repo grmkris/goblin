@@ -1,7 +1,7 @@
 # OpenUI spike
 
 An isolated, fixture-driven browser playground. Read the root instructions first. Use Goblin's UI and kit;
-keep OpenUI out of the main web and runtime dependency graphs. No authentication, model endpoint, MCP provider,
+import the production reply renderer from `@goblin/web/replies`, so the preview cannot drift from chat. No authentication, model endpoint, MCP provider,
 owner data or mutations. Action receipts stay in browser memory. The preview is public.
 
 Alchemy owns the independent `goblin-openui-spike` stack, with local state and stage-derived Worker names.

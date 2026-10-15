@@ -15,3 +15,35 @@ scopes the renderer CSS and namespaces marker IDs; model callbacks, links, font 
 are discarded before inline insertion. `Diagram` defaults to interactive; `interactive={false}` keeps only the image.
 The dialog stays inside an agent app's frame. Charts are Recharts in the five `--chart-*` tokens; maps are Leaflet over
 OpenStreetMap's raster tiles, quieted to the theme by a CSS filter, the one host a block fetches from. The persona prefers ordinary Markdown and describes the supported fence grammars; Telegram shows drawn fences as code.
+
+## Interactive replies
+
+A complete `openui` fence uses OpenUI Lang 1.0.1 with Goblin's allowlisted component library
+(`apps/web/src/components/parts/openui/`). It is lazy-loaded through the same `RichBlock` path. The browser owns
+only local field edits; Pi still owns the reply and every submitted message. Reloading restores the original form
+values, while submitted values remain in the ordinary transcript. The runtime's static guidance is
+`apps/runtime/src/pi/reply-ui.ts`; it introduces no renderer dependency into the Worker.
+
+`syntax.ts` uses the pinned language parser to inspect expressions before reference expansion: at most 64 unique
+statements, depth 32, and 2,000 expanded nodes. Only supported components, literals, arrays, objects and named/scalar
+state references are accepted. The component Zod schemas bound their values and collections. `program.ts` also
+bounds source to 20,000 characters and rejects incomplete programs, unresolved references and hosted bundles.
+Queries, mutations, executable actions and functions are unsupported. Parse, load and render failures retain the
+code fallback; an open streaming fence stays code until it closes.
+
+The root is a native form. Buttons have only a visible label, never a hidden instruction or executable action.
+Submission reads that label and `FormData` from the mounted visible controls, bounded to 20 values and 12,000
+characters. `ReplySend` points to the containing `ChatView`'s normal `useConversation.send`, so the typed owner API,
+CSRF header, operation identity, queue and failure handling stay unchanged. While a submission is pending the form
+is disabled; a failed unchanged message retries with the existing operation ID. Closed/archived chats, quoted
+content and views without an owner submission context disable the form. A click authorizes no tool or grant
+(ADR 0068).
+
+The library composes local shadcn controls and the existing kit chart; it offers no raw HTML, image, link, script,
+network provider or custom function. Renderer observability is disabled. The pinned dependency is patched to prevent
+its automatic development inspector from mounting, with the installed patch verified by `check:patches`.
+
+The public [reply playground](../../apps/openui-spike/README.md) imports `@goblin/web/replies`, the same renderer and
+validation as chat, and records submissions locally against synthetic examples. It is not an authenticated agent
+or a live model experiment. `apps/web/test/ui-openui.ts` exercises the actual send hook with intercepted owner HTTP
+requests; the playground's browser check separately exercises built and deployed assets.

@@ -5,6 +5,7 @@ import type { SharedContext } from '../../lib/app-context.ts'
 import { contextPreview } from '../../lib/app-context.ts'
 import { reporterOf } from '../../lib/threads.ts'
 import { MessageFiles } from '../attachments.tsx'
+import { ReplySend } from './openui/context.ts'
 import { ChatMarkdown } from './markdown.tsx'
 import { useConversations } from '../../lib/workspace/hooks.ts'
 import { useMinute } from '../use-now.ts'
@@ -12,7 +13,7 @@ import { relativeTime } from '../../lib/format.ts'
 
 /**
  * Assistant text as GitHub-flavoured Markdown, set by shadcn/typeset (`ChatMarkdown`), with the little HTML ADR 0039 allows.
- * ```mermaid, ```chart and ```map blocks are drawn (ADR 0023). While `live`, an open fence stays code.
+ * ```mermaid, ```chart, ```map and ```openui blocks are drawn (ADR 0023). While `live`, an open fence stays code.
  *
  * Memoised on its text, and its renderers are module constants: a streamed batch rebuilds every part of the
  * transcript, and new renderer functions would remount every link and table (a table scrolled sideways would snap
@@ -59,7 +60,9 @@ export function Cause({
         <span>{line}</span>
       </figcaption>
       <blockquote className="cause-quote">
-        <MessageText text={text} />
+        <ReplySend value={undefined}>
+          <MessageText text={text} />
+        </ReplySend>
       </blockquote>
     </figure>
   )

@@ -4,6 +4,9 @@
   "private": true,
   "license": "MIT",
   "type": "module",
+  "exports": {
+    "./replies": "./src/replies.ts"
+  },
   "scripts": {
     "dev": "vite dev --port 18970 --strictPort",
     "build": "vite build",
@@ -21,6 +24,8 @@
     "@goblin/ui": "workspace:*",
     "@modelcontextprotocol/client": "2.2.0",
     "@modelcontextprotocol/ext-apps": "2.0.3",
+    "@openuidev/lang-core": "1.0.1",
+    "@openuidev/react-lang": "1.0.1",
     "@streamdown/code": "2.0.0",
     "@streamdown/math": "1.0.3",
     "@tanstack/react-query": "5.104.0",
@@ -37,7 +42,8 @@
     "remark-gfm": "4.0.1",
     "remark-parse": "11.0.0",
     "streamdown": "2.7.0",
-    "unified": "11.0.5"
+    "unified": "11.0.5",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260928.1",

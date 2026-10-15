@@ -1,0 +1,14 @@
+{
+  "checks": [
+    "1280: keyboard send, pending lock, preserved form, same-operation retry through owner API",
+    "1280: closed and quoted replies disabled, other chat uses its own submission",
+    "1280: streaming and invalid code fallback, inert text, no inspector in development",
+    "1280: light/dark layout fits",
+    "390: keyboard send, pending lock, preserved form, same-operation retry through owner API",
+    "390: closed and quoted replies disabled, other chat uses its own submission",
+    "390: streaming and invalid code fallback, inert text, no inspector in development",
+    "390: light/dark layout fits"
+  ],
+  "errors": [],
+  "evidence": "local Chromium; intercepted owner API"
+}

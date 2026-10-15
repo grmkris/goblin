@@ -1,0 +1,39 @@
+diff --git a/node_modules/@openuidev/react-lang/.bun-tag-3b799f733df9a85a b/.bun-tag-3b799f733df9a85a
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/dist/index.cjs b/dist/index.cjs
+index cc6a9eb7a4f4c5e3417c7565d4b7a749b004bfbb..4d0beec4f97deb1a80f31ec8708f5e0bea406a46 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -1,3 +1,4 @@
++// @openuidev/react-lang 1.0.1 + goblin patches/openui f4af6833410e
+ Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+ const require_WithPreviewRenderer = require("./WithPreviewRenderer-DT8MjE5L.cjs");
+ let _openuidev_lang_core = require("@openuidev/lang-core");
+@@ -15,7 +16,7 @@ let _openuidev_lang_core = require("@openuidev/lang-core");
+ * in package.json's `sideEffects` so bundlers preserve the side effect while
+ * the rest of the package stays tree-shakeable.
+ */
+-if (process.env.NODE_ENV === "development") {
++if (false) {
+ 	const AUTO_MOUNT_FLAG = Symbol.for("openui.devtools.autoMount");
+ 	const flags = globalThis;
+ 	if (!flags[AUTO_MOUNT_FLAG]) {
+diff --git a/dist/index.mjs b/dist/index.mjs
+index a00fac25775e54a4c23280576054c9ce4ee0f325..0728aa24b9706f9fffa30cc194d3d287e7df94a5 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -1,3 +1,4 @@
++// @openuidev/react-lang 1.0.1 + goblin patches/openui f4af6833410e
+ import { A as useRendererQuery, B as createLibrary, C as useRendererPreview, D as useStateField, E as useFormValidation, F as useIsStreaming, I as useRenderNode, L as useSetDefaultValue, M as useFormName, N as useGetFieldValue, O as reactive, P as useIsQueryLoading, R as useSetFieldValue, S as WithPreviewRenderer, T as useCreateFormValidation, V as defineComponent, _ as parseRules, a as buildMessage, b as tagSchemaId, c as createStreamingParser, d as extractToolResult, f as generatePrompt, g as parseMessage, h as mergeStatements, i as action, j as FormNameContext, k as Renderer, l as defineAction, m as isReactiveAssign, n as BuiltinActionType, o as builtInValidators, p as generateSystemPrompt, r as ToolNotFoundError, s as createParser, t as ACTION_STEPS, u as defineFunction, v as parseStructuredRules, w as FormValidationContext, x as validate, y as steps, z as useTriggerAction } from "./exports-CLfR509v.mjs";
+ //#region src/devtoolsBootstrap.ts
+ /**
+@@ -13,7 +14,7 @@ import { A as useRendererQuery, B as createLibrary, C as useRendererPreview, D a
+ * in package.json's `sideEffects` so bundlers preserve the side effect while
+ * the rest of the package stays tree-shakeable.
+ */
+-if (process.env.NODE_ENV === "development") {
++if (false) {
+ 	const AUTO_MOUNT_FLAG = Symbol.for("openui.devtools.autoMount");
+ 	const flags = globalThis;
+ 	if (!flags[AUTO_MOUNT_FLAG]) {

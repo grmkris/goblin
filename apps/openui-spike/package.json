@@ -17,11 +17,10 @@
   "dependencies": {
     "@goblin/kit": "workspace:*",
     "@goblin/ui": "workspace:*",
-    "@openuidev/react-lang": "1.0.1",
+    "@goblin/web": "workspace:*",
     "lucide-react": "1.48.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "zod": "4.6.7"
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",

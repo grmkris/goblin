@@ -1,0 +1,5 @@
+--- src/devtoolsBootstrap.ts
++++ src/devtoolsBootstrap.ts
+@@ -1 +1 @@
+-if (process.env.NODE_ENV === "development") {
++if (false) {

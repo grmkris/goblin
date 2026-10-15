@@ -32,6 +32,7 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   as `Harness.open` returns. A listener runs inside Pi's commit: if it throws, Pi faults the user's task, so guard it,
   keep it synchronous and never call Session APIs from it. Hooks do not pair reliably (no `afterTool` for a blocked
   call, no `afterResponse` after an abort) and subagents and routine runs keep their own extension lists.
+- The static `pi/reply-ui.ts` guidance describes interactive web replies (ADR 0068). Keep it aligned with the browser component grammar; it grants no authority and adds no Pi extension state.
 - Submissions carry stable operation IDs. Acceptance is not completed external work; never claim exactly-once effects.
 - Extensions take the agent's bridge (`runtime/bridge.ts`) as their way into its services: `run`. A hook calls it; a
   program never calls it from inside an Effect. New Effect code reaches Pi through `PiSessions` (`pi/sessions.ts`): every call

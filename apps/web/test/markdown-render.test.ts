@@ -10,6 +10,7 @@ const tool = (text: string) => renderToStaticMarkup(createElement(ToolMarkdown, 
 
 /** Sources each figure kind can draw. */
 const SOURCES = {
+  openui: 'root = Stack([Heading("Hello", "World")])',
   mermaid: 'graph TD\n A-->B',
   chart: '{"type":"bar","x":"month","series":[{"key":"sales"}],"data":[{"month":"Jan","sales":3}]}',
   map: '{"center":[52.52,13.405],"zoom":10}',
@@ -24,7 +25,7 @@ const PLACES = [
 ] as const
 const BOTH = [false, true] as const
 /** Every figure kind, fence character and place, open and closed, streaming and settled. */
-const fences: Fence[] = (['mermaid', 'chart', 'map'] as const).flatMap((kind) =>
+const fences: Fence[] = (['mermaid', 'chart', 'map', 'openui'] as const).flatMap((kind) =>
   ['```', '~~~'].flatMap((mark) =>
     PLACES.flatMap(([where, before]) =>
       BOTH.flatMap((closed) =>

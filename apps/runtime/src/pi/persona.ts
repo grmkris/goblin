@@ -1,4 +1,5 @@
 import { defineExtension, section } from '@earendil-works/pi-durable'
+import { REPLY_UI } from './reply-ui.ts'
 
 // Sentences are joined with spaces so the model sees prose, not the source file's line wrapping.
 const prose = (...paragraphs: ReadonlyArray<ReadonlyArray<string>>): string =>
@@ -62,5 +63,9 @@ const TRUST = prose([
 /** goblin's system prompt: who the agent is, and how it treats remote content. Static, so prompt caches stay warm. */
 export const personaExtension = defineExtension({
   name: 'goblin.persona',
-  sections: [section('persona', () => PERSONA, { tag: false }), section('trust', () => TRUST)],
+  sections: [
+    section('persona', () => PERSONA, { tag: false }),
+    section('reply-ui', () => REPLY_UI),
+    section('trust', () => TRUST),
+  ],
 })

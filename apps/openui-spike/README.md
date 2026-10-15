@@ -1,16 +1,16 @@
 # OpenUI playground
 
-A public, fixture-driven spike for interactive Goblin replies: hotel comparison with a reactive budget filter,
+A public, fixture-driven preview of Goblin’s production reply renderer: hotel comparison,
 a trip form, and a weekly dashboard using Goblin's existing chart. The source editor accepts another plain OpenUI
-program, and **Replay stream** feeds the real renderer small chunks of the saved program.
+program, and **Replay stream** shows the same code fallback as chat until the fence closes.
 
 This does not call a model. The examples are synthetic. Buttons record their message and values in the page;
 they do not send a conversation message, book anything, or call an MCP tool. Reloading resets the examples.
 
 Preview: <https://goblin-openui-spike-preview.kristjan-grm11775.workers.dev>
 
-Try each tab, change the hotel budget or trip details, and press a reply button to inspect its local action receipt.
-Use **Replay stream** to see the reply appear incrementally, or edit **OpenUI source** and press **Render code**.
+Try each tab, change the trip details, and press a reply button to inspect its local action receipt.
+Use **Replay stream** to see an unfinished fence become an interactive reply, or edit **OpenUI source** and press **Render code**.
 The theme button switches between light and dark.
 
 ## Run and check
@@ -27,7 +27,7 @@ heavy bun run --cwd apps/openui-spike test:browser
 ```
 
 The browser check starts the built site at a loopback URL and covers a 1440px desktop and a 390px phone, light and
-dark themes, partial rendering, form values, filtering, empty results, source editing, invalid input, and reload.
+dark themes, streaming fallback, form values, option selection, source editing, invalid input, and reload.
 Screenshots and its receipt go to `.local/openui-spike/`. Pass `--url https://<preview>.workers.dev --out <directory>`
 to `test:browser` to exercise the deployed artifact instead. Chromium phone emulation is not physical-device evidence.
 
@@ -52,21 +52,18 @@ owner is done with the preview, is `alchemy destroy --config alchemy.run.ts --st
 
 ## Scope and boundaries
 
-- `src/library.tsx` registers ten components backed by `@goblin/ui` and a lazy `@goblin/kit/chart` import.
-- `src/program.ts` bounds source size, reports parser errors and unresolved references, and refuses queries,
-  mutations, and hosted message bundles. The renderer receives no tool provider or custom executable functions.
-- Action output remains data in a local receipt. Even a generated open-URL action never opens a URL.
-- Text is React text, with no raw HTML, image or link component. The deployed CSP blocks network connections,
-  frames, form submission, and external scripts. Every runtime asset is served by the preview itself.
-- OpenUI's automatic development inspector is excluded by using its production entry behavior in this playground.
-  Install scripts are not needed. No OpenUI cloud, telemetry consent, or model service is configured.
-- OpenUI remains a dependency of this app only. Pi, the main web app, the MCP Apps host and agent-app runtime do
-  not import it. Root quality checks include this workspace.
+The preview imports `@goblin/web/replies`: the same `ChatMarkdown`, OpenUI component library, validation and action
+message builder used by the real app. There is no second renderer. Its `ReplySend` adapter records the exact text
+locally instead of calling the owner API. The main app uses the containing conversation's normal send hook.
 
-This spike establishes component compatibility and interactive rendering, not generation reliability or a latency
-improvement. A subsequent model experiment should measure total prompt/output tokens, successful generations,
-time until usable, and client cost against current rich blocks and agent apps. Any integration into conversations
-also needs an explicit action/authority adapter, replay/state policy, and readable fallback for external channels.
+Text stays React text; there are no HTML, image or URL components, executable actions, functions, queries or
+mutations. The deployed CSP blocks network connections, frames, native form navigation and external scripts.
+OpenUI's automatic development inspector is disabled by the checked package patch, and renderer observability is
+off. Every runtime asset is self-hosted. The Alchemy build includes web source in its memo inputs.
+
+This preview demonstrates rendering and action-message construction. It does not establish model-generation
+reliability, latency savings, tool execution or authenticated deployment behavior. See
+[chat blocks](../../docs/architecture/chat-blocks.md) for the integration and its state/authority policy.
 
 Sources: [OpenUI React runtime](https://github.com/thesysdev/openui/tree/47514a85963524ad3c73d9158d91e2b3b829a1f5/packages/react-lang),
 [benchmark methodology](https://github.com/thesysdev/openui/blob/47514a85963524ad3c73d9158d91e2b3b829a1f5/benchmarks/README.md),

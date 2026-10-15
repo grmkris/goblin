@@ -1,8 +1,8 @@
 # Development
 
-The isolated [OpenUI playground](../apps/openui-spike/README.md) explores interactive replies with synthetic data.
-It has its own Alchemy stack and public Worker preview; it has no model or account bindings. Its dependencies are
-not imported by the main web app. See its README for local checks and preview deployment.
+The isolated [OpenUI playground](../apps/openui-spike/README.md) previews the production interactive-reply renderer with synthetic data.
+It has its own Alchemy stack and public Worker preview; it has no model or account bindings. The playground imports
+the web app's reply renderer and does not enter the main app bundle. See its README for local checks and deployment.
 
 Requirements are Bun `1.4.2` and Node.js 22.
 
@@ -510,3 +510,12 @@ delivery, cron-after-deploy and real producer acceptance require separate deploy
 Check Main with an empty transcript and existing history at desktop and phone widths: the composer remains reachable and the latest exchange is the landing point. Apps open in their tool rows or as their own pages; moving between page and chat preserves the single iframe and action bridge. Installed iPhone behavior remains an owner device check.
 
 The no-auth inbox fixture builds the `app_docs` example in Dynamic Workers and drives the native job callback through 15-minute slots. It checks newest-five validation, freshness and last-good retention after an invalid response. Run it from `apps/runtime` with `heavy bun run test:integration test/integration/inbox.test.ts`. Real MyInbox sign-in, app-power approval and message freshness on dev are separate owner steps.
+
+## Interactive reply checks
+
+`heavy bun apps/web/test/ui-openui.ts` exercises native Markdown rendering and the real conversation submission hook
+against intercepted HTTP: field values, keyboard submit, pending state, failed-send retry identity, conversation
+routing, disabled quoted/closed replies, streaming and invalid fallback, light/dark and 390px layout. It uses local
+Chromium and does not call a model or prove authenticated deployment behavior. The public playground uses the same
+renderer and has its own built/deployed browser check documented in its README. `check:patches` verifies the OpenUI
+inspector patch in both normal gates; review it when upgrading the dependency.

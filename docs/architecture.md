@@ -40,3 +40,5 @@ flowchart LR
 - [Storage](architecture/storage.md): D1, Durable Object SQLite and migrations.
 - [Infrastructure and release](architecture/infrastructure.md): Alchemy stacks, stage origins, release and public source.
 - [Routines and notices](architecture/routines.md): routine definitions, runs and notices.
+
+Interactive `openui` replies use the existing Markdown and owner-message paths; see [chat blocks](architecture/chat-blocks.md) and [ADR 0068](adr/0068-interactive-replies.md).

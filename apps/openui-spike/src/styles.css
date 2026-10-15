@@ -1,6 +1,7 @@
 @import '@goblin/ui/styles.css';
 @import '@goblin/kit/kit.css';
 @source './';
+@source '../../web/src/components/parts/';
 
 body {
   margin: 0;
@@ -80,23 +81,6 @@ body {
   min-block-size: 12rem;
   min-inline-size: 0;
   overflow-wrap: anywhere;
-}
-.spike-stays {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-  gap: 1rem;
-}
-.spike-stays [data-slot='card'] {
-  display: flex;
-  flex-direction: column;
-}
-.spike-stays [data-slot='card-footer'] {
-  margin-block-start: auto;
-}
-.spike-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
-  gap: 1.5rem;
 }
 .spike-receipt {
   display: flex;

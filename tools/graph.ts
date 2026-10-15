@@ -48,7 +48,7 @@ export const nodes: readonly Node[] = [
     name: '@goblin/openui-spike',
     role: 'isolated fixture playground for OpenUI with Goblin components',
     runtime: 'browser',
-    mayImport: ['@goblin/kit', '@goblin/ui'],
+    mayImport: ['@goblin/kit', '@goblin/ui', '@goblin/web'],
     zones: { 'alchemy.run.ts': 'tooling', 'vite.config.ts': 'tooling' },
   },
   {

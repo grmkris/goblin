@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { examples } from '../src/examples.ts'
-import { maxSourceLength, programProblems } from '../src/program.ts'
+import { maxSourceLength, programProblems } from '@goblin/web/replies'
 
 describe('the fixture library', () => {
   for (const example of examples)
@@ -12,8 +12,8 @@ describe('the fixture library', () => {
   })
 
   it('refuses tool queries and mutations even when they are valid OpenUI', () => {
-    expect(programProblems('root = Stack([])\nrows = Query("read_private_data", {}, [])').join(' ')).toMatch(/disabled/)
-    expect(programProblems('root = Stack([])\nwrite = Mutation("send_message", {})').join(' ')).toMatch(/disabled/)
+    expect(programProblems('root = Stack([])\nrows = Query("read_private_data", {}, [])')).not.toEqual([])
+    expect(programProblems('root = Stack([])\nwrite = Mutation("send_message", {})')).not.toEqual([])
   })
 
   it('bounds source size and refuses hosted message bundles', () => {

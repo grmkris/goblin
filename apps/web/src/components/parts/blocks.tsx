@@ -4,6 +4,7 @@ import { Skeleton } from '@goblin/ui'
 import type { BlockKind } from '../../lib/fences.ts'
 
 // Each kind loads its library only when a message first shows one.
+const OpenUI = lazy(() => import('./openui/block.tsx').then((module) => ({ default: module.OpenUIBlock })))
 const Diagram = lazy(() => import('@goblin/kit/diagram').then((module) => ({ default: module.Diagram })))
 const Chart = lazy(() => import('@goblin/kit/chart').then((module) => ({ default: module.Chart })))
 const MapView = lazy(() => import('@goblin/kit/map').then((module) => ({ default: module.MapView })))
@@ -29,6 +30,7 @@ const useInBrowser = () =>
   )
 
 function drawn(kind: BlockKind, source: string, code: ReactNode): ReactNode {
+  if (kind === 'openui') return <OpenUI source={source} fallback={code} />
   if (kind === 'mermaid') return <Diagram source={source} fallback={code} />
   if (kind === 'chart') {
     const spec = chartSpec(source)
@@ -39,7 +41,7 @@ function drawn(kind: BlockKind, source: string, code: ReactNode): ReactNode {
 }
 
 /**
- * A ```mermaid, ```chart, or ```map block drawn from its source; `code` shows before hydration
+ * A ```mermaid, ```chart, ```map, or ```openui block drawn from its source; `code` shows before hydration
  * and whenever the source is not one it can draw.
  */
 export function RichBlock({

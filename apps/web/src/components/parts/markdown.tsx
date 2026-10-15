@@ -64,7 +64,7 @@ const LANGUAGE = /(?:^|\s)language-(\S+)/u
 
 /**
  * Code in a reply. Inline, it is typeset's. A block (Streamdown's `pre` marks it `data-block`) is a figure when its
- * language is ```mermaid, ```chart or ```map and its fence is whole, and a `CodeBlock` otherwise. While a reply
+ * language is ```mermaid, ```chart, ```map or ```openui and its fence is whole, and a `CodeBlock` otherwise. While a reply
  * streams, the block still being written stays code: Streamdown says which one that is. A figure's fallback is marked
  * `data-figure`, so which code becomes a figure shows (and is tested) before hydration.
  */

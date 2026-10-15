@@ -48,11 +48,10 @@
       "dependencies": {
         "@goblin/kit": "workspace:*",
         "@goblin/ui": "workspace:*",
-        "@openuidev/react-lang": "1.0.1",
+        "@goblin/web": "workspace:*",
         "lucide-react": "1.48.0",
         "react": "19.3.0",
         "react-dom": "19.3.0",
-        "zod": "4.6.7",
       },
       "devDependencies": {
         "@tailwindcss/vite": "4.3.3",
@@ -110,6 +109,8 @@
         "@goblin/ui": "workspace:*",
         "@modelcontextprotocol/client": "2.2.0",
         "@modelcontextprotocol/ext-apps": "2.0.3",
+        "@openuidev/lang-core": "1.0.1",
+        "@openuidev/react-lang": "1.0.1",
         "@streamdown/code": "2.0.0",
         "@streamdown/math": "1.0.3",
         "@tanstack/react-query": "5.104.0",
@@ -127,6 +128,7 @@
         "remark-parse": "11.0.0",
         "streamdown": "2.7.0",
         "unified": "11.0.5",
+        "zod": "4.6.7",
       },
       "devDependencies": {
         "@cloudflare/workers-types": "5.20260928.1",
@@ -245,6 +247,7 @@
   },
   "patchedDependencies": {
     "@shadcn/react@0.3.1": "patches/@shadcn%2Freact@0.3.1.patch",
+    "@openuidev/react-lang@1.0.1": "patches/@openuidev%2Freact-lang@1.0.1.patch",
   },
   "overrides": {
     "@better-auth/oauth-provider": "1.7.6",

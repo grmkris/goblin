@@ -12,6 +12,7 @@ import { Conversation } from '../conversation.tsx'
 import { ConversationDock } from '../conversation-dock.tsx'
 import { useMarkRead, useOnScreen } from '../on-screen.ts'
 import { AppsIn } from '../parts/mcp-tool-part.tsx'
+import { ReplySend } from '../parts/openui/context.ts'
 import { PartView } from '../parts/registry.tsx'
 import { Cause } from '../parts/text-part.tsx'
 import { useConversation, useDockInsets, useTranscript } from '../use-conversation.ts'
@@ -87,9 +88,11 @@ function useLead(view: ConversationView, parts: readonly Part[], earlier: boolea
     )
   else if (root.length > 0)
     lead = (
-      <AppsIn conversation={undefined}>
-        <ThreadRoot parts={root} replies={view.replies} from={parent} />
-      </AppsIn>
+      <ReplySend value={undefined}>
+        <AppsIn conversation={undefined}>
+          <ThreadRoot parts={root} replies={view.replies} from={parent} />
+        </AppsIn>
+      </ReplySend>
     )
   return { lead, shown }
 }
@@ -106,6 +109,15 @@ function useFolded(id: string, parts: readonly Part[]): Part[] {
     ),
   )
   return useMemo(() => groupWork(parts, { appCalls: new Set(openApps) }), [parts, openApps])
+}
+
+/** Keeps the channel's list of thread heads aligned with its transcript. */
+function useHeads(parts: readonly Part[], onHeads: ((heads: ReadonlySet<string>) => void) | undefined) {
+  const heads = useMemo(
+    () => parts.flatMap((part) => (part.kind === 'thread-head' ? [part.thread] : [])).join(' '),
+    [parts],
+  )
+  useEffect(() => onHeads?.(new Set(heads === '' ? [] : heads.split(' '))), [heads, onHeads])
 }
 
 /**
@@ -160,27 +172,25 @@ export function ChatView({
   const { lead, shown } = useLead(view, parts, earlier !== undefined, hideRoot)
   const extras = useChatExtras(id, shown)
   const rows = useFolded(id, shown)
-  const heads = useMemo(
-    () => parts.flatMap((part) => (part.kind === 'thread-head' ? [part.thread] : [])).join(' '),
-    [parts],
-  )
-  useEffect(() => onHeads?.(new Set(heads === '' ? [] : heads.split(' '))), [heads, onHeads])
+  useHeads(parts, onHeads)
   return (
     <section className="chat-view" data-place={place} aria-label={threadTitle(view)} ref={section} data-app-scope>
       {header}
-      <AppsIn conversation={id}>
-        <Conversation
-          parts={rows}
-          canSwitchModel={models > 1}
-          threads={threads}
-          onOpen={openChat}
-          after={extras.after}
-          trail={extras.trail}
-          loading={projection === undefined}
-          {...(earlier && { onEarlier: earlier })}
-          {...(lead !== undefined && { lead })}
-        />
-      </AppsIn>
+      <ReplySend value={banner === undefined && closedBy(view) === undefined ? conversation.send : undefined}>
+        <AppsIn conversation={id}>
+          <Conversation
+            parts={rows}
+            canSwitchModel={models > 1}
+            threads={threads}
+            onOpen={openChat}
+            after={extras.after}
+            trail={extras.trail}
+            loading={projection === undefined}
+            {...(earlier && { onEarlier: earlier })}
+            {...(lead !== undefined && { lead })}
+          />
+        </AppsIn>
+      </ReplySend>
       {banner ?? (
         <ConversationDock
           ref={dock}

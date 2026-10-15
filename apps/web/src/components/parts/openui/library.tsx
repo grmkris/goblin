@@ -1,19 +1,11 @@
-import { lazy, Suspense, useId, useState } from 'react'
-import {
-  action,
-  createLibrary,
-  defineComponent,
-  reactive,
-  useIsStreaming,
-  useStateField,
-  useTriggerAction,
-} from '@openuidev/react-lang'
+import { lazy, Suspense, useId } from 'react'
+import { createLibrary, defineComponent, reactive, useIsStreaming, useStateField } from '@openuidev/react-lang'
 import { z } from 'zod/v4'
+import { chartSpec } from '@goblin/kit'
 import {
   Alert,
   AlertDescription,
   AlertTitle,
-  Badge,
   Button,
   Card,
   CardContent,
@@ -21,10 +13,6 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
   Field,
   FieldGroup,
   FieldLabel,
@@ -36,21 +24,6 @@ import {
 
 const Chart = lazy(() => import('@goblin/kit/chart').then((module) => ({ default: module.Chart })))
 const text = z.string().max(1000)
-
-function useLocalAction() {
-  const trigger = useTriggerAction()
-  const [failure, setFailure] = useState('')
-  const run = (...args: Parameters<typeof trigger>) => {
-    setFailure('')
-    Promise.resolve()
-      .then(() => trigger(...args))
-      .catch(() => {
-        // expected: report invalid user-edited actions in the preview without exposing interpreter internals.
-        setFailure('This action could not be recorded. Reset the example and try again.')
-      })
-  }
-  return { run, failure }
-}
 
 const Stack = defineComponent({
   name: 'Stack',
@@ -85,6 +58,7 @@ const TextField = defineComponent({
           <FieldLabel htmlFor={id}>{props.label}</FieldLabel>
           <Input
             id={id}
+            name={props.label}
             value={field.value ?? ''}
             maxLength={500}
             disabled={streaming}
@@ -110,6 +84,7 @@ const NumberField = defineComponent({
           <FieldLabel htmlFor={id}>{props.label}</FieldLabel>
           <Input
             id={id}
+            name={props.label}
             type="number"
             min={props.min}
             max={props.max}
@@ -140,12 +115,13 @@ const ChoiceField = defineComponent({
           <FieldLabel htmlFor={id}>{props.label}</FieldLabel>
           <NativeSelect
             id={id}
+            name={props.label}
             value={field.value ?? ''}
             disabled={streaming}
             onChange={(event) => field.setValue(event.target.value)}
           >
-            {props.options.map((option) => (
-              <NativeSelectOption key={option} value={option}>
+            {props.options.map((option, index) => (
+              <NativeSelectOption key={index} value={option}>
                 {option}
               </NativeSelectOption>
             ))}
@@ -158,80 +134,41 @@ const ChoiceField = defineComponent({
 
 const ActionButton = defineComponent({
   name: 'ActionButton',
-  description: 'An explicit action, recorded locally in this spike. Use @ToAssistant(message, context).',
-  props: z.object({ label: text, action: action() }),
-  component: function ActionButtonView({ props }) {
-    const { run: trigger, failure } = useLocalAction()
-    const streaming = useIsStreaming()
-    // SAFETY: OpenUI materializes action() as ActionPlan; its published schema still describes the legacy action shape.
-    const plan = props.action as Parameters<typeof trigger>[2]
-    return (
-      <div>
-        <Button disabled={streaming} onClick={() => trigger(props.label, undefined, plan)}>
-          {props.label}
-        </Button>
-        {failure !== '' && <p role="alert">{failure}</p>}
-      </div>
-    )
-  },
+  description: 'Sends its visible label and the visible form values as an owner follow-up. No hidden action.',
+  props: z.object({ label: text.min(1).max(200) }),
+  component: ({ props }) => (
+    <Button type="submit" value={props.label}>
+      {props.label}
+    </Button>
+  ),
 })
 
-const Hotels = defineComponent({
-  name: 'Hotels',
-  description: 'Compare synthetic hotel options within the current nightly budget.',
+const Cards = defineComponent({
+  name: 'Cards',
+  description: 'Compare up to eight options. Each button sends its visible label as a follow-up.',
   props: z.object({
-    items: z.array(z.object({ name: text, area: text, price: z.number(), note: text, tag: text })).max(12),
-    budget: z.number(),
+    items: z.array(z.object({ title: text, description: text, detail: text, label: text.min(1).max(200) })).max(8),
   }),
-  component: function HotelsView({ props }) {
-    const { run: trigger, failure } = useLocalAction()
-    const streaming = useIsStreaming()
-    const stays = props.items.filter((hotel) => hotel.price <= props.budget)
-    if (stays.length === 0)
-      return (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>No stays in this range</EmptyTitle>
-            <EmptyDescription>Raise the nightly budget to see more options.</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      )
-    return (
-      <div className="spike-stays">
-        {failure !== '' && <p role="alert">{failure}</p>}
-        {stays.map((hotel) => (
-          <Card key={hotel.name} size="sm">
-            <CardHeader>
-              <Badge variant="secondary">{hotel.tag}</Badge>
-              <CardTitle>{hotel.name}</CardTitle>
-              <CardDescription>{hotel.area}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <p className="text-sm text-muted-foreground">{hotel.note}</p>
-              <p>
-                <span className="text-2xl font-semibold tabular-nums">€{hotel.price}</span>
-                <span className="text-sm text-muted-foreground"> / night</span>
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button
-                variant="outline"
-                disabled={streaming}
-                onClick={() => {
-                  trigger(`Choose ${hotel.name}`, undefined, {
-                    type: 'continue_conversation',
-                    params: { hotel: hotel.name, price: hotel.price },
-                  })
-                }}
-              >
-                Choose {hotel.name}
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
-    )
-  },
+  component: ({ props }) => (
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,14rem),1fr))] gap-4">
+      {props.items.map((item, index) => (
+        <Card key={index} size="sm">
+          <CardHeader>
+            <CardTitle>{item.title}</CardTitle>
+            <CardDescription>{item.description}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p>{item.detail}</p>
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" variant="outline" value={item.label}>
+              {item.label}
+            </Button>
+          </CardFooter>
+        </Card>
+      ))}
+    </div>
+  ),
 })
 
 const Metrics = defineComponent({
@@ -239,9 +176,9 @@ const Metrics = defineComponent({
   description: 'A row of up to four summary numbers.',
   props: z.object({ items: z.array(z.object({ label: text, value: text, note: text })).max(4) }),
   component: ({ props }) => (
-    <dl className="spike-metrics">
-      {props.items.map((item) => (
-        <div key={item.label} className="flex flex-col gap-1">
+    <dl className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-4">
+      {props.items.map((item, index) => (
+        <div key={index} className="flex flex-col gap-1">
           <dt className="text-sm text-muted-foreground">{item.label}</dt>
           <dd className="text-3xl font-semibold tabular-nums">{item.value}</dd>
           <dd className="text-xs text-muted-foreground">{item.note}</dd>
@@ -251,26 +188,19 @@ const Metrics = defineComponent({
   ),
 })
 
-const ActivityChart = defineComponent({
-  name: 'ActivityChart',
-  description: 'A Goblin bar chart of tasks completed on each day.',
-  props: z.object({
-    title: text,
-    points: z.array(z.object({ day: text, tasks: z.number().min(0).max(1000) })).max(14),
-  }),
-  component: ({ props }) => (
-    <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-      <Chart
-        spec={{
-          type: 'bar',
-          title: props.title,
-          x: 'day',
-          series: [{ key: 'tasks', label: 'Tasks' }],
-          data: props.points,
-        }}
-      />
-    </Suspense>
-  ),
+const ReplyChart = defineComponent({
+  name: 'Chart',
+  description: 'A chart using the same JSON spec as a chart fence, encoded as a string.',
+  props: z.object({ spec: z.string().max(12000) }),
+  component: function ChartView({ props }) {
+    const spec = chartSpec(props.spec)
+    if (spec === undefined) throw new Error('Invalid reply chart')
+    return (
+      <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+        <Chart spec={spec} />
+      </Suspense>
+    )
+  },
 })
 
 const Note = defineComponent({
@@ -286,7 +216,14 @@ const Note = defineComponent({
 })
 
 /** No custom functions, tool provider, remote images, links, HTML, or scripts. */
+const components = [Stack, Heading, TextField, NumberField, ChoiceField, ActionButton, Cards, Metrics, ReplyChart, Note]
+
+/** Concrete schemas retained independently of OpenUI's type-erased component registry. */
+export const componentSchemas: ReadonlyMap<string, z.ZodObject> = new Map(
+  components.map(({ name, props }) => [name, props]),
+)
+
 export const library = createLibrary({
-  components: [Stack, Heading, TextField, NumberField, ChoiceField, ActionButton, Hotels, Metrics, ActivityChart, Note],
+  components,
   root: 'Stack',
 })
