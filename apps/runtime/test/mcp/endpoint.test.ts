@@ -17,7 +17,16 @@ describe('endpoints the owner may add', () => {
     expect(reason('http://mcp.example.com/mcp')).toBe('endpoint_not_https')
     expect(reason('https://user:pw@mcp.example.com/mcp')).toBe('endpoint_invalid')
     expect(reason('https://mcp.example.com/mcp#x')).toBe('endpoint_invalid')
-    for (const host of ['localhost', '127.0.0.1', '[::1]', 'intranet', 'nas.local', 'db.internal', 'a.home.arpa'])
+    for (const host of [
+      'localhost',
+      'localhost.',
+      '127.0.0.1',
+      '[::1]',
+      'intranet',
+      'nas.local',
+      'db.internal',
+      'a.home.arpa',
+    ])
       expect(reason(`https://${host}/mcp`)).toBe('endpoint_not_public')
     expect(reason('not a url')).toBe('endpoint_not_a_url')
     expect(reason(`https://example.com/${'x'.repeat(2050)}`)).toBe('endpoint_too_long')

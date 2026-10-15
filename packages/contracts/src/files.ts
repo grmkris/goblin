@@ -76,3 +76,10 @@ export const Attachment = Schema.Struct({
   mimeType: Schema.String.check(Schema.isMaxLength(128)),
 })
 export type Attachment = typeof Attachment.Type
+
+/**
+ * The files goblin kept in the owner's files from one MCP tool result (ADR 0065): its links, embedded resources and
+ * audio, written under `/agent/received/`. A model call's result details carry them as `received`, which the web shows
+ * as chips under the call.
+ */
+export const ReceivedFiles = Schema.Array(Attachment)

@@ -11,10 +11,9 @@ import { bound } from '../runtime/boundary.ts'
 import { authority, resumeRoutine } from './held-authority.ts'
 import { metUrlRequest, urlRequestId } from './approvals.ts'
 import { type McpCallInput, heldCallChanged, modelApprovalId, waitOnOwner } from './approval-request.ts'
-import { urlRequiredResult } from './extension.ts'
+import { outcomeResult, urlRequiredResult } from './extension.ts'
 import { keepLateApp } from './kept-app.ts'
 import { named } from './labels.ts'
-import { redactSecretFields } from './redaction.ts'
 import { Approvals, McpConnections, McpServers, UrlRequests } from './service.ts'
 import type { HeldCallOutcome, UrlAnswer, UrlPrompt } from './types.ts'
 import type { UrlRequestRow } from './url-requests.ts'
@@ -233,7 +232,7 @@ export const answerUrlRequest = <R>(input: {
           state: row.state as McpOutcome['continuation']['state'],
         },
         origin: { connectionId: row.connectionId, trust: 'untrusted' },
-        ...Option.match(result, { onNone: () => ({}), onSome: (value) => ({ result: redactSecretFields(value) }) }),
+        ...Option.match(result, { onNone: () => ({}), onSome: (value) => ({ result: outcomeResult(value) }) }),
       }
       const text = settledText(row, named(labels, row.connectionId))
       const from = labels.get(row.connectionId) ?? row.connectionId

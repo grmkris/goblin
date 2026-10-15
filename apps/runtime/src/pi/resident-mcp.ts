@@ -1,4 +1,10 @@
-import { type ToolExecutionApi, ToolTask, defineExtension, hook } from '@earendil-works/pi-durable'
+import {
+  type ToolExecutionApi,
+  type ToolRegistration,
+  ToolTask,
+  defineExtension,
+  hook,
+} from '@earendil-works/pi-durable'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import type { Grant, ServerView } from '@goblin/contracts'
@@ -8,8 +14,18 @@ import { Chats } from '../chats/service.ts'
 import { FlowEvents } from '../observability/flows.ts'
 import type { SetupScope } from '../setup/scope.ts'
 import { Setups } from '../setup/service.ts'
-import { type GrantDenied, type NeedsAuthorization, NotFound, type ScopeRequired, UpstreamMcp } from '../http/errors.ts'
+import {
+  type GrantDenied,
+  type NeedsAuthorization,
+  NotFound,
+  type ScopeRequired,
+  UpstreamMcp,
+  attempt,
+  attemptSync,
+} from '../http/errors.ts'
+import { AgentInput } from '../runtime/input.ts'
 import { describeError } from '../telemetry/attributes.ts'
+import { materialize } from '../mcp/content.ts'
 import { offersEvents, toolOffered } from '../mcp/remote.ts'
 import { connectRequiredResult, grantRequiredResult, mcpModelResult, scopeRequiredResult } from '../mcp/extension.ts'
 import { named } from '../mcp/labels.ts'
@@ -23,6 +39,9 @@ import { ReadyResult, typedTool } from './typed-tool.ts'
 import { McpCallInput, holdModelCall, approvalResult } from '../mcp/approval-request.ts'
 import { keepModelApp } from '../mcp/kept-app.ts'
 import { holdUrlRequest } from '../mcp/url-request.ts'
+
+/** The Pi context a tool's execution runs in. */
+type ToolContext = Parameters<ToolRegistration['execute']>[2]
 
 /** What a model's MCP tool checks before it runs: resident authority, then a routine run's own, when it is one. */
 const executionAuthority = (session: string) => Effect.andThen(requireResident, requireRoutineSession(session))
@@ -347,6 +366,24 @@ const callFailure = (cause: unknown): string =>
     ? `${describeError(cause)}. The call may have reached the server and taken effect: check its state with a read-only tool before calling it again, and never repeat a paid or one-time action blind.`
     : describeError(cause)
 
+/**
+ * Whether the model answering this conversation sees images: its Pi model takes image input (`pi/model.ts`), as pi-ai
+ * decides when it sends a tool result's images. Asked only when a kept file is a small image, which is then shown to it
+ * beside the file's reference (ADR 0065).
+ */
+const seesImages = (api: ToolExecutionApi, context: ToolContext) =>
+  Effect.gen(function* () {
+    const { pi } = yield* AgentInput
+    const chosen = (yield* attempt(() => api.agent(context))).model
+    const model = yield* attemptSync(() =>
+      chosen === undefined ? pi.model : pi.models.getModel(chosen.provider, chosen.modelId),
+    )
+    return model?.input.includes('image') === true
+  }).pipe(
+    // expected: a model goblin cannot tell sees images reads the file's reference alone, which is enough.
+    Effect.orElseSucceed(() => false),
+  )
+
 const requestFor = (api: ToolExecutionApi, signal: AbortSignal | undefined): McpRequestOptions => ({
   runContext: { conversationId: String(api.conversationId), taskId: String(api.taskId) },
   ...(signal === undefined ? {} : { signal }),
@@ -454,7 +491,12 @@ export function residentMcpExtension(run: RunProgram) {
                           yield* holdUrlRequest(session, api.callId, String(api.taskId), input, outcome.prompt),
                         )
                       yield* keepModelApp(session, api.callId, input)
-                      return new ReadyResult(mcpModelResult(input.connectionId, outcome.result))
+                      // The files the result hands over are kept in the owner's files (ADR 0065), after the call.
+                      const received = yield* materialize(input.connectionId, outcome.result, {
+                        images: seesImages(api, context),
+                        ...(context.abortSignal === undefined ? {} : { signal: context.abortSignal }),
+                      })
+                      return new ReadyResult(mcpModelResult(input.connectionId, outcome.result, received))
                     }),
                   ),
                   Effect.catchTag('GrantDenied', (denied) =>

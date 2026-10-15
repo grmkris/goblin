@@ -1,17 +1,53 @@
 import type { CallToolResult } from '@modelcontextprotocol/client'
 import type { ToolExecutionResult } from '@earendil-works/pi-durable'
+import { type Materialized, NOTHING_RECEIVED, type Received, recordedBlock, recordedContent } from './content.ts'
 import { redactSecretFields as redact } from './redaction.ts'
-/** Pi supports text and image blocks. Other MCP blocks remain explicit tagged data in the result details. */
-const mcpModelContent = (result: CallToolResult): NonNullable<ToolExecutionResult['content']> => {
-  const blocks: NonNullable<ToolExecutionResult['content']> = []
-  for (const block of result.content) {
-    if (block.type === 'text') blocks.push({ type: 'text', text: block.text })
+
+type ModelContent = NonNullable<ToolExecutionResult['content']>
+
+/**
+ * What the model reads in place of a block goblin kept as a file (ADR 0065): the file's path, name, type and size, with
+ * a small copy of an image when it sees images; or the note saying why it was not kept.
+ */
+const receivedContent = (received: Received): ModelContent => {
+  if (received.kind === 'note')
+    return [
+      {
+        type: 'text',
+        text: JSON.stringify({
+          notReceived: received.note,
+          ...(received.link === undefined ? {} : { resourceLink: received.link }),
+        }),
+      },
+    ]
+  const { path, name, mimeType, size } = received.file
+  return [
+    { type: 'text', text: JSON.stringify({ receivedFile: { path, name, mimeType, size } }) },
+    ...(received.image === undefined ? [] : [{ type: 'image' as const, ...received.image }]),
+  ]
+}
+
+/**
+ * Pi supports text and image blocks. A block goblin kept as a file is its reference; any other is explicit tagged data,
+ * its links without their query and fragment.
+ */
+const mcpModelContent = (result: CallToolResult, received: Materialized): ModelContent => {
+  const blocks: ModelContent = []
+  for (const [index, block] of result.content.entries()) {
+    const kept = received.get(index)
+    if (kept !== undefined) blocks.push(...receivedContent(kept))
+    else if (block.type === 'text') blocks.push({ type: 'text', text: block.text })
     else if (block.type === 'image') blocks.push({ type: 'image', data: block.data, mimeType: block.mimeType })
-    else blocks.push({ type: 'text', text: JSON.stringify({ unsupportedMcpContent: redact(block) }) })
+    else blocks.push({ type: 'text', text: JSON.stringify({ unsupportedMcpContent: redact(recordedBlock(block)) }) })
   }
   return blocks
 }
-/** The details of a model's tool result: the server's own fields, redacted and marked untrusted. */
+
+/**
+ * The details of a model's tool result: the server's own fields, redacted and marked untrusted, with every link
+ * without its query and fragment (a signed URL never reaches the transcript) and a kept block without its bytes; and
+ * `received`, goblin's own list of the files it kept from the result (ADR 0065).
+ */
 export const mcpResultDetails = (
   connectionId: string,
   result: {
@@ -19,22 +55,39 @@ export const mcpResultDetails = (
     readonly _meta?: unknown
     readonly content?: unknown
   },
-) =>
-  redact({
+  received: Materialized = NOTHING_RECEIVED,
+) => {
+  const files = [...received.values()].flatMap((item) => (item.kind === 'file' ? [item.file] : []))
+  return redact({
     origin: { connectionId, trust: 'untrusted' },
     structuredContent: result.structuredContent,
     _meta: result._meta,
-    content: result.content,
+    content: recordedContent(result.content, received),
+    ...(files.length === 0 ? {} : { received: files }),
   })
+}
 
-/** A redacted model envelope; the manager retains the original rich MCP result for the host. */
-export const mcpModelResult = (connectionId: string, result: CallToolResult): ToolExecutionResult => ({
+/**
+ * A held call's result as its outcome carries it into the conversation (ADR 0042): redacted, every link without its
+ * query and fragment.
+ */
+export const outcomeResult = (result: CallToolResult) => redact({ ...result, content: recordedContent(result.content) })
+
+/**
+ * A redacted model envelope; the manager retains the original rich MCP result for the host. `received` is what
+ * `materialize` kept of it, each such block read as its file's reference.
+ */
+export const mcpModelResult = (
+  connectionId: string,
+  result: CallToolResult,
+  received: Materialized = NOTHING_RECEIVED,
+): ToolExecutionResult => ({
   content: [
     { type: 'text', text: JSON.stringify({ origin: { connectionId, trust: 'untrusted' } }) },
-    ...mcpModelContent(result),
+    ...mcpModelContent(result, received),
   ],
   isError: result.isError === true,
-  details: mcpResultDetails(connectionId, result),
+  details: mcpResultDetails(connectionId, result, received),
 })
 
 /**

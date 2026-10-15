@@ -5,7 +5,7 @@ import * as Option from 'effect/Option'
 import type { AppError } from '../http/errors.ts'
 import { bound } from '../runtime/boundary.ts'
 import { type ApprovalRow, metUrlRequest } from './approvals.ts'
-import { redactSecretFields } from './redaction.ts'
+import { outcomeResult } from './extension.ts'
 import { named } from './labels.ts'
 import { heldCallChanged } from './approval-request.ts'
 import { keepLateApp } from './kept-app.ts'
@@ -139,7 +139,7 @@ export const decideApproval = <R>(input: {
           state: row.state as McpOutcome['continuation']['state'],
         },
         origin: { connectionId: row.connectionId, trust: 'untrusted' },
-        ...Option.match(result, { onNone: () => ({}), onSome: (value) => ({ result: redactSecretFields(value) }) }),
+        ...Option.match(result, { onNone: () => ({}), onSome: (value) => ({ result: outcomeResult(value) }) }),
       }
       const text = decisionText(row, named(labels, row.connectionId))
       const from = labels.get(row.connectionId) ?? row.connectionId

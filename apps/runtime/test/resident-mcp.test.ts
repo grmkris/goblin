@@ -22,6 +22,7 @@ import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
 import type { AgentServices } from '../src/layers/index.ts'
 import { chatDatabase, durable } from './chats-sqlite.ts'
 import { FixedProfiles } from './fixed-services.ts'
+import { memoryFiles } from './memory-files.ts'
 import { sqliteDb, stub } from './http/api/fixture.ts'
 import { MemoryCredentials, MemoryGrants, MemoryLabels, MemoryRegistries } from './mcp/memory.ts'
 import { declaresUrlElicitation, lowLevelServer } from './mcp/low-level-server.ts'
@@ -47,6 +48,7 @@ const notes = createMcpHandler(() => {
       { name: 'panel', inputSchema: { type: 'object', properties: {} }, _meta: { ui: { visibility: ['app'] } } },
       { name: 'admin', inputSchema: { type: 'object', properties: {} } },
       { name: 'share', inputSchema: { type: 'object', properties: {} } },
+      { name: 'export', inputSchema: { type: 'object', properties: {} } },
     ],
   }))
   server.setRequestHandler('tools/call', (request, ctx) => {
@@ -60,6 +62,13 @@ const notes = createMcpHandler(() => {
         },
         requestState: 'share_1',
       } as never
+    if (request.params.name === 'export')
+      return {
+        content: [
+          { type: 'text', text: 'ran export' },
+          { type: 'resource_link', uri: EXPORT, name: 'Export', mimeType: 'text/csv' },
+        ],
+      }
     return { content: [{ type: 'text', text: `ran ${request.params.name}` }] }
   })
   return server
@@ -67,6 +76,11 @@ const notes = createMcpHandler(() => {
 
 /** The link `share` asks the owner to open: it carries a one-time token, so it never enters a transcript. */
 const SHARE = 'https://notes.test/share?token=one-time'
+
+/** The file `export` hands over: a signed link to a public host, so its signature never enters a transcript. */
+const EXPORT = 'https://cdn.notes.test/exports/notes.csv?signature=signed-secret'
+/** The headers each fetch of the export link was sent with. */
+const downloads: Record<string, string>[] = []
 
 /** A long remote description, over several lines: what a large server's tools carry. */
 const LONG = Array.from(
@@ -125,6 +139,10 @@ const fetcher = async (input: RequestInfo | URL, init?: RequestInit) => {
       headers: { 'www-authenticate': 'Bearer error="insufficient_scope", scope="notes:read notes:admin"' },
     })
   const host = new URL(request.url).hostname
+  if (host === 'cdn.notes.test') {
+    downloads.push(Object.fromEntries(request.headers))
+    return new Response('title\nfirst note\n', { headers: { 'content-type': 'text/csv' } })
+  }
   return host === 'jobs.test'
     ? jobs.fetch(request)
     : host === 'gateway.test'
@@ -143,6 +161,7 @@ const host = mcpHost({
     { connectionId: 'notes', capability: 'tool', name: 'read' },
     { connectionId: 'notes', capability: 'tool', name: 'admin' },
     { connectionId: 'notes', capability: 'tool', name: 'share' },
+    { connectionId: 'notes', capability: 'tool', name: 'export' },
     { connectionId: 'jobs', capability: 'tool', name: 'job.0', askFirst: true },
     { connectionId: 'jobs', capability: 'tool', name: 'job.1' },
   ]),
@@ -180,6 +199,8 @@ const scopes: Readonly<Record<string, SetupScope>> = {
   '9': work({ mcpServers: [{ connectionId: 'notes', tools: ['write'] }] }),
   '10': scopeOf([off('server', 'notes')], false),
 }
+/** The owner's files, where a result's linked file is kept (ADR 0065). */
+const files = memoryFiles()
 /** The tools' services over the host and the fixed switches above, always resident. */
 const profiles = new FixedProfiles(scopes)
 const urlRequests = new McpUrlRequestStore(
@@ -202,7 +223,7 @@ const layer = host.pipe(
       sqliteDb(chatDatabase().db),
     ),
   ),
-  Layer.merge(Layer.mergeAll(resident, events)),
+  Layer.merge(Layer.mergeAll(resident, events, files.layer)),
 )
 const run = <A>(program: Effect.Effect<A, AppError, AgentServices>): Promise<A> =>
   // SAFETY: mcp_call and mcp_list need only the MCP, resident authority and capability services provided here.
@@ -272,6 +293,19 @@ describe('mcp_call and the owner grant (unit)', () => {
       url: SHARE,
       message: 'Share it?',
     })
+  })
+  it("keeps the file a result links to in the owner's files: the model reads its path, never the link (ADR 0065)", async () => {
+    const result = await call('export')
+    expect(result.isError).toBe(false)
+    const [path] = [...files.written.keys()]
+    expect(path).toMatch(/^\/agent\/received\/notes-mine\/\d{4}-\d{2}-\d{2}\/Export\.csv$/u)
+    expect(JSON.stringify(result.content)).toContain(`"path\\":\\"${String(path)}\\"`)
+    expect(result.details).toMatchObject({ received: [{ path, name: 'Export.csv', mimeType: 'text/csv' }] })
+    expect(JSON.stringify(result)).not.toContain('signed-secret')
+    // Fetched as anyone could: the connection's token stays with the connection.
+    expect(downloads).toHaveLength(1)
+    expect(JSON.stringify(downloads)).not.toContain('fixture-token')
+    expect(downloads[0]).not.toHaveProperty('authorization')
   })
   it("lists each connection with the owner's label, so two accounts of one server are told apart", async () => {
     expect(await listed({}, 7)).toEqual({
