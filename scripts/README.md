@@ -44,8 +44,9 @@ is measured on the opened panel itself. All visible text fields are checked for 
 or range has no text to size); the code input uses 18px. The hybrid context verifies touch behavior with a fine primary pointer.
 
 `heavy bun apps/web/test/ui-local.ts` runs the source components in a local Vite fixture without an account or model
-call. It covers editable primitives, composer Return behavior, full Home note reading with focus return, synthetic
-keyboard/pinch-zoom handling, failed attachment retry/remove/send blocking, and Home feedback under reduced motion.
+call. It covers editable primitives and composer Return behavior across touch, desktop and hybrid pointers,
+failed attachment retry/remove/send blocking, component styles and Thoughts closure under reduced motion,
+and conversation-feed render isolation.
 Its private receipts and screenshots go under `.local/goblin-acceptance/local-*`.
 
 ## Smoke
