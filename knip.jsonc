@@ -24,33 +24,55 @@
   "ignore": ["tools/oxlint/anti-slop/**", ".agents/skills/**"],
   // `cloudflare:workers` is a Workers runtime module (RpcTarget, WorkerEntrypoint), not a package.
   "ignoreDependencies": ["@effect/language-service", "cloudflare"],
+  // `bun run lint:gate` runs knip twice: as configured, and in production mode (`--production`), which reads only the
+  // entries and project files marked `!` and so reports code that only tests use. Tests, test helpers, browser
+  // fixtures and build scripts are project files without `!`. An export production does not use but keeps on purpose
+  // carries the JSDoc tag `@internal` and says why; production mode skips it, and the configured run still requires a
+  // user of it.
   "workspaces": {
     ".": {
+      // The stage, release and smoke scripts deploy and check the stages.
       "entry": ["scripts/**/*.ts!"],
     },
     "scripts/fixtures/mcp-app": {
+      // What the fixture serves is the App's module (client.mts). Its loopback server (server.ts, an entry through
+      // `bun run start`) only serves it to the browser tests: what only the server imports (`effect`) is a
+      // devDependency; `@modelcontextprotocol/server` stays a dependency as the App SDK's peer.
       "entry": ["client.mts!"],
-      "project": ["**/*.ts", "**/*.mts"],
+      "project": ["**/*.mts!", "**/*.ts"],
     },
     "tools": {
       "entry": ["*.ts!", "oxlint/*.ts!"],
+      "project": ["*.ts!", "oxlint/**/*.ts!", "test/**/*.ts"],
       "ignoreDependencies": ["@effect/tsgo"],
     },
     "apps/runtime": {
-      "entry": ["test/provider-probe.ts!"],
+      // A hand-run probe of a model provider, not part of the agent.
+      "entry": ["test/provider-probe.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"],
+      // The Telegram channel is being deleted (cleanup plan); only its tests use `closeOffer`. Drop this with it.
+      "ignoreIssues": { "src/channel/routes.ts": ["exports"] },
+    },
+    "apps/cli": {
+      "project": ["src/**/*.ts!", "test/**/*.ts"],
     },
     "apps/web": {
       // Browser acceptance scripts boot the source fixtures through Vite, outside the app import graph.
       "entry": [
         "alchemy.run.ts!",
         "src/worker.ts!",
-        "test/ui-*.ts!",
-        "test/browser/*.tsx!",
-        "test/browser/question-app.ts!",
-        "test/browser/vite.config.ts!",
-        "test/perf/*.tsx!",
-        "test/perf/vite.config.ts!",
+        "test/ui-*.ts",
+        "test/browser/*.tsx",
+        "test/browser/question-app.ts",
+        "test/browser/vite.config.ts",
+        "test/perf/*.tsx",
+        "test/perf/vite.config.ts",
       ],
+      // `vite.react.ts` holds the build's React plugins, which the Vite configs import.
+      "project": ["src/**/*.{ts,tsx,css}!", "vite.react.ts", "test/**/*.{ts,tsx}"],
+    },
+    "packages/kit": {
+      "project": ["src/**/*.{ts,tsx}!", "test/**/*.ts"],
     },
     "packages/app": {
       // scripts/build.ts reads tw-animate-css's stylesheet from node_modules by path (its package exports CSS only).
@@ -70,6 +92,8 @@
         // Appended by scripts/build.ts to the frame's ui.css.
         "src/ui/frame.css!",
       ],
+      // The build script makes dist/ from the sources; it is tooling, not part of what ships.
+      "project": ["src/**/*.{ts,tsx,css}!", "scripts/**/*.ts", "test/**/*.ts"],
     },
   },
   "ignoreExportsUsedInFile": true,

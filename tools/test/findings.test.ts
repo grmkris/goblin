@@ -35,4 +35,13 @@ describe('knip collection', () => {
   test('a run that did not finish fails with its stderr', () => {
     expect(knipFailures({ exitCode: 2, stdout: '', stderr: 'boom' }, 0)).toEqual(['knip exited 2\nboom'])
   })
+
+  test('the production run names itself in its failures', () => {
+    expect(knipFailures({ exitCode: 1, stdout: '{"issues":[]}', stderr: '' }, 0, 'knip --production')).toEqual([
+      'knip --production reported configuration hints, which knip.jsonc treats as errors; `bun run knip --production` lists them',
+    ])
+    expect(knipFailures({ exitCode: 2, stdout: '', stderr: 'boom' }, 0, 'knip --production')).toEqual([
+      'knip --production exited 2\nboom',
+    ])
+  })
 })

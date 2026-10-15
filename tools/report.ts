@@ -160,8 +160,12 @@ const isItemList = Schema.is(Schema.Array(Schema.Unknown))
 /** Issue types `knip --fix` removes: the `export` keyword, or the manifest entry. */
 const KNIP_FIXABLE = new Set(['exports', 'types', 'dependencies', 'devDependencies'])
 
-/** `knip --reporter json` output as findings, one per issue item, under the rule `knip(<issue type>)`. */
-export const fromKnip = (output: unknown): Finding[] =>
+/**
+ * `knip --reporter json` output as findings, one per issue item, under the rule `knip(<issue type>)`, or with
+ * `production` (a `knip --production` run) `knip(production:<issue type>)`. A production finding is code only tests
+ * use, which `knip --fix` would break the tests by removing, so none is fixable.
+ */
+export const fromKnip = (output: unknown, production = false): Finding[] =>
   decodeKnipOutput(output).issues.flatMap((issue) => {
     const file = decodeIssueFile(issue).file
     return Object.entries(issue).flatMap(([type, items]) =>
@@ -169,10 +173,10 @@ export const fromKnip = (output: unknown): Finding[] =>
         ? []
         : items.map((item) => ({
             source: 'knip' as const,
-            rule: `knip(${type})`,
+            rule: production ? `knip(production:${type})` : `knip(${type})`,
             file,
             line: isPositioned(item) ? item.line : 0,
-            fixable: KNIP_FIXABLE.has(type),
+            fixable: !production && KNIP_FIXABLE.has(type),
           })),
     )
   })

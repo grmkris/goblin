@@ -1,6 +1,7 @@
 /**
  * The collectors of `bun run lint:report` and `bun run lint:gate`: every finding of oxlint (type-aware), of the Effect
- * diagnostics of every effect:check project, and of knip, together with the reasons a collection is incomplete. Each
+ * diagnostics of every effect:check project, and of knip as configured and in production mode, together with the
+ * reasons a collection is incomplete. Each
  * tool runs from the repository root, through `heavy` when it is installed (tools/run.ts). The Effect diagnostics that
  * gate are errors, warnings and directives that change nothing (`gatingDiagnostics` in report.ts).
  */
@@ -137,22 +138,48 @@ export const effectFindings = async (): Promise<Collected> => {
 /**
  * Why a knip run fails beyond its issues. knip exits 1 for issues and, with `treatConfigHintsAsErrors` in knip.jsonc,
  * for configuration hints too, which its JSON report leaves out: a run that exits 1 with no issue had hints. Turning
- * that flag on is the switch; until then hints are printed by `bun run knip` and do not fail.
+ * that flag on is the switch; until then hints are printed by `bun run knip` and do not fail. `label` names the run.
  */
-export const knipFailures = (result: RunResult, issues: number): readonly string[] => {
-  const failures = didNotRun('knip', result)
+export const knipFailures = (result: RunResult, issues: number, label = 'knip'): readonly string[] => {
+  const failures = didNotRun(label, result)
   if (failures.length > 0) return failures
   return result.exitCode === 1 && issues === 0
-    ? ['knip reported configuration hints, which knip.jsonc treats as errors; `bun run knip` lists them']
+    ? [`${label} reported configuration hints, which knip.jsonc treats as errors; \`bun run ${label}\` lists them`]
     : []
 }
 
-export const knipFindings = async (): Promise<Collected> => {
-  const result = await run([bin('knip'), '--reporter', 'json', '--no-progress'])
-  const failures = didNotRun('knip', result)
+/** One knip run: as configured, or with `production` in production mode (only what knip.jsonc marks with `!`). */
+const knipRun = async (production: boolean): Promise<Collected> => {
+  const label = production ? 'knip --production' : 'knip'
+  const result = await run([
+    bin('knip'),
+    '--reporter',
+    'json',
+    '--no-progress',
+    ...(production ? ['--production'] : []),
+  ])
+  const failures = didNotRun(label, result)
   if (failures.length > 0) return { findings: [], failures }
-  const findings = fromKnip(JSON.parse(result.stdout))
-  return { findings, failures: knipFailures(result, findings.length) }
+  const findings = fromKnip(JSON.parse(result.stdout), production)
+  return { findings, failures: knipFailures(result, findings.length, label) }
+}
+
+/** A knip finding's issue, whichever run reported it: its file, line and issue type. */
+const knipIssue = (finding: Finding): string =>
+  `${finding.file}:${finding.line}:${finding.rule.replace('production:', '')}`
+
+/**
+ * knip as configured, then in production mode, which reports what only tests use (an unused file, export or
+ * dependency once the tests are left out). An issue the configured run already reports is not counted twice.
+ */
+export const knipFindings = async (): Promise<Collected> => {
+  const configured = await knipRun(false)
+  const production = await knipRun(true)
+  const known = new Set(configured.findings.map(knipIssue))
+  return {
+    findings: [...configured.findings, ...production.findings.filter((finding) => !known.has(knipIssue(finding)))],
+    failures: [...configured.failures, ...production.failures],
+  }
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

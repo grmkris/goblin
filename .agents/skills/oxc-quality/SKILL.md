@@ -13,6 +13,7 @@ Keep the MyApps quality families at zero new findings. Adapt paths and runtime z
 - `tools/graph.ts` is the runtime/import authority. Keep `apps/runtime` cloud, `apps/web` with explicit server/browser zones, `packages/contracts` shared, `packages/ui` browser, and tools tooling. Workspace manifest edges and graph edges must agree.
 - Keep `process.env` out of runtime code; use Effect Config. Permit environment reads only in explicitly scoped test/build/tooling files.
 - Run Knip, jscpd, Effect diagnostics, and TypeScript as separate gates. A checker that cannot resolve a project must fail, not report zero.
+- `lint:gate` runs Knip as configured and in production mode (`bun run knip --production`, only what `knip.jsonc` marks with `!`), so code only tests use fails. Mark a new workspace's shipped sources with `!` and leave tests, fixtures and build scripts unmarked; an export kept on purpose carries `@internal` with its reason.
 - New goblin code starts without a lint baseline. If a legacy finding is discovered, record the exact file/rule/reason and resolve it before merging.
 
 Canonical commands are `bun run fmt:check`, `bun run agents:check`, `bun run graph`, `bun run dupes`, `bun run typecheck`, `bun run effect:check`, `bun run lint`, `bun run knip`, and `bun run test`; `check:files` is the inner loop. `heavy` is coordinator-owned.

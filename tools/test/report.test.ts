@@ -1,10 +1,26 @@
 import { describe, expect, test } from 'vitest'
 import { verifiedEffectOutput } from '../effect.ts'
-import { decodeEffect, fromEffect } from '../report.ts'
+import { decodeEffect, fromEffect, fromKnip } from '../report.ts'
 import { repoRoot } from '../run.ts'
 
 const summary = { filesChecked: 1, filesWithoutPlugin: 0 }
 const at = { line: 4, column: 2, message: 'm' }
+
+describe('knip input', () => {
+  const output = { issues: [{ file: 'apps/runtime/src/a.ts', exports: [{ name: 'x', line: 3 }], files: [] }] }
+
+  test('each issue item is a finding under its issue type; an unused export is fixable', () => {
+    expect(fromKnip(output)).toEqual([
+      { source: 'knip', rule: 'knip(exports)', file: 'apps/runtime/src/a.ts', line: 3, fixable: true },
+    ])
+  })
+
+  test('a production run names its issues apart and fixes none, since removing them breaks the tests', () => {
+    expect(fromKnip(output, true)).toEqual([
+      { source: 'knip', rule: 'knip(production:exports)', file: 'apps/runtime/src/a.ts', line: 3, fixable: false },
+    ])
+  })
+})
 
 describe('effect-tsgo input', () => {
   test('errors and warnings become findings with repository-relative paths; messages and suggestions do not', () => {
