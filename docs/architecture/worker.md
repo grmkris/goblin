@@ -8,7 +8,7 @@ Runtime paths below are relative to `apps/runtime/src/`; browser paths are relat
 
 | Path | What happens |
 | --- | --- |
-| `/health` | What the deployment is and offers, from its settings alone (`http/health.ts`, the `Health` contract): `ok`, `service`, the `stage` label, the `signup` mode, the `signIn` methods (`{ method: 'email' }` with mail, `{ method: 'oidc', label }` with a provider) and the optional `features` it has (`largeFiles`, `agentApps`, `flows`, `decisions`; ADR 0064). |
+| `/health` | What the deployment is and offers, from its settings alone (`http/health.ts`, the `Health` contract): `ok`, `service`, the `stage` label, the `signup` mode, the `signIn` methods (`{ method: 'email' }` with mail, `{ method: 'oidc', label }` with a provider) and the optional `features` it has (`largeFiles`, `agentApps`, `flows`; ADR 0064). |
 | `/.well-known/oauth-protected-resource*` | Protected-resource metadata for `/mcp`, the same document at every path. |
 | `/.well-known/*`, `/api/auth/*` | Better Auth: sign-up and sign-in (emailed codes, and the deployment's OpenID Connect provider at `/api/auth/sign-in/social` and `/api/auth/callback/oidc`), the OAuth authorization server for inbound clients. |
 | `/mcp` | goblin's own MCP server; a Bearer token from an inbound client reaches the agent of the user who consented, and `goblin:inspect` adds read-only inspection (ADR 0024). |

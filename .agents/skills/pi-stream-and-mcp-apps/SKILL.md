@@ -73,4 +73,4 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
 
-- Home presentation is deferred (ADR 0025). Main has only its transcript and composer; the single App stage follows page > inline slots. Saved Home placements must not hide inline Apps. Keep frame/bridge continuity, clipping, grants and the six-instance soft cap.
+- Main has only its transcript and composer; the single App stage follows page > inline slots. Keep frame/bridge continuity, clipping, grants and the six-instance soft cap.

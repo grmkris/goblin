@@ -24,7 +24,7 @@ a run. The ledger supplies exact submission/task correlation when a cache entry 
 Outside Pi, the agent's services report to the same telemetry (`telemetry/report.ts`):
 
 - **Model calls outside a turn** (`model.aux`): one cheap model per purpose (`naming`, `memory`, `skill`,
-  `app_llm`, `retrieval`, and `decision` for Clef), with tokens and errors (`memory/model.ts`).
+  `app_llm`, `retrieval`), with tokens and errors (`memory/model.ts`).
 - **Remote MCP steps** (`mcp.request`): every connect, tool call, skills request and Events request, with server,
   tool, outcome code (`UpstreamMcp:timeout`), expected blocked waits and duration (`mcp/log.ts`). Resident callers pass
   explicit conversation/task metadata, stripped before SDK dispatch; shared connection discovery is marked without
@@ -36,8 +36,7 @@ Outside Pi, the agent's services report to the same telemetry (`telemetry/report
   records every flow `FlowName` names: an owner's send, a client's ask and a Telegram message as they are admitted, a
   thread started (`start`, `reply`, `empty`), a move, a share-back, a close and a Stop, a Persona's ask and answer, a
   Delegate's spawn and report, a thread's announcement, a Topic created or archived, an organize Undo, a routine
-  firing and report, a Telegram delivery, a decision proposed, confirmed or dismissed (and the Worker a browser
-  crash). The operation id has its own column and
+  firing and report, a Telegram delivery (and the Worker a browser crash). The operation id has its own column and
   the operation that caused it is
   `goblin.operation.parent`; the rest are allowlisted ids and closed classes. A `refused` step is stored `blocked`,
   an `error` step `error`. Ledger reads skip a row of a kind they do not know.
@@ -51,8 +50,8 @@ span cannot outlive its invocation, so each is one span written whole where it e
 `goblin.started_at` and `goblin.duration_ms`. Today only model calls outside a turn reach Traces: the spans of a
 turn's calls, recorded from Pi's commit listener, are created but never exported (seen on dev 2026-10-06, cause not
 yet found), so those calls are in the ledger and the log only. Never content:
-ids, sizes, counts, timings, outcomes and fixed error summaries. Known fields are sanitized before fan-out and on
-legacy reads; arbitrary provider, schema and remote error text stays in Pi inspection. Expected authority waits use
+ids, sizes, counts, timings, outcomes and fixed error summaries. Known fields are sanitized before fan-out and again
+when read back; arbitrary provider, schema and remote error text stays in Pi inspection. Expected authority waits use
 info log lines and an unset trace status. At start the agent marks whatever the last run left
 `started` as interrupted and logs one `recovery` event; an event that ends after a restart says it resumed. Pi faults
 the user's task if a commit listener throws, so the recorder and every sink are guarded and only log their own
@@ -65,7 +64,7 @@ right after `Harness.open`, before scheduling resumes. Tests pass a `CollectedRu
 read events in process, and `summarize(turn, events)` (`inspect/inspector.ts`) gives the per-turn numbers: attempts,
 failures, tool calls and tokens. Attempt timing runs from the generation entering `request` to its assistant entry;
 the first chunk is the first committed partial, so it is good to about 100 ms. The runtime package exports no
-telemetry entry; the benchmark workspace imports `@goblin/runtime/memory` and `@goblin/runtime/decisions`.
+telemetry entry.
 
 ### Logs, failures and references
 

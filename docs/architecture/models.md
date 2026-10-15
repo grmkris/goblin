@@ -2,10 +2,6 @@
 
 ## Models
 
-Typed decisions are the scoped Workers AI exception ([ADR 0031](../adr/archive/0031-typed-decisions-through-workers-ai.md)): Clef
-judges bounded state and questions through `AI` after the rules decide what they can. It is never a chat model, and
-its calls check the daily cap and count their tokens like the cheap model's.
-
 Model calls go to one OpenAI-compatible endpoint ([ADR 0059](../adr/0059-bring-your-own-model-endpoint.md)): the
 owner's own, set in Settings, else the deployment's when it has one. The deployment's is `GOBLIN_MODEL_BASE_URL` with
 `GOBLIN_MODEL_KEY`, offering `GOBLIN_MODEL_ID` (the default) plus `GOBLIN_MODELS`; all three or none (`models.ts`
@@ -59,9 +55,8 @@ tokens count toward the owner's daily usage like any other.
 
 Each agent counts its model tokens per UTC day ([ADR 0058](../adr/0058-no-plans-tokens-and-an-optional-cap.md)). A Pi
 extension (`pi/budget.ts`) adds every model response's tokens, input, output and cached alike, to `app_usage_daily`.
-The cheap model's calls (titles, memory, skill drafts, an app's `llm` power), Clef's decisions (a Clef call whose usage
-is unknown counts its whole 65,536-token context) and routine runs (`routines/usage.ts`, from Pi's `pi.usage`) count
-the same way. Compaction summaries in main and threads are not counted yet.
+The cheap model's calls (titles, memory, skill drafts, an app's `llm` power) and routine runs (`routines/usage.ts`,
+from Pi's `pi.usage`) count the same way. Compaction summaries in main and threads are not counted yet.
 
 Users of a deployment share its model key, so the deployment may cap each account's day with `GOBLIN_DAILY_TOKEN_CAP`
 (the Worker's `DAILY_TOKEN_CAP`, a positive whole number); unset, while the owner uses their own endpoint, or without

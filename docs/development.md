@@ -73,7 +73,7 @@ continues to own transcripts, tasks, request ids and documents. Receipts are pru
 Admission and passive writes hold the chat's one lock, `KeyedLock`'s (`ChatOperations.withChat`; the mover and a
 Topic's seed take it too), never across model execution.
 
-The unit suite covers lookup, receipts (a row from before them reads as `legacy`), replay binding, retention, the one
+The unit suite covers lookup, receipts (a row without its kind and state is refused), replay binding, retention, the one
 admission sequence, flows and chat locks (`chat-receipts.test.ts`, `chats.test.ts`, `chats-service.test.ts`). The
 local workerd profile proves the boundary by binding chat `1` to a fresh non-root Pi session before service
 composition:
@@ -225,7 +225,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   workspace or closes it. Several Apps run at once, in any conversation; beyond six the least recently seen unloads to
   a stub. These moves keep the same iframe and bridge. What an App shares rides along with your next message in its conversation as untrusted
   context; links it offers wait for your click. The originating server supplies the resource URI and the App's
-  behavior. Home dashboard placement is deferred; Apps open in their conversations or as pages.
+  behavior. Apps open in their conversations or as pages.
   A MyPlan question App saves the answer in MyPlan, then offers a bounded saved-answer receipt through
   `ui/message`. Goblin shows **Continue** and **Dismiss** in its own chrome. Only the owner's Continue click
   submits a fixed message with the receipt as untrusted App context in the originating conversation; it sends no
@@ -501,24 +501,8 @@ across restart, revoked-authority skip with unchanged usage, active/running caps
 CLIProxy. The native recurring-wake regression verifies the next sweep survives the callback that scheduled it. Telegram
 delivery, cron-after-deploy and real producer acceptance require separate deployed verification.
 
-## Conversation and retained Home data
+## Main and the inbox example
 
-Check Main with an empty transcript and existing history at desktop and phone widths: the composer remains reachable, the latest exchange is the landing point, and there is no Home grid or Home entry in the turn map. Apps previously placed on Home should be available in their tool rows or their own pages. Moving between page and chat preserves the single iframe and action bridge.
-
-Home's runtime service and native workerd tests still cover persistence, replay, stale revisions, owner authority, bounds, app deletion and MCP grants. The browser does not render this saved layout. Dashboard UI acceptance resumes with a future iteration; installed iPhone behavior remains an owner device check.
+Check Main with an empty transcript and existing history at desktop and phone widths: the composer remains reachable and the latest exchange is the landing point. Apps open in their tool rows or as their own pages; moving between page and chat preserves the single iframe and action bridge. Installed iPhone behavior remains an owner device check.
 
 The no-auth inbox fixture builds the `app_docs` example in Dynamic Workers and drives the native job callback through 15-minute slots. It checks newest-five validation, freshness and last-good retention after an invalid response. Run it from `apps/runtime` with `heavy bun run test:integration test/integration/inbox.test.ts`. Real MyInbox sign-in, app-power approval and message freshness on dev are separate owner steps.
-
-## Typed decisions
-
-Only the dev stage binds Workers AI (`AI`) for Clef (ADR 0031). The local stack and the native test stacks bind none,
-so decisions judge nothing there and nothing calls paid Workers AI. Runtime unit tests cover the critic's routing,
-decoding, stale results, authority, budget and unknown usage, and context relevance over a real transcript index in
-`node:sqlite` with a fake Pi source and a fake Clef. The native `decisions` probe (in the probe registry) and the
-owner's decisions case run the real service over the object's SQLite and Pi with the probe's own Clef: a report judged
-once per relay, the first label kept and replayed, a stale result discarded, no call once the budget is spent, nothing
-judged without Clef, and main still answering. Web unit tests cover the rows, the label call and the feed's slice, not
-a browser run. These are local results; dev acceptance is separate.
-
-A dispatched Clef call counts its reported tokens toward the owner's day, like any model call; one whose usage is
-unknown counts its whole 65,536-token context, and without the binding there is no call and nothing is counted.

@@ -23,20 +23,20 @@ it:
 - **The start** (`layers/index.ts`): the agent's start, step by step in one fixed order, each step a layer in its
   owning area's file and built after every step before it, so each await holds up the steps after it. In order: the
   MCP host (each server's endpoint binding checked, so a re-pointed server loses what it had, the credential cipher,
-  held calls a restart cut off recovered); the cheap models; helper execution restored; the retained Pi filters
-  retooled once; routine runs, with their usage projection subscribed to Pi's commits; main registered; the App
+  held calls a restart cut off recovered); the cheap models; helper execution restored; routine runs, with their
+  usage projection subscribed to Pi's commits; main registered; the App
   registry; every Topic Conversation given memory; skills; the Telegram channel; and Events, with the
   Telegram and skills consumers registered before any delivery (the routines layer registers the routine trigger,
   before the agent runs anything). A stateful object is made once, by its step, and shared as that step's service;
-  programs use the area's services.
+  programs use the area's services. No step rewrites data an older version left: goblin is greenfield (ADR 0067).
   The conversation services publish `conversations.changed` with what each write changed, from inside the write; the
   App registry and the workspace feed follow that topic. A move a restart interrupted finishes once the conversation
   layer is built (`Moves` forks its reconcile in the layer's scope), never holding up the start.
 - **One layer per area** after the start, in order: the daily token usage and picker (`Budget`, `Models`, which a
   send's admission reads), conversation (`Chats`, `ChatOperations`, `Conversations`, `Moves`), setup (`Setups`),
-  knowledge (`Memories`, `Retrieval`), delegation (`Topics`, `Personas`, `Invocations`, `Receipts`, `Home`), routines
+  knowledge (`Memories`, `Retrieval`), delegation (`Topics`, `Personas`, `Invocations`, `Receipts`), routines
   (`Routines`, `RoutineControl`), inspection (`Inspection`), apps (`AppEngine`, `Files`), the skill learner (`Learner`,
-  after the owner's files and the routines' notices it writes), typed decisions (`Decisions`), the workspace feed
+  after the owner's files and the routines' notices it writes), the workspace feed
   (`Workspace`) and HTTP (`AgentHttp`). The MCP host's `McpConnections`, `McpServers`, `McpGrants`, `Approvals` and
   `Cipher`, and `CheapModels`, `RoutineRuns`, `RoutineUsage`, `Apps`, `Skills`, `Channel` and `Events`, are served by
   their start steps.
@@ -71,11 +71,10 @@ Erasing the agent disposes its runtime, whose layers' finalizers close every MCP
   so interrupting its first caller does not cancel it. `run` joins every caller to it: an MCP token refresh
   (`mcp.refresh:<server>`) and connect (`mcp.connect:<server>`), a skills listing (`skills.listing:<server>`) and a
   move's remaining steps (`move:<op>`). `skip` answers at once while one is in flight: naming a thread
-  (`naming:<chat>`), the skill learner (`skills.learn:<conversation>`) and a decision's judgment (`decision:<id>`).
+  (`naming:<chat>`) and the skill learner (`skills.learn:<conversation>`).
 - `Changes` (`runtime/changes.ts`): a synchronous topic bus with no fibers or timers. An area declares its topics where
   it publishes them, with ids as payloads (`conversations.changed`, `topics.changed`, `personas.changed`,
-  `invocations.changed`, `receipts.changed`, `apps.changed`, `apps.removed`, `agent-apps.changed`, `home.changed`,
-  `decisions.changed`), and
+  `invocations.changed`, `receipts.changed`, `apps.changed`, `apps.removed`, `agent-apps.changed`), and
   the workspace feed reads each item as it is then. Handlers run inline in order; a failing one is reported and ends
   only itself.
 - `PiSessions` (`pi/sessions.ts`): Pi's submit, write, wait, abort, model choice, event stream and reads as Effects
@@ -138,10 +137,7 @@ Personas still answering show after the transcript ("answering…", from the fee
 server the composer offers them as `@` references (with their avatars), and with two or more tagged a Together or
 In turn choice that is sent as `personaOrder`. What an answer used from other chats shows as a strip under it: a
 `search_chats` call's `SourcesDetails`, and automatic retrieval from `GET /api/conversations/:id/sources`
-(`lib/sources.ts`), each source opening its chat. Owner-only messages (`EphemeralMessage`, "Only visible to you")
-have a slot after the entry they follow and a provider (`components/shell/ephemeral-slot.tsx`); acting on one or
-dismissing it hides it at once, and a refusal brings it back. Decision proposals fill it (see Typed decision
-proposals).
+(`lib/sources.ts`), each source opening its chat.
 A thread started with "+" tells its channel its name once it has one (ADR 0010): the channel gets one
 `app.thread_started` note, `[thread started: "<title>"]`, and its transcript shows that thread's summary.
 **The thread operation** ([ADR 0034](../adr/0034-move-to-thread.md), `chats/thread-heads.ts`) is one idempotent call for
@@ -164,8 +160,8 @@ branched from the turn and its App placements move under it, the chat's memory f
 (`forgetFrom`; its collector skips omitted entries), and the transcript index gives it to the Thread. A
 turn still running, an older turn, a turn already moved and a turn waiting on an MCP approval are refused with a
 reason (`streaming`, `not_latest`, `moved`, `awaiting_approval`). Each move is an `app_chat_moves` row (`requested`,
-`forked`, `settled` or `refused`) that a restart finishes. The running-turn identity swap was built and measured
-first; it hit the latency kill criterion and is not shipped (ADR 0034).
+`forked`, `settled` or `refused`) that a restart finishes; Pi cannot move a running turn, so this settled-turn move
+is the only one (ADRs 0034, 0067).
 
 Queued inputs in Main and ordinary threads stay in Pi's native `InboxDoc`. The browser projects native inbox IDs
 and modes, then reads contents through `GET /api/conversations/:id/queue`; helper and routine queues are absent
@@ -231,7 +227,7 @@ subagent example): `subagent_spawn`, `subagent_send`, `subagent_stop`, `subagent
 (ADR 0027). A subagent is a Pi conversation owned by a background anchor task of its spawner, so the spawner's Stop
 and idle waits do not reach it. It starts with the spawner's model and is given exactly the persona, the owner's MCP
 and budget extensions, skills, files, code execution, app calls and the subagents extension again. Owner questions,
-Home, routine and app management, memory and skill learning remain absent. Spawn exclusions and `subagent_config`
+routine and app management, memory and skill learning remain absent. Spawn exclusions and `subagent_config`
 narrow servers, tools, skill libraries, apps and delegation against every live ancestor. Retained helpers get the
 current extension selection through Pi configuration on reconstruction (ADRs 0018 and 0029). Each message goes through a relay task in the
 spawner (`pi/subagent-relay.ts`): it delivers the message, waits until the subagent is done (idle, with none of its
@@ -268,8 +264,8 @@ recorded session; the receipt alone proves no Pi acceptance, so a retry still su
 deduplicate. A receipt (`chats/receipts.ts`) says what the operation was (`kind`: send, ask_client, telegram,
 persona_ask, start, reply, empty, move, `write:<entry kind>` for a passive write…), who started it (`origin`), the
 chat it made (`target_chat`), the operation that led to it (`parent_op`), how it ended (`state`, `reason`,
-`settled_at`); one admitted before receipts had kinds reads as `legacy`, and `receiptOf` reads one synchronously by
-operation id. Passive writes (`ChatOperations.passiveWrite`: thread heads, shares, announcements, routine reports,
+`settled_at`); every admission writes its kind and state, so a row without them reads as `Internal`, and `receiptOf`
+reads one synchronously by operation id. Passive writes (`ChatOperations.passiveWrite`: thread heads, shares, announcements, routine reports,
 Persona answers, memory views) write their receipt and Pi's write under the same lock. Rows older than 30 days are
 pruned opportunistically. The lock covers admission only, and releases before model execution or waiting for an
 answer. Nothing rebinds a chat: Move to thread (ADR 0034) forks the moved turn's Thread and records a `move` receipt;
@@ -284,8 +280,8 @@ allowed tools (an unknown or no-longer-owned session, a chat whose Topic is gone
 spawners, may use nothing). The scope also answers for agent apps (`app`) and names its Topic, so a refusal can say
 what held it back. What the scope leaves out is hidden from the model: `mcp_list` leaves it out, the `skills` section
 does not list or fetch that library, and Pi's per-conversation tool filter (`configure({ tools: { remove } })`) drops
-the subagent tools, whose section then hides too; Pi stores the filter as tool names, so when those names changed
-every filtering conversation's filter was applied again once (`retoolOnce`, which skips Persona forks and routine
+the subagent tools, whose section then hides too. A chat's filter is set when it is made or configured, and applied
+again to every chat of a Topic whose setup's subagents change (`retoolTopic`, which skips Persona forks and routine
 runs, whose filters are set when they are made). A call that still arrives runs nothing: `mcp_call`, `skill_activate`,
 `skill_read`, `subagent_spawn` and `subagent_send` check the scope before anything else (before the grant check or any
 connection) and return an error result (`pi/setup.ts`, `outsideScopeResult`): when the Topic's setup does not hold the target,
@@ -295,9 +291,7 @@ owner's console and an App view and job calls carry no conversation. Agent-initi
 conversation through nested apps and MCP powers, so its scope is checked live at dispatch; Telegram and inbound clients
 talk in Personal's Conversation, so Personal's setup covers them.
 
-The per-conversation switches of ADR 0010 are gone. The agent's start (`RetoolLive`) deleted the owner's rows once
-(`dropSwitchesOnce`, marker `drop:conversation-switches`), keeping every subagent's, applied the Pi filter again to each
-chat that had subagents switched off, and logged the count as a `job` line (`conversation-switches-dropped`).
+The per-conversation switches of ADR 0010 are gone; the only rows of their tables are a subagent's exclusions.
 
 The persona contributes two static system-prompt sections (`pi/persona.ts`): who the agent is (it speaks of the
 owner's connected MCP servers in general and names none of them, ADR 0063), and that remote content is untrusted data. The system prompt holds only text that does not change between requests: pi-ai folds every change

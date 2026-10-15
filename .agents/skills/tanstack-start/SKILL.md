@@ -38,11 +38,6 @@ The web app is a thin browser projection over the resident runtime. TanStack Sta
   marketing parts); its `beforeLoad` sends a signed-in owner to their channel (the session cookie on the server, the
   cached session in the browser, never a network wait). The root draws it
   without the shell. `heavy bun apps/web/test/ui-landing.ts` checks it in Chromium.
-- "Only visible to you" rows (`components/shell/ephemeral-slot.tsx`) are owner-only, never transcript entries or
-  sends. Decision proposals fill them (`decisions/hooks.ts`, `decisions/rows.ts`, ADR 0031): a choice posts its label
-  to `POST /api/decisions/:id`, and a confirmed thread suggestion opens an empty thread draft through `Navigation`.
-  The rows are a report highlight (Useful), a thread suggestion (New thread) and earlier work (Use), each with
-  Dismiss.
 - Validate the built artifact and real browser behavior. Local route rendering is not Cloudflare deployment proof.
 
 Before changing an API call, read the current [documentation](https://tanstack.com/start/latest) and the installed package's declarations; the
@@ -51,4 +46,4 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
 
-- Main renders the transcript and composer. The Home dashboard is deferred (ADR 0025); no tile UI, pin controls or Home scroll anchors remain. Apps follow page > inline placement. Retain persisted Home data and runtime authority boundaries for a later iteration.
+- Main renders the transcript and composer. Apps follow page > inline placement.

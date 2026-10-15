@@ -25,7 +25,7 @@
 | Agent DO SQLite | `cf_workspace_app_<name>` | Shell: each agent app's own files. |
 | Agent DO SQLite | `app_registry` | Drizzle: every App the workspace shows, by source: an MCP App per Pi session and call, with logical `chat_id` placement, an agent app per name (ADRs 0020, 0021, 0030). `app_apps`, its predecessor, was copied in with the same ids and is no longer read. |
 | Agent DO SQLite | `app_run_events` | Drizzle: the run ledger, turns, model attempts and tool calls without content, 30 days (ADR 0024). |
-| Agent DO SQLite | `app_decision_proposals`, `app_decision_labels` | Drizzle: typed decision proposals and the owner's first label of each (ADR 0031). |
+| Agent DO SQLite | `app_home`, `app_home_operations`, `app_decision_proposals`, `app_decision_labels` | Unread until the migrations are squashed: the Home layout and typed decisions are gone (ADR 0067). |
 | D1 `goblinAuth` | `user`, `session`, `account`, `verification`, `jwks`, `rateLimit`, `oauth*` | Better Auth, `apps/runtime/migrations`. |
 | D1 `goblinAuth` | `app_billing_accounts`, `app_billing_subscriptions`, `app_billing_inbox`, `app_billing_checkouts`, `app_billing_wallet_subscriptions` | Unread until the migrations are squashed (ADR 0058). |
 

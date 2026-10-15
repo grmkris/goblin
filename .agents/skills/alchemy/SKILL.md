@@ -29,6 +29,4 @@ itself authorize model spend, external messages, deployment or production change
 
 - Bump the pinned alchemy beta together with myapps. The shared store's Worker is versioned with alchemy: a `deploy --yes` at another version upgrades (or downgrades) it for every stack in the account, and a CI `plan` at a mismatched version stops with "state store is out of date".
 
-- Workers AI (`AI: Cloudflare.Workers.AI()`) is bound on the dev stage only, exclusively for typed Clef decisions
-  (ADR 0031); `RuntimeEnv.AI` is a narrow optional binding. Without it (prod, the local stack, the native test stacks)
-  decisions judge nothing; never add it to a stage to make a test pass.
+- No stage binds Workers AI (ADR 0067): every model call goes to the endpoint the deployment or the owner configures.

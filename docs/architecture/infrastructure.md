@@ -3,9 +3,8 @@
 ## Infrastructure
 
 `apps/web/alchemy.run.ts` declares the Vite Worker, the `PersonalAgent` namespace, the D1 database, the `FILES` R2
-bucket, the `FLOWS` Analytics Engine dataset (`goblin-<stage>-flows`, ADR 0037), the `LOADER` Worker Loader
-(Dynamic Workers, open beta, Workers Paid) and, on dev only, Workers AI as `AI` for typed decisions (ADR 0031; without
-it decisions judge nothing); it is goblin's deployment entrypoint.
+bucket, the `FLOWS` Analytics Engine dataset (`goblin-<stage>-flows`, ADR 0037) and the `LOADER` Worker Loader
+(Dynamic Workers, open beta, Workers Paid); it is goblin's deployment entrypoint.
 
 What a deployment does comes from its configuration, never from its stage's name
 ([ADR 0064](../adr/0064-openid-connect-and-config-driven-deployment.md)); the runtime reads `STAGE` only as a label

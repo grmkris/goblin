@@ -38,10 +38,8 @@ infrastructure. Read
 
 - Coding agents and local runs use CLIProxy. The deployed Worker calls models through the deployment's endpoint
   (Railway LiteLLM, with a dedicated, model-limited, budget-capped key) or the owner's own endpoint and key
-  ([ADR 0059](docs/adr/0059-bring-your-own-model-endpoint.md)), sealed in the agent and never answered back. Typed
-  decisions through the Workers AI `AI` binding, bound on dev only, are the scoped exception in
-  [ADR 0031](docs/adr/archive/0031-typed-decisions-through-workers-ai.md): metered, content-free telemetry, owner-confirmed
-  proposals and no authority changes. Never bind the LiteLLM master key into the Worker.
+  ([ADR 0059](docs/adr/0059-bring-your-own-model-endpoint.md)), sealed in the agent and never answered back. Never bind
+  the LiteLLM master key into the Worker.
 - Secrets live in mode-600 `.local/*.env` files and Worker secret bindings. Never print, commit, expose in browser
   bundles or persist them in transcripts, logs or docs. Outbound OAuth tokens are encrypted at rest in the Agent DO.
 - The repository is public. Committed handoffs, evidence and docs never carry private paths, tailnet IPs, personal

@@ -57,9 +57,8 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   tools `<service>_<tool>` and Events `<service>.<event>`: check an app's tool or Event name only through
   `packages/contracts/src/service-names.ts`, never with a bare string. `mcp_list` lists a connection with many such
   tools by service (`service`, `query`).
-- Home pinning adds no grant: only the owner adds an open MCP App after launch/resource re-verification. Every owner
-  write, `/api/mcp/` included, needs the app's Origin and the CSRF header at the Worker's edge (ADR 0038); the bridge
-  remains bound to the originating server.
+- Pinning an App adds no grant. Every owner write, `/api/mcp/` included, needs the app's Origin and the CSRF header at
+  the Worker's edge (ADR 0038); the bridge remains bound to the originating server.
 - The owner's MCP endpoints are the owner API's `mcp` and `resident` groups (`packages/contracts/src/api/mcp.ts` and
   `resident.ts`, handlers in `mcp/api.ts` and `mcp/resident-api.ts`) over the services in `mcp/service.ts` (`McpServers`,
   `McpGrants`, `McpConnections`, `Approvals`, `Events`, `Resident`). An App's own calls carry `x-mcp-caller: app`,

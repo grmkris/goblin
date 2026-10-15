@@ -73,17 +73,10 @@ Diagnostics focus on work needing attention; `problems --all` includes expected 
 Successful background model completions stay out of problems; their failures remain visible.
 Private error details stay in conversation inspection; logs and traces carry fixed summaries.
 The ledger also records how conversations move, content-free (ADR 0037): sends, threads, moves, share-backs, closes
-and Stops, Personas, Delegates, Topics, organize Undo, routines, Telegram deliveries and decision proposals. A message's
+and Stops, Personas, Delegates, Topics, organize Undo, routines and Telegram deliveries. A message's
 Details shows what ran behind it, every failure the app shows quotes a reference (`… · ref 7f3a9c12`) that
 `goblin lookup` finds in the Worker's logs, and `goblin stats` sums flows across every agent of a stage from Workers
 Analytics Engine, under hashed agent ids.
-
-Typed decisions judge ordinary Delegate reports and the owner's exchanges with rules, then Cloudflare Clef for
-undecided cases. They propose a highlight, a thread draft, or earlier work from the owner's other chats for the owner
-to confirm or dismiss, keep that label, and leave chat working when decisions are unavailable. They never move
-history, route a send or grant permission. Each open proposal shows in its chat as an "Only visible to you" row. Only
-the dev stage binds Workers AI; elsewhere nothing is judged. See
-[ADR 0031](docs/adr/archive/0031-typed-decisions-through-workers-ai.md).
 
 **Goblin Wallet**, the agent wallet built for the October 2026 hackathon, has left this repository: its source is kept
 at the tag [`hackathon-2026-10`](https://github.com/grmkris/goblin/tree/hackathon-2026-10), and goblin connects to a

@@ -51,7 +51,6 @@ callback). It annotates the request's logs with `goblin.rpc`
 | `agentApps` | `/agent-apps`, `/agent-apps/:name` | `agent-apps/api.ts` |
 | `workspace` | `GET /workspace/events` (SSE) | `workspace/api.ts` |
 | `files` | `GET /files`, `GET`/`PUT`/`DELETE /files/content` | `files/api.ts` |
-| `decisions` | `POST /decisions/:id` | `decisions/api.ts` |
 | account (Worker) | `clients`: `/clients`, `/clients/:clientId`; `clientErrors`: `/client-errors` | `http/api/account.ts` |
 
 What is not JSON in and out is served through HttpApi's raw handlers, all annotated `RenewsResident: false`: the two
@@ -95,7 +94,7 @@ and Better Auth's client (`/api/auth`) reach `/api`. Server data follows myapps 
   `useSuspenseQuery` inside a `QueryBoundary` (`lib/query/query-boundary.tsx`), which keeps a failure inline with its
   reference and a retry; a section that reads with `useQuery` shows `QueryError`.
 - The workspace feed writes into the same cache (`lib/workspace/`): each slice (conversations, activity, apps, topics,
-  personas, invocations, receipts, proposals) is a query under `['workspace', slice]` that never goes stale, filled from
+  personas, invocations, receipts) is a query under `['workspace', slice]` that never goes stale, filled from
   the stream's snapshot and changes, and a change that makes another feature's reads stale invalidates them through one
   map (`lib/workspace/invalidations.ts`). The conversation stream stays a dedicated SSE store that only invalidates.
 - A failure reads through `messageOf` or `describeError` (`lib/query/app-error.ts`) and quotes its reference. A route

@@ -44,8 +44,6 @@ through `promiseWith` (`runtime/boundary.ts`).
   defines intentionally Pi-keyed records and the unit/local workerd proof; the test-only permuted primary binding
   ships in no production class.
 - Never import Alchemy deployment code into workerd. Transactions and gates never span network or model work.
-- Typed decisions (ADR 0031) are the owner API's `decisions` group: `POST /api/decisions/:id` keeps the owner's first
-  label, behind the edge's session and CSRF checks like every owner write; no endpoint takes an agent selector.
 
 Before changing an API call, read the current [documentation](https://developers.cloudflare.com/agents/) and the installed package's declarations; the
 lockfile pins the versions. [Architecture](../../../docs/architecture.md) describes how goblin uses it today.
