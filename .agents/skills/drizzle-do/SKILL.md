@@ -23,5 +23,8 @@ lockfile pins the versions. [Architecture](../../../docs/architecture.md) descri
 Inner loop: `bun run check:files <paths>`. Before calling it done: `heavy bun run check`. This skill does not by
 itself authorize model spend, external messages, deployment or production changes.
 
-- A removed feature's tables stay in the migrations, unread, until they are squashed: `app_home`,
-  `app_home_operations`, `app_decision_proposals` and `app_decision_labels` (ADR 0067) have no Drizzle schema left.
+- Application storage has one fresh baseline in `storage/migrations/baseline.ts`, with live declarations in
+  `storage/*.ts`; D1 auth has `apps/runtime/migrations/0000_baseline.sql`. Retired tables and columns are absent.
+  Compare table/column parity and exercise FTS5 and uniqueness constraints when either schema changes. The native
+  baseline canary verifies first application and reapplication against populated Pi/Agents storage.
+
