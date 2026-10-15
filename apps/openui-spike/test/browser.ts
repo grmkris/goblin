@@ -84,7 +84,7 @@ try {
     await fit(page, `${label} dashboard`)
     await page.screenshot({ path: resolve(output, `${label}-dashboard.png`), fullPage: true })
     await page.getByRole('button', { name: 'Use dark theme' }).click()
-    await page.waitForFunction(() => document.documentElement.classList.contains('dark'))
+    await page.locator('html.dark').waitFor({ state: 'attached' })
     const foreground = await page.locator('.spike-intro h1').evaluate((node) => getComputedStyle(node).color)
     const headingColors = await page
       .locator('.spike-renderer h2')
