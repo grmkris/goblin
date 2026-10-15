@@ -27,4 +27,3 @@ itself authorize model spend, external messages, deployment or production change
   `storage/*.ts`; D1 auth has `apps/runtime/migrations/0000_baseline.sql`. Retired tables and columns are absent.
   Compare table/column parity and exercise FTS5 and uniqueness constraints when either schema changes. The native
   baseline canary verifies first application and reapplication against populated Pi/Agents storage.
-
