@@ -6,8 +6,9 @@ import { MemoryStorage } from '@earendil-works/pi-durable/storage/memory'
 import { RunAttribute } from '@goblin/contracts/telemetry'
 import { describe, expect, it } from 'vitest'
 import { BACKGROUND } from '../src/pi/context.ts'
-import { CollectedRuns, RunTelemetry } from '../src/telemetry/events.ts'
+import { RunTelemetry } from '../src/telemetry/events.ts'
 import { PiRunRecorder } from '../src/telemetry/pi.ts'
+import { CollectedRuns } from './telemetry-sink.ts'
 
 const model: Model<'openai-completions'> = {
   id: 'recovery-fixture',

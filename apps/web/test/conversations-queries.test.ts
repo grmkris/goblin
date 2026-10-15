@@ -6,7 +6,7 @@ import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { historyQuery, streamReads, submitMutation } from '../src/conversations/queries.ts'
 import { owner } from '../src/lib/api.ts'
-import { fakeHttpApi, testQueryClient } from '../src/lib/query/testing.ts'
+import { fakeHttpApi, testQueryClient } from './query/testing.ts'
 import { unusedHandlers } from './query/unused-handlers.ts'
 
 /** Entries 1 to 9 of chat 7, two to a page: a page before `before` holds the two entries just older. */

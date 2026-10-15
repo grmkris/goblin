@@ -11,7 +11,6 @@ const Startup = Schema.Struct({
   snapshot: Schema.Unknown,
   before: Schema.Array(Table),
   after: Schema.Array(Table),
-  metadata: Schema.String,
 })
 
 const Status = Schema.Struct({ state: Schema.String })
@@ -216,7 +215,6 @@ export const agentCases = (phase: Phase): readonly NativeCase[] => [
     Startup,
     (result) => {
       expect(result.snapshot).toMatchObject({ type: 'snapshot', entries: [] })
-      expect(result.metadata).toBe('stored-updated')
       expect(result.after).toEqual(result.before)
       expect(JSON.stringify(result.after)).toContain('app_metadata')
       expect(JSON.stringify(result.after)).toContain('pi_submissions')

@@ -7,7 +7,7 @@ import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { chooseModelMutation, modelQuery } from '../src/agent/queries.ts'
 import { owner } from '../src/lib/api.ts'
-import { fakeHttpApi, testQueryClient } from '../src/lib/query/testing.ts'
+import { fakeHttpApi, testQueryClient } from './query/testing.ts'
 import { changeRoutineMutation, routinesQuery } from '../src/routines/queries.ts'
 import { unusedHandlers } from './query/unused-handlers.ts'
 

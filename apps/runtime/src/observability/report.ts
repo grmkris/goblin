@@ -135,6 +135,9 @@ export const reportAndRecover =
 /**
  * Marks `error` as expected where it is made: the reporter logs it at `Info`, or with `skip` not at all. It sets the
  * `ErrorReporter` annotation on the error itself and returns it.
+ *
+ * @internal No program marks a failure this way today, but it is the documented way to (docs/agents/effect.md), so it
+ * stays, pinned by its test.
  */
 export const expectedFailure = <E extends object>(error: E, how: 'lower' | 'skip' = 'lower'): E =>
   Object.assign(error, how === 'skip' ? { [ErrorReporter.ignore]: true } : { [ErrorReporter.severity]: 'Info' })

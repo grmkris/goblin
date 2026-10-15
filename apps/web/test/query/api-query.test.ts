@@ -18,7 +18,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { owner } from '../../src/lib/api.ts'
 import { ApiDefect, makeApiQuery, withOperation } from '../../src/lib/query/api-query.ts'
 import { ERROR_KINDS, type ErrorKind, describeError, messageOf } from '../../src/lib/query/app-error.ts'
-import { fakeHttpApi, testQueryClient } from '../../src/lib/query/testing.ts'
+import { fakeHttpApi, testQueryClient } from './testing.ts'
 import { unusedHandlers } from './unused-handlers.ts'
 
 const RAY = '7f3a9c12e4b5a6d7-AMS'

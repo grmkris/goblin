@@ -92,16 +92,6 @@ const setupAllows = (setup: TopicSetup | PersonaSetup): Allow => ({
   app: (name) => hasApp(setup, name),
 })
 
-/** The scope of an owner chat of a Topic with nothing else narrowing it: for fixtures and probes. */
-export const topicScope = (
-  topic: { readonly id: number; readonly name: string; readonly setup: TopicSetup },
-  editable = true,
-): SetupScope => ({
-  ...setupAllows(topic.setup),
-  editable,
-  topic: { id: topic.id, name: topic.name, holds: (item) => holds(topic.setup, item) },
-})
-
 /** Everything either bound allows. */
 const either = (one: Allow, other: Allow): Allow => ({
   server: (connectionId) => one.server(connectionId) || other.server(connectionId),
@@ -415,46 +405,3 @@ export const routinesOutside = (db: Db, topic: number, setup: TopicSetup) =>
         .map(({ connectionId, name }) => ({ connectionId, name }))
       return outside.length === 0 ? [] : [{ id: routine.id, title: definition.title, outside }]
     })
-
-/** The scope and a helper's exclusions as one object over a database, for the probes and test fixtures. Programs use
- * `Setups`. */
-export class SetupScopes {
-  readonly #retooling: Retooling
-
-  constructor(
-    db: Db,
-    subagentTools: readonly ToolRegistration[],
-    retool: (session: string, tools: PiTools) => Promise<void>,
-  ) {
-    this.#retooling = { db, subagentTools, retool }
-  }
-
-  scope(session: string): SetupScope {
-    return sessionScope(this.#retooling.db, session)
-  }
-
-  app(session: string, app: string): boolean {
-    return appAllowed(this.#retooling.db, session, app)
-  }
-
-  async configureHelper(
-    parent: string,
-    session: string,
-    exclusions: readonly HelperExclusion[],
-    now: number,
-  ): Promise<void> {
-    await configureHelper(this.#retooling, { parent, session, exclusions }, now)
-  }
-
-  piTools(session: string): PiTools {
-    return piToolsFor(this.#retooling.db, this.#retooling.subagentTools, session)
-  }
-
-  async syncPi(session: string): Promise<void> {
-    await syncPi(this.#retooling, session)
-  }
-
-  async retoolTopic(topic: number): Promise<void> {
-    await retoolTopic(this.#retooling, topic)
-  }
-}

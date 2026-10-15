@@ -43,9 +43,9 @@ const locatedFrames = (cause: unknown): string[] =>
 
 /**
  * Known failures pass through; anything else becomes `Internal` without leaking its message to the caller. That
- * includes a `SchemaError`: a request that does not decode is refused as invalid input where it is decoded (`readJson`,
- * HttpApi's own request decoding), so one that reaches here came from stored data or a value the agent built, which is
- * our fault, not the caller's. This is the one place an unexpected failure loses its identity, so it is reported here
+ * includes a `SchemaError`: a request that does not decode is refused as invalid input where it is decoded (HttpApi's
+ * own request decoding), so one that reaches here came from stored data or a value the agent built, which is our
+ * fault, not the caller's. This is the one place an unexpected failure loses its identity, so it is reported here
  * first, under `where`: its type and stack locations, never its message (ADR 0024).
  */
 export const toAppError = (cause: unknown, where = 'http.toAppError'): AppError => {

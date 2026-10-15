@@ -35,14 +35,6 @@ export function jsonSchemaOf(schema: Schema.Top): JsonSchema {
   return typeof inlined === 'object' && inlined !== null && !Array.isArray(inlined) ? inlined : {}
 }
 
-/** A typed tool as the model and other callers see it: its name, what it does, and its input and output types. */
-export type ToolSignature = {
-  readonly name: string
-  readonly description: string
-  readonly inputSchema: JsonSchema
-  readonly outputSchema: JsonSchema
-}
-
 /**
  * One tool with an Effect Schema for its input and its output (ADR 0027). The model is offered the input as a JSON
  * Schema; arguments are decoded by the schema before `execute` runs, and a value that fails is the model's error to
@@ -78,14 +70,6 @@ export class ReadyResult {
     this.result = result
   }
 }
-
-/** A typed tool's signature, what `/mcp` and codemode will list: computed from its definition, never kept. */
-export const toolSignature = <I, O>(tool: TypedTool<I, O>): ToolSignature => ({
-  name: tool.name,
-  description: tool.description,
-  inputSchema: parametersOf(tool.name, jsonSchemaOf(tool.input)),
-  outputSchema: jsonSchemaOf(tool.output),
-})
 
 /**
  * A free-form object field (an app member's input, an MCP tool's arguments): the object, or the JSON string of one,

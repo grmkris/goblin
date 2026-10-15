@@ -5,7 +5,7 @@ import * as Layer from 'effect/Layer'
 import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import type { Applied } from '../../../src/agent-model.ts'
-import { ModelBudget, usageLedger } from '../../../src/budget.ts'
+import { recordUse, usageLedger } from '../../../src/budget.ts'
 import { telegramChannel } from '../../../src/channel/channel.ts'
 import { Channel } from '../../../src/channel/service.ts'
 import { registerPrimary } from '../../../src/chats/directory.ts'
@@ -33,7 +33,8 @@ const fixture = () => {
   const db = database()
   const sqlite = durable(db)
   registerPrimary(db, 1)
-  const budget = new ModelBudget(usageLedger(sqlite), null)
+  // The usage ledger the budget counts in, over the lane's database.
+  const ledger = usageLedger(sqlite)
   const pinned: string[] = []
   const applied: Applied = new Map()
   const legacy = Layer.mergeAll(
@@ -93,13 +94,13 @@ const fixture = () => {
       Layer.provide(Layer.provideMerge(Layer.mergeAll(ModelBudgetLive, ChatsLive), legacy)),
     ),
   )
-  return { fetch, budget, pinned, applied }
+  return { fetch, ledger, pinned, applied }
 }
 
 describe('the agent group served by the agent', () => {
   it("answers today's usage in tokens against the deployment's cap", async () => {
-    const { fetch, budget } = fixture()
-    budget.record({ input: 5000, output: 0, cacheRead: 0, cacheWrite: 0 }, Math.floor(Date.now() / 1000))
+    const { fetch, ledger } = fixture()
+    recordUse(ledger, { input: 5000, output: 0, cacheRead: 0, cacheWrite: 0 }, Math.floor(Date.now() / 1000))
     const response = await fetch(json('GET', '/api/agent/usage'))
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ used: 5000, limit: 100_000 })

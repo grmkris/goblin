@@ -1,8 +1,7 @@
 import type { PiHarness } from 'agents/harness/pi'
 import * as Layer from 'effect/Layer'
-import type { ChatDirectory } from '../src/chats/directory.ts'
-import { ChatOperations, Chats } from '../src/chats/service.ts'
-import { attemptSync } from '../src/http/errors.ts'
+import { ChatOperations } from '../src/chats/service.ts'
+import { ChatsLive } from '../src/layers/conversation.ts'
 import { KnowledgeLive } from '../src/layers/knowledge.ts'
 import { CheapModels } from '../src/memory/model.ts'
 import { KeyedLock } from '../src/observability/lock.ts'
@@ -14,10 +13,8 @@ import { unread } from './fake.ts'
 
 /** The database and started instances the knowledge layer reads; a test gives the ones its programs reach. */
 type Given = {
-  /** The memory tables (chats-sqlite.ts). */
+  /** The memory and chat tables (chats-sqlite.ts), which the chats (`ChatsLive`) read as well. */
   readonly db?: ChatDatabase
-  /** The chats, as the memory's status reads them: Personal, and the Conversation a chat sits under. */
-  readonly chats?: ChatDirectory
   /** Pi, as the memory's builder reads it. */
   readonly harness?: PiHarness
   /** The memory's fold threshold (`MEMORY_FOLD_TOKENS`), the deployment's by default. */
@@ -34,7 +31,7 @@ type Given = {
  */
 export const knowledgeOver = (given: Given) => {
   // A layer only holds what it is given until one of its methods runs; a test reaches only the ones it gave.
-  const { chats } = given
+  const db = given.db === undefined ? Layer.succeed(Db, unread) : sqliteDb(given.db)
   const input: Pick<AgentInputs, 'harness' | 'memory'> & { readonly env: Partial<AgentInputs['env']> } = {
     harness: given.harness ?? unread,
     env: given.foldTokens === undefined ? {} : { MEMORY_FOLD_TOKENS: String(given.foldTokens) },
@@ -43,13 +40,8 @@ export const knowledgeOver = (given: Given) => {
   const services = KnowledgeLive.pipe(
     Layer.provide(
       Layer.mergeAll(
-        given.db === undefined ? Layer.succeed(Db, unread) : sqliteDb(given.db),
-        chats === undefined
-          ? Layer.succeed(Chats, unread)
-          : Layer.mock(Chats)({
-              primary: chats.primary(),
-              conversationAbove: (chat: string) => attemptSync(() => chats.conversationAbove(chat)),
-            }),
+        db,
+        ChatsLive.pipe(Layer.provide(db)),
         // SAFETY: memory and retrieval read only Pi, the fold threshold and the memory extensions from the instance
         // input, and Pi only when a test steps a memory or searches.
         Layer.succeed(AgentInput, input as AgentInputs),

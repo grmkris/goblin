@@ -50,7 +50,10 @@ export function recordUse(ledger: UsageLedger, use: TokenUse, now: number): void
   ledger.add(utcDay(now).day, tokens, now)
 }
 
-/** The deployment's daily token cap per account (`DAILY_TOKEN_CAP`, a positive whole number), or none. */
+/**
+ * The deployment's daily token cap per account (`DAILY_TOKEN_CAP`, a positive whole number), or none. Accounts that
+ * share the deployment's model key are each capped, so no one account can spend it for everyone.
+ */
 export const dailyTokenCap = (value: string | undefined): number | null => {
   const cap = Number(value)
   return value !== undefined && value.trim() !== '' && Number.isSafeInteger(cap) && cap > 0 ? cap : null
@@ -61,36 +64,6 @@ export const refuseSpent = (today: UsageToday): Effect.Effect<void, BudgetExhaus
   today.limit !== null && today.used >= today.limit
     ? Effect.fail(new BudgetExhausted({ limit: today.limit, resetsAt: today.resetsAt }))
     : Effect.void
-
-/**
- * This agent's model usage per UTC day, in tokens, against an optional daily cap. A deployment whose accounts share
- * one model key caps each account, so one cannot spend it for everyone; without a cap nothing is refused.
- */
-export class ModelBudget {
-  readonly #ledger: UsageLedger
-  readonly #limit: number | null
-  constructor(ledger: UsageLedger, limit: number | null) {
-    this.#ledger = ledger
-    this.#limit = limit
-  }
-
-  /** Today's tokens and cap. */
-  async today(now: number): Promise<UsageToday> {
-    const { day, resetsAt } = utcDay(now)
-    return { used: this.#ledger.tokens(day), limit: this.#limit, resetsAt }
-  }
-
-  record(use: TokenUse, now: number): void {
-    recordUse(this.#ledger, use, now)
-  }
-
-  /** Fails with `BudgetExhausted` once a cap is set and today's tokens have reached it. */
-  async require(now: number): Promise<void> {
-    const today = await this.today(now)
-    if (today.limit !== null && today.used >= today.limit)
-      throw new BudgetExhausted({ limit: today.limit, resetsAt: today.resetsAt })
-  }
-}
 
 /** The agent's daily model usage and cap, as the programs use it. Instants are epoch seconds. */
 export class Budget extends Context.Service<

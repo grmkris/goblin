@@ -27,8 +27,8 @@ operation reconciliation require fresh owner connections and separate deployed a
 
 ## Smaller items
 
-- `app_metadata` is created by the application migrations, but its `AppMetadata` service is used only by the
-  integration test worker; remove it or give it a job.
+- `app_metadata` is still created by the base migration, but nothing reads or writes it (its `AppMetadata` service,
+  used only by the integration test worker, is gone); drop it when the migrations are squashed.
 - A production stage is live at `https://goblin.surf`: its own D1, credential key, files bucket and capped model key; nothing is shared with dev. The first public release is invite-only and owner OTP/bootstrap remains an operator step.
 - Dev is live at `https://dev.goblin.surf`: its fresh auth D1 and PersonalAgent namespace were verified empty before
   bootstrap, the owner signed in with delivered OTP from `hello@goblin.surf` (SPF, DKIM and DMARC passed), and signup

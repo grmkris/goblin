@@ -11,7 +11,7 @@ import { approvalsProbe } from './approvals-probe.ts'
 import { requireUserSession } from '../../src/auth/index.ts'
 import { AppsMcpFixture } from './apps-mcp.ts'
 import { permutePrimary, profileEnabled } from './primary-profile.ts'
-import { ChatDirectory } from '../../src/chats/directory.ts'
+import { chatSession } from '../../src/chats/directory.ts'
 import { drizzle } from 'drizzle-orm/durable-sqlite'
 import { unwrap } from '../../src/http/rpc.ts'
 import { askResult } from '../internal-client.ts'
@@ -57,7 +57,7 @@ export class OwnerAgent extends PersonalAgent {
     if (path === '/test/primary-profile' && profileEnabled(this.env)) {
       const operationId = 'permuted-owner-proof'
       await ownerSend(this, '1', 'prove the owner primary binding', operationId)
-      const session = new ChatDirectory(drizzle(this.ctx.storage)).session('1')
+      const session = chatSession(drizzle(this.ctx.storage), '1')
       const result = await this.harness.wait(operationId, { session })
       const messages = await this.harness.messages({ session: result.session })
       return Response.json({
@@ -129,7 +129,7 @@ export class OwnerAgent extends PersonalAgent {
       const { chat, rounds } = Schema.decodeUnknownSync(Schema.Struct({ chat: Schema.String, rounds: Schema.Number }))(
         await request.json(),
       )
-      return Response.json(await readRounds(this.harness, new ChatDirectory(drizzle(this.ctx.storage)), chat, rounds))
+      return Response.json(await readRounds(this.harness, drizzle(this.ctx.storage), chat, rounds))
     }
     return Response.json(await moveState(this.harness, drizzle(this.ctx.storage)))
   }

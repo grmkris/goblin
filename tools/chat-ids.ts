@@ -18,7 +18,7 @@ const explicitSession = (node: Node | undefined): boolean =>
 /** Parse calls so comments, strings, nested commas and a neighbouring call cannot satisfy the guard. */
 export function chatIdViolations(
   source: string,
-  allowed: { readonly root?: boolean; readonly directory?: boolean } = {},
+  allowed: { readonly root?: boolean } = {},
 ): readonly ChatIdViolation[] {
   const result = parseSync('runtime.ts', source)
   const violations: ChatIdViolation[] = []
@@ -37,10 +37,6 @@ export function chatIdViolations(
         fail(node.start, 'harness.session requires an explicit Pi session')
       if (name === 'submit' && !explicitSession(node.arguments[1]))
         fail(node.start, 'harness.submit requires an explicit Pi session')
-    },
-    NewExpression(node) {
-      if (!allowed.directory && node.callee.type === 'Identifier' && node.callee.name === 'ChatDirectory')
-        fail(node.start, 'ChatDirectory must be shared from layers/conversation.ts')
     },
   }).visit(result.program)
   return violations

@@ -7,7 +7,7 @@ import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { owner } from '../src/lib/api.ts'
 import { messageOf } from '../src/lib/query/app-error.ts'
-import { fakeHttpApi, testQueryClient } from '../src/lib/query/testing.ts'
+import { fakeHttpApi, testQueryClient } from './query/testing.ts'
 import {
   agentAppQuery,
   agentAppsQuery,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ModelBudget, type UsageLedger, dailyTokenCap, utcDay } from '../src/budget.ts'
+import { type UsageLedger, dailyTokenCap, recordUse, utcDay } from '../src/budget.ts'
 import type { TokenUse } from '../src/token-use.ts'
 
 class MemoryLedger implements UsageLedger {
@@ -24,34 +24,19 @@ describe('per-account model usage (unit)', () => {
     expect(utcDay(AFTER_MIDNIGHT).day).toBe('2026-10-05')
   })
 
-  it('counts every token, refuses once a capped day is spent, and allows again the next day', async () => {
+  it('counts every token of a response on its UTC day', () => {
     const ledger = new MemoryLedger()
-    const budget = new ModelBudget(ledger, 6000)
-    budget.record(use(5000), BEFORE_MIDNIGHT)
-    await expect(budget.require(BEFORE_MIDNIGHT)).resolves.toBeUndefined()
-    budget.record(use(0, 830, 170), BEFORE_MIDNIGHT)
-    expect(await budget.today(BEFORE_MIDNIGHT)).toEqual({ used: 6000, limit: 6000, resetsAt: 1_791_158_400 })
-    await expect(budget.require(BEFORE_MIDNIGHT)).rejects.toMatchObject({
-      _tag: 'BudgetExhausted',
-      limit: 6000,
-      resetsAt: 1_791_158_400,
-    })
-    await expect(budget.require(AFTER_MIDNIGHT)).resolves.toBeUndefined()
-  })
-
-  it('never refuses without a cap', async () => {
-    const budget = new ModelBudget(new MemoryLedger(), null)
-    budget.record(use(10_000_000), BEFORE_MIDNIGHT)
-    expect(await budget.today(BEFORE_MIDNIGHT)).toMatchObject({ used: 10_000_000, limit: null })
-    await expect(budget.require(BEFORE_MIDNIGHT)).resolves.toBeUndefined()
+    recordUse(ledger, use(5000), BEFORE_MIDNIGHT)
+    recordUse(ledger, use(0, 830, 170), BEFORE_MIDNIGHT)
+    recordUse(ledger, use(40), AFTER_MIDNIGHT)
+    expect(Object.fromEntries(ledger.days)).toEqual({ '2026-10-04': 6000, '2026-10-05': 40 })
   })
 
   it('ignores responses that report no usage', () => {
     const ledger = new MemoryLedger()
-    const budget = new ModelBudget(ledger, 10)
-    budget.record(use(0), BEFORE_MIDNIGHT)
-    budget.record(use(Number.NaN), BEFORE_MIDNIGHT)
-    budget.record(use(-5), BEFORE_MIDNIGHT)
+    recordUse(ledger, use(0), BEFORE_MIDNIGHT)
+    recordUse(ledger, use(Number.NaN), BEFORE_MIDNIGHT)
+    recordUse(ledger, use(-5), BEFORE_MIDNIGHT)
     expect(ledger.days.size).toBe(0)
   })
 

@@ -4,7 +4,7 @@ import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import * as HttpRouter from 'effect/http/HttpRouter'
 import * as HttpServer from 'effect/http/HttpServer'
-import { makeQueryClient } from './api-query.ts'
+import { makeQueryClient } from '../../src/lib/query/api-query.ts'
 
 /** A recorded request; typed from `clone()` so it matches the DOM, Bun and Workers `Request` types alike. */
 export type RecordedRequest = ReturnType<Request['clone']>

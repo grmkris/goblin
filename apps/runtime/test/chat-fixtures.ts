@@ -1,8 +1,6 @@
 import type { PiHarness } from 'agents/harness/pi'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
-import { Budget, type ModelBudget } from '../src/budget.ts'
-import { attempt, attemptSync } from '../src/http/errors.ts'
 import { makeChatOperations } from '../src/chats/operations.ts'
 import { PERSONAL_TOPIC } from '@goblin/contracts'
 import { primaryChat } from '../src/chats/directory.ts'
@@ -14,8 +12,9 @@ import { Skills } from '../src/skills/service.ts'
 import { McpConnections, McpGrants, McpServers } from '../src/mcp/service.ts'
 import { Setups } from '../src/setup/service.ts'
 import { Topics } from '../src/topics/service.ts'
+import { ModelBudgetLive } from '../src/layers/budget.ts'
 import { ChatsLive } from '../src/layers/conversation.ts'
-import { Models, type ModelPicker } from '../src/models.ts'
+import { Cipher, CredentialCipher } from '../src/mcp/cipher.ts'
 import { FlowEvents } from '../src/observability/flows.ts'
 import { KeyedLock } from '../src/observability/lock.ts'
 import { PiSessions } from '../src/pi/sessions.ts'
@@ -26,38 +25,37 @@ import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
 type PortInstances = {
   readonly db: Db['Service']
   readonly harness: PiHarness
-  readonly budget: ModelBudget
-  readonly models: ModelPicker
   /** Where flows go: nowhere unless a probe records them. */
   readonly flows?: Layer.Layer<FlowEvents>
 }
 
+/** The deployment's model settings a probe runs with: one model, `storage-only`, and a daily cap of 300,000 tokens. */
+const PROBE_MODEL = {
+  MODEL_ID: 'storage-only',
+  MODEL_BASE_URL: 'https://no-model-calls.invalid/v1',
+  MODEL_KEY: 'unused',
+  DAILY_TOKEN_CAP: '300000',
+}
+
 /**
  * The services the Telegram ports' programs read, over a probe's own instances: the chat directory and admission over
- * its database (each chat's lock in `KeyedLock`), its budget and model picker as their services wrap them, and Pi as
- * its sessions. Flows go to `flows`, else nowhere.
+ * its database (each chat's lock in `KeyedLock`), the budget and model picker as the agent builds them over it
+ * (`ModelBudgetLive`, with the probe's model settings), and Pi as its sessions. Flows go to `flows`, else nowhere.
  */
-export const portServices = ({ db, harness, budget, models, flows = FlowEvents.noop }: PortInstances) => {
-  // SAFETY: admission reads only Pi's harness and the models it applied from the instance input; no routine answers.
-  const input = Layer.succeed(AgentInput, { harness, applied: new Map() } as AgentInputs)
-  const plans = Layer.mergeAll(
-    Layer.succeed(
-      Budget,
-      Budget.of({
-        today: (now) => attempt(() => budget.today(now)),
-        record: (use, now) => Effect.sync(() => budget.record(use, now)),
-        require: (now) => attempt(() => budget.require(now)),
-      }),
-    ),
-    Layer.succeed(
-      Models,
-      Models.of({
-        current: Effect.sync(() => models.current()),
-        choice: Effect.sync(() => models.choice()),
-        choose: (modelId, now) => attemptSync(() => models.choose(modelId, now)),
-      }),
-    ),
+export const portServices = ({ db, harness, flows = FlowEvents.noop }: PortInstances) => {
+  // SAFETY: admission reads only Pi's harness and the models it applied from the instance input, and the model layers
+  // only the deployment's model settings and the owner; no probe sets an owner endpoint, and no routine answers.
+  const input = Layer.succeed(AgentInput, {
+    harness,
+    applied: new Map(),
+    env: PROBE_MODEL,
+    userId: 'probe-owner',
+  } as AgentInputs)
+  const cipher = Layer.effect(
+    Cipher,
+    Effect.promise(() => CredentialCipher.fromBase64(btoa('\0'.repeat(32)))),
   )
+  const plans = ModelBudgetLive.pipe(Layer.provide(Layer.mergeAll(Layer.succeed(Db, db), input, cipher)))
   const pi = PiSessions.layer.pipe(Layer.provide(input))
   const core = Layer.mergeAll(Layer.succeed(Db, db), KeyedLock.layer, pi, flows, plans, input)
   const operations = Layer.effect(ChatOperations, makeChatOperations)

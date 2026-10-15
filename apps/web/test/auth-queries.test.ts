@@ -8,7 +8,7 @@ import {
   signOutMutation,
 } from '../src/auth/queries.ts'
 import { messageOf } from '../src/lib/query/app-error.ts'
-import { testQueryClient } from '../src/lib/query/testing.ts'
+import { testQueryClient } from './query/testing.ts'
 
 /** A fetch that answers every request with `response` and keeps what was sent. */
 const answerer = (response: () => Response) => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { nextCron, nextFire, parseCron } from '../src/routines/time.ts'
-import { browserWrite } from '../src/http/csrf.ts'
+import { forgedWrite } from '../src/http/csrf.ts'
 import type { RoutineDefinition } from '@goblin/contracts'
 
 const at = (iso: string) => Date.parse(iso)
@@ -44,18 +44,18 @@ describe('routine dates and schedule policy', () => {
   })
   it('requires exact configured origin and CSRF header on every routine write', () => {
     const url = 'https://goblin.test/api/routines'
-    expect(() => browserWrite(new Request(url, { method: 'POST' }), 'https://goblin.test')).toThrow()
-    expect(() =>
-      browserWrite(
+    expect(forgedWrite(new Request(url, { method: 'POST' }), 'https://goblin.test')).toBe(true)
+    expect(
+      forgedWrite(
         new Request(url, { method: 'POST', headers: { origin: 'https://foreign.test', 'x-goblin-csrf': '1' } }),
         'https://goblin.test',
       ),
-    ).toThrow()
-    expect(() =>
-      browserWrite(
+    ).toBe(true)
+    expect(
+      forgedWrite(
         new Request(url, { method: 'POST', headers: { origin: 'https://goblin.test', 'x-goblin-csrf': '1' } }),
         'https://goblin.test',
       ),
-    ).not.toThrow()
+    ).toBe(false)
   })
 })

@@ -84,7 +84,7 @@ const admitUser = (request: Request, edge: Edge): Effect.Effect<string, AppError
     return userId
   })
 
-/** A body read up to `limit` bytes; past it, `PayloadTooLarge`, as `readJson` refused it. */
+/** A body read up to `limit` bytes; past it, `PayloadTooLarge` (`readBytes`). */
 const bounded = (request: Request, limit: number): Effect.Effect<Uint8Array<ArrayBuffer> | null, AppError> =>
   request.body === null ? Effect.succeed(null) : attempt(() => readBytes(request, limit))
 

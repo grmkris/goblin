@@ -32,8 +32,8 @@ through `promiseWith` (`runtime/boundary.ts`).
   program, `exit` returns the exit. Only the files
   `tools/graph.ts` lists may import it, and never call it inside an Effect. What a program needs from the
   instance is in `AgentInput` (`runtime/input.ts`); build services in a layer, never at module level, and keep no
-  module-level mutable state in the object's code. Work that outlives its caller is finite (`background()`,
-  `observability/background.ts`): no loops or timers meant to outlive the object.
+  module-level mutable state in the object's code. Work that outlives its caller is finite: no loops or timers meant
+  to outlive the object.
 - Alarm and schedule callbacks are one-line delegations into their area's `wake.ts`; the Agents SDK calls them by name.
 - Inbound user authentication, the agent's resident authority and outbound MCP authorization are three separate
   things. Check them at the boundary that owns them.

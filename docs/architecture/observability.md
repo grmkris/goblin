@@ -60,7 +60,7 @@ Telegram Events probe). Compaction summaries' model calls are not recorded yet.
 
 The agent builds these pieces with `runTelemetry(storage, name, sinks)` (`telemetry/run.ts`, from
 `telemetry/agent.ts`): its ledger, log and recorder. The recorder is attached and `recorder.restore(harness)` awaited
-right after `Harness.open`, before scheduling resumes. Tests pass a `CollectedRuns` sink (`telemetry/events.ts`) to
+right after `Harness.open`, before scheduling resumes. Tests pass an in-memory sink (`CollectedRuns`, `test/telemetry-sink.ts`) to
 read events in process, and `summarize(turn, events)` (`inspect/inspector.ts`) gives the per-turn numbers: attempts,
 failures, tool calls and tokens. Attempt timing runs from the generation entering `request` to its assistant entry;
 the first chunk is the first committed partial, so it is good to about 100 ms. The runtime package exports no
@@ -71,7 +71,7 @@ telemetry entry.
 Every line the runtime writes goes through one logger (`observability/logger.ts`, the runtime's only `console`
 writer): `GoblinLogger` for `Effect.log*`, `logEvent` for named events inside Effect, and `writeLine` for synchronous
 code outside it (the run log, Pi's commit listener). A line is one JSON object: allowlisted keys, each only with a value
-of its shape (`LOG_KEYS`: where, operation, request, ref, agent, route, method, status, code, error type, frames,
+of its shape (`FIELDS` in `observability/logger.ts`: where, operation, request, ref, agent, route, method, status, code, error type, frames,
 counts, timings and a few more), then run attributes through their own allowlist (`telemetry/safety.ts`). The logger
 reads a fiber's log annotations and spans only, never a log message or a cause. Event names are a closed list
 (`LOG_EVENTS`: `client_error`, `failure`, `flow`, `http.failure`, `job`, `mcp`, `rpc`, `run`, `skill-learner`, `wake`).

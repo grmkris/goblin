@@ -3,11 +3,10 @@ import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
 import * as Schema from 'effect/Schema'
 import { expect, test, vi } from 'vitest'
-import { readJson } from '../../src/http/body.ts'
+import { readBytes } from '../../src/http/body.ts'
 import {
   GrantDenied,
   Internal,
-  InvalidInput,
   PayloadTooLarge,
   attempt,
   attemptSync,
@@ -44,14 +43,9 @@ const chunked = (parts: readonly string[]): Request => {
 
 test('a chunked body without content-length is still bounded', async () => {
   const request = chunked(['{"a":"', 'x'.repeat(40), '"}'])
-  await expect(readJson(request, Schema.Unknown, 16)).rejects.toBeInstanceOf(PayloadTooLarge)
-})
-
-test('bodies decode through the schema; mismatches are InvalidInput', async () => {
-  const schema = Schema.Struct({ input: Schema.String })
-  await expect(readJson(chunked(['{"input":"hi"}']), schema)).resolves.toEqual({ input: 'hi' })
-  await expect(readJson(chunked(['{"input":1}']), schema)).rejects.toBeInstanceOf(InvalidInput)
-  await expect(readJson(chunked(['not json']), schema)).rejects.toBeInstanceOf(InvalidInput)
+  await expect(readBytes(request, 16)).rejects.toBeInstanceOf(PayloadTooLarge)
+  const read = await readBytes(chunked(['{"input":', '"hi"}']))
+  expect(new TextDecoder().decode(read)).toBe('{"input":"hi"}')
 })
 
 test('a typed failure passes through; anything else, stored data that does not decode included, is ours (H2)', () => {

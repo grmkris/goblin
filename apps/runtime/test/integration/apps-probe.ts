@@ -7,7 +7,7 @@ import type { Send } from '../../src/agent-apps/egress.ts'
 import { AppFiles } from '../../src/agent-apps/files.ts'
 import { problemText } from '../../src/agent-apps/queue.ts'
 import { runScript } from '../../src/agent-apps/script.ts'
-import { ChatDirectory } from '../../src/chats/directory.ts'
+import { chatSession } from '../../src/chats/directory.ts'
 import type { RuntimeEnv } from '../../src/env.ts'
 import { callOwner } from '../owner-client.ts'
 import { memorySchedules, probePorts } from './apps-jobs-probe.ts'
@@ -346,7 +346,7 @@ async function appsPowersProbe(storage: DurableObjectStorage, env: RuntimeEnv, o
  */
 async function appsTurn({ api, storage, harness, seen }: Inside) {
   await callOwner(api, (owner) => owner.resident.set({ payload: { enabled: true } }))
-  return appsTurnProbe(harness, seen, new ChatDirectory(drizzle(storage)).session(PRIMARY_CHAT))
+  return appsTurnProbe(harness, seen, chatSession(drizzle(storage), PRIMARY_CHAT))
 }
 
 export const probes: Probes = {

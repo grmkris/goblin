@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from '@effect/vitest'
 import * as Cause from 'effect/Cause'
 import * as Effect from 'effect/Effect'
-import { LOG_KEYS, LoggerLive, logEvent, writeLine } from '../../src/observability/logger.ts'
+import { LoggerLive, logEvent, writeLine } from '../../src/observability/logger.ts'
 import { withLines } from './lines.ts'
 
 const SECRET = 'the owner wrote: please keep my diagnosis private'
@@ -22,7 +22,7 @@ describe('goblin logger', () => {
     }),
   )
 
-  it.effect('drops annotation keys outside LOG_KEYS and values of the wrong shape, keeps run attributes', () =>
+  it.effect('drops annotation keys outside the allowlist and values of the wrong shape, keeps run attributes', () =>
     Effect.gen(function* () {
       const { lines } = yield* withLines(
         Effect.logWarning('ignored').pipe(
@@ -38,8 +38,6 @@ describe('goblin logger', () => {
           Effect.provide(LoggerLive),
         ),
       )
-      expect(LOG_KEYS).toContain('goblin.where')
-      expect(LOG_KEYS).not.toContain('prompt')
       expect(lines).toEqual([
         {
           method: 'warn',

@@ -6,7 +6,7 @@ import { drizzle } from 'drizzle-orm/durable-sqlite'
 import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { chatSession } from '../../src/chats/directory.ts'
-import { SetupScopes } from '../../src/setup/scope.ts'
+import { type Retooling, configureHelper, retoolTopic, sessionScope } from '../../src/setup/scope.ts'
 import { runApplicationMigrations } from '../../src/storage/migrations.ts'
 import { appConversations } from '../../src/storage/schema.ts'
 import { appTopics } from '../../src/storage/topics.ts'
@@ -61,10 +61,14 @@ async function scopeProbe(storage: DurableObjectStorage) {
     execute: async () => ({ content: [] }),
   })
   const retooled: string[] = []
-  const profiles = new SetupScopes(db, [tool], async (session) => void retooled.push(session))
-  await profiles.configureHelper('900', '901', [{ kind: 'skills', connectionId: 'myskills' }], 2)
+  const retooling: Retooling = { db, subagentTools: [tool], retool: async (session) => void retooled.push(session) }
+  await configureHelper(
+    retooling,
+    { parent: '900', session: '901', exclusions: [{ kind: 'skills', connectionId: 'myskills' }] },
+    2,
+  )
   const view = (session: string) => {
-    const scope = profiles.scope(session)
+    const scope = sessionScope(db, session)
     return {
       editable: scope.editable,
       mail: scope.server('mail'),
@@ -115,7 +119,7 @@ async function scopeProbe(storage: DurableObjectStorage) {
   setup({ ...WORK, subagents: false })
   // Every chat of the Topic whose filter follows its setup, Persona forks and routine runs aside; no other Topic's.
   const configured = [...retooled]
-  await profiles.retoolTopic(90)
+  await retoolTopic(retooling, 90)
   const topic = retooled.slice(configured.length).toSorted()
   return { ...before, allServers, configured, topic }
 }
@@ -148,7 +152,7 @@ const closed = { editable: false, mail: false, send: false, read: false, write: 
 
 /**
  * Every chat works with its Topic's setup, read live; a subagent is bounded by every chat above it and its spawner's
- * exclusions; a change of the Topic's subagents applies the Pi filter of its chats again (`SetupScopes.retoolTopic`).
+ * exclusions; a change of the Topic's subagents applies the Pi filter of its chats again (`retoolTopic`).
  */
 async function scopeChecks(base: string): Promise<void> {
   const result = await probeOf(base, 'scopes', Scopes)

@@ -34,7 +34,7 @@ export type LogEvent = (typeof LOG_EVENTS)[number]
 /** A line's level; the console method follows it (`info` is `console.log`). */
 export type LineLevel = 'info' | 'warn' | 'error'
 
-/** Fields offered to a line: only `LOG_KEYS` with values of their shape, and run attributes, survive. */
+/** Fields offered to a line: only the keys `FIELDS` allows, with values of their shape, and run attributes survive. */
 export type LogFields = Readonly<Record<string, unknown>>
 
 type Value = string | number | boolean | readonly string[]
@@ -96,9 +96,6 @@ const FIELDS: Readonly<Record<string, Check>> = {
   ms: amount,
   count: amount,
 }
-
-/** The keys a line may carry besides run attributes. */
-export const LOG_KEYS: readonly string[] = Object.keys(FIELDS)
 
 const scalar = (value: unknown): value is string | number | boolean =>
   Predicate.isString(value) || Predicate.isNumber(value) || Predicate.isBoolean(value)

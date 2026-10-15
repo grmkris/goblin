@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { migrationKeys } from '../src/storage/migrations.ts'
+import { MIGRATIONS } from '../src/storage/migrations.ts'
 
 /**
  * Every key a deployed agent may have applied, in order. Drizzle records applied migrations by key, so a key that
@@ -53,13 +53,15 @@ const APPLIED = [
   '20261026000600_decisions',
 ]
 
+/** The migration keys in the order they apply. */
+const keys = MIGRATIONS.map((migration) => migration.key)
+
 describe('application migrations (unit)', () => {
   it('keeps every applied key, in order, ahead of any new one', () => {
-    expect(migrationKeys().slice(0, APPLIED.length)).toEqual(APPLIED)
+    expect(keys.slice(0, APPLIED.length)).toEqual(APPLIED)
   })
 
   it('applies in key order with no key twice', () => {
-    const keys = migrationKeys()
     expect(keys).toEqual(keys.toSorted())
     expect(new Set(keys).size).toBe(keys.length)
   })

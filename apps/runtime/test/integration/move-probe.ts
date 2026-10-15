@@ -1,6 +1,6 @@
 import type { PiHarness } from 'agents/harness/pi'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
-import type { ChatDirectory } from '../../src/chats/directory.ts'
+import { chatSession } from '../../src/chats/directory.ts'
 import { BACKGROUND, conversationId } from '../../src/pi/context.ts'
 import { eq } from 'drizzle-orm'
 import { appChatMemoryLog } from '../../src/storage/chat-memory.ts'
@@ -39,8 +39,8 @@ export async function moveState(harness: PiHarness, db: DrizzleSqliteDODatabase)
  * `rounds` reads of a chat's current Pi session, its newest 50 entries and its model context each time, so the
  * caller can time them from outside (workerd's clock stands still while a request computes).
  */
-export async function readRounds(harness: PiHarness, chats: ChatDirectory, chat: string, rounds: number) {
-  const conversation = await (await harness.pi()).conversation(conversationId(chats.session(chat)), BACKGROUND)
+export async function readRounds(harness: PiHarness, db: DrizzleSqliteDODatabase, chat: string, rounds: number) {
+  const conversation = await (await harness.pi()).conversation(conversationId(chatSession(db, chat)), BACKGROUND)
   if (conversation === undefined) throw new Error('conversation missing')
   let entries = 0
   let messages = 0

@@ -1,7 +1,7 @@
 import type { ToolRegistration } from '@earendil-works/pi-durable'
 import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
-import { type TypedTool, jsonSchemaOf, toolSignature, typedTool } from '../src/pi/typed-tool.ts'
+import { type TypedTool, jsonSchemaOf, typedTool } from '../src/pi/typed-tool.ts'
 import { executeTool } from './pi-tool.ts'
 
 const Place = Schema.Struct({ name: Schema.String, lat: Schema.Number }).annotate({ identifier: 'Place' })
@@ -26,7 +26,7 @@ const trip: TypedTool<typeof Trip.Type, typeof Plan.Type> = {
 const trips = typedTool(trip)
 
 describe('typed tools (unit, ADR 0027)', () => {
-  it('offer the input as one JSON Schema without references, and list their signatures', () => {
+  it('offer the input as one JSON Schema without references', () => {
     const schema = jsonSchemaOf(Trip)
     expect(JSON.stringify(schema)).not.toContain('$ref')
     expect(schema).toMatchObject({
@@ -35,10 +35,7 @@ describe('typed tools (unit, ADR 0027)', () => {
       properties: { from: { type: 'object', properties: { name: { type: 'string' } } } },
     })
     expect(trips.parameters).toEqual(schema)
-    expect(toolSignature(trip)).toMatchObject({
-      description: 'Plan a trip.',
-      outputSchema: { type: 'object', required: ['legs', 'note'] },
-    })
+    expect(jsonSchemaOf(Plan)).toMatchObject({ type: 'object', required: ['legs', 'note'] })
   })
 
   it('offer an empty input as an object with no fields, as providers require', () => {

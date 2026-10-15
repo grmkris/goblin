@@ -101,7 +101,7 @@ carrying that reference, which `messageOf` and `withRef` quote like any other.
 
 ## Tests
 
-`lib/query/testing.ts` `fakeHttpApi` serves the real contract in memory through an injected `fetch`, and
+`test/query/testing.ts` `fakeHttpApi` serves the real contract in memory through an injected `fetch`, and
 `testQueryClient` gives a fresh cache. A fake group answers what the test calls and nothing else:
 `handlers.handleAll({ ...unusedHandlers(OwnerApi.groups.mcp), approval: … })` (`test/query/unused-handlers.ts`) gives every other
 endpoint a handler that dies, so a new endpoint needs no line in the test. Browser fixtures render inside a

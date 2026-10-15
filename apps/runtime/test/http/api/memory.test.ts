@@ -4,7 +4,6 @@ import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
-import { ChatDirectory } from '../../../src/chats/directory.ts'
 import { MemoryHandlers } from '../../../src/memory/api.ts'
 import { Resident } from '../../../src/mcp/service.ts'
 import { appChatMemoryLog, appChatMemoryState } from '../../../src/storage/chat-memory.ts'
@@ -43,10 +42,9 @@ const fixture = () => {
       { chatId: '70', originEntry: 10, viewThrough: 2 },
     ])
     .run()
-  const chats = new ChatDirectory(db)
   const { fetch } = serve(
     served([MemoryGroup], MemoryHandlers).pipe(
-      Layer.provide(Layer.mergeAll(knowledgeOver({ db, chats }), Layer.succeed(Resident, currentResident().service))),
+      Layer.provide(Layer.mergeAll(knowledgeOver({ db }), Layer.succeed(Resident, currentResident().service))),
     ),
   )
   return { fetch }

@@ -6,10 +6,8 @@ import { drizzle } from 'drizzle-orm/durable-sqlite'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
-import { ModelBudget, usageLedger } from '../../src/budget.ts'
 import { channelPorts } from '../../src/channel/turns.ts'
 import { registerPrimary } from '../../src/chats/directory.ts'
-import { ModelChoiceStore, ModelPicker, modelOptions } from '../../src/models.ts'
 import { FlowEvents } from '../../src/observability/flows.ts'
 import { runApplicationMigrations } from '../../src/storage/migrations.ts'
 import { portServices } from '../chat-fixtures.ts'
@@ -90,8 +88,6 @@ async function telegramFlowsProbe(storage: DurableObjectStorage, harness: PiHarn
   const services = portServices({
     db,
     harness,
-    budget: new ModelBudget(usageLedger(db), 300_000),
-    models: new ModelPicker(new ModelChoiceStore(db), modelOptions(undefined, 'storage-only')),
     flows: FlowEvents.layerWith((event) => Effect.sync(() => void recorded.push(event))),
   })
   const twice = Effect.gen(function* () {

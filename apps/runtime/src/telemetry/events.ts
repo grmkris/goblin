@@ -247,19 +247,3 @@ export class RunTelemetry {
     return this.#failures <= MAX_FAILURE_LINES
   }
 }
-
-/** Keeps every event in memory, last state per id: tests read it, and the benchmark's agent can too. */
-export class CollectedRuns implements RunSink {
-  readonly name = 'collected'
-  readonly #events = new Map<string, RunEvent>()
-  started(event: RunEvent): void {
-    this.#events.set(event.id, event)
-  }
-  ended(event: RunEvent): void {
-    this.#events.set(event.id, event)
-  }
-  /** Every event in the order it first appeared. */
-  events(): readonly RunEvent[] {
-    return [...this.#events.values()]
-  }
-}

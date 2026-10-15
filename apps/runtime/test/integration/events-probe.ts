@@ -1,5 +1,5 @@
 import type { PiHarness } from 'agents/harness/pi'
-import { ChatDirectory, registerPrimary } from '../../src/chats/directory.ts'
+import { chatSession, primaryChat, registerPrimary } from '../../src/chats/directory.ts'
 import { drizzle } from 'drizzle-orm/durable-sqlite'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
@@ -9,7 +9,7 @@ import * as TestClock from 'effect/testing/TestClock'
 import { telegramChannel } from '../../src/channel/channel.ts'
 import { type ChannelCall, channelTool } from '../../src/channel/tools.ts'
 import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
-import { CollectedRuns, RunTelemetry } from '../../src/telemetry/events.ts'
+import { RunTelemetry } from '../../src/telemetry/events.ts'
 import { mcpReporter } from '../../src/telemetry/report.ts'
 import { CredentialCipher } from '../../src/mcp/cipher.ts'
 import { GrantDenied, attempt } from '../../src/http/errors.ts'
@@ -20,12 +20,11 @@ import { offersEvents } from '../../src/mcp/remote.ts'
 import { McpConnections } from '../../src/mcp/service.ts'
 import { SingleFlight } from '../../src/observability/single-flight.ts'
 import { channelPorts } from '../../src/channel/turns.ts'
-import { ModelBudget, usageLedger } from '../../src/budget.ts'
-import { ModelChoiceStore, ModelPicker, modelOptions } from '../../src/models.ts'
 import { runApplicationMigrations } from '../../src/storage/migrations.ts'
 import { appEventDeliveries } from '../../src/storage/schema.ts'
 import { portServices } from '../chat-fixtures.ts'
 import { EventsFixture } from '../mcp/events-fixture.ts'
+import { CollectedRuns } from '../telemetry-sink.ts'
 import type { EventEnvelope } from '../../src/mcp/events/protocol.ts'
 import { SqliteSkillState } from '../../src/skills/store.ts'
 import { eventsSkillsProbe, eventsRecoveryProbe } from './events-recovery.ts'
@@ -45,7 +44,6 @@ async function setup(storage: DurableObjectStorage, harness: PiHarness) {
   runApplicationMigrations(storage)
   const db = drizzle(storage)
   registerPrimary(db, 1)
-  const chats = new ChatDirectory(db)
   const store = new SqliteEventStore(db)
   const skillState = new SqliteSkillState(db)
   const cipher = await CredentialCipher.fromBase64(KEY)
@@ -106,11 +104,9 @@ async function setup(storage: DurableObjectStorage, harness: PiHarness) {
     return new Response(exit.value.response ?? null, { status: exit.value.status })
   }
   const operations: string[] = []
-  const budget = new ModelBudget(usageLedger(db), 300_000)
-  const models = new ModelPicker(new ModelChoiceStore(db), modelOptions(undefined, 'storage-only'))
   /** A tool of the channel server, as the channel calls it, on the probe's clock. */
   const call: ChannelCall = (name, args) => attempt(() => run(channelTool(connections, 'mygram')(name, args)))
-  const portRuntime = ManagedRuntime.make(portServices({ db, harness, budget, models }))
+  const portRuntime = ManagedRuntime.make(portServices({ db, harness }))
   const ports = await portRuntime.runPromise(channelPorts(call))
   const pull = () =>
     Effect.runPromise(
@@ -134,7 +130,6 @@ async function setup(storage: DurableObjectStorage, harness: PiHarness) {
   )
   return {
     db,
-    chats,
     runs,
     store,
     cipher,
@@ -296,7 +291,7 @@ async function eventsProbe(storage: DurableObjectStorage, harness: PiHarness) {
     const result = await exercise(state)
     const skills = await eventsSkillsProbe(state)
     const recovery = await eventsRecoveryProbe(state)
-    const messages = await harness.messages({ session: state.chats.session(state.chats.primary()) })
+    const messages = await harness.messages({ session: chatSession(state.db, primaryChat) })
     return {
       ...result,
       discovered,

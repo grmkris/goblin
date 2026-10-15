@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/durable-sqlite'
 import * as Effect from 'effect/Effect'
 import { type AgentFetch, deliverEvents } from '../../src/inbound/client.ts'
 import type { EventWebhook } from '../../src/mcp/events.ts'
-import { ResidentAuthority } from '../../src/resident.ts'
+import { revokeResident } from '../../src/resident.ts'
 import { type Probes, inAgent } from './probe.ts'
 
 /** A webhook for a subscription the agent does not know: ingress answers it from the authority checks alone. */
@@ -32,14 +32,14 @@ const answer = (agent: AgentFetch): Promise<number | string> =>
  */
 async function eventsIngressCase(
   agent: AgentFetch,
-  revokeResident: () => Promise<void>,
+  revoke: () => Promise<void>,
 ): Promise<{ readonly revoked: number | string }> {
-  await revokeResident()
+  await revoke()
   return { revoked: await answer(agent) }
 }
 
 export const probes: Probes = {
   'events-ingress': inAgent(({ api, storage }) =>
-    eventsIngressCase(api, async () => new ResidentAuthority(drizzle(storage)).revoke(Math.floor(Date.now() / 1000))),
+    eventsIngressCase(api, async () => revokeResident(drizzle(storage), Math.floor(Date.now() / 1000))),
   ),
 }

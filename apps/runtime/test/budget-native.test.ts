@@ -71,16 +71,23 @@ const NOW = 86_400 * 20_000 + 60
 const TOKENS = { input: 5000, output: 0, cacheRead: 0, cacheWrite: 0 }
 
 describe('the model usage the agent checks', () => {
-  it.effect("counts today's tokens against the deployment's cap and refuses once it is reached", () =>
-    Effect.gen(function* () {
-      const budget = yield* Budget
-      yield* budget.record(TOKENS, NOW)
-      expect(yield* budget.today(NOW)).toEqual({ used: 5000, limit: 8000, resetsAt: 86_400 * 20_001 })
-      yield* budget.require(NOW)
-      yield* budget.record(TOKENS, NOW)
-      expect(yield* Effect.flip(budget.require(NOW))).toMatchObject({ _tag: 'BudgetExhausted', limit: 8000 })
-      expect(yield* budget.today(NOW + 86_400)).toMatchObject({ used: 0 })
-    }).pipe(Effect.provide(lane('8000'))),
+  it.effect(
+    "counts today's tokens against the deployment's cap, refuses once it is reached and allows the next day",
+    () =>
+      Effect.gen(function* () {
+        const budget = yield* Budget
+        yield* budget.record(TOKENS, NOW)
+        expect(yield* budget.today(NOW)).toEqual({ used: 5000, limit: 8000, resetsAt: 86_400 * 20_001 })
+        yield* budget.require(NOW)
+        yield* budget.record(TOKENS, NOW)
+        expect(yield* Effect.flip(budget.require(NOW))).toMatchObject({
+          _tag: 'BudgetExhausted',
+          limit: 8000,
+          resetsAt: 86_400 * 20_001,
+        })
+        expect(yield* budget.today(NOW + 86_400)).toMatchObject({ used: 0 })
+        yield* budget.require(NOW + 86_400)
+      }).pipe(Effect.provide(lane('8000'))),
   )
 
   it.effect('refuses nothing without a cap', () =>

@@ -5,7 +5,7 @@ import { agentAppsQuery } from '../src/agent-apps/queries.ts'
 import { AppsPage } from '../src/components/apps-page.tsx'
 import { WorkspaceFeedProvider } from '../src/components/workspace-feed.tsx'
 import { owner } from '../src/lib/api.ts'
-import { testQueryClient } from '../src/lib/query/testing.ts'
+import { testQueryClient } from './query/testing.ts'
 
 /** What reached the network: the page reads what its route primed, and only an unprimed page reads for itself. */
 const requests: string[] = []

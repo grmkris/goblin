@@ -15,7 +15,7 @@ import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { owner } from '../src/lib/api.ts'
 import { primeOwnerRead } from '../src/lib/prime.ts'
-import { fakeHttpApi, testQueryClient } from '../src/lib/query/testing.ts'
+import { fakeHttpApi, testQueryClient } from './query/testing.ts'
 import { personaDetailQuery, personaKeys, updatePersonaMutation } from '../src/personas/queries.ts'
 import { unusedHandlers } from './query/unused-handlers.ts'
 

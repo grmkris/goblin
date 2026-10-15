@@ -3,15 +3,29 @@ import { drizzle } from 'drizzle-orm/node-sqlite'
 import * as Layer from 'effect/Layer'
 import { DatabaseSync } from 'node:sqlite'
 import { Db } from '../src/runtime/db.ts'
-import { migrationStatements } from '../src/storage/migrations.ts'
+import { MIGRATIONS } from '../src/storage/migrations.ts'
+import { BREAK } from '../src/storage/migrations/migration.ts'
+
+/** Where `chatDatabase` stops or resumes the migrations: after the key `after` (else the first), through `through`. */
+type MigrationRange = { readonly after?: string; readonly through?: string }
+
+/** The statements of the application migrations in `range`, in order. */
+function migrationStatements(range: MigrationRange): string[] {
+  const keys = MIGRATIONS.map((migration) => migration.key)
+  const start = range.after === undefined ? 0 : keys.indexOf(range.after) + 1
+  const end = range.through === undefined ? keys.length : keys.indexOf(range.through) + 1
+  if (start === 0 && range.after !== undefined) throw new Error(`Unknown migration ${range.after}`)
+  if (end === 0) throw new Error(`Unknown migration ${String(range.through)}`)
+  return MIGRATIONS.slice(start, end).flatMap((migration) => migration.sql.split(BREAK))
+}
 
 /**
  * Real SQLite with the application migrations applied, for directory, Topic and memory unit tests; native integrations
  * separately exercise the Durable Object driver. `range` stops or resumes the migrations around seeded data.
  */
-export function chatDatabase(range: Parameters<typeof migrationStatements>[0] = {}) {
+export function chatDatabase(range: MigrationRange = {}) {
   const sqlite = new DatabaseSync(':memory:')
-  const migrate = (next: Parameters<typeof migrationStatements>[0]) => {
+  const migrate = (next: MigrationRange) => {
     for (const statement of migrationStatements(next)) sqlite.exec(statement)
   }
   migrate(range)

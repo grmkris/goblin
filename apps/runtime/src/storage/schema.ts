@@ -1,12 +1,7 @@
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
-export { appChatOperations } from './chat-operations.ts'
 export { appSidebar } from './sidebar.ts'
 
-/** Pi owns conversations; these tables hold application state only. Every name keeps the `app_` prefix. */
-export const appMetadata = sqliteTable('app_metadata', {
-  id: text('id').primaryKey().notNull(),
-  value: text('value').notNull(),
-})
+// Pi owns conversations; these tables hold application state only. Every name keeps the `app_` prefix.
 
 /** Owner grants: exactly which tool, resource or prompt of a configured server may be used. */
 export const appMcpGrants = sqliteTable(

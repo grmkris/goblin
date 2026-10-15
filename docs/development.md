@@ -65,7 +65,7 @@ If a check fails, look at `git status` first. Another agent's half-finished file
 
 ## Chat identities and local proof
 
-Browser conversation ids are stable logical chat ids. `ChatDirectory` (`chats/directory.ts`) resolves one to its current Pi
+Browser conversation ids are stable logical chat ids. The chat directory (`chats/directory.ts`, served as `Chats`) resolves one to its current Pi
 session, and the primary remains chat `1` (nothing rebinds a chat: Move to thread forks, ADR 0034). Every input into a
 chat goes through one admission sequence (`ChatOperations.send`, `chats/operations.ts`), which records the operation's
 receipt and selected session in `app_chat_operations` (`chats/receipts.ts`); retries keep that session, while Pi

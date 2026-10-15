@@ -42,18 +42,6 @@ export function isVendorTable(name: string): boolean {
   )
 }
 
-export type TableDefinition = { readonly name: string; readonly definition: string | null }
-
-/** Read schema names only; platform-owned rows such as `_cf_KV` are intentionally opaque. */
-export function listTables(storage: DurableObjectStorage): readonly TableDefinition[] {
-  return storage.sql
-    .exec<{ name: string; sql: string | null }>(
-      "SELECT name, sql FROM sqlite_master WHERE type = 'table' ORDER BY name",
-    )
-    .toArray()
-    .map(({ name, sql }) => ({ name, definition: sql }))
-}
-
 /** A migration may touch only the application's own `app_` tables: anything else is our defect, `Internal`. */
 export function assertApplicationTable(name: string): void {
   if (isVendorTable(name)) throw new Internal({ reason: `application migration attempted vendor table: ${name}` })

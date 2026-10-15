@@ -1,6 +1,6 @@
-import { PRIMARY_CHAT } from '@goblin/contracts'
+import { type HelperExclusion, PRIMARY_CHAT } from '@goblin/contracts'
 import { drizzle } from 'drizzle-orm/durable-sqlite'
-import { SetupScopes } from '../../src/setup/scope.ts'
+import { type Retooling, appAllowed, configureHelper, sessionScope } from '../../src/setup/scope.ts'
 import { appConversations } from '../../src/storage/schema.ts'
 import { runApplicationMigrations } from '../../src/storage/migrations.ts'
 import { type Probes, type ProbeStub, agentProbe, inAgent, inWorker } from './probe.ts'
@@ -21,8 +21,10 @@ async function helperExclusionsProbe(storage: DurableObjectStorage) {
       { chatId: '703', piSession: '703', kind: 'thread', parentSession: '702', createdAt: 1 },
     ])
     .run()
-  const profiles = new SetupScopes(db, [], async () => undefined)
-  await profiles.configureHelper(
+  const retooling: Retooling = { db, subagentTools: [], retool: async () => undefined }
+  const configure = (parent: string, session: string, exclusions: HelperExclusion[], now: number) =>
+    configureHelper(retooling, { parent, session, exclusions }, now)
+  await configure(
     '700',
     '701',
     [
@@ -33,22 +35,22 @@ async function helperExclusionsProbe(storage: DurableObjectStorage) {
     ],
     2,
   )
-  await profiles.configureHelper('701', '702', [], 2)
+  await configure('701', '702', [], 2)
   const state = (id: string) => ({
-    app: profiles.app(id, 'counter'),
-    skills: profiles.scope(id).skills('lib'),
-    tool: profiles.scope(id).tool('notes', 'write'),
-    delegation: profiles.scope(id).subagents(),
+    app: appAllowed(db, id, 'counter'),
+    skills: sessionScope(db, id).skills('lib'),
+    tool: sessionScope(db, id).tool('notes', 'write'),
+    delegation: sessionScope(db, id).subagents(),
   })
   const narrowed = state('702')
   let foreignRefused = false
   try {
-    await profiles.configureHelper('700', '702', [], 3)
+    await configure('700', '702', [], 3)
   } catch {
     // expected: a spawner that is not the helper's own is refused; the probe records that it was.
     foreignRefused = true
   }
-  await profiles.configureHelper('700', '701', [], 4)
+  await configure('700', '701', [], 4)
   return { narrowed, restored: state('702'), branched: state('703'), foreignRefused }
 }
 

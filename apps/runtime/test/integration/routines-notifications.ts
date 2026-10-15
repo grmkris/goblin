@@ -7,7 +7,7 @@ import { mcpHost } from '../../src/mcp/host.ts'
 import { deliverNoticeCopies } from '../../src/notices/telegram.ts'
 import { Notices } from '../../src/notices/service.ts'
 import { NoticeStore } from '../../src/notices/store.ts'
-import { ResidentAuthority } from '../../src/resident.ts'
+import { enableResident } from '../../src/resident.ts'
 import { telegramChannel } from '../../src/channel/channel.ts'
 import { enableEvents } from '../../src/channel/store.ts'
 import { noticesOf } from '../../src/layers/routines.ts'
@@ -70,8 +70,7 @@ function notificationHost(
 async function setupNotifications(storage: DurableObjectStorage) {
   const db = drizzle(storage)
   const notices = new NoticeStore(db)
-  const resident = new ResidentAuthority(db)
-  resident.enable(Math.floor(Date.now() / 1000))
+  enableResident(db, Math.floor(Date.now() / 1000))
   const channel = telegramChannel({ db, telemetry: undefined, wake: () => undefined })
   enableEvents(db, 'mygram', '', Math.floor(Date.now() / 1000), { reach: 'dm' })
   const credentials = new MemoryCredentials()

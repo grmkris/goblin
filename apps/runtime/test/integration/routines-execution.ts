@@ -8,7 +8,7 @@ import { appConversations, appHelperExclusions } from '../../src/storage/schema.
 import { BACKGROUND, conversationId } from '../../src/pi/context.ts'
 import type { SeenRequest } from './model.ts'
 import { type RoutineDefinition } from '@goblin/contracts'
-import { ChatDirectory } from '../../src/chats/directory.ts'
+import { chatSession, primaryChat } from '../../src/chats/directory.ts'
 import { type Probes, inAgent } from './probe.ts'
 import { until } from './until.ts'
 
@@ -46,8 +46,7 @@ async function routineExecutionProbe(
   if (record.sessionId === null) throw new Error('Routine session did not bind')
   const thread = db.select().from(appConversations).where(eq(appConversations.chatId, record.sessionId)).get()
   const pi = await agent.harness.pi()
-  const chats = new ChatDirectory(db)
-  const main = await pi.conversation(conversationId(chats.session(chats.primary())), BACKGROUND)
+  const main = await pi.conversation(conversationId(chatSession(db, primaryChat)), BACKGROUND)
   const history = await main?.entries({}, 100, undefined, BACKGROUND)
   const notes = history?.items.filter((entry) => entry.kind === 'app.routine') ?? []
   const child = await pi.conversation(conversationId(record.sessionId), BACKGROUND)

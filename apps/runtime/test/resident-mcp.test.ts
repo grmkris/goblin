@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 import { type AppError, UpstreamMcp } from '../src/http/errors.ts'
 import { EVENTS_EXTENSION } from '../src/mcp/events/protocol.ts'
 import { mcpHost } from '../src/mcp/host.ts'
-import { type SetupScope, type Exclusion, scopeOf, topicScope } from '../src/setup/scope.ts'
+import { type SetupScope, type Exclusion, scopeOf } from '../src/setup/scope.ts'
 import { Setups } from '../src/setup/service.ts'
 import { listedServers, residentMcpExtension } from '../src/pi/resident-mcp.ts'
 import { Events, Resident, UrlRequests } from '../src/mcp/service.ts'
@@ -21,7 +21,7 @@ import { SingleFlight } from '../src/observability/single-flight.ts'
 import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
 import type { AgentServices } from '../src/layers/index.ts'
 import { chatDatabase, durable } from './chats-sqlite.ts'
-import { FixedProfiles } from './fixed-services.ts'
+import { fixedScopes, topicChatScope } from './fixed-services.ts'
 import { memoryFiles } from './memory-files.ts'
 import { sqliteDb, stub } from './http/api/fixture.ts'
 import { MemoryCredentials, MemoryGrants, MemoryLabels, MemoryRegistries } from './mcp/memory.ts'
@@ -192,7 +192,7 @@ const off = (kind: Exclusion['kind'], connectionId = '', name = ''): Exclusion =
  * What each conversation works with (ADR 0040): 7 everything, 8 a Topic whose setup holds no server, 9 one that holds
  * only notes' `write`, and 10 a subagent whose spawner switched notes off for it.
  */
-const work = (setup: Partial<TopicSetup>) => topicScope({ id: 2, name: 'Work', setup: { ...EVERYTHING, ...setup } })
+const work = (setup: Partial<TopicSetup>) => topicChatScope({ id: 2, name: 'Work', setup: { ...EVERYTHING, ...setup } })
 const scopes: Readonly<Record<string, SetupScope>> = {
   '7': scopeOf([], true),
   '8': work({ mcpServers: [] }),
@@ -202,7 +202,7 @@ const scopes: Readonly<Record<string, SetupScope>> = {
 /** The owner's files, where a result's linked file is kept (ADR 0065). */
 const files = memoryFiles()
 /** The tools' services over the host and the fixed switches above, always resident. */
-const profiles = new FixedProfiles(scopes)
+const scopeOfSession = fixedScopes(scopes)
 const urlRequests = new McpUrlRequestStore(
   durable(chatDatabase().db),
   await CredentialCipher.fromBase64(btoa(String.fromCharCode(...new Uint8Array(32)))),
@@ -212,7 +212,7 @@ const layer = host.pipe(
     Layer.mergeAll(
       SingleFlight.layer,
       FlowEvents.noop,
-      stub(Setups, { scope: (session) => Effect.sync(() => profiles.scope(session)) }),
+      stub(Setups, { scope: (session) => Effect.sync(() => scopeOfSession(session)) }),
       // No conversation here is a routine run's.
       stub(RoutineRuns, { session: () => Effect.succeed(undefined) }),
       // No conversation here is a subagent's or has a chat; URL requests are kept in the test's own store.

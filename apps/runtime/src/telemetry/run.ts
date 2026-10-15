@@ -17,7 +17,7 @@ export type RunTelemetryKit = {
 
 /**
  * Run telemetry for any object that runs Pi on its own SQLite: the ledger, one log line per event, and `sinks` beside
- * them (a benchmark's `CollectedRuns`). Attach `recorder` to the harness as soon as it opens.
+ * them (the agent's trace sink). Attach `recorder` to the harness as soon as it opens.
  */
 export function runTelemetry(
   storage: DurableObjectStorage,

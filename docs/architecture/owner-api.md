@@ -100,4 +100,4 @@ and Better Auth's client (`/api/auth`) reach `/api`. Server data follows myapps 
 - A failure reads through `messageOf` or `describeError` (`lib/query/app-error.ts`) and quotes its reference. A route
   that fails shows `ReportedRouteError`, which reports a defect as a crash (see Logs, failures and references).
 
-The web's tests serve the real contract in memory (`fakeHttpApi`, `lib/query/testing.ts`).
+The web's tests serve the real contract in memory (`fakeHttpApi`, `test/query/testing.ts`).

@@ -1,12 +1,9 @@
 import { PRIMARY_CHAT } from '@goblin/contracts'
 import { drizzle } from 'drizzle-orm/durable-sqlite'
-import * as Effect from 'effect/Effect'
 import { bindEndpoints } from '../../src/mcp/endpoints.ts'
 import { AddedServerStore } from '../../src/mcp/servers.ts'
-import { AppMetadata } from '../../src/storage/metadata.ts'
 import { runApplicationMigrations } from '../../src/storage/migrations.ts'
 import { appMcpCredentials, appMcpEndpoints, appMcpGrants, appMcpOauthPending } from '../../src/storage/schema.ts'
-import { listTables } from '../../src/storage/vendor.ts'
 import { askResult, recentResult } from '../internal-client.ts'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
 import { type ProbeEnv, type Probes, type ProbeStub, inAgent, inWorker } from './probe.ts'
@@ -20,25 +17,27 @@ import {
   workspaceConversations,
 } from './probe-reads.ts'
 
+/** The object's tables and their definitions: schema names only, platform-owned rows such as `_cf_KV` stay opaque. */
+export function listTables(storage: DurableObjectStorage): readonly { name: string; definition: string | null }[] {
+  return storage.sql
+    .exec<{ name: string; sql: string | null }>(
+      "SELECT name, sql FROM sqlite_master WHERE type = 'table' ORDER BY name",
+    )
+    .toArray()
+    .map(({ name, sql }) => ({ name, definition: sql }))
+}
+
 /**
  * The startup check, run in the agent's `onRequest` after its start: migrating again changes no table, every
- * application table was made by the constructor (`constructed`, before Pi opened), metadata stores, and main's snapshot
- * reads empty. A table made later answers an error response.
+ * application table was made by the constructor (`constructed`, before Pi opened), and main's snapshot reads empty. A
+ * table made later answers an error response.
  */
 export async function startupCheck(storage: DurableObjectStorage, constructed: readonly string[], api: AgentFetch) {
   const before = listTables(storage)
   runApplicationMigrations(storage)
   const after = listTables(storage)
   if (after.some(({ name }) => name.startsWith('app_') && !constructed.includes(name))) return Response.error()
-  const metadata = await Effect.runPromise(
-    Effect.gen(function* () {
-      const service = yield* AppMetadata
-      yield* service.set('probe', 'stored-once')
-      yield* service.set('probe', 'stored-updated')
-      return yield* service.get('probe')
-    }).pipe(Effect.provide(AppMetadata.layer(storage))),
-  )
-  return Response.json({ snapshot: await ownerSnapshot(api, PRIMARY_CHAT), before, after, metadata })
+  return Response.json({ snapshot: await ownerSnapshot(api, PRIMARY_CHAT), before, after })
 }
 
 const notesAt = (endpoint: string) => [{ connectionId: 'notes', endpoint }]

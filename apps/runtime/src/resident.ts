@@ -1,8 +1,12 @@
 import type { ResidentStatus } from '@goblin/contracts'
 import { eq } from 'drizzle-orm'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
-import { ResidentInactive } from './http/errors.ts'
 import { appResident } from './storage/schema.ts'
+
+// Resident authority: what lets tools run without a live browser session (chat, inbound MCP clients, routines and
+// channels), kept in the agent's one `app_resident` row. Owner admission renews it; a revocation is sticky until the
+// owner enables it again. Programs use the `Resident` service (mcp/service.ts), built over these functions in
+// layers/core.ts.
 
 /** The agent may act on its own for this long after the owner's last signed-in action. */
 export const RESIDENT_TTL_SECONDS = 30 * 24 * 60 * 60
@@ -44,38 +48,4 @@ export function revokeResident(db: Database, now: number): void {
 export function enableResident(db: Database, now: number): void {
   renewResident(db, now)
   db.update(appResident).set({ revokedAt: null }).where(eq(appResident.id, 1)).run()
-}
-
-/**
- * Resident authority: what lets tools run without a live browser session (chat, inbound MCP clients, routines and
- * channels). Owner admission renews it; a revocation is sticky until the owner re-enables it. The agent's programs use
- * the `Resident` service (mcp/service.ts, built over the functions above in layers/core.ts); this object reads and
- * writes the same row for code that holds only the database.
- */
-export class ResidentAuthority {
-  readonly #db: Database
-  constructor(db: Database) {
-    this.#db = db
-  }
-
-  status(now: number): ResidentStatus {
-    return residentStatus(this.#db, now)
-  }
-
-  renew(now: number): void {
-    renewResident(this.#db, now)
-  }
-
-  revoke(now: number): void {
-    revokeResident(this.#db, now)
-  }
-
-  enable(now: number): void {
-    enableResident(this.#db, now)
-  }
-
-  require(now: number): void {
-    const status = this.status(now)
-    if (status.state !== 'active') throw new ResidentInactive({ state: status.state })
-  }
 }

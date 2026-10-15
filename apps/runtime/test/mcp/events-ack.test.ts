@@ -4,7 +4,7 @@ import { Conflict } from '../../src/http/errors.ts'
 import { makeEvents } from '../../src/mcp/events.ts'
 import { SqliteEventStore } from '../../src/mcp/events/store.ts'
 import { SingleFlight } from '../../src/observability/single-flight.ts'
-import { appEventConsumerReceipts, appMetadata } from '../../src/storage/schema.ts'
+import { appEventConsumerReceipts, appUsageDaily } from '../../src/storage/schema.ts'
 import { chatDatabase, durable } from '../chats-sqlite.ts'
 import { fake } from '../fake.ts'
 
@@ -34,8 +34,9 @@ const pending = async () => {
     makeEvents(fake<Parameters<typeof makeEvents>[0]>({ store })).pipe(Effect.provide(SingleFlight.layer)),
   )
   const state = () => db.select().from(appEventConsumerReceipts).get()?.state
-  const written = () => db.select().from(appMetadata).all().length
-  const write = () => db.insert(appMetadata).values({ id: 'pending-handoff', value: '1' }).run()
+  // Any application row stands in for the consumer's own write.
+  const written = () => db.select().from(appUsageDaily).all().length
+  const write = () => db.insert(appUsageDaily).values({ day: '2026-10-15', tokens: 1, updatedAt: 1 }).run()
   return { events, state, written, write }
 }
 

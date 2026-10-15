@@ -7,7 +7,7 @@ import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { approvalQuery, decideApprovalMutation } from '../src/approvals/queries.ts'
 import { owner } from '../src/lib/api.ts'
-import { fakeHttpApi, testQueryClient } from '../src/lib/query/testing.ts'
+import { fakeHttpApi, testQueryClient } from './query/testing.ts'
 import { unusedHandlers } from './query/unused-handlers.ts'
 
 const HELD: ApprovalView = {

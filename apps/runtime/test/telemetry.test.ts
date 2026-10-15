@@ -9,7 +9,7 @@ import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
 import { describe, expect, it, vi } from 'vitest'
 import { BACKGROUND } from '../src/pi/context.ts'
-import { CollectedRuns, RunTelemetry, boundAttributes, type RunSink } from '../src/telemetry/events.ts'
+import { RunTelemetry, boundAttributes, type RunSink } from '../src/telemetry/events.ts'
 import { RunLog } from '../src/telemetry/log.ts'
 import { PiRunRecorder, sourceOf } from '../src/telemetry/pi.ts'
 import { auxReporter, mcpReporter } from '../src/telemetry/report.ts'
@@ -19,6 +19,7 @@ import { type StepReport, timed } from '../src/mcp/log.ts'
 import type { McpStep } from '../src/telemetry/report.ts'
 import { grantRequiredResult } from '../src/mcp/extension.ts'
 import { NeedsAuthorization, NotFound, UpstreamMcp } from '../src/http/errors.ts'
+import { CollectedRuns } from './telemetry-sink.ts'
 
 const model: Model<'openai-completions'> = {
   id: 'telemetry-fixture',

@@ -2,7 +2,7 @@ import { PRIMARY_CHAT } from '@goblin/contracts'
 import { drizzle } from 'drizzle-orm/durable-sqlite'
 import { Schema } from 'effect'
 import { expect } from 'vitest'
-import { ChatDirectory } from '../../src/chats/directory.ts'
+import { chatSession, operationSession } from '../../src/chats/directory.ts'
 import { unwrap } from '../../src/http/rpc.ts'
 import { askResult, recentResult } from '../internal-client.ts'
 import { type NativeCase, probeOf } from './native-case.ts'
@@ -14,14 +14,14 @@ async function primaryProfileProbe({ agent, api, storage, harness }: Inside) {
   const operationId = 'permuted-primary-proof'
   await ownerSend(api, PRIMARY_CHAT, 'prove the primary binding', operationId)
   const settled = await agent.settle(PRIMARY_CHAT, operationId)
-  const directory = new ChatDirectory(drizzle(storage))
-  const session = directory.session(PRIMARY_CHAT)
+  const db = drizzle(storage)
+  const session = chatSession(db, PRIMARY_CHAT)
   const inbound = unwrap(await askResult(api, 'fixture-client', 'inbound binding proof', 'primary-inbound', 5000))
   const recent = unwrap(await recentResult(api, 20))
   return {
     session,
     inboundStatus: inbound.status,
-    inboundSession: directory.operation(PRIMARY_CHAT, 'primary-inbound'),
+    inboundSession: operationSession(db, PRIMARY_CHAT, 'primary-inbound'),
     recentInbound: recent.some(
       (message) => message.author === 'fixture-client' && message.text === 'inbound binding proof',
     ),

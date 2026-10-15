@@ -4,11 +4,10 @@ import * as Effect from 'effect/Effect'
 import { nextInt } from 'effect/Random'
 import { JOB_CALLBACK } from '../../src/agent-apps/jobs.ts'
 import { PersonalAgent } from '../../src/agent.ts'
-import { ChatDirectory } from '../../src/chats/directory.ts'
+import { chatSession, operationSession } from '../../src/chats/directory.ts'
 import { canonicalRedirect } from '../../src/http/canonical.ts'
-import { listTables } from '../../src/storage/vendor.ts'
 import { EventsFixture } from '../mcp/events-fixture.ts'
-import { probes as agentProbes, startupCheck } from './agent-probe.ts'
+import { probes as agentProbes, listTables, startupCheck } from './agent-probe.ts'
 import { probes as appsJobsProbes } from './apps-jobs-probe.ts'
 import { probes as appsProbes } from './apps-probe.ts'
 import { probes as codeRecoveryProbes } from './code-recovery-probe.ts'
@@ -118,15 +117,14 @@ export class PersonalAgentProbe extends PersonalAgent {
 
   /** Waits for an operation in a conversation to settle (the owner API has no wait route). */
   async settle(chat: string, operationId: string) {
-    const directory = new ChatDirectory(drizzle(this.ctx.storage))
-    const session = directory.operation(chat, operationId) ?? directory.session(chat)
+    const db = drizzle(this.ctx.storage)
+    const session = operationSession(db, chat, operationId) ?? chatSession(db, chat)
     return this.harness.wait(operationId, { session })
   }
 
   /** Whether Pi runs a conversation now (the workspace feed carries this; the conversation list does not). */
   async busy(chat: string): Promise<boolean> {
-    const directory = new ChatDirectory(drizzle(this.ctx.storage))
-    return this.harness.session(directory.session(chat)).busy()
+    return this.harness.session(chatSession(drizzle(this.ctx.storage), chat)).busy()
   }
 
   /**

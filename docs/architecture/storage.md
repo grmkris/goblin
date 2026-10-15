@@ -7,7 +7,8 @@
 | Agent DO SQLite | `pi_*`, `cf_agents_*` and the other vendor tables | Pi, Agents SDK. Never touched. |
 | Agent DO SQLite | `app_mcp_connections`, `app_mcp_registries`, `app_mcp_endpoints`, `app_mcp_credentials`, `app_mcp_oauth_pending`, `app_mcp_grants` | Drizzle: MCP metadata and authorization. |
 | Agent DO SQLite | `app_mcp_spend_rules`, `app_mcp_spend` | Unread until the migrations are squashed (ADR 0063). |
-| Agent DO SQLite | `app_resident`, `app_conversations`, `app_model_choice`, `app_usage_daily`, `app_metadata` | Drizzle: agent metadata and logical chat bindings (ADR 0030). `app_usage_daily` counts model tokens per UTC day; its `milli_credits` is unread until the migrations are squashed (ADR 0058). |
+| Agent DO SQLite | `app_resident`, `app_conversations`, `app_model_choice`, `app_usage_daily` | Drizzle: agent metadata and logical chat bindings (ADR 0030). `app_usage_daily` counts model tokens per UTC day; its `milli_credits` is unread until the migrations are squashed (ADR 0058). |
+| Agent DO SQLite | `app_metadata` | Unread until the migrations are squashed. |
 | Agent DO SQLite | `app_chat_operations` | Drizzle: operation receipts per chat, pinned to their original Pi session, with kind, origin, target chat, parent operation, state and reason (`20261027000000_chat_operation_receipts`), pruned opportunistically after 30 days (ADR 0030). |
 | Agent DO SQLite | `app_conversation_capabilities`, `app_execution_exclusions` | Drizzle: a helper's exclusions, set by its spawner (ADRs 0018, 0029); the owner's per-conversation switches were deleted (ADR 0040). |
 | Agent DO SQLite | `app_persona_chats` | Drizzle: the setup a Persona answers with in a chat: its fork, frozen at the ask (ADR 0040), or a routine's run at the pinned revision (ADR 0041). |
@@ -47,9 +48,8 @@ acceptance starts no model turn and proves no external effect.
 The chat layer has unit proof for lookup, operation retries, retention, CAS ownership and admission locks, plus a
 local workerd profile that binds chat `1` to a fresh non-root Pi session in test subclasses before service
 composition. Owner, helper, routine, channel and memory cases run under that profile; explicit owner and inbound
-proofs assert the non-root session and an empty root transcript. The AST guard bans root constants, session-less
-harness submission/session calls, and a `ChatDirectory` built outside the conversation layer (`layers/conversation.ts`)
-and tests. These
+proofs assert the non-root session and an empty root transcript. The AST guard bans root constants and session-less
+harness submission/session calls in the runtime's source (tests aside). These
 prove local behavior; deployed-stage, live-provider,
 Telegram-service and remote-eviction acceptance remain separate.
 
