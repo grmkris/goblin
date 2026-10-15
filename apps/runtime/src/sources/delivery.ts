@@ -11,8 +11,23 @@ import type { Answer, ReplyRef } from './turns.ts'
 /** How long a turn's answer is waited for before it is given up, in seconds. */
 const REPLY_WINDOW = 86_400
 
-/** An answer owed: the turn it belongs to, and when its message came in (epoch seconds). */
-type Owed = ReplyRef & { readonly createdAt: number }
+/**
+ * An answer owed as its store keeps it: the turn's operation, when its message came in (epoch seconds), the goblin chat
+ * it ran in and the Persona that answers it (null when there is none).
+ */
+type Owed = {
+  readonly operationId: string
+  readonly createdAt: number
+  readonly chatId: string | null
+  readonly personaId: number | null
+}
+
+/** The turn an owed answer belongs to, with what it does not have left out. */
+const refOf = (owed: Owed): ReplyRef => ({
+  operationId: owed.operationId,
+  ...(owed.chatId === null ? {} : { chatId: owed.chatId }),
+  ...(owed.personaId === null ? {} : { personaId: owed.personaId }),
+})
 
 /**
  * Sends every answer of `owed` that is ready, in order: `answer` reads how its turn ended, and `send` sends it, or gives
@@ -21,13 +36,13 @@ type Owed = ReplyRef & { readonly createdAt: number }
 export const deliverReady = <O extends Owed, E, R>(
   owed: readonly O[],
   now: number,
-  answer: (reply: O) => Effect.Effect<Answer | undefined, E, R>,
+  answer: (reply: ReplyRef) => Effect.Effect<Answer | undefined, E, R>,
   send: (reply: O, answer: Answer | undefined) => Effect.Effect<void, E, R>,
 ) =>
   Effect.gen(function* () {
     let waiting = false
     for (const reply of owed) {
-      const answered = yield* answer(reply)
+      const answered = yield* answer(refOf(reply))
       if (answered === undefined && now - reply.createdAt < REPLY_WINDOW) waiting = true
       else yield* send(reply, answered)
     }

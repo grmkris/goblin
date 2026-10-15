@@ -119,21 +119,7 @@ const sendReply = (
 export const deliverReplies = (context: EngineContext, ports: SourcePorts, delivered: Report) =>
   Effect.flatMap(Clock.currentTimeMillis, (millis) => {
     const now = Math.floor(millis / 1000)
-    return deliverReady(
-      dueReplies(context.db, now).map((reply) => ({
-        operationId: reply.operationId,
-        createdAt: reply.createdAt,
-        ...(reply.chatId === null ? {} : { chatId: reply.chatId }),
-        ...(reply.personaId === null ? {} : { personaId: reply.personaId }),
-        reply,
-      })),
-      now,
-      ({ operationId, chatId, personaId }) =>
-        ports.answer({
-          operationId,
-          ...(chatId === undefined ? {} : { chatId }),
-          ...(personaId === undefined ? {} : { personaId }),
-        }),
-      ({ reply }, answer) => sendReply(context, reply, answer, ports, delivered),
+    return deliverReady(dueReplies(context.db, now), now, ports.answer, (reply, answer) =>
+      sendReply(context, reply, answer, ports, delivered),
     )
   })

@@ -459,22 +459,8 @@ const deliver = (
   delivered: (reply: DeliveredReply) => Effect.Effect<void>,
 ) =>
   Effect.suspend(() =>
-    deliverReady(
-      pendingReplies(input.db).map((reply) => ({
-        operationId: reply.operationId,
-        createdAt: reply.createdAt,
-        ...(reply.chatId === null ? {} : { chatId: reply.chatId }),
-        ...(reply.personaId === null ? {} : { personaId: reply.personaId }),
-        reply,
-      })),
-      now,
-      ({ operationId, chatId, personaId }) =>
-        ports.answer({
-          operationId,
-          ...(chatId === undefined ? {} : { chatId }),
-          ...(personaId === undefined ? {} : { personaId }),
-        }),
-      ({ reply }, answer) => sendAnswer(input, record, ports, { reply, answer, now }, delivered),
+    deliverReady(pendingReplies(input.db), now, ports.answer, (reply, answer) =>
+      sendAnswer(input, record, ports, { reply, answer, now }, delivered),
     ),
   )
 
