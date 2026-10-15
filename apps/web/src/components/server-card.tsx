@@ -1,6 +1,6 @@
 // One of the owner's connections (ADR 0041): its name, the server it reaches, where it stands and its actions (Open for
-// its App), then once connected a summary, and behind Manage access its words, events, skills, Telegram channel and
-// tools. A server's title and description are its own claims.
+// its App), then once connected a summary, and behind Manage access its words, events, Sources, skills, Telegram channel
+// and tools. A server's title and description are its own claims.
 import { useEffect, useId, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ServerView, ToolView } from '@goblin/contracts'
@@ -32,6 +32,7 @@ import { routinesQuery } from '../routines/queries.ts'
 import { QueryError } from '../lib/query/query-boundary.tsx'
 import { serverStatus } from '../lib/labels.ts'
 import { ConnectionEvents, eventsAnchor } from './connection-events.tsx'
+import { ConnectionSources } from './connection-sources.tsx'
 import { AppTile } from './apps/app-tile.tsx'
 import { StatusLabel } from './status-label.tsx'
 import { type TelegramChannel, TelegramControl, hasTelegramTools } from './telegram-control.tsx'
@@ -99,7 +100,7 @@ function SkillsSwitch({
 
 /**
  * What a connected server offers, behind Manage access: its own words, its events (and what goblin does with them),
- * skills, Telegram, then its tools.
+ * its Sources (ADR 0066), skills, Telegram, then its tools.
  */
 function ServerBody({
   server,
@@ -123,6 +124,7 @@ function ServerBody({
           </p>
         )}
         <ConnectionEvents server={server} />
+        <ConnectionSources server={server} />
         {settings && (
           <section className="server-part" aria-label="Settings">
             {(server.skillsOffered === true || server.skillsEnabled === true) && (

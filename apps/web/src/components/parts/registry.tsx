@@ -44,6 +44,7 @@ import { AssistantText, UserText } from './text-part.tsx'
 import { SubagentBlock } from './subagent-block.tsx'
 import { GenericToolPart } from './tool-part.tsx'
 import { RoutineProposalPart } from './routine-proposal.tsx'
+import { SourceProposalPart } from './source-proposal.tsx'
 import { SourcesStrip } from './sources-strip.tsx'
 import { sourcesOf } from '../../lib/sources.ts'
 
@@ -141,6 +142,8 @@ function ToolView({ part }: { readonly part: ToolPart }) {
   if (part.built !== undefined) return <AppBuildPart part={part} />
   // `routine` is the single tool older transcripts used (ADR 0027).
   if (part.call.name === 'routine_propose' || part.call.name === 'routine') return <RoutineProposalPart part={part} />
+  // A Source the agent proposed (ADR 0066): the owner reviews and confirms it on its card.
+  if (part.call.name === 'source_propose') return <SourceProposalPart part={part} />
   // What a search of the owner's other chats found: a source strip, not a tool card.
   const sources = part.call.name === 'search_chats' ? sourcesOf(part.result?.details) : []
   if (sources.length > 0)

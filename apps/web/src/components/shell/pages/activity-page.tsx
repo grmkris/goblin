@@ -31,6 +31,8 @@ import { useMinute } from '../../use-now.ts'
 import { undoRefusal } from '../organize.ts'
 import { messageOf } from '../../../lib/query/app-error.ts'
 import { ChatRow, RowContents } from './chat-link.tsx'
+import { OfferPick } from './offer-pick.tsx'
+import { SourceOffers, useSourceOffers } from './source-offers.tsx'
 import { StartChecklist } from '../../start/setup-cards.tsx'
 import { onboardingQuery } from '../../../onboarding/queries.ts'
 import { relativeTime } from '../../../lib/format.ts'
@@ -238,33 +240,25 @@ function TelegramOfferRow({
         title={`${offerWords(chat)} “${chat.title}”${within}`}
         meta={error === '' ? (waitingWords(chat.held) ?? 'Choose where its messages go') : error}
       />
-      <span className="telegram-offer-pick">
-        <RouteSelect
-          chat={chat}
-          choice={choice}
-          places={places}
-          onChoose={(next) => {
-            route.reset()
-            setTouched(next)
-          }}
-        />
-        <span className="row-actions">
-          <Button variant="ghost" size="sm" disabled={route.isPending} onClick={onNotNow}>
-            Not now
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            pending={route.isPending}
-            disabled={pick === undefined}
-            onClick={() => {
-              if (pick !== undefined) route.mutate(pick)
+      <OfferPick
+        select={
+          <RouteSelect
+            chat={chat}
+            choice={choice}
+            places={places}
+            onChoose={(next) => {
+              route.reset()
+              setTouched(next)
             }}
-          >
-            Set up
-          </Button>
-        </span>
-      </span>
+          />
+        }
+        pending={route.isPending}
+        ready={pick !== undefined}
+        onNotNow={onNotNow}
+        onSetUp={() => {
+          if (pick !== undefined) route.mutate(pick)
+        }}
+      />
     </li>
   )
 }
@@ -321,10 +315,16 @@ function ReceiptRow({ receipt, now }: { readonly receipt: OrganizeReceipt; reado
   )
 }
 
+/** A need's key in its list: the App, or the chat and what it asks there. */
+const needKey = (need: NeedsYou): string =>
+  need.kind === 'app'
+    ? `app:${need.app.id}`
+    : `${need.chat.id}:${need.attention.kind}:${need.attention.since}:${String(need.attention.entry ?? '')}:${need.attention.label ?? ''}`
+
 /**
  * `/activity`: what needs the owner across every Topic (questions, approvals, grants, App schedules), linked to where
- * it waits; the Telegram chats waiting for a route; Tell me's notifications; the chats with unread replies; and what
- * organizing did, with Undo.
+ * it waits; the Telegram chats waiting for a route; the Sources' conversations waiting for one and Sources to review;
+ * Tell me's notifications; the chats with unread replies; and what organizing did, with Undo.
  */
 export function ActivityPage() {
   const conversations = useConversations()
@@ -337,7 +337,8 @@ export function ActivityPage() {
   const setup = useQuery(onboardingQuery).data
   const setupLeft = setup?.steps.filter((step) => !step.done).length ?? 0
   const telegram = useTelegramOffers()
-  const waiting = needs.length + offers.length + telegram.offers.length + setupLeft
+  const sources = useSourceOffers()
+  const waiting = needs.length + offers.length + telegram.offers.length + sources.count + setupLeft
   if (waiting + notifications.length + receipts.length + unread.length === 0)
     return <p className="page-empty">Nothing needs you.</p>
   return (
@@ -347,15 +348,7 @@ export function ActivityPage() {
         <PageSection id="needs" title="Needs you" count={needs.length}>
           <ul className="list-rows">
             {needs.map((need) => (
-              <NeedRow
-                key={
-                  need.kind === 'app'
-                    ? `app:${need.app.id}`
-                    : `${need.chat.id}:${need.attention.kind}:${need.attention.since}:${String(need.attention.entry ?? '')}:${need.attention.label ?? ''}`
-                }
-                need={need}
-                now={now}
-              />
+              <NeedRow key={needKey(need)} need={need} now={now} />
             ))}
           </ul>
         </PageSection>
@@ -370,6 +363,7 @@ export function ActivityPage() {
         </PageSection>
       )}
       {telegram.offers.length > 0 && <TelegramOffers telegram={telegram} />}
+      {sources.count > 0 && <SourceOffers offers={sources} />}
       {notifications.length > 0 && (
         <Notifications
           notifications={notifications}

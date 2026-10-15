@@ -71,7 +71,8 @@ export function chatStatus(chat: Pick<TelegramChat, 'status' | 'held'>): Label |
  */
 export type RouteChoice = { readonly place: string; readonly responder: string }
 
-const GOBLIN = 'goblin'
+/** The responder value for goblin itself; a Persona's is `persona:<id>`. */
+export const GOBLIN = 'goblin'
 
 /** The longest name a Topic takes. */
 const TOPIC_NAME_MAX = 80
@@ -142,6 +143,12 @@ export function suggestedChoice(chat: TelegramChat, topics: readonly TopicView[]
   return { place: `answer:${String(named?.id ?? PERSONAL_TOPIC)}`, responder: GOBLIN }
 }
 
+/** The Persona a responder value names (`persona:<id>`); none for goblin. */
+export function responderPersona(responder: string): number | undefined {
+  const persona = Number(responder.split(':')[1])
+  return responder.startsWith('persona:') && Number.isInteger(persona) && persona > 0 ? persona : undefined
+}
+
 /** The pick a choice makes for the owner API; none while nothing is picked, or for a place the select does not offer. */
 export function pickOf(chat: TelegramChat, choice: RouteChoice, topics: readonly TopicView[]): RoutePick | undefined {
   const base = { chat: chat.chat, thread: chat.thread }
@@ -150,11 +157,8 @@ export function pickOf(chat: TelegramChat, choice: RouteChoice, topics: readonly
   if (place === 'inherit') return chat.thread > 0 ? { ...base, mode: 'inherit' } : undefined
   const [mode, where] = place.split(':')
   if (mode !== 'answer' && mode !== 'listen') return undefined
-  const persona = Number(choice.responder.split(':')[1])
-  const answeredBy =
-    mode === 'answer' && choice.responder.startsWith('persona:') && Number.isInteger(persona) && persona > 0
-      ? { persona }
-      : {}
+  const persona = responderPersona(choice.responder)
+  const answeredBy = mode === 'answer' && persona !== undefined ? { persona } : {}
   if (where === 'new') {
     const name = newTopicName(chat, topics)
     return name === undefined ? undefined : { ...base, mode, newTopic: name, ...answeredBy }
@@ -170,10 +174,23 @@ export type Option = { readonly value: string; readonly text: string }
 export type OptionGroup = { readonly label?: string; readonly options: readonly Option[] }
 
 /** A Topic as an option names it: by name, archived ones said so, one goblin does not list (just made) plainly. */
-function topicWords(id: number, topics: readonly TopicView[]): string {
+export function topicWords(id: number, topics: readonly TopicView[]): string {
   const topic = topics.find((each) => each.id === id)
   if (topic === undefined) return 'a new Topic'
   return topic.archivedAt === undefined ? `#${topic.name}` : `#${topic.name} (archived)`
+}
+
+/**
+ * The Topics a route select offers: every live one, and the one `current` (`answer:<id>` or `listen:<id>`) names even
+ * when it is not live, so the select always shows what is chosen.
+ */
+export function offeredTopics(topics: readonly TopicView[], current: string): readonly number[] {
+  const shown = live(topics).map((topic) => topic.id)
+  const [mode, where] = current.split(':')
+  const held = Number(where)
+  return (mode === 'answer' || mode === 'listen') && Number.isInteger(held) && held > 0 && !shown.includes(held)
+    ? [...shown, held]
+    : shown
 }
 
 /**
@@ -186,13 +203,7 @@ export function routeOptions(
   topics: readonly TopicView[],
   current: string,
 ): readonly OptionGroup[] {
-  const shown = live(topics).map((topic) => topic.id)
-  const [mode, where] = current.split(':')
-  const held = Number(where)
-  const ids =
-    (mode === 'answer' || mode === 'listen') && Number.isInteger(held) && held > 0 && !shown.includes(held)
-      ? [...shown, held]
-      : shown
+  const ids = offeredTopics(topics, current)
   const name = newTopicName(chat, topics)
   const places = (kind: 'answer' | 'listen', suffix: string): readonly Option[] => [
     ...ids.map((id) => ({ value: `${kind}:${String(id)}`, text: `${topicWords(id, topics)}${suffix}` })),

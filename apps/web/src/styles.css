@@ -1529,6 +1529,29 @@
     gap: 0.75rem;
     margin-inline-start: auto;
   }
+  /*
+   * A connection's Sources (components/connection-sources.tsx, ADR 0066): a row like a set-up event's, with its card or
+   * its conversations opening under it at the row's full width. A Source's conversations are a flat list of rows.
+   */
+  .source-set-open {
+    flex: 1 1 100%;
+    min-width: 0;
+    padding-block: 0.25rem;
+    container: telegram-route / inline-size;
+  }
+  .telegram-chat-list > .telegram-chat + .telegram-chat {
+    border-block-start: 1px solid var(--hairline);
+  }
+  /* Settings' Notify me via: the Source to copy from and its conversation side by side, under each other on a phone. */
+  .notify-copy {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+  .notify-copy > [data-slot='native-select-wrapper'] {
+    flex: 1 1 12rem;
+    min-width: 0;
+  }
   /* How the channel works is read whole, not cut at two lines like a tool's purpose. */
   .grant-about.telegram-about,
   .grant-about.telegram-ended {
