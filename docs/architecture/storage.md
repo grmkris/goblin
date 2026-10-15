@@ -27,12 +27,12 @@
 | Agent DO SQLite | `app_registry` | Drizzle: every App the workspace shows, by source: an MCP App per Pi session and call, with logical `chat_id` placement, an agent app per name (ADRs 0020, 0021, 0030). `app_apps`, its predecessor, was copied in with the same ids and is no longer read. |
 | Agent DO SQLite | `app_run_events` | Drizzle: the run ledger, turns, model attempts and tool calls without content, 30 days (ADR 0024). |
 | Agent DO SQLite | `app_home`, `app_home_operations`, `app_decision_proposals`, `app_decision_labels` | Unread until the migrations are squashed: the Home layout and typed decisions are gone (ADR 0067). |
-| D1 `goblinAuth` | `user`, `session`, `account`, `verification`, `jwks`, `rateLimit`, `oauth*` | Better Auth, `apps/runtime/migrations`. |
-| D1 `goblinAuth` | `app_billing_accounts`, `app_billing_subscriptions`, `app_billing_inbox`, `app_billing_checkouts`, `app_billing_wallet_subscriptions` | Unread until the migrations are squashed (ADR 0058). |
+| D1 `goblinAuth` | `user`, `session`, `account`, `verification`, `jwks`, `rateLimit`, `oauth*` | Better Auth, `apps/runtime/migrations/0000_baseline.sql`. |
 
-The withdrawn Members feature left dormant auth D1 tables and DO columns/tables. Applied migration files and keys
-remain intact to preserve real data and migration history; the runtime no longer reads or writes that access metadata.
-See [ADR 0014](../adr/0014-members-and-workspace-authority.md) for the withdrawal.
+The auth D1 baseline contains the current schema: withdrawn billing, workspace, member and wallet tables are absent.
+The disposable dev reset recreates this baseline; prod remains frozen until its separate reset decision.
+The auth migration unit tests apply the baseline to SQLite, compare it with the installed Better Auth schema and
+exercise constraints and MCP client registration. This verifies local schema behavior, not a deployed reset.
 
 Application tables are declared in `storage/schema.ts` and migrated inline by `storage/migrations.ts`, which applies
 the area lists in `storage/migrations/` (`base.ts`, `conversation.ts`, `decisions.ts`, `setup.ts`) in key order.
