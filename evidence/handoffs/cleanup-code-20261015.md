@@ -49,7 +49,11 @@ These checks use local fixtures and do not establish authenticated MySI or Teleg
 1. Finish and review the separate Mygram lane. At this checkpoint it still needs per-entry MCP attachment blocks
    preserved through SDK/MySI, pending-media recovery that cannot advance past an undeliverable photo, text-format
    defaults, guide updates, archive/timeline proof, integration with its current base and its final checks. A retained
-   cursor also needs a durable later wake; Goblin does not poll `media_read` after an empty Source page.
+   cursor also needs a durable later wake; Goblin does not poll `media_read` after an empty Source page. The Source
+   setup must key both `chat` and `threadId` to keep forum topics distinct, while the producer must omit a missing
+   thread id rather than send JSON `null` to Mygram's optional field. Reply results also need a truthful mapping of
+   structured `accepted`, `retryable`, `rejected` and `unknown` outcomes; successful MCP transport alone is not
+   external delivery.
 2. Follow the [reset/setup checklist](../../docs/development.md#reset-dev) for the checked release. Preserve only the
    setup checklist; dev data is disposable. Record the selected SHA, old and new Worker versions, authenticated smoke,
    drift and the exact CI acceptance receipt. Keep the production freeze in place.
