@@ -5,6 +5,8 @@ import { NotFound } from '@goblin/contracts/api'
 import { Button } from '@goblin/ui'
 import { messageOf, withRef } from '../../lib/query/app-error.ts'
 import type { ToolPart } from '../../lib/parts.ts'
+import { receivedFiles } from '../../lib/tool-payload.ts'
+import { ReceivedFiles } from '../attachments.tsx'
 import { useAppHost } from '../apps/host.tsx'
 import { AppPlace } from '../apps/slot.tsx'
 import { useApps } from '../../lib/workspace/hooks.ts'
@@ -53,13 +55,21 @@ export function AppsIn({
   return <AppsConversation value={conversation}>{children}</AppsConversation>
 }
 
-/** A call to an owner's MCP server: the generic card, and its App in the row's place below it. */
+/**
+ * A call to an owner's MCP server: the generic card, its App in the row's place below it, and a chip for each file
+ * goblin kept from its result (ADR 0065).
+ */
 export function McpToolPart({ part }: { readonly part: ToolPart }) {
   const conversation = use(AppsConversation)
-  return conversation === undefined ? (
-    <ToolCard part={part} />
-  ) : (
-    <McpToolWithApp part={part} conversation={conversation} />
+  const files = receivedFiles(part.result?.details)
+  const card =
+    conversation === undefined ? <ToolCard part={part} /> : <McpToolWithApp part={part} conversation={conversation} />
+  if (files.length === 0) return card
+  return (
+    <div className="flex flex-col gap-2">
+      {card}
+      <ReceivedFiles files={files} />
+    </div>
   )
 }
 

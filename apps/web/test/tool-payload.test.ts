@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { JsonView, ToolPayload, type ToolPayloadView } from '@goblin/ui'
-import { outputBlocks, payloadView } from '../src/lib/tool-payload.ts'
+import { outputBlocks, payloadView, receivedFiles } from '../src/lib/tool-payload.ts'
 
 const envelope = (content: readonly unknown[], structuredContent: unknown = '[unsupported]') => ({
   origin: { connectionId: 'fixture', trust: 'untrusted' },
@@ -123,5 +123,17 @@ describe('tool output views', () => {
     expect(plain).toContain('shown')
     expect(plain).not.toContain('Raw')
     expect(plain).not.toContain('role="tablist"')
+  })
+})
+
+describe('files received from a tool result (ADR 0065)', () => {
+  const file = { path: '/agent/received/docs/2026-10-15/q3.csv', name: 'q3.csv', size: 22, mimeType: 'text/csv' }
+  it("reads the envelope's own list of the files goblin kept", () => {
+    expect(receivedFiles({ ...envelope([]), received: [file] })).toEqual([file])
+  })
+  it("reads none outside an MCP envelope, and no path outside the owner's files", () => {
+    expect(receivedFiles({ received: [file] })).toEqual([])
+    expect(receivedFiles({ ...envelope([]), received: [{ ...file, path: 'https://example.com/q3.csv' }] })).toEqual([])
+    expect(receivedFiles(envelope([]))).toEqual([])
   })
 })

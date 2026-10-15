@@ -10,23 +10,44 @@ const MAX_FILES = 8
 
 const isImage = (mimeType: string) => /^image\/(?:png|jpeg|gif|webp)$/u.test(mimeType)
 
-/** The files a sent message carried: a plain image opens in a new tab, anything else downloads. */
+/** One of the owner's files as a chip: a plain image opens in a new tab, anything else downloads. */
+function FileChip({ file }: { readonly file: Attachment }) {
+  return (
+    <a
+      className="file-chip"
+      href={fileUrl(file.path)}
+      title={file.path}
+      {...(isImage(file.mimeType) ? { target: '_blank', rel: 'noreferrer' } : { download: file.name })}
+    >
+      {isImage(file.mimeType) ? <ImageIcon aria-hidden /> : <FileIcon aria-hidden />}
+      <span className="truncate">{file.name}</span>
+      <span className="file-chip-size">{fileSize(file.size)}</span>
+    </a>
+  )
+}
+
+/** The files a sent message carried, under its bubble. */
 export function MessageFiles({ files }: { readonly files: readonly Attachment[] }) {
   if (files.length === 0) return null
   return (
     <ul className="message-files" aria-label="Attached files">
       {files.map((file) => (
         <li key={file.path}>
-          <a
-            className="file-chip"
-            href={fileUrl(file.path)}
-            title={file.path}
-            {...(isImage(file.mimeType) ? { target: '_blank', rel: 'noreferrer' } : { download: file.name })}
-          >
-            {isImage(file.mimeType) ? <ImageIcon aria-hidden /> : <FileIcon aria-hidden />}
-            <span className="truncate">{file.name}</span>
-            <span className="file-chip-size">{fileSize(file.size)}</span>
-          </a>
+          <FileChip file={file} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** The files goblin kept from a tool's result (ADR 0065), under its call: now in the owner's files. */
+export function ReceivedFiles({ files }: { readonly files: readonly Attachment[] }) {
+  if (files.length === 0) return null
+  return (
+    <ul className="received-files" aria-label="Files received">
+      {files.map((file) => (
+        <li key={file.path}>
+          <FileChip file={file} />
         </li>
       ))}
     </ul>

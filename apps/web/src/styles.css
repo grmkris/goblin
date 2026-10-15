@@ -604,9 +604,13 @@
     width: 0.875rem;
     height: 0.875rem;
   }
-  /* The files a message carried, under its bubble, and the files picked for the next one, above the field. */
+  /*
+   * The files a message carried, under its bubble; the files picked for the next one, above the field; and the files
+   * goblin kept from a tool's result, under its call.
+   */
   .message-files,
-  .pending-files {
+  .pending-files,
+  .received-files {
     display: flex;
     flex-wrap: wrap;
     gap: 0.375rem;

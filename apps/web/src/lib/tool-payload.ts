@@ -1,5 +1,5 @@
-import { Schema } from 'effect'
-import type { JsonValue } from '@goblin/contracts'
+import { Option, Schema } from 'effect'
+import { type Attachment, type JsonValue, ReceivedFiles } from '@goblin/contracts'
 import type { ToolPayloadView } from '@goblin/ui'
 import { isString, record, records } from './values.ts'
 import { looksLikeMarkdown } from './markdown.ts'
@@ -61,6 +61,17 @@ export function outputBlocks(result: { readonly text: string; readonly details: 
   )
   if (structured === undefined && content.length === 0) return [textBlock(result.text)]
   return [...(structured === undefined ? [] : [structured]), ...content]
+}
+
+const decodeReceived = Schema.decodeUnknownOption(ReceivedFiles)
+
+/**
+ * The files goblin kept in the owner's files from an MCP result (ADR 0065): its envelope's own `received`, each a path
+ * in the owner's files, never one a server's content names. None when there are none, or the list does not decode.
+ */
+export function receivedFiles(details: unknown): readonly Attachment[] {
+  const envelope = record(details)
+  return isMcpEnvelope(envelope) ? Option.getOrElse(decodeReceived(envelope['received']), () => []) : []
 }
 
 /** The view an output opens on: formatted when any part is Markdown, a tree when any is JSON, else plain text. */
