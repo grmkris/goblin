@@ -1,8 +1,6 @@
 import * as Effect from 'effect/Effect'
 import type { AgentRpc, RuntimeEnv } from '../env.ts'
 import { handleAuth, resourceMetadata, requireUserSession } from '../auth/index.ts'
-import { mailerOf } from '../auth/mail.ts'
-import { signupMode } from '../auth/signup.ts'
 import { readBytes } from './body.ts'
 import { NotFound, attempt } from './errors.ts'
 import { accountRecords } from './api/account.ts'
@@ -13,6 +11,7 @@ import { handleInboundMcp } from '../inbound/route.ts'
 import { eventsHookTokenValid } from '../mcp/events/route-token.ts'
 import { EVENT_BODY_BYTES } from '../mcp/events/webhook.ts'
 import { canonicalRedirect } from './canonical.ts'
+import { healthOf } from './health.ts'
 
 /** Only the authenticated user ID supplies the native Agent name. */
 const agentOf = (env: RuntimeEnv, userId: string): DurableObjectStub<AgentRpc> => env.AGENTS.getByName(userId)
@@ -79,14 +78,7 @@ export const worker = {
     const redirect = canonicalRedirect(request, env.APP_URL)
     if (redirect !== undefined) return redirect
     const url = new URL(request.url)
-    if (url.pathname === '/health')
-      return Response.json({
-        ok: true,
-        service: 'goblin',
-        stage: env.STAGE,
-        signup: signupMode(env.SIGNUP_MODE),
-        mail: mailerOf(env) !== undefined,
-      })
+    if (url.pathname === '/health') return Response.json(healthOf(env))
     if (url.pathname.startsWith('/.well-known/oauth-protected-resource'))
       return secured(Response.json(resourceMetadata(env)), undefined)
     if (url.pathname.startsWith('/.well-known/') || url.pathname.startsWith('/api/auth/'))

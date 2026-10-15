@@ -31,6 +31,14 @@ export interface RuntimeEnv {
   readonly SIGNUP_MODE?: string
   readonly SIGNUP_INVITE_CODE?: string
   /**
+   * The deployment's OpenID Connect provider (ADR 0064, `auth/oidc.ts`): its issuer, the client goblin is registered
+   * as and that client's secret, all three or none, and the sign-in button's words.
+   */
+  readonly OIDC_ISSUER?: string
+  readonly OIDC_CLIENT_ID?: string
+  readonly OIDC_CLIENT_SECRET?: string
+  readonly OIDC_LABEL?: string
+  /**
    * The deployment's own model endpoint (`models.ts` `deploymentEndpoint`): an OpenAI-compatible base URL, its key and
    * the default model, all three or none (ADR 0064). Without them each owner brings their own (ADR 0059).
    */

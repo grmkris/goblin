@@ -20,7 +20,7 @@ const out =
   options.out ?? path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance', `landing-${Date.now()}`)
 mkdirSync(out, { recursive: true, mode: 0o700 })
 
-const HEALTH = { ok: true, service: 'goblin', stage: 'dev', signup: 'invite', mail: true }
+const HEALTH = { ok: true, service: 'goblin', stage: 'dev', signup: 'invite', signIn: [{ method: 'email' }] }
 const errors: string[] = []
 
 /** A page of the fixture with `/health` and Better Auth's session answered: signed out unless `signedIn`. */

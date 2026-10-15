@@ -115,6 +115,7 @@ export { Dialog, DialogClose, DialogContent, DialogTitle, DialogDescription } fr
 export { AuthPage } from './auth/auth-page.tsx'
 export { type AuthActionResult, failed, succeeded } from './auth/contract.ts'
 export { EmailSignInForm } from './auth/sign-in.tsx'
+export { ProviderSignIn, SignInDivider } from './auth/provider-sign-in.tsx'
 export { GoblinMark } from './components/goblin-mark.tsx'
 export { MossFrame, type MossFrameProps } from './marketing/moss-frame.tsx'
 export { Section, type SectionProps } from './marketing/section.tsx'

@@ -2,7 +2,8 @@ import { verifyJwsAccessToken } from 'better-auth/oauth2'
 import type { RuntimeEnv } from '../env.ts'
 import { nowSeconds } from '../clock.ts'
 import { Unauthenticated } from '../http/errors.ts'
-import { authIssuer, createAuth } from './options.ts'
+import { isOidcPath } from './oidc.ts'
+import { AUTH_BASE_PATH, authIssuer, createAuth } from './options.ts'
 import {
   type ConsentRow,
   clientFromClaims,
@@ -63,9 +64,15 @@ export const verifyClientToken = async (token: string, env: RuntimeEnv): Promise
   return { ...principal, scopes: principal.scopes.filter((scope) => granted.includes(scope)) }
 }
 
-/** No logging of auth request content; the provider owns its discovery/OAuth responses. */
-export const handleAuth = (request: Request, env: RuntimeEnv): Promise<Response> =>
-  createAuth(env, env.AUTH_DB).handler(request)
+/**
+ * No logging of auth request content; the provider owns its discovery/OAuth responses. The OpenID Connect provider is
+ * built only for its own two routes.
+ */
+export const handleAuth = (request: Request, env: RuntimeEnv): Promise<Response> => {
+  const path = new URL(request.url).pathname
+  const provider = path.startsWith(`${AUTH_BASE_PATH}/`) && isOidcPath(path.slice(AUTH_BASE_PATH.length))
+  return createAuth(env, env.AUTH_DB, { provider }).handler(request)
+}
 
 /** RFC 9728 metadata for /mcp, served at every `/.well-known/oauth-protected-resource…` path. */
 export const resourceMetadata = (env: Pick<RuntimeEnv, 'APP_URL'>) =>

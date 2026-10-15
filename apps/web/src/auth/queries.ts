@@ -1,4 +1,5 @@
 import { mutationOptions, queryOptions } from '@tanstack/react-query'
+import { OIDC_PROVIDER_ID, SignInMethod, SignupMode } from '@goblin/contracts'
 import { Data, Option, Schema } from 'effect'
 import { requestId } from '../lib/api.ts'
 import { authClient, redirectOf } from '../lib/auth-client.ts'
@@ -27,11 +28,22 @@ const authKeys = {
 /** The reference `response` carries for the owner to quote. */
 const refOf = (response: Response): string | undefined => answerRef((name) => response.headers.get(name))
 
-/** The fetch options every Better Auth call here carries: its request id, and a hook that keeps its answer's ref. */
+/**
+ * The fetch options every Better Auth call here carries: its request id, and a hook that keeps its answer's ref; with
+ * `customFetchImpl`, how the request leaves (the browser's fetch otherwise, bound when the client was made).
+ */
 type AuthFetch = {
   readonly headers: Readonly<Record<string, string>>
   readonly onResponse: (context: { readonly response: Response }) => void
   readonly signal?: AbortSignal
+  readonly customFetchImpl?: Send
+}
+/** How a request leaves, as Better Auth's client takes it. */
+type Send = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
+type AuthCallOptions = {
+  readonly signal?: AbortSignal
+  readonly headers?: Readonly<Record<string, string>>
+  readonly send?: Send
 }
 type AuthAnswer<A> = { readonly data: A; readonly error: { readonly status: number } | null }
 
@@ -41,7 +53,7 @@ type AuthAnswer<A> = { readonly data: A; readonly error: { readonly status: numb
  */
 async function authCall<A>(
   call: (fetchOptions: AuthFetch) => Promise<AuthAnswer<A>>,
-  options: { readonly signal?: AbortSignal; readonly headers?: Readonly<Record<string, string>> } = {},
+  options: AuthCallOptions = {},
 ): Promise<{ readonly data: A; readonly ref: string }> {
   const sent = requestId()
   let ref: string | undefined
@@ -51,6 +63,7 @@ async function authCall<A>(
       ref = refOf(response)
     },
     ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(options.send === undefined ? {} : { customFetchImpl: options.send }),
   }
   let answer: AuthAnswer<A>
   try {
@@ -72,13 +85,26 @@ export const sessionQuery = queryOptions({
   meta: { auth: 'optional' },
 })
 
+// Read field by field: what the Worker does not say, or says in a shape this build does not know, reads as off.
 const Health = Schema.Struct({
-  signup: Schema.optional(Schema.Literals(['open', 'invite', 'closed'])),
-  mail: Schema.optional(Schema.Boolean),
+  signup: Schema.optional(SignupMode),
+  signIn: Schema.optional(Schema.Array(SignInMethod)),
 })
 const decodeHealth = Schema.decodeUnknownOption(Health)
 
-/** How sign-up works here and whether sign-in mail is on, anything the Worker does not say reading as off. */
+/** How someone signs in here (ADR 0064): an emailed code, the deployment's provider under its button's words, or both. */
+export type SignInMethods = { readonly email: boolean; readonly oidc?: { readonly label: string } }
+
+/** The sign-in methods `/health` lists, as the sign-in page offers them. */
+const methodsOf = (listed: readonly SignInMethod[]): SignInMethods => {
+  const provider = listed.find((each) => each.method === 'oidc')
+  return {
+    email: listed.some((each) => each.method === 'email'),
+    ...(provider === undefined ? {} : { oidc: { label: provider.label } }),
+  }
+}
+
+/** How sign-up works here and the ways to sign in, anything the Worker does not say reading as off. */
 export const healthQuery = queryOptions({
   queryKey: authKeys.health,
   queryFn: async ({ signal }) => {
@@ -93,7 +119,7 @@ export const healthQuery = queryOptions({
     const health = Option.getOrElse(decodeHealth(await response.json()), (): typeof Health.Type => ({}))
     return {
       signup: health.signup ?? 'closed',
-      mail: health.mail === true,
+      methods: methodsOf(health.signIn ?? []),
     }
   },
   meta: { auth: 'optional' },
@@ -162,6 +188,33 @@ export const requestSignInCode = async (email: string, inviteCode: string): Prom
     (fetchOptions) => authClient.emailOtp.sendVerificationOtp({ email, type: 'sign-in', fetchOptions }),
     inviteCode === '' ? {} : { headers: { 'x-invite-code': inviteCode } },
   )
+}
+
+/**
+ * Starts a sign-in through the deployment's provider: where the browser goes next (the provider's sign-in page). It
+ * comes back to `/` (or Start's welcome for an account it made), or to `errorPath` with Better Auth's `error` when it
+ * does not finish; an MCP client's authorization rides along in the signed query, as it does through a code. With an
+ * invite code, a new account may be made with it. `send` replaces the browser's fetch (a test's stand-in).
+ */
+export const signInWithProvider = async (inviteCode: string, errorPath: string, send?: Send): Promise<string> => {
+  const { data, ref } = await authCall(
+    (fetchOptions) =>
+      authClient.signIn.social({
+        provider: OIDC_PROVIDER_ID,
+        callbackURL: '/',
+        newUserCallbackURL: '/start/welcome',
+        errorCallbackURL: errorPath,
+        disableRedirect: true,
+        fetchOptions,
+      }),
+    {
+      ...(inviteCode === '' ? {} : { headers: { 'x-invite-code': inviteCode } }),
+      ...(send === undefined ? {} : { send }),
+    },
+  )
+  const next = redirectOf(data)
+  if (next === undefined) throw new AuthRefused({ status: 502, ref })
+  return next
 }
 
 /** Signs in with an emailed code; the answer may name where an OAuth authorization continues. */

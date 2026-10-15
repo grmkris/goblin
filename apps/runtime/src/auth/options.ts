@@ -1,6 +1,6 @@
 import { Predicate } from 'effect'
 import { mcp } from '@better-auth/mcp'
-import { betterAuth, type BetterAuthPlugin } from 'better-auth'
+import { type Account, betterAuth, type BetterAuthPlugin } from 'better-auth'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { emailOTP, jwt } from 'better-auth/plugins'
 import type { RuntimeEnv } from '../env.ts'
@@ -9,9 +9,10 @@ import { safeErrorType } from '../observability/report.ts'
 import { deleteAgentOf } from './account.ts'
 import { CODE_SEND, CODE_SIGN_IN, guardEmailCode } from './email-code.ts'
 import { codeMail, mailerOf } from './mail.ts'
+import { guardOidc, oidcPlugin, oidcProviderOf, refuseUnverifiedOidcUser, withoutProviderTokens } from './oidc.ts'
 import { MCP_SCOPES, mcpResource } from './resources.ts'
 
-const AUTH_BASE_PATH = '/api/auth'
+export const AUTH_BASE_PATH = '/api/auth'
 export const authIssuer = (appUrl: string): string => `${appUrl.replace(/\/$/u, '')}${AUTH_BASE_PATH}`
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
@@ -40,7 +41,18 @@ export const markLoopbackClientsNative = (body: unknown): void => {
 
 export type AuthEnvironment = Pick<
   RuntimeEnv,
-  'APP_URL' | 'BETTER_AUTH_SECRET' | 'SIGNUP_MODE' | 'SIGNUP_INVITE_CODE' | 'MAIL' | 'MAIL_SENDER' | 'AGENTS' | 'STAGE'
+  | 'APP_URL'
+  | 'BETTER_AUTH_SECRET'
+  | 'SIGNUP_MODE'
+  | 'SIGNUP_INVITE_CODE'
+  | 'MAIL'
+  | 'MAIL_SENDER'
+  | 'AGENTS'
+  | 'STAGE'
+  | 'OIDC_ISSUER'
+  | 'OIDC_CLIENT_ID'
+  | 'OIDC_CLIENT_SECRET'
+  | 'OIDC_LABEL'
 >
 
 /** Per-IP limits on the endpoints that create accounts or send mail; everything else keeps the default window. */
@@ -48,6 +60,7 @@ const RATE_LIMITS = {
   '/delete-user': { window: 300, max: 5 },
   [CODE_SEND]: { window: 3600, max: 10 },
   [CODE_SIGN_IN]: { window: 300, max: 20 },
+  '/sign-in/social': { window: 300, max: 20 },
 } as const
 
 /** Six-digit sign-in codes: ten minutes, five attempts, stored hashed. Mail is required to send a code. */
@@ -82,7 +95,11 @@ const codePlugin = (env: AuthEnvironment, delivery: MailDelivery) =>
     },
   })
 
-/** Email codes are the sole identity proof. Unsupported account methods cannot create credentials or send mail. */
+/**
+ * Email codes and the deployment's OpenID Connect provider are the only identity proofs. Unsupported account methods
+ * cannot create credentials or send mail, and a provider's account is for signing in only: it is never linked by hand,
+ * nor are its tokens handed out.
+ */
 const unavailableMethod = (path: string): boolean =>
   path.startsWith('/sign-up') ||
   path.startsWith('/passkey/') ||
@@ -95,6 +112,11 @@ const unavailableMethod = (path: string): boolean =>
     '/send-verification-email',
     '/verify-email',
     '/change-email',
+    '/link-social',
+    '/unlink-account',
+    '/get-access-token',
+    '/refresh-token',
+    '/account-info',
   ].some((route) => path === route || path.startsWith(`${route}/`))
 
 /** A field of a request body, which Better Auth hands its hooks untyped. */
@@ -119,18 +141,29 @@ const beforeAuth = (env: AuthEnvironment, database: D1Database) =>
         throw new APIError('BAD_REQUEST', { message: 'Invalid request' })
       return
     }
+    if (guardOidc(context, env)) return
     await guardEmailCode(context, env, database, Date.now())
   })
+
+/** What an instance needs beyond the deployment's settings. */
+export type AuthNeeds = {
+  /**
+   * The OpenID Connect provider's own routes (`oidc.ts` `isOidcPath`): only then is the provider built, since building
+   * it reads the issuer's discovery document, and Better Auth is built again for every request.
+   */
+  readonly provider?: boolean
+}
 
 /**
  * Better Auth is instantiated per request: Worker I/O promises cannot outlive their request. The D1 adapter owns
  * auth tables; application Drizzle never adopts/migrates them. mcp() already includes OAuth provider functionality.
  */
-const authOptions = (env: AuthEnvironment, database: D1Database) => {
+const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeeds) => {
   // Better Auth 1.7.6 swallows mail callback errors. Its after hook must refuse success and erase an undelivered
   // code. This state belongs to one auth instance/request, never the Worker isolate or another user's request.
   const delivery: MailDelivery = { failed: false }
   const resource = mcpResource(env.APP_URL)
+  const provider = needs.provider === true ? oidcProviderOf(env) : undefined
   const oauthPlugin = mcp({
     resource,
     // One resource, and a token for it carries only these scopes (ADR 0024). Config is the source of truth for the row:
@@ -165,6 +198,16 @@ const authOptions = (env: AuthEnvironment, database: D1Database) => {
         enabled: true,
         beforeDelete: (user: { id: string }) => deleteAgentOf(env, user.id),
       },
+      validateUserInfo: refuseUnverifiedOidcUser,
+    },
+    // A provider's account joins an existing one only when the provider says the email is verified and the account's
+    // own is (by an emailed code); no provider is trusted past that. Its tokens are never kept or refreshed.
+    account: {
+      updateAccountOnSignIn: false,
+      accountLinking: { enabled: true, trustedProviders: [], requireLocalEmailVerified: true },
+    },
+    databaseHooks: {
+      account: { create: { before: async (account: Account) => ({ data: withoutProviderTokens(account) }) } },
     },
     rateLimit: { enabled: true, storage: 'database' as const, window: 60, max: 100, customRules: RATE_LIMITS },
     advanced: { ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] } },
@@ -183,7 +226,9 @@ const authOptions = (env: AuthEnvironment, database: D1Database) => {
       // SAFETY: Better Auth 1.7.6 MCP endpoint metadata types violate exactOptionalPropertyTypes; runtime shape is the pinned official plugin.
       oauthPlugin as BetterAuthPlugin,
       codePlugin(env, delivery),
+      ...(provider === undefined ? [] : [oidcPlugin(provider)]),
     ],
   }
 }
-export const createAuth = (env: AuthEnvironment, database: D1Database) => betterAuth(authOptions(env, database))
+export const createAuth = (env: AuthEnvironment, database: D1Database, needs: AuthNeeds = {}) =>
+  betterAuth(authOptions(env, database, needs))

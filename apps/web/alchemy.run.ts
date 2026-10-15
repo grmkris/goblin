@@ -23,6 +23,29 @@ const modelEnv = {
   MEMORY_MODEL: Config.String('GOBLIN_MEMORY_MODEL').pipe(Config.withDefault('')),
 }
 
+/**
+ * The deployment's OpenID Connect provider (ADR 0064): its issuer, the client goblin is registered as and that
+ * client's secret, all three or none (half a provider is refused), and the button's words. Bound only when set.
+ */
+const oidcEnv = Effect.gen(function* () {
+  const issuer = yield* Config.String('GOBLIN_OIDC_ISSUER').pipe(Config.withDefault(''))
+  const clientId = yield* Config.String('GOBLIN_OIDC_CLIENT_ID').pipe(Config.withDefault(''))
+  const secret = Config.Redacted('GOBLIN_OIDC_CLIENT_SECRET')
+  const hasSecret = Redacted.value(yield* secret.pipe(Config.withDefault(Redacted.make('')))) !== ''
+  const label = yield* Config.String('GOBLIN_OIDC_LABEL').pipe(Config.withDefault(''))
+  if (issuer === '' && clientId === '' && !hasSecret) return undefined
+  if (issuer === '' || clientId === '' || !hasSecret)
+    return yield* Effect.die(
+      new Error('GOBLIN_OIDC_ISSUER, GOBLIN_OIDC_CLIENT_ID and GOBLIN_OIDC_CLIENT_SECRET go together'),
+    )
+  return {
+    OIDC_ISSUER: issuer,
+    OIDC_CLIENT_ID: clientId,
+    OIDC_CLIENT_SECRET: secret,
+    ...(label === '' ? {} : { OIDC_LABEL: label }),
+  }
+})
+
 /** What the Website build reads: a change to any of them builds again. */
 const BUILD_INPUTS = [
   'src/**',
@@ -45,11 +68,14 @@ export default Alchemy.Stack(
     const zoneId = domain === '' ? '' : yield* Config.String('GOBLIN_ZONE_ID')
     const signupMode = yield* Config.String('GOBLIN_SIGNUP_MODE').pipe(Config.withDefault('closed'))
     const build = yield* Config.String('VITE_GOBLIN_BUILD').pipe(Config.withDefault(''))
-    // An address on a domain onboarded for Cloudflare Email Sending; local uses its mail simulator.
-    const mailSender = yield* Config.String('GOBLIN_MAIL_SENDER').pipe(
-      Config.withDefault(stage.local ? 'hello@goblin.test' : ''),
-    )
-    if (mailSender === '') return yield* Effect.die(new Error('OTP login requires GOBLIN_MAIL_SENDER'))
+    // An address on a domain onboarded for Cloudflare Email Sending; local uses its mail simulator (scripts/stage.ts).
+    const mailSender = yield* Config.String('GOBLIN_MAIL_SENDER').pipe(Config.withDefault(''))
+    const oidc = yield* oidcEnv
+    // A deployment needs one way in: emailed codes, its OpenID Connect provider, or both (ADR 0064).
+    if (mailSender === '' && oidc === undefined)
+      return yield* Effect.die(
+        new Error('sign-in needs GOBLIN_MAIL_SENDER, or GOBLIN_OIDC_ISSUER, GOBLIN_OIDC_CLIENT_ID and _SECRET'),
+      )
     if (stage.name === 'dev' && signupMode === 'open')
       return yield* Effect.die(new Error('dev_sign_up_must_be_closed_or_invite_only'))
     const db = yield* Cloudflare.D1.Database('goblinAuth', {
@@ -99,6 +125,7 @@ export default Alchemy.Stack(
               MAIL_SENDER: mailSender,
             }),
         SIGNUP_INVITE_CODE: Config.Redacted('GOBLIN_SIGNUP_INVITE_CODE').pipe(Config.withDefault(Redacted.make(''))),
+        ...oidc,
         ...modelEnv,
         MCP_SERVERS: Config.String('GOBLIN_MCP_SERVERS').pipe(Config.withDefault('[]')),
         MCP_SHELF: Config.String('GOBLIN_MCP_SHELF').pipe(Config.withDefault('')),

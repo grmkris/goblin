@@ -2,7 +2,7 @@ import { internalChecks } from './smoke-edge.ts'
 
 /**
  * Production without a signed-in session: public health, admission, page, metadata, internal-route and canonical
- * redirect checks. Sign-up is invite-only, refused without the code, or open.
+ * redirect checks. Sign-up is invite-only, refused without the code, or open, and `/health` lists a way to sign in.
  */
 type Client = {
   readonly origin: string
@@ -17,7 +17,8 @@ export async function publicSmoke(
   steps: Array<{ readonly step: string; readonly status: number }>,
   refusedSignup: () => Promise<void>,
 ): Promise<void> {
-  if ((signup !== 'invite' && signup !== 'open') || health['mail'] !== true)
+  const signIn = health['signIn']
+  if ((signup !== 'invite' && signup !== 'open') || !Array.isArray(signIn) || signIn.length === 0)
     throw new Error('prod_admission_policy_mismatch')
   const probe = await dev.send('/api/agent/usage', { owner: false })
   if (probe.status !== 401) throw new Error('anonymous_auth_probe_not_refused')
