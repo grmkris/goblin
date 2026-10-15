@@ -1,7 +1,15 @@
 // What an App hands the host for the owner and the agent: links to open, and context to share with the next
 // message. Both come from the App, so both are untrusted: links open only on the owner's click, context travels as
 // a labelled block the agent treats as data. A sent message is read back here too, with the files it carried.
-import { Attachment, ComposerMetadata, type ComposerOption, McpOutcome, authorOf } from '@goblin/contracts'
+import {
+  Attachment,
+  ComposerMetadata,
+  type ComposerOption,
+  McpOutcome,
+  OwnTurnMark,
+  ReceivedBlock,
+  authorOf,
+} from '@goblin/contracts'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { isString, record, records } from './values.ts'
@@ -36,10 +44,13 @@ export type SharedContext = { readonly from: string; readonly text: string }
 const decodeAttachments = Schema.decodeUnknownOption(Schema.Struct({ attachments: Schema.Array(Attachment) }))
 const decodeComposer = Schema.decodeUnknownOption(ComposerMetadata)
 const decodeOutcome = Schema.decodeUnknownOption(McpOutcome)
+const decodeOwn = Schema.decodeUnknownOption(OwnTurnMark)
+const decodeReceived = Schema.decodeUnknownOption(ReceivedBlock)
 
 /**
- * One block after the words: the files the owner attached, what an App shared, or how a held call ended (an outcome
- * from its connection); anything else is none of them.
+ * One block after the words: the files the owner attached (or goblin kept of what a message from elsewhere brought),
+ * what an App shared, how a held call ended (an outcome from its connection), or goblin's mark of the owner's own turn
+ * from elsewhere; anything else is none of them.
  */
 function sharedBlock(
   block: string,
@@ -48,6 +59,7 @@ function sharedBlock(
   | { readonly app: SharedContext }
   | { readonly composer: ComposerMetadata['composer'] }
   | { readonly outcome: McpOutcome }
+  | { readonly own: true }
   | undefined {
   let value: unknown
   try {
@@ -58,6 +70,9 @@ function sharedBlock(
   }
   const files = decodeAttachments(value)
   if (Option.isSome(files)) return { files: files.value.attachments }
+  if (Option.isSome(decodeOwn(value))) return { own: true }
+  const received = decodeReceived(value)
+  if (Option.isSome(received)) return { files: received.value.received }
   const composer = decodeComposer(value)
   if (Option.isSome(composer)) return composer.value
   const outcome = decodeOutcome(value)
@@ -73,8 +88,9 @@ function sharedBlock(
 
 /**
  * A user message's parts as the runtime wrote them (`pi/content.ts`): an optional author tag block (a message from
- * Telegram, an MCP client or a subagent), the words, then the attached files and App context blocks. Only blocks after
- * the words count, and only when every one of them is one of those, so nothing anyone typed is ever read as either.
+ * Telegram, a Source, an MCP client or a subagent), the words, then the attached files and App context blocks, and for
+ * a message from elsewhere goblin's mark that it is the owner's own turn (`own`). Only blocks after the words count,
+ * and only when every one of them is one of those, so nothing anyone typed is ever read as either.
  */
 export function sharedContext(content: unknown): {
   readonly text: string
@@ -84,6 +100,8 @@ export function sharedContext(content: unknown): {
   readonly author?: string
   /** How a held call ended, when this is its outcome: only from an author, never the owner's own words. */
   readonly outcome?: McpOutcome
+  /** The owner's own turn that came from elsewhere (a Source's, ADR 0066): only with an author, by goblin's mark. */
+  readonly own?: true
 } {
   if (isString(content)) return { text: content, context: [] }
   const blocks = records(content)
@@ -94,17 +112,25 @@ export function sharedContext(content: unknown): {
   const shared = rest.map(sharedBlock)
   const by = author === undefined ? {} : { author }
   if (!shared.every((block) => block !== undefined)) return { text: [first, ...rest].join('\n'), context: [], ...by }
-  const { context, attachments, composer, outcome } = collected(shared)
+  const { context, attachments, composer, outcome, own } = collected(shared)
   return {
     text: composer?.text ?? first ?? '',
     context,
     ...(composer === undefined ? {} : { selections: composer.selections }),
     ...(attachments.length > 0 && { attachments }),
-    // An outcome comes only from a connection, an author: the owner's own words never carry one.
-    ...(outcome === undefined || author === undefined ? {} : { outcome }),
-    ...by,
+    ...(author === undefined ? {} : fromElsewhere(author, outcome, own)),
   }
 }
+
+/**
+ * What a message from elsewhere carries besides its words: its author, how a held call ended, and goblin's mark of the
+ * owner's own turn. Only an author's message carries the last two: the owner's own words never do.
+ */
+const fromElsewhere = (author: string, outcome: McpOutcome | undefined, own: boolean) => ({
+  author,
+  ...(outcome === undefined ? {} : { outcome }),
+  ...(own ? { own: true as const } : {}),
+})
 
 /** The blocks after the words, sorted by what each one is. */
 function collected(shared: readonly NonNullable<ReturnType<typeof sharedBlock>>[]) {
@@ -113,6 +139,7 @@ function collected(shared: readonly NonNullable<ReturnType<typeof sharedBlock>>[
     attachments: shared.flatMap((block) => ('files' in block ? block.files : [])),
     composer: shared.flatMap((block) => ('composer' in block ? [block.composer] : [])).at(0),
     outcome: shared.flatMap((block) => ('outcome' in block ? [block.outcome] : [])).at(0),
+    own: shared.some((block) => 'own' in block),
   }
 }
 

@@ -2,8 +2,8 @@ import { BREAK, type Migration } from './migration.ts'
 
 /**
  * Sources (ADR 0066, keys from `20261102000`): the setups the owner confirms on any connection that sends events, where
- * each conversation goes, what waits for a route and the answers owed; then "Notify me via". Added by their own
- * migrations, so dev and prod keep their data.
+ * each conversation goes, what waits for a route and the answers owed; then "Notify me via"; then each conversation's
+ * title and the files a held message brought. Added by their own migrations, so dev and prod keep their data.
  */
 export const SOURCE_MIGRATIONS: readonly Migration[] = [
   {
@@ -22,5 +22,13 @@ export const SOURCE_MIGRATIONS: readonly Migration[] = [
     key: '20261102000200_notify_sink',
     tables: ['app_notify_sink'],
     sql: 'CREATE TABLE app_notify_sink (id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1), connection_id TEXT NOT NULL, tool TEXT NOT NULL, arguments TEXT NOT NULL, updated_at INTEGER NOT NULL)',
+  },
+  {
+    key: '20261102000300_source_parity',
+    tables: ['app_source_routes', 'app_source_held'],
+    sql: [
+      'ALTER TABLE app_source_routes ADD COLUMN title TEXT',
+      'ALTER TABLE app_source_held ADD COLUMN files TEXT',
+    ].join(BREAK),
   },
 ]

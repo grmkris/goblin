@@ -34,7 +34,7 @@ export const appSourceSetups = sqliteTable('app_source_setups', {
 
 /**
  * Where each conversation of a Source goes (ADR 0066), by its key (`key`, the JSON of its values in the setup's order;
- * `key_values` names them). `route` is `topic` or `persona` (turns in `topic_id`, answered by goblin or `persona_id`),
+ * `key_values` names them) and its `title` (the server's name for it, the newest a message carried). `route` is `topic` or `persona` (turns in `topic_id`, answered by goblin or `persona_id`),
  * `listen` (notes in `topic_id`), `ignore` or `held`. `held_dropped` counts the held messages dropped past the twenty
  * kept; `revision` counts route changes, so Undo can tell whether anything touched it.
  */
@@ -44,6 +44,7 @@ export const appSourceRoutes = sqliteTable(
     sourceId: text('source_id').notNull(),
     key: text('key').notNull(),
     keyValues: text('key_values').notNull(),
+    title: text('title'),
     route: text('route', { enum: ['topic', 'persona', 'listen', 'ignore', 'held'] }).notNull(),
     topicId: integer('topic_id'),
     personaId: integer('persona_id'),
@@ -58,7 +59,8 @@ export const appSourceRoutes = sqliteTable(
 
 /**
  * The owner's messages a conversation holds while it waits for a route (ADR 0066), at most twenty a conversation,
- * delivered in order once it has one: the message's id, its conversation and its words.
+ * delivered in order once it has one: the message's id, its conversation, its words, and the files goblin kept of its
+ * attachments (`files`, JSON: their references and notes; ADR 0065).
  */
 export const appSourceHeld = sqliteTable(
   'app_source_held',
@@ -67,6 +69,7 @@ export const appSourceHeld = sqliteTable(
     itemId: text('item_id').notNull(),
     key: text('key').notNull(),
     text: text('text').notNull(),
+    files: text('files'),
     heldAt: integer('held_at').notNull(),
   },
   (table) => [

@@ -2,6 +2,7 @@
 // while it waits for a route, and the answers owed. Plain functions over the agent's SQLite; each write is one statement
 // or one short transaction, never across a network call.
 import {
+  ReceivedFiles,
   type SourceKeyValues,
   SourceKeyValues as SourceKeyValuesSchema,
   type SourceRoute,
@@ -14,6 +15,7 @@ import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { Internal } from '../http/errors.ts'
+import type { KeptAttachments } from '../pi/content.ts'
 import { appSourceHeld, appSourceReplies, appSourceRoutes, appSourceSetups } from '../storage/sources.ts'
 import { holdNewest } from './held.ts'
 
@@ -33,6 +35,14 @@ export type RouteBy = 'owner' | 'agent' | 'default'
 
 const decodeSetup = Schema.decodeUnknownOption(Schema.fromJsonString(SourceSetup))
 const decodeValues = Schema.decodeUnknownOption(Schema.fromJsonString(SourceKeyValuesSchema))
+
+/** What a held message keeps of its attachments: the files' references and the notes, never image bytes. */
+const HeldFiles = Schema.Struct({
+  connectionId: Schema.String,
+  files: ReceivedFiles,
+  notes: Schema.Array(Schema.String),
+})
+const decodeHeldFiles = Schema.decodeUnknownOption(Schema.fromJsonString(HeldFiles))
 
 /** A row's setup; none for a row that does not decode (goblin wrote it, so it always should). */
 export const setupOf = (row: Pick<SourceRow, 'setup'>): Setup | undefined =>
@@ -145,23 +155,36 @@ export const routeRows = (db: Db, sourceId: string): readonly RouteRow[] =>
     .orderBy(desc(appSourceRoutes.createdAt), asc(appSourceRoutes.key))
     .all()
 
+/** A conversation as a message names it: its Source, its key and values, and the title the message gives it. */
+type SeenKey = {
+  readonly sourceId: string
+  readonly key: string
+  readonly values: SourceKeyValues
+  readonly title?: string | undefined
+}
+
 /**
- * The route of `sourceId`'s conversation `key`, made with `first` (the setup's `newKeys`) when goblin sees it for the
- * first time. Whether it was new.
+ * The route of a conversation goblin has seen, its title kept as the newest a message gave; none for one it has not.
  */
-export function seeKey(
-  db: Db,
-  conversation: { readonly sourceId: string; readonly key: string; readonly values: SourceKeyValues },
-  first: SourceRoute,
-  now: number,
-): { readonly row: RouteRow; readonly created: boolean } {
+export function knownKey(db: Db, conversation: SeenKey): RouteRow | undefined {
   const known = routeRow(db, conversation.sourceId, conversation.key)
-  if (known !== undefined) return { row: known, created: false }
+  const { title } = conversation
+  if (known === undefined || title === undefined || known.title === title) return known
+  db.update(appSourceRoutes)
+    .set({ title })
+    .where(and(eq(appSourceRoutes.sourceId, conversation.sourceId), eq(appSourceRoutes.key, conversation.key)))
+    .run()
+  return { ...known, title }
+}
+
+/** A conversation seen for the first time, with `first` (from the setup's `newKeys`) as its route. Its row. */
+export function addKey(db: Db, conversation: SeenKey, first: SourceRoute, now: number): RouteRow {
   db.insert(appSourceRoutes)
     .values({
       sourceId: conversation.sourceId,
       key: conversation.key,
       keyValues: JSON.stringify(conversation.values),
+      title: conversation.title ?? null,
       ...columnsOf(first),
       updatedBy: 'default',
       createdAt: now,
@@ -171,7 +194,7 @@ export function seeKey(
     .run()
   const row = routeRow(db, conversation.sourceId, conversation.key)
   if (row === undefined) throw new Internal({ reason: 'source route not written' })
-  return { row, created: true }
+  return row
 }
 
 /** Sets where `sourceId`'s conversation `key` goes, as `by` chose it: its revision moves on. The row before and after. */
@@ -209,17 +232,31 @@ export function routeRevision(db: Db, target: string): number | undefined {
   return routeRow(db, sourceId, key)?.revision
 }
 
-/** One owner message held while its conversation waits: its id, its conversation and its words. */
-export type Held = { readonly sourceId: string; readonly itemId: string; readonly key: string; readonly text: string }
+/**
+ * One owner message held while its conversation waits: its id, its conversation, its words and what goblin kept of its
+ * attachments.
+ */
+export type Held = {
+  readonly sourceId: string
+  readonly itemId: string
+  readonly key: string
+  readonly text: string
+  readonly kept?: KeptAttachments | undefined
+}
+
+/** What a held message keeps of its attachments, as its row's `files`; none when it brought none. */
+const heldFiles = (kept: KeptAttachments | undefined): string | null =>
+  kept === undefined ? null : JSON.stringify({ connectionId: kept.connectionId, files: kept.files, notes: kept.notes })
 
 /** Holds `held` until its conversation has a route, keeping the twenty newest of it (sources/held.ts). */
 export function hold(db: Db, held: Held, now: number): void {
   const conversation = and(eq(appSourceHeld.sourceId, held.sourceId), eq(appSourceHeld.key, held.key))
+  const { kept, ...row } = held
   holdNewest(db, {
     put: () =>
       db
         .insert(appSourceHeld)
-        .values({ ...held, heldAt: now })
+        .values({ ...row, files: heldFiles(kept), heldAt: now })
         .onConflictDoNothing()
         .run(),
     newestFirst: () =>
@@ -242,7 +279,7 @@ export function hold(db: Db, held: Held, now: number): void {
   })
 }
 
-/** What `sourceId`'s conversation `key` holds, oldest first. */
+/** What `sourceId`'s conversation `key` holds, oldest first; its kept files by reference, its images not shown. */
 export const heldOf = (db: Db, sourceId: string, key: string): readonly Held[] =>
   db
     .select({
@@ -250,11 +287,16 @@ export const heldOf = (db: Db, sourceId: string, key: string): readonly Held[] =
       itemId: appSourceHeld.itemId,
       key: appSourceHeld.key,
       text: appSourceHeld.text,
+      files: appSourceHeld.files,
     })
     .from(appSourceHeld)
     .where(and(eq(appSourceHeld.sourceId, sourceId), eq(appSourceHeld.key, key)))
     .orderBy(sql`rowid`)
     .all()
+    .map(({ files, ...held }) => {
+      const kept = files === null ? undefined : Option.getOrUndefined(decodeHeldFiles(files))
+      return kept === undefined ? held : { ...held, kept: { ...kept, images: [] } }
+    })
 
 /** A held message went on to its route. */
 export function release(db: Db, sourceId: string, itemId: string): void {
@@ -297,7 +339,12 @@ export function waitingOf(db: Db, sourceId: string): readonly SourceWaiting[] {
     .orderBy(desc(appSourceRoutes.updatedAt))
     .limit(20)
     .all()
-    .map((row) => ({ key: row.key, values: valuesOf(row), held: held.get(row.key) ?? 0 }))
+    .map((row) => ({
+      key: row.key,
+      values: valuesOf(row),
+      ...(row.title === null ? {} : { title: row.title }),
+      held: held.get(row.key) ?? 0,
+    }))
 }
 
 /** Remembers a turn whose answer goes back through its Source; whether it was new. */

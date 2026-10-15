@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import type { SourceRouteView, SourceView } from '@goblin/contracts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { QueryError } from '../lib/query/query-boundary.tsx'
-import { choiceOfRoute, keyWords, routeOfChoice, sourceRouteOptions } from '../lib/source-routes.ts'
+import { choiceOfRoute, conversationName, routeOfChoice, sourceRouteOptions } from '../lib/source-routes.ts'
 import { type RouteChoice, waitingWords } from '../lib/telegram-chats.ts'
 import { routeSourceMutation, sourceRoutesQuery } from '../sources/queries.ts'
 import { StatusLabel } from './status-label.tsx'
@@ -53,7 +53,7 @@ function RouteRow({
 }) {
   const routing = useMutation(routeSourceMutation)
   const choice = choiceOfRoute(routing.isPending ? routing.variables.route : view.route)
-  const name = keyWords(view.values)
+  const name = conversationName(view)
   const waiting = view.route.to === 'held' ? waitingWords(view.held) : undefined
   const meta = setBy(view)
   return (

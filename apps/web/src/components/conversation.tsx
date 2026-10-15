@@ -11,9 +11,8 @@ import {
   useMessageScroller,
 } from '@goblin/ui'
 import { memo, type ReactNode, useMemo, useRef } from 'react'
-import { TELEGRAM_AUTHOR } from '@goblin/contracts'
 import { HistoryIcon } from 'lucide-react'
-import { isOwnTurn, type Part, partKey, samePart } from '../lib/parts.ts'
+import { isOwnTurn, type Part, partKey, samePart, turnVia } from '../lib/parts.ts'
 import { turnLabel } from '../lib/turn-map.ts'
 import { PartView } from './parts/registry.tsx'
 import { OpenThread } from './parts/text-part.tsx'
@@ -88,11 +87,10 @@ export function Conversation({
   const viewport = useRef<HTMLDivElement>(null)
   const turns = useMemo(
     () =>
-      parts.filter(isOwnTurn).map((part): Turn => ({
-        id: part.id,
-        label: turnLabel(part.text),
-        telegram: part.kind === 'user' && part.author === TELEGRAM_AUTHOR,
-      })),
+      parts.filter(isOwnTurn).map((part): Turn => {
+        const via = turnVia(part)
+        return { id: part.id, label: turnLabel(part.text), ...(via === undefined ? {} : { via }) }
+      }),
     [parts],
   )
   return (

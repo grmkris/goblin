@@ -18,6 +18,8 @@ const messagePointers = (setup: SourceSetup): readonly (readonly [string, string
   ...('pointer' in setup.speaksForMe ? [['speaksForMe', setup.speaksForMe.pointer] as const] : []),
   ['read.text', setup.read.text],
   ...(setup.read.id === undefined ? [] : [['read.id', setup.read.id] as const]),
+  ...(setup.read.title === undefined ? [] : [['read.title', setup.read.title] as const]),
+  ...(setup.read.attachments === undefined ? [] : [['read.attachments', setup.read.attachments] as const]),
   ...(setup.read.direction === undefined ? [] : [['read.direction', setup.read.direction.pointer] as const]),
 ]
 

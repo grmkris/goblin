@@ -1,4 +1,5 @@
 import type { SourceSetup } from '@goblin/contracts'
+import type { KeptAttachments } from '../pi/content.ts'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import type * as Effect from 'effect/Effect'
 import type { AppError } from '../http/errors.ts'
@@ -35,6 +36,13 @@ export interface SourcePorts {
   readonly answer: (reply: ReplyRef) => Effect.Effect<Answer | undefined, AppError>
   /** A notice to the owner, framed as untrusted data from the connection. */
   readonly notice: (notice: SourceNotice) => Effect.Effect<void, AppError>
+  /**
+   * A message's attachments (MCP content blocks) kept in the owner's files with `materialize` (ADR 0065): the files, a
+   * note for each one not kept, and small images for a model that sees them. It never fails.
+   */
+  readonly receive: (connectionId: string, blocks: readonly unknown[]) => Effect.Effect<KeptAttachments>
+  /** A new Topic named `name` (`fallback` when it has no words) for a conversation, made once by `operationId`. */
+  readonly topic: (name: string, fallback: string, operationId: string) => Effect.Effect<number, AppError>
   /** The connection's label: the owner's own name for it. */
   readonly label: (connectionId: string) => Effect.Effect<string>
 }

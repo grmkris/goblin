@@ -10,7 +10,7 @@ import { InboxIcon, ShieldAlertIcon } from 'lucide-react'
 import { notNowList } from '../../../lib/not-now.ts'
 import {
   type WaitingConversation,
-  keyWords,
+  conversationName,
   routeOfChoice,
   sourcesToReview,
   waitingChoice,
@@ -43,7 +43,7 @@ function WaitingRow({
   const routing = useMutation(routeSourceMutation)
   const [choice, setChoice] = useState<RouteChoice>(waitingChoice)
   const route = routeOfChoice(choice)
-  const name = keyWords(item.waiting.values)
+  const name = conversationName(item.waiting)
   // expected: a refusal shows why in place of the row's line, and the row stays
   const error = routing.error === null ? '' : sourceRefusal(routing.error, `set up “${name}”`)
   return (

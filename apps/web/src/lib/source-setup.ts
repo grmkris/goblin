@@ -4,7 +4,7 @@
 import {
   ArgumentsTemplate,
   type SourceKeyValues,
-  type SourceRoute,
+  type SourceNewKeys,
   type SourceSetup,
   type SourceView,
   fillTemplate,
@@ -16,8 +16,8 @@ import { filtersInWords } from './events.ts'
 /** One fact of a review: what it is about, and what the setup says in words. */
 export type Fact = { readonly term: string; readonly text: string }
 
-/** What a review names besides the setup itself: its event's title and a route in words. */
-export type FactNames = { readonly event: string; readonly route: (route: SourceRoute) => string }
+/** What a review names besides the setup itself: its event's title and where new conversations go, in words. */
+export type FactNames = { readonly event: string; readonly newKeys: (newKeys: SourceNewKeys) => string }
 
 /** A pointer and the value it is compared with, in words: `/from/isOwner` is `true`. */
 const matchWords = (match: { readonly pointer: string; readonly equals: unknown }): string =>
@@ -25,12 +25,17 @@ const matchWords = (match: { readonly pointer: string; readonly equals: unknown 
 
 /** How a setup reads its messages, in words. */
 function readWords(read: SourceSetup['read']): string {
+  const parts = [
+    `its words at ${read.text}`,
+    ...(read.title === undefined ? [] : [`its conversation's name at ${read.title}`]),
+    ...(read.attachments === undefined ? [] : [`what it brought at ${read.attachments}, kept in your files`]),
+  ].join(', ')
   const incoming = read.direction === undefined ? '' : `, only those where ${matchWords(read.direction)}`
   if (read.from === 'payload') {
     const each = read.items === undefined ? 'the event is one message' : `each message at ${read.items}`
-    return `From the event's data: ${each}, its words at ${read.text}${incoming}`
+    return `From the event's data: ${each}, ${parts}${incoming}`
   }
-  return `By calling ${read.tool} from where it left off (cursor at ${read.cursor}): each message at ${read.items}, its words at ${read.text}${incoming}`
+  return `By calling ${read.tool} from where it left off (cursor at ${read.cursor}): each message at ${read.items}, ${parts}${incoming}`
 }
 
 /**
@@ -68,7 +73,7 @@ export function setupFacts(setup: SourceSetup, names: FactNames): readonly Fact[
           ? 'Not sent back'
           : `Sent back with ${reply.tool}, in pieces of at most ${reply.maxChars.toLocaleString()} characters`,
     },
-    { term: 'New conversations', text: names.route(setup.newKeys) },
+    { term: 'New conversations', text: names.newKeys(setup.newKeys) },
   ]
 }
 

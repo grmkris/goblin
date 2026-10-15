@@ -5,6 +5,7 @@ import {
   PERSONAL_TOPIC,
   type PersonaView,
   type SourceKeyValues,
+  type SourceNewKeys,
   type SourceRoute,
   type SourceView,
   type SourceWaiting,
@@ -28,6 +29,12 @@ export function keyWords(values: SourceKeyValues): string {
   return parts.length === 0 ? 'A conversation' : parts.join(' · ')
 }
 
+/** A conversation as a list names it: its title (the server's name for it) when it has one, else its key in words. */
+export const conversationName = (conversation: {
+  readonly values: SourceKeyValues
+  readonly title?: string | undefined
+}): string => conversation.title ?? keyWords(conversation.values)
+
 /** A Topic by name for a sentence: `#Name`, `#Personal` for one goblin does not list. */
 const topicName = (id: number, topics: readonly TopicView[]): string =>
   `#${topics.find((topic) => topic.id === id)?.name ?? 'Personal'}`
@@ -49,6 +56,16 @@ export function routeWords(route: SourceRoute, topics: readonly TopicView[], per
       return 'Held until you choose where they go'
   }
 }
+
+/** Where a conversation seen for the first time goes, in words: a route, or a new Topic of its own. */
+export const newKeysWords = (
+  newKeys: SourceNewKeys,
+  topics: readonly TopicView[],
+  personas: readonly PersonaView[],
+): string =>
+  newKeys.to === 'topic-per-key'
+    ? 'Each in a new Topic of its own, named after it, answered by goblin'
+    : routeWords(newKeys, topics, personas)
 
 /** The select's choice for a route: `answer:<topic>` (with who answers), `listen:<topic>`, `ignore` or `held`. */
 export function choiceOfRoute(route: SourceRoute): RouteChoice {

@@ -1,7 +1,8 @@
 // The owner's messages from outside goblin as turns, shared by the Telegram channel and Sources: a message becomes a
 // turn in its Topic's Conversation (answered by goblin or a Persona) or a passive note there, through the one
 // admission sequence, and how each turn ended is read back for the answer that goes out again.
-import { PersonaAnswerData } from '@goblin/contracts'
+import type { TextContent } from '@earendil-works/pi-ai'
+import { type OwnTurnVia, PersonaAnswerData } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
@@ -12,16 +13,20 @@ import { epochSeconds } from '../clock.ts'
 import { toAppError } from '../http/errors.ts'
 import { askPersonas } from '../personas/ask.ts'
 import { Invocations, Personas } from '../personas/service.ts'
-import { authoredContent } from '../pi/content.ts'
+import { type KeptAttachments, messageContent } from '../pi/content.ts'
 import { type PiFailure, PiSessions } from '../pi/sessions.ts'
 import { askedChoice, askedText, cutOff } from '../pi/transcript.ts'
 
-/** One message from the owner into a goblin Topic: where, under which operation, from whom, and its words. */
+/**
+ * One message from the owner into a goblin Topic: where, under which operation, from whom, its words, and what goblin
+ * kept of its attachments.
+ */
 export type Turn = {
   readonly topic: number
   readonly operationId: string
   readonly author: string
   readonly text: string
+  readonly kept?: KeptAttachments
 }
 
 /** A single-choice question an answer ended on, as buttons can ask it. */
@@ -38,14 +43,26 @@ export type ReplyRef = { readonly operationId: string; readonly chatId?: string;
 
 /**
  * Where the owner's messages come from, as their turns record it: the operation's receipt, the flow it records, how a
- * Persona's ask came in, and the kind of the passive note a message kept with no turn is written as.
+ * Persona's ask came in, the kind of the passive note a message kept with no turn is written as, and the mark a turn's
+ * content carries as the owner's own (`own`), which the web reads.
  */
 export type TurnOrigin = {
   readonly receipt: Pick<ReceiptInput, 'kind' | 'origin'>
   readonly flow: Pick<AdmissionFlow, 'flow' | 'via'>
   readonly persona: Parameters<typeof askPersonas>[4]
   readonly note: `app.${string}`
+  readonly own?: OwnTurnVia
 }
+
+/** A turn's content: its author and words, its mark as the owner's own when it is a turn, and what it brought. */
+const turnContent = (origin: TurnOrigin, turn: Turn, asTurn: boolean) =>
+  messageContent(turn.author, turn.text, {
+    ...(asTurn && origin.own !== undefined ? { own: origin.own } : {}),
+    ...(turn.kept === undefined ? {} : { kept: turn.kept }),
+  })
+
+/** Text blocks only: a Persona's ask carries no images, only the files' references. */
+const isText = (block: { readonly type: string }): block is TextContent => block.type === 'text'
 
 /** What is added to an answer that reached the output limit, as the web transcript's receipt says. */
 const CUT_OFF = '(Cut off at the output limit. Ask it to continue.)'
@@ -119,14 +136,14 @@ export const answerOf = (origin: TurnOrigin, reply: ReplyRef) =>
 export const submitTurn = (origin: TurnOrigin, turn: Turn, persona: number | undefined) =>
   Effect.gen(function* () {
     const home = yield* (yield* Conversations).routineHome(turn.topic)
-    const content = authoredContent(turn.author, turn.text)
+    const content = turnContent(origin, turn, true)
     const active = persona !== undefined && (yield* (yield* Personas).active).some((each) => each.id === persona)
     if (active) {
       yield* askPersonas(
         { thread: home.chat, operationId: turn.operationId },
         [persona],
         'parallel',
-        content,
+        content.filter(isText),
         origin.persona,
       )
       return { chatId: home.chat, persona }
@@ -152,7 +169,7 @@ export const keepTurn = (origin: TurnOrigin, turn: Turn) =>
       entry: {
         kind: origin.note,
         data: { listen: true },
-        model: [{ role: 'user', content: authoredContent(turn.author, turn.text), timestamp: now * 1000 }],
+        model: [{ role: 'user', content: turnContent(origin, turn, false), timestamp: now * 1000 }],
       },
     })
   })

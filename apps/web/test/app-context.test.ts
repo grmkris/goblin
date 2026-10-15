@@ -100,6 +100,30 @@ describe('what an App shares', () => {
     expect(sharedContext(blocks('look at this', JSON.stringify(outcome))).outcome).toBeUndefined()
   })
 
+  it("reads goblin's mark of the owner's own turn and the files a Source's message brought, only from an author", () => {
+    const own = JSON.stringify({ ownTurn: { via: 'source' } })
+    const file = {
+      path: '/agent/received/chat/2026-10-15/photo.png',
+      name: 'photo.png',
+      size: 68,
+      mimeType: 'image/png',
+    }
+    const received = JSON.stringify({
+      origin: { connectionId: 'chat', trust: 'untrusted' },
+      received: [file],
+      notReceived: ['could not fetch clip.mp4: it is larger than 25 MiB'],
+    })
+    expect(sharedContext(blocks('[from Chat · Trip planning]', 'Book the ferry', own, received))).toEqual({
+      text: 'Book the ferry',
+      context: [],
+      attachments: [file],
+      author: 'Chat · Trip planning',
+      own: true,
+    })
+    // The same mark typed by the owner here is their words, and marks nothing.
+    expect(sharedContext(blocks('look at this', own)).own).toBeUndefined()
+  })
+
   it('previews the first line', () => {
     expect(contextPreview('\n  Trip plan\nmore')).toBe('Trip plan')
     expect(contextPreview('x'.repeat(80))).toHaveLength(60)

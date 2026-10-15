@@ -61,8 +61,8 @@ const start = (input: AgentInputs) =>
  * Every service of one agent, built once per Durable Object (agent.ts): the start (above), the model budget and model
  * picker (a send's admission reads them), then each area's layer in turn, each built
  * after and over everything before it: the skill learner after the owner's files and the routines' notices it writes,
- * and the Sources after the routines' notices they post (their Events handler is registered there, before the agent
- * runs anything).
+ * and the Sources after the routines' notices they post and the owner's files they keep attachments in (their Events
+ * handler is registered there, before the agent runs anything).
  */
 export const AgentLive = (input: AgentInputs) =>
   start(input).pipe(
@@ -72,9 +72,9 @@ export const AgentLive = (input: AgentInputs) =>
     then(KnowledgeLive),
     then(DelegationLive),
     then(RoutinesLive),
-    then(SourcesLive),
     then(Inspection.layer),
     then(AppsLive),
+    then(SourcesLive),
     then(LearnerLive),
     then(WorkspaceLive),
     then(OnboardingLive),

@@ -17,7 +17,7 @@ import { epochSeconds } from '../clock.ts'
 import { type AppError, InvalidInput, NotFound } from '../http/errors.ts'
 import { Receipts } from '../organize/service.ts'
 import { Db } from '../runtime/db.ts'
-import { activePersona, activeTopic, personaWords, topicWords } from '../sources/places.ts'
+import { activePersona, activeTopic, personaWords, topicFor, topicWords } from '../sources/places.ts'
 import {
   type RouteChoice,
   type RouteRow,
@@ -28,7 +28,7 @@ import {
   routeRow,
   seeChat,
 } from './routes.ts'
-import { topicFor, topicOperation } from './places.ts'
+import { topicOperation } from './places.ts'
 import { Channel } from './service.ts'
 import { onChannel } from './turns.ts'
 
@@ -139,7 +139,12 @@ export const choiceOf = (pick: RoutePick, actor: 'owner' | 'agent') =>
     const row = routeRow(yield* Db, pick.chat, thread)
     const topic =
       pick.topic === undefined
-        ? yield* topicFor(pick.newTopic ?? row?.title ?? 'Telegram', topicOperation(pick.chat, thread), actor)
+        ? yield* topicFor(
+            pick.newTopic ?? row?.title ?? 'Telegram',
+            topicOperation(pick.chat, thread),
+            actor,
+            'Telegram',
+          )
         : yield* activeTopic(pick.topic)
     if (pick.mode === 'listen') return { mode: 'listen', topic } satisfies TelegramRoute
     const persona = pick.persona === undefined ? undefined : yield* activePersona(pick.persona)

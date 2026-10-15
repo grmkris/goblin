@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { EVERYTHING, type SourceSetup, type SourceView, type TopicView } from '@goblin/contracts'
 import {
   choiceOfRoute,
+  conversationName,
   keyWords,
+  newKeysWords,
   routeOfChoice,
   routeWords,
   sourceRouteOptions,
@@ -61,10 +63,12 @@ describe('a Source in words (ADR 0066)', () => {
     expect(keyWords({ chat: 'dm', thread: 3 })).toBe('chat dm · thread 3')
     expect(keyWords({ chat: 'dm', thread: null })).toBe('chat dm')
     expect(keyWords({})).toBe('A conversation')
+    expect(conversationName({ values: { chat: 'c1' }, title: 'Trip planning' })).toBe('Trip planning')
+    expect(conversationName({ values: { chat: 'c1' } })).toBe('chat c1')
   })
 
   it('says each fact of a setup, with every pointer and tool as it is', () => {
-    const facts = setupFacts(SETUP, { event: 'Message received', route: (route) => route.to })
+    const facts = setupFacts(SETUP, { event: 'Message received', newKeys: (newKeys) => newKeys.to })
     expect(facts.map((fact) => fact.term)).toEqual([
       'Wakes on',
       'Conversations',
@@ -77,6 +81,23 @@ describe('a Source in words (ADR 0066)', () => {
     expect(facts[2]?.text).toBe('When /from/isOwner is true: those become your own turns')
     expect(facts[5]?.text).toBe('Sent back with message_send, in pieces of at most 3,500 characters')
     expect(facts[6]?.text).toBe('held')
+  })
+
+  it("names a setup's title and attachments pointers, and a new Topic for each new conversation", () => {
+    const setup: SourceSetup = {
+      ...SETUP,
+      read: { from: 'payload', text: '/text', title: '/chatTitle', attachments: '/attachments' },
+      newKeys: { to: 'topic-per-key' },
+    }
+    const facts = setupFacts(setup, {
+      event: 'Message received',
+      newKeys: (newKeys) => newKeysWords(newKeys, TOPICS, []),
+    })
+    expect(facts[4]?.text).toBe(
+      "From the event's data: the event is one message, its words at /text, its conversation's name at /chatTitle, what it brought at /attachments, kept in your files",
+    )
+    expect(facts[6]?.text).toBe('Each in a new Topic of its own, named after it, answered by goblin')
+    expect(newKeysWords({ to: 'listen', topic: 2 }, TOPICS, [])).toBe('Kept as notes in #Travel')
   })
 
   it('says where each route sends a conversation', () => {

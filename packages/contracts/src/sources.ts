@@ -124,12 +124,25 @@ export type SpeaksForMe = typeof SpeaksForMe.Type
 export const SourceOthers = Schema.Literals(['notice', 'drop'])
 export type SourceOthers = typeof SourceOthers.Type
 
-/** Where a message's parts are: its id (for a message read again), its words, and what marks it incoming. */
+/**
+ * Where a message's parts are: its id (for a message read again), its words, its conversation's name, what it brought
+ * and what marks it incoming.
+ */
 const MessagePointers = {
   /** The message's own id; without it, an event's message is known by the event's id. */
   id: Schema.optionalKey(JsonPointer),
   /** The message's words. */
   text: JsonPointer,
+  /**
+   * Its conversation's name as the server gives it (a chat's title): shown on the conversation's route and given to a
+   * Topic made for it. The newest one a message carries wins.
+   */
+  title: Schema.optionalKey(JsonPointer),
+  /**
+   * What the message brought: a list of MCP content blocks (`resource_link`, `image`, `resource`, `audio`), shaped as a
+   * tool result's content is. goblin keeps each one in the owner's files (ADR 0065) and the turn names the files.
+   */
+  attachments: Schema.optionalKey(JsonPointer),
   /** Only messages whose value here equals this are read (an inbox that lists sent messages too). */
   direction: Schema.optionalKey(SourceMatch),
 }
@@ -167,19 +180,33 @@ export const SourceReply = Schema.Struct({
 })
 export type SourceReply = typeof SourceReply.Type
 
+const ToTopic = Schema.Struct({ to: Schema.Literal('topic'), topic: TopicId })
+const ToPersona = Schema.Struct({ to: Schema.Literal('persona'), persona: PersonaId, topic: TopicId })
+const ToListen = Schema.Struct({ to: Schema.Literal('listen'), topic: TopicId })
+const ToIgnore = Schema.Struct({ to: Schema.Literal('ignore') })
+const ToHeld = Schema.Struct({ to: Schema.Literal('held') })
+
 /**
  * Where one conversation's owner messages go: turns in a Topic answered by goblin (`topic`) or by a Persona there
  * (`persona`), passive notes in a Topic with no turn (`listen`), nothing (`ignore`), or kept until the owner routes it
  * (`held`).
  */
-export const SourceRoute = Schema.Union([
-  Schema.Struct({ to: Schema.Literal('topic'), topic: TopicId }),
-  Schema.Struct({ to: Schema.Literal('persona'), persona: PersonaId, topic: TopicId }),
-  Schema.Struct({ to: Schema.Literal('listen'), topic: TopicId }),
-  Schema.Struct({ to: Schema.Literal('ignore') }),
-  Schema.Struct({ to: Schema.Literal('held') }),
-])
+export const SourceRoute = Schema.Union([ToTopic, ToPersona, ToListen, ToIgnore, ToHeld])
 export type SourceRoute = typeof SourceRoute.Type
+
+/**
+ * What becomes of a conversation seen for the first time: a route, or a new Topic of its own answered by goblin
+ * (`topic-per-key`), named after the conversation's title, else its key's values.
+ */
+export const SourceNewKeys = Schema.Union([
+  ToTopic,
+  ToPersona,
+  ToListen,
+  ToIgnore,
+  ToHeld,
+  Schema.Struct({ to: Schema.Literal('topic-per-key') }),
+])
+export type SourceNewKeys = typeof SourceNewKeys.Type
 
 /** The placeholders a read's tool arguments may use. */
 export const readPlaceholder = (name: string) => name === 'cursor'
@@ -210,7 +237,7 @@ export const SourceSetup = Schema.Struct({
   others: SourceOthers,
   read: SourceRead,
   reply: Schema.optionalKey(SourceReply),
-  newKeys: SourceRoute,
+  newKeys: SourceNewKeys,
 }).check(Schema.makeFilter((setup) => setupProblem(setup) ?? true))
 export type SourceSetup = typeof SourceSetup.Type
 
@@ -247,8 +274,13 @@ export type SourceBound = typeof SourceBound.Type
 export const SourceState = Schema.Literals(['proposed', 'active', 'paused', 'refused'])
 export type SourceState = typeof SourceState.Type
 
-/** A conversation waiting for the owner's route: its key, its values and how many messages it holds. */
-export const SourceWaiting = Schema.Struct({ key: SourceKeyId, values: SourceKeyValues, held: Schema.Int })
+/** A conversation waiting for the owner's route: its key, its values, its title and how many messages it holds. */
+export const SourceWaiting = Schema.Struct({
+  key: SourceKeyId,
+  values: SourceKeyValues,
+  title: Schema.optional(Schema.String),
+  held: Schema.Int,
+})
 export type SourceWaiting = typeof SourceWaiting.Type
 
 /**
@@ -280,13 +312,14 @@ export const SourcePage = Schema.Struct({ sources: Schema.Array(SourceView) })
 export type SourcePage = typeof SourcePage.Type
 
 /**
- * One conversation of a Source and where it goes: its key and values, its route, how many messages it holds, and who
- * set the route last (`default` for the setup's `newKeys`). `revision` counts route changes, so Undo can tell whether
- * anything touched it.
+ * One conversation of a Source and where it goes: its key and values, its title (the server's name for it, by the
+ * setup's `read.title`), its route, how many messages it holds, and who set the route last (`default` for the setup's
+ * `newKeys`). `revision` counts route changes, so Undo can tell whether anything touched it.
  */
 export const SourceRouteView = Schema.Struct({
   key: SourceKeyId,
   values: SourceKeyValues,
+  title: Schema.optional(Schema.String),
   route: SourceRoute,
   held: Schema.Int,
   revision: Schema.Int,

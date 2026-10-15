@@ -22,7 +22,7 @@ import {
 import { ChevronRightIcon } from 'lucide-react'
 import { eventTitle, eventWords } from '../lib/events.ts'
 import { messageOf, withRef } from '../lib/query/app-error.ts'
-import { routeWords, sourceStatus } from '../lib/source-routes.ts'
+import { newKeysWords, sourceStatus } from '../lib/source-routes.ts'
 import { setupFacts } from '../lib/source-setup.ts'
 import { usePersonas, useTopics } from '../lib/workspace/hooks.ts'
 import { eventsQuery, serversQuery } from '../mcp/queries.ts'
@@ -112,7 +112,7 @@ export function SourceReview({ source }: { readonly source: SourceView }) {
   const topics = useTopics()
   const personas = usePersonas()
   const event = useEventTitle(source)
-  const facts = setupFacts(source.setup, { event, route: (route) => routeWords(route, topics, personas) })
+  const facts = setupFacts(source.setup, { event, newKeys: (newKeys) => newKeysWords(newKeys, topics, personas) })
   const pending = changing.isPending ? changing.variables.action : undefined
   const error = changing.error === null ? '' : sourceRefusal(changing.error, 'change this Source')
   return (

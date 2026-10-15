@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { logMessage } from '../src/memory/log.ts'
 import {
+  authoredContent,
+  messageContent,
   outcomeContent,
   ownerContent,
   threadHeadContent,
@@ -46,6 +48,44 @@ describe('the owner message with attached files', () => {
         text: JSON.stringify({ origin: { connectionId: 'myplan', trust: 'untrusted' }, appContext: 'note' }),
       },
     ])
+  })
+})
+
+describe('a message from elsewhere (ADR 0066, ADR 0065)', () => {
+  it("marks the owner's own turn, then names the files it brought as untrusted references, then shows its images", () => {
+    const file = {
+      path: '/agent/received/chat/2026-10-15/photo.png',
+      name: 'photo.png',
+      size: 68,
+      mimeType: 'image/png',
+    }
+    const kept = {
+      connectionId: 'chat',
+      files: [file],
+      notes: ['could not fetch clip.mp4: it is larger than 25 MiB'],
+      images: [{ data: 'aGk=', mimeType: 'image/png' }],
+    }
+    expect(messageContent('Chat · Trip planning', 'Book the ferry', { own: 'source', kept })).toEqual([
+      { type: 'text', text: '[from Chat · Trip planning]' },
+      { type: 'text', text: 'Book the ferry' },
+      { type: 'text', text: '{"ownTurn":{"via":"source"}}' },
+      {
+        type: 'text',
+        text: JSON.stringify({
+          origin: { connectionId: 'chat', trust: 'untrusted' },
+          received: [file],
+          notReceived: ['could not fetch clip.mp4: it is larger than 25 MiB'],
+        }),
+      },
+      { type: 'image', data: 'aGk=', mimeType: 'image/png' },
+    ])
+  })
+
+  it('is the authored message alone when it is no turn and brought nothing', () => {
+    expect(messageContent('Chat · Trip planning', 'hi', {})).toEqual(authoredContent('Chat · Trip planning', 'hi'))
+    expect(messageContent('Chat', 'hi', { kept: { connectionId: 'chat', files: [], notes: [], images: [] } })).toEqual(
+      authoredContent('Chat', 'hi'),
+    )
   })
 })
 

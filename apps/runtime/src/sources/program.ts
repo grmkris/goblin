@@ -4,6 +4,7 @@
 // endpoint and those grants. A Source whose endpoint or grants changed since pauses for the owner's review; one whose
 // subscription the server ended is subscribed again while they did not.
 import {
+  type SourceNewKeys,
   type SourceProposal,
   type SourceRoute,
   type SourceRoutePick,
@@ -118,6 +119,7 @@ export const sourcesList = Effect.gen(function* () {
 const routeView = (row: RouteRow, held: number): SourceRouteView => ({
   key: row.key,
   values: valuesOf(row),
+  ...(row.title === null ? {} : { title: row.title }),
   route: routeOf(row),
   held,
   revision: row.revision,
@@ -136,8 +138,8 @@ export const sourceRoutes = (id: string) =>
     return { source: yield* sourceView(row), routes }
   })
 
-/** A route checked before it is set: its Topic open, its Persona active. */
-const checkedRoute = (route: SourceRoute) =>
+/** A route checked before it is set: its Topic open, its Persona active. A Topic of its own is made when it is needed. */
+const checkedRoute = (route: SourceRoute | SourceNewKeys) =>
   Effect.gen(function* () {
     if (route.to === 'topic' || route.to === 'listen' || route.to === 'persona') yield* activeTopic(route.topic)
     if (route.to === 'persona') yield* activePersona(route.persona)
@@ -391,7 +393,7 @@ export const routeSource = (
     if (changed === undefined) return yield* new NotFound({ what: 'source conversation' })
     const { before, after } = changed
     const label = yield* ports.label(source.row.connectionId)
-    const where = keyWords(valuesOf(after))
+    const where = after.title ?? keyWords(valuesOf(after))
     const summary = `"${source.row.title}" (${label})${where === '' ? '' : `, ${where},`} is ${yield* routeWords(routeOf(after))}`
     yield* (yield* Receipts).record({
       kind: 'source.route',

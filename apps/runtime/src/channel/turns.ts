@@ -9,7 +9,7 @@ import type { PiSessions } from '../pi/sessions.ts'
 import type { AgentInput } from '../runtime/input.ts'
 import { type TurnOrigin, answerOf, keepTurn, submitTurn } from '../sources/turns.ts'
 import type { ChannelPorts } from './channel.ts'
-import { topicFor } from './places.ts'
+import { topicFor } from '../sources/places.ts'
 import { Channel } from './service.ts'
 import { type ChannelCall, channelTool } from './tools.ts'
 
@@ -46,7 +46,7 @@ export const channelPorts = (call: ChannelCall) =>
     submit: (turn, persona) => Effect.provideContext(submitTurn(TELEGRAM, turn, persona), context),
     keep: (turn) => Effect.provideContext(keepTurn(TELEGRAM, turn), context),
     // The owner chose "New topic" (an offer's tap, or the default for new chats).
-    topic: (title, operationId) => Effect.provideContext(topicFor(title, operationId, 'owner'), context),
+    topic: (title, operationId) => Effect.provideContext(topicFor(title, operationId, 'owner', 'Telegram'), context),
     answer: (reply) => Effect.provideContext(answerOf(TELEGRAM, reply), context),
   }))
 

@@ -88,13 +88,26 @@ export const message = (id: string, extra: Record<string, unknown> = {}) => ({
   ...extra,
 })
 
-/** What the fake ports saw: each tool call, turn (with its Persona), note kept and notice. */
+/** What the fake ports saw: each tool call, turn (with its Persona), note kept, notice, attachments and Topic made. */
 export type Seen = {
   readonly calls: { readonly tool: string; readonly args: Record<string, unknown> }[]
   readonly turns: { readonly turn: Turn; readonly persona?: number }[]
   readonly kept: Turn[]
   readonly notices: SourceNotice[]
+  readonly received: { readonly connectionId: string; readonly blocks: readonly unknown[] }[]
+  readonly topics: { readonly name: string; readonly fallback: string; readonly operationId: string }[]
 }
+
+/** The file the fake ports keep for each attachment, by its place in the message's list. */
+export const keptFile = (index: number) => ({
+  path: `/agent/received/chat/2026-10-15/photo-${String(index)}.png`,
+  name: `photo-${String(index)}.png`,
+  size: 68,
+  mimeType: 'image/png',
+})
+
+/** The Topic the fake ports make for a new conversation. */
+export const NEW_TOPIC = 9
 
 /**
  * The Sources' engine on real SQLite with fake ports: a tool call answers `answer(tool, args)` (failing while `failing`
@@ -117,7 +130,7 @@ export const sourceWorld = (
       telemetry: undefined,
       wake: (seconds) => void woken.push(seconds),
     })
-    const seen: Seen = { calls: [], turns: [], kept: [], notices: [] }
+    const seen: Seen = { calls: [], turns: [], kept: [], notices: [], received: [], topics: [] }
     const state = { failing: false }
     const ports: SourcePorts = {
       call: (connectionId, tool, args) =>
@@ -135,6 +148,21 @@ export const sourceWorld = (
       answer: ({ operationId }) => Effect.succeed(options.answers?.get(operationId)),
       notice: (notice) => Effect.sync(() => void seen.notices.push(notice)),
       label: () => Effect.succeed('Chat'),
+      receive: (connectionId, blocks) =>
+        Effect.sync(() => {
+          seen.received.push({ connectionId, blocks })
+          return {
+            connectionId,
+            files: blocks.map((_, index) => keptFile(index)),
+            notes: [],
+            images: blocks.map(() => ({ data: 'aGk=', mimeType: 'image/png' })),
+          }
+        }),
+      topic: (name, fallback, operationId) =>
+        Effect.sync(() => {
+          seen.topics.push({ name, fallback, operationId })
+          return NEW_TOPIC
+        }),
     }
     /** A Source with `setup` on connection `chat`, confirmed and bound at binding 7. */
     const active = (setup: SourceSetup = PAYLOAD_SETUP, id = 'src_00000000000000a1') =>
