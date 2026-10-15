@@ -1,18 +1,34 @@
 # Outbound MCP
 
+The runtime host lives in `apps/runtime/src/mcp/`, grouped by responsibility. `service.ts` exposes the services the
+rest of the runtime composes; `resident-api.ts` serves the resident-authority endpoint.
+
+| Directory | Responsibility |
+| --- | --- |
+| `connections/` | SDK connections, dispatch, tool lists and model results |
+| `oauth/` | Sign-in, refresh, encrypted credentials and endpoint bindings |
+| `grants/` | Exact grants and suggested access |
+| `approvals/` | Frozen calls and owner approval |
+| `url-requests/` | URL elicitation and its one authorized retry |
+| `events/` | Subscriptions, signed ingress, dispatch and wakeups |
+| `servers/` | Owner configuration, labels, registries, shelf and owner API |
+| `apps/` | App HTML, entrypoints and retained App results |
+| `content/` | File materialization from tool and resource results |
+
+
 ## Outbound MCP
 
 Connections come from `GOBLIN_MCP_SERVERS` (JSON: `connectionId`, `endpoint`, optional `label`, `issuer` and
 `resource`) and from the owner, who may add up to thirty-two by URL (`app_mcp_connections`, ADR 0006). A server is an
 address and a connection the owner's account on it (ADR 0041): the owner may connect one server several times, each
 connection with its own id, sign-in, grants, skills switch and Events. Every connection has the owner's **label**
-(`app_mcp_labels`, `mcp/labels.ts`), one line of at most eighty characters, unique whatever its case: given when it is
+(`app_mcp_labels`, `mcp/servers/labels.ts`), one line of at most eighty characters, unique whatever its case: given when it is
 added (`AddServer.label`), else the first free name from the shelf's title for a server on the shelf (`Kiwi.com`,
 `suggestedTitle`), else its server card's title (`Example`, `Example 2`), else its host, or the configured `label`
 (else its id) for a configured one, set once at start; `PATCH /api/mcp/:id` renames it. Every
 connection registers with its authorization server as plain `goblin` (ADR 0062: a consent screen names the app, not
 goblin's own label); MCP has no standard "who am I", so goblin cannot show which account a sign-in reached. An added endpoint is a public https address
-(`mcp/endpoint.ts`), and its server card's title, description and icon are the server's own claims, for the owner's
+(`mcp/servers/endpoint.ts`), and its server card's title, description and icon are the server's own claims, for the owner's
 eyes only. Configured connections win on ID and cannot be removed. Removing an added connection forgets its row,
 label, endpoint binding, credentials, pending sign-ins and grants in one transaction. Every server is treated alike
 ([ADR 0063](../adr/0063-mcp-first-no-server-specific-code.md)): no code knows a server by its endpoint or name, and its
@@ -30,12 +46,12 @@ reopens) the server's thread, an empty thread under Personal named after the ser
 `AppHost` loads it with its app tool called as the owner (`serverAppQuery`, on the panel `?focus=` names), rendered in
 the same sandboxed frame as any MCP App and trusted for nothing. Any server's App opens this way: the tool its tools
 declare as their global entrypoint (`_meta["openai/ui"].entrypoints`), kept per connection from its last whole tool list
-(`app_mcp_entrypoints`, `mcp/entrypoints.ts`), so Open and the pin outlive the connection and the object. Its one
+(`app_mcp_entrypoints`, `mcp/apps/entrypoints.ts`), so Open and the pin outlive the connection and the object. Its one
 display mode is fullscreen. A frame reloads
 only for a different App (another `focus` is one); a newer result of the same call reaches the live App through the
 bridge (`deliver` in `lib/app-bridge.ts`). On its page, an App that calls a tool the owner has not allowed gets the
 same Allow card as in a conversation. Connections
-also offers a shelf of suggested servers (`mcp/suggested.ts`, ADR 0052), with source comments recording their
+also offers a shelf of suggested servers (`mcp/servers/shelf.ts`, ADR 0052), with source comments recording their
 connection checks, each in a group (`ServerSuggestion.group`) that the picker's Suggested tab and Start's services step
 show under its name (`server-add.tsx`): the owner's own apps through one mysi connection
 (`https://mysi.lol/mcp?codemode=off`; the query keeps every app's tools listed as `<service>_<tool>` under the same
@@ -44,7 +60,7 @@ crypto data, views in the chat and code. The shelf is data, one endpoint per ent
 ([ADR 0061](../adr/0061-the-shelf-is-data.md)); a deployment's `MCP_SHELF` replaces an entry by its id or adds its own
 (`shelfOf`). A suggestion is marked added when a connection has its endpoint's origin and path, whatever its query. One tap adds and
 connects. It also searches MCP registries that speak
-the generic registry API (`mcp/registry.ts`, `GET /api/mcp/catalog?q=`): the Official MCP Registry and GitHub's, built
+the generic registry API (`mcp/servers/registry.ts`, `GET /api/mcp/catalog?q=`): the Official MCP Registry and GitHub's, built
 in, then up to eight the owner adds (`app_mcp_registries`). A registry is
 added only once it answers `/v0.1/servers`, and removing it keeps the servers added from it. Search reads one page of
 up to twenty entries per registry and keeps https streamable-HTTP remotes, rejecting entries explicitly marked
@@ -68,30 +84,30 @@ its registry, name and version. The owner connects each server from the Connecti
 3. Client registration and tokens are AES-GCM encrypted at rest (`GOBLIN_CREDENTIAL_KEY`, bound to server ID and
    purpose); discovery metadata is stored in plain JSON.
 
-Credentials and grants belong to the endpoint they were made for (`mcp/endpoints.ts`, `app_mcp_endpoints`). When the
+Credentials and grants belong to the endpoint they were made for (`mcp/oauth/endpoints.ts`, `app_mcp_endpoints`). When the
 agent starts and a server ID now points at another endpoint, everything stored for it is dropped in one short
 transaction: credentials, client registration, pending authorizations and grants. The owner connects and grants
 again, so tokens issued by one host never reach another.
 
-Calls go through the connection manager (`McpConnections`, `mcp/manager.ts`), keyed by server ID, which caches a
-connection and closes it after five minutes idle. Its auth provider (`mcp/auth.ts`) refreshes a token a minute before
+Calls go through the connection manager (`McpConnections`, `mcp/connections/manager.ts`), keyed by server ID, which caches a
+connection and closes it after five minutes idle. Its auth provider (`mcp/oauth/auth.ts`) refreshes a token a minute before
 expiry, one `SingleFlight` per server, and refreshes once after a 401. A refresh the authorization server refuses (an
 OAuth error, a refused flow, a 401) marks the server `needs_auth` and the owner reconnects; one that never got an answer (the network, a 5xx) fails as `UpstreamMcp`
-transport and keeps the credentials for the next call (`mcp/errors.ts` `isOAuthRejection`). Results are bounded (1 MiB,
+transport and keeps the credentials for the next call (`mcp/connections/errors.ts` `isOAuthRejection`). Results are bounded (1 MiB,
 16 MiB for App HTML); a result JSON cannot hold is `unsupported`, not over the limit.
 
 A tool call may go 90 seconds without an answer; it asks for progress, and each progress notification the server
 sends restarts that wait, up to five minutes in all, when goblin aborts the request (`withDeadline`). A missed deadline
-is `UpstreamMcp` `timeout`, a caller who stopped waiting `cancelled` (`mcp/errors.ts` reads the SDK's timeout data).
+is `UpstreamMcp` `timeout`, a caller who stopped waiting `cancelled` (`mcp/connections/errors.ts` reads the SDK's timeout data).
 Neither drops the connection; a second timeout in a row does. A call that timed out or lost its connection may still
 have run, so `mcp_call` tells the model to check the server's state before calling it again.
 
-**Files from results** ([ADR 0065](../adr/0065-files-from-mcp-content.md), `mcp/content.ts`). After a model's `mcp_call`
+**Files from results** ([ADR 0065](../adr/0065-files-from-mcp-content.md), `mcp/content/materialize.ts`). After a model's `mcp_call`
 completes, `materialize` keeps each `resource_link`, embedded blob, embedded text over 16 K characters and `audio` block
 of its result (never an App's own `ui://` resource) in the owner's files, at most eight, one at a time, under
 `/agent/received/<connection label, slugged>/<YYYY-MM-DD>/` with a name that replaces nothing there. A public https link
 is fetched with no credentials (never the connection's token): the link and each of at most three redirects must pass
-`isPublicHttps` (`mcp/endpoint.ts`, the rule for added servers), the body is counted as it arrives and abandoned past
+`isPublicHttps` (`mcp/servers/endpoint.ts`, the rule for added servers), the body is counted as it arrives and abandoned past
 25 MiB, and all of it has thirty seconds. A link of another scheme is read with `resources/read` on the same connection,
 under the owner's grant for that exact resource (bounded at 1 MiB, as every resource result); without the grant it stays
 a reference. `http:` and private addresses are refused. The model reads
@@ -109,7 +125,7 @@ Connections (`components/tool-grants.tsx`) names the App from its resource, says
 allowed App has, lists those tools under the switch, each still adjustable (an allowed tool's call policy is a select:
 runs without asking, or asks first), and offers Use suggested access, Allow
 all and None. Each tool carries goblin's suggestion from its annotations (`ToolView.suggested`,
-`mcp/suggested-access.ts`, [ADR 0060](../adr/0060-suggested-access-from-tool-annotations.md)): `run` for one that says it
+`mcp/grants/suggested-access.ts`, [ADR 0060](../adr/0060-suggested-access-from-tool-annotations.md)): `run` for one that says it
 only reads and does not say it destroys, else `ask`. Use suggested access (`POST /api/mcp/:id/suggested`) allows every
 tool the agent can see and turns ask first on for each one suggested to ask, never off; it shows until that state is in
 place. Allow all and None send exact grants one at a time, skip (and count) a tool the server no longer offers, then
@@ -130,7 +146,7 @@ that check comes first, and a helper's exclusions are forgotten with the server'
 goblin negotiates the protocol era (`versionNegotiation: auto`); on a 2026 connection it implements three client
 features ([ADR 0042](../adr/0042-mcp-2026-client.md)).
 
-**Live tool lists** (`mcp/tool-list.ts`). A connection's snapshot keeps its tools in place: `refreshTools` lists them
+**Live tool lists** (`mcp/connections/tool-list.ts`). A connection's snapshot keeps its tools in place: `refreshTools` lists them
 again, one flight per connection that lists once more while changes arrive, bounded as discovery is; a list that fails
 or overflows is never kept in part, and the connection is marked stale so its next use opens it again. A call (or a
 grant request) for a tool goblin does not list re-lists once before refusing. After a 2026 connect to a server that
@@ -146,7 +162,7 @@ connection; one that drops it (a deploy) or fails it on the way is asked again a
 never closed for being idle while a request on it is under way. The SDK client's stray errors are logged by type
 only.
 
-**URL requests** (`mcp/url-asks.ts`, `mcp/url-request.ts`, `app_mcp_url_requests`). Only the model's `mcp_call`
+**URL requests** (`mcp/url-requests/url-asks.ts`, `mcp/url-requests/url-request.ts`, `app_mcp_url_requests`). Only the model's `mcp_call`
 (Goblin, a Persona, a routine run) declares URL elicitation, per request and only on a 2026 connection, and takes an
 `input_required` result back (`McpConnections.callModelTool`): its own call, and the dispatch of its held call once the
 owner approved it (`sendApproved`). The owner's console and Apps never declare it, so servers

@@ -1,7 +1,7 @@
 import type { Extension } from '@earendil-works/pi-durable'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
-import { CredentialCipher } from '../mcp/cipher.ts'
+import { CredentialCipher } from '../mcp/oauth/cipher.ts'
 import { askingExtension } from '../pi/ask-user.ts'
 import { personaExtension } from '../pi/persona.ts'
 import { routineBudgetExtension } from '../pi/routine-budget.ts'

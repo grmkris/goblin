@@ -80,7 +80,7 @@ route's Topic, or Personal; it never starts a turn, and what it brought is never
 
 The owner's own message's attachments are kept before it is routed, held or not, since a link may not last: the ports
 read each block at `read.attachments` (a link, an image or audio with its bytes, or an embedded resource) and keep it
-with `materialize` (`mcp/content.ts`, ADR 0065) under `/agent/received/<connection>/<day>/`, an image as an embedded
+with `materialize` (`mcp/content/materialize.ts`, ADR 0065) under `/agent/received/<connection>/<day>/`, an image as an embedded
 blob named `image`. The turn names the kept files after its words as untrusted references from the connection
 (`ReceivedBlock`: `received`, and a `notReceived` note for each block not kept or not MCP content), and a kept image of
 at most 256 KiB is shown inline when the owner's model takes images. A held message keeps the files' references

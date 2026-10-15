@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mcpModelResult } from '../../src/mcp/extension.ts'
+import { mcpModelResult } from '../../src/mcp/connections/extension.ts'
 
 describe('Pi MCP result projection (unit)', () => {
   it('keeps public asset token fields while scrubbing nested credential-shaped keys', () => {

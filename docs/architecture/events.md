@@ -33,7 +33,7 @@ and the producer drops the subscription, and any other failure of the check is r
 producer retries. A subscription is dropped as invalid only when its server is gone (`NotFound`) or its grant or
 endpoint changed. A maintenance sweep keeps the next alarm only for when something is due (`SqliteEventStore.nextDue`:
 the earliest lease refresh or poll of a running subscription, or a delivery's retry); with nothing waiting, no alarm is
-kept. A failed sweep is reported, then retried a minute later while something waits (`mcp/wake.ts`).
+kept. A failed sweep is reported, then retried a minute later while something waits (`mcp/events/wake.ts`).
 
 Every Telegram Event schedules the channel's pull alarm at once (`channelPull`); `chat.changed` also marks the server's
 chat list to be read again (`sync_due`). The pull runs there, one at a time: it reads `chat_list` (and each forum's

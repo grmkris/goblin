@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/durable-sqlite'
 import * as Effect from 'effect/Effect'
 import { type AgentFetch, deliverEvents } from '../../src/inbound/client.ts'
-import type { EventWebhook } from '../../src/mcp/events.ts'
+import type { EventWebhook } from '../../src/mcp/events/engine.ts'
 import { revokeResident } from '../../src/resident.ts'
 import { type Probes, inAgent } from './probe.ts'
 

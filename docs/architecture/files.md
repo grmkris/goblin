@@ -14,7 +14,7 @@ gets the owner's words, then one block listing each file's path, name, size and 
 (`pi/content.ts`). The web reads that block back into chips under the message (`lib/app-context.ts`), only when every
 block after the words is one it knows. Deleting the account deletes the R2 prefix before the object's storage.
 
-goblin itself writes under `/agent/received/` ([ADR 0065](../adr/0065-files-from-mcp-content.md), `mcp/content.ts`):
+goblin itself writes under `/agent/received/` ([ADR 0065](../adr/0065-files-from-mcp-content.md), `mcp/content/materialize.ts`):
 the files a model's MCP call hands over in its result (links, embedded blobs and long text, audio), in a folder per
 connection (its label, slugged) and day (UTC), under a name that replaces nothing there, within the same limits (a file
 over one, such as over 128 KiB without the bucket, is a note the model reads instead). The model reads each file's

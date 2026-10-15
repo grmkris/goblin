@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CredentialCipher } from '../../src/mcp/cipher.ts'
-import { CredentialStore } from '../../src/mcp/credentials.ts'
+import { CredentialCipher } from '../../src/mcp/oauth/cipher.ts'
+import { CredentialStore } from '../../src/mcp/oauth/credentials.ts'
 import { chatDatabase, durable } from '../chats-sqlite.ts'
 
 const key = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))

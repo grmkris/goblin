@@ -18,7 +18,7 @@ export const appMcpGrants = sqliteTable(
 )
 
 /**
- * The endpoint each server id's credentials and grants were made for (mcp/endpoints.ts). Kept apart from the
+ * The endpoint each server id's credentials and grants were made for (mcp/oauth/endpoints.ts). Kept apart from the
  * credentials, which a disconnect deletes, so grants stay bound too.
  */
 export const appMcpEndpoints = sqliteTable('app_mcp_endpoints', {
@@ -27,14 +27,14 @@ export const appMcpEndpoints = sqliteTable('app_mcp_endpoints', {
   boundAt: integer('bound_at').notNull(),
 })
 
-/** The owner's name for each connection, configured or added (mcp/labels.ts, ADR 0041); unique whatever its case. */
+/** The owner's name for each connection, configured or added (mcp/servers/labels.ts, ADR 0041); unique whatever its case. */
 export const appMcpLabels = sqliteTable('app_mcp_labels', {
   connectionId: text('connection_id').primaryKey().notNull(),
   label: text('label').notNull(),
 })
 
 /**
- * Servers the owner added (mcp/servers.ts), beside the deployment's configured ones. Title, description and icon are
+ * Servers the owner added (mcp/servers/servers.ts), beside the deployment's configured ones. Title, description and icon are
  * the server's own claims from its card or registry entry; `source` records where it was found.
  */
 export const appMcpConnections = sqliteTable('app_mcp_connections', {
@@ -47,14 +47,14 @@ export const appMcpConnections = sqliteTable('app_mcp_connections', {
   createdAt: integer('created_at').notNull(),
 })
 
-/** MCP registries the owner added to search (mcp/registries.ts), after the built-in ones. */
+/** MCP registries the owner added to search (mcp/servers/registries.ts), after the built-in ones. */
 export const appMcpRegistries = sqliteTable('app_mcp_registries', {
   url: text('url').primaryKey().notNull(),
   title: text('title').notNull(),
   addedAt: integer('added_at').notNull(),
 })
 
-/** Outbound OAuth state per server. `client_info` and `tokens` are AES-GCM ciphertext (mcp/credentials.ts). */
+/** Outbound OAuth state per server. `client_info` and `tokens` are AES-GCM ciphertext (mcp/oauth/credentials.ts). */
 export const appMcpCredentials = sqliteTable('app_mcp_credentials', {
   connectionId: text('connection_id').primaryKey().notNull(),
   status: text('status', { enum: ['connected', 'needs_auth'] }).notNull(),
@@ -260,7 +260,7 @@ export const appMcpEventOffers = sqliteTable('app_mcp_event_offers', {
   at: integer('at').notNull(),
 })
 
-/** Each connection's own App entrypoint, as its last whole tool list declared it (`mcp/entrypoints.ts`). */
+/** Each connection's own App entrypoint, as its last whole tool list declared it (`mcp/apps/entrypoints.ts`). */
 export const appMcpEntrypoints = sqliteTable('app_mcp_entrypoints', {
   connectionId: text('connection_id').primaryKey().notNull(),
   tool: text('tool').notNull(),

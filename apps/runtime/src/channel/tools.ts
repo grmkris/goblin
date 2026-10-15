@@ -7,7 +7,7 @@ import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { type AppError, InvalidInput, UpstreamMcp } from '../http/errors.ts'
 import type { McpConnections } from '../mcp/service.ts'
-import type { McpToolResult } from '../mcp/types.ts'
+import type { McpToolResult } from '../mcp/connections/types.ts'
 
 /** The tools a server without Events must offer as well, to ring the doorbell; granted when the owner turns it on. */
 export const DOORBELL_TOOLS = ['subscribe', 'unsubscribe'] as const

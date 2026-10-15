@@ -2,7 +2,7 @@ import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { type AppError, GrantDenied, InvalidInput, UpstreamMcp, attempt, attemptSync } from '../../http/errors.ts'
-import type { CredentialCipher } from '../cipher.ts'
+import type { CredentialCipher } from '../oauth/cipher.ts'
 import type { McpConnections } from '../service.ts'
 import { canonicalArguments, EVENT_LIMITS, type SqliteEventStore, type Subscription } from './store.ts'
 import {

@@ -1,7 +1,7 @@
 import * as Effect from 'effect/Effect'
 import { Setups } from '../setup/service.ts'
 import { type AppError, NotFound } from '../http/errors.ts'
-import type { SkillIdentity } from '../mcp/types.ts'
+import type { SkillIdentity } from '../mcp/connections/types.ts'
 import { type Resident, requireResident } from '../mcp/service.ts'
 
 /**

@@ -138,7 +138,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   searches the MCP registries; add your own under Registries searched. **By address** takes any MCP address (public
   https only). Servers without sign-in connect directly; the suggestions mark DeepWiki, Context7 and Cloudflare Docs
   this way. Remove, in a server's ··· menu, asks first and takes its sign-in and grants with it. To suggest another server, check that it connects from a Worker,
-  then add it to `apps/runtime/src/mcp/suggested.ts` with its endpoint for each stage.
+  then add it to `apps/runtime/src/mcp/servers/shelf.ts` with its endpoint for each stage.
 - **Connect a server.** Connections → Connect. You sign in at the remote server and approve; you come back
   connected. Servers that answer without sign-in connect directly. Then turn on the tools the agent may use, one by one
   or with Allow all; None turns them all off. Nothing is granted by default. A server marked **Needs sign-in** needs a
@@ -195,7 +195,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
   clears selection, then closes. Agent-app views share the kit; see `app_docs` topic `ui`. Local browser acceptance:
   build the app runtime with `heavy bun run --cwd packages/app build`, then run `heavy bun apps/web/test/ui-diagram.ts`.
 - **mysi.** The shelf's first suggestion is one mysi connection for the owner's own apps (MyPlan, MyTab, MyGram,
-  MyInbox, MySkills, MyTmux): `https://mysi.lol/mcp?codemode=off` (`apps/runtime/src/mcp/suggested.ts`, ADRs 0052 and
+  MyInbox, MySkills, MyTmux): `https://mysi.lol/mcp?codemode=off` (`apps/runtime/src/mcp/servers/shelf.ts`, ADRs 0052 and
   0061); a deployment against mysi's dev sets `GOBLIN_MCP_SHELF` to point the `mysi` entry at `dev.mysi.lol`. mysi is a product of its own with a free tier; the
   owner signs up there and chooses which apps the connection reaches on mysi's consent page. Its tools are
   `<service>_<tool>` (`mygram_inbox_read`), so ask the agent for one app's tools ("list my myplan tools") and it calls

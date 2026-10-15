@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { ConnectionLabels, labelOf } from '../../src/mcp/labels.ts'
+import { ConnectionLabels, labelOf } from '../../src/mcp/servers/labels.ts'
 import { chatDatabase, durable } from '../chats-sqlite.ts'
 
 const open: { close: () => void }[] = []

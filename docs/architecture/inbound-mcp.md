@@ -9,7 +9,7 @@ the OAuth callback; the internal API (inbound calls and hooks) never renews it. 
 it off in Settings ("Work while you're away") sticks: activity does not re-enable it, only the explicit toggle does.
 Model MCP tools, skills, inbound `ask_agent` and scheduled Telegram pulls and replies require current authority. The
 owner's own `mcp` endpoints are renewed like the rest and do not call `requireResident`; their tool and resource calls
-still check exact grants (`mcp/api.ts`, `pi/resident-mcp.ts`, `pi/skills.ts`).
+still check exact grants (`mcp/servers/api.ts`, `pi/resident-mcp.ts`, `pi/skills.ts`).
 
 ## Inbound MCP
 

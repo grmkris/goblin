@@ -1,6 +1,6 @@
 import * as Effect from 'effect/Effect'
 import { attempt } from '../../src/http/errors.ts'
-import { makeEvents } from '../../src/mcp/events.ts'
+import { makeEvents } from '../../src/mcp/events/engine.ts'
 import { installEventConsumers } from '../../src/mcp/events/consumers.ts'
 import { SqliteEventStore } from '../../src/mcp/events/store.ts'
 import { makeSkills } from '../../src/skills/library.ts'

@@ -1,7 +1,7 @@
 import type { FetchLike } from '@modelcontextprotocol/client'
 import * as Effect from 'effect/Effect'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { catalogEntry, DEFAULT_REGISTRIES, makeCatalog, probeRegistry } from '../../src/mcp/registry.ts'
+import { catalogEntry, DEFAULT_REGISTRIES, makeCatalog, probeRegistry } from '../../src/mcp/servers/registry.ts'
 import { MemoryRegistries } from './memory.ts'
 
 afterEach(() => {

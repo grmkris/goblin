@@ -95,7 +95,7 @@ export const nodes: readonly Node[] = [
       },
       'src/runtime/boundary.ts': {
         names: ['promiseWith'],
-        importers: ['src/mcp/auth.ts', 'src/mcp/dispatch.ts', 'src/workspace/live.ts', 'test/'],
+        importers: ['src/mcp/oauth/auth.ts', 'src/mcp/connections/dispatch.ts', 'src/workspace/live.ts', 'test/'],
         reason:
           "promiseWith answers a foreign Promise callback wired inside a layer: the MCP SDK's auth provider and dispatch guards, and Pi's task graph watch",
       },

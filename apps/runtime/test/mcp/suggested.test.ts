@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { shelfOf, suggestedTitle, suggestions } from '../../src/mcp/suggested.ts'
+import { shelfOf, suggestedTitle, suggestions } from '../../src/mcp/servers/shelf.ts'
 
 const shelf = shelfOf(undefined)
 

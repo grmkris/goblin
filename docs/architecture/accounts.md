@@ -98,7 +98,7 @@ the agent alone: a step is done once the owner went through it, the model step a
 are connected. A step id an older Start had is dropped when the row is read.
 
 **Sign-ins.** `POST /api/onboarding/connect` notes the step against the connection (`app_onboarding_connects`, an
-hour). The OAuth callback (`mcp/program.ts` `connectCallback`) takes the note and redirects to `/start/<step>` rather
+hour). The OAuth callback (`mcp/servers/program.ts` `connectCallback`) takes the note and redirects to `/start/<step>` rather
 than Connections. Nothing is allowed on the way.
 
 **Ways back** (`start/setup-cards.tsx`). While Start is not finished and the model or services step is left, the chat

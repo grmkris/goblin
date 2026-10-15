@@ -1,8 +1,8 @@
 import { drizzle } from 'drizzle-orm/durable-sqlite'
-import { McpApprovalStore } from '../../src/mcp/approvals.ts'
-import { CredentialCipher } from '../../src/mcp/cipher.ts'
-import { GrantStore } from '../../src/mcp/grants.ts'
-import type { ApprovedDispatch } from '../../src/mcp/types.ts'
+import { McpApprovalStore } from '../../src/mcp/approvals/approvals.ts'
+import { CredentialCipher } from '../../src/mcp/oauth/cipher.ts'
+import { GrantStore } from '../../src/mcp/grants/grants.ts'
+import type { ApprovedDispatch } from '../../src/mcp/connections/types.ts'
 import { runApplicationMigrations } from '../../src/storage/migrations.ts'
 
 /** Native SQLite recovery and argument/context fencing; no external call is replayed by reconstruction. */

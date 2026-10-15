@@ -9,7 +9,7 @@ import type {
 import * as Context from 'effect/Context'
 import type * as Effect from 'effect/Effect'
 import type { AppError } from '../http/errors.ts'
-import type { CredentialCipher } from '../mcp/cipher.ts'
+import type { CredentialCipher } from '../mcp/oauth/cipher.ts'
 import type { appRoutineSettings } from '../storage/routines.ts'
 import type { Firing, RoutineRun } from './runs.ts'
 import type { RoutineSlot } from './scheduler.ts'

@@ -4,14 +4,14 @@ import {
   type Credentials,
   type InvalidationScope,
   PENDING_TTL_SECONDS,
-} from '../../src/mcp/credentials.ts'
-import type { Grant, Grants } from '../../src/mcp/grants.ts'
-import type { AddedRegistries } from '../../src/mcp/registries.ts'
-import type { Registry } from '../../src/mcp/registry.ts'
-import type { AddedServer, AddedServers } from '../../src/mcp/servers.ts'
+} from '../../src/mcp/oauth/credentials.ts'
+import type { Grant, Grants } from '../../src/mcp/grants/grants.ts'
+import type { AddedRegistries } from '../../src/mcp/servers/registries.ts'
+import type { Registry } from '../../src/mcp/servers/registry.ts'
+import type { AddedServer, AddedServers } from '../../src/mcp/servers/servers.ts'
 import { Conflict } from '../../src/http/errors.ts'
-import { freeLabel, type Labels } from '../../src/mcp/labels.ts'
-import type { McpServerConfig } from '../../src/mcp/types.ts'
+import { freeLabel, type Labels } from '../../src/mcp/servers/labels.ts'
+import type { McpServerConfig } from '../../src/mcp/connections/types.ts'
 
 type Row = {
   status: 'connected' | 'needs_auth'

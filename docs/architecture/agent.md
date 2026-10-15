@@ -315,9 +315,9 @@ leaves `events` out and the tools listed. A connection with more than forty tool
 unfiltered listing with its `services` instead: each prefix, its tool count and its first few names, and goblin's own
 `next` line telling the model to call again with `service` (one service's tools) or `query` (every word in a tool's
 name or description). Both filters also narrow any listing, and naming tools in `tools` lists them in full as before. Refusals, held calls and the `skills` section name a connection the same way, `"<label>" (<connectionId>)`
-(`named` in `mcp/labels.ts`); labels never enter telemetry. `mcp_call` takes its `arguments` as an object or the JSON string of one, and returns the server's result as
+(`named` in `mcp/servers/labels.ts`); labels never enter telemetry. `mcp_call` takes its `arguments` as an object or the JSON string of one, and returns the server's result as
 Pi's MCP tools shape it (content blocks, `details.structuredContent`, `_meta` and the origin).
-Remote result details and signed routine event metadata share `mcp/redaction.ts`: it scrubs exact credential-shaped
+Remote result details and signed routine event metadata share `mcp/oauth/redaction.ts`: it scrubs exact credential-shaped
 keys such as `accessToken`, `refresh_token` and `apiKey`, recursively. Public asset and usage fields such as
 `rewardToken`, `token`, `tokens` and `tokenAddress` remain readable.
 

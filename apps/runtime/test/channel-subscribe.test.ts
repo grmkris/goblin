@@ -10,7 +10,7 @@ import { registerPrimary } from '../src/chats/directory.ts'
 import { UpstreamMcp } from '../src/http/errors.ts'
 import type { Consumer, Subscription } from '../src/mcp/events/store.ts'
 import { Events, McpConnections, McpGrants, McpServers } from '../src/mcp/service.ts'
-import type { McpConnectionSnapshot, McpToolResult } from '../src/mcp/types.ts'
+import type { McpConnectionSnapshot, McpToolResult } from '../src/mcp/connections/types.ts'
 import { chatDatabase, durable } from './chats-sqlite.ts'
 
 const closes: (() => void)[] = []

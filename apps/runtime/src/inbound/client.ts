@@ -6,7 +6,7 @@ import * as HttpClient from 'effect/http/HttpClient'
 import * as HttpClientRequest from 'effect/http/HttpClientRequest'
 import * as HttpApiClient from 'effect/http-api/HttpApiClient'
 import { type AppError, NotFound, isAppError, toAppError } from '../http/errors.ts'
-import type { EventWebhook } from '../mcp/events.ts'
+import type { EventWebhook } from '../mcp/events/engine.ts'
 
 /** The part of an agent's Durable Object stub the internal API is called through. */
 export type AgentFetch = { readonly fetch: (request: Request) => Promise<Response> }

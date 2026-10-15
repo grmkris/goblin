@@ -1,5 +1,5 @@
 import { Predicate } from 'effect'
-import { redactSecretFields } from '../mcp/redaction.ts'
+import { redactSecretFields } from '../mcp/oauth/redaction.ts'
 import { routineSummary } from '../routines/summary.ts'
 
 /** How long a notice's title and body may be; with the link they stay within the 1600 characters a summary keeps. */

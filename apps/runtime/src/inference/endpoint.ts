@@ -3,7 +3,7 @@
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { InvalidInput } from '../http/errors.ts'
-import { userEndpoint } from '../mcp/endpoint.ts'
+import { userEndpoint } from '../mcp/servers/endpoint.ts'
 
 const MAX_MODELS = 500
 const MAX_BODY = 1024 * 1024

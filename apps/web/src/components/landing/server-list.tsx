@@ -1,5 +1,5 @@
 // The shelf of servers goblin suggests, typeset as a short list by what they are for. The names and groups are the
-// shelf's own (apps/runtime/src/mcp/suggested.ts, titled as `components/server-add.tsx` titles its groups); this is
+// shelf's own (apps/runtime/src/mcp/servers/shelf.ts, titled as `components/server-add.tsx` titles its groups); this is
 // a picture of it for visitors, so it reads nothing from the server.
 
 const SHELF: readonly { readonly group: string; readonly servers: readonly string[] }[] = [
