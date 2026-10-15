@@ -1,3 +1,5 @@
+import { is } from 'drizzle-orm'
+import { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { MIGRATIONS } from '../src/storage/migrations.ts'
 import { assertApplicationTable } from '../src/storage/vendor.ts'
@@ -13,6 +15,19 @@ const database = () => {
   databases.push(value)
   return value.sqlite
 }
+
+const indexSnapshot = (sqlite: ReturnType<typeof database>, name: string) =>
+  sqlite
+    .prepare(`PRAGMA index_list("${name}")`)
+    .all()
+    .map((row) => ({
+      columns: sqlite
+        .prepare(`PRAGMA index_info("${String(row['name'])}")`)
+        .all()
+        .map((column) => column['name']),
+      unique: Boolean(row['unique']),
+      partial: Boolean(row['partial']),
+    }))
 
 // SQLite creates these for the one application-owned virtual table; Drizzle has no FTS5 declaration.
 const FTS = [
@@ -64,6 +79,36 @@ describe('fresh application baseline', () => {
         }))
         .toSorted((a, b) => a.name.localeCompare(b.name))
       expect(actual, name).toEqual(expected)
+    }
+  })
+
+  it('preserves declared primary keys and indexes, including uniqueness', async () => {
+    const sqlite = database()
+    for (const [name, table] of await declaredTables()) {
+      const primary = sqlite
+        .prepare(`PRAGMA table_info("${name}")`)
+        .all()
+        .filter((column) => Number(column['pk']) > 0)
+        .toSorted((a, b) => Number(a['pk']) - Number(b['pk']))
+        .map((column) => column['name'])
+      const declaredPrimary = table.primaryKeys.flatMap((key) => key.columns.map((column) => column.name))
+      expect(primary, name).toEqual(
+        declaredPrimary.length > 0
+          ? declaredPrimary
+          : table.columns.filter((column) => column.primary).map((column) => column.name),
+      )
+      const indexes = indexSnapshot(sqlite, name)
+      const declared = table.indexes.map(({ config }) => ({
+        columns: config.columns.map((column) => {
+          expect(is(column, SQLiteColumn), `${name} index expression needs explicit verification`).toBe(true)
+          return is(column, SQLiteColumn) ? column.name : undefined
+        }),
+        unique: config.unique,
+        partial: config.where !== undefined,
+      }))
+      for (const column of table.columns.filter((each) => each.isUnique))
+        declared.push({ columns: [column.name], unique: true, partial: false })
+      for (const index of declared) expect(indexes, name).toContainEqual(index)
     }
   })
 
