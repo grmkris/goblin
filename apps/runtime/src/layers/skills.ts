@@ -14,7 +14,7 @@ import { makeSkills } from '../skills/library.ts'
 import { Learner, Skills } from '../skills/service.ts'
 import { SqliteDraftLog, SqliteSkillState } from '../skills/store.ts'
 
-/** Start step 10: skills from the owner's MCP libraries, over the host's connections and the skills state. */
+/** Start step 9: skills from the owner's MCP libraries, over the host's connections and the skills state. */
 export const SkillsLive: Layer.Layer<Skills, never, Db | McpConnections | SingleFlight> = Layer.effect(
   Skills,
   Effect.gen(function* () {
@@ -24,7 +24,7 @@ export const SkillsLive: Layer.Layer<Skills, never, Db | McpConnections | Single
 
 /**
  * The skill learner, after the start: it writes its drafts to the owner's files and tells them with a notice, so it is
- * built over the files (`AppsLive`) and the routines' notices (`RoutinesLive`) as well as the skills (start step 10).
+ * built over the files (`AppsLive`) and the routines' notices (`RoutinesLive`) as well as the skills (start step 9).
  */
 export const LearnerLive: Layer.Layer<
   Learner,

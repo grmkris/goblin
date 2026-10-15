@@ -34,7 +34,7 @@ import { SingleFlight } from '../observability/single-flight.ts'
 import { Db } from '../runtime/db.ts'
 import type { FoundationServices } from './core.ts'
 
-/** Start step 7: main is registered, once (a retained binding is never overwritten). */
+/** Start step 6: main is registered, once (a retained binding is never overwritten). */
 export const PrimaryChatLive: Layer.Layer<never, never, Db> = Layer.effectDiscard(
   Effect.gen(function* () {
     const db = yield* Db

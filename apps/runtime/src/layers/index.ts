@@ -29,18 +29,18 @@ const then =
  * 2. The MCP host. Awaits the credential cipher's key, which every stored credential and held call is sealed with;
  *    each server's endpoint binding is checked and the held calls a restart cut off are recovered before anything
  *    can connect or decide one.
- * 3. The cheap models, which the memories (9) and the skill learner (after the start) are built over.
+ * 3. The cheap models, which the memories (8) and the skill learner (after the start) are built over.
  * 4. Helper execution. Awaits Pi: every registered helper goes on with the execution extensions the agent has now,
  *    also after the object was rebuilt.
- * 6. Routine runs. Awaits the usage projection's subscription to Pi's commits, made after a snapshot of each live
+ * 5. Routine runs. Awaits the usage projection's subscription to Pi's commits, made after a snapshot of each live
  *    run, so nothing after it can commit to Pi unseen.
- * 7. Main registered, before anything reads the chat directory for it.
- * 8. The App registry, which follows `conversations.changed` and `agent-apps.changed` from the first write on.
- * 9. Memories. Awaits every Topic Conversation without memory being given it (a fresh agent's Personal, registered
- *    at 7, or a Topic whose activation a crash cut short).
- * 10. Skills, over the host's connections.
- * 11. The Telegram channel.
- * 12. Events. Awaits the hook token, then registers the Telegram and skills consumers (10, 11) before any delivery
+ * 6. Main registered, before anything reads the chat directory for it.
+ * 7. The App registry, which follows `conversations.changed` and `agent-apps.changed` from the first write on.
+ * 8. Memories. Awaits every Topic Conversation without memory being given it (a fresh agent's Personal, registered
+ *    at 6, or a Topic whose activation a crash cut short).
+ * 9. Skills, over the host's connections.
+ * 10. The Telegram channel.
+ * 11. Events. Awaits the hook token, then registers the Telegram and skills consumers (9, 10) before any delivery
  *     can reach the engine.
  */
 const start = (input: AgentInputs) =>
@@ -48,13 +48,13 @@ const start = (input: AgentInputs) =>
     then(McpHostLive), // 2
     then(CheapModelsLive), // 3
     then(HelperExecutionLive), // 4
-    then(RoutineRunsLive), // 6
-    then(PrimaryChatLive), // 7
-    then(AppRegistryLive), // 8
-    then(ActivateMemoriesLive), // 9
-    then(SkillsLive), // 10
-    then(ChannelLive), // 11
-    then(McpEventsLive), // 12
+    then(RoutineRunsLive), // 5
+    then(PrimaryChatLive), // 6
+    then(AppRegistryLive), // 7
+    then(ActivateMemoriesLive), // 8
+    then(SkillsLive), // 9
+    then(ChannelLive), // 10
+    then(McpEventsLive), // 11
   )
 
 /**
