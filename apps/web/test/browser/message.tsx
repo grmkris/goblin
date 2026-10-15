@@ -9,6 +9,7 @@ import '../../src/styles.css'
 /** The App the page shows, one value for the page's life as the stage keeps it: a new one would reload the frame. */
 const SELECTION: AppSelection = {
   kind: 'mcp',
+  tool: { name: 'myplan_question_read', inputSchema: { type: 'object' } },
   connectionId: 'myplan',
   uri: 'ui://myplan/question.html',
   arguments: {},
@@ -18,8 +19,12 @@ const SELECTION: AppSelection = {
 function MessageHost() {
   const [receipt, setReceipt] = useState<QuestionAnswerReceipt>()
   const [error, setError] = useState('')
+  const [page, setPage] = useState(false)
   return (
     <main className="flex flex-col gap-3 p-4">
+      <button type="button" onClick={() => setPage((shown) => !shown)}>
+        Toggle placement
+      </button>
       {error && <p role="alert">{error}</p>}
       {receipt && (
         <MessageOffer
@@ -33,7 +38,12 @@ function MessageHost() {
       )}
       <AppFrame
         selection={SELECTION}
-        placement={{ mode: 'inline', available: ['inline'], width: 360, height: 400 }}
+        placement={{
+          mode: page ? 'fullscreen' : 'inline',
+          available: ['inline', 'fullscreen'],
+          width: 360,
+          height: 400,
+        }}
         height={400}
         events={{
           report: setError,

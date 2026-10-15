@@ -90,14 +90,45 @@ export type Device = {
   readonly timeZone: string
 }
 
+/** The exact tool an MCP App shows, with its JSON-RPC request id only when the host knows it. */
+export type AppToolInfo = NonNullable<McpUiHostContext['toolInfo']>
+
+/** A tool summary may lack its schema; MCP Apps still require an object input schema. */
+export function appTool(tool: {
+  readonly name: string
+  readonly title?: string | undefined
+  readonly description?: string | undefined
+  readonly inputSchema?: AppToolInfo['tool']['inputSchema'] | undefined
+}): AppToolInfo['tool'] {
+  return {
+    name: tool.name,
+    inputSchema: tool.inputSchema ?? { type: 'object' },
+    ...(tool.title === undefined ? {} : { title: tool.title }),
+    ...(tool.description === undefined ? {} : { description: tool.description }),
+  }
+}
+
+/** The part of an App selection that identifies the tool it shows; agent apps have no associated MCP tool. */
+type AppContextSource =
+  | { readonly kind: 'mcp'; readonly tool: AppToolInfo['tool']; readonly requestId?: AppToolInfo['id'] }
+  | { readonly kind: 'agent' }
+
 /** The display modes this host offers: in its place in the transcript, or as a page of its own (fullscreen). */
 export const APP_MODES: readonly McpUiDisplayMode[] = ['inline', 'fullscreen']
 
 /** Everything an App learns about the host: theme, styles, device and its own placement. Never the owner's data. */
-export function hostContext(read: TokenReader, device: Device, placement: AppPlacement): McpUiHostContext {
+export function hostContext(
+  read: TokenReader,
+  device: Device,
+  placement: AppPlacement,
+  app?: AppContextSource,
+): McpUiHostContext {
   const width = Math.round(placement.width)
   const height = Math.round(placement.height)
   return {
+    ...(app?.kind === 'mcp'
+      ? { toolInfo: { tool: app.tool, ...(app.requestId === undefined ? {} : { id: app.requestId }) } }
+      : {}),
     theme: device.dark ? 'dark' : 'light',
     styles: { variables: hostStyles(read) },
     displayMode: placement.mode,

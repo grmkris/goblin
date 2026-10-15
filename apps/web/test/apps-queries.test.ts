@@ -1,5 +1,5 @@
 import { AppsGroup, McpGroup, NotFound, OwnerApi, OwnerAdmission, UpstreamMcp, ownerApiOf } from '@goblin/contracts/api'
-import type { AppLaunch } from '@goblin/contracts'
+import type { AppLaunch, AppView, ToolView } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
@@ -17,6 +17,7 @@ import {
 } from '../src/apps/queries.ts'
 import { addAndConnectMutation, grantsQuery, mcpKeys, toolGrantMutation } from '../src/mcp/queries.ts'
 import { unusedHandlers } from './query/unused-handlers.ts'
+import { launchSelection } from '../src/components/apps/residency.ts'
 
 const LAUNCH: AppLaunch = {
   kind: 'agent',
@@ -27,6 +28,29 @@ const LAUNCH: AppLaunch = {
   ui: { module: '', css: '', libs: [] },
 }
 const OP = '0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e'
+const TOOL: ToolView = {
+  name: 'mymedia_media_view',
+  title: 'Media',
+  description: 'Show media',
+  appResource: 'ui://media/view',
+  suggested: 'run',
+  modelVisible: true,
+  granted: true,
+}
+const MCP_APP: AppView = {
+  id: '9',
+  conversation: '1',
+  title: 'Media',
+  createdAt: 1,
+  source: { kind: 'mcp', callId: 'pi-call-9', connectionId: 'connector', tool: TOOL.name, uri: 'ui://media/view' },
+}
+const MCP_LAUNCH: AppLaunch = {
+  kind: 'mcp',
+  connectionId: 'connector',
+  uri: 'ui://media/view',
+  arguments: { query: 'recent' },
+  result: { content: [], structuredContent: { total: 3 } },
+}
 
 /** The real contract's Apps and MCP groups, answering one agent app and one MCP server. */
 const fakeApps = () => {
@@ -39,7 +63,9 @@ const fakeApps = () => {
       launch: ({ params }) =>
         params.id === '7'
           ? Effect.succeed({ ...LAUNCH, revision })
-          : Effect.fail(new NotFound({ what: 'app', ref: 'ray-404' })),
+          : params.id === '9'
+            ? Effect.succeed(MCP_LAUNCH)
+            : Effect.fail(new NotFound({ what: 'app', ref: 'ray-404' })),
       state: () => Effect.succeed({ revision, release: 'r_1', state: { n: revision } }),
       call: ({ payload }) => {
         revision += 1
@@ -55,6 +81,7 @@ const fakeApps = () => {
     handlers.handleAll({
       ...unusedHandlers(OwnerApi.groups.mcp),
       grants: () => Effect.succeed([]),
+      tools: () => Effect.succeed([TOOL]),
       addServer: ({ payload }) =>
         Effect.succeed({
           connectionId: 'kiwi-1',
@@ -110,6 +137,70 @@ afterAll(async () => {
 })
 
 describe("an App's frame calls", () => {
+  it('keeps the exact tool name for a model-opened App and a fresh replay, without treating a Pi id as a request id', async () => {
+    const client = testQueryClient()
+    const first = await launchSelection(client, MCP_APP)
+    expect(first).toMatchObject({
+      kind: 'mcp',
+      tool: { name: 'mymedia_media_view', inputSchema: { type: 'object' } },
+      connectionId: 'connector',
+      uri: 'ui://media/view',
+      arguments: { query: 'recent' },
+      result: { content: [], structuredContent: { total: 3 } },
+    })
+    expect(first).not.toHaveProperty('requestId')
+    client.clear()
+    expect(await launchSelection(client, MCP_APP)).toEqual(first)
+    expect(calls()).toEqual(['GET /api/apps/9/launch', 'GET /api/apps/9/launch'])
+  })
+
+  it('opens a fullscreen server entrypoint with the exact called tool and its available metadata', async () => {
+    const app: AppView = {
+      ...MCP_APP,
+      source: {
+        kind: 'mcp',
+        callId: 'goblin:entrypoint',
+        connectionId: 'connector',
+        tool: TOOL.name,
+        uri: 'ui://media/view',
+        entrypoint: true,
+      },
+    }
+    const selected = await launchSelection(testQueryClient(), app, 'library')
+    expect(selected).toMatchObject({
+      kind: 'mcp',
+      tool: {
+        name: 'mymedia_media_view',
+        inputSchema: { type: 'object' },
+        title: 'Media',
+        description: 'Show media',
+      },
+      arguments: { focus: 'library' },
+      result: { content: [{ type: 'text', text: 'mymedia_media_view' }] },
+    })
+    expect(selected).not.toHaveProperty('requestId')
+    expect(calls()).toEqual(['POST /api/mcp/connector/tools/call', 'GET /api/mcp/connector/tools'])
+  })
+
+  it('uses metadata already known for the exact tool on its originating connection', async () => {
+    const client = testQueryClient()
+    client.setQueryData(mcpKeys.tools('connector'), [TOOL, { ...TOOL, name: 'media_view', title: 'Bare' }])
+    client.setQueryData(mcpKeys.tools('other'), [{ ...TOOL, title: 'Other connection' }])
+    expect(await launchSelection(client, MCP_APP)).toMatchObject({
+      tool: { name: TOOL.name, title: 'Media', description: 'Show media', inputSchema: { type: 'object' } },
+    })
+    expect(calls()).toEqual(['GET /api/apps/9/launch'])
+  })
+
+  it('loads an agent app without adding MCP tool information', async () => {
+    const app: AppView = {
+      ...MCP_APP,
+      id: '7',
+      source: { kind: 'agent', name: 'tapper', release: 'r_1', revision: 2, version: 1, jobs: [] },
+    }
+    expect(await launchSelection(testQueryClient(), app)).toEqual({ kind: 'agent', id: '7', launch: LAUNCH })
+  })
+
   it('launch and read state fresh every time, never from the cache', async () => {
     const client = testQueryClient()
     expect(await client.query(appLaunchQuery('7'))).toEqual(LAUNCH)

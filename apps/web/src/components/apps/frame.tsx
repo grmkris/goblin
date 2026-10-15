@@ -36,13 +36,16 @@ import type { DownloadFile } from '../../lib/app-download.ts'
 import type { QuestionAnswerReceipt } from '../../lib/app-message.ts'
 import { isString, records } from '../../lib/values.ts'
 import { messageOf } from '../../lib/query/app-error.ts'
-import { type AppPlacement, type Device, hostContext, inlineHeight } from '../../lib/host-context.ts'
+import { type AppPlacement, type AppToolInfo, type Device, hostContext, inlineHeight } from '../../lib/host-context.ts'
 import { LinkOffer } from './offers.tsx'
 import { browserZone } from '../../lib/format.ts'
 
 /** An MCP App: its server and `ui://` resource, and the call it shows with its result. */
 export type McpSelection = {
   readonly kind: 'mcp'
+  readonly tool: AppToolInfo['tool']
+  /** A JSON-RPC request id, never a Pi tool-call id. Omitted when the runtime does not expose it. */
+  readonly requestId?: AppToolInfo['id']
   readonly connectionId: string
   readonly uri: string
   readonly arguments: Record<string, unknown>
@@ -88,9 +91,9 @@ function device(): Device {
 }
 
 /** The host context for `placement`, read from the document's current theme. */
-function contextFor(placement: AppPlacement): McpUiHostContext {
+function contextFor(placement: AppPlacement, selection: AppSelection): McpUiHostContext {
   const style = getComputedStyle(document.documentElement)
-  return hostContext((name) => style.getPropertyValue(name), device(), placement)
+  return hostContext((name) => style.getPropertyValue(name), device(), placement, selection)
 }
 
 /** A failure of this frame's own making, whose words the owner reads as they are. */
@@ -158,10 +161,10 @@ async function attachApp(
   element.srcdoc = sandboxProxy(window.location.origin)
   const target = element.contentWindow
   if (!target) throw new FrameFailure('App sandbox could not be created')
-  const attached = createAppBridge(selection, html, contextFor(placement()), frame.calls, frame.events)
+  const attached = createAppBridge(selection, html, contextFor(placement(), selection), frame.calls, frame.events)
   const { bridge } = attached
   // The theme follows the system; tell the App when it switches.
-  const theme = new MutationObserver(() => bridge.setHostContext(contextFor(placement())))
+  const theme = new MutationObserver(() => bridge.setHostContext(contextFor(placement(), selection)))
   theme.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
   const gate = (event: MessageEvent): void => {
     if (event.source === target && !isSandboxMessage(event, target)) event.stopImmediatePropagation()
@@ -204,10 +207,17 @@ function relayTo(events: () => FrameEvents): FrameEvents {
   }
 }
 
-/** What makes an App a different App: an MCP App's server, resource, arguments and fate; an agent app's launch. */
+/** What makes an App different: its server, tool call, resource, arguments and fate; an agent app's launch. */
 const identityOf = (selection: AppSelection): AppSelection | string =>
   selection.kind === 'mcp'
-    ? JSON.stringify([selection.connectionId, selection.uri, selection.arguments, selection.cancelled ?? null])
+    ? JSON.stringify([
+        selection.connectionId,
+        selection.tool,
+        selection.requestId ?? null,
+        selection.uri,
+        selection.arguments,
+        selection.cancelled ?? null,
+      ])
     : selection
 
 /**
@@ -276,7 +286,8 @@ export function AppFrame({
   const { mode, width, height: room, surface, insets } = placement
   const covered = insets === undefined ? '' : `${insets.top} ${insets.right} ${insets.bottom} ${insets.left}`
   useEffect(() => {
-    bridge.current?.setHostContext(contextFor(current().placement))
+    const shown = current()
+    bridge.current?.setHostContext(contextFor(shown.placement, shown.selection))
   }, [mode, width, room, surface, covered])
   return (
     <iframe

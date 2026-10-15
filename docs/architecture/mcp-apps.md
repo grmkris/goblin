@@ -54,7 +54,11 @@ an older revision answers `stale`, and the browser makes it once more from the p
 (`mcp.removed`) or deleting an App (`apps.removed`) takes its pin.
 
 The App learns the host context (`lib/host-context.ts`): theme, our tokens as MCP Apps style variables, device,
-locale and time zone, its display mode, surface, the modes on offer, and its measured box. The host re-sends it when these change.
+locale and time zone, its display mode, surface, the modes on offer, and its measured box. MCP Apps also receive
+`toolInfo.tool` with the exact exposed tool name (including any connector prefix), its input schema or
+`{ type: 'object' }` when unavailable, and its title and description when available. `toolInfo.id` is included only
+when the JSON-RPC request id is known; Pi call ids are not request ids. Agent apps receive no `toolInfo`.
+The host re-sends the context when its theme or placement changes, retaining the tool information.
 On its page the App fills the main column; in its transcript its own height request is bounded (160px to 70% of the
 window).
 

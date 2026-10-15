@@ -27,6 +27,7 @@ import { ChevronRightIcon } from 'lucide-react'
 import { callToolMutation, toolsQuery } from '../mcp/queries.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { connectionName } from '../lib/labels.ts'
+import { appTool } from '../lib/host-context.ts'
 import { McpApp, type McpSelection } from './apps/frame.tsx'
 
 type ConsoleFormProps = {
@@ -105,12 +106,13 @@ export function ToolConsole({ servers }: { readonly servers: readonly ServerView
       const data = await calling.mutateAsync({ connectionId: target, name, arguments: parsed })
       setResult(JSON.stringify(data, null, 2))
       const tools = await queryClient.query(toolsQuery(target))
-      const uri = tools.find((tool) => tool.name === name)?.appResource
-      if (uri !== undefined)
+      const tool = tools.find((item) => item.name === name)
+      if (tool?.appResource !== undefined)
         setSelection({
           kind: 'mcp',
+          tool: appTool(tool),
           connectionId: target,
-          uri,
+          uri: tool.appResource,
           arguments: parsed,
           // SAFETY: the runtime returned this body from the SDK-validated CallToolResult of this exact call.
           result: data as CallToolResult,

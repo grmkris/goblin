@@ -62,6 +62,7 @@ try {
   await page.route('**/api/mcp/myplan/tools/call', (route) => {
     assert.equal(route.request().headers()['x-mcp-caller'], 'app')
     const body = record(route.request().postDataJSON())
+    assert(['myplan_question_read', 'question_answer'].includes(String(body?.name)), 'calls use the exposed name')
     if (body?.name === 'question_answer') saved = true
     return route.fulfill({ json: { content: [], structuredContent: saved ? { continuation: receipt } : {} } })
   })
@@ -89,6 +90,20 @@ try {
     writeSync(STDERR, `Fixture diagnostics ${JSON.stringify(diagnostics)}\n`)
     throw cause
   }
+  const hostContext = frame.getByLabel('Host context')
+  const expectedTool = { tool: { name: 'myplan_question_read', inputSchema: { type: 'object' } } }
+  assert.deepEqual(JSON.parse(await hostContext.innerText()).toolInfo, expectedTool)
+  await frame.getByRole('textbox', { name: 'Answer' }).fill('retained across placement')
+  await page.getByRole('button', { name: 'Toggle placement' }).click()
+  await hostContext.filter({ hasText: 'fullscreen' }).waitFor()
+  await page.evaluate(() => document.documentElement.classList.add('dark'))
+  await hostContext.filter({ hasText: 'dark' }).waitFor()
+  assert.deepEqual(JSON.parse(await hostContext.innerText()).toolInfo, expectedTool)
+  assert.equal(await frame.getByRole('textbox', { name: 'Answer' }).inputValue(), 'retained across placement')
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.getByRole('button', { name: 'Toggle placement' }).click()
+  await hostContext.filter({ hasText: 'inline' }).waitFor()
+  assert.deepEqual(JSON.parse(await hostContext.innerText()).toolInfo, expectedTool)
   await frame.getByRole('textbox', { name: 'Answer' }).fill('answer stays inside MyPlan')
   await frame.getByRole('button', { name: 'Save answer' }).click()
   await frame.getByRole('status').filter({ hasText: 'Saved; use Continue' }).waitFor()
@@ -121,7 +136,7 @@ try {
   assert.deepEqual(errors, [])
   writeSync(
     STDOUT,
-    'MCP question App browser acceptance: save, stage, owner Continue, retry, reload, dismiss passed.\n',
+    'MCP App browser acceptance: prefixed toolInfo, theme/placement retention, phone/desktop, save, stage, owner Continue, retry, reload, dismiss passed.\n',
   )
 } finally {
   await browser.close()

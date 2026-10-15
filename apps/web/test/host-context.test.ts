@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { APP_MODES, hostContext, hostStyles, inlineHeight } from '../src/lib/host-context.ts'
+import { APP_MODES, type AppToolInfo, appTool, hostContext, hostStyles, inlineHeight } from '../src/lib/host-context.ts'
 
 const tokens: Record<string, string> = {
   '--background': ' oklch(0.2 0.006 255)',
@@ -10,8 +10,50 @@ const tokens: Record<string, string> = {
 }
 const read = (name: string) => tokens[name] ?? ''
 const device = { dark: true, touch: false, hover: true, locale: 'en-GB', timeZone: 'Europe/Ljubljana' }
+const placement = { mode: 'inline', available: ['inline'], width: 640, height: 600 } as const
 
 describe('the host context an MCP App receives', () => {
+  it('preserves known schemas and metadata, and supplies an object schema when none is available', () => {
+    expect(appTool({ name: 'mymedia_media_view' })).toEqual({
+      name: 'mymedia_media_view',
+      inputSchema: { type: 'object' },
+    })
+    const tool: AppToolInfo['tool'] = {
+      name: 'mymedia_media_view',
+      title: 'Media',
+      description: 'Show media',
+      inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
+    }
+    expect(appTool(tool)).toEqual(tool)
+  })
+  it.each(['media_view', 'mymedia_media_view', 'mytab_capture_view'])(
+    'identifies the exact exposed tool %s, with its available metadata and no invented request id',
+    (name) => {
+      const tool: AppToolInfo['tool'] = {
+        name,
+        inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
+        title: 'Media',
+        description: 'Show selected media',
+      }
+      const context = hostContext(read, device, placement, { kind: 'mcp', tool })
+      expect(context.toolInfo).toEqual({ tool })
+      expect(context.toolInfo).not.toHaveProperty('id')
+      expect(
+        hostContext(read, { ...device, dark: false }, { ...placement, mode: 'fullscreen' }, { kind: 'mcp', tool })
+          .toolInfo,
+      ).toEqual(context.toolInfo)
+    },
+  )
+  it.each([0, 'rpc-42'])('includes the JSON-RPC request id %s when it is known', (requestId) => {
+    const tool: AppToolInfo['tool'] = { name: 'mymedia_media_view', inputSchema: { type: 'object' } }
+    expect(hostContext(read, device, placement, { kind: 'mcp', tool, requestId }).toolInfo).toEqual({
+      tool,
+      id: requestId,
+    })
+  })
+  it('leaves toolInfo out for agent apps', () => {
+    expect(hostContext(read, device, placement, { kind: 'agent' })).not.toHaveProperty('toolInfo')
+  })
   it('maps our theme tokens to MCP Apps style variables and leaves out what the document lacks', () => {
     const styles = hostStyles(read)
     expect(styles['--color-background-primary']).toBe('oklch(0.2 0.006 255)')

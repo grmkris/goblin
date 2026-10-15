@@ -269,7 +269,10 @@ export const serverAppQuery = (connectionId: string, tool: string, focus?: strin
           }),
           api.mcp.tools({ params: { id: connectionId }, query: {} }),
         ]),
-        ([result, tools]) => ({ result, uri: tools.find((each) => each.name === tool)?.appResource }),
+        ([result, tools]) => {
+          const found = tools.find((each) => each.name === tool)
+          return { result, uri: found?.appResource, tool: found }
+        },
       ),
   }),
   staleTime: 0,

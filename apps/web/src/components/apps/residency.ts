@@ -7,10 +7,11 @@ import type { AppView } from '@goblin/contracts'
 import type { CallToolResult } from '@modelcontextprotocol/client'
 import { LIVE_APPS, evictions } from '../../lib/app-residency.ts'
 import { appLaunchQuery } from '../../apps/queries.ts'
-import { serverAppQuery } from '../../mcp/queries.ts'
+import { serverAppQuery, toolsQuery } from '../../mcp/queries.ts'
 import { cancelledReason } from '../../lib/call-outcome.ts'
 import { record, records } from '../../lib/values.ts'
 import { messageOf } from '../../lib/query/app-error.ts'
+import { appTool } from '../../lib/host-context.ts'
 import type { AppSelection } from './frame.tsx'
 import { type Instance, patched, withItem, without } from './instance.ts'
 
@@ -49,9 +50,10 @@ async function launchServerApp(queryClient: QueryClient, app: AppView, focus?: s
   if (app.source.kind !== 'mcp') throw new NoServerApp(app.title)
   const { connectionId, tool } = app.source
   const opened = await queryClient.query(serverAppQuery(connectionId, tool, focus))
-  if (opened.uri === undefined) throw new NoServerApp(app.title)
+  if (opened.uri === undefined || opened.tool === undefined) throw new NoServerApp(app.title)
   return {
     kind: 'mcp',
+    tool: appTool(opened.tool),
     connectionId,
     uri: opened.uri,
     arguments: focus === undefined ? {} : { focus },
@@ -60,13 +62,18 @@ async function launchServerApp(queryClient: QueryClient, app: AppView, focus?: s
   }
 }
 
-async function launch(queryClient: QueryClient, app: AppView, focus?: string): Promise<AppSelection> {
+/** Loads a kept or replayed App, preserving its exact exposed tool name in the frame's selection. */
+export async function launchSelection(queryClient: QueryClient, app: AppView, focus?: string): Promise<AppSelection> {
   if (isServerApp(app)) return launchServerApp(queryClient, app, focus)
   const loaded = await queryClient.query(appLaunchQuery(app.id))
   if (loaded.kind === 'agent') return { kind: 'agent', id: app.id, launch: loaded }
+  if (app.source.kind !== 'mcp') throw new NoServerApp(app.title)
+  const name = app.source.tool
+  const tool = queryClient.getQueryData(toolsQuery(loaded.connectionId).queryKey)?.find((item) => item.name === name)
   const cancelled = cancelledReason(loaded.result)
   return {
     kind: 'mcp',
+    tool: appTool(tool ?? { name }),
     connectionId: loaded.connectionId,
     uri: loaded.uri,
     arguments: loaded.arguments,
@@ -89,7 +96,7 @@ function useLaunch(setProblems: Dispatch<SetStateAction<ReadonlyMap<string, stri
     (app: AppView, put: (selection: AppSelection) => void, focus?: string) => {
       if (loading.current.has(app.id)) return
       loading.current.add(app.id)
-      launch(queryClient, app, focus)
+      launchSelection(queryClient, app, focus)
         .then(put)
         .catch((cause: unknown) =>
           setProblems((current) => withItem(current, app.id, messageOf(cause, 'load the app'))),

@@ -4,8 +4,9 @@ import { App } from '@modelcontextprotocol/ext-apps'
 import { GrantDenied } from '@goblin/contracts/api'
 import { createAppBridge, type AppCalls } from '../src/lib/app-bridge.ts'
 import type { AgentAppCalls } from '../src/lib/agent-app-bridge.ts'
-import type { FrameEvents } from '../src/components/apps/frame.tsx'
+import type { FrameEvents, McpSelection } from '../src/components/apps/frame.tsx'
 import type { QuestionAnswerReceipt } from '../src/lib/app-message.ts'
+import { hostContext } from '../src/lib/host-context.ts'
 
 const events: FrameEvents = {
   report: () => undefined,
@@ -35,17 +36,24 @@ async function pair(
   extra: Partial<FrameEvents> = {},
   shown: { readonly cancelled?: string; readonly observe?: (app: App) => void } = {},
 ) {
+  const selection: McpSelection = {
+    kind: 'mcp',
+    tool: { name: 'mymedia_media_view', inputSchema: { type: 'object' } },
+    connectionId,
+    uri: `ui://${connectionId}/app`,
+    arguments: {},
+    result: { content: [{ type: 'text', text: 'shown' }] },
+    ...(shown.cancelled === undefined ? {} : { cancelled: shown.cancelled }),
+  }
   const { bridge } = createAppBridge(
-    {
-      kind: 'mcp',
-      connectionId,
-      uri: `ui://${connectionId}/app`,
-      arguments: {},
-      result: { content: [{ type: 'text', text: 'shown' }] },
-      ...(shown.cancelled === undefined ? {} : { cancelled: shown.cancelled }),
-    },
+    selection,
     '',
-    { displayMode: 'inline' },
+    hostContext(
+      () => '',
+      { dark: false, touch: false, hover: true, locale: 'en', timeZone: 'UTC' },
+      { mode: 'inline', available: ['inline'], width: 640, height: 600 },
+      selection,
+    ),
     { ...calls, agent: noAgent },
     { ...events, ...extra },
   )
@@ -104,6 +112,27 @@ describe('an App of a call that did not complete (ui/notifications/tool-cancelle
 })
 
 describe('official MCP App bridge stays bound to its originating connection', () => {
+  it('initializes with the exposed tool name and forwards the App calling that exact name to its connection', async () => {
+    const reached: unknown[] = []
+    const connected = await pair('connector', {
+      tool: async (connectionId, params) => {
+        reached.push({ connectionId, ...params })
+        return { content: [{ type: 'text', text: 'refreshed' }] }
+      },
+      resource: async () => ({ contents: [] }),
+    })
+    try {
+      const info = connected.app.getHostContext()?.toolInfo
+      expect(info).toEqual({ tool: { name: 'mymedia_media_view', inputSchema: { type: 'object' } } })
+      if (info === undefined) throw new Error('Missing tool info')
+      expect(await connected.app.callServerTool({ name: info.tool.name, arguments: { refresh: true } })).toEqual({
+        content: [{ type: 'text', text: 'refreshed' }],
+      })
+      expect(reached).toEqual([{ connectionId: 'connector', name: 'mymedia_media_view', arguments: { refresh: true } }])
+    } finally {
+      await connected.close()
+    }
+  })
   it('reconnects the same originating App after teardown without retaining the old bridge', async () => {
     const reached: string[] = []
     const calls: Omit<AppCalls, 'agent'> = {
