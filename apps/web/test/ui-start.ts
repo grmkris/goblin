@@ -8,6 +8,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
+import { SHELF } from './browser/services-fixture.ts'
 import { type Browser, type BrowserContextOptions, type Page, chromium } from 'playwright-core'
 
 const STDOUT = 1
@@ -82,114 +83,8 @@ const SCREENS = [
   },
 ] as const
 
-/** The shelf as the runtime serves it (apps/runtime/src/mcp/servers/shelf.ts), one server already added. */
-const SHELF = [
-  [
-    'mysi',
-    'mysi',
-    'yours',
-    true,
-    'Your my* apps in one connection: notes, browsers, Telegram, email, skills and terminals.',
-  ],
-  [
-    'cloudflare',
-    'Cloudflare',
-    'publish',
-    true,
-    'Publish a page or a small app as a Worker on your Cloudflare account.',
-  ],
-  [
-    'kiwi',
-    'Kiwi.com',
-    'travel',
-    false,
-    'Flight search across airlines, with prices and a booking link for each option.',
-  ],
-  ['trivago', 'trivago', 'travel', false, 'Hotels and their prices across booking sites, in a view you can browse.'],
-  [
-    'ferryhopper',
-    'Ferryhopper',
-    'travel',
-    false,
-    'Ferry routes, times and prices, mostly around Europe, in a view you can browse.',
-  ],
-  [
-    'wikidata',
-    'Wikidata',
-    'knowledge',
-    false,
-    'Facts about people, places and works, and how they connect, from Wikidata.',
-  ],
-  [
-    'microsoft-learn',
-    'Microsoft Learn',
-    'knowledge',
-    false,
-    "Microsoft's documentation and code samples: Azure, .NET, Microsoft 365 and the rest.",
-  ],
-  [
-    'aws-knowledge',
-    'AWS Knowledge',
-    'knowledge',
-    false,
-    'AWS documentation and guidance, and which services each region offers.',
-  ],
-  [
-    'huggingface',
-    'Hugging Face',
-    'knowledge',
-    false,
-    'Search models, datasets and Spaces on Hugging Face, and read their files.',
-  ],
-  [
-    'coingecko',
-    'CoinGecko',
-    'crypto',
-    false,
-    "Crypto prices, market caps and coin details from CoinGecko's public data.",
-  ],
-  [
-    'etherscan',
-    'Etherscan',
-    'crypto',
-    false,
-    'Balances, transactions and contracts on Ethereum and other EVM chains, on its keyless tier.',
-  ],
-  ['excalidraw', 'Excalidraw', 'apps', false, 'Hand-drawn diagrams your agent sketches, live in the chat.'],
-  [
-    'subwayinfo',
-    'SubwayInfo.nyc',
-    'apps',
-    false,
-    'New York transit: live subway, bus, ferry and rail arrivals, alerts and trip plans.',
-  ],
-  [
-    'deepwiki',
-    'DeepWiki',
-    'code',
-    false,
-    'Questions about any public GitHub repository, answered from its generated wiki.',
-  ],
-  ['context7', 'Context7', 'code', false, 'Current documentation and code examples for programming libraries.'],
-  ['cloudflare-docs', 'Cloudflare Docs', 'code', false, "Search Cloudflare's developer documentation."],
-  ['svelte', 'Svelte', 'code', false, 'Svelte and SvelteKit documentation, and a checker that fixes Svelte code.'],
-].map(([id, title, group, signIn, description]) => ({
-  id,
-  title,
-  description,
-  endpoint: `https://${String(id)}.example/mcp`,
-  group,
-  signIn,
-  ...(['cloudflare', 'trivago', 'wikidata', 'huggingface', 'excalidraw', 'cloudflare-docs', 'svelte'].includes(
-    String(id),
-  )
-    ? { icon: `/shelf/${String(id)}.svg` }
-    : {}),
-  added: id === 'excalidraw',
-}))
-
-/** The shelf's columns at this width: one on a phone, two on a tablet, three beside Start's panel on a desktop. */
-const COLUMNS: Readonly<Record<string, number>> = { 'phone-light': 1, 'tablet-light': 2, 'desktop-dark': 3 }
+/** The shelf's intrinsic columns at this width: one on a phone, three on a tablet and desktop. */
+const COLUMNS: Readonly<Record<string, number>> = { 'phone-light': 1, 'tablet-light': 3, 'desktop-dark': 3 }
 
 const errors: string[] = []
 
@@ -235,6 +130,9 @@ async function drive(browser: Browser, origin: string, label: string, options: B
     await page.waitForLoadState('networkidle')
     await shows(page, screen.name)
     if (screen.name === 'services') {
+      await page.waitForFunction(() =>
+        [...document.querySelectorAll<HTMLImageElement>('.server-mark > img')].every((icon) => icon.naturalWidth > 0),
+      )
       const shelf = await page.evaluate(() => ({
         columns: getComputedStyle(document.querySelector('.shelf-grid') ?? document.body).gridTemplateColumns.split(' ')
           .length,

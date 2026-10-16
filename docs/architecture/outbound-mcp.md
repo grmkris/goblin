@@ -52,8 +52,8 @@ only for a different App (another `focus` is one); a newer result of the same ca
 bridge (`deliver` in `lib/app-bridge.ts`). On its page, an App that calls a tool the owner has not allowed gets the
 same Allow card as in a conversation. Connections
 also offers a shelf of suggested servers (`mcp/servers/shelf.ts`, ADR 0052), with source comments recording their
-connection checks, each in a group (`ServerSuggestion.group`) that the picker's Suggested tab and Start's services step
-show under its name (`server-add.tsx`): the owner's own apps through one mysi connection
+connection checks, each in a group (`ServerSuggestion.group`) that the Connections catalogue and Start's services step
+name beside each service (`server-add.tsx`): the owner's own apps through one mysi connection
 (`https://mysi.lol/mcp?codemode=off`; the query keeps every app's tools listed as `<service>_<tool>` under the same
 OAuth resource), publishing (Cloudflare), then servers that need no sign-in by what they are for: travel, knowledge,
 crypto data, views in the chat and code. The shelf is data, one endpoint per entry
@@ -61,8 +61,12 @@ crypto data, views in the chat and code. The shelf is data, one endpoint per ent
 (`shelfOf`). A suggestion is marked added when a connection has its endpoint's origin and path, whatever its query. An
 entry may carry an `icon`, a square image of the provider's mark: goblin's are the web app's own files
 (`apps/web/public/shelf`, Simple Icons glyphs on the brand's colour), so showing the shelf asks no provider's host for
-anything, and an entry without one shows its initial. The shelf is a bento of its groups, one to three columns by its own
-width (container queries), so Start's page and the picker share it. One tap adds and connects. It also searches MCP registries that speak
+anything, and an entry without one shows its initial. Start and Connections share the compact service cards, with
+columns that adapt to their available width. Connections puts the catalogue first and previews one entry from each
+group, in a horizontally scrolling shelf on narrow screens; See all expands the full catalogue. Search catalogue
+and Add by address open inline panels. The owner's
+connections follow in a grid of compact cards; Manage access expands a card across the grid. One tap on a suggestion
+adds and connects. It also searches MCP registries that speak
 the generic registry API (`mcp/servers/registry.ts`, `GET /api/mcp/catalog?q=`): the Official MCP Registry and GitHub's, built
 in, then up to eight the owner adds (`app_mcp_registries`). A registry is
 added only once it answers `/v0.1/servers`, and removing it keeps the servers added from it. Search reads one page of

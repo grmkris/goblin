@@ -5,17 +5,22 @@ function Card({
   className,
   size = 'default',
   interactive = false,
+  variant = 'default',
   ...props
 }: React.ComponentProps<'div'> & {
   size?: 'default' | 'sm'
   readonly interactive?: boolean
+  /** A quiet raised surface, used for compact connection cards without an enclosing outline. */
+  readonly variant?: 'default' | 'soft'
 }) {
   return (
     <div
       data-slot="card"
       data-size={size}
+      data-variant={variant}
       className={cn(
-        'group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl',
+        'group/card flex flex-col gap-(--card-spacing) overflow-hidden bg-card py-(--card-spacing) text-sm text-card-foreground [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl',
+        variant === 'soft' ? 'rounded-2xl shadow-sm' : 'rounded-xl ring-1 ring-foreground/10',
         interactive &&
           'transition-[background-color] duration-150 in-[a:active]:bg-[color-mix(in_oklab,var(--card),var(--foreground)_4%)] pointer-fine:in-[a:hover]:bg-[color-mix(in_oklab,var(--card),var(--foreground)_4%)]',
         className,

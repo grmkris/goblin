@@ -1813,148 +1813,194 @@
     font-size: 0.75rem;
     white-space: nowrap;
   }
-  /*
-   * The shelf (components/server-add.tsx): a bento of its groups. One column, two from 34rem of its own width, three
-   * from 52rem, so it fits Start's page and the Connections picker alike. A tile's corner is concentric with what it
-   * holds: 1.25rem outside, 1rem padding, so a mark near it rounds at about 0.25rem plus its own size's share.
-   */
+  /* Connections: discovery first, then a compact workspace of owned connections. */
+  .connections-shell {
+    max-inline-size: 74rem;
+  }
+  .connections-page > .page-section + * {
+    margin-block-start: 2rem;
+  }
+  .connections-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+    align-items: start;
+    gap: 0.875rem;
+  }
+  .connection-card {
+    min-inline-size: 0;
+    scroll-margin-block-start: 1.5rem;
+  }
+  .connection-card[data-expanded='true'] {
+    grid-column: 1 / -1;
+  }
+  .connection-card .server-summary-row {
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+  }
+  .connection-card .server-note {
+    font-size: var(--text-13);
+  }
+  .connection-card .server-title > .app-tile {
+    inline-size: 2rem;
+    block-size: 2rem;
+    border-radius: 0.625rem;
+  }
+  .connection-card .server-from {
+    font-size: 0.75rem;
+  }
+  /* Direct actions, not a tabbed card around the catalogue. */
+  .server-picker {
+    display: grid;
+    gap: 1rem;
+  }
+  .picker-toolbar,
+  .picker-actions,
+  .picker-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+  }
+  .picker-toolbar > p {
+    flex: 1 1 20rem;
+    max-inline-size: 56ch;
+    margin: 0;
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    text-wrap: pretty;
+  }
+  .picker-actions {
+    gap: 0.25rem;
+  }
+  .picker-actions > button,
+  .picker-panel-head > button {
+    min-block-size: 2.75rem;
+  }
+  .picker-panel:not([hidden]) {
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 1rem;
+    background: var(--muted);
+  }
+  .picker-panel-head > h3 {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+  /* The shelf's colour comes from the providers. Quiet surfaces group each service without drawing a box around it. */
   .shelf {
     container-type: inline-size;
   }
   .shelf-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
     gap: 0.75rem;
-  }
-  .shelf-tile {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    min-width: 0;
-    padding: 1rem;
-    border-radius: 1.25rem;
-    background: var(--card);
-    box-shadow:
-      0 0 0 1px var(--hairline),
-      0 1px 2px oklch(0 0 0 / 0.04);
-  }
-  /* The owner's own apps lead the shelf, in goblin's moss (mixed in oklab: oklch would turn the white card's hue 0 pink). */
-  .shelf-tile[data-group='yours'] {
-    background: color-mix(in oklab, var(--moss) 9%, var(--card));
-    box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--moss) 24%, transparent),
-      0 1px 2px oklch(0 0 0 / 0.04);
-  }
-  /* Descriptions are the shelf's own few words; a tile shows them whole. */
-  .shelf-tile .grant-about {
-    display: block;
-    overflow: visible;
-    -webkit-line-clamp: unset;
-  }
-  @container (min-width: 34rem) {
-    .shelf-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .shelf-tile[data-wide='two'] {
-      grid-column: span 2;
-    }
-    /* A wide list sets its servers side by side. */
-    .shelf-tile[data-wide='two'] > .shelf-rows {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      column-gap: 1.25rem;
-    }
-  }
-  @container (min-width: 52rem) {
-    .shelf-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-    .shelf-tile[data-wide] {
-      grid-column: span 2;
-    }
-  }
-  .shelf-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
-  .shelf-title {
-    margin: 0;
-    font-size: var(--text-13);
-    font-weight: 600;
-    color: var(--muted-foreground);
-    text-wrap: balance;
-  }
-  .shelf-tile[data-group='yours'] .shelf-title {
-    color: var(--moss);
-  }
-  /* A group of one: the server large, what it is, and its one action under them. */
-  .shelf-feature {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-    gap: 0.75rem 0.875rem;
-  }
-  .shelf-feature > button {
-    grid-column: 2;
-    justify-self: start;
-  }
-  .shelf-feature-name {
-    font-size: 1.0625rem;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-  .shelf-rows {
-    display: flex;
-    flex-direction: column;
     margin: 0;
     padding: 0;
     list-style: none;
   }
-  /* A row: the mark beside the name and its Add, what it is under both, so the words take the tile's width. */
-  .shelf-row {
+  .shelf-grid:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 4px;
+    border-radius: 1.125rem;
+  }
+  @container (width < 34rem) {
+    .shelf[data-preview='true'] > .shelf-grid {
+      grid-template-columns: none;
+      grid-auto-flow: column;
+      grid-auto-columns: min(85%, 20rem);
+      overflow-x: auto;
+      scroll-snap-type: inline proximity;
+      scroll-padding-inline: 0.25rem;
+      padding-block-end: 0.5rem;
+    }
+    .shelf[data-preview='true'] .shelf-service {
+      scroll-snap-align: start;
+    }
+  }
+  .shelf-service {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      'mark name add'
-      'mark about about';
-    align-items: center;
-    column-gap: 0.75rem;
-    row-gap: 0.125rem;
-    padding-block: 0.625rem;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: 1fr auto;
+    gap: 0.875rem 0.75rem;
+    min-inline-size: 0;
+    padding: 1rem;
+    border-radius: 1.125rem;
+    background: color-mix(in oklab, var(--card) 60%, var(--muted));
   }
-  .shelf-row > .server-mark {
-    grid-area: mark;
-    align-self: start;
+  .shelf-service[data-group='yours'] {
+    background: color-mix(in oklab, var(--moss) 10%, var(--card));
   }
-  .shelf-row > .grant-name {
-    grid-area: name;
+  .shelf-service-text {
+    min-inline-size: 0;
   }
-  .shelf-row > button {
-    grid-area: add;
+  .shelf-service-text > h3 {
+    margin: 0 0 0.25rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
   }
-  .shelf-row-about {
+  .shelf-service-text > p {
+    margin: 0;
+    color: var(--muted-foreground);
+    font-size: var(--text-13);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
+  }
+  .shelf-service-foot {
     display: flex;
-    grid-area: about;
+    grid-column: 1 / -1;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .shelf-service-meta {
+    display: flex;
     flex-direction: column;
     gap: 0.125rem;
-    min-width: 0;
+    font-size: 0.75rem;
+    line-height: 1.35;
   }
-  .shelf-row + .shelf-row {
-    border-top: 1px solid var(--hairline);
+  .shelf-service-meta > span {
+    color: var(--muted-foreground);
   }
-  .shelf-row:first-child {
-    padding-block-start: 0.125rem;
+  .shelf-more {
+    display: flex;
+    justify-content: center;
+    margin-block-start: 0.75rem;
   }
-  .shelf-row:last-child {
-    padding-block-end: 0;
+  .shelf-more [aria-expanded='true'] > svg {
+    rotate: 180deg;
   }
   @container (min-width: 34rem) {
-    /* Side by side, the second column's first row needs no hairline above it. */
-    .shelf-tile[data-wide='two'] > .shelf-rows > .shelf-row:nth-child(2) {
-      padding-block-start: 0.125rem;
-      border-top: 0;
+    .shelf-service[data-group='yours'] {
+      grid-column: span 2;
+    }
+    .shelf-service[data-group='yours'] .server-mark {
+      --mark: 2.75rem;
+    }
+    .shelf-service[data-group='yours'] h3 {
+      font-size: 1.25rem;
+      letter-spacing: -0.025em;
+    }
+  }
+  .server-toggle:active {
+    background: var(--muted);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .server-toggle:hover {
+      background: var(--muted);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .server-toggle > svg {
+      transition: none;
     }
   }
   /*
@@ -1979,9 +2025,6 @@
     font-weight: 600;
     line-height: 1;
     user-select: none;
-  }
-  .server-mark[data-size='feature'] {
-    --mark: 3.25rem;
   }
   .server-mark > img {
     width: 100%;

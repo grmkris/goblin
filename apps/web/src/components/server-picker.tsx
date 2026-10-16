@@ -1,51 +1,80 @@
-// The one place to add a server: the servers we suggest, a registry search, or an address, as tabs of one card.
-import { useState } from 'react'
+// The service shelf stays visible. Search and address entry are direct, reversible actions above it.
+import { useId, useRef, useState } from 'react'
 import type { ServerView } from '@goblin/contracts'
-import { Card, CardContent, Tabs, TabsContent, TabsList, TabsTrigger } from '@goblin/ui'
+import { Button } from '@goblin/ui'
+import { LinkIcon, SearchIcon, XIcon } from 'lucide-react'
 import { QueryBoundary } from '../lib/query/query-boundary.tsx'
 import { AddByAddress, SuggestedServers } from './server-add.tsx'
 import { ServerSearch } from './server-search.tsx'
 
-type PickerTab = 'suggested' | 'search' | 'address'
+type PickerAction = 'search' | 'address'
 
 export function ServerPicker({
   onChanged,
   onAdded,
   onMessage,
 }: {
-  /** A server was added and connected from a list, with what to tell the owner. */
   readonly onChanged: (message: string) => void
-  /** A server was added by its address and waits to be connected. */
   readonly onAdded: (server: ServerView) => void
   readonly onMessage: (message: string) => void
 }) {
-  const [tab, setTab] = useState<PickerTab>('suggested')
+  const [action, setAction] = useState<PickerAction>()
+  const panel = useId()
+  const search = useRef<HTMLButtonElement>(null)
+  const address = useRef<HTMLButtonElement>(null)
+  const close = () => {
+    setAction(undefined)
+    const trigger = action === 'search' ? search : address
+    trigger.current?.focus()
+  }
+  const toggle = (next: PickerAction) => setAction(action === next ? undefined : next)
   return (
-    <Card>
-      <CardContent>
-        <Tabs value={tab} onValueChange={(value: PickerTab) => setTab(value)}>
-          <TabsList>
-            <TabsTrigger value="suggested">Suggested</TabsTrigger>
-            <TabsTrigger value="search">Search</TabsTrigger>
-            <TabsTrigger value="address">By address</TabsTrigger>
-          </TabsList>
-          <TabsContent value="suggested">
-            <p className="server-note">Servers we have checked work from here. You still choose every tool.</p>
-            <QueryBoundary
-              action="list the suggested servers"
-              pending={<p className="server-note">Looking for suggestions…</p>}
-            >
-              <SuggestedServers onChanged={onChanged} onMessage={onMessage} />
-            </QueryBoundary>
-          </TabsContent>
-          <TabsContent value="search">
-            <ServerSearch onChanged={onChanged} onMessage={onMessage} />
-          </TabsContent>
-          <TabsContent value="address">
-            <AddByAddress onAdded={onAdded} onMessage={onMessage} />
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+    <div className="server-picker">
+      <div className="picker-toolbar">
+        <p>Give goblin a few more ways to help. You choose which tools it can use.</p>
+        <div className="picker-actions">
+          <Button
+            ref={search}
+            variant="ghost"
+            aria-expanded={action === 'search'}
+            aria-controls={panel}
+            onClick={() => toggle('search')}
+          >
+            <SearchIcon data-icon="inline-start" aria-hidden />
+            Search catalogue
+          </Button>
+          <Button
+            ref={address}
+            variant="ghost"
+            aria-expanded={action === 'address'}
+            aria-controls={panel}
+            onClick={() => toggle('address')}
+          >
+            <LinkIcon data-icon="inline-start" aria-hidden />
+            Add by address
+          </Button>
+        </div>
+      </div>
+      <div id={panel} hidden={action === undefined} className="picker-panel">
+        {action !== undefined && (
+          <>
+            <div className="picker-panel-head">
+              <h3>{action === 'search' ? 'Find a service' : 'Add your own server'}</h3>
+              <Button variant="ghost" size="icon" aria-label="Close server search or address entry" onClick={close}>
+                <XIcon aria-hidden />
+              </Button>
+            </div>
+            {action === 'search' ? (
+              <ServerSearch onChanged={onChanged} onMessage={onMessage} />
+            ) : (
+              <AddByAddress onAdded={onAdded} onMessage={onMessage} />
+            )}
+          </>
+        )}
+      </div>
+      <QueryBoundary action="list the suggested servers" pending={<p className="server-note">Loading services…</p>}>
+        <SuggestedServers preview onChanged={onChanged} onMessage={onMessage} />
+      </QueryBoundary>
+    </div>
   )
 }

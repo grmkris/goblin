@@ -1,5 +1,4 @@
-// The owner's MCP servers: theirs first, each with what the agent may use from it, then one place to add another and,
-// last, a way to try a tool by hand.
+// Add a service first, then the owner's compact connection cards and a way to try a tool by hand.
 import { useCallback, useRef, useState } from 'react'
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import {
@@ -14,7 +13,7 @@ import {
   EmptyTitle,
   Skeleton,
 } from '@goblin/ui'
-import { CircleAlertIcon, CircleCheckIcon, PlugIcon, PlusIcon } from 'lucide-react'
+import { CircleAlertIcon, CircleCheckIcon, PlugIcon } from 'lucide-react'
 import type { ServerView } from '@goblin/contracts'
 import { useConnectionLabels } from '../mcp/hooks.ts'
 import { serversQuery } from '../mcp/queries.ts'
@@ -81,7 +80,7 @@ function NoServers({ onAdd }: { readonly onAdd: () => void }) {
   )
 }
 
-const SERVERS_NOTE = 'Your agent reaches another service only through a server here, and only with the tools you allow.'
+const SERVERS_NOTE = 'Connected services and the tools you let goblin use.'
 
 /** The connections in the order they came, those to one server side by side (ADR 0041). */
 const byServer = (servers: readonly ServerView[]): readonly ServerView[] => {
@@ -89,7 +88,7 @@ const byServer = (servers: readonly ServerView[]): readonly ServerView[] => {
   return order.flatMap((endpoint) => servers.filter((server) => server.endpoint === endpoint))
 }
 
-/** The owner's connections, each a card; `onAdd` goes to the picker below. */
+/** The owner's connections, each a card; `onAdd` goes to the picker above. */
 function Servers({
   onAdd,
   onDone,
@@ -105,22 +104,22 @@ function Servers({
   return (
     <PageSection
       id="servers"
-      title="Your servers"
+      title="Your connections"
       {...(servers.length > 0 && { count: servers.length })}
-      action={
-        servers.length > 0 ? (
-          <Button size="sm" variant="ghost" onClick={onAdd}>
-            <PlusIcon data-icon="inline-start" />
-            Add a server
-          </Button>
-        ) : undefined
-      }
       note={SERVERS_NOTE}
     >
       {servers.length === 0 && <NoServers onAdd={onAdd} />}
-      {byServer(servers).map((server) => (
-        <ServerCard key={server.connectionId} server={server} onReload={reload} onDone={onDone} onMessage={onMessage} />
-      ))}
+      <div className="connections-grid">
+        {byServer(servers).map((server) => (
+          <ServerCard
+            key={server.connectionId}
+            server={server}
+            onReload={reload}
+            onDone={onDone}
+            onMessage={onMessage}
+          />
+        ))}
+      </div>
     </PageSection>
   )
 }
@@ -134,21 +133,8 @@ export function Connections() {
   const picker = useRef<HTMLElement>(null)
   const toPicker = () => picker.current?.scrollIntoView({ behavior: glide(), block: 'start' })
   return (
-    <div className="page-stack">
+    <div className="page-stack connections-page">
       {notice !== undefined && <NoticeAlert notice={notice} />}
-      <QueryBoundary
-        action="list your servers"
-        pending={
-          <PageSection id="servers" title="Your servers" note={SERVERS_NOTE}>
-            <div className="page-stack" aria-busy>
-              <Skeleton className="h-28 w-full" />
-              <Skeleton className="h-28 w-full" />
-            </div>
-          </PageSection>
-        }
-      >
-        <Servers onAdd={toPicker} onDone={done} onMessage={failed} />
-      </QueryBoundary>
       <PageSection id="add" title="Add a server" ref={picker}>
         <ServerPicker
           onChanged={done}
@@ -158,6 +144,19 @@ export function Connections() {
           onMessage={failed}
         />
       </PageSection>
+      <QueryBoundary
+        action="list your servers"
+        pending={
+          <PageSection id="servers" title="Your connections" note={SERVERS_NOTE}>
+            <div className="page-stack" aria-busy>
+              <Skeleton className="h-28 w-full" />
+              <Skeleton className="h-28 w-full" />
+            </div>
+          </PageSection>
+        }
+      >
+        <Servers onAdd={toPicker} onDone={done} onMessage={failed} />
+      </QueryBoundary>
       <ToolConsole servers={connected} />
     </div>
   )

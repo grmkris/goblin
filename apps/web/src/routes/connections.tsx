@@ -19,7 +19,7 @@ function ConnectionsPage() {
   return (
     <OwnerGate>
       <PageBar title="Connections" />
-      <div className="shell">
+      <div className="shell connections-shell">
         <Connections />
       </div>
     </OwnerGate>

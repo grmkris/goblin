@@ -358,6 +358,25 @@ function ServerSummary({
   )
 }
 
+/** Keep direct connection links useful after the catalogue pushes cards down the page. */
+function useConnectionAnchor(connectionId: string, open: boolean, loaded: boolean, setOpen: (open: boolean) => void) {
+  useEffect(() => {
+    const reveal = () => {
+      if (window.location.hash === `#${connectionAnchor(connectionId)}`) setOpen(true)
+    }
+    window.addEventListener('hashchange', reveal)
+    return () => window.removeEventListener('hashchange', reveal)
+  }, [connectionId, setOpen])
+  useEffect(() => {
+    if (open && loaded) scrollToConnection(connectionId)
+  }, [connectionId, loaded, open])
+}
+
+function scrollToConnection(connectionId: string) {
+  if (window.location.hash === `#${connectionAnchor(connectionId)}`)
+    document.getElementById(connectionAnchor(connectionId))?.scrollIntoView({ block: 'start' })
+}
+
 export function ServerCard({ server, onReload, onMessage, onDone }: ServerCardProps) {
   const { tools, error, retry } = useServerTools(server)
   const { pending, act } = useServerActions(server, onMessage)
@@ -368,58 +387,69 @@ export function ServerCard({ server, onReload, onMessage, onDone }: ServerCardPr
   )
   const connected = server.status === 'connected'
   const loaded = tools !== undefined
+  useConnectionAnchor(server.connectionId, open, loaded, setOpen)
   // Loading tools opens the connection; reload once so what it declares (skills) shows.
   useEffect(() => {
     if (loaded && !server.live) onReload()
   }, [loaded, server.live, onReload])
   return (
-    <Card id={connectionAnchor(server.connectionId)}>
-      <ServerHeading
-        server={server}
-        pending={pending}
-        onAct={act}
-        onEdit={(edit) => {
-          setRemoving(false)
-          setEditing(edit)
-        }}
-        onRemove={() => {
-          setEditing(undefined)
-          setRemoving(true)
-        }}
-      />
-      <CardForms
-        server={server}
-        editing={editing}
-        removing={removing}
-        onClose={() => {
-          setEditing(undefined)
-          setRemoving(false)
-        }}
-        onDone={onDone}
-        onMessage={onMessage}
-      />
-      {connected && (
-        <Collapsible open={open} onOpenChange={setOpen}>
-          <ServerSummary
-            server={server}
-            tools={tools}
-            open={open}
-            onEvents={() => {
-              setOpen(true)
-              showEvents(server.connectionId)
-            }}
-          />
-          <CollapsibleContent>
-            <ServerBody
+    <div
+      className="connection-card"
+      id={connectionAnchor(server.connectionId)}
+      data-expanded={open || removing || editing !== undefined}
+    >
+      <Card variant="soft">
+        <ServerHeading
+          server={server}
+          pending={pending}
+          onAct={act}
+          onEdit={(edit) => {
+            setRemoving(false)
+            setEditing(edit)
+          }}
+          onRemove={() => {
+            setEditing(undefined)
+            setRemoving(true)
+          }}
+        />
+        <CardForms
+          server={server}
+          editing={editing}
+          removing={removing}
+          onClose={() => {
+            setEditing(undefined)
+            setRemoving(false)
+          }}
+          onDone={onDone}
+          onMessage={onMessage}
+        />
+        {connected && (
+          <Collapsible open={open} onOpenChange={setOpen}>
+            <ServerSummary
               server={server}
               tools={tools}
-              failure={{ error, retry }}
-              onReload={onReload}
-              onMessage={onMessage}
+              open={open}
+              onEvents={() => {
+                setOpen(true)
+                showEvents(server.connectionId)
+              }}
             />
-          </CollapsibleContent>
-        </Collapsible>
-      )}
-    </Card>
+            <CollapsibleContent
+              onTransitionEnd={(event) => {
+                if (open && event.target === event.currentTarget) scrollToConnection(server.connectionId)
+              }}
+            >
+              <ServerBody
+                server={server}
+                tools={tools}
+                failure={{ error, retry }}
+                onReload={onReload}
+                onMessage={onMessage}
+              />
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+      </Card>
+    </div>
   )
 }
