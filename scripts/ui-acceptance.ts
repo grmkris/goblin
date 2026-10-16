@@ -342,11 +342,10 @@ async function usageCheck(page: Page, checks: Record<string, Check>, prefix: str
     return
   }
   await usage.click()
-  const popup = page.locator('[data-slot="popover-content"]').filter({ hasText: "today's model budget" })
+  const popup = page.locator('[data-slot="popover-content"]').first()
   const shown = await popup
-    .first()
     .waitFor({ timeout: 3000 })
-    .then(() => true)
+    .then(async () => /today's token cap used|tokens used today/u.test(await popup.innerText()))
     // expected: a timeout means it did not show, which the check records
     .catch(() => false)
   checks[`${prefix}.usage.tap`] = { ok: shown, detail: null }
