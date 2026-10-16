@@ -14,7 +14,7 @@ Quoted and closed replies disable their controls. Streaming, invalid source and 
 HTML-like text remains inert, the development inspector stays absent, and no external requests occur.
 Light/dark screenshots were inspected. This is local Chromium evidence, not a signed-in deployed conversation.
 
-The [deployed receipt](deployed-browser.json) records 22 checks with zero failures at desktop and phone widths after the final theme fix. The live HTML and entry JavaScript match the Alchemy build byte for byte; the [artifact record](deployed-artifact.json) gives the 1,188,259-byte entry hash and security headers.
+The [deployed receipt](deployed-browser.json) records 22 checks with zero failures at desktop and phone widths after the final theme fix. The live HTML and entry JavaScript matched the Alchemy build byte for byte (a 1,188,259-byte entry at the time); the [artifact record](deployed-artifact.json) now describes the redeployed build below.
 
 ## Local repository gates
 
@@ -49,7 +49,10 @@ An independent review of the PR head `10340b18` found three blockers, fixed in `
 
 The native browser receipt then recorded ten grouped checks at 1280 px and 390 px with zero page errors: the eight
 above, plus Enter beside several buttons, a wrapped long label, a typed 250 in a 100–5000 field, and focus returning
-after a send. The playground's built-site check passed 22 of 22. The deployed receipts above predate these fixes.
+after a send. The playground's built-site check passed 22 of 22. The preview was then redeployed from the dev release
+`0c539e15` (Alchemy plan: one in-place update), and its deployed check passed 22 of 22 again. The
+[deployed receipt](deployed-browser.json) and [artifact record](deployed-artifact.json) now describe that build, whose
+entry carries the new text rules.
 
 ## Scope
 
