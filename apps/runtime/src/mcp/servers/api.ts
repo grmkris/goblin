@@ -70,6 +70,9 @@ const grants = endpoint('grants')(() => McpGrants.use((owned) => owned.list()))
 const setToolGrant = endpoint('setToolGrant')(({ payload }) =>
   McpGrants.use((owned) => owned.setTool(payload.connectionId, payload.name, payload.allowed)),
 )
+const setToolGrants = endpoint('setToolGrants')(({ payload }) =>
+  McpGrants.use((owned) => owned.setTools(payload.connectionId, payload.names, payload.allowed)),
+)
 const setToolAskFirst = endpoint('setAskFirst')(({ payload }) =>
   setAskFirst(payload.connectionId, payload.name, payload.enabled),
 )
@@ -156,6 +159,7 @@ export const McpHandlers = HttpApiBuilder.group(OwnerApi, 'mcp', (handlers) =>
       removeRegistry,
       grants,
       setToolGrant,
+      setToolGrants,
       setAskFirst: setToolAskFirst,
       setSkills,
       setAppGrant,

@@ -122,3 +122,72 @@ describe('allowing an App as a whole', () => {
     }
   })
 })
+
+describe('changing tools in one batch', () => {
+  it('grants only the selected names, keeps existing Ask first policy and version, and shares App resources', async () => {
+    const mcp = await host()
+    try {
+      await mcp.grants.setTool('notes', 'open', true)
+      await mcp.grants.setAskFirst('notes', 'open', true)
+      const policy = await mcp.grants.policy('notes', 'open')
+      const result = await mcp.grants.setTools('notes', ['open', 'move', 'move'], true)
+      expect(result.missing).toEqual([])
+      expect(await allowed(mcp)).toEqual([`resource:${BOARD}`, 'tool:move', 'tool:open'])
+      expect(await mcp.grants.policy('notes', 'open')).toEqual(policy)
+      await mcp.grants.setTools('notes', ['open'], false)
+      expect(await allowed(mcp)).toEqual([`resource:${BOARD}`, 'tool:move'])
+      await mcp.grants.setTools('notes', ['move'], false)
+      expect(await allowed(mcp)).toEqual([])
+    } finally {
+      await mcp.dispose()
+    }
+  })
+
+  it('refreshes discovery once for every missing name and reports those still absent', async () => {
+    const server = changing()
+    const mcp = await changingHost(server)
+    try {
+      await mcp.connections.connect('notes')
+      const lists = server.state.lists
+      server.state.extra = 'archive'
+      const result = await mcp.grants.setTools('notes', ['delete', 'archive', 'gone', 'gone-again'], true)
+      expect(server.state.lists - lists).toBe(1)
+      expect(result.missing).toEqual(['gone', 'gone-again'])
+      expect(await allowed(mcp)).toEqual(['tool:archive', 'tool:delete'])
+    } finally {
+      await mcp.dispose()
+    }
+  })
+
+  it('revokes dropped tools and App resources without connecting, even when the server is down', async () => {
+    const server = changing()
+    server.state.extra = 'archive'
+    const mcp = await changingHost(server)
+    try {
+      await mcp.grants.setTools('notes', ['open', 'move', 'archive'], true)
+      await mcp.connections.close('notes')
+      server.state.down = true
+      const result = await mcp.grants.setTools('notes', ['open', 'move', 'archive'], false)
+      expect(result).toEqual({ grants: [], missing: [] })
+      expect(await mcp.connections.snapshot('notes')).toMatchObject({ _tag: 'None' })
+    } finally {
+      await mcp.dispose()
+    }
+  })
+
+  it('does not apply a partial batch when discovery fails', async () => {
+    const server = changing()
+    const mcp = await changingHost(server)
+    try {
+      await mcp.grants.setTool('notes', 'open', true)
+      const before = await mcp.grants.list()
+      server.state.down = true
+      await expect(mcp.grants.setTools('notes', ['delete', 'unlisted'], true)).rejects.toMatchObject({
+        _tag: 'UpstreamMcp',
+      })
+      expect(await mcp.grants.list()).toEqual(before)
+    } finally {
+      await mcp.dispose()
+    }
+  })
+})

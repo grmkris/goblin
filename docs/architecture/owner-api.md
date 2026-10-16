@@ -42,7 +42,7 @@ callback). It annotates the request's logs with `goblin.rpc`
 | `setup` | `GET /setup/catalog` | `setup/api.ts` |
 | `personas` | `/personas`, `/personas/:id` | `personas/api.ts` |
 | `organize` | `/organize/:id/undo` | `organize/api.ts` |
-| `mcp` | `/mcp/servers`, `/mcp/suggested`, `/mcp/catalog`, `/mcp/registries`, `/mcp/registries/remove`, `/mcp/grants`, `/mcp/ask-first`, `/mcp/skills`, `/mcp/app-grants`, `/mcp/approvals/:id`, `/mcp/url-requests/:id`, `/mcp/oauth/callback`, and `/mcp/:id/` `tools`, `events`, `connect`, `step-up`, `disconnect`, `remove`, `tools/call`, `resources/read` | `mcp/servers/api.ts` |
+| `mcp` | `/mcp/servers`, `/mcp/suggested`, `/mcp/catalog`, `/mcp/registries`, `/mcp/registries/remove`, `/mcp/grants`, `/mcp/grants/batch`, `/mcp/ask-first`, `/mcp/skills`, `/mcp/app-grants`, `/mcp/approvals/:id`, `/mcp/url-requests/:id`, `/mcp/oauth/callback`, and `/mcp/:id/` `tools`, `events`, `connect`, `step-up`, `disconnect`, `remove`, `tools/call`, `resources/read` | `mcp/servers/api.ts` |
 | `resident` | `/agent/resident` | `mcp/resident-api.ts` |
 | `agent` | `/agent/usage`, `/agent/model`, `/agent/model-endpoint` | `routines/agent-api.ts` |
 | `memory` | `/agent/memory` | `memory/api.ts` |

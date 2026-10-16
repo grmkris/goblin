@@ -66,3 +66,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0072](0072-source-reply-result-outcomes.md) | Source reply result outcomes and durable piece progress | Accepted |
 | [0073](0073-event-lease-callback-generations.md) | Event lease callback generations | Accepted |
 | [0074](0074-interactive-replies.md) | Interactive replies are ordinary owner follow-ups | Accepted |
+| [0075](0075-batch-tool-grants.md) | Batch changes to exact tool grants | Accepted |

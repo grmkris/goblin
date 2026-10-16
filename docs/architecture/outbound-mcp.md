@@ -128,8 +128,10 @@ all and None. Each tool carries goblin's suggestion from its annotations (`ToolV
 `mcp/grants/suggested-access.ts`, [ADR 0060](../adr/0060-suggested-access-from-tool-annotations.md)): `run` for one that says it
 only reads and does not say it destroys, else `ask`. Use suggested access (`POST /api/mcp/:id/suggested`) allows every
 tool the agent can see and turns ask first on for each one suggested to ask, never off; it shows until that state is in
-place. Allow all and None send exact grants one at a time, skip (and count) a tool the server no longer offers, then
-read the list again; the card says how it went. Granting a tool goblin has not listed lists the tools once more first;
+place. Allow all and None send the exact changed tool names through `PUT /api/mcp/grants/batch`. The runtime
+discovers once, skips and reports missing names, and commits tool and App-resource grants in one synchronous
+transaction. Allowing preserves existing Ask first policies. The confirmed response updates every switch together;
+revoking needs no network. Granting a tool goblin has not listed lists the tools once more first;
 taking a grant back always works, even for a tool the server dropped or while it cannot be reached. When a connection's
 whole tool list differs from the last one it saw, the runtime publishes `mcp.tools` with a digest of the new list; the
 workspace feed carries it (`tools`) and the web reads that connection's tools again. "Look for new tools" lists them

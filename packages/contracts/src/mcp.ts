@@ -63,6 +63,18 @@ export const GrantChange = Schema.Struct({
 })
 export type GrantChange = typeof GrantChange.Type
 
+/** `PUT /api/mcp/grants/batch`: grant or revoke the discovered tools named by one connection in one write. */
+export const GrantBatchChange = Schema.Struct({
+  connectionId: ConnectionIdField,
+  names: Schema.Array(NonEmptyString(256)).check(Schema.isMinLength(1), Schema.isMaxLength(2000)),
+  allowed: Schema.Boolean,
+})
+export type GrantBatchChange = typeof GrantBatchChange.Type
+
+/** Confirmed grants and requested tools no longer offered; revocation never depends on discovery. */
+export const GrantBatchResult = Schema.Struct({ grants: Schema.Array(Grant), missing: Schema.Array(Schema.String) })
+export type GrantBatchResult = typeof GrantBatchResult.Type
+
 /** `PUT /api/mcp/ask-first`: a granted tool's calls wait for the owner's decision, or no longer do. */
 export const AskFirstChange = Schema.Struct({
   connectionId: ConnectionIdField,

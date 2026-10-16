@@ -4,7 +4,6 @@
 import { useId, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import type { ToolView } from '@goblin/contracts'
-import { NotFound } from '@goblin/contracts/api'
 import {
   Badge,
   Button,
@@ -21,7 +20,7 @@ import {
   allowSuggestedMutation,
   appGrantMutation,
   askFirstMutation,
-  refreshToolsMutation,
+  toolGrantsMutation,
   toolGrantMutation,
 } from '../mcp/queries.ts'
 import { messageOf } from '../lib/query/app-error.ts'
@@ -266,23 +265,13 @@ const allNote = (allowed: boolean, changed: number, gone: number): Note => {
   }
 }
 
-/** One grant of a whole-server change: true when it changed, false when the server no longer offers it. */
-const offered = (grant: Promise<unknown>) =>
-  grant.then(
-    () => true,
-    (error: unknown) => {
-      if (error instanceof NotFound) return false
-      throw error
-    },
-  )
-
 /** The grant calls behind the switches; each updates the list in the cache once the runtime has it. */
 function useGrants(connectionId: string, tools: Tools, onNote: (note: Note | undefined) => void) {
   const { pending, during } = usePending()
   const toolGrant = useMutation(toolGrantMutation)
+  const toolGrants = useMutation(toolGrantsMutation)
   const appGrant = useMutation(appGrantMutation)
   const askFirst = useMutation(askFirstMutation)
-  const refresh = useMutation(refreshToolsMutation)
   const suggested = useMutation(allowSuggestedMutation)
   const tool = (name: string, allowed: boolean) => toolGrant.mutateAsync({ connectionId, name, allowed })
   const app = (uri: string, allowed: boolean) => appGrant.mutateAsync({ connectionId, uri, allowed })
@@ -310,27 +299,13 @@ function useGrants(connectionId: string, tools: Tools, onNote: (note: Note | und
       attempt([target.name], `change ${target.name}`, () => tool(target.name, allowed)),
     allowApp: (uri: string, allowed: boolean) =>
       attempt(names(tools.filter((each) => each.appResource === uri)), 'change that App', () => app(uri, allowed)),
-    /**
-     * Every App, then every other tool, one grant at a time. A tool or App the server no longer offers is skipped and
-     * counted (the list shown may be older than the server's); any other refusal stops. The list is read again after.
-     */
+    /** One request for the exact tools shown; the confirmed grants update every switch together. */
     all: (allowed: boolean) => {
-      const loose = tools.filter((each) => each.appResource === undefined && each.granted !== allowed)
-      const apps = appsOf(tools).filter((uri) =>
-        tools.some((each) => each.appResource === uri && each.granted !== allowed),
-      )
+      const target = tools.filter((each) => each.granted !== allowed)
+      if (target.length === 0) return
       attempt(names(tools), allowed ? 'allow every tool' : 'turn every tool off', async () => {
-        let changed = 0
-        let gone = 0
-        const count = (done: boolean, size: number) => {
-          if (done) changed += size
-          else gone += size
-        }
-        for (const uri of apps)
-          count(await offered(app(uri, allowed)), tools.filter((each) => each.appResource === uri).length)
-        for (const each of loose) count(await offered(tool(each.name, allowed)), 1)
-        await refresh.mutateAsync(connectionId)
-        onNote(allNote(allowed, changed, gone))
+        const { missing } = await toolGrants.mutateAsync({ connectionId, names: names(target), allowed })
+        onNote(allNote(allowed, target.length - missing.length, missing.length))
       })
     },
   }

@@ -147,6 +147,28 @@ const decodeGrants = Schema.decodeUnknownSync(Schema.Array(Grant))
 const decodeTools = Schema.decodeUnknownSync(Schema.Array(ToolView))
 
 describe('the mcp group', () => {
+  it('grants and revokes tools and App resources through one typed batch request', async () => {
+    const { fetch } = await fixture()
+    const changed = await callOwner({ fetch }, (api) =>
+      api.mcp.setToolGrants({
+        payload: { connectionId: 'notes', names: ['open', 'move', 'delete', 'absent'], allowed: true },
+      }),
+    )
+    expect(changed.missing).toEqual(['absent'])
+    expect(changed.grants.map(({ capability, name }) => `${capability}:${name}`).toSorted()).toEqual([
+      `resource:${BOARD}`,
+      'tool:delete',
+      'tool:move',
+      'tool:open',
+    ])
+    const revoked = await callOwner({ fetch }, (api) =>
+      api.mcp.setToolGrants({
+        payload: { connectionId: 'notes', names: ['open', 'move', 'delete'], allowed: false },
+      }),
+    )
+    expect(revoked).toEqual({ grants: [], missing: [] })
+  })
+
   it("lists a connection's event streams for the owner: bounded descriptions, the data's shape, subscribable only by poll and webhook", async () => {
     const { fetch } = await fixture()
     const response = await fetch(get('/api/mcp/notes/events'))

@@ -24,7 +24,7 @@ flowchart LR
 - [Per-call MCP approval](architecture/mcp-approvals.md): Ask first, held calls and their decisions.
 - [Accounts](architecture/accounts.md): sign-in, sign-up, the landing and first-run Start.
 - [The agent object](architecture/agent.md): PersonalAgent, Pi, conversations, threads and subagents.
-- [Outbound MCP](architecture/outbound-mcp.md): connections, OAuth, grants and the MCP client.
+- [Outbound MCP](architecture/outbound-mcp.md): connections, OAuth, exact and batch grants and the MCP client.
 - [Skills](architecture/skills.md): skills from MCP servers.
 - [Chat blocks](architecture/chat-blocks.md): diagrams, charts and maps in replies.
 - [MCP Apps host](architecture/mcp-apps.md): sandboxed server UIs.

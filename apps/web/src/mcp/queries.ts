@@ -5,6 +5,7 @@ import type {
   AppGrantChange,
   AskFirstChange,
   Grant,
+  GrantBatchChange,
   GrantChange,
   ServerSource,
   ToolView,
@@ -221,6 +222,25 @@ export const toolGrantMutation = mutationOptions({
   ...owner.apiMutation({ mutationFn: (api, change: GrantChange) => api.mcp.setToolGrant({ payload: change }) }),
   onSuccess: (grants, { connectionId, name, allowed }, _result, { client }) =>
     grantsChanged(client, grants, connectionId, (tool) => (tool.name === name ? granted(tool, allowed) : tool)),
+})
+
+/** Grants or revokes several tools with one owner API request. */
+export const toolGrantsMutation = mutationOptions({
+  ...owner.apiMutation({
+    mutationFn: (api, change: GrantBatchChange) => api.mcp.setToolGrants({ payload: change }),
+  }),
+  onSuccess: ({ grants }, { connectionId }, _result, { client }) => {
+    const held = new Map(
+      grants
+        .filter((grant) => grant.connectionId === connectionId && grant.capability === 'tool')
+        .map((grant) => [grant.name, grant]),
+    )
+    grantsChanged(client, grants, connectionId, (tool) => ({
+      ...tool,
+      granted: held.has(tool.name),
+      askFirst: held.get(tool.name)?.askFirst ?? false,
+    }))
+  },
 })
 
 /** Grants or revokes an MCP App as a whole, with its tools. */

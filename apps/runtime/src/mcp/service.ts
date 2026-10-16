@@ -5,6 +5,7 @@ import type {
   ConnectStart,
   EventHealth,
   Grant,
+  GrantBatchResult,
   JsonObject,
   RegistryView,
   ResidentStatus,
@@ -148,6 +149,12 @@ export class McpGrants extends Context.Service<
       name: string,
       allowed: boolean,
     ) => Effect.Effect<readonly Grant[], AppError>
+    /** Grants or revokes several discovered tools after one whole tool-list read. */
+    readonly setTools: (
+      connectionId: string,
+      names: readonly string[],
+      allowed: boolean,
+    ) => Effect.Effect<GrantBatchResult, AppError>
     /** A granted tool's calls wait for the owner's decision, or no longer do. */
     readonly setAskFirst: (
       connectionId: string,

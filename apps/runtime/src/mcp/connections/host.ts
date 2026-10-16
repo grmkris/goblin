@@ -8,7 +8,7 @@ import type { SingleFlight } from '../../observability/single-flight.ts'
 import { mcpAuth } from '../oauth/auth.ts'
 import type { McpManager } from './connections.ts'
 import type { Credentials } from '../oauth/credentials.ts'
-import type { Grants } from '../grants/grants.ts'
+import type { Grants, GrantWrite } from '../grants/grants.ts'
 import type { Entrypoints } from '../apps/entrypoints.ts'
 import type { EventOffers } from '../events/offers.ts'
 import { type ShelfEntry, shelfOf } from '../servers/shelf.ts'
@@ -104,6 +104,71 @@ const setTool = (grants: Grants, manager: McpManager, tool: { readonly connectio
     })
   })
 
+/** The exact tool writes and the App resources still used after them, without changing unrelated grants. */
+const batchWrites = (
+  grants: Grants,
+  connectionId: string,
+  names: readonly string[],
+  allowed: boolean,
+  snapshot: McpConnectionSnapshot | undefined,
+): readonly GrantWrite[] => {
+  const selected = new Set(names)
+  const writes: GrantWrite[] = names.map((name) => ({
+    grant: { connectionId, capability: 'tool', name },
+    allowed,
+  }))
+  const tools = snapshot?.tools ?? []
+  const current = grants.list(connectionId)
+  const held = new Set([
+    ...current.filter((grant) => grant.capability === 'tool' && !selected.has(grant.name)).map((grant) => grant.name),
+    ...(allowed ? names : []),
+  ])
+  const resources = new Set(
+    tools
+      .filter((tool) => selected.has(tool.name))
+      .flatMap((tool) => {
+        const uri = toolAppResource(tool)
+        return uri === undefined ? [] : [uri]
+      }),
+  )
+  // Without any remaining tool, no App resource can still be used, even when discovery is unavailable.
+  if (!allowed && held.size === 0)
+    for (const grant of current.filter((item) => item.capability === 'resource' && item.name.startsWith('ui://')))
+      resources.add(grant.name)
+  for (const uri of resources)
+    writes.push({
+      grant: { connectionId, capability: 'resource', name: uri },
+      allowed: tools.some((tool) => toolAppResource(tool) === uri && held.has(tool.name)),
+    })
+  return writes
+}
+
+/** Discover once, then commit the selected tools and their resources together; revocation needs no network. */
+const setTools = (
+  grants: Grants,
+  manager: McpManager,
+  batch: { readonly connectionId: string; readonly names: readonly string[] },
+) =>
+  Effect.fnUntraced(function* (allowed: boolean) {
+    const { connectionId } = batch
+    const names = [...new Set(batch.names)]
+    const listed = (snapshot: McpConnectionSnapshot) => {
+      const offered = new Set(snapshot.tools.map((tool) => tool.name))
+      return names.every((name) => offered.has(name))
+    }
+    const snapshot = allowed
+      ? yield* toolsNow(manager, connectionId, listed)
+      : Option.getOrUndefined(yield* manager.snapshot(connectionId))
+    const offered = new Set(snapshot?.tools.map((tool) => tool.name))
+    const missing = allowed ? names.filter((name) => !offered.has(name)) : []
+    const selected = allowed ? names.filter((name) => offered.has(name)) : names
+    const now = yield* epochSeconds
+    return yield* Effect.sync(() => {
+      grants.setMany(batchWrites(grants, connectionId, selected, allowed, snapshot), now)
+      return { grants: grants.list(), missing }
+    })
+  })
+
 /**
  * Grants or revokes an App as a whole: exactly the discovered tools that declare `uri` as their App (including the
  * ones only the App may call), and the App resource itself. Nothing else on the server changes.
@@ -134,6 +199,13 @@ const hostGrants = (grants: Grants, manager: McpManager): McpGrants['Service'] =
     }),
     setTool: Effect.fn('McpGrants.setTool')(function* (connectionId: string, name: string, allowed: boolean) {
       return yield* setTool(grants, manager, { connectionId, name })(allowed)
+    }),
+    setTools: Effect.fn('McpGrants.setTools')(function* (
+      connectionId: string,
+      names: readonly string[],
+      allowed: boolean,
+    ) {
+      return yield* setTools(grants, manager, { connectionId, names })(allowed)
     }),
     setAskFirst: Effect.fn('McpGrants.setAskFirst')(function* (connectionId: string, name: string, enabled: boolean) {
       return yield* attemptSync(() => {

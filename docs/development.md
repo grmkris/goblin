@@ -189,7 +189,8 @@ until it runs, real provider and Telegram delivery remain unverified.
   then add it to `apps/runtime/src/mcp/servers/shelf.ts` with its endpoint for each stage.
 - **Connect a server.** Connections → Connect. You sign in at the remote server and approve; you come back
   connected. Servers that answer without sign-in connect directly. Then turn on the tools the agent may use, one by one
-  or with Allow all; None turns them all off. Nothing is granted by default. A server marked **Needs sign-in** needs a
+  or with Allow all; None turns them all off. Both bulk actions save in one request; Allow all preserves existing Ask
+  first policies. Nothing is granted by default. A server marked **Needs sign-in** needs a
   new sign-in: press Sign in again. **Try a tool**, at the bottom, calls an allowed tool by hand.
 - **Queued messages.** While Main or an ordinary thread is working, Send adds a follow-up. Queued messages appear
   above the composer in the channel and in the thread panel with expandable text, files, references and authors. They enter the transcript

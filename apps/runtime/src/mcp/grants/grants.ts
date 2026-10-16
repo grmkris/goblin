@@ -7,10 +7,13 @@ import { GrantDenied } from '../../http/errors.ts'
 /** The owner's grants are the contract's (`@goblin/contracts`), which the web reads too. */
 export type { Grant, GrantCapability } from '@goblin/contracts'
 
+export type GrantWrite = { readonly grant: Grant; readonly allowed: boolean }
+
 export interface Grants {
   allows(grant: Grant): boolean
   list(connectionId?: string): readonly Grant[]
   set(grant: Grant, allowed: boolean, now: number): void
+  setMany(changes: readonly GrantWrite[], now: number): void
   policy(grant: Grant): { readonly askFirst: boolean; readonly version: string } | undefined
   setAskFirst(grant: Grant, enabled: boolean): void
 }
@@ -83,6 +86,13 @@ export class GrantStore implements Grants {
         ),
       )
       .get()
+  }
+
+  /** One synchronous transaction: tools and their App resources commit or roll back together. */
+  setMany(changes: readonly GrantWrite[], now: number): void {
+    this.#db.transaction(() => {
+      for (const { grant, allowed } of changes) this.set(grant, allowed, now)
+    })
   }
 
   setAskFirst(grant: Grant, enabled: boolean): void {

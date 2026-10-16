@@ -47,6 +47,7 @@ chat, code), grant tools explicitly (every server alike: no code favours one, AD
 **Ask first** for approval of every exact call, bring their own
 OpenAI-compatible model endpoint and key or use the deployment's (a deployment may have none, and then each owner
 brings one), choose among its models, and see the day's token usage against the deployment's optional per-account cap.
+Allow all and None save the connection's tool permissions together in one request. Allow all keeps existing Ask first settings.
 The agent uses
 `ask_user` to ask questions the owner answers in their next message. The owner attaches files to a message with the
 composer's paperclip; the agent reads them and writes its own results beside them, kept per agent in SQLite and R2.

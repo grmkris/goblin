@@ -5,7 +5,7 @@ import {
   type InvalidationScope,
   PENDING_TTL_SECONDS,
 } from '../../src/mcp/oauth/credentials.ts'
-import type { Grant, Grants } from '../../src/mcp/grants/grants.ts'
+import type { Grant, Grants, GrantWrite } from '../../src/mcp/grants/grants.ts'
 import type { AddedRegistries } from '../../src/mcp/servers/registries.ts'
 import type { Registry } from '../../src/mcp/servers/registry.ts'
 import type { AddedServer, AddedServers } from '../../src/mcp/servers/servers.ts'
@@ -109,6 +109,9 @@ export class MemoryGrants implements Grants {
         this.#versions.set(this.#key(grant), crypto.randomUUID())
       }
     } else this.#grants.delete(this.#key(grant))
+  }
+  setMany(changes: readonly GrantWrite[]): void {
+    for (const { grant, allowed } of changes) this.set(grant, allowed)
   }
   policy(grant: Grant) {
     const row = this.#grants.get(this.#key(grant))

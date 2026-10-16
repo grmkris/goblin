@@ -14,6 +14,8 @@ import {
   EventStream,
   RenameConnection,
   Grant,
+  GrantBatchChange,
+  GrantBatchResult,
   GrantChange,
   McpResourceResult,
   McpToolResult,
@@ -93,6 +95,11 @@ export class McpGroup extends HttpApiGroup.make('mcp').add(
   HttpApiEndpoint.put('setToolGrant', '/mcp/grants', {
     payload: GrantChange,
     success: Schema.Array(Grant),
+    error: [ApiErrors.notFound, ...REMOTE],
+  }),
+  HttpApiEndpoint.put('setToolGrants', '/mcp/grants/batch', {
+    payload: GrantBatchChange,
+    success: GrantBatchResult,
     error: [ApiErrors.notFound, ...REMOTE],
   }),
   HttpApiEndpoint.put('setAskFirst', '/mcp/ask-first', {
