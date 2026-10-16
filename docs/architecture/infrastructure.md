@@ -41,7 +41,8 @@ proves a custom-domain Origin succeeds and a foreign Origin is rejected.
 
 ## Release and public source
 
-`dev` is the daily source branch and the default; `prod` records the deliberately promoted SHA. One workflow,
+`dev` is the daily source branch; `prod` records the deliberately promoted SHA and is GitHub's default branch, so the
+repository shows what is live (ADR 0077). One workflow,
 `ci.yml`, runs on GitHub-hosted runners: Check on every push and pull request, then, for a push to `dev`, Deploy dev
 (exact-tip deployment and authenticated acceptance, published as the `dev-acceptance` artifact), and for a push to
 `prod`, Deploy prod. `bun run promote <sha>` verifies the dev Check, that SHA's `dev-acceptance` receipt at the live dev
