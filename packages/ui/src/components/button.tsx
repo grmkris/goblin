@@ -37,6 +37,8 @@ const buttonVariants = cva(
         model:
           'h-8 min-w-0 max-w-40 shrink gap-1.5 px-2.5 pointer-coarse:h-11 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
         lg: 'h-9 gap-1.5 px-2.5 pointer-coarse:h-11 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
+        // A label of any length that must show whole (an interactive reply's button sends its label): it wraps.
+        wrap: 'h-auto min-h-8 max-w-full shrink gap-1.5 px-2.5 py-1.5 text-balance whitespace-normal pointer-coarse:min-h-11',
         // A screen's one action (first-run Start): 40px to point at, 44px to touch.
         cta: 'h-10 gap-2 px-4 text-[0.9375rem] pointer-coarse:h-11 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3',
         icon: `size-8 ${TOUCH_TARGET}`,

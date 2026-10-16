@@ -4,7 +4,9 @@ Accepted. Extends the read-only drawn fences in ADR 0023 and the ordinary-messag
 
 Goblin may render a complete `openui` fence as a small form, choice list or dashboard using its own UI components.
 A click submits the button's visible text and visible field values through the containing conversation's existing
-owner-message path. Generated code cannot supply a separate hidden instruction, tool call, URL action or grant.
+owner-message path. Generated code cannot supply a separate hidden instruction, tool call, URL action or grant,
+and the text it can send is a single visible line: no hidden characters or padding, buttons wrap, and defaults fit
+their fields.
 There is no new interaction record, transcript, submission endpoint or execution engine: Pi keeps owning them.
 
 This chooses a constrained in-process component interpreter over arbitrary generated HTML or another sandboxed

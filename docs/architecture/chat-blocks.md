@@ -35,8 +35,11 @@ Queries, mutations, executable actions and functions are unsupported. Parse, loa
 code fallback; an open streaming fence stays code until it closes.
 
 The root is a native form. Buttons have only a visible label, never a hidden instruction or executable action.
-Submission reads that label and `FormData` from the mounted visible controls, bounded to 20 values and 12,000
-characters. `ReplySend` points to the containing `ChatView`'s normal `useConversation.send`, so the typed owner API,
+Model-written text that a click sends (button and field labels, options, text defaults) must be one line that shows
+whole: no control, format (bidi, Unicode tag, zero-width), private or unassigned characters and no padding beyond
+single plain spaces. Labels are at most 120 characters and reply buttons wrap; options and text defaults are at most
+40 characters, so they fit their controls. Submission reads that label and `FormData` from the mounted visible
+controls, checks it again (`message.ts`), and is bounded to 20 values and 12,000 characters. `ReplySend` points to the containing `ChatView`'s normal `useConversation.send`, so the typed owner API,
 CSRF header, operation identity, queue and failure handling stay unchanged. While a submission is pending the form
 is disabled; a failed unchanged message retries with the existing operation ID. Closed/archived chats, quoted
 content and views without an owner submission context disable the form. A click authorizes no tool or grant

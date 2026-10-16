@@ -21,9 +21,16 @@ import {
   NativeSelectOption,
   Skeleton,
 } from '@goblin/ui'
+import { maxLabelLength, shownWhole } from './message.ts'
 
 const Chart = lazy(() => import('@goblin/kit/chart').then((module) => ({ default: module.Chart })))
 const text = z.string().max(1000)
+/** Text a click sends without its own label (a field's default, an option): one line that fits its control whole. */
+const shown = (max: number) => z.string().max(max).refine(shownWhole, 'Use one line of plain, visible text.')
+/** A button's or a field's label, sent as the owner's words: never blank, never hidden. */
+const label = z.string().max(maxLabelLength).regex(/\S/u).refine(shownWhole, 'Use one line of plain, visible text.')
+/** A number field's default lies in its range (the default is checked before it is bound to state). */
+const inRange = (value: unknown, min: number, max: number) => typeof value === 'number' && min <= value && value <= max
 
 const Stack = defineComponent({
   name: 'Stack',
@@ -47,7 +54,7 @@ const Heading = defineComponent({
 const TextField = defineComponent({
   name: 'TextField',
   description: 'A labelled text input. Bind value to a $variable.',
-  props: z.object({ name: text, label: text, value: reactive(z.string().max(500)) }),
+  props: z.object({ name: text, label, value: reactive(shown(40)) }),
   component: function TextFieldView({ props }) {
     const id = useId()
     const field = useStateField(props.name, props.value)
@@ -73,7 +80,9 @@ const TextField = defineComponent({
 const NumberField = defineComponent({
   name: 'NumberField',
   description: 'A bounded number input. Bind value to a $variable.',
-  props: z.object({ name: text, label: text, value: reactive(z.number()), min: z.number(), max: z.number() }),
+  props: z
+    .object({ name: text, label, value: reactive(z.number()), min: z.number(), max: z.number() })
+    .refine(({ value, min, max }) => inRange(value, min, max), 'Keep the value between min and max.'),
   component: function NumberFieldView({ props }) {
     const id = useId()
     const field = useStateField(props.name, props.value)
@@ -104,7 +113,7 @@ const NumberField = defineComponent({
 const ChoiceField = defineComponent({
   name: 'ChoiceField',
   description: 'Choose a value from a short list. Bind value to a $variable.',
-  props: z.object({ name: text, label: text, options: z.array(text).max(8), value: reactive(z.string()) }),
+  props: z.object({ name: text, label, options: z.array(shown(40).regex(/\S/u)).max(8), value: reactive(z.string()) }),
   component: function ChoiceFieldView({ props }) {
     const id = useId()
     const field = useStateField(props.name, props.value)
@@ -135,9 +144,9 @@ const ChoiceField = defineComponent({
 const ActionButton = defineComponent({
   name: 'ActionButton',
   description: 'Sends its visible label and the visible form values as an owner follow-up. No hidden action.',
-  props: z.object({ label: text.min(1).max(200) }),
+  props: z.object({ label }),
   component: ({ props }) => (
-    <Button type="submit" value={props.label}>
+    <Button type="submit" size="wrap" value={props.label}>
       {props.label}
     </Button>
   ),
@@ -147,7 +156,7 @@ const Cards = defineComponent({
   name: 'Cards',
   description: 'Compare up to eight options. Each button sends its visible label as a follow-up.',
   props: z.object({
-    items: z.array(z.object({ title: text, description: text, detail: text, label: text.min(1).max(200) })).max(8),
+    items: z.array(z.object({ title: text, description: text, detail: text, label })).max(8),
   }),
   component: ({ props }) => (
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,14rem),1fr))] gap-4">
@@ -161,7 +170,7 @@ const Cards = defineComponent({
             <p>{item.detail}</p>
           </CardContent>
           <CardFooter>
-            <Button type="submit" variant="outline" value={item.label}>
+            <Button type="submit" variant="outline" size="wrap" value={item.label}>
               {item.label}
             </Button>
           </CardFooter>
