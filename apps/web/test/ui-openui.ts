@@ -59,6 +59,7 @@ try {
     release?.()
     await reply.getByRole('status').filter({ hasText: 'Could not send' }).waitFor()
     assert.equal(await reply.getByLabel('Destination').inputValue(), 'Porto')
+    assert.equal(await reply.getByLabel('Destination').evaluate((field) => field === document.activeElement), true)
     await button.click()
     await reply.getByRole('status').filter({ hasText: 'Reply recorded.' }).waitFor()
     assert.equal(submissions.length, 2)
@@ -87,6 +88,33 @@ try {
     assert.equal(await page.getByRole('region', { name: 'Inert text' }).locator('img, script').count(), 0)
     assert.equal(await page.locator('[data-openui-devtools-auto-mount]').count(), 0)
     checks.push(`${width}: streaming and invalid code fallback, inert text, no inspector in development`)
+    const choices = page.getByRole('region', { name: 'Choice reply', exact: true })
+    const sent = submissions.length
+    await choices.getByLabel('Anything else?').fill('A quiet street')
+    await choices.getByLabel('Anything else?').press('Enter')
+    assert.equal(await choices.locator('fieldset').isDisabled(), false)
+    assert.equal(submissions.length, sent)
+    const budget = choices.getByLabel('Budget per night')
+    await budget.fill('')
+    await budget.pressSequentially('250')
+    assert.equal(await budget.inputValue(), '250')
+    const long = choices.getByRole('button', { name: /^Choose Casa do Jardim/u })
+    assert.equal(
+      await long.evaluate((element) => {
+        const card = element.closest('[data-slot="card"]')?.getBoundingClientRect()
+        const box = element.getBoundingClientRect()
+        return element.scrollWidth <= element.clientWidth && card !== undefined && box.right <= card.right + 0.5
+      }),
+      true,
+    )
+    const notesSend = choices.getByRole('button', { name: 'Send my notes' })
+    await notesSend.click()
+    await choices.getByRole('status').filter({ hasText: 'Reply recorded.' }).waitFor()
+    assert.equal(submissions.length, sent + 1)
+    assert.match(submissions.at(-1)?.input ?? '', /^Send my notes\n\nForm values:/u)
+    assert.match(submissions.at(-1)?.input ?? '', /"label":"Budget per night","value":"250"/u)
+    assert.equal(await notesSend.evaluate((element) => element === document.activeElement), true)
+    checks.push(`${width}: Enter beside several buttons sends nothing, long labels wrap whole, numbers type freely`)
     mkdirSync(out, { recursive: true })
     for (const dark of [false, true]) {
       await page.evaluate((value) => document.documentElement.classList.toggle('dark', value), dark)

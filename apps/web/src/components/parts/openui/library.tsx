@@ -1,5 +1,5 @@
-import { lazy, Suspense, useId } from 'react'
-import { createLibrary, defineComponent, reactive, useIsStreaming, useStateField } from '@openuidev/react-lang'
+import { lazy, type ReactNode, Suspense, useId, useState } from 'react'
+import { createLibrary, defineComponent, reactive, useStateField } from '@openuidev/react-lang'
 import { z } from 'zod/v4'
 import { chartSpec } from '@goblin/kit'
 import {
@@ -28,7 +28,7 @@ const text = z.string().max(1000)
 /** Text a click sends without its own label (a field's default, an option): one line that fits its control whole. */
 const shown = (max: number) => z.string().max(max).refine(shownWhole, 'Use one line of plain, visible text.')
 /** A button's or a field's label, sent as the owner's words: never blank, never hidden. */
-const label = z.string().max(maxLabelLength).regex(/\S/u).refine(shownWhole, 'Use one line of plain, visible text.')
+const labelText = z.string().max(maxLabelLength).regex(/\S/u).refine(shownWhole, 'Use one line of plain, visible text.')
 /** A number field's default lies in its range (the default is checked before it is bound to state). */
 const inRange = (value: unknown, min: number, max: number) => typeof value === 'number' && min <= value && value <= max
 
@@ -51,28 +51,43 @@ const Heading = defineComponent({
   ),
 })
 
+/** A field's label over its control; the label is also the name its value is sent under. */
+function Labelled({
+  id,
+  label,
+  children,
+}: {
+  readonly id: string
+  readonly label: string
+  readonly children: ReactNode
+}) {
+  return (
+    <FieldGroup>
+      <Field>
+        <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        {children}
+      </Field>
+    </FieldGroup>
+  )
+}
+
 const TextField = defineComponent({
   name: 'TextField',
   description: 'A labelled text input. Bind value to a $variable.',
-  props: z.object({ name: text, label, value: reactive(shown(40)) }),
+  props: z.object({ name: text, label: labelText, value: reactive(shown(40)) }),
   component: function TextFieldView({ props }) {
     const id = useId()
     const field = useStateField(props.name, props.value)
-    const streaming = useIsStreaming()
     return (
-      <FieldGroup>
-        <Field>
-          <FieldLabel htmlFor={id}>{props.label}</FieldLabel>
-          <Input
-            id={id}
-            name={props.label}
-            value={field.value ?? ''}
-            maxLength={500}
-            disabled={streaming}
-            onChange={(event) => field.setValue(event.target.value)}
-          />
-        </Field>
-      </FieldGroup>
+      <Labelled id={id} label={props.label}>
+        <Input
+          id={id}
+          name={props.label}
+          value={field.value ?? ''}
+          maxLength={500}
+          onChange={(event) => field.setValue(event.target.value)}
+        />
+      </Labelled>
     )
   },
 })
@@ -81,31 +96,30 @@ const NumberField = defineComponent({
   name: 'NumberField',
   description: 'A bounded number input. Bind value to a $variable.',
   props: z
-    .object({ name: text, label, value: reactive(z.number()), min: z.number(), max: z.number() })
+    .object({ name: text, label: labelText, value: reactive(z.number()), min: z.number(), max: z.number() })
     .refine(({ value, min, max }) => inRange(value, min, max), 'Keep the value between min and max.'),
   component: function NumberFieldView({ props }) {
     const id = useId()
     const field = useStateField(props.name, props.value)
-    const streaming = useIsStreaming()
+    // What the owner typed, as typed: "250" passes through "2" on its way. The browser checks min and max on send.
+    const [typed, setTyped] = useState<string>()
     return (
-      <FieldGroup>
-        <Field>
-          <FieldLabel htmlFor={id}>{props.label}</FieldLabel>
-          <Input
-            id={id}
-            name={props.label}
-            type="number"
-            min={props.min}
-            max={props.max}
-            value={field.value ?? props.min}
-            disabled={streaming}
-            onChange={(event) => {
-              const value = event.target.valueAsNumber
-              if (Number.isFinite(value)) field.setValue(Math.min(props.max, Math.max(props.min, value)))
-            }}
-          />
-        </Field>
-      </FieldGroup>
+      <Labelled id={id} label={props.label}>
+        <Input
+          id={id}
+          name={props.label}
+          type="number"
+          step="any"
+          required
+          min={props.min}
+          max={props.max}
+          value={typed ?? String(field.value ?? props.min)}
+          onChange={(event) => {
+            setTyped(event.target.value)
+            if (Number.isFinite(event.target.valueAsNumber)) field.setValue(event.target.valueAsNumber)
+          }}
+        />
+      </Labelled>
     )
   },
 })
@@ -113,30 +127,30 @@ const NumberField = defineComponent({
 const ChoiceField = defineComponent({
   name: 'ChoiceField',
   description: 'Choose a value from a short list. Bind value to a $variable.',
-  props: z.object({ name: text, label, options: z.array(shown(40).regex(/\S/u)).max(8), value: reactive(z.string()) }),
+  props: z.object({
+    name: text,
+    label: labelText,
+    options: z.array(shown(40).regex(/\S/u)).max(8),
+    value: reactive(z.string()),
+  }),
   component: function ChoiceFieldView({ props }) {
     const id = useId()
     const field = useStateField(props.name, props.value)
-    const streaming = useIsStreaming()
     return (
-      <FieldGroup>
-        <Field>
-          <FieldLabel htmlFor={id}>{props.label}</FieldLabel>
-          <NativeSelect
-            id={id}
-            name={props.label}
-            value={field.value ?? ''}
-            disabled={streaming}
-            onChange={(event) => field.setValue(event.target.value)}
-          >
-            {props.options.map((option, index) => (
-              <NativeSelectOption key={index} value={option}>
-                {option}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
-      </FieldGroup>
+      <Labelled id={id} label={props.label}>
+        <NativeSelect
+          id={id}
+          name={props.label}
+          value={field.value ?? ''}
+          onChange={(event) => field.setValue(event.target.value)}
+        >
+          {props.options.map((option, index) => (
+            <NativeSelectOption key={index} value={option}>
+              {option}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      </Labelled>
     )
   },
 })
@@ -144,7 +158,7 @@ const ChoiceField = defineComponent({
 const ActionButton = defineComponent({
   name: 'ActionButton',
   description: 'Sends its visible label and the visible form values as an owner follow-up. No hidden action.',
-  props: z.object({ label }),
+  props: z.object({ label: labelText }),
   component: ({ props }) => (
     <Button type="submit" size="wrap" value={props.label}>
       {props.label}
@@ -156,7 +170,7 @@ const Cards = defineComponent({
   name: 'Cards',
   description: 'Compare up to eight options. Each button sends its visible label as a follow-up.',
   props: z.object({
-    items: z.array(z.object({ title: text, description: text, detail: text, label })).max(8),
+    items: z.array(z.object({ title: text, description: text, detail: text, label: labelText })).max(8),
   }),
   component: ({ props }) => (
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,14rem),1fr))] gap-4">

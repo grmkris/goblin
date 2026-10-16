@@ -41,7 +41,10 @@ single plain spaces. Labels are at most 120 characters and reply buttons wrap; o
 40 characters, so they fit their controls. Submission reads that label and `FormData` from the mounted visible
 controls, checks it again (`message.ts`), and is bounded to 20 values and 12,000 characters. `ReplySend` points to the containing `ChatView`'s normal `useConversation.send`, so the typed owner API,
 CSRF header, operation identity, queue and failure handling stay unchanged. While a submission is pending the form
-is disabled; a failed unchanged message retries with the existing operation ID. Closed/archived chats, quoted
+is disabled, and focus then returns to where the owner sent from; a failed unchanged message retries with the
+existing operation ID. Enter in a field submits only when the form has one button: with several, Enter would send
+the first, a choice the owner never made, so they press the one they mean. A number field keeps what is typed and
+the browser checks its range and that it is filled when the form is sent. Closed/archived chats, quoted
 content and views without an owner submission context disable the form. A click authorizes no tool or grant
 (ADR 0074).
 

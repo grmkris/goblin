@@ -580,8 +580,9 @@ proofs; reconnecting MySI, confirming the deployed Source and Telegram DM/group/
 ## Interactive reply checks
 
 `heavy bun apps/web/test/ui-openui.ts` exercises native Markdown rendering and the real conversation submission hook
-against intercepted HTTP: field values, keyboard submit, pending state, failed-send retry identity, conversation
-routing, disabled quoted/closed replies, streaming and invalid fallback, light/dark and 390px layout. It uses local
+against intercepted HTTP: field values, keyboard submit, pending state and returning focus, failed-send retry
+identity, conversation routing, disabled quoted/closed replies, streaming and invalid fallback, Enter beside several
+buttons, wrapped long labels, typed number ranges, light/dark and 390px layout. It uses local
 Chromium and does not call a model or prove authenticated deployment behavior. The public playground uses the same
 renderer and has its own built/deployed browser check documented in its README. `check:patches` verifies the OpenUI
 inspector patch in both normal gates; review it when upgrading the dependency.

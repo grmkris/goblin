@@ -17,6 +17,14 @@ city = TextField("city", "Destination", $city)
 days = NumberField("days", "Days away", $days, 1, 14)
 pace = ChoiceField("pace", "Pace", ["Slow", "Busy"], $pace)
 send = ActionButton("Plan my weekend")`
+// Several buttons, so Enter in a field must not choose one; a long label must wrap whole; a wide number range.
+const CHOICES = `root = Stack([stays, notes, budget, send])
+$notes = ""
+$budget = 300
+stays = Cards([{title: "Casa do Jardim", description: "Príncipe Real", detail: "A leafy courtyard.", label: "Choose Casa do Jardim, the quiet one with the leafy courtyard and the small breakfast room by the park"}, {title: "Alfama House", description: "Alfama", detail: "River views.", label: "Choose Alfama House"}])
+notes = TextField("notes", "Anything else?", $notes)
+budget = NumberField("budget", "Budget per night", $budget, 100, 5000)
+send = ActionButton("Send my notes")`
 const fence = (source: string) => `\`\`\`openui\n${source}\n\`\`\``
 
 /** The production send hook and Markdown path, with HTTP intercepted by the browser acceptance script. */
@@ -31,6 +39,9 @@ function Fixture() {
       <ReplySend value={closed ? undefined : chat.send}>
         <section aria-label="Owner reply">
           <ChatMarkdown text={fence(SOURCE) + (live ? '' : '\n\nDone.')} live={live} />
+        </section>
+        <section aria-label="Choice reply">
+          <ChatMarkdown text={fence(CHOICES)} live={false} />
         </section>
         <section aria-label="Quoted reply">
           <Cause icon={null} line="Shared from another chat" text={fence(SOURCE)} />
