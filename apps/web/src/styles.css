@@ -1813,16 +1813,65 @@
     font-size: 0.75rem;
     white-space: nowrap;
   }
-  /* The shelf (components/server-add.tsx): suggestions in groups, set apart by space, each under its own name. */
+  /*
+   * The shelf (components/server-add.tsx): a bento of its groups. One column, two from 34rem of its own width, three
+   * from 52rem, so it fits Start's page and the Connections picker alike. A tile's corner is concentric with what it
+   * holds: 1.25rem outside, 1rem padding, so a mark near it rounds at about 0.25rem plus its own size's share.
+   */
   .shelf {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
+    container-type: inline-size;
   }
-  .shelf-group {
+  .shelf-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+  .shelf-tile {
     display: flex;
     flex-direction: column;
+    gap: 0.75rem;
     min-width: 0;
+    padding: 1rem;
+    border-radius: 1.25rem;
+    background: var(--card);
+    box-shadow:
+      0 0 0 1px var(--hairline),
+      0 1px 2px oklch(0 0 0 / 0.04);
+  }
+  /* The owner's own apps lead the shelf, in goblin's moss (mixed in oklab: oklch would turn the white card's hue 0 pink). */
+  .shelf-tile[data-group='yours'] {
+    background: color-mix(in oklab, var(--moss) 9%, var(--card));
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--moss) 24%, transparent),
+      0 1px 2px oklch(0 0 0 / 0.04);
+  }
+  /* Descriptions are the shelf's own few words; a tile shows them whole. */
+  .shelf-tile .grant-about {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+  @container (min-width: 34rem) {
+    .shelf-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .shelf-tile[data-wide='two'] {
+      grid-column: span 2;
+    }
+    /* A wide list sets its servers side by side. */
+    .shelf-tile[data-wide='two'] > .shelf-rows {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 1.25rem;
+    }
+  }
+  @container (min-width: 52rem) {
+    .shelf-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .shelf-tile[data-wide] {
+      grid-column: span 2;
+    }
   }
   .shelf-head {
     display: flex;
@@ -1834,7 +1883,151 @@
     margin: 0;
     font-size: var(--text-13);
     font-weight: 600;
+    color: var(--muted-foreground);
     text-wrap: balance;
+  }
+  .shelf-tile[data-group='yours'] .shelf-title {
+    color: var(--moss);
+  }
+  /* A group of one: the server large, what it is, and its one action under them. */
+  .shelf-feature {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 0.75rem 0.875rem;
+  }
+  .shelf-feature > button {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .shelf-feature-name {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .shelf-rows {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  /* A row: the mark beside the name and its Add, what it is under both, so the words take the tile's width. */
+  .shelf-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'mark name add'
+      'mark about about';
+    align-items: center;
+    column-gap: 0.75rem;
+    row-gap: 0.125rem;
+    padding-block: 0.625rem;
+  }
+  .shelf-row > .server-mark {
+    grid-area: mark;
+    align-self: start;
+  }
+  .shelf-row > .grant-name {
+    grid-area: name;
+  }
+  .shelf-row > button {
+    grid-area: add;
+  }
+  .shelf-row-about {
+    display: flex;
+    grid-area: about;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+  }
+  .shelf-row + .shelf-row {
+    border-top: 1px solid var(--hairline);
+  }
+  .shelf-row:first-child {
+    padding-block-start: 0.125rem;
+  }
+  .shelf-row:last-child {
+    padding-block-end: 0;
+  }
+  @container (min-width: 34rem) {
+    /* Side by side, the second column's first row needs no hairline above it. */
+    .shelf-tile[data-wide='two'] > .shelf-rows > .shelf-row:nth-child(2) {
+      padding-block-start: 0.125rem;
+      border-top: 0;
+    }
+  }
+  /*
+   * A server's mark: the provider's own square image, or its initial on a plate of its own hue. The outline keeps a
+   * light mark's edge on a light tile (pure black or white at 10%, never a tinted grey).
+   */
+  .server-mark {
+    --mark: 2.25rem;
+    position: relative;
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--mark);
+    height: var(--mark);
+    border-radius: calc(var(--mark) * 0.26);
+    overflow: hidden;
+    outline: 1px solid oklch(0 0 0 / 0.1);
+    outline-offset: -1px;
+    background: oklch(0.6 0.11 var(--mark-hue, 148));
+    color: oklch(0.99 0.01 var(--mark-hue, 148));
+    font-size: calc(var(--mark) * 0.46);
+    font-weight: 600;
+    line-height: 1;
+    user-select: none;
+  }
+  .server-mark[data-size='feature'] {
+    --mark: 3.25rem;
+  }
+  .server-mark > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .server-mark[data-hue='0'] {
+    --mark-hue: 148;
+  }
+  .server-mark[data-hue='1'] {
+    --mark-hue: 75;
+  }
+  .server-mark[data-hue='2'] {
+    --mark-hue: 40;
+  }
+  .server-mark[data-hue='3'] {
+    --mark-hue: 205;
+  }
+  .server-mark[data-hue='4'] {
+    --mark-hue: 265;
+  }
+  .server-mark[data-hue='5'] {
+    --mark-hue: 330;
+  }
+  .server-mark[data-hue='6'] {
+    --mark-hue: 115;
+  }
+  .server-mark[data-hue='7'] {
+    --mark-hue: 15;
+  }
+  .dark .server-mark {
+    outline-color: oklch(1 0 0 / 0.1);
+  }
+  /* Already added: a small check on its mark, besides Add another. */
+  [data-added] > .server-mark::after {
+    position: absolute;
+    right: 0.125rem;
+    bottom: 0.125rem;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 999px;
+    background: var(--success)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 6.2 5 8l4-4.2' fill='none' stroke='white' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+    box-shadow: 0 0 0 1.5px var(--card);
+    content: '';
   }
   /* The picker's panels (components/server-picker.tsx): a field above its list. */
   .pick-panel {

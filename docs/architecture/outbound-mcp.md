@@ -58,8 +58,11 @@ show under its name (`server-add.tsx`): the owner's own apps through one mysi co
 OAuth resource), publishing (Cloudflare), then servers that need no sign-in by what they are for: travel, knowledge,
 crypto data, views in the chat and code. The shelf is data, one endpoint per entry
 ([ADR 0061](../adr/0061-the-shelf-is-data.md)); a deployment's `MCP_SHELF` replaces an entry by its id or adds its own
-(`shelfOf`). A suggestion is marked added when a connection has its endpoint's origin and path, whatever its query. One tap adds and
-connects. It also searches MCP registries that speak
+(`shelfOf`). A suggestion is marked added when a connection has its endpoint's origin and path, whatever its query. An
+entry may carry an `icon`, a square image of the provider's mark: goblin's are the web app's own files
+(`apps/web/public/shelf`, Simple Icons glyphs on the brand's colour), so showing the shelf asks no provider's host for
+anything, and an entry without one shows its initial. The shelf is a bento of its groups, one to three columns by its own
+width (container queries), so Start's page and the picker share it. One tap adds and connects. It also searches MCP registries that speak
 the generic registry API (`mcp/servers/registry.ts`, `GET /api/mcp/catalog?q=`): the Official MCP Registry and GitHub's, built
 in, then up to eight the owner adds (`app_mcp_registries`). A registry is
 added only once it answers `/v0.1/servers`, and removing it keeps the servers added from it. Search reads one page of

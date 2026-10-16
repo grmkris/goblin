@@ -22,7 +22,7 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   the App's resource, never a wildcard.
   Allow all and None use `McpGrants.setTools` through `PUT /api/mcp/grants/batch`: exact requested names, one discovery,
   one synchronous transaction for tools and resources, existing Ask first policies preserved when allowing. Revoking needs no network;
-  missing offered names are reported, never granted (ADR 0075).
+  missing offered names are reported, never granted (ADR 0076).
 - A Topic's setup chooses the servers and tools its chats use (`setup/`, ADR 0040). `mcp_list` and `mcp_call`
   ask `Setups.scope(conversationId)` before the grant check; a setup only chooses and never grants, and a
   helper's exclusions are forgotten with a server's grants (`mcp/oauth/endpoints.ts`).

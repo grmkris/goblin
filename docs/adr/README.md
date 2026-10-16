@@ -44,7 +44,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0041](0041-connections-tell-me-hand-to.md) | Connections, Tell me and Hand to | Accepted; amended by 0066, 0068, 0070 and 0073 |
 | [0042](0042-mcp-2026-client.md) | MCP 2026 client: live tool lists, URL requests and step-up | Accepted |
 | [0046](0046-production-promotion-and-public-source.md) | Daily development, deliberate production promotion and public source | Accepted |
-| [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted; amended by 0061 and 0063 |
+| [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted; amended by 0061, 0063 and 0075 |
 | [0053](0053-pinned-services-and-apps-with-a-chat-bar.md) | Pinned services and Apps with a chat bar | Accepted; amended by 0063 |
 | [0055](archive/0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | Superseded by 0066 and 0069 |
 | [0056](0056-goblin-wallet-leaves-goblin.md) | Goblin Wallet leaves goblin | Accepted |
@@ -66,4 +66,5 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0072](0072-source-reply-result-outcomes.md) | Source reply result outcomes and durable piece progress | Accepted |
 | [0073](0073-event-lease-callback-generations.md) | Event lease callback generations | Accepted |
 | [0074](0074-interactive-replies.md) | Interactive replies are ordinary owner follow-ups | Accepted |
-| [0075](0075-batch-tool-grants.md) | Batch changes to exact tool grants | Accepted |
+| [0075](0075-production-mysi-on-every-stage.md) | goblin uses production mysi on every stage | Accepted |
+| [0076](0076-batch-tool-grants.md) | Batch changes to exact tool grants | Accepted |
