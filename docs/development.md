@@ -244,7 +244,8 @@ until it runs, real provider and Telegram delivery remain unverified.
   build the app runtime with `heavy bun run --cwd packages/app build`, then run `heavy bun apps/web/test/ui-diagram.ts`.
 - **mysi.** The shelf's first suggestion is one mysi connection for the owner's own apps (MyPlan, MyTab, MyGram,
   MyInbox, MySkills, MyTmux): `https://mysi.lol/mcp?codemode=off` (`apps/runtime/src/mcp/servers/shelf.ts`, ADRs 0052 and
-  0061); a deployment against mysi's dev sets `GOBLIN_MCP_SHELF` to point the `mysi` entry at `dev.mysi.lol`. mysi is a product of its own with a free tier; the
+  0061). goblin's own dev and prod both use production mysi, so goblin is tested against mysi's stable release (ADR
+  0075); a deployment that does need mysi's dev sets `GOBLIN_MCP_SHELF` to point the `mysi` entry at `dev.mysi.lol`. mysi is a product of its own with a free tier; the
   owner signs up there and chooses which apps the connection reaches on mysi's consent page. Its tools are
   `<service>_<tool>` (`mygram_inbox_read`), so ask the agent for one app's tools ("list my myplan tools") and it calls
   `mcp_list` with `service`. A connection made to plain `/mcp` counts as added, but lists the code tools instead.
