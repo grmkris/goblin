@@ -64,7 +64,7 @@ function Receipt({ action }: { readonly action: string | undefined }) {
 
 function usePlayground(example: Example) {
   const [source, setSource] = useState<string>(example.source)
-  const [problems, setProblems] = useState<string[]>([])
+  const [problems, setProblems] = useState<readonly string[]>([])
   const [action, setAction] = useState<string>()
   const { playback, setPlayback } = usePlayback(example.source)
   const render = (stream: boolean) => {
