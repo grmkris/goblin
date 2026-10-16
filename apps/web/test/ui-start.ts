@@ -82,6 +82,115 @@ const SCREENS = [
   },
 ] as const
 
+/** The shelf as the runtime serves it (apps/runtime/src/mcp/servers/shelf.ts), one server already added. */
+const SHELF = [
+  [
+    'mysi',
+    'mysi',
+    'yours',
+    true,
+    'Your my* apps in one connection: notes, browsers, Telegram, email, skills and terminals.',
+  ],
+  [
+    'cloudflare',
+    'Cloudflare',
+    'publish',
+    true,
+    'Publish a page or a small app as a Worker on your Cloudflare account.',
+  ],
+  [
+    'kiwi',
+    'Kiwi.com',
+    'travel',
+    false,
+    'Flight search across airlines, with prices and a booking link for each option.',
+  ],
+  ['trivago', 'trivago', 'travel', false, 'Hotels and their prices across booking sites, in a view you can browse.'],
+  [
+    'ferryhopper',
+    'Ferryhopper',
+    'travel',
+    false,
+    'Ferry routes, times and prices, mostly around Europe, in a view you can browse.',
+  ],
+  [
+    'wikidata',
+    'Wikidata',
+    'knowledge',
+    false,
+    'Facts about people, places and works, and how they connect, from Wikidata.',
+  ],
+  [
+    'microsoft-learn',
+    'Microsoft Learn',
+    'knowledge',
+    false,
+    "Microsoft's documentation and code samples: Azure, .NET, Microsoft 365 and the rest.",
+  ],
+  [
+    'aws-knowledge',
+    'AWS Knowledge',
+    'knowledge',
+    false,
+    'AWS documentation and guidance, and which services each region offers.',
+  ],
+  [
+    'huggingface',
+    'Hugging Face',
+    'knowledge',
+    false,
+    'Search models, datasets and Spaces on Hugging Face, and read their files.',
+  ],
+  [
+    'coingecko',
+    'CoinGecko',
+    'crypto',
+    false,
+    "Crypto prices, market caps and coin details from CoinGecko's public data.",
+  ],
+  [
+    'etherscan',
+    'Etherscan',
+    'crypto',
+    false,
+    'Balances, transactions and contracts on Ethereum and other EVM chains, on its keyless tier.',
+  ],
+  ['excalidraw', 'Excalidraw', 'apps', false, 'Hand-drawn diagrams your agent sketches, live in the chat.'],
+  [
+    'subwayinfo',
+    'SubwayInfo.nyc',
+    'apps',
+    false,
+    'New York transit: live subway, bus, ferry and rail arrivals, alerts and trip plans.',
+  ],
+  [
+    'deepwiki',
+    'DeepWiki',
+    'code',
+    false,
+    'Questions about any public GitHub repository, answered from its generated wiki.',
+  ],
+  ['context7', 'Context7', 'code', false, 'Current documentation and code examples for programming libraries.'],
+  ['cloudflare-docs', 'Cloudflare Docs', 'code', false, "Search Cloudflare's developer documentation."],
+  ['svelte', 'Svelte', 'code', false, 'Svelte and SvelteKit documentation, and a checker that fixes Svelte code.'],
+].map(([id, title, group, signIn, description]) => ({
+  id,
+  title,
+  description,
+  endpoint: `https://${String(id)}.example/mcp`,
+  group,
+  signIn,
+  ...(['cloudflare', 'trivago', 'wikidata', 'huggingface', 'excalidraw', 'cloudflare-docs', 'svelte'].includes(
+    String(id),
+  )
+    ? { icon: `/shelf/${String(id)}.svg` }
+    : {}),
+  added: id === 'excalidraw',
+}))
+
+/** The shelf's columns at this width: one on a phone, two on a tablet, three beside Start's panel on a desktop. */
+const COLUMNS: Readonly<Record<string, number>> = { 'phone-light': 1, 'tablet-light': 2, 'desktop-dark': 3 }
+
 const errors: string[] = []
 
 /** Waits for what screen `name` shows: its title (the splash, its mark), and what tells its state apart. */
@@ -119,41 +228,27 @@ async function drive(browser: Browser, origin: string, label: string, options: B
       if (pathname === '/api/agent/model-endpoint') return json(screen.view.model)
       if (pathname === '/api/mcp/servers') return json(screen.servers)
       if (pathname === '/api/mcp/notes/tools') return json(tools(screen.granted))
-      if (pathname === '/api/mcp/suggested')
-        return json([
-          {
-            id: 'mysi',
-            title: 'mysi',
-            description: 'Your my* apps in one connection: notes, browsers, Telegram, email, skills and terminals.',
-            endpoint: 'https://mysi.lol/mcp?codemode=off',
-            group: 'yours',
-            signIn: true,
-            added: false,
-          },
-          {
-            id: 'kiwi',
-            title: 'Kiwi.com',
-            description: 'Flight search across airlines, with prices and a booking link for each option.',
-            endpoint: 'https://mcp.kiwi.com',
-            group: 'travel',
-            signIn: false,
-            added: false,
-          },
-          {
-            id: 'excalidraw',
-            title: 'Excalidraw',
-            description: 'Hand-drawn diagrams your agent sketches, live in the chat.',
-            endpoint: 'https://mcp.excalidraw.com/mcp',
-            group: 'apps',
-            signIn: false,
-            added: true,
-          },
-        ])
+      if (pathname === '/api/mcp/suggested') return json(SHELF)
       return route.fulfill({ status: 404, json: { error: { code: 'not_found', message: 'not here' } } })
     })
     await page.goto(`${origin}start.html?at=${encodeURIComponent(screen.at)}`)
     await page.waitForLoadState('networkidle')
     await shows(page, screen.name)
+    if (screen.name === 'services') {
+      const shelf = await page.evaluate(() => ({
+        columns: getComputedStyle(document.querySelector('.shelf-grid') ?? document.body).gridTemplateColumns.split(' ')
+          .length,
+        icons: [...document.querySelectorAll<HTMLImageElement>('.server-mark > img')].map((icon) => icon.naturalWidth),
+        initials: document.querySelectorAll('.server-mark[data-hue]').length,
+      }))
+      assert.equal(shelf.columns, COLUMNS[label], `${label}: shelf columns`)
+      assert.equal(shelf.icons.length, 7, `${label}: shelf icons`)
+      assert(
+        shelf.icons.every((width) => width > 0),
+        `${label}: every shelf icon loads`,
+      )
+      assert.equal(shelf.initials, 10, `${label}: initials for servers without an icon`)
+    }
     const sideways = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     assert(sideways <= 0, `${label} ${screen.name}: scrolls sideways by ${String(sideways)}px`)
     await page.screenshot({ path: path.join(out, `${label}-${screen.name}.png`), fullPage: true })
@@ -173,6 +268,7 @@ try {
     isMobile: true,
     colorScheme: 'light',
   })
+  await drive(browser, origin, 'tablet-light', { viewport: { width: 820, height: 1180 }, colorScheme: 'light' })
   await drive(browser, origin, 'desktop-dark', { viewport: { width: 1280, height: 800 }, colorScheme: 'dark' })
   assert.deepEqual(errors, [])
   writeSync(STDOUT, `${JSON.stringify({ ok: true, out })}\n`)

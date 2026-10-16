@@ -328,16 +328,19 @@
     0 1px 2px oklch(0 0 0 / 0.04);
 }
 
-/* Services: the shelf, and where any other server is added. */
+/* Services: the shelf, and where any other server is added. Its bento takes a wider column than the other steps. */
+.start-task[data-step='services'] {
+  max-width: 60rem;
+}
 .start-more {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   width: 100%;
 }
-/* The shelf's groups sit apart from the heading above them. */
+/* The shelf's groups sit apart from the heading above them and from the note under them. */
 .start-more > .shelf {
-  margin-block-start: 0.5rem;
+  margin-block: 0.5rem 0.75rem;
 }
 
 /* What goblin is for: the owner's words, or an idea to start from. */

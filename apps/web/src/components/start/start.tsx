@@ -242,7 +242,7 @@ export function StartPage({ step, search }: { readonly step: OnboardingStep; rea
         step={step}
         onSkip={() => change.mutate({ status: 'skipped' }, { onSuccess: leave })}
       />
-      <section className="start-task" aria-labelledby="start-title">
+      <section className="start-task" data-step={step} aria-labelledby="start-title">
         <header className="start-head">
           <h1 id="start-title">{STEP_TEXT[step].title}</h1>
           <p>{STEP_TEXT[step].why}</p>

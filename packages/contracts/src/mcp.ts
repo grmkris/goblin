@@ -243,7 +243,10 @@ export type ServerView = typeof ServerView.Type
 export const ServerGroup = Schema.Literals(['yours', 'publish', 'travel', 'knowledge', 'crypto', 'apps', 'code'])
 export type ServerGroup = typeof ServerGroup.Type
 
-/** A server we suggest: our own description, its shelf group, whether it needs sign-in and whether the owner has it. */
+/**
+ * A server we suggest: our own description, its shelf group, whether it needs sign-in and whether the owner has it.
+ * `icon`, when the shelf has one, is a square image of the provider's mark, as MCP's `icons[].src` names one.
+ */
 export const ServerSuggestion = Schema.Struct({
   id: Schema.String,
   title: Schema.String,
@@ -251,6 +254,7 @@ export const ServerSuggestion = Schema.Struct({
   endpoint: Schema.String,
   group: ServerGroup,
   signIn: Schema.Boolean,
+  icon: Schema.optional(Schema.String),
   added: Schema.Boolean,
 })
 export type ServerSuggestion = typeof ServerSuggestion.Type

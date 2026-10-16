@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { shelfOf, suggestedTitle, suggestions } from '../../src/mcp/servers/shelf.ts'
 
@@ -29,6 +31,17 @@ describe('the suggested servers', () => {
   })
   it('needs sign-in only for the owner’s own apps and the services that publish for them', () => {
     for (const item of shelf) expect(item.signIn).toBe(item.group === 'yours' || item.group === 'publish')
+  })
+  it('draws each mark from the web app’s own files, and passes it on with the suggestion', () => {
+    const marked = shelf.filter((item) => item.icon !== undefined)
+    expect(marked.length).toBeGreaterThan(0)
+    for (const item of marked) {
+      expect(item.icon).toBe(`/shelf/${item.id}.svg`)
+      expect(existsSync(fileURLToPath(new URL(`../../../web/public${String(item.icon)}`, import.meta.url).href))).toBe(
+        true,
+      )
+    }
+    expect(suggestions(shelf, new Set()).find((item) => item.id === 'cloudflare')?.icon).toBe('/shelf/cloudflare.svg')
   })
   it('names a server added from the shelf by its title', () => {
     expect(suggestedTitle(shelf, 'https://mcp.kiwi.com/')).toBe('Kiwi.com')

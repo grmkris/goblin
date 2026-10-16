@@ -1,7 +1,8 @@
 // Servers we suggest, on a shelf in groups (ADR 0052): OAuth discovery is checked from a Worker, or the endpoint needs
 // no sign-in. Credential-backed acceptance is separate. Descriptions are ours, not the servers'. The shelf only adds
 // them; grants still start empty. It is data: one endpoint per entry, the same on every deployment, which a deployment
-// may change or add to with `MCP_SHELF`.
+// may change or add to with `MCP_SHELF`. Icons are the web app's own files (`apps/web/public/shelf`, see its README), so
+// showing the shelf asks no provider's host for anything; an entry without one is drawn as its initial.
 import { ServerGroup, type ServerSuggestion } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
 import { Internal } from '../../http/errors.ts'
@@ -14,6 +15,8 @@ const ShelfEntry = Schema.Struct({
   endpoint: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
   group: ServerGroup,
   signIn: Schema.Boolean,
+  /** A square image of the provider's mark: a path on the deployment's own origin (`/shelf/<id>.svg`) or a URL. */
+  icon: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048))),
 })
 export type ShelfEntry = typeof ShelfEntry.Type
 
@@ -42,6 +45,7 @@ const SHELF: readonly ShelfEntry[] = [
     endpoint: 'https://mcp.cloudflare.com/mcp',
     group: 'publish',
     signIn: true,
+    icon: '/shelf/cloudflare.svg',
   },
   {
     id: 'kiwi',
@@ -59,6 +63,7 @@ const SHELF: readonly ShelfEntry[] = [
     endpoint: 'https://mcp.trivago.com/mcp',
     group: 'travel',
     signIn: false,
+    icon: '/shelf/trivago.svg',
   },
   {
     id: 'ferryhopper',
@@ -75,6 +80,7 @@ const SHELF: readonly ShelfEntry[] = [
     endpoint: 'https://wd-mcp.wmcloud.org/mcp',
     group: 'knowledge',
     signIn: false,
+    icon: '/shelf/wikidata.svg',
   },
   {
     id: 'microsoft-learn',
@@ -99,6 +105,7 @@ const SHELF: readonly ShelfEntry[] = [
     endpoint: 'https://huggingface.co/mcp',
     group: 'knowledge',
     signIn: false,
+    icon: '/shelf/huggingface.svg',
   },
   {
     id: 'coingecko',
@@ -123,6 +130,7 @@ const SHELF: readonly ShelfEntry[] = [
     endpoint: 'https://mcp.excalidraw.com/mcp',
     group: 'apps',
     signIn: false,
+    icon: '/shelf/excalidraw.svg',
   },
   {
     id: 'subwayinfo',
@@ -155,6 +163,7 @@ const SHELF: readonly ShelfEntry[] = [
     endpoint: 'https://docs.mcp.cloudflare.com/mcp',
     group: 'code',
     signIn: false,
+    icon: '/shelf/cloudflare-docs.svg',
   },
   {
     id: 'svelte',
@@ -163,6 +172,7 @@ const SHELF: readonly ShelfEntry[] = [
     endpoint: 'https://mcp.svelte.dev/mcp',
     group: 'code',
     signIn: false,
+    icon: '/shelf/svelte.svg',
   },
 ]
 
