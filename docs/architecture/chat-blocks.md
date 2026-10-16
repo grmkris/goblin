@@ -28,6 +28,9 @@ values, while submitted values remain in the ordinary transcript. The runtime's 
 statements, depth 32, and 2,000 expanded nodes. Only supported components, literals, arrays, objects and named/scalar
 state references are accepted. The component Zod schemas bound their values and collections. `program.ts` also
 bounds source to 20,000 characters and rejects incomplete programs, unresolved references and hosted bundles.
+The Renderer never receives the reply's own text: `syntax.ts` prints the checked statements back, one per line with
+JSON strings, and only that program is parsed and drawn. OpenUI strips comments and Markdown fences before it parses
+and the tokenizer does not, so raw text could check as one program (`pad = #'` opening a string) and render as another.
 Queries, mutations, executable actions and functions are unsupported. Parse, load and render failures retain the
 code fallback; an open streaming fence stays code until it closes.
 

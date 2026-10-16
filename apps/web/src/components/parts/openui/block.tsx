@@ -4,12 +4,12 @@ import { reportUnexpected } from '../../../lib/unexpected.ts'
 import { ReplySend } from './context.ts'
 import { library } from './library.tsx'
 import { replyMessage } from './message.ts'
-import { programProblems } from './program.ts'
+import { checkProgram } from './program.ts'
 
 /** A complete reply program. Field state is local; a click uses the containing chat's existing send path. */
 export function OpenUIBlock({ source, fallback }: { readonly source: string; readonly fallback: ReactNode }) {
   const send = use(ReplySend)
-  const valid = useMemo(() => programProblems(source).length === 0, [source])
+  const checked = useMemo(() => checkProgram(source), [source])
   const [failed, setFailed] = useState(false)
   const [pending, setPending] = useState(false)
   const [notice, setNotice] = useState('')
@@ -41,7 +41,7 @@ export function OpenUIBlock({ source, fallback }: { readonly source: string; rea
       setPending(false)
     }
   }
-  if (!valid || failed) return fallback
+  if (!checked.ok || failed) return fallback
   return (
     <form
       className="not-typeset my-4 min-w-0"
@@ -51,7 +51,7 @@ export function OpenUIBlock({ source, fallback }: { readonly source: string; rea
       }}
     >
       <fieldset disabled={send === undefined || pending} className="min-w-0">
-        <Renderer response={source} library={library} onError={onError} publishObservability={false} />
+        <Renderer response={checked.program} library={library} onError={onError} publishObservability={false} />
       </fieldset>
       {notice !== '' && (
         <p role="status" className="text-sm text-muted-foreground">

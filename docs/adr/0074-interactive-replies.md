@@ -9,7 +9,8 @@ There is no new interaction record, transcript, submission endpoint or execution
 
 This chooses a constrained in-process component interpreter over arbitrary generated HTML or another sandboxed
 App. The grammar and schemas are bounded before rendering; functions, queries, mutations and hosted bundles are
-rejected. Open/invalid fences and render failures remain readable code. The component library offers no network or
+rejected. The interpreter receives the checked program printed back, never the generated text, so what is checked
+is what renders. Open/invalid fences and render failures remain readable code. The component library offers no network or
 HTML primitives. Tool permissions and approvals continue to use the existing tools and cards.
 
 Form edits are ephemeral and reset on reload. The submitted values are durable only as the next ordinary message;

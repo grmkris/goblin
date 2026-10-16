@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { programProblems } from '../src/components/parts/openui/program.ts'
+import { createParser, parseMessage } from '@openuidev/react-lang'
+import { library } from '../src/components/parts/openui/library.tsx'
+import { checkProgram, programProblems } from '../src/components/parts/openui/program.ts'
 import { replyMessage } from '../src/components/parts/openui/message.ts'
 
 const form = `root = Stack([Heading("Weekend", "Tell me the details"), field, ActionButton("Plan my weekend")])
@@ -32,6 +34,54 @@ describe('interactive reply programs', () => {
   })
   it('accepts text that resembles HTML without treating it as markup', () => {
     expect(programProblems('root = Stack([Heading("<script>alert(1)</script>", "https://example.com")])')).toEqual([])
+  })
+  it('refuses a message marker spelled with escapes', () => {
+    expect(programProblems('root = Stack([Heading("]\\u005d>openui:content", "")])')).not.toEqual([])
+  })
+})
+
+/** The program a reply draws, or the reasons it stays code as a failure. */
+function drawn(source: string): string {
+  const checked = checkProgram(source)
+  if (!checked.ok) throw new Error(checked.problems.join('; '))
+  return checked.program
+}
+
+describe('the program the Renderer draws', () => {
+  const parser = createParser(library.toJSONSchema(), library.root)
+  const decoy = {
+    typeName: 'Stack',
+    props: { children: [{ typeName: 'Heading', props: { title: 'A', description: 'B' } }] },
+  }
+  // OpenUI strips comments and fences before parsing; the checker's tokenizer reads both as part of a string.
+  const fanOut = ['root = Stack([n0, n0, n0, n0, n0, n0, n0, n0, n0, n0])']
+  for (let i = 0; i < 7; i++)
+    fanOut.push(`n${i} = Stack([${Array.from({ length: 10 }, () => `n${i + 1}`).join(', ')}])`)
+  fanOut.push('n7 = Heading("x", "y")')
+  it.each([
+    [
+      'a comment',
+      `root = Stack([Heading("A", "B")])\npad = #'\n$x = "a"\nroot = Stack([Heading($x == "a" ? "t" : "f", "")])\n#'`,
+    ],
+    [
+      'a fence',
+      `root = Stack([Heading("A", "B")])\npad = '\`\`\`\nroot = Stack([Heading($x == "a" ? "t" : "f", "")])\n\`\`\`'`,
+    ],
+    ['an exponential fan-out', `root = Stack([Heading("A", "B")])\npad = #'\n${fanOut.join('\n')}\n#'`],
+  ])('draws only what was checked when %s hides another program', (_, source) => {
+    const program = drawn(source)
+    expect(parser.parse(program).root).toMatchObject(decoy)
+    expect(parseMessage(program).content).toBe(program)
+    expect(drawn(program)).toBe(program)
+  })
+  it('prints a form with its state bindings and literals intact', () => {
+    expect(drawn(form)).toBe(
+      'root = Stack([Heading("Weekend", "Tell me the details"), field, ActionButton("Plan my weekend")])\n' +
+        '$city = "Lisbon"\nfield = TextField("city", "Destination", $city)',
+    )
+    expect(
+      drawn('root = Stack([n, c])\n$t = -5\nn = NumberField("t", "Temp", $t, -10, 10)\nc = Chart(\'{"a": 1}\')'),
+    ).toBe('root = Stack([n, c])\n$t = -5\nn = NumberField("t", "Temp", $t, -10, 10)\nc = Chart("{\\"a\\": 1}")')
   })
 })
 

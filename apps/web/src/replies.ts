@@ -2,4 +2,4 @@
 export { ChatMarkdown } from './components/parts/markdown.tsx'
 export { ReplySend } from './components/parts/openui/context.ts'
 export { library } from './components/parts/openui/library.tsx'
-export { maxSourceLength, programProblems } from './components/parts/openui/program.ts'
+export { checkProgram, maxSourceLength, programProblems } from './components/parts/openui/program.ts'
