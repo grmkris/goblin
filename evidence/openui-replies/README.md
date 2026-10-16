@@ -36,6 +36,21 @@ all three production builds. Lint, Effect and Knip reported zero findings or col
 failed or skipped; the dev/prod deployment jobs were intentionally skipped for this pull request.
 The chained-move test completed in 8.9 and 9.3 seconds in those suites without any test or timeout changes.
 
+## Review fixes (2026-10-16)
+
+An independent review of the PR head `10340b18` found three blockers, fixed in `cdeb9c42`, `50752d00` and `e7324cbd`:
+
+- OpenUI strips comments and fences before parsing and the checker did not. A 378-character reply hiding a
+  second `root` after `pad = #'` passed the checks, and parsing it took 15 seconds and 4.7 GB. The Renderer now
+  draws the checked program printed back.
+- Hidden text could be sent as the owner's words: labels clipped in nowrap buttons, no-break-space padding,
+  Unicode tag characters, and long text defaults.
+- Enter in a field sent the first card's choice when the form had several buttons.
+
+The native browser receipt then recorded ten grouped checks at 1280 px and 390 px with zero page errors: the eight
+above, plus Enter beside several buttons, a wrapped long label, a typed 250 in a 100–5000 field, and focus returning
+after a send. The playground's built-site check passed 22 of 22. The deployed receipts above predate these fixes.
+
 ## Scope
 
 Pi's transcript, execution, authority and owner API are unchanged. The public preview has no accounts, model
