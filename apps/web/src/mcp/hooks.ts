@@ -23,6 +23,30 @@ export function useConnectNow() {
   }
 }
 
+/**
+ * Reconnect for a signed-out connection where the owner only opens it (Apps, a pin): off to its sign-in, or connected
+ * at once if it needs none. `pending` stays true while the page leaves for the sign-in; `error` is why it could not
+ * start, if it could not.
+ */
+export function useReconnect() {
+  const connecting = useMutation(connectMutation)
+  const { mutate } = connecting
+  const leaving = connecting.isSuccess && connecting.data.authorizationUrl !== undefined
+  return {
+    reconnect: (connectionId: string) =>
+      mutate(
+        { connectionId },
+        {
+          onSuccess: ({ authorizationUrl }) => {
+            if (authorizationUrl !== undefined) window.location.assign(authorizationUrl)
+          },
+        },
+      ),
+    pending: connecting.isPending || leaving,
+    error: connecting.error,
+  }
+}
+
 /** How a connection is added: the owner's label for it (a free one is chosen when left out) and where it was found. */
 export type AddOptions = { readonly label?: string; readonly source?: ServerSource }
 

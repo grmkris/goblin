@@ -452,21 +452,11 @@
     padding-inline: 0.9rem 0.25rem;
     border-bottom: 0;
   }
-  /* The owner's agent apps (ADR 0021): a grid of app cards, and an app's own page of rows. */
+  /* An agent app's own page of rows (ADR 0021); Apps itself is the launcher in shell.css. */
   .apps-page {
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
-  }
-  .apps-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
-    gap: 0.75rem;
-  }
-  .apps-card {
-    display: block;
-    border-radius: var(--radius-xl);
-    outline-offset: 2px;
   }
   .apps-list {
     display: flex;
