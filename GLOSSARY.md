@@ -18,7 +18,9 @@ The agent's own standing permission to use the owner's MCP connections while the
 renewed by the owner's activity, and the owner can revoke it in Settings.
 
 **Inbound client**:
-An MCP client (Claude Code, another agent) the owner authorized to call goblin's `/mcp`.
+An MCP client (Claude Code, another agent) the owner authorized to call goblin's `/mcp`. Settings lists them as
+Connected clients.
+_Avoid_: apps that use your agent
 
 **Grant**:
 The owner's permission for one tool of one connection. A tool grant also covers the App that tool declares.
@@ -39,8 +41,9 @@ Signing a connection in again with more access, when a call needs a permission i
 
 **Setup**:
 What a Topic's chats work with: its connections, skills, agent apps and whether they may start subagents, each all of
-what the owner allows or a list (ADR 0040). A Persona's setup is what it adds to the Topic's. A setup chooses; it never
-grants.
+what the owner allows or a list (ADR 0040). The web calls a Topic's Topic setup. A Persona's setup is what it adds to
+the Topic's. A setup chooses; it never grants.
+_Avoid_: MCP servers & skills
 _Avoid_: capabilities, switches, toolset, plugin
 
 ## Conversations
@@ -94,7 +97,7 @@ spawner once, which does not answer it unless the job asked for synthesis, and c
 _Avoid_: worker, child agent
 
 **Delegate**:
-A subagent as the owner meets it in Tasks and the transcript: its result arrives marked with its name.
+A subagent as the owner meets it in Work and the transcript: its result arrives marked with its name.
 
 **Persona**:
 A named, versioned agent definition the owner tags with `@name`; each tagged Persona answers once, attributed, in the
@@ -175,16 +178,31 @@ go through it, as goblin's own call under the owner's grant of that tool.
 What a chat is doing now: `working`, or `waiting` on its subagents.
 _Avoid_: activity, on its own
 
+**Sidebar**:
+The web's one moss column (ADR 0078): Jump to, Activity, Work and Apps at its head; the pins and the Topics in the
+middle; Connections, Personas, Settings and the account at its foot. Exactly one row in it shows where the page is.
+_Avoid_: rail
+
+**Strip**:
+The sidebar collapsed to its icons on a desktop, names in tooltips, the Topics behind one `#`.
+
+**Jump to**:
+The quick switcher (⌘K or Ctrl+K): Topics, threads, apps, Personas and the app's places by name, from what the browser
+already holds.
+_Avoid_: search (it reads no transcripts), command palette
+
 **Activity**:
-The rail's page of what waits on the owner across Topics: questions, approvals and grants in chats (a Persona's
+The sidebar's place of what waits on the owner across Topics: questions, approvals and grants in chats (a Persona's
 included), agent apps whose schedules need the owner, notifications, connections whose events are not set up yet,
-unread chats, and organize receipts to Undo.
+unread chats, and organize receipts to Undo. Its count is what needs a response and the unread notifications.
 
-**Tasks**:
-The rail's page of work under way: Delegates, Personas answering and routines on a schedule.
+**Work**:
+The sidebar's place of work under way and on a schedule (`/work`): Delegates and Personas answering, routines, agent
+apps' schedules and recent results. Its count is the work going on now, never the routines.
+_Avoid_: Tasks
 
-**Home**:
-The rail's first place: the channel this tab showed last.
+**All threads**:
+Every thread of every Topic (`/threads`), the last row of the Topics; its count is the threads with unread replies.
 
 ## Connections, skills and apps
 
@@ -227,14 +245,20 @@ between its place in the transcript and its page (`/a/<id>`), where goblin's com
 reloading.
 
 **Server App**:
-A connection's own App (its global entrypoint), opened from its pin or its card. It lives in one thread of its own and
-opens full screen (ADR 0053).
+A connection's own App (its global entrypoint), opened from Apps, its pin or its card. It lives in one thread of its
+own and opens full screen (ADR 0053).
 _Avoid_: service, entrypoint (for the App)
 
 **Pin**:
-A server or one App view the owner keeps in the sidebar's Pinned list, in their order, on every device. A connected
-server with its own App is pinned until the owner unpins it. Pinning grants nothing.
-_Avoid_: favourite, bookmark
+A server or one App view the owner keeps in the Pinned list, in the sidebar and at the top of Apps, in their order, on
+every device. Only the owner pins (ADR 0078); a pin that does not open keeps its place and says why. Pinning grants
+nothing.
+_Avoid_: favourite, bookmark, shortcut, saved view
+
+**Apps**:
+The launcher (`/apps`, ADR 0078): the pins, recent App views, connections with their own App and the agent apps,
+each opened in one step, an agent app managed apart (`/apps/<name>`).
+_Avoid_: app store, catalog
 
 **Agent app**:
 A small program the agent wrote and goblin runs (ADR 0021): durable state, actions and views the agent calls with

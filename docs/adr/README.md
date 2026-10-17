@@ -24,7 +24,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0018](0018-subagents-nest-steer-and-close.md) | Subagents nest, steer and close | Accepted |
 | [0019](0019-panes-for-everything.md) | Panes for everything | Superseded by 0036 |
 | [0020](0020-durable-apps-one-iframe-per-instance.md) | Durable Apps, one iframe per instance | Accepted; amended by 0067 |
-| [0021](0021-agent-apps.md) | Agent apps | Accepted; amended by 0070 |
+| [0021](0021-agent-apps.md) | Agent apps | Accepted; amended by 0070 and 0078 |
 | [0022](0022-owner-files-shell-and-r2.md) | The owner's files, in Shell's Workspace and R2 | Accepted; amended by 0065 |
 | [0023](0023-chat-blocks-and-one-kit.md) | Chat blocks, one kit | Accepted |
 | [0024](0024-observing-conversations.md) | Observing conversations | Accepted |
@@ -36,7 +36,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0033](0033-personas.md) | Personas, organize receipts and Delegate results | Accepted; amended by 0067 |
 | [0034](0034-move-to-thread.md) | Start thread and Move to thread | Accepted; amended by 0067 |
 | [0035](0035-cross-topic-retrieval.md) | Cross-Topic retrieval | Accepted; amended by 0067 |
-| [0036](0036-slack-style-shell.md) | Slack-style shell | Accepted |
+| [0036](0036-slack-style-shell.md) | Slack-style shell | Accepted; amended by 0053; its rail and sidebar superseded by 0078 |
 | [0037](0037-conversation-flows-and-failure-reporting.md) | Conversation flows and failure reporting | Accepted |
 | [0038](0038-typed-owner-api-served-by-the-agent.md) | Typed owner API served by the agent | Accepted |
 | [0039](0039-chat-markdown-through-streamdown.md) | Chat Markdown through Streamdown, and what a reply may load | Accepted |
@@ -45,7 +45,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0042](0042-mcp-2026-client.md) | MCP 2026 client: live tool lists, URL requests and step-up | Accepted |
 | [0046](0046-production-promotion-and-public-source.md) | Daily development, deliberate production promotion and public source | Accepted; amended by 0077 |
 | [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted; amended by 0061, 0063 and 0075 |
-| [0053](0053-pinned-services-and-apps-with-a-chat-bar.md) | Pinned services and Apps with a chat bar | Accepted; amended by 0063 |
+| [0053](0053-pinned-services-and-apps-with-a-chat-bar.md) | Pinned services and Apps with a chat bar | Accepted; amended by 0063; its pins by default superseded by 0078 |
 | [0055](archive/0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | Superseded by 0066 and 0069 |
 | [0056](0056-goblin-wallet-leaves-goblin.md) | Goblin Wallet leaves goblin | Accepted |
 | [0057](0057-goblin-pays-for-no-model-call.md) | goblin pays for no model call | Accepted |
@@ -55,7 +55,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0061](0061-the-shelf-is-data.md) | The shelf is data | Accepted |
 | [0062](0062-short-skippable-start.md) | Short, skippable Start | Accepted |
 | [0063](0063-mcp-first-no-server-specific-code.md) | MCP-first: no server-specific code | Accepted |
-| [0064](0064-openid-connect-and-config-driven-deployment.md) | OpenID Connect sign-in and config-driven deployment | Accepted; amended by 0067 |
+| [0064](0064-openid-connect-and-config-driven-deployment.md) | OpenID Connect sign-in and config-driven deployment | Accepted; amended by 0067 and 0078 |
 | [0065](0065-files-from-mcp-content.md) | Files from MCP content | Accepted |
 | [0066](0066-sources.md) | Sources: any MCP server's events carry the owner's own messages, by a setup the owner confirms | Accepted; amended by 0068 and 0072 |
 | [0067](0067-no-home-surface-and-no-typed-decisions.md) | No Home surface and no typed decisions | Accepted |
@@ -69,3 +69,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0075](0075-production-mysi-on-every-stage.md) | goblin uses production mysi on every stage | Accepted |
 | [0076](0076-batch-tool-grants.md) | Batch changes to exact tool grants | Accepted |
 | [0077](0077-prod-is-the-default-branch.md) | prod is the repository's default branch | Accepted |
+| [0078](0078-one-sidebar-and-one-apps-launcher.md) | One sidebar and one Apps launcher | Accepted |
