@@ -38,7 +38,7 @@ const config = resolve(process.env['GOBLIN_ENV_DIR'] ?? resolve(root, '.local'),
 const shared = process.env['GOBLIN_CLOUD_ENV_FILE'] ?? resolve(root, '.local/cloud.env')
 const childEnv: Record<string, string | undefined> = { ...process.env }
 for (const key of Object.keys(childEnv)) {
-  if (/^(CLOUDFLARE_|GOBLIN_|DODO_|MYAGENT_|MYBROWSER_|MYPLAN_|MYINBOX_|MYTMUX_|LITELLM_|ALCHEMY_STAGE)/u.test(key))
+  if (/^(CLOUDFLARE_|GOBLIN_|MYAGENT_|MYBROWSER_|MYPLAN_|MYINBOX_|MYTMUX_|LITELLM_|ALCHEMY_STAGE)/u.test(key))
     delete childEnv[key]
 }
 childEnv['GOBLIN_STAGE'] = stage.name

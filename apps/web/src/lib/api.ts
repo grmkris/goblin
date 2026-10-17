@@ -25,7 +25,7 @@ const apiHeaders = (
 
 /** The owner's API, served by their own agent: same-origin, with the session cookie. */
 export const owner = makeApiQuery({ id: 'goblin/OwnerApi', client: HttpApiClient.make(OwnerApi), headers: apiHeaders })
-/** The account's own API, answered by the Worker without waking the agent: billing, inbound clients, crash reports. */
+/** The account's own API, answered by the Worker without waking the agent: inbound clients and crash reports. */
 export const account = makeApiQuery({
   id: 'goblin/AccountApi',
   client: HttpApiClient.make(AccountApi),
