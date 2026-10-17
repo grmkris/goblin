@@ -17,7 +17,7 @@ import { readSession, type Session } from './session.ts'
 type Check = { readonly ok: boolean; readonly detail: unknown } | { readonly skipped: true; readonly detail: unknown }
 
 const ROOT = path.resolve(import.meta.dirname, '..')
-const PAGES = ['/c/1', '/threads', '/activity', '/work', '/settings', '/connections', '/apps']
+const PAGES = ['/c/1', '/threads', '/activity', '/work', '/settings', '/connections', '/apps', '/personas']
 const PHONE: BrowserContextOptions = {
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 2,
@@ -354,7 +354,7 @@ async function usageCheck(page: Page, checks: Record<string, Check>, prefix: str
 }
 
 const DRAWER = '[data-slot="drawer-side"]'
-const OPEN_NAVIGATION = 'button[aria-label="Open navigation"]'
+const OPEN_NAVIGATION = 'button[aria-label^="Open navigation"]'
 
 async function sidebarCheck(page: Page, checks: Record<string, Check>, prefix: string): Promise<void> {
   const sheet = DRAWER
