@@ -11,21 +11,18 @@ import {
 import { ArrowDownIcon, ArrowUpIcon, EllipsisIcon, PinOffIcon, RefreshCwIcon } from 'lucide-react'
 import { jobTrouble } from '../../lib/app-jobs.ts'
 import { appOrigin } from '../../lib/app-names.ts'
-import { type PinState, type ShownPin, targetOf } from '../../lib/pins.ts'
+import { pinNote } from '../../lib/launcher.ts'
+import { type ShownPin, targetOf } from '../../lib/pins.ts'
+import { useReconnect } from '../../mcp/hooks.ts'
 import { type Pins, usePins } from '../../sidebar/hooks.ts'
 import { AppTile } from '../apps/app-tile.tsx'
+import { useOpenApp } from '../apps/use-open-app.ts'
 import { EXACT, Section, Tip, useCurrent } from './sidebar-parts.tsx'
-
-const STATE_WORDS: Partial<Record<PinState, string>> = {
-  'signed-out': 'Signed out',
-  'no-app': 'No app any more',
-  closed: 'Closed',
-  gone: 'Not available',
-}
 
 /** A pin's menu: move it up or down among the pins, sign in again when its server is signed out, or unpin it. */
 function PinMenu({ pin, pins }: { readonly pin: ShownPin; readonly pins: Pins }) {
   const target = targetOf(pin)
+  const { reconnect, pending } = useReconnect()
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -34,9 +31,9 @@ function PinMenu({ pin, pins }: { readonly pin: ShownPin; readonly pins: Pins })
         <EllipsisIcon aria-hidden />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
-        {pin.state === 'signed-out' && (
+        {pin.kind === 'server' && pin.state === 'signed-out' && (
           <>
-            <DropdownMenuItem render={<Link activeOptions={EXACT} to="/connections" />}>
+            <DropdownMenuItem disabled={pending} onClick={() => reconnect(pin.connectionId)}>
               <RefreshCwIcon aria-hidden />
               Reconnect
             </DropdownMenuItem>
@@ -62,14 +59,16 @@ function PinMenu({ pin, pins }: { readonly pin: ShownPin; readonly pins: Pins })
 }
 
 /**
- * One pin: a server opens its own App in its thread; a view opens that App's page. One that does not open keeps its
- * place and says why; a signed-out server leads to Connections, where it signs in again.
+ * One pin: a server opens its own App in its thread; a view opens that App's page, opening a closed one again on the
+ * way. One that does not open keeps its place and says why; a signed-out server leads to its card on Connections, and
+ * its menu signs in again.
  */
 function PinnedRow({ pin, pins }: { readonly pin: ShownPin; readonly pins: Pins }) {
   const current = useCurrent(`pin:${pin.kind === 'server' ? `server:${pin.connectionId}` : `view:${pin.appId}`}`)
   const origin = pin.kind === 'server' ? pin.connectionId : pin.app === undefined ? pin.appId : appOrigin(pin.app)
   const trouble = pin.kind === 'view' && pin.app?.source.kind === 'agent' && pin.app.source.jobs.some(jobTrouble)
-  const words = STATE_WORDS[pin.state]
+  const words = pinNote(pin.state)
+  const { open } = useOpenApp()
   const label = (
     <>
       <AppTile origin={origin} />
@@ -92,11 +91,22 @@ function PinnedRow({ pin, pins }: { readonly pin: ShownPin; readonly pins: Pins 
         className="sidebar-row"
         data-state={pin.state}
         aria-current={current}
+        onClick={(event) => {
+          if (pin.app === undefined || pin.state !== 'closed') return
+          event.preventDefault()
+          open(pin.app)
+        }}
       >
         {label}
       </Link>
     ) : pin.state === 'signed-out' ? (
-      <Link activeOptions={EXACT} to="/connections" className="sidebar-row" data-state={pin.state}>
+      <Link
+        activeOptions={EXACT}
+        to="/connections"
+        hash={`connection-${pin.connectionId}`}
+        className="sidebar-row"
+        data-state={pin.state}
+      >
         {label}
       </Link>
     ) : (

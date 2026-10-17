@@ -2,7 +2,7 @@
 // query ranks them. Nothing here reads a transcript or asks the server; opening a place changes nothing. Pure.
 import type { AgentAppSummary, ConversationView, PersonaView, ServerView, TopicView } from '@goblin/contracts'
 import { appOrigin } from './app-names.ts'
-import { entrypoints } from './entrypoints.ts'
+import { connectedApps } from './launcher.ts'
 import { activePersonas } from './personas.ts'
 import type { ShownPin } from './pins.ts'
 import { threadList } from './rail.ts'
@@ -120,12 +120,14 @@ function apps({ pins, servers, built, agentApps }: JumpSources): JumpItem[] {
       link: pinLink(pin),
       tile: pin.kind === 'server' ? pin.connectionId : pin.app === undefined ? pin.appId : appOrigin(pin.app),
     }))
-  const connected = entrypoints(servers ?? []).map(({ connectionId, title }): AppRow => ({
-    label: title,
-    detail: 'App · Connected',
-    link: { to: '/connections/$connectionId/app', params: { connectionId } },
-    tile: connectionId,
-  }))
+  const connected = connectedApps(servers ?? [])
+    .filter((app) => app.connected)
+    .map(({ connectionId, title }): AppRow => ({
+      label: title,
+      detail: 'App · Connected',
+      link: { to: '/connections/$connectionId/app', params: { connectionId } },
+      tile: connectionId,
+    }))
   const made = (agentApps ? (built ?? []) : []).map((app): AppRow => ({
     label: app.title,
     detail: 'App · Built for you',

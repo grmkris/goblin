@@ -11,6 +11,7 @@ import {
 import { type AppView, type ConversationView, EVERYTHING, type WorkspaceSnapshot } from '@goblin/contracts'
 import { PageBar } from '../../src/components/page-bar.tsx'
 import { PersonasPage } from '../../src/components/shell/pages/personas-page.tsx'
+import { ShellNavigation } from '../../src/components/shell/navigation.tsx'
 import { ShellFrame } from '../../src/components/shell/shell.tsx'
 import { withQueryClient } from './with-query-client.tsx'
 import '../../src/styles.css'
@@ -206,9 +207,11 @@ function Page({ title, children }: { readonly title: string; readonly children?:
 
 const root = createRootRoute({
   component: () => (
-    <ShellFrame>
-      <Outlet />
-    </ShellFrame>
+    <ShellNavigation>
+      <ShellFrame>
+        <Outlet />
+      </ShellFrame>
+    </ShellNavigation>
   ),
 })
 const page = (path: string, title: string, body?: () => ReactNode) =>

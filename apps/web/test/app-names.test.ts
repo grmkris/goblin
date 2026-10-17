@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AppView } from '@goblin/contracts'
-import { agentApps, appHue, appNames, appOrigin } from '../src/lib/app-names.ts'
+import { appHue, appNames, appOrigin } from '../src/lib/app-names.ts'
 
 const app = (id: string, conversation: string, extra: Partial<AppView> = {}): AppView => ({
   id,
@@ -27,14 +27,8 @@ describe('App names', () => {
     expect(Object.fromEntries(names)).toEqual({ 1: 'Board (1)', 2: 'Board (2)', 3: 'Board (3)', 4: 'Board', 5: 'Map' })
   })
 
-  it('lists the open agent apps newest first, apart from MCP Apps', () => {
-    const apps = [
-      app('1', '1', agent('1')),
-      app('2', '1'),
-      app('3', '1', agent('3')),
-      app('4', '1', { ...agent('4'), closedAt: 1 }),
-    ]
-    expect(agentApps(apps).map(({ id }) => id)).toEqual(['3', '1'])
+  it('names where an App comes from: an MCP App’s server, or an agent app’s own name', () => {
+    const apps = [app('1', '1', agent('1')), app('2', '1')]
     expect(appOrigin(apps[1] ?? app('0', '1'))).toBe('board')
     expect(appOrigin(apps[0] ?? app('0', '1'))).toBe('app-1')
   })

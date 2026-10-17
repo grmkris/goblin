@@ -54,13 +54,6 @@ export function appNames(
   return names
 }
 
-/** The owner's open agent apps, newest first: the sidebar lists them apart from any conversation (ADR 0021). */
-export const agentApps = (apps: readonly AppView[]): AppView[] =>
-  apps
-    .filter((app) => app.source.kind === 'agent' && app.closedAt === undefined)
-    .toSorted(byCreation)
-    .toReversed()
-
 /** Where an App comes from, as its tile and caption name it: an MCP App's server, or an agent app's own name. */
 export const appOrigin = (app: AppView): string =>
   app.source.kind === 'mcp' ? app.source.connectionId : app.source.name
