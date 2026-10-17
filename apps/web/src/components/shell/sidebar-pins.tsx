@@ -14,7 +14,7 @@ import { appOrigin } from '../../lib/app-names.ts'
 import { type PinState, type ShownPin, targetOf } from '../../lib/pins.ts'
 import { type Pins, usePins } from '../../sidebar/hooks.ts'
 import { AppTile } from '../apps/app-tile.tsx'
-import { Section, Tip, useCurrent } from './sidebar-parts.tsx'
+import { EXACT, Section, Tip, useCurrent } from './sidebar-parts.tsx'
 
 const STATE_WORDS: Partial<Record<PinState, string>> = {
   'signed-out': 'Signed out',
@@ -36,7 +36,7 @@ function PinMenu({ pin, pins }: { readonly pin: ShownPin; readonly pins: Pins })
       <DropdownMenuContent align="start">
         {pin.state === 'signed-out' && (
           <>
-            <DropdownMenuItem render={<Link to="/connections" />}>
+            <DropdownMenuItem render={<Link activeOptions={EXACT} to="/connections" />}>
               <RefreshCwIcon aria-hidden />
               Reconnect
             </DropdownMenuItem>
@@ -86,6 +86,7 @@ function PinnedRow({ pin, pins }: { readonly pin: ShownPin; readonly pins: Pins 
       </span>
     ) : pin.kind === 'view' ? (
       <Link
+        activeOptions={EXACT}
         to="/a/$appId"
         params={{ appId: pin.appId }}
         className="sidebar-row"
@@ -95,11 +96,12 @@ function PinnedRow({ pin, pins }: { readonly pin: ShownPin; readonly pins: Pins 
         {label}
       </Link>
     ) : pin.state === 'signed-out' ? (
-      <Link to="/connections" className="sidebar-row" data-state={pin.state}>
+      <Link activeOptions={EXACT} to="/connections" className="sidebar-row" data-state={pin.state}>
         {label}
       </Link>
     ) : (
       <Link
+        activeOptions={EXACT}
         to="/connections/$connectionId/app"
         params={{ connectionId: pin.connectionId }}
         className="sidebar-row"

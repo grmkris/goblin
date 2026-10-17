@@ -6,6 +6,12 @@ import { ChevronRightIcon } from 'lucide-react'
 import type { Highlight, NavRow } from '../../lib/nav-highlight.ts'
 import { useFolded } from './sidebar-state.ts'
 
+/**
+ * Every sidebar link is active only on its exact place: the router marks an active link the page itself, and its own
+ * prefix match would mark a channel while its thread shows and Connections while a server's App shows.
+ */
+export const EXACT = { exact: true } as const
+
 /** Whether the sidebar shows as its strip of icons: on a desktop, once the owner collapsed it. */
 export const Strip = createContext(false)
 /** The row that shows where the page is. */

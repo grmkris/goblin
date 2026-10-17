@@ -8,7 +8,7 @@ import { ChevronRightIcon, HashIcon, MessagesSquareIcon, PlusIcon } from 'lucide
 import { isUnread, threadTitle } from '../../lib/threads.ts'
 import { channels, topicThreads } from '../../lib/topics.ts'
 import { useActivities, useActivity, useConversation, useConversations, useTopics } from '../../lib/workspace/hooks.ts'
-import { Count, Here, Section, Tip, useCurrent } from './sidebar-parts.tsx'
+import { Count, EXACT, Here, Section, Strip, Tip, useCurrent } from './sidebar-parts.tsx'
 import { useRecentThreads } from './sidebar-state.ts'
 import { TopicDialog } from './topic-dialog.tsx'
 
@@ -21,6 +21,7 @@ function ChannelRow({ topic }: { readonly topic: TopicView }) {
   return (
     <li>
       <Link
+        activeOptions={EXACT}
         to="/c/$chatId"
         params={{ chatId: topic.conversation }}
         className="sidebar-row"
@@ -44,6 +45,7 @@ function ThreadRow({ view, channel }: { readonly view: ConversationView; readonl
   return (
     <li>
       <Link
+        activeOptions={EXACT}
         to="/c/$chatId"
         params={{ chatId: channel }}
         search={{ thread: Number(view.id) }}
@@ -115,7 +117,7 @@ function AllThreads({ unread }: { readonly unread: number }) {
   const current = useCurrent('threads')
   return (
     <li>
-      <Link to="/threads" className="sidebar-row" aria-current={current}>
+      <Link activeOptions={EXACT} to="/threads" className="sidebar-row" aria-current={current}>
         <MessagesSquareIcon className="sidebar-row-mark" aria-hidden />
         <span className="sidebar-row-name">All threads</span>
         <Count count={unread} words="unread" />
@@ -153,7 +155,8 @@ export function TopicsInStrip({ unread }: { readonly unread: number }) {
     const view = views.find((each) => each.id === topic.conversation)
     return view !== undefined && isUnread(view)
   })
-  const held = here !== undefined && (here.row.startsWith('topic:') || here.row.startsWith('thread:'))
+  const strip = use(Strip)
+  const held = strip && here !== undefined && (here.row.startsWith('topic:') || here.row.startsWith('thread:'))
   return (
     <li>
       <Popover open={open} onOpenChange={setOpen}>
@@ -177,14 +180,19 @@ export function TopicsInStrip({ unread }: { readonly unread: number }) {
           <ul className="strip-topics">
             {active.map((topic) => (
               <li key={topic.id}>
-                <Link to="/c/$chatId" params={{ chatId: topic.conversation }} className="strip-topic">
+                <Link
+                  activeOptions={EXACT}
+                  to="/c/$chatId"
+                  params={{ chatId: topic.conversation }}
+                  className="strip-topic"
+                >
                   <HashIcon aria-hidden />
                   <span>{topic.name}</span>
                 </Link>
               </li>
             ))}
             <li>
-              <Link to="/threads" className="strip-topic">
+              <Link activeOptions={EXACT} to="/threads" className="strip-topic">
                 <MessagesSquareIcon aria-hidden />
                 <span>All threads</span>
                 {unread > 0 && <span className="strip-topic-count">{unread}</span>}

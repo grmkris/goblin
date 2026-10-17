@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Navigation fixture</title>
+    <script>
+      try {
+        if (localStorage.getItem('goblin:sidebar:collapsed') === '1')
+          document.documentElement.dataset.sidebar = 'collapsed'
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/navigation.tsx"></script>
+  </body>
+</html>

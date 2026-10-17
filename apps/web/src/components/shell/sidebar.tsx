@@ -25,7 +25,7 @@ import {
 } from 'lucide-react'
 import { signOutMutation } from '../../auth/queries.ts'
 import type { NavRow } from '../../lib/nav-highlight.ts'
-import { Count, Here, Strip, Tip, useCurrent } from './sidebar-parts.tsx'
+import { Count, EXACT, Here, Strip, Tip, useCurrent } from './sidebar-parts.tsx'
 import { Pinned } from './sidebar-pins.tsx'
 import { toggleCollapsed, useCollapsed, useHighlight, useNavCounts } from './sidebar-state.ts'
 import { Topics, TopicsInStrip } from './sidebar-topics.tsx'
@@ -52,7 +52,7 @@ function Place({
   return (
     <li>
       <Tip label={label}>
-        <Link to={to} className="sidebar-row sidebar-place" aria-current={current}>
+        <Link activeOptions={EXACT} to={to} className="sidebar-row sidebar-place" aria-current={current}>
           {icon}
           <span className="sidebar-row-name">{label}</span>
           {count !== undefined && <Count count={count} words={words} />}
@@ -75,7 +75,7 @@ function Account() {
           </DropdownMenuTrigger>
         </Tip>
         <DropdownMenuContent side="top" align="start">
-          <DropdownMenuItem render={<Link to="/settings" hash="account" />}>
+          <DropdownMenuItem render={<Link activeOptions={EXACT} to="/settings" hash="account" />}>
             <UserCogIcon aria-hidden />
             Account settings
           </DropdownMenuItem>
@@ -129,7 +129,7 @@ export function Sidebar({ place, jump }: { readonly place: 'column' | 'drawer'; 
           <nav className="shell-sidebar" aria-label="Navigation" data-place={place}>
             <header className="sidebar-head">
               <Tip label="goblin">
-                <Link to="/" className="sidebar-brand" aria-label="goblin, the last channel">
+                <Link activeOptions={EXACT} to="/" className="sidebar-brand" aria-label="goblin, the last channel">
                   <GoblinMark />
                   <span className="sidebar-title">goblin</span>
                 </Link>
