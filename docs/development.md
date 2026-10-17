@@ -454,6 +454,16 @@ right on a desktop and from the bottom on a phone, in light and dark: Everything
 touch rows of 44px, no sideways scroll, and Save as the owner API's compare-and-set answered with a routine left short.
 Screenshots go under `.local/goblin-acceptance/setup-*`; this is browser fixture evidence only.
 
+`heavy bun apps/web/test/ui-navigation.ts` renders the real sidebar (ADR 0078) over a populated workspace in local
+Chromium, desktop and phone, light and dark: one highlighted row per page (a thread, a pinned App, an unpinned App under
+Apps, a profile under Personas), the counts, every pin state, the strip with ⌘B/Ctrl+B, its tooltip, a reload that keeps
+it and the Topics list beside its `#`, and the phone's dot and drawer. `heavy bun apps/web/test/ui-apps.ts` renders
+Apps: the four sections in order, pins that do not open keeping their place, two accounts on one service, search by
+label, a closed view reopened in one step, a failed built-app read kept to its section and the ⋯ targets.
+`heavy bun apps/web/test/ui-jump.ts` opens Jump to with ⌘K/Ctrl+K and its row, moves with the arrows, opens a thread
+and a section, and closes with Escape, returning focus. Screenshots go under `.local/goblin-acceptance/`; these are
+browser fixture evidence only.
+
 `heavy bun apps/web/test/ui-events.ts` renders a connection's Events (ADR 0041, ADR 0068) from source in local Chromium
 at desktop and phone widths, light and dark: the open offer, the picker with the events' titles and descriptions grouped
 by service, nothing picked until the owner picks it, an event with an existing subscription, a filter the server requires
