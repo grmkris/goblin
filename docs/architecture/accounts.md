@@ -58,7 +58,7 @@ cookie (`__Secure-better-auth.session_token`, or `better-auth.session_token` on 
 network, and the landing leaves for the tab's last channel if a check under way says signed in. The cookie is only a
 hint: `OwnerGate` still decides on every owner page. Everyone else gets goblin's landing (`components/landing`), which
 the root draws as a page of its own (`main.landing-root`: no shell, no splash) with Safari's bars tinted moss. The
-rail's Home and mark link to `/`, which the cached session turns into the owner's channel; signing in, signing out and
+sidebar's goblin mark links to `/`, which the cached session turns into the owner's channel; signing in, signing out and
 deleting the account `assign('/')`, so the server's cookie check sends each to their chat or to the landing.
 
 The landing is built from `@goblin/ui`'s marketing parts (`src/marketing`: `SiteBar`, `MossFrame`, `Section`,
@@ -79,7 +79,7 @@ the same for an open, skipped or finished Start. An owner who signs in through C
 lands on `/start/welcome`.
 
 **The page** (`components/start`). `/start/<step>` fills the screen (`routes/__root.tsx` draws no shell around it): one
-task per screen beside a panel in the rail's own green, which on a phone narrows to a band with a count and one
+task per screen beside a panel in the sidebar's own green, which on a phone narrows to a band with a count and one
 segment per step:
 1. welcome: what goblin is (goblin, the model it thinks with, the services it reaches);
 2. model: the deployment's models unless the owner brings their own endpoint and key, in Settings' own form
@@ -88,7 +88,7 @@ segment per step:
    came back or one that needed none, offers Use suggested access (`start/connect-server.tsx`);
 4. what the owner wants goblin for. The kickoff is recorded before its message is sent.
 
-Continue marks the step gone through; Skip setup skips Start. Finishing narrows the panel into the rail as the chat
+Continue marks the step gone through; Skip setup skips Start. Finishing narrows the panel into the sidebar as the chat
 appears.
 
 **State** (`onboarding/`). `app_onboarding` keeps the status the owner set (`done`, `skipped`; `open` otherwise, and

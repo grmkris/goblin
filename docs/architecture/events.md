@@ -71,7 +71,7 @@ events**, proposes and then confirms each stream's own routine in turn (`setUpEv
 grants exactly its selector; a filter the server requires and that is empty stops it and opens Advanced. Every stream remains selectable until a routine is configured for it; another consumer is not a service-specific
 exclusion. A quiet line states the
 limits: one run a minute, 20 notices an hour then a digest, events from before setup dropped. Activity lists each open
-offer ("Set up events for `<label>`", linking to its card, with Not now); it is not counted in the rail's badge.
+offer ("Set up events for `<label>`", linking to its card, with Not now); it is not counted in Activity's badge.
 
 The client refreshes before the producer's ISO `refreshBefore` and polls on gaps or webhook outages. Bounds are
 64 live subscriptions (maintenance reconciles every one; a tombstone is pruned once no delivery or binding

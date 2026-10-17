@@ -6,7 +6,7 @@ An App is a tool's `ui://` resource, served by the server that answered the call
 sandboxed frames (`lib/app-sandbox.ts`). The outer proxy only relays protocol messages to and from the host's origin.
 Its calls go through the owner API to the originating server and need that server's grant.
 
-The app is a Slack-style shell (ADR 0036, `components/shell`): the rail and the sidebar, then the channel, with the
+The app is a Slack-style shell (ADRs 0036 and 0078, `components/shell`): the sidebar, then the channel, with the
 thread panel placed by the channel's own width (a container query): beside it where the channel can spare the panel,
 over its right side where it cannot, over all of it (with a crumb back) where the rest would be too narrow to read, and
 as a full view of its own on a phone. The
@@ -45,13 +45,20 @@ page or closes it. Agent apps are listed in the sidebar's Apps section and on th
 `components/apps-page.tsx`, `components/app-manage.tsx`). Grant cards, link offers and context sharing remain
 host-drawn, per App.
 
-The sidebar's Pinned section (ADR 0053, `components/shell/sidebar.tsx` over the pure `lib/pins.ts`) shows the owner's
-pins, whole servers (they open the server's own App) and single App views, in their order. They are one revisioned row
-in the agent (`app_sidebar`, `sidebar/`), read and edited through `GET` and `POST /api/sidebar` and carried on the
-workspace feed (`sidebar`), so every device follows. A connected server with its own App shows pinned until the pins
-change; an edit first stores those (`adopt`) and the row remembers them (`seen`), so an unpin sticks. An edit made from
-an older revision answers `stale`, and the browser makes it once more from the pins it brings. Removing a connection
-(`mcp.removed`) or deleting an App (`apps.removed`) takes its pin.
+The Pinned list (ADRs 0053 and 0078, `components/shell/sidebar-pins.tsx` and the top of Apps, over the pure
+`lib/pins.ts`) shows the owner's pins, whole servers (they open the server's own App) and single App views, in their
+order. They are one revisioned row in the agent (`app_sidebar`, `sidebar/`), read and edited through `GET` and
+`POST /api/sidebar` and carried on the workspace feed (`sidebar`), so every device follows. Only the owner pins: a
+newly connected server is listed in Apps under Connected. Every pin shows in its place with its state (ready, signed
+out, no App any more, closed, not available); a read not made yet never hides one. An edit made from an older revision
+answers `stale`, and the browser makes it once more from the pins it brings. Removing a connection (`mcp.removed`) or
+deleting an App (`apps.removed`) takes its pin.
+
+Apps (`/apps`, ADR 0078, `components/apps-page.tsx` over the pure `lib/launcher.ts`) is the one launcher: the pins,
+the recent App views (at most six open, unpinned MCP App views, one per connection and tool, nothing stored), every
+connection that declares its own App (Open, or Reconnect while signed out) and every agent app (Open its view,
+reopening a closed one in the same step, or Manage at `/apps/<name>`). Each source loads and fails on its own; without
+agent apps on the deployment the last section is not shown.
 
 The App learns the host context (`lib/host-context.ts`): theme, our tokens as MCP Apps style variables, device,
 locale and time zone, its display mode, surface, the modes on offer, and its measured box. MCP Apps also receive

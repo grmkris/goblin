@@ -10,7 +10,7 @@ now (`topicNamed`, `personaNamed`). Routine writes require an exact configured O
 clear confirmation and stale revisions return 409. A definition (ADR 0041) is a trigger, a timezone, **Tell me**
 (`tellMe: { on, copy }`, a copy through Notify me via only with Tell me, ADR 0070) and **Hand to** (`handTo`: `none`; `goblin` with its
 instruction, allowed tools and budget; or `persona` with those and the Persona's id and the revision it pins); one that
-hands nothing over must tell the owner. Only a hand-over makes runs (`handOverOf`, `runHandOver`). Settings shows the
+hands nothing over must tell the owner. Only a hand-over makes runs (`handOverOf`, `runHandOver`). Work shows the
 instruction, exact tool pairs, timezone, budgets and whether notices are copied before confirmation. Its editor
 (`components/routine-editor.tsx`, `routine-when.tsx`, `routine-hand.tsx`) asks what, where (the Topic), when, Tell me
 (and "Also send to <label>", the sink's connection, offered only while Notify me via is set) and Hand to (nobody, Goblin or a Persona, with the instruction, tools and limits only for a hand-over);
@@ -36,7 +36,7 @@ A hand-over to a Persona pins its revision: propose, edit and confirm refuse a P
 the Persona as it is. A firing whose Persona was archived or changed since is recorded skipped and pauses the routine
 with that reason as its health (`routines/persona.ts` `personaHold`, `RoutineStore.halt`) until the owner confirms it
 again. `RoutineView.persona` reads the Persona live beside the pin (`{ id, name, pinned, current, archived }`), so
-Settings says "changed since you confirmed" as soon as it is edited, and **Confirm again**
+Work says "changed since you confirmed" as soon as it is edited, and **Confirm again**
 (`POST /api/routines/:id/confirm-again`) pins the Persona's revision now as a new routine revision and confirms it in
 one transaction. The web reads the routines again whenever the feed shows a Persona changed. The run works in the routine's own run conversation, not a fork of the Topic, so it replays no Topic history and
 is charged once: it is configured with the Persona's text in its context tail (`personaText(…, 'routine')`), its model
@@ -113,4 +113,4 @@ Activity lists the notifications from the workspace feed: its snapshot carries t
 thirty days (`Notices.views`), and every write or read publishes `notices.changed`, which the feed sends on as a
 `notification` change. A notification is unread while the owner has neither read it in Activity
 (`POST /api/notices/read`, `notices/api.ts`, at most two hundred ids) nor read its chat past it: opening the Topic reads
-its notices too. The rail's Activity count adds the unread notifications to what needs the owner.
+its notices too. Activity's count adds the unread notifications to what needs the owner.

@@ -7,7 +7,8 @@ itself an MCP server other tools can talk to.
 The agent has one stable main chat (`/c/1`); it resolves to the current Pi session. Side threads can start empty or branch from any message of any conversation, at
 any depth; they can share a note back to where they came from, and Close stops one with everything under it until it is
 reopened. Main learns the name of a thread started empty, and one live feed keeps every open tab's list and activity
-current. The web app is a Slack-style shell: a moss rail and a sidebar of Topics as channels, the channel (Personal's
+current. The web app is a Slack-style shell: one moss sidebar (Activity, Work and Apps, the owner's pins, the Topics as
+channels, then Connections, Personas and Settings), the channel (Personal's
 is Main), and a thread panel beside it where a message's thread opens, stacking threads opened inside threads. Each Topic has a setup:
 the MCP servers and their tools, skills, agent apps and subagents its chats work with, everything until the owner
 chooses a list, and a Persona adds its own while it answers there. Background subagents work in their own conversations, start their own when a job splits, post their final

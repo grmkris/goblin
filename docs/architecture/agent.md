@@ -331,19 +331,23 @@ stream is that session's; a reconnect starts again from a fresh snapshot. The wo
 to current chat ownership. `ConversationView.primary` is an optional boolean; `WorkspaceSnapshot.primary` is an optional
 chat id for compatible readers.
 
-Every signed-in page sits beside the app's shell (`components/shell`, ADR 0036): a moss rail of places (Home,
-Threads, Activity and Tasks, each with a count of what waits there, and at its foot Apps, Connections, Settings and
-Sign out) and the sidebar of channels (then the Personas, the owner's pins and the agent apps), both always shown on a
-desktop; on a phone they share a drawer from the left edge (`DrawerSide` in `@goblin/ui`, `tone="shell"`) that the page's top bar
-opens and a swipe left closes. The rail's pages (`components/shell/pages`, over the pure `lib/rail.ts`): Threads lists every thread, unread first, the
-closed folded; Activity collects what needs the owner across Topics (each chat's `attention` from a server that
-reports it, and agent apps whose schedules need the owner), Tell me's notifications (unread first, with Mark all
-read), the unread chats, and organizing receipts with Undo (`POST /api/organize/:id/undo`, offered while the receipt is
-undoable), and its count is what needs the owner plus the unread notifications; Tasks lists the Delegates (subagents) at work
-and finished, the Personas answering and answered, and the routines on a schedule. On a server with Personas the
-sidebar lists them after the Topics; a click opens the profile (`/p/<id>`), never a chat: its definition (a glyph on
-a hue, name, role, instructions, a model from the offered ones, and what it may use, which only narrows the owner's
-grants) saved as a new revision with the revision it was read at (`PATCH /api/personas/:id`, a conflict asks for a
+Every signed-in page sits beside the app's shell (`components/shell`, ADRs 0036 and 0078): one moss sidebar. At its
+head goblin's mark (the channel this tab showed last), Jump to (⌘K, `jump-to.tsx`) and the places Activity, Work and
+Apps; in the middle, which scrolls, the owner's pins and the Topics as channels, each with its live threads, then
+Archived, Add topic and All threads; at its foot Connections, Personas, Settings and the account menu with Sign out.
+Exactly one row shows where the page is (`lib/nav-highlight.ts`): an App's page marks its pin or Apps, never its
+Topic. Its counts (`lib/rail.ts` `railCounts`): Activity what needs the owner plus the unread notifications, Work the
+Delegates at work and the Personas answering, All threads the unread threads. On a desktop it collapses to a strip of
+icons (⌘B; `data-sidebar` on the root, restored before the first paint from this browser's storage); on a phone it is
+a drawer from the left edge (`DrawerSide` in `@goblin/ui`, `tone="shell"`) that the page's top bar opens, with a dot
+while Activity has something, and a swipe left closes. The pages (`components/shell/pages`, over the pure
+`lib/rail.ts`): All threads lists every thread, unread first, the closed folded; Activity collects what needs the owner
+across Topics (each chat's `attention` from a server that reports it, and agent apps whose schedules need the owner),
+Tell me's notifications (unread first, with Mark all read), the unread chats, and organizing receipts with Undo
+(`POST /api/organize/:id/undo`, offered while the receipt is undoable); Work lists what runs (the Delegates at work,
+the Personas answering), the routines with their controls, every agent app's schedules, and the recent results.
+`/personas` lists the Personas; a click opens the profile (`/p/<id>`), never a chat: its definition (a glyph on a hue,
+name, role, instructions, a model from the offered ones, and what it may use, which only narrows the owner's grants) saved as a new revision with the revision it was read at (`PATCH /api/personas/:id`, a conflict asks for a
 reload), Archive or Restore, and its revisions. `/p/new` creates one (one operation id per visit). Connections and Settings are columns of titled sections (`PageSection`)
 whose states read in words (`lib/labels.ts`), never the raw value the runtime sends. The workspace fills the page beside it. The transcript scrolls in a `MessageScroller` (from `@shadcn/react`, patched with upstream fixes that are not
 released yet; `bun run check:patches` proves the patch is installed). Each of
@@ -404,7 +408,7 @@ are kept in goblin's store, not settled by a message: each stays pinned while it
 ended or its store forgot it, read from the queries its card keeps (`approvals/hooks.ts`); its outcome row then says
 how it went. Only one that is pending counts as the agent waiting on the owner (`waitingOnOwner`), so presence says
 Working, not Waiting for you, while the turn the owner's answer started runs. Each change of a held call or URL request
-publishes `conversations.changed` for its chat, so attention (the rail, Needs you) follows it at once.
+publishes `conversations.changed` for its chat, so attention (the sidebar's counts, Needs you) follows it at once.
 
 At a keyboard and mouse Enter sends and Shift+Enter breaks the line; on a touch screen Return breaks the line and
 the Send button sends, with ⌘/Ctrl+Enter from a hardware keyboard (`lib/keys.ts`). The composer carries the agent's presence (`lib/presence.ts`): one state for the whole agent, with the most urgent

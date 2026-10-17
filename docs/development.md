@@ -116,7 +116,7 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_MCP_SERVERS` | JSON list of outbound servers every account starts with (`[]` for none): `[{"connectionId":"notes","endpoint":"https://mcp.example.com/mcp","label":"Notes"}]`. Each owner still signs in, and grants start empty; nothing in code depends on which servers they are (ADR 0063). |
 | `GOBLIN_MCP_SHELF` | Optional JSON list of shelf entries (`id`, `title`, `description`, `endpoint`, `group`, `signIn`): one with the id of goblin's own entry replaces it, the others are added after (ADR 0061). Unset, the shelf is goblin's. |
 | `GOBLIN_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP credentials and Events secrets/envelopes; derives purpose-separated hook tokens. |
-| `GOBLIN_LARGE_FILES`, `GOBLIN_AGENT_APPS`, `GOBLIN_FLOWS` | Optional bindings, each on unless `off` (ADR 0064): the `FILES` bucket (without it files up to 128 KiB stay in the agent and larger ones are refused), the `LOADER` for agent apps and `code_run` (without it the agent has no app tools and the rail no Apps), the `FLOWS` dataset (without it no flow metrics). Dev and prod keep all three. |
+| `GOBLIN_LARGE_FILES`, `GOBLIN_AGENT_APPS`, `GOBLIN_FLOWS` | Optional bindings, each on unless `off` (ADR 0064): the `FILES` bucket (without it files up to 128 KiB stay in the agent and larger ones are refused), the `LOADER` for agent apps and `code_run` (without it the agent has no app tools and Apps no Built for you), the `FLOWS` dataset (without it no flow metrics). Dev and prod keep all three. |
 
 These are source defaults and configuration names; active dev settings and provider caps must be verified separately.
 
@@ -198,7 +198,11 @@ until it runs, real provider and Telegram delivery remain unverified.
   retries. An idle conversation with pending inputs does not say Ready. Helpers and routine runs use their existing flows.
   Remove withdraws one waiting message without stopping active work. If Pi has already started it, the message keeps
   running and the UI says so. Failed removals keep the row visible for retry.
-- **Conversations.** Each Topic is a channel in the sidebar; Personal's is Main (`/c/1`), and the rail's Home opens
+- **The sidebar.** One moss column on every page: Jump to (⌘K), Activity, Work and Apps; your pins; the Topics with
+  their live threads and All threads; Connections, Personas, Settings and Account (Sign out) at its foot. One row
+  shows where you are. ⌘B (Ctrl+B) or its button collapses it to a strip of icons, remembered in this browser; on a
+  phone it is a drawer from the top bar's button, which shows a dot while Activity has something.
+- **Conversations.** Each Topic is a channel in the sidebar; Personal's is Main (`/c/1`), and goblin's mark opens
   the channel you showed last. **Reply in thread** in the toolbar over any settled message, in any conversation,
   opens a draft in the thread panel beside the channel; sending starts the thread from that message, so an unsent
   reply leaves nothing behind. The message then carries the thread's summary ("n replies · Last reply …"), which
@@ -214,15 +218,18 @@ until it runs, real provider and Telegram delivery remain unverified.
   keeps it open, and while it works your
   message steers it, and its answer goes up to whoever started it with your words quoted. Every chat of a Topic works
   with the Topic's setup (its MCP servers and their tools, skills, apps and subagents; ADR 0040): choose it when you
-  create the Topic, from the Topic menu's "MCP servers & skills…" or from the button beside the composer, which reads
+  create the Topic, from the Topic menu's "Topic setup…" or from the button beside the composer, which reads
   what a narrowed setup holds. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
-- **Threads, Activity and Tasks.** The rail's Threads lists every thread, unread first; Activity what needs you (with
-  Undo for what Goblin organized); Tasks the Delegates, Personas and routines at work. A Persona in the sidebar opens
-  its profile: edit it (each save is a revision), archive it, or read its revisions. **Add persona** makes one.
-- **Pinned and an App full screen.** The sidebar's Pinned section lists what you pinned, in your order, on every
-  device; a connected server with its own App is pinned until you unpin it. Pin to sidebar is in a server card's menu,
-  an App page's menu and the bar above an App in a chat; a row's own menu moves it or unpins it. A pinned server opens
-  its App in its own thread (listed under Threads). On an App's page goblin's composer stays at the bottom: a reply
+- **All threads, Activity, Work and Personas.** All threads lists every thread, unread first; Activity what needs you
+  (with Undo for what Goblin organized); Work what runs (Delegates, Personas answering), your routines with their
+  controls, every agent app's schedules and recent results. Personas lists them; a click opens a profile: edit it
+  (each save is a revision), archive it, or read its revisions. **Add persona** makes one.
+- **Apps, Pinned and an App full screen.** Apps lists your pins, the recent App views from your chats, every
+  connection with its own App (Reconnect when signed out) and the apps goblin built for you (Open, or Manage). Pinned,
+  in the sidebar and at the top of Apps, lists only what you pinned, in your order, on every device; a pin that does
+  not open says why. Pin to sidebar is in Apps, a server card's menu, an App page's menu and the bar above an App in a
+  chat; a row's own menu moves it or unpins it. A pinned server opens its App in its own thread (listed under All
+  threads). On an App's page goblin's composer stays at the bottom: a reply
   shows as one line over it, and a tap opens the conversation beside the App (a sheet on a phone).
 - **Threads from the composer, Personas and sources.** The composer's thread button (or `/new-thread`) makes the next
   send start a thread; × goes back with the draft kept. On a server with Move, a message of yours in a channel offers
@@ -364,7 +371,7 @@ until it runs, real provider and Telegram delivery remain unverified.
 - UI components: goblin looks like the myapps apps. Prefer porting a component from the myapps checkout's `packages/ui`
   (with an "Adapted from" header naming the commit); otherwise `bunx shadcn@latest add <component>` from
   `packages/ui`, then review the generated file. Keep the shared tokens in `packages/ui/src/styles.css` as myapps has
-  them (the shell's `--shell-*` and `--moss` tokens are goblin's: the moss rail and sidebar beside the off-white page). Motion uses the theme's curves (`ease-out`,
+  them (the shell's `--shell-*` and `--moss` tokens are goblin's: the moss sidebar beside the off-white page). Motion uses the theme's curves (`ease-out`,
   `ease-in-out`, `ease-drawer`, the default for every `transition-*`), never ease-in or `transition-all`, at 300ms or
   less with exits faster than entrances (sheets excepted). Every raw `:hover` in the app CSS sits under
   `(hover: hover)`, and a control that tints on hover tints on `:active` too, because the tap highlight is off. Fields

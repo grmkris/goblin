@@ -43,7 +43,7 @@ chat's work through the owner's Stop (runs, queued inputs, subagents and routine
 They are the owner API's `topics` group (`topics/api.ts`); the web reads the Topics, archived ones included, from the
 workspace feed. Its snapshot lists `topics`, a change is
 `{ type: 'topic', topic }`, and each `ConversationView` carries `topic` and, for a Conversation, `conversation: true`.
-Its `attention` (`attention.ts`) lists what in that chat waits on the owner for the Activity rail: the asks since its
+Its `attention` (`attention.ts`) lists what in that chat waits on the owner for Activity: the asks since its
 newest user message from goblin's own tool-result markers (`ask_user`, a grant request, something outside the Topic's
 setup), its
 pending held MCP calls, and the unanswered powers of agent apps living there.

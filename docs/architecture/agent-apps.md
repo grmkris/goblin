@@ -11,7 +11,7 @@ runs `state.migrate`. Only then does the release become active, as one transacti
 build is kept with its problems and changes nothing that runs. Every app release, the transpiler and `code_run` run
 through `agent-apps/isolates.ts` over the `LOADER` binding: no network, no bindings, a CPU limit, at most eight calls
 at once, and wall timeouts. A deployment without it (`GOBLIN_AGENT_APPS=off`, ADR 0064) gives the agent no app or
-`code_run` tools, refuses any isolate (`Forbidden`, `agent_apps_unavailable`) and drops Apps from the rail.
+`code_run` tools, refuses any isolate (`Forbidden`, `agent_apps_unavailable`) and drops Built for you from Apps.
 
 A call (`agent-apps/dispatch.ts`) checks its input against the member's schema; an action's `prepare` runs once
 with a read-only state snapshot and the app's powers (its own files in Shell's namespace `app_<name>`, a log line),
