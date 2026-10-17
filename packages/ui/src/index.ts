@@ -51,6 +51,7 @@ export {
   PopoverTrigger,
 } from './components/popover.tsx'
 export { Meter } from './components/meter.tsx'
+export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/tooltip.tsx'
 export { NativeSelect, NativeSelectOption } from './components/native-select.tsx'
 export {
   MessageScroller,

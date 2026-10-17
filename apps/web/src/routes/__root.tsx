@@ -13,6 +13,7 @@ import { AppLayer } from '../components/apps/stage.tsx'
 import { LinkConfirmProvider } from '../components/parts/link-confirm.tsx'
 import { ShellNavigation } from '../components/shell/navigation.tsx'
 import { ShellFrame } from '../components/shell/shell.tsx'
+import { COLLAPSE_SCRIPT } from '../components/shell/sidebar-state.ts'
 import { WorkspaceFeedProvider } from '../components/workspace-feed.tsx'
 import { useSession } from '../auth/hooks.ts'
 import { startupImages } from '../lib/startup-images.ts'
@@ -72,7 +73,7 @@ function Root() {
 }
 
 /**
- * The app around every page: the rail and the sidebar beside the page (`components/shell`), and above it the stages
+ * The app around every page: the sidebar beside the page (`components/shell`), and above it the stages
  * of the live Apps, which outlive moving between a channel and an App's page, once someone is (or may be) signed in.
  * Signing in, and a visitor who is signed out, get the bare page. First-run Start (ADR 0062) fills the screen on its
  * own; no other page waits for it, whatever its status. Every other page shows the shell while the session is still
@@ -118,6 +119,7 @@ function Document({ children }: { readonly children: ReactNode }) {
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: COLLAPSE_SCRIPT }} />
         {/* The top colour of each scheme. Written here because the route head keeps one meta per name. */}
         <meta name="theme-color" content={top.light} media="(prefers-color-scheme: light)" />
         <meta name="theme-color" content={top.dark} media="(prefers-color-scheme: dark)" />

@@ -1,379 +1,197 @@
-import { type ReactNode, useState } from 'react'
-import { Link, useRouterState } from '@tanstack/react-router'
-import { type AppView, type ConversationView, type PersonaView, type TopicView, pinKey } from '@goblin/contracts'
+import type { ReactNode } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  GoblinMark,
+  TooltipProvider,
 } from '@goblin/ui'
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  ChevronRightIcon,
-  EllipsisIcon,
-  HashIcon,
+  AtSignIcon,
+  BellIcon,
+  CircleUserIcon,
   LayoutGridIcon,
-  MessagesSquareIcon,
-  PinOffIcon,
-  PlusIcon,
+  ListChecksIcon,
+  LogOutIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
+  PlugIcon,
+  SettingsIcon,
+  UserCogIcon,
 } from 'lucide-react'
-import { jobTrouble } from '../../lib/app-jobs.ts'
-import { agentApps, appOrigin } from '../../lib/app-names.ts'
-import { activePersonas } from '../../lib/personas.ts'
-import { type ShownPin, targetOf } from '../../lib/pins.ts'
-import { isUnread, threadTitle } from '../../lib/threads.ts'
-import { channels, topicThreads } from '../../lib/topics.ts'
-import {
-  useActivities,
-  useActivity,
-  useApps,
-  useConversation,
-  useConversations,
-  usePersonas,
-  useTopics,
-} from '../../lib/workspace/hooks.ts'
-import { type Pins, usePins } from '../../sidebar/hooks.ts'
-import { AppTile } from '../apps/app-tile.tsx'
-import { PersonaAvatar } from '../persona-avatar.tsx'
-import { useCurrent, useFolded, useRecentThreads } from './sidebar-state.ts'
-import { TopicDialog } from './topic-dialog.tsx'
+import { signOutMutation } from '../../auth/queries.ts'
+import type { NavRow } from '../../lib/nav-highlight.ts'
+import { Count, Here, Strip, Tip, useCurrent } from './sidebar-parts.tsx'
+import { Pinned } from './sidebar-pins.tsx'
+import { toggleCollapsed, useCollapsed, useHighlight, useNavCounts } from './sidebar-state.ts'
+import { Topics, TopicsInStrip } from './sidebar-topics.tsx'
 
-/** A section of the sidebar: a label that folds it, an action at its end, and its rows. */
-function Section({
-  id,
+type PlaceTo = '/activity' | '/tasks' | '/apps' | '/threads' | '/connections' | '/personas' | '/settings'
+
+/** One of the places: its icon and name, and what waits there. */
+function Place({
+  to,
+  row,
   label,
-  action,
-  children,
+  icon,
+  count,
+  words = '',
 }: {
-  readonly id: string
+  readonly to: PlaceTo
+  readonly row: NavRow
   readonly label: string
-  readonly action?: ReactNode
-  readonly children: ReactNode
+  readonly icon: ReactNode
+  readonly count?: number
+  readonly words?: string
 }) {
-  const [folded, toggle] = useFolded(id)
-  return (
-    <section className="sidebar-section" aria-label={label}>
-      <div className="sidebar-section-head">
-        <button type="button" className="sidebar-section-toggle" aria-expanded={!folded} onClick={toggle}>
-          <ChevronRightIcon aria-hidden />
-          {label}
-        </button>
-        {action}
-      </div>
-      {!folded && <ul className="sidebar-rows">{children}</ul>}
-    </section>
-  )
-}
-
-/** A Topic's channel: `#` and its name, bold with a dot while it has replies the owner has not read. */
-function ChannelRow({ topic, current }: { readonly topic: TopicView; readonly current: boolean }) {
-  const view = useConversation(topic.conversation)
-  const unread = view !== undefined && isUnread(view)
-  const working = useActivity(topic.conversation) !== undefined
+  const current = useCurrent(row)
   return (
     <li>
-      <Link
-        to="/c/$chatId"
-        params={{ chatId: topic.conversation }}
-        className="sidebar-row"
-        aria-current={current ? 'page' : undefined}
-        data-unread={unread || undefined}
-      >
-        <HashIcon className="sidebar-row-mark" aria-hidden />
-        <span className="sidebar-row-name">{topic.name}</span>
-        {working && <span className="sidebar-row-busy" aria-label="Working" />}
-        {unread && !working && <span className="sidebar-row-unread" aria-label="Unread replies" />}
-      </Link>
-    </li>
-  )
-}
-
-/** A thread under its channel: its name, bold with a dot while unread, a pulse while it works; it opens in the panel. */
-function ThreadRow({
-  view,
-  channel,
-  current,
-}: {
-  readonly view: ConversationView
-  readonly channel: string
-  readonly current: boolean
-}) {
-  const unread = isUnread(view)
-  const working = useActivity(view.id) !== undefined
-  return (
-    <li>
-      <Link
-        to="/c/$chatId"
-        params={{ chatId: channel }}
-        search={{ thread: Number(view.id) }}
-        className="sidebar-row sidebar-thread"
-        aria-current={current ? 'page' : undefined}
-        data-unread={unread || undefined}
-      >
-        <MessagesSquareIcon className="sidebar-row-mark" aria-hidden />
-        <span className="sidebar-row-name">{threadTitle(view)}</span>
-        {working && <span className="sidebar-row-busy" aria-label="Working" />}
-        {unread && !working && <span className="sidebar-row-unread" aria-label="Unread replies" />}
-      </Link>
-    </li>
-  )
-}
-
-/** A channel with, one flat level under it, its threads at work, unread, recently opened or showing now. */
-function ChannelWithThreads({
-  topic,
-  current,
-  recent,
-}: {
-  readonly topic: TopicView
-  readonly current: ReturnType<typeof useCurrent>
-  readonly recent: ReadonlySet<string>
-}) {
-  const conversations = useConversations()
-  const topics = useTopics()
-  const activity = useActivities()
-  const shown = current.thread === undefined ? recent : new Set([...recent, current.thread])
-  const threads = topicThreads(topic.conversation, conversations, topics, activity, shown)
-  return (
-    <>
-      <ChannelRow topic={topic} current={topic.conversation === current.channel && current.thread === undefined} />
-      {threads.map((view) => (
-        <ThreadRow key={view.id} view={view} channel={topic.conversation} current={view.id === current.thread} />
-      ))}
-    </>
-  )
-}
-
-/** The archived Topics, folded under one row until asked for. */
-function Archived({
-  topics,
-  current,
-}: {
-  readonly topics: readonly TopicView[]
-  readonly current: string | undefined
-}) {
-  const [open, setOpen] = useState(false)
-  if (topics.length === 0) return null
-  return (
-    <>
-      <li>
-        <button type="button" className="sidebar-row sidebar-fold" aria-expanded={open} onClick={() => setOpen(!open)}>
-          <ChevronRightIcon className="sidebar-row-mark" aria-hidden />
-          <span className="sidebar-row-name">Archived ({topics.length})</span>
-        </button>
-      </li>
-      {open &&
-        topics.map((topic) => <ChannelRow key={topic.id} topic={topic} current={topic.conversation === current} />)}
-    </>
-  )
-}
-
-/** One agent app: its tile and title, and a dot while one of its schedules needs the owner. */
-function AppRow({ app, current }: { readonly app: AppView; readonly current: boolean }) {
-  const trouble = app.source.kind === 'agent' && app.source.jobs.some(jobTrouble)
-  return (
-    <li>
-      <Link
-        to="/a/$appId"
-        params={{ appId: app.id }}
-        className="sidebar-row"
-        aria-current={current ? 'page' : undefined}
-      >
-        <AppTile origin={appOrigin(app)} />
-        <span className="sidebar-row-name">{app.title}</span>
-        {trouble && <span className="sidebar-row-alert" aria-label="Needs you" />}
-      </Link>
-    </li>
-  )
-}
-
-/** A pinned row's menu: move it up or down among the pins, or unpin it. */
-function PinMenu({ pin, pins }: { readonly pin: ShownPin; readonly pins: Pins }) {
-  const target = targetOf(pin)
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={<button type="button" className="sidebar-row-more" aria-label={`More for ${pin.title}`} />}
-      >
-        <EllipsisIcon aria-hidden />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        <DropdownMenuItem disabled={!pins.canMove(target, -1)} onClick={() => pins.move(target, -1)}>
-          <ArrowUpIcon aria-hidden />
-          Move up
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={!pins.canMove(target, 1)} onClick={() => pins.move(target, 1)}>
-          <ArrowDownIcon aria-hidden />
-          Move down
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => pins.unpin(target)}>
-          <PinOffIcon aria-hidden />
-          Unpin
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-/** One pin: a server opens its own App in its thread; a view opens that App's page. */
-function PinnedRow({ pin, pins, current }: { readonly pin: ShownPin; readonly pins: Pins; readonly current: boolean }) {
-  const label = (
-    <>
-      <AppTile
-        origin={pin.kind === 'server' ? pin.connectionId : pin.app === undefined ? pin.appId : appOrigin(pin.app)}
-      />
-      <span className="sidebar-row-name">{pin.title}</span>
-    </>
-  )
-  const page = current ? 'page' : undefined
-  return (
-    <li className="sidebar-pin">
-      {pin.kind === 'server' ? (
-        <Link
-          to="/connections/$connectionId/app"
-          params={{ connectionId: pin.connectionId }}
-          className="sidebar-row"
-          aria-current={page}
-        >
-          {label}
+      <Tip label={label}>
+        <Link to={to} className="sidebar-row sidebar-place" aria-current={current}>
+          {icon}
+          <span className="sidebar-row-name">{label}</span>
+          {count !== undefined && <Count count={count} words={words} />}
         </Link>
-      ) : (
-        <Link to="/a/$appId" params={{ appId: pin.appId }} className="sidebar-row" aria-current={page}>
-          {label}
-        </Link>
-      )}
-      <PinMenu pin={pin} pins={pins} />
+      </Tip>
     </li>
   )
 }
 
-/** The App id of each server's own App, by connection: the page a pinned server is current on. */
-const serverApps = (apps: readonly AppView[]): ReadonlyMap<string, string> =>
-  new Map(
-    apps.flatMap((app) =>
-      app.source.kind === 'mcp' && app.source.entrypoint === true ? [[app.source.connectionId, app.id]] : [],
-    ),
-  )
-
-/**
- * The owner's pins (ADRs 0053, 0078), in their order: servers with their own App and single App views, mixed. Nothing
- * when nothing is pinned.
- */
-function Pinned({ path }: { readonly path: string }) {
-  const pins = usePins()
-  const opened = useApps(serverApps)
-  if (pins.shown.length === 0) return null
-  const isCurrent = (pin: ShownPin) =>
-    pin.kind === 'server'
-      ? path === `/connections/${pin.connectionId}/app` || path === `/a/${opened.get(pin.connectionId) ?? ''}`
-      : path === `/a/${pin.appId}`
-  return (
-    <Section id="pinned" label="Pinned">
-      {pins.shown.map((pin) => (
-        <PinnedRow key={pinKey(targetOf(pin))} pin={pin} pins={pins} current={isCurrent(pin)} />
-      ))}
-    </Section>
-  )
-}
-
-/** A Persona: its mark and `@name`; a click opens its profile (never a chat with it). */
-function PersonaRow({ persona, current }: { readonly persona: PersonaView; readonly current: boolean }) {
+/** The Account row: a menu with the account's settings and Sign out. */
+function Account() {
+  const signingOut = useMutation(signOutMutation)
   return (
     <li>
-      <Link
-        to="/p/$id"
-        params={{ id: String(persona.id) }}
-        className="sidebar-row"
-        aria-current={current ? 'page' : undefined}
-      >
-        <PersonaAvatar avatar={persona.avatar} size="sm" />
-        <span className="sidebar-row-name">@{persona.name}</span>
-      </Link>
-    </li>
-  )
-}
-
-/** The Personas, then "+ Add persona". */
-function Personas({ path }: { readonly path: string }) {
-  const personas = usePersonas()
-  return (
-    <Section id="personas" label="Personas">
-      {activePersonas(personas).map((persona) => (
-        <PersonaRow key={persona.id} persona={persona} current={path === `/p/${persona.id}`} />
-      ))}
-      <li>
-        <Link
-          to="/p/$id"
-          params={{ id: 'new' }}
-          className="sidebar-row"
-          aria-current={path === '/p/new' ? 'page' : undefined}
-        >
-          <PlusIcon className="sidebar-row-mark" aria-hidden />
-          <span className="sidebar-row-name">Add persona</span>
-        </Link>
-      </li>
-    </Section>
-  )
-}
-
-/** "+ Add topic" at the end of the Topics: it opens the new Topic's dialog. */
-function AddTopic() {
-  const [open, setOpen] = useState(false)
-  return (
-    <li>
-      <button type="button" className="sidebar-row" onClick={() => setOpen(true)}>
-        <PlusIcon className="sidebar-row-mark" aria-hidden />
-        <span className="sidebar-row-name">Add topic</span>
-      </button>
-      {open && <TopicDialog open onOpenChange={setOpen} />}
-    </li>
-  )
-}
-
-/**
- * The sidebar: the Topics as channels (Personal first, each with its live threads under it, the archived folded at the
- * end, then Add topic), then the Personas (a click opens a profile), then the owner's pins, then the agent apps. A click on a channel opens it; on a thread, opens it in the panel.
- */
-export function Sidebar() {
-  const current = useCurrent()
-  const recent = useRecentThreads()
-  const path = useRouterState({ select: (router) => router.location.pathname })
-  const { active, archived } = channels(useTopics())
-  const apps = useApps(agentApps)
-  return (
-    <nav className="shell-sidebar" aria-label="Topics and apps">
-      <header className="sidebar-head">
-        <span className="sidebar-title">goblin</span>
-      </header>
-      <div className="sidebar-scroll">
-        <Section id="topics" label="Topics">
-          {active.map((topic) => (
-            <ChannelWithThreads key={topic.id} topic={topic} current={current} recent={recent} />
-          ))}
-          <Archived topics={archived} current={current.channel} />
-          <AddTopic />
-        </Section>
-        <Personas path={path} />
-        <Pinned path={path} />
-        {apps.length > 0 && (
-          <Section
-            id="apps"
-            label="Apps"
-            action={
-              <Link to="/apps" className="sidebar-section-action" aria-label="All apps" title="All apps">
-                <LayoutGridIcon aria-hidden />
-              </Link>
-            }
+      <DropdownMenu>
+        <Tip label="Account">
+          <DropdownMenuTrigger render={<button type="button" className="sidebar-row sidebar-place" />}>
+            <CircleUserIcon className="sidebar-row-mark" aria-hidden />
+            <span className="sidebar-row-name">Account</span>
+          </DropdownMenuTrigger>
+        </Tip>
+        <DropdownMenuContent side="top" align="start">
+          <DropdownMenuItem render={<Link to="/settings" hash="account" />}>
+            <UserCogIcon aria-hidden />
+            Account settings
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            disabled={signingOut.isPending}
+            onClick={() => signingOut.mutate(undefined, { onSettled: () => window.location.assign('/') })}
           >
-            {apps.map((app) => (
-              <AppRow key={app.id} app={app} current={path === `/a/${app.id}`} />
-            ))}
-          </Section>
-        )}
-      </div>
-    </nav>
+            <LogOutIcon aria-hidden />
+            Sign out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </li>
+  )
+}
+
+/** Collapses the sidebar to its strip of icons, or opens it again (⌘B or Ctrl+B too). */
+function CollapseButton() {
+  const collapsed = useCollapsed()
+  const label = collapsed ? 'Expand sidebar' : 'Collapse sidebar'
+  return (
+    <Tip label={label}>
+      <button
+        type="button"
+        className="sidebar-collapse"
+        aria-label={label}
+        aria-expanded={!collapsed}
+        onClick={toggleCollapsed}
+      >
+        {collapsed ? <PanelLeftOpenIcon aria-hidden /> : <PanelLeftCloseIcon aria-hidden />}
+      </button>
+    </Tip>
+  )
+}
+
+/**
+ * The sidebar (ADR 0078): goblin's mark (the channel this tab showed last) and the places (Activity, Work, Apps) at
+ * its head; the owner's pins and the Topics with their live threads in the middle, which scrolls; Connections,
+ * Personas, Settings and the account at its foot. On a desktop it is a column the owner can collapse to a strip of
+ * icons; on a phone, the drawer's contents. Exactly one row shows where the page is.
+ */
+export function Sidebar({ place, jump }: { readonly place: 'column' | 'drawer'; readonly jump?: ReactNode }) {
+  const collapsed = useCollapsed()
+  const here = useHighlight()
+  const counts = useNavCounts()
+  return (
+    <Strip value={place === 'column' && collapsed}>
+      <Here value={here}>
+        <TooltipProvider>
+          <nav className="shell-sidebar" aria-label="Navigation" data-place={place}>
+            <header className="sidebar-head">
+              <Tip label="goblin">
+                <Link to="/" className="sidebar-brand" aria-label="goblin, the last channel">
+                  <GoblinMark />
+                  <span className="sidebar-title">goblin</span>
+                </Link>
+              </Tip>
+              {place === 'column' && <CollapseButton />}
+            </header>
+            <ul className="sidebar-rows sidebar-places">
+              {jump}
+              <Place
+                to="/activity"
+                row="activity"
+                label="Activity"
+                icon={<BellIcon className="sidebar-row-mark" aria-hidden />}
+                count={counts.activity}
+                words="waiting"
+              />
+              <Place
+                to="/tasks"
+                row="work"
+                label="Work"
+                icon={<ListChecksIcon className="sidebar-row-mark" aria-hidden />}
+                count={counts.tasks}
+                words="running"
+              />
+              <Place
+                to="/apps"
+                row="apps"
+                label="Apps"
+                icon={<LayoutGridIcon className="sidebar-row-mark" aria-hidden />}
+              />
+            </ul>
+            <div className="sidebar-scroll">
+              <Pinned />
+              <ul className="sidebar-rows sidebar-strip-only">
+                <TopicsInStrip unread={counts.threads} />
+              </ul>
+              <Topics unread={counts.threads} />
+            </div>
+            <ul className="sidebar-rows sidebar-foot">
+              <Place
+                to="/connections"
+                row="connections"
+                label="Connections"
+                icon={<PlugIcon className="sidebar-row-mark" aria-hidden />}
+              />
+              <Place
+                to="/personas"
+                row="personas"
+                label="Personas"
+                icon={<AtSignIcon className="sidebar-row-mark" aria-hidden />}
+              />
+              <Place
+                to="/settings"
+                row="settings"
+                label="Settings"
+                icon={<SettingsIcon className="sidebar-row-mark" aria-hidden />}
+              />
+              <Account />
+            </ul>
+          </nav>
+        </TooltipProvider>
+      </Here>
+    </Strip>
   )
 }

@@ -1,15 +1,21 @@
 /*
- * The app's frame (components/shell): a moss rail and sidebar beside the page on a desktop; on a phone the page alone,
- * with the rail and sidebar in a drawer from the left. The colours are the `--shell-*` tokens of @goblin/ui. The rail
- * and sidebar are chrome: nothing in them is text to select or press and hold.
+ * The app's frame (components/shell, ADR 0078): the moss sidebar beside the page on a desktop, which the owner can
+ * collapse to a strip of icons; on a phone the page alone, with the sidebar in a drawer from the left. The colours are
+ * the `--shell-*` tokens of @goblin/ui. The sidebar is chrome: nothing in it is text to select or press and hold.
  */
+:root {
+  --sidebar-width: 17rem;
+  --sidebar-strip-width: 3.5rem;
+}
 .shell-frame {
-  --rail-width: 4.75rem;
-  --sidebar-width: 16.5rem;
-  --shell-nav-width: calc(var(--rail-width) + var(--sidebar-width));
+  --shell-nav-width: var(--sidebar-width);
   display: flex;
   min-height: 100dvh;
   background: var(--background);
+}
+/* Collapsed (sidebar-state.ts): the page widens at once; the column never animates its width over the page. */
+:root[data-sidebar='collapsed'] .shell-frame {
+  --shell-nav-width: var(--sidebar-strip-width);
 }
 .shell-nav {
   position: fixed;
@@ -33,122 +39,22 @@
     margin-inline-start: var(--shell-nav-width);
   }
 }
-.shell-rail,
 .shell-sidebar {
   -webkit-touch-callout: none;
   user-select: none;
 }
 
-/* The rail: each stop an icon on a rounded square with its name under it; the current one filled. */
-.shell-rail {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.375rem;
-  width: var(--rail-width);
-  padding-block: max(0.75rem, var(--safe-top)) max(0.75rem, var(--safe-bottom));
-  overflow-y: auto;
-  scrollbar-width: none;
-  background: var(--shell-rail);
-  color: var(--shell-foreground);
-}
-.rail-brand {
-  display: grid;
-  width: 2.5rem;
-  height: 2.5rem;
-  flex: none;
-  place-items: center;
-  margin-block-end: 0.5rem;
-  border-radius: 0.75rem;
-  background: var(--shell-active);
-  color: var(--shell-active-foreground);
-}
-.rail-brand > svg {
-  width: 1.375rem;
-  height: 1.375rem;
-}
-.rail-item {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.1875rem;
-  width: 100%;
-  padding-block: 0.125rem;
-  color: var(--shell-muted);
-  font-size: var(--text-2xs);
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  touch-action: manipulation;
-}
-.rail-icon {
-  position: relative;
-  display: grid;
-  width: 2.25rem;
-  height: 2.25rem;
-  place-items: center;
-  border-radius: 0.625rem;
-  transition:
-    background-color 150ms var(--ease-out),
-    scale 120ms var(--ease-out);
-}
-.rail-icon > svg {
-  width: 1.25rem;
-  height: 1.25rem;
-  stroke-width: 1.75;
-}
-@media (hover: hover) and (pointer: fine) {
-  .rail-item:hover {
-    color: var(--shell-foreground);
-  }
-  .rail-item:hover > .rail-icon {
-    background: var(--shell-hover);
-  }
-}
-.rail-item:active > .rail-icon {
-  background: var(--shell-pressed);
-  scale: 0.96;
-}
-.rail-item[aria-current='page'] {
-  color: var(--shell-foreground);
-}
-.rail-item[aria-current='page'] > .rail-icon {
-  background: var(--shell-pressed);
-}
-.rail-item:focus-visible,
-.rail-brand:focus-visible {
-  outline: 2px solid var(--shell-ring);
-  outline-offset: -2px;
-  border-radius: 0.75rem;
-}
-.rail-count {
-  position: absolute;
-  top: -0.3125rem;
-  inset-inline-end: -0.4375rem;
-  min-width: 1.125rem;
-  height: 1.125rem;
-  padding-inline: 0.25rem;
-  border-radius: var(--radius-pill);
-  background: var(--shell-badge);
-  box-shadow: 0 0 0 2px var(--shell-rail);
-  color: oklch(0.99 0 none);
-  font-size: 0.625rem;
-  font-variant-numeric: tabular-nums;
-  font-weight: 650;
-  line-height: 1.125rem;
-  text-align: center;
-}
-.rail-spacer {
-  flex: 1;
-}
-
-/* The sidebar: the workspace's name, then sections that fold, each a list of rows. */
+/*
+ * The sidebar: goblin's mark and the places at its head, the pins and Topics in the middle (the part that scrolls), and
+ * Connections, Personas, Settings and the account at its foot. On a very short screen the whole column scrolls instead,
+ * so the foot never covers a row.
+ */
 .shell-sidebar {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   background: var(--shell);
   color: var(--shell-foreground);
 }
@@ -156,23 +62,78 @@
   display: flex;
   flex: none;
   align-items: center;
+  gap: 0.25rem;
   height: var(--top-bar-height);
-  padding: var(--safe-top) 1rem 0;
+  padding: var(--safe-top) 0.5rem 0;
   border-block-end: 1px solid var(--shell-border);
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  min-height: 2.5rem;
+  padding-inline: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  color: var(--shell-foreground);
+  touch-action: manipulation;
+}
+.sidebar-brand > svg {
+  flex: none;
+  width: 1.875rem;
+  height: 1.875rem;
+  padding: 0.25rem;
+  border-radius: 0.5rem;
+  background: var(--shell-active);
+  color: var(--shell-active-foreground);
 }
 .sidebar-title {
   font-size: 1.0625rem;
   font-weight: 700;
   letter-spacing: -0.015em;
 }
+.sidebar-collapse {
+  display: grid;
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-inline-start: auto;
+  place-items: center;
+  border-radius: 0.5rem;
+  color: var(--shell-muted);
+  touch-action: manipulation;
+  transition: background-color 120ms var(--ease-out);
+}
+.sidebar-collapse > svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+.sidebar-places {
+  flex: none;
+  padding: 0.5rem 0.5rem 0.25rem;
+}
 .sidebar-scroll {
   flex: 1;
   min-height: 0;
-  padding: 0.75rem 0.5rem max(1rem, var(--safe-bottom));
+  padding: 0.75rem 0.5rem 1rem;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-color: var(--shell-border) transparent;
   scrollbar-width: thin;
+}
+.sidebar-foot {
+  flex: none;
+  padding: 0.375rem 0.5rem max(0.5rem, var(--safe-bottom));
+  border-block-start: 1px solid var(--shell-border);
+}
+@media (max-height: 30rem) {
+  .shell-sidebar {
+    overflow-y: auto;
+  }
+  .sidebar-scroll {
+    flex: none;
+    overflow: visible;
+  }
 }
 .sidebar-section + .sidebar-section {
   margin-block-start: 1.125rem;
@@ -181,7 +142,7 @@
   display: flex;
   align-items: center;
   gap: 0.125rem;
-  min-height: 1.875rem;
+  min-height: 2.125rem;
 }
 .sidebar-section-toggle {
   display: inline-flex;
@@ -189,7 +150,7 @@
   align-items: center;
   gap: 0.25rem;
   min-width: 0;
-  min-height: 1.875rem;
+  min-height: 2.125rem;
   padding-inline: 0.375rem;
   border-radius: 0.375rem;
   color: var(--shell-muted);
@@ -205,20 +166,6 @@
 .sidebar-section-toggle[aria-expanded='true'] > svg {
   rotate: 90deg;
 }
-.sidebar-section-action {
-  display: grid;
-  flex: none;
-  width: 1.875rem;
-  height: 1.875rem;
-  place-items: center;
-  border-radius: 0.375rem;
-  color: var(--shell-muted);
-  touch-action: manipulation;
-}
-.sidebar-section-action > svg {
-  width: 1rem;
-  height: 1rem;
-}
 .sidebar-rows {
   display: flex;
   flex-direction: column;
@@ -226,11 +173,12 @@
   margin-block-start: 0.125rem;
 }
 .sidebar-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   width: 100%;
-  min-height: 1.875rem;
+  min-height: 2.125rem;
   padding-inline: 0.625rem;
   border-radius: 0.375rem;
   color: var(--shell-muted);
@@ -241,12 +189,12 @@
 }
 @media (pointer: coarse), (any-pointer: coarse) {
   .sidebar-row,
-  .sidebar-section-toggle,
-  .sidebar-section-action {
+  .sidebar-section-toggle {
     min-height: 2.75rem;
   }
-  .sidebar-section-action {
+  .sidebar-collapse {
     width: 2.75rem;
+    height: 2.75rem;
   }
 }
 .sidebar-row-mark {
@@ -254,6 +202,10 @@
   height: 1rem;
   flex: none;
   opacity: 0.85;
+}
+.sidebar-place > .sidebar-row-mark {
+  width: 1.125rem;
+  height: 1.125rem;
 }
 .sidebar-row > .app-tile {
   width: 1.25rem;
@@ -266,17 +218,41 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sidebar-row-state {
+  flex: none;
+  color: var(--shell-muted);
+  font-size: var(--text-13);
+}
+.sidebar-row:is([data-state='signed-out'], [data-state='no-app'], [data-state='closed'], [data-state='gone'])
+  > :is(.app-tile, .sidebar-row-name) {
+  opacity: 0.6;
+}
+.sidebar-count {
+  flex: none;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding-inline: 0.375rem;
+  border-radius: var(--radius-pill);
+  background: var(--shell-badge);
+  color: oklch(0.99 0 none);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  line-height: 1.25rem;
+  text-align: center;
+}
 @media (hover: hover) and (pointer: fine) {
-  .sidebar-row:hover,
+  .sidebar-row:not([aria-disabled]):hover,
   .sidebar-section-toggle:hover,
-  .sidebar-section-action:hover {
+  .sidebar-collapse:hover,
+  .sidebar-brand:hover {
     background: var(--shell-hover);
     color: var(--shell-foreground);
   }
 }
-.sidebar-row:active,
+.sidebar-row:not([aria-disabled]):active,
 .sidebar-section-toggle:active,
-.sidebar-section-action:active {
+.sidebar-collapse:active {
   background: var(--shell-pressed);
   color: var(--shell-foreground);
 }
@@ -284,13 +260,14 @@
   color: var(--shell-foreground);
   font-weight: 650;
 }
-.sidebar-row[aria-current='page'] {
+.sidebar-row[aria-current] {
   background: var(--shell-active);
   color: var(--shell-active-foreground);
 }
 .sidebar-row:focus-visible,
 .sidebar-section-toggle:focus-visible,
-.sidebar-section-action:focus-visible {
+.sidebar-collapse:focus-visible,
+.sidebar-brand:focus-visible {
   outline: 2px solid var(--shell-ring);
   outline-offset: -2px;
 }
@@ -323,26 +300,151 @@
   border-radius: var(--radius-pill);
   background: var(--live);
 }
+/* Only in the strip: the Topics as one `#` that lists them beside it. */
+.sidebar-strip-only {
+  display: none;
+}
 
-/* On a phone, the rail and the sidebar side by side in the drawer, clear of the notch. */
+/*
+ * The strip (ADR 0078): on a desktop, once the owner collapses the sidebar, each row is its icon alone with its name in
+ * a tooltip (and still read out), counts and dots on the icon's corner, the Topics behind one `#`.
+ */
+@media (min-width: 48rem) {
+  :root[data-sidebar='collapsed'] [data-place='column'] .sidebar-head {
+    flex-direction: column;
+    height: auto;
+    padding: max(0.5rem, var(--safe-top)) 0 0.5rem;
+  }
+  :root[data-sidebar='collapsed'] [data-place='column'] .sidebar-brand {
+    padding: 0.3125rem;
+  }
+  :root[data-sidebar='collapsed'] [data-place='column'] .sidebar-collapse {
+    margin-inline: auto;
+  }
+  :root[data-sidebar='collapsed']
+    [data-place='column']
+    :is(.sidebar-title, .sidebar-row-name, .sidebar-row-state, .jump-to-keys) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  :root[data-sidebar='collapsed'] [data-place='column'] :is(.sidebar-scroll, .sidebar-places, .sidebar-foot) {
+    padding-inline: 0;
+  }
+  :root[data-sidebar='collapsed'] [data-place='column'] .sidebar-rows {
+    align-items: center;
+  }
+  :root[data-sidebar='collapsed'] [data-place='column'] .sidebar-row {
+    justify-content: center;
+    width: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0;
+  }
+  :root[data-sidebar='collapsed']
+    [data-place='column']
+    :is(.sidebar-section-head, .sidebar-row-more, [data-section='topics']) {
+    display: none;
+  }
+  :root[data-sidebar='collapsed'] [data-place='column'] .sidebar-strip-only {
+    display: flex;
+  }
+  :root[data-sidebar='collapsed']
+    [data-place='column']
+    :is(.sidebar-count, .sidebar-row-unread, .sidebar-row-alert, .sidebar-row-busy) {
+    position: absolute;
+    top: 0.125rem;
+    inset-inline-end: 0.125rem;
+    box-shadow: 0 0 0 2px var(--shell);
+  }
+  :root[data-sidebar='collapsed'] [data-place='column'] .sidebar-count {
+    min-width: 1rem;
+    height: 1rem;
+    padding-inline: 0.1875rem;
+    font-size: 0.625rem;
+    line-height: 1rem;
+  }
+}
+
+/* The Topics beside the strip's `#`: plain rows on the popover's surface. */
+.strip-topics {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.strip-topic {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding-inline: 0.5rem;
+  border-radius: 0.375rem;
+  font-size: var(--text-15);
+  transition: background-color 120ms var(--ease-out);
+}
+.strip-topic > svg {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  color: var(--muted-foreground);
+}
+.strip-topic > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+  overflow: clip;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.strip-topic-count {
+  color: var(--muted-foreground);
+  font-size: var(--text-13);
+  font-variant-numeric: tabular-nums;
+}
+@media (hover: hover) and (pointer: fine) {
+  .strip-topic:hover {
+    background: var(--accent);
+  }
+}
+.strip-topic:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+/* The phone's navigation button, with a dot while something waits in Activity; a desktop has the sidebar instead. */
+.nav-button {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+@media (min-width: 48rem) {
+  .nav-button {
+    display: none;
+  }
+}
+.nav-button-dot {
+  position: absolute;
+  top: 0.375rem;
+  inset-inline-end: 0.375rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--shell-badge);
+  box-shadow: 0 0 0 2px var(--background);
+}
+
+/* On a phone, the sidebar in the drawer, clear of the notch. */
 .shell-drawer-body {
   display: flex;
   height: 100%;
   padding-inline-start: var(--safe-left);
-  background: var(--shell-rail);
+  background: var(--shell);
 }
 @media (forced-colors: active) {
-  .rail-item[aria-current='page'] > .rail-icon,
-  .sidebar-row[aria-current='page'] {
+  .sidebar-row[aria-current] {
     outline: 2px solid CanvasText;
   }
-}
-.rail-label {
-  max-width: 100%;
-  padding-inline: 0.125rem;
-  overflow: clip;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /*
@@ -925,8 +1027,9 @@
   height: 0.875rem;
 }
 /*
- * A pinned row (ADR 0053): its link, and its menu at the row's end. With a mouse the menu shows while the row is
- * pointed at, focused or open; on a touch screen it is always there, a full finger wide.
+ * A pinned row (ADRs 0053, 0078): its link, and its menu at the row's end, as tall as the row (a taller target would
+ * cover the rows beside it). With a mouse the menu shows while the row is pointed at, focused or open; on a touch
+ * screen it is always there, a full finger wide.
  */
 .sidebar-pin {
   position: relative;
@@ -934,14 +1037,14 @@
   align-items: center;
 }
 .sidebar-pin > .sidebar-row {
-  padding-inline-end: 2.25rem;
+  padding-inline-end: 2.5rem;
 }
 .sidebar-row-more {
   position: absolute;
-  inset-inline-end: 0.125rem;
+  inset-inline-end: 0;
   display: grid;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2.25rem;
+  height: 2.125rem;
   place-items: center;
   border-radius: 0.3125rem;
   color: var(--shell-muted);
@@ -1233,7 +1336,7 @@
   }
 }
 
-/* A rail page's list (Threads, Activity, Tasks, a Persona's revisions): a row each, its mark, its title and a quiet line. */
+/* A page's list (Threads, Activity, Work, Personas, a Persona's revisions): a row each, its mark, title and a note. */
 .page-empty {
   padding-block: 2rem;
   color: var(--muted-foreground);
@@ -1297,6 +1400,13 @@ a.list-row:focus-visible {
   font-size: var(--text-13);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* What a row's click does, said at its end (a Persona's Edit). */
+.list-row-action {
+  flex: none;
+  color: var(--muted-foreground);
+  font-size: var(--text-13);
+  font-weight: 500;
 }
 /* A row's own actions at its end (Activity's Set up events): side by side, never squeezed. */
 .row-actions {

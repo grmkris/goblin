@@ -392,9 +392,9 @@
   min-height: 2.75rem;
 }
 
-/* Finishing: the panel becomes the rail, the task gives way to the chat. */
+/* Finishing: the panel becomes the sidebar, the task gives way to the chat. */
 .start[data-leaving] .start-panel {
-  width: var(--rail-width);
+  width: var(--sidebar-width);
 }
 .start[data-leaving] .start-panel > * {
   opacity: 0;

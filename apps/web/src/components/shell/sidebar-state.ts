@@ -1,11 +1,23 @@
-// What the sidebar keeps outside the workspace: the sections folded in this browser, where the page is, and the threads
-// this browser opened recently. Folds and recent threads are device conveniences, read through useSyncExternalStore so
-// the server and the first render in the browser show none.
-import { useSyncExternalStore } from 'react'
+// What the sidebar keeps outside the workspace: the sections folded in this browser, whether it is collapsed to its
+// strip, its counts, which row shows where the page is, and the threads this browser opened recently. Folds, the strip
+// and recent threads are device conveniences, read through useSyncExternalStore so the server and the first render in
+// the browser show none.
+import { useMemo, useSyncExternalStore } from 'react'
 import { useRouterState } from '@tanstack/react-router'
+import { pinKey } from '@goblin/contracts'
+import { type Highlight, highlightOf } from '../../lib/nav-highlight.ts'
+import { railCounts } from '../../lib/rail.ts'
 import { recentThreads } from '../../lib/recent-threads.ts'
 import { channelOf } from '../../lib/topics.ts'
-import { useApps, useConversations, useTopics } from '../../lib/workspace/hooks.ts'
+import {
+  useActivities,
+  useApps,
+  useConversations,
+  useInvocations,
+  useNotifications,
+  useSidebarPins,
+  useTopics,
+} from '../../lib/workspace/hooks.ts'
 
 /** What this visit folded, whether or not storage kept it, and who to tell when it changes. */
 const foldedHere = new Map<string, boolean>()
@@ -50,20 +62,73 @@ export function useFolded(section: string): readonly [boolean, () => void] {
   return [folded, toggle]
 }
 
-/** Where the page is: the channel it shows (a channel's own page, or the channel of a thread or App there) and its thread. */
-export function useCurrent(): { readonly channel: string | undefined; readonly thread: string | undefined } {
+/**
+ * The one row that shows where the page is (ADR 0078): a channel or thread, a pin, or one of the places. An App's page
+ * marks its pin or Apps, never its Topic.
+ */
+export function useHighlight(): Highlight | undefined {
   const conversations = useConversations()
   const topics = useTopics()
   const apps = useApps()
-  const location = useRouterState({ select: (router) => router.location })
-  const [, kind, id] = /^\/([ca])\/(\d{1,12})$/u.exec(location.pathname) ?? []
-  if (id === undefined) return { channel: undefined, thread: undefined }
-  const chat = kind === 'a' ? apps.find((app) => app.id === id)?.conversation : id
-  const thread = kind === 'c' ? location.search.thread : undefined
-  return {
-    channel: chat === undefined ? undefined : channelOf(chat, conversations, topics),
-    thread: thread === undefined ? undefined : String(thread),
+  const stored = useSidebarPins()
+  const path = useRouterState({ select: (router) => router.location.pathname })
+  const thread = useRouterState({ select: (router) => router.location.search.thread })
+  return useMemo(
+    () =>
+      highlightOf(
+        { path, thread },
+        {
+          pins: new Set(stored.pins.map(pinKey)),
+          apps,
+          channelOf: (chat) => channelOf(chat, conversations, topics),
+        },
+      ),
+    [path, thread, stored, apps, conversations, topics],
+  )
+}
+
+/** The sidebar's counts (ADR 0078): what waits on the owner, the work under way, and the unread threads. */
+export function useNavCounts(): ReturnType<typeof railCounts> {
+  return railCounts({
+    views: useConversations(),
+    apps: useApps(),
+    activity: useActivities(),
+    invocations: useInvocations(),
+    notifications: useNotifications(),
+  })
+}
+
+/** Where the strip is remembered in this browser, and the script that puts it back before the first paint. */
+const COLLAPSED = 'goblin:sidebar:collapsed'
+export const COLLAPSE_SCRIPT = `(function(){try{if(localStorage.getItem('${COLLAPSED}')==='1')document.documentElement.dataset.sidebar='collapsed'}catch(e){}})()`
+
+const collapseListeners = new Set<() => void>()
+const subscribeCollapse = (listener: () => void) => {
+  collapseListeners.add(listener)
+  return () => {
+    collapseListeners.delete(listener)
   }
+}
+const collapsedNow = () => document.documentElement.dataset.sidebar === 'collapsed'
+
+/**
+ * Whether the desktop sidebar is collapsed to its strip. The page itself carries it (`data-sidebar` on the root, set
+ * before the first paint), so the server and the first render in the browser say open and the strip never flashes.
+ */
+export const useCollapsed = (): boolean => useSyncExternalStore(subscribeCollapse, collapsedNow, () => false)
+
+/** Collapses the sidebar to its strip, or opens it again, and remembers that in this browser. */
+export function toggleCollapsed(): void {
+  const root = document.documentElement
+  const collapse = !collapsedNow()
+  if (collapse) root.dataset.sidebar = 'collapsed'
+  else delete root.dataset.sidebar
+  try {
+    localStorage.setItem(COLLAPSED, collapse ? '1' : '0')
+  } catch {
+    // expected: storage is off or full; the strip is a device preference only, kept for this visit
+  }
+  for (const listener of collapseListeners) listener()
 }
 
 const NO_THREADS: ReadonlySet<string> = new Set()

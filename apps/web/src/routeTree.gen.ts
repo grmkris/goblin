@@ -14,6 +14,7 @@ import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as ConnectionsRouteImport } from './routes/connections'
 import { Route as ConsentRouteImport } from './routes/consent'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as PersonasRouteImport } from './routes/personas'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TasksRouteImport } from './routes/tasks'
@@ -51,6 +52,11 @@ const ConsentRoute = ConsentRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PersonasRoute = PersonasRouteImport.update({
+  id: '/personas',
+  path: '/personas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -126,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/connections': typeof ConnectionsRoute
   '/consent': typeof ConsentRoute
   '/login': typeof LoginRoute
+  '/personas': typeof PersonasRoute
   '/privacy': typeof PrivacyRoute
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
@@ -146,6 +153,7 @@ export interface FileRoutesByTo {
   '/connections': typeof ConnectionsRoute
   '/consent': typeof ConsentRoute
   '/login': typeof LoginRoute
+  '/personas': typeof PersonasRoute
   '/privacy': typeof PrivacyRoute
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/connections': typeof ConnectionsRoute
   '/consent': typeof ConsentRoute
   '/login': typeof LoginRoute
+  '/personas': typeof PersonasRoute
   '/privacy': typeof PrivacyRoute
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/connections'
     | '/consent'
     | '/login'
+    | '/personas'
     | '/privacy'
     | '/settings'
     | '/tasks'
@@ -209,6 +219,7 @@ export interface FileRouteTypes {
     | '/connections'
     | '/consent'
     | '/login'
+    | '/personas'
     | '/privacy'
     | '/settings'
     | '/tasks'
@@ -229,6 +240,7 @@ export interface FileRouteTypes {
     | '/connections'
     | '/consent'
     | '/login'
+    | '/personas'
     | '/privacy'
     | '/settings'
     | '/tasks'
@@ -250,6 +262,7 @@ export interface RootRouteChildren {
   ConnectionsRoute: typeof ConnectionsRoute
   ConsentRoute: typeof ConsentRoute
   LoginRoute: typeof LoginRoute
+  PersonasRoute: typeof PersonasRoute
   PrivacyRoute: typeof PrivacyRoute
   SettingsRoute: typeof SettingsRoute
   TasksRoute: typeof TasksRoute
@@ -300,6 +313,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/personas': {
+      id: '/personas'
+      path: '/personas'
+      fullPath: '/personas'
+      preLoaderRoute: typeof PersonasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -402,6 +422,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConnectionsRoute: ConnectionsRoute,
   ConsentRoute: ConsentRoute,
   LoginRoute: LoginRoute,
+  PersonasRoute: PersonasRoute,
   PrivacyRoute: PrivacyRoute,
   SettingsRoute: SettingsRoute,
   TasksRoute: TasksRoute,

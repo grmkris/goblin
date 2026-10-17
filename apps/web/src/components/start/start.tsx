@@ -1,7 +1,7 @@
-// First-run Start (ADR 0062): one task per screen, on the rail's own green, which the owner may pass by or skip; the app
-// never waits for it. The panel lists the steps (each a link; a sign-in Start began comes back to its step), and on a
-// phone narrows to a band with a count and one segment per step; the task says why and offers one action. Finishing
-// narrows the panel into the rail as the chat appears: the one motion of the page.
+// First-run Start (ADR 0062): one task per screen, on the sidebar's own green, which the owner may pass by or skip; the
+// app never waits for it. The panel lists the steps (each a link; a sign-in Start began comes back to its step), and on
+// a phone narrows to a band with a count and one segment per step; the task says why and offers one action. Finishing
+// narrows the panel into the sidebar as the chat appears: the one motion of the page.
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { ONBOARDING_STEPS, PRIMARY_CHAT, type OnboardingStep, type OnboardingView } from '@goblin/contracts'
@@ -18,10 +18,10 @@ import { GoblinStep, ModelStep, STEP_TEXT, ServicesStep, WelcomeStep } from './s
 /** How a sign-in Start began came back (the callback's own words): connected, or why not. */
 export type StartSearch = { readonly connected?: string; readonly error?: string; readonly ref?: string }
 
-/** How long the panel takes to become the rail (`--start-leave` in start.css). */
+/** How long the panel takes to become the sidebar (`--start-leave` in start.css). */
 const LEAVE_MS = 320
 
-/** Opens the chat, after the panel has narrowed into the rail (at once when the owner asks for less motion). */
+/** Opens the chat, after the panel has narrowed into the sidebar (at once when the owner asks for less motion). */
 function useLeave(): { readonly leaving: boolean; readonly leave: () => void } {
   const navigate = useNavigate()
   const [leaving, setLeaving] = useState(false)

@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { channelOf } from '../../../lib/topics.ts'
 import { useConversations, useTopics } from '../../../lib/workspace/hooks.ts'
 
-/** A row of a rail page that opens a chat where it lives: a channel as itself, a thread or subagent in its panel. */
+/** A row of a page's list that opens a chat where it lives: a channel as itself, a thread or subagent in its panel. */
 export function ChatRow({
   chat,
   unread = false,
@@ -27,7 +27,7 @@ export function ChatRow({
   )
 }
 
-/** A row of a rail page: its mark, its title with a quiet line under it, and what it is doing at its end. */
+/** A row of a page's list: its mark, its title with a quiet line under it, and what it is doing at its end. */
 export function RowContents({
   mark,
   title,
