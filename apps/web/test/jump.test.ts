@@ -8,17 +8,7 @@ import {
   type ServerView,
   type TopicView,
 } from '@goblin/contracts'
-import {
-  type JumpItem,
-  type JumpSources,
-  type ShortcutPress,
-  WORK_PATH,
-  isJumpShortcut,
-  jumpItems,
-  jumpResults,
-  jumpShortcut,
-  shortcutPlatform,
-} from '../src/lib/jump.ts'
+import { type JumpItem, type JumpSources, jumpItems, jumpResults } from '../src/lib/jump.ts'
 import type { ShownPin } from '../src/lib/pins.ts'
 
 const topic = (id: number, name: string, conversation: string, extra: Partial<TopicView> = {}): TopicView => ({
@@ -114,14 +104,16 @@ describe('the places Jump to lists', () => {
   it('lists the pages, the Apps page only where the deployment has agent apps', () => {
     expect(of(jumpItems(sources()), 'destination').map((item) => item.link.to)).toEqual([
       '/activity',
-      WORK_PATH,
+      '/work',
       '/apps',
       '/connections',
+      '/personas',
       '/settings',
       '/threads',
     ])
+    // Apps stays without agent apps (ADR 0078): it still holds the pins, recent views and connected apps.
     const without = jumpItems(sources({ agentApps: false }))
-    expect(of(without, 'destination').map((item) => item.label)).not.toContain('Apps')
+    expect(of(without, 'destination').map((item) => item.label)).toContain('Apps')
     expect(rows(of(without, 'app'))).toEqual(['mysi — App · Connected'])
   })
 
@@ -177,7 +169,7 @@ describe('the places Jump to lists', () => {
     expect(sections[0]).toMatchObject({
       label: 'Routines',
       detail: 'Section in Work',
-      link: { to: WORK_PATH, hash: 'routines' },
+      link: { to: '/work', hash: 'routines' },
     })
     expect(sections.map((item) => item.link)).toContainEqual({ to: '/settings', hash: 'usage' })
   })
@@ -196,7 +188,7 @@ const ranked = (items: readonly JumpItem[], query: string) =>
 describe('how a query ranks the places', () => {
   it('shows the pages and then the Topics before anything is typed', () => {
     expect(ranked(jumpItems(sources()), '  ')).toEqual([
-      'Places: Activity, Work, Apps, Connections, Settings, All threads',
+      'Places: Activity, Work, Apps, Connections, Personas, Settings, All threads',
       'Topics: Personal, Travel',
     ])
   })
@@ -231,43 +223,5 @@ describe('how a query ranks the places', () => {
 
   it('finds nothing for a query nothing matches', () => {
     expect(jumpResults(jumpItems(sources()), 'zzz')).toEqual([])
-  })
-})
-
-const press = (extra: Partial<ShortcutPress> = {}): ShortcutPress => ({
-  key: 'k',
-  metaKey: false,
-  ctrlKey: false,
-  altKey: false,
-  shiftKey: false,
-  repeat: false,
-  isComposing: false,
-  ...extra,
-})
-
-describe('the Jump to shortcut', () => {
-  it('is ⌘K on Apple’s platforms and Ctrl+K elsewhere', () => {
-    expect(isJumpShortcut(press({ metaKey: true }), 'apple')).toBe(true)
-    expect(isJumpShortcut(press({ ctrlKey: true }), 'apple')).toBe(false)
-    expect(isJumpShortcut(press({ ctrlKey: true }), 'other')).toBe(true)
-    expect(isJumpShortcut(press({ metaKey: true }), 'other')).toBe(false)
-    expect(isJumpShortcut(press({ key: 'K', ctrlKey: true }), 'other')).toBe(true)
-  })
-
-  it('leaves K alone, other shortcuts with Shift or Alt, a held key and an input method’s K', () => {
-    expect(isJumpShortcut(press(), 'apple')).toBe(false)
-    expect(isJumpShortcut(press({ metaKey: true, shiftKey: true }), 'apple')).toBe(false)
-    expect(isJumpShortcut(press({ ctrlKey: true, altKey: true }), 'other')).toBe(false)
-    expect(isJumpShortcut(press({ metaKey: true, repeat: true }), 'apple')).toBe(false)
-    expect(isJumpShortcut(press({ metaKey: true, isComposing: true }), 'apple')).toBe(false)
-    expect(isJumpShortcut(press({ key: 'j', metaKey: true }), 'apple')).toBe(false)
-  })
-
-  it('reads the platform from the user agent and writes the shortcut its way', () => {
-    expect(shortcutPlatform('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')).toBe('apple')
-    expect(shortcutPlatform('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)')).toBe('apple')
-    expect(shortcutPlatform('Mozilla/5.0 (X11; Linux x86_64)')).toBe('other')
-    expect(jumpShortcut('apple')).toEqual({ label: '⌘K', aria: 'Meta+K' })
-    expect(jumpShortcut('other')).toEqual({ label: 'Ctrl K', aria: 'Control+K' })
   })
 })

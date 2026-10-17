@@ -9,11 +9,8 @@ import { threadList } from './rail.ts'
 import { threadTitle } from './threads.ts'
 import { channelOf, channels, topicOfChannel } from './topics.ts'
 
-/** Work's page: running helpers, Persona answers and routines. The one place its path is spelled. */
-export const WORK_PATH = '/tasks'
-
 /** A page the switcher opens as a whole. */
-type PagePath = '/activity' | typeof WORK_PATH | '/apps' | '/connections' | '/settings' | '/threads'
+type PagePath = '/activity' | '/work' | '/apps' | '/connections' | '/personas' | '/settings' | '/threads'
 
 /** Where a place opens, as the router's `Link` and `navigate` take it. */
 export type JumpLink =
@@ -83,7 +80,7 @@ const page = (to: PagePath, label: string): JumpItem => ({
 
 /** The sections of Settings and Work a link can open at, by their anchors. */
 const SECTIONS: readonly { readonly to: PagePath; readonly hash: string; readonly label: string }[] = [
-  { to: WORK_PATH, hash: 'routines', label: 'Routines' },
+  { to: '/work', hash: 'routines', label: 'Routines' },
   { to: '/settings', hash: 'usage', label: 'Usage and model' },
   { to: '/settings', hash: 'agent', label: 'Your agent' },
   { to: '/settings', hash: 'clients', label: 'Apps that use your agent' },
@@ -155,9 +152,10 @@ export function jumpItems(sources: JumpSources): readonly JumpItem[] {
   const { topics, views } = sources
   const pages = [
     page('/activity', 'Activity'),
-    page(WORK_PATH, 'Work'),
-    ...(sources.agentApps ? [page('/apps', 'Apps')] : []),
+    page('/work', 'Work'),
+    page('/apps', 'Apps'),
     page('/connections', 'Connections'),
+    page('/personas', 'Personas'),
     page('/settings', 'Settings'),
     page('/threads', 'All threads'),
   ]
@@ -191,7 +189,7 @@ export function jumpItems(sources: JumpSources): readonly JumpItem[] {
     id: `section:${to}#${hash}`,
     kind: 'setting',
     label,
-    detail: `Section in ${to === WORK_PATH ? 'Work' : 'Settings'}`,
+    detail: `Section in ${to === '/work' ? 'Work' : 'Settings'}`,
     link: { to, hash },
   }))
   return [...pages, ...active, ...threads, ...apps(sources), ...personas, ...sections]
@@ -249,36 +247,4 @@ export function jumpResults(items: readonly JumpItem[], query: string): readonly
   })
     .toSorted((a, b) => a.best - b.best || a.place - b.place)
     .map(({ group, items: shown }) => ({ kind: group.kind, label: group.label, items: shown }))
-}
-
-/** Which modifier the platform's shortcuts use: ⌘ on Apple's, Ctrl elsewhere. */
-export type ShortcutPlatform = 'apple' | 'other'
-
-/** The platform a browser's user agent names (an iPad's says Macintosh, which is right for its keyboard). */
-export const shortcutPlatform = (userAgent: string): ShortcutPlatform =>
-  /mac|iphone|ipad|ipod/iu.test(userAgent) ? 'apple' : 'other'
-
-/** The switcher's shortcut as the platform writes it, and as `aria-keyshortcuts` names it. */
-export const jumpShortcut = (platform: ShortcutPlatform): { readonly label: string; readonly aria: string } =>
-  platform === 'apple' ? { label: '⌘K', aria: 'Meta+K' } : { label: 'Ctrl K', aria: 'Control+K' }
-
-/** A key press, as much of it as decides whether it opens the switcher. */
-export type ShortcutPress = {
-  readonly key: string
-  readonly metaKey: boolean
-  readonly ctrlKey: boolean
-  readonly altKey: boolean
-  readonly shiftKey: boolean
-  readonly repeat: boolean
-  readonly isComposing: boolean
-}
-
-/**
- * Whether a key press opens or closes the switcher: K with ⌘ alone on Apple's platforms, with Ctrl alone elsewhere.
- * Shift or Option/Alt with it is another shortcut; a held key does not toggle again; an input method's K composes.
- */
-export function isJumpShortcut(press: ShortcutPress, platform: ShortcutPlatform): boolean {
-  if (press.key.toLowerCase() !== 'k' || press.repeat || press.isComposing) return false
-  if (press.altKey || press.shiftKey) return false
-  return platform === 'apple' ? press.metaKey && !press.ctrlKey : press.ctrlKey && !press.metaKey
 }

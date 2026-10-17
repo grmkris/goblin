@@ -300,6 +300,19 @@
   border-radius: var(--radius-pill);
   background: var(--live);
 }
+/* Jump to's shortcut at its row's end, at a keyboard and mouse only. */
+.jump-to-keys {
+  flex: none;
+  font: inherit;
+  font-size: var(--text-13);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+@media (pointer: coarse) {
+  .jump-to-keys {
+    display: none;
+  }
+}
 /* Only in the strip: the Topics as one `#` that lists them beside it. */
 .sidebar-strip-only {
   display: none;

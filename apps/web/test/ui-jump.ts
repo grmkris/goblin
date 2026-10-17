@@ -190,7 +190,7 @@ async function matrix(origin: string, page: Page, label: string, phone: boolean)
   await search.fill('rout')
   await page.getByRole('option', { name: /Routines/u }).click()
   await dialog.waitFor({ state: 'hidden' })
-  assert.equal(await location(page), '/tasks#routines')
+  assert.equal(await location(page), '/work#routines')
   if (!phone) assert.equal(await focused(page), 'row')
 
   // Nothing matches: it says so.

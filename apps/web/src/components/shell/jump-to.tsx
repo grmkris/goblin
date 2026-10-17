@@ -3,6 +3,7 @@
 // lists it already keeps, never a transcript, and opening a place changes no pin, grant or App power. The shortcut
 // works anywhere in the shell except inside an App's sandboxed frame, which keeps its own keys.
 import {
+  type ComponentProps,
   type ReactNode,
   createContext,
   use,
@@ -43,18 +44,8 @@ import {
 } from 'lucide-react'
 import { agentAppsQuery } from '../../agent-apps/queries.ts'
 import { healthQuery } from '../../auth/queries.ts'
-import {
-  type JumpGroup,
-  type JumpItem,
-  type JumpKind,
-  type ShortcutPlatform,
-  WORK_PATH,
-  isJumpShortcut,
-  jumpItems,
-  jumpResults,
-  jumpShortcut,
-  shortcutPlatform,
-} from '../../lib/jump.ts'
+import { type JumpGroup, type JumpItem, type JumpKind, jumpItems, jumpResults } from '../../lib/jump.ts'
+import { type ShortcutPlatform, isModShortcut, shortcutLabel, shortcutPlatform } from '../../lib/shortcuts.ts'
 import { useConversations, usePersonas, useTopics } from '../../lib/workspace/hooks.ts'
 import { serversQuery } from '../../mcp/queries.ts'
 import { usePins } from '../../sidebar/hooks.ts'
@@ -85,7 +76,7 @@ function useShortcut(toggle: () => void) {
   useEffect(() => {
     const platform = shortcutPlatform(navigator.userAgent)
     const keydown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !isJumpShortcut(event, platform)) return
+      if (event.defaultPrevented || !isModShortcut(event, 'k', platform)) return
       event.preventDefault()
       toggle()
     }
@@ -115,23 +106,30 @@ export function JumpToProvider({ children }: { readonly children: ReactNode }) {
   )
 }
 
-/** The sidebar's "Jump to…" row, with the platform's shortcut at its end at a keyboard and mouse. */
-export function JumpToButton() {
+/**
+ * The sidebar's "Jump to…" row, with the platform's shortcut at its end at a keyboard and mouse. What it is given (a
+ * tooltip's trigger props in the strip) reaches its button.
+ */
+export function JumpToButton({ onClick, ...props }: ComponentProps<'button'>) {
   const { open } = useJumpTo()
   const platform = usePlatform()
-  const shortcut = platform === undefined ? undefined : jumpShortcut(platform)
+  const shortcut = platform === undefined ? undefined : shortcutLabel('k', platform)
   return (
     <button
+      {...props}
       type="button"
-      className="sidebar-row"
+      className="sidebar-row sidebar-place"
       aria-haspopup="dialog"
       aria-keyshortcuts={shortcut?.aria}
-      onClick={open}
+      onClick={(event) => {
+        onClick?.(event)
+        open()
+      }}
     >
       <SearchIcon className="sidebar-row-mark" aria-hidden />
       <span className="sidebar-row-name">Jump to…</span>
       {shortcut !== undefined && (
-        <kbd className="font-sans text-13 tabular-nums opacity-75 pointer-coarse:hidden" aria-hidden>
+        <kbd className="jump-to-keys" aria-hidden>
           {shortcut.label}
         </kbd>
       )}
@@ -161,7 +159,8 @@ function useJumpItems(): readonly JumpItem[] {
 /** Each page's icon, by its path: a page and its sections share it. */
 const PAGE_ICONS: Readonly<Partial<Record<string, LucideIcon>>> = {
   '/activity': BellIcon,
-  [WORK_PATH]: ListChecksIcon,
+  '/work': ListChecksIcon,
+  '/personas': AtSignIcon,
   '/apps': LayoutGridIcon,
   '/connections': PlugIcon,
   '/settings': SettingsIcon,

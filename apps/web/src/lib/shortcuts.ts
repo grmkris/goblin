@@ -1,24 +1,39 @@
-// The app's keyboard shortcuts with the platform's modifier: ⌘ on Apple's systems, Ctrl elsewhere. Pure.
+// The app's keyboard shortcuts: a key with ⌘ on Apple's platforms and with Ctrl elsewhere (⌘K Jump to, ⌘B the
+// sidebar's strip). Pure.
 
-/** What a shortcut needs to know of a key press. */
-export type KeyPress = {
+/** Which modifier the platform's shortcuts use: ⌘ on Apple's, Ctrl elsewhere. */
+export type ShortcutPlatform = 'apple' | 'other'
+
+/** The platform a browser's user agent names (an iPad's says Macintosh, which is right for its keyboard). */
+export const shortcutPlatform = (userAgent: string): ShortcutPlatform =>
+  /mac|iphone|ipad|ipod/iu.test(userAgent) ? 'apple' : 'other'
+
+/** A key press, as much of it as decides whether it is a shortcut. */
+export type ShortcutPress = {
   readonly key: string
   readonly metaKey: boolean
   readonly ctrlKey: boolean
   readonly altKey: boolean
   readonly shiftKey: boolean
+  readonly repeat: boolean
+  readonly isComposing: boolean
 }
 
-/** Whether the system is Apple's, by what the browser says of it: ⌘ is its modifier. */
-export const isApple = (platform: string): boolean => /mac|iphone|ipad|ipod/iu.test(platform)
+/**
+ * Whether a key press is the platform's modifier with `key` alone: ⌘ on Apple's platforms, Ctrl elsewhere. Shift or
+ * Option/Alt with it is another shortcut; a held key does not repeat it; an input method's letter composes.
+ */
+export function isModShortcut(press: ShortcutPress, key: string, platform: ShortcutPlatform): boolean {
+  if (press.key.toLowerCase() !== key || press.repeat || press.isComposing) return false
+  if (press.altKey || press.shiftKey) return false
+  return platform === 'apple' ? press.metaKey && !press.ctrlKey : press.ctrlKey && !press.metaKey
+}
 
-/** Whether `event` is the platform's modifier with `key` and nothing else held. */
-export const isModShortcut = (event: KeyPress, key: string, apple: boolean): boolean =>
-  event.key.toLowerCase() === key &&
-  !event.altKey &&
-  !event.shiftKey &&
-  (apple ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey)
-
-/** The platform the browser runs on, as `isApple` reads it. */
-export const browserPlatform = (): string =>
-  typeof navigator === 'undefined' ? '' : (navigator.userAgent.match(/\(([^)]*)\)/u)?.[1] ?? navigator.userAgent)
+/** A shortcut as the platform writes it (`⌘K`, `Ctrl K`) and as `aria-keyshortcuts` names it. */
+export const shortcutLabel = (
+  key: string,
+  platform: ShortcutPlatform,
+): { readonly label: string; readonly aria: string } =>
+  platform === 'apple'
+    ? { label: `⌘${key.toUpperCase()}`, aria: `Meta+${key.toUpperCase()}` }
+    : { label: `Ctrl ${key.toUpperCase()}`, aria: `Control+${key.toUpperCase()}` }

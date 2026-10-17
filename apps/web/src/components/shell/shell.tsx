@@ -2,7 +2,8 @@ import { type ReactNode, createContext, use, useCallback, useEffect, useMemo, us
 import { useRouterState } from '@tanstack/react-router'
 import { Button, Drawer, DrawerDescription, DrawerSide, DrawerTitle, useIsMobile } from '@goblin/ui'
 import { PanelLeftIcon } from 'lucide-react'
-import { browserPlatform, isApple, isModShortcut } from '../../lib/shortcuts.ts'
+import { isModShortcut, shortcutPlatform } from '../../lib/shortcuts.ts'
+import { JumpToProvider } from './jump-to.tsx'
 import { Sidebar } from './sidebar.tsx'
 import { toggleCollapsed, useNavCounts } from './sidebar-state.ts'
 
@@ -67,9 +68,9 @@ function NavigationDrawer({
 function useCollapseShortcut(narrow: boolean) {
   useEffect(() => {
     if (narrow) return undefined
-    const apple = isApple(browserPlatform())
+    const platform = shortcutPlatform(navigator.userAgent)
     const onKey = (event: KeyboardEvent) => {
-      if (!isModShortcut(event, 'b', apple)) return
+      if (event.defaultPrevented || !isModShortcut(event, 'b', platform)) return
       event.preventDefault()
       toggleCollapsed()
     }
@@ -79,9 +80,9 @@ function useCollapseShortcut(narrow: boolean) {
 }
 
 /**
- * The signed-in app: the moss sidebar beside the page on a desktop (collapsible to a strip of icons); on a phone the
- * page alone, full width, with the sidebar in a drawer its top bar opens. The server renders the desktop column (CSS
- * hides it on a phone, so a phone's first paint does not show it either).
+ * The signed-in app, with Jump to (⌘K) over it: the moss sidebar beside the page on a desktop (collapsible to a strip
+ * of icons); on a phone the page alone, full width, with the sidebar in a drawer its top bar opens. The server renders
+ * the desktop column (CSS hides it on a phone, so a phone's first paint does not show it either).
  */
 export function ShellFrame({ children }: { readonly children: ReactNode }) {
   const narrow = useIsMobile()
@@ -95,15 +96,17 @@ export function ShellFrame({ children }: { readonly children: ReactNode }) {
   useCollapseShortcut(narrow)
   return (
     <ShellContext value={shell}>
-      <div className="shell-frame">
-        {!narrow && (
-          <div className="shell-nav" data-slot="shell-nav">
-            <Sidebar place="column" />
-          </div>
-        )}
-        {narrow && <NavigationDrawer open={open} onOpenChange={setOpen} />}
-        <div className="shell-main">{children}</div>
-      </div>
+      <JumpToProvider>
+        <div className="shell-frame">
+          {!narrow && (
+            <div className="shell-nav" data-slot="shell-nav">
+              <Sidebar place="column" />
+            </div>
+          )}
+          {narrow && <NavigationDrawer open={open} onOpenChange={setOpen} />}
+          <div className="shell-main">{children}</div>
+        </div>
+      </JumpToProvider>
     </ShellContext>
   )
 }

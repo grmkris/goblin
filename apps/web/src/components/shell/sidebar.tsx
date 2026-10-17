@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { signOutMutation } from '../../auth/queries.ts'
 import type { NavRow } from '../../lib/nav-highlight.ts'
+import { JumpToButton } from './jump-to.tsx'
 import { Count, EXACT, Here, Strip, Tip, useCurrent } from './sidebar-parts.tsx'
 import { Pinned } from './sidebar-pins.tsx'
 import { toggleCollapsed, useCollapsed, useHighlight, useNavCounts } from './sidebar-state.ts'
@@ -112,13 +113,70 @@ function CollapseButton() {
   )
 }
 
+/** The head's places: Jump to, then Activity and Work with what waits and runs there, then Apps. */
+function Places({ counts }: { readonly counts: ReturnType<typeof useNavCounts> }) {
+  return (
+    <ul className="sidebar-rows sidebar-places">
+      <li>
+        <Tip label="Jump to">
+          <JumpToButton />
+        </Tip>
+      </li>
+      <Place
+        to="/activity"
+        row="activity"
+        label="Activity"
+        icon={<BellIcon className="sidebar-row-mark" aria-hidden />}
+        count={counts.activity}
+        words="waiting"
+      />
+      <Place
+        to="/work"
+        row="work"
+        label="Work"
+        icon={<ListChecksIcon className="sidebar-row-mark" aria-hidden />}
+        count={counts.tasks}
+        words="running"
+      />
+      <Place to="/apps" row="apps" label="Apps" icon={<LayoutGridIcon className="sidebar-row-mark" aria-hidden />} />
+    </ul>
+  )
+}
+
+/** The foot: Connections, Personas, Settings and the account. */
+function Foot() {
+  return (
+    <ul className="sidebar-rows sidebar-foot">
+      <Place
+        to="/connections"
+        row="connections"
+        label="Connections"
+        icon={<PlugIcon className="sidebar-row-mark" aria-hidden />}
+      />
+      <Place
+        to="/personas"
+        row="personas"
+        label="Personas"
+        icon={<AtSignIcon className="sidebar-row-mark" aria-hidden />}
+      />
+      <Place
+        to="/settings"
+        row="settings"
+        label="Settings"
+        icon={<SettingsIcon className="sidebar-row-mark" aria-hidden />}
+      />
+      <Account />
+    </ul>
+  )
+}
+
 /**
- * The sidebar (ADR 0078): goblin's mark (the channel this tab showed last) and the places (Activity, Work, Apps) at
- * its head; the owner's pins and the Topics with their live threads in the middle, which scrolls; Connections,
+ * The sidebar (ADR 0078): goblin's mark (the channel this tab showed last) and the places (Jump to, Activity, Work,
+ * Apps) at its head; the owner's pins and the Topics with their live threads in the middle, which scrolls; Connections,
  * Personas, Settings and the account at its foot. On a desktop it is a column the owner can collapse to a strip of
  * icons; on a phone, the drawer's contents. Exactly one row shows where the page is.
  */
-export function Sidebar({ place, jump }: { readonly place: 'column' | 'drawer'; readonly jump?: ReactNode }) {
+export function Sidebar({ place }: { readonly place: 'column' | 'drawer' }) {
   const collapsed = useCollapsed()
   const here = useHighlight()
   const counts = useNavCounts()
@@ -136,31 +194,7 @@ export function Sidebar({ place, jump }: { readonly place: 'column' | 'drawer'; 
               </Tip>
               {place === 'column' && <CollapseButton />}
             </header>
-            <ul className="sidebar-rows sidebar-places">
-              {jump}
-              <Place
-                to="/activity"
-                row="activity"
-                label="Activity"
-                icon={<BellIcon className="sidebar-row-mark" aria-hidden />}
-                count={counts.activity}
-                words="waiting"
-              />
-              <Place
-                to="/work"
-                row="work"
-                label="Work"
-                icon={<ListChecksIcon className="sidebar-row-mark" aria-hidden />}
-                count={counts.tasks}
-                words="running"
-              />
-              <Place
-                to="/apps"
-                row="apps"
-                label="Apps"
-                icon={<LayoutGridIcon className="sidebar-row-mark" aria-hidden />}
-              />
-            </ul>
+            <Places counts={counts} />
             <div className="sidebar-scroll">
               <Pinned />
               <ul className="sidebar-rows sidebar-strip-only">
@@ -168,27 +202,7 @@ export function Sidebar({ place, jump }: { readonly place: 'column' | 'drawer'; 
               </ul>
               <Topics unread={counts.threads} />
             </div>
-            <ul className="sidebar-rows sidebar-foot">
-              <Place
-                to="/connections"
-                row="connections"
-                label="Connections"
-                icon={<PlugIcon className="sidebar-row-mark" aria-hidden />}
-              />
-              <Place
-                to="/personas"
-                row="personas"
-                label="Personas"
-                icon={<AtSignIcon className="sidebar-row-mark" aria-hidden />}
-              />
-              <Place
-                to="/settings"
-                row="settings"
-                label="Settings"
-                icon={<SettingsIcon className="sidebar-row-mark" aria-hidden />}
-              />
-              <Account />
-            </ul>
+            <Foot />
           </nav>
         </TooltipProvider>
       </Here>
