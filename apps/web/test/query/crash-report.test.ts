@@ -89,14 +89,14 @@ describe('a crash report', () => {
     const stop = reportUncaught(
       target as never,
       (error, route) => heard.push([error, route]),
-      () => '/tasks',
+      () => '/work',
     )
     listeners.get('error')?.({ error: null })
     listeners.get('error')?.({ error: 'boom' })
     listeners.get('unhandledrejection')?.({ reason: 'nope' })
     expect(heard).toEqual([
-      ['boom', '/tasks'],
-      ['nope', '/tasks'],
+      ['boom', '/work'],
+      ['nope', '/work'],
     ])
     stop()
     expect(listeners.size).toBe(0)

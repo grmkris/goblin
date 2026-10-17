@@ -17,9 +17,9 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as PersonasRouteImport } from './routes/personas'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as ThreadsRouteImport } from './routes/threads'
+import { Route as WorkRouteImport } from './routes/work'
 import { Route as AAppIdRouteImport } from './routes/a.$appId'
 import { Route as AppsIndexRouteImport } from './routes/apps.index'
 import { Route as AppsNameRouteImport } from './routes/apps.$name'
@@ -69,11 +69,6 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TasksRoute = TasksRouteImport.update({
-  id: '/tasks',
-  path: '/tasks',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
@@ -82,6 +77,11 @@ const TermsRoute = TermsRouteImport.update({
 const ThreadsRoute = ThreadsRouteImport.update({
   id: '/threads',
   path: '/threads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorkRoute = WorkRouteImport.update({
+  id: '/work',
+  path: '/work',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AAppIdRoute = AAppIdRouteImport.update({
@@ -135,9 +135,9 @@ export interface FileRoutesByFullPath {
   '/personas': typeof PersonasRoute
   '/privacy': typeof PrivacyRoute
   '/settings': typeof SettingsRoute
-  '/tasks': typeof TasksRoute
   '/terms': typeof TermsRoute
   '/threads': typeof ThreadsRoute
+  '/work': typeof WorkRoute
   '/a/$appId': typeof AAppIdRoute
   '/apps/$name': typeof AppsNameRoute
   '/c/$chatId': typeof CChatIdRoute
@@ -156,9 +156,9 @@ export interface FileRoutesByTo {
   '/personas': typeof PersonasRoute
   '/privacy': typeof PrivacyRoute
   '/settings': typeof SettingsRoute
-  '/tasks': typeof TasksRoute
   '/terms': typeof TermsRoute
   '/threads': typeof ThreadsRoute
+  '/work': typeof WorkRoute
   '/a/$appId': typeof AAppIdRoute
   '/apps/$name': typeof AppsNameRoute
   '/c/$chatId': typeof CChatIdRoute
@@ -178,9 +178,9 @@ export interface FileRoutesById {
   '/personas': typeof PersonasRoute
   '/privacy': typeof PrivacyRoute
   '/settings': typeof SettingsRoute
-  '/tasks': typeof TasksRoute
   '/terms': typeof TermsRoute
   '/threads': typeof ThreadsRoute
+  '/work': typeof WorkRoute
   '/a/$appId': typeof AAppIdRoute
   '/apps/$name': typeof AppsNameRoute
   '/c/$chatId': typeof CChatIdRoute
@@ -201,9 +201,9 @@ export interface FileRouteTypes {
     | '/personas'
     | '/privacy'
     | '/settings'
-    | '/tasks'
     | '/terms'
     | '/threads'
+    | '/work'
     | '/a/$appId'
     | '/apps/$name'
     | '/c/$chatId'
@@ -222,9 +222,9 @@ export interface FileRouteTypes {
     | '/personas'
     | '/privacy'
     | '/settings'
-    | '/tasks'
     | '/terms'
     | '/threads'
+    | '/work'
     | '/a/$appId'
     | '/apps/$name'
     | '/c/$chatId'
@@ -243,9 +243,9 @@ export interface FileRouteTypes {
     | '/personas'
     | '/privacy'
     | '/settings'
-    | '/tasks'
     | '/terms'
     | '/threads'
+    | '/work'
     | '/a/$appId'
     | '/apps/$name'
     | '/c/$chatId'
@@ -265,9 +265,9 @@ export interface RootRouteChildren {
   PersonasRoute: typeof PersonasRoute
   PrivacyRoute: typeof PrivacyRoute
   SettingsRoute: typeof SettingsRoute
-  TasksRoute: typeof TasksRoute
   TermsRoute: typeof TermsRoute
   ThreadsRoute: typeof ThreadsRoute
+  WorkRoute: typeof WorkRoute
   AAppIdRoute: typeof AAppIdRoute
   AppsNameRoute: typeof AppsNameRoute
   CChatIdRoute: typeof CChatIdRoute
@@ -336,13 +336,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/tasks': {
-      id: '/tasks'
-      path: '/tasks'
-      fullPath: '/tasks'
-      preLoaderRoute: typeof TasksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/terms': {
       id: '/terms'
       path: '/terms'
@@ -355,6 +348,13 @@ declare module '@tanstack/react-router' {
       path: '/threads'
       fullPath: '/threads'
       preLoaderRoute: typeof ThreadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/work': {
+      id: '/work'
+      path: '/work'
+      fullPath: '/work'
+      preLoaderRoute: typeof WorkRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/a/$appId': {
@@ -425,9 +425,9 @@ const rootRouteChildren: RootRouteChildren = {
   PersonasRoute: PersonasRoute,
   PrivacyRoute: PrivacyRoute,
   SettingsRoute: SettingsRoute,
-  TasksRoute: TasksRoute,
   TermsRoute: TermsRoute,
   ThreadsRoute: ThreadsRoute,
+  WorkRoute: WorkRoute,
   AAppIdRoute: AAppIdRoute,
   AppsNameRoute: AppsNameRoute,
   CChatIdRoute: CChatIdRoute,

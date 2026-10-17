@@ -38,9 +38,9 @@ function ChannelName({ name, working }: { readonly name: string; readonly workin
 }
 
 /**
- * The channel's name, and on a server with Topics its menu, as Slack's channel header has: rename, choose its MCP
- * servers and skills (ADR 0040), keep the Topic out of automatic search or let it back in, and archive it or restore it
- * (never Personal). A failure shows under the bar.
+ * The channel's name, and on a server with Topics its menu, as Slack's channel header has: rename, open its Topic setup
+ * (ADR 0040), keep the Topic out of automatic search or let it back in, and archive it or restore it (never Personal).
+ * A failure shows under the bar.
  */
 export function ChannelMenu({
   topic,
@@ -78,7 +78,7 @@ export function ChannelMenu({
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setSettingUp(true)}>
             <Settings2Icon aria-hidden />
-            MCP servers & skills…
+            Topic setup…
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => change({ searchExcluded: !topic.searchExcluded })}>
             {topic.searchExcluded ? <SearchIcon aria-hidden /> : <EyeOffIcon aria-hidden />}

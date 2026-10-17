@@ -32,7 +32,6 @@ export type NavFacts = {
 const PLACES: readonly (readonly [string, NavRow])[] = [
   ['/activity', 'activity'],
   ['/work', 'work'],
-  ['/tasks', 'work'],
   ['/apps', 'apps'],
   ['/threads', 'threads'],
   ['/connections', 'connections'],

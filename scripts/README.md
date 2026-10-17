@@ -29,7 +29,7 @@ they run in GitHub Actions or `GOBLIN_BREAK_GLASS=1` is set (`deploy_runs_in_ci_
 `bun run ui:acceptance` opens the stage named by the smoke session file (`.local/dev-session.json` unless another
 is given; a `http://localhost` session runs it against the local stack) in headless Chromium, as a phone (390×844,
 touch), landscape phone (844×390), tablet (820×1180), hybrid pointer device and desktop (1440×900), light and dark,
-on `/c/1`, a thread's panel, Threads, Activity, Tasks, Settings, Connections and Apps. It only taps and clicks what
+on `/c/1`, a thread's panel, Threads, Activity, Work, Settings, Connections and Apps. It only taps and clicks what
 changes nothing: menus, a Thoughts disclosure, the navigation drawer, a thread's panel. It sends no message and edits
 nothing. It checks behaviour the eye cannot confirm from a screenshot: the theme's curves, menus that scale, Return-key
 hints, 16px text fields and 44px icon targets on touch, panels that open to their content's height, the thread panel

@@ -52,7 +52,7 @@ function NewTopicSetup({
       <CollapsibleTrigger render={<button type="button" className="switch-row switch-expand" />}>
         <ChevronRightIcon aria-hidden />
         <span className="switch-name">
-          <span>MCP servers & skills</span>
+          <span>Topic setup</span>
           <span className="switch-detail">
             {catalog.data === undefined ? 'Everything' : setupSummary(setup, catalog.data)}
           </span>

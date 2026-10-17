@@ -67,7 +67,7 @@ export const EMPTY_WORKSPACE: Slices = {
   sidebar: EMPTY_SIDEBAR,
 }
 
-/** How many settled Persona answers and organizing receipts the slices keep: enough for Activity and Tasks. */
+/** How many settled Persona answers and organizing receipts the slices keep: enough for Activity and Work. */
 const KEPT = 50
 /** How many notifications the slice keeps: as many as the server's snapshot sends. */
 const KEPT_NOTIFICATIONS = 100

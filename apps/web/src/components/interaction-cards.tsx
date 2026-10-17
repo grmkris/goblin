@@ -341,8 +341,7 @@ function AddToTopicCard({ interaction, onAnswer }: { readonly interaction: Setup
         </p>
       </AskCardHeader>
       <AskCardDescription>
-        It is not in #{topic.name}'s MCP servers & skills. Adding it changes what every chat of #{topic.name} works
-        with.
+        It is not in #{topic.name}'s Topic setup. Adding it changes what every chat of #{topic.name} works with.
       </AskCardDescription>
       <CardReplies busy={busy} error={error} yes={`Add to #${topic.name}`} onReply={reply} />
     </AskCard>

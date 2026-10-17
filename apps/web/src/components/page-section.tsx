@@ -1,8 +1,8 @@
 import type { ReactNode, Ref } from 'react'
 
 /**
- * A section of a page outside the workspace (Connections, Settings): a heading with an optional count and action, an
- * optional note under it, then its cards.
+ * A section of a page outside the workspace (Connections, Settings, Work): a heading with an optional count and action,
+ * an optional note under it, then its cards. Its id is its anchor, so a link to `#id` lands on it.
  */
 export function PageSection({
   id,
@@ -22,7 +22,7 @@ export function PageSection({
   readonly children: ReactNode
 }) {
   return (
-    <section className="page-section" aria-labelledby={`${id}-title`} ref={ref}>
+    <section id={id} className="page-section" aria-labelledby={`${id}-title`} ref={ref}>
       <div className="section-head">
         <h2 id={`${id}-title`}>
           {title}

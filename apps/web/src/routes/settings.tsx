@@ -5,7 +5,6 @@ import { Settings } from '../components/settings.tsx'
 import { clientsQuery } from '../account/queries.ts'
 import { memoryQuery, modelEndpointQuery, residentQuery, usageQuery } from '../agent/queries.ts'
 import { primeOwnerRead } from '../lib/prime.ts'
-import { routineSettingsQuery, routinesQuery } from '../routines/queries.ts'
 
 /** The settings' cards start loading before the page renders. */
 export const Route = createFileRoute('/settings')({
@@ -15,8 +14,6 @@ export const Route = createFileRoute('/settings')({
       primeOwnerRead(context.queryClient, modelEndpointQuery),
       primeOwnerRead(context.queryClient, residentQuery),
       primeOwnerRead(context.queryClient, memoryQuery()),
-      primeOwnerRead(context.queryClient, routinesQuery),
-      primeOwnerRead(context.queryClient, routineSettingsQuery),
       primeOwnerRead(context.queryClient, clientsQuery),
     ])
   },

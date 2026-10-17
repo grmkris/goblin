@@ -50,7 +50,7 @@ function useWhenOf(definition: RoutineDefinition): string {
 /**
  * The event stream a routine waits for, as its server describes it now (its title and filter schema); none for a
  * routine on no event, or while the server has not said. Only a connected connection is asked: one that needs sign-in
- * refuses (403), and a review is read on every Settings load.
+ * refuses (403), and a review is read on every Work load.
  */
 function useStreamOf(definition: RoutineDefinition) {
   const { trigger } = definition
@@ -119,8 +119,8 @@ function RoutineDetails({ routine }: { readonly routine: RoutineView }) {
           <div>
             <dt>Not in its Topic</dt>
             <dd>
-              {routine.outsideSetup.map((tool) => `${tool.connectionId} · ${tool.name}`).join(', ')}: its Topic's MCP
-              servers & skills leave these out, so a run that calls one is refused.
+              {routine.outsideSetup.map((tool) => `${tool.connectionId} · ${tool.name}`).join(', ')}: its Topic setup
+              leaves these out, so a run that calls one is refused.
             </dd>
           </div>
         )}

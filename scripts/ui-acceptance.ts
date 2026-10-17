@@ -5,7 +5,7 @@
  * disclosures, the navigation drawer, a thread's panel), and checks what the UI does there: motion that runs,
  * touch-sized fields and targets, drawers that close on a tap or a swipe, a panel beside the channel on a desktop and a
  * full view on a phone, and no page wider than the screen. It sends no message and edits nothing. Screenshots of the
- * page matrix (a channel, a thread's panel, Threads, Activity, Tasks, Settings, Connections, Apps; phone 390×844 with
+ * page matrix (a channel, a thread's panel, Threads, Activity, Work, Settings, Connections, Apps; phone 390×844 with
  * touch, landscape, tablet, desktop 1440×900; light and dark) and a receipt go to a private
  * `.local/goblin-acceptance/ui-<utc>/`. Chromium emulation is not device evidence: a real phone still checks feel.
  */
@@ -17,7 +17,7 @@ import { readSession, type Session } from './session.ts'
 type Check = { readonly ok: boolean; readonly detail: unknown } | { readonly skipped: true; readonly detail: unknown }
 
 const ROOT = path.resolve(import.meta.dirname, '..')
-const PAGES = ['/c/1', '/threads', '/activity', '/tasks', '/settings', '/connections', '/apps']
+const PAGES = ['/c/1', '/threads', '/activity', '/work', '/settings', '/connections', '/apps']
 const PHONE: BrowserContextOptions = {
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 2,
@@ -313,13 +313,13 @@ async function editableChecks(page: Page, checks: Record<string, Check>, prefix:
  * phone) with each category's Everything | Only these choice; it is closed without saving.
  */
 async function setupCheck(page: Page, checks: Record<string, Check>, prefix: string): Promise<void> {
-  const button = page.locator('button[aria-label^="MCP servers & skills of"]').first()
+  const button = page.locator('button[aria-label^="Topic setup for"]').first()
   if ((await button.count()) === 0) {
     checks[`${prefix}.setup.opens`] = skipped('no setup button on this page')
     return
   }
   await button.click()
-  const editor = page.getByRole('dialog', { name: 'MCP servers & skills' })
+  const editor = page.getByRole('dialog', { name: 'Topic setup' })
   // The picker shows once the catalog it is chosen from has loaded: wait for its first choice, not just the panel.
   const shown = await editor
     .getByRole('tab', { name: 'Only these' })

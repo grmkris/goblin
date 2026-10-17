@@ -30,7 +30,7 @@ import { Pinned } from './sidebar-pins.tsx'
 import { toggleCollapsed, useCollapsed, useHighlight, useNavCounts } from './sidebar-state.ts'
 import { Topics, TopicsInStrip } from './sidebar-topics.tsx'
 
-type PlaceTo = '/activity' | '/tasks' | '/apps' | '/threads' | '/connections' | '/personas' | '/settings'
+type PlaceTo = '/activity' | '/work' | '/apps' | '/threads' | '/connections' | '/personas' | '/settings'
 
 /** One of the places: its icon and name, and what waits there. */
 function Place({
@@ -147,7 +147,7 @@ export function Sidebar({ place, jump }: { readonly place: 'column' | 'drawer'; 
                 words="waiting"
               />
               <Place
-                to="/tasks"
+                to="/work"
                 row="work"
                 label="Work"
                 icon={<ListChecksIcon className="sidebar-row-mark" aria-hidden />}

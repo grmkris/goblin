@@ -229,7 +229,6 @@ const router = createRouter({
     channel,
     page('/threads', 'All threads'),
     page('/activity', 'Activity'),
-    page('/tasks', 'Work'),
     page('/work', 'Work'),
     page('/apps', 'Apps'),
     page('/apps/$name', 'Manage app'),

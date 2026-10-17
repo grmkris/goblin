@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import type { AgentAppChange, AgentAppDetail, AgentAppJob, AppPower, ConversationView } from '@goblin/contracts'
+import type { AgentAppChange, AgentAppDetail, AppPower, ConversationView } from '@goblin/contracts'
 import {
   Alert,
   AlertDescription,
@@ -15,7 +15,6 @@ import {
   Skeleton,
 } from '@goblin/ui'
 import { agentAppQuery, changeAgentAppMutation, deleteAgentAppMutation } from '../agent-apps/queries.ts'
-import { jobLine } from '../lib/app-jobs.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { QueryBoundary } from '../lib/query/query-boundary.tsx'
 import { reportUnexpected } from '../lib/unexpected.ts'
@@ -23,7 +22,7 @@ import { useConversations } from '../lib/workspace/hooks.ts'
 import { PageSection } from './page-section.tsx'
 import { powerText } from './parts/app-powers.tsx'
 import { AppTile } from './apps/app-tile.tsx'
-import { useMinute } from './use-now.ts'
+import { AppJobRow } from './app-job-row.tsx'
 
 type Run = (change: AgentAppChange) => void
 
@@ -90,35 +89,6 @@ function Overview({ app, busy, run }: { readonly app: AgentAppDetail; readonly b
         </div>
       </CardContent>
     </Card>
-  )
-}
-
-function JobRow({ job, busy, run }: { readonly job: AgentAppJob; readonly busy: boolean; readonly run: Run }) {
-  const paused = job.paused !== null
-  const now = useMinute() * 1000
-  return (
-    <li className="apps-row">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm">{jobLine(job, now)}</p>
-        {job.lastAt !== null && (
-          <p className="text-xs text-muted-foreground">
-            Last run {when(job.lastAt)}: {job.status ?? 'none'}
-            {job.error === null ? '' : ` · ${job.error}`}
-          </p>
-        )}
-      </div>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={busy}
-        onClick={() => run({ kind: 'pause', action: job.action, paused: !paused })}
-      >
-        {paused ? 'Resume' : 'Pause'}
-      </Button>
-      <Button size="sm" variant="outline" disabled={busy} onClick={() => run({ kind: 'run', action: job.action })}>
-        Run now
-      </Button>
-    </li>
   )
 }
 
@@ -252,7 +222,7 @@ function AgentAppPage({ name }: { readonly name: string }) {
         <PageSection id="app-schedules" title="Schedules" count={app.jobs.length}>
           <ul className="apps-list">
             {app.jobs.map((job) => (
-              <JobRow key={job.action} job={job} busy={busy} run={run} />
+              <AppJobRow key={job.action} job={job} busy={busy} run={run} />
             ))}
           </ul>
         </PageSection>
