@@ -100,7 +100,6 @@ bun run check      # the full gate (run it through `heavy` on the build box)
 - [Architecture](docs/architecture.md): how the Worker, the agent object, Pi, MCP and auth fit together, including
   conversations, memory, skills, Sources and MCP Apps.
 - [Development](docs/development.md): local setup, the dev stage, connecting servers, adding goblin to Claude Code.
-- [Next](docs/next.md): remaining acceptance and write approvals.
 - [Decisions](docs/adr/): why it is shaped this way. [Glossary](GLOSSARY.md).
 - [Brand](brand/README.md): the mark, app tiles, lockups and social images, with their colours and public URLs.
 
