@@ -39,7 +39,6 @@ columns are absent. Notice outbox fields use `copy_*`; each copy binds the sink 
 This is a fresh schema, with no upgrade path for the previous application or auth migrations. A release that changes
 either baseline must reset disposable dev before recreating it, following the reset/setup checklist in
 [development](../development.md). Existing deployments must not receive these migrations without that reset.
-The separate production freeze remains in force.
 
 Unit tests compare the baseline's complete table and column inventory with the current Drizzle declarations,
 including types, defaults and nullability; they exercise partial uniqueness and FTS insert/update/delete triggers.

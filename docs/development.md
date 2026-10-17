@@ -137,7 +137,7 @@ agent's next start; connect it again. Tokens are never carried from one host to 
 
 Dev contains disposable test data. A reset erases its accounts, sessions, conversations, files, routines, grants and
 connection credentials. Preserve the setup checklist below and any separately requested exports before starting.
-The production stage is independent; the hackathon freeze keeps it at `hackathon-2026-10` until the owner lifts it.
+The production stage is independent: a reset of dev never touches it.
 
 Finish and commit the entire reset release first. Install the root and browser fixture dependencies exactly as CI does
 (`bun install --frozen-lockfile`, then the same command in `scripts/fixtures/mcp-app`), and run `heavy bun run check`
