@@ -222,7 +222,9 @@ function PinMenu({ pin, pins }: { readonly pin: ShownPin; readonly pins: Pins })
 function PinnedRow({ pin, pins, current }: { readonly pin: ShownPin; readonly pins: Pins; readonly current: boolean }) {
   const label = (
     <>
-      <AppTile origin={pin.kind === 'server' ? pin.connectionId : appOrigin(pin.app)} />
+      <AppTile
+        origin={pin.kind === 'server' ? pin.connectionId : pin.app === undefined ? pin.appId : appOrigin(pin.app)}
+      />
       <span className="sidebar-row-name">{pin.title}</span>
     </>
   )
@@ -257,8 +259,8 @@ const serverApps = (apps: readonly AppView[]): ReadonlyMap<string, string> =>
   )
 
 /**
- * The owner's pins (ADR 0053), in their order: servers with their own App and single App views, mixed. A connected
- * server with its own App is pinned until the owner unpins it. Nothing when nothing is pinned.
+ * The owner's pins (ADRs 0053, 0078), in their order: servers with their own App and single App views, mixed. Nothing
+ * when nothing is pinned.
  */
 function Pinned({ path }: { readonly path: string }) {
   const pins = usePins()

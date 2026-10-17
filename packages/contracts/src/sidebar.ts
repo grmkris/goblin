@@ -4,9 +4,8 @@ import { AppId, NonEmptyString } from './ids.ts'
 /** A connection's id, as the MCP host names it. */
 const ConnectionId = NonEmptyString(200)
 
-/** The most pins the sidebar keeps, and the most servers it remembers having pinned on its own (ADR 0053). */
+/** The most pins the sidebar keeps (ADR 0053). */
 export const MAX_PINS = 40
-export const MAX_SEEN = 200
 
 /** What a pin opens: a whole server (its own App, in its own thread) or one App view (one note, one drawing). */
 export const SidebarTarget = Schema.Union([
@@ -27,9 +26,8 @@ export const pinKey = (target: SidebarTarget): string =>
   target.kind === 'server' ? `server:${target.connectionId}` : `view:${target.appId}`
 
 /**
- * The owner's pinned servers and App views in their order, synced to every device (ADR 0053). `seen` names the servers
- * the sidebar has already pinned on its own once: a connected server with its own App shows pinned until the owner
- * changes the pins, and one the owner unpinned stays unpinned.
+ * The owner's pinned servers and App views in their order, synced to every device (ADR 0053). Only the owner pins:
+ * a newly connected server is listed under Apps, never pinned on its own (ADR 0078).
  */
 export const SidebarPins = Schema.Struct({
   revision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
@@ -37,10 +35,9 @@ export const SidebarPins = Schema.Struct({
     Schema.isMaxLength(MAX_PINS),
     Schema.makeFilter((pins) => new Set(pins.map(pinKey)).size === pins.length),
   ),
-  seen: Schema.Array(ConnectionId).check(Schema.isMaxLength(MAX_SEEN)),
 })
 export type SidebarPins = typeof SidebarPins.Type
-export const EMPTY_SIDEBAR: SidebarPins = { revision: 0, pins: [], seen: [] }
+export const EMPTY_SIDEBAR: SidebarPins = { revision: 0, pins: [] }
 
 const Index = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(MAX_PINS))
 
@@ -52,13 +49,9 @@ export const SidebarOperation = Schema.Union([
 ])
 export type SidebarOperation = typeof SidebarOperation.Type
 
-/**
- * `POST /api/sidebar`: one change to the pins as they were at `expectedRevision`. `adopt` names the servers the
- * sidebar showed pinned on its own but had not stored yet: they are stored first, in that order, then `op` applies.
- */
+/** `POST /api/sidebar`: one change to the pins as they were at `expectedRevision`. */
 export const SidebarEdit = Schema.Struct({
   expectedRevision: SidebarPins.fields.revision,
-  adopt: Schema.optional(Schema.Array(ConnectionId).check(Schema.isMaxLength(MAX_PINS))),
   op: SidebarOperation,
 })
 export type SidebarEdit = typeof SidebarEdit.Type

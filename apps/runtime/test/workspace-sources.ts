@@ -37,7 +37,7 @@ export const emptySources = Layer.mergeAll(
   stub(Personas, { list: Effect.succeed([]) }),
   stub(Invocations, { live: Effect.succeed([]) }),
   stub(Receipts, { list: () => Effect.succeed([]) }),
-  stub(Sidebar, { read: Effect.succeed({ revision: 0, pins: [], seen: [] }) }),
+  stub(Sidebar, { read: Effect.succeed({ revision: 0, pins: [] }) }),
   stub(PiSessions, { pi: Effect.succeed(pi) }),
 )
 

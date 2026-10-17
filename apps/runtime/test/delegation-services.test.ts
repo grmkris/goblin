@@ -76,7 +76,7 @@ const services = () => {
     stub(Conversations, { list: Effect.succeed([]) }),
     stub(Apps, { list: Effect.succeed([]) }),
     stub(Notices, { views: Effect.succeed([]) }),
-    stub(Sidebar, { read: Effect.succeed({ revision: 0, pins: [], seen: [] }) }),
+    stub(Sidebar, { read: Effect.succeed({ revision: 0, pins: [] }) }),
     stub(PiSessions, { pi: Effect.succeed(pi) }),
   )
   const layer = Layer.provideMerge(WorkspaceLive, Layer.merge(lane, sources))

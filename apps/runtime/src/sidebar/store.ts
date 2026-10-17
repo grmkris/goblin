@@ -1,7 +1,6 @@
 import {
   EMPTY_SIDEBAR,
   MAX_PINS,
-  MAX_SEEN,
   type SidebarEdit,
   type SidebarPin,
   SidebarPins,
@@ -41,22 +40,9 @@ const placed = (pins: readonly SidebarPin[], pin: SidebarPin, index: number | un
   return [...pins.slice(0, at), pin, ...pins.slice(at)]
 }
 
-/** The servers remembered as pinned once, the newest last, at most `MAX_SEEN`. */
-const remembered = (seen: ReadonlySet<string>) => [...seen].slice(-MAX_SEEN)
-
-/**
- * The pins after `edit`, a revision on: the servers it adopts stored first (each pinned last, unless the owner already
- * changed it), then its pin, unpin or move. A server pinned or unpinned is remembered, so the sidebar never pins it on
- * its own again. Refused when it would keep more than `MAX_PINS`.
- */
+/** The pins after `edit`'s pin, unpin or move, a revision on. Refused when it would keep more than `MAX_PINS`. */
 export function editedSidebar(current: SidebarPins, edit: SidebarEdit): SidebarPins {
-  const seen = new Set(current.seen)
   let pins: readonly SidebarPin[] = current.pins
-  for (const connectionId of edit.adopt ?? []) {
-    const pin = { kind: 'server', connectionId } as const
-    if (!seen.has(connectionId) && !pins.some((each) => pinKey(each) === pinKey(pin))) pins = [...pins, pin]
-    seen.add(connectionId)
-  }
   const { op } = edit
   if (op.kind === 'pin') pins = placed(without(pins, op.pin), op.pin, op.index)
   else if (op.kind === 'unpin') pins = without(pins, op.target)
@@ -64,25 +50,18 @@ export function editedSidebar(current: SidebarPins, edit: SidebarEdit): SidebarP
     const pin = pins.find((each) => pinKey(each) === pinKey(op.target))
     if (pin !== undefined) pins = placed(without(pins, op.target), pin, op.index)
   }
-  const target = op.kind === 'pin' ? op.pin : op.target
-  if (target.kind === 'server') seen.add(target.connectionId)
   if (pins.length > MAX_PINS) throw new InvalidInput({ reason: `The sidebar keeps ${MAX_PINS} pins; unpin one first` })
-  return { revision: current.revision + 1, pins, seen: remembered(seen) }
+  return { revision: current.revision + 1, pins }
 }
 
-/**
- * The pins without a removed connection's server, which is forgotten too (added again, it is pinned again); undefined
- * when nothing changes.
- */
+/** The pins without a removed connection's server; undefined when it was not pinned. */
 export function withoutServer(current: SidebarPins, connectionId: string): SidebarPins | undefined {
-  const target = { kind: 'server', connectionId } as const
-  const pins = without(current.pins, target)
-  if (pins.length === current.pins.length && !current.seen.includes(connectionId)) return undefined
-  return { revision: current.revision + 1, pins, seen: current.seen.filter((id) => id !== connectionId) }
+  const pins = without(current.pins, { kind: 'server', connectionId })
+  return pins.length === current.pins.length ? undefined : { revision: current.revision + 1, pins }
 }
 
 /** The pins without a deleted App's view; undefined when it was not pinned. */
 export function withoutView(current: SidebarPins, appId: string): SidebarPins | undefined {
   const pins = without(current.pins, { kind: 'view', appId })
-  return pins.length === current.pins.length ? undefined : { ...current, revision: current.revision + 1, pins }
+  return pins.length === current.pins.length ? undefined : { revision: current.revision + 1, pins }
 }

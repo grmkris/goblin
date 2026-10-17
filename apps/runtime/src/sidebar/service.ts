@@ -25,7 +25,7 @@ export class Sidebar extends Context.Service<
     readonly read: Effect.Effect<SidebarPins, AppError>
     /** One pin, unpin or move against the revision the browser read: applied, or stale with the pins as they are. */
     readonly edit: (edit: SidebarEdit) => Effect.Effect<SidebarEditResult, AppError>
-    /** A connection was removed: its server's pin goes, and it is forgotten. */
+    /** A connection was removed: its server's pin goes. */
     readonly forgetServer: (connectionId: string) => Effect.Effect<void, AppError>
     /** An App was deleted: its view's pin goes. */
     readonly forgetView: (appId: string) => Effect.Effect<void, AppError>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AppView, ServerView, SidebarPins } from '@goblin/contracts'
-import { appPin, moveOperation, pinnedRows } from '../src/lib/pins.ts'
+import { type ShownPin, appPin, moveOperation, pinnedRows } from '../src/lib/pins.ts'
 
 const server = (connectionId: string, overrides: Partial<ServerView> = {}): ServerView => ({
   connectionId,
@@ -22,55 +22,57 @@ const app = (id: string, overrides: Partial<AppView> = {}): AppView => ({
   ...overrides,
 })
 
-const pins = (overrides: Partial<SidebarPins> = {}): SidebarPins => ({ revision: 3, pins: [], seen: [], ...overrides })
+const pins = (overrides: Partial<SidebarPins> = {}): SidebarPins => ({ revision: 3, pins: [], ...overrides })
+const states = (rows: readonly ShownPin[]) =>
+  rows.map((pin) => `${pin.kind === 'server' ? pin.connectionId : pin.appId}:${pin.state}`)
 
-describe('the sidebar’s pins (ADR 0053)', () => {
-  it('shows the stored pins in order, then the servers with their own App it has never pinned, to adopt', () => {
+describe('the owner’s pins (ADRs 0053, 0078)', () => {
+  it('shows every stored pin in the owner’s order and pins no server on its own', () => {
     const stored = pins({
       pins: [
         { kind: 'view', appId: '7', title: 'Trip board' },
         { kind: 'server', connectionId: 'notes' },
       ],
-      seen: ['notes', 'gone'],
     })
-    const rows = pinnedRows(stored, [server('notes'), server('tasks'), server('gone')], [app('7')])
-    expect(rows.shown.map((pin) => (pin.kind === 'server' ? pin.connectionId : pin.appId))).toEqual([
-      '7',
-      'notes',
-      'tasks',
-    ])
-    expect(rows.adopt).toEqual(['tasks'])
+    const rows = pinnedRows(stored, [server('notes', { title: 'Notes' }), server('tasks')], [app('7')])
+    expect(states(rows)).toEqual(['7:ready', 'notes:ready'])
+    expect(rows.map((pin) => pin.title)).toEqual(['Trip board', 'Notes'])
   })
 
-  it('hides a pin whose server is signed out or whose App is gone, and keeps it stored', () => {
+  it('keeps a pin that does not open in its place, with why: signed out, no App, closed or gone', () => {
     const stored = pins({
       pins: [
         { kind: 'server', connectionId: 'notes' },
+        { kind: 'server', connectionId: 'tools' },
+        { kind: 'server', connectionId: 'removed' },
+        { kind: 'view', appId: '8', title: 'Closed' },
         { kind: 'view', appId: '9', title: 'Gone' },
       ],
-      seen: ['notes'],
     })
-    const rows = pinnedRows(stored, [server('notes', { status: 'needs_auth' })], [])
-    expect(rows.shown).toEqual([])
-    expect(rows.adopt).toEqual([])
+    const servers = [server('notes', { status: 'needs_auth' }), server('tools', { entrypoint: undefined })]
+    const rows = pinnedRows(stored, servers, [app('8', { closedAt: 5 })])
+    expect(states(rows)).toEqual(['notes:signed-out', 'tools:no-app', 'removed:gone', '8:closed', '9:gone'])
   })
 
-  it('moves a row to its shown neighbour’s place among the stored pins, past hidden ones', () => {
+  it('shows a server pin by its id while the servers are not read, never hiding it', () => {
+    const rows = pinnedRows(pins({ pins: [{ kind: 'server', connectionId: 'notes' }] }), undefined, [])
+    expect(rows).toEqual([{ kind: 'server', connectionId: 'notes', title: 'notes', state: 'loading' }])
+  })
+
+  it('moves a pin one place among the stored pins, and not past either end', () => {
     const stored = pins({
       pins: [
         { kind: 'server', connectionId: 'a' },
-        { kind: 'server', connectionId: 'hidden' },
         { kind: 'server', connectionId: 'b' },
       ],
-      seen: ['a', 'hidden', 'b'],
     })
-    const rows = pinnedRows(stored, [server('a'), server('b')], [])
-    expect(moveOperation(stored, rows, { kind: 'server', connectionId: 'b' }, -1)).toEqual({
+    expect(moveOperation(stored, { kind: 'server', connectionId: 'b' }, -1)).toEqual({
       kind: 'move',
       target: { kind: 'server', connectionId: 'b' },
       index: 0,
     })
-    expect(moveOperation(stored, rows, { kind: 'server', connectionId: 'a' }, -1)).toBeUndefined()
+    expect(moveOperation(stored, { kind: 'server', connectionId: 'a' }, -1)).toBeUndefined()
+    expect(moveOperation(stored, { kind: 'server', connectionId: 'b' }, 1)).toBeUndefined()
   })
 
   it('pins a server’s own App as its server, any other App as its view', () => {
