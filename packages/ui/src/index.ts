@@ -1,5 +1,18 @@
 export { Alert, AlertDescription, AlertTitle } from './components/alert.tsx'
 export { AskCard, AskCardActions, AskCardDescription, AskCardHeader } from './components/ask-card.tsx'
+export {
+  Autocomplete,
+  AutocompleteCollection,
+  AutocompleteDialog,
+  AutocompleteEmpty,
+  AutocompleteGroup,
+  AutocompleteGroupLabel,
+  AutocompleteInput,
+  AutocompleteItem,
+  AutocompleteItemDetail,
+  AutocompleteItemLabel,
+  AutocompleteList,
+} from './components/autocomplete.tsx'
 export { Badge } from './components/badge.tsx'
 export { Button, buttonVariants } from './components/button.tsx'
 export {
