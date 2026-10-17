@@ -1,5 +1,6 @@
-import { type SubmitEvent, useState } from 'react'
+import { type SubmitEvent, useEffect, useRef, useState } from 'react'
 import { useMutation, useSuspenseQueries } from '@tanstack/react-query'
+import { useLocation } from '@tanstack/react-router'
 import type { RoutineSettings, RoutineView } from '@goblin/contracts'
 import {
   Alert,
@@ -97,13 +98,22 @@ function NoRoutines({ onNew }: { readonly onNew: () => void }) {
   )
 }
 
-/** The owner's routines, newest change first, with the timezone new ones use; both read together. */
+/**
+ * The owner's routines, newest change first, with the timezone new ones use; both read together. A link to
+ * `/work#routines` lands here once they are read: the router only scrolls to what is on the page when it arrives.
+ */
 function Routines() {
   const [{ data: list }, { data: settings }] = useSuspenseQueries({ queries: [routinesQuery, routineSettingsQuery] })
   const [editing, setEditing] = useState<RoutineView | 'new'>()
+  const section = useRef<HTMLElement>(null)
+  const hash = useLocation({ select: (location) => location.hash })
+  useEffect(() => {
+    if (hash === 'routines') section.current?.scrollIntoView({ block: 'start' })
+  }, [hash])
   const listed = list.routines
   return (
     <PageSection
+      ref={section}
       id="routines"
       title="Routines"
       {...(listed.length > 0 && { count: listed.length })}

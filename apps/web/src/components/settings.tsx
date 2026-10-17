@@ -3,12 +3,11 @@ import { MemoryCard, ResidentCard, UsageCard } from './agent-cards.tsx'
 import { ModelEndpointCard } from './model-endpoint-card.tsx'
 import { NotifySinkCard } from './notify-sink-card.tsx'
 import { PageSection } from './page-section.tsx'
-import { RoutinesSection } from './routines.tsx'
 import { SetupSettingsCard } from './start/setup-cards.tsx'
 
 /**
  * The owner's settings, most used first: today's usage, Start and the model, their agent (and where its notices go),
- * routines, the apps that use their agent, and last the account itself.
+ * the apps that use their agent, and last the account itself. Routines are on Work.
  */
 export function Settings() {
   return (
@@ -23,7 +22,6 @@ export function Settings() {
         <MemoryCard />
         <NotifySinkCard />
       </PageSection>
-      <RoutinesSection />
       <PageSection
         id="clients"
         title="Apps that use your agent"

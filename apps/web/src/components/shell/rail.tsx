@@ -77,7 +77,7 @@ export function Rail() {
       <Link to="/activity" className="rail-item" aria-current={current(at('/activity'))}>
         <Stop label="Activity" icon={<BellIcon aria-hidden />} count={counts.activity} />
       </Link>
-      <Link to="/tasks" className="rail-item" aria-current={current(at('/tasks'))}>
+      <Link to="/work" className="rail-item" aria-current={current(at('/work'))}>
         <Stop label="Tasks" icon={<ListChecksIcon aria-hidden />} count={counts.tasks} />
       </Link>
       <span className="rail-spacer" />

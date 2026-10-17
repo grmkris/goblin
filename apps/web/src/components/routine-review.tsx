@@ -50,7 +50,7 @@ function useWhenOf(definition: RoutineDefinition): string {
 /**
  * The event stream a routine waits for, as its server describes it now (its title and filter schema); none for a
  * routine on no event, or while the server has not said. Only a connected connection is asked: one that needs sign-in
- * refuses (403), and a review is read on every Settings load.
+ * refuses (403), and a review is read on every Work load.
  */
 function useStreamOf(definition: RoutineDefinition) {
   const { trigger } = definition
