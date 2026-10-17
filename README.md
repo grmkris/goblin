@@ -125,7 +125,7 @@ grants and webhook (ADR 0041). A routine fires once, on a schedule or when a con
 Topic and can **Tell me** (each event, reminder and answer is a notice in the Topic and a notification in Activity,
 through Notify me via too if asked) and **Hand to** Goblin or a Persona pinned at its revision, with an instruction, exact tool
 pairs and budgets. The owner confirms
-each revision in Settings → Routines or on the connection's Events section, a picker that names each event by its own
+each revision in Work → Routines or on the connection's Events section, a picker that names each event by its own
 title, sends each one the owner picks to a Topic (Tell me) or hands it to goblin or a Persona, and sets them up in one
 step; Goblin may propose one, never confirm it. Run now, Stop, Pause, Edit and Archive are available. Event confirmation
 authorizes the exact connection, event name and JSON filters; event text reaches the model only as framed untrusted

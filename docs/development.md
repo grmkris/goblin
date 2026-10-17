@@ -271,7 +271,7 @@ until it runs, real provider and Telegram delivery remain unverified.
 - **Resident authority.** Settings → Your agent → **Work while you're away** shows it and when it expires. Owner
   activity renews it for 30 days; inbound and scheduled work do not renew it. Turning it off stops all outbound MCP
   use by the agent until you turn it on again.
-- **Routines.** Settings → Routines → New routine: what it does, when it runs (once at a time you pick, on a cron
+- **Routines.** Work → Routines → New routine: what it does, when it runs (once at a time you pick, on a cron
   schedule, or on a server's event) and the tools and limits it may use. Saving makes a proposal; Confirm on its card
   turns it on, and an edit pauses it until you confirm again. The agent can also propose one in chat.
 - **MyPlan as an App.** Connect mysi with MyPlan included (or MyPlan's own `https://dev.myplan.lol/mcp` by address), then switch
@@ -300,7 +300,7 @@ until it runs, real provider and Telegram delivery remain unverified.
 
   Sign in and approve in the browser. It gets `ask_agent` and `get_recent_messages` in the agent's main conversation,
   with its messages labelled by client name, and, if you turn on "Also let it read your conversations and runs" on
-  the consent page (it starts off), the read-only inspection tools (ADR 0024). Revoke it under Settings → Apps that use your agent. A connection made before inspection joined `/mcp`
+  the consent page (it starts off), the read-only inspection tools (ADR 0024). Revoke it under Settings → Connected clients. A connection made before inspection joined `/mcp`
   gets those tools after reconnecting once (in Claude Code: `/mcp` → goblin → Clear authentication).
 - **Inspect your agent from a coding agent.** Start with `inspect_problems` or `inspect_turns`, then `inspect_turn`
   with an operation id (a Source message is `source-<source>-<message>`), then `inspect_conversation` for the words.

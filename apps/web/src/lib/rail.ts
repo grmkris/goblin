@@ -61,7 +61,7 @@ export const unreadChats = (views: readonly ConversationView[]): readonly Conver
   views.filter((view) => !isClosed(view) && view.kind !== 'subagent' && isUnread(view)).toSorted(newest)
 
 /**
- * The Tasks page's Delegates (subagents): those at work first, then the others still open, newest first; the
+ * Work's Delegates (subagents): those at work first, then the others still open, newest first; the
  * finished ones (closed once their job was done, or by the owner) apart, the newest few.
  */
 export function delegates(
@@ -78,7 +78,7 @@ export function delegates(
   }
 }
 
-/** Persona answers for Tasks: those on their way first (in order), then the settled ones, newest first. */
+/** Persona answers for Work: those on their way first (in order), then the settled ones, newest first. */
 export const personaTasks = (invocations: readonly PersonaInvocationView[]): readonly PersonaInvocationView[] => [
   ...invocations.filter(answering).toSorted((a, b) => a.createdAt - b.createdAt || a.order - b.order),
   ...invocations.filter((each) => !answering(each)).toSorted((a, b) => b.createdAt - a.createdAt),
