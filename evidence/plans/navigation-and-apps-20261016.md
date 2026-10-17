@@ -1,8 +1,8 @@
 # Navigation and Apps redesign plan
 
-Status: implementation-ready plan. Created 2026-10-16 against `b3ac028e`; revised the same day with the owner's
-decisions (section 1.1). This document specifies the next iteration; it does not record implemented or deployed UI
-changes.
+Status: implemented on `feat/navigation-and-apps` (2026-10-17) and recorded as ADR 0078. Created 2026-10-16 against
+`b3ac028e`, revised the same day with the owner's decisions (section 1.1). Section 10 records where the implementation
+differs from this plan.
 
 ## 1. Outcome
 
@@ -678,3 +678,28 @@ Verification so far:
 Verdict: **Needs changes** for the current navigation. The proposed design is **not verified** in authenticated
 desktop or mobile browsers, with keyboard or screen reader, in light and dark themes, under motion preferences, for
 runtime performance, for state-changing flows, or after deploy. Those checks belong to phases 1–5.
+
+## 10. Implementation record (2026-10-17)
+
+Built in parallel lanes (Apps launcher, Work and configuration, Jump to) and the shell, merged on
+`feat/navigation-and-apps`. Where it differs from the plan above:
+
+- **Strip memory.** The collapsed state is kept in the browser's storage and restored by a script before the first
+  paint (`data-sidebar` on the root, as the theme script does), not in a cookie the server reads. The first paint still
+  matches and nothing flashes; the server never needs to know.
+- **Targets inside rows.** A pin's ⋯ menu sits inside its 34px row, so it is as tall as the row (36×34px) rather than
+  40px, which would cover the rows beside it. Standalone icon controls (collapse) are 40px; every control is 44px on a
+  coarse pointer. Apps' ⋯ buttons, outside rows, are 40px.
+- **Links' own active state.** The router marks an active link `aria-current="page"` by prefix, which marked a channel
+  while its thread showed (a bug the old sidebar had too). Sidebar links are now active only on their exact place, so
+  the one-row rule alone decides.
+- **Recent** orders by creation time; the app keeps no last-opened time.
+- **Jump to** breaks ties by group, then each source's own order (threads already unread first, then newest); it reads
+  the connected apps from the launcher's list.
+- **Topic setup** is the Topic's; a Persona's setup is titled "What it adds".
+- **The agent** now tells the owner to confirm a proposed routine in Work → Routines.
+
+Evidence (local): `heavy bun run check` green on the integrated branch; browser fixtures `ui-navigation.ts`,
+`ui-apps.ts`, `ui-jump.ts` and `ui-setup.ts` pass at desktop and phone widths in light and dark. Not verified: an
+authenticated walk on dev, a screen reader, real devices.
+
