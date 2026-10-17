@@ -23,6 +23,8 @@ export const agentIgnorePatterns = (): string[] => [
   // written by repoagents in its own JSON style
   '.agents/skills/sources.json',
   '.claude/skills/**',
+  // Claude Code's per-machine settings, never committed
+  '.claude/settings.local.json',
   '.codex/**',
   '.grok/**',
   // generated from .mcp.json
