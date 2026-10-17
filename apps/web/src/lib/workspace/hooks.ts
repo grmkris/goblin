@@ -66,6 +66,14 @@ export function useApps<T>(select?: (apps: readonly AppView[]) => T) {
   return useSlice(workspaceQueries.apps, EMPTY_WORKSPACE.apps, pick)
 }
 
+const snapshotIn = () => true
+
+/**
+ * Whether the feed's first snapshot is in. Before it every slice reads as an empty workspace's, so a page that would
+ * otherwise say "none" waits on its placeholder until this is true.
+ */
+export const useWorkspaceRead = (): boolean => useQuery({ ...workspaceQueries.apps, select: snapshotIn }).data === true
+
 /** The Topics, in order. */
 export const useTopics = (): readonly TopicView[] => useSlice(workspaceQueries.topics, EMPTY_WORKSPACE.topics, whole)
 
