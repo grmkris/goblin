@@ -119,8 +119,8 @@ function RoutineDetails({ routine }: { readonly routine: RoutineView }) {
           <div>
             <dt>Not in its Topic</dt>
             <dd>
-              {routine.outsideSetup.map((tool) => `${tool.connectionId} · ${tool.name}`).join(', ')}: its Topic's MCP
-              servers & skills leave these out, so a run that calls one is refused.
+              {routine.outsideSetup.map((tool) => `${tool.connectionId} · ${tool.name}`).join(', ')}: its Topic setup
+              leaves these out, so a run that calls one is refused.
             </dd>
           </div>
         )}

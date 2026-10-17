@@ -69,7 +69,7 @@ async function drive(browser: Browser, origin: string, label: string, options: B
     })
   })
   await page.goto(`${origin}setup.html`)
-  const drawer = page.getByRole('dialog', { name: 'MCP servers & skills' })
+  const drawer = page.getByRole('dialog', { name: 'Topic setup' })
   await drawer.waitFor()
   await page.getByRole('tab', { name: 'Everything' }).first().waitFor()
   await page.screenshot({ path: path.join(out, `${label}-everything.png`) })

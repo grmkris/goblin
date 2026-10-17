@@ -1,4 +1,4 @@
-// The Settings cards about the account: the MCP clients that use the agent, and deleting the account.
+// The Settings cards about the account: the connected clients that use the agent, and deleting the account.
 import { type SubmitEvent, useState } from 'react'
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import {
@@ -23,7 +23,7 @@ function Clients() {
   const clients = useSuspenseQuery(clientsQuery).data
   const revoke = useMutation(revokeClientMutation)
   const revoking = revoke.isPending ? revoke.variables : ''
-  const failure = revoke.error === null ? '' : messageOf(revoke.error, 'revoke that app')
+  const failure = revoke.error === null ? '' : messageOf(revoke.error, 'revoke that client')
   return (
     <>
       {failure && (
@@ -62,7 +62,7 @@ export function ClientsCard() {
   return (
     <Card>
       <CardContent>
-        <QueryBoundary action="list the apps that use your agent" pending={<Skeleton className="h-6 w-full" />}>
+        <QueryBoundary action="list your connected clients" pending={<Skeleton className="h-6 w-full" />}>
           <Clients />
         </QueryBoundary>
       </CardContent>

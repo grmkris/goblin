@@ -100,7 +100,8 @@ function TopicSetupEditor({ topic, onClose }: { readonly topic: TopicView; reado
 
 /**
  * Where a Topic's setup is edited: a panel from the right on a wide screen, a sheet from the bottom on a phone. It says
- * whose setup it is and that it applies to every chat of the Topic, Source messages and connected clients included.
+ * what it chooses: the tools, skills, apps and helpers every chat of the Topic can use (for Personal, Source messages
+ * and connected clients too).
  */
 export function TopicSetupDrawer({
   topic,
@@ -114,12 +115,12 @@ export function TopicSetupDrawer({
   const narrow = useIsMobile()
   const description =
     topic.personal === true
-      ? 'What every chat of Personal works with, Source messages and connected clients included.'
-      : `What every chat of #${topic.name} works with.`
+      ? 'Choose the tools, skills, apps and helpers every chat of Personal can use, Source messages and connected clients included.'
+      : `Choose the tools, skills, apps and helpers every chat of #${topic.name} can use.`
   const contents = (
     <>
       <DrawerHeader>
-        <DrawerTitle>MCP servers & skills</DrawerTitle>
+        <DrawerTitle>Topic setup</DrawerTitle>
         <DrawerDescription>{description}</DrawerDescription>
       </DrawerHeader>
       {open && <TopicSetupEditor key={topic.revision} topic={topic} onClose={() => onOpenChange(false)} />}
@@ -157,7 +158,7 @@ export function SetupButton({ chat }: { readonly chat: string }) {
       <Button
         type="button"
         variant="ghost"
-        aria-label={`MCP servers & skills of ${topic.personal === true ? 'Personal' : `#${topic.name}`}: ${summary ?? (narrowed ? 'a chosen list' : 'everything')}`}
+        aria-label={`Topic setup for ${topic.personal === true ? 'Personal' : `#${topic.name}`}: ${summary ?? (narrowed ? 'a chosen list' : 'everything')}`}
         onClick={() => setOpen(true)}
       >
         <Settings2Icon />

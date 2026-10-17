@@ -313,13 +313,13 @@ async function editableChecks(page: Page, checks: Record<string, Check>, prefix:
  * phone) with each category's Everything | Only these choice; it is closed without saving.
  */
 async function setupCheck(page: Page, checks: Record<string, Check>, prefix: string): Promise<void> {
-  const button = page.locator('button[aria-label^="MCP servers & skills of"]').first()
+  const button = page.locator('button[aria-label^="Topic setup for"]').first()
   if ((await button.count()) === 0) {
     checks[`${prefix}.setup.opens`] = skipped('no setup button on this page')
     return
   }
   await button.click()
-  const editor = page.getByRole('dialog', { name: 'MCP servers & skills' })
+  const editor = page.getByRole('dialog', { name: 'Topic setup' })
   // The picker shows once the catalog it is chosen from has loaded: wait for its first choice, not just the panel.
   const shown = await editor
     .getByRole('tab', { name: 'Only these' })

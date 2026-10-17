@@ -7,7 +7,7 @@ import { SetupSettingsCard } from './start/setup-cards.tsx'
 
 /**
  * The owner's settings, most used first: today's usage, Start and the model, their agent (and where its notices go),
- * the apps that use their agent, and last the account itself. Routines are on Work.
+ * the clients connected to their agent, and last the account itself. Routines are on Work.
  */
 export function Settings() {
   return (
@@ -24,10 +24,11 @@ export function Settings() {
       </PageSection>
       <PageSection
         id="clients"
-        title="Apps that use your agent"
+        title="Connected clients"
         note={
           <>
-            MCP clients you allowed to use goblin at <code>{`${window.location.origin}/mcp`}</code>.
+            External MCP clients you allowed to use goblin at <code>{`${window.location.origin}/mcp`}</code>. Revoking
+            one ends its access at once.
           </>
         }
       >
