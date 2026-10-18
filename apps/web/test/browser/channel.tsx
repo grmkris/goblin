@@ -49,7 +49,14 @@ const workspace: WorkspaceSnapshot = {
         'Prefer walkable neighborhoods and locally owned places. Check dates and prices before recommending a booking.',
       searchExcluded: false,
       revision: 1,
-      setup: EVERYTHING,
+      // One skill the library lists and one it no longer does.
+      setup: {
+        ...EVERYTHING,
+        skills: [
+          { connectionId: 'notes', name: 'trip-planning' },
+          { connectionId: 'notes', name: 'packing-list' },
+        ],
+      },
       createdBy: 'owner',
       createdAt: 1,
     },
