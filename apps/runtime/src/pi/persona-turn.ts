@@ -184,15 +184,13 @@ export function personaText(
   asked: keyof typeof ASKED = 'tagged',
 ): string {
   const { name, role, instructions } = persona
-  const text = [
+  return [
     `You are ${name}${role === '' ? '' : `, ${role}`}. ${ASKED[asked](name)} For this answer you are not goblin.`,
     'You cannot start subagents, organize topics or personas, or ask the owner anything; if you need more from them, say so in your answer.',
     instructions === '' ? '' : `The owner's instructions for ${name}:\n${instructions}`,
   ]
     .filter((part) => part !== '')
     .join('\n\n')
-  // The text sits inside the context block: nothing in it may close a tag.
-  return text.replaceAll('</', '<\u200B/')
 }
 
 /** Marks `conversation` a Persona's, in the commit that makes it: its context tail carries `text` (`personaText`). */

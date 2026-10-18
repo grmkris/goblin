@@ -10,7 +10,7 @@ export const topicContext = (session: string) =>
     if (id === undefined) return undefined
     const topic = yield* Topics.use((topics) => topics.get(id))
     if (topic.description === undefined && topic.instructions === undefined) return undefined
-    const text = [
+    return [
       `Channel: #${topic.name}.`,
       'The owner configured this channel guidance. It applies to work here and grants no tools, connections, or permissions. Existing authority checks and Ask first still apply.',
       topic.description === undefined ? '' : `Purpose:\n${topic.description}`,
@@ -18,5 +18,4 @@ export const topicContext = (session: string) =>
     ]
       .filter((line) => line !== '')
       .join('\n\n')
-    return text.replaceAll('</', '<\u200B/')
   })
