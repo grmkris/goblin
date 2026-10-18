@@ -270,32 +270,34 @@ export function StartPage({ step, search }: { readonly step: OnboardingStep; rea
         <StartPanel view={view} step={step} onSkip={skip} />
       </div>
       <section className="start-task" data-step={step} aria-labelledby="start-title">
-        <header className="start-head">
-          <h1 id="start-title">{STEP_TEXT[step].title}</h1>
-          <p>{STEP_TEXT[step].why}</p>
-        </header>
-        <ReturnNotice search={search} />
-        {step === 'welcome' && (
-          <WelcomeStep
-            goal={draft.goal}
-            onChange={(goal) => saved.edit({ goal })}
-            onContinue={() => {
-              if (draft.channel === 'My first project') saved.edit({ channel: suggestedChannel(draft.goal) })
-              next()
-            }}
-          />
-        )}
-        {step === 'model' && <ModelStep />}
-        {step === 'services' && <ServicesStep connected={search.connected} goal={draft.goal} />}
-        {step === 'goblin' && (
-          <GoblinStep draft={draft} onChange={saved.edit} pending={starting} onStart={() => void finish(true)} />
-        )}
-        {failure !== null && (
-          <Receipt tone="error">
-            <CircleAlertIcon aria-hidden />
-            <span>{messageOf(failure, 'finish setting up')}</span>
-          </Receipt>
-        )}
+        <div className="start-content">
+          <header className="start-head">
+            <h1 id="start-title">{STEP_TEXT[step].title}</h1>
+            <p>{STEP_TEXT[step].why}</p>
+          </header>
+          <ReturnNotice search={search} />
+          {step === 'welcome' && (
+            <WelcomeStep
+              goal={draft.goal}
+              onChange={(goal) => saved.edit({ goal })}
+              onContinue={() => {
+                if (draft.channel === 'My first project') saved.edit({ channel: suggestedChannel(draft.goal) })
+                next()
+              }}
+            />
+          )}
+          {step === 'model' && <ModelStep />}
+          {step === 'services' && <ServicesStep connected={search.connected} goal={draft.goal} />}
+          {step === 'goblin' && (
+            <GoblinStep draft={draft} onChange={saved.edit} pending={starting} onStart={() => void finish(true)} />
+          )}
+          {failure !== null && (
+            <Receipt tone="error">
+              <CircleAlertIcon aria-hidden />
+              <span>{messageOf(failure, 'finish setting up')}</span>
+            </Receipt>
+          )}
+        </div>
         <StartNav step={step} view={view} finishing={starting} onNext={next} onFinish={() => void finish(false)} />
       </section>
     </div>

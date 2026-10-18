@@ -49,6 +49,8 @@ const at = new URLSearchParams(location.search).get('at') ?? '/start/welcome'
 const router = createRouter({
   routeTree: root.addChildren([step, splash, channel]),
   history: createMemoryHistory({ initialEntries: [at] }),
+  scrollRestoration: true,
+  scrollToTopSelectors: ['.start-content'],
 })
 
 const element = document.getElementById('root')

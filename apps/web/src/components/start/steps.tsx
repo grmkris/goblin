@@ -65,8 +65,8 @@ export function WelcomeStep({
       </div>
       <div className="start-ideas">
         {IDEAS.map((idea) => (
-          <button key={idea} type="button" className="start-idea" onClick={() => onChange(idea)}>
-            {idea}
+          <button key={idea.label} type="button" className="start-idea" onClick={() => onChange(idea.goal)}>
+            {idea.label}
           </button>
         ))}
       </div>
@@ -126,9 +126,9 @@ export function ServicesStep({ connected, goal }: { readonly connected: string |
 
 /** Ideas to start from: tapping one fills the field. */
 const IDEAS = [
-  'Plan a trip and keep every booking in one place',
-  'Research a topic and write up what I should know',
-  'Track my training and nudge me when I slack',
+  { label: 'Plan a trip', goal: 'Plan a trip and keep every booking in one place' },
+  { label: 'Research a topic', goal: 'Research a topic and write up what I should know' },
+  { label: 'Track my training', goal: 'Track my training and nudge me when I slack' },
 ]
 
 export function GoblinStep({

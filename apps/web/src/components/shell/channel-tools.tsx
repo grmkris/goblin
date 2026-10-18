@@ -12,6 +12,7 @@ import {
   type Grant,
 } from '@goblin/contracts'
 import { Button } from '@goblin/ui'
+import { ChevronRightIcon } from 'lucide-react'
 import { grantsQuery, serversQuery } from '../../mcp/queries.ts'
 import { setupCatalogQuery } from '../../setup/queries.ts'
 import { messageOf } from '../../lib/query/app-error.ts'
@@ -48,10 +49,9 @@ export function ChannelTools({ topic, onEdit }: { readonly topic: TopicView; rea
   return (
     <div className="channel-info-sections">
       <p className="channel-info-empty">
-        Available to goblin in this channel and its threads. Personas can add their own tools. Connection permissions
-        and Ask first still apply.
+        Tools for this channel and its threads. Personas may add more. Connection permissions and Ask first still apply.
       </p>
-      <Button variant="outline" onClick={onEdit}>
+      <Button variant="outline" size="sm" onClick={onEdit}>
         Choose tools & skills
       </Button>
       <ChannelConnections topic={topic} available={available} servers={servers.data} permissions={permissions} />
@@ -107,6 +107,7 @@ function ConnectionDetails({
   return (
     <details className="channel-info-capability" key={server.connectionId}>
       <summary>
+        <ChevronRightIcon aria-hidden />
         <span>{server.label}</span>
         <small data-ready={status === 'Ready' || undefined}>{status}</small>
       </summary>
@@ -200,8 +201,9 @@ function ChannelSkills({ topic, available }: { readonly topic: TopicView; readon
           hasSkill(topic.setup, { connectionId: library.connectionId, name: skill.name, uri: skill.uri }),
         )
         return (
-          <details key={library.connectionId} className="channel-info-capability" open>
+          <details key={library.connectionId} className="channel-info-capability">
             <summary>
+              <ChevronRightIcon aria-hidden />
               <span>{library.label}</span>
               <small>{library.available ? `${skills.length} available` : 'Library unavailable'}</small>
             </summary>

@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
 import type { ConversationView, TopicView } from '@goblin/contracts'
 import { Button, Input } from '@goblin/ui'
-import { FileIcon, ImageIcon, LinkIcon } from 'lucide-react'
+import { FileIcon, ImageIcon, LinkIcon, RefreshCwIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { SharedItem } from '../../lib/channel-shared.ts'
 import { sharedPages, sharedQuery } from '../../conversations/shared.ts'
@@ -30,15 +30,12 @@ export function ChannelShared({ topic }: { readonly topic: TopicView }) {
       (kind === 'all' || kind === item.kind) && `${item.name} ${item.detail}`.toLocaleLowerCase().includes(query),
   )
   return (
-    <div className="channel-info-sections channel-shared">
-      <Button variant="ghost" size="sm" pending={read.isRefetching} onClick={() => void read.refetch()}>
-        Refresh shared items
-      </Button>
-      <Input
-        aria-label="Search loaded shared items"
-        value={filter}
-        placeholder="Search loaded items"
-        onChange={(event) => setFilter(event.target.value)}
+    <div className="channel-info-sections">
+      <SharedToolbar
+        filter={filter}
+        onFilter={setFilter}
+        pending={read.isRefetching}
+        onRefresh={() => void read.refetch()}
       />
       <div className="channel-shared-filters" aria-label="Shared item type">
         {(['all', 'media', 'file', 'link'] as const).map((value) => (
@@ -53,7 +50,7 @@ export function ChannelShared({ topic }: { readonly topic: TopicView }) {
           </Button>
         ))}
       </div>
-      <p className="channel-info-empty">From this channel and its threads, including closed threads.</p>
+      <p className="channel-info-empty">Includes this channel and its threads.</p>
       {read.isPending && <p role="status">Reading shared items…</p>}
       {read.error !== null && <p role="alert">{messageOf(read.error, 'read shared items')}</p>}
       {read.isSuccess && visible.length === 0 && (
@@ -80,6 +77,40 @@ export function ChannelShared({ topic }: { readonly topic: TopicView }) {
           Try again
         </Button>
       )}
+    </div>
+  )
+}
+
+function SharedToolbar({
+  filter,
+  onFilter,
+  pending,
+  onRefresh,
+}: {
+  readonly filter: string
+  readonly onFilter: (value: string) => void
+  readonly pending: boolean
+  readonly onRefresh: () => void
+}) {
+  return (
+    <div className="channel-shared-toolbar">
+      <Input
+        aria-label="Search loaded shared items"
+        value={filter}
+        placeholder="Search loaded items"
+        onChange={(event) => onFilter(event.target.value)}
+      />
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-11"
+        aria-label="Refresh shared items"
+        title="Refresh shared items"
+        pending={pending}
+        onClick={onRefresh}
+      >
+        <RefreshCwIcon aria-hidden />
+      </Button>
     </div>
   )
 }
