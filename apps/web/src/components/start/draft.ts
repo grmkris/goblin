@@ -5,10 +5,10 @@ const KEY = 'goblin:start-draft'
 export type StartDraft = {
   readonly goal: string
   readonly channel: string
+  /** The kickoff's operation once it was sent: the draft is frozen until it is refused or done. */
   readonly operation: string
-  readonly accepted: boolean
 }
-const empty = (): StartDraft => ({ goal: '', channel: 'My first project', operation: '', accepted: false })
+const empty = (): StartDraft => ({ goal: '', channel: 'My first project', operation: '' })
 
 /** Kept in this tab across model setup and a connection's OAuth return; never stores a model key. */
 function read(): StartDraft {
@@ -25,7 +25,6 @@ function read(): StartDraft {
       goal: value.goal.slice(0, 2000),
       channel: value.channel.slice(0, 80),
       operation: value.operation,
-      accepted: value.accepted === true,
     }
   } catch {
     // expected: storage can be unavailable, or a draft from an interrupted write can be unreadable
@@ -56,9 +55,8 @@ export function useStartDraft() {
     draft,
     edit: (change: Partial<Pick<StartDraft, 'goal' | 'channel'>>) =>
       draft.operation === '' ? store({ ...draft, ...change }) : draft,
-    rejected: () => store({ ...draft, operation: '', accepted: false }),
+    rejected: () => store({ ...draft, operation: '' }),
     begin: () => (draft.operation === '' ? store({ ...draft, operation: crypto.randomUUID() }) : draft),
-    accepted: (sent: StartDraft) => store({ ...sent, accepted: true }),
   }
 }
 

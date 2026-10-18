@@ -86,15 +86,19 @@ segment per step:
    (`model-endpoint-card.tsx` `ModelEndpoint`);
 3. services: the shelf (`server-add.tsx` `SuggestedServers`); the server just connected from here, by a sign-in that
    came back or one that needed none, offers Use suggested access (`start/connect-server.tsx`);
-4. review the channel name and first message. Stable operations create the channel and submit once across retries.
-   The tab retains the draft across model setup and OAuth returns and clears it on finish or sign-out.
+4. review the channel name and first message. `POST /api/onboarding/kickoff` does the rest in one call
+   (`onboarding/program.ts` `kickoff`): it creates the channel with the goal as its description, records the kickoff
+   into it, sends the goal as the owner's first message and marks Start done, each under an operation id made from the
+   kickoff's, so a retry replays it. Its refusals (a taken name) come before anything is made, which reopens the draft;
+   any other failure keeps it frozen for a retry. The tab retains the draft across model setup and OAuth returns and
+   clears it on finish or sign-out.
 
 Continue marks the step gone through; Skip setup skips Start. Finishing narrows the panel into the sidebar as the chat
 appears.
 
 **State** (`onboarding/`). `app_onboarding` keeps the status the owner set (`done`, `skipped`; `open` otherwise, and
-again after they reopen it), the steps they went through and the kickoff's time and logical channel id. `GET /api/onboarding` answers from
-the agent alone: a step is done once the owner went through it, the model step also once they set their own endpoint
+again after they reopen it), the steps they went through and the kickoff: its time and logical channel id, both or
+neither. `GET /api/onboarding` answers from the agent alone: a step is done once the owner went through it, the model step also once they set their own endpoint
 (`Inference.view`), the goblin step once the kickoff was sent. It also carries the endpoint in use and how many servers
 are connected. A step id an older Start had is dropped when the row is read.
 

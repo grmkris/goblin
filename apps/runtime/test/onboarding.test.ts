@@ -133,14 +133,14 @@ describe('first-run Start (ADR 0062)', () => {
       // A step alone keeps the kept status; `open` forgets it.
       expect((yield* changeOnboarding({ step: 'model' })).status).toBe('skipped')
       expect((yield* changeOnboarding({ status: 'open' })).status).toBe('open')
-      const finished = yield* changeOnboarding({ status: 'done', kickoff: true })
+      yield* Onboarding.use((onboarding) => onboarding.kickoff('2', 60))
+      const finished = yield* changeOnboarding({ status: 'done' })
       expect(finished).toMatchObject({ status: 'done', kickoff: true })
       // The kickoff alone is the goblin step done.
       expect(done(finished)).toEqual(['welcome', 'model', 'goblin'])
-      const first = (yield* kept)?.kickoffAt
-      yield* TestClock.adjust('1 minute')
-      yield* changeOnboarding({ kickoff: true })
-      expect((yield* kept)?.kickoffAt).toBe(first)
+      // A retried kickoff keeps the first one, its time and its channel.
+      yield* Onboarding.use((onboarding) => onboarding.kickoff('3', 120))
+      expect((yield* kept)?.kickoff).toEqual({ at: 60, chat: '2' })
     }).pipe(Effect.provide(start().layer)),
   )
 
@@ -151,12 +151,7 @@ describe('first-run Start (ADR 0062)', () => {
     sqlite.exec(
       `INSERT INTO app_onboarding (id, status, steps, updated_at) VALUES (1, 'open', '["welcome","wallet","mercator","goblin","goblin"]', 1000)`,
     )
-    expect(store.get()).toEqual({
-      status: undefined,
-      steps: ['welcome', 'goblin'],
-      kickoffAt: undefined,
-      kickoffChat: undefined,
-    })
+    expect(store.get()).toEqual({ status: undefined, steps: ['welcome', 'goblin'], kickoff: undefined })
     sqlite.exec(`UPDATE app_onboarding SET steps = 'not json' WHERE id = 1`)
     expect(store.get()?.steps).toEqual([])
   })
@@ -205,7 +200,7 @@ describe('first-run Start (ADR 0062)', () => {
   it.effect('tells goblin to begin useful work after the kickoff, without an architecture questionnaire', () =>
     Effect.gen(function* () {
       expect(yield* onboardingContext('s1')).toBeUndefined()
-      yield* changeOnboarding({ status: 'done', step: 'goblin', kickoff: true, kickoffChat: '2' })
+      yield* Onboarding.use((onboarding) => onboarding.kickoff('2', 0))
       const kickoff = yield* onboardingContext('s2')
       expect(kickoff).toContain('Begin by doing one useful piece')
       expect(kickoff).not.toContain('topic_create')

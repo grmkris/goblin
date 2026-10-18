@@ -12,6 +12,8 @@ export class Onboarding extends Context.Service<
     readonly read: Effect.Effect<OnboardingRecord | undefined>
     /** Applies the owner's change at `now` (epoch seconds). */
     readonly change: (change: OnboardingChange, now: number) => Effect.Effect<OnboardingRecord, AppError>
+    /** Records the kickoff into `chat` at `now`, unless one is recorded already. */
+    readonly kickoff: (chat: string, now: number) => Effect.Effect<OnboardingRecord, AppError>
     /** Notes a sign-in Start sent the owner to from `step`, to come back to it. */
     readonly noteConnect: (connectionId: string, step: OnboardingStep, now: number) => Effect.Effect<void, AppError>
     /** Takes that note's step when the sign-in comes back; none for a sign-in Start did not begin. */

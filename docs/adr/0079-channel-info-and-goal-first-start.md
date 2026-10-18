@@ -27,8 +27,9 @@ Pi's globally minted entry IDs. Media is not fetched for previews. Search descri
 remain available. Work shows only conversations, routines and external source routes belonging to the channel.
 
 Start collects a goal, offers model setup and optional relevant connections, and lets the owner review the first
-channel and message. A session draft survives navigation and OAuth. Stable operations make channel creation and
-message retries idempotent. A definite rejected creation unlocks editing; uncertain outcomes retain the operation.
+channel and message. A session draft survives navigation and OAuth. One kickoff call creates the channel, records
+the kickoff, sends the goal and finishes Start, each step under an operation id derived from the kickoff's, so a retry
+replays it. Its refusals come before anything is made and unlock editing; uncertain outcomes retain the operation.
 The kickoff is bound to that logical channel and resolved to its current Pi session. It asks for useful work first,
 with a focused question only if needed; Personas and routines are introduced when useful.
 
