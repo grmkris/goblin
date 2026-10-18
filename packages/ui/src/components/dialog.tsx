@@ -20,7 +20,7 @@ function DialogContent({ className, ...props }: DialogPrimitive.Popup.Props) {
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          'fixed top-1/2 left-1/2 z-(--z-overlay) flex max-h-[85dvh] w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl bg-popover p-4 text-popover-foreground shadow-(--shadow-3) ring-1 ring-foreground/10 outline-none transition-opacity duration-150 data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-100',
+          'fixed top-1/2 left-1/2 z-(--z-overlay) flex max-h-[85dvh] w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl bg-popover p-4 text-popover-foreground shadow-(--shadow-3) ring-1 ring-foreground/10 outline-none transition-[scale,opacity] duration-200 data-starting-style:scale-[0.96] data-starting-style:opacity-0 data-ending-style:scale-[0.96] data-ending-style:opacity-0 data-ending-style:duration-150',
           className,
         )}
         {...props}
