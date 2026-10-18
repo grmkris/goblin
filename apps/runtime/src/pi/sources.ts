@@ -1,28 +1,14 @@
-import {
-  PERSONAL_TOPIC,
-  type SourceNewKeys,
-  SourceKey,
-  SourceKeyId,
-  SourceOthers,
-  SourceRead,
-  SourceReply,
-  type SourceRoute,
-  SourceSetup,
-  SourceTitle,
-  SourceWake,
-  SpeaksForMe,
-} from '@goblin/contracts'
+import { AskedSource, type AskedSourceRoute, SourceKeyId } from '@goblin/contracts'
 import { defineExtension, section } from '@earendil-works/pi-durable'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { InvalidInput } from '../http/errors.ts'
 import { requireResident } from '../mcp/service.ts'
-import { personaNamed } from '../personas/program.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
+import { resolveAskedSource, routeOfAsked } from '../sources/asked.ts'
 import { keyWords } from '../sources/messages.ts'
 import { routeWords } from '../sources/program.ts'
 import { Sources } from '../sources/service.ts'
-import { topicNamed } from '../topics/program.ts'
 import { byAgent } from './organize.ts'
 import { typedTool } from './typed-tool.ts'
 
@@ -41,53 +27,8 @@ const SOURCE_TOOLS: readonly string[] = ['source_propose', 'source_routes', 'sou
 const TopicName = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80))
 const PersonaName = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(40))
 
-/** Where new conversations go, as the model names it: a Topic and a Persona by name, or nowhere yet. */
-const AskedRoute = Schema.Union([
-  Schema.Struct({ to: Schema.Literal('topic'), topic: TopicName }),
-  Schema.Struct({ to: Schema.Literal('listen'), topic: TopicName }),
-  Schema.Struct({ to: Schema.Literal('persona'), persona: PersonaName, topic: Schema.optionalKey(TopicName) }),
-  Schema.Struct({ to: Schema.Literal('ignore') }),
-  Schema.Struct({ to: Schema.Literal('held') }),
-])
-type AskedRoute = typeof AskedRoute.Type
-
-/** Where new conversations go, as the model names it: a route, or each in a new Topic of its own. */
-const AskedNewKeys = Schema.Union([AskedRoute, Schema.Struct({ to: Schema.Literal('topic-per-key') })])
-
-/** A Source as the model proposes it: its name and the five facts, with places by name. */
-const Asked = Schema.Struct({
-  connectionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
-  title: SourceTitle,
-  wake: SourceWake,
-  key: SourceKey,
-  speaksForMe: SpeaksForMe,
-  others: SourceOthers,
-  read: SourceRead,
-  reply: Schema.optionalKey(SourceReply),
-  newKeys: Schema.optionalKey(AskedNewKeys),
-})
-
 const Proposed = Schema.Struct({ sourceId: Schema.String, revision: Schema.Int, title: Schema.String })
 const Done = Schema.Struct({ summary: Schema.String })
-
-/** A Topic by the name the model gave (`Personal` included): its id. */
-const topicId = (name: string) =>
-  name.trim().toLowerCase() === 'personal'
-    ? Effect.succeed(PERSONAL_TOPIC)
-    : Effect.map(topicNamed(name), (topic) => topic.id)
-
-/** A route the model names, with its Topic and Persona resolved by name. */
-const routeOfAsked = (asked: AskedRoute) =>
-  Effect.gen(function* () {
-    if (asked.to === 'ignore' || asked.to === 'held') return { to: asked.to } satisfies SourceRoute
-    if (asked.to === 'persona') {
-      const persona = (yield* personaNamed(asked.persona)).id
-      return { to: 'persona', persona, topic: yield* topicId(asked.topic ?? 'Personal') } satisfies SourceRoute
-    }
-    return { to: asked.to, topic: yield* topicId(asked.topic) } satisfies SourceRoute
-  })
-
-const decodeSetup = Schema.decodeUnknownEffect(SourceSetup)
 
 /** `source_propose`: a Source for the owner to review; it ends the turn. */
 const proposeTool = (run: RunProgram) =>
@@ -95,23 +36,18 @@ const proposeTool = (run: RunProgram) =>
     name: 'source_propose',
     description:
       "Propose a Source on a connection that sends events: messages the owner writes elsewhere (a chat app, mail) come in as the owner's own turns and your answers go back. Give: `wake` (`{ event, arguments }`, one of the connection's events from mcp_list with `events: true`); `key` (named RFC 6901 pointers into a message that identify its conversation, e.g. `[{ name: 'chat', pointer: '/chat' }]`); `speaksForMe` (`{ all: true }`, or `{ pointer, equals }` saying which messages are the owner's, e.g. `{ pointer: '/from/isOwner', equals: true }`); `others` (`notice` or `drop`, for anyone else's message); `read` (`{ from: 'payload', items?, id?, text, title?, attachments?, direction? }` to read the event's data, or `{ from: 'tool', tool, arguments, items, cursor, id, text, title?, attachments?, direction? }` to call a tool from a cursor, with `\"{{cursor}}\"` as a whole argument value; `title` points at the conversation's name, e.g. a chat's title, and `attachments` at a list of MCP content blocks (`resource_link`, `image`, `resource`, `audio`) a message brought, which goblin keeps in the owner's files); optional `reply` (`{ tool, arguments, maxChars, result? }`, result has accepted and optional retryable/rejected rules of `{ pointer, equals }` into structuredContent, and optional retryAt pointer to epoch milliseconds; only one matching rule determines the outcome, unknown results stop without retrying; arguments whose whole string values may be `\"{{key.<name>}}\"`, `\"{{text}}\"` (required) and `\"{{operationId}}\"`; never put a placeholder inside other text); optional `newKeys` (where a conversation seen first goes: `{ to: 'held' }` (default), `ignore`, `{ to: 'topic' | 'listen', topic }`, `{ to: 'persona', persona, topic? }` by name, or `{ to: 'topic-per-key' }` for a new Topic of its own, named after its title). Pointers are checked against the server's schemas. Proposing does not start it: the owner reviews and confirms the exact setup, which ends this turn.",
-    input: Asked,
+    input: AskedSource,
     output: Proposed,
     replay: 'safe',
     execute: async (asked, api) => {
       await run(requireResident)
       return run(
         Effect.gen(function* () {
-          const { connectionId, title, newKeys, ...facts } = asked
-          const route: SourceNewKeys =
-            newKeys?.to === 'topic-per-key' ? newKeys : yield* routeOfAsked(newKeys ?? { to: 'held' })
-          const setup = yield* decodeSetup({ ...facts, newKeys: route }).pipe(
-            Effect.mapError((issue) => new InvalidInput({ reason: issue.message })),
-          )
+          const proposal = yield* resolveAskedSource(asked)
           const by = yield* byAgent(api)
           const operationId = `source:${String(api.conversationId)}:${api.callId}`
           const view = yield* (yield* Sources).propose(
-            { connectionId, title, setup, operationId },
+            { ...proposal, operationId },
             { actor: 'agent', ...(by.chat === undefined ? {} : { chat: by.chat }) },
           )
           return { sourceId: view.id, revision: view.revision, title: view.title }
@@ -207,7 +143,7 @@ const routeTool = (run: RunProgram) =>
         Effect.gen(function* () {
           if (input.to === 'persona' && input.persona === undefined)
             return yield* new InvalidInput({ reason: 'source_route_persona' })
-          const asked: AskedRoute =
+          const asked: AskedSourceRoute =
             input.to === 'persona'
               ? {
                   to: 'persona',

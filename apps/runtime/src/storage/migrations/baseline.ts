@@ -79,6 +79,7 @@ export const BASELINE: Migration = {
     'app_transcript_fts',
     'app_transcript_index',
     'app_usage_daily',
+    'app_workspace_plans',
   ],
   sql: [
     "CREATE TABLE app_agent_apps (name TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL, home_session TEXT NOT NULL, active_release TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)",
@@ -196,6 +197,7 @@ export const BASELINE: Migration = {
     "CREATE INDEX app_transcript_excerpts_session ON app_transcript_excerpts (session_id, entry_id)",
     "CREATE TABLE app_transcript_index (session_id TEXT PRIMARY KEY NOT NULL, through_entry INTEGER NOT NULL, checked_at INTEGER NOT NULL)",
     "CREATE TABLE app_usage_daily (day TEXT PRIMARY KEY NOT NULL, tokens INTEGER NOT NULL, updated_at INTEGER NOT NULL)",
+    "CREATE TABLE app_workspace_plans (id TEXT PRIMARY KEY NOT NULL, operation_id TEXT NOT NULL UNIQUE, chat_id TEXT NOT NULL, definition TEXT NOT NULL, review TEXT NOT NULL, created_at INTEGER NOT NULL)",
     "CREATE VIRTUAL TABLE app_transcript_fts USING fts5(text, content='app_transcript_excerpts', content_rowid='entry_id', tokenize='unicode61')",
     "CREATE TRIGGER app_transcript_ai AFTER INSERT ON app_transcript_excerpts BEGIN INSERT INTO app_transcript_fts(rowid, text) VALUES (new.entry_id, new.text); END",
     "CREATE TRIGGER app_transcript_ad AFTER DELETE ON app_transcript_excerpts BEGIN INSERT INTO app_transcript_fts(app_transcript_fts, rowid, text) VALUES ('delete', old.entry_id, old.text); END",

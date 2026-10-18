@@ -42,6 +42,7 @@ export const routinesOf = (store: RoutineStore) =>
     view: trySync('Routines.view', store.view.bind(store)),
     topicOf: sync('Routines.topicOf', store.topicOf.bind(store)),
     propose: trySync('Routines.propose', store.propose.bind(store)),
+    prepare: (...args) => Effect.succeed(() => store.insertProposal(...args).routine),
     edit: trySync('Routines.edit', store.edit.bind(store)),
     confirm: trySync('Routines.confirm', store.confirm.bind(store)),
     confirmAgain: trySync('Routines.confirmAgain', store.confirmAgain.bind(store)),

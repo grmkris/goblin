@@ -225,3 +225,7 @@ and states only: `url_request` (held), then the owner's answer as `url_request_w
 `url_request_finish` (answered; `error` with the state when the retry failed or was uncertain, `refused` when expired,
 `replayed` when answered again) or `url_request_cancel`; `scope_required` when a call needed more access, and `step_up`
 when the owner started signing in again.
+
+Named `mcp_list` tools include their advertised output schema as well as their input schema. This lets the agent
+configure Source read pointers and delivery-result rules from the server contract. Brief listings keep both schemas
+out; discovering a schema changes no grant.

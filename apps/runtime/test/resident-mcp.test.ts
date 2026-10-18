@@ -365,15 +365,21 @@ describe('mcp_list keeps what the model reads small (unit)', () => {
     expect(shown[2]).toEqual({ name: 'job.2', description: short, granted: false })
     for (const tool of shown) expect(String(tool['description']).length).toBeLessThanOrEqual(160)
   })
-  it('shows the tools the model names in full, with their input schemas, and says which it is not offered', async () => {
+  it('shows named input and output schemas for configuring Sources, without changing access', async () => {
     expect(await listed({ connectionId: 'jobs', tools: ['job.1', 'job.0', 'missing'] }, 7)).toEqual({
       origin: 'jobs',
       trusted: false,
       tools: [
-        { name: 'job.0', description: LONG, inputSchema: LARGE, askFirst: true },
-        { name: 'job.1', description: LONG, inputSchema: LARGE },
+        { name: 'job.0', description: LONG, inputSchema: LARGE, outputSchema: LARGE, askFirst: true },
+        { name: 'job.1', description: LONG, inputSchema: LARGE, outputSchema: LARGE },
       ],
       unknown: ['missing'],
+    })
+    expect(await listed({ connectionId: 'jobs', tools: ['job.2'] }, 7)).toMatchObject({
+      tools: [{ name: 'job.2', outputSchema: LARGE, granted: false }],
+    })
+    expect(await listed({ connectionId: 'notes', tools: ['read'] }, 7)).toMatchObject({
+      tools: [{ name: 'read', inputSchema: { type: 'object', properties: {} } }],
     })
     // A tool meant for an App only is not offered to the model, named or not.
     expect(await listed({ connectionId: 'notes', tools: ['panel'] }, 7)).toMatchObject({

@@ -23,6 +23,7 @@ import { TopicsHandlers } from '../../topics/api.ts'
 import { NoticesHandlers } from '../../notices/api.ts'
 import { OnboardingHandlers } from '../../onboarding/api.ts'
 import { WorkspaceHandlers } from '../../workspace/api.ts'
+import { WorkspacePlansHandlers } from '../../workspace-plans/api.ts'
 import { InternalGateLive, OwnerAdmissionLive } from './middleware.ts'
 
 /** Every owner group's handlers behind owner admission. */
@@ -42,6 +43,7 @@ const OwnerApiLayer = HttpApiBuilder.layer(OwnerApi).pipe(
     AgentAppsHandlers,
     InspectHandlers,
     WorkspaceHandlers,
+    WorkspacePlansHandlers,
     FilesHandlers,
     NoticesHandlers,
     OnboardingHandlers,

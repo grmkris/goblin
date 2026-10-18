@@ -20,7 +20,7 @@ import * as Option from 'effect/Option'
 import * as Random from 'effect/Random'
 import * as Schema from 'effect/Schema'
 import { epochSeconds } from '../clock.ts'
-import { Conflict, InvalidInput, NotFound, attemptSync } from '../http/errors.ts'
+import { Conflict, Internal, InvalidInput, NotFound, attemptSync } from '../http/errors.ts'
 import type { EventContext } from '../mcp/events/dispatcher.ts'
 import { Events, McpConnections, McpGrants, McpServers, requireResident } from '../mcp/service.ts'
 import { reportAndRecover } from '../observability/report.ts'
@@ -49,6 +49,7 @@ import {
   routeRows,
   routeTarget,
   sourceRow,
+  setupOf,
   sourceRows,
   targetOf,
   valuesOf,
@@ -224,21 +225,25 @@ const newId = Effect.map(Effect.all([Random.nextIntBetween(0, 2 ** 31), Random.n
 )
 
 /**
- * A proposal of a Source on `connectionId` (the agent's `source_propose`, ADR 0068): checked against what the connection
- * offers now, kept as revision 1 for the owner to confirm. The same operation finds the same one.
+ * Validate against the connection before returning a local-only write. Compositions can commit several proposals and
+ * their review in one SQLite transaction; no network wait or Effect runs inside that transaction.
  */
-export const proposeSource = Effect.fn('sources.propose')(function* (
+export const prepareSource = Effect.fn('sources.prepare')(function* (
   proposal: SourceProposal,
   by: { readonly actor: 'owner' | 'agent'; readonly chat?: string },
 ) {
   const db = yield* Db
   const existing = proposalOf(db, proposal.operationId)
-  if (existing !== undefined) return yield* sourceView(existing)
+  if (existing !== undefined) {
+    const view = yield* sourceView(existing)
+    return () => view
+  }
   yield* checkedSetup(proposal.connectionId, proposal.setup)
   const id = yield* newId
   const now = yield* epochSeconds
-  const row = yield* attemptSync(() =>
-    propose(
+  const labels = yield* (yield* McpServers).labels()
+  return () => {
+    const row = propose(
       db,
       {
         id,
@@ -250,10 +255,18 @@ export const proposeSource = Effect.fn('sources.propose')(function* (
         setup: proposal.setup,
       },
       now,
-    ),
-  )
-  return yield* sourceView(row)
+    )
+    const setup = setupOf(row)
+    if (setup === undefined) throw new Internal({ reason: 'source setup unreadable' })
+    return viewOf(row, labels.get(row.connectionId) ?? row.connectionId, setup, waitingOf(db, row.id))
+  }
 })
+
+/** A Source proposal, kept as revision 1 for owner confirmation; the same operation finds the same one. */
+export const proposeSource = (
+  proposal: SourceProposal,
+  by: { readonly actor: 'owner' | 'agent'; readonly chat?: string },
+) => Effect.flatMap(prepareSource(proposal, by), attemptSync)
 
 /**
  * Binds `row` as it is now: its event and tools granted, its event subscribed under a new binding (the one before it

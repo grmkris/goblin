@@ -90,6 +90,7 @@ export const nodes: readonly Node[] = [
           'src/pi/subagent-relay.ts',
           'src/pi/subagents.ts',
           'src/pi/thread.ts',
+          'src/pi/workspace-plans.ts',
           'src/routines/kit.ts',
           'src/routines/wake.ts',
           'src/sources/wake.ts',

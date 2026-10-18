@@ -25,6 +25,7 @@ function stays(part: ToolPart, keep: WorkKeep): boolean {
     part.call.name === 'routine_propose' ||
     part.call.name === 'routine' ||
     part.call.name === 'source_propose' ||
+    part.call.name === 'workspace_propose' ||
     (part.call.name === 'search_chats' && sourcesOf(part.result?.details).length > 0) ||
     (part.state === 'done' && keep.appCalls.has(part.call.id))
   )

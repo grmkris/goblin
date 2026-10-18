@@ -7,6 +7,7 @@ import * as ManagedRuntime from 'effect/ManagedRuntime'
 import type { AgentRpcMethods, RuntimeEnv } from './env.ts'
 import { failureOf, toAppError } from './http/errors.ts'
 import { sourcesExtension } from './pi/sources.ts'
+import { workspacePlansExtension } from './pi/workspace-plans.ts'
 import { sourcesWake } from './sources/wake.ts'
 import { type RpcResult, encodeExit } from './http/rpc.ts'
 import { filesExtension } from './pi/files.ts'
@@ -133,7 +134,13 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       retrieval,
       onboardingExtension(run),
     ]
-    const own = [serversExtension(run), subagents, routinesExtension(run), this.#telemetry.diagnose]
+    const own = [
+      serversExtension(run),
+      subagents,
+      routinesExtension(run),
+      workspacePlansExtension(run),
+      this.#telemetry.diagnose,
+    ]
     const extras = [this.#thread, memory, recall, this.#personas.extension, ...routineKit.extra]
     this.harness = makePiHarness(this.#pi, [...base, ...own], extras, apps, this.#telemetry.recorder)
     this.lifecycle.use(this.harness)

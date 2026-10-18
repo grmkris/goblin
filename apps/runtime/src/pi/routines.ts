@@ -1,14 +1,6 @@
 import { defineExtension, section } from '@earendil-works/pi-durable'
 import * as Schema from 'effect/Schema'
-import {
-  PersonaName,
-  RoutineDefinition,
-  RoutineHandOverFields,
-  RoutinePage,
-  RoutineTellMe,
-  RoutineTrigger,
-  RoutineView,
-} from '@goblin/contracts'
+import { AskedRoutine, RoutinePage, RoutineView } from '@goblin/contracts'
 import { changeRoutine, proposeAsked, routinesList } from '../routines/program.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { typedTool } from './typed-tool.ts'
@@ -19,34 +11,12 @@ const operationOf = (api: { readonly conversationId: unknown; readonly callId: s
 /** A draft the owner must review: its id, the revision they will confirm, and its title. */
 const Proposed = Schema.Struct({ routineId: Schema.String, revision: Schema.Int, title: Schema.String })
 
-/** Who the model hands a routine's work to: nobody, Goblin, or a Persona by its name (its revision is pinned for it). */
-const AskedHandTo = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal('none') }),
-  Schema.Struct({ kind: Schema.Literal('goblin'), ...RoutineHandOverFields }),
-  Schema.Struct({ kind: Schema.Literal('persona'), persona: PersonaName, ...RoutineHandOverFields }),
-])
-
-/** A routine as the model proposes it (ADR 0041): its definition, the Persona by name, and another Topic by name. */
-const Asked = Schema.Struct({
-  title: RoutineDefinition.fields.title,
-  trigger: RoutineTrigger,
-  timezone: RoutineDefinition.fields.timezone,
-  tellMe: RoutineTellMe,
-  handTo: AskedHandTo,
-  topic: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80))),
-}).check(
-  Schema.makeFilter(
-    (asked) =>
-      asked.handTo.kind !== 'none' || asked.tellMe.on || 'A routine that hands nothing over must tell the owner.',
-  ),
-)
-
 const proposeTool = (run: RunProgram) =>
   typedTool({
     name: 'routine_propose',
     description:
       "Propose a routine: what happens at a time (`trigger: { kind: 'once', at }`), on a schedule (`{ kind: 'cron', expression }`), or when a connection sends an event (`{ kind: 'event', connectionId, name, arguments }`, with a name and arguments from that connection's `events`, which mcp_list lists with `events: true`). `tellMe` (`{ on, copy }`) tells the owner of everything it posts: each event as a notice, and the answer; `copy` also sends each one through the owner's Notify me via, when they set one in Settings. `handTo` gives the work to nobody (`{ kind: 'none' }`, then `tellMe.on` must be true), to Goblin (`{ kind: 'goblin', instruction, allowedTools, budget }`) or to a Persona by its name (`{ kind: 'persona', persona, instruction, allowedTools, budget }`). It lives in this chat's Topic unless `topic` names another. Proposing does not activate it: the owner reviews and confirms it in Work → Routines, which ends this turn.",
-    input: Asked,
+    input: AskedRoutine,
     output: Proposed,
     replay: 'safe',
     execute: async (asked, api) => {

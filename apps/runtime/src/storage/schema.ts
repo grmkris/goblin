@@ -534,3 +534,5 @@ export const appRunEvents = sqliteTable(
     index('app_run_events_started').on(table.startedAt),
   ],
 )
+
+export { appWorkspacePlans } from './workspace-plans.ts'

@@ -25,6 +25,7 @@ import {
 } from './move-case.ts'
 import { call, lever, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 import { clientErrorsCase, conversationEventsCase, csrfCase, internalRefusalCase } from './edge-case.ts'
+import { workspacePlansCase } from './workspace-plans-case.ts'
 
 const harness = Test.make({
   providers: Cloudflare.providers(),
@@ -33,6 +34,10 @@ const harness = Test.make({
   dev: true,
 })
 const stack = harness.beforeAll(harness.deploy(Stack))
+harness.test(
+  'native: workspace setup reviews compose routines through Pi and activate once through the owner API',
+  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => workspacePlansCase(url)))),
+)
 harness.test(
   'native: queued follow-ups remain visible, safe removal preserves active work, placement wins, and owners stay isolated',
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => queueCase(url)))),

@@ -51,6 +51,14 @@ export class Routines extends Context.Service<
       at: number,
       topic: number,
     ) => Effect.Effect<RoutineOperationResult, AppError>
+    /** A synchronous local proposal write, for a caller composing several drafts in one SQLite transaction. */
+    readonly prepare: (
+      definition: RoutineDefinition,
+      operationId: string,
+      routineId: string,
+      at: number,
+      topic: number,
+    ) => Effect.Effect<() => RoutineView>
     /** A new revision, in the Topic the change names (it may move); it waits for confirmation again. */
     readonly edit: (
       routineId: string,

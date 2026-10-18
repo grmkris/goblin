@@ -123,6 +123,10 @@ tokens count toward the daily usage.
 
 ## Work on its own
 
+**Workspace plan**:
+A group of Sources and routines Goblin prepares for one owner review. It keeps the exact proposed configuration and
+the progress of activating it. Configured means those settings are active; external delivery still needs verification.
+
 **Routine**:
 What the owner confirmed to happen on a trigger (once, a cron schedule or an MCP Event of a connection) in a Topic:
 **Tell me**, **Hand to**, or both (ADRs 0012, 0041). A routine that hands over runs in its own run conversation and

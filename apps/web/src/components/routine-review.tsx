@@ -1,6 +1,13 @@
 // A routine's card: what it does and when, its facts, and the owner's Confirm, Pause, Edit and Archive, with its runs.
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { type RoutineDefinition, type RoutinePersona, type RoutineView, handOverOf } from '@goblin/contracts'
+import {
+  type PersonaView,
+  type RoutineDefinition,
+  type RoutinePersona,
+  type RoutineView,
+  type TopicView,
+  handOverOf,
+} from '@goblin/contracts'
 import {
   Alert,
   AlertDescription,
@@ -66,8 +73,7 @@ const tellMeOf = (tellMe: RoutineDefinition['tellMe']): string =>
   !tellMe.on ? 'Off' : tellMe.copy ? 'In Activity, and through Notify me via' : 'In Activity'
 
 /** Who a routine hands its work to, in words: Goblin, or the Persona by name at the pinned revision. */
-function useHandedTo(definition: RoutineDefinition): string | undefined {
-  const personas = usePersonas()
+function handedToOf(definition: RoutineDefinition, personas: readonly PersonaView[]): string | undefined {
   const { handTo } = definition
   if (handTo.kind === 'none') return undefined
   if (handTo.kind === 'goblin') return 'goblin'
@@ -75,13 +81,63 @@ function useHandedTo(definition: RoutineDefinition): string | undefined {
   return `@${name}, revision ${String(handTo.revision)}`
 }
 
+/** The tools and limits being confirmed, including those the Topic will refuse. */
+function RoutineAccess({ routine }: { readonly routine: RoutineView }) {
+  const handOver = handOverOf(routine.definition)
+  return (
+    <>
+      {handOver !== undefined && (
+        <div>
+          <dt>Tools</dt>
+          <dd>
+            {handOver.allowedTools.length === 0
+              ? 'None: it can only answer'
+              : handOver.allowedTools.map((tool) => `${tool.connectionId} · ${tool.name}`).join(', ')}
+          </dd>
+        </div>
+      )}
+      {routine.outsideSetup.length > 0 && (
+        <div>
+          <dt>Not in its Topic</dt>
+          <dd>
+            {routine.outsideSetup.map((tool) => `${tool.connectionId} · ${tool.name}`).join(', ')}: its Topic setup
+            leaves these out, so a run that calls one is refused.
+          </dd>
+        </div>
+      )}
+      {handOver !== undefined && (
+        <div>
+          <dt>Limits</dt>
+          <dd>
+            {count(handOver.budget.tokensPerRun)} tokens a run, {count(handOver.budget.tokensPerDay)} a day,{' '}
+            {Math.round(handOver.budget.runtimeSeconds / 60)} minutes at most
+          </dd>
+        </div>
+      )}
+    </>
+  )
+}
+
 /** What a routine does and may use, as facts beside each other. */
-function RoutineDetails({ routine }: { readonly routine: RoutineView }) {
+export function RoutineDetails({
+  routine,
+  topics: topicSnapshot,
+  personas: personaSnapshot,
+}: {
+  readonly routine: RoutineView
+  readonly topics?: readonly TopicView[]
+  readonly personas?: readonly PersonaView[]
+}) {
   const { definition } = routine
   const { trigger } = definition
   const handOver = handOverOf(definition)
-  const handedTo = useHandedTo(definition)
-  const topic = useTopics().find((each) => each.id === routine.topic)
+  const liveTopics = useTopics()
+  const livePersonas = usePersonas()
+  const topics = topicSnapshot ?? liveTopics
+  const personas = personaSnapshot ?? livePersonas
+  const handedTo = handedToOf(definition, personas)
+  const persona = personaNote(routine.persona)
+  const topic = topics.find((each) => each.id === routine.topic)
   const stream = useStreamOf(definition)
   return (
     <>
@@ -105,34 +161,7 @@ function RoutineDetails({ routine }: { readonly routine: RoutineView }) {
             <dd>{filtersInWords(trigger.arguments, stream?.inputSchema)}</dd>
           </div>
         )}
-        {handOver !== undefined && (
-          <div>
-            <dt>Tools</dt>
-            <dd>
-              {handOver.allowedTools.length === 0
-                ? 'None: it can only answer'
-                : handOver.allowedTools.map((tool) => `${tool.connectionId} · ${tool.name}`).join(', ')}
-            </dd>
-          </div>
-        )}
-        {routine.outsideSetup.length > 0 && (
-          <div>
-            <dt>Not in its Topic</dt>
-            <dd>
-              {routine.outsideSetup.map((tool) => `${tool.connectionId} · ${tool.name}`).join(', ')}: its Topic setup
-              leaves these out, so a run that calls one is refused.
-            </dd>
-          </div>
-        )}
-        {handOver !== undefined && (
-          <div>
-            <dt>Limits</dt>
-            <dd>
-              {count(handOver.budget.tokensPerRun)} tokens a run, {count(handOver.budget.tokensPerDay)} a day,{' '}
-              {Math.round(handOver.budget.runtimeSeconds / 60)} minutes at most
-            </dd>
-          </div>
-        )}
+        <RoutineAccess routine={routine} />
         <div>
           <dt>Tell me</dt>
           <dd>{tellMeOf(definition.tellMe)}</dd>
@@ -144,6 +173,7 @@ function RoutineDetails({ routine }: { readonly routine: RoutineView }) {
           </div>
         )}
       </dl>
+      {persona !== undefined && <p className="server-note">{persona}</p>}
       {routine.health !== null &&
         routine.health !== 'execution_pending' &&
         !Object.hasOwn(PERSONA_HEALTH, routine.health) && <p className="server-note">{routine.health}</p>}
@@ -202,7 +232,6 @@ export function RoutineReview({ routine, onEdit }: { readonly routine: RoutineVi
       <CardContent>
         <div className="card-body">
           <RoutineDetails routine={routine} />
-          {persona !== undefined && <p className="server-note">{persona}</p>}
           {state === 'proposed' && !repin && <p className="server-note">Nothing runs until you confirm it.</p>}
           {error && (
             <Alert variant="destructive">

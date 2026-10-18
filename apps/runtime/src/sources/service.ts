@@ -29,6 +29,11 @@ export class Sources extends Context.Service<
       proposal: SourceProposal,
       by: { readonly actor: 'owner' | 'agent'; readonly chat?: string },
     ) => Effect.Effect<SourceView, AppError>
+    /** Check remote schemas first, then return a synchronous local proposal write for an atomic composition. */
+    readonly prepare: (
+      proposal: SourceProposal,
+      by: { readonly actor: 'owner' | 'agent'; readonly chat?: string },
+    ) => Effect.Effect<() => SourceView, AppError>
     /** The owner confirms the exact revision: its event and tools are granted, it is subscribed and bound. */
     readonly confirm: (id: string, revision: number) => Effect.Effect<SourceView, AppError>
     /** Owner edits reply-result rules at an exact revision; a new proposal must be confirmed. */

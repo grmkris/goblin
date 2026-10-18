@@ -36,6 +36,8 @@ flowchart LR
 - [MCP Events](architecture/events.md): signed subscriptions, consumers and the event picker.
 - [Sources](architecture/sources.md): any connection's events as the owner's own messages, routed to Topics and answered
   back.
+- [Chat-driven setup](architecture/workspace-plans.md): composing Sources and routines into one durable review and
+  continuing the original chat after activation.
 - [Run ledger](architecture/observability.md): run ledger, logs, failures and inspection.
 - [Storage](architecture/storage.md): D1, Durable Object SQLite and migrations.
 - [Infrastructure and release](architecture/infrastructure.md): Alchemy stacks, stage origins, release and public source.
