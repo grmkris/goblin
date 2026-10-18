@@ -5,7 +5,6 @@
     "": {
       "name": "goblin",
       "devDependencies": {
-        "@modelcontextprotocol/server": "2.2.0",
         "@shadcn/lint": "0.2.0",
         "@tanstack/eslint-plugin-query": "5.104.1",
         "@tanstack/eslint-plugin-router": "1.162.0",
