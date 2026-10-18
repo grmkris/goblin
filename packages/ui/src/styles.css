@@ -331,8 +331,10 @@
   touch-action: manipulation;
 }
 /*
- * Less motion: transitions and animations finish at once, and a looping one (a pulse, a spinner) runs once and rests
- * instead of cycling every 0.01ms, which would strobe. Smooth scrolling jumps.
+ * Less motion is gentler motion, not none. Fades and colour changes keep their timing; movement goes (transitions of
+ * transform, translate, scale, rotate, size and position stop). Keyframes finish at once, and a looping one (a pulse)
+ * runs once and rests instead of cycling every 0.01ms, which would strobe. A spinner keeps turning, slower, because a
+ * still one reads as stuck. Smooth scrolling jumps.
  */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -340,7 +342,12 @@
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-property:
+      opacity, color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, box-shadow !important;
     scroll-behavior: auto !important;
+  }
+  .animate-spin {
+    animation-duration: 1.5s !important;
+    animation-iteration-count: infinite !important;
   }
 }
