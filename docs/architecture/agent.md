@@ -295,8 +295,10 @@ The persona contributes two static system-prompt sections (`pi/persona.ts`): who
 owner's connected MCP servers in general and names none of them, ADR 0063), and that remote content is untrusted data. The system prompt holds only text that does not change between requests: pi-ai folds every change
 of it into the one leading system message, which empties the provider's prompt cache. What does change (the apps with
 their versions, members and last errors; the skills on offer) goes into one trailing `<goblin-context>` message that
-`beforeRequest` hooks add to each request (`pi/context-tail.ts`), marked as goblin's note and not the owner's. Pi
-never stores it, so everything before it stays a cacheable prefix. The `mcp_list` and `mcp_call` tools
+`beforeRequest` hooks add to each request (`pi/context-tail.ts`), marked as goblin's note and not the owner's. Its
+`PARTS` table says what each part holds, which decides its quoting: the channel's and a Persona's owner guidance only
+lose closing tags, retrieval's sources keep the tags they write, and runtime state keeps no tag at all, so remote text
+can never pose as owner guidance. Pi never stores the block, so everything before it stays a cacheable prefix. The `mcp_list` and `mcp_call` tools
 (`pi/resident-mcp.ts`) are how the model reaches the owner's MCP servers; both require current resident authority, and
 `mcp_call` is marked unsafe to replay. `mcp_list` lists the connections with the owner's labels (two accounts of one
 server are told apart by them; ADR 0041), connected ones first, so a connection never signed in does not win over the
