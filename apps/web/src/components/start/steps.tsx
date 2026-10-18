@@ -10,7 +10,7 @@ import { QueryBoundary } from '../../lib/query/query-boundary.tsx'
 import { startAddMutation } from '../../onboarding/queries.ts'
 import { ModelEndpoint } from '../model-endpoint-card.tsx'
 import { SuggestedServers } from '../server-add.tsx'
-import type { StartDraft, StartIdea } from './draft.ts'
+import type { StartDraft, StartIdea } from '../../onboarding/draft.ts'
 import { SuggestedAccess } from './connect-server.tsx'
 
 /** Each step's name on the panel, its title, and the one line of why. */

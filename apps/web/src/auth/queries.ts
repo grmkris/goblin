@@ -1,10 +1,10 @@
-import { clearStartDraft } from '../components/start/draft.ts'
 import { mutationOptions, queryOptions } from '@tanstack/react-query'
 import { DeploymentFeatures, OIDC_PROVIDER_ID, SignInMethod, SignupMode } from '@goblin/contracts'
 import { Data, Option, Schema } from 'effect'
 import { requestId } from '../lib/api.ts'
 import { authClient, redirectOf } from '../lib/auth-client.ts'
 import { answerRef } from '../lib/query/app-error.ts'
+import { clearStartDraft } from '../onboarding/draft.ts'
 
 /**
  * Signing in and out and what is public about the deployment: Better Auth's own routes (through `authClient`) and the
