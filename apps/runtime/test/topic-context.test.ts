@@ -1,6 +1,5 @@
 import { createModels, createProvider } from '@earendil-works/pi-ai/models'
 import { createRegistry, Harness, MemoryStorage } from '@earendil-works/pi-durable'
-import { EVERYTHING } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as ManagedRuntime from 'effect/ManagedRuntime'
@@ -12,7 +11,6 @@ import { BACKGROUND } from '../src/pi/context.ts'
 import { makeBridge } from '../src/runtime/bridge.ts'
 import { CLOSED } from '../src/setup/scope.ts'
 import { Setups } from '../src/setup/service.ts'
-import { Topics } from '../src/topics/service.ts'
 import { fake } from './fake.ts'
 import { model, scriptedStreams, type SeenRequest } from './integration/model.ts'
 
@@ -33,37 +31,20 @@ describe('channel guidance generation hook', () => {
       }),
     )
 
-    const services = Layer.merge(
-      Layer.succeed(
-        Setups,
-        fake<Setups['Service']>({
-          scope: () => Effect.succeed({ ...CLOSED, topic: { id: 2, name: 'Travel', holds: () => false } }),
-        }),
-      ),
-      Layer.succeed(
-        Topics,
-        fake<Topics['Service']>({
-          get: () =>
-            Effect.suspend(() => {
-              reads += 1
-              return failRead
-                ? Effect.fail(new Internal({ reason: 'guidance unavailable', ref: 'guidance-fixture' }))
-                : Effect.succeed({
-                    id: 2,
-                    name: 'Travel',
-                    conversation: '2',
-                    instructions: 'Use metric units.',
-                    setup: EVERYTHING,
-                    searchExcluded: false,
-                    createdBy: 'owner',
-                    revision: 1,
-                    createdAt: 1,
-                  })
-            }),
-        }),
-      ),
+    const travel = { id: 2, name: 'Travel', description: '', instructions: 'Use metric units.', holds: () => false }
+    const services = Layer.succeed(
+      Setups,
+      fake<Setups['Service']>({
+        scope: () =>
+          Effect.suspend(() => {
+            reads += 1
+            return failRead
+              ? Effect.die(new Internal({ reason: 'guidance unavailable', ref: 'guidance-fixture' }))
+              : Effect.succeed({ ...CLOSED, topic: travel })
+          }),
+      }),
     )
-    // SAFETY: topicContext reads only Setups and Topics, both supplied by this test's real Effect layers.
+    // SAFETY: topicContext reads only Setups, supplied by this test's real Effect layer.
     const runtime = ManagedRuntime.make(services) as ManagedRuntime.ManagedRuntime<AgentServices, never>
     const { run } = makeBridge(async () => runtime)
     let harness!: Harness
