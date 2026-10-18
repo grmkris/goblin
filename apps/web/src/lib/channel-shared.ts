@@ -71,7 +71,10 @@ function textOf(message: ChatMessage): string {
   }
 }
 
-/** Project visible transcript messages only; attachments use the same validated shapes as the conversation. */
+/**
+ * Project visible transcript messages only; attachments use the same validated shapes as the conversation. A link
+ * written twice in a message comes twice: `sharedPages` keeps each key once.
+ */
 export function sharedItems(messages: readonly ChatMessage[], conversation: string): SharedItem[] {
   return messages.flatMap((message) => {
     const files =
@@ -98,6 +101,6 @@ export function sharedItems(messages: readonly ChatMessage[], conversation: stri
         detail: new URL(link.href).hostname,
         href: link.href,
       })
-    return [...new Map(items.map((item) => [item.key, item])).values()]
+    return items
   })
 }
