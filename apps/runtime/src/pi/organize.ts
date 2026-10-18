@@ -61,7 +61,10 @@ export const byAgent = (api: { readonly conversationId: unknown; readonly callId
     return { actor: 'agent' as const, operationId: operationOf(api), ...(chat === undefined ? {} : { chat }) }
   })
 
-const said = ({ summary }: typeof Done.Type) => `${summary}. The owner can undo it from Activity.`
+// Keep the stable identifiers in the model-visible result as well as the structured tool details. Composition tools
+// need the Topic or Persona id immediately after creation, and Pi does not expose tool details as model text.
+const said = ({ id, revision, summary }: typeof Done.Type) =>
+  `${summary} (id: ${String(id)}, revision: ${String(revision)}). The owner can undo it from Activity.`
 const topicDone = (topic: TopicView, summary: string) => ({
   id: topic.id,
   name: topic.name,
