@@ -8,7 +8,6 @@ import { ONBOARDING_STEPS, PRIMARY_CHAT, type OnboardingStep, type OnboardingVie
 import { Button, GoblinMark, Receipt } from '@goblin/ui'
 import { CheckIcon, CircleAlertIcon } from 'lucide-react'
 import { useState } from 'react'
-import { modelEndpointQuery } from '../../agent/queries.ts'
 import { clearStartDraft, suggestedChannel, useStartDraft } from './draft.ts'
 import { describeError, messageOf } from '../../lib/query/app-error.ts'
 import { reportUnexpected } from '../../lib/unexpected.ts'
@@ -136,6 +135,9 @@ function ReturnNotice({ search }: { readonly search: StartSearch }) {
   )
 }
 
+/** Whether the agent has a model to answer with: the model step and the kickoff wait for one. */
+const hasModel = (view: OnboardingView | undefined): boolean => view !== undefined && view.model.source !== 'none'
+
 /**
  * Back and Continue move through setup. Model setup waits for a configured endpoint; services remain optional.
  * The welcome has its own button, and the last step can finish without sending the first message.
@@ -162,11 +164,7 @@ function StartNav({
         Finish without it
       </Button>
     ) : (
-      <Button
-        variant="default"
-        disabled={step === 'model' && (view === undefined || view.model.source === 'none')}
-        onClick={onNext}
-      >
+      <Button disabled={step === 'model' && !hasModel(view)} onClick={onNext}>
         Continue
       </Button>
     )
@@ -193,7 +191,7 @@ function StartNav({
 /** Start's flow: going through a step, the kickoff, finishing without it, and skipping. */
 function useStartFlow(step: OnboardingStep) {
   const read = useQuery(onboardingQuery)
-  const model = useQuery(modelEndpointQuery)
+  const view = read.data
   const navigate = useNavigate()
   const change = useMutation(changeOnboardingMutation)
   const kickoff = useMutation(kickoffMutation)
@@ -201,13 +199,13 @@ function useStartFlow(step: OnboardingStep) {
   const { leaving, leave } = useLeave()
   const starting = kickoff.isPending || (change.isPending && change.variables?.status !== undefined)
   const next = () => {
-    if (step === 'model' && (model.data === undefined || model.data.source === 'none')) return
+    if (step === 'model' && !hasModel(view)) return
     change.mutate({ step })
     const following = ONBOARDING_STEPS[ONBOARDING_STEPS.indexOf(step) + 1]
     if (following !== undefined) navigate({ to: '/start/$step', params: { step: following } }).catch(reportUnexpected)
   }
   const start = () => {
-    if (model.data === undefined || model.data.source === 'none') {
+    if (!hasModel(view)) {
       navigate({ to: '/start/$step', params: { step: 'model' } }).catch(reportUnexpected)
       return
     }
@@ -238,8 +236,7 @@ function useStartFlow(step: OnboardingStep) {
       },
     )
   const skip = () => change.mutate({ status: 'skipped' }, { onSuccess: () => leave() })
-  const failure = kickoff.error ?? change.error ?? read.error ?? model.error
-  const view = read.data === undefined ? undefined : { ...read.data, model: model.data ?? read.data.model }
+  const failure = kickoff.error ?? change.error ?? read.error
   return { saved, view, starting, leaving, failure, next, start, finish, skip }
 }
 
