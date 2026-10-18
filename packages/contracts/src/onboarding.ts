@@ -1,6 +1,7 @@
 import * as Schema from 'effect/Schema'
 import { ModelEndpointView } from './agent.ts'
-import { ChatId } from './ids.ts'
+import { NonEmptyString } from './ids.ts'
+import { TopicName, TopicView } from './topics.ts'
 
 /**
  * First-run Start (ADR 0062): `done` or `skipped` once the owner said so, `open` until then. Start never stands before
@@ -30,17 +31,31 @@ export const OnboardingView = Schema.Struct({
 export type OnboardingView = typeof OnboardingView.Type
 
 /**
- * `PUT /api/onboarding`: finish or skip Start (`open` forgets that), mark a step the owner went through, or record the
- * kickoff. Only `status` changes the status: going through a step leaves it as it was.
+ * `PUT /api/onboarding`: finish or skip Start (`open` forgets that), or mark a step the owner went through. Only
+ * `status` changes the status: going through a step leaves it as it was.
  */
 export const OnboardingChange = Schema.Struct({
   status: Schema.optional(OnboardingStatus),
   step: Schema.optional(OnboardingStep),
-  kickoff: Schema.optional(Schema.Literal(true)),
-  /** The channel that receives the first useful-work message and its temporary guidance. */
-  kickoffChat: Schema.optional(ChatId),
 })
 export type OnboardingChange = typeof OnboardingChange.Type
+
+/**
+ * `POST /api/onboarding/kickoff`, Start's last step (ADR 0079): the owner's goal becomes a new channel's description and
+ * its first message, goblin is reminded there to begin useful work, and Start is done. A retry with the same
+ * `operationId` replays what the first attempt made; a refusal (the name is taken, nothing to say) comes before anything
+ * is made, so the owner may change the draft and try again.
+ */
+export const OnboardingKickoff = Schema.Struct({
+  goal: NonEmptyString(2000),
+  channel: TopicName,
+  operationId: NonEmptyString(180),
+})
+export type OnboardingKickoff = typeof OnboardingKickoff.Type
+
+/** The channel the kickoff made, and Start's view after it. */
+export const OnboardingKickedOff = Schema.Struct({ topic: TopicView, view: OnboardingView })
+export type OnboardingKickedOff = typeof OnboardingKickedOff.Type
 
 /**
  * `POST /api/onboarding/connect`: Start signs the owner in to `connectionId` and brings them back to `step`. Nothing is

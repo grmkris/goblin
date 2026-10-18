@@ -15,6 +15,9 @@ export const OnboardingLive = Layer.effect(
       change: Effect.fn('Onboarding.change')(function* (change, now) {
         return yield* attemptSync(() => store.apply(change, now))
       }),
+      kickoff: Effect.fn('Onboarding.kickoff')(function* (chat, now) {
+        return yield* attemptSync(() => store.kickoff(chat, now))
+      }),
       noteConnect: Effect.fn('Onboarding.noteConnect')(function* (connectionId, step, now) {
         return yield* attemptSync(() => store.noteConnect(connectionId, step, now))
       }),

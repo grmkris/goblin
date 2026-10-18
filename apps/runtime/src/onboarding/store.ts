@@ -8,15 +8,17 @@ import { appOnboarding, appOnboardingConnects } from '../storage/onboarding.ts'
 /** Start's status once it is kept: the owner finished or skipped it. */
 type KeptStatus = 'done' | 'skipped'
 
+/** Start's kickoff (ADR 0079): when the owner sent their goal, and the channel it started. */
+export type Kickoff = { readonly at: number; readonly chat: string }
+
 /**
- * What the owner did with Start: its kept status (none while it is open), the steps they went through, and when they
- * sent the kickoff.
+ * What the owner did with Start: its kept status (none while it is open), the steps they went through, and the kickoff
+ * once they sent it.
  */
 export type OnboardingRecord = {
   readonly status: KeptStatus | undefined
   readonly steps: readonly OnboardingStep[]
-  readonly kickoffAt: number | undefined
-  readonly kickoffChat: string | undefined
+  readonly kickoff: Kickoff | undefined
 }
 
 const decodeStrings = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.String)))
@@ -50,32 +52,36 @@ export class OnboardingStore {
     return {
       status: Option.getOrUndefined(decodeKept(row.status)),
       steps: stepsOf(row.steps),
-      kickoffAt: row.kickoffAt ?? undefined,
-      kickoffChat: row.kickoffChat ?? undefined,
+      kickoff:
+        row.kickoffAt === null || row.kickoffChat === null ? undefined : { at: row.kickoffAt, chat: row.kickoffChat },
     }
   }
 
   /**
-   * Applies the owner's change in one statement: a status (`open` forgets the kept one, so Start is open again), a step
-   * they went through (kept once), the kickoff's time (kept from the first). Only a status changes the status: a step
-   * or the kickoff alone leaves it as it was.
+   * Applies the owner's change in one statement: a status (`open` forgets the kept one, so Start is open again) or a
+   * step they went through (kept once). Only a status changes the status: a step alone leaves it as it was.
    */
   apply(change: OnboardingChange, now: number): OnboardingRecord {
     const current = this.get()
     const steps = [...(current?.steps ?? [])]
     if (change.step !== undefined && !steps.includes(change.step)) steps.push(change.step)
     const status = change.status === undefined ? current?.status : change.status === 'open' ? undefined : change.status
-    const next: OnboardingRecord = {
-      status,
-      steps,
-      kickoffAt: current?.kickoffAt ?? (change.kickoff === true ? now : undefined),
-      kickoffChat: current?.kickoffChat ?? change.kickoffChat,
-    }
+    return this.#write({ status, steps, kickoff: current?.kickoff }, now)
+  }
+
+  /** Records the kickoff into `chat` at `now`; the first one is kept, so a retried kickoff leaves it as it was. */
+  kickoff(chat: string, now: number): OnboardingRecord {
+    const current = this.get()
+    if (current?.kickoff !== undefined) return current
+    return this.#write({ status: current?.status, steps: current?.steps ?? [], kickoff: { at: now, chat } }, now)
+  }
+
+  #write(next: OnboardingRecord, now: number): OnboardingRecord {
     const values = {
       status: next.status ?? 'open',
       steps: JSON.stringify(next.steps),
-      kickoffAt: next.kickoffAt ?? null,
-      kickoffChat: next.kickoffChat ?? null,
+      kickoffAt: next.kickoff?.at ?? null,
+      kickoffChat: next.kickoff?.chat ?? null,
     }
     this.#db
       .insert(appOnboarding)

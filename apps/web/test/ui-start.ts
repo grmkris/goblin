@@ -162,7 +162,6 @@ async function drive(browser: Browser, origin: string, label: string, options: B
           goal: 'Plan a trip and keep every booking in one place',
           channel: 'Travel plans',
           operation: '',
-          accepted: false,
         }),
       ),
     )

@@ -1,7 +1,14 @@
 import { mutationOptions } from '@tanstack/react-query'
-import type { OnboardingChange, OnboardingConnect, OnboardingStep, OnboardingView } from '@goblin/contracts'
+import type {
+  OnboardingChange,
+  OnboardingConnect,
+  OnboardingKickoff,
+  OnboardingStep,
+  OnboardingView,
+} from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import { owner } from '../lib/api.ts'
+import { applyWorkspaceChanges } from '../lib/workspace/sync.ts'
 
 /** First-run Start (ADR 0062) on the owner API. Keys are `['onboarding', kind]`. */
 export const onboardingKeys = {
@@ -25,13 +32,24 @@ export const firstOpenStep = (view: OnboardingView | undefined): OnboardingStep 
 export const stepsLeft = (view: OnboardingView): OnboardingView['steps'] =>
   view.status === 'done' ? [] : view.steps.filter((step) => !step.done && step.id !== 'welcome' && step.id !== 'goblin')
 
-/** The owner finishes or skips Start, goes through a step, or records the kickoff; the view follows. */
+/** The owner finishes or skips Start, or goes through a step; the view follows. */
 export const changeOnboardingMutation = mutationOptions({
   ...owner.apiMutation({
     mutationFn: (api, change: OnboardingChange) => api.onboarding.change({ payload: change }),
   }),
   onSuccess: (view, _change, _result, { client }) => {
     client.setQueryData(onboardingQuery.queryKey, view)
+  },
+})
+
+/** Start's kickoff (ADR 0079): the channel it made joins the workspace, and Start's view follows. */
+export const kickoffMutation = mutationOptions({
+  ...owner.apiMutation({
+    mutationFn: (api, kickoff: OnboardingKickoff) => api.onboarding.kickoff({ payload: kickoff }),
+  }),
+  onSuccess: ({ topic, view }, _kickoff, _result, { client }) => {
+    client.setQueryData(onboardingQuery.queryKey, view)
+    applyWorkspaceChanges(client, [{ type: 'topic', topic }])
   },
 })
 
