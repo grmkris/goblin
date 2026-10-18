@@ -10,7 +10,11 @@ function DialogClose(props: DialogPrimitive.Close.Props) {
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
 }
 
-/** An inline panel with the dialog's focus and dismissal behavior; its container owns placement. */
+/**
+ * An inline side panel with the dialog's focus and dismissal behavior, portalled into `container`. It draws its edge,
+ * surface and shadow; the edge goes once its container is too narrow to keep anything beside it, and the edge and shadow
+ * on a phone, where it fills the screen. Where it sits and how wide is the caller's layout.
+ */
 function DialogPanel({
   container,
   className,
@@ -21,9 +25,8 @@ function DialogPanel({
       <DialogPrimitive.Popup
         data-slot="dialog-panel"
         className={cn(
-          'relative z-[calc(var(--z-chrome)+1)] flex w-[min(25rem,100%)] min-w-0 shrink-0 flex-col border-s border-border bg-background shadow-(--shadow-2) outline-none',
-          '@max-[54rem]/channel:absolute @max-[54rem]/channel:inset-y-0 @max-[54rem]/channel:end-0 @max-[42rem]/channel:w-full @max-[42rem]/channel:border-s-0',
-          'max-md:fixed max-md:inset-0 max-md:w-full max-md:border-0 max-md:shadow-none',
+          'flex min-w-0 shrink-0 flex-col border-s border-border bg-background shadow-(--shadow-2) outline-none',
+          '@max-[42rem]:border-s-0 max-md:border-0 max-md:shadow-none',
           className,
         )}
         {...props}
