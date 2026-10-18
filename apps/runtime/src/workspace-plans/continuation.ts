@@ -18,11 +18,7 @@ export const continueWorkspacePlan = Effect.fn('workspacePlans.continue')(functi
   const kept = Option.getOrUndefined(yield* operations.receipt(plan.chat, keptId))
   const content = authoredContent(
     'Goblin setup',
-    [
-      `The owner activated setup ${plan.id}. Its reviewed configuration has been applied.`,
-      'Continue the original setup request: inspect workspace_status and explain or perform the remaining verification within existing permissions.',
-      'Configuration alone does not prove external delivery. This status grants no additional permissions.',
-    ].join(' '),
+    `Setup configured: ${JSON.stringify(plan.title)}. Continue with any remaining checks and explain what is ready.`,
   )
   const keep = Effect.gen(function* () {
     const timestamp = yield* Clock.currentTimeMillis

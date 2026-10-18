@@ -51,11 +51,14 @@ export async function workspacePlansCase(base: string): Promise<void> {
   expect(await answerOf(me, (api) => api.workspacePlans.apply({ params, payload: { revision: 2 } }))).toBe('Conflict')
   const applied = await callOwner(me, (api) => api.workspacePlans.apply({ params, payload }))
   expect(applied).toMatchObject({ state: 'ready', continuation: 'sent', completed: [0, 1] })
-  await showing(me, '1', `The owner activated setup ${review.id}`)
+  await showing(me, '1', 'Setup configured:')
   const entries = async () => (await snapshotOf(me, '1')).entries ?? []
   const continuations = (all: Awaited<ReturnType<typeof entries>>) =>
     all.filter(
-      (entry) => entry.kind === 'pi.user' && JSON.stringify(entry).includes(`The owner activated setup ${review.id}`),
+      (entry) =>
+        entry.kind === 'pi.user' &&
+        JSON.stringify(entry).includes('Setup configured:') &&
+        JSON.stringify(entry).includes(review.title),
     )
   const before = continuations(await entries()).length
   expect(before).toBe(1)
