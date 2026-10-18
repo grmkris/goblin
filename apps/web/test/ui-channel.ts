@@ -182,6 +182,9 @@ try {
       await page.screenshot({ path: path.join(out, `${label}-tools-collapsed.png`) })
       await panel.locator('summary').filter({ hasText: 'Travel skills' }).click()
       await panel.getByText('trip-planning', { exact: true }).waitFor()
+      // The setup editor's own reading: the listed skill is available, only the missing one is unavailable.
+      await panel.getByText('notes · packing-list', { exact: true }).waitFor()
+      assert.equal(await panel.getByText('notes · trip-planning', { exact: true }).count(), 0)
       await page.screenshot({ path: path.join(out, `${label}-tools.png`) })
       await panel.getByRole('tab', { name: 'Shared', exact: true }).click()
       await panel.getByRole('link', { name: 'Lisbon guide.pdf' }).waitFor()
