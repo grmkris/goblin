@@ -1,3 +1,31 @@
+/*
+ * Where channel info's panel (ADR 0079) sits: beside the chat while the channel is wide, over it once narrow (at the
+ * thread panel's widths), and over the whole screen on a phone. The panel draws its own edge and surface.
+ */
+.channel-layout [data-slot='dialog-panel'] {
+  position: relative;
+  z-index: calc(var(--z-chrome) + 1);
+  width: min(25rem, 100%);
+}
+@container channel (max-width: 54rem) {
+  .channel-layout [data-slot='dialog-panel'] {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+  }
+}
+@container channel (max-width: 42rem) {
+  .channel-layout [data-slot='dialog-panel'] {
+    width: 100%;
+  }
+}
+@media (max-width: 47.99rem) {
+  .channel-layout [data-slot='dialog-panel'] {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+  }
+}
 .channel-info-head {
   display: flex;
   flex: none;
