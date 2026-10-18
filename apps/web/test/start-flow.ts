@@ -110,7 +110,10 @@ async function runMode(browser: Browser, origin: string, mode: Mode): Promise<vo
     await page.getByText('Opened channel 42', { exact: true }).waitFor()
     if (mode === 'conflict') assert.notEqual(fixture.creations[0]?.operationId, fixture.creations[1]?.operationId)
     assert.equal(await stored(page), null)
-    assert(fixture.changes.filter((change) => change.kickoff).every((change) => change.kickoffChat === '42'))
+    assert.deepEqual(
+      fixture.changes.filter((change) => change.kickoff).map((change) => change.kickoffChat),
+      mode === 'uncertain' ? ['42', '42'] : ['42'],
+    )
     assert.equal(new Set(fixture.messages.map((message) => message.operationId)).size, 1)
     assert.equal(fixture.messages.length, mode === 'uncertain' ? 2 : 1)
     if (mode === 'uncertain')
