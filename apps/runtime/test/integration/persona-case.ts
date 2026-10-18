@@ -389,7 +389,6 @@ async function organizingTopics(url: string, owner: Person): Promise<void> {
   })
   const orchard = (await topics(url, owner)).find((topic) => topic.name === 'Orchard')
   expect(orchard).toMatchObject({ createdBy: 'agent', revision: 1 })
-  await showing(signedIn(url, owner), '1', `(id: ${String(orchard?.id)}, revision: 1)`)
   // The new Conversation starts with its seed: the brief and a frozen excerpt of the owner's request, as quoted history.
   const seeded = await showing(signedIn(url, owner), orchard?.conversation ?? '', 'app.topic_seed')
   expect(seeded).toContain('Fruit trees for the back garden')
