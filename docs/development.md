@@ -36,6 +36,21 @@ The native owner test verifies routine/subagent holds and recovery fencing witho
 
 ## Local
 
+Chat-driven setup is described in [the architecture](architecture/workspace-plans.md). Its focused runtime check is:
+
+```sh
+heavy bun run --cwd apps/runtime test:unit test/workspace-plans.test.ts test/resident-mcp.test.ts
+heavy bun apps/web/test/ui-workspace-plans.ts
+```
+
+For a manual check, connect a disposable MCP chat account with Events and enable its setup skills. In Goblin chat,
+ask: “Set up my private chat here and a daily reminder in a separate Topic. Prepare one setup review.” Inspect the
+Source's sender rule, destination, reply tool and the routine's schedule before activating. Reload the page and
+verify that progress remains; after activation Goblin should continue the original chat. Send a real message from
+the external account and check both its receipt in Goblin and the provider's reply receipt. Record configuration,
+inbound acceptance and outbound delivery separately. Use test conversations; a separate Topic does not isolate
+private context from shared-group replies yet.
+
 ```sh
 bun install --frozen-lockfile
 mkdir -p .local && cp .env.example .local/local.env && chmod 600 .local/local.env

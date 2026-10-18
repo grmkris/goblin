@@ -1,5 +1,10 @@
 # goblin
 
+Ask Goblin to set up an outside conversation or automation in chat. It discovers the connected server's tools,
+events and enabled skills, prepares Sources and routines together, and shows one setup review. Activation applies
+the exact reviewed configuration and resumes the original chat; partial progress survives a retry. See
+[chat-driven setup](docs/architecture/workspace-plans.md) for the current scope and provider-verification boundaries.
+
 Your own goblin, always on. Resident personal agents on Cloudflare. Each user signs up and gets their own agent: they
 talk to it in the browser, it keeps running, holds its own authority to use the MCP servers that user connected, and is
 itself an MCP server other tools can talk to.

@@ -15,6 +15,7 @@ import { RoutineRunsLive, RoutinesLive } from './routines.ts'
 import { LearnerLive, SkillsLive } from './skills.ts'
 import { SourcesLive } from './sources.ts'
 import { WorkspaceLive } from '../workspace/live.ts'
+import { WorkspacePlansLive } from './workspace-plans.ts'
 
 /** `step`, built after and over everything `built` provides; the result provides both. */
 const then =
@@ -75,6 +76,7 @@ export const AgentLive = (input: AgentInputs) =>
     then(SourcesLive),
     then(LearnerLive),
     then(WorkspaceLive),
+    then(WorkspacePlansLive),
     then(OnboardingLive),
     then(AgentHttp.layer),
   )

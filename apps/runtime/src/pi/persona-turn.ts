@@ -136,6 +136,8 @@ export const PERSONA_DENIED_TOOLS: readonly string[] = [
   'source_propose',
   'routine_propose',
   'routine_pause',
+  'workspace_propose',
+  'workspace_status',
 ]
 
 /** Extensions a Persona's fork leaves out: main's memory belongs to Goblin, not to a Persona. */

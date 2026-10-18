@@ -22,6 +22,7 @@ import { SidebarGroup } from './sidebar.ts'
 import { NotifyGroup, SourcesGroup } from './sources.ts'
 import { TopicsGroup } from './topics.ts'
 import { WorkspaceGroup } from './workspace.ts'
+import { WorkspacePlansGroup } from './workspace-plans.ts'
 
 /**
  * Admission to every owner endpoint, run by the agent before the handler: a renewal of resident authority. Its implementation lives in the runtime (`http/api/middleware.ts`); clients need none. Its error
@@ -51,6 +52,7 @@ export class OwnerApi extends HttpApi.make('goblin-owner')
     AgentAppsGroup,
     InspectGroup,
     WorkspaceGroup,
+    WorkspacePlansGroup,
     FilesGroup,
     NoticesGroup,
     OnboardingGroup,
