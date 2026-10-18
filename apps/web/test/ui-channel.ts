@@ -189,6 +189,9 @@ try {
       await panel.getByRole('tab', { name: 'Shared', exact: true }).click()
       await panel.getByRole('link', { name: 'Lisbon guide.pdf' }).waitFor()
       await page.screenshot({ path: path.join(out, `${label}-shared.png`) })
+      await panel.getByRole('tab', { name: 'Work', exact: true }).click()
+      await panel.getByText(/^No routines in this channel/u).waitFor()
+      await panel.getByText('No external conversations route here.', { exact: true }).waitFor()
       await page
         .getByRole('button', { name: width === 390 ? 'Back to channel' : 'Close channel info', exact: true })
         .click()

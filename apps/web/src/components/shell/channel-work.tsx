@@ -11,95 +11,38 @@ import { channelOf } from '../../lib/topics.ts'
 import { useActivities, useConversations, usePersonas, useTopics } from '../../lib/workspace/hooks.ts'
 import { useOpenChat } from './panel.tsx'
 
-/** Work stays scoped to this channel; a source connection alone says nothing about where its messages go. */
-function useChannelWork({ topic }: { readonly topic: TopicView }) {
-  const routines = useQuery(routinesQuery)
-  const sources = useQuery(sourcesQuery)
-  const routes = useQueries({ queries: (sources.data?.sources ?? []).map((source) => sourceRoutesQuery(source.id)) })
-  const conversations = useConversations()
-  const activity = useActivities()
-  const topics = useTopics()
-  const personas = usePersonas()
-  const threads = conversations.filter(
-    (view) =>
-      view.id !== topic.conversation &&
-      view.closedAt === undefined &&
-      channelOf(view.id, conversations, topics) === topic.conversation,
-  )
-  const waiting = conversations.filter(
-    (view) => (view.attention?.length ?? 0) > 0 && channelOf(view.id, conversations, topics) === topic.conversation,
-  )
-  const scheduled = (routines.data?.routines ?? []).filter((routine) => routine.topic === topic.id)
-  const connected = routes.flatMap((read) =>
-    read.data === undefined
-      ? []
-      : read.data.routes
-          .filter(({ route }) => 'topic' in route && route.topic === topic.id)
-          .map((route) => ({ source: read.data.source, route })),
-  )
-  const error = routines.error ?? sources.error ?? routes.find((read) => read.error !== null)?.error
-  const loading = routines.isPending || sources.isPending || routes.some((read) => read.isPending)
-  return {
-    routines,
-    sources,
-    routes,
-    activity,
-    topics,
-    personas,
-    threads,
-    waiting,
-    scheduled,
-    connected,
-    error,
-    loading,
-  }
-}
-
+/** Work stays scoped to this channel; each section reads its own data, so one failing read leaves the others. */
 export function ChannelWork({ topic }: { readonly topic: TopicView }) {
-  const work = useChannelWork({ topic })
-  const { routines, sources, routes, error, scheduled } = work
   return (
     <div className="channel-info-sections">
-      {error != null && (
-        <p role="alert">
-          {messageOf(error, 'read channel work')}{' '}
-          <Button
-            variant="ghost"
-            onClick={() => {
-              routines.refetch().catch(reportUnexpected)
-              sources.refetch().catch(reportUnexpected)
-              routes.forEach((read) => {
-                read.refetch().catch(reportUnexpected)
-              })
-            }}
-          >
-            Try again
-          </Button>
-        </p>
-      )}
-      <WorkChats work={work} />
-      <section className="channel-info-section">
-        <h2>Routines</h2>
-        {scheduled.map((routine) => (
-          <Link className="channel-info-row" key={routine.id} to="/work">
-            <span>{routine.definition.title}</span>
-            <small>{routine.state === 'proposed' ? 'Awaiting approval' : routine.state}</small>
-          </Link>
-        ))}
-        {routines.isSuccess && scheduled.length === 0 && (
-          <p className="channel-info-empty">
-            No routines in this channel. Ask goblin to suggest a reminder or recurring task.
-          </p>
-        )}
-      </section>
-      <WorkRoutes work={work} />
+      <WorkChats topic={topic} />
+      <WorkRoutines topic={topic} />
+      <WorkRoutes topic={topic} />
     </div>
   )
 }
 
-function WorkChats({ work }: { readonly work: ReturnType<typeof useChannelWork> }) {
-  const { waiting, threads, activity } = work
+/** A section's failed read, with the way to read it again. */
+function Failed({ error, onRetry }: { readonly error: unknown; readonly onRetry: () => void }) {
+  return (
+    <p role="alert">
+      {messageOf(error, 'read channel work')}{' '}
+      <Button variant="ghost" onClick={onRetry}>
+        Try again
+      </Button>
+    </p>
+  )
+}
+
+/** The channel's own chats from the workspace feed: the ones waiting on the owner, and its open threads and helpers. */
+function WorkChats({ topic }: { readonly topic: TopicView }) {
+  const conversations = useConversations()
+  const topics = useTopics()
+  const activity = useActivities()
   const open = useOpenChat()
+  const here = conversations.filter((view) => channelOf(view.id, conversations, topics) === topic.conversation)
+  const waiting = here.filter((view) => (view.attention?.length ?? 0) > 0)
+  const threads = here.filter((view) => view.id !== topic.conversation && view.closedAt === undefined)
   return (
     <>
       <section className="channel-info-section">
@@ -133,11 +76,59 @@ function WorkChats({ work }: { readonly work: ReturnType<typeof useChannelWork> 
     </>
   )
 }
-function WorkRoutes({ work }: { readonly work: ReturnType<typeof useChannelWork> }) {
-  const { connected, topics, personas, loading, error } = work
+
+function WorkRoutines({ topic }: { readonly topic: TopicView }) {
+  const routines = useQuery(routinesQuery)
+  const scheduled = (routines.data?.routines ?? []).filter((routine) => routine.topic === topic.id)
+  return (
+    <section className="channel-info-section">
+      <h2>Routines</h2>
+      {routines.error !== null && (
+        <Failed
+          error={routines.error}
+          onRetry={() => {
+            routines.refetch().catch(reportUnexpected)
+          }}
+        />
+      )}
+      {scheduled.map((routine) => (
+        <Link className="channel-info-row" key={routine.id} to="/work">
+          <span>{routine.definition.title}</span>
+          <small>{routine.state === 'proposed' ? 'Awaiting approval' : routine.state}</small>
+        </Link>
+      ))}
+      {routines.isSuccess && scheduled.length === 0 && (
+        <p className="channel-info-empty">
+          No routines in this channel. Ask goblin to suggest a reminder or recurring task.
+        </p>
+      )}
+    </section>
+  )
+}
+
+/** Source routes into this channel; a source connection alone says nothing about where its messages go. */
+function WorkRoutes({ topic }: { readonly topic: TopicView }) {
+  const sources = useQuery(sourcesQuery)
+  const routes = useQueries({ queries: (sources.data?.sources ?? []).map((source) => sourceRoutesQuery(source.id)) })
+  const topics = useTopics()
+  const personas = usePersonas()
+  const connected = routes.flatMap((read) =>
+    read.data === undefined
+      ? []
+      : read.data.routes
+          .filter(({ route }) => 'topic' in route && route.topic === topic.id)
+          .map((route) => ({ source: read.data.source, route })),
+  )
+  const error = sources.error ?? routes.find((read) => read.error !== null)?.error ?? null
+  const loading = sources.isPending || routes.some((read) => read.isPending)
+  const retry = () => {
+    sources.refetch().catch(reportUnexpected)
+    for (const read of routes) read.refetch().catch(reportUnexpected)
+  }
   return (
     <section className="channel-info-section">
       <h2>Connected conversations</h2>
+      {error !== null && <Failed error={error} onRetry={retry} />}
       {connected.map(({ source, route }) => (
         <div className="channel-info-detail-row" key={`${source.id}:${route.key}`}>
           <b>{conversationName(route)}</b>
@@ -155,7 +146,7 @@ function WorkRoutes({ work }: { readonly work: ReturnType<typeof useChannelWork>
           </Link>
         </div>
       ))}
-      {!loading && error == null && connected.length === 0 && (
+      {!loading && error === null && connected.length === 0 && (
         <p className="channel-info-empty">No external conversations route here.</p>
       )}
       {loading && <p role="status">Loading channel work…</p>}
