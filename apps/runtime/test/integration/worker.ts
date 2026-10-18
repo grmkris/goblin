@@ -135,7 +135,9 @@ export class PersonalAgentProbe extends PersonalAgent {
    */
   requestFor(
     turn: string,
-  ): { messages: { role: string; text: string }[]; systemPrompt: string; tools: string[] } | undefined {
+  ):
+    | { messages: { role: string; text: string }[]; systemPrompt: string; tools: string[]; context: string }
+    | undefined {
     const request = this.seen.findLast(
       ({ messages }) => messages.findLast((message) => message.role !== 'system')?.text === turn,
     )
@@ -143,6 +145,7 @@ export class PersonalAgentProbe extends PersonalAgent {
     return {
       messages: request.messages.map(({ role, text }) => ({ role, text })),
       systemPrompt: request.systemPrompt,
+      context: request.context ?? '',
       tools: [...request.tools],
     }
   }

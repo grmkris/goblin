@@ -15,7 +15,13 @@ import { RoutineRuns } from './service.ts'
  * works with the Persona turn's extension (its text in the context tail) and without `ask_user` (ADR 0041). Its Pi
  * callbacks run their programs through the bridge `agent.ts` gives it.
  */
-export function routineExtensions(run: RunProgram, resident: Extension, personaTurn: Extension, key: string) {
+export function routineExtensions(
+  run: RunProgram,
+  resident: Extension,
+  personaTurn: Extension,
+  key: string,
+  guidance: Extension,
+) {
   const asking = askingExtension(async (session, callId, questions) => {
     const cipher = await CredentialCipher.fromBase64(key)
     await run(
@@ -28,8 +34,8 @@ export function routineExtensions(run: RunProgram, resident: Extension, personaT
   })
   const budget = routineBudgetExtension(run)
   const task = routineRunExtension(run, {
-    goblin: [personaExtension, resident, asking, budget],
-    persona: [personaExtension, resident, budget, personaTurn],
+    goblin: [personaExtension, resident, asking, budget, guidance],
+    persona: [personaExtension, resident, budget, personaTurn, guidance],
   })
   return { start: task.start, extra: [task.extension, asking, budget] }
 }

@@ -12,22 +12,20 @@ import {
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
-  ChevronDownIcon,
+  EllipsisIcon,
   EyeOffIcon,
   HashIcon,
   PencilIcon,
   SearchIcon,
-  Settings2Icon,
 } from 'lucide-react'
 import { messageOf } from '../../lib/query/app-error.ts'
 import { isArchived } from '../../lib/topics.ts'
 import { useTopics } from '../../lib/workspace/hooks.ts'
 import { updateWorkspaceTopicMutation } from '../../lib/workspace/mutations.ts'
-import { TopicSetupDrawer } from '../topic-setup.tsx'
 import { TopicDialog } from './topic-dialog.tsx'
 
 /** The channel's name as its bar shows it: `#` and the Topic's name, with a pulse while its agent works. */
-function ChannelName({ name, working }: { readonly name: string; readonly working: boolean }) {
+export function ChannelName({ name, working }: { readonly name: string; readonly working: boolean }) {
   return (
     <span className="channel-title">
       <HashIcon aria-hidden />
@@ -45,19 +43,16 @@ function ChannelName({ name, working }: { readonly name: string; readonly workin
 export function ChannelMenu({
   topic,
   name,
-  working,
   onFailure,
 }: {
   readonly topic: TopicView | undefined
   readonly name: string
-  readonly working: boolean
   readonly onFailure: (text: string) => void
 }) {
   const topics = useTopics()
   const update = useMutation(updateWorkspaceTopicMutation)
   const [renaming, setRenaming] = useState(false)
-  const [settingUp, setSettingUp] = useState(false)
-  if (topic === undefined || topics.length === 0) return <ChannelName name={name} working={working} />
+  if (topic === undefined || topics.length === 0) return null
   const change = (patch: UpdateTopic) =>
     update.mutate(
       { id: topic.id, change: patch },
@@ -67,18 +62,13 @@ export function ChannelMenu({
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" aria-label={`#${name}: topic actions`} />}>
-          <ChannelName name={name} working={working} />
-          <ChevronDownIcon data-icon="inline-end" />
+        <DropdownMenuTrigger render={<Button variant="ghost" aria-label={`Actions for #${name}`} />}>
+          <EllipsisIcon aria-hidden />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           <DropdownMenuItem onClick={() => setRenaming(true)}>
             <PencilIcon aria-hidden />
             Rename
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setSettingUp(true)}>
-            <Settings2Icon aria-hidden />
-            Topic setup…
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => change({ searchExcluded: !topic.searchExcluded })}>
             {topic.searchExcluded ? <SearchIcon aria-hidden /> : <EyeOffIcon aria-hidden />}
@@ -96,7 +86,6 @@ export function ChannelMenu({
         </DropdownMenuContent>
       </DropdownMenu>
       {renaming && <TopicDialog open onOpenChange={setRenaming} topic={topic} />}
-      <TopicSetupDrawer topic={topic} open={settingUp} onOpenChange={setSettingUp} />
     </>
   )
 }

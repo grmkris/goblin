@@ -1,39 +1,52 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Navigate } from '@tanstack/react-router'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { Navigate, useNavigate } from '@tanstack/react-router'
 import type { ConversationView, TopicView } from '@goblin/contracts'
-import { TopBar, TopBarTitle } from '@goblin/ui'
+import { Button, TopBar, TopBarTitle } from '@goblin/ui'
+import { InfoIcon } from 'lucide-react'
+import { reportUnexpected } from '../../lib/unexpected.ts'
 import { rememberChannel } from '../../lib/last-channel.ts'
 import { type PanelSearch, panelItems } from '../../lib/panel.ts'
 import { channelOf, isArchived, isChannel, topicOfChannel } from '../../lib/topics.ts'
 import { useActivity, useConversation, useConversations, useTopics } from '../../lib/workspace/hooks.ts'
-import { ArchivedBanner, ChannelMenu } from './channel-menu.tsx'
+import { ArchivedBanner, ChannelName } from './channel-menu.tsx'
 import { ChatView } from './chat-view.tsx'
 import { PanelProvider } from './panel.tsx'
 import { NavigationButton } from './shell.tsx'
 import { ThreadPanel } from './thread-panel.tsx'
+import { ChannelInfo } from './channel-info.tsx'
 
 /** A channel's bar: on a phone the navigation's button, then `#` and the Topic's name with its menu. */
 function ChannelHeader({
   view,
   topic,
-  onFailure,
+  onInfo,
+  infoTrigger,
+  infoOpen,
 }: {
   readonly view: ConversationView
   readonly topic: TopicView | undefined
-  readonly onFailure: (text: string) => void
+  readonly infoTrigger: RefObject<HTMLButtonElement | null>
+  readonly infoOpen: boolean
+  readonly onInfo: () => void
 }) {
   const working = useActivity(view.id)?.state === 'working'
   return (
     <TopBar floating data-app-cover>
       <NavigationButton />
       <TopBarTitle>
-        <ChannelMenu
-          topic={topic}
-          name={topic?.name ?? view.title ?? 'Personal'}
-          working={working}
-          onFailure={onFailure}
-        />
+        <ChannelName name={topic?.name ?? view.title ?? 'Personal'} working={working} />
       </TopBarTitle>
+      <Button
+        variant="ghost"
+        className="size-11 shrink-0 me-1"
+        ref={infoTrigger}
+        aria-expanded={infoOpen}
+        aria-haspopup="dialog"
+        aria-label={`Info for #${topic?.name ?? view.title ?? 'Personal'}`}
+        onClick={onInfo}
+      >
+        <InfoIcon />
+      </Button>
     </TopBar>
   )
 }
@@ -45,25 +58,51 @@ function ChannelLayout({ view, search }: { readonly view: ConversationView; read
   const items = useMemo(() => panelItems(search, view.id, conversations), [search, view.id, conversations])
   const [heads, setHeads] = useState<ReadonlySet<string>>(new Set())
   const [failure, setFailure] = useState('')
+  const infoOpen = search.info === true
+  const navigate = useNavigate()
+  const infoTrigger = useRef<HTMLButtonElement>(null)
+  const layout = useRef<HTMLDivElement>(null)
+  const setInfoOpen = (info: boolean) => {
+    navigate({ to: '/c/$chatId', params: { chatId: view.id }, search: { ...search, info } }).catch(reportUnexpected)
+  }
   useEffect(() => rememberChannel(view.id), [view.id])
   const open = items.length > 0
   const archived = topic !== undefined && isArchived(topic)
   return (
     <PanelProvider channel={view.id} items={items}>
-      <div className="channel-layout" data-panel={open || undefined}>
+      <div ref={layout} className="channel-layout" data-panel={open || undefined} data-info={infoOpen || undefined}>
         <div className="channel-column">
           <ChatView
             key={view.id}
             view={view}
             place="channel"
-            active={!open}
-            header={<ChannelHeader view={view} topic={topic} onFailure={setFailure} />}
+            active={!open && !infoOpen}
+            header={
+              <ChannelHeader
+                view={view}
+                topic={topic}
+                onInfo={() => setInfoOpen(true)}
+                infoTrigger={infoTrigger}
+                infoOpen={infoOpen}
+              />
+            }
             notices={failure === '' ? [] : [failure]}
             {...(archived && { banner: <ArchivedBanner topic={topic} onFailure={setFailure} /> })}
             onHeads={setHeads}
           />
         </div>
         {open && <ThreadPanel heads={heads} />}
+        {topic !== undefined && (
+          <ChannelInfo
+            topic={topic}
+            open={infoOpen}
+            onOpenChange={setInfoOpen}
+            trigger={infoTrigger}
+            container={layout}
+            failure={failure}
+            onFailure={setFailure}
+          />
+        )}
       </div>
     </PanelProvider>
   )

@@ -39,6 +39,8 @@ export type TopicPorts = {
 const view = (row: Row): TopicView => ({
   id: row.id,
   name: row.name,
+  ...(row.description === '' ? {} : { description: row.description }),
+  ...(row.instructions === '' ? {} : { instructions: row.instructions }),
   conversation: row.chatId,
   ...(row.id === PERSONAL_TOPIC ? { personal: true } : {}),
   ...(row.archivedAt === null ? {} : { archivedAt: row.archivedAt }),
@@ -54,6 +56,14 @@ const cleanName = (name: string): string => {
   const clean = name.replaceAll(/\s+/gu, ' ').trim()
   if (clean === '') throw new InvalidInput({ reason: 'topic_name' })
   return clean
+}
+
+/** Guidance edits must name the revision they replace; other edits may opt into the same check. */
+function checkGuidanceRevision(change: UpdateTopic, revision: number): void {
+  if ((change.description !== undefined || change.instructions !== undefined) && change.expectedRevision === undefined)
+    throw new InvalidInput({ reason: 'revision_required' })
+  if (change.expectedRevision !== undefined && revision !== change.expectedRevision)
+    throw new Conflict({ reason: 'revision' })
 }
 
 /**
@@ -147,6 +157,8 @@ export class TopicRegistry<RunResult = unknown> {
             .insert(appTopics)
             .values({
               name,
+              description: input.description?.trim() ?? '',
+              instructions: input.instructions?.trim() ?? '',
               chatId: chat,
               operationId: input.operationId,
               setup: storedSetup(input.setup ?? EVERYTHING),
@@ -179,20 +191,38 @@ export class TopicRegistry<RunResult = unknown> {
    */
   update(id: number, change: UpdateTopic, now: number): TopicView {
     const row = this.#row(id)
+    checkGuidanceRevision(change, row.revision)
     if (change.archived === true && id === PERSONAL_TOPIC) throw new InvalidInput({ reason: 'personal_topic' })
     const name = change.name === undefined ? row.name : cleanName(change.name)
+    const description = change.description?.trim() ?? row.description
+    const instructions = change.instructions?.trim() ?? row.instructions
     const archivedAt = change.archived === undefined ? row.archivedAt : change.archived ? (row.archivedAt ?? now) : null
     const searchExcluded = change.searchExcluded ?? row.searchExcluded
-    if (name === row.name && archivedAt === row.archivedAt && searchExcluded === row.searchExcluded) return view(row)
+    if (
+      name === row.name &&
+      description === row.description &&
+      instructions === row.instructions &&
+      archivedAt === row.archivedAt &&
+      searchExcluded === row.searchExcluded
+    )
+      return view(row)
     const updated = this.#db.transaction(() => {
       if (archivedAt === null) this.#assertFree(name, id)
       const [next] = this.#db
         .update(appTopics)
-        .set({ name, archivedAt, searchExcluded, revision: row.revision + 1, updatedAt: now })
-        .where(eq(appTopics.id, id))
+        .set({
+          name,
+          description,
+          instructions,
+          archivedAt,
+          searchExcluded,
+          revision: row.revision + 1,
+          updatedAt: now,
+        })
+        .where(and(eq(appTopics.id, id), eq(appTopics.revision, row.revision)))
         .returning()
         .all()
-      if (next === undefined) throw new NotFound({ what: 'topic' })
+      if (next === undefined) throw new Conflict({ reason: 'revision' })
       if (name !== row.name) this.#ports.retitle(row.chatId, name)
       return next
     })

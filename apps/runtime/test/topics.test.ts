@@ -86,6 +86,27 @@ const serviceOf = (store: TopicRegistry) => {
 }
 
 describe('Topics (ADR 0032)', () => {
+  it('keeps channel guidance with a required revision and refuses stale edits without losing either field', async () => {
+    const { topics, create } = fixture()
+    const { topic } = await create(
+      { name: 'Travel', description: ' Trip planning ', instructions: 'Check sources.', operationId: 'guidance' },
+      'owner',
+      10,
+    )
+    expect(topic).toMatchObject({ description: 'Trip planning', instructions: 'Check sources.' })
+    expect(() => topics.update(topic.id, { instructions: 'New' }, 11)).toThrow(
+      expect.objectContaining({ reason: 'revision_required' }),
+    )
+    const saved = topics.update(topic.id, { description: 'Summer trip', expectedRevision: topic.revision }, 12)
+    expect(saved).toMatchObject({ description: 'Summer trip', instructions: 'Check sources.', revision: 2 })
+    expect(() =>
+      topics.update(topic.id, { instructions: 'Stale draft', expectedRevision: topic.revision }, 13),
+    ).toThrow(expect.objectContaining({ reason: 'revision' }))
+    expect(topics.get(topic.id)).toEqual(saved)
+    expect(
+      topics.update(topic.id, { instructions: '', expectedRevision: saved.revision }, 14).instructions,
+    ).toBeUndefined()
+  })
   it('seeds Personal with Main as its Conversation', () => {
     const { topics } = fixture()
     expect(topics.list()).toEqual([

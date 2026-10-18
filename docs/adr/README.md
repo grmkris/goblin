@@ -53,7 +53,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0059](0059-bring-your-own-model-endpoint.md) | Bring your own model endpoint | Accepted; amended by 0064 |
 | [0060](0060-suggested-access-from-tool-annotations.md) | Suggested access from tool annotations | Accepted |
 | [0061](0061-the-shelf-is-data.md) | The shelf is data | Accepted |
-| [0062](0062-short-skippable-start.md) | Short, skippable Start | Accepted |
+| [0062](0062-short-skippable-start.md) | Short, skippable Start | Amended by 0079 |
 | [0063](0063-mcp-first-no-server-specific-code.md) | MCP-first: no server-specific code | Accepted |
 | [0064](0064-openid-connect-and-config-driven-deployment.md) | OpenID Connect sign-in and config-driven deployment | Accepted; amended by 0067 and 0078 |
 | [0065](0065-files-from-mcp-content.md) | Files from MCP content | Accepted |
@@ -70,3 +70,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0076](0076-batch-tool-grants.md) | Batch changes to exact tool grants | Accepted |
 | [0077](0077-prod-is-the-default-branch.md) | prod is the repository's default branch | Accepted |
 | [0078](0078-one-sidebar-and-one-apps-launcher.md) | One sidebar and one Apps launcher | Accepted |
+| [0079](0079-channel-info-and-goal-first-start.md) | Channel info and goal-first Start | Accepted |

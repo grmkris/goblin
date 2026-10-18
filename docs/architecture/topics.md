@@ -23,6 +23,16 @@ Undo restores the setup before it, applies the Pi filter again to the Topic's ch
 `<apps>` context lists only the apps a chat's scope holds, and a new agent app built in a Topic that lists its apps
 joins that Topic's setup with an agent receipt (`newAppJoinsTopic`; a failure there leaves the build as it is).
 
+Channel info ([ADR 0079](../adr/0079-channel-info-and-goal-first-start.md)) opens from the top-right info button.
+Overview edits the Topic's description and instructions with an expected revision; Tools & skills opens the setup
+editor; Shared pages through visible history across the channel's chats; Work lists its threads, helpers, routines
+and incoming Source routes. The panel preserves mounted chat and thread drafts.
+
+`pi/topic-context.ts` reads the current Topic guidance before each model request through `topics/context.ts`, including
+threads, helpers, Personas and routine runs. Guidance grants no authority. If the read fails, the extension aborts its
+generation through Pi's public `abortTask` with the invocation context; cancellation depends on Pi storage accepting
+the mark. The in-memory Harness regression checks zero provider calls on failure and a healthy subsequent request.
+
 `TopicRegistry` (`topics/registry.ts`, a store behind the `Topics` service in `topics/service.ts`) creates a Topic
 with a new Pi session as its Conversation, not forked from Personal's: its tool filter follows its setup's subagents,
 and nothing is copied from Personal. Create is idempotent by operation id and serialized by the service's `KeyedLock` (key
@@ -35,8 +45,8 @@ chat's work through the owner's Stop (runs, queued inputs, subagents and routine
 
 | Route | Purpose |
 | --- | --- |
-| `POST /api/topics` | `CreateTopic` (`{ name, operationId, setup? }`): a new Topic and Conversation, with that setup or everything, or the one that operation made; 201. |
-| `PATCH /api/topics/:id` | `UpdateTopic`: rename, archive or restore, and the automatic-search opt-out; one new revision per change. |
+| `POST /api/topics` | `CreateTopic` (`{ name, operationId, setup?, description?, instructions? }`): a new Topic and Conversation, with that setup or everything, or the one that operation made; 201. |
+| `PATCH /api/topics/:id` | `UpdateTopic`: rename, edit description/instructions, archive or restore, and the automatic-search opt-out; one new revision per change. Guidance edits require the current `expectedRevision`. |
 | `PATCH /api/topics/:id/setup` | `TopicSetupEdit`: a whole setup (409 unless `expectedRevision` is current) or items added or removed; answers `TopicSetupSaved`, the Topic and the routines it leaves without some of their tools. |
 | `GET /api/setup/catalog` | `SetupCatalog`: the servers with the tools the owner granted the model, the skill servers they turned on with the skills each lists, and the agent's apps. |
 
