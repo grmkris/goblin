@@ -2,7 +2,7 @@
 // Refuse of that exact revision, then Pause, Resume and Remove. Confirming is an authenticated owner operation on the
 // revision shown, never something a tool's text or a server's suggestion does.
 import { useMutation, useQuery } from '@tanstack/react-query'
-import type { SourceView } from '@goblin/contracts'
+import type { PersonaView, SourceView, TopicView } from '@goblin/contracts'
 import { Conflict } from '@goblin/contracts/api'
 import {
   Alert,
@@ -102,13 +102,37 @@ function changesOf(source: SourceView): readonly {
 const CONFIRM_NOTE =
   'Nothing runs until you confirm this exact setup. Confirming lets goblin take this event and call these tools for you. Messages where you speak become your own turns; their words stay data and grant nothing, and tools that ask first still ask.'
 
+/** The same readable Source facts used by the standalone Source review and a combined workspace plan. */
+export function SourceFacts({
+  source,
+  topics,
+  personas,
+  event,
+}: {
+  readonly source: SourceView
+  readonly topics: readonly TopicView[]
+  readonly personas: readonly PersonaView[]
+  readonly event: string
+}) {
+  const facts = setupFacts(source.setup, { event, newKeys: (newKeys) => newKeysWords(newKeys, topics, personas) })
+  return (
+    <dl className="routine-facts">
+      {facts.map((fact) => (
+        <div key={fact.term}>
+          <dt>{fact.term}</dt>
+          <dd>{fact.text}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
 /** A Source's card: its facts, its exact setup, and what the owner may do with it in its state. */
 export function SourceReview({ source }: { readonly source: SourceView }) {
   const changing = useMutation(changeSourceMutation)
   const topics = useTopics()
   const personas = usePersonas()
   const event = useEventTitle(source)
-  const facts = setupFacts(source.setup, { event, newKeys: (newKeys) => newKeysWords(newKeys, topics, personas) })
   const pending = changing.isPending ? changing.variables.action : undefined
   const error = changing.error === null ? '' : sourceRefusal(changing.error, 'change this Source')
   return (
@@ -128,14 +152,7 @@ export function SourceReview({ source }: { readonly source: SourceView }) {
       </CardHeader>
       <CardContent>
         <div className="card-body">
-          <dl className="routine-facts">
-            {facts.map((fact) => (
-              <div key={fact.term}>
-                <dt>{fact.term}</dt>
-                <dd>{fact.text}</dd>
-              </div>
-            ))}
-          </dl>
+          <SourceFacts source={source} topics={topics} personas={personas} event={event} />
           {source.health !== undefined && <p className="server-note">{source.health}</p>}
           {source.state === 'proposed' && <p className="server-note">{CONFIRM_NOTE}</p>}
           <ExactSetup source={source} />

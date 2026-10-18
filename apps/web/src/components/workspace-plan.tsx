@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import type { TopicView, WorkspacePlanItem, WorkspacePlanView } from '@goblin/contracts'
+import type { PersonaView, TopicView, WorkspacePlanItem, WorkspacePlanView } from '@goblin/contracts'
 import {
   Alert,
   AlertDescription,
@@ -20,13 +20,14 @@ import {
 } from '@goblin/ui'
 import { CheckCircle2Icon, ChevronRightIcon, CircleIcon } from 'lucide-react'
 import { messageOf } from '../lib/query/app-error.ts'
-import { setupFacts } from '../lib/source-setup.ts'
-import { newKeysWords } from '../lib/source-routes.ts'
+import { usePersonas } from '../lib/workspace/hooks.ts'
 import {
   applyWorkspacePlanMutation,
   prepareWorkspacePlanMutation,
   workspacePlanQuery,
 } from '../workspace-plans/queries.ts'
+import { RoutineDetails } from './routine-review.tsx'
+import { SourceFacts } from './source-review.tsx'
 
 const labels: Readonly<Record<WorkspacePlanView['state'], string>> = {
   preparing: 'Preparing',
@@ -50,10 +51,12 @@ function descriptionOf(item: WorkspacePlanItem): string {
 function PlanItem({
   item,
   topics,
+  personas,
   completed,
 }: {
   readonly item: WorkspacePlanItem
   readonly topics: readonly TopicView[]
+  readonly personas: readonly PersonaView[]
   readonly completed: boolean
 }) {
   const title = item.kind === 'source' ? item.source.title : item.routine.definition.title
@@ -66,28 +69,9 @@ function PlanItem({
         <p className="font-medium break-words">{title}</p>
         <p className="text-muted-foreground text-sm break-words">{descriptionOf(item)}</p>
         {item.kind === 'source' && (
-          <dl className="routine-facts">
-            {setupFacts(item.source.setup, {
-              event: item.source.setup.wake.event,
-              newKeys: (route) => newKeysWords(route, topics, []),
-            })
-              .filter((fact) => ['You speak', 'Others', 'New conversations'].includes(fact.term))
-              .map((fact) => (
-                <div key={fact.term}>
-                  <dt>{fact.term}</dt>
-                  <dd>{fact.text}</dd>
-                </div>
-              ))}
-          </dl>
+          <SourceFacts source={item.source} topics={topics} personas={personas} event={item.source.setup.wake.event} />
         )}
-        {item.kind === 'routine' && (
-          <p className="text-sm break-words">
-            In #{topics.find((topic) => topic.id === item.routine.topic)?.name ?? String(item.routine.topic)}
-            {item.routine.definition.handTo.kind === 'none'
-              ? ' · Reminder only'
-              : ` · ${item.routine.definition.handTo.instruction}`}
-          </p>
-        )}
+        {item.kind === 'routine' && <RoutineDetails routine={item.routine} topics={topics} personas={personas} />}
         <Collapsible>
           <CollapsibleTrigger render={<button type="button" className="event-advanced-toggle" />}>
             <ChevronRightIcon aria-hidden /> Exact settings
@@ -144,6 +128,7 @@ function PlanBody({
   readonly error: unknown
   readonly pending: boolean
 }) {
+  const personas = usePersonas()
   return (
     <div className="flex flex-col gap-4">
       {!plan && pending && <Skeleton className="h-24 w-full" />}
@@ -155,6 +140,7 @@ function PlanBody({
                 key={item.kind === 'source' ? item.source.id : item.routine.id}
                 item={item}
                 topics={plan.topics}
+                personas={personas}
                 completed={plan.completed.includes(index)}
               />
             ))}
@@ -162,8 +148,8 @@ function PlanBody({
           <p className="text-muted-foreground text-sm">
             {plan.state === 'ready'
               ? plan.continuation === 'kept'
-                ? 'Configuration is active. Goblin will read the result on your next message.'
-                : 'Configuration is active. Check a real message or scheduled run to verify it works.'
+                ? 'Setup was applied. Goblin will read the result on your next message.'
+                : 'Setup was applied. Check a real message or scheduled run to verify it works.'
               : 'Activating confirms these exact Sources and routines, including their event subscriptions and tool access. Tools set to Ask first still ask.'}
           </p>
           {plan.state === 'attention' && (

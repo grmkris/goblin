@@ -25,7 +25,7 @@ const source = (suffix: string, title: string): SourceView => ({
       arguments: { chat: '{{key.chat}}', text: '{{text}}', operationId: '{{operationId}}' },
       maxChars: 3500,
     },
-    newKeys: { to: 'topic', topic: 4 },
+    newKeys: { to: 'persona', persona: 7, topic: 4 },
   },
   revision: 1,
   state: 'proposed',
@@ -45,6 +45,39 @@ const plan = (): WorkspacePlanView => ({
   items: [
     { kind: 'source', source: source('a', 'Personal messages') },
     { kind: 'source', source: source('b', 'Work messages') },
+    {
+      kind: 'routine',
+      routine: {
+        id: 'rt_daily',
+        revision: 1,
+        state: 'proposed',
+        topic: 4,
+        definition: {
+          title: 'Daily plan',
+          trigger: { kind: 'cron', expression: '0 9 * * *' },
+          timezone: 'UTC',
+          tellMe: { on: true, copy: true },
+          handTo: {
+            kind: 'persona',
+            persona: 7,
+            revision: 3,
+            instruction: 'Prepare my day.',
+            allowedTools: [{ connectionId: 'calendar', name: 'events_list' }],
+            budget: { tokensPerRun: 2000, tokensPerDay: 10000, runtimeSeconds: 300 },
+          },
+        },
+        persona: { id: 7, name: 'Planner', pinned: 3, current: 3, archived: false },
+        confirmedAt: null,
+        nextFireAt: null,
+        lastFireAt: null,
+        missedCount: 0,
+        suppressedCount: 0,
+        health: null,
+        createdAt: 1,
+        updatedAt: 1,
+        outsideSetup: [{ connectionId: 'calendar', name: 'events_list' }],
+      },
+    },
   ],
   topics: [
     {
@@ -80,6 +113,7 @@ try {
     page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`))
     let current = plan()
     let attempts = 0
+    await page.route('**/api/mcp/servers', (route) => route.fulfill({ json: { servers: [] } }))
     await page.route('**/api/workspace-plans/*', (route) => route.fulfill({ json: current }))
     await page.route('**/api/workspace-plans/*/apply', async (route) => {
       assert.equal(route.request().method(), 'POST')
@@ -93,17 +127,25 @@ try {
           json: { error: { code: 'conflict', message: 'A setup step needs attention.', reason: 'fixture' } },
         })
       }
-      current = { ...current, state: 'ready', completed: [0, 1], problem: null, continuation: 'sent' }
+      current = { ...current, state: 'ready', completed: [0, 1, 2], problem: null, continuation: 'sent' }
       return route.fulfill({ json: current })
     })
     await page.goto(`${origin}workspace-plan.html`)
     await page.getByText('My conversations', { exact: true }).waitFor()
     await page.getByText('When /from/isOwner is true: those become your own turns').first().waitFor()
-    assert.equal(await page.getByRole('button', { name: 'Exact settings', exact: true }).count(), 2)
+    await page.getByText("From the event's data:", { exact: false }).first().waitFor()
+    await page.getByText('Sent back with message_send', { exact: false }).first().waitFor()
+    await page.getByText('@Planner', { exact: false }).first().waitFor()
+    await page.getByText('@Planner, revision 3', { exact: true }).waitFor()
+    await page.getByText('calendar · events_list', { exact: true }).waitFor()
+    await page.getByText('2,000 tokens a run, 10,000 a day, 5 minutes at most', { exact: true }).waitFor()
+    await page.getByText('its Topic setup leaves these out', { exact: false }).waitFor()
+    assert.equal(await page.getByRole('button', { name: 'Exact settings', exact: true }).count(), 3)
     await page.getByRole('button', { name: 'Exact settings', exact: true }).first().click()
     await page.getByRole('tab', { name: 'Raw', exact: true }).click()
     await page.getByText('"message_send"', { exact: false }).first().waitFor()
     await page.getByRole('button', { name: 'Exact settings', exact: true }).first().click()
+    await page.getByRole('tab', { name: 'Raw', exact: true }).waitFor({ state: 'hidden' })
     assert(
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
       `${label}: horizontal overflow`,
@@ -114,9 +156,9 @@ try {
     await page.reload()
     await page.getByText('Needs attention', { exact: true }).waitFor()
     await page.getByRole('button', { name: 'Continue setup', exact: true }).click()
-    await page.getByText('Configuration is active.', { exact: false }).waitFor()
+    await page.getByText('Setup was applied.', { exact: false }).waitFor()
     await page.reload()
-    await page.getByText('Configuration is active.', { exact: false }).waitFor()
+    await page.getByText('Setup was applied.', { exact: false }).waitFor()
     assert.equal(await page.getByRole('button', { name: /Activate setup|Continue setup/u }).count(), 0)
     assert.equal(attempts, 2)
     assert(
