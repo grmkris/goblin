@@ -12,13 +12,10 @@ import {
   Spinner,
   useIsMobile,
 } from '@goblin/ui'
-import { Settings2Icon } from 'lucide-react'
 import { itemLabel } from '@goblin/contracts'
 import { setupCatalogQuery } from '../setup/queries.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { setWorkspaceTopicSetupMutation } from '../lib/workspace/mutations.ts'
-import { useConversation, useTopics } from '../lib/workspace/hooks.ts'
-import { setupSummary } from '../lib/setup.ts'
 import { SetupPicker } from './setup-picker.tsx'
 
 const same = (one: TopicSetup, other: TopicSetup) => JSON.stringify(one) === JSON.stringify(other)
@@ -59,6 +56,7 @@ function RoutinesLeftShort({
  */
 function TopicSetupEditor({ topic, onClose }: { readonly topic: TopicView; readonly onClose: () => void }) {
   const catalog = useQuery(setupCatalogQuery)
+  const [revision] = useState(topic.revision)
   const [draft, setDraft] = useState<TopicSetup>(topic.setup)
   const [short, setShort] = useState<readonly RoutineOutsideSetup[]>()
   const save = useMutation(setWorkspaceTopicSetupMutation)
@@ -86,7 +84,7 @@ function TopicSetupEditor({ topic, onClose }: { readonly topic: TopicView; reado
           disabled={save.isPending || same(draft, topic.setup)}
           onClick={() =>
             save.mutate(
-              { id: topic.id, edit: { set: draft, expectedRevision: topic.revision } },
+              { id: topic.id, edit: { set: draft, expectedRevision: revision } },
               { onSuccess: (saved) => (saved.routines.length === 0 ? onClose() : setShort(saved.routines)) },
             )
           }
@@ -123,7 +121,7 @@ export function TopicSetupDrawer({
         <DrawerTitle>Topic setup</DrawerTitle>
         <DrawerDescription>{description}</DrawerDescription>
       </DrawerHeader>
-      {open && <TopicSetupEditor key={topic.revision} topic={topic} onClose={() => onOpenChange(false)} />}
+      {open && <TopicSetupEditor topic={topic} onClose={() => onOpenChange(false)} />}
     </>
   )
   return narrow ? (
@@ -136,35 +134,5 @@ export function TopicSetupDrawer({
         {contents}
       </DrawerSide>
     </Drawer>
-  )
-}
-
-/**
- * Beside the composer: what the chat's Topic works with, in a line once it is narrowed ("2 MCP servers · 4 skills"), and
- * the way to change it. A subagent follows the chat that started it, so it has none.
- */
-export function SetupButton({ chat }: { readonly chat: string }) {
-  const view = useConversation(chat)
-  const topic = useTopics().find((each) => each.id === (view?.topic ?? 1))
-  const narrowed =
-    topic !== undefined &&
-    !(topic.setup.mcpServers === 'all' && topic.setup.skills === 'all' && topic.setup.apps === 'all')
-  const catalog = useQuery({ ...setupCatalogQuery, enabled: narrowed })
-  const [open, setOpen] = useState(false)
-  if (topic === undefined || view?.kind === 'subagent') return null
-  const summary = narrowed && catalog.data !== undefined ? setupSummary(topic.setup, catalog.data) : undefined
-  return (
-    <>
-      <Button
-        type="button"
-        variant="ghost"
-        aria-label={`Topic setup for ${topic.personal === true ? 'Personal' : `#${topic.name}`}: ${summary ?? (narrowed ? 'a chosen list' : 'everything')}`}
-        onClick={() => setOpen(true)}
-      >
-        <Settings2Icon />
-        {summary !== undefined && <span className="setup-summary">{summary}</span>}
-      </Button>
-      <TopicSetupDrawer topic={topic} open={open} onOpenChange={setOpen} />
-    </>
   )
 }

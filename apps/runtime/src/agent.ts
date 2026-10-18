@@ -41,6 +41,7 @@ import { nowSeconds } from './clock.ts'
 import { type MovePhase } from './chats/mover.ts'
 import { budgetExtension } from './pi/budget.ts'
 import { onboardingExtension } from './pi/onboarding.ts'
+import { topicContextExtension } from './pi/topic-context.ts'
 import { retrievalExtension } from './pi/retrieval.ts'
 import { type Applied } from './agent-model.ts'
 import { routinesExtension } from './pi/routines.ts'
@@ -100,7 +101,10 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     const { memory, recall } = this.#memory
     const { personas, organize } = organizingKit(run)
     this.#personas = personas
-    const routineKit = routineExtensions(run, residentTools, personas.extension, env.CREDENTIAL_KEY)
+    const guidance = topicContextExtension(run, async (task, context) =>
+      (await this.harness.pi()).abortTask(task, context),
+    )
+    const routineKit = routineExtensions(run, residentTools, personas.extension, env.CREDENTIAL_KEY, guidance)
     this.#routineStart = routineKit.start
     const apps = agentApps(ctx.storage, env, () => this.name, {
       schedules: this.#jobSchedules(),
@@ -112,6 +116,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     const appsRun = env.LOADER !== undefined
     const execution = [
       ...tools,
+      guidance,
       skillsExtension(run),
       filesExtension(run),
       ...(appsRun ? [appExecutionExtension(apps, run)] : []),

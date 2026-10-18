@@ -3,6 +3,8 @@ import { ChatId, EntryId, NonEmptyString, OperationId, TopicId } from './ids.ts'
 import { SetupItems, TopicSetup } from './setup.ts'
 
 export const TopicName = NonEmptyString(80)
+const TopicDescription = Schema.String.check(Schema.isMaxLength(1000))
+const TopicInstructions = Schema.String.check(Schema.isMaxLength(8000))
 
 /**
  * A Topic: a durable container with exactly one Conversation (`conversation`) and any number of Threads under it.
@@ -14,6 +16,8 @@ export const TopicName = NonEmptyString(80)
 export const TopicView = Schema.Struct({
   id: TopicId,
   name: Schema.String,
+  description: Schema.optional(TopicDescription),
+  instructions: Schema.optional(TopicInstructions),
   conversation: ChatId,
   personal: Schema.optional(Schema.Boolean),
   archivedAt: Schema.optional(Schema.Number),
@@ -31,6 +35,8 @@ export type TopicView = typeof TopicView.Type
  */
 export const CreateTopic = Schema.Struct({
   name: TopicName,
+  description: Schema.optional(TopicDescription),
+  instructions: Schema.optional(TopicInstructions),
   operationId: OperationId,
   setup: Schema.optional(TopicSetup),
 })
@@ -39,6 +45,10 @@ export type CreateTopic = typeof CreateTopic.Type
 /** `PATCH /api/topics/:id`. Personal cannot be archived. */
 export const UpdateTopic = Schema.Struct({
   name: Schema.optional(TopicName),
+  description: Schema.optional(TopicDescription),
+  instructions: Schema.optional(TopicInstructions),
+  /** Required when editing description or instructions; a stale revision is a conflict. */
+  expectedRevision: Schema.optional(Schema.Int),
   archived: Schema.optional(Schema.Boolean),
   searchExcluded: Schema.optional(Schema.Boolean),
 })

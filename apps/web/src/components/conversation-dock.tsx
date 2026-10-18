@@ -18,7 +18,6 @@ import type { SendExtras } from './composer-state.ts'
 import { QueuedMessages } from './queued-messages.tsx'
 import { InteractionCards } from './interaction-cards.tsx'
 import { ModelPicker } from './model-picker.tsx'
-import { SetupButton } from './topic-setup.tsx'
 import { FinishSetupRow } from './start/setup-cards.tsx'
 import { UsageIndicator } from './usage-indicator.tsx'
 import type { useConversation } from './use-conversation.ts'
@@ -88,14 +87,12 @@ function ClosedNotice({ by, onReopen }: { readonly by: 'owner' | 'done'; readonl
 
 /** What the composer shows beside its buttons: what the agent is doing, the model, what it may use, the day's usage. */
 function ComposerContext({
-  id,
   active,
   presence,
   usage,
   context,
   onError,
 }: {
-  readonly id: string
   readonly presence: ReturnType<typeof presenceOf>
   readonly usage: UsageToday | undefined
   readonly context: number | undefined
@@ -111,7 +108,6 @@ function ComposerContext({
         <span className="truncate">{presence.label}</span>
       </span>
       <ModelPicker onError={onError} />
-      <SetupButton chat={id} />
       <UsageIndicator
         usage={usage}
         context={context}
@@ -256,14 +252,7 @@ export function ConversationDock({
               {...(placeholder !== undefined && { placeholder })}
               {...(sendLabel !== undefined && { sendLabel })}
               context={
-                <ComposerContext
-                  id={id}
-                  active={active}
-                  presence={presence}
-                  usage={usage}
-                  context={context}
-                  onError={report}
-                />
+                <ComposerContext active={active} presence={presence} usage={usage} context={context} onError={report} />
               }
             />
           </div>

@@ -21,6 +21,7 @@ export function getRouter() {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+    scrollToTopSelectors: ['.start-content'],
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
     defaultErrorComponent: ReportedRouteError,

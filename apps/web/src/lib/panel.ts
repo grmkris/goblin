@@ -17,6 +17,7 @@ export type PanelItem =
  * Numbers stay numbers so the URL reads `?thread=12`, not `?thread=%2212%22`.
  */
 export type PanelSearch = {
+  readonly info?: boolean
   readonly thread?: number
   readonly stack?: string
   readonly reply?: string
@@ -35,6 +36,7 @@ export function parsePanelSearch(raw: Record<string, unknown>): PanelSearch {
   const stackIds = stack.split('-').filter((id) => DIGITS.test(id))
   const reply = typeof raw.reply === 'string' && (raw.reply === 'new' || /^\d{1,12}-\d{1,15}$/u.test(raw.reply))
   return {
+    ...(raw.info === true && { info: true }),
     ...(thread !== undefined && { thread: Number(thread) }),
     ...(thread !== undefined && stackIds.length > 0 && { stack: stackIds.join('-') }),
     ...(reply && { reply: String(raw.reply) }),

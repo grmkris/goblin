@@ -113,7 +113,7 @@ const served = (view: ModelEndpointView): string =>
  * either, the agent cannot answer, which it says first. Shared by Settings' card and Start's model step; it suspends
  * until the endpoint is read.
  */
-export function ModelEndpoint() {
+export function ModelEndpoint({ progressive = false }: { readonly progressive?: boolean }) {
   const view = useSuspenseQuery(modelEndpointQuery).data
   const remove = useMutation(changeModelEndpointMutation)
   const [editing, setEditing] = useState(false)
@@ -132,7 +132,13 @@ export function ModelEndpoint() {
     return (
       <div className="card-body">
         <p className="text-sm text-muted-foreground">Your agent uses this deployment's {served(view)}.</p>
-        <EndpointForm onSaved={() => setEditing(false)} />
+        {progressive && !editing ? (
+          <Button variant="outline" onClick={() => setEditing(true)}>
+            Use your own model
+          </Button>
+        ) : (
+          <EndpointForm onSaved={() => setEditing(false)} />
+        )}
       </div>
     )
   const leave = view.deployment ? "Use this deployment's models" : 'Stop using this endpoint'

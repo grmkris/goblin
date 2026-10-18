@@ -75,6 +75,11 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
 - Pi's generation hooks may report and swallow exceptions. The pinned ToolTask's beforeTool catches a throw as a
   block, but a blocked call skips afterTool. Ask-first prepares in beforeTool and emits its terminating approval
   marker from the tool body; the body and shared dispatch seam independently recheck policy (ADR 0028).
+- Channel guidance (ADR 0079) is read before each request, including helpers, Personas and routine runs. A failed
+  read cancels the generation through public `Harness.abortTask(api.taskId, context)` using the hook's invocation
+  context, never `BACKGROUND` (which would wait on the hook itself). Cancellation depends on Pi storage accepting
+  its mark. Keep the real Harness regression in `test/topic-context.test.ts` when upgrading Pi: failed read, zero
+  provider calls, aborted receipt, then a successful request with healthy guidance.
 - Tool implementations check resident authority, the chat's scope (`Setups.scope`: its Topic's setup, ADR 0040)
   and grants before any outbound call, and never hold a SQLite transaction across model or network work. Something
   outside the scope returns `outsideScopeResult` (`pi/setup.ts`); outside the Topic's setup, the owner adds it

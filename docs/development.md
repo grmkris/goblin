@@ -218,8 +218,8 @@ until it runs, real provider and Telegram delivery remain unverified.
   keeps it open, and while it works your
   message steers it, and its answer goes up to whoever started it with your words quoted. Every chat of a Topic works
   with the Topic's setup (its MCP servers and their tools, skills, apps and subagents; ADR 0040): choose it when you
-  create the Topic, from the Topic menu's "Topic setup…" or from the button beside the composer, which reads
-  what a narrowed setup holds. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
+  create the Topic or from channel info (the top-right info button), under Tools & skills. Channel info also shows
+  the description, owner instructions, shared media/files/links, threads and work. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
 - **All threads, Activity, Work and Personas.** All threads lists every thread, unread first; Activity what needs you
   (with Undo for what Goblin organized); Work what runs (Delegates, Personas answering), your routines with their
   controls, every agent app's schedules and recent results. Personas lists them; a click opens a profile: edit it
@@ -610,3 +610,7 @@ buttons, wrapped long labels, typed number ranges, light/dark and 390px layout. 
 Chromium and does not call a model or prove authenticated deployment behavior. The public playground uses the same
 renderer and has its own built/deployed browser check documented in its README. `check:patches` verifies the OpenUI
 inspector patch in both normal gates; review it when upgrading the dependency.
+
+`heavy bun apps/web/test/ui-channel.ts` exercises the real channel with synthetic API responses at desktop and 390px:
+opening info, reading capabilities and shared content, closing/back, draft retention and thread restoration. These local
+Chromium checks do not establish installed iPhone or deployed acceptance.

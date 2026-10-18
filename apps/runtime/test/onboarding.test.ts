@@ -151,7 +151,12 @@ describe('first-run Start (ADR 0062)', () => {
     sqlite.exec(
       `INSERT INTO app_onboarding (id, status, steps, updated_at) VALUES (1, 'open', '["welcome","wallet","mercator","goblin","goblin"]', 1000)`,
     )
-    expect(store.get()).toEqual({ status: undefined, steps: ['welcome', 'goblin'], kickoffAt: undefined })
+    expect(store.get()).toEqual({
+      status: undefined,
+      steps: ['welcome', 'goblin'],
+      kickoffAt: undefined,
+      kickoffChat: undefined,
+    })
     sqlite.exec(`UPDATE app_onboarding SET steps = 'not json' WHERE id = 1`)
     expect(store.get()?.steps).toEqual([])
   })
@@ -197,17 +202,17 @@ describe('first-run Start (ADR 0062)', () => {
     }).pipe(Effect.provide(layer))
   })
 
-  it.effect('tells goblin nothing about setup until the kickoff, then asks for Topics and Personas in main only', () =>
+  it.effect('tells goblin to begin useful work after the kickoff, without an architecture questionnaire', () =>
     Effect.gen(function* () {
       expect(yield* onboardingContext('s1')).toBeUndefined()
-      yield* changeOnboarding({ status: 'done', step: 'goblin', kickoff: true })
-      const kickoff = yield* onboardingContext('s1')
-      expect(kickoff).toContain('ask_user')
-      expect(kickoff).toContain('topic_create')
-      expect(yield* onboardingContext('s2')).toBeUndefined()
+      yield* changeOnboarding({ status: 'done', step: 'goblin', kickoff: true, kickoffChat: '2' })
+      const kickoff = yield* onboardingContext('s2')
+      expect(kickoff).toContain('Begin by doing one useful piece')
+      expect(kickoff).not.toContain('topic_create')
+      expect(yield* onboardingContext('s1')).toBeUndefined()
       // Twenty minutes on, the ask is gone.
       yield* TestClock.adjust('20 minutes')
-      expect(yield* onboardingContext('s1')).toBeUndefined()
+      expect(yield* onboardingContext('s2')).toBeUndefined()
     }).pipe(Effect.provide(start().layer)),
   )
 })

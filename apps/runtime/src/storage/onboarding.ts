@@ -10,6 +10,7 @@ export const appOnboarding = sqliteTable('app_onboarding', {
   status: text('status').notNull(),
   steps: text('steps').notNull(),
   kickoffAt: integer('kickoff_at'),
+  kickoffChat: text('kickoff_chat'),
   updatedAt: integer('updated_at').notNull(),
 })
 

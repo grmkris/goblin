@@ -10,6 +10,7 @@ import path from 'node:path'
 import { createServer } from 'vite'
 import { SHELF } from './browser/services-fixture.ts'
 import { type Browser, type BrowserContextOptions, type Page, chromium } from 'playwright-core'
+import { startFlowChecks } from './start-flow.ts'
 
 const STDOUT = 1
 const out = path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance', `start-${Date.now()}`)
@@ -104,6 +105,34 @@ async function shows(page: Page, name: (typeof SCREENS)[number]['name']): Promis
   }
 }
 
+/** The last service remains reachable by keyboard and clear of the phone/tablet navigation. */
+async function serviceNavigation(page: Page, label: string): Promise<void> {
+  if (label === 'desktop-dark') return
+  const last = page.locator('.shelf-service').last().getByRole('button')
+  await last.focus()
+  const bounds = await page.evaluate(() => {
+    const content = document.querySelector('.start-content')?.getBoundingClientRect()
+    const nav = document.querySelector('.start-nav')?.getBoundingClientRect()
+    const focused = document.activeElement?.getBoundingClientRect()
+    return { contentEnd: content?.bottom, navStart: nav?.top, navEnd: nav?.bottom, focusedEnd: focused?.bottom }
+  })
+  assert(bounds.contentEnd !== undefined && bounds.navStart !== undefined && bounds.focusedEnd !== undefined)
+  assert(bounds.contentEnd <= bounds.navStart, `${label}: content does not overlap navigation`)
+  assert(bounds.focusedEnd <= bounds.navStart, `${label}: keyboard-focused last service stays above navigation`)
+  assert((bounds.navEnd ?? Infinity) <= (page.viewportSize()?.height ?? 0), `${label}: navigation stays in view`)
+  await page.screenshot({ path: path.join(out, `${label}-services-end.png`) })
+  // A short viewport also makes the next step scrollable, so a carried offset cannot hide behind clamping.
+  await page.setViewportSize({ width: 390, height: 500 })
+  await last.focus()
+  assert((await page.locator('.start-content').evaluate((element) => element.scrollTop)) > 0)
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  await page.getByRole('heading', { name: 'Your first conversation', exact: true }).waitFor()
+  await page.waitForFunction(() => document.querySelector('.start-content')?.scrollTop === 0)
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await page.getByRole('heading', { name: 'Connect what this goal needs', exact: true }).waitFor()
+  await page.waitForFunction(() => document.querySelector('.start-content')?.scrollTop === 0)
+}
+
 async function drive(browser: Browser, origin: string, label: string, options: BrowserContextOptions) {
   for (const screen of SCREENS) {
     const page = await browser.newPage(options)
@@ -126,10 +155,23 @@ async function drive(browser: Browser, origin: string, label: string, options: B
       if (pathname === '/api/mcp/suggested') return json(SHELF)
       return route.fulfill({ status: 404, json: { error: { code: 'not_found', message: 'not here' } } })
     })
+    await page.addInitScript(() =>
+      sessionStorage.setItem(
+        'goblin:start-draft',
+        JSON.stringify({
+          goal: 'Plan a trip and keep every booking in one place',
+          channel: 'Travel plans',
+          operation: '',
+          accepted: false,
+        }),
+      ),
+    )
     await page.goto(`${origin}start.html?at=${encodeURIComponent(screen.at)}`)
     await page.waitForLoadState('networkidle')
     await shows(page, screen.name)
     if (screen.name === 'services') {
+      await page.screenshot({ path: path.join(out, `${label}-services-preview.png`), fullPage: true })
+      await page.getByRole('button', { name: /See all .* services/u }).click()
       await page.waitForFunction(() =>
         [...document.querySelectorAll<HTMLImageElement>('.server-mark > img')].every((icon) => icon.naturalWidth > 0),
       )
@@ -150,6 +192,7 @@ async function drive(browser: Browser, origin: string, label: string, options: B
     const sideways = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     assert(sideways <= 0, `${label} ${screen.name}: scrolls sideways by ${String(sideways)}px`)
     await page.screenshot({ path: path.join(out, `${label}-${screen.name}.png`), fullPage: true })
+    if (screen.name === 'services') await serviceNavigation(page, label)
     await page.close()
   }
 }
@@ -168,6 +211,7 @@ try {
   })
   await drive(browser, origin, 'tablet-light', { viewport: { width: 820, height: 1180 }, colorScheme: 'light' })
   await drive(browser, origin, 'desktop-dark', { viewport: { width: 1280, height: 800 }, colorScheme: 'dark' })
+  await startFlowChecks(browser, origin)
   assert.deepEqual(errors, [])
   writeSync(STDOUT, `${JSON.stringify({ ok: true, out })}\n`)
 } finally {

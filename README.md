@@ -17,6 +17,10 @@ when done; the owner can write to one to steer it. Personas are named, versioned
 answers once, attributed, in the same chat, and Goblin can organize Topics and Personas on request, leaving receipts the owner can undo. Every Topic's Conversation (Main is Personal's) keeps its own OptChat-style memory view: summaries of older messages followed by the
 newest exchange verbatim.
 
+The channel bar's info button opens its description and instructions, tools and skills, shared media/files/links, and
+channel work. Start begins with a goal, preserves the draft through setup, then creates a channel and starts useful work
+([ADR 0079](docs/adr/0079-channel-info-and-goal-first-start.md)).
+
 Tool calls expand in place to readable input and output, with folding JSON branches, formatted Markdown, full-value
 copying and a Raw view.
 The agent's replies draw Mermaid diagrams, charts and maps from fenced blocks, in the theme's colours.

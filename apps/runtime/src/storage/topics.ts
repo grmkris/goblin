@@ -10,6 +10,8 @@ import { EVERYTHING_JSON } from './migrations/setup.ts'
 export const appTopics = sqliteTable('app_topics', {
   id: integer('id').primaryKey().notNull(),
   name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  instructions: text('instructions').notNull().default(''),
   chatId: text('chat_id').notNull().unique(),
   archivedAt: integer('archived_at'),
   searchExcluded: integer('search_excluded', { mode: 'boolean' }).notNull().default(false),

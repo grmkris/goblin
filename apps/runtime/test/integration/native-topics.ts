@@ -110,7 +110,46 @@ async function topicRoutineSequence(agent: ProbeStub) {
   }
 }
 
+/** Current channel guidance reaches real model requests, survives updates, and follows a thread. */
+async function guidanceSequence(agent: ProbeStub) {
+  const created = await callOwner(agent, (api) =>
+    api.topics.create({
+      payload: {
+        name: 'Guidance',
+        description: 'Plan the garden',
+        instructions: 'Use metric units.',
+        operationId: 'guidance-topic',
+      },
+    }),
+  )
+  const chat = created.conversation
+  await exchange(agent, chat, 'guidance before', 'guidance-before')
+  const before = await agent.requestFor('guidance before')
+  await callOwner(agent, (api) =>
+    api.topics.update({
+      params: { id: created.id },
+      payload: {
+        instructions: 'Keep a planting calendar.',
+        expectedRevision: created.revision,
+      },
+    }),
+  )
+  await exchange(agent, chat, 'guidance after', 'guidance-after')
+  const after = await agent.requestFor('guidance after')
+  const thread = await ownerCreate(agent, { topic: created.id })
+  if (!thread.ok) return { thread }
+  await exchange(agent, thread.value.id, 'guidance thread', 'guidance-thread')
+  await exchange(agent, PRIMARY_CHAT, 'guidance separate', 'guidance-separate')
+  return {
+    before: before?.context,
+    after: after?.context,
+    thread: (await agent.requestFor('guidance thread'))?.context,
+    separate: (await agent.requestFor('guidance separate'))?.context,
+  }
+}
+
 export const probes: Probes = {
+  'topic-guidance': inWorker(({ agent }) => guidanceSequence(agent)),
   'topic-memory': inWorker(({ agent }) => topicMemorySequence(agent)),
   'topic-routine': inWorker(({ agent }) => topicRoutineSequence(agent)),
 }
@@ -139,6 +178,17 @@ const TopicRoutineRun = Schema.Struct({
 
 /** The native Topic cases: two Topics remember apart, and a Topic's routine reports to its own Conversation. */
 async function topicChecks(base: string): Promise<void> {
+  const guidance = await probeOf(
+    base,
+    'topic-guidance',
+    Schema.Struct({ before: Schema.String, after: Schema.String, thread: Schema.String, separate: Schema.String }),
+  )
+  expect(guidance.before).toContain('Use metric units.')
+  expect(guidance.after).toContain('Keep a planting calendar.')
+  expect(guidance.after).not.toContain('Use metric units.')
+  expect(guidance.thread).toContain('Plan the garden')
+  expect(guidance.thread).toContain('Keep a planting calendar.')
+  expect(guidance.separate).not.toContain('Keep a planting calendar.')
   const result = await probeOf(base, 'topic-memory', TopicMemoryRun)
   expect(result.garden.summarized).toBeGreaterThanOrEqual(2)
   expect(result.thread.messages).toBeGreaterThanOrEqual(result.garden.messages)

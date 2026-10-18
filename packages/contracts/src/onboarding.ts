@@ -1,5 +1,6 @@
 import * as Schema from 'effect/Schema'
 import { ModelEndpointView } from './agent.ts'
+import { ChatId } from './ids.ts'
 
 /**
  * First-run Start (ADR 0062): `done` or `skipped` once the owner said so, `open` until then. Start never stands before
@@ -36,6 +37,8 @@ export const OnboardingChange = Schema.Struct({
   status: Schema.optional(OnboardingStatus),
   step: Schema.optional(OnboardingStep),
   kickoff: Schema.optional(Schema.Literal(true)),
+  /** The channel that receives the first useful-work message and its temporary guidance. */
+  kickoffChat: Schema.optional(ChatId),
 })
 export type OnboardingChange = typeof OnboardingChange.Type
 

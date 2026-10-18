@@ -1,3 +1,4 @@
+import { clearStartDraft } from '../components/start/draft.ts'
 import { mutationOptions, queryOptions } from '@tanstack/react-query'
 import { DeploymentFeatures, OIDC_PROVIDER_ID, SignInMethod, SignupMode } from '@goblin/contracts'
 import { Data, Option, Schema } from 'effect'
@@ -175,6 +176,7 @@ export const consentMutation = mutationOptions({
  */
 export const signOutMutation = mutationOptions({
   mutationFn: async (_: void) => {
+    clearStartDraft()
     await authCall((fetchOptions) => authClient.signOut({ fetchOptions }))
   },
   meta: { auth: 'optional' },
