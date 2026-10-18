@@ -11,6 +11,7 @@ import type {
   ToolView,
 } from '@goblin/contracts'
 import { owner } from '../lib/api.ts'
+import { setupCatalogQuery } from '../setup/queries.ts'
 
 /**
  * The owner's MCP servers on the owner API (ADRs 0003, 0005, 0006, 0008, 0028): the servers and what to add more from,
@@ -196,7 +197,8 @@ export const setSkillsMutation = mutationOptions({
     mutationFn: (api, change: { readonly connectionId: string; readonly enabled: boolean }) =>
       api.mcp.setSkills({ payload: change }),
   }),
-  onSuccess: (_servers, _change, _result, { client }) => serversChanged(client),
+  onSuccess: (_servers, _change, _result, { client }) =>
+    Promise.all([serversChanged(client), client.invalidateQueries({ queryKey: setupCatalogQuery.queryKey })]),
 })
 
 /** A tool as its switch shows it once a grant changed: a revoked tool no longer waits for the owner. */

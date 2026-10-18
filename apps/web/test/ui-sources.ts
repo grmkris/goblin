@@ -242,6 +242,7 @@ async function settings(browser: Browser, origin: string, label: string, options
   await serve(page, label, new Map([[ACTIVE, sourceOf(ACTIVE, SETUP, 'active')]]))
   await page.goto(`${origin}sources.html?at=/settings`)
   await page.getByText('Not set: your notices stay in Activity.').waitFor()
+  assert.equal(await page.getByRole('link', { name: 'Connections', exact: true }).getAttribute('href'), '/connections')
   await page.getByLabel('Copy a Source’s answers').selectOption({ label: 'Messages from Chat' })
   await page.getByLabel('Which conversation notices go to').selectOption({ label: 'chat dm' })
   assert.equal(await page.getByLabel('Tool').inputValue(), 'message_send', `${label}: tool not copied`)

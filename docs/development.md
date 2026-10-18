@@ -258,8 +258,9 @@ until it runs, real provider and Telegram delivery remain unverified.
   `<service>_<tool>` (`mygram_inbox_read`), so ask the agent for one app's tools ("list my myplan tools") and it calls
   `mcp_list` with `service`. A connection made to plain `/mcp` counts as added, but lists the code tools instead.
 - **Skills.** Connect a server that offers skills, then turn on its **Use its skills** switch. The agent reads and
-  follows those procedures; their tools still need grants. While skills are on for some server, a correction or a
-  request to keep how something was done may become a draft in your files, `/agent/skills/drafts/<name>.md`, with a
+  follows those procedures; their tools still need grants. Its Skills section lists their names and descriptions once
+  enabled, with an expandable list after eight entries and explicit loading, empty and unavailable states. While
+  skills are on for some server, a correction or a request to keep how something was done may become a draft in your files, `/agent/skills/drafts/<name>.md`, with a
   notice in the chat; what becomes of it is yours.
 - **Mygram through a Source.** Connect MySI with Mygram included and the required chat access, or Mygram directly.
   Ask goblin to propose a Source from the connected event and tool schemas. Review the exact event selector, cursor
@@ -464,9 +465,13 @@ label, a closed view reopened in one step, a failed built-app read kept to its s
 and a section, and closes with Escape, returning focus. Screenshots go under `.local/goblin-acceptance/`; these are
 browser fixture evidence only.
 
+`heavy bun apps/web/test/ui-connections.ts` also checks skills: no catalog request while disabled, loading after the
+owner enables the library, names and descriptions, keyboard expansion, unavailable retry, an empty library and
+refreshed contents after toggling. It covers desktop and 390px, light and dark, including reduced motion.
+
 `heavy bun apps/web/test/ui-events.ts` renders a connection's Events (ADR 0041, ADR 0068) from source in local Chromium
-at desktop and phone widths, light and dark: the open offer, the picker with the events' titles and descriptions grouped
-by service, nothing picked until the owner picks it, an event with an existing subscription, a filter the server requires
+at desktop and phone widths, light and dark: loading, empty and unsupported catalogs, failures with a reference and retry,
+refresh recovery, the open offer, the picker with the events' titles and descriptions grouped by service, nothing picked until the owner picks it, an event with an existing subscription, a filter the server requires
 asked for in Advanced, a hand-over to a Persona, and both events set up in one step (each proposed, then confirmed), with the owner
 API routed in the page and the proposals it receives checked. Screenshots go under
 `.local/goblin-acceptance/events-*`; this is browser fixture evidence only.

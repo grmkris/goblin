@@ -3,6 +3,7 @@
 // for one of its conversations (a message to the owner's own chat, say).
 import { type SubmitEvent, useState } from 'react'
 import { useMutation, useQuery, useSuspenseQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { notifyPlaceholder } from '@goblin/contracts'
 import {
   Alert,
@@ -255,9 +256,12 @@ export function NotifySinkCard() {
       <CardHeader>
         <CardTitle>Notify me via</CardTitle>
         <CardDescription>
-          A tool of one of your connections that goblin can send you notices with, like a message to your own chat:
-          routines you ask to “Also send” and apps that message you use it. It is goblin’s own call, under the access
-          you give that tool.
+          Choose how goblin sends notices to you, such as a message to your own chat. Routines marked “Also send” and
+          apps use this destination. To choose which incoming events goblin listens for, open{' '}
+          <Link to="/connections" className="underline underline-offset-2">
+            Connections
+          </Link>
+          .
         </CardDescription>
       </CardHeader>
       <CardContent>

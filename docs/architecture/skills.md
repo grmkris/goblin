@@ -3,7 +3,10 @@
 ## Skills
 
 Skills come from MCP servers that declare the MCP Skills extension, and only from those the owner turns them on for
-in Connections (`app_skill_sources`, ADR 0008). The client declares the extension; `McpConnections.skills` and
+in Connections (`app_skill_sources`, ADR 0008). The connection’s Skills section groups the trust switch with its
+current skill count, names and descriptions; eight entries show first, with the remainder expandable. The list uses
+`GET /api/setup/catalog` only while skills are enabled, and shows loading, empty and unavailable states.
+The client declares the extension; `McpConnections.skills` and
 `skillFile` speak `skills/list` and `resources/read`, with the shapes decoded in `skills/protocol.ts` because the SDK
 has no Skills support yet. The library activates entries from `skills/list`.
 

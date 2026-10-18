@@ -9,6 +9,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
+import type { EventStream } from '@goblin/contracts'
 import { type Browser, type BrowserContextOptions, chromium } from 'playwright-core'
 
 const STDOUT = 1
@@ -34,7 +35,7 @@ const WORKER = {
     },
   ],
 }
-const STREAMS = [
+const STREAMS: EventStream[] = [
   {
     name: 'sidequest.worker.requests',
     description: 'A hirer asks you for a quote.',
@@ -90,7 +91,26 @@ async function drive(browser: Browser, origin: string, label: string, options: B
   const routines = new Map<string, { readonly topic: number; readonly definition: unknown }>()
   page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`))
   await page.route('**/api/mcp/servers', (route) => route.fulfill({ json: [WORKER] }))
-  await page.route('**/api/mcp/sq-worker/events', (route) => route.fulfill({ json: STREAMS }))
+  let streams = STREAMS
+  let failCatalog = false
+  let release = Promise.withResolvers<void>()
+  await page.route('**/api/mcp/sq-worker/events', async (route) => {
+    await release.promise
+    if (failCatalog)
+      return route.fulfill({
+        status: 502,
+        json: {
+          error: {
+            code: 'upstream_mcp',
+            connectionId: 'sq-worker',
+            reason: 'remote-rpc',
+            message: 'The MCP server did not respond as expected.',
+            ref: 'events-fixture',
+          },
+        },
+      })
+    return route.fulfill({ json: streams })
+  })
   await page.route('**/api/routines/settings', (route) =>
     route.fulfill({ json: { timezone: 'Europe/Tallinn', maxActive: 20, maxRunning: 2 } }),
   )
@@ -113,7 +133,25 @@ async function drive(browser: Browser, origin: string, label: string, options: B
     return route.fulfill({ status: 201, json: routineOf(id, body, 'proposed') })
   })
   await page.goto(`${origin}events.html`)
-  await page.getByText('Sidequest · Worker sends events').waitFor()
+  await page.getByText('Reading its events…').waitFor()
+  streams = []
+  release.resolve()
+  await page.getByText('This server supports events, but none are available to this connection right now.').waitFor()
+  await page.screenshot({ path: path.join(out, `${label}-empty.png`), fullPage: true })
+  failCatalog = true
+  await page.getByRole('button', { name: 'Refresh event streams' }).click()
+  await page.getByRole('alert').filter({ hasText: 'ref events-f' }).waitFor()
+  failCatalog = false
+  streams = STREAMS.map((stream) => ({ ...stream, subscribable: false }))
+  await page.getByRole('button', { name: 'Try again' }).click()
+  await page.getByText('This server’s event streams do not support subscriptions in goblin yet.').waitFor()
+  assert.equal(await page.getByRole('checkbox').count(), 0)
+  streams = STREAMS
+  release = Promise.withResolvers<void>()
+  await page.getByRole('button', { name: 'Refresh event streams' }).click()
+  await page.getByRole('button', { name: 'Refresh event streams' }).and(page.locator('[aria-busy="true"]')).waitFor()
+  release.resolve()
+  await page.getByText('Sidequest · Worker supports events').waitFor()
   await page.getByText('Quote requests').first().waitFor()
   assert(
     !(await page.getByRole('checkbox', { name: 'Messages', exact: true }).isChecked()),
@@ -150,12 +188,17 @@ assert(origin, 'missing browser fixture origin')
 const browser = await chromium.launch()
 try {
   for (const scheme of ['light', 'dark'] as const) {
-    await drive(browser, origin, `desktop-${scheme}`, { viewport: { width: 1280, height: 800 }, colorScheme: scheme })
+    await drive(browser, origin, `desktop-${scheme}`, {
+      viewport: { width: 1280, height: 800 },
+      colorScheme: scheme,
+      reducedMotion: scheme === 'dark' ? 'reduce' : 'no-preference',
+    })
     await drive(browser, origin, `phone-${scheme}`, {
       viewport: { width: 390, height: 844 },
       hasTouch: true,
       isMobile: true,
       colorScheme: scheme,
+      reducedMotion: scheme === 'dark' ? 'reduce' : 'no-preference',
     })
   }
   assert.deepEqual(errors, [])

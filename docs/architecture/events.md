@@ -58,7 +58,10 @@ routine on it (`done`, recorded when an event routine on it is confirmed) or dis
 a dismissal never undoes `done`. The connection's card shows an **Events** section (`components/connection-events.tsx`):
 the offer while open, what is set up ("`<title>` → #Topic", "→ goblin, in #Topic" or "→ @Persona", with Pause or
 Resume and Edit, which opens the routine editor and then its review), the **picker** for the rest
-(`components/event-picker.tsx`, `lib/event-setup.ts`, `lib/events.ts`), and the subscriptions' health. The picker
+(`components/event-picker.tsx`, `lib/event-setup.ts`, `lib/events.ts`), and the subscriptions' health. An empty catalog
+or streams without supported subscriptions show an explanation and Refresh event streams; read failures show their
+reference and Try again. Settings → Notify me via configures outgoing delivery and links back to Connections for
+incoming events. The picker
 lists the streams grouped by the service a gateway names them by (the part before the first dot of a name of three
 parts or more, mysi's `<service>.<event>`), else flat, each by its title (else its name in words, `message.received` →
 "Message received") with its description. Nothing is picked until the owner picks it; a picked stream goes to Tell me

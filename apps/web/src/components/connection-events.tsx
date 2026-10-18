@@ -2,12 +2,13 @@
 // picker for the rest, and its subscriptions' health. While the owner has not answered its offer, it says so and can
 // be dismissed.
 import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { type UseQueryResult, useMutation, useQuery } from '@tanstack/react-query'
 import type { EventStream, RoutineView, ServerView } from '@goblin/contracts'
 import { Button } from '@goblin/ui'
 import { eventTitle, eventWords, filtersInWords } from '../lib/events.ts'
 import { routineStatus } from '../lib/labels.ts'
 import { messageOf } from '../lib/query/app-error.ts'
+import { QueryError } from '../lib/query/query-boundary.tsx'
 import { usePersonas, useTopics } from '../lib/workspace/hooks.ts'
 import { dismissEventsMutation, eventsQuery } from '../mcp/queries.ts'
 import { changeRoutineMutation, routineSettingsQuery, routinesQuery } from '../routines/queries.ts'
@@ -109,7 +110,7 @@ function OfferNote({ server }: { readonly server: ServerView }) {
   return (
     <div className="event-offer">
       <p className="server-note">
-        {server.label} sends events. Pick the ones goblin should tell you about, or hand to goblin or a Persona.
+        {server.label} supports events. Pick the ones goblin should tell you about, or hand to goblin or a Persona.
       </p>
       <Button
         type="button"
@@ -136,6 +137,32 @@ function useConnectionRoutines(server: ServerView) {
   return { routines, named }
 }
 
+/** A catalog can be empty or use a transport goblin cannot subscribe to; neither is a blank section. */
+function EventCatalogStatus({ read }: { readonly read: UseQueryResult<readonly EventStream[], unknown> }) {
+  if (read.error !== null)
+    return <QueryError error={read.error} action="read its event streams" onRetry={() => void read.refetch()} />
+  if (read.isPending)
+    return (
+      <p className="server-note" role="status">
+        Reading its events…
+      </p>
+    )
+  const data = read.data ?? []
+  if (data.some((stream) => stream.subscribable)) return null
+  return (
+    <div className="capability-empty">
+      <p className="server-note">
+        {data.length === 0
+          ? 'This server supports events, but none are available to this connection right now.'
+          : 'This server’s event streams do not support subscriptions in goblin yet.'}
+      </p>
+      <Button size="sm" variant="outline" pending={read.isFetching} onClick={() => void read.refetch()}>
+        Refresh event streams
+      </Button>
+    </div>
+  )
+}
+
 /** Where a connection's Events are on its card, for the card summary's Set up. */
 export const eventsAnchor = (connectionId: string): string => `events-${connectionId}`
 
@@ -160,12 +187,7 @@ export function ConnectionEvents({ server }: { readonly server: ServerView }) {
     <section className="server-part" id={eventsAnchor(server.connectionId)} aria-label="Events">
       <h3 className="server-part-title">Events</h3>
       {server.events === 'open' && <OfferNote server={server} />}
-      {streams.error !== null && <p className="server-note">{messageOf(streams.error, 'read the events it sends')}</p>}
-      {streams.isPending && (
-        <p className="server-note" role="status">
-          Reading its events…
-        </p>
-      )}
+      <EventCatalogStatus read={streams} />
       {routines.length > 0 && (
         <ul className="event-sets">
           {routines.map((routine) => (

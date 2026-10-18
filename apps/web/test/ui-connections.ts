@@ -4,7 +4,7 @@ import { mkdirSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { chromium } from 'playwright-core'
-import type { ServerView, ToolView } from '@goblin/contracts'
+import type { ServerView, SetupCatalog, ToolView } from '@goblin/contracts'
 import { SHELF } from './browser/services-fixture.ts'
 
 const out = path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance', `connections-${Date.now()}`)
@@ -17,6 +17,8 @@ const SERVERS: ServerView[] = [
     status: 'connected',
     live: true,
     source: 'added',
+    skillsOffered: true,
+    skillsEnabled: false,
   },
   {
     connectionId: 'cloudflare',
@@ -43,6 +45,11 @@ const TOOLS: ToolView[] = Array.from({ length: 16 }, (_, i) => ({
   granted: i === 0,
   askFirst: i === 0,
 }))
+const SKILLS: SetupCatalog['libraries'][number]['skills'] = Array.from({ length: 10 }, (_, i) => ({
+  name: `Research skill ${i + 1}`,
+  uri: `skill://research/${i + 1}/SKILL.md`,
+  description: `Find and compare sources for research step ${i + 1}.`,
+}))
 const vite = await createServer({ configFile: path.join(import.meta.dirname, 'browser/vite.config.ts') })
 await vite.listen()
 const origin = vite.resolvedUrls?.local[0]
@@ -64,6 +71,10 @@ try {
       let servers = [...SERVERS]
       let refuse = true
       let empty = false
+      let catalogReads = 0
+      let catalogAvailable = true
+      let skills = SKILLS
+      let catalogRelease = Promise.withResolvers<void>()
       let release = Promise.withResolvers<void>()
       page.on('pageerror', (error) => errors.push(error.message))
       await page.route(
@@ -111,6 +122,32 @@ try {
           return route.fulfill({ status: 404, json: { error: { code: 'not_found', message: 'Not in fixture' } } })
         },
       )
+      await page.route('**/api/mcp/skills', (route) => {
+        const change = JSON.parse(route.request().postData() ?? '{}')
+        writes.push('PUT /api/mcp/skills')
+        servers = servers.map((server) =>
+          server.connectionId === change.connectionId ? { ...server, skillsEnabled: change.enabled } : server,
+        )
+        return route.fulfill({ json: change })
+      })
+      await page.route('**/api/setup/catalog', async (route) => {
+        catalogReads += 1
+        await catalogRelease.promise
+        return route.fulfill({
+          json: {
+            servers: [],
+            apps: [],
+            libraries: servers
+              .filter((server) => server.skillsEnabled)
+              .map((server) => ({
+                connectionId: server.connectionId,
+                label: server.label,
+                available: catalogAvailable,
+                skills,
+              })),
+          },
+        })
+      })
       await page.goto(`${origin}connections.html`)
       await page.getByText('1 of 16 tools allowed', { exact: true }).waitFor()
       assert.equal(await page.getByRole('tab').count(), 0)
@@ -161,6 +198,25 @@ try {
         card: document.getElementById('connection-mysi')?.getBoundingClientRect().width,
       }))
       assert.equal(sizes.grid, sizes.card)
+      const library = card.getByRole('region', { name: 'Skills', exact: true })
+      await library.getByText('Turn on Use its skills', { exact: false }).waitFor()
+      assert.equal(catalogReads, 0, 'A disabled skills library is never read')
+      assert.deepEqual(writes, [], 'Opening access is read-only')
+      await library.getByRole('switch', { name: 'Use its skills' }).click()
+      await library.getByRole('status').getByText('Reading its skill library…').waitFor()
+      catalogRelease.resolve()
+      await library.getByText('10 skills available', { exact: true }).waitFor()
+      await library.getByText('Research skill 1', { exact: true }).waitFor()
+      await library.getByText('Find and compare sources for research step 1.', { exact: true }).waitFor()
+      assert.equal(await library.locator('.skill-row:visible').count(), 8)
+      const more = library.locator('summary')
+      await more.focus()
+      await page.keyboard.press('Enter')
+      await library.getByText('Research skill 10', { exact: true }).waitFor()
+      assert.equal(await library.locator('.skill-row:visible').count(), 10)
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0)
+      assert.deepEqual(writes, ['PUT /api/mcp/skills'], 'Only the explicit skill toggle writes')
+      writes.length = 0
       await page.screenshot({ path: path.join(out, `${label}-access.png`), fullPage: true })
       await card.getByRole('button', { name: 'Hide access' }).click()
       assert.deepEqual(writes, [], 'Browsing and opening access must not grant or connect anything')
@@ -184,6 +240,22 @@ try {
       await page.waitForFunction(
         () => (document.getElementById('connection-mysi')?.getBoundingClientRect().top ?? 1000) < 80,
       )
+      catalogAvailable = false
+      await page.reload()
+      await library.getByText('Skills are on, but this server’s library is unavailable right now.').waitFor()
+      catalogAvailable = true
+      skills = []
+      await library.getByRole('button', { name: 'Try again' }).click()
+      await library.getByText('This server has no skills available right now.').waitFor()
+      await page.screenshot({ path: path.join(out, `${label}-skills-empty.png`), fullPage: true })
+      // Toggling must invalidate a fresh cached catalog, including another read after re-enabling.
+      await library.getByRole('switch', { name: 'Use its skills' }).click()
+      await library.getByText('Turn on Use its skills', { exact: false }).waitFor()
+      skills = SKILLS.slice(0, 1)
+      catalogRelease = Promise.withResolvers<void>()
+      catalogRelease.resolve()
+      await library.getByRole('switch', { name: 'Use its skills' }).click()
+      await library.getByText('1 skill available', { exact: true }).waitFor()
       empty = true
       await page.goto(`${origin}connections.html`)
       await page.getByText('No servers yet', { exact: true }).waitFor()

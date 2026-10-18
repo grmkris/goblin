@@ -1,7 +1,7 @@
 // One of the owner's connections (ADR 0041): its name, the server it reaches, where it stands and its actions (Open for
 // its App), then once connected a summary, and behind Manage access its words, events, Sources, skills
 // and tools. A server's title and description are its own claims.
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ServerView, ToolView } from '@goblin/contracts'
 import { Link } from '@tanstack/react-router'
@@ -16,16 +16,9 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-  Switch,
 } from '@goblin/ui'
 import { ChevronRightIcon } from 'lucide-react'
-import {
-  connectMutation,
-  connectedToolsQuery,
-  disconnectMutation,
-  refreshToolsMutation,
-  setSkillsMutation,
-} from '../mcp/queries.ts'
+import { connectMutation, connectedToolsQuery, disconnectMutation, refreshToolsMutation } from '../mcp/queries.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { glide } from '../lib/motion.ts'
 import { routinesQuery } from '../routines/queries.ts'
@@ -33,6 +26,7 @@ import { QueryError } from '../lib/query/query-boundary.tsx'
 import { serverStatus } from '../lib/labels.ts'
 import { ConnectionEvents, eventsAnchor } from './connection-events.tsx'
 import { ConnectionSources } from './connection-sources.tsx'
+import { ConnectionSkills } from './connection-skills.tsx'
 import { AppTile } from './apps/app-tile.tsx'
 import { StatusLabel } from './status-label.tsx'
 import { AnotherConnection, ChooseAccess, RenameConnection } from './connection-forms.tsx'
@@ -62,42 +56,6 @@ function useServerTools(server: ServerView) {
 }
 
 /**
- * Whether the agent follows this server's skills. A skill is a procedure the agent reads and acts on, so this is for a
- * library the owner trusts; a skill still never allows a tool by itself.
- */
-function SkillsSwitch({
-  server,
-  onMessage,
-}: {
-  readonly server: ServerView
-  readonly onMessage: (message: string) => void
-}) {
-  const id = useId()
-  const toggle = useMutation(setSkillsMutation)
-  const pending = toggle.isPending
-  const enabled = pending ? toggle.variables.enabled : server.skillsEnabled === true
-  const change = (next: boolean) =>
-    toggle.mutate(
-      { connectionId: server.connectionId, enabled: next },
-      { onError: (error) => onMessage(messageOf(error, "change whether your agent uses this server's skills")) },
-    )
-  return (
-    <div className="setting-row">
-      <span className="grant-text">
-        <span id={id} className="grant-name">
-          Use its skills
-        </span>
-        <span className="grant-about">
-          Skills are procedures your agent follows. Turn this on only for a skills library you trust. A skill never
-          allows a tool by itself.
-        </span>
-      </span>
-      <Switch checked={enabled} disabled={pending} aria-busy={pending} aria-labelledby={id} onCheckedChange={change} />
-    </div>
-  )
-}
-
-/**
  * What a connected server offers, behind Manage access: its own words, its events (and what goblin does with them),
  * its Sources (ADR 0066), skills, then its tools.
  */
@@ -111,7 +69,6 @@ function ServerBody({
   /** Why its tools could not be read, if they could not, and a way to read them again. */
   readonly failure: { readonly error: unknown; readonly retry: () => void }
 }) {
-  const settings = server.skillsOffered === true || server.skillsEnabled === true
   return (
     <CardContent>
       <div className="server-body server-body-open">
@@ -123,11 +80,7 @@ function ServerBody({
         )}
         <ConnectionEvents server={server} />
         <ConnectionSources server={server} />
-        {settings && (
-          <section className="server-part" aria-label="Settings">
-            <SkillsSwitch server={server} onMessage={onMessage} />
-          </section>
-        )}
+        <ConnectionSkills server={server} onMessage={onMessage} />
         {failure.error !== null ? (
           <QueryError error={failure.error} action={`list the tools of ${server.label}`} onRetry={failure.retry} />
         ) : tools === undefined ? (
@@ -319,7 +272,9 @@ function EventsLine({ server, onOpen }: { readonly server: ServerView; readonly 
   if (server.events === undefined || (server.events === 'dismissed' && set === 0)) return null
   return (
     <div className="server-summary-row">
-      <span className="server-note tabular-nums">{set === 0 ? 'Sends events' : `Sends events, ${set} set up`}</span>
+      <span className="server-note tabular-nums">
+        {set === 0 ? 'Offers event streams' : `Offers events, ${set} set up`}
+      </span>
       <Button size="sm" variant="outline" onClick={onOpen}>
         {set === 0 ? 'Set up' : 'Change'}
       </Button>
