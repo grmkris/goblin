@@ -8,7 +8,7 @@ import { ONBOARDING_STEPS, PRIMARY_CHAT, type OnboardingStep, type OnboardingVie
 import { Button, GoblinMark, Receipt } from '@goblin/ui'
 import { CheckIcon, CircleAlertIcon } from 'lucide-react'
 import { useState } from 'react'
-import { clearStartDraft, useStartDraft } from './draft.ts'
+import { clearStartDraft, useStartDraft } from '../../onboarding/draft.ts'
 import { describeError, messageOf } from '../../lib/query/app-error.ts'
 import { reportUnexpected } from '../../lib/unexpected.ts'
 import { changeOnboardingMutation, kickoffMutation, onboardingQuery } from '../../onboarding/queries.ts'
