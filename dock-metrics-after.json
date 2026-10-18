@@ -1,0 +1,28 @@
+{
+  "variant": "after",
+  "playbackRate": 0.25,
+  "intermediateDockValues": [
+    0,
+    0
+  ],
+  "framesSampled": [
+    130,
+    130
+  ],
+  "sampleGrow": [
+    "18rem"
+  ],
+  "recalcStyleMs": [
+    66.8,
+    68.4
+  ],
+  "layoutMs": [
+    0.7,
+    0.7
+  ],
+  "layoutCount": [
+    3,
+    3
+  ],
+  "rows": 167
+}
