@@ -3,7 +3,7 @@ import * as Effect from 'effect/Effect'
 import { Conflict, InvalidInput, attempt } from '../http/errors.ts'
 import { requireResident } from '../mcp/service.ts'
 import { SingleFlight } from '../observability/single-flight.ts'
-import { proposeRoutine, routineChange } from '../routines/program.ts'
+import { prepareRoutine, routineChange } from '../routines/program.ts'
 import { Routines } from '../routines/service.ts'
 import { Sources } from '../sources/service.ts'
 import { Topics } from '../topics/service.ts'
@@ -27,18 +27,19 @@ const prepareWorkspacePlan = Effect.fn('workspacePlans.prepare')(function* (id: 
   const topics = yield* Effect.forEach(topicIds, (topicId) => Topics.use((registry) => registry.get(topicId)))
   if (topics.some((topic) => topic.archivedAt !== undefined))
     return yield* new InvalidInput({ reason: 'topic_archived' })
-  const items: WorkspacePlanItem[] = []
+  const writes: (() => WorkspacePlanItem)[] = []
   for (const [index, source] of proposal.sources.entries()) {
-    const view = yield* Sources.use((sources) =>
-      sources.propose({ ...source, operationId: `${id}:source:${String(index)}` }, { actor: 'agent', chat: plan.chat }),
+    const write = yield* Sources.use((sources) =>
+      sources.prepare({ ...source, operationId: `${id}:source:${String(index)}` }, { actor: 'agent', chat: plan.chat }),
     )
-    items.push({ kind: 'source', source: view })
+    writes.push(() => ({ kind: 'source', source: write() }))
   }
   for (const [index, routine] of proposal.routines.entries()) {
-    const view = yield* proposeRoutine(routine.definition, `${id}:routine:${String(index)}`, routine.topic)
-    items.push({ kind: 'routine', routine: view })
+    const write = yield* prepareRoutine(routine.definition, `${id}:routine:${String(index)}`, routine.topic)
+    writes.push(() => ({ kind: 'routine', routine: write() }))
   }
-  return yield* plans.save({ ...plan, items, topics, state: 'proposed', problem: null })
+  yield* requireTopics(topics, topicIds)
+  return yield* plans.prepared(id, topics, writes)
 })
 
 /** A failed preparation stays reviewable and retryable, without approving any of its primitives. */
@@ -52,7 +53,9 @@ export const retryWorkspacePlan = Effect.fn('workspacePlans.prepareAgain')(funct
       `workspace-plan:prepare:${id}`,
       prepareWorkspacePlan(id).pipe(
         // expected: preparation can wait for a connection or grant; keep its review card available for recovery.
-        Effect.catch((error) => plans.save({ ...current, problem: outcomeOf(error) })),
+        Effect.catch((error) =>
+          Effect.flatMap(plans.get(id), (latest) => plans.save({ ...latest, problem: outcomeOf(error) })),
+        ),
       ),
     ),
   )
@@ -98,8 +101,16 @@ const applyItem = Effect.fn('workspacePlans.applyItem')(function* (id: string, i
   }
 })
 
-const requireTopics = Effect.fn('workspacePlans.requireTopics')(function* (topics: readonly TopicView[]) {
-  for (const topic of topics) {
+const topicIdsOf = (item: WorkspacePlanItem): readonly number[] => {
+  if (item.kind === 'routine') return [item.routine.topic]
+  return 'topic' in item.source.setup.newKeys ? [item.source.setup.newKeys.topic] : []
+}
+
+const requireTopics = Effect.fn('workspacePlans.requireTopics')(function* (
+  topics: readonly TopicView[],
+  ids: readonly number[],
+) {
+  for (const topic of topics.filter(({ id }) => ids.includes(id))) {
     if ((yield* Topics.use((registry) => registry.get(topic.id))).revision !== topic.revision)
       return yield* new Conflict({ reason: 'workspace_plan_topic_changed' })
   }
@@ -113,17 +124,20 @@ const apply = (id: string, revision: number) =>
     let plan = yield* plans.get(id)
     if (plan.revision !== revision) return yield* new Conflict({ reason: 'workspace_plan_revision' })
     if (plan.state === 'preparing') return yield* new Conflict({ reason: 'workspace_plan_not_ready' })
-    yield* requireTopics(plan.topics)
-    for (const item of plan.items) yield* currentItem(item)
     if (plan.state === 'ready') return plan
+    const pending = plan.items.filter((_, index) => !plan.completed.includes(index))
+    for (const item of pending) {
+      yield* requireTopics(plan.topics, topicIdsOf(item))
+      yield* currentItem(item)
+    }
     plan = yield* plans.save({ ...plan, state: 'applying', problem: null })
     for (const [index, item] of plan.items.entries()) {
       if (plan.completed.includes(index)) continue
-      yield* requireTopics(plan.topics)
+      const topics = topicIdsOf(item)
+      yield* requireTopics(plan.topics, topics)
       yield* applyItem(id, index, item)
       plan = yield* plans.save({ ...plan, completed: [...plan.completed, index] })
     }
-    yield* requireTopics(plan.topics)
     return yield* plans.save({ ...plan, state: 'ready' })
   })
 

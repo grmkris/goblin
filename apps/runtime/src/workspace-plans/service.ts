@@ -1,4 +1,4 @@
-import type { WorkspacePlanProposal, WorkspacePlanView } from '@goblin/contracts'
+import type { TopicView, WorkspacePlanItem, WorkspacePlanProposal, WorkspacePlanView } from '@goblin/contracts'
 import * as Context from 'effect/Context'
 import type * as Effect from 'effect/Effect'
 import type { AppError } from '../http/errors.ts'
@@ -14,6 +14,12 @@ export class WorkspacePlans extends Context.Service<
       operationId: string,
       chat: string,
       proposal: WorkspacePlanProposal,
+    ) => Effect.Effect<WorkspacePlanView, AppError>
+    /** Commit local primitive proposals and their review in one synchronous transaction. */
+    readonly prepared: (
+      id: string,
+      topics: readonly TopicView[],
+      writes: readonly (() => WorkspacePlanItem)[],
     ) => Effect.Effect<WorkspacePlanView, AppError>
     readonly save: (view: WorkspacePlanView) => Effect.Effect<WorkspacePlanView, AppError>
     readonly proposal: (id: string) => Effect.Effect<WorkspacePlanProposal, AppError>

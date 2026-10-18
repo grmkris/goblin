@@ -12,11 +12,15 @@ import type { Receipt } from '../src/chats/receipts.ts'
 import { BudgetExhausted, Conflict, Forbidden, NotFound, UpstreamMcp, attemptSync } from '../src/http/errors.ts'
 import { routinesOf } from '../src/layers/routines.ts'
 import { WorkspacePlansLive } from '../src/layers/workspace-plans.ts'
-import { Resident } from '../src/mcp/service.ts'
+import { Events, McpConnections, McpServers, Resident } from '../src/mcp/service.ts'
+import type { McpConnectionSnapshot } from '../src/mcp/connections/types.ts'
 import { SingleFlight } from '../src/observability/single-flight.ts'
+import { Personas } from '../src/personas/service.ts'
 import { RoutineControl, Routines } from '../src/routines/service.ts'
 import { RoutineStore } from '../src/routines/store.ts'
 import { Sources } from '../src/sources/service.ts'
+import { prepareSource } from '../src/sources/program.ts'
+import { sourceRows } from '../src/sources/store.ts'
 import { appTopics } from '../src/storage/topics.ts'
 import { Topics } from '../src/topics/service.ts'
 import { applyWorkspacePlan, proposeWorkspacePlan, retryWorkspacePlan } from '../src/workspace-plans/program.ts'
@@ -24,7 +28,7 @@ import { WorkspacePlans } from '../src/workspace-plans/service.ts'
 import { WorkspacePlanStore } from '../src/workspace-plans/store.ts'
 import { durable } from './chats-sqlite.ts'
 import { database, stub, sqliteDb } from './http/api/fixture.ts'
-import { PAYLOAD_SETUP } from './sources-fixture.ts'
+import { MESSAGE_RECEIVED, PAYLOAD_SETUP } from './sources-fixture.ts'
 import { fake } from './fake.ts'
 
 const TOPIC: TopicView = {
@@ -90,27 +94,29 @@ function world(wait: Effect.Effect<void> = Effect.void) {
     return source
   }
   const sourceLayer = stub(Sources, {
-    propose: (proposal) =>
+    prepare: (proposal) =>
       attemptSync(() => {
         if (state.failPrepare) throw new UpstreamMcp({ connectionId: 'chat', reason: 'transport' })
-        const id = `src_${'a'.repeat(32)}`
-        const prior = sources.get(id)
-        if (prior !== undefined) return prior
-        const source: SourceView = {
-          id,
-          connectionId: proposal.connectionId,
-          title: proposal.title,
-          label: 'Chat',
-          setup: proposal.setup,
-          revision: 1,
-          state: 'proposed',
-          proposedBy: 'agent',
-          waiting: [],
-          createdAt: 0,
-          updatedAt: 0,
+        return () => {
+          const id = `src_${'a'.repeat(32)}`
+          const prior = sources.get(id)
+          if (prior !== undefined) return prior
+          const source: SourceView = {
+            id,
+            connectionId: proposal.connectionId,
+            title: proposal.title,
+            label: 'Chat',
+            setup: proposal.setup,
+            revision: 1,
+            state: 'proposed',
+            proposedBy: 'agent',
+            waiting: [],
+            createdAt: 0,
+            updatedAt: 0,
+          }
+          sources.set(id, source)
+          return source
         }
-        sources.set(id, source)
-        return source
       }),
     routes: (id) => attemptSync(() => ({ source: readSource(id), routes: [] })),
     confirm: (id, revision) =>
@@ -281,6 +287,9 @@ describe('workspace setup reviews', () => {
       fixture.state.failRoutine = true
       expect(yield* Effect.flip(applyWorkspacePlan(plan.id, plan.revision))).toMatchObject({ _tag: 'UpstreamMcp' })
       expect(fixture.store.get(plan.id)).toMatchObject({ state: 'attention', completed: [0] })
+      const source = [...fixture.sources.values()][0]
+      if (source === undefined) throw new Error('proposal did not create its Source')
+      fixture.sources.set(source.id, { ...source, state: 'paused' })
       fixture.state.failRoutine = false
       const applied = yield* applyWorkspacePlan(plan.id, plan.revision)
       expect(applied).toMatchObject({ state: 'ready', completed: [0, 1] })
@@ -291,6 +300,68 @@ describe('workspace setup reviews', () => {
       expect(fixture.calls).toEqual({ source: 1, routine: 2 })
     }).pipe(Effect.provide(fixture.layer))
   })
+
+  it.effect('continues a ready setup after a completed Topic changes', () => {
+    const fixture = world()
+    return Effect.gen(function* () {
+      const plan = yield* proposeWorkspacePlan({ ...PROPOSAL, sources: [] }, '1', 'setup-topic-continuation')
+      const applied = yield* applyWorkspacePlan(plan.id, plan.revision)
+      new WorkspacePlanStore(durable(fixture.db)).save({ ...applied, continuation: 'pending' })
+      fixture.state.topic = { ...TOPIC, name: 'Renamed', revision: 2 }
+      const continued = yield* applyWorkspacePlan(plan.id, plan.revision)
+      expect(continued).toMatchObject({ state: 'ready', continuation: 'sent' })
+      expect(fixture.continuations.attempts).toBe(1)
+    }).pipe(Effect.provide(fixture.layer))
+  })
+
+  it.effect(
+    'rolls back every draft when a later proposal fails and a corrected proposal creates only its drafts',
+    () => {
+      const fixture = world()
+      const sourceServices = Layer.mergeAll(
+        sqliteDb(fixture.db),
+        stub(Topics, { get: () => Effect.succeed(TOPIC) }),
+        stub(Personas),
+        stub(Events, { catalog: () => Effect.succeed([MESSAGE_RECEIVED]) }),
+        stub(McpConnections, {
+          connect: () =>
+            Effect.succeed(
+              fake<McpConnectionSnapshot>({ tools: [{ name: 'message_send', inputSchema: { type: 'object' } }] }),
+            ),
+        }),
+        stub(McpServers, { labels: () => Effect.succeed(new Map([['chat', 'Chat']])) }),
+      )
+      const sources = stub(Sources, {
+        prepare: (proposal, by) => prepareSource(proposal, by).pipe(Effect.provide(sourceServices)),
+      })
+      return Effect.gen(function* () {
+        const first = PROPOSAL.routines[0]
+        if (first === undefined) throw new Error('fixture has no routine')
+        const invalid = {
+          ...first,
+          definition: { ...first.definition, title: 'Broken reminder', timezone: 'Invalid/Timezone' },
+        }
+        const proposal = { ...PROPOSAL, routines: [first, invalid] }
+        const waiting = yield* proposeWorkspacePlan(proposal, '1', 'setup-partial-preparation')
+        expect(waiting).toMatchObject({ state: 'preparing', items: [] })
+        expect(waiting.problem).toMatch(/^InvalidInput/u)
+        expect(fixture.routines.list()).toHaveLength(0)
+        expect(sourceRows(durable(fixture.db))).toHaveLength(0)
+        const retried = yield* retryWorkspacePlan(waiting.id, waiting.revision)
+        expect(retried.items).toHaveLength(0)
+        expect(fixture.routines.list()).toHaveLength(0)
+        expect(sourceRows(durable(fixture.db))).toHaveLength(0)
+        const corrected = {
+          ...proposal,
+          routines: [first, { ...invalid, definition: { ...invalid.definition, timezone: 'UTC' } }],
+        }
+        const replacement = yield* proposeWorkspacePlan(corrected, '1', 'setup-corrected-preparation')
+        expect(replacement.items).toHaveLength(3)
+        expect(fixture.routines.list()).toHaveLength(2)
+        expect(sourceRows(durable(fixture.db))).toHaveLength(1)
+      }).pipe(Effect.provide(Layer.merge(fixture.layer, sources)))
+    },
+  )
 
   it.effect('keeps the activation result for the next message when the model budget is exhausted', () => {
     const fixture = world()

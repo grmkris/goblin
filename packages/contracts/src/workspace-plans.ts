@@ -2,6 +2,7 @@ import * as Schema from 'effect/Schema'
 import { ChatId, NonEmptyString, TopicId } from './ids.ts'
 import { RoutineDefinition, RoutineView } from './routines.ts'
 import { SourceSetup, SourceTitle, SourceView } from './sources.ts'
+import { AskedRoutine, AskedSource } from './proposals.ts'
 import { TopicView } from './topics.ts'
 
 /** A composition of existing Sources and routines, prepared together for one owner review. */
@@ -20,6 +21,17 @@ export const WorkspacePlanProposal = Schema.Struct({
   Schema.makeFilter((plan) => plan.sources.length + plan.routines.length > 0 || 'Include a Source or a routine.'),
 )
 export type WorkspacePlanProposal = typeof WorkspacePlanProposal.Type
+
+/** A model composes the same named requests as source_propose and routine_propose. */
+export const WorkspacePlanAsk = Schema.Struct({
+  title: WorkspacePlanProposal.fields.title,
+  purpose: WorkspacePlanProposal.fields.purpose,
+  sources: Schema.Array(AskedSource).check(Schema.isMaxLength(8)),
+  routines: Schema.Array(AskedRoutine).check(Schema.isMaxLength(8)),
+}).check(
+  Schema.makeFilter((plan) => plan.sources.length + plan.routines.length > 0 || 'Include a Source or a routine.'),
+)
+export type WorkspacePlanAsk = typeof WorkspacePlanAsk.Type
 
 export const WorkspacePlanId = Schema.String.check(Schema.isPattern(/^wsp_[0-9a-f]{32}$/u))
 export const WorkspacePlanItem = Schema.Union([

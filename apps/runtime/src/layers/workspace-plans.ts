@@ -18,6 +18,7 @@ export const WorkspacePlansLive = Layer.effect(
         const now = yield* epochSeconds
         return yield* attemptSync(() => store.begin(id, operationId, chat, proposal, now))
       }),
+      prepared: (id, topics, writes) => attemptSync(() => store.prepared(id, topics, writes)),
       save: (view) => attemptSync(() => store.save(view)),
       proposal: (id) => attemptSync(() => store.proposal(id)),
     })

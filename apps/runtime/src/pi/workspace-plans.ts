@@ -1,4 +1,4 @@
-import { WorkspacePlanProposal, WorkspacePlanView } from '@goblin/contracts'
+import { WorkspacePlanAsk, WorkspacePlanView } from '@goblin/contracts'
 import { defineExtension, section } from '@earendil-works/pi-durable'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
@@ -8,12 +8,14 @@ import { Forbidden, NotFound } from '../http/errors.ts'
 import { requireResident } from '../mcp/service.ts'
 import { Setups } from '../setup/service.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
+import { resolveAskedSource } from '../sources/asked.ts'
+import { resolveAskedRoutine } from '../routines/program.ts'
 import { proposeWorkspacePlan } from '../workspace-plans/program.ts'
 import { WorkspacePlans } from '../workspace-plans/service.ts'
 import { typedTool } from './typed-tool.ts'
 
 const GUIDE =
-  'When the owner asks you to set up a workflow or connect an outside conversation, compose the existing building blocks. Discover their connections with mcp_list, use mcp_suggest and mcp_request_server only when a needed connection is missing, and activate relevant owner-enabled skills. Create the requested Topics and Personas with organize tools, then use workspace_propose for one review of all Sources and routines together. Sources use the same setup as source_propose but route to numeric Topic and Persona ids returned by organize tools. Proposing grants nothing. The owner reviews exact definitions in the chat and activates them together. workspace_status reads durable progress. A ready setup means configuration applied, not a verified reply or external completion. Never claim shared-group privacy: cross-Topic retrieval is not isolated yet; explain that limitation before proposing a shared conversation.'
+  'When the owner asks you to set up a workflow or connect an outside conversation, compose the existing building blocks. Discover their connections with mcp_list, use mcp_suggest and mcp_request_server only when a needed connection is missing, and activate relevant owner-enabled skills. Create the requested Topics and Personas with organize tools, then use workspace_propose for one review of all Sources and routines together. Use the same named requests as source_propose and routine_propose; the runtime resolves Topic and Persona names. Proposing grants nothing. The owner reviews exact definitions in the chat and activates them together. workspace_status reads durable progress. A ready setup means configuration applied, not a verified reply or external completion. Never claim shared-group privacy: cross-Topic retrieval is not isolated yet; explain that limitation before proposing a shared conversation.'
 
 /** Composition tools available only to owner conversations, never helpers, Personas or routine runs. */
 export function workspacePlansExtension(run: RunProgram) {
@@ -24,8 +26,8 @@ export function workspacePlansExtension(run: RunProgram) {
       typedTool({
         name: 'workspace_propose',
         description:
-          'Prepare several Sources and routines together as one durable setup review. First discover actual MCP schemas and create the requested Topics or Personas. Give a short title and purpose, Source setups (numeric route ids), and routines with their Topic ids and full definitions. Creates proposals only. The owner activates the exact reviewed setup; this ends the turn.',
-        input: WorkspacePlanProposal,
+          'Prepare several Sources and routines together as one durable setup review. First discover actual MCP schemas and create the requested Topics or Personas. Give a short title and purpose, Sources in the source_propose format and routines in the routine_propose format, naming Topics and Personas. Creates proposals only. The owner activates the exact reviewed setup; this ends the turn.',
+        input: WorkspacePlanAsk,
         output: WorkspacePlanView,
         replay: 'safe',
         execute: async (proposal, api) =>
@@ -37,7 +39,13 @@ export function workspacePlansExtension(run: RunProgram) {
               if (!scope.editable) return yield* new Forbidden({ reason: 'workspace_plan_owner_only' })
               const chat = yield* (yield* Chats).chatOf(session)
               if (Option.isNone(chat)) return yield* new NotFound({ what: 'chat' })
-              return yield* proposeWorkspacePlan(proposal, chat.value, `workspace:${session}:${api.callId}`)
+              const resolved = {
+                title: proposal.title,
+                purpose: proposal.purpose,
+                sources: yield* Effect.forEach(proposal.sources, resolveAskedSource),
+                routines: yield* Effect.forEach(proposal.routines, (asked) => resolveAskedRoutine(asked, session)),
+              }
+              return yield* proposeWorkspacePlan(resolved, chat.value, `workspace:${session}:${api.callId}`)
             }),
           ),
         text: (plan) =>

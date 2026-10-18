@@ -219,38 +219,47 @@ export class RoutineStore {
     at: number,
     topic: number,
   ): RoutineOperationResult {
-    return this.#db.transaction(() => {
-      const existing = this.#operation(operationId, { kind: 'propose', topic, definition })
-      if (existing !== undefined) return existing
-      this.#requireTopic(topic)
-      const valid = validate(definition, at)
-      this.#requirePersona(valid)
-      if (this.list().filter((routine) => routine.state !== 'archived').length >= 100)
-        throw new Conflict({ reason: 'routine draft limit' })
-      const routine: RoutineRow = {
-        id: routineId,
-        revision: 1,
-        state: 'proposed',
-        definitionJson: json(valid),
-        proposerUserId: this.#user,
-        confirmedByUserId: null,
-        confirmedAt: null,
-        scheduleId: null,
-        nextFireAt: nextFire(valid, at),
-        lastFireAt: null,
-        missedCount: 0,
-        pendingTrigger: null,
-        suppressedCount: 0,
-        health: null,
-        createdAt: at,
-        updatedAt: at,
-        topicId: topic,
-      }
-      this.#db.insert(appRoutines).values(routine).run()
-      const response = { routine: this.#view(routine), operationId }
-      this.#saveOperation(operationId, { kind: 'propose', topic, definition }, response, at)
-      return response
-    })
+    return this.#db.transaction(() => this.insertProposal(definition, operationId, routineId, at, topic))
+  }
+
+  /** Local draft and receipt writes only; the caller owns the surrounding SQLite transaction. */
+  insertProposal(
+    definition: RoutineDefinition,
+    operationId: string,
+    routineId: string,
+    at: number,
+    topic: number,
+  ): RoutineOperationResult {
+    const existing = this.#operation(operationId, { kind: 'propose', topic, definition })
+    if (existing !== undefined) return existing
+    this.#requireTopic(topic)
+    const valid = validate(definition, at)
+    this.#requirePersona(valid)
+    if (this.list().filter((routine) => routine.state !== 'archived').length >= 100)
+      throw new Conflict({ reason: 'routine draft limit' })
+    const routine: RoutineRow = {
+      id: routineId,
+      revision: 1,
+      state: 'proposed',
+      definitionJson: json(valid),
+      proposerUserId: this.#user,
+      confirmedByUserId: null,
+      confirmedAt: null,
+      scheduleId: null,
+      nextFireAt: nextFire(valid, at),
+      lastFireAt: null,
+      missedCount: 0,
+      pendingTrigger: null,
+      suppressedCount: 0,
+      health: null,
+      createdAt: at,
+      updatedAt: at,
+      topicId: topic,
+    }
+    this.#db.insert(appRoutines).values(routine).run()
+    const response = { routine: this.#view(routine), operationId }
+    this.#saveOperation(operationId, { kind: 'propose', topic, definition }, response, at)
+    return response
   }
   edit(routineId: string, change: RoutineEdit, at: number): RoutineOperationResult {
     const { revision, definition, operationId, topic } = change

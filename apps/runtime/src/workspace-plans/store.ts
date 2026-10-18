@@ -1,4 +1,4 @@
-import { WorkspacePlanView, WorkspacePlanProposal } from '@goblin/contracts'
+import { type TopicView, type WorkspacePlanItem, WorkspacePlanView, WorkspacePlanProposal } from '@goblin/contracts'
 import { desc, eq } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import * as Schema from 'effect/Schema'
@@ -69,6 +69,15 @@ export class WorkspacePlanStore {
       .values({ id, operationId, chatId: chat, definition, review: JSON.stringify(view), createdAt: now })
       .run()
     return view
+  }
+
+  prepared(id: string, topics: readonly TopicView[], writes: readonly (() => WorkspacePlanItem)[]): WorkspacePlanView {
+    return this.#db.transaction(() => {
+      const plan = this.get(id)
+      if (plan.state !== 'preparing') return plan
+      const items = writes.map((write) => write())
+      return this.save({ ...plan, items, topics, state: 'proposed', problem: null })
+    })
   }
 
   save(view: WorkspacePlanView): WorkspacePlanView {

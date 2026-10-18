@@ -1,5 +1,5 @@
 import { expect } from 'vitest'
-import type { WorkspacePlanProposal } from '@goblin/contracts'
+import type { WorkspacePlanAsk } from '@goblin/contracts'
 import { callOwner, type AgentFetch } from '../owner-client.ts'
 import { call, lever, person, showing, signedIn, type Person } from './owner-requests.ts'
 import { answerOf, ownerSend, snapshotOf } from './probe-reads.ts'
@@ -16,19 +16,17 @@ export async function workspacePlansCase(base: string): Promise<void> {
   const topic = await callOwner(me, (api) =>
     api.topics.create({ payload: { name: 'Setup trial', operationId: 'setup-topic' } }),
   )
-  const proposal: WorkspacePlanProposal = {
+  const proposal: WorkspacePlanAsk = {
     title: 'Morning and evening',
     purpose: 'Two reminders in their own Topic.',
     sources: [],
     routines: ['Morning', 'Evening'].map((title, index) => ({
-      topic: topic.id,
-      definition: {
-        title,
-        trigger: { kind: 'cron', expression: `0 ${index === 0 ? '9' : '18'} * * *` },
-        timezone: 'UTC',
-        tellMe: { on: true, copy: false },
-        handTo: { kind: 'none' },
-      },
+      topic: topic.name,
+      title,
+      trigger: { kind: 'cron', expression: `0 ${index === 0 ? '9' : '18'} * * *` },
+      timezone: 'UTC',
+      tellMe: { on: true, copy: false },
+      handTo: { kind: 'none' },
     })),
   }
   expect(
@@ -69,7 +67,7 @@ export async function workspacePlansCase(base: string): Promise<void> {
 }
 
 /** A second plan can activate when its continuation cannot spend model tokens. */
-async function budgetFallback(base: string, who: Person, me: AgentFetch, proposal: WorkspacePlanProposal) {
+async function budgetFallback(base: string, who: Person, me: AgentFetch, proposal: WorkspacePlanAsk) {
   const read = () => callOwner(me, (api) => api.workspacePlans.list())
   await ownerSend(
     me,
