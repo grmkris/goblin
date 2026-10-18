@@ -116,7 +116,7 @@ function InfoHeader({
         <p className="channel-info-kicker">Channel info</p>
         <DialogTitle>#{topic.name}</DialogTitle>
       </div>
-      <ChannelMenu topic={topic} name={topic.name} onFailure={onFailure} />
+      <ChannelMenu topic={topic} onFailure={onFailure} />
       {!narrow && (
         <Button className="size-11" variant="ghost" aria-label="Close channel info" onClick={onClose}>
           <XIcon />
