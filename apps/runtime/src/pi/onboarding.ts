@@ -4,8 +4,8 @@ import type { RunProgram } from '../runtime/bridge.ts'
 import { withContext } from './context-tail.ts'
 
 /**
- * First-run Start in main (ADR 0062): right after the kickoff, the ask to propose Topics and Personas joins goblin's
- * context block before each request (for that request only, never the transcript). A failure, or nothing to ask,
+ * First-run Start (ADR 0079): right after the kickoff, the reminder to begin useful work joins the kickoff channel's
+ * context block before each request (for that request only, never the transcript). A failure, or no reminder,
  * leaves the request as it was.
  */
 export function onboardingExtension(run: RunProgram) {

@@ -4,69 +4,76 @@
 // connected from here gets no access until the owner gives it.
 import { useMutation } from '@tanstack/react-query'
 import type { OnboardingStep, ServerSuggestion } from '@goblin/contracts'
-import { Button, GoblinMark, Skeleton, Textarea } from '@goblin/ui'
-import { CpuIcon, PlugIcon } from 'lucide-react'
+import { Button, Input, Skeleton, Textarea } from '@goblin/ui'
 import { useId, useState } from 'react'
 import { QueryBoundary } from '../../lib/query/query-boundary.tsx'
 import { startAddMutation } from '../../onboarding/queries.ts'
 import { ModelEndpoint } from '../model-endpoint-card.tsx'
 import { SuggestedServers } from '../server-add.tsx'
+import { type StartDraft } from './draft.ts'
 import { SuggestedAccess } from './connect-server.tsx'
 
 /** Each step's name on the panel, its title, and the one line of why. */
 export const STEP_TEXT: Readonly<Record<OnboardingStep, { label: string; title: string; why: string }>> = {
   welcome: {
-    label: 'Welcome',
-    title: 'goblin is your own agent',
-    why: 'It thinks with the model you choose and works through the services you connect, using only the tools you allow.',
+    label: 'Your goal',
+    title: 'What would you like help with?',
+    why: 'Start with one useful outcome. You can refine the channel and add connections as you go.',
   },
   model: {
-    label: 'Your model',
-    title: 'The model goblin thinks with',
-    why: "goblin uses this deployment's models, if it has any, unless you bring your own: any OpenAI-compatible endpoint and your key.",
+    label: 'Model',
+    title: 'A model, ready to help',
+    why: 'Use the available model or connect your own. You can change this later.',
   },
   services: {
     label: 'Services',
-    title: 'How goblin reaches the outside world',
-    why: 'Each service is an MCP server you connect. goblin can use none of its tools until you allow them.',
+    title: 'Connect what this goal needs',
+    why: 'Optional. Start without connections, or add a useful service and choose which tools goblin can use.',
   },
   goblin: {
-    label: 'Your goblin',
-    title: 'What do you want goblin for?',
-    why: 'Say it in your own words. goblin suggests a few Topics and Personas to start with.',
+    label: 'First conversation',
+    title: 'Your first conversation',
+    why: 'Give this work a channel and review your first message. Goblin will start helping right away.',
   },
 }
 
 /** What goblin is, in three pieces: goblin itself, the model it thinks with, and the services it reaches. */
-export function WelcomeStep({ onContinue }: { readonly onContinue: () => void }) {
+export function WelcomeStep({
+  goal,
+  onChange,
+  onContinue,
+}: {
+  readonly goal: string
+  readonly onChange: (goal: string) => void
+  readonly onContinue: () => void
+}) {
+  const field = useId()
   return (
     <div className="start-action">
-      <ul className="start-pieces">
-        <li>
-          <span className="start-piece-mark" aria-hidden>
-            <GoblinMark />
-          </span>
-          <span className="start-piece-name">goblin</span>
-          <span className="start-piece-about">Your agent, right here</span>
-        </li>
-        <li>
-          <span className="start-piece-mark" aria-hidden>
-            <CpuIcon />
-          </span>
-          <span className="start-piece-name">Your model</span>
-          <span className="start-piece-about">This deployment's, or your own</span>
-        </li>
-        <li>
-          <span className="start-piece-mark" aria-hidden>
-            <PlugIcon />
-          </span>
-          <span className="start-piece-name">Your services</span>
-          <span className="start-piece-about">MCP servers you connect and allow</span>
-        </li>
-      </ul>
-      <Button size="cta" onClick={onContinue}>
-        Get started
+      <label className="sr-only" htmlFor={field}>
+        What would you like help with?
+      </label>
+      <div className="start-kickoff">
+        <Textarea
+          id={field}
+          rows={4}
+          maxLength={2000}
+          value={goal}
+          placeholder="I’m moving to Lisbon in March and…"
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </div>
+      <div className="start-ideas">
+        {IDEAS.map((idea) => (
+          <button key={idea} type="button" className="start-idea" onClick={() => onChange(idea)}>
+            {idea}
+          </button>
+        ))}
+      </div>
+      <Button size="cta" disabled={goal.trim() === ''} onClick={onContinue}>
+        Continue
       </Button>
+      <p className="start-note">Your own agent, with a separate channel for each thing you’re working on.</p>
     </div>
   )
 }
@@ -76,7 +83,7 @@ export function ModelStep() {
   return (
     <div className="start-action start-model">
       <QueryBoundary action="read where your model calls go" pending={<Skeleton className="h-10 w-full" />}>
-        <ModelEndpoint />
+        <ModelEndpoint progressive />
       </QueryBoundary>
       <p className="start-note">You can change it any time in Settings.</p>
     </div>
@@ -87,7 +94,7 @@ export function ModelStep() {
  * The servers we suggest. One that needs a sign-in comes back here (`connected`, the callback's connection); either way
  * the one just connected offers its suggested access.
  */
-export function ServicesStep({ connected }: { readonly connected: string | undefined }) {
+export function ServicesStep({ connected, goal }: { readonly connected: string | undefined; readonly goal: string }) {
   const add = useMutation(startAddMutation).mutateAsync
   const [latest, setLatest] = useState(connected)
   const [message, setMessage] = useState('')
@@ -102,7 +109,13 @@ export function ServicesStep({ connected }: { readonly connected: string | undef
       {latest !== undefined && <SuggestedAccess connectionId={latest} />}
       <div className="start-more">
         <QueryBoundary action="show suggested services">
-          <SuggestedServers connectWith={connectWith} onChanged={setMessage} onMessage={setMessage} />
+          <SuggestedServers
+            goal={goal}
+            preview
+            connectWith={connectWith}
+            onChanged={setMessage}
+            onMessage={setMessage}
+          />
         </QueryBoundary>
         {message !== '' && <p className="start-note">{message}</p>}
         <p className="start-note">Add any other MCP server by its address in Connections.</p>
@@ -120,38 +133,52 @@ const IDEAS = [
 
 export function GoblinStep({
   pending,
+  draft,
+  onChange,
   onStart,
 }: {
   readonly pending: boolean
-  readonly onStart: (text: string) => void
+  readonly draft: StartDraft
+  readonly onChange: (change: Partial<Pick<StartDraft, 'goal' | 'channel'>>) => void
+  readonly onStart: () => void
 }) {
-  const [text, setText] = useState('')
   const field = useId()
   return (
     <div className="start-action">
-      <label className="sr-only" htmlFor={field}>
-        What do you want goblin for?
+      <label className="start-field">
+        <span>Channel name</span>
+        <Input
+          maxLength={80}
+          value={draft.channel}
+          disabled={pending || draft.operation !== ''}
+          onChange={(event) => onChange({ channel: event.target.value })}
+        />
+      </label>
+      <label className="start-field" htmlFor={field}>
+        Your first message
       </label>
       <div className="start-kickoff">
         <Textarea
           id={field}
           rows={4}
           maxLength={2000}
-          placeholder="I'm moving to Lisbon in March and…"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
+          value={draft.goal}
+          disabled={pending || draft.operation !== ''}
+          onChange={(event) => onChange({ goal: event.target.value })}
         />
       </div>
-      <div className="start-ideas">
-        {IDEAS.map((idea) => (
-          <button key={idea} type="button" className="start-idea" onClick={() => setText(idea)}>
-            {idea}
-          </button>
-        ))}
-      </div>
-      <Button size="cta" disabled={text.trim() === ''} pending={pending} onClick={() => onStart(text.trim())}>
-        Start with this
+      <Button
+        size="cta"
+        disabled={draft.goal.trim() === '' || draft.channel.trim() === ''}
+        pending={pending}
+        onClick={onStart}
+      >
+        {draft.operation === '' ? 'Start conversation' : 'Continue starting conversation'}
       </Button>
+      <p className="start-note">
+        A channel keeps the conversation, its files and its instructions together. Add Personas when another perspective
+        would help.
+      </p>
     </div>
   )
 }

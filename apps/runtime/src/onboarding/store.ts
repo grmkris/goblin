@@ -16,6 +16,7 @@ export type OnboardingRecord = {
   readonly status: KeptStatus | undefined
   readonly steps: readonly OnboardingStep[]
   readonly kickoffAt: number | undefined
+  readonly kickoffChat: string | undefined
 }
 
 const decodeStrings = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.String)))
@@ -50,6 +51,7 @@ export class OnboardingStore {
       status: Option.getOrUndefined(decodeKept(row.status)),
       steps: stepsOf(row.steps),
       kickoffAt: row.kickoffAt ?? undefined,
+      kickoffChat: row.kickoffChat ?? undefined,
     }
   }
 
@@ -67,11 +69,13 @@ export class OnboardingStore {
       status,
       steps,
       kickoffAt: current?.kickoffAt ?? (change.kickoff === true ? now : undefined),
+      kickoffChat: current?.kickoffChat ?? change.kickoffChat,
     }
     const values = {
       status: next.status ?? 'open',
       steps: JSON.stringify(next.steps),
       kickoffAt: next.kickoffAt ?? null,
+      kickoffChat: next.kickoffChat ?? null,
     }
     this.#db
       .insert(appOnboarding)

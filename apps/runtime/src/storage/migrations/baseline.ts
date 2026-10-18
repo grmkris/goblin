@@ -145,7 +145,7 @@ export const BASELINE: Migration = {
     "CREATE INDEX app_notices_at ON app_notices (at)",
     "CREATE INDEX app_notices_routine ON app_notices (routine_id, at)",
     "CREATE TABLE app_notify_sink (id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1), connection_id TEXT NOT NULL, tool TEXT NOT NULL, arguments TEXT NOT NULL, policy TEXT NOT NULL DEFAULT '{}', revision TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL)",
-    "CREATE TABLE app_onboarding (id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1), status TEXT NOT NULL CHECK (status IN ('open', 'done', 'skipped')), steps TEXT NOT NULL, kickoff_at INTEGER, updated_at INTEGER NOT NULL)",
+    "CREATE TABLE app_onboarding (id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1), status TEXT NOT NULL CHECK (status IN ('open', 'done', 'skipped')), steps TEXT NOT NULL, kickoff_at INTEGER, kickoff_chat TEXT, updated_at INTEGER NOT NULL)",
     "CREATE TABLE app_onboarding_connects (connection_id TEXT PRIMARY KEY NOT NULL, step TEXT NOT NULL, recommend INTEGER NOT NULL, created_at INTEGER NOT NULL)",
     "CREATE TABLE app_organize_receipts (id TEXT PRIMARY KEY NOT NULL, operation_id TEXT UNIQUE, kind TEXT NOT NULL, target TEXT NOT NULL, summary TEXT NOT NULL, actor TEXT NOT NULL CHECK (actor IN ('owner', 'agent')), chat_id TEXT, before TEXT NOT NULL, after TEXT NOT NULL, after_revision INTEGER NOT NULL, created_at INTEGER NOT NULL, undone_at INTEGER)",
     "CREATE INDEX app_organize_receipts_created ON app_organize_receipts (created_at)",

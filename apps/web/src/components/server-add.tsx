@@ -149,11 +149,13 @@ export function SuggestedServers({
   onMessage,
   connectWith,
   preview = false,
+  goal,
 }: {
   readonly onChanged: (message: string) => void
   readonly onMessage: (message: string) => void
   readonly connectWith?: (item: ServerSuggestion) => Promise<string>
   readonly preview?: boolean
+  readonly goal?: string
 }) {
   const items = useSuspenseQuery(suggestedQuery).data
   const connect = useAddAndConnect()
@@ -173,12 +175,27 @@ export function SuggestedServers({
   if (items.length === 0)
     return <p className="server-note">Nothing to suggest right now. Search or add a server by its address.</p>
   const groups = GROUPS.map((group) => ({ ...group, items: items.filter((item) => item.group === group.group) }))
-  const initialCount = groups.filter((group) => group.items.length > 0).length
+  const suggestedGroups =
+    goal === undefined
+      ? undefined
+      : /trip|travel|booking|holiday|flight|moving/iu.test(goal)
+        ? ['travel', 'yours']
+        : /research|learn|read|write|study/iu.test(goal)
+          ? ['knowledge', 'code', 'yours']
+          : ['yours', 'knowledge']
+  const initialCount = groups.filter(
+    (group) => group.items.length > 0 && (suggestedGroups === undefined || suggestedGroups.includes(group.group)),
+  ).length
   return (
     <div className="shelf" data-preview={preview && !expanded}>
       <ul id={list} className="shelf-grid" aria-label="Suggested services" tabIndex={0}>
         {groups.flatMap((section) =>
-          (preview && !expanded ? section.items.slice(0, 1) : section.items).map((item) => (
+          (preview && !expanded
+            ? suggestedGroups === undefined || suggestedGroups.includes(section.group)
+              ? section.items.slice(0, 1)
+              : []
+            : section.items
+          ).map((item) => (
             <ServiceCard
               key={item.id}
               item={item}

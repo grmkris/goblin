@@ -38,9 +38,16 @@ const step = createRoute({
   },
 })
 const splash = createRoute({ getParentRoute: () => root, path: '/splash', component: StartSplash })
+const channel = createRoute({
+  getParentRoute: () => root,
+  path: '/c/$chatId',
+  component: function Destination() {
+    return <p>Opened channel {channel.useParams().chatId}</p>
+  },
+})
 const at = new URLSearchParams(location.search).get('at') ?? '/start/welcome'
 const router = createRouter({
-  routeTree: root.addChildren([step, splash]),
+  routeTree: root.addChildren([step, splash, channel]),
   history: createMemoryHistory({ initialEntries: [at] }),
 })
 

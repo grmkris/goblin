@@ -10,6 +10,7 @@ import path from 'node:path'
 import { createServer } from 'vite'
 import { SHELF } from './browser/services-fixture.ts'
 import { type Browser, type BrowserContextOptions, type Page, chromium } from 'playwright-core'
+import { startFlowChecks } from './start-flow.ts'
 
 const STDOUT = 1
 const out = path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance', `start-${Date.now()}`)
@@ -126,10 +127,23 @@ async function drive(browser: Browser, origin: string, label: string, options: B
       if (pathname === '/api/mcp/suggested') return json(SHELF)
       return route.fulfill({ status: 404, json: { error: { code: 'not_found', message: 'not here' } } })
     })
+    await page.addInitScript(() =>
+      sessionStorage.setItem(
+        'goblin:start-draft',
+        JSON.stringify({
+          goal: 'Plan a trip and keep every booking in one place',
+          channel: 'Travel plans',
+          operation: '',
+          accepted: false,
+        }),
+      ),
+    )
     await page.goto(`${origin}start.html?at=${encodeURIComponent(screen.at)}`)
     await page.waitForLoadState('networkidle')
     await shows(page, screen.name)
     if (screen.name === 'services') {
+      await page.screenshot({ path: path.join(out, `${label}-services-preview.png`), fullPage: true })
+      await page.getByRole('button', { name: /See all .* services/u }).click()
       await page.waitForFunction(() =>
         [...document.querySelectorAll<HTMLImageElement>('.server-mark > img')].every((icon) => icon.naturalWidth > 0),
       )
@@ -168,6 +182,7 @@ try {
   })
   await drive(browser, origin, 'tablet-light', { viewport: { width: 820, height: 1180 }, colorScheme: 'light' })
   await drive(browser, origin, 'desktop-dark', { viewport: { width: 1280, height: 800 }, colorScheme: 'dark' })
+  await startFlowChecks(browser, origin)
   assert.deepEqual(errors, [])
   writeSync(STDOUT, `${JSON.stringify({ ok: true, out })}\n`)
 } finally {

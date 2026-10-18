@@ -66,22 +66,22 @@ export const startConnect = ({ connectionId, step }: OnboardingConnect) =>
     return started
   })
 
-/** How long after the kickoff goblin is reminded to propose Topics and Personas (seconds). */
+/** How long the kickoff channel receives the reminder to begin useful work (seconds). */
 const KICKOFF_WINDOW = 20 * 60
 
 const KICKOFF_ASK =
-  'The owner just finished setup and said in their first message what they want goblin for. If you have not yet, propose 2 to 4 Topics and at most 2 Personas that fit it, in one ask_user question (kind "multi", each option one Topic or Persona with a one-line why). Create only the ones they choose, with topic_create and persona_create.'
+  'The owner just described what they want help with. Begin by doing one useful piece of that work in the current channel. Ask one focused question only if it is needed to make progress. Offer a channel name, Persona, or routine later when the work makes one useful; do not begin with an architecture questionnaire.'
 
 /**
- * What goblin's context block says about setup, in main only: right after the kickoff, the ask to propose Topics and
- * Personas; nothing otherwise. Read from the agent's own record, so it costs no call to any server.
+ * What goblin's context block says about setup, in the kickoff channel only: right after the kickoff, begin useful
+ * work and introduce structure when needed. Read from the agent's own record, so it costs no call to any server.
  */
 export const onboardingContext = (session: string) =>
   Effect.gen(function* () {
     const chats = yield* Chats
-    if ((yield* chats.session(chats.primary)) !== session) return undefined
-    const now = yield* epochSeconds
     const record = yield* Onboarding.use((onboarding) => onboarding.read)
+    if (record?.kickoffChat === undefined || (yield* chats.session(record.kickoffChat)) !== session) return undefined
+    const now = yield* epochSeconds
     const kickoff = record?.kickoffAt !== undefined && now - record.kickoffAt < KICKOFF_WINDOW
     return kickoff ? KICKOFF_ASK : undefined
   })

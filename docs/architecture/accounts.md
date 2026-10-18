@@ -74,25 +74,26 @@ production allows everything but `/api/` and `/mcp`, other stages nothing. `Meet
 
 ### First-run Start
 
-ADR 0062. A short tour the owner may pass by or skip; no page waits for it, whatever its status, so the app is drawn
+ADRs 0062 and 0079. A short, goal-first setup flow the owner may pass by or skip; no page waits for it, whatever its status, so the app is drawn
 the same for an open, skipped or finished Start. An owner who signs in through Create an account (`routes/login.tsx`)
 lands on `/start/welcome`.
 
 **The page** (`components/start`). `/start/<step>` fills the screen (`routes/__root.tsx` draws no shell around it): one
 task per screen beside a panel in the sidebar's own green, which on a phone narrows to a band with a count and one
 segment per step:
-1. welcome: what goblin is (goblin, the model it thinks with, the services it reaches);
+1. welcome: the owner's goal, with examples that fill an editable first message;
 2. model: the deployment's models unless the owner brings their own endpoint and key, in Settings' own form
    (`model-endpoint-card.tsx` `ModelEndpoint`);
 3. services: the shelf (`server-add.tsx` `SuggestedServers`); the server just connected from here, by a sign-in that
    came back or one that needed none, offers Use suggested access (`start/connect-server.tsx`);
-4. what the owner wants goblin for. The kickoff is recorded before its message is sent.
+4. review the channel name and first message. Stable operations create the channel and submit once across retries.
+   The tab retains the draft across model setup and OAuth returns and clears it on finish or sign-out.
 
 Continue marks the step gone through; Skip setup skips Start. Finishing narrows the panel into the sidebar as the chat
 appears.
 
 **State** (`onboarding/`). `app_onboarding` keeps the status the owner set (`done`, `skipped`; `open` otherwise, and
-again after they reopen it), the steps they went through and the kickoff's time. `GET /api/onboarding` answers from
+again after they reopen it), the steps they went through and the kickoff's time and logical channel id. `GET /api/onboarding` answers from
 the agent alone: a step is done once the owner went through it, the model step also once they set their own endpoint
 (`Inference.view`), the goblin step once the kickoff was sent. It also carries the endpoint in use and how many servers
 are connected. A step id an older Start had is dropped when the row is read.
@@ -105,5 +106,6 @@ than Connections. Nothing is allowed on the way.
 shows one quiet line back to the first step still to do, which the owner can put away for the visit. Settings has a
 Set up goblin card and Activity a Get started checklist.
 
-**In the chat.** In main, for twenty minutes after the kickoff, `pi/onboarding.ts` adds the ask to propose Topics and
-Personas with one `ask_user` to goblin's context block. Nothing else about setup reaches the model.
+**In the chat.** For twenty minutes after kickoff, `pi/onboarding.ts` asks the selected channel to begin useful work,
+ask a focused question only if necessary, and introduce Personas or routines when the work calls for them. The logical
+channel resolves to its current Pi session; unrelated chats receive no kickoff guidance.
