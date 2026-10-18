@@ -8,7 +8,7 @@ import { ONBOARDING_STEPS, PRIMARY_CHAT, type OnboardingStep, type OnboardingVie
 import { Button, GoblinMark, Receipt } from '@goblin/ui'
 import { CheckIcon, CircleAlertIcon } from 'lucide-react'
 import { useState } from 'react'
-import { clearStartDraft, suggestedChannel, useStartDraft } from './draft.ts'
+import { clearStartDraft, useStartDraft } from './draft.ts'
 import { describeError, messageOf } from '../../lib/query/app-error.ts'
 import { reportUnexpected } from '../../lib/unexpected.ts'
 import { changeOnboardingMutation, kickoffMutation, onboardingQuery } from '../../onboarding/queries.ts'
@@ -259,14 +259,12 @@ export function StartPage({ step, search }: { readonly step: OnboardingStep; rea
             <WelcomeStep
               goal={draft.goal}
               onChange={(goal) => saved.edit({ goal })}
-              onContinue={() => {
-                if (draft.channel === 'My first project') saved.edit({ channel: suggestedChannel(draft.goal) })
-                next()
-              }}
+              onPick={saved.pick}
+              onContinue={next}
             />
           )}
           {step === 'model' && <ModelStep />}
-          {step === 'services' && <ServicesStep connected={search.connected} goal={draft.goal} />}
+          {step === 'services' && <ServicesStep connected={search.connected} featured={draft.groups} />}
           {step === 'goblin' && <GoblinStep draft={draft} onChange={saved.edit} pending={starting} onStart={start} />}
           {failure !== null && (
             <Receipt tone="error">

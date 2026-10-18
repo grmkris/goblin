@@ -81,11 +81,13 @@ lands on `/start/welcome`.
 **The page** (`components/start`). `/start/<step>` fills the screen (`routes/__root.tsx` draws no shell around it): one
 task per screen beside a panel in the sidebar's own green, which on a phone narrows to a band with a count and one
 segment per step:
-1. welcome: the owner's goal, with examples that fill an editable first message;
+1. welcome: the owner's goal. Each example (`start/steps.tsx` `IDEAS`) fills the goal, names the channel and picks
+   the service groups the shelf shows first; a goal of the owner's own keeps the defaults;
 2. model: the deployment's models unless the owner brings their own endpoint and key, in Settings' own form
    (`model-endpoint-card.tsx` `ModelEndpoint`);
-3. services: the shelf (`server-add.tsx` `SuggestedServers`); the server just connected from here, by a sign-in that
-   came back or one that needed none, offers Use suggested access (`start/connect-server.tsx`);
+3. services: the shelf (`server-add.tsx` `SuggestedServers`, previewing those groups); the server just connected
+   from here, by a sign-in that came back or one that needed none, offers Use suggested access
+   (`start/connect-server.tsx`);
 4. review the channel name and first message. `POST /api/onboarding/kickoff` does the rest in one call
    (`onboarding/program.ts` `kickoff`): it creates the channel with the goal as its description, records the kickoff
    into it, sends the goal as the owner's first message and marks Start done, each under an operation id made from the

@@ -5,7 +5,7 @@ import { EVERYTHING, type OnboardingKickoff } from '@goblin/contracts'
 const model = { source: 'deployment', deployment: true, models: ['house-model'] }
 const view = { status: 'open', steps: [], model, connected: 0, kickoff: false }
 type Mode = 'uncertain' | 'conflict'
-const draft = { goal: 'Plan a trip to Lisbon', channel: 'Travel plans', operation: '' }
+const draft = { goal: 'Plan a trip to Lisbon', channel: 'Travel plans', groups: ['travel'], operation: '' }
 
 /**
  * Start's kickoff against a simulated owner API: the first attempt fails, either with no answer the page can trust
