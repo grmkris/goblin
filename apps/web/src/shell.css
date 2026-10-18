@@ -579,20 +579,10 @@
   min-height: 0;
 }
 /*
- * The composer's height moves the transcript's bottom padding, the arrow and the fade. Registered as a length so it can
- * ease when the composer grows (a queued message, an attachment) or empties after a send, instead of stepping; the first
- * measurement has nothing to ease from, so it waits for `data-dock-ready` (use-conversation.ts).
+ * The composer's height moves the transcript's bottom padding, the arrow and the fade, and it steps rather than eases:
+ * `--dock-height` is inherited by the whole transcript, so easing it would restyle and re-lay out every message on every
+ * frame of each send.
  */
-@property --dock-height {
-  syntax: '<length>';
-  inherits: true;
-  initial-value: 8rem;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .chat-view[data-dock-ready] {
-    transition: --dock-height 200ms var(--ease-out);
-  }
-}
 @media (min-width: 48rem) {
   .chat-view[data-place='channel'] {
     --chat-gutter: 2rem;
