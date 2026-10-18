@@ -43,7 +43,11 @@ export const sharedQuery = (chats: readonly ConversationView[]) =>
     staleTime: 0,
   })
 
-/** Later edits also omit entries in earlier pages. A fork's inherited entry shares its source's stable entry id. */
+/**
+ * Later edits also omit entries in earlier pages. Each item is kept once by its key (entry id and target): a link twice
+ * in one message, a fork's branch entry, which shares its source's entry id, and an entry moved into a thread, which
+ * keeps its id there.
+ */
 export function sharedPages(
   pages: readonly { readonly chat: string; readonly entries: readonly Record<string, unknown>[] }[],
 ) {
