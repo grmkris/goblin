@@ -4,7 +4,8 @@
   align-items: center;
   gap: 0.5rem;
   min-height: var(--top-bar-height);
-  padding: var(--safe-top) 0.5rem 0;
+  padding-block: var(--safe-top) 0;
+  padding-inline: max(0.5rem, var(--safe-left)) max(0.5rem, var(--safe-right));
   border-block-end: 1px solid var(--border);
 }
 .channel-info-head > div {
@@ -21,7 +22,8 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 1.25rem calc(1.5rem + var(--safe-bottom));
+  padding-block: 0 calc(1.5rem + var(--safe-bottom));
+  padding-inline: max(1.25rem, var(--safe-left)) max(1.25rem, var(--safe-right));
 }
 .channel-info-section {
   padding-block: 1.25rem;
@@ -91,7 +93,7 @@
   flex: none;
   inline-size: 100%;
   min-block-size: 2.75rem;
-  padding-inline: 0.5rem;
+  padding-inline: max(0.5rem, var(--safe-left)) max(0.5rem, var(--safe-right));
   border-block-end: 1px solid var(--border);
 }
 [data-slot='dialog-panel'] [hidden] {
