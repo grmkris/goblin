@@ -3,14 +3,14 @@
 // deployment without models of its own, ADR 0064, the model step says the owner's are needed), and a server
 // connected from here gets no access until the owner gives it.
 import { useMutation } from '@tanstack/react-query'
-import type { OnboardingStep, ServerSuggestion } from '@goblin/contracts'
+import type { OnboardingStep, ServerGroup, ServerSuggestion } from '@goblin/contracts'
 import { Button, Input, Skeleton, Textarea } from '@goblin/ui'
 import { useId, useState } from 'react'
 import { QueryBoundary } from '../../lib/query/query-boundary.tsx'
 import { startAddMutation } from '../../onboarding/queries.ts'
 import { ModelEndpoint } from '../model-endpoint-card.tsx'
 import { SuggestedServers } from '../server-add.tsx'
-import { type StartDraft } from './draft.ts'
+import type { StartDraft, StartIdea } from './draft.ts'
 import { SuggestedAccess } from './connect-server.tsx'
 
 /** Each step's name on the panel, its title, and the one line of why. */
@@ -41,10 +41,12 @@ export const STEP_TEXT: Readonly<Record<OnboardingStep, { label: string; title: 
 export function WelcomeStep({
   goal,
   onChange,
+  onPick,
   onContinue,
 }: {
   readonly goal: string
   readonly onChange: (goal: string) => void
+  readonly onPick: (idea: StartIdea) => void
   readonly onContinue: () => void
 }) {
   const field = useId()
@@ -65,7 +67,7 @@ export function WelcomeStep({
       </div>
       <div className="start-ideas">
         {IDEAS.map((idea) => (
-          <button key={idea.label} type="button" className="start-idea" onClick={() => onChange(idea.goal)}>
+          <button key={idea.label} type="button" className="start-idea" onClick={() => onPick(idea)}>
             {idea.label}
           </button>
         ))}
@@ -94,7 +96,13 @@ export function ModelStep() {
  * The servers we suggest. One that needs a sign-in comes back here (`connected`, the callback's connection); either way
  * the one just connected offers its suggested access.
  */
-export function ServicesStep({ connected, goal }: { readonly connected: string | undefined; readonly goal: string }) {
+export function ServicesStep({
+  connected,
+  featured,
+}: {
+  readonly connected: string | undefined
+  readonly featured: readonly ServerGroup[]
+}) {
   const add = useMutation(startAddMutation).mutateAsync
   const [latest, setLatest] = useState(connected)
   const [message, setMessage] = useState('')
@@ -110,7 +118,7 @@ export function ServicesStep({ connected, goal }: { readonly connected: string |
       <div className="start-more">
         <QueryBoundary action="show suggested services">
           <SuggestedServers
-            goal={goal}
+            featured={featured}
             preview
             connectWith={connectWith}
             onChanged={setMessage}
@@ -124,11 +132,26 @@ export function ServicesStep({ connected, goal }: { readonly connected: string |
   )
 }
 
-/** Ideas to start from: tapping one fills the field. */
-const IDEAS = [
-  { label: 'Plan a trip', goal: 'Plan a trip and keep every booking in one place' },
-  { label: 'Research a topic', goal: 'Research a topic and write up what I should know' },
-  { label: 'Track my training', goal: 'Track my training and nudge me when I slack' },
+/** Ideas to start from: tapping one fills the goal, names the channel and picks the services suggested first. */
+const IDEAS: readonly (StartIdea & { readonly label: string })[] = [
+  {
+    label: 'Plan a trip',
+    goal: 'Plan a trip and keep every booking in one place',
+    channel: 'Travel plans',
+    groups: ['travel', 'yours'],
+  },
+  {
+    label: 'Research a topic',
+    goal: 'Research a topic and write up what I should know',
+    channel: 'Research',
+    groups: ['knowledge', 'code', 'yours'],
+  },
+  {
+    label: 'Track my training',
+    goal: 'Track my training and nudge me when I slack',
+    channel: 'Training',
+    groups: ['yours', 'knowledge'],
+  },
 ]
 
 export function GoblinStep({

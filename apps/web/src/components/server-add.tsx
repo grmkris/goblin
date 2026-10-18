@@ -149,13 +149,14 @@ export function SuggestedServers({
   onMessage,
   connectWith,
   preview = false,
-  goal,
+  featured,
 }: {
   readonly onChanged: (message: string) => void
   readonly onMessage: (message: string) => void
   readonly connectWith?: (item: ServerSuggestion) => Promise<string>
   readonly preview?: boolean
-  readonly goal?: string
+  /** The groups the compact preview shows a service from; every group when none. */
+  readonly featured?: readonly ServerGroup[]
 }) {
   const items = useSuspenseQuery(suggestedQuery).data
   const connect = useAddAndConnect()
@@ -175,27 +176,15 @@ export function SuggestedServers({
   if (items.length === 0)
     return <p className="server-note">Nothing to suggest right now. Search or add a server by its address.</p>
   const groups = GROUPS.map((group) => ({ ...group, items: items.filter((item) => item.group === group.group) }))
-  const suggestedGroups =
-    goal === undefined
-      ? undefined
-      : /trip|travel|booking|holiday|flight|moving/iu.test(goal)
-        ? ['travel', 'yours']
-        : /research|learn|read|write|study/iu.test(goal)
-          ? ['knowledge', 'code', 'yours']
-          : ['yours', 'knowledge']
-  const initialCount = groups.filter(
-    (group) => group.items.length > 0 && (suggestedGroups === undefined || suggestedGroups.includes(group.group)),
-  ).length
+  const previewed = groups
+    .filter((group) => featured === undefined || featured.includes(group.group))
+    .map((group) => ({ ...group, items: group.items.slice(0, 1) }))
+  const previewCount = previewed.reduce((count, group) => count + group.items.length, 0)
   return (
     <div className="shelf" data-preview={preview && !expanded}>
       <ul id={list} className="shelf-grid" aria-label="Suggested services" tabIndex={0}>
-        {groups.flatMap((section) =>
-          (preview && !expanded
-            ? suggestedGroups === undefined || suggestedGroups.includes(section.group)
-              ? section.items.slice(0, 1)
-              : []
-            : section.items
-          ).map((item) => (
+        {(preview && !expanded ? previewed : groups).flatMap((section) =>
+          section.items.map((item) => (
             <ServiceCard
               key={item.id}
               item={item}
@@ -207,7 +196,7 @@ export function SuggestedServers({
           )),
         )}
       </ul>
-      {preview && items.length > initialCount && (
+      {preview && items.length > previewCount && (
         <div className="shelf-more">
           <Button
             size="cta"
