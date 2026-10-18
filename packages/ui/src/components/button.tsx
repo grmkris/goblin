@@ -1,6 +1,5 @@
 import { Button as ButtonPrimitive } from '@base-ui/react/button'
 import { cva, type VariantProps } from 'class-variance-authority'
-import { forwardRef } from 'react'
 import { cn } from '../lib/cn'
 import { Spinner } from './spinner.tsx'
 
@@ -59,25 +58,18 @@ const buttonVariants = cva(
  * `pending`: the button's action is under way. It turns busy and inert and shows a spinner, which stands in for an
  * icon-only button's icon and leads a labelled button's text.
  */
-const Button = forwardRef<
-  HTMLButtonElement,
-  ButtonPrimitive.Props & VariantProps<typeof buttonVariants> & { readonly pending?: boolean }
->(function Button(
-  {
-    className,
-    variant = 'default',
-    size = 'default',
-    pending = false,
-    disabled,
-    children,
-    ...props
-  }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants> & { readonly pending?: boolean },
-  ref,
-) {
+function Button({
+  className,
+  variant = 'default',
+  size = 'default',
+  pending = false,
+  disabled,
+  children,
+  ...props
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants> & { readonly pending?: boolean }) {
   const iconOnly = size?.includes('icon') === true
   return (
     <ButtonPrimitive
-      ref={ref}
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       disabled={disabled === true || pending}
@@ -88,6 +80,6 @@ const Button = forwardRef<
       {pending && iconOnly ? null : children}
     </ButtonPrimitive>
   )
-})
+}
 
 export { Button, buttonVariants }
