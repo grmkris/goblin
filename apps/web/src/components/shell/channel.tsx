@@ -72,7 +72,9 @@ function ChannelLayout({ view, search }: { readonly view: ConversationView; read
   const infoOpen = search.info === true
   const navigate = useNavigate()
   const infoTrigger = useRef<HTMLButtonElement>(null)
-  const layout = useRef<HTMLDivElement>(null)
+  // The info panel's container is the element itself, not a ref: a panel open from the first render (a link with
+  // `info=true`) mounts its portal in that commit, before a ref is attached, and Base UI waits for a `null` container.
+  const [layout, setLayout] = useState<HTMLDivElement | null>(null)
   const setInfoOpen = (info: boolean) => {
     navigate({ to: '/c/$chatId', params: { chatId: view.id }, search: { ...search, info } }).catch(reportUnexpected)
   }
@@ -81,7 +83,7 @@ function ChannelLayout({ view, search }: { readonly view: ConversationView; read
   const archived = topic !== undefined && isArchived(topic)
   return (
     <PanelProvider channel={view.id} items={items}>
-      <div ref={layout} className="channel-layout" data-panel={open || undefined} data-info={infoOpen || undefined}>
+      <div ref={setLayout} className="channel-layout" data-panel={open || undefined} data-info={infoOpen || undefined}>
         <div className="channel-column">
           <ChatView
             key={view.id}

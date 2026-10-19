@@ -33,7 +33,7 @@ export function ChannelInfo({
   readonly open: boolean
   readonly onOpenChange: (open: boolean) => void
   readonly trigger: RefObject<HTMLButtonElement | null>
-  readonly container: RefObject<HTMLDivElement | null>
+  readonly container: HTMLDivElement | null
   readonly failure: string
   readonly onFailure: (message: string) => void
 }) {
@@ -48,7 +48,7 @@ export function ChannelInfo({
     const frame = requestAnimationFrame(() => {
       const target = trigger.current?.checkVisibility({ visibilityProperty: true })
         ? trigger.current
-        : container.current?.querySelector<HTMLButtonElement>('.thread-panel button')
+        : container?.querySelector<HTMLButtonElement>('.thread-panel button')
       target?.focus({ preventScroll: true })
     })
     return () => cancelAnimationFrame(frame)
