@@ -1,9 +1,15 @@
 import { ServerGroup } from '@goblin/contracts'
+import { Conflict, InvalidInput } from '@goblin/contracts/api'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { useState } from 'react'
 
 const KEY = 'goblin:start-draft'
+
+/** Only these typed kickoff refusals prove no channel was created. A generic 400/409 may follow a partial kickoff. */
+export const kickoffAllowsEdit = (error: unknown): boolean =>
+  (Schema.is(Conflict)(error) && error.reason === 'topic_name_taken') ||
+  (Schema.is(InvalidInput)(error) && ['empty_message', 'topic_name'].includes(error.reason))
 
 /** What the owner is starting with: their goal, the channel's name and the service groups worth showing first. */
 const StartDraft = Schema.Struct({

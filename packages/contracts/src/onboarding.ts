@@ -43,8 +43,9 @@ export type OnboardingChange = typeof OnboardingChange.Type
 /**
  * `POST /api/onboarding/kickoff`, Start's last step (ADR 0079): the owner's goal becomes a new channel's description and
  * its first message, goblin is reminded there to begin useful work, and Start is done. A retry with the same
- * `operationId` replays what the first attempt made; a refusal (the name is taken, nothing to say) comes before anything
- * is made, so the owner may change the draft and try again.
+ * `operationId` replays what the first attempt made. Only `Conflict:topic_name_taken` and
+ * `InvalidInput:empty_message|topic_name` prove creation was refused and permit editing the draft. Other failures,
+ * including admission refusals, may follow creation: retry the same draft and operation.
  */
 export const OnboardingKickoff = Schema.Struct({
   goal: NonEmptyString(2000),

@@ -4,22 +4,27 @@ import { EVERYTHING, type OnboardingKickoff } from '@goblin/contracts'
 
 const model = { source: 'deployment', deployment: true, models: ['house-model'] }
 const view = { status: 'open', steps: [], model, connected: 0, kickoff: false }
-type Mode = 'uncertain' | 'conflict'
+const FAILURES = {
+  uncertain: { status: 500, json: { error: { code: 'internal', message: 'Retry', reason: 'fixture' } } },
+  conflict: { status: 409, json: { error: { code: 'conflict', message: 'Name exists', reason: 'topic_name_taken' } } },
+  archived: { status: 400, json: { error: { code: 'invalid_input', message: 'Archived', reason: 'topic_archived' } } },
+  lateConflict: { status: 409, json: { error: { code: 'conflict', message: 'Retry', reason: 'fixture_late' } } },
+  untyped: { status: 409, body: 'Conflict' },
+} as const
+type Mode = keyof typeof FAILURES
 const draft = { goal: 'Plan a trip to Lisbon', channel: 'Travel plans', groups: ['travel'], operation: '' }
 
 /**
  * Start's kickoff against a simulated owner API: the first attempt fails, either with no answer the page can trust
- * (`uncertain`) or with a refusal (`conflict`); the next succeeds. No account, model or external work.
+ * (`uncertain`, `untyped`), a later admission failure (`archived`, `lateConflict`) or a pre-creation name refusal
+ * (`conflict`); the next succeeds. No account, model or external work.
  */
 function api(mode: Mode) {
   const kickoffs: OnboardingKickoff[] = []
   const kickoff = (route: Route) => {
     const sent: OnboardingKickoff = route.request().postDataJSON()
     kickoffs.push(sent)
-    if (kickoffs.length === 1)
-      return mode === 'uncertain'
-        ? route.fulfill({ status: 500, json: { error: { code: 'internal', message: 'Retry', reason: 'fixture' } } })
-        : route.fulfill({ status: 409, json: { error: { code: 'conflict', message: 'Name exists', reason: 'name' } } })
+    if (kickoffs.length === 1) return route.fulfill(FAILURES[mode])
     const topic = {
       id: 2,
       name: sent.channel,
@@ -57,7 +62,7 @@ async function runMode(browser: Browser, origin: string, mode: Mode): Promise<vo
     await page.evaluate((value) => sessionStorage.setItem('goblin:start-draft', JSON.stringify(value)), draft)
     await page.reload()
     await page.getByRole('button', { name: 'Start conversation', exact: true }).click()
-    await page.getByText(mode === 'conflict' ? /clashes with something/u : /Something went wrong/u).waitFor()
+    await page.locator('.start-content [data-slot="receipt"]').waitFor()
     if (mode === 'conflict') {
       // A refusal made nothing: the draft opens again for a new name.
       await page.getByLabel('Channel name').fill('Lisbon plans')
@@ -85,6 +90,8 @@ async function runMode(browser: Browser, origin: string, mode: Mode): Promise<vo
 }
 
 export async function startFlowChecks(browser: Browser, origin: string): Promise<void> {
-  await runMode(browser, origin, 'uncertain')
-  await runMode(browser, origin, 'conflict')
+  for (const mode of Object.keys(FAILURES)) {
+    // SAFETY: Object.keys enumerates only the five fixed fixture modes above.
+    await runMode(browser, origin, mode as Mode)
+  }
 }

@@ -8,8 +8,8 @@ import { ONBOARDING_STEPS, PRIMARY_CHAT, type OnboardingStep, type OnboardingVie
 import { Button, GoblinMark, Receipt } from '@goblin/ui'
 import { CheckIcon, CircleAlertIcon } from 'lucide-react'
 import { useState } from 'react'
-import { clearStartDraft, useStartDraft } from '../../onboarding/draft.ts'
-import { describeError, messageOf } from '../../lib/query/app-error.ts'
+import { clearStartDraft, kickoffAllowsEdit, useStartDraft } from '../../onboarding/draft.ts'
+import { messageOf } from '../../lib/query/app-error.ts'
 import { reportUnexpected } from '../../lib/unexpected.ts'
 import { changeOnboardingMutation, kickoffMutation, onboardingQuery } from '../../onboarding/queries.ts'
 import { GoblinStep, ModelStep, STEP_TEXT, ServicesStep, WelcomeStep } from './steps.tsx'
@@ -217,10 +217,10 @@ function useStartFlow(step: OnboardingStep) {
           clearStartDraft()
           leave(topic.conversation)
         },
-        // A refusal comes before the kickoff makes anything, so the draft may change. Any other failure may have made
-        // the channel: the draft stays frozen under its operation, and a retry replays it.
+        // Only a typed refusal known to precede creation reopens the draft. Admission failures and untyped responses
+        // may follow a partial kickoff: retain the operation so a retry reaches the same channel and message.
         onError: (error) => {
-          if (['conflict', 'validation'].includes(describeError(error).kind)) saved.rejected()
+          if (kickoffAllowsEdit(error)) saved.rejected()
         },
       },
     )
