@@ -1,5 +1,6 @@
 // Source replies use owner-reviewed result rules, frozen calls and durable piece progress (ADR 0072).
 // Tool acceptance is not external delivery. Only an explicit retryable result authorizes another dispatch.
+import type { SourceReply } from '@goblin/contracts'
 import { RunAttribute } from '@goblin/contracts/telemetry'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
@@ -10,6 +11,7 @@ import { acceptPiece, dispatchPiece, planReply, savedReplyPlan, type ReplyPlan }
 import { sinkOutcome, sinkRetryAt, type SinkOutcome } from './sink-result.ts'
 import {
   type ReplyRow,
+  type SourceRow,
   dueReplies,
   reportedReply,
   retryReply,
@@ -19,7 +21,7 @@ import {
   setupOf,
   sourceRow,
 } from './store.ts'
-import type { Answer } from './turns.ts'
+import type { Answer, ReplyRef } from './turns.ts'
 import type { EngineContext, SourceDelivery, SourcePorts } from './types.ts'
 
 export const REPLY_TRIES = 5
@@ -111,6 +113,38 @@ const attempt = (context: EngineContext, reply: ReplyRow, plan: ReplyPlan, ports
     Effect.catch(() => Effect.succeed<Attempt>({ outcome: 'unknown' })),
   )
 
+/**
+ * A piece the producer's result says to retry: given up at the last try, else tried again after its backoff (or at its
+ * `retryAt` when later), within the reply's window.
+ */
+const retryPiece = (
+  context: EngineContext,
+  reply: ReplyRow,
+  ports: SourcePorts,
+  delivered: Report,
+  piece: { readonly index: number; readonly retryAt: number | undefined; readonly connectionId: string },
+) =>
+  Effect.gen(function* () {
+    const attempts = reply.attempts + 1
+    if (attempts >= REPLY_TRIES)
+      return yield* finish(context, reply, ports, delivered, {
+        outcome: 'given_up',
+        pieces: piece.index,
+        connectionId: piece.connectionId,
+      })
+    const now = Math.floor((yield* Clock.currentTimeMillis) / 1000)
+    retryReply(
+      context.db,
+      reply.operationId,
+      attempts,
+      Math.min(
+        reply.createdAt + REPLY_WINDOW,
+        Math.max(now + backoff(attempts), Math.ceil((piece.retryAt ?? 0) / 1000)),
+      ),
+    )
+    return yield* report(context, reply, delivered, 'retryable', piece.index)
+  })
+
 /** Frozen calls resume at the first unaccepted piece. Each acknowledgement is committed before the next dispatch. */
 const sendPieces = (context: EngineContext, reply: ReplyRow, plan: ReplyPlan, ports: SourcePorts, delivered: Report) =>
   Effect.gen(function* () {
@@ -133,24 +167,11 @@ const sendPieces = (context: EngineContext, reply: ReplyRow, plan: ReplyPlan, po
           pieces: index,
           connectionId: plan.connectionId,
         })
-      const attempts = reply.attempts + 1
-      if (attempts >= REPLY_TRIES)
-        return yield* finish(context, reply, ports, delivered, {
-          outcome: 'given_up',
-          pieces: index,
-          connectionId: plan.connectionId,
-        })
-      const now = Math.floor((yield* Clock.currentTimeMillis) / 1000)
-      retryReply(
-        context.db,
-        reply.operationId,
-        attempts,
-        Math.min(
-          reply.createdAt + REPLY_WINDOW,
-          Math.max(now + backoff(attempts), Math.ceil((result.retryAt ?? 0) / 1000)),
-        ),
-      )
-      return yield* report(context, reply, delivered, 'retryable', index)
+      return yield* retryPiece(context, reply, ports, delivered, {
+        index,
+        retryAt: result.retryAt,
+        connectionId: plan.connectionId,
+      })
     }
     yield* finish(context, reply, ports, delivered, {
       outcome: 'accepted',
@@ -158,6 +179,32 @@ const sendPieces = (context: EngineContext, reply: ReplyRow, plan: ReplyPlan, po
       connectionId: plan.connectionId,
     })
   })
+
+/** How a reply ends before another piece goes out: its outcome and how many pieces were accepted by then. */
+type Settled = { readonly outcome: Terminal; readonly pieces: number }
+
+/**
+ * Where a due reply stands before it sends: settled when it already has an outcome, has every piece accepted, was
+ * interrupted mid-dispatch (unknown), is past its window or has lost its Source or reply rule (given up), or its Source
+ * changed since (rejected); else the Source row and reply rule it goes out by.
+ */
+const standingOf = (
+  reply: ReplyRow,
+  saved: ReplyPlan | undefined,
+  row: SourceRow | undefined,
+  now: number,
+): Settled | { readonly row: SourceRow; readonly rule: SourceReply } => {
+  const rule = row === undefined ? undefined : setupOf(row)?.reply
+  if (reply.outcome !== null) return { outcome: reply.outcome, pieces: reply.nextPiece }
+  if (saved !== undefined && reply.nextPiece >= saved.calls.length)
+    return { outcome: 'accepted', pieces: saved.calls.length }
+  if (reply.dispatching) return { outcome: 'unknown', pieces: reply.nextPiece }
+  if (now >= reply.createdAt + REPLY_WINDOW || row === undefined || rule === undefined)
+    return { outcome: 'given_up', pieces: reply.nextPiece }
+  if (row.revision !== reply.sourceRevision || row.binding !== reply.sourceBinding)
+    return { outcome: 'rejected', pieces: reply.nextPiece }
+  return { row, rule }
+}
 
 const sendReply = (
   context: EngineContext,
@@ -170,39 +217,11 @@ const sendReply = (
     const now = Math.floor((yield* Clock.currentTimeMillis) / 1000)
     const saved = savedReplyPlan(reply)
     const row = sourceRow(context.db, reply.sourceId)
-    const setup = row === undefined ? undefined : setupOf(row)
     const connectionId = saved?.connectionId ?? row?.connectionId ?? ''
-    if (reply.outcome !== null)
-      return yield* finish(context, reply, ports, delivered, {
-        outcome: reply.outcome,
-        pieces: reply.nextPiece,
-        connectionId: connectionId,
-      })
-    if (saved !== undefined && reply.nextPiece >= saved.calls.length)
-      return yield* finish(context, reply, ports, delivered, {
-        outcome: 'accepted',
-        pieces: saved.calls.length,
-        connectionId: connectionId,
-      })
-    if (reply.dispatching)
-      return yield* finish(context, reply, ports, delivered, {
-        outcome: 'unknown',
-        pieces: reply.nextPiece,
-        connectionId: connectionId,
-      })
-    if (now >= reply.createdAt + REPLY_WINDOW || row === undefined || setup?.reply === undefined)
-      return yield* finish(context, reply, ports, delivered, {
-        outcome: 'given_up',
-        pieces: reply.nextPiece,
-        connectionId: connectionId,
-      })
-    if (row.revision !== reply.sourceRevision || row.binding !== reply.sourceBinding)
-      return yield* finish(context, reply, ports, delivered, {
-        outcome: 'rejected',
-        pieces: reply.nextPiece,
-        connectionId: connectionId,
-      })
-    if (row.state !== 'active') {
+    const standing = standingOf(reply, saved, row, now)
+    if ('outcome' in standing) return yield* finish(context, reply, ports, delivered, { ...standing, connectionId })
+    const { row: source, rule } = standing
+    if (source.state !== 'active') {
       return retryReply(
         context.db,
         reply.operationId,
@@ -210,8 +229,7 @@ const sendReply = (
         Math.min(reply.createdAt + REPLY_WINDOW, now + PAUSED_RETRY),
       )
     }
-    const plan =
-      saved ?? (answer === undefined ? undefined : planReply(context.db, reply, row, setup.reply, answer.text))
+    const plan = saved ?? (answer === undefined ? undefined : planReply(context.db, reply, source, rule, answer.text))
     if (plan === undefined)
       return yield* finish(context, reply, ports, delivered, {
         outcome: 'unknown',
@@ -220,6 +238,13 @@ const sendReply = (
       })
     yield* sendPieces(context, reply, plan, ports, delivered)
   })
+
+/** Which turn `reply` answers: its operation, and the chat and Persona when it has them. */
+const refOf = (reply: ReplyRow): ReplyRef => ({
+  operationId: reply.operationId,
+  ...(reply.chatId === null ? {} : { chatId: reply.chatId }),
+  ...(reply.personaId === null ? {} : { personaId: reply.personaId }),
+})
 
 /** Source wake is single-flight in the live service; a retained dispatch intent therefore means process interruption. */
 export const deliverReplies = (context: EngineContext, ports: SourcePorts, delivered: Report) =>
@@ -231,11 +256,7 @@ export const deliverReplies = (context: EngineContext, ports: SourcePorts, deliv
         yield* sendReply(context, reply, undefined, ports, delivered)
         continue
       }
-      const answer = yield* ports.answer({
-        operationId: reply.operationId,
-        ...(reply.chatId === null ? {} : { chatId: reply.chatId }),
-        ...(reply.personaId === null ? {} : { personaId: reply.personaId }),
-      })
+      const answer = yield* ports.answer(refOf(reply))
       if (answer === undefined) waiting = true
       else yield* sendReply(context, reply, answer, ports, delivered)
     }

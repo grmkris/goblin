@@ -186,19 +186,34 @@ const routesTool = (run: RunProgram) =>
     },
   })
 
+/** One conversation's route as the model asks for it: the Source, the conversation's key, and places by name. */
+const RouteInput = Schema.Struct({
+  source: Schema.String.check(Schema.isMaxLength(64)),
+  key: SourceKeyId,
+  to: Schema.Literals(['topic', 'persona', 'listen', 'ignore', 'held']),
+  topic: Schema.optionalKey(TopicName),
+  persona: Schema.optionalKey(PersonaName),
+})
+
+/** The route `source_route` asks for, its Topic Personal when the model named none. */
+const askedOf = (input: typeof RouteInput.Type): AskedRoute =>
+  input.to === 'persona'
+    ? {
+        to: 'persona',
+        persona: input.persona ?? '',
+        ...(input.topic === undefined ? {} : { topic: input.topic }),
+      }
+    : input.to === 'topic' || input.to === 'listen'
+      ? { to: input.to, topic: input.topic ?? 'Personal' }
+      : { to: input.to }
+
 /** `source_route`: one conversation's route, with a receipt the owner can undo. */
 const routeTool = (run: RunProgram) =>
   typedTool({
     name: 'source_route',
     description:
       "Change where one conversation of a Source goes, only on the owner's direct request: `source` is its id and `key` the conversation's key, both from source_routes; `to` is topic (turns in a Topic, answered by you and sent back), persona (answered by a Persona there), listen (kept in a Topic as notes, no answer), ignore, or held; `topic` (topic, persona and listen) is the Topic's name, Personal when left out; `persona` (persona only) the Persona's name. What the conversation held is delivered in order.",
-    input: Schema.Struct({
-      source: Schema.String.check(Schema.isMaxLength(64)),
-      key: SourceKeyId,
-      to: Schema.Literals(['topic', 'persona', 'listen', 'ignore', 'held']),
-      topic: Schema.optionalKey(TopicName),
-      persona: Schema.optionalKey(PersonaName),
-    }),
+    input: RouteInput,
     output: Done,
     replay: 'safe',
     execute: async (input, api) => {
@@ -207,17 +222,7 @@ const routeTool = (run: RunProgram) =>
         Effect.gen(function* () {
           if (input.to === 'persona' && input.persona === undefined)
             return yield* new InvalidInput({ reason: 'source_route_persona' })
-          const asked: AskedRoute =
-            input.to === 'persona'
-              ? {
-                  to: 'persona',
-                  persona: input.persona ?? '',
-                  ...(input.topic === undefined ? {} : { topic: input.topic }),
-                }
-              : input.to === 'topic' || input.to === 'listen'
-                ? { to: input.to, topic: input.topic ?? 'Personal' }
-                : { to: input.to }
-          const route = yield* routeOfAsked(asked)
+          const route = yield* routeOfAsked(askedOf(input))
           const { summary } = yield* (yield* Sources).route(
             input.source,
             { key: input.key, route },

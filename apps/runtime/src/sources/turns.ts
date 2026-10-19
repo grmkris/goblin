@@ -66,6 +66,9 @@ const isText = (block: { readonly type: string }): block is TextContent => block
 /** What is added to an answer that reached the output limit, as the web transcript's receipt says. */
 const CUT_OFF = '(Cut off at the output limit. Ask it to continue.)'
 
+/** An answer's words, with the line saying so when it was `cut` off at the output limit. */
+const withCutOff = (text: string, cut: boolean) => (!cut ? text : text === '' ? CUT_OFF : `${text}\n\n${CUT_OFF}`)
+
 /** A Pi call's failure as the programs take one: Pi's own error through `toAppError`. */
 const piFailure = (failure: PiFailure) => Effect.fail(toAppError(failure.cause))
 
@@ -95,7 +98,7 @@ const goblinAnswer = (chat: string, operationId: string, receipt: TurnOrigin['re
     const final = result.text?.trim() ?? ''
     const question = final === '' ? askedChoice(entries) : undefined
     const text = final === '' ? askedText(entries) : final
-    const answer = !cutOff(entries) ? text : text === '' ? CUT_OFF : `${text}\n\n${CUT_OFF}`
+    const answer = withCutOff(text, cutOff(entries))
     return { text: answer, ...(question === undefined ? {} : { question }) } satisfies Answer
   })
 

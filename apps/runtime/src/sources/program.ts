@@ -496,6 +496,19 @@ const replayed = (row: SourceRow, occurredAt: number, at: number): boolean =>
   (row.confirmedAt !== null && occurredAt < row.confirmedAt * 1000 - REPLAY_GRACE)
 
 /**
+ * A lifecycle notice on `row`'s subscription: one the server terminated is subscribed again by the alarm, and a gap in
+ * a tool read pulls again; any other changes nothing.
+ */
+const onLifecycle = (row: SourceRow, source: Loaded, type: string, now: number) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+    if (type === 'terminated') patchSource(db, row.id, { resubscribeDue: true }, now)
+    else if (type === 'gap' && source.setup.read.from === 'tool') patchSource(db, row.id, { pullDue: true }, now)
+    else return
+    return (yield* AgentInput).scheduleSources(1)
+  })
+
+/**
  * A delivery to a Source's subscription (handler `source-wake`), for its active binding only. An occurrence is taken
  * while the Source is bound as it was confirmed (else it pauses for review): from the event's data at once, or by the
  * pull its alarm runs. A terminated subscription is subscribed again by the alarm, and a gap pulls again. The
@@ -510,13 +523,7 @@ export const consumeSourceEvent = (engine: SourceEngine, ports: SourcePorts, con
     const source = yield* loaded(row)
     const { envelope } = context
     const now = yield* epochSeconds
-    if ('type' in envelope) {
-      if (envelope.type === 'terminated') patchSource(db, row.id, { resubscribeDue: true }, now)
-      else if (envelope.type === 'gap' && source.setup.read.from === 'tool')
-        patchSource(db, row.id, { pullDue: true }, now)
-      else return
-      return input.scheduleSources(1)
-    }
+    if ('type' in envelope) return yield* onLifecycle(row, source, envelope.type, now)
     if (envelope.name !== context.subscription.name) return
     if (replayed(row, Date.parse(envelope.timestamp), yield* Clock.currentTimeMillis)) return
     if (!(yield* holds(source))) return yield* Effect.asVoid(markPaused(row, 'review', CHANGED))

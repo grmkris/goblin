@@ -9,6 +9,7 @@ import {
   type SourceKeyValues,
   type SourceRoute,
   type SourceScalar,
+  type SourceSetup,
   type SpeaksForMe,
   fillTemplate,
 } from '@goblin/contracts'
@@ -137,6 +138,25 @@ const noticeBody = (text: string) => routineSummary(text.replaceAll(/[\s\p{Cc}]+
 /** A template filled as an argument record; anything else (a template is always one) is no arguments. */
 export const asArguments = (value: unknown): Record<string, unknown> => (isRecord(value) ? value : {})
 
+/** The turn one owner message makes in `topic`, written by the connection's `label` in its conversation. */
+const turnOf = (
+  route: RouteRow,
+  topic: number,
+  operationId: string,
+  label: string,
+  { held, note }: { readonly held: Held; readonly note: string },
+) => {
+  const where = conversationWords({ values: valuesOf(route), title: route.title })
+  const words = held.text.trim() === '' ? ONLY_ATTACHMENTS : held.text
+  return {
+    topic,
+    operationId,
+    author: where === '' ? label : `${label} · ${where}`,
+    text: `${note}${words}`,
+    ...(held.kept === undefined ? {} : { kept: held.kept }),
+  }
+}
+
 /** One owner message to where its conversation's route says; `note` goes before its words. */
 const send = (
   context: EngineContext,
@@ -153,15 +173,7 @@ const send = (
     if (target.to === 'ignore') return
     const operationId = yield* turnOperation(source.row.id, held.itemId)
     const label = yield* ports.label(source.row.connectionId)
-    const where = conversationWords({ values: valuesOf(route), title: route.title })
-    const words = held.text.trim() === '' ? ONLY_ATTACHMENTS : held.text
-    const turn = {
-      topic: target.topic,
-      operationId,
-      author: where === '' ? label : `${label} · ${where}`,
-      text: `${note}${words}`,
-      ...(held.kept === undefined ? {} : { kept: held.kept }),
-    }
+    const turn = turnOf(route, target.topic, operationId, label, { held, note })
     if (target.to === 'listen') return yield* ports.keep(turn)
     const attributes = { [RunAttribute.sourceMessage]: operationId }
     const failed = (error: AppError) =>
@@ -260,6 +272,30 @@ const attachmentsOf = (item: unknown, pointer: string | undefined): readonly unk
   return Array.isArray(found) ? found : []
 }
 
+/** What goblin reads of a message: whether the owner speaks in it, its conversation, its words and its attachments. */
+type Message = {
+  readonly owner: boolean
+  readonly conversation: Conversation
+  readonly text: string
+  readonly blocks: readonly unknown[]
+}
+
+/**
+ * `item` as the setup reads it; none when it is not incoming (by `read.direction`), is someone else's while the setup
+ * drops those, is in no conversation goblin can key, or has neither words nor attachments.
+ */
+const messageOf = (setup: SourceSetup, item: unknown): Message | undefined => {
+  if (setup.read.direction !== undefined && !matches(item, setup.read.direction)) return undefined
+  const owner = speaks(item, setup.speaksForMe)
+  if (!owner && setup.others === 'drop') return undefined
+  const conversation = conversationOf(item, setup.key, setup.read.title)
+  const found = valueAt(item, setup.read.text)
+  const text = typeof found === 'string' ? found : ''
+  const blocks = attachmentsOf(item, setup.read.attachments)
+  if (conversation === undefined || (text.trim() === '' && blocks.length === 0)) return undefined
+  return { owner, conversation, text, blocks }
+}
+
 /**
  * One message: incoming (by `read.direction`), in a conversation goblin can key, with words or attachments. A
  * conversation seen for the first time takes the setup's `newKeys`. The owner's own message goes where its route says,
@@ -268,24 +304,18 @@ const attachmentsOf = (item: unknown, pointer: string | undefined): readonly unk
  */
 const take = (context: EngineContext, source: Loaded, item: unknown, itemId: string, ports: SourcePorts) =>
   Effect.gen(function* () {
-    const { row, setup } = source
-    if (setup.read.direction !== undefined && !matches(item, setup.read.direction)) return
-    const owner = speaks(item, setup.speaksForMe)
-    if (!owner && setup.others === 'drop') return
-    const conversation = conversationOf(item, setup.key, setup.read.title)
-    const found = valueAt(item, setup.read.text)
-    const text = typeof found === 'string' ? found : ''
-    const blocks = attachmentsOf(item, setup.read.attachments)
-    if (conversation === undefined || (text.trim() === '' && blocks.length === 0)) return
+    const { row } = source
+    const message = messageOf(source.setup, item)
+    if (message === undefined) return
+    const { owner, conversation, text, blocks } = message
     const route = yield* routeFor(context, source, conversation, ports)
     const target = routeOf(route)
+    if (target.to === 'ignore') return
     if (owner) {
-      if (target.to === 'ignore') return
       const kept = blocks.length === 0 ? undefined : yield* ports.receive(row.connectionId, blocks)
       const held = { sourceId: row.id, itemId, key: conversation.key, text, kept }
       return yield* send(context, source, route, { held, note: '' }, ports)
     }
-    if (target.to === 'ignore') return
     const notice = yield* noticeOf(source, conversation, target, itemId, text)
     yield* ports.notice(notice(yield* ports.label(row.connectionId)))
   })
@@ -331,6 +361,15 @@ const readPage = (source: Loaded, cursor: string | null, ports: SourcePorts): Ef
     }
   })
 
+/** Each message of a page taken in order; one without an id of its own is left. */
+const takePage = (context: EngineContext, source: Loaded, page: Page, ports: SourcePorts) =>
+  Effect.gen(function* () {
+    for (const item of page.items) {
+      const id = itemIdOf(item, page.id, '')
+      if (id !== '') yield* take(context, source, item, id, ports)
+    }
+  })
+
 /**
  * A tool read from the Source's cursor, a page at a time, each message taken and the cursor following each page, while
  * the Source is active at the binding it started with.
@@ -341,10 +380,7 @@ export const pull = (context: EngineContext, source: Loaded, ports: SourcePorts)
       const row = sourceRow(context.db, source.row.id)
       if (row?.state !== 'active' || row.binding !== source.row.binding) return
       const page = yield* readPage(source, row.cursor, ports)
-      for (const item of page.items) {
-        const id = itemIdOf(item, page.id, '')
-        if (id !== '') yield* take(context, source, item, id, ports)
-      }
+      yield* takePage(context, source, page, ports)
       if (page.next === undefined) return
       checkpoint(context.db, row.id, row.binding, page.next)
       if (page.items.length === 0 || page.next === row.cursor) return

@@ -47,6 +47,10 @@ const SCALARS = new Set(['string', 'number', 'integer', 'boolean', 'null'])
 const COMBINATORS = ['allOf', 'anyOf', 'oneOf']
 const STRUCTURE = ['type', 'properties', 'items', 'prefixItems', 'additionalProperties', 'patternProperties']
 
+/** The schemas `schema` combines: the members of its `allOf`, `anyOf` and `oneOf`, in that order. */
+const combined = (schema: Readonly<Record<string, unknown>>): readonly unknown[] =>
+  COMBINATORS.flatMap((key): unknown[] => (Array.isArray(schema[key]) ? schema[key] : []))
+
 /**
  * The schema's own branches: itself (unless it only combines others), and those of `allOf`, `anyOf` and `oneOf`, with
  * a local `$ref` followed.
@@ -63,8 +67,7 @@ function branches(root: Readonly<Record<string, unknown>>, schema: Readonly<Reco
     }
     const combines = COMBINATORS.some((key) => key in each)
     if (!combines || STRUCTURE.some((key) => key in each)) found.push(each)
-    for (const key of COMBINATORS)
-      for (const branch of Array.isArray(each[key]) ? each[key] : []) visit(branch, level + 1)
+    for (const branch of combined(each)) visit(branch, level + 1)
   }
   visit(schema, depth)
   return found
