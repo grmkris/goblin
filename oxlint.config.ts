@@ -163,6 +163,41 @@ export default defineConfig({
         'shadcn/require-static-classes': 'error',
       },
     },
+    // The triggers in packages/ui set no classes of their own: each renders the app's control through `render`, styled
+    // by that control's class in apps/web/src (and its open state, e.g. `[data-panel-open]`). shadcn/lint reads the
+    // render element since 0.2.3; these are the only such classes, by name, and they resolve in the app's stylesheet.
+    {
+      files: ['apps/web/src/**/*.tsx'],
+      rules: {
+        'shadcn/no-restyle': [
+          'error',
+          {
+            allow: ['layout'],
+            contracts: [
+              {
+                pattern: '^CollapsibleTrigger$',
+                allow: [
+                  'layout',
+                  'console-trigger',
+                  'event-advanced-toggle',
+                  'grant-text',
+                  'grant-toggle',
+                  'server-toggle',
+                  'switch-expand',
+                  'switch-row',
+                ],
+              },
+              { pattern: '^DrawerTrigger$', allow: ['layout', 'message-action', 'turn-map-tab'] },
+              {
+                pattern: '^DropdownMenuTrigger$',
+                allow: ['layout', 'block-action', 'sidebar-place', 'sidebar-row', 'sidebar-row-more'],
+              },
+              { pattern: '^PopoverTrigger$', allow: ['layout', 'sidebar-row', 'turn-map-trigger', 'usage-indicator'] },
+            ],
+          },
+        ],
+      },
+    },
     // The components own their appearance: they define the styles no-restyle protects and need structural values such
     // as `ring-[3px]` (shadcn/lint's recommended setup). no-raw-colors, no-inline-styles and no-unknown-classes stay on.
     {
