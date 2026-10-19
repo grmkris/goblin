@@ -1,8 +1,9 @@
 import type { ModelEndpointView, OnboardingKickoff, OnboardingStep, OnboardingView } from '@goblin/contracts'
 import { ONBOARDING_STEPS, type OnboardingChange, type OnboardingConnect } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
 import { sendOwnerMessage } from '../agent-program.ts'
-import { Chats } from '../chats/service.ts'
+import { ChatOperations, Chats } from '../chats/service.ts'
 import { epochSeconds } from '../clock.ts'
 import { InvalidInput } from '../http/errors.ts'
 import { Inference } from '../inference/service.ts'
@@ -90,8 +91,8 @@ export const onboardingContext = (session: string) =>
 /**
  * Start's kickoff (ADR 0079), whole: a channel named `channel` with the goal as its description, the kickoff recorded
  * into it, the goal sent there as the owner's first message, and Start done. Each piece runs under an operation id made
- * from the kickoff's, so a retry replays what an earlier attempt made and goes on from there. The only refusals (no
- * goal, a taken name) come before anything is made.
+ * from the kickoff's, so a retry replays what an earlier attempt made and goes on from there. Name and empty-goal
+ * refusals precede creation; message admission may still fail after the channel exists.
  */
 export const kickoff = ({ goal, channel, operationId }: OnboardingKickoff) =>
   Effect.gen(function* () {
@@ -104,7 +105,14 @@ export const kickoff = ({ goal, channel, operationId }: OnboardingKickoff) =>
     // Recorded before the message goes, so the first model request in the channel already sees the reminder.
     const now = yield* epochSeconds
     yield* Onboarding.use((onboarding) => onboarding.kickoff(topic.conversation, now))
-    yield* sendOwnerMessage(topic.conversation, { text, operationId: `${operationId}:message` })
+    const messageOperation = `${operationId}:message`
+    const receipt = Option.getOrUndefined(
+      yield* ChatOperations.use((operations) => operations.receipt(topic.conversation, messageOperation)),
+    )
+    // A lost final response must not re-admit a message Pi already accepted: its budget or channel may have changed.
+    // Admitted/refused receipts still retry the same submission through Pi's own deduplication.
+    if (receipt?.state !== 'submitted' && receipt?.state !== 'settled')
+      yield* sendOwnerMessage(topic.conversation, { text, operationId: messageOperation })
     const view = yield* changeOnboarding({ status: 'done', step: 'goblin' })
     return { topic, view }
   })

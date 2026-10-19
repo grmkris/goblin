@@ -157,7 +157,10 @@ async function kickoffSequence(agent: ProbeStub) {
   const first = await callOwner(agent, (api) => api.onboarding.kickoff({ payload: kickoff }))
   const chat = first.topic.conversation
   await agent.settle(chat, 'kickoff:message')
+  // A response can be lost after acceptance. Current admission must not strand that completed kickoff's retry.
+  await callOwner(agent, (api) => api.topics.update({ params: { id: first.topic.id }, payload: { archived: true } }))
   const replay = await callOwner(agent, (api) => api.onboarding.kickoff({ payload: kickoff }))
+  await callOwner(agent, (api) => api.topics.update({ params: { id: first.topic.id }, payload: { archived: false } }))
   const taken = await callOwner(agent, (api) =>
     Effect.result(api.onboarding.kickoff({ payload: { ...kickoff, operationId: 'kickoff-again' } })),
   )
@@ -167,6 +170,7 @@ async function kickoffSequence(agent: ProbeStub) {
     status: first.view.status,
     kicked: first.view.kickoff,
     replayed: replay.topic.id === first.topic.id,
+    replayedArchived: replay.topic.archivedAt !== undefined,
     taken: Result.isFailure(taken) ? taken.failure._tag : 'made',
     named: (topics ?? []).filter((topic) => topic.name === kickoff.channel).length,
     context: (await agent.requestFor(kickoff.goal))?.context ?? '',
@@ -213,6 +217,7 @@ async function topicChecks(base: string): Promise<void> {
       status: Schema.String,
       kicked: Schema.Boolean,
       replayed: Schema.Boolean,
+      replayedArchived: Schema.Boolean,
       taken: Schema.String,
       named: Schema.Number,
       context: Schema.String,
@@ -224,6 +229,7 @@ async function topicChecks(base: string): Promise<void> {
     status: 'done',
     kicked: true,
     replayed: true,
+    replayedArchived: true,
     taken: 'Conflict',
     named: 1,
   })
