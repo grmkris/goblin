@@ -28,8 +28,9 @@ Overview edits the Topic's description and instructions with an expected revisio
 editor; Shared pages through visible history across the channel's chats; Work lists its threads, helpers, routines
 and incoming Source routes. The panel preserves mounted chat and thread drafts.
 
-`pi/topic-context.ts` reads the current Topic guidance before each model request through `topics/context.ts`, including
-threads, helpers, Personas and routine runs. Guidance grants no authority. If the read fails, the extension aborts its
+`pi/topic-context.ts` reads the current Topic guidance before each model request from the session's setup scope
+(`topics/context.ts`; the scope reads the Topic's row), including threads, helpers, Personas and routine runs. Guidance
+grants no authority. If the read fails, the extension aborts its
 generation through Pi's public `abortTask` with the invocation context; cancellation depends on Pi storage accepting
 the mark. The in-memory Harness regression checks zero provider calls on failure and a healthy subsequent request.
 

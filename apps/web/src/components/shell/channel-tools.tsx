@@ -16,6 +16,7 @@ import { ChevronRightIcon } from 'lucide-react'
 import { grantsQuery, serversQuery } from '../../mcp/queries.ts'
 import { setupCatalogQuery } from '../../setup/queries.ts'
 import { messageOf } from '../../lib/query/app-error.ts'
+import { unavailableIn } from '../../lib/setup.ts'
 import { reportUnexpected } from '../../lib/unexpected.ts'
 import { connectionAnchor } from '../server-card.tsx'
 
@@ -72,6 +73,7 @@ export function ChannelTools({ topic, onEdit }: { readonly topic: TopicView; rea
         <h2>Background helpers</h2>
         <p>{topic.setup.subagents ? 'Goblin can delegate work to helpers.' : 'Background helpers are off here.'}</p>
       </section>
+      <ChannelUnavailable topic={topic} available={available} servers={servers.data} />
       {(topic.setup.mcpServers === 'all' || topic.setup.skills === 'all' || topic.setup.apps === 'all') && (
         <p className="channel-info-footnote">
           “All” includes what you allow now and in the future. Choose a list to keep this channel focused.
@@ -81,11 +83,21 @@ export function ChannelTools({ topic, onEdit }: { readonly topic: TopicView; rea
   )
 }
 
-function connectionStatus(server: ServerView, topic: TopicView, count: number): string {
-  if (!hasServer(topic.setup, server.connectionId)) return 'Off in this channel'
-  if (server.status === 'needs_auth') return 'Needs sign-in'
-  if (server.status !== 'connected') return 'Unavailable'
-  return count === 0 ? 'No tools allowed' : 'Ready'
+/** How a connection stands in this channel, most limiting first. */
+type ConnectionStatus = 'off' | 'needs_auth' | 'unavailable' | 'no_tools' | 'ready'
+const STATUS_LABEL: Readonly<Record<ConnectionStatus, string>> = {
+  off: 'Off in this channel',
+  needs_auth: 'Needs sign-in',
+  unavailable: 'Unavailable',
+  no_tools: 'No tools allowed',
+  ready: 'Ready',
+}
+
+function connectionStatus(server: ServerView, topic: TopicView, allowed: number): ConnectionStatus {
+  if (!hasServer(topic.setup, server.connectionId)) return 'off'
+  if (server.status === 'needs_auth') return 'needs_auth'
+  if (server.status !== 'connected') return 'unavailable'
+  return allowed === 0 ? 'no_tools' : 'ready'
 }
 
 function ConnectionDetails({
@@ -105,11 +117,11 @@ function ConnectionDetails({
       ?.tools.filter((tool) => hasTool(topic.setup, server.connectionId, tool.name)) ?? []
   const status = connectionStatus(server, topic, allowed.length)
   return (
-    <details className="channel-info-capability" key={server.connectionId}>
+    <details className="channel-info-capability">
       <summary>
         <ChevronRightIcon aria-hidden />
         <span>{server.label}</span>
-        <small data-ready={status === 'Ready' || undefined}>{status}</small>
+        <small data-ready={status === 'ready' || undefined}>{STATUS_LABEL[status]}</small>
       </summary>
       <ul>
         {allowed.map((tool) => (
@@ -143,10 +155,6 @@ function ChannelConnections({
   readonly servers: readonly ServerView[]
   readonly permissions: readonly Grant[]
 }) {
-  const missingServers =
-    topic.setup.mcpServers === 'all'
-      ? []
-      : topic.setup.mcpServers.filter((item) => !servers.some((server) => server.connectionId === item.connectionId))
   return (
     <section className="channel-info-section">
       <h2>Connections</h2>
@@ -162,11 +170,6 @@ function ChannelConnections({
           permissions={permissions}
         />
       ))}
-      {missingServers.map((item) => (
-        <p key={item.connectionId}>
-          {item.connectionId} <small>Unavailable connection</small>
-        </p>
-      ))}
       <Link className="channel-info-link" to="/connections">
         Add a connection
       </Link>
@@ -176,22 +179,10 @@ function ChannelConnections({
 
 function ChannelSkills({ topic, available }: { readonly topic: TopicView; readonly available: SetupCatalog }) {
   const libraries = available.libraries.filter(({ connectionId }) => hasLibrary(topic.setup, connectionId))
-  const missingSkills =
-    topic.setup.skills === 'all'
-      ? []
-      : topic.setup.skills.filter(
-          (item) =>
-            !libraries.some(
-              (library) =>
-                library.connectionId === item.connectionId &&
-                (!('name' in item) ||
-                  library.skills.some((skill) => skill.name === item.name && skill.uri === item.uri)),
-            ),
-        )
   return (
     <section className="channel-info-section">
       <h2>Available skills</h2>
-      {libraries.length === 0 && missingSkills.length === 0 && (
+      {libraries.length === 0 && (
         <p className="channel-info-empty">
           No skill libraries enabled here. Enable skills on a connection to see what it offers.
         </p>
@@ -223,9 +214,33 @@ function ChannelSkills({ topic, available }: { readonly topic: TopicView; readon
           </details>
         )
       })}
-      {missingSkills.map((item) => (
-        <p key={`${item.connectionId}:${'name' in item ? item.name : '*'}`}>
-          {'name' in item ? item.name : item.connectionId} <small>Selected, currently unavailable</small>
+    </section>
+  )
+}
+
+/**
+ * What this channel's setup lists that cannot be used now, as the setup editor names it (`unavailableIn`). A connection
+ * with its own row above already says how it stands there.
+ */
+function ChannelUnavailable({
+  topic,
+  available,
+  servers,
+}: {
+  readonly topic: TopicView
+  readonly available: SetupCatalog
+  readonly servers: readonly ServerView[]
+}) {
+  const gone = unavailableIn(topic.setup, available).filter(
+    ({ item }) => item.kind !== 'server' || !servers.some((server) => server.connectionId === item.connectionId),
+  )
+  if (gone.length === 0) return null
+  return (
+    <section className="channel-info-section">
+      <h2>Unavailable</h2>
+      {gone.map(({ label, reason }) => (
+        <p key={label}>
+          <span>{label}</span> <small>{reason}</small>
         </p>
       ))}
     </section>

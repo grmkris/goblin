@@ -74,27 +74,34 @@ production allows everything but `/api/` and `/mcp`, other stages nothing. `Meet
 
 ### First-run Start
 
-ADRs 0062 and 0079. A short, goal-first setup flow the owner may pass by or skip; no page waits for it, whatever its status, so the app is drawn
-the same for an open, skipped or finished Start. An owner who signs in through Create an account (`routes/login.tsx`)
-lands on `/start/welcome`.
+ADRs 0062, 0079 and [0080](../adr/0080-server-owned-start-kickoff.md). A short, goal-first setup flow the owner may
+pass by or skip; no page waits for it, whatever its status, so the app is drawn the same for an open, skipped or finished
+Start. An owner who signs in through Create an account (`routes/login.tsx`) lands on `/start/welcome`.
 
 **The page** (`components/start`). `/start/<step>` fills the screen (`routes/__root.tsx` draws no shell around it): one
 task per screen beside a panel in the sidebar's own green, which on a phone narrows to a band with a count and one
 segment per step:
-1. welcome: the owner's goal, with examples that fill an editable first message;
+1. welcome: the owner's goal. Each example (`start/steps.tsx` `IDEAS`) fills the goal, names the channel and picks
+   the service groups the shelf shows first; a goal of the owner's own keeps the defaults;
 2. model: the deployment's models unless the owner brings their own endpoint and key, in Settings' own form
    (`model-endpoint-card.tsx` `ModelEndpoint`);
-3. services: the shelf (`server-add.tsx` `SuggestedServers`); the server just connected from here, by a sign-in that
-   came back or one that needed none, offers Use suggested access (`start/connect-server.tsx`);
-4. review the channel name and first message. Stable operations create the channel and submit once across retries.
+3. services: the shelf (`server-add.tsx` `SuggestedServers`, previewing those groups); the server just connected
+   from here, by a sign-in that came back or one that needed none, offers Use suggested access
+   (`start/connect-server.tsx`);
+4. review the channel name and first message. `POST /api/onboarding/kickoff` does the rest in one call
+   (`onboarding/program.ts` `kickoff`): it creates the channel with the goal as its description, records the kickoff
+   into it, sends the goal as the owner's first message and marks Start done, each under an operation id made from the
+   kickoff's, so a retry replays it. A submitted or settled chat operation receipt skips message admission on retry,
+   even if the channel or budget has since changed. Only typed pre-creation failures (`topic_name_taken`, `topic_name`
+   or `empty_message`) reopen the draft; later admission failures and unknown outcomes keep it frozen for a retry.
    The tab retains the draft across model setup and OAuth returns and clears it on finish or sign-out.
 
 Continue marks the step gone through; Skip setup skips Start. Finishing narrows the panel into the sidebar as the chat
 appears.
 
 **State** (`onboarding/`). `app_onboarding` keeps the status the owner set (`done`, `skipped`; `open` otherwise, and
-again after they reopen it), the steps they went through and the kickoff's time and logical channel id. `GET /api/onboarding` answers from
-the agent alone: a step is done once the owner went through it, the model step also once they set their own endpoint
+again after they reopen it), the steps they went through and the kickoff: its time and logical channel id, both or
+neither. `GET /api/onboarding` answers from the agent alone: a step is done once the owner went through it, the model step also once they set their own endpoint
 (`Inference.view`), the goblin step once the kickoff was sent. It also carries the endpoint in use and how many servers
 are connected. A step id an older Start had is dropped when the row is read.
 

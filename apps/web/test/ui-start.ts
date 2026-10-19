@@ -161,8 +161,8 @@ async function drive(browser: Browser, origin: string, label: string, options: B
         JSON.stringify({
           goal: 'Plan a trip and keep every booking in one place',
           channel: 'Travel plans',
+          groups: ['travel', 'yours'],
           operation: '',
-          accepted: false,
         }),
       ),
     )

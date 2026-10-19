@@ -1,7 +1,7 @@
 import { Attention, PRIMARY_CHAT } from '@goblin/contracts'
 import { Effect, Result, Schema } from 'effect'
 import { expect } from 'vitest'
-import { type AgentFetch, callOwner } from '../owner-client.ts'
+import { type AgentFetch, callOwner, workspaceSnapshot } from '../owner-client.ts'
 import { ModelRequest, requestTurns } from './conversation-checks.ts'
 import { type NativeCase, probeOf } from './native-case.ts'
 import { type Probes, type ProbeStub, inWorker } from './probe.ts'
@@ -148,7 +148,38 @@ async function guidanceSequence(agent: ProbeStub) {
   }
 }
 
+/**
+ * Start's kickoff (ADR 0079) in one call: a channel with the goal as its description, the goal sent there with the
+ * reminder to begin useful work, Start done. A retry replays it, and a taken name is refused before anything is made.
+ */
+async function kickoffSequence(agent: ProbeStub) {
+  const kickoff = { goal: 'Plan a balcony garden for spring', channel: 'Balcony garden', operationId: 'kickoff' }
+  const first = await callOwner(agent, (api) => api.onboarding.kickoff({ payload: kickoff }))
+  const chat = first.topic.conversation
+  await agent.settle(chat, 'kickoff:message')
+  // A response can be lost after acceptance. Current admission must not strand that completed kickoff's retry.
+  await callOwner(agent, (api) => api.topics.update({ params: { id: first.topic.id }, payload: { archived: true } }))
+  const replay = await callOwner(agent, (api) => api.onboarding.kickoff({ payload: kickoff }))
+  await callOwner(agent, (api) => api.topics.update({ params: { id: first.topic.id }, payload: { archived: false } }))
+  const taken = await callOwner(agent, (api) =>
+    Effect.result(api.onboarding.kickoff({ payload: { ...kickoff, operationId: 'kickoff-again' } })),
+  )
+  const { topics } = await workspaceSnapshot(await agent.fetch(new Request('https://agent/api/workspace/events')))
+  return {
+    description: first.topic.description ?? '',
+    status: first.view.status,
+    kicked: first.view.kickoff,
+    replayed: replay.topic.id === first.topic.id,
+    replayedArchived: replay.topic.archivedAt !== undefined,
+    taken: Result.isFailure(taken) ? taken.failure._tag : 'made',
+    named: (topics ?? []).filter((topic) => topic.name === kickoff.channel).length,
+    context: (await agent.requestFor(kickoff.goal))?.context ?? '',
+    lines: await transcript(agent, chat),
+  }
+}
+
 export const probes: Probes = {
+  'onboarding-kickoff': inWorker(({ agent }) => kickoffSequence(agent)),
   'topic-guidance': inWorker(({ agent }) => guidanceSequence(agent)),
   'topic-memory': inWorker(({ agent }) => topicMemorySequence(agent)),
   'topic-routine': inWorker(({ agent }) => topicRoutineSequence(agent)),
@@ -178,6 +209,33 @@ const TopicRoutineRun = Schema.Struct({
 
 /** The native Topic cases: two Topics remember apart, and a Topic's routine reports to its own Conversation. */
 async function topicChecks(base: string): Promise<void> {
+  const kickoff = await probeOf(
+    base,
+    'onboarding-kickoff',
+    Schema.Struct({
+      description: Schema.String,
+      status: Schema.String,
+      kicked: Schema.Boolean,
+      replayed: Schema.Boolean,
+      replayedArchived: Schema.Boolean,
+      taken: Schema.String,
+      named: Schema.Number,
+      context: Schema.String,
+      lines: Schema.Array(Schema.String),
+    }),
+  )
+  expect(kickoff).toMatchObject({
+    description: 'Plan a balcony garden for spring',
+    status: 'done',
+    kicked: true,
+    replayed: true,
+    replayedArchived: true,
+    taken: 'Conflict',
+    named: 1,
+  })
+  expect(kickoff.context).toContain('Begin by doing one useful piece')
+  // The goal went once, however often the kickoff was asked.
+  expect(kickoff.lines.filter((line) => line.startsWith('pi.user') && line.includes('balcony garden'))).toHaveLength(1)
   const guidance = await probeOf(
     base,
     'topic-guidance',

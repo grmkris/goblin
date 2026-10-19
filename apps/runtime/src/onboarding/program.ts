@@ -1,10 +1,14 @@
-import type { ModelEndpointView, OnboardingStep, OnboardingView } from '@goblin/contracts'
+import type { ModelEndpointView, OnboardingKickoff, OnboardingStep, OnboardingView } from '@goblin/contracts'
 import { ONBOARDING_STEPS, type OnboardingChange, type OnboardingConnect } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
-import { Chats } from '../chats/service.ts'
+import * as Option from 'effect/Option'
+import { sendOwnerMessage } from '../agent-program.ts'
+import { ChatOperations, Chats } from '../chats/service.ts'
 import { epochSeconds } from '../clock.ts'
+import { InvalidInput } from '../http/errors.ts'
 import { Inference } from '../inference/service.ts'
 import { McpServers } from '../mcp/service.ts'
+import { createTopic } from '../topics/program.ts'
 import { Onboarding } from './service.ts'
 import type { OnboardingRecord } from './store.ts'
 
@@ -18,7 +22,7 @@ const stepsOf = (record: OnboardingRecord | undefined, model: ModelEndpointView)
     welcome: went('welcome'),
     model: went('model') || model.source === 'owner',
     services: went('services'),
-    goblin: record?.kickoffAt !== undefined || went('goblin'),
+    goblin: record?.kickoff !== undefined || went('goblin'),
   }
   return ONBOARDING_STEPS.map((id) => ({ id, done: done[id] }))
 }
@@ -33,12 +37,12 @@ export const onboardingView = Effect.gen(function* () {
     steps: stepsOf(record, model),
     model,
     connected: servers.filter((server) => server.status === 'connected').length,
-    kickoff: record?.kickoffAt !== undefined,
+    kickoff: record?.kickoff !== undefined,
   }
   return view
 })
 
-/** The owner finishes, skips or reopens Start, goes through a step, or sends the kickoff; answered with the view. */
+/** The owner finishes, skips or reopens Start, or goes through a step; answered with the view. */
 export const changeOnboarding = (change: OnboardingChange) =>
   Effect.gen(function* () {
     const now = yield* epochSeconds
@@ -78,10 +82,37 @@ const KICKOFF_ASK =
  */
 export const onboardingContext = (session: string) =>
   Effect.gen(function* () {
+    const kickoff = (yield* Onboarding.use((onboarding) => onboarding.read))?.kickoff
+    if (kickoff === undefined || (yield* epochSeconds) - kickoff.at >= KICKOFF_WINDOW) return undefined
     const chats = yield* Chats
-    const record = yield* Onboarding.use((onboarding) => onboarding.read)
-    if (record?.kickoffChat === undefined || (yield* chats.session(record.kickoffChat)) !== session) return undefined
+    return (yield* chats.session(kickoff.chat)) === session ? KICKOFF_ASK : undefined
+  })
+
+/**
+ * Start's kickoff (ADR 0079), whole: a channel named `channel` with the goal as its description, the kickoff recorded
+ * into it, the goal sent there as the owner's first message, and Start done. Each piece runs under an operation id made
+ * from the kickoff's, so a retry replays what an earlier attempt made and goes on from there. Name and empty-goal
+ * refusals precede creation; message admission may still fail after the channel exists.
+ */
+export const kickoff = ({ goal, channel, operationId }: OnboardingKickoff) =>
+  Effect.gen(function* () {
+    const text = goal.trim()
+    if (text === '') return yield* new InvalidInput({ reason: 'empty_message' })
+    const topic = yield* createTopic(
+      { name: channel, description: text.slice(0, 1000), operationId: `${operationId}:channel` },
+      'owner',
+    )
+    // Recorded before the message goes, so the first model request in the channel already sees the reminder.
     const now = yield* epochSeconds
-    const kickoff = record?.kickoffAt !== undefined && now - record.kickoffAt < KICKOFF_WINDOW
-    return kickoff ? KICKOFF_ASK : undefined
+    yield* Onboarding.use((onboarding) => onboarding.kickoff(topic.conversation, now))
+    const messageOperation = `${operationId}:message`
+    const receipt = Option.getOrUndefined(
+      yield* ChatOperations.use((operations) => operations.receipt(topic.conversation, messageOperation)),
+    )
+    // A lost final response must not re-admit a message Pi already accepted: its budget or channel may have changed.
+    // Admitted/refused receipts still retry the same submission through Pi's own deduplication.
+    if (receipt?.state !== 'submitted' && receipt?.state !== 'settled')
+      yield* sendOwnerMessage(topic.conversation, { text, operationId: messageOperation })
+    const view = yield* changeOnboarding({ status: 'done', step: 'goblin' })
+    return { topic, view }
   })

@@ -9,50 +9,25 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@goblin/ui'
-import {
-  ArchiveIcon,
-  ArchiveRestoreIcon,
-  EllipsisIcon,
-  EyeOffIcon,
-  HashIcon,
-  PencilIcon,
-  SearchIcon,
-} from 'lucide-react'
+import { ArchiveIcon, ArchiveRestoreIcon, EllipsisIcon, EyeOffIcon, PencilIcon, SearchIcon } from 'lucide-react'
 import { messageOf } from '../../lib/query/app-error.ts'
 import { isArchived } from '../../lib/topics.ts'
-import { useTopics } from '../../lib/workspace/hooks.ts'
 import { updateWorkspaceTopicMutation } from '../../lib/workspace/mutations.ts'
 import { TopicDialog } from './topic-dialog.tsx'
 
-/** The channel's name as its bar shows it: `#` and the Topic's name, with a pulse while its agent works. */
-export function ChannelName({ name, working }: { readonly name: string; readonly working: boolean }) {
-  return (
-    <span className="channel-title">
-      <HashIcon aria-hidden />
-      <span className="truncate">{name}</span>
-      {working && <span className="thread-busy" aria-label="Working" />}
-    </span>
-  )
-}
-
 /**
- * The channel's name, and on a server with Topics its menu, as Slack's channel header has: rename, open its Topic setup
- * (ADR 0040), keep the Topic out of automatic search or let it back in, and archive it or restore it (never Personal).
- * A failure shows under the bar.
+ * A channel's actions, in its info panel's header: rename, keep the Topic out of automatic search or let it back in,
+ * and archive it or restore it (never Personal). A failure shows in the panel and under the chat's bar.
  */
 export function ChannelMenu({
   topic,
-  name,
   onFailure,
 }: {
-  readonly topic: TopicView | undefined
-  readonly name: string
+  readonly topic: TopicView
   readonly onFailure: (text: string) => void
 }) {
-  const topics = useTopics()
   const update = useMutation(updateWorkspaceTopicMutation)
   const [renaming, setRenaming] = useState(false)
-  if (topic === undefined || topics.length === 0) return null
   const change = (patch: UpdateTopic) =>
     update.mutate(
       { id: topic.id, change: patch },
@@ -62,7 +37,7 @@ export function ChannelMenu({
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" aria-label={`Actions for #${name}`} />}>
+        <DropdownMenuTrigger render={<Button variant="ghost" aria-label={`Actions for #${topic.name}`} />}>
           <EllipsisIcon aria-hidden />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">

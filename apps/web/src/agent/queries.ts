@@ -1,6 +1,7 @@
 import type { ChatId, ModelEndpointInput } from '@goblin/contracts'
 import { mutationOptions } from '@tanstack/react-query'
 import { owner } from '../lib/api.ts'
+import { onboardingKeys } from '../onboarding/queries.ts'
 
 /**
  * The agent itself, on the owner API: today's usage, its model and model endpoint, resident
@@ -44,8 +45,8 @@ export const modelEndpointQuery = owner.apiQuery({
 })
 
 /**
- * Sets the owner's own model endpoint, or goes back to the deployment's with null. The models on offer and today's
- * usage (whose cap holds on the deployment's endpoint only) follow it, so both are read again.
+ * Sets the owner's own model endpoint, or goes back to the deployment's with null. The models on offer, today's usage
+ * (whose cap holds on the deployment's endpoint only) and Start's view (its model step) follow it, so all are read again.
  */
 export const changeModelEndpointMutation = mutationOptions({
   ...owner.apiMutation({
@@ -57,6 +58,7 @@ export const changeModelEndpointMutation = mutationOptions({
     return Promise.all([
       client.invalidateQueries({ queryKey: agentKeys.model }),
       client.invalidateQueries({ queryKey: agentKeys.usage }),
+      client.invalidateQueries({ queryKey: onboardingKeys.view }),
     ])
   },
 })

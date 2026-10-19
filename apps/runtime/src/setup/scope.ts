@@ -50,7 +50,14 @@ type Allow = {
 }
 
 /** The Topic a chat works in (ADR 0040), and whether its setup holds an item: a refusal says what held it back. */
-export type ScopeTopic = { readonly id: number; readonly name: string; readonly holds: (item: SetupItem) => boolean }
+export type ScopeTopic = {
+  readonly id: number
+  readonly name: string
+  /** The channel guidance the owner wrote (ADR 0079); empty when there is none. */
+  readonly description: string
+  readonly instructions: string
+  readonly holds: (item: SetupItem) => boolean
+}
 
 /**
  * What a chat's agent may use: its Topic's setup, narrowed by its switches and those of every spawner above a subagent,
@@ -237,16 +244,21 @@ const routineScope = (db: Db, scope: SetupScope, runId: string): SetupScope => {
   }
 }
 
-/** A Topic as a scope reads it, live: its name and its setup. A Topic that is not there holds nothing. */
+/** A Topic as a scope reads it, live: its name, guidance and setup. A Topic that is not there holds nothing. */
 const topicOf = (db: Db, id: number): (ScopeTopic & { readonly setup: TopicSetup }) | undefined => {
   const row = db
-    .select({ name: appTopics.name, setup: appTopics.setup })
+    .select({
+      name: appTopics.name,
+      description: appTopics.description,
+      instructions: appTopics.instructions,
+      setup: appTopics.setup,
+    })
     .from(appTopics)
     .where(eq(appTopics.id, id))
     .get()
   if (row === undefined) return undefined
   const setup = topicSetupOf(row.setup)
-  return { id, name: row.name, setup, holds: (item) => holds(setup, item) }
+  return { id, ...row, setup, holds: (item) => holds(setup, item) }
 }
 
 /** The setup a Persona answers with in `chat` (its fork, or a routine's run handed to it); none in any other chat. */

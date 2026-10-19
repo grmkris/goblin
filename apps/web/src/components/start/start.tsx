@@ -7,15 +7,11 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { ONBOARDING_STEPS, PRIMARY_CHAT, type OnboardingStep, type OnboardingView } from '@goblin/contracts'
 import { Button, GoblinMark, Receipt } from '@goblin/ui'
 import { CheckIcon, CircleAlertIcon } from 'lucide-react'
-import { useRef, useState } from 'react'
-import { modelEndpointQuery } from '../../agent/queries.ts'
-import { createWorkspaceTopicMutation } from '../../lib/workspace/mutations.ts'
-import { clearStartDraft, suggestedChannel, useStartDraft } from './draft.ts'
-import { submitMutation } from '../../conversations/queries.ts'
-import { describeError, messageOf } from '../../lib/query/app-error.ts'
+import { useState } from 'react'
+import { clearStartDraft, kickoffAllowsEdit, useStartDraft } from '../../onboarding/draft.ts'
+import { messageOf } from '../../lib/query/app-error.ts'
 import { reportUnexpected } from '../../lib/unexpected.ts'
-import { changeOnboardingMutation, onboardingQuery } from '../../onboarding/queries.ts'
-import { messageBody } from '../use-conversation.ts'
+import { changeOnboardingMutation, kickoffMutation, onboardingQuery } from '../../onboarding/queries.ts'
 import { GoblinStep, ModelStep, STEP_TEXT, ServicesStep, WelcomeStep } from './steps.tsx'
 
 /** How a sign-in Start began came back (the callback's own words): connected, or why not. */
@@ -139,6 +135,9 @@ function ReturnNotice({ search }: { readonly search: StartSearch }) {
   )
 }
 
+/** Whether the agent has a model to answer with: the model step and the kickoff wait for one. */
+const hasModel = (view: OnboardingView | undefined): boolean => view !== undefined && view.model.source !== 'none'
+
 /**
  * Back and Continue move through setup. Model setup waits for a configured endpoint; services remain optional.
  * The welcome has its own button, and the last step can finish without sending the first message.
@@ -165,11 +164,7 @@ function StartNav({
         Finish without it
       </Button>
     ) : (
-      <Button
-        variant="default"
-        disabled={step === 'model' && (view === undefined || view.model.source === 'none')}
-        onClick={onNext}
-      >
+      <Button disabled={step === 'model' && !hasModel(view)} onClick={onNext}>
         Continue
       </Button>
     )
@@ -193,76 +188,60 @@ function StartNav({
   )
 }
 
+/** Start's flow: going through a step, the kickoff, finishing without it, and skipping. */
 function useStartFlow(step: OnboardingStep) {
   const read = useQuery(onboardingQuery)
-  const model = useQuery(modelEndpointQuery)
+  const view = read.data
   const navigate = useNavigate()
   const change = useMutation(changeOnboardingMutation)
-  const submit = useMutation(submitMutation)
-  const create = useMutation(createWorkspaceTopicMutation)
+  const kickoff = useMutation(kickoffMutation)
   const saved = useStartDraft()
-  const lock = useRef(false)
-  const [starting, setStarting] = useState(false)
   const { leaving, leave } = useLeave()
+  const starting = kickoff.isPending || (change.isPending && change.variables?.status !== undefined)
   const next = () => {
-    if (step === 'model' && (model.data === undefined || model.data.source === 'none')) return
+    if (step === 'model' && !hasModel(view)) return
     change.mutate({ step })
     const following = ONBOARDING_STEPS[ONBOARDING_STEPS.indexOf(step) + 1]
     if (following !== undefined) navigate({ to: '/start/$step', params: { step: following } }).catch(reportUnexpected)
   }
-  const finish = async (kickoff: boolean) => {
-    if (lock.current) return
-    if (kickoff && (model.data === undefined || model.data.source === 'none')) {
-      await navigate({ to: '/start/$step', params: { step: 'model' } })
+  const start = () => {
+    if (!hasModel(view)) {
+      navigate({ to: '/start/$step', params: { step: 'model' } }).catch(reportUnexpected)
       return
     }
-    lock.current = true
-    setStarting(true)
-    try {
-      let chat: string = PRIMARY_CHAT
-      if (kickoff) {
-        const current = saved.begin()
-        const topic = await create
-          .mutateAsync({
-            name: current.channel.trim(),
-            description: current.goal.trim().slice(0, 1000),
-            operationId: `${current.operation}:channel`,
-          })
-          .catch((error: unknown) => {
-            // Only a definite refusal permits editing a frozen operation. Unknown outcomes retry its identity.
-            if (['conflict', 'invalid_input'].includes(describeError(error).code)) saved.rejected()
-            throw error
-          })
-        chat = topic.conversation
-        if (!current.accepted) {
-          await change.mutateAsync({ kickoff: true, kickoffChat: chat })
-          await submit.mutateAsync({
-            id: chat,
-            message: messageBody(current.goal.trim(), `${current.operation}:message`),
-          })
-          saved.accepted(current)
-        }
-      }
-      await change.mutateAsync({ status: 'done', step: 'goblin' })
-      clearStartDraft()
-      leave(chat)
-    } catch {
-      // expected: the responsible mutation renders its error; the unchanged operation and draft remain retryable
-    } finally {
-      lock.current = false
-      setStarting(false)
-    }
+    const { goal, channel, operation } = saved.begin()
+    kickoff.mutate(
+      { goal: goal.trim(), channel: channel.trim(), operationId: operation },
+      {
+        onSuccess: ({ topic }) => {
+          clearStartDraft()
+          leave(topic.conversation)
+        },
+        // Only a typed refusal known to precede creation reopens the draft. Admission failures and untyped responses
+        // may follow a partial kickoff: retain the operation so a retry reaches the same channel and message.
+        onError: (error) => {
+          if (kickoffAllowsEdit(error)) saved.rejected()
+        },
+      },
+    )
   }
-  const failure = submit.error ?? create.error ?? change.error ?? read.error ?? model.error
-  const view = read.data === undefined ? undefined : { ...read.data, model: model.data ?? read.data.model }
-  const skip = () => {
-    if (!starting) change.mutate({ status: 'skipped' }, { onSuccess: () => leave() })
-  }
-  return { saved, view, starting, leaving, failure, next, finish, skip }
+  const finish = () =>
+    change.mutate(
+      { status: 'done', step: 'goblin' },
+      {
+        onSuccess: () => {
+          clearStartDraft()
+          leave()
+        },
+      },
+    )
+  const skip = () => change.mutate({ status: 'skipped' }, { onSuccess: () => leave() })
+  const failure = kickoff.error ?? change.error ?? read.error
+  return { saved, view, starting, leaving, failure, next, start, finish, skip }
 }
 
 export function StartPage({ step, search }: { readonly step: OnboardingStep; readonly search: StartSearch }) {
-  const { saved, view, starting, leaving, failure, next, finish, skip } = useStartFlow(step)
+  const { saved, view, starting, leaving, failure, next, start, finish, skip } = useStartFlow(step)
   const { draft } = saved
   return (
     <div className="start" aria-busy={starting} {...(leaving ? { 'data-leaving': true } : {})}>
@@ -280,17 +259,13 @@ export function StartPage({ step, search }: { readonly step: OnboardingStep; rea
             <WelcomeStep
               goal={draft.goal}
               onChange={(goal) => saved.edit({ goal })}
-              onContinue={() => {
-                if (draft.channel === 'My first project') saved.edit({ channel: suggestedChannel(draft.goal) })
-                next()
-              }}
+              onPick={saved.pick}
+              onContinue={next}
             />
           )}
           {step === 'model' && <ModelStep />}
-          {step === 'services' && <ServicesStep connected={search.connected} goal={draft.goal} />}
-          {step === 'goblin' && (
-            <GoblinStep draft={draft} onChange={saved.edit} pending={starting} onStart={() => void finish(true)} />
-          )}
+          {step === 'services' && <ServicesStep connected={search.connected} featured={draft.groups} />}
+          {step === 'goblin' && <GoblinStep draft={draft} onChange={saved.edit} pending={starting} onStart={start} />}
           {failure !== null && (
             <Receipt tone="error">
               <CircleAlertIcon aria-hidden />
@@ -298,7 +273,7 @@ export function StartPage({ step, search }: { readonly step: OnboardingStep; rea
             </Receipt>
           )}
         </div>
-        <StartNav step={step} view={view} finishing={starting} onNext={next} onFinish={() => void finish(false)} />
+        <StartNav step={step} view={view} finishing={starting} onNext={next} onFinish={finish} />
       </section>
     </div>
   )

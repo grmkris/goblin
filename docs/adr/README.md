@@ -70,4 +70,5 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0076](0076-batch-tool-grants.md) | Batch changes to exact tool grants | Accepted |
 | [0077](0077-prod-is-the-default-branch.md) | prod is the repository's default branch | Accepted |
 | [0078](0078-one-sidebar-and-one-apps-launcher.md) | One sidebar and one Apps launcher | Accepted |
-| [0079](0079-channel-info-and-goal-first-start.md) | Channel info and goal-first Start | Accepted |
+| [0079](0079-channel-info-and-goal-first-start.md) | Channel info and goal-first Start | Accepted; amended by 0080 |
+| [0080](0080-server-owned-start-kickoff.md) | Server-owned Start kickoff | Accepted |

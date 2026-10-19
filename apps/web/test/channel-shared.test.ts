@@ -69,4 +69,12 @@ describe('channel shared items', () => {
       ]),
     ).toHaveLength(1)
   })
+  it('keeps a link written twice in one message once', () => {
+    const twice = {
+      id: 12,
+      kind: 'pi.user',
+      model: [{ role: 'user', content: 'https://example.com/a and https://example.com/a' }],
+    }
+    expect(sharedPages([{ chat: '30', entries: [twice] }])).toHaveLength(1)
+  })
 })

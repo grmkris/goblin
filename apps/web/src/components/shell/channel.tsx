@@ -2,20 +2,31 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Navigate, useNavigate } from '@tanstack/react-router'
 import type { ConversationView, TopicView } from '@goblin/contracts'
 import { Button, TopBar, TopBarTitle } from '@goblin/ui'
-import { InfoIcon } from 'lucide-react'
+import { HashIcon, InfoIcon } from 'lucide-react'
 import { reportUnexpected } from '../../lib/unexpected.ts'
 import { rememberChannel } from '../../lib/last-channel.ts'
 import { type PanelSearch, panelItems } from '../../lib/panel.ts'
 import { channelOf, isArchived, isChannel, topicOfChannel } from '../../lib/topics.ts'
 import { useActivity, useConversation, useConversations, useTopics } from '../../lib/workspace/hooks.ts'
-import { ArchivedBanner, ChannelName } from './channel-menu.tsx'
+import { ArchivedBanner } from './channel-menu.tsx'
 import { ChatView } from './chat-view.tsx'
 import { PanelProvider } from './panel.tsx'
 import { NavigationButton } from './shell.tsx'
 import { ThreadPanel } from './thread-panel.tsx'
 import { ChannelInfo } from './channel-info.tsx'
 
-/** A channel's bar: on a phone the navigation's button, then `#` and the Topic's name with its menu. */
+/** The channel's name as its bar shows it: `#` and the Topic's name, with a pulse while its agent works. */
+function ChannelName({ name, working }: { readonly name: string; readonly working: boolean }) {
+  return (
+    <span className="channel-title">
+      <HashIcon aria-hidden />
+      <span className="truncate">{name}</span>
+      {working && <span className="thread-busy" aria-label="Working" />}
+    </span>
+  )
+}
+
+/** A channel's bar: on a phone the navigation's button, then `#` and the Topic's name, and its Info button. */
 function ChannelHeader({
   view,
   topic,
