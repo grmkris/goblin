@@ -72,6 +72,20 @@ function scripted(replies: Reply[]): ProviderStreams {
   return { stream, streamSimple: stream }
 }
 
+/** Models whose one provider is `scripted(replies)`, for a cheap model call outside Pi. */
+const cheapModels = (replies: Reply[]) => {
+  const models = createModels()
+  models.setProvider(
+    createProvider({
+      id: MODEL_PROVIDER,
+      models: [{ ...model, provider: MODEL_PROVIDER }],
+      auth: { apiKey: { name: 'keyless fixture', resolve: async () => ({ auth: {} }) } },
+      api: scripted(replies),
+    }),
+  )
+  return models
+}
+
 const call = (name: string, args: JsonObject): Reply => ({
   content: [{ type: 'toolCall', id: `call-${name}`, name, arguments: args }],
   stopReason: 'toolUse',
@@ -380,19 +394,6 @@ describe('run telemetry (unit)', () => {
 })
 
 describe('run telemetry outside Pi (unit)', () => {
-  const cheapModels = (replies: Reply[]) => {
-    const models = createModels()
-    models.setProvider(
-      createProvider({
-        id: MODEL_PROVIDER,
-        models: [{ ...model, provider: MODEL_PROVIDER }],
-        auth: { apiKey: { name: 'keyless fixture', resolve: async () => ({ auth: {} }) } },
-        api: scripted(replies),
-      }),
-    )
-    return models
-  }
-
   it('records a cheap model call with its purpose and tokens, and a failed one', async () => {
     const collected = new CollectedRuns()
     const telemetry = new RunTelemetry([collected])

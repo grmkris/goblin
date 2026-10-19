@@ -51,6 +51,28 @@ const recording = () => {
   return { ran, handlers }
 }
 
+/** The real handlers over stubs: only the services a case names do anything. */
+const fixture = (parts: { readonly events?: Layer.Layer<Events>; readonly inspection?: Layer.Layer<Inspection> }) =>
+  serve(
+    servedInternal(InboundHandlers).pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          parts.events ?? stub(Events),
+          parts.inspection ?? stub(Inspection),
+          stub(Chats),
+          stub(ChatOperations),
+          stub(PiSessions),
+          stub(AgentInput),
+          stub(Conversations),
+          stub(Notices),
+          stub(Changes),
+          stub(Files),
+          Layer.succeed(Resident, currentResident().service),
+        ),
+      ),
+    ),
+  )
+
 const ASK = { author: 'Claude', input: 'hello', operationId: 'op-1', waitMs: 0 }
 const internal = (path: string, body?: unknown, headers: Record<string, string> = {}) =>
   body === undefined ? get(`/internal${path}`, headers) : post(`/internal${path}`, body, headers)
@@ -103,28 +125,6 @@ describe('the internal API served by the agent', () => {
 })
 
 describe('the inbound handlers', () => {
-  /** The real handlers over stubs: only the services a case names do anything. */
-  const fixture = (parts: { readonly events?: Layer.Layer<Events>; readonly inspection?: Layer.Layer<Inspection> }) =>
-    serve(
-      servedInternal(InboundHandlers).pipe(
-        Layer.provide(
-          Layer.mergeAll(
-            parts.events ?? stub(Events),
-            parts.inspection ?? stub(Inspection),
-            stub(Chats),
-            stub(ChatOperations),
-            stub(PiSessions),
-            stub(AgentInput),
-            stub(Conversations),
-            stub(Notices),
-            stub(Changes),
-            stub(Files),
-            Layer.succeed(Resident, currentResident().service),
-          ),
-        ),
-      ),
-    )
-
   it("hands a connection's Events webhook bytes and signing headers to ingress, and answers its result", async () => {
     const seen: unknown[] = []
     const events = stub(Events, {

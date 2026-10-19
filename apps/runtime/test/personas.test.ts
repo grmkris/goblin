@@ -342,6 +342,38 @@ const run = <A, E>(layer: Layer.Layer<Provided>, program: Effect.Effect<A, E, Pr
 const fails = <A, E>(layer: Layer.Layer<Provided>, program: Effect.Effect<A, E, Provided>) =>
   Effect.runPromise(Effect.flip(Effect.provide(program, layer)))
 
+/** The services Undo runs over: real registries on real SQLite, no Pi. */
+const services = () => {
+  const parts = fixture()
+  // Stop is never reached here: no Undo here archives a Topic with chats.
+  // SAFETY: renaming a Topic never reaches the chat registry; only an archive reads its open chats (`openIn`).
+  const conversations = Object.assign(Object.create(null) as Conversations['Service'], {
+    openIn: () => Effect.succeed([]),
+  })
+  const layer = Layer.mergeAll(
+    Layer.effect(Topics, Topics.make(parts.topics)),
+    Layer.effect(Personas, Personas.make(parts.personas)),
+    Layer.effect(Receipts, Receipts.make(parts.receipts)),
+    Layer.succeed(Conversations, conversations),
+    Layer.succeed(AgentInput, unread),
+    Layer.succeed(RoutineRuns, unread),
+    Layer.succeed(RoutineControl, unread),
+    Layer.succeed(Invocations, unread),
+    Layer.succeed(PiSessions, unread),
+    // A setup is never edited here: only a `topic.setup` receipt's Undo reaches these.
+    Layer.succeed(Setups, unread),
+    Layer.succeed(McpServers, unread),
+    Layer.succeed(McpGrants, unread),
+    Layer.succeed(McpConnections, unread),
+    Layer.succeed(Skills, unread),
+    Layer.succeed(AppEngine, unread),
+    // Only a Source's route receipt reaches the Sources.
+    Layer.succeed(Sources, unread),
+    FlowEvents.noop,
+  ).pipe(Layer.provide(Layer.merge(KeyedLock.layer, Layer.succeed(Changes, makeChanges()))))
+  return { ...parts, layer }
+}
+
 const asUser = (text: string) => [{ role: 'user' as const, content: [{ type: 'text' as const, text }], timestamp: 1 }]
 
 describe("a chat's memory keeps what Personas and Delegates add", () => {
@@ -355,38 +387,6 @@ describe("a chat's memory keeps what Personas and Delegates add", () => {
 })
 
 describe('organize receipts and Undo', () => {
-  /** The services Undo runs over: real registries on real SQLite, no Pi. */
-  const services = () => {
-    const parts = fixture()
-    // Stop is never reached here: no Undo here archives a Topic with chats.
-    // SAFETY: renaming a Topic never reaches the chat registry; only an archive reads its open chats (`openIn`).
-    const conversations = Object.assign(Object.create(null) as Conversations['Service'], {
-      openIn: () => Effect.succeed([]),
-    })
-    const layer = Layer.mergeAll(
-      Layer.effect(Topics, Topics.make(parts.topics)),
-      Layer.effect(Personas, Personas.make(parts.personas)),
-      Layer.effect(Receipts, Receipts.make(parts.receipts)),
-      Layer.succeed(Conversations, conversations),
-      Layer.succeed(AgentInput, unread),
-      Layer.succeed(RoutineRuns, unread),
-      Layer.succeed(RoutineControl, unread),
-      Layer.succeed(Invocations, unread),
-      Layer.succeed(PiSessions, unread),
-      // A setup is never edited here: only a `topic.setup` receipt's Undo reaches these.
-      Layer.succeed(Setups, unread),
-      Layer.succeed(McpServers, unread),
-      Layer.succeed(McpGrants, unread),
-      Layer.succeed(McpConnections, unread),
-      Layer.succeed(Skills, unread),
-      Layer.succeed(AppEngine, unread),
-      // Only a Source's route receipt reaches the Sources.
-      Layer.succeed(Sources, unread),
-      FlowEvents.noop,
-    ).pipe(Layer.provide(Layer.merge(KeyedLock.layer, Layer.succeed(Changes, makeChanges()))))
-    return { ...parts, layer }
-  }
-
   it('records what changed with the revision it left, and offers Undo only while that holds', async () => {
     const { layer, receipts, personas } = services()
     const made = await run(layer, createPersona({ ...scout, operationId: 'op-1' }, { actor: 'agent', chat: '1' }))

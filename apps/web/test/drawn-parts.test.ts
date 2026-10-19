@@ -42,6 +42,16 @@ const result = Schema.decodeUnknownSync(DelegateResultData)({
 
 const snapshot = (entries: readonly unknown[]) => projectSnapshot({ type: 'snapshot', entries, tools: [], inbox: [] })
 const user = (id: number, content: string) => ({ id, kind: 'pi.user', model: [{ role: 'user', content }] })
+const held = (id: number, persona: number, hold?: object) => ({
+  id,
+  kind: 'app.persona',
+  data: Schema.decodeUnknownSync(PersonaAnswerData)({
+    ...answer,
+    persona,
+    operationId: `op-${String(id)}`,
+    ...(hold === undefined ? {} : { hold }),
+  }),
+})
 
 describe('entries the app writes into a chat', () => {
   it('draws a thread head, a Persona ask and answer, a Topic brief and a Delegate result as their own parts', () => {
@@ -82,16 +92,6 @@ describe('entries the app writes into a chat', () => {
   })
 
   it("keeps a Persona's hold on its newest answer only: its next answer settles it (ADR 0041)", () => {
-    const held = (id: number, persona: number, hold?: object) => ({
-      id,
-      kind: 'app.persona',
-      data: Schema.decodeUnknownSync(PersonaAnswerData)({
-        ...answer,
-        persona,
-        operationId: `op-${String(id)}`,
-        ...(hold === undefined ? {} : { hold }),
-      }),
-    })
     const grant = { kind: 'grant', connectionId: 'sq', name: 'quote', fork: '40' }
     const approval = { kind: 'approval', approvalId: 'mcp:41:c1', connectionId: 'sq', name: 'bid', fork: '41' }
     const parts = conversationParts(snapshot([held(1, 1, grant), held(2, 2, approval), held(3, 1), held(4, 1, grant)]))

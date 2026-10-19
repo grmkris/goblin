@@ -62,6 +62,12 @@ const through = async (
   const { value, lines } = await Effect.runPromise(withLines(http[side](request, edge)))
   return { response: value, lines: lines.map(({ line }) => line) }
 }
+/** One request through one of the Worker's own routes, answered by `serve`: its response and the lines it logged. */
+const route = async (request: Request, serve: () => Promise<Response>) => {
+  const http = await built
+  const { value, lines } = await Effect.runPromise(withLines(http.route(request, () => attempt(serve))))
+  return { response: value, lines: lines.map(({ line }) => line) }
+}
 
 const write = (path: string, init: { headers?: Record<string, string>; body?: BodyInit; method?: string } = {}) =>
   new Request(`${APP}${path}`, {
@@ -331,12 +337,6 @@ describe('the account API in the Worker', () => {
 })
 
 describe("the Worker's own routes", () => {
-  const route = async (request: Request, serve: () => Promise<Response>) => {
-    const http = await built
-    const { value, lines } = await Effect.runPromise(withLines(http.route(request, () => attempt(serve))))
-    return { response: value, lines: lines.map(({ line }) => line) }
-  }
-
   it('answers with the API headers and the reference', async () => {
     const request = new Request(`${APP}/mcp`, { method: 'POST', headers: { 'cf-ray': 'ray-4' } })
     const { response, lines } = await route(request, async () => Response.json({ ok: true }))

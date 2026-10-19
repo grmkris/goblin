@@ -25,6 +25,7 @@ const call = (id: string, state: ToolState = 'done', server?: string, extra: Par
 })
 const kinds = (parts: readonly Part[]) => parts.map((part) => part.kind)
 const works = (parts: readonly Part[]) => parts.flatMap((part) => (part.kind === 'work' ? [part] : []))
+const live = (run: Part[]) => works(groupWork([user(), ...run], none))[0]?.live
 
 describe('folding a turn’s quiet work', () => {
   it('folds a run of thinking and tool calls into one part and leaves the answer outside', () => {
@@ -81,7 +82,6 @@ describe('folding a turn’s quiet work', () => {
     expect(parts.filter((part) => part.kind === 'work').map(partKey)).toEqual(['work:1:0', 'work:5:0:text'])
   })
   it('says it is live while a tool runs, thinking streams or the working row waits, and not once everything settled', () => {
-    const live = (run: Part[]) => works(groupWork([user(), ...run], none))[0]?.live
     expect(live([call('a'), call('b', 'running')])).toBe(true)
     expect(live([call('a'), thoughts('t', true)])).toBe(true)
     expect(live([call('a'), working])).toBe(true)

@@ -125,6 +125,25 @@ const conversations = {
   kindOf: () => Effect.succeed('main' as const),
 }
 
+const launching = (details: unknown) =>
+  fakeApps({
+    launch: () =>
+      Effect.succeed({
+        kind: 'mcp' as const,
+        connectionId: 'fixture',
+        uri: BOARD,
+        arguments: { marker: 'kept' },
+        result: details,
+      }),
+  })
+const launched = async (details: unknown, others: OtherParts): Promise<Record<string, unknown>> => {
+  const { fetch } = appsServer({ apps: launching(details), others })
+  const response = await fetch(json('GET', '/api/apps/3/launch'))
+  expect(response.status).toBe(200)
+  // SAFETY: the launch endpoint answers a JSON object.
+  return (await response.json()) as Record<string, unknown>
+}
+
 describe('the apps group served by the agent', () => {
   it('keeps the App of a call with 201 while its tool still renders it, and 404 once it does not', async () => {
     const registered: { session: string; callId: string; origin: AppOrigin }[] = []
@@ -162,30 +181,12 @@ describe('the apps group served by the agent', () => {
   })
 
   it("launches a held call's App with the real result once the owner has decided, and the placeholder until then", async () => {
-    const launching = (details: unknown) =>
-      fakeApps({
-        launch: () =>
-          Effect.succeed({
-            kind: 'mcp' as const,
-            connectionId: 'fixture',
-            uri: BOARD,
-            arguments: { marker: 'kept' },
-            result: details,
-          }),
-      })
     const answered = { structuredContent: { rows: 3 }, content: [{ type: 'text', text: 'three rows' }] }
     const waiting = { result: () => Effect.succeed(Option.none()) }
     // SAFETY: the settled App reads only whether a held call still waits (`state`, `resultSealed`) and its call.
     const pending = { state: 'pending', resultSealed: null, sessionId: '7', sourceCallId: 'call-1' } as ApprovalRow
     const waitingApproval = { ...waiting, get: () => Effect.succeed(pending) }
     const decided = { result: () => Effect.succeed(Option.some(answered)) }
-    const launched = async (details: unknown, others: OtherParts): Promise<Record<string, unknown>> => {
-      const { fetch } = appsServer({ apps: launching(details), others })
-      const response = await fetch(json('GET', '/api/apps/3/launch'))
-      expect(response.status).toBe(200)
-      // SAFETY: the launch endpoint answers a JSON object.
-      return (await response.json()) as Record<string, unknown>
-    }
     for (const [kind, key, parts] of [
       ['approval-required', 'approvalId', 'approvals'],
       ['url-required', 'requestId', 'urlRequests'],

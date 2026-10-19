@@ -43,6 +43,10 @@ export class PiFailure extends Schema.TaggedError<PiFailure>()('PiFailure', {
 export const fromPi = <A, R>(effect: Effect.Effect<A, PiFailure, R>): Effect.Effect<A, AppError, R> =>
   effect.pipe(Effect.catchTag('PiFailure', (failure) => Effect.fail(toAppError(failure.cause))))
 
+/** Runs one Pi call as an Effect whose failure is a `PiFailure` naming `operation`. */
+const call = <A>(operation: typeof PiOperation.Type, run: (signal: AbortSignal) => PromiseLike<A>) =>
+  Effect.tryPromise({ try: run, catch: (cause) => new PiFailure({ operation, cause }) })
+
 /** A passive entry for a conversation: its model sees it at its next turn and no run starts. */
 type PassiveWrite = { readonly requestId: string; readonly entry: EntryDraft }
 
@@ -83,8 +87,6 @@ export class PiSessions extends Context.Service<
     PiSessions,
     Effect.gen(function* () {
       const { harness } = yield* AgentInput
-      const call = <A>(operation: typeof PiOperation.Type, run: (signal: AbortSignal) => PromiseLike<A>) =>
-        Effect.tryPromise({ try: run, catch: (cause) => new PiFailure({ operation, cause }) })
       const conversation = Effect.fn('PiSessions.conversation')(function* (session: string) {
         const found = yield* call('conversation', async () =>
           (await harness.pi()).conversation(conversationId(session), BACKGROUND),

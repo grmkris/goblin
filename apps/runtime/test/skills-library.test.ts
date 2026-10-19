@@ -117,6 +117,24 @@ const skillsAt = () => {
 let services: ReturnType<typeof skillsAt>
 let library: Skills['Service']
 const later = (ms: number) => services.run(TestClock.adjust(ms))
+const run = <A, E>(program: Effect.Effect<A, E, McpConnections | McpServers>) => services.run(program)
+
+/** `skill_activate` in conversation 4 of a Topic "Work" whose setup holds the skills `held`. */
+const activateIn = async (held: TopicSetup['skills'], handle: string) => {
+  const setup = { ...EVERYTHING, skills: held }
+  const scopeOfSession = fixedScopes({ '4': topicChatScope({ id: 2, name: 'Work', setup }) })
+  const layer = Layer.mergeAll(
+    knowledgeOver({ skills: library }),
+    Layer.mock(Resident)({ require: () => Effect.void }),
+    Layer.mock(Setups)({ scope: (session: string) => Effect.sync(() => scopeOfSession(session)) }),
+  )
+  const runProgram = <A>(program: Effect.Effect<A, AppError, AgentServices>): Promise<A> =>
+    // SAFETY: skill_activate needs only the Skills, Resident and Setups services provided here.
+    Effect.runPromise(Effect.provide(program, layer) as Effect.Effect<A, AppError>)
+  const activate = skillsExtension(runProgram).tools?.find((tool) => tool.name === 'skill_activate')
+  if (activate === undefined) throw new Error('skill_activate is not registered')
+  return executeTool(activate, { skill: handle }, inConversation(4))
+}
 
 beforeEach(async () => {
   services = skillsAt()
@@ -132,8 +150,6 @@ afterEach(async () => {
 })
 
 describe('skills over MCP (unit)', () => {
-  const run = <A, E>(program: Effect.Effect<A, E, McpConnections | McpServers>) => services.run(program)
-
   it('reads nothing from a server the owner has not turned skills on for', async () => {
     await run(library.setEnabled('lib', false))
     expect(await run(library.catalog())).toEqual({ skills: [], unavailable: [] })
@@ -230,23 +246,6 @@ describe("a skills library outside the Topic's setup (unit)", () => {
     served.down = true
     expect(await services.run(library.catalog({}, () => false))).toEqual({ skills: [], unavailable: [] })
   })
-
-  /** `skill_activate` in conversation 4 of a Topic "Work" whose setup holds the skills `held`. */
-  const activateIn = async (held: TopicSetup['skills'], handle: string) => {
-    const setup = { ...EVERYTHING, skills: held }
-    const scopeOfSession = fixedScopes({ '4': topicChatScope({ id: 2, name: 'Work', setup }) })
-    const layer = Layer.mergeAll(
-      knowledgeOver({ skills: library }),
-      Layer.mock(Resident)({ require: () => Effect.void }),
-      Layer.mock(Setups)({ scope: (session: string) => Effect.sync(() => scopeOfSession(session)) }),
-    )
-    const run = <A>(program: Effect.Effect<A, AppError, AgentServices>): Promise<A> =>
-      // SAFETY: skill_activate needs only the Skills, Resident and Setups services provided here.
-      Effect.runPromise(Effect.provide(program, layer) as Effect.Effect<A, AppError>)
-    const activate = skillsExtension(run).tools?.find((tool) => tool.name === 'skill_activate')
-    if (activate === undefined) throw new Error('skill_activate is not registered')
-    return executeTool(activate, { skill: handle }, inConversation(4))
-  }
 
   it("loads nothing when the model still asks for one of its skills, and offers to add it to the Topic's setup", async () => {
     expect(await activateIn([], 'lib:code-review')).toMatchObject({

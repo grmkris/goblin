@@ -83,6 +83,15 @@ const makeManager = (
   })
 }
 
+const read = async (resource: ResourceFixture, max?: number) => {
+  const manager = makeManager(undefined, true, resource, max)
+  try {
+    return await manager.connections.readResource('fixture', 'ui://fixture/view.html', 'app')
+  } finally {
+    await manager.dispose()
+  }
+}
+
 describe('official MCP SDK host interoperability (unit)', () => {
   it('keeps shared discovery separate from caller scopes and never sends correlation to the server', async () => {
     const official = handler()
@@ -296,14 +305,6 @@ describe('official MCP SDK host interoperability (unit)', () => {
     }
   })
   describe('a base64 blob App bundle', () => {
-    const read = async (resource: ResourceFixture, max?: number) => {
-      const manager = makeManager(undefined, true, resource, max)
-      try {
-        return await manager.connections.readResource('fixture', 'ui://fixture/view.html', 'app')
-      } finally {
-        await manager.dispose()
-      }
-    }
     it('decodes multibyte UTF-8 and hands the host text', async () => {
       const html = '<!doctype html><title>héllo – 世界 🙂</title>'
       const app = await read({ blob: base64(new TextEncoder().encode(html)) })
@@ -365,33 +366,33 @@ describe('official MCP SDK host interoperability (unit)', () => {
   })
 })
 
-describe('the connection manager as a service (unit)', () => {
-  /** A manager on a test clock whose connections close after 1 s unused; `opened` counts the handshakes. */
-  const idleManager = () => {
-    const official = handler()
-    const counts = { opened: 0 }
-    const services = servicesOf(
-      Layer.effect(
-        McpConnections,
-        Effect.orDie(
-          nativeManager({
-            servers: [serverConfig],
-            allows: (grant) => grants.allows(grant),
-            auth: () => ({ token: async () => 'fixture' }),
-            idleMs: 1000,
-            fetch: async (input, init) => {
-              const request = new Request(input, init)
-              const body = request.method === 'POST' ? await request.clone().text() : ''
-              if (/"method":"(?:server\/discover|initialize)"/u.test(body)) counts.opened += 1
-              return official.fetch(request)
-            },
-          }),
-        ),
-      ).pipe(Layer.provide(SingleFlight.layer), Layer.provideMerge(TestClock.layer())),
-    )
-    return { ...services, counts }
-  }
+/** A manager on a test clock whose connections close after 1 s unused; `opened` counts the handshakes. */
+const idleManager = () => {
+  const official = handler()
+  const counts = { opened: 0 }
+  const services = servicesOf(
+    Layer.effect(
+      McpConnections,
+      Effect.orDie(
+        nativeManager({
+          servers: [serverConfig],
+          allows: (grant) => grants.allows(grant),
+          auth: () => ({ token: async () => 'fixture' }),
+          idleMs: 1000,
+          fetch: async (input, init) => {
+            const request = new Request(input, init)
+            const body = request.method === 'POST' ? await request.clone().text() : ''
+            if (/"method":"(?:server\/discover|initialize)"/u.test(body)) counts.opened += 1
+            return official.fetch(request)
+          },
+        }),
+      ),
+    ).pipe(Layer.provide(SingleFlight.layer), Layer.provideMerge(TestClock.layer())),
+  )
+  return { ...services, counts }
+}
 
+describe('the connection manager as a service (unit)', () => {
   it('opens one connection for callers that connect at once', async () => {
     const { run, dispose, counts } = idleManager()
     try {
@@ -437,29 +438,30 @@ describe('the connection manager as a service (unit)', () => {
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+/** A server whose one tool answers after `answerMs`, sending progress every `progressMs` when asked for it. */
+const slowServer = (answerMs: number, progressMs?: number) =>
+  createMcpHandler(() => {
+    const server = lowLevelServer({ name: 'slow', version: '1.0.0' }, { capabilities: { tools: {} } })
+    server.setRequestHandler('tools/list', () => ({
+      tools: [{ name: 'slow', inputSchema: { type: 'object', properties: {} } }],
+    }))
+    server.setRequestHandler('tools/call', async (_request, ctx) => {
+      const token = ctx.mcpReq._meta?.progressToken
+      const started = Date.now()
+      let progress = 0
+      while (Date.now() - started < answerMs && !ctx.mcpReq.signal.aborted) {
+        await pause(progressMs ?? answerMs)
+        progress += 1
+        if (progressMs !== undefined && token !== undefined)
+          await ctx.mcpReq.notify({ method: 'notifications/progress', params: { progressToken: token, progress } })
+      }
+      return { content: [{ type: 'text', text: 'done' }] }
+    })
+    return server
+  })
+
 describe('a slow tool call (unit)', () => {
   const slowGrants = new MemoryGrants([{ connectionId: 'fixture', capability: 'tool', name: 'slow' }])
-  /** A server whose one tool answers after `answerMs`, sending progress every `progressMs` when asked for it. */
-  const slowServer = (answerMs: number, progressMs?: number) =>
-    createMcpHandler(() => {
-      const server = lowLevelServer({ name: 'slow', version: '1.0.0' }, { capabilities: { tools: {} } })
-      server.setRequestHandler('tools/list', () => ({
-        tools: [{ name: 'slow', inputSchema: { type: 'object', properties: {} } }],
-      }))
-      server.setRequestHandler('tools/call', async (_request, ctx) => {
-        const token = ctx.mcpReq._meta?.progressToken
-        const started = Date.now()
-        let progress = 0
-        while (Date.now() - started < answerMs && !ctx.mcpReq.signal.aborted) {
-          await pause(progressMs ?? answerMs)
-          progress += 1
-          if (progressMs !== undefined && token !== undefined)
-            await ctx.mcpReq.notify({ method: 'notifications/progress', params: { progressToken: token, progress } })
-        }
-        return { content: [{ type: 'text', text: 'done' }] }
-      })
-      return server
-    })
   const slowManager = (
     answerMs: number,
     progressMs?: number,

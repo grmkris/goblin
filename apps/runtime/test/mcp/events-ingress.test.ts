@@ -39,6 +39,34 @@ const refusedBy = (refusal: Effect.Effect<never, Internal | Forbidden | Resident
     ).pipe(Effect.provide(ReporterLive)),
   )
 
+/** Events over one active subscription to `connectionId`, whose server lookup is `server`. */
+const events = (server: Effect.Effect<McpServerConfig, NotFound | Internal>) => {
+  const row = {
+    id: 'sub-1',
+    remoteId: WEBHOOK.subscriptionId,
+    connectionId: 'notes',
+    name: 'message.received',
+    argumentsJson: '{}',
+    endpoint: 'https://notes.test/mcp',
+    status: 'active',
+  }
+  // A webhook for a tombstoned or invalid subscription reads only the rows, the grant and the server lookup.
+  return Effect.runPromise(
+    makeEvents({
+      connections: fake<EventsOptions['connections']>({ server: () => server }),
+      // SAFETY: the row holds every field of a subscription the engine reads here.
+      store: fake<EventsOptions['store']>({ byRemote: () => [row as Subscription], allows: () => true }),
+      cipher: unread,
+      principal: 'owner',
+      callback: () => Effect.succeed('https://goblin.test/hooks/mcp-events/owner/fixture/token'),
+      wake: () => Effect.void,
+      authority: Effect.void,
+      authorize: () => Effect.void,
+      connected: () => Effect.void,
+    }).pipe(Effect.provide(SingleFlight.layer)),
+  )
+}
+
 describe('the Events webhook ingress (unit)', () => {
   it("ends the subscription (410) only for the owner's own refusals", async () => {
     for (const refusal of [
@@ -63,34 +91,6 @@ describe('the Events webhook ingress (unit)', () => {
 })
 
 describe('which subscriptions stay valid (unit)', () => {
-  /** Events over one active subscription to `connectionId`, whose server lookup is `server`. */
-  const events = (server: Effect.Effect<McpServerConfig, NotFound | Internal>) => {
-    const row = {
-      id: 'sub-1',
-      remoteId: WEBHOOK.subscriptionId,
-      connectionId: 'notes',
-      name: 'message.received',
-      argumentsJson: '{}',
-      endpoint: 'https://notes.test/mcp',
-      status: 'active',
-    }
-    // A webhook for a tombstoned or invalid subscription reads only the rows, the grant and the server lookup.
-    return Effect.runPromise(
-      makeEvents({
-        connections: fake<EventsOptions['connections']>({ server: () => server }),
-        // SAFETY: the row holds every field of a subscription the engine reads here.
-        store: fake<EventsOptions['store']>({ byRemote: () => [row as Subscription], allows: () => true }),
-        cipher: unread,
-        principal: 'owner',
-        callback: () => Effect.succeed('https://goblin.test/hooks/mcp-events/owner/fixture/token'),
-        wake: () => Effect.void,
-        authority: Effect.void,
-        authorize: () => Effect.void,
-        connected: () => Effect.void,
-      }).pipe(Effect.provide(SingleFlight.layer)),
-    )
-  }
-
   it('drops a subscription whose server the owner removed (410)', async () => {
     const removed = await events(Effect.fail(new NotFound({ what: 'server notes' })))
     expect(await Effect.runPromise(removed.receive(WEBHOOK))).toEqual({ status: 410 })

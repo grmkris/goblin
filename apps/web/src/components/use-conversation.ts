@@ -51,14 +51,16 @@ const streams = new StreamPool((thread) => ({
   events: () => new BrowserPiEvents(`/api/conversations/${thread}/events`),
 }))
 
+/** Starts every followed conversation again from a fresh snapshot, while the page is visible. */
+const resume = () => {
+  if (document.visibilityState === 'visible') streams.resume()
+}
+
 let resuming = false
 /** Coming back to the tab, or back online, every followed conversation starts again from a fresh snapshot. */
 function resumeWithThePage(): void {
   if (resuming) return
   resuming = true
-  const resume = () => {
-    if (document.visibilityState === 'visible') streams.resume()
-  }
   window.addEventListener('online', resume)
   document.addEventListener('visibilitychange', resume)
 }

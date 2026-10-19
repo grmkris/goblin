@@ -31,18 +31,18 @@ export class AgentHttp extends Context.Service<
    * (`test/http/api/fixture.ts`).
    */
   static serve<R>(routes: readonly RouteNames[], apiLayer: Layer.Layer<never, never, R>) {
+    const routeOf = (request: Request) => {
+      for (const route of routes) {
+        const name = route(request)
+        if (name !== undefined) return name
+      }
+      return undefined
+    }
     return Layer.effect(
       AgentHttp,
       Effect.gen(function* () {
         const services = yield* Effect.context<HttpRouter.Request.Only<'Requires', R>>()
         const http = yield* HttpRouter.toHttpEffect(apiLayer)
-        const routeOf = (request: Request) => {
-          for (const route of routes) {
-            const name = route(request)
-            if (name !== undefined) return name
-          }
-          return undefined
-        }
         return AgentHttp.of({
           handle: (request) => {
             const internal = under(new URL(request.url).pathname, INTERNAL_PREFIX)

@@ -28,6 +28,7 @@ const event = (kind: string, status: string, attributes: Record<string, string |
   endedAt: AT + 250,
   attributes,
 })
+const line = (source: unknown) => ({ timestamp: AT, source })
 
 describe('goblin output (unit)', () => {
   it('shows a turn as its summary, Pi settlement, events and gaps', () => {
@@ -150,7 +151,6 @@ describe('goblin output (unit)', () => {
   })
 
   it("finds the operations goblin's own log lines name", () => {
-    const line = (source: unknown) => ({ timestamp: AT, source })
     expect(
       operationsOf([
         line({ event: 'http.failure', operation: 'owner:op-3', ref: 'r1' }),

@@ -32,6 +32,7 @@ const result = (toolName: string, isError: boolean, details: Details) =>
     details,
     timestamp,
   }))
+const answer = () => entry('app.persona', (timestamp) => ({ role: 'user', content: 'answer', timestamp }))
 
 /** `record` as Persona `persona`'s answer, holding `hold` when it waits on the owner. */
 const withData = (record: EntryRecord, persona: number, hold?: Record<string, string>): EntryRecord => ({
@@ -164,7 +165,6 @@ describe('attention (A5, ADR 0032)', () => {
   })
 
   it("keeps a Persona's tool to allow until its next answer (ADR 0041)", () => {
-    const answer = () => entry('app.persona', (timestamp) => ({ role: 'user', content: 'answer', timestamp }))
     const hold = { kind: 'grant', connectionId: 'sq', name: 'bid', fork: '90' }
     const asked = withData(answer(), 1, hold)
     const other = withData(answer(), 2, { ...hold, fork: '91' })

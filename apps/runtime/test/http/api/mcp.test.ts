@@ -55,6 +55,12 @@ const notes = createMcpHandler(() => {
   return server
 })
 
+/** The notes server at `/mcp`; every other request (a server card, a registry) finds nothing. */
+const fetcher = async (input: RequestInfo | URL, init?: RequestInit) => {
+  const request = new Request(input, init)
+  return new URL(request.url).pathname === '/mcp' ? notes.fetch(request) : new Response(null, { status: 404 })
+}
+
 const VIEW: ApprovalView = {
   id: 'mcp:7:call-1',
   connectionId: 'notes',
@@ -74,11 +80,6 @@ const fixture = async () => {
   const credentials = new MemoryCredentials()
   await credentials.saveTokens('notes', { access_token: 'fixture-token', token_type: 'bearer' }, 0)
   const grants = new MemoryGrants()
-  /** The notes server at `/mcp`; every other request (a server card, a registry) finds nothing. */
-  const fetcher = async (input: RequestInfo | URL, init?: RequestInit) => {
-    const request = new Request(input, init)
-    return new URL(request.url).pathname === '/mcp' ? notes.fetch(request) : new Response(null, { status: 404 })
-  }
   const host = mcpHost({
     servers: [{ connectionId: 'notes', endpoint: 'https://notes.test/mcp' }],
     credentials,

@@ -30,6 +30,32 @@ const log = (chatId: string, entries: readonly number[]) =>
   }))
 const node = (chatId: string, level: number, idx: number) => ({ chatId, level, idx, text: `${level}:${idx}`, bytes: 3 })
 
+/**
+ * Personal (`1`) with three remembered messages, each summarized, and no view yet: the next step places a view
+ * through message 2, its newest input. Pi has nothing newer, and a fold threshold of 0 places it at once.
+ */
+const placing = (write: (chat: string, write: PassiveWrite) => Effect.Effect<Submission, Internal>) => {
+  const { db, close } = chatDatabase()
+  cleanups.push(close)
+  db.insert(appConversations).values({ chatId: '1', piSession: '1', kind: 'main', role: 'primary', createdAt: 1 }).run()
+  db.insert(appChatMemoryLog)
+    .values(log('1', [11, 12, 13]))
+    .run()
+  db.insert(appChatMemoryNodes)
+    .values([node('1', 0, 0), node('1', 0, 1), node('1', 0, 2)])
+    .run()
+  db.insert(appChatMemoryState).values({ chatId: '1', originEntry: 10, viewThrough: 0 }).run()
+  // A step reads only `pi().conversation().entries()`, answered empty here.
+  const conversation = fake<Conversation>({ entries: async () => ({ items: [] }) })
+  const harness = fake<PiHarness>({ pi: async () => fake<Harness>({ conversation: async () => conversation }) })
+  // Every remembered message is summarized already, so no step asks the model.
+  const operations = Layer.mock(ChatOperations)({ passiveWrite: write })
+  const step = Memories.use((service) => service.step('1', new AbortController().signal)).pipe(
+    Effect.provide(knowledgeOver({ db, harness, foldTokens: 0, operations })),
+  )
+  return { db, step }
+}
+
 describe('per-Topic memory (ADR 0032)', () => {
   it("keeps two Topics' memories apart and truncates one without touching the other", () => {
     const { db, close } = chatDatabase()
@@ -89,34 +115,6 @@ describe('per-Topic memory (ADR 0032)', () => {
   })
 
   describe('placing a view (K1)', () => {
-    /**
-     * Personal (`1`) with three remembered messages, each summarized, and no view yet: the next step places a view
-     * through message 2, its newest input. Pi has nothing newer, and a fold threshold of 0 places it at once.
-     */
-    const placing = (write: (chat: string, write: PassiveWrite) => Effect.Effect<Submission, Internal>) => {
-      const { db, close } = chatDatabase()
-      cleanups.push(close)
-      db.insert(appConversations)
-        .values({ chatId: '1', piSession: '1', kind: 'main', role: 'primary', createdAt: 1 })
-        .run()
-      db.insert(appChatMemoryLog)
-        .values(log('1', [11, 12, 13]))
-        .run()
-      db.insert(appChatMemoryNodes)
-        .values([node('1', 0, 0), node('1', 0, 1), node('1', 0, 2)])
-        .run()
-      db.insert(appChatMemoryState).values({ chatId: '1', originEntry: 10, viewThrough: 0 }).run()
-      // A step reads only `pi().conversation().entries()`, answered empty here.
-      const conversation = fake<Conversation>({ entries: async () => ({ items: [] }) })
-      const harness = fake<PiHarness>({ pi: async () => fake<Harness>({ conversation: async () => conversation }) })
-      // Every remembered message is summarized already, so no step asks the model.
-      const operations = Layer.mock(ChatOperations)({ passiveWrite: write })
-      const step = Memories.use((service) => service.step('1', new AbortController().signal)).pipe(
-        Effect.provide(knowledgeOver({ db, harness, foldTokens: 0, operations })),
-      )
-      return { db, step }
-    }
-
     it("goes through the chat's passive write and is recorded once it is in", async () => {
       const writes: { chat: string; write: PassiveWrite }[] = []
       // SAFETY: the step only awaits the write; it never reads the submission back.

@@ -15,6 +15,7 @@ const problems: ToolInfo = {
   inputSchema: { properties: { since: { type: 'integer' }, limit: { type: 'integer' }, all: { type: 'boolean' } } },
 }
 const NOW = 1_000_000_000
+const fails = (tool: ToolInfo, argv: string[]) => () => argumentsFor(tool, parseArgs(argv), NOW)
 
 describe('goblin command lines (unit)', () => {
   it('splits a command line into words and flags', () => {
@@ -55,7 +56,6 @@ describe('goblin command lines (unit)', () => {
   })
 
   it('refuses what the schema does not take', () => {
-    const fails = (tool: ToolInfo, argv: string[]) => () => argumentsFor(tool, parseArgs(argv), NOW)
     expect(fails(turn, ['turn'])).toThrow('turn needs --operation-id')
     expect(fails(turn, ['turn', 'a', 'b'])).toThrow('unexpected b')
     expect(fails(problems, ['problems', '--limit', 'many'])).toThrow('--limit takes a number')

@@ -93,6 +93,35 @@ const fixture = () => {
   return { db: durable(db), raw: db }
 }
 
+/** Two Persona forks of the thread `21`: `24` adds the mail server and an app, `25` was asked before setups. */
+const forks = () => {
+  const { db, raw } = fixture()
+  for (const chatId of ['24', '25'])
+    raw
+      .insert(appConversations)
+      .values({
+        chatId,
+        piSession: `s${chatId}`,
+        kind: 'thread',
+        role: 'persona',
+        parentSession: '21',
+        topicId: 2,
+        createdAt: 1,
+      })
+      .run()
+  raw
+    .insert(appPersonaChats)
+    .values({
+      chatId: '24',
+      personaId: 1,
+      revision: 3,
+      setup: JSON.stringify({ mcpServers: [{ connectionId: 'mail', tools: 'all' }], skills: [], apps: ['diary'] }),
+      createdAt: 1,
+    })
+    .run()
+  return db
+}
+
 describe("a chat's scope follows its Topic's setup (ADR 0040)", () => {
   it('lets every chat of Personal use everything, as before', () => {
     const { db } = fixture()
@@ -200,35 +229,6 @@ describe("a chat's scope follows its Topic's setup (ADR 0040)", () => {
 })
 
 describe("a Persona's fork works with its Topic's setup and its own (ADR 0040)", () => {
-  /** Two Persona forks of the thread `21`: `24` adds the mail server and an app, `25` was asked before setups. */
-  const forks = () => {
-    const { db, raw } = fixture()
-    for (const chatId of ['24', '25'])
-      raw
-        .insert(appConversations)
-        .values({
-          chatId,
-          piSession: `s${chatId}`,
-          kind: 'thread',
-          role: 'persona',
-          parentSession: '21',
-          topicId: 2,
-          createdAt: 1,
-        })
-        .run()
-    raw
-      .insert(appPersonaChats)
-      .values({
-        chatId: '24',
-        personaId: 1,
-        revision: 3,
-        setup: JSON.stringify({ mcpServers: [{ connectionId: 'mail', tools: 'all' }], skills: [], apps: ['diary'] }),
-        createdAt: 1,
-      })
-      .run()
-    return db
-  }
-
   it('lets the Persona use what it adds, while Goblin in the same Topic still may not', () => {
     const db = forks()
     const persona = chatScope(db, '24')
