@@ -249,6 +249,12 @@ async function revisions(url: string, owner: Person): Promise<void> {
   expect(latest?.context).toContain('Beta rules.')
 }
 
+/** The workspace changes one frame of the feed carries: a `change` event's, none for any other frame. */
+function frameChanges(frame: string): readonly WorkspaceChange[] {
+  const data = /^data: (.*)$/mu.exec(frame)?.[1]
+  return frame.startsWith('event: change') && data !== undefined ? decodeChanges(JSON.parse(data)) : []
+}
+
 /** Reads the workspace feed in the background: every `change` event, until stopped. */
 function watchFeed(url: string, owner: Person) {
   const controller = new AbortController()
@@ -268,10 +274,7 @@ function watchFeed(url: string, owner: Person) {
       buffered += decoder.decode(value, { stream: true })
       const frames = buffered.split('\n\n')
       buffered = frames.pop() ?? ''
-      for (const frame of frames) {
-        const data = /^data: (.*)$/mu.exec(frame)?.[1]
-        if (frame.startsWith('event: change') && data !== undefined) changes.push(...decodeChanges(JSON.parse(data)))
-      }
+      for (const frame of frames) changes.push(...frameChanges(frame))
     }
   })().catch(() => {
     // expected: stop() aborts the stream, which ends the read loop with an abort

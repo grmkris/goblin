@@ -13,7 +13,7 @@ import * as Schema from 'effect/Schema'
 import { Conflict, NotFound } from '../http/errors.ts'
 import { BACKGROUND, entryId } from './context.ts'
 import { MemoryBuilder } from './memory.ts'
-import { SUBAGENT_RELAY, Subagents, relayTarget } from './subagent-relay.ts'
+import { SUBAGENT_RELAY, type Subagent, Subagents, relayTarget } from './subagent-relay.ts'
 
 /**
  * The Thread a move forked, by the move's operation id: the fork reads it first, so a restarted move finds the Thread
@@ -37,6 +37,14 @@ const ofTurn = (entry: EntryRecord, message: number): boolean =>
   TURN_KINDS.has(entry.kind) ||
   (entry.kind === 'app.delegate_result' &&
     Option.match(delegateOf(entry.data), { onNone: () => false, onSome: (data) => Number(data.delegate) > message }))
+
+/** A helper's roster entry as the Thread's roster takes it: a copy, so the two rosters share nothing. */
+const copied = (agent: Subagent): Subagent => ({
+  conversationId: agent.conversationId,
+  reported: [...agent.reported],
+  ...(agent.quotes === undefined ? {} : { quotes: [...agent.quotes] }),
+  ...(agent.synthesize === undefined ? {} : { synthesize: agent.synthesize }),
+})
 
 /**
  * The Thread of a settled move (ADR 0034), one Pi commit on the chat's session: a fork at the last entry of the moved
@@ -68,13 +76,7 @@ export async function forkThread(
     await configure(tx, fork.id, input.agent)
     const helpers = await tx.doc(Subagents, fork.id)
     for (const [name, agent] of Object.entries(roster.agents))
-      if (agent.conversationId > input.message)
-        helpers.agents[name] = {
-          conversationId: agent.conversationId,
-          reported: [...agent.reported],
-          ...(agent.quotes === undefined ? {} : { quotes: [...agent.quotes] }),
-          ...(agent.synthesize === undefined ? {} : { synthesize: agent.synthesize }),
-        }
+      if (agent.conversationId > input.message) helpers.agents[name] = copied(agent)
     witness.fork = fork.id
     return fork.id
   }, BACKGROUND)

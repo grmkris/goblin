@@ -425,27 +425,7 @@ export class PiRunRecorder {
       if (state.status !== 'running' || checkpoint?.phase !== 'request' || checkpoint.attempt === undefined) return
       this.#attemptStarted({ id: String(seq), conversation, taskId }, checkpoint.attempt, checkpoint.model, now)
     } else if (task.kind === 'pi.tool') {
-      const id = `tool:${taskId}`
-      if (this.#telemetry.isOpen(id) || this.#ledger.latestForTask('tool.call', taskId) !== undefined) return
-      const input = decodeToolInput(task.input)
-      const call = input === undefined ? undefined : this.#calls.get(`${String(input.assistant)}:${input.callId}`)
-      this.#telemetry.begin({
-        id,
-        kind: 'tool.call',
-        ...this.#scope(conversation, taskId),
-        startedAt: now,
-        attributes: {
-          [RunAttribute.operation]: 'execute_tool',
-          ...(input === undefined ? {} : { [RunAttribute.toolCallId]: input.callId }),
-          ...(call === undefined
-            ? {}
-            : {
-                [RunAttribute.toolName]: call.name,
-                [RunAttribute.toolFamily]: familyOf(call.name),
-                ...call.attributes,
-              }),
-        },
-      })
+      this.#toolStarted(conversation, taskId, task.input, now)
     } else if (task.kind === 'pi.compaction') {
       const id = `compaction:${taskId}`
       if (this.#telemetry.isOpen(id)) return
@@ -458,6 +438,34 @@ export class PiRunRecorder {
         attributes: input === undefined ? {} : { [RunAttribute.compactionReason]: input.reason },
       })
     }
+  }
+
+  /**
+   * A tool task: its call starts, named by the assistant entry that made it, unless it is open already or the ledger
+   * has it from before a restart.
+   */
+  #toolStarted(conversation: string, taskId: string, raw: unknown, now: number): void {
+    const id = `tool:${taskId}`
+    if (this.#telemetry.isOpen(id) || this.#ledger.latestForTask('tool.call', taskId) !== undefined) return
+    const input = decodeToolInput(raw)
+    const call = input === undefined ? undefined : this.#calls.get(`${String(input.assistant)}:${input.callId}`)
+    this.#telemetry.begin({
+      id,
+      kind: 'tool.call',
+      ...this.#scope(conversation, taskId),
+      startedAt: now,
+      attributes: {
+        [RunAttribute.operation]: 'execute_tool',
+        ...(input === undefined ? {} : { [RunAttribute.toolCallId]: input.callId }),
+        ...(call === undefined
+          ? {}
+          : {
+              [RunAttribute.toolName]: call.name,
+              [RunAttribute.toolFamily]: familyOf(call.name),
+              ...call.attributes,
+            }),
+      },
+    })
   }
 
   /** A generation entered `request`: an attempt starts. `place.id` is the commit sequence, unique per start. */

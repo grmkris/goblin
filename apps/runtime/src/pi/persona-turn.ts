@@ -142,6 +142,10 @@ export const PERSONA_DENIED_TOOLS: readonly string[] = [
 const PERSONA_LEFT_OUT = ['goblin.memory']
 const PERSONA_EXTENSION = 'goblin.persona-turn'
 
+/** The extension names with the Persona turn extension, added once. */
+const withTurn = (names: readonly string[]) =>
+  names.includes(PERSONA_EXTENSION) ? [...names] : [...names, PERSONA_EXTENSION]
+
 /**
  * The fork's stored selection with the Persona's changes: extensions without main's memory and with the Persona turn
  * extension, tools without the ones a Persona never has. Names only, as Pi stores them; an exact list stays exact.
@@ -153,8 +157,6 @@ export function personaSelection(
   const extensions = state.extensions
   const leftOut = new Set(PERSONA_LEFT_OUT)
   const kept = (names: readonly string[] | undefined) => (names ?? []).filter((name) => !leftOut.has(name))
-  const withTurn = (names: readonly string[]) =>
-    names.includes(PERSONA_EXTENSION) ? [...names] : [...names, PERSONA_EXTENSION]
   const nextExtensions = Array.isArray(extensions)
     ? withTurn(kept(extensions))
     : {
@@ -475,6 +477,16 @@ export type PersonaAsk = {
   readonly order: 'parallel' | 'sequence'
 }
 
+/** What the turn at `order` of an ask waits for: in a sequence, the turn and the Persona asked before it; else none. */
+const predecessor = (
+  ask: PersonaAsk,
+  ids: readonly TaskId<null>[],
+  order: number,
+): Pick<Input, 'previous' | 'previousPersona'> =>
+  ask.order === 'sequence'
+    ? { previous: ids[order - 1] ?? null, previousPersona: ask.personas[order - 1]?.id ?? null }
+    : { previous: null, previousPersona: null }
+
 /** What going on after a hold needs (ADR 0041): the owner's reply, where it goes, and the Persona it resumes. */
 export type PersonaResume = {
   readonly operationId: string
@@ -527,8 +539,6 @@ export function personaTurnExtension(run: RunProgram): PersonaTurnKit {
         if (asks.tasks[ask.operationId] !== undefined) return
         const ids: TaskId<null>[] = []
         for (const [order, persona] of ask.personas.entries()) {
-          const previous = ask.order === 'sequence' ? (ids[order - 1] ?? null) : null
-          const before = ask.order === 'sequence' ? (ask.personas[order - 1]?.id ?? null) : null
           ids.push(
             await tx.createTask(
               Turn,
@@ -537,8 +547,7 @@ export function personaTurnExtension(run: RunProgram): PersonaTurnKit {
                 chat: ask.chat,
                 parent: ask.parent,
                 order,
-                previous,
-                previousPersona: before,
+                ...predecessor(ask, ids, order),
                 persona,
                 mode: ask.order,
               },

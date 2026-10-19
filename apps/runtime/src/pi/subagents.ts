@@ -227,6 +227,10 @@ type Delivery = {
 }
 type Deliver = (api: Api, delivery: Delivery, context: CallContext) => Promise<Done>
 
+/** What a delivered message did: started a new subagent, opened one closed when its job was done, or was sent. */
+const delivered = (action: Delivery['action'], admitted: 'open' | 'reopened'): 'started' | 'reopened' | 'sent' =>
+  action === 'spawn' ? 'started' : admitted === 'reopened' ? 'reopened' : 'sent'
+
 const configTool = (run: RunProgram, roster: (api: Api, context: CallContext) => Promise<Agents>) =>
   typedTool({
     name: 'subagent_config',
@@ -473,8 +477,7 @@ export function subagentsExtension(run: RunProgram, members: (self: Extension) =
         ...(parentOperation === undefined ? {} : { parentOperation }),
       } as const
       await tx.createTask(Relay, input, background)
-      if (action === 'spawn') return 'started' as const
-      return admitted === 'reopened' ? ('reopened' as const) : ('sent' as const)
+      return delivered(action, admitted)
     }, context)
     const flow = spawned(String(api.conversationId), outcome === 'started', synthesize, parentOperation)
     if (action === 'spawn')

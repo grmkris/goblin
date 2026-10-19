@@ -334,6 +334,17 @@ function offered(
 const nextStep = (connectionId: string): string =>
   `Too many tools to list at once. Call mcp_list again with connectionId "${connectionId}" and one \`service\` to list its tools, or a \`query\` to find tools by what they do.`
 
+/** A connection's event streams in its listing: listed when asked (`events: true`), else only that it sends some. */
+const streamsOf = (snapshot: McpConnectionSnapshot, input: ListInput, connectionId: string) =>
+  Effect.gen(function* () {
+    const sends = offersEvents(snapshot)
+    const events = sends && input.events === true ? yield* eventsOf(connectionId) : undefined
+    return {
+      ...(sends && input.events !== true ? { sendsEvents: true as const } : {}),
+      ...(events === undefined ? {} : { events }),
+    }
+  })
+
 /**
  * One connection's listing from its discovered `snapshot`: its services when it has many tools and nothing narrows
  * them, else its tools as `offered` gives them, with the names asked for that are not there and its event streams.
@@ -342,12 +353,7 @@ const connectionListing = (snapshot: McpConnectionSnapshot, input: ListInput, co
   Effect.gen(function* () {
     const { connectionId, full } = context
     const listed = offered(snapshot.tools, context)
-    const sends = offersEvents(snapshot)
-    const events = sends && input.events === true ? yield* eventsOf(connectionId) : undefined
-    const streams = {
-      ...(sends && input.events !== true ? { sendsEvents: true as const } : {}),
-      ...(events === undefined ? {} : { events }),
-    }
+    const streams = yield* streamsOf(snapshot, input, connectionId)
     const narrowed = full !== undefined || input.service !== undefined || input.query !== undefined
     const services = narrowed ? undefined : servicesOf(listed)
     if (services !== undefined)
