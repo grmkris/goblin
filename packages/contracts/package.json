@@ -18,10 +18,10 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "effect": "4.0.1"
+    "effect": "4.0.5"
   },
   "devDependencies": {
     "typescript": "7.0.2",
-    "vitest": "5.0.1"
+    "vitest": "5.0.5"
   }
 }
