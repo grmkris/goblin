@@ -89,6 +89,18 @@ const COLUMNS: Readonly<Record<string, number>> = { 'phone-light': 1, 'tablet-li
 
 const errors: string[] = []
 
+/** What the owner API answers at `pathname` on `screen`; undefined for a path it does not serve. */
+function ownerAnswer(screen: (typeof SCREENS)[number], pathname: string): unknown {
+  return new Map<string, unknown>([
+    ['/api/auth/get-session', { session: { id: 's', userId: 'u' }, user: { id: 'u', email: 'owner@example.com' } }],
+    ['/api/onboarding', screen.view],
+    ['/api/agent/model-endpoint', screen.view.model],
+    ['/api/mcp/servers', screen.servers],
+    ['/api/mcp/notes/tools', tools(screen.granted)],
+    ['/api/mcp/suggested', SHELF],
+  ]).get(pathname)
+}
+
 /** Waits for what screen `name` shows: its title (the splash, its mark), and what tells its state apart. */
 async function shows(page: Page, name: (typeof SCREENS)[number]['name']): Promise<void> {
   if (name === 'splash') return page.getByRole('status').waitFor()
@@ -145,14 +157,8 @@ async function drive(browser: Browser, origin: string, label: string, options: B
       const { pathname } = new URL(route.request().url())
       // Only the owner API is answered here; the fixture's own modules (`/@fs/…/src/api/…`) load as they are.
       if (!pathname.startsWith('/api/')) return route.continue()
-      const json = (body: unknown) => route.fulfill({ json: body })
-      if (pathname === '/api/auth/get-session')
-        return json({ session: { id: 's', userId: 'u' }, user: { id: 'u', email: 'owner@example.com' } })
-      if (pathname === '/api/onboarding') return json(screen.view)
-      if (pathname === '/api/agent/model-endpoint') return json(screen.view.model)
-      if (pathname === '/api/mcp/servers') return json(screen.servers)
-      if (pathname === '/api/mcp/notes/tools') return json(tools(screen.granted))
-      if (pathname === '/api/mcp/suggested') return json(SHELF)
+      const body = ownerAnswer(screen, pathname)
+      if (body !== undefined) return route.fulfill({ json: body })
       return route.fulfill({ status: 404, json: { error: { code: 'not_found', message: 'not here' } } })
     })
     await page.addInitScript(() =>

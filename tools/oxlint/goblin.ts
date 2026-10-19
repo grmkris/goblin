@@ -181,6 +181,24 @@ const isStageName = (node: AnyNode): boolean => {
   )
 }
 
+/** Reports a named resource whose props set no `name:`, or set one that is not the stage's. */
+const checkResourceName = (context: Context, node: ESTree.CallExpression, callee: string): void => {
+  const props = node.arguments[1]
+  if (props === undefined) {
+    context.report({ messageId: 'missing', data: { callee }, node })
+    return
+  }
+  const values = nameValues(props)
+  if (values === undefined) return // props built elsewhere (a variable): not statically checkable here
+  if (values.length === 0) {
+    context.report({ messageId: 'missing', data: { callee }, node })
+    return
+  }
+  for (const value of values) {
+    if (!isStageName(value)) context.report({ messageId: 'literal', data: { callee }, node: value })
+  }
+}
+
 export const resourceNameViaStage = defineRule({
   meta: {
     type: 'problem',
@@ -209,20 +227,7 @@ export const resourceNameViaStage = defineRule({
         const callee = constructorName(node)
         if (callee === undefined || !callee.startsWith('Cloudflare.')) return
         if (!named.some((n) => callee === `Cloudflare.${n}`)) return
-        const props = node.arguments[1]
-        if (props === undefined) {
-          context.report({ messageId: 'missing', data: { callee }, node })
-          return
-        }
-        const values = nameValues(props)
-        if (values === undefined) return // props built elsewhere (a variable): not statically checkable here
-        if (values.length === 0) {
-          context.report({ messageId: 'missing', data: { callee }, node })
-          return
-        }
-        for (const value of values) {
-          if (!isStageName(value)) context.report({ messageId: 'literal', data: { callee }, node: value })
-        }
+        checkResourceName(context, node, callee)
       },
     }
   },

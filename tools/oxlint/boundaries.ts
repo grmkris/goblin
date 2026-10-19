@@ -18,7 +18,7 @@ import type { Context, ESTree } from '@oxlint/plugins'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { nodes, runtimeAllows, runtimeModules, zones } from '../graph.ts'
-import type { Node, Runtime } from '../graph.ts'
+import type { Closed, Node, Runtime } from '../graph.ts'
 import { isFreeReference, isStringLiteral } from './scope.ts'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -71,6 +71,17 @@ const workspaceOf = (specifier: string): string | undefined =>
 /** An asset import: the file's URL or text goes into the bundle, never its code. */
 const isAsset = (specifier: string): boolean => /\?(?:url|raw)$/u.test(specifier)
 
+/** May a file placed here import `specifier` of workspace `target`: its own workspace, or a declared edge? */
+const mayImportWorkspace = (placement: Placement, target: string, specifier: string): boolean => {
+  // The web workspace may import the runtime only from its Worker adapter. Browser routes/components must
+  // remain browser-only even though the package edge is needed by `src/worker.ts`; a built asset is no code.
+  const cloudCode =
+    placement.runtime === 'browser' &&
+    nodes.find((item) => item.name === target)?.runtime === 'cloud' &&
+    !isAsset(specifier)
+  return target === placement.node.name || (placement.node.mayImport.includes(target) && !cloudCode)
+}
+
 type Sourced =
   | ESTree.ImportDeclaration
   | ESTree.ExportAllDeclaration
@@ -103,13 +114,7 @@ export const noCrossBoundaryImport = defineRule({
       }
       const target = workspaceOf(specifier)
       if (target !== undefined) {
-        // The web workspace may import the runtime only from its Worker adapter. Browser routes/components must
-        // remain browser-only even though the package edge is needed by `src/worker.ts`; a built asset is no code.
-        const cloudCode =
-          placement.runtime === 'browser' &&
-          nodes.find((item) => item.name === target)?.runtime === 'cloud' &&
-          !isAsset(specifier)
-        if (target === placement.node.name || (placement.node.mayImport.includes(target) && !cloudCode)) return
+        if (mayImportWorkspace(placement, target, specifier)) return
         const allowed = placement.node.mayImport.length === 0 ? 'none' : placement.node.mayImport.join(', ')
         context.report({
           messageId: 'workspace',
@@ -150,6 +155,19 @@ const resolvedFrom = (filename: string, specifier: string): string | undefined =
   return path.relative(repoRoot, target).split(path.sep).join('/')
 }
 
+/** The closed module a relative specifier names, with the workspace that closes it; undefined when it names none. */
+const closedModule = (
+  filename: string,
+  specifier: string,
+): { readonly owner: Node; readonly module: string; readonly closed: Closed } | undefined => {
+  const target = resolvedFrom(filename, specifier)
+  const owner = target === undefined ? undefined : placementOf(path.join(repoRoot, target))?.node
+  if (target === undefined || owner?.closed === undefined) return undefined
+  const module = target.slice(owner.dir.length + 1)
+  const closed = owner.closed[module] ?? owner.closed[`${module}.ts`]
+  return closed === undefined ? undefined : { owner, module, closed }
+}
+
 /** Is `file` (relative to its workspace) one of `importers`, a listed file or under a listed directory? */
 const listed = (importers: readonly string[], file: string): boolean =>
   importers.some((entry) => (entry.endsWith('/') ? file.startsWith(entry) : file === entry))
@@ -185,12 +203,9 @@ export const noClosedImport = defineRule({
   create(context: Context) {
     const importer = path.relative(repoRoot, context.physicalFilename).split(path.sep).join('/')
     const check = (specifier: string, node: Sourced): void => {
-      const target = resolvedFrom(context.physicalFilename, specifier)
-      const owner = target === undefined ? undefined : placementOf(path.join(repoRoot, target))?.node
-      if (target === undefined || owner?.closed === undefined) return
-      const module = target.slice(owner.dir.length + 1)
-      const closed = owner.closed[module] ?? owner.closed[`${module}.ts`]
-      if (closed === undefined) return
+      const found = closedModule(context.physicalFilename, specifier)
+      if (found === undefined) return
+      const { owner, module, closed } = found
       if (importer.startsWith(`${owner.dir}/`) && listed(closed.importers, importer.slice(owner.dir.length + 1))) return
       const taken = namesTaken(node)
       const names = closed.names

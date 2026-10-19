@@ -6,6 +6,11 @@ import { composerTrigger, pickerItems, type PickerItem, type Trigger } from '../
 import { messageOf } from '../lib/query/app-error.ts'
 
 const NOTHING: ComposerOptions = { options: [], unavailable: [] }
+/** How far each arrow key moves the active option. */
+const STEPS: ReadonlyMap<string, number> = new Map([
+  ['ArrowDown', 1],
+  ['ArrowUp', -1],
+])
 
 /** The conversation's references, read while the picker is open: the last read shows at once, a stale one is read again. */
 function useCatalog(conversation: string, open: boolean) {
@@ -48,9 +53,10 @@ export function useComposerPicker(
       setTrigger(undefined)
       return true
     }
-    if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && items.length > 0) {
+    const step = STEPS.get(event.key)
+    if (step !== undefined && items.length > 0) {
       event.preventDefault()
-      setActive((index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length)
+      setActive((index + step + items.length) % items.length)
       return true
     }
     const item = items[index]

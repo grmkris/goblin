@@ -27,6 +27,12 @@ function keepEnterToOneButton(event: ReactKeyboardEvent<HTMLFormElement>) {
   if (buttons.length !== 1) event.preventDefault()
 }
 
+/** The button that sent the form; undefined when no button did. */
+function submitterOf(event: ReactSubmitEvent<HTMLFormElement>): HTMLButtonElement | undefined {
+  const button = event.nativeEvent instanceof SubmitEvent ? event.nativeEvent.submitter : null
+  return button instanceof HTMLButtonElement ? button : undefined
+}
+
 /** A complete reply program. Field state is local; a click uses the containing chat's existing send path. */
 export function OpenUIBlock({ source, fallback }: { readonly source: string; readonly fallback: ReactNode }) {
   const send = use(ReplySend)
@@ -48,8 +54,8 @@ export function OpenUIBlock({ source, fallback }: { readonly source: string; rea
   const submit = async (event: ReactSubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (send === undefined || flight.current) return
-    const button = event.nativeEvent instanceof SubmitEvent ? event.nativeEvent.submitter : null
-    if (!(button instanceof HTMLButtonElement)) return
+    const button = submitterOf(event)
+    if (button === undefined) return
     const message = replyMessage(button.value, new FormData(event.currentTarget))
     if (message === undefined) {
       setNotice('These values could not be sent. Write your reply in the composer instead.')

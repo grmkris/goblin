@@ -27,15 +27,8 @@ export function canonicalProgram(source: string): string | undefined {
       case 'Null':
         return null
       case 'Ref':
-      case 'StateRef': {
-        const target = definitions.get(node.n)
-        if (target === undefined || path.has(node.n)) throw new Error('Unresolved reference')
-        if (node.k === 'StateRef' && !scalar(target)) throw new Error('State must be a scalar')
-        path.add(node.n)
-        const value = visit(target, depth + 1)
-        path.delete(node.n)
-        return value
-      }
+      case 'StateRef':
+        return dereference(node, depth)
       case 'Arr':
         return node.els.map((child) => visit(child, depth + 1))
       case 'Obj':
@@ -58,6 +51,16 @@ export function canonicalProgram(source: string): string | undefined {
       case 'Ternary':
         throw new Error('Unsupported expression')
     }
+  }
+  // A reference expands its definition in place; one already on the path would expand forever.
+  const dereference = (node: Extract<ASTNode, { k: 'Ref' | 'StateRef' }>, depth: number): unknown => {
+    const target = definitions.get(node.n)
+    if (target === undefined || path.has(node.n)) throw new Error('Unresolved reference')
+    if (node.k === 'StateRef' && !scalar(target)) throw new Error('State must be a scalar')
+    path.add(node.n)
+    const value = visit(target, depth + 1)
+    path.delete(node.n)
+    return value
   }
   const root = definitions.get('root')
   if (root?.k !== 'Comp' || root.name !== 'Stack') return undefined

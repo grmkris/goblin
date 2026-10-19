@@ -91,6 +91,35 @@ async function install(page: Page) {
     }
     Object.defineProperty(window, 'EventSource', { value: Events })
   })
+  const remove = async (route: Route) => {
+    const { submissionId } = Schema.decodeUnknownSync(Schema.Struct({ submissionId: Schema.Int }))(
+      route.request().postDataJSON(),
+    )
+    await removal
+    if (refuseRemoval) {
+      refuseRemoval = false
+      return route.fulfill({ status: 503, json: { error: 'Unavailable' } })
+    }
+    inputs = inputs.filter(({ id }) => id !== submissionId)
+    await route.fulfill({ json: { status: 'removed' } })
+    await events(page, inputs)
+  }
+  const submit = async (route: Route) => {
+    const message = Schema.decodeUnknownSync(Schema.Struct({ input: Schema.String, operationId: Schema.String }))(
+      route.request().postDataJSON(),
+    )
+    submissions.push(message)
+    if (failNext) {
+      failNext = false
+      return route.abort('failed')
+    }
+    await new Promise<void>((resolve) => {
+      hold = resolve
+    })
+    inputs = [...inputs, { id: 9, mode: 'followUp', content: message.input }]
+    await route.fulfill({ status: 202, json: { accepted: true, session: '1', operationId: message.operationId } })
+    await events(page, inputs)
+  }
   await page.route('**/api/conversations/1/**', async (route: Route) => {
     const request = route.request()
     const action = new URL(request.url()).pathname.split('/').at(-1)
@@ -104,43 +133,14 @@ async function install(page: Page) {
           run: { inputs: [1] },
         },
       })
-    if (action === 'queue' && request.method() === 'DELETE') {
-      const { submissionId } = Schema.decodeUnknownSync(Schema.Struct({ submissionId: Schema.Int }))(
-        request.postDataJSON(),
-      )
-      await removal
-      if (refuseRemoval) {
-        refuseRemoval = false
-        return route.fulfill({ status: 503, json: { error: 'Unavailable' } })
-      }
-      inputs = inputs.filter(({ id }) => id !== submissionId)
-      await route.fulfill({ json: { status: 'removed' } })
-      await events(page, inputs)
-      return
-    }
+    if (action === 'queue' && request.method() === 'DELETE') return remove(route)
     if (action === 'queue') {
       reads += 1
       if (failReads) return route.fulfill({ status: 503, json: { error: 'Unavailable' } })
       return route.fulfill({ json: { inputs } })
     }
     if (action === 'composer') return route.fulfill({ json: { options: [], unavailable: [] } })
-    if (action === 'messages') {
-      const message = Schema.decodeUnknownSync(Schema.Struct({ input: Schema.String, operationId: Schema.String }))(
-        request.postDataJSON(),
-      )
-      submissions.push(message)
-      if (failNext) {
-        failNext = false
-        return route.abort('failed')
-      }
-      await new Promise<void>((resolve) => {
-        hold = resolve
-      })
-      inputs = [...inputs, { id: 9, mode: 'followUp', content: message.input }]
-      await route.fulfill({ status: 202, json: { accepted: true, session: '1', operationId: message.operationId } })
-      await events(page, inputs)
-      return
-    }
+    if (action === 'messages') return submit(route)
     return route.fulfill({ json: {} })
   })
   page.on('pageerror', (error) => errors.push(error.message))

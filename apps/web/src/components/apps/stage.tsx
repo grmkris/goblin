@@ -117,6 +117,21 @@ function useStageMotion({ stage, live, slot, onTarget, onVisible }: StageMotion)
       watched = around
       if (around !== null) content.observe(around)
     }
+    // One step after the slot: measure it, spring the stage towards it and clip it. True while another frame is due.
+    const follow = (element: HTMLElement, followed: HTMLElement, seconds: number): boolean => {
+      watch(followed)
+      if (clips?.slot !== followed) clips = { slot: followed, ancestors: clippingAncestors(followed) }
+      const rect = rectOf(followed)
+      onTarget(rect)
+      quiet = target !== undefined && AXES.every((axis) => rect[axis] === target?.[axis]) ? quiet + 1 : 0
+      target = rect
+      const moving = advance(live.current, rect, seconds, reduced.matches)
+      write(element, live.current.axes)
+      onVisible(clipStage(element, followed, boxOf(live.current.axes), clips.ancestors))
+      // A viewport change can reflow the slot one or two frames after its first measurement.
+      // Keep a short settled tail so reduced-motion stages do not retain their old slot rectangle.
+      return moving || quiet < 8
+    }
     const frame = (now: number) => {
       raf = 0
       const seconds = last === 0 ? 1 / 60 : (now - last) / 1000
@@ -131,18 +146,7 @@ function useStageMotion({ stage, live, slot, onTarget, onVisible }: StageMotion)
         return
       }
       delete element.dataset.hidden
-      watch(followed)
-      if (clips?.slot !== followed) clips = { slot: followed, ancestors: clippingAncestors(followed) }
-      const rect = rectOf(followed)
-      onTarget(rect)
-      quiet = target !== undefined && AXES.every((axis) => rect[axis] === target?.[axis]) ? quiet + 1 : 0
-      target = rect
-      const moving = advance(live.current, rect, seconds, reduced.matches)
-      write(element, live.current.axes)
-      onVisible(clipStage(element, followed, boxOf(live.current.axes), clips.ancestors))
-      // A viewport change can reflow the slot one or two frames after its first measurement.
-      // Keep a short settled tail so reduced-motion stages do not retain their old slot rectangle.
-      if (moving || quiet < 8) raf = requestAnimationFrame(frame)
+      if (follow(element, followed, seconds)) raf = requestAnimationFrame(frame)
       else {
         last = 0
         // At rest the pane may move later (into the chat sheet, out of parking): find the ancestors again then.
