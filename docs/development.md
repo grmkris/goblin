@@ -385,7 +385,11 @@ until it runs, real provider and Telegram delivery remain unverified.
 - Dependencies: `bun add <package> --cwd <workspace>`; commit `package.json` and `bun.lock` together. A patched
   dependency (root `patchedDependencies`) stays pinned to the version its patch was made for, and `bun run
   check:patches` fails when the installed file is not the patched one; `patches/shadcn-react/README.md` says how the
-  MessageScroller patch is rebuilt.
+  MessageScroller patch is rebuilt. Versions are exact. The `@earendil-works/pi-*` packages move together, alchemy
+  moves with myapps (the shared state store, `.agents/skills/alchemy`), and a few follow something else rather than
+  their newest release: `typebox` the version pi-durable pins (one TypeBox in the Worker), `katex` the 0.16 line
+  `@streamdown/math` renders with (goblin loads only its stylesheet, which must match), `@types/node` and `@types/bun`
+  the box's Node 22 LTS and Bun, and workerd alchemy's pin.
 
 Unit tests, local workerd and the deployed dev stage are separate kinds of evidence. Say which one you ran.
 

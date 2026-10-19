@@ -1,6 +1,6 @@
 # Effect in the runtime
 
-Read `node_modules/effect/AGENTS.md` (Effect 4.0.1's own guide) and the
+Read `node_modules/effect/AGENTS.md` (Effect 4.0.5's own guide) and the
 [effect-4 skill](../../.agents/skills/effect-4/SKILL.md) first. This page is the runtime's rules for where Effect
 starts, how work is serialised and how areas talk.
 
