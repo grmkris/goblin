@@ -176,18 +176,28 @@ export function holds(setup: Setup, item: SetupItem): boolean {
   }
 }
 
+type ServerItem = Extract<SetupItem, { kind: 'server' | 'tool' }>
+type SkillItem = Extract<SetupItem, { kind: 'skill' }>
+
+/**
+ * `setup` with a server, or with one more of its tools: a server added whole, or one that holds all its tools already,
+ * holds them all. Adding to servers that are `all` changes nothing.
+ */
+function withServer<S extends Setup>(setup: S, item: ServerItem): S {
+  if (setup.mcpServers === 'all') return setup
+  const held = serverOf(setup, item.connectionId)
+  const rest = setup.mcpServers.filter((server) => server.connectionId !== item.connectionId)
+  const tools: 'all' | readonly string[] =
+    item.kind === 'server' || held?.tools === 'all' ? 'all' : [...new Set([...(held?.tools ?? []), item.name])]
+  return { ...setup, mcpServers: [...rest, { connectionId: item.connectionId, tools }] }
+}
+
 /** `setup` with `item` added. Adding to a category that is `all` changes nothing. */
 function withItem<S extends Setup>(setup: S, item: SetupItem): S {
   switch (item.kind) {
     case 'server':
-    case 'tool': {
-      if (setup.mcpServers === 'all') return setup
-      const held = serverOf(setup, item.connectionId)
-      const rest = setup.mcpServers.filter((server) => server.connectionId !== item.connectionId)
-      const tools: 'all' | readonly string[] =
-        item.kind === 'server' || held?.tools === 'all' ? 'all' : [...new Set([...(held?.tools ?? []), item.name])]
-      return { ...setup, mcpServers: [...rest, { connectionId: item.connectionId, tools }] }
-    }
+    case 'tool':
+      return withServer(setup, item)
     case 'library': {
       if (setup.skills === 'all') return setup
       const rest = setup.skills.filter((skill) => skill.connectionId !== item.connectionId)
@@ -230,9 +240,6 @@ const toolsOf = (server: SetupServer, allowed: Allowed): readonly string[] => {
   const now = allowed.servers.find((candidate) => candidate.connectionId === server.connectionId)
   return (now?.tools ?? []).map(({ name }) => name)
 }
-
-type ServerItem = Extract<SetupItem, { kind: 'server' | 'tool' }>
-type SkillItem = Extract<SetupItem, { kind: 'skill' }>
 
 /**
  * The servers without a server, or without one tool of it: the server stays with its other tools, and goes when none
