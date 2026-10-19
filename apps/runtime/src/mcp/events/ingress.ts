@@ -6,7 +6,7 @@ import type { CredentialCipher } from '../oauth/cipher.ts'
 import { secretAad } from './client.ts'
 import { challengeResponse, decodeEnvelope, isOccurrence, verifyWebhook } from './webhook.ts'
 import type { EventEnvelope } from './protocol.ts'
-import type { SqliteEventStore, Subscription } from './store.ts'
+import type { Delivery, SqliteEventStore, Subscription } from './store.ts'
 import type { EventWebhook, EventWebhookResult } from './engine.ts'
 
 export type Ingress = {
@@ -68,13 +68,12 @@ const select = (ingress: Ingress, input: EventWebhook) =>
     const now = yield* Clock.currentTimeMillis
     const mine = (row: Subscription) => row.connectionId === input.connectionId
     const known = store.byRemote(input.subscriptionId).filter((row) => mine(row) && row.status !== 'tombstone')
-    const candidates = known.length > 0 ? known : []
-    if (known.length === 0)
-      for (const row of store.pendingSince(now - 300_000).filter(mine))
-        if (yield* ingress.valid(row)) candidates.push(row)
+    const candidates =
+      known.length > 0
+        ? known
+        : yield* Effect.filter(store.pendingSince(now - 300_000).filter(mine), (row) => ingress.valid(row))
     if (candidates.length === 0) return undefined
-    const matched: Subscription[] = []
-    for (const row of candidates) if (yield* matches(ingress, row, input)) matched.push(row)
+    const matched = yield* Effect.filter(candidates, (row) => matches(ingress, row, input))
     if (matched.length !== 1) return yield* new InvalidInput({ reason: 'event signature or timestamp' })
     return matched[0]
   })
@@ -101,6 +100,16 @@ const ended = (ingress: Ingress, input: EventWebhook) =>
     return false
   })
 
+/** A delivery already stored is answered as it was first, a challenge within its window, and the sweep is woken. */
+const replay = (ingress: Ingress, prior: Delivery): Effect.Effect<EventWebhookResult, AppError> =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    yield* ingress.wake(now + 1000)
+    if (prior.challengeResponse !== null && (prior.challengeUntil ?? 0) >= now)
+      return { status: 200, response: prior.challengeResponse }
+    return { status: 204 }
+  })
+
 /**
  * One signed webhook delivery, verified against this owner's endpoint-bound pending intents and current or previous
  * secrets, stored durably before it is answered.
@@ -116,13 +125,7 @@ export const receive = (ingress: Ingress, input: EventWebhook): Effect.Effect<Ev
     const envelope = yield* attemptSync(() => decodeEnvelope(input.body, input.id))
     if (!(yield* accepts(ingress, row, input, envelope))) return LATER
     const prior = store.delivery(row.id, input.id)
-    if (prior !== undefined) {
-      const now = yield* Clock.currentTimeMillis
-      yield* ingress.wake(now + 1000)
-      if (prior.challengeResponse !== null && (prior.challengeUntil ?? 0) >= now)
-        return { status: 200, response: prior.challengeResponse }
-      return { status: 204 }
-    }
+    if (prior !== undefined) return yield* replay(ingress, prior)
     const full = yield* ingress.persist(row, input.id, input.body, envelope).pipe(
       Effect.as(false),
       Effect.catchTag('InvalidInput', (error) =>

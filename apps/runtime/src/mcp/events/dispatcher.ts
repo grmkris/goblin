@@ -19,6 +19,18 @@ export type EventHandler = (context: EventContext) => Effect.Effect<void, AppErr
 
 const decodeEnvelope = Schema.decodeUnknownSync(EventEnvelope)
 
+/** A gap or a termination is recorded on the subscription before any consumer handles the delivery. */
+const recordControl = (store: SqliteEventStore, subscription: Subscription, envelope: Envelope, now: number): void => {
+  if ('type' in envelope && envelope.type === 'gap')
+    store.patchLive(subscription, { status: 'catching_up', cursor: envelope.cursor, nextPollAt: now })
+  if ('type' in envelope && envelope.type === 'terminated')
+    store.patchLive(subscription, {
+      status: 'terminated',
+      nextRefreshAt: Number.MAX_SAFE_INTEGER,
+      lastError: `terminated:${envelope.error?.code ?? 'unknown'}`,
+    })
+}
+
 /**
  * The static handler registry and one pass over the deliveries due. A completed handler has durably accepted its
  * intent before its independent ack; a delivery whose handling failed stays queued and is retried with backoff.
@@ -46,14 +58,7 @@ export const makeDispatcher = (store: SqliteEventStore, cipher: CredentialCipher
       )
       const envelope = yield* Effect.try(() => decodeEnvelope(JSON.parse(plain)))
       if (!store.pendingDelivery(subscription, row)) return
-      if ('type' in envelope && envelope.type === 'gap')
-        store.patchLive(subscription, { status: 'catching_up', cursor: envelope.cursor, nextPollAt: now })
-      if ('type' in envelope && envelope.type === 'terminated')
-        store.patchLive(subscription, {
-          status: 'terminated',
-          nextRefreshAt: Number.MAX_SAFE_INTEGER,
-          lastError: `terminated:${envelope.error?.code ?? 'unknown'}`,
-        })
+      recordControl(store, subscription, envelope, now)
       for (const receipt of store.snapshots(row.subscriptionId, row.webhookId)) {
         if (!store.pendingDelivery(subscription, row)) return
         yield* handle(subscription, envelope, receipt, now)

@@ -172,6 +172,10 @@ export const prepareEvents = (
     return row
   })
 
+/** A lease the server answered truncated, or with its delivery inactive, catches up by polling before it is active. */
+const leaseStatus = (result: EventsSubscribeResult): 'catching_up' | 'active' =>
+  result.truncated === true || result.deliveryStatus?.active === false ? 'catching_up' : 'active'
+
 /** Subscribes (or renews) `row` remotely and records the lease, refreshed 10% early with bounded jitter. */
 export const subscribeEvents = (client: EventClient, row: Subscription, ttlMs: number = EVENT_LIMITS.ttlMs) =>
   Effect.gen(function* () {
@@ -205,7 +209,7 @@ export const subscribeEvents = (client: EventClient, row: Subscription, ttlMs: n
     const margin = Math.min(300_000, Math.max(1000, (refreshBefore - now) / 10))
     const jitter = crypto.getRandomValues(new Uint16Array(1))[0] ?? 0
     const nextRefreshAt = Math.max(now + 1000, refreshBefore - margin - (jitter % 1000))
-    const status = result.truncated === true || result.deliveryStatus?.active === false ? 'catching_up' : 'active'
+    const status = leaseStatus(result)
     yield* client.wake(Math.min(nextRefreshAt, now + 300_000))
     const written = store.patchLive(row, {
       remoteId: result.id,

@@ -35,6 +35,31 @@ type Plan =
       readonly archived: boolean
     }
 
+/** Makes the change a plan names, as the owner; a setup or Persona change expects the target still at `revision`. */
+const applyPlan = (plan: Plan, revision: number) =>
+  Effect.gen(function* () {
+    if (plan.target === 'setup') {
+      yield* editTopicSetup(plan.id, { set: plan.setup, expectedRevision: revision }, { actor: 'owner' })
+    } else if (plan.target === 'topic') {
+      yield* updateTopic(
+        plan.id,
+        { ...(plan.name === undefined ? {} : { name: plan.name }), archived: plan.archived },
+        { actor: 'owner' },
+      )
+    } else {
+      yield* updatePersona(
+        plan.id,
+        {
+          ...plan.definition,
+          model: plan.definition?.model ?? null,
+          archived: plan.archived,
+          expectedRevision: revision,
+        },
+        { actor: 'owner' },
+      )
+    }
+  })
+
 /**
  * Undoes one receipt: the target goes back to what it was before the change. It is refused as `touched` (409) once
  * anything changed the target since (its revision is no longer the one the change left), and an Undo is itself not
@@ -57,26 +82,7 @@ export const undoReceipt = (id: string) => {
     const revision = (isTopic ? yield* topics.get(target) : yield* personas.get(target)).revision
     if (revision !== stored.afterRevision) return yield* new Conflict({ reason: 'touched' })
     const plan = yield* planOf(stored.kind, target, stored.before)
-    if (plan.target === 'setup') {
-      yield* editTopicSetup(plan.id, { set: plan.setup, expectedRevision: revision }, { actor: 'owner' })
-    } else if (plan.target === 'topic') {
-      yield* updateTopic(
-        plan.id,
-        { ...(plan.name === undefined ? {} : { name: plan.name }), archived: plan.archived },
-        { actor: 'owner' },
-      )
-    } else {
-      yield* updatePersona(
-        plan.id,
-        {
-          ...plan.definition,
-          model: plan.definition?.model ?? null,
-          archived: plan.archived,
-          expectedRevision: revision,
-        },
-        { actor: 'owner' },
-      )
-    }
+    yield* applyPlan(plan, revision)
     const undone: OrganizeReceipt = yield* receipts.markUndone(id)
     if (undone.undoneAt === undefined) return yield* new InvalidInput({ reason: 'undo' })
     return undone

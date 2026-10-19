@@ -53,6 +53,20 @@ export function pendingFits(rows: number, bytes: number, incoming: number): bool
   return rows < EVENT_LIMITS.pendingRows && bytes + incoming <= EVENT_LIMITS.pendingBytes
 }
 
+type Tx = Parameters<Parameters<DrizzleSqliteDODatabase['transaction']>[0]>[0]
+
+/** A live delivery is taken only for its own subscription while `lease` is still its current, running generation. */
+function holdLease(tx: Tx, row: typeof deliveries.$inferInsert, lease: Subscription): void {
+  const current = tx.select().from(subscriptions).where(eq(subscriptions.id, lease.id)).get()
+  if (
+    row.subscriptionId !== lease.id ||
+    current?.secret !== lease.secret ||
+    current.status === 'tombstone' ||
+    current.status === 'terminated'
+  )
+    throw new Conflict({ reason: 'event lease changed' })
+}
+
 /** Database operations are synchronous and short; callers seal bytes before beginning a transaction. */
 export class SqliteEventStore {
   readonly db: DrizzleSqliteDODatabase
@@ -345,16 +359,7 @@ export class SqliteEventStore {
   }
   receive(row: typeof deliveries.$inferInsert, lease?: Subscription): boolean {
     return this.db.transaction((tx) => {
-      if (lease !== undefined) {
-        const current = tx.select().from(subscriptions).where(eq(subscriptions.id, lease.id)).get()
-        if (
-          row.subscriptionId !== lease.id ||
-          current?.secret !== lease.secret ||
-          current.status === 'tombstone' ||
-          current.status === 'terminated'
-        )
-          throw new Conflict({ reason: 'event lease changed' })
-      }
+      if (lease !== undefined) holdLease(tx, row, lease)
       if (
         tx
           .select()

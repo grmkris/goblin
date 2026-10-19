@@ -1,3 +1,4 @@
+import type { CallToolResult } from '@modelcontextprotocol/client'
 import { ProtocolError, ProtocolErrorCode, createMcpHandler } from '@modelcontextprotocol/server'
 import { declaresUrlElicitation, lowLevelServer } from './low-level-server.ts'
 
@@ -29,6 +30,18 @@ export const sidequestServer = (
 ) => {
   const seen: Seen[] = []
   const state = { approved: false, wrongOutput: false, unlisted: false, askOnDecline: false, refuse: false, app: false }
+  /** A call that declared URL elicitation: closed on a decline, asked until it comes back accepted once `approved`. */
+  const approval = (answer: string, requestState: string | undefined): CallToolResult => {
+    if (answer === '{"action":"decline"}' && requestState === 'op_1' && !state.askOnDecline)
+      return { content: [{ type: 'text', text: 'closed: the operator was not asked' }], isError: true }
+    if (!(answer === '{"action":"accept"}' && requestState === 'op_1' && state.approved))
+      // SAFETY: the 2026 server seam takes a hand-built input_required result in place of a CallToolResult.
+      return { resultType: 'input_required', inputRequests: ask(APPROVE), requestState: 'op_1' } as never
+    return {
+      content: [{ type: 'text', text: 'created' }],
+      structuredContent: state.wrongOutput ? { other: 1 } : { agent: 'ag_1' },
+    }
+  }
   const official = createMcpHandler(() => {
     const server = lowLevelServer({ name: 'sq', version: '1.0.0' }, { capabilities: { tools: {} } })
     server.setRequestHandler('tools/list', () => ({
@@ -51,16 +64,8 @@ export const sidequestServer = (
       seen.push({ url, answer: inputResponses?.['approval'], state: requestState })
       const answer = JSON.stringify(inputResponses?.['approval'])
       if (state.refuse) throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'operation key reused')
-      if (url && answer === '{"action":"decline"}' && requestState === 'op_1' && !state.askOnDecline)
-        return { content: [{ type: 'text', text: 'closed: the operator was not asked' }], isError: true }
-      if (url && !(answer === '{"action":"accept"}' && requestState === 'op_1' && state.approved))
-        // SAFETY: the 2026 server seam takes a hand-built input_required result in place of a CallToolResult.
-        return { resultType: 'input_required', inputRequests: ask(APPROVE), requestState: 'op_1' } as never
-      if (!url) return { content: [{ type: 'text', text: `Approval needed: ${APPROVE}` }], isError: true }
-      return {
-        content: [{ type: 'text', text: 'created' }],
-        structuredContent: state.wrongOutput ? { other: 1 } : { agent: 'ag_1' },
-      }
+      if (url) return approval(answer, requestState)
+      return { content: [{ type: 'text', text: `Approval needed: ${APPROVE}` }], isError: true }
     })
     return server
   })

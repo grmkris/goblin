@@ -62,6 +62,16 @@ const FILES = '/api/files'
 /** The owner paths the edge forwards: under `/api/`, never the account API's. */
 const OWNER_PREFIX = '/api/'
 
+/** The headers an owner request carries to its agent: the edge's reference, the owner-forward mark and `FORWARDED`. */
+const forwardedHeaders = (request: Request, ref: string): Headers => {
+  const headers = new Headers({ 'x-goblin-ref': ref, [FORWARDED_HEADER]: 'owner' })
+  for (const name of FORWARDED) {
+    const value = request.headers.get(name)
+    if (value !== null) headers.set(name, value)
+  }
+  return headers
+}
+
 /** The edge's reference for a request: Cloudflare's ray id, or a random one where there is none (a local run). */
 export const refOf = (request: Request): string =>
   request.headers.get('cf-ray') ?? crypto.randomUUID().replaceAll('-', '').slice(0, 16)
@@ -231,11 +241,7 @@ export const makeEdgeHttp: Effect.Effect<EdgeHttp> = Effect.gen(function* () {
         known(userId)
         const files = url.pathname === FILES || url.pathname.startsWith(`${FILES}/`)
         const body = files ? request.body : yield* bounded(request, JSON_BODY_LIMIT)
-        const headers = new Headers({ 'x-goblin-ref': facts.ref, [FORWARDED_HEADER]: 'owner' })
-        for (const name of FORWARDED) {
-          const value = request.headers.get(name)
-          if (value !== null) headers.set(name, value)
-        }
+        const headers = forwardedHeaders(request, facts.ref)
         // A streamed body needs `duplex` outside workerd (Node, the unit tests); workerd ignores it and its types omit it.
         // The agent's redirect (an outbound sign-in's callback, to Connections) goes to the browser: a followed one would
         // ask the agent for a page it does not serve.

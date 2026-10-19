@@ -5,17 +5,18 @@ import { type AppError, Forbidden } from '../../http/errors.ts'
 import { promiseWith } from '../../runtime/boundary.ts'
 
 const HEADER = 'x-goblin-local-dispatch'
-function headersOf(input: RequestInfo | URL, init: RequestInit | undefined): Headers {
-  const headers = new Headers(input instanceof Request ? input.headers : undefined)
-  const incoming = init?.headers
+function setHeaders(headers: Headers, incoming: HeadersInit): void {
   if (incoming instanceof Headers) incoming.forEach((value, key) => headers.set(key, value))
-  else if (incoming !== undefined && Symbol.iterator in incoming)
+  else if (Symbol.iterator in incoming)
     for (const tuple of incoming) {
       const [key, value] = [...tuple]
       if (typeof key === 'string' && typeof value === 'string') headers.set(key, value)
     }
-  else if (incoming !== undefined)
-    for (const [key, value] of Object.entries(incoming)) if (typeof value === 'string') headers.set(key, value)
+  else for (const [key, value] of Object.entries(incoming)) if (typeof value === 'string') headers.set(key, value)
+}
+function headersOf(input: RequestInfo | URL, init: RequestInit | undefined): Headers {
+  const headers = new Headers(input instanceof Request ? input.headers : undefined)
+  if (init?.headers !== undefined) setHeaders(headers, init.headers)
   return headers
 }
 

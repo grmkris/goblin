@@ -142,6 +142,12 @@ export const urlRequestsOver = (store: McpUrlRequestStore) =>
     }),
   })
 
+/** A call that comes without an approval goes out unless its tool asks first. */
+const unapproved = (policy: ReturnType<Grants['policy']>): Effect.Effect<void, Forbidden> =>
+  policy?.askFirst === true
+    ? Effect.fail(new Forbidden({ reason: 'Owner approval required for this exact call' }))
+    : Effect.void
+
 /**
  * The owner's decision on a call by the model or an App: an ask-first tool's call goes out only as the held call the
  * owner approved, with exactly its reviewed arguments, conversation and grant version (and the retry of a URL request
@@ -155,11 +161,7 @@ export const heldCalls =
       if (call.caller === 'human') return
       const grant = { connectionId: call.connectionId, capability: 'tool' as const, name: call.name }
       const policy = grants.policy(grant)
-      if (approvalId === undefined) {
-        if (policy?.askFirst === true)
-          return yield* new Forbidden({ reason: 'Owner approval required for this exact call' })
-        return
-      }
+      if (approvalId === undefined) return yield* unapproved(policy)
       if (policy === undefined) return yield* new GrantDenied({ connectionId: call.connectionId, name: call.name })
       const hash = yield* attempt(() => argumentsHash(call.arguments))
       if (authorize !== undefined) yield* authorize
