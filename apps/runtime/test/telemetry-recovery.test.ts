@@ -42,7 +42,7 @@ const echo = defineExtension({
       description: 'echo',
       parameters: Type.Object({ text: Type.String() }),
       replay: 'safe',
-      execute: async ({ text }) => ({ content: [{ type: 'text', text }] }),
+      execute: async ({ text }) => ({ output: [{ type: 'text', text }] }),
     }),
   ],
 })

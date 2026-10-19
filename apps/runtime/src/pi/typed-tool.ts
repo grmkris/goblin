@@ -88,7 +88,7 @@ function parametersOf(name: string, schema: JsonSchema): JsonSchema {
 }
 
 const failed = (text: string, code: string): ToolExecutionResult => ({
-  content: [{ type: 'text', text }],
+  output: [{ type: 'text', text }],
   isError: true,
   diagnostics: [{ severity: 'error', code, message: text }],
 })
@@ -123,7 +123,7 @@ export function typedTool<I, O>(tool: TypedTool<I, O>): ToolRegistration {
       // SAFETY: the JSON codec's encoded side is JSON.
       const structuredContent = encode(output) as JsonValue
       return {
-        content: [{ type: 'text', text: tool.text?.(output, input) ?? JSON.stringify(structuredContent) }],
+        output: [{ type: 'text', text: tool.text?.(output, input) ?? JSON.stringify(structuredContent) }],
         details: { ...tool.details?.(output, input), structuredContent },
         ...(tool.terminate?.(output) === true ? { control: { terminate: true } } : {}),
       }

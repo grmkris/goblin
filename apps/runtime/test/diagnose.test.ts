@@ -23,7 +23,7 @@ const fixture = () => {
   const diagnose = async (input: Record<string, unknown>): Promise<unknown> => {
     if (tool === undefined) throw new Error('diagnose is not registered')
     const result = await executeTool(tool, input)
-    const [block] = result?.content ?? []
+    const [block] = result?.output ?? []
     return block?.type === 'text' ? JSON.parse(block.text) : undefined
   }
   return { ledger, diagnose }

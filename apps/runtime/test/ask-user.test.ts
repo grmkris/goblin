@@ -28,7 +28,7 @@ describe('ask_user (unit)', () => {
     ])
     expect(result.control).toEqual({ terminate: true })
     expect(result.isError).toBeUndefined()
-    expect(result.content).toEqual([
+    expect(result.output).toEqual([
       {
         type: 'text',
         text: [
@@ -74,7 +74,7 @@ describe('ask_user (unit)', () => {
     ])
     expect(result.isError).toBe(true)
     expect(result.control).toBeUndefined()
-    const text = JSON.stringify(result.content)
+    const text = JSON.stringify(result.output)
     expect(text).toContain('Question ids repeat.')
     expect(text).toContain('needs at least two options')
     expect(text).toContain('repeats an option id')

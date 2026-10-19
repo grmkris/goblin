@@ -9,7 +9,7 @@ import {
 } from '../content/materialize.ts'
 import { redactSecretFields as redact } from '../oauth/redaction.ts'
 
-type ModelContent = NonNullable<ToolExecutionResult['content']>
+type ModelContent = NonNullable<ToolExecutionResult['output']>
 
 /**
  * What the model reads in place of a block goblin kept as a file (ADR 0065): the file's path, name, type and size, with
@@ -88,7 +88,7 @@ export const mcpModelResult = (
   result: CallToolResult,
   received: Materialized = NOTHING_RECEIVED,
 ): ToolExecutionResult => ({
-  content: [
+  output: [
     { type: 'text', text: JSON.stringify({ origin: { connectionId, trust: 'untrusted' } }) },
     ...mcpModelContent(result, received),
   ],
@@ -102,7 +102,7 @@ export const mcpModelResult = (
  * server's content cannot forge it. The model is told to wait: granting is the owner's act, never the model's.
  */
 export const grantRequiredResult = (connectionId: string, name: string, connection: string): ToolExecutionResult => ({
-  content: [
+  output: [
     {
       type: 'text',
       text: `Not granted: ${connection} · ${name}. The owner has been shown an Allow button for this tool. Stop here and wait for their decision; do not retry until they reply.`,
@@ -119,7 +119,7 @@ export const grantRequiredResult = (connectionId: string, name: string, connecti
  * to continue.
  */
 export const connectRequiredResult = (connectionId: string, name: string, connection: string): ToolExecutionResult => ({
-  content: [
+  output: [
     {
       type: 'text',
       text: `Not signed in: ${connection}. The owner has been shown a card to connect it. Stop here and wait until they say to continue.`,
@@ -144,7 +144,7 @@ export const scopeRequiredResult = (
   scope: string,
   connection: string,
 ): ToolExecutionResult => ({
-  content: [
+  output: [
     {
       type: 'text',
       text: `Needs more access: ${connection} says this call needs ${scope === '' ? 'more access' : `the scope ${scope}`}. The owner has been shown a card to sign in to it again with more access. Stop here and wait until they say to continue.`,
@@ -168,7 +168,7 @@ export const urlRequiredResult = (
   name: string,
   connection: string,
 ): ToolExecutionResult => ({
-  content: [
+  output: [
     {
       type: 'text',
       text: `Waiting on the owner: ${connection} · ${name} asks them to finish a step on its site first, and nothing has completed yet. They have a card with the server's link. Once they finish or cancel it, the outcome arrives as a new message from the connection, with the server's answer. Stop and wait; do not call the tool again.`,

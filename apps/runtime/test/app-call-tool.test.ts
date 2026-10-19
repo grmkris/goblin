@@ -59,13 +59,13 @@ describe('app_call (unit, ADR 0027)', () => {
     }
     const wrong = await run({ app: 'counter', member: 'add', input: 3 })
     expect(wrong.isError).toBe(true)
-    expect(JSON.stringify(wrong.content)).toContain("The arguments do not match app_call's input")
+    expect(JSON.stringify(wrong.output)).toContain("The arguments do not match app_call's input")
   })
 
   it("refuses an action for the owner's view only, and summarizes a result too large to show", async () => {
     const refused = await run({ app: 'counter', member: 'reset' })
     expect(refused.isError).toBe(true)
-    expect(JSON.stringify(refused.content)).toContain("for the owner's view only")
+    expect(JSON.stringify(refused.output)).toContain("for the owner's view only")
     const large = await run({ app: 'counter', member: 'dump' })
     expect(large.details).toMatchObject({ structuredContent: { revision: 4, truncated: { keys: [], items: 2_000 } } })
   })

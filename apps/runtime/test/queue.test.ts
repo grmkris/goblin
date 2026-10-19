@@ -21,7 +21,7 @@ async function heldQueue() {
         execute: async () => {
           entered.resolve()
           await release.promise
-          return { content: [{ type: 'text', text: 'released' }] }
+          return { output: [{ type: 'text', text: 'released' }] }
         },
       }),
     ],
@@ -89,7 +89,10 @@ describe('queued content from real Pi (in memory, keyless fixture)', () => {
       expect((await queued.status(BACKGROUND)).status).toBe('queued')
       expect(await withdrawQueuedInput(pi, String(root.id), queued.id)).toEqual({ status: 'removed' })
       expect(await withdrawQueuedInput(pi, String(root.id), queued.id)).toEqual({ status: 'already_settled' })
-      const write = await root.submit({ type: 'write', entry: { kind: 'fixture.note' } }, BACKGROUND)
+      // A write the model reads, as goblin's passive notes are, waits for the run's boundary; Pi settles a display-only
+      // write (only `kind` and `data`) at once.
+      const note = { kind: 'fixture.note', model: [{ role: 'user' as const, content: 'note', timestamp: 0 }] }
+      const write = await root.submit({ type: 'write', entry: note }, BACKGROUND)
       expect(await withdrawQueuedInput(pi, String(root.id), write.id)).toEqual({ status: 'not_found' })
       expect((await write.status(BACKGROUND)).status).toBe('queued')
       expect(await withdrawQueuedInput(pi, '999', first.id)).toEqual({ status: 'not_found' })

@@ -253,7 +253,7 @@ describe("a Persona's fork works with its Topic's setup and its own (ADR 0040)",
     const db = forks()
     const result = outsideScopeResult({ kind: 'server', connectionId: 'calendar' }, chatScope(db, '24'))
     expect(result.details).toBeUndefined()
-    expect(result.content).toEqual([expect.objectContaining({ text: expect.stringContaining('calendar') })])
+    expect(result.output).toEqual([expect.objectContaining({ text: expect.stringContaining('calendar') })])
   })
 })
 
@@ -266,7 +266,7 @@ describe('a call outside the setup', () => {
       target: { kind: 'server', connectionId: 'mail' },
       topic: { id: 2, name: 'Work' },
     })
-    expect(result.content).toEqual([expect.objectContaining({ text: expect.stringContaining('wait for their reply') })])
+    expect(result.output).toEqual([expect.objectContaining({ text: expect.stringContaining('wait for their reply') })])
     expect(result.diagnostics).toEqual([expect.objectContaining({ code: 'not_in_topic' })])
   })
 
@@ -274,7 +274,7 @@ describe('a call outside the setup', () => {
     const { db } = fixture()
     const library = outsideScopeResult({ kind: 'skills', connectionId: 'other' }, chatScope(db, '22'))
     expect(library.details).toBeUndefined()
-    expect(library.content).toEqual([
+    expect(library.output).toEqual([
       expect.objectContaining({ text: expect.stringContaining("Not in #Work's setup: skills from other") }),
     ])
   })
@@ -287,7 +287,7 @@ describe('a call outside the setup', () => {
       .run()
     const result = outsideScopeResult({ kind: 'tool', connectionId: 'notes', name: 'read' }, chatScope(db, '22'))
     expect(result.details).toBeUndefined()
-    expect(result.content).toEqual([
+    expect(result.output).toEqual([
       expect.objectContaining({ text: expect.stringContaining('Off for the conversation') }),
     ])
   })

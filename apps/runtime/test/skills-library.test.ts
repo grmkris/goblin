@@ -261,7 +261,7 @@ describe("a skills library outside the Topic's setup (unit)", () => {
 
   it('loads a skill the setup names, whatever its URI now, and refuses its namesake-free neighbours', async () => {
     const loaded = await activateIn([{ connectionId: 'lib', name: 'code-review' }], 'lib:code-review')
-    expect(JSON.stringify(loaded.content)).toContain('<skill handle=\\"lib:code-review\\"')
+    expect(JSON.stringify(loaded.output)).toContain('<skill handle=\\"lib:code-review\\"')
     expect(await activateIn([{ connectionId: 'lib', name: 'plan' }], 'lib:code-review')).toMatchObject({
       isError: true,
       details: {

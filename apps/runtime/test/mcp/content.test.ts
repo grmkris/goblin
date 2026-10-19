@@ -119,7 +119,7 @@ describe('files from MCP content (unit)', () => {
 
     // The model reads the file's reference in the link's place; the signature reaches neither it nor the transcript.
     const projected = mcpModelResult('docs', { content }, received)
-    const reference = projected.content?.[2]
+    const reference = projected.output?.[2]
     expect(reference?.type === 'text' && JSON.parse(reference.text)).toEqual({ receivedFile: file })
     expect(projected.details).toMatchObject({
       content: [{ type: 'text' }, { type: 'resource_link', uri: 'https://cdn.example.com/exports/q3%20report.csv' }],
@@ -291,11 +291,11 @@ describe('files from MCP content (unit)', () => {
     // The model reads each file's reference, the small image beside it; short text stays as it was.
     const projected = mcpModelResult('docs', { content }, received)
     const { path, name, mimeType, size } = chart
-    expect(projected.content?.slice(1, 3)).toEqual([
+    expect(projected.output?.slice(1, 3)).toEqual([
       { type: 'text', text: JSON.stringify({ receivedFile: { path, name, mimeType, size } }) },
       { type: 'image', data: png, mimeType: 'image/png' },
     ])
-    expect(JSON.stringify(projected.content)).toContain('short')
+    expect(JSON.stringify(projected.output)).toContain('short')
     // The transcript keeps no bytes of a kept block.
     expect(JSON.stringify(projected.details)).not.toContain(png)
     expect(JSON.stringify(projected.details)).not.toContain(long)

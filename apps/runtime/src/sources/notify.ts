@@ -73,9 +73,9 @@ export const setNotifySink = Effect.fn('sources.setNotifySink')(function* (sink:
     tool: sink.tool,
     arguments: JSON.stringify(sink.arguments),
     updatedAt: yield* epochSeconds,
-    revision: yield* (yield* Crypto.Crypto).randomUUIDv4.pipe(
-      Effect.mapError((cause) => toAppError(cause, 'sources.sinkRevision')),
-    ),
+    revision: yield* (yield* Crypto.Crypto)
+      .randomUUIDv4()
+      .pipe(Effect.mapError((cause) => toAppError(cause, 'sources.sinkRevision'))),
     policy: JSON.stringify({ result: sink.result, echo: sink.echo }),
   }
   db.insert(appNotifySink).values(row).onConflictDoUpdate({ target: appNotifySink.id, set: row }).run()

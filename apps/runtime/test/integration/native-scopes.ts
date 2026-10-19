@@ -58,7 +58,7 @@ async function scopeProbe(storage: DurableObjectStorage) {
     name: 'subagent',
     description: '',
     parameters: Type.Object({}),
-    execute: async () => ({ content: [] }),
+    execute: async () => ({ output: [] }),
   })
   const retooled: string[] = []
   const retooling: Retooling = { db, subagentTools: [tool], retool: async (session) => void retooled.push(session) }

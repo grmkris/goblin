@@ -203,7 +203,7 @@ const readTool = (run: RunProgram) =>
           )
           if (file.kind === 'image')
             return new ReadyResult({
-              content: [
+              output: [
                 { type: 'text', text: `Image ${path} from skill ${skill}.` },
                 { type: 'image', data: file.data, mimeType: file.mimeType },
               ],

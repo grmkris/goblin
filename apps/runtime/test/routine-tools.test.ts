@@ -75,6 +75,6 @@ describe('routine tools (unit, ADR 0027)', () => {
       },
       control: { terminate: true },
     })
-    expect(JSON.stringify(result.content)).toContain('Work → Routines')
+    expect(JSON.stringify(result.output)).toContain('Work → Routines')
   })
 })

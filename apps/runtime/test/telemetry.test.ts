@@ -85,14 +85,14 @@ const tools = defineExtension({
       description: 'echo',
       parameters: Type.Object({ text: Type.String() }),
       replay: 'safe',
-      execute: async ({ text }) => ({ content: [{ type: 'text', text }] }),
+      execute: async ({ text }) => ({ output: [{ type: 'text', text }] }),
     }),
     defineTool({
       name: 'mcp_call',
       description: 'stand-in for the resident MCP tool',
       parameters: Type.Object({ connectionId: Type.String(), name: Type.String(), arguments: Type.Object({}) }),
       replay: 'unsafe',
-      execute: async () => ({ content: [{ type: 'text', text: 'remote said no' }], isError: true }),
+      execute: async () => ({ output: [{ type: 'text', text: 'remote said no' }], isError: true }),
     }),
     defineTool({
       name: 'wait_grant',
@@ -106,7 +106,7 @@ const tools = defineExtension({
       description: 'always blocked',
       parameters: Type.Object({}),
       replay: 'safe',
-      execute: async () => ({ content: [{ type: 'text', text: 'never runs' }] }),
+      execute: async () => ({ output: [{ type: 'text', text: 'never runs' }] }),
     }),
   ],
   hooks: [

@@ -71,10 +71,10 @@ describe('Pi MCP result projection (unit)', () => {
       _meta: { nested: { authorization: 'Bearer private-value' } },
       isError: true,
     })
-    expect(projected.content?.[0]).toMatchObject({ type: 'text', text: expect.stringContaining('untrusted') })
-    expect(projected.content?.[1]).toEqual({ type: 'text', text: 'Remote content' })
-    expect(projected.content?.[2]).toEqual({ type: 'image', data: 'aW1hZ2U=', mimeType: 'image/png' })
-    expect(projected.content?.[3]).toMatchObject({ type: 'text', text: expect.stringContaining('resource_link') })
+    expect(projected.output?.[0]).toMatchObject({ type: 'text', text: expect.stringContaining('untrusted') })
+    expect(projected.output?.[1]).toEqual({ type: 'text', text: 'Remote content' })
+    expect(projected.output?.[2]).toEqual({ type: 'image', data: 'aW1hZ2U=', mimeType: 'image/png' })
+    expect(projected.output?.[3]).toMatchObject({ type: 'text', text: expect.stringContaining('resource_link') })
     expect(projected.isError).toBe(true)
     expect(JSON.stringify(projected.details)).not.toContain('private-value')
     expect(projected.details).toMatchObject({ structuredContent: { safe: true, apiKey: '[redacted]' } })
