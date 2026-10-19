@@ -48,10 +48,11 @@ infrastructure. Read
   edited in place as if the schema had always been so, and a release that edits an applied one resets dev first
   (`GOBLIN_BREAK_GLASS=1 bun run destroy:dev -- --confirm-reset`, then `GOBLIN_BREAK_GLASS=1 bun run deploy:dev`
   re-creates it: CI refuses a plan that would create goblinAuth, Files or Web). Prod is reset only when the owner
-  decides, as for the hackathon release (owner, 2026-10-12):
-  `GOBLIN_BREAK_GLASS=1 GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset`, then re-create it with a
-  break-glass `deploy:prod` of the same sha. A user only ever reaches their own agent; never add a route that takes an
-  agent name from the request.
+  decides, as for the hackathon release (owner, 2026-10-12) and the channel-info baseline (owner, 2026-10-20): export
+  its auth D1 into `.local` (`wrangler d1 export goblin-prod-auth --remote`), pause CI, then
+  `GOBLIN_BREAK_GLASS=1 GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset`, re-create it with a
+  break-glass `deploy:prod` of the same sha, and promote that sha once CI is back on. A user only ever reaches their
+  own agent; never add a route that takes an agent name from the request.
   Telemetry never carries content ([ADR 0024](docs/adr/0024-observing-conversations.md)).
 
 ## Quality
