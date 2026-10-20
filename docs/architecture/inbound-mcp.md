@@ -60,6 +60,11 @@ keeps what it made, and the change is logged as one `api_key` line. Better Auth'
   | `personas` | `persona_list`, `models_list`, `persona_create`, `persona_get`, `persona_update` |
   | `inspect` | `inspect_turns`, `inspect_turn`, `inspect_problems`, `inspect_flows`, `inspect_details` |
 
+A key may make 600 requests of its agent in each minute of the clock, counted by the agent's owner admission
+([ADR 0085](../adr/0085-a-keys-rate-limit-is-a-fixed-minute-counted-by-its-agent.md)); past them it is refused with
+`key_rate_limited` and `retryAfter` (seconds), with `Retry-After` on `/api` and as the tool's error result on `/mcp`. A
+key that does not admit on `/mcp` gets the same envelope as on `/api`.
+
 A key reaches only the Topics, their chats and the Personas it made (`app_key_reach`); an operation id never adopts
 the owner's. Its Topics start with nothing in their setup, and any setup it writes names only its servers, tool by
 tool. Messages it sends are owner turns in those Topics: built-in tools are the owner's, and `searchExcluded` is not

@@ -35,7 +35,9 @@ Each group's handlers (`HttpApiBuilder.group`) live in their area (`<area>/api.t
 from context. Owner admission (the `OwnerAdmission` middleware, `http/api/middleware.ts`) admits every request
 before its handler, and before its body is decoded: a renewal of resident authority, except where an endpoint is
 annotated `RenewsResident: false` (`POST /api/agent/resident`, the event streams, the entries read, the files group and the
-OAuth callback). A request a key sent never renews it; owner admission checks the key's scope again, and the Topics,
+OAuth callback). A request a key sent never renews it; owner admission checks the key's scope again and counts its
+requests per minute (600, ADR 0085; past them `key_rate_limited` with `retryAfter`, which the edge answers with
+`Retry-After`), and the Topics,
 conversations, Personas and inspection handlers confine a key to what it made (`keys/policy.ts`, `app_key_reach`): its lists hold only its own, and inspection sees only its own chats' run events (ADR 0084). It annotates the request's logs with `goblin.rpc`
 (`<group>.<endpoint>`), `goblin.operation` and `ref`, and stamps `ref` on every typed failure.
 
