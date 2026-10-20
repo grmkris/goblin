@@ -12,22 +12,22 @@ import { chatDatabase, durable } from './chats-sqlite.ts'
 const unused = () => Effect.die('resident authority: not used here')
 
 /**
- * Resident authority as the owner gate and the programs use it (`Resident`), always current: `renewals` holds the time
- * (epoch seconds) of each renewal the gate asked for. Nothing that stands it in asks for its status or changes it.
+ * Resident authority as the owner gate and the programs use it (`Resident`), always current: `grants` holds the time
+ * (epoch seconds) of each grant the gate asked for. Nothing that stands it in asks for its status or changes it.
  */
 export const currentResident = () => {
-  const renewals: number[] = []
+  const grants: number[] = []
   const service = Resident.of({
     status: unused,
-    renew: () =>
+    grant: () =>
       Effect.map(Clock.currentTimeMillis, (millis) => {
-        renewals.push(Math.floor(millis / 1000))
+        grants.push(Math.floor(millis / 1000))
       }),
     revoke: unused,
     enable: unused,
     require: () => Effect.void,
   })
-  return { service, renewals }
+  return { service, grants }
 }
 
 /** Fixed switches per conversation (everything on for any other): the tools only ask for a `scope`. */

@@ -80,7 +80,7 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   (`inbound/route.ts`). Each tool in the registry (`inbound/tools.ts`, `mcp-server.ts`, `inspect-tools.ts`) calls one
   owner endpoint as the caller (`ownerCall` in `inbound/client.ts`, forwarding `x-goblin-caller`) and is listed only
   when the caller holds the endpoint's `EndpointScope`; owner admission checks the scope, counts the caller per minute
-  and never renews resident authority. A new tool is a new annotated endpoint first.
+  and never grants resident authority. A new tool is a new annotated endpoint first.
 - Fixture tests (`test/mcp/`) prove protocol behaviour; the real behaviour of mysi and its apps (myplan, mytab and the
   rest) is proven only on dev.
 

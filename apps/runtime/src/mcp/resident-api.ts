@@ -5,8 +5,8 @@ import { Events, Resident } from './service.ts'
 
 /**
  * The `resident` group (ADR 0003): resident authority's status, and revoking or re-enabling it. A revocation cleans up
- * the Events subscriptions first, while the authorization that made them still holds. The gate does not renew
- * authority before `set` (`RenewsResident`), as the Durable Object's `residentSet` never did.
+ * the Events subscriptions first, while the authorization that made them still holds. The gate does not grant
+ * authority before `set` (`GrantsResident`), as the Durable Object's `residentSet` never did.
  */
 export const ResidentHandlers = HttpApiBuilder.group(OwnerApi, 'resident', (handlers) =>
   handlers

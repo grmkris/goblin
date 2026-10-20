@@ -48,8 +48,6 @@ export function residentStatus(state: ResidentStatus['state']): Label {
   switch (state) {
     case 'active':
       return { text: 'On', tone: 'good' }
-    case 'expired':
-      return { text: 'Expired', tone: 'attention' }
     case 'revoked':
       return { text: 'Off', tone: 'quiet' }
     case 'never':

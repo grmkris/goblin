@@ -253,7 +253,7 @@ export const agentCases = (phase: Phase): readonly NativeCase[] => [
   ),
   {
     title:
-      'owner RPC renews resident authority, gates threads, revocation blocks client asks, and Events ingress [canary]',
+      'owner RPC grants resident authority, gates threads, revocation blocks client asks, and Events ingress [canary]',
     run: ownerApiChecks,
   },
   probeCase(

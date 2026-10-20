@@ -104,7 +104,7 @@ describe('the routines group served by the agent', () => {
     expect(Schema.decodeUnknownSync(RoutinePage)(await list.json()).routines.map((routine) => routine.id)).toEqual([
       draft.id,
     ])
-    expect(resident.renewals).toHaveLength(4)
+    expect(resident.grants).toHaveLength(4)
   })
 
   it('answers a definition the store refuses as 400 and a body that does not decode as 400', async () => {

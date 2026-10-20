@@ -54,18 +54,18 @@ import type { SkillEntry } from '../skills/protocol.ts'
 // passes a time.
 
 /**
- * Resident authority (ADR 0003): what lets tools run without a live browser session. Every owner request renews it; a
- * revocation is sticky until the owner enables it again.
+ * Resident authority (ADR 0003, 0088): what lets tools run without a live browser session, from the owner's first
+ * signed-in request until they revoke it; a revocation is sticky until the owner enables it again.
  */
 export class Resident extends Context.Service<
   Resident,
   {
     readonly status: () => Effect.Effect<ResidentStatus>
-    /** Owner activity: extends the window, unless the owner revoked authority. */
-    readonly renew: () => Effect.Effect<void>
-    /** Revokes it (renewing the row first, so the times are current) and answers the status after. */
+    /** The owner's signed-in activity: grants it the first time; a revocation stays. */
+    readonly grant: () => Effect.Effect<void>
+    /** Revokes it and answers the status after. */
     readonly revoke: () => Effect.Effect<ResidentStatus>
-    /** Clears a revocation and renews; answers the status after. */
+    /** Clears a revocation; answers the status after. */
     readonly enable: () => Effect.Effect<ResidentStatus>
     /** Fails with `ResidentInactive` unless authority is current. */
     readonly require: () => Effect.Effect<void, AppError>

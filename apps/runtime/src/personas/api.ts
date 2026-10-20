@@ -83,7 +83,7 @@ export const PersonasHandlers = HttpApiBuilder.group(OwnerApi, 'personas', (hand
     .handle('reply', ({ payload }) =>
       Effect.gen(function* () {
         // The reply makes the Persona work again: the same admission an owner message gets.
-        yield* Resident.use((resident) => resident.renew())
+        yield* Resident.use((resident) => resident.grant())
         yield* resumePersona(payload.fork, payload.operationId, payload.text)
         return null
       }),

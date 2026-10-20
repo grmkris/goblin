@@ -5,6 +5,10 @@ import { MIGRATIONS } from '../src/storage/migrations.ts'
 import { assertApplicationTable } from '../src/storage/vendor.ts'
 import { chatDatabase } from './chats-sqlite.ts'
 import { declaredTables } from './migration-schema.ts'
+import { DatabaseSync } from 'node:sqlite'
+import { drizzle } from 'drizzle-orm/node-sqlite'
+import { BREAK } from '../src/storage/migrations/migration.ts'
+import { residentStatus } from '../src/resident.ts'
 
 const databases: ReturnType<typeof chatDatabase>[] = []
 afterEach(() => {
@@ -38,6 +42,21 @@ const FTS = [
   'app_transcript_fts_idx',
 ]
 
+describe('resident authority until revoked (ADR 0088)', () => {
+  it('keeps when it was granted and drops the expiry, so a lapsed one is active again', () => {
+    const sqlite = new DatabaseSync(':memory:')
+    const [last, ...before] = [...MIGRATIONS].toReversed()
+    for (const migration of before.toReversed())
+      for (const statement of migration.sql.split(BREAK)) sqlite.exec(statement)
+    // Authority as it was before: renewed at 100, lapsed at 200.
+    sqlite.exec('INSERT INTO app_resident (id, renewed_at, expires_at, revoked_at) VALUES (1, 100, 200, NULL)')
+    for (const statement of last?.sql.split(BREAK) ?? []) sqlite.exec(statement)
+    expect(sqlite.prepare('SELECT * FROM app_resident').all()).toEqual([{ id: 1, granted_at: 100, revoked_at: null }])
+    expect(residentStatus(drizzle({ client: sqlite }))).toEqual({ state: 'active', grantedAt: 100 })
+    sqlite.close()
+  })
+})
+
 describe('fresh application baseline', () => {
   it('creates exactly the live application tables and declares its complete ownership', async () => {
     const sqlite = database()
@@ -51,6 +70,7 @@ describe('fresh application baseline', () => {
       '20261015000000_baseline',
       '20261020000000_key_reach',
       '20261020120000_invocation_reason',
+      '20261020200000_resident_until_revoked',
     ])
     // An additive migration that alters a table names it too, so a table may be named more than once.
     const owned = [...new Set(MIGRATIONS.flatMap((migration) => migration.tables))]

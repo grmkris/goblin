@@ -44,10 +44,10 @@ const continuation =
 
 /**
  * Where an owner's decision goes, as the owner API runs it: the outcome goes into the chat (`sendOutcome`, not as the
- * owner's message), after the same admission an owner request gets (a renewal of resident authority).
+ * owner's message), after the same admission an owner request gets (a grant of resident authority).
  */
 export const ownerContinuation = continuation(
-  Resident.use((resident) => resident.renew()),
+  Resident.use((resident) => resident.grant()),
   sendOutcome,
 )
 

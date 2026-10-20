@@ -20,7 +20,7 @@ import { SourceUse } from '../retrieval.ts'
 import { MoveReceipt, MoveToThread } from '../threads.ts'
 import { ApiErrors } from './errors.ts'
 import { EndpointScope } from './scope.ts'
-import { RenewsResident } from './resident.ts'
+import { GrantsResident } from './resident.ts'
 import { EventStream } from './stream.ts'
 
 /** The chat a path names: a logical chat id of 1 to 12 digits. */
@@ -72,10 +72,10 @@ const EntriesQuery = {
  * - `snapshot`: `GET …/:id/snapshot`: the chat's Pi snapshot, as JSON.
  * - `history`: `GET …/:id/history?before=`: a page of older entries.
  * - `entries`: `GET …/:id/entries?after=&limit=`: entries after a cursor, oldest first, normalized for a server
- *   (`ConversationEntries`), with the chat's activity and Persona invocations. It does not renew resident authority.
+ *   (`ConversationEntries`), with the chat's activity and Persona invocations. It does not grant resident authority.
  * - `sources`: `GET …/:id/sources`: what retrieval gave the chat's answers (ADR 0035), newest first.
  * - `events`: `GET …/:id/events`, server-sent: Pi's `snapshot`, then a `batch` per commit, until the browser goes away.
- *   A chat keeps its Pi session, so this is its session's stream. It does not renew resident authority.
+ *   A chat keeps its Pi session, so this is its session's stream. It does not grant resident authority.
  *
  * An API key with the `conversations` scope reaches `submit`, `startThread`, `stop` and `entries` (ADR 0081).
  */
@@ -154,7 +154,7 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     error: [ApiErrors.notFound, ApiErrors.conflict],
   })
     .annotate(EndpointScope, 'conversations')
-    .annotate(RenewsResident, false),
+    .annotate(GrantsResident, false),
   HttpApiEndpoint.get('sources', '/conversations/:id/sources', {
     params,
     success: Schema.Array(SourceUse),
@@ -164,5 +164,5 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     params,
     success: EventStream,
     error: [ApiErrors.notFound],
-  }).annotate(RenewsResident, false),
+  }).annotate(GrantsResident, false),
 ) {}

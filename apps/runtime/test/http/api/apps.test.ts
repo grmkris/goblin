@@ -160,7 +160,7 @@ describe('the apps group served by the agent', () => {
       callId: 'call-1',
       origin: { connectionId: 'fixture', tool: 'board', uri: BOARD, title: 'Board' },
     })
-    expect(resident.renewals).toHaveLength(1)
+    expect(resident.grants).toHaveLength(1)
     uri = undefined
     const gone = await fetch(post('/api/apps', { conversation: '7', callId: 'call-1' }, { 'x-goblin-ref': 'r' }))
     expect(gone.status).toBe(404)
@@ -343,7 +343,7 @@ describe('the agentApps group served by the agent', () => {
     const ghost = await fetch(json('GET', '/api/agent-apps/ghost', undefined, { 'x-goblin-ref': 'ref-404' }))
     expect(ghost.status).toBe(404)
     expect(await ghost.json()).toMatchObject({ error: { code: 'not_found', what: 'app ghost', ref: 'ref-404' } })
-    expect(resident.renewals).toHaveLength(3)
+    expect(resident.grants).toHaveLength(3)
   })
 
   it("applies a change and answers with the app after it; a new home is the owner's main or a thread", async () => {

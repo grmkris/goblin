@@ -1,9 +1,12 @@
 import * as Schema from 'effect/Schema'
 
+/**
+ * Resident authority (ADR 0088): `never` before the owner's first signed-in action, then `active` until they revoke it.
+ * `grantedAt` is when it was first granted, `revokedAt` when it was revoked; epoch seconds.
+ */
 export const ResidentStatus = Schema.Struct({
-  state: Schema.Literals(['active', 'expired', 'revoked', 'never']),
-  renewedAt: Schema.optional(Schema.Number),
-  expiresAt: Schema.optional(Schema.Number),
+  state: Schema.Literals(['active', 'revoked', 'never']),
+  grantedAt: Schema.optional(Schema.Number),
   revokedAt: Schema.optional(Schema.Number),
 })
 export type ResidentStatus = typeof ResidentStatus.Type

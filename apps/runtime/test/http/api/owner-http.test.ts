@@ -28,7 +28,7 @@ describe('the owner API served by the agent', () => {
     expect(response.headers.get('x-goblin-ref')).toBe('8c1f2a3b4d5e6f70-AMS')
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(response.headers.get('x-content-type-options')).toBe('nosniff')
-    expect(resident.renewals).toHaveLength(1)
+    expect(resident.grants).toHaveLength(1)
   })
 
   it('answers a name clash with the 409 envelope carrying the reference', async () => {
@@ -65,7 +65,7 @@ describe('the owner API served by the agent', () => {
     expect(badId.status).toBe(404)
     expect(await badId.json()).toMatchObject({ error: { code: 'not_found', what: 'route' } })
     // The gate admits before the body is decoded, exactly as it ran before every owner RPC method.
-    expect(resident.renewals).toHaveLength(5)
+    expect(resident.grants).toHaveLength(5)
   })
 
   it('refuses to archive Personal (400)', async () => {
@@ -88,7 +88,7 @@ describe('the owner API served by the agent', () => {
       expect(response.headers.get('cache-control')).toBe('no-store')
       expect(await unrouted(response)).toBe(true)
     }
-    expect(resident.renewals).toEqual([])
+    expect(resident.grants).toEqual([])
   })
 
   it("serves the probes' typed client: a clash decodes as the Conflict class with its reference", async () => {

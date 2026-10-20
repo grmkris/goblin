@@ -4,48 +4,36 @@ import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import { appResident } from './storage/schema.ts'
 
 // Resident authority: what lets tools run without a live browser session (chat, inbound MCP clients, routines and
-// channels), kept in the agent's one `app_resident` row. Owner admission renews it; a revocation is sticky until the
-// owner enables it again. Programs use the `Resident` service (mcp/service.ts), built over these functions in
-// layers/core.ts.
-
-/** The agent may act on its own for this long after the owner's last signed-in action. */
-export const RESIDENT_TTL_SECONDS = 30 * 24 * 60 * 60
+// channels), kept in the agent's one `app_resident` row. The owner's first signed-in action grants it, and it lasts
+// until they revoke it (ADR 0088); a revocation is sticky until the owner enables it again. Programs use the `Resident`
+// service (mcp/service.ts), built over these functions in layers/core.ts.
 
 export type { ResidentStatus }
 
 /** The database resident authority lives in: its one `app_resident` row. */
 type Database = SQLiteAsyncDatabase<'sync', unknown>
 
-/** Resident authority at `now` (epoch seconds). */
-export function residentStatus(db: Database, now: number): ResidentStatus {
+/** Resident authority as its row says. */
+export function residentStatus(db: Database): ResidentStatus {
   const row = db.select().from(appResident).where(eq(appResident.id, 1)).get()
   if (row === undefined) return { state: 'never' }
-  const times = {
-    renewedAt: row.renewedAt,
-    expiresAt: row.expiresAt,
-    ...(row.revokedAt === null ? {} : { revokedAt: row.revokedAt }),
-  }
-  if (row.revokedAt !== null) return { state: 'revoked', ...times }
-  return { state: row.expiresAt > now ? 'active' : 'expired', ...times }
+  if (row.revokedAt === null) return { state: 'active', grantedAt: row.grantedAt }
+  return { state: 'revoked', grantedAt: row.grantedAt, revokedAt: row.revokedAt }
 }
 
-/** Owner activity: extend the window, unless the owner revoked authority (a renewal never clears a revocation). */
-export function renewResident(db: Database, now: number): void {
-  const values = { id: 1, renewedAt: now, expiresAt: now + RESIDENT_TTL_SECONDS }
-  db.insert(appResident)
-    .values(values)
-    .onConflictDoUpdate({ target: appResident.id, set: { renewedAt: now, expiresAt: values.expiresAt } })
-    .run()
+/** The owner's signed-in activity: grants it the first time, and never clears a revocation. */
+export function grantResident(db: Database, now: number): void {
+  db.insert(appResident).values({ id: 1, grantedAt: now }).onConflictDoNothing().run()
 }
 
-/** Revokes it, sticky until the owner enables it again; the window is renewed first so its times are current. */
+/** Revokes it, sticky until the owner enables it again. */
 export function revokeResident(db: Database, now: number): void {
-  renewResident(db, now)
+  grantResident(db, now)
   db.update(appResident).set({ revokedAt: now }).where(eq(appResident.id, 1)).run()
 }
 
-/** Clears a revocation and renews. */
+/** Clears a revocation. */
 export function enableResident(db: Database, now: number): void {
-  renewResident(db, now)
+  grantResident(db, now)
   db.update(appResident).set({ revokedAt: null }).where(eq(appResident.id, 1)).run()
 }

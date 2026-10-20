@@ -125,7 +125,7 @@ function ResidentHeader({ id, action }: { readonly id: string; readonly action: 
       <CardTitle id={id}>Work while you're away</CardTitle>
       <CardDescription>
         Lets your agent use the tools you allowed when you are not watching: for apps you connected, routines and
-        Sources. It lasts 30 days from your last visit and renews whenever you use goblin.
+        Sources. It stays on until you turn it off.
       </CardDescription>
       <CardAction>{action}</CardAction>
     </CardHeader>
@@ -162,8 +162,8 @@ function Resident({ id }: { readonly id: string }) {
       <CardContent>
         <div className="card-line">
           <StatusLabel label={residentStatus(status.state)} />
-          {status.state === 'active' && status.expiresAt !== undefined && (
-            <span className="card-line-meta">until {dayAndMonth(status.expiresAt * 1000)}</span>
+          {status.state === 'active' && status.grantedAt !== undefined && (
+            <span className="card-line-meta">since {dayAndMonth(status.grantedAt * 1000)}</span>
           )}
         </div>
       </CardContent>

@@ -46,7 +46,7 @@ export const disconnectOwnerServer = (connectionId: string) =>
  * Where an outbound sign-in comes back (`GET /api/mcp/oauth/callback`, the `mcp` group's raw `oauthCallback`: it
  * answers a redirect, not JSON). The owner lands on Connections with `connected=<connectionId>`, or with `error=` and the
  * authorization server's own error, `authorization_failed` for an incomplete callback, or the tag of the failure that
- * stopped it. As for every raw endpoint, owner admission does not renew resident authority, so finishing renews it.
+ * stopped it. As for every raw endpoint, owner admission does not grant resident authority, so finishing grants it.
  */
 export const connectCallback = (params: URLSearchParams, appUrl: string) =>
   Effect.gen(function* () {
@@ -59,7 +59,7 @@ export const connectCallback = (params: URLSearchParams, appUrl: string) =>
     }
     const issuer = params.get('iss') ?? undefined
     const finish = Effect.gen(function* () {
-      yield* Resident.use((resident) => resident.renew())
+      yield* Resident.use((resident) => resident.grant())
       return yield* McpServers.use((servers) => servers.finishConnect(state, code, issuer))
     })
     const finished = yield* Effect.exit(finish)

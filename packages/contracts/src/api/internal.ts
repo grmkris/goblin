@@ -25,7 +25,7 @@ export const FORWARDED_HEADER = 'x-goblin-forwarded'
 
 /**
  * Admission to every internal endpoint, run by the agent before the handler: an owner forward is refused. It never
- * renews resident authority.
+ * grants resident authority.
  * Its implementation lives in the runtime (`http/api/middleware.ts`); its error schema is every envelope.
  */
 export class InternalGate extends HttpApiMiddleware.Service<InternalGate>()('goblin/api/InternalGate', {
@@ -58,7 +58,7 @@ export type EventWebhookResult = typeof EventWebhookResult.Type
  *   headers that sign it.
  * - `linkedFile`: `GET /internal/files/linked?path=`, the owner file a file link names (ADR 0070), once the Worker has
  *   checked the link's token: its bytes as an attachment, with its type and name in the answer's headers. It needs
- *   current resident authority and never renews it.
+ *   current resident authority and never grants it.
  */
 export class InboundGroup extends HttpApiGroup.make('inbound').add(
   HttpApiEndpoint.post('mcpEvents', '/mcp-events/:connectionId', {

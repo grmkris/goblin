@@ -63,7 +63,7 @@ export const changeModelEndpointMutation = mutationOptions({
   },
 })
 
-/** Resident authority (ADR 0003), renewed by the read itself. */
+/** Resident authority (ADR 0003, 0088), granted by the read itself the first time. */
 export const residentQuery = owner.apiQuery({
   queryKey: agentKeys.resident,
   queryFn: (api) => api.resident.status(),

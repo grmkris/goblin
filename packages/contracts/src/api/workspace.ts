@@ -1,10 +1,10 @@
 import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
-import { RenewsResident } from './resident.ts'
+import { GrantsResident } from './resident.ts'
 import { EventStream } from './stream.ts'
 
 /**
- * The owner's workspace as one live feed. Paths are relative to the API's `/api` prefix; it does not renew resident
+ * The owner's workspace as one live feed. Paths are relative to the API's `/api` prefix; it does not grant resident
  * authority.
  *
  * - `events`: `GET /api/workspace/events`, server-sent: `event: snapshot` with every conversation, App, Topic, Persona,
@@ -13,4 +13,4 @@ import { EventStream } from './stream.ts'
  */
 export class WorkspaceGroup extends HttpApiGroup.make('workspace')
   .add(HttpApiEndpoint.get('events', '/workspace/events', { success: EventStream }))
-  .annotateEndpoints(RenewsResident, false) {}
+  .annotateEndpoints(GrantsResident, false) {}

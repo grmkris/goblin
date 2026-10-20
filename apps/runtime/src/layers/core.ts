@@ -20,7 +20,7 @@ import { LoggerLive } from '../observability/logger.ts'
 import { ReporterLive } from '../observability/report.ts'
 import { SingleFlight } from '../observability/single-flight.ts'
 import { PiSessions } from '../pi/sessions.ts'
-import { enableResident, renewResident, residentStatus, revokeResident } from '../resident.ts'
+import { enableResident, grantResident, residentStatus, revokeResident } from '../resident.ts'
 import { Changes } from '../runtime/changes.ts'
 import { Db } from '../runtime/db.ts'
 import { CryptoLive } from '../runtime/crypto.ts'
@@ -54,27 +54,26 @@ export const ResidentLive: Layer.Layer<Resident, never, Db> = Layer.effect(
   Effect.gen(function* () {
     const db = yield* Db
     const status = Effect.fn('Resident.status')(function* () {
-      const now = yield* epochSeconds
-      return yield* Effect.sync(() => residentStatus(db, now))
+      return yield* Effect.sync(() => residentStatus(db))
     })
     return Resident.of({
       status,
-      renew: Effect.fn('Resident.renew')(function* () {
+      grant: Effect.fn('Resident.grant')(function* () {
         const now = yield* epochSeconds
-        yield* Effect.sync(() => renewResident(db, now))
+        yield* Effect.sync(() => grantResident(db, now))
       }),
       revoke: Effect.fn('Resident.revoke')(function* () {
         const now = yield* epochSeconds
         return yield* Effect.sync(() => {
           revokeResident(db, now)
-          return residentStatus(db, now)
+          return residentStatus(db)
         })
       }),
       enable: Effect.fn('Resident.enable')(function* () {
         const now = yield* epochSeconds
         return yield* Effect.sync(() => {
           enableResident(db, now)
-          return residentStatus(db, now)
+          return residentStatus(db)
         })
       }),
       require: Effect.fn('Resident.require')(function* () {

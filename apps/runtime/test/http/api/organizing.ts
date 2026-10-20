@@ -90,7 +90,7 @@ export const organizing = () => {
     db,
     (kind, target) => (kind.startsWith('topic.') ? topics : personas).get(Number(target)).revision,
   )
-  // Current, counting the gate's renewals; the organizing programs ask it only to `require` itself.
+  // Current, counting the gate's grants; the organizing programs ask it only to `require` itself.
   const resident = currentResident()
   // A Topic created here has no open chat, so an archive (an Undo of its creation) reads only `openIn`.
   const conversations = stub(Conversations, { openIn: () => Effect.succeed([]) })

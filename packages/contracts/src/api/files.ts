@@ -4,7 +4,7 @@ import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
 import { FileEntry, FileListing } from '../files.ts'
 import { ApiErrors } from './errors.ts'
-import { RenewsResident } from './resident.ts'
+import { GrantsResident } from './resident.ts'
 import { Bytes } from './stream.ts'
 
 /** `?path=`: the file, as the owner's files name it (`FILE_PATH`); the agent refuses any other. */
@@ -12,7 +12,7 @@ const PathQuery = { path: Schema.String }
 
 /**
  * The owner's files (ADR 0022): `/uploads` holds what the owner uploaded or attached, `/agent` what the agent wrote.
- * Paths are relative to the API's `/api` prefix; none of them renews resident authority.
+ * Paths are relative to the API's `/api` prefix; none of them grants resident authority.
  *
  * - `list`: `GET /api/files?dir=` (default `/uploads`), a directory's entries, newest first, and the storage in use.
  * - `read`: `GET /api/files/content?path=`, the file's bytes as stored. Only a plain image opens in place; anything
@@ -44,4 +44,4 @@ export class FilesGroup extends HttpApiGroup.make('files')
       error: [ApiErrors.notFound, ApiErrors.invalidInput, ApiErrors.forbidden],
     }),
   )
-  .annotateEndpoints(RenewsResident, false) {}
+  .annotateEndpoints(GrantsResident, false) {}

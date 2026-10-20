@@ -200,10 +200,10 @@ describe("an API key's reach (ADR 0081)", () => {
     expect((await fetch(get('/api/personas?limit=1', OTHER))).status).toBe(200)
   })
 
-  it('is admitted only where its scope reaches, and never renews resident authority', async () => {
+  it('is admitted only where its scope reaches, and never grants resident authority', async () => {
     const { fetch, resident } = organizing()
     expect((await fetch(post('/api/topics', { name: 'A', operationId: 'svc:a' }, KEY))).status).toBe(201)
-    expect(resident.renewals).toHaveLength(0)
+    expect(resident.grants).toHaveLength(0)
     const topicsOnly = grant('key-3', ['topics'])
     const refused = await fetch(post('/api/personas', { ...scout, operationId: 'svc:p' }, topicsOnly))
     expect(refused.status).toBe(403)
@@ -211,6 +211,6 @@ describe("an API key's reach (ADR 0081)", () => {
     // An endpoint no key reaches: Undo in the organize log.
     expect((await fetch(post('/api/organize/receipt-1/undo', {}, KEY))).status).toBe(403)
     await fetch(post('/api/topics', { name: 'B', operationId: 'owner-b' }))
-    expect(resident.renewals.length).toBeGreaterThan(0)
+    expect(resident.grants.length).toBeGreaterThan(0)
   })
 })

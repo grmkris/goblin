@@ -1,5 +1,5 @@
 import { ResidentStatus } from '@goblin/contracts'
-import { OwnerApi, RenewsResident, ResidentGroup } from '@goblin/contracts/api'
+import { OwnerApi, GrantsResident, ResidentGroup } from '@goblin/contracts/api'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
@@ -27,7 +27,7 @@ const fixture = () => {
 const decode = Schema.decodeUnknownSync(ResidentStatus)
 
 describe('the resident group', () => {
-  it('answers the status after the gate renewed it, then revokes with the Events cleanup first and stays revoked', async () => {
+  it('answers the status after the gate granted it, then revokes with the Events cleanup first and stays revoked', async () => {
     const { fetch, disabled } = fixture()
     const first = await fetch(get('/api/agent/resident'))
     expect(first.status).toBe(200)
@@ -36,7 +36,7 @@ describe('the resident group', () => {
     expect(revoked.status).toBe(200)
     expect(decode(await revoked.json())).toMatchObject({ state: 'revoked' })
     expect(disabled).toEqual([undefined])
-    // An ordinary owner request renews the window but never clears a revocation.
+    // An ordinary owner request never clears a revocation.
     const after = decode(await (await fetch(get('/api/agent/resident'))).json())
     expect(after.state).toBe('revoked')
     const enabled = decode(await (await fetch(post('/api/agent/resident', { enabled: true }))).json())
@@ -52,10 +52,10 @@ describe('the resident group', () => {
     expect(await response.json()).toMatchObject({ error: { code: 'invalid_input' } })
   })
 
-  it('marks only `set` as the endpoint owner admission does not renew authority for', () => {
+  it('marks only `set` as the endpoint owner admission does not grant authority for', () => {
     const { endpoints } = OwnerApi.groups.resident
-    expect(Context.get(endpoints.status.annotations, RenewsResident)).toBe(true)
-    expect(Context.get(endpoints.set.annotations, RenewsResident)).toBe(false)
+    expect(Context.get(endpoints.status.annotations, GrantsResident)).toBe(true)
+    expect(Context.get(endpoints.set.annotations, GrantsResident)).toBe(false)
   })
 
   it("serves the probes' typed client", async () => {

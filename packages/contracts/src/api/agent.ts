@@ -38,7 +38,7 @@ const ModelPick = Schema.Struct({ model: NonEmptyString(128) })
  *   (ADR 0084), so a server can check a model before it writes a Persona.
  * - `ask`: `POST /api/agent/ask`, a question for the agent in main, labelled with the caller's name, answered when it
  *   settles within `waitMs` (else `running`, to ask again with the same operation id). It needs current resident
- *   authority and never renews it.
+ *   authority and never grants it.
  * - `recent`: `GET /api/agent/recent?limit=`, the newest messages of main.
  *
  * `ask` and `recent` need the `agent` scope, which only an OAuth client of the owner holds (ADR 0086).

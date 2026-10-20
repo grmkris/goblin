@@ -72,7 +72,7 @@ describe('the inspect group served by the agent', () => {
     expect(await missing.json()).toEqual({
       error: { code: 'not_found', message: 'That does not exist.', what: 'entry operation', ref: 'ref-1' },
     })
-    expect(resident.renewals).toHaveLength(3)
+    expect(resident.grants).toHaveLength(3)
   })
 
   it('refuses a query naming neither an operation nor a chat entry, and one that does not decode (400)', async () => {
@@ -209,8 +209,8 @@ describe("the inspect group under a server's API key (ADR 0084)", () => {
       servers: [{ server: 'mycut', calls: 1, ms: 30_000 }],
       otherMs: 9_000,
     })
-    // Nothing a key reads renews resident authority.
-    expect(resident.renewals).toHaveLength(0)
+    // Nothing a key reads grants resident authority.
+    expect(resident.grants).toHaveLength(0)
   })
 
   it("lists and finds only what its own chats ran; the owner's and another Topic's are not there", async () => {

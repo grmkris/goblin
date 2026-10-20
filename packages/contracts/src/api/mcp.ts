@@ -34,7 +34,7 @@ import {
   UrlRequestView,
 } from '../mcp.ts'
 import { ApiErrors } from './errors.ts'
-import { RenewsResident } from './resident.ts'
+import { GrantsResident } from './resident.ts'
 
 /** A connection's id in a path; anything else names no connection (404). */
 const ConnectionParam = Schema.String.check(Schema.isPattern(/^[\w-]{1,64}$/u))
@@ -59,7 +59,7 @@ const REMOTE = [ApiErrors.upstream, ApiErrors.upstreamTimeout, ApiErrors.conflic
  * itself produces. Remote results are the server's, untrusted, and answered whole.
  *
  * `oauthCallback`: `GET /api/mcp/oauth/callback`, an outbound sign-in coming back, answered with a redirect to
- * Connections (with `?error=` and the request's `ref` when it failed). It does not renew resident authority.
+ * Connections (with `?error=` and the request's `ref` when it failed). It does not grant resident authority.
  */
 export class McpGroup extends HttpApiGroup.make('mcp').add(
   HttpApiEndpoint.get('servers', '/mcp/servers', { success: Schema.Array(ServerView) }),
@@ -214,7 +214,7 @@ export class McpGroup extends HttpApiGroup.make('mcp').add(
     error: [ApiErrors.notFound, ...REMOTE],
   }),
   HttpApiEndpoint.get('oauthCallback', '/mcp/oauth/callback', { success: HttpApiSchema.Empty(302) }).annotate(
-    RenewsResident,
+    GrantsResident,
     false,
   ),
 ) {}

@@ -359,7 +359,7 @@ describe('the conversations API served by the agent', () => {
     expect(response.headers.get('x-goblin-ref')).toBe('r-1')
     expect(record.submitted).toEqual([{ session: '2', operationId: 'op-1', content: 'hello' }])
     expect(operations()).toEqual([expect.objectContaining({ chatId: '2', operationId: 'op-1', sessionId: '2' })])
-    expect(resident.renewals).toHaveLength(1)
+    expect(resident.grants).toHaveLength(1)
   })
 
   it('refuses an empty or closed send (400), an unknown chat (404) and a path id or body that does not decode', async () => {

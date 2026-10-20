@@ -19,12 +19,12 @@ through `promiseWith` (`runtime/boundary.ts`).
   `api.ts`; never a new RPC method or Worker route. The Worker's edge (`http/api/edge.ts`) admits the request (Origin,
   the cookie session, CSRF on every write, the 64 KiB body cap) and forwards it with an allowlisted set of headers,
   `x-goblin-ref` and its mark (`x-goblin-forwarded: owner`). Owner admission (`OwnerAdmission`,
-  `http/api/middleware.ts`) renews resident authority, except on an endpoint annotated `RenewsResident: false`.
+  `http/api/middleware.ts`) grants resident authority, except on an endpoint annotated `GrantsResident: false`.
 - What is not JSON in and out (the SSE streams, the owner's file bytes, the OAuth callback redirect) is an endpoint
   served through HttpApi's raw handlers, behind the same edge. One router (`AgentHttp`) serves the owner API and the
   internal API (`/internal`, `@goblin/contracts/internal`), which only the Worker calls on the stub: an inbound
   client's ask, recent read and inspection, MCP Events, and the file a file link names (ADR 0070). Its gate
-  (`InternalGate`) refuses a request carrying the edge's mark; it never renews resident authority. A new caller that is
+  (`InternalGate`) refuses a request carrying the edge's mark; it never grants resident authority. A new caller that is
   not the owner's browser gets an internal endpoint, never an RPC method.
 - Workers RPC drops custom error classes. The one RPC method left (`deleteAgentData`) returns `RpcResult`
   (`http/rpc.ts`) and the Worker unwraps it; both APIs answer their error envelope instead.

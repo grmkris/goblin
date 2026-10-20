@@ -9,7 +9,7 @@ import { Onboarding } from '../../src/onboarding/service.ts'
 import { stub } from '../http/api/fixture.ts'
 
 /**
- * The callback over resident authority that counts renewals, a host whose `finishConnect` is `finish`, and the step
+ * The callback over resident authority that counts grants, a host whose `finishConnect` is `finish`, and the step
  * first-run Start noted for the sign-in (none unless `started`). No grant service is reachable: the callback allows
  * nothing.
  */
@@ -18,10 +18,10 @@ const callback = async (
   finish: (state: string) => Effect.Effect<string, InvalidInput> = () => Effect.succeed('notes'),
   started?: OnboardingStep,
 ) => {
-  const renewals: number[] = []
+  const grants: number[] = []
   const finished: string[] = []
   const services = Layer.mergeAll(
-    stub(Resident, { renew: () => Effect.sync(() => void renewals.push(1)) }),
+    stub(Resident, { grant: () => Effect.sync(() => void grants.push(1)) }),
     stub(McpServers, {
       finishConnect: (state: string) => Effect.tap(finish(state), () => Effect.sync(() => void finished.push(state))),
     }),
@@ -30,7 +30,7 @@ const callback = async (
   const target = await Effect.runPromise(
     connectCallback(new URLSearchParams(query), 'https://goblin.test').pipe(Effect.provide(services)),
   )
-  return { target: target.href, renewals: renewals.length, finished }
+  return { target: target.href, grants: grants.length, finished }
 }
 
 describe('the outbound sign-in callback', () => {
@@ -38,7 +38,7 @@ describe('the outbound sign-in callback', () => {
     const result = await callback('state=s1&code=c1&iss=https://auth.test')
     expect(result).toEqual({
       target: 'https://goblin.test/connections?connected=notes',
-      renewals: 1,
+      grants: 1,
       finished: ['s1'],
     })
   })
@@ -47,7 +47,7 @@ describe('the outbound sign-in callback', () => {
     const back = await callback('state=s1&code=c1', undefined, 'services')
     expect(back).toEqual({
       target: 'https://goblin.test/start/services?connected=notes',
-      renewals: 1,
+      grants: 1,
       finished: ['s1'],
     })
   })
@@ -59,7 +59,7 @@ describe('the outbound sign-in callback', () => {
     const incomplete = await callback('state=s1')
     expect(incomplete).toEqual({
       target: 'https://goblin.test/connections?error=authorization_failed',
-      renewals: 0,
+      grants: 0,
       finished: [],
     })
   })

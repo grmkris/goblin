@@ -76,8 +76,7 @@ export const appMcpOauthPending = sqliteTable('app_mcp_oauth_pending', {
 /** The single resident-authority row (id 1): whether the agent may act on its own. */
 export const appResident = sqliteTable('app_resident', {
   id: integer('id').primaryKey().notNull(),
-  renewedAt: integer('renewed_at').notNull(),
-  expiresAt: integer('expires_at').notNull(),
+  grantedAt: integer('granted_at').notNull(),
   revokedAt: integer('revoked_at'),
 })
 /** The tokens this agent spent on models per UTC day (`YYYY-MM-DD`), which the daily cap counts. */

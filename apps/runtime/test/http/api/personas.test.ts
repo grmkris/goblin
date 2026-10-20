@@ -27,7 +27,7 @@ describe('the personas group', () => {
     expect(again.status).toBe(201)
     expect(decodeView(await again.json())).toEqual(made)
     expect(personas.list()).toEqual([made])
-    expect(resident.renewals).toHaveLength(2)
+    expect(resident.grants).toHaveLength(2)
   })
 
   it('answers a taken name with 409 and a model the deployment does not offer with 400', async () => {
