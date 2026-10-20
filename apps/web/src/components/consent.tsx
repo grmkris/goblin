@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Alert, AlertDescription, Button, Switch } from '@goblin/ui'
 import { AuthRefused, consentClientQuery, consentMutation } from '../auth/queries.ts'
-import { INSPECT_SCOPE, consentBody, requestedScopes } from '../lib/consent-scope.ts'
+import { type OptionalScope, consentBody, offeredScopes, requestedScopes } from '../lib/consent-scope.ts'
 import { messageOf, withRef } from '../lib/query/app-error.ts'
 import { AuthShell } from './auth-shell.tsx'
 
@@ -22,11 +22,35 @@ const ASK = [
   'read the recent messages of your main conversation;',
   "have your agent use the tools you allowed under Connections, while Work while you're away is on.",
 ]
-/** What the `goblin:inspect` scope adds (ADR 0024): read-only, it never sends or changes anything. */
-const INSPECT = [
-  'read all your conversations in full, including tool calls and their results, without changing anything;',
-  'read how each turn ran: model calls, tool calls, retries, errors and timings.',
-]
+
+/** What each opt-in scope adds (ADRs 0024, 0086), its switch's name first. Each starts off. */
+const SCOPE_COPY: Readonly<Record<OptionalScope, { readonly name: string; readonly lines: readonly string[] }>> = {
+  'goblin:topics': {
+    name: 'Also let it manage your Topics',
+    lines: [
+      'list and read your Topics, including their guidance;',
+      'make, rename and archive Topics, and change what each works with.',
+    ],
+  },
+  'goblin:conversations': {
+    name: 'Also let it send in your chats',
+    lines: [
+      "send messages and start threads in any of your Topics' chats, shown with its name;",
+      'read their replies, and stop what a chat is doing.',
+    ],
+  },
+  'goblin:personas': {
+    name: 'Also let it manage your Personas',
+    lines: ['list and read your Personas;', 'make and change Personas, and see the models they may use.'],
+  },
+  'goblin:inspect': {
+    name: 'Also let it read your conversations and runs',
+    lines: [
+      'read all your conversations in full, including tool calls and their results, without changing anything;',
+      'read how each turn ran: model calls, tool calls, retries, errors and timings.',
+    ],
+  },
+}
 
 /** The client's registered name and address: untrusted, shown as the client's own claim. */
 function useClient(clientId: string): ClientLookup {
@@ -37,19 +61,24 @@ function useClient(clientId: string): ClientLookup {
   return { kind: 'failed', reason: withRef(unknown ? UNKNOWN_CLIENT : LOOKUP_FAILED, read.error) }
 }
 
-/** The opt-in for inspection, with what it adds; off until the owner turns it on. */
-function InspectChoice({ on, onChange }: { readonly on: boolean; readonly onChange: (on: boolean) => void }) {
+/** One opt-in scope's switch, with what it adds; off until the owner turns it on. */
+function ScopeChoice(props: {
+  readonly scope: OptionalScope
+  readonly on: boolean
+  readonly onChange: (on: boolean) => void
+}) {
+  const { name, lines } = SCOPE_COPY[props.scope]
   return (
     <div className="flex flex-col gap-2">
       <label className="switch-row">
         <span className="switch-name">
-          <span>Also let it read your conversations and runs</span>
+          <span>{name}</span>
           <span className="switch-detail">Off unless you turn it on. With it, the app can:</span>
         </span>
-        <Switch checked={on} onCheckedChange={onChange} />
+        <Switch checked={props.on} onCheckedChange={props.onChange} />
       </label>
-      <ul className="plan-points" data-off={on ? undefined : true}>
-        {INSPECT.map((line) => (
+      <ul className="plan-points" data-off={props.on ? undefined : true}>
+        {lines.map((line) => (
           <li key={line}>{line}</li>
         ))}
       </ul>
@@ -58,8 +87,8 @@ function InspectChoice({ on, onChange }: { readonly on: boolean; readonly onChan
 }
 
 /**
- * Ask the owner whether an MCP client may use goblin, saying what the requested scopes grant. Inspection, when asked
- * for, is a separate opt-in. Client-supplied names and URLs are shown as untrusted.
+ * Ask the owner whether an MCP client may use goblin, saying what the requested scopes grant. Each `goblin:*` scope it
+ * asks for is a separate opt-in (ADR 0086). Client-supplied names and URLs are shown as untrusted.
  */
 export function Consent() {
   const query = new URLSearchParams(window.location.search)
@@ -67,7 +96,7 @@ export function Consent() {
   const requested = requestedScopes(query.get('scope'))
   const lookup = useClient(clientId)
   const client = lookup.kind === 'found' ? lookup.client : undefined
-  const [inspect, setInspect] = useState(false)
+  const [on, setOn] = useState<readonly string[]>([])
   const deciding = useMutation(consentMutation)
   const [choice, setChoice] = useState<'allow' | 'deny'>()
   // A decision that succeeded is leaving for the client, so its button stays busy.
@@ -75,7 +104,7 @@ export function Consent() {
   const error = deciding.error === null ? '' : messageOf(deciding.error, 'complete the authorization')
   function decide(accept: boolean): void {
     setChoice(accept ? 'allow' : 'deny')
-    deciding.mutate(consentBody(requested, accept, inspect), { onSuccess: (next) => window.location.assign(next) })
+    deciding.mutate(consentBody(requested, accept, on), { onSuccess: (next) => window.location.assign(next) })
   }
   return (
     <AuthShell
@@ -96,7 +125,14 @@ export function Consent() {
             <li key={line}>{line}</li>
           ))}
         </ul>
-        {requested.includes(INSPECT_SCOPE) && <InspectChoice on={inspect} onChange={setInspect} />}
+        {offeredScopes(requested).map((scope) => (
+          <ScopeChoice
+            key={scope}
+            scope={scope}
+            on={on.includes(scope)}
+            onChange={(turned) => setOn(turned ? [...on, scope] : on.filter((each) => each !== scope))}
+          />
+        ))}
         {(error || lookup.kind === 'failed') && (
           <Alert variant="destructive">
             <AlertDescription>{error || (lookup.kind === 'failed' && lookup.reason)}</AlertDescription>
