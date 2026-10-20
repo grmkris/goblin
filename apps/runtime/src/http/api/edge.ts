@@ -155,12 +155,13 @@ const settle = (
   })
 
 /** The account API's paths; anything else under them is a 404 in the envelope. */
-const ACCOUNT_PATHS = ['/api/clients', '/api/client-errors'] as const
+const ACCOUNT_PATHS = ['/api/clients', '/api/keys', '/api/client-errors'] as const
 const under = (path: string, prefix: string): boolean => path === prefix || path.startsWith(`${prefix}/`)
 export const isAccountPath = (path: string): boolean => ACCOUNT_PATHS.some((prefix) => under(path, prefix))
 
 /**
- * Each account group's admission: clients for any signed-in account, crash reports for anyone. A crash
+ * Each account group's admission: clients and API keys for any signed-in account (a key never reaches them), crash
+ * reports for anyone. A crash
  * report needs no session, but one that comes with a session names its user (its flow point is indexed by the agent's
  * hash).
  */

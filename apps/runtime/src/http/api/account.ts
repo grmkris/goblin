@@ -1,5 +1,5 @@
 import { AccountApi, type AppError, withRef } from '@goblin/contracts/api'
-import type { ClientErrorReport, InboundClient } from '@goblin/contracts'
+import type { ApiKeyView, ClientErrorReport, CreateApiKey, CreatedApiKey, InboundClient } from '@goblin/contracts'
 import type { FlowEvent } from '@goblin/contracts/telemetry'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
@@ -7,6 +7,7 @@ import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
 import * as HttpServer from 'effect/http/HttpServer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
+import { createKey, listKeys, revokeKey } from '../../auth/api-keys.ts'
 import { listInboundClients, revokeInboundClient } from '../../auth/clients.ts'
 import type { RuntimeEnv } from '../../env.ts'
 import { logEvent } from '../../observability/logger.ts'
@@ -19,6 +20,10 @@ import { RequestContext } from './context.ts'
 export interface AccountRecords {
   readonly clients: (userId: string) => Effect.Effect<readonly InboundClient[], AppError>
   readonly revokeClient: (userId: string, clientId: string) => Effect.Effect<void, AppError>
+  /** The user's API keys (ADR 0081), and making and ending one. */
+  readonly keys: (userId: string) => Effect.Effect<readonly ApiKeyView[], AppError>
+  readonly createKey: (userId: string, input: CreateApiKey) => Effect.Effect<CreatedApiKey, AppError>
+  readonly revokeKey: (userId: string, keyId: string) => Effect.Effect<void, AppError>
   /**
    * A browser crash's `client_error` flow point (ADR 0037), under the hash of `userId`'s agent when the report came
    * with a session; nothing without the `FLOWS` binding.
@@ -67,6 +72,9 @@ export const accountRecords = (env: RuntimeEnv): AccountRecords => {
           }),
     clients: (userId) => attempt(() => listInboundClients(env, userId)),
     revokeClient: (userId, clientId) => attempt(() => revokeInboundClient(env, userId, clientId)),
+    keys: (userId) => attempt(() => listKeys(env, userId)),
+    createKey: (userId, input) => attempt(() => createKey(env, userId, input)),
+    revokeKey: (userId, keyId) => attempt(() => revokeKey(env, userId, keyId)),
   }
 }
 
@@ -131,12 +139,27 @@ const ClientsHandlers = HttpApiBuilder.group(AccountApi, 'clients', (handlers) =
     ),
 )
 
+const KeysHandlers = HttpApiBuilder.group(AccountApi, 'keys', (handlers) =>
+  handlers
+    .handle('list', () => quoted(Effect.flatMap(signedIn, ({ records, user }) => records.keys(user))))
+    .handle('create', ({ payload }) =>
+      quoted(Effect.flatMap(signedIn, ({ records, user }) => records.createKey(user, payload))),
+    )
+    .handle('revoke', ({ params }) =>
+      quoted(
+        Effect.flatMap(signedIn, ({ records, user }) =>
+          Effect.as(records.revokeKey(user, params.keyId), { revoked: true as const }),
+        ),
+      ),
+    ),
+)
+
 const ClientErrorsHandlers = HttpApiBuilder.group(AccountApi, 'clientErrors', (handlers) =>
   handlers.handle('report', ({ payload }) => takeReport(payload)),
 )
 
 /** The account API's routes, served by the Worker (`edge.ts`). */
 export const AccountApiLayer = HttpApiBuilder.layer(AccountApi).pipe(
-  Layer.provide([ClientsHandlers, ClientErrorsHandlers]),
+  Layer.provide([ClientsHandlers, KeysHandlers, ClientErrorsHandlers]),
   Layer.provide(HttpServer.layerServices),
 )

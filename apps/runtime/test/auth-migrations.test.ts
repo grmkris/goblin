@@ -116,7 +116,7 @@ const registration = (auth: ReturnType<typeof createAuth>, changes: Record<strin
 
 describe('auth D1 baseline', () => {
   it('contains exactly the configured Better Auth schema, including columns, indexes and foreign keys', async () => {
-    expect(migrations).toEqual(['0000_baseline.sql'])
+    expect(migrations).toEqual(['0000_baseline.sql', '0001_api_keys.sql'])
     const { db, auth } = fixture()
     await auth.$context
     const schema = getSchema(auth.options)

@@ -4,6 +4,7 @@ import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
 import { CreatePersona, PersonaDetail, PersonaReply, PersonaView, UpdatePersona } from '../personas.ts'
 import { ApiErrors } from './errors.ts'
+import { ApiKeyScope } from './keys.ts'
 
 /** A Persona's id in a path: 1 to 999999999. */
 const PersonaParam = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 999_999_999 }))
@@ -18,24 +19,26 @@ const PersonaParam = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 99
  *   otherwise), and the name and model rules of `create` apply.
  * - `reply`: `POST /api/personas/reply`, 202: the owner's reply to a Persona's hold (ADR 0041) goes to its fork, and the
  *   Persona answers again in the chat it was asked in. A fork that is not a Persona's, or whose chat is closed, refuses.
+ *
+ * An API key with the `personas` scope reaches `create`, `detail` and `update`, never `reply` (ADR 0081).
  */
 export class PersonasGroup extends HttpApiGroup.make('personas').add(
   HttpApiEndpoint.post('create', '/personas', {
     payload: CreatePersona,
     success: PersonaView.pipe(HttpApiSchema.status(201)),
     error: [ApiErrors.conflict, ApiErrors.invalidInput],
-  }),
+  }).annotate(ApiKeyScope, 'personas'),
   HttpApiEndpoint.get('detail', '/personas/:id', {
     params: { id: PersonaParam },
     success: PersonaDetail,
     error: ApiErrors.notFound,
-  }),
+  }).annotate(ApiKeyScope, 'personas'),
   HttpApiEndpoint.patch('update', '/personas/:id', {
     params: { id: PersonaParam },
     payload: UpdatePersona,
     success: PersonaView,
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput],
-  }),
+  }).annotate(ApiKeyScope, 'personas'),
   HttpApiEndpoint.post('reply', '/personas/reply', {
     payload: PersonaReply,
     success: Schema.Null.pipe(HttpApiSchema.status(202)),

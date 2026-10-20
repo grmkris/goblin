@@ -29,3 +29,36 @@ export const InboundClient = Schema.Struct({
   consentedAt: Schema.optional(Schema.String),
 })
 export type InboundClient = typeof InboundClient.Type
+
+/** What a server's API key may reach (ADR 0081): each scope opens its area's annotated owner endpoints. */
+export const KeyScope = Schema.Literals(['topics', 'conversations', 'personas'])
+export type KeyScope = typeof KeyScope.Type
+
+/** An MCP connection a key's setups may name: the key's server ceiling. */
+export const KeyServer = Schema.String.check(Schema.isPattern(/^[\w-]{1,64}$/u))
+
+/** `POST /api/keys`: a key for a server the owner runs, its scopes, the servers its setups may use and its lifetime. */
+export const CreateApiKey = Schema.Struct({
+  name: Schema.String.check(Schema.isPattern(/^[\w .:-]{1,64}$/u)),
+  scopes: Schema.Array(KeyScope).check(Schema.isMinLength(1), Schema.isMaxLength(3)),
+  servers: Schema.Array(KeyServer).check(Schema.isMaxLength(32)),
+  expiresInDays: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 365 })),
+})
+export type CreateApiKey = typeof CreateApiKey.Type
+
+/** A key as the owner sees it: its first characters, never its secret. */
+export const ApiKeyView = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  start: Schema.optional(Schema.String),
+  scopes: Schema.Array(KeyScope),
+  servers: Schema.Array(KeyServer),
+  createdAt: Schema.String,
+  expiresAt: Schema.optional(Schema.String),
+  lastUsedAt: Schema.optional(Schema.String),
+})
+export type ApiKeyView = typeof ApiKeyView.Type
+
+/** A new key and its secret, which is shown this once. */
+export const CreatedApiKey = Schema.Struct({ key: ApiKeyView, secret: Schema.String })
+export type CreatedApiKey = typeof CreatedApiKey.Type

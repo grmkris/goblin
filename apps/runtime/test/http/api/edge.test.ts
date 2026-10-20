@@ -18,6 +18,9 @@ const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
   const records: AccountRecords = {
     clients: () => Effect.succeed([{ clientId: 'client.1', name: 'Claude' }]),
     revokeClient: () => Effect.void,
+    keys: () => Effect.succeed([]),
+    createKey: () => Effect.die(new Error('no keys in this fixture')),
+    revokeKey: () => Effect.void,
     crash: (report, userId) => {
       crashes.push(Option.getOrUndefined(userId))
       return crash(report, userId)

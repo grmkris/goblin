@@ -6,6 +6,12 @@ export const INSPECT_SCOPE = 'goblin:inspect'
 /** What a client may ask for: `offline_access` earns a refresh token, `goblin:inspect` the read-only inspection tools. */
 export const MCP_SCOPES = ['openid', 'profile', 'email', 'offline_access', INSPECT_SCOPE] as const
 
+/**
+ * Every server API key's prefix (ADR 0081). An inbound OAuth access token is a JWS, so a bearer with this prefix is
+ * never one of those, and the edge and /mcp tell the two apart by it alone.
+ */
+export const KEY_PREFIX = 'gbk_'
+
 const METADATA_PATH = '/.well-known/oauth-protected-resource'
 const base = (appUrl: string) => appUrl.replace(/\/$/u, '')
 

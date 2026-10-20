@@ -18,6 +18,7 @@ import { ConversationQueue, QueueRemoval, QueueRemovalResult } from '../queue.ts
 import { SourceUse } from '../retrieval.ts'
 import { MoveReceipt, MoveToThread } from '../threads.ts'
 import { ApiErrors } from './errors.ts'
+import { ApiKeyScope } from './keys.ts'
 import { RenewsResident } from './resident.ts'
 import { EventStream } from './stream.ts'
 
@@ -60,6 +61,8 @@ const HistoryQuery = {
  * - `sources`: `GET …/:id/sources`: what retrieval gave the chat's answers (ADR 0035), newest first.
  * - `events`: `GET …/:id/events`, server-sent: Pi's `snapshot`, then a `batch` per commit, until the browser goes away.
  *   A chat keeps its Pi session, so this is its session's stream. It does not renew resident authority.
+ *
+ * An API key with the `conversations` scope reaches `submit`, `startThread` and `stop` (ADR 0081).
  */
 export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
   HttpApiEndpoint.post('create', '/conversations', {
@@ -78,13 +81,13 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     payload: SendMessage,
     success: MessageReceipt.pipe(HttpApiSchema.status(202)),
     error: [ApiErrors.notFound, ApiErrors.invalidInput, ApiErrors.budgetExhausted],
-  }),
+  }).annotate(ApiKeyScope, 'conversations'),
   HttpApiEndpoint.post('startThread', '/conversations/:id/threads', {
     params,
     payload: StartThread,
     success: StartedThread.pipe(HttpApiSchema.status(201)),
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput, ApiErrors.budgetExhausted],
-  }),
+  }).annotate(ApiKeyScope, 'conversations'),
   HttpApiEndpoint.post('move', '/conversations/:id/move', {
     params,
     payload: MoveToThread,
@@ -96,7 +99,7 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     payload: StopConversation,
     success: Schema.Struct({ stopped: Schema.Boolean }),
     error: [ApiErrors.notFound],
-  }),
+  }).annotate(ApiKeyScope, 'conversations'),
   HttpApiEndpoint.get('queue', '/conversations/:id/queue', {
     params,
     success: ConversationQueue,

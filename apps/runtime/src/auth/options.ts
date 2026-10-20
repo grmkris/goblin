@@ -1,4 +1,5 @@
 import { Predicate } from 'effect'
+import { apiKey } from '@better-auth/api-key'
 import { mcp } from '@better-auth/mcp'
 import { type Account, betterAuth, type BetterAuthPlugin } from 'better-auth'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
@@ -10,7 +11,7 @@ import { deleteAgentOf } from './account.ts'
 import { CODE_SEND, CODE_SIGN_IN, guardEmailCode } from './email-code.ts'
 import { codeMail, mailerOf } from './mail.ts'
 import { guardOidc, oidcPlugin, oidcProviderOf, refuseUnverifiedOidcUser, withoutProviderTokens } from './oidc.ts'
-import { MCP_SCOPES, mcpResource } from './resources.ts'
+import { KEY_PREFIX, MCP_SCOPES, mcpResource } from './resources.ts'
 
 export const AUTH_BASE_PATH = '/api/auth'
 export const authIssuer = (appUrl: string): string => `${appUrl.replace(/\/$/u, '')}${AUTH_BASE_PATH}`
@@ -93,6 +94,25 @@ const codePlugin = (env: AuthEnvironment, delivery: MailDelivery) =>
         delivery.failed = true
       }
     },
+  })
+
+const DAY_SECONDS = 86_400
+
+/**
+ * Server API keys (ADR 0081): hashed at rest, named, `gbk_`-prefixed, expiring (90 days unless the owner says, a year at
+ * most) and limited to 600 requests a minute each. A key is never turned into a session. Keys are made, listed and
+ * ended only through `auth/api-keys.ts`; the plugin's own routes are not served (`handleAuth`).
+ */
+const keyPlugin = () =>
+  apiKey({
+    defaultPrefix: KEY_PREFIX,
+    requireName: true,
+    maximumNameLength: 64,
+    enableMetadata: true,
+    enableSessionForAPIKeys: false,
+    startingCharactersConfig: { shouldStore: true, charactersLength: 10 },
+    keyExpiration: { defaultExpiresIn: 90 * DAY_SECONDS, minExpiresIn: 1, maxExpiresIn: 365 },
+    rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 600 },
   })
 
 /**
@@ -196,7 +216,11 @@ const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeed
     user: {
       deleteUser: {
         enabled: true,
-        beforeDelete: (user: { id: string }) => deleteAgentOf(env, user.id),
+        // The user's API keys go with them: no key outlives the account that made it.
+        beforeDelete: async (user: { id: string }) => {
+          await deleteAgentOf(env, user.id)
+          await database.prepare('DELETE FROM apikey WHERE referenceId = ?').bind(user.id).run()
+        },
       },
       validateUserInfo: refuseUnverifiedOidcUser,
     },
@@ -226,6 +250,7 @@ const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeed
       // SAFETY: Better Auth 1.7.6 MCP endpoint metadata types violate exactOptionalPropertyTypes; runtime shape is the pinned official plugin.
       oauthPlugin as BetterAuthPlugin,
       codePlugin(env, delivery),
+      keyPlugin(),
       ...(provider === undefined ? [] : [oidcPlugin(provider)]),
     ],
   }

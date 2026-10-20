@@ -70,6 +70,8 @@ export const verifyClientToken = async (token: string, env: RuntimeEnv): Promise
  */
 export const handleAuth = (request: Request, env: RuntimeEnv): Promise<Response> => {
   const path = new URL(request.url).pathname
+  // API keys are made and ended only through the account API (ADR 0081): none of the plugin's own routes is served.
+  if (path.startsWith(`${AUTH_BASE_PATH}/api-key/`)) return Promise.resolve(new Response('Not found', { status: 404 }))
   const provider = path.startsWith(`${AUTH_BASE_PATH}/`) && isOidcPath(path.slice(AUTH_BASE_PATH.length))
   return createAuth(env, env.AUTH_DB, { provider }).handler(request)
 }
