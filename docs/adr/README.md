@@ -8,7 +8,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | --- | --- | --- |
 | [0001](0001-runtime-and-auth-storage.md) | Native Pi runtime and identity storage | Accepted; amended by 0064 |
 | [0002](0002-stages-and-provider.md) | Isolated stages and provider planes | Accepted; amended by 0059, 0064 and 0067 |
-| [0003](0003-resident-mcp-and-inbound-server.md) | The agent object owns MCP, holds its own authority, and serves /mcp | Accepted; amended by 0081 |
+| [0003](0003-resident-mcp-and-inbound-server.md) | The agent object owns MCP, holds its own authority, and serves /mcp | Accepted; amended by 0081 and 0088 |
 | [0004](0004-an-agent-per-user.md) | An agent per user, with gated sign-up | Accepted; amended by 0064 |
 | [0005](0005-mcp-apps-host.md) | One live MCP App on a stage, told about its host, trusted for nothing | Accepted; its one live App superseded by 0020 |
 | [0006](0006-servers-the-owner-adds.md) | Servers the owner adds are a trust boundary, not a configuration change | Accepted |
@@ -79,3 +79,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0085](0085-a-keys-rate-limit-is-a-fixed-minute-counted-by-its-agent.md) | A key's rate limit is a fixed minute, counted by its agent | Accepted; amended by 0086 |
 | [0086](0086-one-mcp-for-every-caller.md) | One /mcp for every caller | Accepted |
 | [0087](0087-the-owners-own-subscription-models.md) | The owner's own subscription models | Accepted |
+| [0088](0088-resident-authority-lasts-until-revoked.md) | Resident authority lasts until revoked | Accepted |

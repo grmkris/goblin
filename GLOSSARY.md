@@ -14,8 +14,8 @@ The owner's resident agent, one `PersonalAgent` Durable Object named by the owne
 _Avoid_: bot, assistant instance
 
 **Resident authority**:
-The agent's own standing permission to use the owner's MCP connections while the owner is away. It lasts 30 days,
-renewed by the owner's activity, and the owner can revoke it in Settings.
+The agent's own standing permission to use the owner's MCP connections while the owner is away. The owner's first
+signed-in action grants it, and it lasts until the owner revokes it in Settings (ADR 0088).
 
 **Inbound client**:
 An MCP client (Claude Code, another agent) the owner authorized to call goblin's `/mcp`. Settings lists them as

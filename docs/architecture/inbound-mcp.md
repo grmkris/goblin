@@ -3,12 +3,13 @@
 ## Resident authority
 
 The agent acts for the owner when the owner is not there, so it needs its own standing permission rather than a
-borrowed browser session. Resident authority (`app_resident`, the `Resident` service) is active for 30 days. Owner admission renews the
-window on every owner API request except changing it (`POST /api/agent/resident`), the event streams, the files and
-the OAuth callback; no caller (an OAuth client or a key, ADR 0086) and no internal call (hooks, file links) renews it. Turning
-it off in Settings ("Work while you're away") sticks: activity does not re-enable it, only the explicit toggle does.
+borrowed browser session. Resident authority (`app_resident`, the `Resident` service) lasts until the owner revokes it
+(ADR 0088). Owner admission grants it on the owner's first API request, and on every one after except changing it
+(`POST /api/agent/resident`), the event streams, the files and the OAuth callback; no caller (an OAuth client or a key,
+ADR 0086) and no internal call (hooks, file links) grants it. Turning it off in Settings ("Work while you're away")
+sticks: activity does not re-enable it, only the explicit toggle does.
 Model MCP tools, skills, inbound `ask_agent` and scheduled Source pulls and replies require current authority. The
-owner's own `mcp` endpoints are renewed like the rest and do not call `requireResident`; their tool and resource calls
+owner's own `mcp` endpoints grant it like the rest and do not call `requireResident`; their tool and resource calls
 still check exact grants (`mcp/servers/api.ts`, `pi/resident-mcp.ts`, `pi/skills.ts`).
 
 ## Inbound MCP
@@ -54,7 +55,7 @@ Code, claude.ai, Cursor) or a server's API key.
   admission per caller ([ADR 0085](../adr/0085-a-keys-rate-limit-is-a-fixed-minute-counted-by-its-agent.md)); past
   them it is refused with `rate_limited` and `retryAfter` (seconds), with `Retry-After` on `/api` and in the tool's
   error result on `/mcp`. A tool outside the caller's scopes is not listed, and calling it is refused with `scope`.
-  No caller renews resident authority.
+  No caller grants resident authority.
 - **Revoking.** Revoking a client in Settings deletes your consent to it and revokes its refresh tokens for you
   (`auth/clients.ts`); its next call gets a 401. Consenting again with fewer scopes takes the rest from tokens already
   issued.

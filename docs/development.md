@@ -289,9 +289,9 @@ until it runs, real provider and Telegram delivery remain unverified.
   The same path handles DMs, groups and forum topics; no built-in Telegram switch or hard-coded tool names remain.
   Configure **Notify me via** separately for routine copies and app notifications, reviewing its result and echo rules.
   Real MySI authorization and Telegram DM/group/photo acceptance remain the separate owner session described below.
-- **Resident authority.** Settings → Your agent → **Work while you're away** shows it and when it expires. Owner
-  activity renews it for 30 days; inbound and scheduled work do not renew it. Turning it off stops all outbound MCP
-  use by the agent until you turn it on again.
+- **Resident authority.** Settings → Your agent → **Work while you're away** shows it and since when it is on. The
+  owner's first signed-in action grants it and it lasts until they turn it off (ADR 0088); inbound and scheduled work
+  never grant it. Turning it off stops all outbound MCP use by the agent until you turn it on again.
 - **Routines.** Work → Routines → New routine: what it does, when it runs (once at a time you pick, on a cron
   schedule, or on a server's event) and the tools and limits it may use. Saving makes a proposal; Confirm on its card
   turns it on, and an edit pauses it until you confirm again. The agent can also propose one in chat.

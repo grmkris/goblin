@@ -33,10 +33,10 @@ handlers of the owner and internal APIs (`http/api/groups.ts`), built once insid
 layers, never at module level.
 Each group's handlers (`HttpApiBuilder.group`) live in their area (`<area>/api.ts`) and read the agent's services
 from context. Owner admission (the `OwnerAdmission` middleware, `http/api/middleware.ts`) admits every request
-before its handler, and before its body is decoded: a renewal of resident authority, except where an endpoint is
-annotated `RenewsResident: false` (`POST /api/agent/resident`, the event streams, the entries read, the files group and the
+before its handler, and before its body is decoded: a grant of resident authority, except where an endpoint is
+annotated `GrantsResident: false` (`POST /api/agent/resident`, the event streams, the entries read, the files group and the
 OAuth callback). A request from a caller (ADR 0086: a server's key, or an OAuth client of the owner on `/mcp`) never
-renews it; owner admission admits it only to an endpoint whose `EndpointScope` it holds (else `scope`) and counts its
+grants it; owner admission admits it only to an endpoint whose `EndpointScope` it holds (else `scope`) and counts its
 requests per minute (600, ADR 0085; past them `rate_limited` with `retryAfter`, which the edge answers with
 `Retry-After`). Past admission a key is confined to what it made (`keys/policy.ts`, `app_key_reach`): its lists hold
 only its own, and inspection sees only its own chats' run events (ADR 0084); an OAuth client reaches what the owner
@@ -62,7 +62,7 @@ does. It annotates the request's logs with `goblin.rpc`
 | `files` | `GET /files`, `GET`/`PUT`/`DELETE /files/content` | `files/api.ts` |
 | account (Worker) | `clients`: `/clients`, `/clients/:clientId`; `keys`: `/keys`, `/keys/:keyId` (`PATCH` changes a key's scopes, ADR 0084); `clientErrors`: `/client-errors` | `http/api/account.ts` |
 
-What is not JSON in and out is served through HttpApi's raw handlers, all annotated `RenewsResident: false`: the two
+What is not JSON in and out is served through HttpApi's raw handlers, all annotated `GrantsResident: false`: the two
 event streams (SSE), the owner's file bytes (streamed both ways, never buffered), and `mcp.oauthCallback`, a redirect
 to Connections that carries `ref` when it failed. A streamed answer owns its body, past the request's scope. Any path
 no endpoint names is a 404 in the envelope.
@@ -79,7 +79,7 @@ Callers that are not the owner's browser reach the agent through its internal AP
 only from `@goblin/contracts/internal`), which the Worker calls on the agent's stub with a typed client
 (`inbound/client.ts`) after its own check of the caller (a bearer token, a hook's route token, a file link's token):
 `ask`, `recent` and `inspect` (inbound `/mcp`), `mcpEvents` (the Events hook) and `linkedFile` (a file link, ADR 0070). Its gate (`InternalGate`, `http/api/middleware.ts`)
-refuses a request carrying the owner forward's mark; it never renews resident authority. One Durable Object RPC
+refuses a request carrying the owner forward's mark; it never grants resident authority. One Durable Object RPC
 method remains, `deleteAgentData` (account deletion): Workers RPC drops custom error classes, so it returns an encoded
 `RpcResult` (`http/rpc.ts`) that the Worker unwraps.
 
