@@ -49,6 +49,13 @@ export const CreateApiKey = Schema.Struct({
 })
 export type CreateApiKey = typeof CreateApiKey.Type
 
+/**
+ * `PATCH /api/keys/:keyId`: the key's scopes from now on (ADR 0084). It stays the same key, so what it made stays within
+ * its reach; its secret, servers and expiry do not change.
+ */
+export const UpdateApiKey = Schema.Struct({ scopes: CreateApiKey.fields.scopes })
+export type UpdateApiKey = typeof UpdateApiKey.Type
+
 /** A key as the owner sees it: its first characters, never its secret. */
 export const ApiKeyView = Schema.Struct({
   id: Schema.String,

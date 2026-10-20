@@ -3,7 +3,7 @@ import * as Schema from 'effect/Schema'
 import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
-import { ApiKeyView, CreateApiKey, CreatedApiKey, type KeyScope } from '../account.ts'
+import { ApiKeyView, CreateApiKey, CreatedApiKey, type KeyScope, UpdateApiKey } from '../account.ts'
 import { API_ERRORS } from './errors.ts'
 
 /**
@@ -23,6 +23,8 @@ const KeyId = Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u))
  *
  * - `list`: `GET /api/keys`, every key, newest first, without secrets.
  * - `create`: `POST /api/keys`, 201 with the key and its secret, which is never shown again.
+ * - `update`: `PATCH /api/keys/:keyId` gives the key new scopes (ADR 0084); it keeps its id, secret and reach. A key
+ *   of another user's, or one that is gone, is not found.
  * - `revoke`: `DELETE /api/keys/:keyId` ends the key at once.
  */
 export class KeysGroup extends HttpApiGroup.make('keys').add(
@@ -30,6 +32,12 @@ export class KeysGroup extends HttpApiGroup.make('keys').add(
   HttpApiEndpoint.post('create', '/keys', {
     payload: CreateApiKey,
     success: CreatedApiKey.pipe(HttpApiSchema.status(201)),
+    error: API_ERRORS,
+  }),
+  HttpApiEndpoint.patch('update', '/keys/:keyId', {
+    params: { keyId: KeyId },
+    payload: UpdateApiKey,
+    success: ApiKeyView,
     error: API_ERRORS,
   }),
   HttpApiEndpoint.delete('revoke', '/keys/:keyId', {

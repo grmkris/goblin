@@ -18,6 +18,7 @@ import { sanitizeAttributes } from '../telemetry/safety.ts'
 
 /** What a line is about. Closed: an area that writes a new kind of line adds it here, in alphabetical order. */
 const LOG_EVENTS = [
+  'api_key',
   'client_error',
   'failure',
   'file-link',
@@ -67,6 +68,9 @@ const frames = (value: unknown): value is readonly string[] =>
   Array.isArray(value) &&
   value.length <= MAX_FRAMES &&
   value.every((frame) => Predicate.isString(frame) && FRAME.test(frame))
+/** A few short tokens: a key's scopes. */
+const tokens = (value: unknown): value is readonly string[] =>
+  Array.isArray(value) && value.length <= 8 && value.every((each) => token(40)(each))
 const status = (value: unknown): value is number | string =>
   (Predicate.isNumber(value) && Number.isInteger(value)) || token(40)(value)
 
@@ -94,6 +98,8 @@ const FIELDS: Readonly<Record<string, Check>> = {
   severity: oneOf(['Fatal', 'Error', 'Warn', 'Info', 'Debug', 'Trace']),
   'error.type': matching(ERROR_TYPE),
   frames,
+  scopes: tokens,
+  'scopes.before': tokens,
   ms: amount,
   count: amount,
 }

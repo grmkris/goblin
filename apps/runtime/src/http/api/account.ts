@@ -1,5 +1,12 @@
 import { AccountApi, type AppError, withRef } from '@goblin/contracts/api'
-import type { ApiKeyView, ClientErrorReport, CreateApiKey, CreatedApiKey, InboundClient } from '@goblin/contracts'
+import type {
+  ApiKeyView,
+  ClientErrorReport,
+  CreateApiKey,
+  CreatedApiKey,
+  InboundClient,
+  UpdateApiKey,
+} from '@goblin/contracts'
 import type { FlowEvent } from '@goblin/contracts/telemetry'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
@@ -7,7 +14,7 @@ import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
 import * as HttpServer from 'effect/http/HttpServer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
-import { createKey, listKeys, revokeKey } from '../../auth/api-keys.ts'
+import { type KeyChange, createKey, listKeys, revokeKey, updateKey } from '../../auth/api-keys.ts'
 import { listInboundClients, revokeInboundClient } from '../../auth/clients.ts'
 import type { RuntimeEnv } from '../../env.ts'
 import { logEvent } from '../../observability/logger.ts'
@@ -23,6 +30,8 @@ export interface AccountRecords {
   /** The user's API keys (ADR 0081), and making and ending one. */
   readonly keys: (userId: string) => Effect.Effect<readonly ApiKeyView[], AppError>
   readonly createKey: (userId: string, input: CreateApiKey) => Effect.Effect<CreatedApiKey, AppError>
+  /** New scopes for one of the user's keys (ADR 0084), before and after. */
+  readonly updateKey: (userId: string, keyId: string, change: UpdateApiKey) => Effect.Effect<KeyChange, AppError>
   readonly revokeKey: (userId: string, keyId: string) => Effect.Effect<void, AppError>
   /**
    * A browser crash's `client_error` flow point (ADR 0037), under the hash of `userId`'s agent when the report came
@@ -74,6 +83,7 @@ export const accountRecords = (env: RuntimeEnv): AccountRecords => {
     revokeClient: (userId, clientId) => attempt(() => revokeInboundClient(env, userId, clientId)),
     keys: (userId) => attempt(() => listKeys(env, userId)),
     createKey: (userId, input) => attempt(() => createKey(env, userId, input)),
+    updateKey: (userId, keyId, change) => attempt(() => updateKey(env, userId, keyId, change)),
     revokeKey: (userId, keyId) => attempt(() => revokeKey(env, userId, keyId)),
   }
 }
@@ -139,12 +149,31 @@ const ClientsHandlers = HttpApiBuilder.group(AccountApi, 'clients', (handlers) =
     ),
 )
 
+/**
+ * A key's new scopes, as the owner's change of it is audited (ADR 0084): one `api_key` line with the key, its scopes
+ * before and after, the user and the request's reference. Never its secret.
+ */
+const changeScopes = (keyId: string, change: UpdateApiKey) =>
+  Effect.gen(function* () {
+    const { records, user } = yield* signedIn
+    const { before, after } = yield* records.updateKey(user, keyId, change)
+    yield* logEvent('info', 'api_key', {
+      kind: 'scopes',
+      id: keyId,
+      agent: user,
+      scopes: after.scopes,
+      'scopes.before': before.scopes,
+    })
+    return after
+  })
+
 const KeysHandlers = HttpApiBuilder.group(AccountApi, 'keys', (handlers) =>
   handlers
     .handle('list', () => quoted(Effect.flatMap(signedIn, ({ records, user }) => records.keys(user))))
     .handle('create', ({ payload }) =>
       quoted(Effect.flatMap(signedIn, ({ records, user }) => records.createKey(user, payload))),
     )
+    .handle('update', ({ params, payload }) => quoted(changeScopes(params.keyId, payload)))
     .handle('revoke', ({ params }) =>
       quoted(
         Effect.flatMap(signedIn, ({ records, user }) =>

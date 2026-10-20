@@ -1,10 +1,10 @@
-import { Unauthenticated } from '@goblin/contracts/api'
+import { NotFound, Unauthenticated } from '@goblin/contracts/api'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createKey, listKeys, revokeKey, verifyKey } from '../src/auth/api-keys.ts'
+import { createKey, listKeys, revokeKey, updateKey, verifyKey } from '../src/auth/api-keys.ts'
 import { bearerKey } from '../src/http/api/principal.ts'
 import { handleAuth } from '../src/auth/service.ts'
 import type { RuntimeEnv } from '../src/env.ts'
@@ -63,6 +63,22 @@ describe('server API keys (ADR 0081)', () => {
     expect(await listKeys(env, 'u1')).toEqual([expect.objectContaining({ id: key.id, name: 'service-dev' })])
     expect(JSON.stringify(await listKeys(env, 'u1'))).not.toContain(secret)
     expect(await listKeys(env, 'u2')).toEqual([])
+  })
+
+  it('gives a key new scopes in place: the same id and secret, and only for the user who made it (ADR 0084)', async () => {
+    const { env } = fixture()
+    const { key, secret } = await createKey(env, 'u1', KEY)
+    const { before, after } = await updateKey(env, 'u1', key.id, { scopes: ['topics', 'inspect', 'inspect'] })
+    expect(before.scopes).toEqual(['topics', 'conversations'])
+    expect(after).toMatchObject({ id: key.id, name: 'service-dev', scopes: ['topics', 'inspect'], servers: ['mycut'] })
+    expect(await verifyKey(env, secret)).toEqual({
+      userId: 'u1',
+      keyId: key.id,
+      scopes: ['topics', 'inspect'],
+      servers: ['mycut'],
+    })
+    await expect(updateKey(env, 'u2', key.id, { scopes: ['personas'] })).rejects.toBeInstanceOf(NotFound)
+    expect((await verifyKey(env, secret)).scopes).toEqual(['topics', 'inspect'])
   })
 
   it('refuses an unknown, revoked or expired key, and one whose user is gone', async () => {

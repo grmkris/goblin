@@ -1,5 +1,5 @@
 // The Settings card for API keys (ADR 0081): what a server the owner runs uses instead of a browser session.
-import { type SubmitEvent, useState } from 'react'
+import { Fragment, type SubmitEvent, useState } from 'react'
 import { useMutation, useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import type { KeyScope } from '@goblin/contracts'
 import {
@@ -18,7 +18,7 @@ import {
   Skeleton,
   Switch,
 } from '@goblin/ui'
-import { createKeyMutation, keysQuery, revokeKeyMutation } from '../account/queries.ts'
+import { createKeyMutation, keysQuery, revokeKeyMutation, updateKeyMutation } from '../account/queries.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { QueryBoundary } from '../lib/query/query-boundary.tsx'
 import { setupCatalogQuery } from '../setup/queries.ts'
@@ -27,6 +27,7 @@ const SCOPES: readonly { readonly scope: KeyScope; readonly label: string }[] = 
   { scope: 'topics', label: 'Make and change its own Topics' },
   { scope: 'conversations', label: 'Send to and read its own chats' },
   { scope: 'personas', label: 'Make and change its own Personas' },
+  { scope: 'inspect', label: 'See how its own chats ran, without their words' },
 ]
 
 /** One switch of a set, as a labelled row. */
@@ -136,10 +137,54 @@ function NewKey() {
   )
 }
 
-/** The owner's keys, each revocable. */
+/** One key's scopes, changed in place (ADR 0084): it stays the same key, and keeps what it made. */
+function KeyScopes(props: {
+  readonly keyId: string
+  readonly scopes: readonly KeyScope[]
+  readonly onDone: () => void
+}) {
+  const update = useMutation(updateKeyMutation)
+  const [scopes, setScopes] = useState(props.scopes)
+  const failure = update.error === null ? '' : messageOf(update.error, 'change that key')
+  function submit(event: SubmitEvent<HTMLFormElement>): void {
+    event.preventDefault()
+    update.mutate({ keyId: props.keyId, scopes: [...scopes] }, { onSuccess: props.onDone })
+  }
+  return (
+    <form onSubmit={submit}>
+      <FieldGroup>
+        {failure && (
+          <Alert variant="destructive">
+            <AlertDescription>{failure}</AlertDescription>
+          </Alert>
+        )}
+        {SCOPES.map(({ scope, label }) => (
+          <Toggle
+            key={scope}
+            id={`key-${props.keyId}-scope-${scope}`}
+            label={label}
+            on={scopes.includes(scope)}
+            onChange={(on) => setScopes(toggled(scopes, scope, on))}
+          />
+        ))}
+        <Field orientation="horizontal">
+          <Button type="submit" size="sm" pending={update.isPending} disabled={scopes.length === 0}>
+            Save scopes
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={props.onDone}>
+            Cancel
+          </Button>
+        </Field>
+      </FieldGroup>
+    </form>
+  )
+}
+
+/** The owner's keys, each revocable, and each one's scopes changeable. */
 function Keys() {
   const keys = useSuspenseQuery(keysQuery).data
   const revoke = useMutation(revokeKeyMutation)
+  const [editing, setEditing] = useState('')
   const revoking = revoke.isPending ? revoke.variables : ''
   const failure = revoke.error === null ? '' : messageOf(revoke.error, 'revoke that key')
   return (
@@ -153,28 +198,38 @@ function Keys() {
       {keys.length > 0 && (
         <ul className="pick-list">
           {keys.map((key) => (
-            <li className="pick-row" key={key.id}>
-              <span className="grant-text">
-                <span className="grant-name">
-                  {key.name} {key.start && <code>{key.start}…</code>}
+            <Fragment key={key.id}>
+              <li className="pick-row">
+                <span className="grant-text">
+                  <span className="grant-name">
+                    {key.name} {key.start && <code>{key.start}…</code>}
+                  </span>
+                  <span className="grant-about">
+                    {key.scopes.join(', ')}
+                    {key.servers.length > 0 && ` · ${key.servers.join(', ')}`}
+                    {key.expiresAt && ` · expires ${new Date(key.expiresAt).toLocaleDateString()}`}
+                    {key.lastUsedAt && ` · used ${new Date(key.lastUsedAt).toLocaleDateString()}`}
+                  </span>
                 </span>
-                <span className="grant-about">
-                  {key.scopes.join(', ')}
-                  {key.servers.length > 0 && ` · ${key.servers.join(', ')}`}
-                  {key.expiresAt && ` · expires ${new Date(key.expiresAt).toLocaleDateString()}`}
-                  {key.lastUsedAt && ` · used ${new Date(key.lastUsedAt).toLocaleDateString()}`}
-                </span>
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                pending={revoking === key.id}
-                disabled={revoking !== '' && revoking !== key.id}
-                onClick={() => revoke.mutate(key.id)}
-              >
-                Revoke
-              </Button>
-            </li>
+                <Button size="sm" variant="ghost" disabled={editing === key.id} onClick={() => setEditing(key.id)}>
+                  Change scopes
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  pending={revoking === key.id}
+                  disabled={revoking !== '' && revoking !== key.id}
+                  onClick={() => revoke.mutate(key.id)}
+                >
+                  Revoke
+                </Button>
+              </li>
+              {editing === key.id && (
+                <li>
+                  <KeyScopes keyId={key.id} scopes={key.scopes} onDone={() => setEditing('')} />
+                </li>
+              )}
+            </Fragment>
           ))}
         </ul>
       )}

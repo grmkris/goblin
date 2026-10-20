@@ -1,4 +1,4 @@
-import type { CreateApiKey } from '@goblin/contracts'
+import type { CreateApiKey, UpdateApiKey } from '@goblin/contracts'
 import { mutationOptions } from '@tanstack/react-query'
 import { account } from '../lib/api.ts'
 
@@ -29,6 +29,15 @@ export const keysQuery = account.apiQuery({ queryKey: accountKeys.keys, queryFn:
 export const createKeyMutation = mutationOptions({
   ...account.apiMutation({ mutationFn: (api, payload: CreateApiKey) => api.keys.create({ payload }) }),
   onSuccess: (_created, _payload, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),
+})
+
+/** New scopes for one key (ADR 0084): the same key, which keeps what it made. */
+export const updateKeyMutation = mutationOptions({
+  ...account.apiMutation({
+    mutationFn: (api, { keyId, ...payload }: UpdateApiKey & { readonly keyId: string }) =>
+      api.keys.update({ params: { keyId }, payload }),
+  }),
+  onSuccess: (_updated, _change, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),
 })
 
 /** Ends one key at once. */

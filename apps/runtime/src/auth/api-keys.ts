@@ -1,8 +1,15 @@
-import { type ApiKeyView, type CreateApiKey, type CreatedApiKey, KeyScope, KeyServer } from '@goblin/contracts'
+import {
+  type ApiKeyView,
+  type CreateApiKey,
+  type CreatedApiKey,
+  KeyScope,
+  KeyServer,
+  type UpdateApiKey,
+} from '@goblin/contracts'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type { RuntimeEnv } from '../env.ts'
-import { Unauthenticated } from '../http/errors.ts'
+import { NotFound, Unauthenticated } from '../http/errors.ts'
 import type { KeyGrant } from '../http/api/principal.ts'
 import { createAuth } from './options.ts'
 
@@ -109,6 +116,38 @@ export const createKey = async (env: RuntimeEnv, userId: string, input: CreateAp
     },
   })
   return { key: viewOf(created), secret: created.key }
+}
+
+/** One of the user's keys before and after a change. */
+export interface KeyChange {
+  readonly before: ApiKeyView
+  readonly after: ApiKeyView
+}
+
+/**
+ * New scopes for one of the user's keys (ADR 0084): the same key, so what it made stays within its reach. A key of
+ * another user's, or one that is gone, is `NotFound`.
+ */
+export const updateKey = async (
+  env: RuntimeEnv,
+  userId: string,
+  keyId: string,
+  change: UpdateApiKey,
+): Promise<KeyChange> => {
+  const auth = createAuth(env, env.AUTH_DB)
+  const { adapter } = await auth.$context
+  const before = await adapter.findOne<KeyRecord>({
+    model: MODEL,
+    where: [
+      { field: 'id', value: keyId },
+      { field: 'referenceId', value: userId },
+    ],
+  })
+  if (before === null) throw new NotFound({ what: 'key' })
+  const after = await auth.api.updateApiKey({
+    body: { keyId, userId, permissions: { goblin: [...new Set(change.scopes)] } },
+  })
+  return { before: viewOf(before), after: viewOf(after) }
 }
 
 /** Ends one of the user's keys at once; a key of another user's, or one already gone, is left as it is. */

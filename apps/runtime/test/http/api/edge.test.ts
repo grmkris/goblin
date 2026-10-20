@@ -13,6 +13,8 @@ const OWNER = 'user-owner'
 const SECRET = 'secret-words'
 const KEY = `gbk_${'k'.repeat(64)}`
 
+const KEY_VIEW = { id: 'key-1', name: 'svc', scopes: [], servers: ['mycut'], createdAt: '2026-10-20T00:00:00.000Z' }
+
 /** The account's records, keeping the crash points asked for: each one's user, if the report came with a session. */
 const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
   const crashes: (string | undefined)[] = []
@@ -21,6 +23,13 @@ const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
     revokeClient: () => Effect.void,
     keys: () => Effect.succeed([]),
     createKey: () => Effect.die(new Error('no keys in this fixture')),
+    updateKey: (_user, keyId, change) =>
+      keyId === 'key-1'
+        ? Effect.succeed({
+            before: { ...KEY_VIEW, scopes: ['topics', 'personas'] },
+            after: { ...KEY_VIEW, scopes: change.scopes },
+          })
+        : Effect.fail(new NotFound({ what: 'key' })),
     revokeKey: () => Effect.void,
     crash: (report, userId) => {
       crashes.push(Option.getOrUndefined(userId))
@@ -300,9 +309,13 @@ describe("a server's API key (ADR 0081)", () => {
     expect(seen).toHaveLength(0)
   })
 
-  it('never reaches the account API: a key cannot list or make keys', async () => {
+  it('never reaches the account API: a key cannot list, make or change keys', async () => {
     const { edge } = deployment()
-    for (const request of [server('/api/keys', { method: 'GET' }), server('/api/keys', { body: '{}' })]) {
+    for (const request of [
+      server('/api/keys', { method: 'GET' }),
+      server('/api/keys', { body: '{}' }),
+      server('/api/keys/key-1', { method: 'PATCH', body: JSON.stringify({ scopes: ['inspect'] }) }),
+    ]) {
       const { response } = await through('account', request, edge)
       expect(response.status).toBe(401)
     }
@@ -310,6 +323,43 @@ describe("a server's API key (ADR 0081)", () => {
 })
 
 describe('the account API in the Worker', () => {
+  it("gives the signed-in owner's key new scopes and audits the change, never for a foreign Origin (ADR 0084)", async () => {
+    const { edge } = deployment()
+    const change = JSON.stringify({ scopes: ['topics', 'personas', 'inspect'] })
+    const patch = (headers: Record<string, string> = {}) =>
+      write('/api/keys/key-1', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: change,
+      })
+    const { response, lines } = await through('account', patch(), edge)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ id: 'key-1', scopes: ['topics', 'personas', 'inspect'] })
+    expect(lines).toContainEqual(
+      expect.objectContaining({
+        event: 'api_key',
+        kind: 'scopes',
+        id: 'key-1',
+        agent: OWNER,
+        scopes: ['topics', 'personas', 'inspect'],
+        'scopes.before': ['topics', 'personas'],
+      }),
+    )
+    expect((await through('account', patch({ origin: 'https://evil.test' }), edge)).response.status).toBe(403)
+    const gone = write('/api/keys/key-9', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: change,
+    })
+    expect((await through('account', gone, edge)).response.status).toBe(404)
+    const empty = write('/api/keys/key-1', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ scopes: [] }),
+    })
+    expect((await through('account', empty, edge)).response.status).toBe(400)
+  })
+
   const report = {
     route: '/c/$chatId',
     name: 'TypeError',
