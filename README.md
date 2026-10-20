@@ -72,6 +72,11 @@ goblin's components, charts, maps and diagrams, schedules that run on their own,
 the owner's MCP tools, a cheap model, notifications, other apps) that each wait for the owner's Allow. The Apps page lists them; an app can
 fill the workspace with its conversation docked beside it, roll back to an earlier version, or be deleted.
 
+goblin is reachable by AI clients over MCP and by scripts over the API (ADR 0081). A server the owner runs gets a
+scoped `gbk_` API key from Settings and, with it, makes its own Topics and Personas, sends into their chats and reads
+the replies after a cursor, at `/api` or as the same operations on `/mcp`. A key never reaches the owner's own Topics
+or Personas and never keeps the agent active.
+
 Every turn can be seen end to end (ADR 0024). Beside Pi's own record, each agent keeps a 30-day run ledger of how its
 turns ran: model attempts, tool calls, retries, MCP steps, Source replies, timings, tokens and errors, never content.
 Workers Logs and Traces carry the same ids. A coding agent reads the owner's conversations and any turn's timeline

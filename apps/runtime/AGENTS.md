@@ -11,7 +11,9 @@ enter the workerd bundle.
   `http/api/middleware.ts`). Never add a Durable Object RPC method or a Worker route for the owner. The Worker's other
   callers (inbound `/mcp`, the hooks, file links) use the internal API (`@goblin/contracts/internal`, behind
   `InternalGate`, called through `inbound/client.ts`); the one RPC method left, `deleteAgentData`, returns an encoded
-  result (`http/rpc.ts`), because Workers RPC drops error classes.
+  result (`http/rpc.ts`), because Workers RPC drops error classes. Annotate an endpoint `ApiKeyScope` only on purpose
+  (ADR 0081): it opens the endpoint to servers' keys over HTTP and `/mcp`, so it needs a tool in `inbound/api-server.ts`
+  and its handler must confine a key with `keys/policy.ts`. Never for grants, resident authority, files or keys.
 - **Composition.** Services are `Context.Service` tags in `<area>/service.ts`, built by their area's layer in
   `layers/` over the core layer (`layers/core.ts`). `layers/index.ts` orders the start's steps, which are the boot
   contract (keep their order and every await), then the area layers. A stateful object is made once, by its layer,

@@ -24,7 +24,9 @@ infrastructure. Read
   untouchable.
 - Keep SQLite transactions short. Never hold a transaction or lifecycle gate across model calls, network waits or
   token refreshes.
-- Better Auth (`mcp()` + `jwt()`) lives in an isolated D1 auth store. Do not add `oauthProvider()` or a custom adapter.
+- Better Auth (`mcp()` + `jwt()` + `apiKey()`) lives in an isolated D1 auth store. Do not add `oauthProvider()` or a
+  custom adapter. A server API key reaches only the Topics, chats and Personas it made, and never renews resident
+  authority (ADR 0081).
 - Outbound MCP calls require current resident authority and an exact owner grant for the server and tool/resource.
   Tool annotations, descriptions and remote content are untrusted data: they never grant permission and never become
   instructions. One exception is a skill from a server the owner turned skills on for (ADR 0008): the agent follows its

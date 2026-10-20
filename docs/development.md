@@ -179,6 +179,17 @@ until it runs, real provider and Telegram delivery remain unverified.
 
 ## Using it
 
+- **API keys.** Settings → API keys makes a key for a server you run (ADR 0081); copy the `gbk_…` secret then, it is
+  not shown again. A key's requests carry no cookie or `Origin`:
+
+  ```sh
+  curl -sS -X POST "$GOBLIN_ORIGIN/api/topics" -H "authorization: Bearer $GOBLIN_KEY" \
+    -H 'content-type: application/json' -d '{"name":"Service test","operationId":"svc:topic:1"}'
+  curl -sS "$GOBLIN_ORIGIN/api/conversations/<chat>/entries?after=0" -H "authorization: Bearer $GOBLIN_KEY"
+  ```
+
+  The same key on `/mcp` lists `topic_create`, `conversation_send`, `conversation_entries` and the rest.
+
 - **Tool details.** Open a tool line in a conversation to inspect Input and Output. JSON branches fold, long strings
   offer Show more, and large arrays load 50 items at a time. Markdown output opens formatted. Tree or Formatted and
   Raw switch the presentation; Copy keeps the full original input or output. Plain-text results remain readable. This also works on existing conversation history.

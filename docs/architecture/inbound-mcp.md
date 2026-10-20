@@ -38,3 +38,20 @@ goblin is an MCP server at `/mcp`, the one protected resource of Better Auth's `
   may request inspection, but only the owner's consent grants it.
 - Revoking a client in Settings deletes your consent to it and revokes its refresh tokens for you (`auth/clients.ts`);
   its next call gets a 401. Consenting again without `goblin:inspect` ends inspection for tokens already issued.
+
+## API keys
+
+A server the owner runs uses an API key instead of a session ([ADR 0081](../adr/0081-api-keys-and-the-same-operations-over-mcp.md)).
+The owner makes one in Settings: a name, its scopes (`topics`, `conversations`, `personas`), the connected MCP servers
+its setups may name, and a lifetime of at most a year. Better Auth's `apiKey()` plugin keeps it hashed in the auth D1
+(`auth/api-keys.ts`); its own routes are not served. With `Authorization: Bearer gbk_…` a key reaches:
+
+- `/api`: the owner endpoints annotated `ApiKeyScope` (Topics, sending and threads, the forward `entries` read,
+  Personas), as the owner, never renewing resident authority;
+- `/mcp`: the same operations as tools (`inbound/api-server.ts`), each calling the owner API with the key's grant, so
+  admission, scopes and reach are one path.
+
+A key reaches only the Topics, their chats and the Personas it made (`app_key_reach`); an operation id never adopts
+the owner's. Its Topics start with nothing in their setup, and any setup it writes names only its servers, tool by
+tool. Messages it sends are owner turns in those Topics: built-in tools are the owner's, and `searchExcluded` is not
+isolation.

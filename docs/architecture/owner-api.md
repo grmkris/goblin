@@ -7,11 +7,15 @@ in `packages/contracts/src/api`: `OwnerApi`, which each user's agent serves, `Ac
 and `errors.ts`, the failure vocabulary (`AppError`) and its envelope.
 
 **The edge** (`http/api/edge.ts`, built once per isolate). The account API's groups are answered in the Worker
-(`http/api/account.ts`): `clients` for any signed-in account, and `clientErrors`, a browser crash report, without a
-session. Every other `/api/*` request is admitted in this order, then forwarded:
+(`http/api/account.ts`): `clients` and `keys` for any signed-in account (never for an API key), and `clientErrors`, a
+browser crash report, without a session. Every other `/api/*` request is admitted in this order, then forwarded:
 
 1. a write whose `Origin` names another site is refused;
-2. the session comes from the cookie alone; a request with an `Authorization` header is refused;
+2. the session comes from the cookie alone, and any `Authorization` header but a server API key is refused. A
+   `Bearer gbk_…` key ([ADR 0081](../adr/0081-api-keys-and-the-same-operations-over-mcp.md)) is admitted instead of a
+   session: verified in the auth D1, refused with a cookie or an `Origin`, and only for an endpoint annotated
+   `ApiKeyScope` with a scope the key holds (`keyScopes`); it needs no CSRF header, and its grant (id, scopes, server
+   ceiling) is forwarded in `x-goblin-key`;
 3. every write needs the app's own `Origin` and `x-goblin-csrf: 1` (`http/csrf.ts`), which the web sends on every write;
 4. a body is capped at 64 KiB, except file bytes, which stream through to the agent's own limits;
 5. `AGENTS.getByName(userId).fetch` gets the request with only `content-type`, `content-length`, `accept`,
@@ -30,8 +34,9 @@ layers, never at module level.
 Each group's handlers (`HttpApiBuilder.group`) live in their area (`<area>/api.ts`) and read the agent's services
 from context. Owner admission (the `OwnerAdmission` middleware, `http/api/middleware.ts`) admits every request
 before its handler, and before its body is decoded: a renewal of resident authority, except where an endpoint is
-annotated `RenewsResident: false` (`POST /api/agent/resident`, the event streams, the files group and the OAuth
-callback). It annotates the request's logs with `goblin.rpc`
+annotated `RenewsResident: false` (`POST /api/agent/resident`, the event streams, the entries read, the files group and the
+OAuth callback). A request a key sent never renews it; owner admission checks the key's scope again, and the Topics,
+conversations and Personas handlers confine a key to what it made (`keys/policy.ts`, `app_key_reach`). It annotates the request's logs with `goblin.rpc`
 (`<group>.<endpoint>`), `goblin.operation` and `ref`, and stamps `ref` on every typed failure.
 
 | Group | Paths under `/api` | Handlers |
