@@ -1,4 +1,4 @@
-import type { AssistantMessage, Message, Model, ProviderStreams } from '@earendil-works/pi-ai'
+import type { AssistantMessage, Message, Model, ProviderStreams, ThinkingLevel } from '@earendil-works/pi-ai'
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream'
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import { describe, expect, it } from 'vitest'
@@ -7,14 +7,21 @@ import { NoModelEndpoint } from '../src/http/errors.ts'
 import { NO_ENDPOINT_ANSWER, servedFailure } from '../src/inference/service.ts'
 import { LITELLM_STREAMS, MAX_OUTPUT_TOKENS, MIN_ANSWER_ROOM, MODEL_PROVIDER, makePiModels } from '../src/pi/model.ts'
 
-const env = { MODEL_ID: 'qwen3.8-flash', MODEL_BASE_URL: 'https://no-model-calls.invalid/v1', MODEL_KEY: 'test' }
+const env = {
+  MODEL_ID: 'qwen3.8-flash',
+  MODELS: 'deepseek-v4.1-flash,deepseek-v4-pro,glm-5.3,gemini-3.8-flash,muse-spark-1.3-contributor,unknown-model',
+  MODEL_BASE_URL: 'https://no-model-calls.invalid/v1',
+  MODEL_KEY: 'test',
+}
 
-/** The chat completions request pi-ai would send for `messages`, captured before it leaves. */
-async function requestFor(messages: Message[]) {
-  const { model } = makePiModels(env)
+/** The chat completions request pi-ai would send for `messages` to model `id` at `reasoning`, captured before it leaves. */
+async function requestFor(messages: Message[], id = env.MODEL_ID, reasoning?: ThinkingLevel) {
+  const model = makePiModels(env).models.getModel(MODEL_PROVIDER, id)
+  if (model === undefined) throw new Error(`not offered: ${id}`)
   let request: Record<string, unknown> = {}
   const stream = LITELLM_STREAMS.streamSimple(model, normalizeContext({ systemPrompt: 'Be brief.', messages }), {
     apiKey: 'test',
+    ...(reasoning === undefined ? {} : { reasoning }),
     onPayload: (params) => {
       // SAFETY: openai-completions hands over the JSON object it is about to send.
       request = params as Record<string, unknown>
@@ -44,6 +51,34 @@ describe('the output limit (unit)', () => {
     expect(request).toEqual({})
     expect(result).toMatchObject({ stopReason: 'error', model: 'qwen3.8-flash' })
     expect(isContextOverflow(result)).toBe(true)
+  })
+})
+
+/** The thinking controls a request carries. */
+const thinkingParams = (request: Record<string, unknown>) =>
+  Object.fromEntries(
+    ['enable_thinking', 'thinking_budget', 'reasoning_effort'].flatMap((key) =>
+      key in request ? [[key, request[key]]] : [],
+    ),
+  )
+
+describe('how thinking is bounded (unit)', () => {
+  // Each value is one the deployment's endpoint accepted for that model (probed 2026-10-20).
+  it.each([
+    ['qwen3.8-flash', 'medium', { enable_thinking: true, thinking_budget: 8192 }],
+    ['qwen3.8-flash', undefined, { enable_thinking: false }],
+    ['deepseek-v4.1-flash', 'medium', { enable_thinking: true, reasoning_effort: 'high' }],
+    ['deepseek-v4.1-flash', undefined, { enable_thinking: false }],
+    ['deepseek-v4-pro', 'minimal', { enable_thinking: true, reasoning_effort: 'low' }],
+    ['glm-5.3', 'medium', { reasoning_effort: 'high' }],
+    ['glm-5.3', undefined, { reasoning_effort: 'low' }],
+    ['gemini-3.8-flash', 'medium', { reasoning_effort: 'medium' }],
+    ['gemini-3.8-flash', undefined, { reasoning_effort: 'low' }],
+    ['muse-spark-1.3-contributor', 'medium', { reasoning_effort: 'medium' }],
+    ['muse-spark-1.3-contributor', undefined, { reasoning_effort: 'minimal' }],
+    ['unknown-model', 'medium', {}],
+  ] as const)('sends %s at %s level: %j', async (id, level, sent) => {
+    expect(thinkingParams((await requestFor([ask('hi')], id, level)).request)).toEqual(sent)
   })
 })
 

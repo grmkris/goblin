@@ -64,6 +64,8 @@ export function makePiHarness(
       await recorder.restore(harness, context)
       return harness
     },
-    defaults: { model: pi.model, thinkingLevel: 'low' },
+    // Every conversation thinks at medium, bounded by each model's own control (ADR 0083, `pi/model.ts`): Personas plan
+    // multi-step work, and every step must still leave room to answer.
+    defaults: { model: pi.model, thinkingLevel: 'medium' },
   })
 }

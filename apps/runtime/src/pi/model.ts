@@ -6,7 +6,14 @@ import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/e
 import type { AssistantMessage, Model, ProviderStreams } from '@earendil-works/pi-ai'
 import type { ModelOption } from '@goblin/contracts'
 import type { RuntimeEnv } from '../env.ts'
-import { ENDPOINT_DEFAULT, type ModelOptions, deploymentEndpoint, optionOf } from '../models.ts'
+import {
+  ENDPOINT_DEFAULT,
+  type ModelOptions,
+  type Thinking,
+  deploymentEndpoint,
+  optionOf,
+  thinkingOf,
+} from '../models.ts'
 
 type ModelEnvironment = Partial<Pick<RuntimeEnv, 'MODEL_ID' | 'MODEL_BASE_URL' | 'MODEL_KEY' | 'MODELS'>>
 
@@ -14,11 +21,36 @@ type ModelEnvironment = Partial<Pick<RuntimeEnv, 'MODEL_ID' | 'MODEL_BASE_URL' |
 export const MODEL_PROVIDER = 'goblin-litellm'
 
 /**
- * The most a model writes in one response. pi-ai sends it on every request (clamped to what the context leaves), and
- * reasoning models spend part of it thinking, so it is generous: at 8,192 glm-5.3 and qwen3.8-max ran out mid-answer.
- * A response cut here ends with `stopReason: 'length'`, which the owner sees.
+ * The most a model writes in one response. pi-ai sends it on every request (clamped to what the context leaves). It is
+ * a ceiling, not how thinking is bounded: for some models (DeepSeek and GLM on Model Studio) thinking shares it with
+ * the answer, so each model's own thinking control keeps thinking well below it (`thinkingFields`). A response cut here
+ * ends with `stopReason: 'length'`, which the owner sees.
  */
 export const MAX_OUTPUT_TOKENS = 32_768
+
+type ThinkingFields = Pick<Model<'openai-completions'>, 'reasoning' | 'compat' | 'thinkingLevelMap'>
+
+/**
+ * A model's thinking as pi-ai sends it (ADR 0083): the level Pi asks at bounded by the model's own control, a thinking
+ * token budget (`thinking_budget`, under which Model Studio answers once it is spent) or a reasoning effort per level.
+ * Asking at no level asks for the least: thinking switched off (`enable_thinking`) where the model allows it, its
+ * least effort where it does not. A model goblin does not know is sent no thinking control.
+ */
+const thinkingFields = (thinking: Thinking | undefined): ThinkingFields => {
+  if (thinking === undefined) return { reasoning: false }
+  if (thinking.by === 'budget')
+    return {
+      reasoning: true,
+      compat: { thinkingFormat: 'qwen', supportsReasoningEffort: false, thinkingTokenBudgetField: 'thinking_budget' },
+    }
+  return {
+    reasoning: true,
+    compat: thinking.switchesOff
+      ? { thinkingFormat: 'qwen', supportsReasoningEffort: true }
+      : { supportsReasoningEffort: true },
+    thinkingLevelMap: thinking.efforts,
+  }
+}
 
 /** The provider is configured at the Worker boundary; its key never enters Pi state. */
 function makePiModel(
@@ -34,7 +66,7 @@ function makePiModel(
     api: 'openai-completions',
     baseUrl,
     input: option.images ? ['text', 'image'] : ['text'],
-    reasoning: false,
+    ...thinkingFields(thinkingOf(option.id)),
     contextWindow: contextWindow ?? option.contextWindow,
     maxTokens: MAX_OUTPUT_TOKENS,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

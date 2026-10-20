@@ -7,7 +7,23 @@ import type { RuntimeEnv } from './env.ts'
 import { type AppError, InvalidInput } from './http/errors.ts'
 import { appModelChoice } from './storage/schema.ts'
 
-type Known = Omit<ModelOption, 'id' | 'contextWindow'>
+/** The thinking levels goblin asks at, as Pi names them; `off` is the least thinking a model allows. */
+type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+
+/**
+ * How a model's thinking is bounded (ADR 0083). `budget`: a thinking token budget per level, and off turns thinking off
+ * (Qwen on Model Studio, which then answers at once). `effort`: the provider's reasoning effort for each level, `null`
+ * where it has none; with `switchesOff`, off turns thinking off instead of asking for the least effort.
+ */
+export type Thinking =
+  | { readonly by: 'budget' }
+  | {
+      readonly by: 'effort'
+      readonly switchesOff: boolean
+      readonly efforts: Readonly<Partial<Record<ThinkingLevel, string | null>>>
+    }
+
+type Known = Omit<ModelOption, 'id' | 'contextWindow'> & { readonly thinking: Thinking }
 
 /**
  * The context window Pi assumes for every offered model until a model's own is recorded here: it compacts the
@@ -15,26 +31,97 @@ type Known = Omit<ModelOption, 'id' | 'contextWindow'>
  */
 const CONTEXT_WINDOW = 131_072
 
+/** DeepSeek's efforts are low, high and max; medium and xhigh are its high and max (Model Studio, probed 2026-10-20). */
+const DEEPSEEK: Thinking = {
+  by: 'effort',
+  switchesOff: true,
+  efforts: { minimal: 'low', low: 'low', medium: 'high', high: 'high', xhigh: 'max', max: 'max' },
+}
+
 /**
- * What the picker says about the models LiteLLM serves to goblin. Grouped by the route the call takes, because
- * quotas are per route: when Google refuses, an Alibaba model still answers. Probed 2026-10-04: every model here
- * calls tools; `images` is whether it reads image input (the others drop images silently).
+ * What goblin knows about the models LiteLLM serves to it. Grouped by the route the call takes, because quotas are per
+ * route: when Google refuses, an Alibaba model still answers. Probed 2026-10-04: every model here calls tools; `images`
+ * is whether it reads image input (the others drop images silently). Thinking was probed on 2026-10-20: each value
+ * here is one the endpoint accepts.
  */
 const KNOWN: Readonly<Record<string, Known>> = {
-  'gemini-3.8-flash': { label: 'Gemini 3.8 Flash', route: 'Google', note: 'Fast, sees images', images: true },
-  'qwen3.8-flash': { label: 'Qwen 3.8 Flash', route: 'Alibaba Cloud', note: 'Fast, sees images', images: true },
-  'qwen3.8-max': { label: 'Qwen 3.8 Max', route: 'Alibaba Cloud', note: 'Larger, sees images', images: true },
-  // Probed 2026-10-12: it thinks until its output limit on hard prompts, whatever budget it is given.
-  'glm-5.3': { label: 'GLM 5.3', route: 'Alibaba Cloud', note: 'Thinks at length, text only', images: false },
-  'deepseek-v4-pro': { label: 'DeepSeek V4 Pro', route: 'Alibaba Cloud', note: 'Larger, text only', images: false },
+  // Thinking cannot be turned off; its levels are low, medium and high.
+  'gemini-3.8-flash': {
+    label: 'Gemini 3.8 Flash',
+    route: 'Google',
+    note: 'Fast, sees images',
+    images: true,
+    thinking: {
+      by: 'effort',
+      switchesOff: false,
+      efforts: { off: 'low', minimal: null, low: 'low', medium: 'medium', high: 'high' },
+    },
+  },
+  'qwen3.8-flash': {
+    label: 'Qwen 3.8 Flash',
+    route: 'Alibaba Cloud',
+    note: 'Fast, sees images',
+    images: true,
+    thinking: { by: 'budget' },
+  },
+  'qwen3.8-max': {
+    label: 'Qwen 3.8 Max',
+    route: 'Alibaba Cloud',
+    note: 'Larger, sees images',
+    images: true,
+    thinking: { by: 'budget' },
+  },
+  // Thinking cannot be turned off, and Model Studio ignores a budget for it: its efforts are low, high and max.
+  'glm-5.3': {
+    label: 'GLM 5.3',
+    route: 'Alibaba Cloud',
+    note: 'Thinks at length, text only',
+    images: false,
+    thinking: {
+      by: 'effort',
+      switchesOff: false,
+      efforts: { off: 'low', minimal: null, low: 'low', medium: 'high', high: 'high', xhigh: 'max', max: 'max' },
+    },
+  },
+  'deepseek-v4-pro': {
+    label: 'DeepSeek V4 Pro',
+    route: 'Alibaba Cloud',
+    note: 'Larger, text only',
+    images: false,
+    thinking: DEEPSEEK,
+  },
   // Probed 2026-10-12 on the Token Plan: calls tools.
   'deepseek-v4.1-flash': {
     label: 'DeepSeek V4.1 Flash',
     route: 'Alibaba Cloud',
     note: 'Fast, text only',
     images: false,
+    thinking: DEEPSEEK,
+  },
+  // Thinking cannot be turned off (`none` is refused); minimal is its least.
+  'muse-spark-1.3-contributor': {
+    label: 'Muse Spark 1.3',
+    route: 'Meta',
+    note: 'Text only',
+    images: false,
+    thinking: {
+      by: 'effort',
+      switchesOff: false,
+      efforts: {
+        off: 'minimal',
+        minimal: 'minimal',
+        low: 'low',
+        medium: 'medium',
+        high: 'high',
+        xhigh: 'xhigh',
+        max: 'max',
+      },
+    },
   },
 }
+
+/** How goblin bounds model `id`'s thinking, or nothing for a model it does not know, which is sent no thinking control. */
+export const thinkingOf = (id: string): Thinking | undefined => KNOWN[id]?.thinking
 
 /** Never empty: the default model is always offered, first. */
 export type ModelOptions = readonly [ModelOption, ...ModelOption[]]
@@ -42,9 +129,10 @@ export type ModelOptions = readonly [ModelOption, ...ModelOption[]]
 /** What the picker says about model `id`: what goblin knows of it, else its own name, text only. */
 export const optionOf = (id: string): ModelOption => {
   const known = KNOWN[id]
-  return known === undefined
-    ? { id, label: id, route: 'Other', note: '', images: false, contextWindow: CONTEXT_WINDOW }
-    : { id, ...known, contextWindow: CONTEXT_WINDOW }
+  if (known === undefined)
+    return { id, label: id, route: 'Other', note: '', images: false, contextWindow: CONTEXT_WINDOW }
+  const { label, route, note, images } = known
+  return { id, label, route, note, images, contextWindow: CONTEXT_WINDOW }
 }
 
 /**
