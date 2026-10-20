@@ -3,6 +3,7 @@
 // bot's name on its message; Goblin's own answers carry no name, because Goblin answers unless someone else was asked.
 import { type ReactNode, use } from 'react'
 import { BellIcon, BotIcon, ExternalLinkIcon, PlugIcon, SparklesIcon } from 'lucide-react'
+import { personaAnswerText } from '@goblin/contracts'
 import type { Part } from '../../lib/parts.ts'
 import { MessageFiles } from '../attachments.tsx'
 import { PersonaAvatar } from '../persona-avatar.tsx'
@@ -83,11 +84,16 @@ function Attributed({
   )
 }
 
-/** A Persona's answer: its mark, its name, its words, and what it waits on the owner for (ADR 0041). */
+/**
+ * A Persona's answer: its mark, its name, its words, what it asked with `ask_user` (ADR 0082), which the owner answers
+ * by tagging it again, and what it waits on the owner for (ADR 0041).
+ */
 export function PersonaAnswerPart({ part }: { readonly part: Of<'persona-answer'> }) {
+  const asked = (part.questions ?? []).length > 0
   return (
     <Attributed mark={<PersonaAvatar avatar={part.avatar} />} name={part.name} tag="Persona">
-      <MessageText text={part.text} />
+      <MessageText text={personaAnswerText(part)} />
+      {asked && <p className="attributed-asked">Answer by tagging @{part.name} in your next message.</p>}
       {part.hold !== undefined && <PersonaHoldCard hold={part.hold} answer={part.id} name={part.name} />}
     </Attributed>
   )

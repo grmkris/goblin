@@ -14,27 +14,26 @@ const textOf = (message: Message): string =>
 const PERSONA_PROMPT = /^Answer the owner's message above as @(.+)\.$/u
 
 /**
- * A Persona's fork scripted to call the tool its owner message asks for: `persona-call <tool> <json>` anywhere above
- * the prompt, once; the tool's result is then its answer. Anything else is the echo every other request gets.
+ * A Persona's fork scripted to call the tool its owner message asks for: `persona-call <tool> <json>` in the newest
+ * message tagging it, once; the tool's result is then its answer. Older asks stay in the chat the fork reads, so a
+ * later tag without the token is answered with the echo every other request gets.
  */
 function personaCall(messages: readonly Message[]): AssistantMessage['content'] | undefined {
   const last = messages.findLast((message) => message.role !== 'system')
   if (last === undefined) return undefined
   if (last.role === 'toolResult') return undefined
   if (!PERSONA_PROMPT.test(textOf(last).split('\n').at(-1) ?? '')) return undefined
-  for (const message of messages) {
-    const call = /persona-call (\w+) (\{.*\})/u.exec(message.role === 'user' ? textOf(message) : '')
-    if (call !== null)
-      return [
-        {
-          type: 'toolCall',
-          id: `persona-call-${messages.length}`,
-          name: call[1] ?? '',
-          arguments: JSON.parse(call[2] ?? '{}'),
-        },
-      ]
-  }
-  return undefined
+  const ask = messages.findLast((message) => message.role === 'user' && textOf(message).startsWith('[to @'))
+  const call = /persona-call (\w+) (\{.*\})/u.exec(ask === undefined ? '' : textOf(ask))
+  if (call === null) return undefined
+  return [
+    {
+      type: 'toolCall',
+      id: `persona-call-${messages.length}`,
+      name: call[1] ?? '',
+      arguments: JSON.parse(call[2] ?? '{}'),
+    },
+  ]
 }
 
 /** A rerank request of automatic retrieval (`retrieval/auto.ts`): the owner's message and the candidates, as JSON. */

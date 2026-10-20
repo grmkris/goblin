@@ -13,6 +13,7 @@ import { topicsCase } from './topics-case.ts'
 import { threadHeadsCase } from './thread-heads-case.ts'
 import { organizeCase, personasCase } from './persona-case.ts'
 import { personaHoldsCase } from './persona-holds-case.ts'
+import { personaQuestionsCase } from './persona-questions-case.ts'
 import { retrievalCase } from './retrieval-case.ts'
 import {
   moveApprovalCase,
@@ -70,6 +71,11 @@ harness.test(
 harness.test(
   "native: a Persona's ask-first call and tool to allow wait for the owner and resume; a routine hands work to a Persona",
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => personaHoldsCase(url)))),
+  { timeout: 240_000 },
+)
+harness.test(
+  'native: a tagged Persona asks with ask_user, a tag answers it, and a Persona thread branches a thread it answers in',
+  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => personaQuestionsCase(url)))),
   { timeout: 240_000 },
 )
 harness.test(

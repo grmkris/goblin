@@ -1140,6 +1140,12 @@
 .attributed-body {
   min-width: 0;
 }
+/* Under a Persona's questions: how the owner answers them (ADR 0082). */
+.attributed-asked {
+  margin-block-start: 0.25rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-13);
+}
 .attributed-open {
   display: inline-flex;
   align-items: center;

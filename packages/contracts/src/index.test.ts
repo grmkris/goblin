@@ -10,6 +10,7 @@ import {
   StartThread,
   UpdatePersona,
   WorkspaceChange,
+  personaAnswerText,
   selectionKey,
 } from './index.ts'
 
@@ -110,5 +111,30 @@ describe('client error reports', () => {
     expect(valid({ ...report, frames: Array.from({ length: 13 }, () => 'index.js:1:2') })).toBe(false)
     const long = `https://goblin.surf/${'a'.repeat(270)}.js:1:2`
     expect(valid({ ...report, frames: Array.from({ length: 12 }, () => long) })).toBe(false)
+  })
+})
+
+describe("a Persona's answer as plain text (ADR 0082)", () => {
+  const questions = [
+    {
+      id: 'size',
+      prompt: 'Which size?',
+      kind: 'single' as const,
+      options: [
+        { id: 'square', label: 'Square', description: '3000 × 3000' },
+        { id: 'tall', label: 'Tall' },
+      ],
+      allowOther: true,
+    },
+    { id: 'tone', prompt: 'Any tone to keep?', kind: 'text' as const },
+  ]
+  it('is its words when it asked nothing', () => {
+    expect(personaAnswerText({ text: 'Done.' })).toBe('Done.')
+  })
+  it('numbers what it asked after its words, or alone', () => {
+    const asked =
+      'Asked:\n1. Which size?\n   - Square (3000 × 3000)\n   - Tall\n   - or something else\n2. Any tone to keep?'
+    expect(personaAnswerText({ text: 'Two things first.', questions })).toBe(`Two things first.\n\n${asked}`)
+    expect(personaAnswerText({ text: '', questions })).toBe(asked)
   })
 })

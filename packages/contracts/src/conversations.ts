@@ -82,6 +82,20 @@ export const QuestionSpec = Schema.Struct({
 })
 export type QuestionSpec = typeof QuestionSpec.Type
 
+/** Questions as numbered plain text: what a model sees, and what a text-only channel can show the owner. */
+export function questionText(questions: readonly QuestionSpec[]): string {
+  return questions
+    .map((question, index) => {
+      const lines = [`${index + 1}. ${question.prompt}${question.kind === 'multi' ? ' (choose any)' : ''}`]
+      if (question.kind !== 'text')
+        for (const option of question.options ?? [])
+          lines.push(`   - ${option.label}${option.description === undefined ? '' : ` (${option.description})`}`)
+      if (question.allowOther === true && question.kind !== 'text') lines.push('   - or something else')
+      return lines.join('\n')
+    })
+    .join('\n')
+}
+
 /**
  * What an open App shared for the agent (`ui/update-model-context`), sent with the owner's next message by its App id.
  * The runtime finds where the App comes from (its server, or the agent app it is) and passes the text to the model as

@@ -1,7 +1,7 @@
 // A Source message becomes a turn in its Topic's Conversation, answered by goblin or a Persona, or a passive note.
 // Turns use the one admission sequence; their settlement is read back for the answer sent to the Source.
 import type { TextContent } from '@earendil-works/pi-ai'
-import { type OwnTurnVia, PersonaAnswerData } from '@goblin/contracts'
+import { type OwnTurnVia, PersonaAnswerData, personaAnswerText } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
@@ -117,7 +117,7 @@ const personaAnswer = (operationId: string, persona: number) =>
     const entries = yield* (yield* PiSessions).messages(session).pipe(Effect.catchTag('PiFailure', piFailure))
     const entry = entries.find((each) => Number(each.id) === invocation.answerEntry)
     const data = entry === undefined ? Option.none() : decodeAnswer(entry.data)
-    return (Option.isSome(data) ? { text: data.value.text } : none) satisfies Answer
+    return (Option.isSome(data) ? { text: personaAnswerText(data.value) } : none) satisfies Answer
   })
 
 /** How a turn from `origin` ended: the Persona's answer when one answers it, else goblin's in the chat it ran in. */

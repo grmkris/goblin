@@ -26,9 +26,20 @@ const personaView = (id: number, data: unknown): readonly ConversationEntryView[
         operationId: answer.operationId,
         text: answer.text,
         ...(answer.hold === undefined ? {} : { hold: { kind: answer.hold.kind, name: answer.hold.name } }),
+        ...(answer.questions === undefined ? {} : { questions: answer.questions }),
       },
     ],
   })
+
+/** What `ask_user` asked in `entry`, when it is the tool's result; a Persona's answer ends on it (ADR 0082). */
+export const askedQuestions = (entry: Pick<EntryRecord, 'model'>): readonly QuestionSpec[] | undefined => {
+  for (const message of entry.model ?? [])
+    if (message.role === 'toolResult' && message.toolName === 'ask_user') {
+      const asked = Option.getOrUndefined(decodeAsk(message.details))
+      if (asked !== undefined) return asked.questions
+    }
+  return undefined
+}
 
 /** The owner's words, without the author tag a message from someone else carries first. */
 const ownerView = (id: number, content: unknown): readonly ConversationEntryView[] => {

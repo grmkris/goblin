@@ -1,5 +1,12 @@
 import type { EntryRecord } from '@earendil-works/pi-durable'
-import { DelegateResultData, PersonaAnswerData, type RetrievalSource, TopicSeedData, authorOf } from '@goblin/contracts'
+import {
+  DelegateResultData,
+  PersonaAnswerData,
+  type RetrievalSource,
+  TopicSeedData,
+  authorOf,
+  personaAnswerText,
+} from '@goblin/contracts'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { redactSecretText } from '../mcp/oauth/redaction.ts'
@@ -55,7 +62,7 @@ function rawEntry(entry: EntryRecord): Omit<IndexedEntry, 'at'> | undefined {
       return message?.role === 'user' ? { role: 'shared', ...userText(message.content) } : undefined
     case 'app.persona': {
       const data = persona(entry.data)
-      return data === undefined ? undefined : { role: 'persona', author: data.name, text: data.text }
+      return data === undefined ? undefined : { role: 'persona', author: data.name, text: personaAnswerText(data) }
     }
     case 'app.delegate_result': {
       const data = delegate(entry.data)

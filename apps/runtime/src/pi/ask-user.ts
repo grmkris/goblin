@@ -1,5 +1,5 @@
 import { defineExtension, section } from '@earendil-works/pi-durable'
-import { type JsonObject, QuestionSpec } from '@goblin/contracts'
+import { type JsonObject, QuestionSpec, questionText } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
 import { typedTool } from './typed-tool.ts'
 
@@ -41,22 +41,8 @@ const Questions = Schema.Array(Question).check(
   }),
 )
 
-/** The questions as numbered plain text: what the model sees, and what a text-only channel can show the owner. */
-function questionText(questions: readonly Question[]): string {
-  return questions
-    .map((question, index) => {
-      const lines = [`${index + 1}. ${question.prompt}${question.kind === 'multi' ? ' (choose any)' : ''}`]
-      if (question.kind !== 'text')
-        for (const option of question.options ?? [])
-          lines.push(`   - ${option.label}${option.description === undefined ? '' : ` (${option.description})`}`)
-      if (question.allowOther === true && question.kind !== 'text') lines.push('   - or something else')
-      return lines.join('\n')
-    })
-    .join('\n')
-}
-
 /** The JSON form of a question, without absent fields, matching the `QuestionSpec` contract. */
-const spec = (question: Question): QuestionSpec & JsonObject => ({
+export const questionJson = (question: QuestionSpec): QuestionSpec & JsonObject => ({
   id: question.id,
   prompt: question.prompt,
   kind: question.kind,
@@ -97,13 +83,13 @@ export function askingExtension(
         output: Schema.Struct({ asked: Schema.Array(QuestionSpec) }),
         replay: 'safe',
         execute: async ({ questions }, api) => {
-          const asked = questions.map(spec)
+          const asked = questions.map(questionJson)
           if (onQuestion !== undefined) await onQuestion(String(api.conversationId), api.callId, asked)
           return { asked }
         },
         text: (_asked, { questions }) =>
           `Asked the owner:\n${questionText(questions)}\nTheir answers will arrive as their next message.`,
-        details: (_asked, { questions }) => ({ kind: 'question', questions: questions.map(spec) }),
+        details: (_asked, { questions }) => ({ kind: 'question', questions: questions.map(questionJson) }),
         terminate: () => true,
       }),
     ],

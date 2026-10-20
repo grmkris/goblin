@@ -1,4 +1,5 @@
 import * as Schema from 'effect/Schema'
+import { QuestionSpec, questionText } from './conversations.ts'
 import { ChatId, EntryId, NonEmptyString, OperationId, PersonaId } from './ids.ts'
 import { PersonaSetup } from './setup.ts'
 
@@ -143,8 +144,18 @@ export const PersonaAnswerData = Schema.Struct({
   routine: Schema.optional(Schema.Struct({ id: Schema.String, run: Schema.String })),
   /** What the answer stopped on, when the Persona needs the owner before it can go on (ADR 0041). */
   hold: Schema.optional(PersonaHold),
+  /** What the Persona asked with `ask_user` (ADR 0082): the answer ends there and the owner's next tag answers it. */
+  questions: Schema.optional(Schema.Array(QuestionSpec)),
 })
 export type PersonaAnswerData = typeof PersonaAnswerData.Type
+
+/** A Persona's answer as plain text: its words, then what it asked, numbered, for every reader that shows only text. */
+export function personaAnswerText(answer: Pick<PersonaAnswerData, 'text' | 'questions'>): string {
+  const questions = answer.questions ?? []
+  if (questions.length === 0) return answer.text
+  const asked = `Asked:\n${questionText(questions)}`
+  return answer.text === '' ? asked : `${answer.text}\n\n${asked}`
+}
 
 /**
  * `POST /api/personas/reply`: the owner's reply to a Persona's hold (ADR 0041), after they allowed the tool it asked

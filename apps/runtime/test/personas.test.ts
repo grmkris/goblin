@@ -261,9 +261,11 @@ describe('what a Persona turn changes in its fork', () => {
   })
 
   it('keeps an exact selection exact and starts from the defaults when nothing is stored', () => {
-    expect(personaSelection({ extensions: ['a', 'goblin.memory'], tools: ['ask_user', 'mcp_call'] })).toEqual({
+    expect(
+      personaSelection({ extensions: ['a', 'goblin.memory'], tools: ['ask_user', 'subagent_spawn', 'mcp_call'] }),
+    ).toEqual({
       extensions: ['a', 'goblin.persona-turn'],
-      tools: ['mcp_call'],
+      tools: ['ask_user', 'mcp_call'],
     })
     const fresh = personaSelection({})
     expect(fresh.extensions).toEqual({ add: ['goblin.persona-turn'], remove: ['goblin.memory'] })
@@ -276,6 +278,14 @@ describe('what a Persona turn changes in its fork', () => {
     expect(text).toContain('not goblin')
     expect(text).toContain('Be brief.')
     expect(personaText({ name: 'Scout', role: '', instructions: '' })).not.toContain('instructions for')
+  })
+
+  it('asks with ask_user when tagged, and says what it needs when a routine runs it (ADR 0082)', () => {
+    const persona = { name: 'Scout', role: '', instructions: '' }
+    expect(personaText(persona)).toContain('ask with ask_user and stop')
+    expect(PERSONA_DENIED_TOOLS).not.toContain('ask_user')
+    expect(personaText(persona, 'routine')).toContain('say so in your answer')
+    expect(personaText(persona, 'routine')).not.toContain('ask_user')
   })
 
   it('cannot close the context block it sits in', () => {
