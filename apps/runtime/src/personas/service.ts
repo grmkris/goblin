@@ -123,6 +123,8 @@ export class Invocations extends Context.Service<
     readonly live: Effect.Effect<readonly PersonaInvocationView[]>
     /** Every invocation of one send, in order. */
     readonly of: (operationId: string) => Effect.Effect<readonly PersonaInvocationView[]>
+    /** The newest `limit` invocations asked in `chat`, newest first. */
+    readonly ofChat: (chat: string, limit: number) => Effect.Effect<readonly PersonaInvocationView[]>
     /** The Persona started working; only a pending invocation moves. */
     readonly running: (operationId: string, persona: number) => Effect.Effect<void>
     /** Settles one invocation; a settled one stays as it is. Whether this call settled it. */
@@ -160,6 +162,9 @@ export class Invocations extends Context.Service<
         live: Effect.sync(() => store.live()).pipe(Effect.withSpan('Invocations.live')),
         of: Effect.fn('Invocations.of')(function* (operationId: string) {
           return yield* Effect.sync(() => store.of(operationId))
+        }),
+        ofChat: Effect.fn('Invocations.ofChat')(function* (chat: string, limit: number) {
+          return yield* Effect.sync(() => store.ofChat(chat, limit))
         }),
         running: Effect.fn('Invocations.running')(function* (operationId: string, persona: number) {
           yield* written(() => store.running(operationId, persona))

@@ -1,7 +1,8 @@
 import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
-import { NotFound, attempt, attemptSync } from '../../http/errors.ts'
+import type { EntryRecord } from '@earendil-works/pi-durable'
+import { Conflict, NotFound, attempt, attemptSync } from '../../http/errors.ts'
 import { rememberedThrough } from '../../memory/store.ts'
 import { BACKGROUND, conversationId, entryId } from '../../pi/context.ts'
 import { Subagents, answerText } from '../../pi/subagent-relay.ts'
@@ -121,6 +122,27 @@ const history = Effect.fn('Conversations.history')(function* (core: RegistryCore
   return { entries: page.items.toReversed(), more: page.next !== undefined }
 })
 
+/** How many entries a forward read pages at a time, and looks through at most down to its cursor. */
+const AFTER_PAGE = 100
+const AFTER_SCAN = 1000
+
+/**
+ * A chat's entries after entry `after`, oldest first (ADR 0081). Pi pages newest first, so this reads down to the
+ * cursor and turns the result around; a cursor more than `AFTER_SCAN` entries behind is `Conflict:cursor_behind`.
+ */
+const after = Effect.fn('Conversations.after')(function* (core: RegistryCore, chat: string, from: number) {
+  const source = yield* piConversation(core, chat)
+  const newestFirst: EntryRecord[] = []
+  let cursor: Parameters<typeof source.entries>[2]
+  for (;;) {
+    const page = yield* attempt(() => source.entries({ minEntryId: entryId(from + 1) }, AFTER_PAGE, cursor, BACKGROUND))
+    newestFirst.push(...page.items)
+    if (page.next === undefined) return newestFirst.toReversed()
+    if (newestFirst.length >= AFTER_SCAN) return yield* new Conflict({ reason: 'cursor_behind' })
+    cursor = page.next
+  }
+})
+
 /** The registry's reads over its core, each in its span. */
 export const registryReads = (core: RegistryCore) => {
   const { db } = core
@@ -148,6 +170,7 @@ export const registryReads = (core: RegistryCore) => {
     recallLimit: (session: string, size: number) =>
       attemptSync(() => recallLimit(db, session, size)).pipe(Effect.withSpan('Conversations.recallLimit')),
     history: (chat: string, before: number) => history(core, chat, before),
+    after: (chat: string, from: number) => after(core, chat, from),
     subtree: (chat: string) => attemptSync(() => subtreeOf(db, chat)).pipe(Effect.withSpan('Conversations.subtree')),
   }
 }

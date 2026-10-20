@@ -316,6 +316,8 @@ export class Conversations extends Context.Service<
     /** Names an untitled thread from its latest exchange with the cheap model. */
     readonly nameIfUntitled: (thread: string) => Effect.Effect<void, AppError>
     readonly history: (chat: string, before: number) => Effect.Effect<HistoryPage, AppError>
+    /** A chat's entries after entry `after`, oldest first; a cursor too far behind is `Conflict:cursor_behind`. */
+    readonly after: (chat: string, after: number) => Effect.Effect<readonly EntryRecord[], AppError>
     /** Rename, close or reopen, or pin a subagent open; a Close stops what it closes. */
     readonly update: (chat: string, change: UpdateConversation) => Effect.Effect<Updated, AppError>
     /** `chat` and every chat under it, any depth, closed ones included. */

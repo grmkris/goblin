@@ -14,6 +14,7 @@ import {
   StopConversation,
   UpdateConversation,
 } from '../conversations.ts'
+import { ConversationEntries } from '../entries.ts'
 import { ConversationQueue, QueueRemoval, QueueRemovalResult } from '../queue.ts'
 import { SourceUse } from '../retrieval.ts'
 import { MoveReceipt, MoveToThread } from '../threads.ts'
@@ -40,6 +41,18 @@ const HistoryQuery = {
   ),
 }
 
+/** `?after=<entry>&limit=`: the entry to read after (0 for the first), and at most how many entries to answer. */
+const EntriesQuery = {
+  after: Schema.NumberFromString.check(
+    Schema.isInt(),
+    Schema.isGreaterThanOrEqualTo(0),
+    Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER),
+  ),
+  limit: Schema.optional(
+    Schema.NumberFromString.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100)),
+  ),
+}
+
 /**
  * The owner's conversations and threads (ADRs 0030, 0032, 0034). Paths are relative to the API's `/api` prefix; every
  * endpoint can also answer owner admission's failures (`OwnerAdmission` in `owner.ts`), and `error` names the ones the
@@ -58,11 +71,13 @@ const HistoryQuery = {
  * - `composer`: `GET …/:id/composer`: what the composer can tag in the chat.
  * - `snapshot`: `GET …/:id/snapshot`: the chat's Pi snapshot, as JSON.
  * - `history`: `GET …/:id/history?before=`: a page of older entries.
+ * - `entries`: `GET …/:id/entries?after=&limit=`: entries after a cursor, oldest first, normalized for a server
+ *   (`ConversationEntries`), with the chat's activity and Persona invocations. It does not renew resident authority.
  * - `sources`: `GET …/:id/sources`: what retrieval gave the chat's answers (ADR 0035), newest first.
  * - `events`: `GET …/:id/events`, server-sent: Pi's `snapshot`, then a `batch` per commit, until the browser goes away.
  *   A chat keeps its Pi session, so this is its session's stream. It does not renew resident authority.
  *
- * An API key with the `conversations` scope reaches `submit`, `startThread` and `stop` (ADR 0081).
+ * An API key with the `conversations` scope reaches `submit`, `startThread`, `stop` and `entries` (ADR 0081).
  */
 export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
   HttpApiEndpoint.post('create', '/conversations', {
@@ -132,6 +147,14 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     success: ConversationHistory,
     error: [ApiErrors.notFound, ApiErrors.invalidInput],
   }),
+  HttpApiEndpoint.get('entries', '/conversations/:id/entries', {
+    params,
+    query: EntriesQuery,
+    success: ConversationEntries,
+    error: [ApiErrors.notFound, ApiErrors.conflict],
+  })
+    .annotate(ApiKeyScope, 'conversations')
+    .annotate(RenewsResident, false),
   HttpApiEndpoint.get('sources', '/conversations/:id/sources', {
     params,
     success: Schema.Array(SourceUse),

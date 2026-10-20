@@ -1,5 +1,5 @@
 import type { PersonaInvocationView } from '@goblin/contracts'
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import { appPersonaInvocations } from '../storage/personas.ts'
 
@@ -81,6 +81,18 @@ export class PersonaInvocations<RunResult = unknown> {
       .from(appPersonaInvocations)
       .where(inArray(appPersonaInvocations.state, [...LIVE]))
       .orderBy(asc(appPersonaInvocations.createdAt), asc(appPersonaInvocations.ord))
+      .all()
+      .map(view)
+  }
+
+  /** The newest invocations asked in `chat`, newest first: what a server reading the chat sees settle (ADR 0081). */
+  ofChat(chat: string, limit: number): readonly PersonaInvocationView[] {
+    return this.#db
+      .select()
+      .from(appPersonaInvocations)
+      .where(eq(appPersonaInvocations.chatId, chat))
+      .orderBy(desc(appPersonaInvocations.createdAt), desc(appPersonaInvocations.ord))
+      .limit(limit)
       .all()
       .map(view)
   }

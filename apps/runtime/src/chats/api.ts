@@ -25,8 +25,10 @@ import { ownerQueue, removeOwnerQueuedInput } from '../conversation-queue.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { Retrieval } from '../retrieval/service.ts'
 import { attempt, toAppError } from '../http/errors.ts'
+import { entryViews } from '../pi/entry-view.ts'
 import { piEventResponse, sessionSnapshot } from '../pi/events.ts'
 import { PiSessions } from '../pi/sessions.ts'
+import { Invocations } from '../personas/service.ts'
 import { Conversations } from './service.ts'
 import { moveToThread } from './mover.ts'
 import { startThread } from './thread-heads.ts'
@@ -105,6 +107,37 @@ const history = ({ params, query }: ChatRequest & { readonly query: { readonly b
     Effect.andThen(conversations.require(params.id), conversations.history(params.id, query.before)),
   )
 
+/** How many entries a forward read answers unless it asks for fewer, and how many of the chat's invocations. */
+const ENTRIES = 50
+const INVOCATIONS = 20
+
+/**
+ * A registered chat's entries after a cursor, oldest first, as a server reads them (ADR 0081): at most `limit` of Pi's
+ * entries looked at, the cursor to read from next, the chat's activity and its newest Persona invocations.
+ */
+const entries = ({
+  params,
+  query,
+}: ChatRequest & { readonly query: { readonly after: number; readonly limit?: number | undefined } }) =>
+  Effect.gen(function* () {
+    yield* confineChat(params.id)
+    const session = yield* registeredConversation(params.id)
+    const records = yield* Conversations.use((conversations) => conversations.after(params.id, query.after))
+    const page = records.slice(0, query.limit ?? ENTRIES)
+    const busy = yield* PiSessions.use((pi) => pi.busy(session)).pipe(
+      Effect.catchTag('PiFailure', (failure) => Effect.fail(toAppError(failure.cause))),
+    )
+    const invocations = yield* Invocations.use((each) => each.ofChat(params.id, INVOCATIONS))
+    const last = page.at(-1)
+    return {
+      entries: page.flatMap(entryViews),
+      next: last === undefined ? query.after : Number(last.id),
+      more: records.length > page.length,
+      activity: busy ? ('working' as const) : ('idle' as const),
+      invocations,
+    }
+  })
+
 /** What retrieval gave a registered chat's answers (ADR 0035), newest first: its source strips. */
 const sources = ({ params }: ChatRequest) =>
   Effect.andThen(
@@ -143,6 +176,7 @@ export const ConversationsHandlers = HttpApiBuilder.group(OwnerApi, 'conversatio
     .handle('composer', composer)
     .handle('snapshot', snapshot)
     .handle('history', history)
+    .handle('entries', entries)
     .handle('sources', sources)
     .handleRaw('events', events),
 )

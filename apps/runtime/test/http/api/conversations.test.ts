@@ -71,6 +71,59 @@ const known = (id: string) =>
     CHATS[id] === undefined && id !== NEW ? Effect.fail(new NotFound({ what: 'conversation' })) : Effect.succeed(id),
   )
 
+/** A chat's Pi records as a forward read finds them: words, tool traffic, a question and a Persona's answer. */
+const QUESTION = {
+  id: 'q1',
+  prompt: 'Which size?',
+  kind: 'single',
+  options: [
+    { id: 'a', label: 'Square' },
+    { id: 'b', label: 'Tall' },
+  ],
+}
+const RECORDS = [
+  { id: 4, kind: 'pi.user', model: [{ role: 'user', content: 'Plan my launch', timestamp: 1 }] },
+  {
+    id: 5,
+    kind: 'pi.assistant',
+    model: [{ role: 'assistant', content: [{ type: 'text', text: 'Checking' }], stopReason: 'toolUse' }],
+  },
+  {
+    id: 6,
+    kind: 'pi.tool',
+    model: [{ role: 'toolResult', toolName: 'web_fetch', content: 'secret page', details: {} }],
+  },
+  {
+    id: 7,
+    kind: 'pi.tool',
+    model: [
+      {
+        role: 'toolResult',
+        toolName: 'ask_user',
+        content: 'Which size?',
+        details: { kind: 'question', questions: [QUESTION] },
+      },
+    ],
+  },
+  {
+    id: 8,
+    kind: 'app.persona',
+    data: {
+      persona: 3,
+      name: 'Squarewave',
+      revision: 2,
+      avatar: { glyph: 'S', hue: 10 },
+      operationId: 'op-j',
+      text: 'Cover ready',
+    },
+  },
+  {
+    id: 9,
+    kind: 'pi.assistant',
+    model: [{ role: 'assistant', content: [{ type: 'text', text: 'Here is the plan' }], stopReason: 'stop' }],
+  },
+]
+
 /** The registry's reads over `CHATS`. */
 const registryReads = (): Partial<Conversations['Service']> => ({
   list: Effect.sync(() => Object.values(CHATS)),
@@ -87,6 +140,8 @@ const registryReads = (): Partial<Conversations['Service']> => ({
   // SAFETY: the handler passes Pi's records through as they are; these stand in for them.
   history: (id, before) =>
     Effect.succeed({ entries: [{ id: before - 1, kind: 'pi.user', chat: id }] as never, more: true }),
+  // SAFETY: as `history`: Pi's records are normalized by the handler; these stand in for them.
+  after: (id, from) => Effect.map(known(id), () => RECORDS.filter((record) => record.id > from) as never),
 })
 
 /** How a recorded thread operation names its anchor. */
@@ -181,6 +236,19 @@ const services = (calls: Calls, personas: readonly PersonaView[]) =>
     stub(RoutineRuns, { session: () => Effect.undefined }),
     stub(RoutineControl, { answer: () => Effect.succeed(false) }),
     stub(Invocations, {
+      ofChat: (chat) =>
+        Effect.succeed([
+          {
+            operationId: 'op-j',
+            persona: 3,
+            revision: 2,
+            chat,
+            order: 0,
+            state: 'answered',
+            answerEntry: 8,
+            createdAt: 1,
+          },
+        ]),
       stopChat: (chat) => Effect.sync(() => calls.push(`invocations:${chat}`)),
       insert: (asked) =>
         Effect.sync(() => {
@@ -429,6 +497,47 @@ describe('the conversations API served by the agent', () => {
     expect(await snapshot.json()).toEqual({ session: '2', entries: [{ id: 1, kind: 'pi.user' }] })
     expect((await fetch(json('GET', '/api/conversations/77/snapshot'))).status).toBe(404)
     expect(await (await fetch(json('GET', '/api/conversations/2/sources'))).json()).toEqual([])
+  })
+
+  it('reads entries after a cursor, oldest first and normalized, with the activity and invocations (ADR 0081)', async () => {
+    const { fetch } = fixture()
+    const first = await fetch(json('GET', '/api/conversations/2/entries?after=3&limit=4'))
+    expect(first.status).toBe(200)
+    expect(await first.json()).toEqual({
+      entries: [
+        { kind: 'message', id: 4, role: 'owner', text: 'Plan my launch', final: true },
+        { kind: 'message', id: 5, role: 'agent', text: 'Checking', final: false },
+        { kind: 'question', id: 7, questions: [QUESTION] },
+      ],
+      next: 7,
+      more: true,
+      activity: 'idle',
+      invocations: [expect.objectContaining({ operationId: 'op-j', state: 'answered', answerEntry: 8 })],
+    })
+    const rest = await (await fetch(json('GET', '/api/conversations/2/entries?after=7'))).json()
+    expect(rest).toMatchObject({
+      entries: [
+        {
+          kind: 'persona',
+          id: 8,
+          persona: { id: 3, name: 'Squarewave', revision: 2 },
+          operationId: 'op-j',
+          text: 'Cover ready',
+        },
+        { kind: 'message', id: 9, role: 'agent', text: 'Here is the plan', final: true },
+      ],
+      next: 9,
+      more: false,
+    })
+    expect(JSON.stringify(rest)).not.toContain('secret page')
+    expect(await (await fetch(json('GET', '/api/conversations/2/entries?after=9'))).json()).toMatchObject({
+      entries: [],
+      next: 9,
+      more: false,
+    })
+    for (const query of ['', '?after=-1', '?after=x', '?after=1&limit=0', '?after=1&limit=101'])
+      expect((await fetch(json('GET', `/api/conversations/2/entries${query}`))).status).toBe(400)
+    expect((await fetch(json('GET', '/api/conversations/77/entries?after=0'))).status).toBe(404)
   })
 
   it("lists the owner's queued inputs, answers a move's receipt and reads the composer; switches are gone", async () => {
