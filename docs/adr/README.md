@@ -8,7 +8,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | --- | --- | --- |
 | [0001](0001-runtime-and-auth-storage.md) | Native Pi runtime and identity storage | Accepted; amended by 0064 |
 | [0002](0002-stages-and-provider.md) | Isolated stages and provider planes | Accepted; amended by 0059, 0064 and 0067 |
-| [0003](0003-resident-mcp-and-inbound-server.md) | The agent object owns MCP, holds its own authority, and serves /mcp | Accepted |
+| [0003](0003-resident-mcp-and-inbound-server.md) | The agent object owns MCP, holds its own authority, and serves /mcp | Accepted; amended by 0081 |
 | [0004](0004-an-agent-per-user.md) | An agent per user, with gated sign-up | Accepted; amended by 0064 |
 | [0005](0005-mcp-apps-host.md) | One live MCP App on a stage, told about its host, trusted for nothing | Accepted; its one live App superseded by 0020 |
 | [0006](0006-servers-the-owner-adds.md) | Servers the owner adds are a trust boundary, not a configuration change | Accepted |
@@ -38,7 +38,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0035](0035-cross-topic-retrieval.md) | Cross-Topic retrieval | Accepted; amended by 0067 |
 | [0036](0036-slack-style-shell.md) | Slack-style shell | Accepted; amended by 0053; its rail and sidebar superseded by 0078 |
 | [0037](0037-conversation-flows-and-failure-reporting.md) | Conversation flows and failure reporting | Accepted |
-| [0038](0038-typed-owner-api-served-by-the-agent.md) | Typed owner API served by the agent | Accepted |
+| [0038](0038-typed-owner-api-served-by-the-agent.md) | Typed owner API served by the agent | Accepted; amended by 0081 |
 | [0039](0039-chat-markdown-through-streamdown.md) | Chat Markdown through Streamdown, and what a reply may load | Accepted |
 | [0040](0040-topic-and-persona-setup.md) | Topic setup and Persona setup | Accepted; amended by 0067 |
 | [0041](0041-connections-tell-me-hand-to.md) | Connections, Tell me and Hand to | Accepted; amended by 0066, 0068, 0070 and 0073 |
@@ -72,3 +72,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0078](0078-one-sidebar-and-one-apps-launcher.md) | One sidebar and one Apps launcher | Accepted |
 | [0079](0079-channel-info-and-goal-first-start.md) | Channel info and goal-first Start | Accepted; amended by 0080 |
 | [0080](0080-server-owned-start-kickoff.md) | Server-owned Start kickoff | Accepted |
+| [0081](0081-api-keys-and-the-same-operations-over-mcp.md) | Scoped API keys for servers, and the same operations over /mcp | Accepted |
