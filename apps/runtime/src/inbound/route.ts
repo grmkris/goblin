@@ -1,8 +1,11 @@
 import { createMcpHandler } from 'agents/mcp/server'
+import { verifyKey } from '../auth/api-keys.ts'
 import { INSPECT_SCOPE, challengeOf, clientName, verifyClientToken } from '../auth/index.ts'
 import type { RuntimeEnv } from '../env.ts'
 import { runAtEdge } from '../http/api/edge.ts'
-import { internalCall } from './client.ts'
+import { bearerKey } from '../http/api/principal.ts'
+import { keyServer } from './api-server.ts'
+import { internalCall, ownerCall } from './client.ts'
 import type { InspectReader } from './inspection.ts'
 import { inboundServer } from './server.ts'
 
@@ -11,8 +14,31 @@ export const inboundHosts = (appUrl: string) => ({
   allowedOriginHostnames: [new URL(appUrl).hostname],
 })
 
+/**
+ * `/mcp` for a server's API key (ADR 0081): the key verified, then its tools, each an owner API call as the key to the
+ * agent of the user who made it. A key that does not admit is a plain 401: there is nothing to sign in to.
+ */
+const keyMcp = async (request: Request, env: RuntimeEnv, key: string): Promise<Response> => {
+  let principal: Awaited<ReturnType<typeof verifyKey>>
+  try {
+    principal = await verifyKey(env, key)
+  } catch {
+    // expected: a key that does not verify (unknown, revoked, expired, over its limit) is refused, saying no more.
+    return Response.json({ error: 'Unauthenticated' }, { status: 401 })
+  }
+  const { userId, ...grant } = principal
+  const agent = env.AGENTS.getByName(userId)
+  const handler = createMcpHandler(() => keyServer((call) => runAtEdge(ownerCall(agent, grant, call))), {
+    route: '/mcp',
+    ...inboundHosts(env.APP_URL),
+  })
+  return handler.fetch(request, { authInfo: { token: key, clientId: `key:${grant.keyId}`, scopes: [...grant.scopes] } })
+}
+
 /** `/mcp`: verify the client's bearer token, then serve the stateless MCP handler bound to that client. */
 export const handleInboundMcp = async (request: Request, env: RuntimeEnv): Promise<Response> => {
+  const key = bearerKey(request)
+  if (key !== undefined) return keyMcp(request, env, key)
   const header = request.headers.get('authorization') ?? ''
   if (!header.startsWith('Bearer ')) return challengeOf(env.APP_URL)
   const token = header.slice('Bearer '.length)
