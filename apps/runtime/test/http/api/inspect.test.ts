@@ -1,10 +1,16 @@
 import { InspectGroup } from '@goblin/contracts/api'
+import { InspectFlows, InspectProblems, InspectTurns, TurnTimeline } from '@goblin/contracts/inspect'
+import type { RunEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
+import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import { InspectHandlers } from '../../../src/inspect/api.ts'
+import { recordReach } from '../../../src/keys/reach.ts'
 import { Resident } from '../../../src/mcp/service.ts'
+import { appConversations } from '../../../src/storage/schema.ts'
 import { flowRunEvent } from '../../../src/telemetry/events.ts'
+import { durable, sqliteDb } from '../../chats-sqlite.ts'
 import { inspectionFixture } from '../../inspection-fixture.ts'
 import { callOwner } from '../../owner-client.ts'
 import { cleanup, currentResident, get as request, serve, served } from './fixture.ts'
@@ -19,10 +25,12 @@ const fixture = () => {
   cleanup(inspection.close)
   const { fetch } = serve(
     served([InspectGroup], InspectHandlers).pipe(
-      Layer.provide(Layer.mergeAll(inspection.layer, Layer.succeed(Resident, resident.service))),
+      Layer.provide(
+        Layer.mergeAll(inspection.layer, Layer.succeed(Resident, resident.service), sqliteDb(inspection.db)),
+      ),
     ),
   )
-  return { fetch, resident, ledger: inspection.ledger }
+  return { fetch, resident, ledger: inspection.ledger, db: inspection.db }
 }
 
 /** A move from chat 12 into a new thread, recorded as its one flow step, and the answer of a turn there. */
@@ -89,5 +97,157 @@ describe('the inspect group served by the agent', () => {
       Effect.flip(api.inspect.details({ params: { id: '12' }, query: { entry: 40 } })),
     )
     expect(refused).toMatchObject({ _tag: 'NotFound', what: 'entry operation', ref: 'integration-probe' })
+  })
+})
+
+/** The grant the edge forwards for a key (ADR 0081) with `scopes`. */
+const keyed = (scopes: readonly string[] = ['inspect']) => ({
+  'x-goblin-ref': 'ref-1',
+  'x-goblin-key': JSON.stringify({ keyId: 'key-1', scopes, servers: ['mycut'] }),
+})
+
+/** A run event of operation `operationId` in Pi session `session`, from `start` to `end` ms, `ok`. */
+const event = (
+  id: string,
+  kind: RunEvent['kind'],
+  operationId: string,
+  [session, start, end]: readonly [string, number, number],
+  attributes: RunEvent['attributes'] = {},
+): RunEvent => ({
+  id,
+  kind,
+  status: 'ok',
+  conversationId: session,
+  operationId,
+  startedAt: start,
+  endedAt: end,
+  attributes,
+})
+
+/** The body of `answered` decoded as `schema`. */
+const decoded = async <S extends Schema.Top & Schema.ConstraintDecoder<unknown>>(
+  schema: S,
+  answered: Promise<Response>,
+) => Schema.decodeUnknownSync(schema)(await (await answered).json())
+
+/** What a Persona's fork ran for the key's send `svc:job:1:first` (ADR 0033): two model attempts around one MyCut call. */
+const FORK = 'persona:svc:job:1:first:7'
+const forkTurn = [
+  event('turn:fork', 'turn.submitted', FORK, ['41', 1_000, 61_000]),
+  event('model:fork:1', 'model.attempt', FORK, ['41', 1_000, 11_000], {
+    'gen_ai.request.model': 'qwen',
+    'gen_ai.usage.input_tokens': 900,
+    'gen_ai.usage.output_tokens': 40,
+    'gen_ai.response.finish_reasons': 'toolUse',
+    'goblin.first_partial_at': 3_000,
+    'goblin.attempt': 1,
+  }),
+  event('tool:fork:1', 'tool.call', FORK, ['41', 11_000, 41_000], {
+    'gen_ai.tool.name': 'mycut__job_submit',
+    'goblin.mcp.server': 'mycut',
+    'goblin.mcp.tool': 'job_submit',
+  }),
+  event('model:fork:2', 'model.attempt', FORK, ['41', 41_000, 51_000], {
+    'gen_ai.request.model': 'qwen',
+    'gen_ai.response.finish_reasons': 'stop',
+  }),
+]
+const ask = flowRunEvent(
+  { flow: 'persona_ask', via: 'mcp', actor: 'owner', chat: '12', operationId: 'svc:job:1:first', status: 'ok' },
+  'flow:ask',
+  900,
+)
+
+/**
+ * The key reaches Topic 2: its thread `12` (Pi session `40`) and the Persona fork `13` (session `41`) under it. Main
+ * (`1`) is Personal's and `14` (session `42`) another Topic's; the owner ran a turn in each.
+ */
+const keyFixture = () => {
+  const { fetch, ledger, db, resident } = fixture()
+  db.insert(appConversations)
+    .values([
+      { chatId: '12', piSession: '40', kind: 'thread', topicId: 2, createdAt: 1 },
+      { chatId: '13', piSession: '41', kind: 'thread', role: 'persona', parentSession: '12', topicId: 2, createdAt: 1 },
+      { chatId: '14', piSession: '42', kind: 'main', role: 'conversation', topicId: 3, createdAt: 1 },
+    ])
+    .run()
+  recordReach(durable(db), 'key-1', 'topic', 2, 1)
+  for (const each of [...forkTurn, ask]) ledger.ended(each)
+  ledger.ended(event('turn:main', 'turn.submitted', 'owner:op-1', ['1', 2_000, 3_000]))
+  ledger.ended(event('turn:other', 'turn.submitted', 'owner:op-2', ['42', 2_000, 3_000]))
+  ledger.ended({ ...event('tool:other', 'tool.call', 'owner:op-2', ['42', 2_100, 2_200]), status: 'error' })
+  ledger.ended({
+    ...event('tool:fork:bad', 'tool.call', FORK, ['41', 52_000, 53_000], { 'error.type': 'tool_error' }),
+    status: 'error',
+  })
+  const read = (path: string, scopes?: readonly string[]) => fetch(request(path, keyed(scopes)))
+  return { fetch, read, resident }
+}
+
+describe("the inspect group under a server's API key (ADR 0084)", () => {
+  it("answers a Persona fork's turn by its operation: its steps in order and where its 60 seconds went", async () => {
+    const { read, resident } = keyFixture()
+    const answered = await read(`/api/inspect/turn?operation=${encodeURIComponent(FORK)}`)
+    expect(answered.status).toBe(200)
+    const timeline = Schema.decodeUnknownSync(TurnTimeline)(await answered.json())
+    expect(timeline.steps.map((step) => [step.kind, step.offsetMs, step.ms])).toEqual([
+      ['model.attempt', 0, 10_000],
+      ['tool.call', 10_000, 30_000],
+      ['model.attempt', 40_000, 10_000],
+      ['tool.call', 51_000, 1_000],
+    ])
+    expect(timeline.steps[0]).toMatchObject({ model: 'qwen', inputTokens: 900, firstChunkMs: 2_000, attempt: 1 })
+    expect(timeline.steps[1]).toMatchObject({ tool: 'mycut__job_submit', server: 'mycut', serverTool: 'job_submit' })
+    expect(timeline.steps[3]).toMatchObject({ status: 'error', errorType: 'tool_error' })
+    expect(timeline.spent).toEqual({
+      totalMs: 60_000,
+      modelMs: 20_000,
+      toolMs: 31_000,
+      servers: [{ server: 'mycut', calls: 1, ms: 30_000 }],
+      otherMs: 9_000,
+    })
+    // Nothing a key reads renews resident authority.
+    expect(resident.renewals).toHaveLength(0)
+  })
+
+  it("lists and finds only what its own chats ran; the owner's and another Topic's are not there", async () => {
+    const { read, fetch } = keyFixture()
+    for (const operation of ['owner:op-1', 'owner:op-2'])
+      expect((await read(`/api/inspect/turn?operation=${operation}`)).status).toBe(404)
+    const turns = await decoded(InspectTurns, read('/api/inspect/turns?since=0'))
+    expect(turns.turns.map((turn) => turn.operationId)).toEqual([FORK])
+    const owned = await decoded(InspectTurns, fetch(request('/api/inspect/turns?since=0')))
+    expect(owned.turns).toHaveLength(3)
+    const problems = await decoded(InspectProblems, read('/api/inspect/problems?since=0&all=true'))
+    expect(problems.problems.map((each) => each.id)).toEqual(['tool:fork:bad'])
+    const flows = await decoded(InspectFlows, read('/api/inspect/flows?since=0'))
+    expect(flows.flows.map((each) => each.operationId)).toEqual(['svc:job:1:first'])
+    expect((await read('/api/inspect/turns?conversation=14')).status).toBe(404)
+    expect((await read('/api/inspect/flows?chat=1')).status).toBe(404)
+  })
+
+  it("shows the details of its send with its Persona's answer related, and nothing behind another chat", async () => {
+    const { read } = keyFixture()
+    const details = await read('/api/conversations/12/details?operation=svc%3Ajob%3A1%3Afirst')
+    expect(details.status).toBe(200)
+    expect(await details.json()).toMatchObject({
+      events: [{ id: 'flow:ask' }],
+      related: [{ operation: FORK, kind: 'persona_answer' }],
+    })
+    const fork = await (await read(`/api/conversations/12/details?operation=${encodeURIComponent(FORK)}`)).json()
+    expect(fork).toMatchObject({ turn: { operationId: FORK }, spent: { totalMs: 60_000 } })
+    expect((await read('/api/conversations/14/details?operation=owner%3Aop-2')).status).toBe(404)
+    expect((await read('/api/conversations/12/details?operation=owner%3Aop-2')).status).toBe(404)
+    expect((await read('/api/conversations/1/details?operation=owner%3Aop-1')).status).toBe(404)
+  })
+
+  it('is refused without the inspect scope, before anything is read', async () => {
+    const { read } = keyFixture()
+    const refused = await read(`/api/inspect/turn?operation=${encodeURIComponent(FORK)}`, ['topics', 'personas'])
+    expect(refused.status).toBe(403)
+    expect(await refused.json()).toMatchObject({ error: { reason: 'key_scope' } })
+    expect(
+      (await read('/api/conversations/12/details?operation=svc%3Ajob%3A1%3Afirst', ['conversations'])).status,
+    ).toBe(403)
   })
 })

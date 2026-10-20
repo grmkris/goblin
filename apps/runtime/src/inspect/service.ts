@@ -13,6 +13,7 @@ import type {
   InspectQuery,
   InspectResult,
   InspectTurns,
+  RelatedOperation,
   TurnTimeline,
 } from '@goblin/contracts/inspect'
 import type { RunEvent } from '@goblin/contracts/telemetry'
@@ -27,7 +28,7 @@ import { AgentInput } from '../runtime/input.ts'
 import { Db } from '../runtime/db.ts'
 import { RunLedger } from '../telemetry/ledger.ts'
 import { coverageGaps, operationGaps } from './coverage.ts'
-import { flowRecord, inspectEntry, relatedOf, settlementOf, summarize } from './inspector.ts'
+import { flowRecord, inspectEntry, relatedOf, settlementOf, spentOf, stepsOf, summarize } from './inspector.ts'
 
 /** What a query of `kind` takes besides its kind. */
 type Input<K extends InspectKind> = (typeof InspectInput)[K]['Type']
@@ -43,9 +44,28 @@ const TURNS = 20
 const PROBLEMS = 50
 const FLOWS = 50
 
+/** Where a run event belongs for a key: a chat within its reach, one outside it, or no chat at all. */
+export type Place = 'in' | 'out' | 'nowhere'
+
+/**
+ * What a server's API key may read of the run ledger (ADR 0084): the events of chats within its reach. The reads that
+ * take one see only those: a list leaves the rest out, and an operation is there only when some of its events are in
+ * reach and none is outside it.
+ */
+export interface Reach {
+  readonly place: (event: RunEvent) => Place
+  readonly chat: (chat: string) => boolean
+}
+
+/** Whether an operation of `events` is within `reach`: one of them is in it, and none is outside it. */
+export const withinReach = (reach: Reach, events: readonly RunEvent[]): boolean => {
+  const places = events.map(reach.place)
+  return places.includes('in') && !places.includes('out')
+}
+
 /**
  * Read-only inspection of this agent (ADR 0024): Pi for content and settlement, the run ledger for how each turn and
- * each conversation flow ran. No read changes the agent or calls a model; a turn, conversation or operation that is not
+ * each conversation flow ran. The content-free reads take a key's `Reach` (ADR 0084), and see only within it. No read changes the agent or calls a model; a turn, conversation or operation that is not
  * there is `NotFound`, and a details query that names neither an operation nor a chat entry is `InvalidInput`.
  */
 export class Inspection extends Context.Service<
@@ -58,18 +78,21 @@ export class Inspection extends Context.Service<
     /** A page of a conversation's entries, oldest first, ending before `before` (the newest page without it). */
     readonly conversation: (input: Input<'conversation'>) => Effect.Effect<InspectEntries, AppError>
     /** Turns since `since` (the last day by default), newest first, optionally of one conversation. */
-    readonly turns: (input: Input<'turns'>) => Effect.Effect<InspectTurns, AppError>
-    /** One turn end to end: its summary, Pi's settlement, every run event and what the timeline cannot show. */
-    readonly turn: (operationId: string) => Effect.Effect<TurnTimeline, AppError>
+    readonly turns: (input: Input<'turns'>, reach?: Reach) => Effect.Effect<InspectTurns, AppError>
+    /**
+     * One turn end to end: its summary, Pi's settlement, every run event, its steps and where its time went, and what
+     * the timeline cannot show.
+     */
+    readonly turn: (operationId: string, reach?: Reach) => Effect.Effect<TurnTimeline, AppError>
     /** Events needing attention since `since`, newest first; `all` includes expected waits and recovered attempts. */
-    readonly problems: (input: Input<'problems'>) => Effect.Effect<InspectProblems, AppError>
+    readonly problems: (input: Input<'problems'>, reach?: Reach) => Effect.Effect<InspectProblems, AppError>
     /** Conversation flow steps since `since`, newest first, optionally of one chat or one flow. */
-    readonly flows: (input: InspectFlowsInput) => Effect.Effect<InspectFlows, AppError>
+    readonly flows: (input: InspectFlowsInput, reach?: Reach) => Effect.Effect<InspectFlows, AppError>
     /**
      * The details behind a message: the timeline of its operation (with its turn when it ran one) and the operations
      * related to it. A chat entry names the operation whose model answer or tool result it is.
      */
-    readonly details: (input: InspectDetailsInput) => Effect.Effect<InspectDetails, AppError>
+    readonly details: (input: InspectDetailsInput, reach?: Reach) => Effect.Effect<InspectDetails, AppError>
   }
 >()('goblin/inspect/Inspection') {
   /** Over the run ledger in the agent's SQLite, its registered chats and Pi's own settlements. */
@@ -131,20 +154,37 @@ const detailsInput = ({
 
 type Reads = (typeof Inspection)['Service']
 
-/** A turn's timeline: its summary, Pi's settlement of it, its events and what they cannot show. */
+/** A turn's timeline: its summary, Pi's settlement of it, its events, their steps and time, and what they cannot show. */
 const timelineWith = (settlement: InspectionSources['settlement']) =>
   Effect.fn('Inspection.timeline')(function* (turn: RunEvent, events: readonly RunEvent[]) {
     const operationId = turn.operationId ?? turn.id
     const record = turn.conversationId === undefined ? undefined : yield* settlement(turn.conversationId, operationId)
     const submission = settlementOf(record)
     const gaps = coverageGaps(turn, events, submission)
+    const now = yield* Clock.currentTimeMillis
     return {
       turn: summarize(turn, events),
       ...(submission === undefined ? {} : { submission }),
       events,
+      steps: stepsOf(turn, events),
+      spent: spentOf(turn, events, now),
       coverage: { complete: gaps.length === 0, gaps },
     }
   })
+
+/** `reach`'s judgement of an operation's events: nothing to judge for the owner. */
+const reached = (reach: Reach | undefined, events: readonly RunEvent[]): boolean =>
+  reach === undefined || withinReach(reach, events)
+
+/** A chat `reach` does not hold is as if it were not there. */
+const requireChat = (reach: Reach | undefined, chat: string | undefined) =>
+  reach === undefined || chat === undefined || reach.chat(chat)
+    ? Effect.void
+    : Effect.fail(new NotFound({ what: 'conversation' }))
+
+/** The events `reach` keeps in a list: those of chats within it; every one for the owner. */
+const keepOf = (reach: Reach | undefined) =>
+  reach === undefined ? undefined : (event: RunEvent) => reach.place(event) === 'in'
 
 /**
  * The details behind a message: the operation it names, or the one whose answer or tool result the entry is, with its
@@ -158,10 +198,24 @@ const detailsWith = ({ ledger, chats, settlement }: InspectionSources): Reads['d
     if (operation === undefined) return yield* new NotFound({ what: 'entry operation' })
     return operation
   })
-  return Effect.fn('Inspection.details')(function* (input: InspectDetailsInput) {
+  /** The related operations `reach` holds: those whose own events are within it. */
+  const relatedWithin = (related: readonly RelatedOperation[], reach: Reach | undefined) =>
+    attemptSync(() => {
+      if (reach === undefined) return related
+      const events = ledger.forOperations(related.map((each) => each.operation))
+      return related.filter((each) =>
+        withinReach(
+          reach,
+          events.filter((event) => event.operationId === each.operation),
+        ),
+      )
+    })
+  return Effect.fn('Inspection.details')(function* (input: InspectDetailsInput, reach?: Reach) {
+    yield* requireChat(reach, 'chat' in input ? input.chat : undefined)
     const operationId = 'operation' in input ? input.operation : yield* operationOfEntry(input.chat, input.entry)
     const events = yield* attemptSync(() => ledger.forOperation(operationId))
-    const related = yield* attemptSync(() => relatedOf(ledger, operationId, events))
+    if (!reached(reach, events)) return yield* new NotFound({ what: 'operation' })
+    const related = yield* relatedWithin(yield* attemptSync(() => relatedOf(ledger, operationId, events)), reach)
     const submitted = events.find((event) => event.kind === 'turn.submitted')
     if (submitted !== undefined) return { ...(yield* timeline(submitted, events)), related }
     if (events.length === 0 && related.length === 0) return yield* new NotFound({ what: 'operation' })
@@ -209,32 +263,36 @@ export function makeInspection(sources: InspectionSources): Reads {
         ...(page.more && first !== undefined ? { before: Number(first.id) } : {}),
       }
     }),
-    turns: Effect.fn('Inspection.turns')(function* (input: Input<'turns'>) {
+    turns: Effect.fn('Inspection.turns')(function* (input: Input<'turns'>, reach?: Reach) {
+      yield* requireChat(reach, input.conversation)
       const session = input.conversation === undefined ? undefined : yield* chats.require(input.conversation)
       const since = yield* sinceOr(input.since)
       return yield* attemptSync(() => {
-        const found = ledger.turns(since, input.limit ?? TURNS, session)
+        const found = ledger.turns(since, input.limit ?? TURNS, session, keepOf(reach))
         const events = ledger.forOperations(found.flatMap((turn) => turn.operationId ?? []))
         const own = (turn: RunEvent) => events.filter((event) => event.operationId === turn.operationId)
         return { turns: found.map((turn) => summarize(turn, own(turn))) }
       })
     }),
-    turn: Effect.fn('Inspection.turn')(function* (operationId: string) {
+    turn: Effect.fn('Inspection.turn')(function* (operationId: string, reach?: Reach) {
       const events = yield* attemptSync(() => ledger.forOperation(operationId))
       const submitted = events.find((event) => event.kind === 'turn.submitted')
-      if (submitted === undefined) return yield* new NotFound({ what: 'turn' })
+      if (submitted === undefined || !reached(reach, events)) return yield* new NotFound({ what: 'turn' })
       return yield* timeline(submitted, events)
     }),
-    problems: Effect.fn('Inspection.problems')(function* (input: Input<'problems'>) {
+    problems: Effect.fn('Inspection.problems')(function* (input: Input<'problems'>, reach?: Reach) {
       const since = yield* sinceOr(input.since)
       return {
         since,
-        problems: yield* attemptSync(() => ledger.problems(since, input.limit ?? PROBLEMS, input.all === true)),
+        problems: yield* attemptSync(() =>
+          ledger.problems(since, input.limit ?? PROBLEMS, input.all === true, keepOf(reach)),
+        ),
       }
     }),
-    flows: Effect.fn('Inspection.flows')(function* (input: InspectFlowsInput) {
+    flows: Effect.fn('Inspection.flows')(function* (input: InspectFlowsInput, reach?: Reach) {
+      yield* requireChat(reach, input.chat)
       const since = yield* sinceOr(input.since)
-      const steps = yield* attemptSync(() => ledger.flows(since, input.limit ?? FLOWS, input))
+      const steps = yield* attemptSync(() => ledger.flows(since, input.limit ?? FLOWS, input, keepOf(reach)))
       return { since, flows: steps.flatMap((event) => flowRecord(event) ?? []) }
     }),
     details: detailsWith(sources),

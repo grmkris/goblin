@@ -29,6 +29,7 @@ const connect = async (reply: (request: Request) => Response) => {
 }
 
 const EMPTY = { entries: [], next: 7, more: false, activity: 'idle', invocations: [] }
+const COMPLETE = { complete: true, gaps: [] }
 
 describe("a server's API key on /mcp (ADR 0081)", () => {
   it('has exactly one tool for each owner endpoint a key reaches', () => {
@@ -43,6 +44,11 @@ describe("a server's API key on /mcp (ADR 0081)", () => {
       const readOnly = tools.filter((tool) => tool.annotations?.readOnlyHint === true).map((tool) => tool.name)
       expect(readOnly.toSorted()).toEqual([
         'conversation_entries',
+        'inspect_details',
+        'inspect_flows',
+        'inspect_problems',
+        'inspect_turn',
+        'inspect_turns',
         'models_list',
         'persona_get',
         'persona_list',
@@ -84,6 +90,29 @@ describe("a server's API key on /mcp (ADR 0081)", () => {
       expect(Object.fromEntries(url.searchParams)).toEqual({ limit: '10', name: 'edit' })
       await client.callTool({ name: 'models_list', arguments: {} })
       expect(new URL(seen[1]?.url ?? '').pathname).toBe('/api/models')
+    } finally {
+      await client.close()
+    }
+  })
+
+  it('inspects an operation the key sent in its chat, and refuses details naming both an operation and an entry', async () => {
+    const { client, seen } = await connect(() => Response.json({ events: [], related: [], coverage: COMPLETE }))
+    try {
+      const operation = 'persona:svc:job:1:first:7'
+      await client.callTool({ name: 'inspect_turn', arguments: { operation } })
+      const turn = new URL(seen[0]?.url ?? '')
+      expect([turn.pathname, turn.searchParams.get('operation')]).toEqual(['/api/inspect/turn', operation])
+      const answered = await client.callTool({ name: 'inspect_details', arguments: { chat: '12', operation } })
+      expect(answered.isError).not.toBe(true)
+      const details = new URL(seen[1]?.url ?? '')
+      expect([details.pathname, details.searchParams.get('operation')]).toEqual([
+        '/api/conversations/12/details',
+        operation,
+      ])
+      const both = await client.callTool({ name: 'inspect_details', arguments: { chat: '12', operation, entry: 4 } })
+      expect(both.isError).toBe(true)
+      expect(JSON.stringify(both.content)).toContain('InvalidInput')
+      expect(seen).toHaveLength(2)
     } finally {
       await client.close()
     }

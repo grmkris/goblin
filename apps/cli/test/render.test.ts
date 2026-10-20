@@ -39,11 +39,20 @@ describe('goblin output (unit)', () => {
         event('model.attempt', 'error', { 'gen_ai.request.model': 'gpt-test', 'goblin.error': 'rate limited' }),
         event('tool.call', 'blocked', { 'gen_ai.tool.name': 'mcp_call', 'goblin.blocked_reason': 'grant' }),
       ],
+      steps: [],
+      spent: {
+        totalMs: 61_000,
+        modelMs: 250,
+        toolMs: 30_250,
+        servers: [{ server: 'mycut', calls: 1, ms: 30_000 }],
+        otherMs: 30_500,
+      },
       coverage: { complete: false, gaps: ['Some events have not ended.'] },
     })
     expect(text.split('\n')).toEqual([
       '2026-10-06 10:00:00  error        source           2 calls (1 failed)  1 tools (1 failed)  120/30 tok  source-12  model_error',
       'Pi: unanswered (model_error)',
+      'Time: 61.0s, model 0.3s, tools 30.3s (mycut 30.0s ×1), other 30.5s',
       '',
       '2026-10-06 10:00:00  model.attempt    error          250ms  gpt-test  rate limited',
       expect.stringMatching(/^2026-10-06 10:00:00 {2}tool\.call {8}blocked {8}250ms {2}mcp_call/u),

@@ -30,8 +30,11 @@ export const InboundClient = Schema.Struct({
 })
 export type InboundClient = typeof InboundClient.Type
 
-/** What a server's API key may reach (ADR 0081): each scope opens its area's annotated owner endpoints. */
-export const KeyScope = Schema.Literals(['topics', 'conversations', 'personas'])
+/**
+ * What a server's API key may reach (ADR 0081): each scope opens its area's annotated owner endpoints. `inspect` reads
+ * how the key's own chats ran, content-free (ADR 0084).
+ */
+export const KeyScope = Schema.Literals(['topics', 'conversations', 'personas', 'inspect'])
 export type KeyScope = typeof KeyScope.Type
 
 /** An MCP connection a key's setups may name: the key's server ceiling. */
@@ -40,7 +43,7 @@ export const KeyServer = Schema.String.check(Schema.isPattern(/^[\w-]{1,64}$/u))
 /** `POST /api/keys`: a key for a server the owner runs, its scopes, the servers its setups may use and its lifetime. */
 export const CreateApiKey = Schema.Struct({
   name: Schema.String.check(Schema.isPattern(/^[\w .:-]{1,64}$/u)),
-  scopes: Schema.Array(KeyScope).check(Schema.isMinLength(1), Schema.isMaxLength(3)),
+  scopes: Schema.Array(KeyScope).check(Schema.isMinLength(1), Schema.isMaxLength(4)),
   servers: Schema.Array(KeyServer).check(Schema.isMaxLength(32)),
   expiresInDays: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 365 })),
 })

@@ -56,6 +56,20 @@ const RELATED = 20
 
 /** Leave room for fixed query parameters below Workers SQLite's 100-parameter limit. */
 const PROBLEM_PAGE_SIZE = 64
+/** The most rows a filtered read looks at (`keep`), newest first, before it answers what it kept. */
+export const KEPT_SCAN_ROWS = 4096
+
+/** Which events a read answers: those `keep` keeps, of every row it looks at. */
+export type Keep = (event: RunEvent) => boolean
+
+/** Rows older than `before` in newest-first order (`started_at`, then `id`); every row without it. */
+const olderThan = (before: Row | undefined) =>
+  before === undefined
+    ? undefined
+    : or(
+        lt(appRunEvents.startedAt, before.startedAt),
+        and(eq(appRunEvents.startedAt, before.startedAt), lt(appRunEvents.id, before.id)),
+      )
 
 /**
  * The agent's run ledger in its own SQLite (`app_run_events`). Writes are single statements, never held across an
@@ -126,38 +140,82 @@ export class RunLedger<RunResult = unknown> implements RunSink {
     )
   }
 
-  /** Turns that started since `since`, newest first, optionally in one conversation. */
-  turns(since: number, limit: number, conversationId?: string): readonly RunEvent[] {
+  /** Turns that started since `since`, newest first, optionally in one conversation and only those `keep` keeps. */
+  turns(since: number, limit: number, conversationId?: string, keep?: Keep): readonly RunEvent[] {
     const conversation = conversationId === undefined ? [] : [eq(appRunEvents.conversationId, conversationId)]
-    return this.#events(
-      this.#db
-        .select()
-        .from(appRunEvents)
-        .where(and(eq(appRunEvents.kind, 'turn.submitted'), gte(appRunEvents.startedAt, since), ...conversation))
-        .orderBy(desc(appRunEvents.startedAt))
-        .limit(limit)
-        .all(),
+    return this.#newest(
+      (before, size) =>
+        this.#db
+          .select()
+          .from(appRunEvents)
+          .where(
+            and(
+              eq(appRunEvents.kind, 'turn.submitted'),
+              gte(appRunEvents.startedAt, since),
+              olderThan(before),
+              ...conversation,
+            ),
+          )
+          .orderBy(desc(appRunEvents.startedAt), desc(appRunEvents.id))
+          .limit(size)
+          .all(),
+      limit,
+      keep,
     )
   }
 
-  /** Flow steps (kind `flow`) that started since `since`, newest first, optionally of one chat or one flow. */
-  flows(since: number, limit: number, filter: Pick<InspectFlowsInput, 'chat' | 'flow'> = {}): readonly RunEvent[] {
-    return this.#events(
-      this.#db
-        .select()
-        .from(appRunEvents)
-        .where(
-          and(
-            eq(appRunEvents.kind, 'flow'),
-            gte(appRunEvents.startedAt, since),
-            filter.chat === undefined ? undefined : attributeIs(RunAttribute.chat, filter.chat),
-            filter.flow === undefined ? undefined : attributeIs(RunAttribute.flow, filter.flow),
-          ),
-        )
-        .orderBy(desc(appRunEvents.startedAt), desc(appRunEvents.id))
-        .limit(limit)
-        .all(),
+  /**
+   * Flow steps (kind `flow`) that started since `since`, newest first, optionally of one chat or one flow and only
+   * those `keep` keeps.
+   */
+  flows(
+    since: number,
+    limit: number,
+    filter: Pick<InspectFlowsInput, 'chat' | 'flow'> = {},
+    keep?: Keep,
+  ): readonly RunEvent[] {
+    return this.#newest(
+      (before, size) =>
+        this.#db
+          .select()
+          .from(appRunEvents)
+          .where(
+            and(
+              eq(appRunEvents.kind, 'flow'),
+              gte(appRunEvents.startedAt, since),
+              olderThan(before),
+              filter.chat === undefined ? undefined : attributeIs(RunAttribute.chat, filter.chat),
+              filter.flow === undefined ? undefined : attributeIs(RunAttribute.flow, filter.flow),
+            ),
+          )
+          .orderBy(desc(appRunEvents.startedAt), desc(appRunEvents.id))
+          .limit(size)
+          .all(),
+      limit,
+      keep,
     )
+  }
+
+  /**
+   * Up to `limit` events of `page`'s rows, newest first. Without `keep`, one read of `limit` rows; with it, pages of
+   * rows until `limit` are kept, the rows run out or {@link KEPT_SCAN_ROWS} were looked at.
+   */
+  #newest(page: (before: Row | undefined, size: number) => readonly Row[], limit: number, keep?: Keep): RunEvent[] {
+    if (keep === undefined) return this.#events(page(undefined, limit))
+    const kept: RunEvent[] = []
+    let before: Row | undefined
+    for (let scanned = 0; kept.length < limit && scanned < KEPT_SCAN_ROWS;) {
+      const rows = page(before, PROBLEM_PAGE_SIZE)
+      kept.push(
+        ...this.#events(rows)
+          .filter(keep)
+          .slice(0, limit - kept.length),
+      )
+      scanned += rows.length
+      if (rows.length < PROBLEM_PAGE_SIZE) break
+      before = rows.at(-1)
+    }
+    return kept
   }
 
   /**
@@ -205,14 +263,21 @@ export class RunLedger<RunResult = unknown> implements RunSink {
       .flatMap((row) => (row.operationId === null ? [] : [row.operationId]))
   }
 
-  /** Events that failed, were blocked or were cut short since `since`, newest first. */
-  problems(since: number, limit: number, all = false): readonly RunEvent[] {
+  /**
+   * Events that failed, were blocked or were cut short since `since`, newest first; with `keep`, only those it keeps,
+   * of at most {@link KEPT_SCAN_ROWS} rows.
+   */
+  problems(since: number, limit: number, all = false, keep?: Keep): readonly RunEvent[] {
     const problems: RunEvent[] = []
+    const bound = keep === undefined ? Number.POSITIVE_INFINITY : KEPT_SCAN_ROWS
     let before: Row | undefined
-    while (problems.length < limit) {
+    for (let scanned = 0; problems.length < limit && scanned < bound;) {
       const rows = this.#problemPage(since, before)
+      scanned += rows.length
       const candidates = this.#events(rows).filter(
-        (event) => (event.status !== 'ok' && event.status !== 'started') || incompleteAnswer(event),
+        (event) =>
+          ((event.status !== 'ok' && event.status !== 'started') || incompleteAnswer(event)) &&
+          (keep === undefined || keep(event)),
       )
       const peers = all ? [] : this.#successfulAttempts(candidates)
       problems.push(
@@ -226,13 +291,7 @@ export class RunLedger<RunResult = unknown> implements RunSink {
   }
 
   #problemPage(since: number, before?: Row): readonly Row[] {
-    const cursor =
-      before === undefined
-        ? undefined
-        : or(
-            lt(appRunEvents.startedAt, before.startedAt),
-            and(eq(appRunEvents.startedAt, before.startedAt), lt(appRunEvents.id, before.id)),
-          )
+    const cursor = olderThan(before)
     return this.#db
       .select()
       .from(appRunEvents)

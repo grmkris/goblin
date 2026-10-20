@@ -110,6 +110,18 @@ const piLine = (submission: TurnTimeline['submission']) =>
     ? 'Pi: no submission found'
     : `Pi: ${submission.status}${submission.reason === undefined ? '' : ` (${submission.reason})`}`
 
+/** Seconds with one decimal, for where a turn's time went. */
+const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`
+
+/** Where a turn's time went in a line (ADR 0084): wall, model, tools by server, and the rest. */
+const spentLine = ({ totalMs, modelMs, toolMs, servers, otherMs }: TurnTimeline['spent']) =>
+  [
+    `Time: ${seconds(totalMs)}`,
+    `model ${seconds(modelMs)}`,
+    `tools ${seconds(toolMs)}${servers.length === 0 ? '' : ` (${servers.map((each) => `${each.server} ${seconds(each.ms)} ×${each.calls}`).join(', ')})`}`,
+    `other ${seconds(otherMs)}`,
+  ].join(', ')
+
 const gapLines = (coverage: TurnTimeline['coverage']) =>
   coverage.complete ? [] : ['', ...coverage.gaps.map((gap) => `! ${gap}`)]
 
@@ -141,6 +153,7 @@ const RENDERERS: Readonly<Record<string, (value: unknown) => string | undefined>
         [
           turnLine(timeline.turn),
           piLine(timeline.submission),
+          spentLine(timeline.spent),
           '',
           ...timeline.events.map(eventLine),
           ...gapLines(timeline.coverage),

@@ -2,7 +2,9 @@ import {
   ChatId,
   CreatePersona,
   CreateTopic,
+  EntryId,
   NonEmptyString,
+  OperationId,
   PageCursor,
   SendMessage,
   StartThread,
@@ -11,6 +13,8 @@ import {
   UpdatePersona,
   UpdateTopic,
 } from '@goblin/contracts'
+import { InvalidInput } from '@goblin/contracts/api'
+import { FlowName } from '@goblin/contracts/telemetry'
 import { McpServer } from '@modelcontextprotocol/server'
 import type * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
@@ -45,6 +49,11 @@ export const KEY_TOOLS = {
   persona_create: 'personas.create',
   persona_get: 'personas.detail',
   persona_update: 'personas.update',
+  inspect_turns: 'inspect.turns',
+  inspect_turn: 'inspect.turn',
+  inspect_problems: 'inspect.problems',
+  inspect_flows: 'inspect.flows',
+  inspect_details: 'inspect.details',
 } as const
 
 const Id = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 999_999_999 }))
@@ -66,7 +75,7 @@ const pageQuery = ({
 })
 
 const GUIDE =
-  "goblin for a server's API key: the key makes, lists and uses its own Topics, their chats and its own Personas, never the owner's. Setups name only the MCP servers on the key, tool by tool, and a Persona's model one models_list offers. Send with conversation_send or thread_start, then read replies with conversation_entries after the cursor it last returned."
+  "goblin for a server's API key: the key makes, lists and uses its own Topics, their chats and its own Personas, never the owner's. Setups name only the MCP servers on the key, tool by tool, and a Persona's model one models_list offers. Send with conversation_send or thread_start, then read replies with conversation_entries after the cursor it last returned. With the inspect scope, the inspect_* tools show how the key's own chats ran, content-free: inspect_details of an operation it sent lists its Personas' answers under related (persona:<operation>:<persona id>), and inspect_turn of one shows its steps in order and where its time went."
 
 /** One call's answer as the tool's result, or the agent's refusal as its error result. */
 const replyWith =
@@ -254,6 +263,139 @@ const personaTools = (server: McpServer, reply: Reply) => {
   )
 }
 
+const Since = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).annotate({
+  description: 'Only what started since this time, in epoch milliseconds; the last day without it.',
+})
+const Chat = ChatId.annotate({ description: "One of the key's chats (a Topic's conversation or a thread)." })
+const Operation = OperationId.annotate({
+  description: "An operation id: one the key sent, or one inspect_turns, inspect_flows or a details' related names.",
+})
+
+/** `inspect_details`' input: a chat with the operation it sent, or with an entry of it. */
+const DetailsInput = Schema.Struct({
+  chat: Chat,
+  operation: Schema.optional(Operation),
+  entry: Schema.optional(EntryId.annotate({ description: 'An entry id of the chat, instead of an operation.' })),
+})
+
+/**
+ * `inspect_turns`, `inspect_turn` and `inspect_problems`: how the key's own chats ran (ADR 0084), content-free, as the
+ * owner's inspection shows it.
+ */
+const runTools = (server: McpServer, reply: Reply) => {
+  server.registerTool(
+    'inspect_turns',
+    {
+      title: 'Recent turns',
+      description:
+        "Recent turns of the key's chats (a Persona's answers included), newest first, one line each: where it came from, how it ended, model attempts, tool calls, failures and tokens.",
+      inputSchema: standard(
+        Schema.Struct({
+          conversation: Schema.optional(Chat),
+          since: Schema.optional(Since),
+          limit: Schema.optional(Limit),
+        }),
+      ),
+      annotations: reads,
+    },
+    ({ conversation, since, limit }) =>
+      reply((api) =>
+        api.inspect.turns({
+          query: {
+            ...(conversation === undefined ? {} : { conversation }),
+            ...(since === undefined ? {} : { since }),
+            ...(limit === undefined ? {} : { limit }),
+          },
+        }),
+      ),
+  )
+  server.registerTool(
+    'inspect_turn',
+    {
+      title: 'One turn end to end',
+      description:
+        "One turn by its operation id: Pi's settlement of it, its steps in order (model attempts with model, tokens, finish reason and time to first chunk; tool calls with the MCP server and tool, outcome and failure class), each with its start offset and duration, and `spent`: wall time, model time, tool time by server and the rest (waiting).",
+      inputSchema: standard(Schema.Struct({ operation: Operation })),
+      annotations: reads,
+    },
+    ({ operation }) => reply((api) => api.inspect.turn({ query: { operation } })),
+  )
+  server.registerTool(
+    'inspect_problems',
+    {
+      title: 'Recent problems',
+      description:
+        "Events of the key's chats needing attention since a time, newest first: failures, cutoffs, empty answers and coverage gaps. `all` includes expected waits and recovered attempts.",
+      inputSchema: standard(
+        Schema.Struct({
+          since: Schema.optional(Since),
+          limit: Schema.optional(Limit),
+          all: Schema.optional(Schema.Boolean),
+        }),
+      ),
+      annotations: reads,
+    },
+    ({ since, limit, all }) =>
+      reply((api) =>
+        api.inspect.problems({
+          query: {
+            ...(since === undefined ? {} : { since }),
+            ...(limit === undefined ? {} : { limit }),
+            ...(all === undefined ? {} : { all }),
+          },
+        }),
+      ),
+  )
+}
+
+/** `inspect_flows` and `inspect_details`: how the key's chats moved and what happened behind one message (ADR 0084). */
+const flowTools = (server: McpServer, reply: Reply) => {
+  server.registerTool(
+    'inspect_flows',
+    {
+      title: 'Conversation flows',
+      description:
+        "How the key's chats moved, newest first and content-free: sends, Persona asks and answers, thread starts. Each step names its flow, who acted, its chat and operation ids, timing and how it ended. Filter by `chat` or `flow`.",
+      inputSchema: standard(
+        Schema.Struct({
+          since: Schema.optional(Since),
+          limit: Schema.optional(Limit),
+          chat: Schema.optional(Chat),
+          flow: Schema.optional(FlowName),
+        }),
+      ),
+      annotations: reads,
+    },
+    ({ since, limit, chat, flow }) =>
+      reply((api) =>
+        api.inspect.flows({
+          query: {
+            ...(since === undefined ? {} : { since }),
+            ...(limit === undefined ? {} : { limit }),
+            ...(chat === undefined ? {} : { chat }),
+            ...(flow === undefined ? {} : { flow }),
+          },
+        }),
+      ),
+  )
+  server.registerTool(
+    'inspect_details',
+    {
+      title: 'Details of one operation',
+      description:
+        "What happened behind one message of the key's chat: give `chat` with the `operation` that sent it, or with an `entry`. Its turn summary, steps and time when it ran a turn, every run event in order, and the operations related to it (its Personas' answers, a thread's first send).",
+      inputSchema: standard(DetailsInput),
+      annotations: reads,
+    },
+    ({ chat, operation, entry }) =>
+      operation !== undefined && entry === undefined
+        ? reply((api) => api.inspect.details({ params: { id: chat }, query: { operation } }))
+        : entry !== undefined && operation === undefined
+          ? reply((api) => api.inspect.details({ params: { id: chat }, query: { entry } }))
+          : Promise.resolve(failed(new InvalidInput({ reason: 'details take an operation or an entry' }))),
+  )
+}
+
 /** The key's tools over `call`. */
 export const keyServer = (call: OwnerCaller): McpServer => {
   const server = new McpServer({ name: 'goblin', version: '0.1.0' }, { instructions: GUIDE })
@@ -261,5 +403,7 @@ export const keyServer = (call: OwnerCaller): McpServer => {
   topicTools(server, reply)
   conversationTools(server, reply)
   personaTools(server, reply)
+  runTools(server, reply)
+  flowTools(server, reply)
   return server
 }

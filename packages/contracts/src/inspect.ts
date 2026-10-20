@@ -1,7 +1,7 @@
 import * as Schema from 'effect/Schema'
 import { ChatId, EntryId, OperationId } from './ids.ts'
 import { ConversationView } from './conversations.ts'
-import { FlowEvent, FlowName, RunEvent, RunEventStatus } from './telemetry.ts'
+import { FlowEvent, FlowName, RunEvent, RunEventKind, RunEventStatus } from './telemetry.ts'
 
 /**
  * Read-only inspection of one agent (ADR 0024): its conversations, a conversation's entries, its turns and their
@@ -174,9 +174,51 @@ export type InspectTurns = typeof InspectTurns.Type
 /** What a timeline could not show, so a reader never mistakes a gap for nothing having happened. */
 export const Coverage = Schema.Struct({ complete: Schema.Boolean, gaps: Schema.Array(Schema.String) })
 
+const Ms = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
+
 /**
- * One turn end to end: Pi's own settlement of the submission, every run event of it in order, and the entries it
- * spans (read them with a `conversation` query, `before` the answer).
+ * One step of a turn in order, content-free (ADR 0084): a model attempt, a tool call, a compaction or an error, when
+ * it started after the turn did (`offsetMs`) and how long it took (`ms`, none while it runs). A model attempt names
+ * its model, tokens, why it finished and how long until its first chunk; a tool call its tool, the MCP server and tool
+ * it reached, and the class of its failure or block.
+ */
+export const TurnStep = Schema.Struct({
+  kind: RunEventKind,
+  status: RunEventStatus,
+  offsetMs: Ms,
+  ms: Schema.optional(Ms),
+  model: Schema.optional(Schema.String),
+  attempt: Schema.optional(Schema.Number),
+  inputTokens: Schema.optional(Schema.Number),
+  outputTokens: Schema.optional(Schema.Number),
+  reasoningTokens: Schema.optional(Schema.Number),
+  finishReason: Schema.optional(Schema.String),
+  firstChunkMs: Schema.optional(Ms),
+  tool: Schema.optional(Schema.String),
+  server: Schema.optional(Schema.String),
+  serverTool: Schema.optional(Schema.String),
+  errorType: Schema.optional(Schema.String),
+  blockedReason: Schema.optional(Schema.String),
+})
+export type TurnStep = typeof TurnStep.Type
+
+/**
+ * Where a turn's time went (ADR 0084): its wall time (to now while it runs), the summed time of its model attempts and
+ * of its tool calls, the tool time by MCP server, and `otherMs`, the wall time neither covers (waiting, queueing,
+ * the host's own work). Tool calls can run side by side, so the sums can pass the wall time; `otherMs` is never below 0.
+ */
+export const TurnSpent = Schema.Struct({
+  totalMs: Ms,
+  modelMs: Ms,
+  toolMs: Ms,
+  servers: Schema.Array(Schema.Struct({ server: Schema.String, calls: Schema.Int, ms: Ms })),
+  otherMs: Ms,
+})
+export type TurnSpent = typeof TurnSpent.Type
+
+/**
+ * One turn end to end: Pi's own settlement of the submission, every run event of it in order with its steps and where
+ * its time went, and the entries it spans (read them with a `conversation` query, `before` the answer).
  */
 export const TurnTimeline = Schema.Struct({
   turn: TurnSummary,
@@ -189,6 +231,8 @@ export const TurnTimeline = Schema.Struct({
     }),
   ),
   events: Schema.Array(RunEvent),
+  steps: Schema.Array(TurnStep),
+  spent: TurnSpent,
   coverage: Coverage,
 })
 export type TurnTimeline = typeof TurnTimeline.Type
@@ -221,6 +265,8 @@ export type RelatedOperation = typeof RelatedOperation.Type
 export const InspectDetails = Schema.Struct({
   ...TurnTimeline.fields,
   turn: Schema.optional(TurnSummary),
+  steps: Schema.optional(TurnTimeline.fields.steps),
+  spent: Schema.optional(TurnSpent),
   related: Schema.Array(RelatedOperation),
 })
 export type InspectDetails = typeof InspectDetails.Type

@@ -1,11 +1,14 @@
 import type { SetupItem, TopicSetup, TopicSetupEdit } from '@goblin/contracts'
+import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
+import { chatOfSession, chatRow } from '../chats/directory.ts'
 import { Chats } from '../chats/service.ts'
 import { epochSeconds } from '../clock.ts'
 import { RequestContext } from '../http/api/context.ts'
 import type { KeyGrant } from '../http/api/principal.ts'
 import { Conflict, Forbidden, NotFound } from '../http/errors.ts'
+import type { Place, Reach } from '../inspect/service.ts'
 import { Db } from '../runtime/db.ts'
 import { type ReachKind, hasReach, recordReach } from './reach.ts'
 
@@ -106,3 +109,45 @@ export const confineMessage = (context: {
       if (!(yield* reached(key, 'persona', selection.personaId))) return yield* new NotFound({ what: 'persona' })
     }
   })
+
+/** `read`, answered once for each id. */
+const memo = <K>(read: (id: K) => boolean) => {
+  const known = new Map<K, boolean>()
+  return (id: K): boolean => {
+    const seen = known.get(id)
+    if (seen !== undefined) return seen
+    const within = read(id)
+    known.set(id, within)
+    return within
+  }
+}
+
+const inOrOut = (within: boolean): Place => (within ? 'in' : 'out')
+
+/**
+ * What of the run ledger the request's key may read (ADR 0084): the events of chats within its reach, the Topics it
+ * made with their threads and Persona forks, by the chat or Topic each names. Each Pi session, chat and Topic is
+ * looked up once per request. None for the owner's session, which reads everything.
+ */
+export const inspectReach: Effect.Effect<Reach | undefined, never, Db> = Effect.gen(function* () {
+  const key = yield* requestKey
+  if (key === undefined) return undefined
+  const db = yield* Db
+  const topic = memo((id: number) => hasReach(db, key.keyId, 'topic', id))
+  const chat = memo((id: string) => {
+    const row = chatRow(db, id)
+    return row !== undefined && topic(row.topicId)
+  })
+  const session = memo((id: string) => {
+    const owner = chatOfSession(db, id)
+    return owner !== undefined && chat(owner)
+  })
+  const place = (event: RunEvent): Place => {
+    if (event.conversationId !== undefined) return inOrOut(session(event.conversationId))
+    const named = event.attributes[RunAttribute.chat]
+    if (typeof named === 'string') return inOrOut(chat(named))
+    const topicId = event.attributes[RunAttribute.topic]
+    return typeof topicId === 'number' ? inOrOut(topic(topicId)) : 'nowhere'
+  }
+  return { place, chat }
+})

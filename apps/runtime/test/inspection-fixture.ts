@@ -29,5 +29,5 @@ export function inspectionFixture(settled: Readonly<Record<string, SubmissionRec
     chats,
     settlement: (session, operationId) => Effect.succeed(settled[`${session}/${operationId}`]),
   })
-  return { ledger, inspection, layer: Layer.succeed(Inspection, inspection), close }
+  return { db, ledger, inspection, layer: Layer.succeed(Inspection, inspection), close }
 }

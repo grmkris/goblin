@@ -1,6 +1,14 @@
 import type { EntryRecord, SubmissionRecord } from '@earendil-works/pi-durable'
 import { authorOf } from '@goblin/contracts'
-import type { FlowRecord, InspectEntry, RelatedOperation, TurnSummary, TurnTimeline } from '@goblin/contracts/inspect'
+import type {
+  FlowRecord,
+  InspectEntry,
+  RelatedOperation,
+  TurnSpent,
+  TurnStep,
+  TurnSummary,
+  TurnTimeline,
+} from '@goblin/contracts/inspect'
 import { type FlowEvent, RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
@@ -142,6 +150,11 @@ const stringOf = (event: RunEvent, key: string): string | undefined => {
   return typeof value === 'string' ? value : undefined
 }
 const failed = (event: RunEvent) => event.status !== 'ok' && event.status !== 'started'
+/** A number the event recorded, if it recorded one. */
+const numberAt = (event: RunEvent, key: string): number | undefined => {
+  const value = event.attributes[key]
+  return typeof value === 'number' ? value : undefined
+}
 
 /** A turn in a line, from its own event and the events that share its operation id. */
 export function summarize(turn: RunEvent, events: readonly RunEvent[]): TurnSummary {
@@ -164,6 +177,93 @@ export function summarize(turn: RunEvent, events: readonly RunEvent[]): TurnSumm
     inputTokens: attempts.reduce((sum, event) => sum + numberOf(event, RunAttribute.inputTokens), 0),
     outputTokens: attempts.reduce((sum, event) => sum + numberOf(event, RunAttribute.outputTokens), 0),
     errors: errors.length,
+  }
+}
+
+/** The events a turn's steps show: its model attempts, tool calls, compactions and errors. */
+const STEP_KINDS: ReadonlySet<string> = new Set(['model.attempt', 'tool.call', 'compaction', 'error'])
+
+/** Milliseconds between two times, never below 0. */
+const between = (from: number, to: number): number => Math.max(0, Math.round(to - from))
+
+/** What a model attempt says about itself in a step. */
+function attemptFields(event: RunEvent): Partial<TurnStep> {
+  const model = stringOf(event, RunAttribute.responseModel) ?? stringOf(event, RunAttribute.requestModel)
+  const attempt = numberAt(event, RunAttribute.attempt)
+  const input = numberAt(event, RunAttribute.inputTokens)
+  const output = numberAt(event, RunAttribute.outputTokens)
+  const reasoning = numberAt(event, RunAttribute.reasoningTokens)
+  const finish = stringOf(event, RunAttribute.finishReason)
+  const firstPartial = numberAt(event, RunAttribute.firstPartialAt)
+  return {
+    ...(model === undefined ? {} : { model }),
+    ...(attempt === undefined ? {} : { attempt }),
+    ...(input === undefined ? {} : { inputTokens: input }),
+    ...(output === undefined ? {} : { outputTokens: output }),
+    ...(reasoning === undefined ? {} : { reasoningTokens: reasoning }),
+    ...(finish === undefined ? {} : { finishReason: finish }),
+    ...(firstPartial === undefined ? {} : { firstChunkMs: between(event.startedAt, firstPartial) }),
+  }
+}
+
+/** What a tool call says about itself in a step. */
+function callFields(event: RunEvent): Partial<TurnStep> {
+  const tool = stringOf(event, RunAttribute.toolName)
+  const server = stringOf(event, RunAttribute.mcpServer)
+  const serverTool = stringOf(event, RunAttribute.mcpTool)
+  const blocked = stringOf(event, RunAttribute.blockedReason)
+  return {
+    ...(tool === undefined ? {} : { tool }),
+    ...(server === undefined ? {} : { server }),
+    ...(serverTool === undefined ? {} : { serverTool }),
+    ...(blocked === undefined ? {} : { blockedReason: blocked }),
+  }
+}
+
+/**
+ * A turn's steps in order (ADR 0084), each when it started after the turn and how long it took, from its run event's
+ * scalars alone: content-free, as the events are.
+ */
+export function stepsOf(turn: RunEvent, events: readonly RunEvent[]): TurnStep[] {
+  return events
+    .filter((event) => STEP_KINDS.has(event.kind))
+    .map((event) => {
+      const errorType = stringOf(event, RunAttribute.errorType)
+      return {
+        kind: event.kind,
+        status: event.status,
+        offsetMs: between(turn.startedAt, event.startedAt),
+        ...(event.endedAt === undefined ? {} : { ms: between(event.startedAt, event.endedAt) }),
+        ...(event.kind === 'model.attempt' ? attemptFields(event) : {}),
+        ...(event.kind === 'tool.call' ? callFields(event) : {}),
+        ...(errorType === undefined ? {} : { errorType }),
+      }
+    })
+}
+
+/**
+ * Where a turn's time went (ADR 0084): its wall time, its model and tool time summed, the tool time by MCP server, and
+ * the rest. Anything still running counts to `now`.
+ */
+export function spentOf(turn: RunEvent, events: readonly RunEvent[], now: number): TurnSpent {
+  const took = (event: RunEvent) => between(event.startedAt, event.endedAt ?? Math.max(now, event.startedAt))
+  const sum = (kind: string) => events.filter((event) => event.kind === kind).reduce((ms, event) => ms + took(event), 0)
+  const servers = new Map<string, { calls: number; ms: number }>()
+  for (const event of events) {
+    const server = event.kind === 'tool.call' ? stringOf(event, RunAttribute.mcpServer) : undefined
+    if (server === undefined) continue
+    const spent = servers.get(server) ?? { calls: 0, ms: 0 }
+    servers.set(server, { calls: spent.calls + 1, ms: spent.ms + took(event) })
+  }
+  const totalMs = took(turn)
+  const modelMs = sum('model.attempt')
+  const toolMs = sum('tool.call')
+  return {
+    totalMs,
+    modelMs,
+    toolMs,
+    servers: [...servers].map(([server, spent]) => ({ server, ...spent })).toSorted((a, b) => b.ms - a.ms),
+    otherMs: Math.max(0, totalMs - modelMs - toolMs),
   }
 }
 
