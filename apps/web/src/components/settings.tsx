@@ -1,4 +1,5 @@
 import { ClientsCard, DeleteAccountCard } from './account-cards.tsx'
+import { ApiKeysCard } from './api-keys-card.tsx'
 import { MemoryCard, ResidentCard, UsageCard } from './agent-cards.tsx'
 import { ModelEndpointCard } from './model-endpoint-card.tsx'
 import { NotifySinkCard } from './notify-sink-card.tsx'
@@ -7,7 +8,8 @@ import { SetupSettingsCard } from './start/setup-cards.tsx'
 
 /**
  * The owner's settings, most used first: today's usage, Start and the model, their agent (and where its notices go),
- * the clients connected to their agent, and last the account itself. Routines are on Work.
+ * the clients connected to their agent, the API keys of servers they run, and last the account itself. Routines are on
+ * Work.
  */
 export function Settings() {
   return (
@@ -33,6 +35,18 @@ export function Settings() {
         }
       >
         <ClientsCard />
+      </PageSection>
+      <PageSection
+        id="keys"
+        title="API keys"
+        note={
+          <>
+            For servers you run: <code>Authorization: Bearer gbk_…</code> on{' '}
+            <code>{`${window.location.origin}/api`}</code> or <code>/mcp</code>. Revoking one ends it at once.
+          </>
+        }
+      >
+        <ApiKeysCard />
       </PageSection>
       <PageSection id="account" title="Account">
         <DeleteAccountCard />

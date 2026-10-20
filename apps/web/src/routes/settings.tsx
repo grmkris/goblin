@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { OwnerGate } from '../components/owner-gate.tsx'
 import { PageBar } from '../components/page-bar.tsx'
 import { Settings } from '../components/settings.tsx'
-import { clientsQuery } from '../account/queries.ts'
+import { clientsQuery, keysQuery } from '../account/queries.ts'
 import { memoryQuery, modelEndpointQuery, residentQuery, usageQuery } from '../agent/queries.ts'
 import { primeOwnerRead } from '../lib/prime.ts'
 
@@ -15,6 +15,7 @@ export const Route = createFileRoute('/settings')({
       primeOwnerRead(context.queryClient, residentQuery),
       primeOwnerRead(context.queryClient, memoryQuery()),
       primeOwnerRead(context.queryClient, clientsQuery),
+      primeOwnerRead(context.queryClient, keysQuery),
     ])
   },
   component: SettingsPage,
