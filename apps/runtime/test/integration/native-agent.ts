@@ -23,7 +23,7 @@ const OwnerApiRun = Schema.Struct({
   servers: Ok(Schema.Array(Schema.Unknown)),
   unknownServer: Refused,
   unknownApp: Refused,
-  noConversation: Ok(Schema.Array(Schema.Unknown)),
+  noConversation: Ok(Schema.Struct({ messages: Schema.Array(Schema.Unknown) })),
   threads: Schema.Array(Listed),
   badBranch: Refused,
   unknownThread: Refused,
@@ -42,7 +42,7 @@ async function ownerApiChecks(base: string): Promise<void> {
   expect(states.map(({ state }) => state)).toEqual(['active', 'revoked', 'revoked', 'active'])
   expect(result.servers.value).toEqual([])
   expect([result.unknownServer.error._tag, result.unknownApp.error._tag]).toEqual(['NotFound', 'NotFound'])
-  expect(result.noConversation.value).toEqual([])
+  expect(result.noConversation.value).toEqual({ messages: [] })
   // Main is registered on first use; an empty thread joins it. Only registered conversations reach Pi.
   expect(result.threads.map(({ kind, closedAt }) => ({ kind, closed: closedAt !== undefined }))).toEqual([
     { kind: 'main', closed: false },

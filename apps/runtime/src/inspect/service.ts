@@ -8,10 +8,7 @@ import type {
   InspectFlows,
   InspectFlowsInput,
   InspectInput,
-  InspectKind,
   InspectProblems,
-  InspectQuery,
-  InspectResult,
   InspectTurns,
   RelatedOperation,
   TurnTimeline,
@@ -31,10 +28,7 @@ import { coverageGaps, operationGaps } from './coverage.ts'
 import { flowRecord, inspectEntry, relatedOf, settlementOf, spentOf, stepsOf, summarize } from './inspector.ts'
 
 /** What a query of `kind` takes besides its kind. */
-type Input<K extends InspectKind> = (typeof InspectInput)[K]['Type']
-
-/** What any inspection query answers: the result of its kind. */
-type InspectAnswer = { readonly [K in InspectKind]: (typeof InspectResult)[K]['Type'] }[InspectKind]
+type Input<K extends keyof typeof InspectInput> = (typeof InspectInput)[K]['Type']
 
 /** What `turns`, `problems` and `flows` look back over by default. */
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -71,8 +65,6 @@ export const withinReach = (reach: Reach, events: readonly RunEvent[]): boolean 
 export class Inspection extends Context.Service<
   Inspection,
   {
-    /** Any query, as the agent's `/inspect` route (and so /mcp's `inspect_*` tools) asks it. */
-    readonly run: (query: InspectQuery) => Effect.Effect<InspectAnswer, AppError>
     /** Every conversation the agent keeps (main, threads, subagents, clients), with titles and activity. */
     readonly conversations: Effect.Effect<InspectConversations, AppError>
     /** A page of a conversation's entries, oldest first, ending before `before` (the newest page without it). */
@@ -142,7 +134,7 @@ const sinceOr = (since: number | undefined): Effect.Effect<number> =>
   since === undefined ? Effect.map(Clock.currentTimeMillis, (now) => now - DAY_MS) : Effect.succeed(since)
 
 /** A details query's reader input: an operation, or a chat with one of its entries. Anything else is invalid. */
-const detailsInput = ({
+export const detailsInput = ({
   operation,
   chat,
   entry,
@@ -224,33 +216,11 @@ const detailsWith = ({ ledger, chats, settlement }: InspectionSources): Reads['d
   })
 }
 
-/** Any query, answered by the read of its kind. */
-const dispatch =
-  (reads: Omit<Reads, 'run'>): Reads['run'] =>
-  (query) => {
-    switch (query.kind) {
-      case 'conversations':
-        return reads.conversations
-      case 'conversation':
-        return reads.conversation(query)
-      case 'turns':
-        return reads.turns(query)
-      case 'turn':
-        return reads.turn(query.operationId)
-      case 'problems':
-        return reads.problems(query)
-      case 'flows':
-        return reads.flows(query)
-      case 'details':
-        return Effect.flatMap(detailsInput(query), reads.details)
-    }
-  }
-
 /** The inspection reads over `sources`; the native layer's, and a test's over fakes. */
 export function makeInspection(sources: InspectionSources): Reads {
   const { ledger, chats, settlement } = sources
   const timeline = timelineWith(settlement)
-  const reads: Omit<Reads, 'run'> = {
+  const reads: Reads = {
     conversations: Effect.map(chats.list, (list) => ({ conversations: list })).pipe(
       Effect.withSpan('Inspection.conversations'),
     ),
@@ -297,5 +267,5 @@ export function makeInspection(sources: InspectionSources): Reads {
     }),
     details: detailsWith(sources),
   }
-  return Inspection.of({ run: dispatch(reads), ...reads })
+  return Inspection.of(reads)
 }

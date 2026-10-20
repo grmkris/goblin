@@ -4,7 +4,7 @@ import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
 import { CreateTopic, TopicPage, TopicSetupEdit, TopicSetupSaved, TopicView, UpdateTopic } from '../topics.ts'
 import { ApiErrors } from './errors.ts'
-import { ApiKeyScope } from './keys.ts'
+import { EndpointScope } from './scope.ts'
 import { PageQuery } from './page.ts'
 
 /** A Topic's id in a path: 1 to 999999999. */
@@ -51,4 +51,4 @@ export class TopicsGroup extends HttpApiGroup.make('topics')
       error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput],
     }),
   )
-  .annotateEndpoints(ApiKeyScope, 'topics') {}
+  .annotateEndpoints(EndpointScope, 'topics') {}

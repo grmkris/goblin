@@ -8,7 +8,7 @@ import * as HttpClientRequest from 'effect/http/HttpClientRequest'
 import * as HttpApiClient from 'effect/http-api/HttpApiClient'
 import { type AppError, NotFound, isAppError, toAppError } from '../http/errors.ts'
 import type { EventWebhook } from '../mcp/events/engine.ts'
-import { KEY_HEADER, type KeyGrant, keyHeader } from '../http/api/principal.ts'
+import { CALLER_HEADER, type Caller, callerHeader } from '../http/api/principal.ts'
 
 /** The part of an agent's Durable Object stub the internal API is called through. */
 export type AgentFetch = { readonly fetch: (request: Request) => Promise<Response> }
@@ -48,19 +48,19 @@ export const internalCall = <A, E>(
 export type OwnerClient = HttpApiClient.ForApi<typeof OwnerApi>
 
 /**
- * One call of the owner API over `agent`'s own `fetch` for a server's API key (ADR 0081): an owner forward carrying the
- * key's grant, as the edge forwards a key's request, so owner admission, the key's scopes and its reach apply as they do
+ * One call of the owner API over `agent`'s own `fetch` for a caller on /mcp (ADR 0086): an owner forward carrying the
+ * caller, as the edge forwards a key's request, so owner admission, the caller's scopes and its reach apply as they do
  * over HTTP. Its value, or the `AppError` the agent answered; anything else is reported, and `Internal`.
  */
 export const ownerCall = <A, E>(
   agent: AgentFetch,
-  key: KeyGrant,
+  caller: Caller,
   call: (api: OwnerClient) => Effect.Effect<A, E>,
 ): Effect.Effect<A, AppError> =>
   HttpApiClient.make(OwnerApi, {
     baseUrl: 'https://agent',
     transformClient: HttpClient.mapRequest(
-      HttpClientRequest.setHeaders({ [FORWARDED_HEADER]: 'owner', [KEY_HEADER]: keyHeader(key) }),
+      HttpClientRequest.setHeaders({ [FORWARDED_HEADER]: 'owner', [CALLER_HEADER]: callerHeader(caller) }),
     ),
   }).pipe(
     Effect.flatMap(call),

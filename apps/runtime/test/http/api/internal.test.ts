@@ -12,7 +12,6 @@ import { routeNames } from '../../../src/http/api/context.ts'
 import { InternalGateLive } from '../../../src/http/api/middleware.ts'
 import { AgentHttp } from '../../../src/http/api/server.ts'
 import { InboundHandlers } from '../../../src/inbound/api.ts'
-import { Inspection } from '../../../src/inspect/service.ts'
 import { Events, Resident } from '../../../src/mcp/service.ts'
 import { Notices } from '../../../src/notices/service.ts'
 import { ResidentHandlers } from '../../../src/mcp/resident-api.ts'
@@ -42,23 +41,19 @@ const recording = () => {
     })
   const handlers = HttpApiBuilder.group(InternalApi, 'inbound', (group) =>
     group
-      .handle('ask', ({ payload }) => mark('ask', { status: 'running' as const, operationId: payload.operationId }))
-      .handle('recent', () => mark('recent', []))
       .handle('mcpEvents', () => mark('mcpEvents', { status: 204 as const }))
-      .handle('inspect', () => mark('inspect', { conversations: [] }))
       .handleRaw('linkedFile', () => mark('linkedFile', HttpServerResponse.text('bytes'))),
   )
   return { ran, handlers }
 }
 
 /** The real handlers over stubs: only the services a case names do anything. */
-const fixture = (parts: { readonly events?: Layer.Layer<Events>; readonly inspection?: Layer.Layer<Inspection> }) =>
+const fixture = (parts: { readonly events?: Layer.Layer<Events> }) =>
   serve(
     servedInternal(InboundHandlers).pipe(
       Layer.provide(
         Layer.mergeAll(
           parts.events ?? stub(Events),
-          parts.inspection ?? stub(Inspection),
           stub(Chats),
           stub(ChatOperations),
           stub(PiSessions),
@@ -73,7 +68,6 @@ const fixture = (parts: { readonly events?: Layer.Layer<Events>; readonly inspec
     ),
   )
 
-const ASK = { author: 'Claude', input: 'hello', operationId: 'op-1', waitMs: 0 }
 const internal = (path: string, body?: unknown, headers: Record<string, string> = {}) =>
   body === undefined ? get(`/internal${path}`, headers) : post(`/internal${path}`, body, headers)
 
@@ -81,20 +75,25 @@ describe('the internal API served by the agent', () => {
   it('answers a request without the owner mark', async () => {
     const { ran, handlers } = recording()
     const { fetch } = serve(servedInternal(handlers))
-    const asked = await fetch(internal('/ask', ASK, { 'x-goblin-ref': 'ray-1' }))
-    expect(asked.status).toBe(200)
-    expect(await asked.json()).toEqual({ status: 'running', operationId: 'op-1' })
-    expect((await fetch(internal('/recent?limit=5'))).status).toBe(200)
-    expect(ran).toEqual(['ask', 'recent'])
+    const linked = await fetch(
+      internal('/files/linked?path=%2Fuploads%2Fnotes.md', undefined, { 'x-goblin-ref': 'ray-1' }),
+    )
+    expect(linked.status).toBe(200)
+    expect(await linked.text()).toBe('bytes')
+    expect(ran).toEqual(['linkedFile'])
   })
 
   it('refuses a request marked as the owner forward with the 404 envelope, before any handler runs', async () => {
     const { ran, handlers } = recording()
     const { fetch } = serve(servedInternal(handlers))
     for (const request of [
-      internal('/ask', ASK, { 'x-goblin-forwarded': 'owner', 'x-goblin-ref': 'ray-2' }),
-      internal('/recent?limit=5', undefined, { 'x-goblin-forwarded': 'owner' }),
-      internal('/inspect', { query: { kind: 'conversations' } }, { 'x-goblin-forwarded': '' }),
+      internal('/files/linked?path=%2Fuploads%2Fnotes.md', undefined, {
+        'x-goblin-forwarded': 'owner',
+        'x-goblin-ref': 'ray-2',
+      }),
+      internal('/files/linked?path=%2Fuploads%2Fnotes.md', undefined, { 'x-goblin-forwarded': '' }),
+      // What /mcp's callers once asked here is the owner API's now (ADR 0086).
+      internal('/ask', { input: 'hello', operationId: 'op-1', waitMs: 0 }),
       internal('/nothing-here', {}),
     ]) {
       const response = await fetch(request)
@@ -114,13 +113,13 @@ describe('the internal API served by the agent', () => {
         Layer.provide(Layer.mergeAll(Layer.succeed(Resident, resident.service), stub(Events))),
       ),
     )
-    const refused = await ownerOnly.fetch(internal('/recent?limit=5'))
+    const refused = await ownerOnly.fetch(internal('/files/linked?path=%2Fuploads%2Fnotes.md'))
     expect(refused.status).toBe(404)
     const ownerRoute = routeNames(OwnerApi)
     const internalRoute = routeNames(InternalApi)
-    expect(ownerRoute(internal('/recent?limit=5'))).toBeUndefined()
+    expect(ownerRoute(internal('/files/linked?path=%2Fuploads%2Fnotes.md'))).toBeUndefined()
     expect(internalRoute(get('/api/agent/resident'))).toBeUndefined()
-    expect(internalRoute(get('/recent?limit=5'))).toBeUndefined()
+    expect(internalRoute(get('/files/linked?path=%2Fuploads%2Fnotes.md'))).toBeUndefined()
   })
 })
 
@@ -159,15 +158,5 @@ describe('the inbound handlers', () => {
         signature: 'v1,sig',
       },
     ])
-  })
-
-  it('answers an inspection query with its result, and one that does not decode as invalid input', async () => {
-    const inspection = stub(Inspection, { run: () => Effect.succeed({ conversations: [] }) })
-    const { fetch } = fixture({ inspection })
-    const answered = await fetch(internal('/inspect', { query: { kind: 'conversations' } }))
-    expect(await answered.json()).toEqual({ conversations: [] })
-    const invalid = await fetch(internal('/inspect', { query: { kind: 'everything' } }))
-    expect(invalid.status).toBe(400)
-    expect(await invalid.json()).toMatchObject({ error: { code: 'invalid_input' } })
   })
 })

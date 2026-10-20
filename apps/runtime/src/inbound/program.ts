@@ -4,26 +4,26 @@ import { settledWithin } from '../chats/instance.ts'
 import { ChatOperations, Chats } from '../chats/service.ts'
 import { attempt, toAppError } from '../http/errors.ts'
 import { requireResident } from '../mcp/service.ts'
-import { authoredContent } from '../pi/content.ts'
+import { requestAuthor } from '../keys/policy.ts'
+import { withAuthor } from '../pi/content.ts'
 import { PiSessions } from '../pi/sessions.ts'
 import { recentMessages } from '../pi/transcript.ts'
 
-/** An inbound client's question in main, labelled with its name, answered when it settles within `waitMs`. */
-export const askClient = (input: {
-  readonly author: string
-  readonly input: string
-  readonly operationId: string
-  readonly waitMs: number
-}) =>
+/**
+ * A question for the agent in main from the request's caller, labelled with its name (ADR 0086), answered when it
+ * settles within `waitMs`.
+ */
+export const askAgent = (input: { readonly input: string; readonly operationId: string; readonly waitMs: number }) =>
   Effect.gen(function* () {
     yield* requireResident
+    const author = yield* requestAuthor
     const chats = yield* Chats
     const { session } = yield* (yield* ChatOperations).send({
       chat: chats.primary,
       operationId: input.operationId,
       receipt: { kind: 'ask_client', origin: 'client' },
       flow: { flow: 'ask_client', via: 'mcp', actor: 'client' },
-      content: authoredContent(input.author, input.input),
+      content: withAuthor(author, input.input),
     })
     const settled = yield* settledWithin(session, input.operationId, input.waitMs)
     if (Option.isNone(settled)) return { status: 'running' as const, operationId: input.operationId }

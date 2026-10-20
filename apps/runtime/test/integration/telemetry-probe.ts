@@ -5,7 +5,7 @@ import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { flowRunEvent } from '../../src/telemetry/events.ts'
 import { runTelemetry } from '../../src/telemetry/run.ts'
-import { inspectResult } from '../internal-client.ts'
+import { inspectResult } from '../caller-client.ts'
 import { type Probes, inAgent } from './probe.ts'
 import { ownerSend } from './probe-reads.ts'
 
@@ -21,7 +21,7 @@ const answerOf = (encoded: unknown): number | undefined =>
   )?.value.submission.answer
 
 /** The agent's own inspection (`POST /internal/inspect`): a query in, its encoded result out. */
-type Inspect = (query: InspectQuery | { readonly kind: string }) => Promise<unknown>
+type Inspect = (query: InspectQuery) => Promise<unknown>
 
 /**
  * The run ledger on the agent's real SQLite (ADR 0024): one owner turn with a tool call, the rows it left for that
@@ -47,7 +47,6 @@ async function telemetryProbe(
     turns: await inspect({ kind: 'turns', conversation: PRIMARY_CHAT }),
     conversation: await inspect({ kind: 'conversation', conversation: PRIMARY_CHAT }),
     missing: await inspect({ kind: 'turn', operationId: 'no-such-turn' }),
-    invalid: await inspect({ kind: 'everything' }),
   }
   // A message's details (ADR 0037): the turn by its operation and by its answer's entry, and what it caused, on the
   // agent's own SQLite (json_extract and LIKE … ESCAPE in workerd): a thread it started, a Persona's answer to it.

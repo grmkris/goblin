@@ -1,10 +1,10 @@
-import type { KeyScope } from '@goblin/contracts'
-import { ApiKeyScope } from '@goblin/contracts/api'
+import type { CallerScope } from '@goblin/contracts'
+import { EndpointScope } from '@goblin/contracts/api'
 import * as Context from 'effect/Context'
 import * as FindMyWay from 'effect/http/FindMyWay'
 import * as HttpApi from 'effect/http-api/HttpApi'
 import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
-import type { KeyGrant } from './principal.ts'
+import type { Caller } from './principal.ts'
 
 /** What one owner API request says about itself, for logs and error references. Never content. */
 export interface RequestFacts {
@@ -16,8 +16,8 @@ export interface RequestFacts {
   readonly operation: string | undefined
   /** The endpoint the request reached, as `<group>.<endpoint>` (`topics.update`). */
   readonly route: string
-  /** The server API key the edge admitted the request by (ADR 0081); none for the owner's session. */
-  readonly key?: KeyGrant | undefined
+  /** The caller the Worker admitted the request for, a key or an OAuth client (ADR 0086); none for the owner's session. */
+  readonly caller?: Caller | undefined
 }
 
 /**
@@ -60,17 +60,17 @@ export const routeTemplate = (path: string): string => {
 }
 
 /**
- * The scope each of `api`'s endpoints accepts an API key for (ADR 0081), by its name (`topics.update`): an endpoint
- * without `ApiKeyScope` is absent, and refuses every key.
+ * The scope each of `api`'s endpoints accepts a caller for (ADR 0086), by its name (`topics.update`): an endpoint
+ * without `EndpointScope` is absent, and refuses every caller.
  */
-export const keyScopes = <Id extends string, Groups extends HttpApiGroup.Constraint>(
+export const endpointScopes = <Id extends string, Groups extends HttpApiGroup.Constraint>(
   api: HttpApi.HttpApi<Id, Groups>,
-): ReadonlyMap<string, KeyScope> => {
-  const scopes = new Map<string, KeyScope>()
+): ReadonlyMap<string, CallerScope> => {
+  const scopes = new Map<string, CallerScope>()
   HttpApi.reflect(api, {
     onGroup: () => undefined,
     onEndpoint: ({ group, endpoint }) => {
-      const scope = Context.get(endpoint.annotations, ApiKeyScope)
+      const scope = Context.get(endpoint.annotations, EndpointScope)
       if (scope !== undefined) scopes.set(`${group.identifier}.${endpoint.identifier}`, scope)
     },
   })

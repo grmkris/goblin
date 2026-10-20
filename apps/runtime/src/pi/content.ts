@@ -52,6 +52,16 @@ export function ownerContent(
 }
 
 /**
+ * An owner message an OAuth client of the owner sent (ADR 0086), its author's tag first as `authoredContent` writes
+ * it, so the agent and the owner see who wrote it; the content as it is for anyone else.
+ */
+export function withAuthor(author: string | undefined, content: string | TextContent[]): string | TextContent[] {
+  if (author === undefined) return content
+  const words: TextContent[] = typeof content === 'string' ? [{ type: 'text', text: content }] : content
+  return [{ type: 'text', text: authorTag(author) }, ...words]
+}
+
+/**
  * A message someone other than the owner's browser wrote into a conversation (Source, an MCP client, a subagent):
  * the author's tag in a block of its own, then their words. The model reads both; the web shows the author.
  */

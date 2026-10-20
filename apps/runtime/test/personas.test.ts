@@ -259,7 +259,13 @@ describe("a Persona's own model in a server's work (ADR 0087)", () => {
     const fence = { ownerOnly: (id: string) => id.startsWith('sub/'), keyTopic: (topic: number) => topic === 9 }
     const personas = Effect.runSync(Personas.make(store, fence).pipe(Effect.provideService(Changes, makeChanges())))
     const key: KeyGrant = { keyId: 'key-1', scopes: ['personas'], servers: [] }
-    const facts = { ref: undefined, request: undefined, operation: undefined, route: 'conversations.submit', key }
+    const facts = {
+      ref: undefined,
+      request: undefined,
+      operation: undefined,
+      route: 'conversations.submit',
+      caller: { kind: 'key' as const, ...key },
+    }
     const own = (model: string, topic: number) => Effect.runSync(personas.ownModel(model, topic))
     expect([own('sub/claude-opus-5-5', 1), own('sub/claude-opus-5-5', 9), own('model-a', 9)]).toEqual([
       'sub/claude-opus-5-5',

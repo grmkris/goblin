@@ -5,7 +5,6 @@ import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import * as HttpApiMiddleware from 'effect/http-api/HttpApiMiddleware'
 import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
 import { FilePath } from '../files.ts'
-import { InspectQuery } from '../inspect.ts'
 import { API_ERRORS, ApiErrors } from './errors.ts'
 import { Bytes } from './stream.ts'
 
@@ -33,36 +32,6 @@ export class InternalGate extends HttpApiMiddleware.Service<InternalGate>()('gob
   error: API_ERRORS,
 }) {}
 
-/** A user or assistant message; `author` names who wrote a user message when it was not the owner's browser. */
-export const TranscriptMessage = Schema.Struct({
-  role: Schema.Literals(['user', 'assistant']),
-  text: Schema.String,
-  author: Schema.optionalKey(Schema.String),
-})
-export type TranscriptMessage = typeof TranscriptMessage.Type
-
-/** An inbound client's question, in main and labelled with the client's name. */
-const AskInput = Schema.Struct({
-  author: Schema.String,
-  input: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(20_000)),
-  operationId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
-  /** How long to wait for the answer before answering `running`. */
-  waitMs: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 110_000 })),
-})
-
-/** The answer, or `running` with the operation id to wait again, or why the turn ended without one. */
-export const AskResult = Schema.Union([
-  Schema.Struct({ status: Schema.Literal('done'), operationId: Schema.String, text: Schema.String }),
-  Schema.Struct({ status: Schema.Literal('running'), operationId: Schema.String }),
-  Schema.Struct({ status: Schema.Literal('unanswered'), operationId: Schema.String, reason: Schema.String }),
-])
-export type AskResult = typeof AskResult.Type
-
-/** `?limit=`: how many of the newest messages, 1 to 50. */
-const RecentQuery = {
-  limit: Schema.NumberFromString.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 50 })),
-}
-
 /** The connection whose Events webhook a delivery came to (its id, as the hook's path names it). */
 const ConnectionParam = Schema.String.check(Schema.isPattern(/^[\w-]{1,64}$/u))
 
@@ -82,37 +51,22 @@ export const EventWebhookResult = Schema.Struct({
 export type EventWebhookResult = typeof EventWebhookResult.Type
 
 /**
- * What reaches the agent besides the owner. Paths are relative to the API's `/internal` prefix; every endpoint can
+ * What reaches the agent besides the owner and its callers (ADR 0086). Paths are relative to the API's `/internal` prefix; every endpoint can
  * also answer the gate's failures, and `error` names the ones the endpoint itself produces.
  *
- * - `ask`: `POST /internal/ask`, an inbound MCP client's question (needs current resident authority, never renews it).
- * - `recent`: `GET /internal/recent?limit=`, the newest messages of main.
  * - `mcpEvents`: `POST /internal/mcp-events/:connectionId`, one connection's MCP Events webhook: its bytes and the
  *   headers that sign it.
- * - `inspect`: `POST /internal/inspect` with `{ query }`, /mcp's read-only inspection (ADR 0024). It answers the result
- *   of the query's kind (`InspectResult[kind]` in `../inspect.ts`), which the caller decodes.
  * - `linkedFile`: `GET /internal/files/linked?path=`, the owner file a file link names (ADR 0070), once the Worker has
  *   checked the link's token: its bytes as an attachment, with its type and name in the answer's headers. It needs
  *   current resident authority and never renews it.
  */
 export class InboundGroup extends HttpApiGroup.make('inbound').add(
-  HttpApiEndpoint.post('ask', '/ask', {
-    payload: AskInput,
-    success: AskResult,
-    error: [ApiErrors.conflict, ApiErrors.budgetExhausted],
-  }),
-  HttpApiEndpoint.get('recent', '/recent', { query: RecentQuery, success: Schema.Array(TranscriptMessage) }),
   HttpApiEndpoint.post('mcpEvents', '/mcp-events/:connectionId', {
     params: { connectionId: ConnectionParam },
     headers: WebhookHeaders,
     payload: Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array()),
     success: EventWebhookResult,
     error: [ApiErrors.invalidInput],
-  }),
-  HttpApiEndpoint.post('inspect', '/inspect', {
-    payload: Schema.Struct({ query: InspectQuery }),
-    success: Schema.Unknown,
-    error: [ApiErrors.notFound, ApiErrors.invalidInput],
   }),
   HttpApiEndpoint.get('linkedFile', '/files/linked', {
     query: { path: FilePath },

@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import type { Applied } from '../../../src/agent-model.ts'
 import { recordUse, usageLedger } from '../../../src/budget.ts'
 import { registerPrimary } from '../../../src/chats/directory.ts'
+import { ChatOperations } from '../../../src/chats/service.ts'
 import { AgentHandlers } from '../../../src/routines/agent-api.ts'
 import { ChatsLive } from '../../../src/layers/conversation.ts'
 import { ModelBudgetLive } from '../../../src/layers/budget.ts'
@@ -35,6 +36,8 @@ const fixture = (owner: { readonly OWNER_USER_ID?: string; readonly OWNER_MODELS
       Effect.promise(() => CredentialCipher.fromBase64(btoa('\0'.repeat(32)))),
     ),
     Layer.succeed(Resident, currentResident().service),
+    // Asking main is the inbound tests'; here it only has to be served.
+    stub(ChatOperations),
     // Choosing a model only puts the primary session on it; nothing else of Pi is reached.
     stub(PiSessions, { setModel: (session, { id }) => Effect.sync(() => void pinned.push(`${session} ${id}`)) }),
     // The agent handlers read only these from the instance input.
@@ -72,7 +75,7 @@ const ids = async (response: Response) =>
 
 /** The grant the edge forwards for a key with `scopes` (ADR 0081). */
 const keyHeaders = (scopes: readonly string[]) => ({
-  'x-goblin-key': JSON.stringify({ keyId: 'key-1', scopes, servers: [] }),
+  'x-goblin-caller': JSON.stringify({ kind: 'key', keyId: 'key-1', scopes, servers: [] }),
 })
 
 describe('the agent group served by the agent', () => {

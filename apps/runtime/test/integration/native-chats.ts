@@ -4,7 +4,7 @@ import { Schema } from 'effect'
 import { expect } from 'vitest'
 import { chatSession, operationSession } from '../../src/chats/directory.ts'
 import { unwrap } from '../../src/http/rpc.ts'
-import { askResult, recentResult } from '../internal-client.ts'
+import { askResult, recentResult } from '../caller-client.ts'
 import { type NativeCase, probeOf } from './native-case.ts'
 import { type Inside, type Probes, inAgent } from './probe.ts'
 import { ownerSend } from './probe-reads.ts'
@@ -22,7 +22,7 @@ async function primaryProfileProbe({ agent, api, storage, harness }: Inside) {
     session,
     inboundStatus: inbound.status,
     inboundSession: operationSession(db, PRIMARY_CHAT, 'primary-inbound'),
-    recentInbound: recent.some(
+    recentInbound: recent.messages.some(
       (message) => message.author === 'fixture-client' && message.text === 'inbound binding proof',
     ),
     settledSession: settled.session,

@@ -13,7 +13,16 @@ const migrations = readdirSync(DIR)
   .toSorted()
 const APP = 'https://goblin.test'
 const NOW = '2026-10-15T00:00:00.000Z'
-const SCOPES = ['openid', 'profile', 'email', 'offline_access', 'goblin:inspect']
+const SCOPES = [
+  'openid',
+  'profile',
+  'email',
+  'offline_access',
+  'goblin:topics',
+  'goblin:conversations',
+  'goblin:personas',
+  'goblin:inspect',
+]
 const databases: DatabaseSync[] = []
 afterEach(() => {
   for (const db of databases.splice(0)) db.close()

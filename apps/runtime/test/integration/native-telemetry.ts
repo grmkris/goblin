@@ -79,7 +79,6 @@ async function telemetryChecks(base: string): Promise<void> {
         },
       },
       missing: { ok: false, error: { _tag: 'NotFound', what: 'turn' } },
-      invalid: { ok: false, error: { _tag: 'InvalidInput' } },
     },
     details: {
       byOperation: {

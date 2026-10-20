@@ -1,18 +1,9 @@
-import * as Context from 'effect/Context'
 import * as Schema from 'effect/Schema'
 import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
-import { ApiKeyView, CreateApiKey, CreatedApiKey, type KeyScope, UpdateApiKey } from '../account.ts'
+import { ApiKeyView, CreateApiKey, CreatedApiKey, UpdateApiKey } from '../account.ts'
 import { API_ERRORS } from './errors.ts'
-
-/**
- * The scope an owner endpoint accepts an API key for (ADR 0081). An endpoint without one refuses every key before the
- * agent runs; the owner's session reaches it as before.
- */
-export const ApiKeyScope = Context.Reference<KeyScope | undefined>('goblin/api/ApiKeyScope', {
-  defaultValue: () => undefined,
-})
 
 /** A key's id in a path. */
 const KeyId = Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u))

@@ -58,16 +58,16 @@ describe('the inspect group served by the agent', () => {
     const { fetch, resident, ledger } = fixture()
     ledger.ended(move)
     ledger.ended(answer)
-    const byOperation = await fetch(get('/api/conversations/12/details?operation=owner%3Aop-9'))
+    const byOperation = await fetch(get('/api/inspect/details?operation=owner%3Aop-9'))
     expect(byOperation.status).toBe(200)
     expect(await byOperation.json()).toEqual({
       events: [move],
       coverage: { complete: true, gaps: [] },
       related: [],
     })
-    const byEntry = await fetch(get('/api/conversations/12/details?entry=40'))
+    const byEntry = await fetch(get('/api/inspect/details?chat=12&entry=40'))
     expect(await byEntry.json()).toMatchObject({ events: [{ operationId: 'owner:op-8' }], related: [] })
-    const missing = await fetch(get('/api/conversations/12/details?entry=41'))
+    const missing = await fetch(get('/api/inspect/details?chat=12&entry=41'))
     expect(missing.status).toBe(404)
     expect(await missing.json()).toEqual({
       error: { code: 'not_found', message: 'That does not exist.', what: 'entry operation', ref: 'ref-1' },
@@ -75,13 +75,18 @@ describe('the inspect group served by the agent', () => {
     expect(resident.renewals).toHaveLength(3)
   })
 
-  it('refuses a query naming neither an operation nor an entry (400), and a chat id that is not one (404)', async () => {
+  it('refuses a query naming neither an operation nor a chat entry, and one that does not decode (400)', async () => {
     const { fetch } = fixture()
-    for (const query of ['', '?entry=0', '?entry=forty', '?chat=12'])
-      expect(await (await fetch(get(`/api/conversations/12/details${query}`))).json()).toMatchObject({
+    for (const query of ['', '?chat=12', '?entry=4'])
+      expect(await (await fetch(get(`/api/inspect/details${query}`))).json()).toMatchObject({
+        error: { code: 'invalid_input', reason: 'details take an operation, or a chat and an entry' },
+      })
+    for (const query of ['?chat=12&entry=0', '?chat=12&entry=forty', '?chat=main&entry=4'])
+      expect(await (await fetch(get(`/api/inspect/details${query}`))).json()).toMatchObject({
         error: { code: 'invalid_input', reason: 'query does not match the expected shape' },
       })
-    const route = await fetch(get('/api/conversations/main/details?operation=op-1'))
+    // The details under a chat's own path are gone with ADR 0086.
+    const route = await fetch(get('/api/conversations/12/details?operation=op-1'))
     expect(route.status).toBe(404)
     expect(await route.json()).toMatchObject({ error: { code: 'not_found', what: 'route' } })
   })
@@ -89,12 +94,10 @@ describe('the inspect group served by the agent', () => {
   it("serves the probes' typed client: details decode, and a refusal decodes as the NotFound class", async () => {
     const { fetch, ledger } = fixture()
     ledger.ended(move)
-    const details = await callOwner({ fetch }, (api) =>
-      api.inspect.details({ params: { id: '12' }, query: { operation: 'owner:op-9' } }),
-    )
+    const details = await callOwner({ fetch }, (api) => api.inspect.details({ query: { operation: 'owner:op-9' } }))
     expect(details.events.map((event) => event.id)).toEqual(['flow:1'])
     const refused = await callOwner({ fetch }, (api) =>
-      Effect.flip(api.inspect.details({ params: { id: '12' }, query: { entry: 40 } })),
+      Effect.flip(api.inspect.details({ query: { chat: '12', entry: 40 } })),
     )
     expect(refused).toMatchObject({ _tag: 'NotFound', what: 'entry operation', ref: 'integration-probe' })
   })
@@ -103,7 +106,7 @@ describe('the inspect group served by the agent', () => {
 /** The grant the edge forwards for a key (ADR 0081) with `scopes`. */
 const keyed = (scopes: readonly string[] = ['inspect']) => ({
   'x-goblin-ref': 'ref-1',
-  'x-goblin-key': JSON.stringify({ keyId: 'key-1', scopes, servers: ['mycut'] }),
+  'x-goblin-caller': JSON.stringify({ kind: 'key', keyId: 'key-1', scopes, servers: ['mycut'] }),
 })
 
 /** A run event of operation `operationId` in Pi session `session`, from `start` to `end` ms, `ok`. */
@@ -226,28 +229,35 @@ describe("the inspect group under a server's API key (ADR 0084)", () => {
     expect((await read('/api/inspect/flows?chat=1')).status).toBe(404)
   })
 
-  it("shows the details of its send with its Persona's answer related, and nothing behind another chat", async () => {
+  it("shows the details of its send with its Persona's answer related, and nothing outside its reach", async () => {
     const { read } = keyFixture()
-    const details = await read('/api/conversations/12/details?operation=svc%3Ajob%3A1%3Afirst')
+    const details = await read('/api/inspect/details?operation=svc%3Ajob%3A1%3Afirst')
     expect(details.status).toBe(200)
     expect(await details.json()).toMatchObject({
       events: [{ id: 'flow:ask' }],
       related: [{ operation: FORK, kind: 'persona_answer' }],
     })
-    const fork = await (await read(`/api/conversations/12/details?operation=${encodeURIComponent(FORK)}`)).json()
+    const fork = await (await read(`/api/inspect/details?operation=${encodeURIComponent(FORK)}`)).json()
     expect(fork).toMatchObject({ turn: { operationId: FORK }, spent: { totalMs: 60_000 } })
-    expect((await read('/api/conversations/14/details?operation=owner%3Aop-2')).status).toBe(404)
-    expect((await read('/api/conversations/12/details?operation=owner%3Aop-2')).status).toBe(404)
-    expect((await read('/api/conversations/1/details?operation=owner%3Aop-1')).status).toBe(404)
+    expect((await read('/api/inspect/details?operation=owner%3Aop-2')).status).toBe(404)
+    expect((await read('/api/inspect/details?operation=owner%3Aop-1')).status).toBe(404)
+    expect((await read('/api/inspect/details?chat=14&entry=1')).status).toBe(404)
+  })
+
+  it('never reads conversations in full, whatever its scopes: no key holds transcripts (ADR 0086)', async () => {
+    const { read } = keyFixture()
+    for (const path of ['/api/inspect/conversations', '/api/inspect/conversation?conversation=12']) {
+      const refused = await read(path, ['topics', 'conversations', 'personas', 'inspect'])
+      expect(refused.status).toBe(403)
+      expect(await refused.json()).toMatchObject({ error: { reason: 'scope' } })
+    }
   })
 
   it('is refused without the inspect scope, before anything is read', async () => {
     const { read } = keyFixture()
     const refused = await read(`/api/inspect/turn?operation=${encodeURIComponent(FORK)}`, ['topics', 'personas'])
     expect(refused.status).toBe(403)
-    expect(await refused.json()).toMatchObject({ error: { reason: 'key_scope' } })
-    expect(
-      (await read('/api/conversations/12/details?operation=svc%3Ajob%3A1%3Afirst', ['conversations'])).status,
-    ).toBe(403)
+    expect(await refused.json()).toMatchObject({ error: { reason: 'scope' } })
+    expect((await read('/api/inspect/details?operation=svc%3Ajob%3A1%3Afirst', ['conversations'])).status).toBe(403)
   })
 })

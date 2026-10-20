@@ -259,7 +259,10 @@ describe("a server's API key (ADR 0081)", () => {
   it("reaches its user's agent without a CSRF header, forwarding its grant and never the key or an App mark", async () => {
     const { seen, edge } = deployment()
     const request = server('/api/topics', {
-      headers: { 'x-mcp-caller': 'app', 'x-goblin-key': '{"keyId":"forged","scopes":["personas"],"servers":[]}' },
+      headers: {
+        'x-mcp-caller': 'app',
+        'x-goblin-caller': '{"kind":"key","keyId":"forged","scopes":["personas"],"servers":[]}',
+      },
       body: JSON.stringify({ name: 'x' }),
     })
     const { response } = await through('owner', request, edge)
@@ -268,7 +271,8 @@ describe("a server's API key (ADR 0081)", () => {
     expect(forwarded?.headers.get('authorization')).toBeNull()
     expect(forwarded?.headers.get('x-mcp-caller')).toBeNull()
     expect(forwarded?.headers.get('x-goblin-forwarded')).toBe('owner')
-    expect(JSON.parse(forwarded?.headers.get('x-goblin-key') ?? '')).toEqual({
+    expect(JSON.parse(forwarded?.headers.get('x-goblin-caller') ?? '')).toEqual({
+      kind: 'key',
       keyId: 'key-1',
       scopes: ['topics', 'conversations'],
       servers: ['mycut'],
@@ -277,9 +281,11 @@ describe("a server's API key (ADR 0081)", () => {
 
   it('never forwards a grant a session request names', async () => {
     const { seen, edge } = deployment()
-    const request = write('/api/topics', { headers: { 'x-goblin-key': '{"keyId":"forged","scopes":[],"servers":[]}' } })
+    const request = write('/api/topics', {
+      headers: { 'x-goblin-caller': '{"kind":"key","keyId":"forged","scopes":[],"servers":[]}' },
+    })
     await through('owner', request, edge)
-    expect(seen[0]?.headers.get('x-goblin-key')).toBeNull()
+    expect(seen[0]?.headers.get('x-goblin-caller')).toBeNull()
   })
 
   it.each([
@@ -291,10 +297,10 @@ describe("a server's API key (ADR 0081)", () => {
     ],
     ['a key with a cookie', server('/api/topics', { headers: { cookie: 'session=owner' } }), 403, 'key_browser'],
     ['a key with an Origin', server('/api/topics', { headers: { origin: APP } }), 403, 'key_browser'],
-    ['an endpoint no key reaches', server('/api/agent/resident', { method: 'GET' }), 403, 'key_scope'],
-    ['a scope the key lacks', server('/api/personas', { body: '{}' }), 403, 'key_scope'],
-    ['a file upload', server('/api/files/uploads/a.txt', { method: 'PUT', body: 'x' }), 403, 'key_scope'],
-    ['a path that is no endpoint', server('/api/nothing/here', { method: 'GET' }), 403, 'key_scope'],
+    ['an endpoint no key reaches', server('/api/agent/resident', { method: 'GET' }), 403, 'scope'],
+    ['a scope the key lacks', server('/api/personas', { body: '{}' }), 403, 'scope'],
+    ['a file upload', server('/api/files/uploads/a.txt', { method: 'PUT', body: 'x' }), 403, 'scope'],
+    ['a path that is no endpoint', server('/api/nothing/here', { method: 'GET' }), 403, 'scope'],
     [
       'an inbound OAuth token',
       server('/api/topics', { headers: { authorization: 'Bearer eyJhbGciOi.eyJzdWIiOi.c2ln' } }),
@@ -310,12 +316,12 @@ describe("a server's API key (ADR 0081)", () => {
   })
 
   it("passes its agent's rate-limit refusal on with Retry-After (ADR 0085)", async () => {
-    const limited = new Unauthenticated({ reason: 'key_rate_limited', retryAfter: 17 })
+    const limited = new Unauthenticated({ reason: 'rate_limited', retryAfter: 17 })
     const { edge } = deployment(() => Response.json(envelopeOf(limited), { status: 401 }))
     const { response } = await through('owner', server('/api/topics', { method: 'GET' }), edge)
     expect(response.status).toBe(401)
     expect(response.headers.get('retry-after')).toBe('17')
-    expect(await response.json()).toMatchObject({ error: { reason: 'key_rate_limited', retryAfter: 17 } })
+    expect(await response.json()).toMatchObject({ error: { reason: 'rate_limited', retryAfter: 17 } })
   })
 
   it('never reaches the account API: a key cannot list, make or change keys', async () => {

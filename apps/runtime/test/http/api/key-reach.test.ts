@@ -10,7 +10,7 @@ const scout = { name: 'Scout', avatar: { glyph: 'S', hue: 120 }, role: 'Finds th
 
 /** The grant the edge forwards for a key (ADR 0081): every scope, and one server it may name in a setup. */
 const grant = (keyId = 'key-1', scopes = ['topics', 'conversations', 'personas']) => ({
-  'x-goblin-key': JSON.stringify({ keyId, scopes, servers: ['mycut'] }),
+  'x-goblin-caller': JSON.stringify({ kind: 'key', keyId, scopes, servers: ['mycut'] }),
 })
 const KEY = grant()
 const OTHER = grant('key-2')
@@ -195,7 +195,7 @@ describe("an API key's reach (ADR 0081)", () => {
     const refused = await fetch(get('/api/personas?limit=1', KEY))
     expect(refused.status).toBe(401)
     expect(await refused.json()).toMatchObject({
-      error: { reason: 'key_rate_limited', retryAfter: expect.any(Number) },
+      error: { reason: 'rate_limited', retryAfter: expect.any(Number) },
     })
     expect((await fetch(get('/api/personas?limit=1', OTHER))).status).toBe(200)
   })
@@ -207,7 +207,7 @@ describe("an API key's reach (ADR 0081)", () => {
     const topicsOnly = grant('key-3', ['topics'])
     const refused = await fetch(post('/api/personas', { ...scout, operationId: 'svc:p' }, topicsOnly))
     expect(refused.status).toBe(403)
-    await refusedFor(refused, 'key_scope')
+    await refusedFor(refused, 'scope')
     // An endpoint no key reaches: Undo in the organize log.
     expect((await fetch(post('/api/organize/receipt-1/undo', {}, KEY))).status).toBe(403)
     await fetch(post('/api/topics', { name: 'B', operationId: 'owner-b' }))

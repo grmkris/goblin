@@ -1,4 +1,4 @@
-import type { KeyScope } from '@goblin/contracts'
+import type { CallerScope } from '@goblin/contracts'
 import { AccountApi, AppError, ErrorEnvelope, Forbidden, NotFound, OwnerApi } from '@goblin/contracts/api'
 import { FORWARDED_HEADER } from '@goblin/contracts/internal'
 import * as Effect from 'effect/Effect'
@@ -13,8 +13,15 @@ import { readBytes } from '../body.ts'
 import { crossOrigin, forgedWrite } from '../csrf.ts'
 import { attempt, isAppError } from '../errors.ts'
 import { AccountApiLayer, AccountRequest, type AccountRecords } from './account.ts'
-import { RequestContext, type RequestFacts, keyScopes, requestFacts, routeNames, routeTemplate } from './context.ts'
-import { KEY_HEADER, type KeyGrant, bearerKey, keyHeader } from './principal.ts'
+import {
+  RequestContext,
+  type RequestFacts,
+  endpointScopes,
+  requestFacts,
+  routeNames,
+  routeTemplate,
+} from './context.ts'
+import { CALLER_HEADER, type Caller, type KeyGrant, bearerKey, callerHeader } from './principal.ts'
 import { answer, refusal, secured } from './render.ts'
 
 /**
@@ -71,13 +78,13 @@ const OWNER_PREFIX = '/api/'
  * The headers an owner request carries to its agent: the edge's reference, the owner-forward mark and `FORWARDED`; for
  * a key, its grant, and never an App's caller mark.
  */
-const forwardedHeaders = (request: Request, ref: string, key: KeyGrant | undefined): Headers => {
+const forwardedHeaders = (request: Request, ref: string, caller: Caller | undefined): Headers => {
   const headers = new Headers({ 'x-goblin-ref': ref, [FORWARDED_HEADER]: 'owner' })
   for (const name of FORWARDED) {
     const value = request.headers.get(name)
-    if (value !== null && !(key !== undefined && name === 'x-mcp-caller')) headers.set(name, value)
+    if (value !== null && !(caller !== undefined && name === 'x-mcp-caller')) headers.set(name, value)
   }
-  if (key !== undefined) headers.set(KEY_HEADER, keyHeader(key))
+  if (caller !== undefined) headers.set(CALLER_HEADER, callerHeader(caller))
   return headers
 }
 
@@ -106,20 +113,21 @@ const admitUser = (request: Request, edge: Edge): Effect.Effect<string, AppError
 /**
  * Admission of a server by its API key (ADR 0081): a key is a server's, so a browser's cookie or Origin with it is
  * refused; the key must admit, and hold the scope of the endpoint the request names (`scope`, none for an endpoint no
- * key reaches). The user the key was made by, and its grant.
+ * key reaches). The user the key was made by, and the key as the request's caller (ADR 0086).
  */
 const admitKey = (
   request: Request,
   edge: Edge,
   key: string,
-  scope: KeyScope | undefined,
-): Effect.Effect<{ readonly userId: string; readonly key: KeyGrant }, AppError> =>
+  scope: CallerScope | undefined,
+): Effect.Effect<{ readonly userId: string; readonly caller: Caller }, AppError> =>
   Effect.gen(function* () {
     if (request.headers.has('cookie') || request.headers.has('origin'))
       return yield* new Forbidden({ reason: 'key_browser' })
     const { userId, ...grant } = yield* edge.key(key)
-    if (scope === undefined || !grant.scopes.includes(scope)) return yield* new Forbidden({ reason: 'key_scope' })
-    return { userId, key: grant }
+    if (scope === undefined || !grant.scopes.some((held) => held === scope))
+      return yield* new Forbidden({ reason: 'scope' })
+    return { userId, caller: { kind: 'key', ...grant } }
   })
 
 /** A body read up to `limit` bytes; past it, `PayloadTooLarge` (`readBytes`). */
@@ -251,7 +259,7 @@ export const makeEdgeHttp: Effect.Effect<EdgeHttp> = Effect.gen(function* () {
   const observed = yield* Layer.build(Layer.mergeAll(LoggerLive, ReporterLive)).pipe(Scope.provide(scope))
   const accountRoute = routeNames(AccountApi)
   const ownerRoute = routeNames(OwnerApi)
-  const ownerScopes = keyScopes(OwnerApi)
+  const ownerScopes = endpointScopes(OwnerApi)
 
   const account = (request: Request, edge: Edge): Effect.Effect<Response> => {
     const path = new URL(request.url).pathname
@@ -287,14 +295,14 @@ export const makeEdgeHttp: Effect.Effect<EdgeHttp> = Effect.gen(function* () {
         if (!url.pathname.startsWith(OWNER_PREFIX) || isAccountPath(url.pathname))
           return yield* new NotFound({ what: 'route' })
         const token = bearerKey(request)
-        const { userId, key } =
+        const { userId, caller } =
           token === undefined
-            ? { userId: yield* admitUser(request, edge), key: undefined }
+            ? { userId: yield* admitUser(request, edge), caller: undefined }
             : yield* admitKey(request, edge, token, ownerScopes.get(facts.route))
         known(userId)
         const files = url.pathname === FILES || url.pathname.startsWith(`${FILES}/`)
         const body = files ? request.body : yield* bounded(request, JSON_BODY_LIMIT)
-        const headers = forwardedHeaders(request, facts.ref, key)
+        const headers = forwardedHeaders(request, facts.ref, caller)
         // A streamed body needs `duplex` outside workerd (Node, the unit tests); workerd ignores it and its types omit it.
         // The agent's redirect (an outbound sign-in's callback, to Connections) goes to the browser: a followed one would
         // ask the agent for a page it does not serve.

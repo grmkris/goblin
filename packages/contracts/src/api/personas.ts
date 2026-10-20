@@ -5,7 +5,7 @@ import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
 import { NonEmptyString } from '../ids.ts'
 import { CreatePersona, PersonaDetail, PersonaPage, PersonaReply, PersonaView, UpdatePersona } from '../personas.ts'
 import { ApiErrors } from './errors.ts'
-import { ApiKeyScope } from './keys.ts'
+import { EndpointScope } from './scope.ts'
 import { PageQuery } from './page.ts'
 
 /** A Persona's id in a path: 1 to 999999999. */
@@ -32,25 +32,25 @@ const PersonaQuery = { ...PageQuery, name: Schema.optional(NonEmptyString(32)) }
  */
 export class PersonasGroup extends HttpApiGroup.make('personas').add(
   HttpApiEndpoint.get('list', '/personas', { query: PersonaQuery, success: PersonaPage }).annotate(
-    ApiKeyScope,
+    EndpointScope,
     'personas',
   ),
   HttpApiEndpoint.post('create', '/personas', {
     payload: CreatePersona,
     success: PersonaView.pipe(HttpApiSchema.status(201)),
     error: [ApiErrors.conflict, ApiErrors.invalidInput],
-  }).annotate(ApiKeyScope, 'personas'),
+  }).annotate(EndpointScope, 'personas'),
   HttpApiEndpoint.get('detail', '/personas/:id', {
     params: { id: PersonaParam },
     success: PersonaDetail,
     error: ApiErrors.notFound,
-  }).annotate(ApiKeyScope, 'personas'),
+  }).annotate(EndpointScope, 'personas'),
   HttpApiEndpoint.patch('update', '/personas/:id', {
     params: { id: PersonaParam },
     payload: UpdatePersona,
     success: PersonaView,
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput],
-  }).annotate(ApiKeyScope, 'personas'),
+  }).annotate(EndpointScope, 'personas'),
   HttpApiEndpoint.post('reply', '/personas/reply', {
     payload: PersonaReply,
     success: Schema.Null.pipe(HttpApiSchema.status(202)),

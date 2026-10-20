@@ -1,6 +1,6 @@
 import type { Conversation, EntryRecord } from '@earendil-works/pi-durable'
 import { QuestionSpec, authorOf } from '@goblin/contracts'
-import type { TranscriptMessage } from '@goblin/contracts/internal'
+import type { TranscriptMessage } from '@goblin/contracts'
 import { Predicate } from 'effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'

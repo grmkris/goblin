@@ -3,6 +3,7 @@ import { describe, expect, it } from '@effect/vitest'
 import { type FlowEvent, RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
 import * as TestClock from 'effect/testing/TestClock'
+import { detailsInput } from '../src/inspect/service.ts'
 import { conversationId, entryId, submissionId } from '../src/pi/context.ts'
 import { flowRunEvent } from '../src/telemetry/events.ts'
 import { inspectionFixture } from './inspection-fixture.ts'
@@ -48,7 +49,7 @@ describe('inspection of flows', () => {
             { ...step('reply', '12'), at: NOW - 300 },
           ],
         })
-        const page = yield* inspection.run({ kind: 'flows', since: 0, limit: 1 })
+        const page = yield* inspection.flows({ since: 0, limit: 1 })
         expect(page).toMatchObject({ flows: [{ flow: 'move' }] })
       }),
     ),
@@ -162,7 +163,7 @@ describe('inspection of details', () => {
   it.effect('refuses a query naming neither an operation nor a chat entry, and finds nothing unknown', () =>
     withInspection(({ inspection }) =>
       Effect.gen(function* () {
-        expect(yield* Effect.flip(inspection.run({ kind: 'details', chat: '12' }))).toMatchObject({
+        expect(yield* Effect.flip(detailsInput({ chat: '12' }))).toMatchObject({
           _tag: 'InvalidInput',
         })
         expect(yield* Effect.flip(inspection.details({ operation: 'missing' }))).toMatchObject({

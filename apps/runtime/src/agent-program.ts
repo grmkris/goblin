@@ -24,7 +24,8 @@ import { AgentInput } from './runtime/input.ts'
 import { conversationId } from './pi/context.ts'
 import { PiSessions, fromPi } from './pi/sessions.ts'
 import type { HeldCallOutcome } from './mcp/connections/types.ts'
-import { type SharedContext, outcomeContent, ownerContent } from './pi/content.ts'
+import { requestAuthor } from './keys/policy.ts'
+import { type SharedContext, outcomeContent, ownerContent, withAuthor } from './pi/content.ts'
 import { askPersonas } from './personas/ask.ts'
 
 /** The registration gate for every owner conversation request. */
@@ -201,7 +202,7 @@ export const submitOwner = (input: OwnerSubmit) =>
     const shared = yield* sharedContext(appContext, input.thread)
     const selections = yield* resolveSelections(session, picks)
     const view = Option.getOrUndefined(yield* conversations.view(input.thread))
-    const content = ownerContent(input.text, shared, attachments, selections)
+    const content = withAuthor(yield* requestAuthor, ownerContent(input.text, shared, attachments, selections))
     if (personaIds.length > 0) {
       if (view?.kind === 'subagent') return yield* new InvalidInput({ reason: 'persona_subagent' })
       return yield* askPersonas(input, personaIds, personaOrder, content)

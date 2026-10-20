@@ -10,5 +10,5 @@ const inspectKeys = { details: (chat: string, entry: number) => ['inspect', 'det
 export const detailsQuery = (chat: string, entry: number) =>
   owner.apiQuery({
     queryKey: inspectKeys.details(chat, entry),
-    queryFn: (api) => api.inspect.details({ params: { id: chat }, query: { entry } }),
+    queryFn: (api) => api.inspect.details({ query: { chat, entry } }),
   })

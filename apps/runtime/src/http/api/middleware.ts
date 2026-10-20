@@ -1,4 +1,11 @@
-import { ApiKeyScope, Forbidden, OwnerAdmission, RenewsResident, Unauthenticated, withRef } from '@goblin/contracts/api'
+import {
+  EndpointScope,
+  Forbidden,
+  OwnerAdmission,
+  RenewsResident,
+  Unauthenticated,
+  withRef,
+} from '@goblin/contracts/api'
 import { FORWARDED_HEADER, InternalGate } from '@goblin/contracts/internal'
 import * as Clock from 'effect/Clock'
 import * as Context from 'effect/Context'
@@ -9,9 +16,10 @@ import * as HttpServerRequest from 'effect/http/HttpServerRequest'
 import type * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { type AppError, NotFound, isAppError } from '../errors.ts'
-import { keyMinutes } from '../../keys/rate.ts'
+import { callerMinutes } from '../../keys/rate.ts'
 import { Resident } from '../../mcp/service.ts'
 import { RequestContext } from './context.ts'
+import { callerId } from './principal.ts'
 
 /**
  * `handler` behind `admit`, as every API of the agent runs it: its logs carry the endpoint, the operation and the
@@ -38,28 +46,28 @@ const admitted = <A, E, R, E1, R1>(
 
 /**
  * Owner admission (`OwnerAdmission` in the contract): a renewal of resident authority unless the endpoint says
- * otherwise (`RenewsResident`: changing it must not renew first), then the handler. A request a server's API key sent
- * (ADR 0081) is admitted only to an endpoint whose `ApiKeyScope` the key holds, the edge's check made again here, and
- * within the key's requests for the minute (ADR 0085: past them, `key_rate_limited` with `retryAfter`), and never
- * renews: a key is not the owner's presence.
+ * otherwise (`RenewsResident`: changing it must not renew first), then the handler. A request from a caller (ADR 0086:
+ * a server's key or an OAuth client of the owner) is admitted only to an endpoint whose `EndpointScope` the caller
+ * holds (else `scope`), within its requests for the minute (else `rate_limited` with `retryAfter`, ADR 0085), and never
+ * renews: a caller is not the owner's presence. What it reaches past admission is its kind's (`keys/policy.ts`).
  */
 export const OwnerAdmissionLive = Layer.effect(
   OwnerAdmission,
   Effect.gen(function* () {
     const resident = yield* Resident
-    const take = keyMinutes()
+    const take = callerMinutes()
     const admit = (annotations: Context.Context<never>) =>
       Effect.flatMap(Effect.serviceOption(RequestContext), (context): Effect.Effect<void, AppError> => {
-        const key = Option.getOrUndefined(context)?.key
-        if (key === undefined) return Context.get(annotations, RenewsResident) ? resident.renew() : Effect.void
-        const scope = Context.get(annotations, ApiKeyScope)
-        if (scope === undefined || !key.scopes.includes(scope))
-          return Effect.fail(new Forbidden({ reason: 'key_scope' }))
+        const caller = Option.getOrUndefined(context)?.caller
+        if (caller === undefined) return Context.get(annotations, RenewsResident) ? resident.renew() : Effect.void
+        const scope = Context.get(annotations, EndpointScope)
+        if (scope === undefined || !caller.scopes.some((held) => held === scope))
+          return Effect.fail(new Forbidden({ reason: 'scope' }))
         return Effect.flatMap(Clock.currentTimeMillis, (now) => {
-          const retryAfter = take(key.keyId, now)
+          const retryAfter = take(callerId(caller), now)
           return retryAfter === undefined
             ? Effect.void
-            : Effect.fail(new Unauthenticated({ reason: 'key_rate_limited', retryAfter }))
+            : Effect.fail(new Unauthenticated({ reason: 'rate_limited', retryAfter }))
         })
       })
     return OwnerAdmission.of((handler, names) => admitted(handler, admit(names.endpoint.annotations), names))

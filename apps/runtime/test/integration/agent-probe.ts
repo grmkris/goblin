@@ -4,7 +4,7 @@ import { bindEndpoints } from '../../src/mcp/oauth/endpoints.ts'
 import { AddedServerStore } from '../../src/mcp/servers/servers.ts'
 import { runApplicationMigrations } from '../../src/storage/migrations.ts'
 import { appMcpCredentials, appMcpEndpoints, appMcpGrants, appMcpOauthPending } from '../../src/storage/schema.ts'
-import { askResult, recentResult } from '../internal-client.ts'
+import { askResult, recentResult } from '../caller-client.ts'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
 import { type ProbeEnv, type Probes, type ProbeStub, inAgent, inWorker } from './probe.ts'
 import {

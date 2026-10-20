@@ -1,10 +1,31 @@
+import type { CallerScope } from '@goblin/contracts'
+
 /**
- * goblin's one protected resource (ADR 0024): `/mcp`. Every client asks for the sign-in scopes and `goblin:inspect`;
- * the owner's consent decides, and a client consented without `goblin:inspect` gets no inspection tools.
+ * goblin's one protected resource (ADRs 0024, 0086): `/mcp`. A client asks for the sign-in scopes and the `goblin:*`
+ * scopes it wants; the owner's consent decides each one, and a token holds only what the consent still grants.
  */
-export const INSPECT_SCOPE = 'goblin:inspect'
-/** What a client may ask for: `offline_access` earns a refresh token, `goblin:inspect` the read-only inspection tools. */
-export const MCP_SCOPES = ['openid', 'profile', 'email', 'offline_access', INSPECT_SCOPE] as const
+const INSPECT_SCOPE = 'goblin:inspect'
+
+/**
+ * What each `goblin:*` scope lets an OAuth client of the owner do, as the caller scopes owner admission checks. Every
+ * consented client may ask the agent in main (`agent`); `goblin:inspect` reads how chats ran and the conversations in
+ * full.
+ */
+const GRANTS: Readonly<Record<string, readonly CallerScope[]>> = {
+  'goblin:topics': ['topics'],
+  'goblin:conversations': ['conversations'],
+  'goblin:personas': ['personas'],
+  [INSPECT_SCOPE]: ['inspect', 'transcripts'],
+}
+
+/** What a client may ask for: `offline_access` earns a refresh token, each `goblin:*` scope what `GRANTS` says. */
+export const MCP_SCOPES = ['openid', 'profile', 'email', 'offline_access', ...Object.keys(GRANTS)] as const
+
+/** The caller scopes a token's standing scopes give it (ADR 0086). */
+export const callerScopesOf = (scopes: readonly string[]): readonly CallerScope[] => [
+  'agent',
+  ...new Set(scopes.flatMap((scope) => GRANTS[scope] ?? [])),
+]
 
 /**
  * Every server API key's prefix (ADR 0081). An inbound OAuth access token is a JWS, so a bearer with this prefix is
@@ -28,7 +49,7 @@ export const protectedResourceMetadata = (appUrl: string, issuer: string) => ({
 
 /**
  * The 401 an unauthenticated request gets: where the metadata is, and the scopes to ask for, so a client's first
- * authorization already asks for inspection and the consent page can say so.
+ * authorization already asks for every `goblin:*` scope and the consent page offers each one.
  */
 export const challengeOf = (appUrl: string): Response =>
   new Response(JSON.stringify({ error: 'Unauthenticated' }), {

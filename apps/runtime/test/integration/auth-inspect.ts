@@ -9,7 +9,7 @@ const APP = 'https://goblin.test'
 const REDIRECT = 'http://127.0.0.1:9/callback'
 const RESOURCE = `${APP}/mcp`
 const SIGN_IN_SCOPES = 'openid profile email offline_access'
-const ALL_SCOPES = `${SIGN_IN_SCOPES} goblin:inspect`
+const ALL_SCOPES = `${SIGN_IN_SCOPES} goblin:topics goblin:conversations goblin:personas goblin:inspect`
 const Registered = Schema.Struct({ client_id: Schema.String })
 const Tokens = Schema.Struct({ access_token: Schema.String, refresh_token: Schema.optional(Schema.String) })
 const Redirect = Schema.Struct({ url: Schema.optional(Schema.String), redirect_uri: Schema.optional(Schema.String) })
@@ -142,6 +142,49 @@ async function toolsOf(base: string, access: string): Promise<readonly string[]>
   }
 }
 const inspection = (tools: readonly string[]) => tools.filter((name) => name.startsWith('inspect_'))
+/** The tools that manage the owner's Topics, chats and Personas (ADR 0086), sorted. */
+const MANAGEMENT = [
+  'conversation_entries',
+  'conversation_send',
+  'conversation_stop',
+  'models_list',
+  'persona_create',
+  'persona_get',
+  'persona_list',
+  'persona_update',
+  'thread_start',
+  'topic_create',
+  'topic_get',
+  'topic_list',
+  'topic_set_setup',
+  'topic_update',
+]
+const management = (tools: readonly string[]) => tools.filter((name) => MANAGEMENT.includes(name)).toSorted()
+
+/** A Persona one of the owner's own API keys made (ADR 0081), by its name. */
+async function keyMadePersona(base: string, who: Person): Promise<string> {
+  const browser = { cookie: who.cookie, origin: APP, 'x-goblin-csrf': '1', 'cf-connecting-ip': who.ip }
+  const made = await fetch(`${base}/api/keys`, {
+    method: 'POST',
+    headers: { ...browser, 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'service', scopes: ['personas'], servers: [], expiresInDays: 1 }),
+  })
+  expect(made.status, await made.clone().text()).toBe(201)
+  const { secret } = Schema.decodeUnknownSync(Schema.Struct({ secret: Schema.String }))(await made.json())
+  const persona = await fetch(`${base}/api/personas`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Keymade',
+      avatar: { glyph: 'K', hue: 10 },
+      role: 'Made by a key',
+      instructions: 'Be brief.',
+      operationId: 'service:persona:1',
+    }),
+  })
+  expect(persona.status, await persona.clone().text()).toBe(201)
+  return 'Keymade'
+}
 const INSPECTION = [
   'inspect_conversations',
   'inspect_conversation',
@@ -170,8 +213,8 @@ async function discoveryCase(base: string) {
 }
 
 /**
- * ADR 0024 end to end on the real Worker, D1 auth store and agents: one /mcp, whose inspection tools a client gets
- * only while the owner's consent grants `goblin:inspect`.
+ * ADRs 0024 and 0086 end to end on the real Worker, D1 auth store and agents: one /mcp, whose inspection and management
+ * tools a client gets only while the owner's consent grants their `goblin:*` scopes, with the owner's reach.
  */
 export async function inspectAuthCase(base: string) {
   await discoveryCase(base)
@@ -183,17 +226,28 @@ export async function inspectAuthCase(base: string) {
   expect(asking.asked).toBe(true)
   expect([...(await toolsOf(base, asking.access))].toSorted()).toEqual(['ask_agent', 'get_recent_messages'])
 
-  // Reconnecting with inspection asks the owner again, and the same /mcp then offers the tools.
+  expect(management(await toolsOf(base, asking.access))).toEqual([])
+
+  // Reconnecting with every scope asks the owner again, and the same /mcp then offers inspection and management.
   const inspecting = await authorize(base, owner, clientId, { scope: ALL_SCOPES })
   expect(inspecting.asked).toBe(true)
   expect(inspecting.refresh).toBeDefined()
   const client = await connect(base, inspecting.access)
   try {
-    expect(inspection((await client.listTools()).tools.map((tool) => tool.name))).toEqual(INSPECTION)
+    const names = (await client.listTools()).tools.map((tool) => tool.name)
+    expect(inspection(names)).toEqual(INSPECTION)
+    expect(management(names)).toEqual(MANAGEMENT)
+    // The owner's reach (ADR 0086): a Persona one of the owner's keys made is the client's to read too.
+    const keyMade = await keyMadePersona(base, owner)
+    const personas = await client.callTool({ name: 'persona_list', arguments: {} })
+    expect(personas.isError, JSON.stringify(personas)).toBeFalsy()
+    expect(JSON.stringify(personas.structuredContent)).toContain(keyMade)
+    const topics = await client.callTool({ name: 'topic_list', arguments: { limit: 5 } })
+    expect(JSON.stringify(topics.structuredContent)).toContain('"personal":true')
     const conversations = await client.callTool({ name: 'inspect_conversations', arguments: {} })
     expect(conversations.isError, JSON.stringify(conversations)).toBeFalsy()
     expect(Schema.is(InspectConversations)(conversations.structuredContent)).toBe(true)
-    const missing = await client.callTool({ name: 'inspect_turn', arguments: { operationId: 'no-such-turn' } })
+    const missing = await client.callTool({ name: 'inspect_turn', arguments: { operation: 'no-such-turn' } })
     expect(missing).toMatchObject({ isError: true, content: [{ text: '{"_tag":"NotFound","what":"turn"}' }] })
   } finally {
     await client.close()
@@ -216,6 +270,7 @@ export async function inspectAuthCase(base: string) {
   expect(narrowed.asked).toBe(true)
   expect(inspection(await toolsOf(base, refreshed.access_token))).toEqual([])
   expect(inspection(await toolsOf(base, narrowed.access))).toEqual([])
+  expect(management(await toolsOf(base, narrowed.access))).toEqual([])
 
   // Reading main's newest messages works; revoking the client in Settings then ends every token.
   const reading = await connect(base, narrowed.access)

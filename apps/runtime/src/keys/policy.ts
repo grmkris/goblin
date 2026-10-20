@@ -18,10 +18,23 @@ import { type ReachKind, hasReach, madeByKey, recordReach } from './reach.ts'
  * made, and write setups under its server ceiling. Every program here does nothing for the owner's own session.
  */
 
-/** The key the current request came with; none for the owner's session or work outside a request. */
-export const requestKey: Effect.Effect<KeyGrant | undefined> = Effect.map(
+/** The request's caller (ADR 0086); none for the owner's session or work outside a request. */
+const requestCaller = Effect.map(
   Effect.serviceOption(RequestContext),
-  (context) => Option.getOrUndefined(context)?.key,
+  (context) => Option.getOrUndefined(context)?.caller,
+)
+
+/**
+ * The key the current request came with; none for the owner's session, an OAuth client of the owner (which reaches what
+ * the owner does) or work outside a request.
+ */
+export const requestKey: Effect.Effect<KeyGrant | undefined> = Effect.map(requestCaller, (caller) =>
+  caller?.kind === 'key' ? caller : undefined,
+)
+
+/** The name a request's OAuth client registered, which its messages carry (ADR 0086); none for any other request. */
+export const requestAuthor: Effect.Effect<string | undefined> = Effect.map(requestCaller, (caller) =>
+  caller?.kind === 'client' ? caller.name : undefined,
 )
 
 /**
