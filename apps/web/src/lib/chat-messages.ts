@@ -121,6 +121,9 @@ export function failureReason(raw: string): TurnFailure {
       text: "This model isn't available right now. Pick another model below and send again.",
       provider: true,
     }
+  // The runtime's own words when the model gave no answer, also when asked again (ADR 0083, `pi/model.ts` `NO_ANSWER`).
+  if (/gave no answer, also when asked again/iu.test(raw))
+    return { text: 'The model gave no answer, also when asked again.', provider: true }
   // Pi compacts once on an overflow; this is what is left when even the compacted conversation does not fit.
   if (/exceeds the context window|maximum context length|context[_ ]length[_ ]exceeded/iu.test(raw))
     return {
@@ -139,25 +142,12 @@ export function failureReason(raw: string): TurnFailure {
 }
 
 /** A turn that ended without an answer, or was cut short, says why instead of rendering nothing. */
-function assistantFailure(
-  message: Record<string, unknown>,
-  content: string,
-  calls: readonly ToolCallView[],
-): TurnFailure | undefined {
+function assistantFailure(message: Record<string, unknown>): TurnFailure | undefined {
   if (message.stopReason === 'error') return failureReason(isString(message.errorMessage) ? message.errorMessage : '')
   if (message.stopReason === 'aborted') return { text: 'Stopped before answering.', provider: false, stopped: true }
-  // A reasoning model can spend the whole limit thinking (glm-5.3 does on a long chat): then there is nothing to go on
-  // from, and asking it to continue meets the same wall.
-  if (message.stopReason === 'length' && content === '' && calls.length === 0)
-    return {
-      text: 'It spent its whole output limit thinking and wrote no answer. Send again, or pick another model below.',
-      provider: false,
-      cutOff: true,
-    }
+  // A response with no answer never gets here: the runtime asks again, then fails with its own words (ADR 0083).
   if (message.stopReason === 'length')
     return { text: 'Cut off at the output limit. Ask it to continue.', provider: false, cutOff: true }
-  if (content === '' && calls.length === 0 && message.stopReason === 'stop')
-    return { text: 'The model returned an empty answer.', provider: false }
   return undefined
 }
 
@@ -194,7 +184,7 @@ function assistantMessage(message: Record<string, unknown>, id: string, content:
       name: identifier(block.name),
       arguments: record(block.arguments) ?? {},
     }))
-  const failure = assistantFailure(message, content, toolCalls)
+  const failure = assistantFailure(message)
   const reasoning = reasoningText(message.content)
   const usage = tokenUsage(message.usage)
   return {
