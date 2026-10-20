@@ -116,7 +116,7 @@ composer's draft into a new thread's draft the same way. A draft's (Reply's or "
 thread operation under the draft's one operation id: it makes the thread and sends that message as its first. A send
 meanwhile waits for the same thread and goes into it as a message of its own, and a retry asks for the same thread
 again (`lib/draft-thread.ts`, `components/shell/thread-start.ts`). Details opens a sheet of what ran behind the message
-(`GET /api/conversations/:id/details?entry=`, the inspect group): its operation in a few lines, its steps in order with
+(`GET /api/inspect/details?chat=&entry=`, the inspect group): its operation in a few lines, its steps in order with
 their status and duration, the operations it led to, and what was not recorded; a message with nothing recorded says
 so. The channel and the panel follow conversations through one
 stream pool (`lib/stream-pool.ts`): one event stream per conversation however many show it, at most eight following
@@ -205,7 +205,7 @@ The conversation-scoped routes of the owner API: the `conversations`, `inspect`,
 | `GET /api/conversations/:id/events` | Raw. The chat's Pi events (SSE): a snapshot followed by committed batches. |
 | `GET /api/conversations/:id/history?before=<entry>` | Earlier entries, oldest first, with a `more` flag. |
 | `GET /api/conversations/:id/sources` | What the chat's answers retrieved from other chats (`SourceUse[]`, newest first, empty results left out): the source strips (ADR 0035). |
-| `GET /api/conversations/:id/details?operation=` or `?entry=` | The `inspect` group: what happened behind one message, its operation's timeline (with its turn when it ran one) and the operations related to it (`InspectDetails`, ADR 0037). |
+| `GET /api/inspect/details?operation=` or `?chat=&entry=` | The `inspect` group: what happened behind one message, its operation's timeline (with its turn when it ran one) and the operations related to it (`InspectDetails`, ADR 0037). |
 
 Every thread runs the `goblin.thread` extension (`pi/thread.ts`), added to that conversation alone when it is made;
 main never has it. It tells the model it is in a side thread and offers `share_back`: when the owner asks (the

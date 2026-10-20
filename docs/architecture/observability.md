@@ -139,12 +139,11 @@ without changing it or calling a model. The queries are in `contracts/src/inspec
   result: the operation's timeline (with its turn when it ran one) and `related`, the operations it came from and
   led to.
 
-The agent answers them on its internal API (`POST /internal/inspect` with `{ query }`), which only
-`/mcp` calls, for a client that holds `goblin:inspect` (see Inbound MCP). The owner's
-own app reads `details` through the owner API (`GET /api/conversations/:id/details`, the `inspect` group), for a
-message's Details sheet. The same group serves `turns`, `turn`, `problems` and `flows` (`GET /api/inspect/…`), which a
-server's API key with the `inspect` scope reads too, seeing only the run events of chats within its reach
-(`inspectReach`, ADR 0084).
+The agent answers them on the owner API's `inspect` group (`GET /api/inspect/…`, ADR 0086): the owner's app reads
+`details` for a message's Details sheet, and `/mcp`'s `inspect_*` tools call the same endpoints as their caller. The
+two conversation reads need `transcripts`, which only an OAuth client consented with `goblin:inspect` holds; the
+content-free reads need `inspect`, which a key can hold too, seeing only the run events of chats within its reach
+(`inspectReach`, ADR 0084; see Inbound MCP).
 
 The agent reads itself too: main has a `diagnose` tool (`pi/diagnose.ts`, wired by `telemetry/agent.ts`), so the
 owner can ask through a Source why something failed. Without an operation id it returns the last day's problems and turns;

@@ -72,7 +72,10 @@ goblin's components, charts, maps and diagrams, schedules that run on their own,
 the owner's MCP tools, a cheap model, notifications, other apps) that each wait for the owner's Allow. The Apps page lists them; an app can
 fill the workspace with its conversation docked beside it, roll back to an earlier version, or be deleted.
 
-goblin is reachable by AI clients over MCP and by scripts over the API (ADR 0081). A server the owner runs gets a
+goblin is reachable by AI clients over MCP and by scripts over the API (ADRs 0081, 0086). An MCP client (Claude Code,
+claude.ai, Cursor) signs in to `/mcp` with OAuth, and the owner consents to each scope it asks for: managing Topics,
+sending in chats, managing Personas, reading conversations and runs; with them it manages the agent as the owner does,
+from the same tools a server's key gets. A server the owner runs gets a
 scoped `gbk_` API key from Settings and, with it, makes its own Topics and Personas, sends into their chats and reads
 the replies after a cursor, at `/api` or as the same operations on `/mcp`. It lists and reads back what it made, and
 with the `inspect` scope sees how its own chats ran, content-free, down to where each turn's time went (ADR 0084). A

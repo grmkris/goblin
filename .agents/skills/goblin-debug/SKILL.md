@@ -49,7 +49,7 @@ is read-only: no query changes the agent or calls a model.
 The owner can also ask the agent itself ("why did that fail?"): its `diagnose` tool reads the same ledger.
 Use `all: true` to include expected waits and confirmed recovered attempts. Full turn timelines are never filtered.
 In the app, a message's Details (in its toolbar) shows what `details` shows, from the owner API
-(`GET /api/conversations/:id/details`).
+(`GET /api/inspect/details`).
 
 ## From a reference to the code
 
@@ -93,8 +93,8 @@ found in it.
 
 The ledger lives in `apps/runtime/src/telemetry/` and follows Pi's commit listener (`telemetry/pi.ts`); inspection is
 `apps/runtime/src/inspect/` (the `Inspection` service, and the owner API's `inspect` group in `inspect/api.ts`); the
-MCP tools are `apps/runtime/src/inbound/inspection.ts`, added to `/mcp` by `inbound/route.ts` for a token whose consent
-grants `goblin:inspect`. Lines go only through `observability/logger.ts` (closed `LOG_EVENTS`, allowlisted keys),
+MCP tools are `apps/runtime/src/inbound/inspect-tools.ts`, each calling the `inspect` group as its caller (ADR 0086):
+a token whose consent grants `goblin:inspect` gets all seven, a key with `inspect` the five content-free ones. Lines go only through `observability/logger.ts` (closed `LOG_EVENTS`, allowlisted keys),
 failures through `observability/report.ts`, and flow steps through `FlowEvents.record` (`observability/flows.ts`) to
 the ledger and, one point per operation, to Analytics Engine (`observability/ae.ts`). Their content-freedom is tested
 in `test/observability/`. A listener that throws faults

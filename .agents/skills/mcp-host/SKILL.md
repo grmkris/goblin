@@ -76,8 +76,11 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   which the edge forwards and the contract reads, so they are held to the App's grants. The OAuth callback is the
   `mcp` group's raw `oauthCallback` (`GET /api/mcp/oauth/callback`), a redirect to Connections, with `ref` when it
   failed.
-- Inbound `/mcp` reaches the agent through its internal API (`@goblin/contracts/internal`): `ask`, `recent`, and
-  `inspect` for a token that holds `goblin:inspect`, called on the stub through `inbound/client.ts`.
+- Inbound `/mcp` is one server for every caller (ADR 0086): an OAuth client of the owner or a server's `gbk_` key
+  (`inbound/route.ts`). Each tool in the registry (`inbound/tools.ts`, `mcp-server.ts`, `inspect-tools.ts`) calls one
+  owner endpoint as the caller (`ownerCall` in `inbound/client.ts`, forwarding `x-goblin-caller`) and is listed only
+  when the caller holds the endpoint's `EndpointScope`; owner admission checks the scope, counts the caller per minute
+  and never renews resident authority. A new tool is a new annotated endpoint first.
 - Fixture tests (`test/mcp/`) prove protocol behaviour; the real behaviour of mysi and its apps (myplan, mytab and the
   rest) is proven only on dev.
 

@@ -25,7 +25,7 @@ _Avoid_: apps that use your agent
 **API key**:
 A `gbk_` key the owner makes in Settings for a server they run (ADR 0081). It reaches only the Topics, chats and
 Personas it made, over `/api` or `/mcp`, and never keeps the agent active. Its scopes can change and it keeps what it
-made (ADR 0084).
+made (ADR 0084). With an OAuth client of the owner it is one of `/mcp`'s two kinds of caller (ADR 0086).
 _Avoid_: token, service account
 
 **Grant**:

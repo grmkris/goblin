@@ -72,7 +72,8 @@ owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
    probe: a tool the owner already allowed to run without asking, that the server says only reads (`readOnlyHint`), that
    the agent may call and that needs no input; a server without one is skipped;
 4. an inbound MCP client: dynamic registration, owner consent including `goblin:inspect`, PKCE token, `/mcp`
-   `initialize` and `tools/list` with the seven inspection tools, an `inspect_problems` read, an `ask_agent` model turn, an agent turn that calls that probe through `mcp_call` (only if step 3 proved it),
+   `initialize` and `tools/list` with the seven inspection tools (ADR 0086: every `inspect_*` tool, as the owner API's
+   caller), an `inspect_problems` read, an `ask_agent` model turn, an agent turn that calls that probe through `mcp_call` (only if step 3 proved it),
    `get_recent_messages` with the smoke client's author label, then revocation and a 401;
 5. a new empty thread, a model turn there, `share_back` verified as a new `app.shared` entry in main, then close;
 6. a `smokecount` subagent spawned from main and its attributed result posted back in main (a passive Delegate result, ADR 0033; with `synthesize` the report is an input main answers instead);

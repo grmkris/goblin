@@ -189,7 +189,10 @@ until it runs, real provider and Telegram delivery remain unverified.
   curl -sS "$GOBLIN_ORIGIN/api/conversations/<chat>/entries?after=0" -H "authorization: Bearer $GOBLIN_KEY"
   ```
 
-  The same key on `/mcp` lists `topic_create`, `conversation_send`, `conversation_entries` and the rest. With the
+  The same key on `/mcp` lists `topic_create`, `conversation_send`, `conversation_entries` and the rest for its
+  scopes. For your own MCP client use OAuth instead: an `.mcp.json` entry with only the URL
+  (`{"type": "http", "url": "$GOBLIN_ORIGIN/mcp"}`, no `headers`) signs in at the consent page, where you turn on what
+  it may manage (ADR 0086). With the
   `inspect` scope (Change scopes on the key in Settings), see where a Persona's answer spent its time:
 
   ```sh
@@ -325,7 +328,7 @@ until it runs, real provider and Telegram delivery remain unverified.
   `inspect_flows` shows how conversations moved (sends, replies, thread starts, moves, Personas, Delegates) and
   `inspect_details` the operation behind a message. Reading never calls a model; `ask_agent` does.
 - **The `goblin` CLI** (`apps/cli`) is the same from a terminal: an MCP client of `/mcp` that asks for
-  `goblin:inspect`, whose commands come from the server's tools.
+  `goblin:inspect`, whose commands come from the server's tools (`goblin turn <operation id>` reads one turn).
 
   ```sh
   export GOBLIN_ORIGIN=https://dev.goblin.surf   # which goblin: required, there is no default

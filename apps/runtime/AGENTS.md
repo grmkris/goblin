@@ -8,11 +8,12 @@ enter the workerd bundle.
 - **Owner API** ([ADR 0038](../../docs/adr/0038-typed-owner-api-served-by-the-agent.md)). An owner endpoint is an entry
   in its group in `packages/contracts/src/api` and a handler in its area's `api.ts`, served by the agent
   (`http/api/server.ts`) behind the Worker's edge (`http/api/edge.ts`) and owner admission (`OwnerAdmission`,
-  `http/api/middleware.ts`). Never add a Durable Object RPC method or a Worker route for the owner. The Worker's other
-  callers (inbound `/mcp`, the hooks, file links) use the internal API (`@goblin/contracts/internal`, behind
-  `InternalGate`, called through `inbound/client.ts`); the one RPC method left, `deleteAgentData`, returns an encoded
-  result (`http/rpc.ts`), because Workers RPC drops error classes. Annotate an endpoint `ApiKeyScope` only on purpose
-  (ADR 0081): it opens the endpoint to servers' keys over HTTP and `/mcp`, so it needs a tool in `inbound/api-server.ts`
+  `http/api/middleware.ts`). Never add a Durable Object RPC method or a Worker route for the owner. `/mcp` calls the
+  owner API as its caller, a key or an OAuth client of the owner (ADR 0086, `ownerCall` in `inbound/client.ts`); the
+  Worker's other callers (the hooks, file links) use the internal API (`@goblin/contracts/internal`, behind
+  `InternalGate`, `internalCall`); the one RPC method left, `deleteAgentData`, returns an encoded
+  result (`http/rpc.ts`), because Workers RPC drops error classes. Annotate an endpoint `EndpointScope` only on purpose
+  (ADRs 0081, 0086): it opens the endpoint to callers (servers' keys and OAuth clients of the owner) over HTTP and `/mcp`, so it needs a tool in `inbound/tools.ts`'s registry
   and its handler must confine a key with `keys/policy.ts`. Never for grants, resident authority, files or keys.
 - **Composition.** Services are `Context.Service` tags in `<area>/service.ts`, built by their area's layer in
   `layers/` over the core layer (`layers/core.ts`). `layers/index.ts` orders the start's steps, which are the boot
