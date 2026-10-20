@@ -53,6 +53,8 @@ export const appPersonaInvocations = sqliteTable(
     ord: integer('ord').notNull(),
     state: text('state', { enum: ['pending', 'running', 'answered', 'failed', 'stopped'] }).notNull(),
     answerEntry: integer('answer_entry'),
+    /** Why a failed invocation gave no answer (ADR 0083). */
+    reason: text('reason', { enum: ['no_answer', 'model_error', 'budget', 'unavailable'] }),
     createdAt: integer('created_at').notNull(),
     settledAt: integer('settled_at'),
   },

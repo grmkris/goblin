@@ -1,4 +1,4 @@
-import type { PersonaInvocationView } from '@goblin/contracts'
+import type { PersonaFailure, PersonaInvocationView } from '@goblin/contracts'
 import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import { appPersonaInvocations } from '../storage/personas.ts'
@@ -16,9 +16,23 @@ const view = (row: Row): PersonaInvocationView => ({
   order: row.ord,
   state: row.state,
   ...(row.answerEntry === null ? {} : { answerEntry: row.answerEntry }),
+  ...(row.reason === null ? {} : { reason: row.reason }),
   createdAt: row.createdAt,
   ...(row.settledAt === null ? {} : { settledAt: row.settledAt }),
 })
+
+/** How an invocation settles: answered with its entry, failed with why (ADR 0083), or stopped by the owner. */
+export type Settlement =
+  | { readonly state: 'answered'; readonly entry: number }
+  | { readonly state: 'failed'; readonly reason: PersonaFailure }
+  | { readonly state: 'stopped' }
+
+/** The columns a settlement writes. */
+const settled = (settlement: Settlement, now: number) => {
+  if (settlement.state === 'answered') return { state: settlement.state, answerEntry: settlement.entry, settledAt: now }
+  if (settlement.state === 'failed') return { state: settlement.state, reason: settlement.reason, settledAt: now }
+  return { state: settlement.state, settledAt: now }
+}
 
 /** One tagged Persona on one owner message, as the registry of Persona turns keeps it. */
 export type NewInvocation = {
@@ -126,16 +140,10 @@ export class PersonaInvocations<RunResult = unknown> {
   }
 
   /** Settles one invocation; a settled one stays as it is. */
-  settle(
-    operationId: string,
-    persona: number,
-    state: 'answered' | 'failed' | 'stopped',
-    now: number,
-    answerEntry?: number,
-  ): readonly PersonaInvocationView[] {
+  settle(operationId: string, persona: number, settlement: Settlement, now: number): readonly PersonaInvocationView[] {
     return this.#db
       .update(appPersonaInvocations)
-      .set({ state, settledAt: now, ...(answerEntry === undefined ? {} : { answerEntry }) })
+      .set(settled(settlement, now))
       .where(
         and(
           eq(appPersonaInvocations.operationId, operationId),

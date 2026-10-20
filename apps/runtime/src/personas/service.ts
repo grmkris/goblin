@@ -12,7 +12,7 @@ import * as Option from 'effect/Option'
 import { type AppError, attemptSync } from '../http/errors.ts'
 import { epochSeconds } from '../clock.ts'
 import { Changes } from '../runtime/changes.ts'
-import type { NewInvocation, PersonaInvocations } from './invocations.ts'
+import type { NewInvocation, PersonaInvocations, Settlement } from './invocations.ts'
 import type { PersonaActor, PersonaRegistry } from './registry.ts'
 
 /** One invocation's key: the owner's send and the Persona tagged in it. */
@@ -131,9 +131,8 @@ export class Invocations extends Context.Service<
     readonly settle: (
       operationId: string,
       persona: number,
-      state: 'answered' | 'failed' | 'stopped',
+      settlement: Settlement,
       now: number,
-      answerEntry?: number,
     ) => Effect.Effect<boolean>
     /** Stops every unsettled invocation in `chat` (the owner's Stop); answers how many it stopped. */
     readonly stopChat: (chat: string, now: number) => Effect.Effect<number>
@@ -172,11 +171,10 @@ export class Invocations extends Context.Service<
         settle: Effect.fn('Invocations.settle')(function* (
           operationId: string,
           persona: number,
-          state: 'answered' | 'failed' | 'stopped',
+          settlement: Settlement,
           now: number,
-          answerEntry?: number,
         ) {
-          const settled = yield* written(() => store.settle(operationId, persona, state, now, answerEntry))
+          const settled = yield* written(() => store.settle(operationId, persona, settlement, now))
           return settled.length > 0
         }),
         stopChat: Effect.fn('Invocations.stopChat')(function* (chat: string, now: number) {

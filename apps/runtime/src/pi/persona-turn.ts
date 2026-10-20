@@ -25,17 +25,20 @@ import {
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
+import * as Predicate from 'effect/Predicate'
+import type { PersonaFailure } from '@goblin/contracts'
 import { requireBudget } from '../budget.ts'
 import { Conversations } from '../chats/service.ts'
 import { requireResident } from '../mcp/service.ts'
 import { FlowEvents } from '../observability/flows.ts'
+import type { Settlement } from '../personas/invocations.ts'
 import { Invocations } from '../personas/service.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { withContext } from './context-tail.ts'
 import { authoredContent } from './content.ts'
 import { BACKGROUND, entryId } from './context.ts'
 import { questionJson } from './ask-user.ts'
-import { modelRef } from './model.ts'
+import { NO_ANSWER, modelRef } from './model.ts'
 import { holdJson, readAnswer } from './persona-answer.ts'
 import { ConversationMissing } from './subagent-relay.ts'
 import { epochSeconds } from '../clock.ts'
@@ -237,13 +240,13 @@ const ANSWER_STATUS = {
 } as const
 
 /**
- * Settles an invocation row: answered (with its entry), failed or stopped. The call that settles it records the
+ * Settles an invocation row: answered with its entry, failed with why, or stopped. The call that settles it records the
  * Persona's `persona_answer` flow, once; a settled row stays as it is and records nothing.
  */
-const settle = (input: Input, state: 'answered' | 'failed' | 'stopped', entry?: number) =>
+const settle = (input: Input, settlement: Settlement) =>
   Effect.gen(function* () {
     const now = yield* epochSeconds
-    const settled = yield* (yield* Invocations).settle(input.operationId, input.persona.id, state, now, entry)
+    const settled = yield* (yield* Invocations).settle(input.operationId, input.persona.id, settlement, now)
     if (!settled) return
     yield* FlowEvents.record({
       flow: 'persona_answer',
@@ -252,9 +255,26 @@ const settle = (input: Input, state: 'answered' | 'failed' | 'stopped', entry?: 
       chat: input.chat,
       operationId: input.operationId,
       ...(input.mode === undefined ? {} : { personaOrder: input.mode }),
-      ...ANSWER_STATUS[state],
+      ...ANSWER_STATUS[settlement.state],
     })
   })
+
+const failure = (reason: PersonaFailure): Settlement => ({ state: 'failed', reason })
+
+/**
+ * Why a Persona's fork gave no answer, from how Pi settled its prompt (ADR 0083): its model call failed, or its model
+ * gave none, also when goblin's model streams asked it again (`NO_ANSWER`).
+ */
+export const failureOf = (settled: { readonly status: string; readonly reason?: string; readonly detail?: unknown }) =>
+  settled.status === 'unanswered' &&
+  (settled.reason === 'model_error' || settled.reason === 'no_model') &&
+  settled.detail !== NO_ANSWER
+    ? 'model_error'
+    : 'no_answer'
+
+/** Why a Persona may not answer now: the day's model budget is spent, or the owner's authority is not current. */
+const refusalOf = (error: unknown): PersonaFailure =>
+  Predicate.isTagged(error, 'BudgetExhausted') ? 'budget' : 'unavailable'
 
 /**
  * What a Persona's fork works with: its Topic's setup joined with the setup the ask froze (ADR 0040), never subagents.
@@ -321,7 +341,7 @@ const placePhase =
       const at = before?.state === 'answered' && before.answerEntry !== undefined ? before.answerEntry : ask.entry
       return { status: 'running', checkpoint: { phase: 'fork', at } }
     }, context)
-    if (seen.outcome === 'missing') await run(settle(task.input, 'failed'))
+    if (seen.outcome === 'missing') await run(settle(task.input, failure('unavailable')))
     if (seen.outcome === 'waiting') await runtime.sleep(runtime.now() + Math.min(2000, 250 * (polls + 1)), context)
   }
 
@@ -370,12 +390,12 @@ const askPhase =
   async (task, runtime, context) => {
     const { fork } = task.state.checkpoint
     const conversation = await runtime.conversation(fork, context)
-    const unavailable = await run(mayAnswer).then(
-      () => false,
-      () => true,
+    const refused = await run(mayAnswer).then(
+      () => undefined,
+      (error: unknown) => refusalOf(error),
     )
-    if (conversation === undefined || unavailable) {
-      await run(settle(task.input, 'failed'))
+    if (conversation === undefined || refused !== undefined) {
+      await run(settle(task.input, failure(refused ?? 'unavailable')))
       await runtime.commit(() => failed('The Persona could not answer.'), context)
       return
     }
@@ -393,7 +413,7 @@ const askPhase =
     }, context)
     if (!read.answered) {
       const aborted = settled.status === 'unanswered' && settled.reason === 'aborted'
-      await run(settle(task.input, aborted ? 'stopped' : 'failed'))
+      await run(settle(task.input, aborted ? { state: 'stopped' } : failure(failureOf(settled))))
     }
   }
 
@@ -429,7 +449,7 @@ const writePhase =
         return Option.getOrUndefined(yield* written.placed)
       }),
     )
-    await run(settle(task.input, entry === undefined ? 'failed' : 'answered', entry))
+    await run(settle(task.input, entry === undefined ? failure('unavailable') : { state: 'answered', entry }))
     await runtime.commit(() => terminal, context)
   }
 
@@ -451,7 +471,7 @@ function turnTask(run: RunProgram) {
       write: writePhase(run),
     },
     abort: async (task, runtime, context) => {
-      await run(settle(task.input, 'stopped'))
+      await run(settle(task.input, { state: 'stopped' }))
       await runtime.commit(() => ({ status: 'terminal', outcome: { status: 'aborted' } }), context)
     },
   })

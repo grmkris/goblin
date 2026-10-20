@@ -47,8 +47,13 @@ describe('fresh application baseline', () => {
       .all()
       .map(({ name }) => name)
     expect(names).toEqual([...tables.keys(), ...FTS].toSorted())
-    expect(MIGRATIONS.map(({ key }) => key)).toEqual(['20261015000000_baseline', '20261020000000_key_reach'])
-    const owned = MIGRATIONS.flatMap((migration) => migration.tables)
+    expect(MIGRATIONS.map(({ key }) => key)).toEqual([
+      '20261015000000_baseline',
+      '20261020000000_key_reach',
+      '20261020120000_invocation_reason',
+    ])
+    // An additive migration that alters a table names it too, so a table may be named more than once.
+    const owned = [...new Set(MIGRATIONS.flatMap((migration) => migration.tables))]
     expect(owned.toSorted()).toEqual([...tables.keys(), 'app_transcript_fts'].toSorted())
     for (const name of owned) expect(() => assertApplicationTable(name)).not.toThrow()
   })

@@ -80,8 +80,17 @@ export const PersonaDetail = Schema.Struct({
 export type PersonaDetail = typeof PersonaDetail.Type
 
 /**
+ * Why a Persona gave no answer (ADR 0083): its model gave none, also when asked again (`no_answer`), its model call
+ * failed (`model_error`), the day's model budget is spent (`budget`), or it could not run or place its answer
+ * (`unavailable`: the owner's authority lapsed, or the message or chat is gone).
+ */
+export const PersonaFailure = Schema.Literals(['no_answer', 'model_error', 'budget', 'unavailable'])
+export type PersonaFailure = typeof PersonaFailure.Type
+
+/**
  * One tagged Persona answering one owner message: `order` is its place when the owner asked them in sequence ("then"),
- * otherwise they answer in parallel. `answerEntry` is the attributed answer written into `chat`.
+ * otherwise they answer in parallel. `answerEntry` is the attributed answer written into `chat`; `reason` says why a
+ * failed one gave none.
  */
 export const PersonaInvocationView = Schema.Struct({
   operationId: OperationId,
@@ -91,6 +100,7 @@ export const PersonaInvocationView = Schema.Struct({
   order: Schema.Int,
   state: Schema.Literals(['pending', 'running', 'answered', 'failed', 'stopped']),
   answerEntry: Schema.optional(EntryId),
+  reason: Schema.optional(PersonaFailure),
   createdAt: Schema.Number,
   settledAt: Schema.optional(Schema.Number),
 })

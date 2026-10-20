@@ -17,7 +17,8 @@ import { createPersona, updatePersona } from '../src/personas/program.ts'
 import { logMessage } from '../src/memory/log.ts'
 import { PersonaRegistry, defaultAvatar } from '../src/personas/registry.ts'
 import { withContext } from '../src/pi/context-tail.ts'
-import { PERSONA_DENIED_TOOLS, personaSelection, personaText } from '../src/pi/persona-turn.ts'
+import { NO_ANSWER } from '../src/pi/model.ts'
+import { PERSONA_DENIED_TOOLS, failureOf, personaSelection, personaText } from '../src/pi/persona-turn.ts'
 import { Receipts } from '../src/organize/service.ts'
 import { AppEngine } from '../src/agent-apps/service.ts'
 import { McpConnections, McpGrants, McpServers } from '../src/mcp/service.ts'
@@ -217,8 +218,8 @@ describe('Persona invocations', () => {
         yield* invocations.insert([{ ...asked, revision: 5 }], 11)
         const live = yield* invocations.live
         yield* invocations.running('op', 1)
-        const settled = yield* invocations.settle('op', 1, 'answered', 12, 77)
-        const again = yield* invocations.settle('op', 1, 'stopped', 13)
+        const settled = yield* invocations.settle('op', 1, { state: 'answered', entry: 77 }, 12)
+        const again = yield* invocations.settle('op', 1, { state: 'stopped' }, 13)
         return { live, settled, again }
       }).pipe(Effect.provideService(Changes, changes)),
     )
@@ -239,11 +240,48 @@ describe('Persona invocations', () => {
       ],
       10,
     )
-    invocations.settle('a', 2, 'answered', 11)
+    invocations.settle('a', 2, { state: 'answered', entry: 5 }, 11)
     expect(invocations.stopChat('1', 12)).toEqual([expect.objectContaining({ operationId: 'a', persona: 1 })])
     expect(invocations.get('a', 1)?.state).toBe('stopped')
     expect(invocations.get('a', 2)?.state).toBe('answered')
     expect(invocations.get('b', 1)?.state).toBe('pending')
+  })
+})
+
+describe('why a Persona gave no answer (ADR 0083)', () => {
+  it('keeps the reason a failed invocation settled with, and shows it only on that one', () => {
+    const { invocations } = fixture()
+    invocations.insert(
+      [
+        { operationId: 'a', persona: 1, revision: 1, chat: '1', order: 0 },
+        { operationId: 'a', persona: 2, revision: 1, chat: '1', order: 1 },
+      ],
+      10,
+    )
+    invocations.settle('a', 1, { state: 'failed', reason: 'no_answer' }, 11)
+    invocations.settle('a', 2, { state: 'answered', entry: 7 }, 11)
+    expect(invocations.ofChat('1', 10)).toEqual([
+      expect.objectContaining({ persona: 2, state: 'answered', answerEntry: 7 }),
+      expect.objectContaining({ persona: 1, state: 'failed', reason: 'no_answer' }),
+    ])
+    expect(invocations.get('a', 2)).not.toHaveProperty('reason')
+  })
+
+  it.each([
+    [
+      'its model gave none, also when asked again',
+      { status: 'unanswered', reason: 'model_error', detail: NO_ANSWER },
+      'no_answer',
+    ],
+    [
+      'its model call failed',
+      { status: 'unanswered', reason: 'model_error', detail: '503 Service Unavailable' },
+      'model_error',
+    ],
+    ['its model is not offered', { status: 'unanswered', reason: 'no_model' }, 'model_error'],
+    ['it answered with nothing to read', { status: 'done' }, 'no_answer'],
+  ])('reads %s as %s', (_case, settled, reason) => {
+    expect(failureOf(settled)).toBe(reason)
   })
 })
 
