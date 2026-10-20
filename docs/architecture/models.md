@@ -29,22 +29,37 @@ model view's `source` is `none`, the picker offers nothing (`ModelChoice` withou
 Settings' card ask for the owner's endpoint, and no cap applies.
 
 Each user picks the model their agent answers with, in the composer, among the models of the endpoint in use;
-`models.ts` names and groups known ids by route (Google, Alibaba Cloud), because quota runs out per route, and offers
+`models.ts` names and groups known ids by route (Google, Alibaba Cloud, Meta), because quota runs out per route, and offers
 an unknown one under its own name, text only. The pick is one row in `app_model_choice`; without one, or when the
 endpoint stops offering it, its default applies. Pi stores one model per conversation, set when it is created, so
 before each turn the agent sets it (`PiSessions.setModel`) for the conversation the turn runs in, skipping it when that
 conversation already has the model. A failed model call shows its reason in the chat, and a quota or outage failure
 points at the picker.
 
-Every response may run to 32 768 tokens (`MAX_OUTPUT_TOKENS`, `pi/model.ts`): reasoning models spend part of it
-thinking. pi-ai sends the limit on every request, less whatever the context leaves short of the window, so Pi
-compacts while the context still leaves a whole answer (`reserveTokens` in `pi/harness.ts`). pi-ai estimates the
-context from the last answer's usage, its thinking included, so one long reasoning answer can leave the next request a
-single token: below `MIN_ANSWER_ROOM` (4 096) goblin's stream sends nothing and fails as a context overflow, which Pi
-compacts and retries once. An answer that reaches the limit ends with `stopReason: 'length'`: the chat shows "Cut off
-at the output limit" under what it wrote (or, when it wrote nothing but thinking, says so and points at the picker),
-and Source replies carry the same line. glm-5.3 on the Token Plan thinks until the limit on hard prompts and ignores a thinking
-budget (probed 2026-10-12), which is why the picker says so.
+Thinking is bounded by each model's own control, never by the output limit ([ADR
+0083](../adr/0083-bounded-thinking-and-a-turn-that-answers.md)). `models.ts` records how each known model's thinking is
+bounded and `pi/model.ts` (`thinkingFields`) sends it through pi-ai's `reasoning`, `compat` and `thinkingLevelMap`: a
+`thinking_budget` per level for Qwen (Model Studio answers once it is spent), a `reasoning_effort` per level for
+DeepSeek, GLM, Gemini and Muse. Asking at no level asks for the least: `enable_thinking: false` where the model can
+switch thinking off (DeepSeek, Qwen), its least effort where it cannot (GLM, Gemini low; Muse minimal). A model goblin
+does not know is sent no thinking control. Conversations think at medium (`pi/harness.ts`); housekeeping, which asks at
+no level, thinks least. Each value was accepted by the deployment's endpoint (probed 2026-10-20).
+
+Every response may run to 32 768 tokens (`MAX_OUTPUT_TOKENS`), a ceiling: on Model Studio DeepSeek and GLM share it
+between thinking and answer. pi-ai sends the limit on every request, less whatever the context leaves short of the
+window, so Pi compacts while the context still leaves a whole answer (`reserveTokens` in `pi/harness.ts`). pi-ai
+estimates the context from the last answer's usage, its thinking included, so one long reasoning answer can leave the
+next request a single token: below `MIN_ANSWER_ROOM` (4 096) goblin's stream sends nothing and fails as a context
+overflow, which Pi compacts and retries once.
+
+A response that ends (`length` or `stop`) with no text and no tool call is asked once more (`answering`): the request
+goes again at no thinking level with a nudge to give the final answer or call a tool now, and that reply is the
+response, its tokens counted with the first's and marked `goblin.recovered` in the run ledger. When it gives no answer
+either, the response fails with `NO_ANSWER`, which Pi does not retry, marked cut off or empty; the chat says the
+model gave no answer and points at the picker. Muse ends a thought cut off with an empty `stop`, which is why both stop
+reasons count. An answer cut off mid-text ends with
+`stopReason: 'length'`: the chat shows "Cut off at the output limit" under what it wrote, and Source replies carry the
+same line.
 
 Housekeeping (thread titles, main's summaries and skill-draft decisions) runs on `GOBLIN_MEMORY_MODEL`. Set it to a
 cheap offered model; the code does not choose by price. Unset or not offered, it falls back to the default, and

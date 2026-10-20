@@ -74,3 +74,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0080](0080-server-owned-start-kickoff.md) | Server-owned Start kickoff | Accepted |
 | [0081](0081-api-keys-and-the-same-operations-over-mcp.md) | Scoped API keys for servers, and the same operations over /mcp | Accepted |
 | [0082](0082-personas-ask-with-ask-user.md) | A tagged Persona asks with ask_user | Accepted |
+| [0083](0083-bounded-thinking-and-a-turn-that-answers.md) | Bounded thinking, and a turn that answers | Accepted |
