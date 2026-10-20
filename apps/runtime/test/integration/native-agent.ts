@@ -1,6 +1,7 @@
 import { MessageReceipt } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { MIGRATIONS } from '../../src/storage/migrations.ts'
 import { URL as FileURL } from 'node:url'
 import { expect } from 'vitest'
 import { Listed, Ok, Refused } from './conversation-checks.ts'
@@ -124,7 +125,8 @@ async function baselineChecks(base: string): Promise<void> {
     firstPreserved: true,
     secondPreserved: true,
     tokens: 17,
-    migrations: 1,
+    // The baseline and every additive migration after it (ADR 0081), each recorded once.
+    migrations: MIGRATIONS.length,
   })
   expect(result.vendorTables).toEqual(expect.arrayContaining(['pi_entries', 'pi_submissions', 'cf_agents_jobs']))
   expect(result.vendorRows).toBeGreaterThan(0)
