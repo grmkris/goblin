@@ -33,7 +33,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0029](0029-composer-commands-and-references.md) | Composer commands, references and helper execution | Accepted; amended by 0067 |
 | [0030](0030-logical-chats-over-pi-sessions.md) | Logical chats over Pi sessions | Accepted; amended by 0067 |
 | [0032](0032-topics-and-per-topic-memory.md) | Topics and per-Topic memory | Accepted |
-| [0033](0033-personas.md) | Personas, organize receipts and Delegate results | Accepted; amended by 0067 |
+| [0033](0033-personas.md) | Personas, organize receipts and Delegate results | Accepted; amended by 0067; its `ask_user` denial superseded by 0082 |
 | [0034](0034-move-to-thread.md) | Start thread and Move to thread | Accepted; amended by 0067 |
 | [0035](0035-cross-topic-retrieval.md) | Cross-Topic retrieval | Accepted; amended by 0067 |
 | [0036](0036-slack-style-shell.md) | Slack-style shell | Accepted; amended by 0053; its rail and sidebar superseded by 0078 |
@@ -73,3 +73,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0079](0079-channel-info-and-goal-first-start.md) | Channel info and goal-first Start | Accepted; amended by 0080 |
 | [0080](0080-server-owned-start-kickoff.md) | Server-owned Start kickoff | Accepted |
 | [0081](0081-api-keys-and-the-same-operations-over-mcp.md) | Scoped API keys for servers, and the same operations over /mcp | Accepted |
+| [0082](0082-personas-ask-with-ask-user.md) | A tagged Persona asks with ask_user | Accepted |

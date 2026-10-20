@@ -326,6 +326,10 @@ single choice, multiple choice or free text. The tool result is the questions as
 `{ kind: 'question', questions }` (the `QuestionSpec` contract). It ends the run with `control: { terminate: true }`,
 so no model call waits on a person. The answer is the owner's next ordinary message, whether it comes from the web
 card or any other channel. A question counts as settled once a later user message exists.
+A tagged Persona asks the same way ([ADR 0082](../adr/0082-personas-ask-with-ask-user.md)): `ask_user` ends its fork's
+run, its `app.persona` answer carries `questions`, and the owner answers by tagging it again, so the next fork reads both.
+Readers that show only text use `personaAnswerText` (the words, then the numbered questions). A routine's Persona run
+has no `ask_user`.
 
 The browser URL, snapshot, history and queue use chat ids. Server-Sent Events resolve the current Pi session at
 connection: a snapshot of committed Pi entries, then batches, with a heartbeat. A chat keeps its Pi session, so its
