@@ -23,7 +23,11 @@ import { failed, standard, text } from './tools.ts'
 /** One typed owner API call as the key: its value, or a rejection with the agent's `AppError`. */
 export type OwnerCaller = <A>(call: (api: OwnerClient) => Effect.Effect<A, unknown>) => Promise<A>
 
-/** Each tool, by the endpoint it calls (`<group>.<endpoint>`). */
+/**
+ * Each tool, by the endpoint it calls (`<group>.<endpoint>`).
+ *
+ * @internal The parity test holds it to the endpoints annotated `ApiKeyScope`, one to one.
+ */
 export const KEY_TOOLS = {
   topic_create: 'topics.create',
   topic_update: 'topics.update',
