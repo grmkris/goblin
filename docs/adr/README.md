@@ -27,7 +27,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0021](0021-agent-apps.md) | Agent apps | Accepted; amended by 0070 and 0078 |
 | [0022](0022-owner-files-shell-and-r2.md) | The owner's files, in Shell's Workspace and R2 | Accepted; amended by 0065 |
 | [0023](0023-chat-blocks-and-one-kit.md) | Chat blocks, one kit | Accepted |
-| [0024](0024-observing-conversations.md) | Observing conversations | Accepted |
+| [0024](0024-observing-conversations.md) | Observing conversations | Accepted; amended by 0084, 0086 |
 | [0027](0027-typed-tools.md) | Typed tools and one `app_call` | Accepted; amended by 0067 |
 | [0028](0028-mcp-call-approvals.md) | Owner approval for an exact MCP call | Accepted |
 | [0029](0029-composer-commands-and-references.md) | Composer commands, references and helper execution | Accepted; amended by 0067 |
@@ -72,9 +72,10 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0078](0078-one-sidebar-and-one-apps-launcher.md) | One sidebar and one Apps launcher | Accepted |
 | [0079](0079-channel-info-and-goal-first-start.md) | Channel info and goal-first Start | Accepted; amended by 0080 |
 | [0080](0080-server-owned-start-kickoff.md) | Server-owned Start kickoff | Accepted |
-| [0081](0081-api-keys-and-the-same-operations-over-mcp.md) | Scoped API keys for servers, and the same operations over /mcp | Accepted; amended by 0084, 0085 |
+| [0081](0081-api-keys-and-the-same-operations-over-mcp.md) | Scoped API keys for servers, and the same operations over /mcp | Accepted; amended by 0084, 0085, 0086 |
 | [0082](0082-personas-ask-with-ask-user.md) | A tagged Persona asks with ask_user | Accepted |
 | [0083](0083-bounded-thinking-and-a-turn-that-answers.md) | Bounded thinking, and a turn that answers | Accepted |
 | [0084](0084-a-key-reads-back-what-it-made-and-how-it-ran.md) | A key reads back what it made, and how its chats ran | Accepted |
-| [0085](0085-a-keys-rate-limit-is-a-fixed-minute-counted-by-its-agent.md) | A key's rate limit is a fixed minute, counted by its agent | Accepted |
+| [0085](0085-a-keys-rate-limit-is-a-fixed-minute-counted-by-its-agent.md) | A key's rate limit is a fixed minute, counted by its agent | Accepted; amended by 0086 |
+| [0086](0086-one-mcp-for-every-caller.md) | One /mcp for every caller | Accepted |
 | [0087](0087-the-owners-own-subscription-models.md) | The owner's own subscription models | Accepted |
