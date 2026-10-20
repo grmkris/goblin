@@ -77,3 +77,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0083](0083-bounded-thinking-and-a-turn-that-answers.md) | Bounded thinking, and a turn that answers | Accepted |
 | [0084](0084-a-key-reads-back-what-it-made-and-how-it-ran.md) | A key reads back what it made, and how its chats ran | Accepted |
 | [0085](0085-a-keys-rate-limit-is-a-fixed-minute-counted-by-its-agent.md) | A key's rate limit is a fixed minute, counted by its agent | Accepted |
+| [0087](0087-the-owners-own-subscription-models.md) | The owner's own subscription models | Accepted |

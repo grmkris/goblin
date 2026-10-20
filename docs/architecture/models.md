@@ -29,7 +29,7 @@ model view's `source` is `none`, the picker offers nothing (`ModelChoice` withou
 Settings' card ask for the owner's endpoint, and no cap applies.
 
 Each user picks the model their agent answers with, in the composer, among the models of the endpoint in use;
-`models.ts` names and groups known ids by route (Google, Alibaba Cloud, Meta), because quota runs out per route, and offers
+`models.ts` names and groups known ids by route (Google, Alibaba Cloud, Meta, Your subscription), because quota runs out per route, and offers
 an unknown one under its own name, text only. The pick is one row in `app_model_choice`; without one, or when the
 endpoint stops offering it, its default applies. Pi stores one model per conversation, set when it is created, so
 before each turn the agent sets it (`PiSessions.setModel`) for the conversation the turn runs in, skipping it when that
@@ -65,6 +65,14 @@ Housekeeping (thread titles, main's summaries and skill-draft decisions) runs on
 cheap offered model; the code does not choose by price. Unset or not offered, it falls back to the default, and
 without deployment models to the default of the owner's endpoint (`models.ts` `memoryModelId`, `memory/model.ts`). Its
 tokens count toward the owner's daily usage like any other.
+
+**The owner's own models** ([ADR 0087](../adr/0087-the-owners-own-subscription-models.md)). `GOBLIN_OWNER_MODELS` are
+models on the deployment owner's own subscriptions, offered to `GOBLIN_OWNER_USER_ID`'s account alone, after every
+account's (`offeredEndpoint`); another account never lists, picks or reaches one. A server's work never runs on them:
+work through an API key, or in a Topic a key made (`serverWorkIn`, `keys/policy.ts`), answers on `Models.forServers`
+(the pick, unless it is one of the owner's own, then the default), a Persona's own model there must not be one
+(`Personas.ownModel`), a key reads the models without them (`Models.choiceForServers`) and cannot write one onto a
+Persona.
 
 ## Daily token usage
 
