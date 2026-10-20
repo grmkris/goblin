@@ -188,7 +188,12 @@ until it runs, real provider and Telegram delivery remain unverified.
   curl -sS "$GOBLIN_ORIGIN/api/conversations/<chat>/entries?after=0" -H "authorization: Bearer $GOBLIN_KEY"
   ```
 
-  The same key on `/mcp` lists `topic_create`, `conversation_send`, `conversation_entries` and the rest.
+  The same key on `/mcp` lists `topic_create`, `conversation_send`, `conversation_entries` and the rest. With the
+  `inspect` scope (Change scopes on the key in Settings), see where a Persona's answer spent its time:
+
+  ```sh
+  curl -sS "$GOBLIN_ORIGIN/api/inspect/turn?operation=persona:svc:job:1:first:<persona>" -H "authorization: Bearer $GOBLIN_KEY"
+  ```
 
 - **Tool details.** Open a tool line in a conversation to inspect Input and Output. JSON branches fold, long strings
   offer Show more, and large arrays load 50 items at a time. Markdown output opens formatted. Tree or Formatted and

@@ -42,16 +42,31 @@ goblin is an MCP server at `/mcp`, the one protected resource of Better Auth's `
 ## API keys
 
 A server the owner runs uses an API key instead of a session ([ADR 0081](../adr/0081-api-keys-and-the-same-operations-over-mcp.md)).
-The owner makes one in Settings: a name, its scopes (`topics`, `conversations`, `personas`), the connected MCP servers
-its setups may name, and a lifetime of at most a year. Better Auth's `apiKey()` plugin keeps it hashed in the auth D1
+The owner makes one in Settings: a name, its scopes (`topics`, `conversations`, `personas`, `inspect`), the connected
+MCP servers its setups may name, and a lifetime of at most a year. Change scopes on a key gives it other scopes later
+(`PATCH /api/keys/:keyId`, [ADR 0084](../adr/0084-a-key-reads-back-what-it-made-and-how-it-ran.md)): the same key, so it
+keeps what it made, and the change is logged as one `api_key` line. Better Auth's `apiKey()` plugin keeps it hashed in the auth D1
 (`auth/api-keys.ts`); its own routes are not served. With `Authorization: Bearer gbk_…` a key reaches:
 
 - `/api`: the owner endpoints annotated `ApiKeyScope` (Topics, sending and threads, the forward `entries` read,
   Personas), as the owner, never renewing resident authority;
 - `/mcp`: the same operations as tools (`inbound/api-server.ts`), each calling the owner API with the key's grant, so
-  admission, scopes and reach are one path.
+  admission, scopes and reach are one path:
+
+  | Scope | Tools |
+  | --- | --- |
+  | `topics` | `topic_list`, `topic_get`, `topic_create`, `topic_update`, `topic_set_setup` |
+  | `conversations` | `conversation_send`, `thread_start`, `conversation_entries`, `conversation_stop` |
+  | `personas` | `persona_list`, `models_list`, `persona_create`, `persona_get`, `persona_update` |
+  | `inspect` | `inspect_turns`, `inspect_turn`, `inspect_problems`, `inspect_flows`, `inspect_details` |
 
 A key reaches only the Topics, their chats and the Personas it made (`app_key_reach`); an operation id never adopts
 the owner's. Its Topics start with nothing in their setup, and any setup it writes names only its servers, tool by
 tool. Messages it sends are owner turns in those Topics: built-in tools are the owner's, and `searchExcluded` is not
 isolation.
+
+With `inspect` a key reads how its own chats ran, content-free (ADR 0084): the inspection reads of the owner's
+`goblin:inspect` without the conversation reads, seeing only the run events of chats within its reach (its Topics, their
+threads and Persona forks). `inspect_details` of an operation it sent lists its Personas' answers under `related`
+(`persona:<operation>:<persona id>`), and `inspect_turn` of one gives its `steps` in order and `spent`: where its time
+went, by model, tool and MCP server.

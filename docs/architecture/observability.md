@@ -125,6 +125,9 @@ without changing it or calling a model. The queries are in `contracts/src/inspec
 - `turn`: one operation end to end. It joins Pi's own settlement of the submission (`done` with its answer entry, or
   `unanswered` with a reason) with every run event of the operation, in order, and `coverage` names what the
   timeline cannot show: a restart mid-turn, events still open, a missing final answer, or a compaction's model call.
+  `steps` lists its model attempts, tool calls, compactions and errors in order with their start offsets and durations
+  (model, tokens, finish reason, time to first chunk; tool, MCP server and tool, failure class), and `spent` says where
+  its time went: wall, model and tool time, tool time by server, and the rest (ADR 0084).
 - `problems`: events needing attention since a time (default the last day); expected authority waits and confirmed
   recovered model retries are filtered before applying the limit. Pass `all: true` for the full problem history.
   Cutoffs, empty answers and coverage gaps remain visible. Tool failures remain until reviewed; a successful turn
@@ -139,7 +142,9 @@ without changing it or calling a model. The queries are in `contracts/src/inspec
 The agent answers them on its internal API (`POST /internal/inspect` with `{ query }`), which only
 `/mcp` calls, for a client that holds `goblin:inspect` (see Inbound MCP). The owner's
 own app reads `details` through the owner API (`GET /api/conversations/:id/details`, the `inspect` group), for a
-message's Details sheet.
+message's Details sheet. The same group serves `turns`, `turn`, `problems` and `flows` (`GET /api/inspect/…`), which a
+server's API key with the `inspect` scope reads too, seeing only the run events of chats within its reach
+(`inspectReach`, ADR 0084).
 
 The agent reads itself too: main has a `diagnose` tool (`pi/diagnose.ts`, wired by `telemetry/agent.ts`), so the
 owner can ask through a Source why something failed. Without an operation id it returns the last day's problems and turns;

@@ -36,27 +36,27 @@ from context. Owner admission (the `OwnerAdmission` middleware, `http/api/middle
 before its handler, and before its body is decoded: a renewal of resident authority, except where an endpoint is
 annotated `RenewsResident: false` (`POST /api/agent/resident`, the event streams, the entries read, the files group and the
 OAuth callback). A request a key sent never renews it; owner admission checks the key's scope again, and the Topics,
-conversations and Personas handlers confine a key to what it made (`keys/policy.ts`, `app_key_reach`). It annotates the request's logs with `goblin.rpc`
+conversations, Personas and inspection handlers confine a key to what it made (`keys/policy.ts`, `app_key_reach`): its lists hold only its own, and inspection sees only its own chats' run events (ADR 0084). It annotates the request's logs with `goblin.rpc`
 (`<group>.<endpoint>`), `goblin.operation` and `ref`, and stamps `ref` on every typed failure.
 
 | Group | Paths under `/api` | Handlers |
 | --- | --- | --- |
 | `conversations` | `/conversations`, `/conversations/:id`, and under it `messages`, `threads`, `move`, `stop`, `queue`, `read`, `composer`, `snapshot`, `history`, `sources`, `events` (SSE) | `chats/api.ts` |
-| `inspect` | `GET /conversations/:id/details` | `inspect/api.ts` |
+| `inspect` | `GET /conversations/:id/details`, `GET /inspect/turns`, `/inspect/turn`, `/inspect/problems`, `/inspect/flows` | `inspect/api.ts` |
 | `topics` | `/topics`, `/topics/:id`, `/topics/:id/setup` | `topics/api.ts` |
 | `setup` | `GET /setup/catalog` | `setup/api.ts` |
 | `personas` | `/personas`, `/personas/:id` | `personas/api.ts` |
 | `organize` | `/organize/:id/undo` | `organize/api.ts` |
 | `mcp` | `/mcp/servers`, `/mcp/suggested`, `/mcp/catalog`, `/mcp/registries`, `/mcp/registries/remove`, `/mcp/grants`, `/mcp/grants/batch`, `/mcp/ask-first`, `/mcp/skills`, `/mcp/app-grants`, `/mcp/approvals/:id`, `/mcp/url-requests/:id`, `/mcp/oauth/callback`, and `/mcp/:id/` `tools`, `events`, `connect`, `step-up`, `disconnect`, `remove`, `tools/call`, `resources/read` | `mcp/servers/api.ts` |
 | `resident` | `/agent/resident` | `mcp/resident-api.ts` |
-| `agent` | `/agent/usage`, `/agent/model`, `/agent/model-endpoint` | `routines/agent-api.ts` |
+| `agent` | `/agent/usage`, `/agent/model`, `/agent/model-endpoint`, `GET /models` | `routines/agent-api.ts` |
 | `memory` | `/agent/memory` | `memory/api.ts` |
 | `routines` | `/routines`, `/routines/settings`, `/routines/:id`, and under it `confirm`, `pause`, `run`, `runs` | `routines/api.ts` |
 | `apps` | `/apps`, `/apps/:id`, and under it `launch`, `state`, `call`, `diagnostics` | `apps/api.ts` |
 | `agentApps` | `/agent-apps`, `/agent-apps/:name` | `agent-apps/api.ts` |
 | `workspace` | `GET /workspace/events` (SSE) | `workspace/api.ts` |
 | `files` | `GET /files`, `GET`/`PUT`/`DELETE /files/content` | `files/api.ts` |
-| account (Worker) | `clients`: `/clients`, `/clients/:clientId`; `clientErrors`: `/client-errors` | `http/api/account.ts` |
+| account (Worker) | `clients`: `/clients`, `/clients/:clientId`; `keys`: `/keys`, `/keys/:keyId` (`PATCH` changes a key's scopes, ADR 0084); `clientErrors`: `/client-errors` | `http/api/account.ts` |
 
 What is not JSON in and out is served through HttpApi's raw handlers, all annotated `RenewsResident: false`: the two
 event streams (SSE), the owner's file bytes (streamed both ways, never buffered), and `mcp.oauthCallback`, a redirect
