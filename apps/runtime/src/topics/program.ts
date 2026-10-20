@@ -40,10 +40,10 @@ export const topicNamed = (name: string) =>
 export type Provenance = { readonly actor: TopicActor; readonly chat?: string; readonly operationId?: string }
 
 /**
- * A new Topic with its own Conversation, or the one this operation id already made; a new one leaves a receipt. A
- * Topic made from a discussion starts with `seed` (its brief and frozen excerpts).
+ * A new Topic with its own Conversation, or the one this operation id already made, and whether this call made it; a
+ * new one leaves a receipt. A Topic made from a discussion starts with `seed` (its brief and frozen excerpts).
  */
-export const createTopic = (input: CreateTopic, provenance: Provenance | TopicActor, seed?: TopicSeedData) => {
+export const madeTopic = (input: CreateTopic, provenance: Provenance | TopicActor, seed?: TopicSeedData) => {
   const { actor, chat } = typeof provenance === 'string' ? { actor: provenance, chat: undefined } : provenance
   const flow = {
     flow: 'topic_create',
@@ -71,11 +71,12 @@ export const createTopic = (input: CreateTopic, provenance: Provenance | TopicAc
         operationId: `topic.create:${input.operationId}`,
       })
     return made
-  }).pipe(
-    withFlow(flow, (made) => ({ topic: made.topic.id, status: made.created ? 'ok' : 'replayed' })),
-    Effect.map((made) => made.topic),
-  )
+  }).pipe(withFlow(flow, (made) => ({ topic: made.topic.id, status: made.created ? 'ok' : 'replayed' })))
 }
+
+/** A new Topic, or the one this operation id already made (`madeTopic`). */
+export const createTopic = (input: CreateTopic, provenance: Provenance | TopicActor, seed?: TopicSeedData) =>
+  Effect.map(madeTopic(input, provenance, seed), (made) => made.topic)
 
 /**
  * Rename, archive, restore or change a Topic's search opt-out. Archiving (v1, ADR 0032) hides it and then stops the

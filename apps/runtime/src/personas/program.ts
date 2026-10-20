@@ -41,8 +41,11 @@ export const snapshotOf = (persona: PersonaView): PersonaSnapshot => ({
   archived: persona.archivedAt !== undefined,
 })
 
-/** A new Persona at revision 1, or the one this operation id already made; a new one leaves a receipt. */
-export const createPersona = (input: CreatePersona, provenance: PersonaProvenance) =>
+/**
+ * A new Persona at revision 1, or the one this operation id already made, and whether this call made it; a new one
+ * leaves a receipt.
+ */
+export const madePersona = (input: CreatePersona, provenance: PersonaProvenance) =>
   Effect.gen(function* () {
     const personas = yield* Personas
     const receipts = yield* Receipts
@@ -61,8 +64,12 @@ export const createPersona = (input: CreatePersona, provenance: PersonaProvenanc
         afterRevision: made.persona.revision,
         operationId: `persona.create:${input.operationId}`,
       })
-    return made.persona
+    return made
   })
+
+/** A new Persona, or the one this operation id already made (`madePersona`). */
+export const createPersona = (input: CreatePersona, provenance: PersonaProvenance) =>
+  Effect.map(madePersona(input, provenance), (made) => made.persona)
 
 /** What a change did to a Persona, in a line. */
 function summaryOf(before: PersonaView, after: PersonaView): string {

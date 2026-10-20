@@ -11,6 +11,7 @@ import { withLines } from '../../observability/lines.ts'
 const APP = 'https://goblin.test'
 const OWNER = 'user-owner'
 const SECRET = 'secret-words'
+const KEY = `gbk_${'k'.repeat(64)}`
 
 /** The account's records, keeping the crash points asked for: each one's user, if the report came with a session. */
 const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
@@ -43,6 +44,10 @@ const deployment = (
         return Effect.fail(new Unauthenticated({ reason: 'session required' }))
       return Effect.succeed(OWNER)
     },
+    key: (key) =>
+      key === KEY
+        ? Effect.succeed({ userId: OWNER, keyId: 'key-1', scopes: ['topics', 'conversations'], servers: ['mycut'] })
+        : Effect.fail(new Unauthenticated({ reason: 'key' })),
     agent: () => ({
       fetch: async (request) => {
         seen.push(request)
@@ -230,6 +235,77 @@ describe('the owner forward', () => {
     const { lines } = await through('owner', new Request(`${APP}/api/agent-apps/${SECRET}/nothing`), edge)
     expect(lines).toMatchObject([{ route: '/api/agent-apps/{path}', status: 401, code: 'unauthenticated' }])
     expect(JSON.stringify(lines)).not.toContain(SECRET)
+  })
+})
+
+describe("a server's API key (ADR 0081)", () => {
+  /** A request a server sends with `key`: no cookie, no Origin, no CSRF header. */
+  const server = (path: string, init: { method?: string; headers?: Record<string, string>; body?: string } = {}) =>
+    new Request(`${APP}${path}`, {
+      method: init.method ?? 'POST',
+      headers: { authorization: `Bearer ${KEY}`, 'content-type': 'application/json', ...init.headers },
+      ...(init.body === undefined ? {} : { body: init.body }),
+    })
+
+  it("reaches its user's agent without a CSRF header, forwarding its grant and never the key or an App mark", async () => {
+    const { seen, edge } = deployment()
+    const request = server('/api/topics', {
+      headers: { 'x-mcp-caller': 'app', 'x-goblin-key': '{"keyId":"forged","scopes":["personas"],"servers":[]}' },
+      body: JSON.stringify({ name: 'x' }),
+    })
+    const { response } = await through('owner', request, edge)
+    expect(response.status).toBe(200)
+    const [forwarded] = seen
+    expect(forwarded?.headers.get('authorization')).toBeNull()
+    expect(forwarded?.headers.get('x-mcp-caller')).toBeNull()
+    expect(forwarded?.headers.get('x-goblin-forwarded')).toBe('owner')
+    expect(JSON.parse(forwarded?.headers.get('x-goblin-key') ?? '')).toEqual({
+      keyId: 'key-1',
+      scopes: ['topics', 'conversations'],
+      servers: ['mycut'],
+    })
+  })
+
+  it('never forwards a grant a session request names', async () => {
+    const { seen, edge } = deployment()
+    const request = write('/api/topics', { headers: { 'x-goblin-key': '{"keyId":"forged","scopes":[],"servers":[]}' } })
+    await through('owner', request, edge)
+    expect(seen[0]?.headers.get('x-goblin-key')).toBeNull()
+  })
+
+  it.each([
+    [
+      'an unknown key',
+      server('/api/topics', { headers: { authorization: `Bearer gbk_${'z'.repeat(64)}` } }),
+      401,
+      'key',
+    ],
+    ['a key with a cookie', server('/api/topics', { headers: { cookie: 'session=owner' } }), 403, 'key_browser'],
+    ['a key with an Origin', server('/api/topics', { headers: { origin: APP } }), 403, 'key_browser'],
+    ['an endpoint no key reaches', server('/api/agent/resident', { method: 'GET' }), 403, 'key_scope'],
+    ['a scope the key lacks', server('/api/personas', { body: '{}' }), 403, 'key_scope'],
+    ['a file upload', server('/api/files/uploads/a.txt', { method: 'PUT', body: 'x' }), 403, 'key_scope'],
+    ['a path that is no endpoint', server('/api/nothing/here', { method: 'GET' }), 403, 'key_scope'],
+    [
+      'an inbound OAuth token',
+      server('/api/topics', { headers: { authorization: 'Bearer eyJhbGciOi.eyJzdWIiOi.c2ln' } }),
+      401,
+      'session required',
+    ],
+  ] as const)('refuses %s without waking the agent', async (_case, request, status, reason) => {
+    const { seen, edge } = deployment()
+    const { response } = await through('owner', request, edge)
+    expect(response.status).toBe(status)
+    expect(JSON.stringify(await response.json())).toContain(reason)
+    expect(seen).toHaveLength(0)
+  })
+
+  it('never reaches the account API: a key cannot list or make keys', async () => {
+    const { edge } = deployment()
+    for (const request of [server('/api/keys', { method: 'GET' }), server('/api/keys', { body: '{}' })]) {
+      const { response } = await through('account', request, edge)
+      expect(response.status).toBe(401)
+    }
   })
 })
 

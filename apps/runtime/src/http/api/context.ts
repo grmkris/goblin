@@ -1,7 +1,10 @@
+import type { KeyScope } from '@goblin/contracts'
+import { ApiKeyScope } from '@goblin/contracts/api'
 import * as Context from 'effect/Context'
 import * as FindMyWay from 'effect/http/FindMyWay'
 import * as HttpApi from 'effect/http-api/HttpApi'
 import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
+import type { KeyGrant } from './principal.ts'
 
 /** What one owner API request says about itself, for logs and error references. Never content. */
 export interface RequestFacts {
@@ -13,6 +16,8 @@ export interface RequestFacts {
   readonly operation: string | undefined
   /** The endpoint the request reached, as `<group>.<endpoint>` (`topics.update`). */
   readonly route: string
+  /** The server API key the edge admitted the request by (ADR 0081); none for the owner's session. */
+  readonly key?: KeyGrant | undefined
 }
 
 /**
@@ -52,6 +57,24 @@ export const requestFacts = (request: Request, route: string): RequestFacts => (
 export const routeTemplate = (path: string): string => {
   const [, root = '', area, ...rest] = path.split('/')
   return area === undefined ? path : `/${root}/${area}${rest.length === 0 ? '' : '/{path}'}`
+}
+
+/**
+ * The scope each of `api`'s endpoints accepts an API key for (ADR 0081), by its name (`topics.update`): an endpoint
+ * without `ApiKeyScope` is absent, and refuses every key.
+ */
+export const keyScopes = <Id extends string, Groups extends HttpApiGroup.Constraint>(
+  api: HttpApi.HttpApi<Id, Groups>,
+): ReadonlyMap<string, KeyScope> => {
+  const scopes = new Map<string, KeyScope>()
+  HttpApi.reflect(api, {
+    onGroup: () => undefined,
+    onEndpoint: ({ group, endpoint }) => {
+      const scope = Context.get(endpoint.annotations, ApiKeyScope)
+      if (scope !== undefined) scopes.set(`${group.identifier}.${endpoint.identifier}`, scope)
+    },
+  })
+  return scopes
 }
 
 /** HttpApi paths are absolute; the guard only tells the router so. */

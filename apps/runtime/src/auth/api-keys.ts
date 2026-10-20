@@ -3,8 +3,8 @@ import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type { RuntimeEnv } from '../env.ts'
 import { Unauthenticated } from '../http/errors.ts'
+import type { KeyGrant } from '../http/api/principal.ts'
 import { createAuth } from './options.ts'
-import { KEY_PREFIX } from './resources.ts'
 
 /**
  * Server API keys (ADR 0081), on Better Auth's apiKey() plugin in the auth D1, read and written through Better Auth's
@@ -16,11 +16,8 @@ const DAY_SECONDS = 86_400
 const MODEL = 'apikey'
 
 /** A server the edge admitted by its key: the user who made the key, and what the key may reach. */
-export interface KeyPrincipal {
+export interface KeyPrincipal extends KeyGrant {
   readonly userId: string
-  readonly keyId: string
-  readonly scopes: readonly KeyScope[]
-  readonly servers: readonly string[]
 }
 
 const Permissions = Schema.Struct({ goblin: Schema.Array(KeyScope) })
@@ -45,14 +42,6 @@ const serversOf = (metadata: unknown): readonly string[] =>
     onNone: () => [],
     onSome: (decoded) => decoded.servers,
   })
-
-/** The key a request carries, when its `Authorization` header is a `gbk_` bearer: never an inbound OAuth token. */
-export const bearerKey = (request: Request): string | undefined => {
-  const header = request.headers.get('authorization')
-  if (header === null || !header.startsWith(`Bearer ${KEY_PREFIX}`)) return undefined
-  const key = header.slice('Bearer '.length)
-  return /^gbk_[A-Za-z0-9]{32,128}$/u.test(key) ? key : undefined
-}
 
 /**
  * The principal a key admits: valid, unexpired, within its rate limit, and made by a user who still exists. Anything

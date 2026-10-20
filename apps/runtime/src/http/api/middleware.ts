@@ -1,4 +1,4 @@
-import { OwnerAdmission, RenewsResident, withRef } from '@goblin/contracts/api'
+import { ApiKeyScope, Forbidden, OwnerAdmission, RenewsResident, withRef } from '@goblin/contracts/api'
 import { FORWARDED_HEADER, InternalGate } from '@goblin/contracts/internal'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
@@ -36,16 +36,24 @@ const admitted = <A, E, R, E1, R1>(
 
 /**
  * Owner admission (`OwnerAdmission` in the contract): a renewal of resident authority unless the endpoint says
- * otherwise (`RenewsResident`: changing it must not renew first), then the handler.
+ * otherwise (`RenewsResident`: changing it must not renew first), then the handler. A request a server's API key sent
+ * (ADR 0081) is admitted only to an endpoint whose `ApiKeyScope` the key holds, the edge's check made again here, and
+ * never renews: a key is not the owner's presence.
  */
 export const OwnerAdmissionLive = Layer.effect(
   OwnerAdmission,
   Effect.gen(function* () {
     const resident = yield* Resident
-    const admit = (renews: boolean) => (renews ? resident.renew() : Effect.void)
-    return OwnerAdmission.of((handler, names) =>
-      admitted(handler, admit(Context.get(names.endpoint.annotations, RenewsResident)), names),
-    )
+    const admit = (annotations: Context.Context<never>) =>
+      Effect.flatMap(Effect.serviceOption(RequestContext), (context) => {
+        const key = Option.getOrUndefined(context)?.key
+        if (key === undefined) return Context.get(annotations, RenewsResident) ? resident.renew() : Effect.void
+        const scope = Context.get(annotations, ApiKeyScope)
+        return scope !== undefined && key.scopes.includes(scope)
+          ? Effect.void
+          : Effect.fail(new Forbidden({ reason: 'key_scope' }))
+      })
+    return OwnerAdmission.of((handler, names) => admitted(handler, admit(names.endpoint.annotations), names))
   }),
 )
 

@@ -47,9 +47,10 @@ describe('fresh application baseline', () => {
       .all()
       .map(({ name }) => name)
     expect(names).toEqual([...tables.keys(), ...FTS].toSorted())
-    expect(MIGRATIONS.map(({ key }) => key)).toEqual(['20261015000000_baseline'])
-    expect(MIGRATIONS[0].tables.toSorted()).toEqual([...tables.keys(), 'app_transcript_fts'].toSorted())
-    for (const name of MIGRATIONS[0].tables) expect(() => assertApplicationTable(name)).not.toThrow()
+    expect(MIGRATIONS.map(({ key }) => key)).toEqual(['20261015000000_baseline', '20261020000000_key_reach'])
+    const owned = MIGRATIONS.flatMap((migration) => migration.tables)
+    expect(owned.toSorted()).toEqual([...tables.keys(), 'app_transcript_fts'].toSorted())
+    for (const name of owned) expect(() => assertApplicationTable(name)).not.toThrow()
   })
 
   it('matches every live column, SQL type, nullability and default', async () => {

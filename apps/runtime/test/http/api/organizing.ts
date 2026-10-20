@@ -24,7 +24,7 @@ import { PersonaRegistry } from '../../../src/personas/registry.ts'
 import { appConversations } from '../../../src/storage/schema.ts'
 import { TopicsHandlers } from '../../../src/topics/api.ts'
 import { TopicRegistry } from '../../../src/topics/registry.ts'
-import { currentResident, database, serve, served, stub } from './fixture.ts'
+import { currentResident, database, serve, served, sqliteDb, stub } from './fixture.ts'
 import { unread } from '../../fake.ts'
 
 /**
@@ -109,8 +109,13 @@ export const organizing = () => {
           lane,
           conversations,
           stub(AgentInput),
-          // No chat here is a Persona's fork: a reply to a hold finds none.
-          stub(Chats, { personaFork: () => Effect.succeed(Option.none()) }),
+          // No chat here is a Persona's fork: a reply to a hold finds none. A Topic's one chat is its own topic's.
+          stub(Chats, {
+            personaFork: () => Effect.succeed(Option.none()),
+            topicOf: (chat) => Effect.succeed(topics.list().find((topic) => topic.conversation === chat)?.id ?? 1),
+          }),
+          // What API keys made (ADR 0081), on the same SQLite.
+          sqliteDb(db),
           stub(PiSessions),
           stub(RoutineRuns),
           stub(RoutineControl),

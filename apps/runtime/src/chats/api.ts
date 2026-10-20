@@ -20,6 +20,7 @@ import {
   updateOwnerConversation,
 } from '../agent-program.ts'
 import { composerOptions } from '../composer.ts'
+import { confineChat, confineMessage } from '../keys/policy.ts'
 import { ownerQueue, removeOwnerQueuedInput } from '../conversation-queue.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { Retrieval } from '../retrieval/service.ts'
@@ -47,28 +48,46 @@ const contextOf = ({
   ...(personaOrder === undefined ? {} : { personaOrder }),
 })
 
+/**
+ * What an API key's request may touch (ADR 0081): a chat of its own Topics, with tags of its own Personas only. Nothing
+ * for the owner's session.
+ */
+const confined = (chat: string, context: ReturnType<typeof contextOf>) =>
+  Effect.andThen(confineChat(chat), confineMessage(context))
+
 /** The owner's message into a chat, or an ask of the Personas it tags. */
 const submit = ({ params, payload }: ChatWrite<SendMessage>) =>
-  sendOwnerMessage(params.id, { text: payload.input, operationId: payload.operationId, context: contextOf(payload) })
+  Effect.andThen(
+    confined(params.id, contextOf(payload)),
+    sendOwnerMessage(params.id, { text: payload.input, operationId: payload.operationId, context: contextOf(payload) }),
+  )
 
 /**
  * The thread operation from a chat (ADR 0034): Reply at an entry, "+" empty, or Start thread at the chat's newest
  * settled entry, the first message answered in the Thread, its Personas in the order it asks (`personaOrder`).
  */
-const threadStart = ({ params, payload }: ChatWrite<StartThread>) =>
-  startThread({
-    parent: params.id,
-    anchor: payload.anchor,
-    text: payload.message.input,
-    operationId: payload.operationId,
-    context: contextOf({ ...payload.message, personaOrder: payload.personaOrder }),
-  })
+const threadStart = ({ params, payload }: ChatWrite<StartThread>) => {
+  const context = contextOf({ ...payload.message, personaOrder: payload.personaOrder })
+  return Effect.andThen(
+    confined(params.id, context),
+    startThread({
+      parent: params.id,
+      anchor: payload.anchor,
+      text: payload.message.input,
+      operationId: payload.operationId,
+      context,
+    }),
+  )
+}
 
 const create = ({ payload }: { readonly payload: CreateConversation }) => createOwnerConversation(payload)
 const update = ({ params, payload }: ChatWrite<UpdateConversation>) => updateOwnerConversation(params.id, payload)
 const move = ({ params, payload }: ChatWrite<MoveToThread>) => moveToThread(params.id, payload)
 const stop = ({ params, payload }: ChatWrite<StopConversation>) =>
-  Effect.map(stopChat(params.id, payload.operationId), (stopped) => ({ stopped }))
+  Effect.andThen(
+    confineChat(params.id),
+    Effect.map(stopChat(params.id, payload.operationId), (stopped) => ({ stopped })),
+  )
 const queue = ({ params }: ChatRequest) => ownerQueue(params.id)
 const removeQueued = ({ params, payload }: ChatWrite<QueueRemoval>) => removeOwnerQueuedInput(params.id, payload)
 const markRead = ({ params }: ChatRequest) => Effect.map(markOwnerRead(params.id), (read) => ({ read }))

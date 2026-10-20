@@ -1,6 +1,7 @@
 import * as Effect from 'effect/Effect'
 import type { AgentRpc, RuntimeEnv } from '../env.ts'
 import { handleAuth, resourceMetadata, requireUserSession } from '../auth/index.ts'
+import { verifyKey } from '../auth/api-keys.ts'
 import { readBytes } from './body.ts'
 import { NotFound, attempt } from './errors.ts'
 import { accountRecords } from './api/account.ts'
@@ -26,6 +27,7 @@ const edgeOf = (env: RuntimeEnv): Edge => ({
       attempt(() => requireUserSession(request, env)),
       (session) => session.userId,
     ),
+  key: (key) => attempt(() => verifyKey(env, key)),
   agent: (userId) => agentOf(env, userId),
   records: accountRecords(env),
 })
