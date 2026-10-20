@@ -1,5 +1,5 @@
 import * as Schema from 'effect/Schema'
-import { ChatId, EntryId, NonEmptyString, OperationId, TopicId } from './ids.ts'
+import { ChatId, EntryId, NonEmptyString, OperationId, PageCursor, TopicId } from './ids.ts'
 import { SetupItems, TopicSetup } from './setup.ts'
 
 export const TopicName = NonEmptyString(80)
@@ -28,6 +28,26 @@ export const TopicView = Schema.Struct({
   createdAt: Schema.Number,
 })
 export type TopicView = typeof TopicView.Type
+
+/**
+ * A Topic in a list (`GET /api/topics`): who it is and how far it has changed, without its guidance or setup, which
+ * `GET /api/topics/:id` answers. `updatedAt` is its last change, in seconds.
+ */
+export const TopicSummary = Schema.Struct({
+  id: TopicId,
+  name: Schema.String,
+  conversation: ChatId,
+  personal: Schema.optional(Schema.Boolean),
+  revision: Schema.Int,
+  archived: Schema.Boolean,
+  searchExcluded: Schema.Boolean,
+  updatedAt: Schema.Number,
+})
+export type TopicSummary = typeof TopicSummary.Type
+
+/** A page of Topics, newest change first; `next` asks for the page after it. */
+export const TopicPage = Schema.Struct({ topics: Schema.Array(TopicSummary), next: Schema.optional(PageCursor) })
+export type TopicPage = typeof TopicPage.Type
 
 /**
  * `POST /api/topics`: the same operation id finds the same Topic. A new Topic opens its Conversation, with `setup` or

@@ -47,6 +47,13 @@ export const ModelChoice = Schema.Struct({
 export type ModelChoice = typeof ModelChoice.Type
 
 /**
+ * The models a Persona may name now (`GET /api/models`): those the owner's model endpoint in use offers, its default
+ * first. A Persona's `model` outside this list is refused when written and ignored when it answers.
+ */
+export const ModelOffer = Schema.Struct({ default: Schema.optional(Schema.String), models: Schema.Array(ModelOption) })
+export type ModelOffer = typeof ModelOffer.Type
+
+/**
  * Where the agent's model calls go (ADR 0059): the deployment's endpoint, or the owner's own OpenAI-compatible one,
  * shown by its base URL and the last characters of its key, never the key. `models` are the ones it serves, its
  * default first. `none` (ADR 0064): the deployment has no endpoint of its own and the owner has not set theirs, so no

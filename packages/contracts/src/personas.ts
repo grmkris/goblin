@@ -1,7 +1,7 @@
 import * as Schema from 'effect/Schema'
 import { QuestionSpec, questionText } from './conversations.ts'
-import { ChatId, EntryId, NonEmptyString, OperationId, PersonaId } from './ids.ts'
-import { PersonaSetup } from './setup.ts'
+import { ChatId, EntryId, NonEmptyString, OperationId, PageCursor, PersonaId } from './ids.ts'
+import { PersonaSetup, SetupSummary } from './setup.ts'
 
 /** A Persona's name, as `@name` in the composer: a letter, then up to 31 letters, digits, spaces, `_` or `-`. */
 export const PersonaName = Schema.String.check(Schema.isPattern(/^[A-Za-z][\w -]{0,31}$/u))
@@ -38,6 +38,27 @@ export const PersonaView = Schema.Struct({
   updatedAt: Schema.Number,
 })
 export type PersonaView = typeof PersonaView.Type
+
+/**
+ * A Persona in a list (`GET /api/personas`): who it is, its revision and model, and its setup in a line; its
+ * instructions and full setup are what `GET /api/personas/:id` answers. `updatedAt` is its last change, in seconds.
+ */
+export const PersonaSummary = Schema.Struct({
+  id: PersonaId,
+  name: Schema.String,
+  role: Schema.String,
+  avatar: PersonaAvatar,
+  revision: Schema.Int,
+  model: Schema.optional(Schema.String),
+  setup: SetupSummary,
+  archivedAt: Schema.optional(Schema.Number),
+  updatedAt: Schema.Number,
+})
+export type PersonaSummary = typeof PersonaSummary.Type
+
+/** A page of Personas, newest change first; `next` asks for the page after it. */
+export const PersonaPage = Schema.Struct({ personas: Schema.Array(PersonaSummary), next: Schema.optional(PageCursor) })
+export type PersonaPage = typeof PersonaPage.Type
 
 /** `POST /api/personas`: the same operation id finds the same Persona. Without a setup it adds nothing. */
 export const CreatePersona = Schema.Struct({

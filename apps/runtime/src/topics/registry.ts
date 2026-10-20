@@ -4,13 +4,16 @@ import {
   PERSONAL_TOPIC,
   type TopicSeedData,
   type TopicSetup,
+  type TopicSummary,
   type TopicView,
   type UpdateTopic,
 } from '@goblin/contracts'
-import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Effect from 'effect/Effect'
 import { type AppError, Conflict, InvalidInput, NotFound, attemptSync } from '../http/errors.ts'
+import { reachedIds } from '../keys/reach.ts'
+import { after, pageOf } from '../storage/page.ts'
 import { appTopics } from '../storage/topics.ts'
 import { storedSetup, topicSetupOf } from './setup.ts'
 
@@ -50,6 +53,20 @@ const view = (row: Row): TopicView => ({
   createdBy: row.createdBy,
   createdAt: row.createdAt,
 })
+
+const summary = (row: Row): TopicSummary => ({
+  id: row.id,
+  name: row.name,
+  conversation: row.chatId,
+  ...(row.id === PERSONAL_TOPIC ? { personal: true } : {}),
+  revision: row.revision,
+  archived: row.archivedAt !== null,
+  searchExcluded: row.searchExcluded,
+  updatedAt: row.updatedAt,
+})
+
+/** Which page of Topics: after `cursor`, at most `limit`, and only key `key`'s own when it names one (ADR 0084). */
+export type TopicPageQuery = { readonly key?: string; readonly cursor?: string; readonly limit: number }
 
 /** A name as stored: runs of whitespace become one space, ends trimmed; nothing left is refused. */
 const cleanName = (name: string): string => {
@@ -95,6 +112,24 @@ export class TopicRegistry<RunResult = unknown> {
 
   get(id: number): TopicView {
     return view(this.#row(id))
+  }
+
+  /** A page of Topics, newest change first; archived ones too. */
+  page(query: TopicPageQuery): { readonly topics: readonly TopicSummary[]; readonly next?: string } {
+    const rows = this.#db
+      .select()
+      .from(appTopics)
+      .where(
+        and(
+          query.key === undefined ? undefined : inArray(appTopics.id, reachedIds(this.#db, query.key, 'topic')),
+          after(appTopics, query.cursor),
+        ),
+      )
+      .orderBy(desc(appTopics.updatedAt), desc(appTopics.id))
+      .limit(query.limit + 1)
+      .all()
+    const page = pageOf(rows, query.limit)
+    return { topics: page.rows.map(summary), ...(page.next === undefined ? {} : { next: page.next }) }
   }
 
   /** Whether the Topic is archived: its chats take no new work until it is restored. */

@@ -41,7 +41,14 @@ describe("a server's API key on /mcp (ADR 0081)", () => {
       const { tools } = await client.listTools()
       expect(tools.map((tool) => tool.name).toSorted()).toEqual(Object.keys(KEY_TOOLS).toSorted())
       const readOnly = tools.filter((tool) => tool.annotations?.readOnlyHint === true).map((tool) => tool.name)
-      expect(readOnly.toSorted()).toEqual(['conversation_entries', 'persona_get'])
+      expect(readOnly.toSorted()).toEqual([
+        'conversation_entries',
+        'models_list',
+        'persona_get',
+        'persona_list',
+        'topic_get',
+        'topic_list',
+      ])
       expect(client.getInstructions()).toContain("never the owner's")
     } finally {
       await client.close()
@@ -62,6 +69,21 @@ describe("a server's API key on /mcp (ADR 0081)", () => {
       expect(request?.headers.get('x-goblin-forwarded')).toBe('owner')
       expect(JSON.parse(request?.headers.get('x-goblin-key') ?? '')).toEqual(GRANT)
       expect(request?.headers.get('authorization')).toBeNull()
+    } finally {
+      await client.close()
+    }
+  })
+
+  it("lists the key's Personas with only the filters it was given (ADR 0084)", async () => {
+    const { client, seen } = await connect(() => Response.json({ personas: [] }))
+    try {
+      const result = await client.callTool({ name: 'persona_list', arguments: { name: 'edit', limit: 10 } })
+      expect(result.isError).not.toBe(true)
+      const url = new URL(seen[0]?.url ?? '')
+      expect(url.pathname).toBe('/api/personas')
+      expect(Object.fromEntries(url.searchParams)).toEqual({ limit: '10', name: 'edit' })
+      await client.callTool({ name: 'models_list', arguments: {} })
+      expect(new URL(seen[1]?.url ?? '').pathname).toBe('/api/models')
     } finally {
       await client.close()
     }

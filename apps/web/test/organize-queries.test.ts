@@ -29,19 +29,20 @@ const RECEIPT = 'org_0123456789abcdef0123456789abcdef'
 const fakeOwner = () => {
   const state = { topics: [PERSONAL], undone: false }
   const Topics = HttpApiBuilder.group(OwnerApi, 'topics', (handlers) =>
-    handlers
-      .handle('create', ({ payload }) => {
+    handlers.handleAll({
+      ...unusedHandlers(OwnerApi.groups.topics),
+      create: ({ payload }) => {
         if (state.topics.some((topic) => topic.name === payload.name))
           return Effect.fail(new Conflict({ reason: 'topic_name_taken' }))
         const topic: TopicView = { ...PERSONAL, id: state.topics.length + 1, name: payload.name, personal: undefined }
         state.topics.push(topic)
         return Effect.succeed(topic)
-      })
-      .handle('update', ({ params, payload }) => {
+      },
+      update: ({ params, payload }) => {
         const topic = state.topics.find((each) => each.id === params.id) ?? PERSONAL
         return Effect.succeed({ ...topic, ...(payload.name !== undefined && { name: payload.name }) })
-      })
-      .handle('setSetup', unusedHandlers(OwnerApi.groups.topics).setSetup),
+      },
+    }),
   )
   const Organize = HttpApiBuilder.group(OwnerApi, 'organize', (handlers) =>
     handlers.handle('undo', ({ params }) => {

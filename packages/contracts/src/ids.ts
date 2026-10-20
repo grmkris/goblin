@@ -26,3 +26,10 @@ export type PersonaId = typeof PersonaId.Type
 
 /** A Pi entry id: positive, unique across the agent's sessions. */
 export const EntryId = Schema.Int.check(Schema.isGreaterThan(0))
+
+/**
+ * Where the next page of a list ordered newest change first starts (`?cursor=`): opaque to callers, who pass back the
+ * `next` the last page answered.
+ */
+export const PageCursor = Schema.String.check(Schema.isPattern(/^\d{1,15}\.\d{1,12}$/u))
+export type PageCursor = typeof PageCursor.Type

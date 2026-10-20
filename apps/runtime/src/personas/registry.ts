@@ -9,11 +9,13 @@ import {
   type PersonaView,
   type UpdatePersona,
 } from '@goblin/contracts'
-import { and, asc, desc, eq, isNull, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { Conflict, InvalidInput, NotFound } from '../http/errors.ts'
+import { reachedIds } from '../keys/reach.ts'
+import { after, pageOf } from '../storage/page.ts'
 import { appPersonaRevisions, appPersonas } from '../storage/personas.ts'
 
 type Row = typeof appPersonas.$inferSelect
@@ -26,6 +28,20 @@ const decodeSetup = Schema.decodeUnknownOption(Schema.fromJsonString(PersonaSetu
 
 /** A Persona's stored setup (ADR 0040), or nothing added when the row cannot be read: a bad row never widens. */
 export const personaSetupOf = (stored: string): PersonaSetup => Option.getOrElse(decodeSetup(stored), () => NOTHING)
+
+/**
+ * Which page of Personas: after `cursor`, at most `limit`, only those whose name holds `name` (ignoring case) when it
+ * is given, and only key `key`'s own when it names one (ADR 0084).
+ */
+export type PersonaPageQuery = {
+  readonly key?: string
+  readonly name?: string
+  readonly cursor?: string
+  readonly limit: number
+}
+
+/** `text` as a LIKE pattern that matches it literally, with `\` as the escape character. */
+const literal = (text: string): string => text.replaceAll(/[\\%_]/gu, (char) => `\\${char}`)
 
 /** A name as stored: runs of whitespace become one space, ends trimmed. */
 const cleanName = (name: string): string => name.replaceAll(/\s+/gu, ' ').trim()
@@ -103,6 +119,27 @@ export class PersonaRegistry<RunResult = unknown> {
 
   get(id: number): PersonaView {
     return view(this.#row(id))
+  }
+
+  /** A page of Personas, newest change first; archived ones too. */
+  page(query: PersonaPageQuery): { readonly personas: readonly PersonaView[]; readonly next?: string } {
+    const rows = this.#db
+      .select()
+      .from(appPersonas)
+      .where(
+        and(
+          query.key === undefined ? undefined : inArray(appPersonas.id, reachedIds(this.#db, query.key, 'persona')),
+          query.name === undefined
+            ? undefined
+            : sql`${appPersonas.name} LIKE ${`%${literal(cleanName(query.name))}%`} ESCAPE '\\'`,
+          after(appPersonas, query.cursor),
+        ),
+      )
+      .orderBy(desc(appPersonas.updatedAt), desc(appPersonas.id))
+      .limit(query.limit + 1)
+      .all()
+    const page = pageOf(rows, query.limit)
+    return { personas: page.rows.map(view), ...(page.next === undefined ? {} : { next: page.next }) }
   }
 
   /** The active Persona named `name` (ignoring case), if any. */

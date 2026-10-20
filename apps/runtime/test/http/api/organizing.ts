@@ -130,5 +130,5 @@ export const organizing = () => {
       ),
     ),
   )
-  return { fetch, resident, topics, personas, receipts, flows, retooled }
+  return { fetch, db, resident, topics, personas, receipts, flows, retooled }
 }

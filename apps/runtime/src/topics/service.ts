@@ -1,11 +1,11 @@
-import type { CreateTopic, TopicSeedData, TopicSetup, TopicView, UpdateTopic } from '@goblin/contracts'
+import type { CreateTopic, TopicPage, TopicSeedData, TopicSetup, TopicView, UpdateTopic } from '@goblin/contracts'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import { type AppError, attemptSync } from '../http/errors.ts'
 import { KeyedLock } from '../observability/lock.ts'
 import { epochSeconds } from '../clock.ts'
 import { Changes } from '../runtime/changes.ts'
-import type { TopicActor, TopicRegistry } from './registry.ts'
+import type { TopicActor, TopicPageQuery, TopicRegistry } from './registry.ts'
 
 declare module '../runtime/changes.ts' {
   interface ChangeTopics {
@@ -33,6 +33,8 @@ export class Topics extends Context.Service<
     readonly list: Effect.Effect<readonly TopicView[]>
     /** One Topic; `NotFound` when there is none with `id`. */
     readonly get: (id: number) => Effect.Effect<TopicView, AppError>
+    /** A page of Topics, newest change first, archived ones too; only a key's own for a key (ADR 0084). */
+    readonly page: (query: TopicPageQuery) => Effect.Effect<TopicPage>
     /**
      * A new Topic named `input.name` with a new Conversation, or the one `input.operationId` already made. A name
      * another active Topic has is a `Conflict`; a Topic made from a discussion starts with `seed`.
@@ -68,6 +70,9 @@ export class Topics extends Context.Service<
         list: Effect.sync(() => store.list()).pipe(Effect.withSpan('Topics.list')),
         get: Effect.fn('Topics.get')(function* (id: number) {
           return yield* attemptSync(() => store.get(id))
+        }),
+        page: Effect.fn('Topics.page')(function* (query: TopicPageQuery) {
+          return yield* Effect.sync(() => store.page(query))
         }),
         create: Effect.fn('Topics.create')(function* (input: CreateTopic, actor: TopicActor, seed?: TopicSeedData) {
           const now = yield* epochSeconds

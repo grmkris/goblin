@@ -13,7 +13,7 @@ import { type AppError, attemptSync } from '../http/errors.ts'
 import { epochSeconds } from '../clock.ts'
 import { Changes } from '../runtime/changes.ts'
 import type { NewInvocation, PersonaInvocations, Settlement } from './invocations.ts'
-import type { PersonaActor, PersonaRegistry } from './registry.ts'
+import type { PersonaActor, PersonaPageQuery, PersonaRegistry } from './registry.ts'
 
 /** One invocation's key: the owner's send and the Persona tagged in it. */
 export type InvocationKey = { readonly operationId: string; readonly persona: number }
@@ -47,6 +47,10 @@ export class Personas extends Context.Service<
     readonly active: Effect.Effect<readonly PersonaView[]>
     /** One Persona; `NotFound` when there is none with `id`. */
     readonly get: (id: number) => Effect.Effect<PersonaView, AppError>
+    /** A page of Personas, newest change first, archived ones too; only a key's own for a key (ADR 0084). */
+    readonly page: (
+      query: PersonaPageQuery,
+    ) => Effect.Effect<{ readonly personas: readonly PersonaView[]; readonly next?: string }>
     /** The active Persona named `name`, ignoring case. */
     readonly byName: (name: string) => Effect.Effect<Option.Option<PersonaView>>
     /** A Persona with its revisions, newest first. */
@@ -74,6 +78,9 @@ export class Personas extends Context.Service<
         active: Effect.sync(() => store.active()).pipe(Effect.withSpan('Personas.active')),
         get: Effect.fn('Personas.get')(function* (id: number) {
           return yield* attemptSync(() => store.get(id))
+        }),
+        page: Effect.fn('Personas.page')(function* (query: PersonaPageQuery) {
+          return yield* Effect.sync(() => store.page(query))
         }),
         byName: Effect.fn('Personas.byName')(function* (name: string) {
           return yield* Effect.sync(() => Option.fromUndefinedOr(store.byName(name)))

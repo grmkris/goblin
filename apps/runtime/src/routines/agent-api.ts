@@ -8,8 +8,8 @@ import { Inference } from '../inference/service.ts'
 import { epochSeconds } from '../clock.ts'
 
 /**
- * The `agent` group: today's usage, the model and its endpoint. Each handler runs its
- * program; owner admission has already admitted the request.
+ * The `agent` group: today's usage, the model and its endpoint, and the models a Persona may name. Each handler runs
+ * its program; owner admission has already admitted the request.
  */
 export const AgentHandlers = HttpApiBuilder.group(OwnerApi, 'agent', (handlers) =>
   handlers
@@ -20,5 +20,14 @@ export const AgentHandlers = HttpApiBuilder.group(OwnerApi, 'agent', (handlers) 
     .handle('setModelEndpoint', ({ payload }) =>
       Effect.flatMap(epochSeconds, (now) => Inference.use((inference) => inference.setOwner(payload, now))),
     )
-    .handle('clearModelEndpoint', () => Inference.use((inference) => inference.clearOwner)),
+    .handle('clearModelEndpoint', () => Inference.use((inference) => inference.clearOwner))
+    .handle('models', () =>
+      Effect.map(
+        Models.use((models) => models.choice),
+        (choice) => ({
+          ...(choice.default === undefined ? {} : { default: choice.default }),
+          models: choice.options,
+        }),
+      ),
+    ),
 )

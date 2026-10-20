@@ -65,6 +65,11 @@ const fixture = () => {
   return { fetch, ledger, pinned, applied }
 }
 
+/** The grant the edge forwards for a key with `scopes` (ADR 0081). */
+const keyHeaders = (scopes: readonly string[]) => ({
+  'x-goblin-key': JSON.stringify({ keyId: 'key-1', scopes, servers: [] }),
+})
+
 describe('the agent group served by the agent', () => {
   it("answers today's usage in tokens against the deployment's cap", async () => {
     const { fetch, ledger } = fixture()
@@ -114,6 +119,21 @@ describe('the agent group served by the agent', () => {
     expect(plain.status).toBe(400)
     const cleared = await callOwner({ fetch }, (api) => api.agent.clearModelEndpoint())
     expect(cleared).toEqual({ source: 'deployment', deployment: true, models: ['model-a', 'model-b'] })
+  })
+
+  it("answers the models a Persona may name, also to a server's key with the personas scope (ADR 0084)", async () => {
+    const { fetch } = fixture()
+    const offer = {
+      default: 'model-a',
+      models: [expect.objectContaining({ id: 'model-a' }), expect.objectContaining({ id: 'model-b' })],
+    }
+    expect(await callOwner({ fetch }, (api) => api.agent.models())).toEqual(offer)
+    const answered = await fetch(json('GET', '/api/models', undefined, keyHeaders(['personas'])))
+    expect(answered.status).toBe(200)
+    expect(await answered.json()).toEqual(offer)
+    expect((await fetch(json('GET', '/api/models', undefined, keyHeaders(['topics'])))).status).toBe(403)
+    // The owner's own pick is not a key's to read.
+    expect((await fetch(json('GET', '/api/agent/model', undefined, keyHeaders(['personas'])))).status).toBe(403)
   })
 
   it('does not expose the retired channel routes', async () => {

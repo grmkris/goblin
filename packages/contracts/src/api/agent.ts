@@ -1,9 +1,10 @@
 import * as Schema from 'effect/Schema'
 import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
-import { ModelChoice, ModelEndpointInput, ModelEndpointView, UsageToday } from '../agent.ts'
+import { ModelChoice, ModelEndpointInput, ModelEndpointView, ModelOffer, UsageToday } from '../agent.ts'
 import { NonEmptyString } from '../ids.ts'
 import { ApiErrors } from './errors.ts'
+import { ApiKeyScope } from './keys.ts'
 
 /** The owner's pick of a model the deployment offers. */
 const ModelPick = Schema.Struct({ model: NonEmptyString(128) })
@@ -19,6 +20,8 @@ const ModelPick = Schema.Struct({ model: NonEmptyString(128) })
  *   owner's own model endpoint (ADR 0059). Setting one lists its models with the key first: a URL that is not public
  *   https, a refused key or an answer that is not a model list is invalid input. Clearing goes back to the
  *   deployment's.
+ * - `models`: `GET /api/models`, the models a Persona may name now. An API key with the `personas` scope reaches it
+ *   (ADR 0084), so a server can check a model before it writes a Persona.
  */
 export class AgentGroup extends HttpApiGroup.make('agent').add(
   HttpApiEndpoint.get('usage', '/agent/usage', { success: UsageToday }),
@@ -35,4 +38,5 @@ export class AgentGroup extends HttpApiGroup.make('agent').add(
     error: [ApiErrors.invalidInput],
   }),
   HttpApiEndpoint.delete('clearModelEndpoint', '/agent/model-endpoint', { success: ModelEndpointView }),
+  HttpApiEndpoint.get('models', '/models', { success: ModelOffer }).annotate(ApiKeyScope, 'personas'),
 ) {}

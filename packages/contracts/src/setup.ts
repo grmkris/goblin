@@ -49,6 +49,36 @@ export const PersonaSetup = Schema.Struct({
 })
 export type PersonaSetup = typeof PersonaSetup.Type
 
+/** How much of a category a setup holds: everything the owner allows, or this many items. */
+const Held = Schema.Union([Schema.Literal('all'), Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))])
+
+/**
+ * A setup in a line, for lists: each MCP server with how many of its tools it holds, and how many skills and apps.
+ * The setup itself is what `GET` of the Topic or Persona answers.
+ */
+export const SetupSummary = Schema.Struct({
+  servers: Schema.Union([
+    Schema.Literal('all'),
+    Schema.Array(Schema.Struct({ connectionId: ConnectionId, tools: Held })),
+  ]),
+  skills: Held,
+  apps: Held,
+})
+export type SetupSummary = typeof SetupSummary.Type
+
+/** How many items a category holds: all, or its count. */
+const count = (items: 'all' | readonly unknown[]) => (items === 'all' ? 'all' : items.length)
+
+/** `setup` in a line. */
+export const setupSummaryOf = (setup: PersonaSetup): SetupSummary => ({
+  servers:
+    setup.mcpServers === 'all'
+      ? 'all'
+      : setup.mcpServers.map((server) => ({ connectionId: server.connectionId, tools: count(server.tools) })),
+  skills: count(setup.skills),
+  apps: count(setup.apps),
+})
+
 /** A Topic that works with everything the owner allows: every existing Topic's setup, and a new one's by default. */
 export const EVERYTHING: TopicSetup = { mcpServers: 'all', skills: 'all', apps: 'all', subagents: true }
 
