@@ -160,6 +160,20 @@ describe("an API key's reach (ADR 0081)", () => {
     expect((await fetch(get('/api/topics/1'))).status).toBe(200)
   })
 
+  it('keeps everything it made when the owner gives it another scope: reach is by key, never by scope (ADR 0084)', async () => {
+    const { fetch } = organizing()
+    const before = grant('key-1', ['topics', 'personas'])
+    await fetch(post('/api/topics', { name: 'Customer 1', operationId: 'svc:topic:1' }, before))
+    await fetch(post('/api/personas', { ...scout, operationId: 'svc:p:1' }, before))
+    const after = grant('key-1', ['topics', 'personas', 'inspect'])
+    expect((await topicPage(fetch(get('/api/topics', after)))).topics.map((topic) => topic.id)).toEqual([2])
+    expect((await personaPage(fetch(get('/api/personas', after)))).personas.map((persona) => persona.id)).toEqual([1])
+    expect((await fetch(get('/api/topics/2', after))).status).toBe(200)
+    expect((await fetch(json('PATCH', '/api/personas/1', { role: 'Edits', expectedRevision: 1 }, after))).status).toBe(
+      200,
+    )
+  })
+
   it('is admitted only where its scope reaches, and never renews resident authority', async () => {
     const { fetch, resident } = organizing()
     expect((await fetch(post('/api/topics', { name: 'A', operationId: 'svc:a' }, KEY))).status).toBe(201)
