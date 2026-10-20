@@ -51,14 +51,13 @@ const serversOf = (metadata: unknown): readonly string[] =>
   })
 
 /**
- * The principal a key admits: valid, unexpired, within its rate limit, and made by a user who still exists. Anything
- * else is `Unauthenticated` (`key`, or `key_rate_limited`), saying nothing more.
+ * The principal a key admits: valid, unexpired, and made by a user who still exists. Anything else is
+ * `Unauthenticated` (`key`), saying nothing more. Its rate limit is its agent's to count (ADR 0085).
  */
 export const verifyKey = async (env: RuntimeEnv, key: string): Promise<KeyPrincipal> => {
   const auth = createAuth(env, env.AUTH_DB)
   const result = await auth.api.verifyApiKey({ body: { key } })
-  if (!result.valid || result.key === null)
-    throw new Unauthenticated({ reason: result.error?.code === 'RATE_LIMITED' ? 'key_rate_limited' : 'key' })
+  if (!result.valid || result.key === null) throw new Unauthenticated({ reason: 'key' })
   const userId = result.key.referenceId
   if ((await (await auth.$context).internalAdapter.findUserById(userId)) === null)
     throw new Unauthenticated({ reason: 'key' })

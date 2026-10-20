@@ -174,6 +174,20 @@ describe("an API key's reach (ADR 0081)", () => {
     )
   })
 
+  it('is refused past its requests for the minute, with how long to wait, and another key is not (ADR 0085)', async () => {
+    const { fetch } = organizing()
+    const answers = await Promise.all(
+      Array.from({ length: 601 }, () => fetch(get('/api/personas?limit=1', KEY)).then((response) => response.status)),
+    )
+    expect(answers.filter((status) => status === 200)).toHaveLength(600)
+    const refused = await fetch(get('/api/personas?limit=1', KEY))
+    expect(refused.status).toBe(401)
+    expect(await refused.json()).toMatchObject({
+      error: { reason: 'key_rate_limited', retryAfter: expect.any(Number) },
+    })
+    expect((await fetch(get('/api/personas?limit=1', OTHER))).status).toBe(200)
+  })
+
   it('is admitted only where its scope reaches, and never renews resident authority', async () => {
     const { fetch, resident } = organizing()
     expect((await fetch(post('/api/topics', { name: 'A', operationId: 'svc:a' }, KEY))).status).toBe(201)

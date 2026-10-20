@@ -99,9 +99,11 @@ const codePlugin = (env: AuthEnvironment, delivery: MailDelivery) =>
 const DAY_SECONDS = 86_400
 
 /**
- * Server API keys (ADR 0081): hashed at rest, named, `gbk_`-prefixed, expiring (90 days unless the owner says, a year at
- * most) and limited to 600 requests a minute each. A key is never turned into a session. Keys are made, listed and
- * ended only through `auth/api-keys.ts`; the plugin's own routes are not served (`handleAuth`).
+ * Server API keys (ADR 0081): hashed at rest, named, `gbk_`-prefixed and expiring (90 days unless the owner says, a
+ * year at most). A key is never turned into a session. Keys are made, listed and ended only through
+ * `auth/api-keys.ts`; the plugin's own routes are not served (`handleAuth`). The plugin's per-key limiter is off, for
+ * keys made before too (its global switch is read first): it resets only after a quiet window, so a steady client
+ * piled up to the limit and was cut off. A key's agent counts its requests per fixed minute instead (ADR 0085).
  */
 const keyPlugin = () =>
   apiKey({
@@ -112,7 +114,7 @@ const keyPlugin = () =>
     enableSessionForAPIKeys: false,
     startingCharactersConfig: { shouldStore: true, charactersLength: 10 },
     keyExpiration: { defaultExpiresIn: 90 * DAY_SECONDS, minExpiresIn: 1, maxExpiresIn: 365 },
-    rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 600 },
+    rateLimit: { enabled: false },
   })
 
 /**

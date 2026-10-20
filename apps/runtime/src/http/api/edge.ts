@@ -138,6 +138,25 @@ const codeOf = (response: Response): Effect.Effect<string | undefined> =>
       )
     : Effect.succeed(undefined)
 
+/**
+ * An agent's refusal that says when to come back (`retryAfter`: a key past its rate limit, ADR 0085) with
+ * `Retry-After`; any other answer as it is.
+ */
+const withRetryAfter = (response: Response): Effect.Effect<Response> =>
+  response.status !== 401 || response.headers.get('content-type')?.startsWith('application/json') !== true
+    ? Effect.succeed(response)
+    : Effect.tryPromise(() => response.clone().json()).pipe(
+        Effect.map((body) => {
+          const retry = Option.getOrUndefined(decodeEnvelope(body))?.error.retryAfter
+          if (retry === undefined) return response
+          const answered = new Response(response.body, response)
+          answered.headers.set('retry-after', String(retry))
+          return answered
+        }),
+        // expected: a body that is not an envelope is answered as the agent sent it.
+        Effect.orElseSucceed(() => response),
+      )
+
 /** An answer the owner made happen (absent, unpaid, taken, too fast) is information; anything else is a warning. */
 const levelOf = (status: number): LineLevel =>
   status >= 500 ? 'error' : [401, 402, 404, 409, 429].includes(status) ? 'info' : 'warn'
@@ -282,7 +301,7 @@ export const makeEdgeHttp: Effect.Effect<EdgeHttp> = Effect.gen(function* () {
         const init = { method: request.method, headers, body, duplex: 'half', redirect: 'manual' } as const
         const forwarded = new Request(`https://agent${url.pathname}${url.search}`, init)
         const response = yield* attempt(() => edge.agent(userId).fetch(forwarded))
-        return secured(response, facts.ref)
+        return secured(yield* withRetryAfter(response), facts.ref)
       }),
     )
     return Effect.provideContext(served, observed)

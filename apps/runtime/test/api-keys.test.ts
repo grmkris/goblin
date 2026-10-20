@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createKey, listKeys, revokeKey, updateKey, verifyKey } from '../src/auth/api-keys.ts'
+import { handleInboundMcp } from '../src/inbound/route.ts'
 import { bearerKey } from '../src/http/api/principal.ts'
 import { handleAuth } from '../src/auth/service.ts'
 import type { RuntimeEnv } from '../src/env.ts'
@@ -79,6 +80,25 @@ describe('server API keys (ADR 0081)', () => {
     })
     await expect(updateKey(env, 'u2', key.id, { scopes: ['personas'] })).rejects.toBeInstanceOf(NotFound)
     expect((await verifyKey(env, secret)).scopes).toEqual(['topics', 'inspect'])
+  })
+
+  it("keeps admitting a key whose plugin counter is full: its rate limit is its agent's (ADR 0085)", async () => {
+    const { db, env } = fixture()
+    const { key, secret } = await createKey(env, 'u1', KEY)
+    db.prepare(
+      'UPDATE apikey SET rateLimitEnabled = 1, rateLimitTimeWindow = 60000, rateLimitMax = 600, requestCount = 600, lastRequest = ? WHERE id = ?',
+    ).run(new Date().toISOString(), key.id)
+    expect((await verifyKey(env, secret)).keyId).toBe(key.id)
+  })
+
+  it('answers /mcp for a key that does not admit with its typed refusal, which the Worker renders', async () => {
+    const { env } = fixture()
+    const request = new Request(`${APP}/mcp`, {
+      method: 'POST',
+      headers: { authorization: `Bearer gbk_${'x'.repeat(64)}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    })
+    await expect(handleInboundMcp(request, env)).rejects.toMatchObject({ _tag: 'Unauthenticated', reason: 'key' })
   })
 
   it('refuses an unknown, revoked or expired key, and one whose user is gone', async () => {

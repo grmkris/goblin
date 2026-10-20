@@ -309,6 +309,15 @@ describe("a server's API key (ADR 0081)", () => {
     expect(seen).toHaveLength(0)
   })
 
+  it("passes its agent's rate-limit refusal on with Retry-After (ADR 0085)", async () => {
+    const limited = new Unauthenticated({ reason: 'key_rate_limited', retryAfter: 17 })
+    const { edge } = deployment(() => Response.json(envelopeOf(limited), { status: 401 }))
+    const { response } = await through('owner', server('/api/topics', { method: 'GET' }), edge)
+    expect(response.status).toBe(401)
+    expect(response.headers.get('retry-after')).toBe('17')
+    expect(await response.json()).toMatchObject({ error: { reason: 'key_rate_limited', retryAfter: 17 } })
+  })
+
   it('never reaches the account API: a key cannot list, make or change keys', async () => {
     const { edge } = deployment()
     for (const request of [

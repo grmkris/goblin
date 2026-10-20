@@ -18,8 +18,10 @@ const ref = Schema.optionalKey(Schema.String)
  * The runtime's failure vocabulary. The owner API answers each one in the error envelope below; Durable Object RPC
  * carries them encoded because Workers RPC does not preserve error classes.
  */
+/** `retryAfter`: for a server's API key over its rate limit, the seconds until it may call again (ADR 0085). */
 export class Unauthenticated extends Schema.TaggedError<Unauthenticated>()('Unauthenticated', {
   reason: Schema.String,
+  retryAfter: Schema.optionalKey(Schema.Number),
   ref,
 }) {}
 export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', { reason: Schema.String, ref }) {}
@@ -177,6 +179,7 @@ const DETAIL_FIELDS = {
   state: Schema.optionalKey(Schema.String),
   limit: Schema.optionalKey(Schema.Number),
   resetsAt: Schema.optionalKey(Schema.Number),
+  retryAfter: Schema.optionalKey(Schema.Number),
   rpcCode: Schema.optionalKey(Schema.Number),
   scope: Schema.optionalKey(Schema.String),
   ref,

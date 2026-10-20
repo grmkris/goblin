@@ -16,17 +16,12 @@ export const inboundHosts = (appUrl: string) => ({
 
 /**
  * `/mcp` for a server's API key (ADR 0081): the key verified, then its tools, each an owner API call as the key to the
- * agent of the user who made it. A key that does not admit is a plain 401: there is nothing to sign in to.
+ * agent of the user who made it. A key that does not admit rejects with its `Unauthenticated`, which the Worker
+ * answers in the envelope `/api` uses: there is nothing to sign in to. A key over its rate limit is refused by its
+ * agent, in each tool's error result (ADR 0085).
  */
 const keyMcp = async (request: Request, env: RuntimeEnv, key: string): Promise<Response> => {
-  let principal: Awaited<ReturnType<typeof verifyKey>>
-  try {
-    principal = await verifyKey(env, key)
-  } catch {
-    // expected: a key that does not verify (unknown, revoked, expired, over its limit) is refused, saying no more.
-    return Response.json({ error: 'Unauthenticated' }, { status: 401 })
-  }
-  const { userId, ...grant } = principal
+  const { userId, ...grant } = await verifyKey(env, key)
   const agent = env.AGENTS.getByName(userId)
   const handler = createMcpHandler(() => keyServer((call) => runAtEdge(ownerCall(agent, grant, call))), {
     route: '/mcp',
