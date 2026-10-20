@@ -27,8 +27,10 @@ import { PiFailure, PiSessions } from '../src/pi/sessions.ts'
 import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
 import { appChatOperations } from '../src/storage/chat-operations.ts'
 import { appChatMoves, appConversations } from '../src/storage/schema.ts'
+import { appTopics } from '../src/storage/topics.ts'
 import { chatDatabase, sqliteDb } from './chats-sqlite.ts'
 import { fake } from './fake.ts'
+import { appKeyReach } from '../src/storage/keys.ts'
 
 /** What Pi was asked, in order. */
 type Calls = string[]
@@ -91,7 +93,7 @@ const harnessOf = (calls: Calls) => {
  * thread `2` owed its announcement with a thread `5` under it, and a closed thread `3`), Pi's harness above, and the
  * flows recorded. Nothing else the layer captures is read.
  */
-const services = (calls: Calls) => {
+const services = (calls: Calls, models = fake<Models['Service']>({ current: Effect.succeed('model-a') })) => {
   const flows: FlowEvent[] = []
   const { db, close } = chatDatabase()
   db.insert(appConversations)
@@ -134,7 +136,7 @@ const services = (calls: Calls) => {
   )
   const plans = Layer.mergeAll(
     Layer.succeed(Budget, fake<Budget['Service']>({ require: () => Effect.void })),
-    Layer.succeed(Models, fake<Models['Service']>({ current: Effect.succeed('model-a') })),
+    Layer.succeed(Models, models),
     FlowEvents.layerWith((event) => Effect.sync(() => void flows.push(event))),
   )
   const layer = ConversationLive.pipe(
@@ -161,6 +163,40 @@ const services = (calls: Calls) => {
     flows,
   }
 }
+
+describe("a server's work never runs on the owner's own subscriptions (ADR 0087)", () => {
+  it.effect('puts a send in a Topic a key made on the model for servers, and the owner elsewhere on their pick', () => {
+    const calls: Calls = []
+    const models = fake<Models['Service']>({
+      current: Effect.succeed('sub/claude-opus-5-5'),
+      forServers: Effect.succeed('model-a'),
+    })
+    const { layer, db } = services(calls, models)
+    // Chat 5 sits in Topic 7, which a server's key made.
+    db.insert(appTopics)
+      .values({ id: 7, name: 'Customer', chatId: '7', createdBy: 'owner', createdAt: 1, updatedAt: 1 })
+      .run()
+    db.update(appConversations).set({ topicId: 7 }).where(eq(appConversations.chatId, '5')).run()
+    db.insert(appKeyReach).values({ keyId: 'key-1', kind: 'topic', resourceId: 7, createdAt: 1 }).run()
+    return Effect.gen(function* () {
+      const operations = yield* ChatOperations
+      const send = (chat: string, operationId: string) =>
+        operations.send({
+          chat,
+          operationId,
+          receipt: { kind: 'send', origin: 'owner' },
+          flow: { flow: 'send', via: 'app', actor: 'owner' },
+          content: 'hello',
+        })
+      yield* send('5', 'op-key-topic')
+      yield* send('2', 'op-own-topic')
+      expect(calls.filter((call) => call.startsWith('model:'))).toEqual([
+        'model:45:model-a',
+        'model:42:sub/claude-opus-5-5',
+      ])
+    }).pipe(Effect.provide(layer))
+  })
+})
 
 describe('the conversation services', () => {
   it.effect('resolve chats as the directory does, absence as None and an unknown chat as NotFound', () => {

@@ -84,7 +84,8 @@ export const organizing = () => {
     touched: () => Effect.void,
     retitle: () => undefined,
   })
-  const personas = new PersonaRegistry(db, () => ['model-a', 'model-b'])
+  // `sub/opus` stands for one of the owner's own subscriptions (ADR 0087).
+  const personas = new PersonaRegistry(db, () => ['model-a', 'model-b', 'sub/opus'])
   const receipts = new OrganizeReceipts(
     db,
     (kind, target) => (kind.startsWith('topic.') ? topics : personas).get(Number(target)).revision,
@@ -96,9 +97,13 @@ export const organizing = () => {
   const flows: FlowEvent[] = []
   const retooled: number[] = []
   const catalog = setupServices(retooled)
-  const lane = delegationServices({ topics, personas, invocations: unread, receipts }).pipe(
-    Layer.provide(Layer.merge(KeyedLock.layer, Layer.succeed(Changes, makeChanges()))),
-  )
+  const lane = delegationServices({
+    topics,
+    personas,
+    invocations: unread,
+    receipts,
+    fence: { ownerOnly: (id: string) => id === 'sub/opus', keyTopic: () => false },
+  }).pipe(Layer.provide(Layer.merge(KeyedLock.layer, Layer.succeed(Changes, makeChanges()))))
   const { fetch } = serve(
     served(
       [TopicsGroup, PersonasGroup, OrganizeGroup],

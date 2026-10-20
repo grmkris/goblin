@@ -9,6 +9,7 @@ import { Chats, Conversations } from '../chats/service.ts'
 import { Conflict, InvalidInput, attempt, toAppError } from '../http/errors.ts'
 import { Cipher } from '../mcp/oauth/cipher.ts'
 import { requireResident } from '../mcp/service.ts'
+import { serverWorkIn } from '../keys/policy.ts'
 import { Models } from '../models.ts'
 import { FlowEvents } from '../observability/flows.ts'
 import { reportFailure, safeErrorType } from '../observability/report.ts'
@@ -16,6 +17,7 @@ import { BACKGROUND } from '../pi/context.ts'
 import { type PiFailure, PiSessions } from '../pi/sessions.ts'
 import { sha256Hex } from '../runtime/digest.ts'
 import { AgentInput } from '../runtime/input.ts'
+import { Db } from '../runtime/db.ts'
 import { notifyReport } from './notices.ts'
 import { personaHold, runPersona } from './persona.ts'
 import type { Firing, RoutineRun } from './runs.ts'
@@ -118,12 +120,15 @@ const eventOf = (record: RoutineRun) =>
 /**
  * Hands a run to Pi: its deadline alarm first, then its own conversation under main (made once) and a reporter task
  * for this firing or this answer, on the owner's model or, for a run handed to a Persona, as that Persona at the
- * pinned revision (ADR 0041). Answers the session it runs in.
+ * pinned revision (ADR 0041). In a Topic a server's key made it runs on `Models.forServers` (ADR 0087). Answers the
+ * session it runs in.
  */
 export const startRun = Effect.fn('routines.start')(function* (record: RoutineRun, answer?: RoutineAnswer) {
   const { routineSchedules, startRoutine } = yield* AgentInput
   yield* attempt(() => routineSchedules.deadline(record.id, record.deadlineAt))
-  const model = yield* Models.use((models) => models.current)
+  const models = yield* Models
+  const server = yield* serverWorkIn(yield* Db, yield* (yield* Routines).topicOf(record.routineId))
+  const model = yield* server ? models.forServers : models.current
   const chats = yield* Chats
   const primary = yield* chats.session(chats.primary)
   const event = yield* eventOf(record)

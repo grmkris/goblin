@@ -3,9 +3,15 @@ import * as Effect from 'effect/Effect'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { chooseOwnerModel } from '../agent-model.ts'
 import { Budget } from '../budget.ts'
+import { requestKey } from '../keys/policy.ts'
 import { Models } from '../models.ts'
 import { Inference } from '../inference/service.ts'
 import { epochSeconds } from '../clock.ts'
+
+/** The model choice as the request's caller reads it: a server's key never sees the owner's own subscriptions (ADR 0087). */
+const choiceFor = Effect.flatMap(requestKey, (key) =>
+  Models.use((models) => (key === undefined ? models.choice : models.choiceForServers)),
+)
 
 /**
  * The `agent` group: today's usage, the model and its endpoint, and the models a Persona may name. Each handler runs
@@ -14,7 +20,7 @@ import { epochSeconds } from '../clock.ts'
 export const AgentHandlers = HttpApiBuilder.group(OwnerApi, 'agent', (handlers) =>
   handlers
     .handle('usage', () => Effect.flatMap(epochSeconds, (now) => Budget.use((budget) => budget.today(now))))
-    .handle('model', () => Models.use((models) => models.choice))
+    .handle('model', () => choiceFor)
     .handle('chooseModel', ({ payload }) => chooseOwnerModel(payload.model))
     .handle('modelEndpoint', () => Inference.use((inference) => inference.view))
     .handle('setModelEndpoint', ({ payload }) =>
@@ -22,12 +28,9 @@ export const AgentHandlers = HttpApiBuilder.group(OwnerApi, 'agent', (handlers) 
     )
     .handle('clearModelEndpoint', () => Inference.use((inference) => inference.clearOwner))
     .handle('models', () =>
-      Effect.map(
-        Models.use((models) => models.choice),
-        (choice) => ({
-          ...(choice.default === undefined ? {} : { default: choice.default }),
-          models: choice.options,
-        }),
-      ),
+      Effect.map(choiceFor, (choice) => ({
+        ...(choice.default === undefined ? {} : { default: choice.default }),
+        models: choice.options,
+      })),
     ),
 )

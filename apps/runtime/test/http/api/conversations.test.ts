@@ -256,7 +256,11 @@ const services = (calls: Calls, personas: readonly PersonaView[]) =>
           return []
         }),
     }),
-    stub(Personas, { active: Effect.succeed(personas), offers: () => Effect.succeed(false) }),
+    stub(Personas, {
+      active: Effect.succeed(personas),
+      offers: () => Effect.succeed(false),
+      ownModel: () => Effect.succeed(undefined),
+    }),
     stub(Setups, { scope: () => Effect.succeed(scopeOf([], true)) }),
     // No servers, grants or connections: the composer offers none.
     stub(McpServers, { list: () => Effect.succeed([]) }),

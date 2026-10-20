@@ -51,6 +51,12 @@ export interface RuntimeEnv {
   /** More model names users may pick, comma-separated (`models.ts`). */
   readonly MODELS?: string
   readonly MODEL_KEY?: string
+  /**
+   * The deployment's owner (ADR 0087): the one account offered `OWNER_MODELS`, models on the owner's own subscriptions,
+   * comma-separated like `MODELS`. No other account sees them.
+   */
+  readonly OWNER_USER_ID?: string
+  readonly OWNER_MODELS?: string
   /** The cheapest offered model, for thread titles and main's memory (`models.ts` `memoryModelId`). */
   readonly MEMORY_MODEL?: string
   /** Native fixture only: tokens main runs past its memory view before a new one (`memory.ts` `FOLD_TOKENS`). */

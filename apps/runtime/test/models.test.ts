@@ -7,6 +7,8 @@ import {
   deploymentModelIds,
   memoryModelId,
   modelOptions,
+  offeredEndpoint,
+  ownerModelIds,
 } from '../src/models.ts'
 
 /** The stored pick in memory: the picker depends on the ledger, not on SQLite. */
@@ -46,10 +48,20 @@ describe("the deployment's own model endpoint (unit)", () => {
       baseUrl: 'https://models.example/v1',
       apiKey: 'k',
     })
-    expect(deploymentModelIds({ ...house, MODELS: 'glm-5.3' })).toEqual(['gemini-3.8-flash', 'glm-5.3'])
+    expect(deploymentModelIds({ ...house, MODELS: 'glm-5.3' }, 'any-account')).toEqual(['gemini-3.8-flash', 'glm-5.3'])
     for (const missing of ['MODEL_BASE_URL', 'MODEL_ID', 'MODEL_KEY'] as const)
       expect(deploymentEndpoint({ ...house, [missing]: '' })).toBeUndefined()
-    expect(deploymentModelIds({})).toEqual([])
+    expect(deploymentModelIds({}, 'any-account')).toEqual([])
+  })
+
+  it("offers the owner's own subscriptions to the owner's account alone, after every account's (ADR 0087)", () => {
+    const owner = { ...house, MODELS: 'glm-5.3', OWNER_USER_ID: 'u_owner', OWNER_MODELS: 'sub/grok-4.7, glm-5.3 ,' }
+    expect(ownerModelIds(owner)).toEqual(['sub/grok-4.7'])
+    expect(deploymentModelIds(owner, 'u_owner')).toEqual(['gemini-3.8-flash', 'glm-5.3', 'sub/grok-4.7'])
+    expect(deploymentModelIds(owner, 'u_other')).toEqual(['gemini-3.8-flash', 'glm-5.3'])
+    // Without an owner named, nobody is offered them.
+    expect(deploymentModelIds({ ...owner, OWNER_USER_ID: '' }, '')).toEqual(['gemini-3.8-flash', 'glm-5.3'])
+    expect(offeredEndpoint(owner, 'u_owner')?.options.at(-1)).toMatchObject({ route: 'Your subscription' })
   })
 
   it("writes memory with the memory model when offered, else the default, else the endpoint's own default", () => {

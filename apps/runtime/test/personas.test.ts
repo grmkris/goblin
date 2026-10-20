@@ -28,6 +28,8 @@ import { Sources } from '../src/sources/service.ts'
 import { Invocations, Personas } from '../src/personas/service.ts'
 import { Topics } from '../src/topics/service.ts'
 import { appConversations } from '../src/storage/schema.ts'
+import { RequestContext } from '../src/http/api/context.ts'
+import type { KeyGrant } from '../src/http/api/principal.ts'
 import { updateTopic } from '../src/topics/program.ts'
 import { TopicRegistry } from '../src/topics/registry.ts'
 import { chatDatabase } from './chats-sqlite.ts'
@@ -181,7 +183,7 @@ describe('Personas (ADR 0033)', () => {
     const seen: number[] = []
     Effect.runSync(changes.on('personas.changed', ({ ids }) => Effect.sync(() => void seen.push(...ids))))
     const program = Effect.gen(function* () {
-      const personas = yield* Personas.make(store)
+      const personas = yield* Personas.make(store, { ownerOnly: () => false, keyTopic: () => false })
       yield* personas.create({ ...scout, operationId: 'op-1' }, 'owner')
       yield* personas.create({ ...scout, operationId: 'op-1' }, 'owner')
       yield* personas.update(1, { role: scout.role, expectedRevision: 1 }, 'owner')
@@ -245,6 +247,30 @@ describe('Persona invocations', () => {
     expect(invocations.get('a', 1)?.state).toBe('stopped')
     expect(invocations.get('a', 2)?.state).toBe('answered')
     expect(invocations.get('b', 1)?.state).toBe('pending')
+  })
+})
+
+describe("a Persona's own model in a server's work (ADR 0087)", () => {
+  it("answers on the owner's own subscription only in the owner's work", async () => {
+    const { db, close } = chatDatabase()
+    cleanups.push(close)
+    const store = new PersonaRegistry(db, () => ['model-a', 'sub/claude-opus-5-5'])
+    // Topic 9 is one a server's key made.
+    const fence = { ownerOnly: (id: string) => id.startsWith('sub/'), keyTopic: (topic: number) => topic === 9 }
+    const personas = Effect.runSync(Personas.make(store, fence).pipe(Effect.provideService(Changes, makeChanges())))
+    const key: KeyGrant = { keyId: 'key-1', scopes: ['personas'], servers: [] }
+    const facts = { ref: undefined, request: undefined, operation: undefined, route: 'conversations.submit', key }
+    const own = (model: string, topic: number) => Effect.runSync(personas.ownModel(model, topic))
+    expect([own('sub/claude-opus-5-5', 1), own('sub/claude-opus-5-5', 9), own('model-a', 9)]).toEqual([
+      'sub/claude-opus-5-5',
+      undefined,
+      'model-a',
+    ])
+    // Through a key, even the owner's own Topic does not run on it; a model not on offer is never the Persona's.
+    expect(
+      Effect.runSync(personas.ownModel('sub/claude-opus-5-5', 1).pipe(Effect.provideService(RequestContext, facts))),
+    ).toBeUndefined()
+    expect(own('model-gone', 1)).toBeUndefined()
   })
 })
 
@@ -400,7 +426,7 @@ const services = () => {
   })
   const layer = Layer.mergeAll(
     Layer.effect(Topics, Topics.make(parts.topics)),
-    Layer.effect(Personas, Personas.make(parts.personas)),
+    Layer.effect(Personas, Personas.make(parts.personas, { ownerOnly: () => false, keyTopic: () => false })),
     Layer.effect(Receipts, Receipts.make(parts.receipts)),
     Layer.succeed(Conversations, conversations),
     Layer.succeed(AgentInput, unread),

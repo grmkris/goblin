@@ -30,12 +30,12 @@ const addressedBlocks = (tag: string, blocks: readonly TextContent[]): TextConte
   return first === undefined ? [] : [{ ...first, text: `${tag}${first.text}` }, ...rest]
 }
 
-/** Persona `id` at `revision`, frozen for a turn: its words, its setup, and its model when offered. */
-export const frozenAt = (id: number, revision: number) =>
+/** Persona `id` at `revision`, frozen for a turn in Topic `topic`: its words, its setup, and its own model (`Personas.ownModel`). */
+export const frozenAt = (id: number, revision: number, topic: number) =>
   Effect.gen(function* () {
     const personas = yield* Personas
     const { name, avatar, role, instructions, setup, model } = yield* personas.revision(id, revision)
-    const offered = model !== undefined && (yield* personas.offers(model))
+    const own = yield* personas.ownModel(model, topic)
     return {
       id,
       name,
@@ -44,12 +44,15 @@ export const frozenAt = (id: number, revision: number) =>
       role,
       instructions,
       setup,
-      ...(offered ? { model } : {}),
+      ...(own === undefined ? {} : { model: own }),
     } satisfies FrozenPersona
   })
 
-/** The tagged Personas as they are now, each at its current revision; one that is gone or archived refuses the send. */
-const freeze = (ids: readonly number[]) =>
+/**
+ * The tagged Personas as they are now, each at its current revision, for a turn in Topic `topic`; one that is gone or
+ * archived refuses the send.
+ */
+const freeze = (ids: readonly number[], topic: number) =>
   Effect.gen(function* () {
     const personas = yield* Personas
     const active = yield* personas.active
@@ -58,7 +61,7 @@ const freeze = (ids: readonly number[]) =>
         const persona = active.find((each) => each.id === id)
         if (persona === undefined) return yield* new InvalidInput({ reason: `composer:persona:${String(id)}` })
         const { name, revision, avatar, role, instructions, setup, model } = persona
-        const offered = (yield* personas.offers(model)) && model !== undefined
+        const own = yield* personas.ownModel(model, topic)
         return {
           id,
           name,
@@ -66,7 +69,7 @@ const freeze = (ids: readonly number[]) =>
           avatar,
           role,
           instructions,
-          ...(offered ? { model } : {}),
+          ...(own === undefined ? {} : { model: own }),
           setup,
         } satisfies FrozenPersona
       }),
@@ -115,7 +118,7 @@ export const askPersonas = (
     const { personas } = yield* AgentInput
     const pi = yield* PiSessions
     const now = yield* epochSeconds
-    const frozen = yield* freeze(ids)
+    const frozen = yield* freeze(ids, yield* (yield* Chats).topicOf(input.thread))
     if (frozen.length > 8) return yield* new InvalidInput({ reason: 'persona_count' })
     const admission = {
       chat: input.thread,
@@ -165,7 +168,7 @@ export const resumePersona = Effect.fn('personas.resume')(function* (fork: strin
   const found = Option.getOrUndefined(yield* chats.personaFork(fork))
   if (found === undefined) return yield* new NotFound({ what: 'persona fork' })
   yield* (yield* Conversations).requireActing(fork)
-  const persona = yield* frozenAt(found.persona, found.revision)
+  const persona = yield* frozenAt(found.persona, found.revision, yield* chats.topicOf(found.parent))
   const invocations = yield* Invocations
   const asked = { operationId, persona: persona.id, revision: persona.revision, chat: found.parent, order: 0 }
   yield* invocations.insert([asked], yield* epochSeconds)

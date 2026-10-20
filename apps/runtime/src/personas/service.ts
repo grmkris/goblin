@@ -10,6 +10,7 @@ import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { type AppError, attemptSync } from '../http/errors.ts'
+import { requestKey } from '../keys/policy.ts'
 import { epochSeconds } from '../clock.ts'
 import { Changes } from '../runtime/changes.ts'
 import type { NewInvocation, PersonaInvocations, Settlement } from './invocations.ts'
@@ -32,6 +33,9 @@ type MadePersona = { readonly persona: PersonaView; readonly created: boolean }
 
 /** A Persona just before and just after one change, read in the step that made it. */
 export type PersonaChange = { readonly before: PersonaView; readonly after: PersonaView }
+
+/** Which models are the owner's own subscriptions, and which Topics a server's key made (ADR 0087). */
+export type ServerFence = { readonly ownerOnly: (id: string) => boolean; readonly keyTopic: (topic: number) => boolean }
 
 /**
  * The owner's Personas (ADR 0033): named, versioned agent definitions. Every change is a new revision of the one it
@@ -59,6 +63,13 @@ export class Personas extends Context.Service<
     readonly revision: (id: number, revision: number) => Effect.Effect<PersonaRevisionView, AppError>
     /** Whether `model` is on offer now. */
     readonly offers: (model: string | undefined) => Effect.Effect<boolean>
+    /**
+     * The Persona's own `model` a turn in Topic `topic` answers with: one on offer, never one of the owner's own
+     * subscriptions in a server's work (a key's request, or a Topic a key made; ADR 0087). None: the chat's model.
+     */
+    readonly ownModel: (model: string | undefined, topic: number) => Effect.Effect<string | undefined>
+    /** Whether `model` is one of the owner's own subscriptions, which a server's key never names (ADR 0087). */
+    readonly ownerOnly: (model: string) => boolean
     /** A new Persona at revision 1, or the one `input.operationId` already made. A taken name is a `Conflict`. */
     readonly create: (input: CreatePersona, actor: PersonaActor) => Effect.Effect<MadePersona, AppError>
     /**
@@ -68,8 +79,11 @@ export class Personas extends Context.Service<
     readonly update: (id: number, change: UpdatePersona, actor: PersonaActor) => Effect.Effect<PersonaChange, AppError>
   }
 >()('goblin/personas/Personas') {
-  /** The Personas over `store`, the one per agent: each new Persona and real change tells `personas.changed`. */
-  static readonly make = (store: PersonaRegistry) =>
+  /**
+   * The Personas over `store`, the one per agent: each new Persona and real change tells `personas.changed`. `fence`
+   * says which models are the owner's own and which Topics a key made (ADR 0087).
+   */
+  static readonly make = (store: PersonaRegistry, fence: ServerFence) =>
     Effect.gen(function* () {
       const changes = yield* Changes
       const changed = (id: number) => changes.publish('personas.changed', { ids: [id] })
@@ -94,6 +108,13 @@ export class Personas extends Context.Service<
         offers: Effect.fn('Personas.offers')(function* (model: string | undefined) {
           return yield* Effect.sync(() => store.offers(model))
         }),
+        ownModel: Effect.fn('Personas.ownModel')(function* (model: string | undefined, topic: number) {
+          if (model === undefined || !store.offers(model)) return undefined
+          if (!fence.ownerOnly(model)) return model
+          const server = (yield* requestKey) !== undefined || fence.keyTopic(topic)
+          return server ? undefined : model
+        }),
+        ownerOnly: fence.ownerOnly,
         create: Effect.fn('Personas.create')(function* (input: CreatePersona, actor: PersonaActor) {
           const now = yield* epochSeconds
           const made = yield* attemptSync(() => store.create(input, actor, now))

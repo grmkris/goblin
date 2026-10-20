@@ -2,6 +2,7 @@ import type { SetupItem, TopicSetup, TopicSetupEdit } from '@goblin/contracts'
 import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
+import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import { chatOfSession, chatRow } from '../chats/directory.ts'
 import { Chats } from '../chats/service.ts'
 import { epochSeconds } from '../clock.ts'
@@ -10,7 +11,7 @@ import type { KeyGrant } from '../http/api/principal.ts'
 import { Conflict, Forbidden, NotFound } from '../http/errors.ts'
 import type { Place, Reach } from '../inspect/service.ts'
 import { Db } from '../runtime/db.ts'
-import { type ReachKind, hasReach, recordReach } from './reach.ts'
+import { type ReachKind, hasReach, madeByKey, recordReach } from './reach.ts'
 
 /**
  * What a server's API key may do inside the agent (ADR 0081): reach only the Topics, their chats and the Personas it
@@ -22,6 +23,13 @@ export const requestKey: Effect.Effect<KeyGrant | undefined> = Effect.map(
   Effect.serviceOption(RequestContext),
   (context) => Option.getOrUndefined(context)?.key,
 )
+
+/**
+ * Whether work in Topic `topic` is a server's (ADR 0087): it comes through a key, or a key made the Topic, whoever works
+ * there. It never runs on the owner's own subscriptions.
+ */
+export const serverWorkIn = (db: DrizzleSqliteDODatabase, topic: number): Effect.Effect<boolean> =>
+  Effect.map(requestKey, (key) => key !== undefined || madeByKey(db, 'topic', topic))
 
 /** A Topic a key's create makes when its body names no setup: nothing but its own chats. */
 export const KEY_TOPIC_SETUP: TopicSetup = { mcpServers: [], skills: [], apps: [], subagents: false }

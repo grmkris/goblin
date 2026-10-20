@@ -101,7 +101,11 @@ const fixture = (gate: { budget?: Effect.Effect<void, AppError> } = {}, persona 
   const starts: RoutineStart[] = []
   const reports: RoutineReport[] = []
   const changes = makeChanges()
-  const personas = Effect.runSync(Personas.make(registry).pipe(Effect.provideService(Changes, changes)))
+  const personas = Effect.runSync(
+    Personas.make(registry, { ownerOnly: () => false, keyTopic: () => false }).pipe(
+      Effect.provideService(Changes, changes),
+    ),
+  )
   const layer = Layer.mergeAll(
     Layer.succeed(Routines, routinesOf(routines)),
     Layer.succeed(RoutineRuns, routineRunsOf(runs)),

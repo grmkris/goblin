@@ -19,7 +19,7 @@ import { callOwner } from '../../owner-client.ts'
 import { durable } from '../../chats-sqlite.ts'
 import { currentResident, database, json, serve, served, stub } from './fixture.ts'
 
-const fixture = () => {
+const fixture = (owner: { readonly OWNER_USER_ID?: string; readonly OWNER_MODELS?: string } = {}) => {
   const db = database()
   const sqlite = durable(db)
   registerPrimary(db, 1)
@@ -50,6 +50,7 @@ const fixture = () => {
           MODEL_BASE_URL: 'https://no-model-calls.invalid/v1',
           MODEL_KEY: 'unused',
           DAILY_TOKEN_CAP: '100000',
+          ...owner,
         },
         userId: 'owner',
         // An owner's model endpoint: it lists one model to any key.
@@ -64,6 +65,10 @@ const fixture = () => {
   )
   return { fetch, ledger, pinned, applied }
 }
+
+/** The model ids a model choice answer offers. */
+const ids = async (response: Response) =>
+  Schema.decodeUnknownSync(ModelChoice)(await response.json()).options.map((option) => option.id)
 
 /** The grant the edge forwards for a key with `scopes` (ADR 0081). */
 const keyHeaders = (scopes: readonly string[]) => ({
@@ -134,6 +139,36 @@ describe('the agent group served by the agent', () => {
     expect((await fetch(json('GET', '/api/models', undefined, keyHeaders(['topics'])))).status).toBe(403)
     // The owner's own pick is not a key's to read.
     expect((await fetch(json('GET', '/api/agent/model', undefined, keyHeaders(['personas'])))).status).toBe(403)
+  })
+
+  it("offers the owner's own subscriptions to the owner alone, never to a server's key (ADR 0087)", async () => {
+    const { fetch } = fixture({ OWNER_USER_ID: 'owner', OWNER_MODELS: 'sub/claude-opus-5-5, model-b' })
+    // model-b is every account's, so naming it among the owner's changes nothing.
+    expect(await ids(await fetch(json('GET', '/api/agent/model')))).toEqual([
+      'model-a',
+      'model-b',
+      'sub/claude-opus-5-5',
+    ])
+    const picked = await callOwner({ fetch }, (api) =>
+      api.agent.chooseModel({ payload: { model: 'sub/claude-opus-5-5' } }),
+    )
+    expect(picked.options.find((option) => option.id === 'sub/claude-opus-5-5')).toMatchObject({
+      route: 'Your subscription',
+      images: true,
+    })
+    const keyed = await fetch(json('GET', '/api/models', undefined, keyHeaders(['personas'])))
+    expect(await keyed.json()).toEqual({
+      default: 'model-a',
+      models: [expect.objectContaining({ id: 'model-a' }), expect.objectContaining({ id: 'model-b' })],
+    })
+  })
+
+  it("never offers the owner's subscriptions to another account, nor lets it pick one", async () => {
+    const { fetch } = fixture({ OWNER_USER_ID: 'someone-else', OWNER_MODELS: 'sub/claude-opus-5-5' })
+    const choice = Schema.decodeUnknownSync(ModelChoice)(await (await fetch(json('GET', '/api/agent/model'))).json())
+    expect(choice.options.map((option) => option.id)).toEqual(['model-a', 'model-b'])
+    const refused = await fetch(json('PUT', '/api/agent/model', { model: 'sub/claude-opus-5-5' }))
+    expect(await refused.json()).toMatchObject({ error: { code: 'invalid_input', reason: 'model' } })
   })
 
   it('does not expose the retired channel routes', async () => {

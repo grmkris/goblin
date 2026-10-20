@@ -83,6 +83,18 @@ describe("an API key's reach (ADR 0081)", () => {
     expect(widened.status).toBe(403)
   })
 
+  it("never lets a key name one of the owner's own subscriptions for a Persona, while the owner may (ADR 0087)", async () => {
+    const { fetch } = organizing()
+    const refused = await fetch(post('/api/personas', { ...scout, model: 'sub/opus', operationId: 'svc:p:1' }, KEY))
+    expect(refused.status).toBe(400)
+    expect(await refused.json()).toMatchObject({ error: { code: 'invalid_input', reason: 'persona_model' } })
+    expect((await fetch(post('/api/personas', { ...scout, operationId: 'svc:p:2' }, KEY))).status).toBe(201)
+    const edited = await fetch(json('PATCH', '/api/personas/1', { model: 'sub/opus', expectedRevision: 1 }, KEY))
+    expect(edited.status).toBe(400)
+    const owners = await fetch(post('/api/personas', { ...scout, name: 'Owl', model: 'sub/opus', operationId: 'own' }))
+    expect(owners.status).toBe(201)
+  })
+
   it('lists only its own Topics and Personas, newest change first, page by page; the owner lists every one', async () => {
     const { fetch, db } = organizing()
     for (const n of [1, 2, 3])

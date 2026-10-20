@@ -14,6 +14,14 @@ export const hasReach = (db: DrizzleSqliteDODatabase, keyId: string, kind: Reach
     .where(and(eq(appKeyReach.keyId, keyId), eq(appKeyReach.kind, kind), eq(appKeyReach.resourceId, id)))
     .get() !== undefined
 
+/** Whether any server key made the `kind` with `id` (ADR 0087). */
+export const madeByKey = (db: DrizzleSqliteDODatabase, kind: ReachKind, id: number): boolean =>
+  db
+    .select({ keyId: appKeyReach.keyId })
+    .from(appKeyReach)
+    .where(and(eq(appKeyReach.kind, kind), eq(appKeyReach.resourceId, id)))
+    .get() !== undefined
+
 /** Records that key `keyId` made the `kind` with `id`; recording it again changes nothing. */
 export const recordReach = (
   db: DrizzleSqliteDODatabase,

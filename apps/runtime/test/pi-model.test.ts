@@ -20,7 +20,8 @@ import { answerAttributes } from '../src/telemetry/attributes.ts'
 
 const env = {
   MODEL_ID: 'qwen3.8-flash',
-  MODELS: 'deepseek-v4.1-flash,deepseek-v4-pro,glm-5.3,gemini-3.8-flash,muse-spark-1.3-contributor,unknown-model',
+  MODELS:
+    'deepseek-v4.1-flash,deepseek-v4-pro,glm-5.3,gemini-3.8-flash,muse-spark-1.3-contributor,sub/claude-opus-5-5,sub/grok-4.7,unknown-model',
   MODEL_BASE_URL: 'https://no-model-calls.invalid/v1',
   MODEL_KEY: 'test',
 }
@@ -87,6 +88,9 @@ describe('how thinking is bounded (unit)', () => {
     ['gemini-3.8-flash', undefined, { reasoning_effort: 'low' }],
     ['muse-spark-1.3-contributor', 'medium', { reasoning_effort: 'medium' }],
     ['muse-spark-1.3-contributor', undefined, { reasoning_effort: 'minimal' }],
+    ['sub/claude-opus-5-5', 'medium', { reasoning_effort: 'medium' }],
+    ['sub/claude-opus-5-5', undefined, { reasoning_effort: 'low' }],
+    ['sub/grok-4.7', 'max', { reasoning_effort: 'xhigh' }],
     ['unknown-model', 'medium', {}],
   ] as const)('sends %s at %s level: %j', async (id, level, sent) => {
     expect(thinkingParams((await requestFor([ask('hi')], id, level)).request)).toEqual(sent)

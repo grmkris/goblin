@@ -4,13 +4,14 @@ import * as Layer from 'effect/Layer'
 import { Conversations } from '../chats/service.ts'
 import { offeredModels } from '../inference/store.ts'
 import { Memories } from '../memory/service.ts'
-import { deploymentModelIds } from '../models.ts'
+import { madeByKey } from '../keys/reach.ts'
+import { deploymentModelIds, ownerModelIds } from '../models.ts'
 import type { KeyedLock } from '../observability/lock.ts'
 import { OrganizeReceipts } from '../organize/receipts.ts'
 import { Receipts } from '../organize/service.ts'
 import { PersonaInvocations } from '../personas/invocations.ts'
 import { PersonaRegistry } from '../personas/registry.ts'
-import { Invocations, Personas } from '../personas/service.ts'
+import { Invocations, Personas, type ServerFence } from '../personas/service.ts'
 import { restoreHelperExecution } from '../pi/helper-execution.ts'
 import type { Changes } from '../runtime/changes.ts'
 import { Db } from '../runtime/db.ts'
@@ -24,6 +25,7 @@ import { Topics } from '../topics/service.ts'
 export type DelegationStores = {
   readonly topics: TopicRegistry
   readonly personas: PersonaRegistry
+  readonly fence: ServerFence
   readonly invocations: PersonaInvocations
   readonly receipts: OrganizeReceipts
 }
@@ -38,7 +40,7 @@ export const delegationServices = (
   Layer.effectContext(
     Effect.gen(function* () {
       const topics = yield* Topics.make(stores.topics)
-      const personas = yield* Personas.make(stores.personas)
+      const personas = yield* Personas.make(stores.personas, stores.fence)
       const receipts = yield* Receipts.make(stores.receipts)
       const invocations = yield* Invocations.make(stores.invocations)
       return Context.mergeAll(
@@ -63,7 +65,7 @@ const stores: Effect.Effect<DelegationStores, never, AgentInput | Db | Conversat
       db,
       topicPorts(db, { conversations: yield* Conversations, memories: yield* Memories }),
     )
-    const personas = new PersonaRegistry(db, offeredModels(db, deploymentModelIds(input.env)))
+    const personas = new PersonaRegistry(db, offeredModels(db, deploymentModelIds(input.env, input.userId)))
     const receipts = new OrganizeReceipts(db, (kind, target) => {
       if (kind === 'source.route') return routeRevision(db, target)
       try {
@@ -73,7 +75,12 @@ const stores: Effect.Effect<DelegationStores, never, AgentInput | Db | Conversat
         return undefined
       }
     })
-    return { topics, personas, invocations: new PersonaInvocations(db), receipts } satisfies DelegationStores
+    const owned = new Set(ownerModelIds(input.env))
+    const fence = {
+      ownerOnly: (id: string) => owned.has(id),
+      keyTopic: (topic: number) => madeByKey(db, 'topic', topic),
+    }
+    return { topics, personas, fence, invocations: new PersonaInvocations(db), receipts } satisfies DelegationStores
   },
 )
 

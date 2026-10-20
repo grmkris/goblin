@@ -39,6 +39,25 @@ const DEEPSEEK: Thinking = {
 }
 
 /**
+ * The owner's own subscriptions, reached through CLIProxy (ADR 0087): no off switch, and their efforts run low to max
+ * (Grok's to xhigh). Probed 2026-10-20: each calls tools and reads images.
+ */
+const SUBSCRIPTION: Thinking = {
+  by: 'effort',
+  switchesOff: false,
+  efforts: { off: 'low', minimal: null, low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' },
+}
+
+/** One of the owner's subscription models: their route, and they all see images. */
+const subscription = (label: string, note: string, thinking: Thinking = SUBSCRIPTION): Known => ({
+  label,
+  route: 'Your subscription',
+  note,
+  images: true,
+  thinking,
+})
+
+/**
  * What goblin knows about the models LiteLLM serves to it. Grouped by the route the call takes, because quotas are per
  * route: when Google refuses, an Alibaba model still answers. Probed 2026-10-04: every model here calls tools; `images`
  * is whether it reads image input (the others drop images silently). Thinking was probed on 2026-10-20: each value
@@ -118,6 +137,15 @@ const KNOWN: Readonly<Record<string, Known>> = {
       },
     },
   },
+  'sub/claude-fable-5-1': subscription('Claude Fable 5.1', 'Largest, sees images'),
+  'sub/claude-opus-5-5': subscription('Claude Opus 5.5', 'Larger, sees images'),
+  'sub/claude-sonnet-5-5': subscription('Claude Sonnet 5.5', 'Fast, sees images'),
+  'sub/gpt-6.1-sol': subscription('GPT-6.1 Sol', 'Sees images'),
+  'sub/gpt-6-astra': subscription('GPT-6 Astra', 'Sees images'),
+  'sub/grok-4.7': subscription('Grok 4.7', 'Sees images', {
+    ...SUBSCRIPTION,
+    efforts: { ...SUBSCRIPTION.efforts, max: null },
+  }),
 }
 
 /** How goblin bounds model `id`'s thinking, or nothing for a model it does not know, which is sent no thinking control. */
@@ -135,20 +163,28 @@ export const optionOf = (id: string): ModelOption => {
   return { id, label, route, note, images, contextWindow: CONTEXT_WINDOW }
 }
 
+/** The model names in a comma-separated list, as `MODELS` and `OWNER_MODELS` give them. */
+const namesIn = (list: string | undefined): readonly string[] =>
+  (list ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => id !== '')
+
 /**
  * The models this deployment offers: `MODELS` (comma-separated model names) with the default `MODEL_ID` always
  * first. An unknown name is offered under its own name, text only.
  */
 export function modelOptions(models: string | undefined, defaultId: string): ModelOptions {
-  const more = (models ?? '').split(',').map((id) => id.trim())
-  const others = [...new Set(more)].filter((id) => id !== '' && id !== defaultId)
+  const others = [...new Set(namesIn(models))].filter((id) => id !== defaultId)
   return [optionOf(defaultId), ...others.map(optionOf)]
 }
 
 /** The deployment's own model endpoint: where its calls go, its key, and the models it offers, its default first. */
 export type DeploymentEndpoint = { readonly baseUrl: string; readonly apiKey: string; readonly options: ModelOptions }
 
-type DeploymentEnvironment = Partial<Pick<RuntimeEnv, 'MODEL_BASE_URL' | 'MODEL_ID' | 'MODEL_KEY' | 'MODELS'>>
+type DeploymentEnvironment = Partial<
+  Pick<RuntimeEnv, 'MODEL_BASE_URL' | 'MODEL_ID' | 'MODEL_KEY' | 'MODELS' | 'OWNER_USER_ID' | 'OWNER_MODELS'>
+>
 
 /**
  * The deployment's model endpoint (ADR 0064): `MODEL_BASE_URL`, `MODEL_KEY` and the default `MODEL_ID`, all three set.
@@ -162,9 +198,30 @@ export function deploymentEndpoint(env: DeploymentEnvironment): DeploymentEndpoi
   return { baseUrl, apiKey, options: modelOptions(env.MODELS, defaultId) }
 }
 
-/** The ids of the models the deployment offers, its default first; none without its own endpoint. */
-export const deploymentModelIds = (env: DeploymentEnvironment): readonly string[] =>
-  deploymentEndpoint(env)?.options.map((option) => option.id) ?? []
+/**
+ * The models on the deployment owner's own subscriptions (`OWNER_MODELS`, ADR 0087). Every account's models never
+ * count among them, so naming one in both lists offers it to everyone.
+ */
+export const ownerModelIds = (env: DeploymentEnvironment): readonly string[] => {
+  const everyone = new Set([env.MODEL_ID?.trim() ?? '', ...namesIn(env.MODELS)])
+  return namesIn(env.OWNER_MODELS).filter((id) => !everyone.has(id))
+}
+
+/**
+ * The deployment's endpoint as account `userId` is offered it (ADR 0087): every account's models, and to the
+ * deployment's owner (`OWNER_USER_ID`) alone also its own subscriptions (`ownerModelIds`), after the others.
+ */
+export function offeredEndpoint(env: DeploymentEnvironment, userId: string): DeploymentEndpoint | undefined {
+  const shared = deploymentEndpoint(env)
+  const owner = env.OWNER_USER_ID?.trim() ?? ''
+  if (shared === undefined || owner === '' || userId !== owner) return shared
+  const [first, ...rest] = shared.options
+  return { ...shared, options: [first, ...rest, ...ownerModelIds(env).map(optionOf)] }
+}
+
+/** The ids of the models the deployment offers account `userId`, its default first; none without its own endpoint. */
+export const deploymentModelIds = (env: DeploymentEnvironment, userId: string): readonly string[] =>
+  offeredEndpoint(env, userId)?.options.map((option) => option.id) ?? []
 
 /**
  * The model id a call names when the deployment offers none: whatever endpoint answers it serves its own default in
@@ -222,8 +279,13 @@ export class ModelPicker {
     return chosen !== undefined && this.#options.some((option) => option.id === chosen) ? chosen : this.#options[0].id
   }
 
+  /** The endpoint's default, which every account is offered. */
+  defaultId(): string {
+    return this.#options[0].id
+  }
+
   choice(): ModelChoice {
-    return { current: this.current(), default: this.#options[0].id, options: this.#options }
+    return { current: this.current(), default: this.defaultId(), options: this.#options }
   }
 
   /** Fails with `InvalidInput` for a model the endpoint does not offer. */
@@ -246,5 +308,11 @@ export class Models extends Context.Service<
     readonly choice: Effect.Effect<ModelChoice, AppError>
     /** Stores the pick (epoch seconds); `InvalidInput` for a model the endpoint does not offer. */
     readonly choose: (modelId: string, now: number) => Effect.Effect<ModelChoice, AppError>
+    /** Whether `id` is one of the owner's own subscriptions (`ownerModelIds`, ADR 0087), which a server's work never uses. */
+    readonly ownerOnly: (id: string) => boolean
+    /** The model a server's work answers with (ADR 0087): the pick, unless it is one of the owner's own, then the default. */
+    readonly forServers: Effect.Effect<string, AppError>
+    /** The choice as a server's key reads it (ADR 0087): without the owner's own subscriptions. */
+    readonly choiceForServers: Effect.Effect<ModelChoice, AppError>
   }
 >()('goblin/models/Models') {}

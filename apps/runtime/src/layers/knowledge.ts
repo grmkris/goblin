@@ -32,9 +32,9 @@ import { auxReporter } from '../telemetry/report.ts'
 export const CheapModelsLive: Layer.Layer<CheapModels, never, AgentInput | Db> = Layer.effect(
   CheapModels,
   Effect.gen(function* () {
-    const { env, pi, telemetry } = yield* AgentInput
+    const { env, userId, pi, telemetry } = yield* AgentInput
     const ledger = usageLedger(yield* Db)
-    const id = memoryModelId(env.MEMORY_MODEL, deploymentModelIds(env))
+    const id = memoryModelId(env.MEMORY_MODEL, deploymentModelIds(env, userId))
     return (purpose) =>
       new CheapModel(pi.models, id, (use) => recordUse(ledger, use, nowSeconds()), auxReporter(telemetry, purpose))
   }),

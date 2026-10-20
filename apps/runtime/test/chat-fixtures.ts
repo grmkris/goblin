@@ -65,7 +65,7 @@ export const portServices = ({ db, harness, flows = FlowEvents.noop }: PortInsta
       routineHome: (topic: number) =>
         Effect.succeed({ chat: primaryChat, topic: topic === PERSONAL_TOPIC ? topic : PERSONAL_TOPIC }),
     }),
-    Layer.mock(Personas, { active: Effect.succeed([]) }),
+    Layer.mock(Personas, { active: Effect.succeed([]), ownerOnly: () => false }),
     Layer.mock(Invocations, {}),
     // No probe makes a Topic for a new chat.
     Layer.mock(Topics, {}),

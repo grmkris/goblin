@@ -10,12 +10,14 @@ export type Applied = Map<string, string>
 
 /**
  * Puts a session on the user's model before a turn. Pi stores one model per conversation, set when it is created, so
- * a pick (or a new deployment default) reaches existing conversations only this way. Skipped when `applied` says the
- * session is on it already.
+ * a pick (or a new deployment default) reaches existing conversations only this way. A server's work (`server`,
+ * `serverWorkIn`) goes on `Models.forServers`, never on the owner's own subscriptions (ADR 0087). Skipped when
+ * `applied` says the session is on it already.
  */
-export const useModel = (pi: PiSessions['Service'], applied: Applied, session: string) =>
+export const useModel = (pi: PiSessions['Service'], applied: Applied, session: string, server: boolean) =>
   Effect.gen(function* () {
-    const id = yield* (yield* Models).current
+    const models = yield* Models
+    const id = yield* server ? models.forServers : models.current
     if (applied.get(session) === id) return
     yield* fromPi(pi.setModel(session, modelRef(id)))
     applied.set(session, id)
@@ -27,6 +29,7 @@ export const chooseOwnerModel = (modelId: string) =>
     const choice = yield* (yield* Models).choose(modelId, yield* epochSeconds)
     const chats = yield* Chats
     const { applied } = yield* AgentInput
-    yield* useModel(yield* PiSessions, applied, yield* chats.session(chats.primary))
+    // The owner chose it in their own session, and main is in Personal, which no key made.
+    yield* useModel(yield* PiSessions, applied, yield* chats.session(chats.primary), false)
     return choice
   })

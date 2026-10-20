@@ -3,6 +3,7 @@ import { OwnerApi } from '@goblin/contracts/api'
 import * as Effect from 'effect/Effect'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { claim, confinePersona, confineSetup, requestKey } from '../keys/policy.ts'
+import { InvalidInput } from '../http/errors.ts'
 import { Resident } from '../mcp/service.ts'
 import { resumePersona } from './ask.ts'
 import { createPersona, madePersona, personaDetail, updatePersona } from './program.ts'
@@ -42,10 +43,18 @@ const list = (query: {
     return { personas: page.personas.map(summaryOf), ...(page.next === undefined ? {} : { next: page.next }) }
   })
 
+/** To a server's key the owner's own subscriptions are not on offer, so a Persona it writes never names one (ADR 0087). */
+const confineModel = (model: string | null | undefined) =>
+  Effect.gen(function* () {
+    if (model === undefined || model === null || (yield* requestKey) === undefined) return
+    if ((yield* Personas).ownerOnly(model)) return yield* new InvalidInput({ reason: 'persona_model' })
+  })
+
 /** A Persona a server's API key makes (ADR 0081): its setup under the key's ceiling, and the key's own from then on. */
 const create = (input: CreatePersona) =>
   Effect.gen(function* () {
     if ((yield* requestKey) === undefined) return yield* createPersona(input, { actor: 'owner' })
+    yield* confineModel(input.model)
     if (input.setup !== undefined) yield* confineSetup(input.setup)
     const made = yield* madePersona(input, { actor: 'owner' })
     yield* claim('persona', made.persona.id, made.created)
@@ -65,7 +74,7 @@ export const PersonasHandlers = HttpApiBuilder.group(OwnerApi, 'personas', (hand
     .handle('update', ({ params, payload }) =>
       Effect.andThen(
         Effect.andThen(
-          confinePersona(params.id),
+          Effect.andThen(confinePersona(params.id), confineModel(payload.model)),
           payload.setup === undefined ? Effect.void : confineSetup(payload.setup),
         ),
         updatePersona(params.id, payload, { actor: 'owner' }),

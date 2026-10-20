@@ -67,9 +67,13 @@ const services = () => {
       return watch
     },
   })
-  const lane = delegationServices({ topics, personas, invocations, receipts }).pipe(
-    Layer.provideMerge(Layer.merge(KeyedLock.layer, Layer.succeed(Changes, makeChanges()))),
-  )
+  const lane = delegationServices({
+    topics,
+    personas,
+    invocations,
+    receipts,
+    fence: { ownerOnly: () => false, keyTopic: () => false },
+  }).pipe(Layer.provideMerge(Layer.merge(KeyedLock.layer, Layer.succeed(Changes, makeChanges()))))
   const sources = Layer.mergeAll(
     // SAFETY: Personal's chat id, as the chat directory brands it.
     stub(Chats, { primary: '1' as ChatId, isHidden: () => Effect.succeed(false) }),

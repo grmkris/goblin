@@ -9,7 +9,15 @@ import { endpointBase, keyHint, listModels } from '../inference/endpoint.ts'
 import { type CurrentEndpoint, Inference, type ResolvedEndpoint } from '../inference/service.ts'
 import { endpointStore } from '../inference/store.ts'
 import { Cipher } from '../mcp/oauth/cipher.ts'
-import { ModelChoiceStore, ModelPicker, type ModelOptions, Models, deploymentEndpoint, optionOf } from '../models.ts'
+import {
+  ModelChoiceStore,
+  ModelPicker,
+  type ModelOptions,
+  Models,
+  offeredEndpoint,
+  optionOf,
+  ownerModelIds,
+} from '../models.ts'
 import { Db } from '../runtime/db.ts'
 import { AgentInput } from '../runtime/input.ts'
 
@@ -19,9 +27,12 @@ const optionsOf = (endpoint: ResolvedEndpoint): ModelOptions => {
   return [optionOf(first), ...rest.map(optionOf)]
 }
 
-/** The deployment's own endpoint as model calls use it, or `none` when it has none (ADR 0064). */
-const deploymentOf = (env: RuntimeEnv): CurrentEndpoint => {
-  const own = deploymentEndpoint(env)
+/**
+ * The deployment's own endpoint as account `userId`'s model calls use it (its owner's subscriptions included for the
+ * owner alone, ADR 0087), or `none` when it has none (ADR 0064).
+ */
+const deploymentOf = (env: RuntimeEnv, userId: string): CurrentEndpoint => {
+  const own = offeredEndpoint(env, userId)
   if (own === undefined) return { source: 'none' }
   const [first, ...rest] = own.options
   return {
@@ -44,7 +55,7 @@ const InferenceLive: Layer.Layer<Inference, never, AgentInput | Db | Cipher> = L
     const store = endpointStore(yield* Db)
     const cipher = yield* Cipher
     const aad = `model-endpoint:${userId}`
-    const deployment = deploymentOf(env)
+    const deployment = deploymentOf(env, userId)
     const kept = yield* Ref.make<CurrentEndpoint | undefined>(undefined)
     const endpoint = Effect.gen(function* () {
       const known = yield* Ref.get(kept)
@@ -137,26 +148,43 @@ const BudgetLive: Layer.Layer<Budget, never, AgentInput | Db | Inference> = Laye
  * The model picker over the agent's SQLite: the owner's pick among what their model endpoint offers. Without an endpoint
  * there is nothing to pick: the choice offers nothing, and the model in use is `NoModelEndpoint`.
  */
-const ModelsLive: Layer.Layer<Models, never, Db | Inference> = Layer.effect(
+const ModelsLive: Layer.Layer<Models, never, AgentInput | Db | Inference> = Layer.effect(
   Models,
   Effect.gen(function* () {
     const ledger = new ModelChoiceStore(yield* Db)
     const inference = yield* Inference
+    const owned = new Set(ownerModelIds((yield* AgentInput).env))
+    const ownerOnly = (id: string) => owned.has(id)
     const picker = Effect.map(inference.endpoint, (endpoint) =>
       endpoint.source === 'none' ? undefined : new ModelPicker(ledger, optionsOf(endpoint)),
     )
     const required = Effect.flatMap(picker, (models) =>
       models === undefined ? Effect.fail(new NoModelEndpoint({})) : Effect.succeed(models),
     )
+    const choice = Effect.map(picker, (models) => models?.choice() ?? { options: [] }).pipe(
+      Effect.withSpan('Models.choice'),
+    )
     return Models.of({
       current: Effect.map(required, (models) => models.current()).pipe(Effect.withSpan('Models.current')),
-      choice: Effect.map(picker, (models) => models?.choice() ?? { options: [] }).pipe(
-        Effect.withSpan('Models.choice'),
-      ),
+      choice,
       choose: Effect.fn('Models.choose')(function* (modelId: string, now: number) {
         const models = yield* required
         return yield* attemptSync(() => models.choose(modelId, now))
       }),
+      ownerOnly,
+      forServers: Effect.map(required, (models) => {
+        const picked = models.current()
+        return ownerOnly(picked) ? models.defaultId() : picked
+      }).pipe(Effect.withSpan('Models.forServers')),
+      choiceForServers: Effect.map(choice, (offered) => {
+        // The default is every account's model (`ownerModelIds` leaves those out), so it stands in for the owner's own.
+        const current = offered.current !== undefined && ownerOnly(offered.current) ? offered.default : offered.current
+        return {
+          ...(current === undefined ? {} : { current }),
+          ...(offered.default === undefined ? {} : { default: offered.default }),
+          options: offered.options.filter((option) => !ownerOnly(option.id)),
+        }
+      }).pipe(Effect.withSpan('Models.choiceForServers')),
     })
   }),
 )

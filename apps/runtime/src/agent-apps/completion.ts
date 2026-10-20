@@ -18,9 +18,9 @@ export const appAnswer = (answer: Promise<string>): Promise<string> =>
 /** The cheap model's completion for apps (`app_llm`): its tokens are recorded even when its answer fails. */
 export const appCompletion: AppCompletion = (system, prompt, maxTokens) =>
   Effect.gen(function* () {
-    const { env, pi, telemetry } = yield* AgentInput
+    const { env, userId, pi, telemetry } = yield* AgentInput
     const budget = yield* Budget
-    const id = memoryModelId(env.MEMORY_MODEL, deploymentModelIds(env))
+    const id = memoryModelId(env.MEMORY_MODEL, deploymentModelIds(env, userId))
     const spent: TokenUse[] = []
     const model = new CheapModel(pi.models, id, (use) => void spent.push(use), auxReporter(telemetry, 'app_llm'))
     const record = Effect.suspend(() =>

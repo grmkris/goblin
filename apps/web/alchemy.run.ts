@@ -21,6 +21,10 @@ const modelEnv = {
   MODEL_KEY: Config.Redacted('GOBLIN_MODEL_KEY').pipe(Config.withDefault(Redacted.make(''))),
   DAILY_TOKEN_CAP: Config.String('GOBLIN_DAILY_TOKEN_CAP').pipe(Config.withDefault('')),
   MEMORY_MODEL: Config.String('GOBLIN_MEMORY_MODEL').pipe(Config.withDefault('')),
+  // The deployment's owner and the models on their own subscriptions, offered to that account alone (ADR 0087). The
+  // user id is a private id, so it is bound as a secret.
+  OWNER_USER_ID: Config.Redacted('GOBLIN_OWNER_USER_ID').pipe(Config.withDefault(Redacted.make(''))),
+  OWNER_MODELS: Config.String('GOBLIN_OWNER_MODELS').pipe(Config.withDefault('')),
 }
 
 /**
