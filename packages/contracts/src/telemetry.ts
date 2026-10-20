@@ -68,6 +68,8 @@ export const RunAttribute = {
   /** Pi entry id that completed this attempt or tool call. */
   entry: 'goblin.entry',
   cutoff: 'goblin.cutoff',
+  /** The response ended without an answer, and answered when asked again (ADR 0083). */
+  recovered: 'goblin.recovered',
   emptyAnswer: 'goblin.empty_answer',
   coverageGap: 'goblin.coverage_gap',
   /** Why a turn went unanswered or a task ended (`faulted`, `aborted`, …). */

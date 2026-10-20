@@ -1,11 +1,22 @@
-import type { AssistantMessage, Message, Model, ProviderStreams, ThinkingLevel } from '@earendil-works/pi-ai'
+import type { Api, AssistantMessage, Message, Model, ProviderStreams, ThinkingLevel } from '@earendil-works/pi-ai'
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream'
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
+import { isRetryableAssistantError } from '@earendil-works/pi-ai/utils/retry'
+import { RunAttribute } from '@goblin/contracts/telemetry'
 import { describe, expect, it } from 'vitest'
 import { isContextOverflow } from '@earendil-works/pi-ai/utils/overflow'
 import { NoModelEndpoint } from '../src/http/errors.ts'
 import { NO_ENDPOINT_ANSWER, servedFailure } from '../src/inference/service.ts'
-import { LITELLM_STREAMS, MAX_OUTPUT_TOKENS, MIN_ANSWER_ROOM, MODEL_PROVIDER, makePiModels } from '../src/pi/model.ts'
+import {
+  LITELLM_STREAMS,
+  MAX_OUTPUT_TOKENS,
+  MIN_ANSWER_ROOM,
+  MODEL_PROVIDER,
+  NO_ANSWER,
+  answering,
+  makePiModels,
+} from '../src/pi/model.ts'
+import { answerAttributes } from '../src/telemetry/attributes.ts'
 
 const env = {
   MODEL_ID: 'qwen3.8-flash',
@@ -79,6 +90,127 @@ describe('how thinking is bounded (unit)', () => {
     ['unknown-model', 'medium', {}],
   ] as const)('sends %s at %s level: %j', async (id, level, sent) => {
     expect(thinkingParams((await requestFor([ask('hi')], id, level)).request)).toEqual(sent)
+  })
+})
+
+/** A response of `model` with no content yet. */
+const response = (model: Model<Api>): AssistantMessage => {
+  const zero = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
+  return {
+    role: 'assistant',
+    content: [],
+    api: model.api,
+    provider: model.provider,
+    model: model.id,
+    usage: { ...zero, totalTokens: 0, cost: { ...zero, total: 0 } },
+    stopReason: 'stop',
+    timestamp: 1,
+  }
+}
+
+const tokens = (output: number, reasoning: number) => ({
+  input: 100,
+  output,
+  cacheRead: 0,
+  cacheWrite: 0,
+  reasoning,
+  totalTokens: 100 + output,
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+})
+
+/** Thought until the output limit, with nothing said. */
+const thoughtOnly: Partial<AssistantMessage> = {
+  content: [{ type: 'thinking', thinking: 'Let me consider every angle once more…' }],
+  stopReason: 'length',
+  usage: tokens(32_768, 32_768),
+}
+/** Ended with nothing said: how Muse ends a thought cut off. */
+const nothing: Partial<AssistantMessage> = { content: [], stopReason: 'stop', usage: tokens(0, 0) }
+const answered: Partial<AssistantMessage> = {
+  content: [{ type: 'text', text: 'It is prime.' }],
+  stopReason: 'stop',
+  usage: tokens(12, 0),
+}
+
+/** Streams that answer each request with the next of `replies`, recording what it carried last and its level. */
+const scripted = (...replies: Partial<AssistantMessage>[]) => {
+  const sent: { last: Message | undefined; reasoning: string | undefined }[] = []
+  const answer: ProviderStreams['streamSimple'] = (model, context, options) => {
+    sent.push({ last: context.messages.at(-1), reasoning: options?.reasoning })
+    const message = { ...response(model), ...replies[sent.length - 1] }
+    const events = createAssistantMessageEventStream()
+    events.push({ type: 'start', partial: message })
+    if (message.stopReason === 'error') events.push({ type: 'error', reason: 'error', error: message })
+    else events.push({ type: 'done', reason: 'stop', message })
+    events.end()
+    return events
+  }
+  return { sent, streams: answering({ stream: answer, streamSimple: answer }) }
+}
+
+describe('a response without an answer (unit)', () => {
+  const { model } = makePiModels(env)
+  const context = normalizeContext({ systemPrompt: 'Be brief.', messages: [ask('Is 1,000,003 prime?')] })
+
+  /** The events a request's stream passes on, and its final message. */
+  const run = async (streams: ProviderStreams) => {
+    const events = streams.streamSimple(model, context, { reasoning: 'medium' })
+    const seen: string[] = []
+    for await (const event of events) seen.push(event.type)
+    return { seen, message: await events.result() }
+  }
+
+  it('is asked once more at the least thinking, told to answer, and that answer is the response', async () => {
+    const { sent, streams } = scripted(thoughtOnly, answered)
+    const { seen, message } = await run(streams)
+    expect(sent).toEqual([
+      { last: context.messages.at(-1), reasoning: 'medium' },
+      {
+        last: expect.objectContaining({ role: 'user', content: expect.stringContaining('Give your final answer now') }),
+        reasoning: undefined,
+      },
+    ])
+    expect(message).toMatchObject({ stopReason: 'stop', content: answered.content })
+    // Both responses' tokens were spent; the run ledger marks the attempt recovered.
+    expect(message.usage).toMatchObject({ input: 200, output: 32_780, reasoning: 32_768, totalTokens: 32_980 })
+    expect(answerAttributes(message)).toMatchObject({ [RunAttribute.recovered]: true })
+    expect(seen).toEqual(['start', 'start', 'done'])
+  })
+
+  it('is asked again when it said nothing at all', async () => {
+    const { sent, streams } = scripted(nothing, answered)
+    const { message } = await run(streams)
+    expect(sent.map((each) => each.reasoning)).toEqual(['medium', undefined])
+    expect(message).toMatchObject({ stopReason: 'stop', content: answered.content })
+  })
+
+  it.each([
+    ['thinks until its output limit again', thoughtOnly, RunAttribute.cutoff],
+    ['says nothing again', nothing, RunAttribute.emptyAnswer],
+  ] as const)("fails in goblin's own words when it %s, which Pi does not retry", async (_name, again, marked) => {
+    const { sent, streams } = scripted(thoughtOnly, again)
+    const { seen, message } = await run(streams)
+    expect(sent).toHaveLength(2)
+    expect(message).toMatchObject({ stopReason: 'error', errorMessage: NO_ANSWER, content: [] })
+    expect(message.usage.output).toBe(32_768 + (again.usage?.output ?? 0))
+    expect(isRetryableAssistantError(message)).toBe(false)
+    expect(answerAttributes(message)).toMatchObject({ [marked]: true })
+    expect(seen).toEqual(['start', 'start', 'error'])
+  })
+
+  it.each([
+    ['an answer cut off mid-sentence', { ...thoughtOnly, content: [{ type: 'text', text: 'It is prime because' }] }],
+    [
+      'a tool call cut off',
+      { ...thoughtOnly, content: [{ type: 'toolCall', id: 'c1', name: 'search', arguments: {} }] },
+    ],
+    ['an answer', answered],
+  ] satisfies [string, Partial<AssistantMessage>][])('passes %s on as it is, asked once', async (_name, reply) => {
+    const { sent, streams } = scripted(reply)
+    const { message } = await run(streams)
+    expect(sent).toHaveLength(1)
+    expect(message).toMatchObject({ stopReason: reply.stopReason, content: reply.content })
+    expect(answerAttributes(message)[RunAttribute.recovered]).toBeUndefined()
   })
 })
 

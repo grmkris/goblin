@@ -12,6 +12,7 @@ export type Answer = {
   readonly stopReason: string
   readonly errorMessage?: string | undefined
   readonly emptyAnswer?: boolean | undefined
+  readonly diagnostics?: readonly { readonly type: string }[] | undefined
   readonly usage: {
     readonly input: number
     readonly output: number
@@ -20,6 +21,10 @@ export type Answer = {
     readonly reasoning?: number | undefined
   }
 }
+
+/** Whether goblin's model streams marked `message` with diagnostic `type` (`pi/model.ts`, ADR 0083). */
+const noted = (message: Answer, type: string): boolean =>
+  message.diagnostics?.some((diagnostic) => diagnostic.type === type) === true
 
 /** What a response tells about its model call: model, finish reason, tokens, error. Never its content. */
 export function answerAttributes(message: Answer): RunAttributes {
@@ -39,8 +44,11 @@ export function answerAttributes(message: Answer): RunAttributes {
     ...(message.errorMessage === undefined && message.stopReason !== 'error'
       ? {}
       : { [RunAttribute.errorType]: failure, [RunAttribute.error]: failure }),
-    ...(message.stopReason === 'length' ? { [RunAttribute.cutoff]: true } : {}),
-    ...(message.emptyAnswer === true ? { [RunAttribute.emptyAnswer]: true } : {}),
+    ...(message.stopReason === 'length' || noted(message, RunAttribute.cutoff) ? { [RunAttribute.cutoff]: true } : {}),
+    ...(noted(message, RunAttribute.recovered) ? { [RunAttribute.recovered]: true } : {}),
+    ...(message.emptyAnswer === true || noted(message, RunAttribute.emptyAnswer)
+      ? { [RunAttribute.emptyAnswer]: true }
+      : {}),
   }
 }
 

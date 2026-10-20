@@ -28,6 +28,7 @@ const Assistant = Schema.Struct({
   errorMessage: Schema.optional(Schema.String),
   timestamp: Schema.Number,
   content: Schema.Array(Block),
+  diagnostics: Schema.optional(Schema.Array(Schema.Struct({ type: Schema.String }))),
 })
 const ToolResult = Schema.Struct({
   role: Schema.Literal('toolResult'),

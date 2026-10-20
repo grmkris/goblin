@@ -2,9 +2,13 @@ import { createModels, createProvider } from '@earendil-works/pi-ai/models'
 import { lazyStream } from '@earendil-works/pi-ai/api/lazy'
 import { stream, streamSimple } from '@earendil-works/pi-ai/api/openai-completions'
 import { clampMaxTokensToContext } from '@earendil-works/pi-ai/api/simple-options'
-import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream'
-import type { AssistantMessage, Model, ProviderStreams } from '@earendil-works/pi-ai'
+import {
+  type AssistantMessageEventStream,
+  createAssistantMessageEventStream,
+} from '@earendil-works/pi-ai/utils/event-stream'
+import type { Api, AssistantMessage, Model, ProviderStreams, Usage } from '@earendil-works/pi-ai'
 import type { ModelOption } from '@goblin/contracts'
+import { RunAttribute } from '@goblin/contracts/telemetry'
 import type { RuntimeEnv } from '../env.ts'
 import {
   ENDPOINT_DEFAULT,
@@ -81,11 +85,10 @@ function makePiModel(
  */
 export const MIN_ANSWER_ROOM = 4096
 
-/** A response that never reached the provider: the context leaves too little room for an answer. */
-function tooFull(model: Model<'openai-completions'>, room: number) {
-  const events = createAssistantMessageEventStream()
+/** A response of `model` that failed with `text` before any tokens were spent. */
+const failed = (model: Model<Api>, text: string): AssistantMessage => {
   const zero = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
-  const message: AssistantMessage = {
+  return {
     role: 'assistant',
     content: [],
     api: model.api,
@@ -93,14 +96,120 @@ function tooFull(model: Model<'openai-completions'>, room: number) {
     model: model.id,
     usage: { ...zero, totalTokens: 0, cost: { ...zero, total: 0 } },
     stopReason: 'error',
-    // Worded to match pi-ai's overflow patterns ("exceeds the context window"), which start Pi's compaction.
-    errorMessage: `The conversation exceeds the context window: ${String(room)} tokens left for the answer.`,
+    errorMessage: text,
     timestamp: Date.now(),
   }
-  events.push({ type: 'error', reason: 'error', error: message })
-  events.end()
+}
+
+/** Ends `events` with `message`: the event its stop reason calls for (a deferred one has none), then the result. */
+const settle = (events: AssistantMessageEventStream, message: AssistantMessage): void => {
+  const { stopReason } = message
+  if (stopReason === 'error' || stopReason === 'aborted')
+    events.push({ type: 'error', reason: stopReason, error: message })
+  else if (stopReason !== 'pending') events.push({ type: 'done', reason: stopReason, message })
+  events.end(message)
+}
+
+/** A response that never reached the provider: the context leaves too little room for an answer. */
+function tooFull(model: Model<'openai-completions'>, room: number) {
+  const events = createAssistantMessageEventStream()
+  // Worded to match pi-ai's overflow patterns ("exceeds the context window"), which start Pi's compaction.
+  settle(
+    events,
+    failed(model, `The conversation exceeds the context window: ${String(room)} tokens left for the answer.`),
+  )
   return events
 }
+
+/** Recovery's nudge (ADR 0083), after Gemini CLI's: the response ended without an answer. */
+const ANSWER_NOW =
+  'Your last response ended without an answer. Give your final answer now, or call a tool, without thinking at length.'
+
+/**
+ * How a response ends when its model ended without answering, also when asked again (ADR 0083): goblin's own words,
+ * which Pi does not take for a passing provider failure, and a Persona's answer flow reads as no answer.
+ */
+export const NO_ANSWER = 'The model gave no answer, also when asked again.'
+
+/**
+ * A response that ended without an answer or a tool call: it thought until its output limit, or said nothing (Muse
+ * ends a thought cut off that way, with `stop`).
+ */
+const unanswered = (message: AssistantMessage): boolean =>
+  (message.stopReason === 'length' || message.stopReason === 'stop') &&
+  !message.content.some((block) => block.type === 'toolCall' || (block.type === 'text' && block.text.trim() !== ''))
+
+/** The tokens of two responses to one request, both spent. */
+const together = (first: Usage, second: Usage): Usage => ({
+  input: first.input + second.input,
+  output: first.output + second.output,
+  cacheRead: first.cacheRead + second.cacheRead,
+  cacheWrite: first.cacheWrite + second.cacheWrite,
+  ...(first.reasoning === undefined && second.reasoning === undefined
+    ? {}
+    : { reasoning: (first.reasoning ?? 0) + (second.reasoning ?? 0) }),
+  totalTokens: first.totalTokens + second.totalTokens,
+  cost: {
+    input: first.cost.input + second.cost.input,
+    output: first.cost.output + second.cost.output,
+    cacheRead: first.cost.cacheRead + second.cost.cacheRead,
+    cacheWrite: first.cost.cacheWrite + second.cost.cacheWrite,
+    total: first.cost.total + second.cost.total,
+  },
+})
+
+/** Passes `from`'s events on to `to`, all but the one that ends it, and answers its final message. */
+async function relay(from: AssistantMessageEventStream, to: AssistantMessageEventStream): Promise<AssistantMessage> {
+  for await (const event of from) if (event.type !== 'done' && event.type !== 'error') to.push(event)
+  return from.result()
+}
+
+/**
+ * A request that answers (ADR 0083). When the response ends without an answer, the request is sent once more at no
+ * thinking level, which asks for the least thinking its model allows (`thinkingFields`), with a nudge to answer now.
+ * That reply is the response, its tokens counted with the first's and a diagnostic the run ledger records
+ * (`goblin.recovered`). When it ends without an answer too, the response fails with `NO_ANSWER`, marked as cut off or
+ * empty. The live partials of both go on to Pi as they come.
+ */
+async function answer(
+  streams: ProviderStreams,
+  out: AssistantMessageEventStream,
+  ...[model, context, options]: Parameters<ProviderStreams['streamSimple']>
+): Promise<AssistantMessage> {
+  const first = await relay(streams.streamSimple(model, context, options), out)
+  if (!unanswered(first)) return first
+  const { reasoning: _asked, ...least } = options ?? {}
+  const asked = {
+    ...context,
+    messages: [...context.messages, { role: 'user' as const, content: ANSWER_NOW, timestamp: Date.now() }],
+  }
+  const second = await relay(streams.streamSimple(model, asked, least), out)
+  const usage = together(first.usage, second.usage)
+  const noting = (type: string) => [...(second.diagnostics ?? []), { type, timestamp: Date.now() }]
+  if (unanswered(second))
+    return {
+      ...second,
+      content: [],
+      usage,
+      stopReason: 'error',
+      errorMessage: NO_ANSWER,
+      diagnostics: noting(second.stopReason === 'length' ? RunAttribute.cutoff : RunAttribute.emptyAnswer),
+    }
+  return { ...second, usage, diagnostics: noting(RunAttribute.recovered) }
+}
+
+/** `streams` whose every simple request answers (`answer`); its full requests go out as they are. */
+export const answering = (streams: ProviderStreams): ProviderStreams => ({
+  stream: (model, context, options) => streams.stream(model, context, options),
+  streamSimple: (model, context, options) => {
+    const out = createAssistantMessageEventStream()
+    answer(streams, out, model, context, options).then(
+      (message) => settle(out, message),
+      (error: unknown) => settle(out, failed(model, error instanceof Error ? error.message : String(error))),
+    )
+    return out
+  },
+})
 
 /** The provider and model Pi runs for a model id: goblin's model provider, whichever endpoint answers it. */
 export const modelRef = (id: string): { readonly provider: string; readonly id: string } => ({
@@ -108,8 +217,11 @@ export const modelRef = (id: string): { readonly provider: string; readonly id: 
   id,
 })
 
-/** How every model's requests leave: an OpenAI-compatible chat completions API, never with a starved answer. */
-export const LITELLM_STREAMS: ProviderStreams = {
+/**
+ * How every model's requests leave: an OpenAI-compatible chat completions API, never with a starved answer, and every
+ * simple request answering rather than only thinking (`answering`).
+ */
+export const LITELLM_STREAMS: ProviderStreams = answering({
   stream,
   streamSimple: (model, context, options) => {
     const wanted = options?.maxTokens ?? model.maxTokens
@@ -118,7 +230,7 @@ export const LITELLM_STREAMS: ProviderStreams = {
     const target = model as Model<'openai-completions'>
     return room < Math.min(MIN_ANSWER_ROOM, wanted) ? tooFull(target, room) : streamSimple(target, context, options)
   },
-}
+})
 
 /** One call's way out (`inference/service.ts` `served`): the endpoint, its key and a model it serves. */
 export type ResolveModel = (modelId: string) => Promise<{ baseUrl: string; apiKey: string; model: string }>
