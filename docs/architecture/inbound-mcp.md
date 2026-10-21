@@ -40,7 +40,7 @@ Code, claude.ai, Cursor) or a server's API key.
   | --- | --- | --- |
   | `agent` | `ask_agent`, `get_recent_messages` | OAuth clients |
   | `topics` | `topic_list`, `topic_get`, `topic_create`, `topic_update`, `topic_set_setup` | both |
-  | `conversations` | `conversation_send`, `thread_start`, `conversation_entries`, `conversation_stop` | both |
+  | `conversations` | `conversation_update`, `conversation_send`, `thread_start`, `conversation_entries`, `conversation_stop` | both |
   | `personas` | `persona_list`, `models_list`, `persona_create`, `persona_get`, `persona_update` | both |
   | `inspect` | `inspect_turns`, `inspect_turn`, `inspect_problems`, `inspect_flows`, `inspect_details` | both |
   | `transcripts` | `inspect_conversations`, `inspect_conversation` | OAuth clients |
@@ -74,7 +74,10 @@ that does not admit on `/mcp` gets the same envelope as on `/api`.
 A key reaches only the Topics, their chats and the Personas it made (`app_key_reach`); an operation id never adopts
 the owner's. Its Topics start with nothing in their setup, and any setup it writes names only its servers, tool by
 tool. Messages it sends are owner turns in those Topics: built-in tools are the owner's, and `searchExcluded` is not
-isolation.
+isolation. It names the threads it starts (`title`, which announces an empty one in its Topic's Conversation), and
+renames, closes and reopens its own threads, never a Topic's Conversation and never pinning one open
+([ADR 0090](../adr/0090-a-key-names-closes-and-reads-back-its-threads.md)); its forward read shows its messages to
+Personas as the owner's, with `to`.
 
 With `inspect` a key reads how its own chats ran, content-free (ADR 0084), seeing only the run events of chats within
 its reach (its Topics, their threads and Persona forks). `inspect_details` of an operation it sent lists its Personas'

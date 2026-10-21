@@ -216,7 +216,8 @@ answers nothing, since a write starts no run. A thread branched from a subagent 
 extensions and `ask_user`, without the subagent's own selection and instructions. After each response an untitled thread is named by the memory model
 from its latest exchange, in the background; the owner can rename it. A thread started with "+" is created with
 `app_conversations.main_note = 'owed'`; once it has a title (the model's or the owner's) the same hook writes main
-an `app.thread_started` entry with request id `thread-started:<id>` and marks the note `written`. The note carries
+an `app.thread_started` entry with request id `thread-started:<id>` and marks the note `written`. A thread operation
+with a `title`, and any rename of a thread still owed its note, write it at once (`announceNamed`, ADR 0090). The note carries
 only the name, never what was said in the thread, and a later rename does not rewrite it. Branched threads already
 show under their message in main and get no note.
 

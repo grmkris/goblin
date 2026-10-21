@@ -40,7 +40,7 @@ and nothing is copied from Personal. Create is idempotent by operation id and se
 `topics.create`), so a retry or concurrent repeat finds one Topic and one Pi session; active
 names are unique ignoring case (409). A Topic's Conversation is never renamed or closed directly and takes its Topic's
 name. Branches, "+" threads (`CreateConversation.topic`) and subagents inherit their parent's Topic, and a "+" thread
-announces itself in its Topic's Conversation. Archiving (`topics/program.ts`) marks the Topic and then stops each open
+announces itself in its Topic's Conversation (at once when it is started with a title, or renamed, ADR 0090). Archiving (`topics/program.ts`) marks the Topic and then stops each open
 chat's work through the owner's Stop (runs, queued inputs, subagents and routine runs); its chats refuse new work
 (`topic_archived`) until Restore, which restarts nothing. Personal is never archived. Schedules are untouched.
 
