@@ -73,6 +73,10 @@ without a session (the link is all a visitor has), and `accept` or `decline` nee
 The email-code gate (`auth/email-code.ts`) lets an address with an invitation waiting sign up whatever the sign-up
 mode, and `workspacesOf` gives such a person no first workspace of their own.
 
+The membership read counts the workspace's people too, and the Worker forwards the member to the agent as
+`x-goblin-member` (`{user, role, name, shared}`, `http/api/principal.ts`): `shared` while anyone else is a member, so
+each of their messages then names who wrote it ([ADR 0094](../adr/0094-a-members-message-names-who-wrote-it.md)).
+
 The browser's OAuth provider client carries an MCP client's authorization query through either sign-in to consent: a
 provider's sign-in keeps it in the sign-in's state and the callback goes on to the authorization.
 

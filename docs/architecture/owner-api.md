@@ -27,8 +27,8 @@ agent is admitted in this order, then forwarded:
 5. `AGENTS.getByName(workspaceId).fetch` gets the request with only `content-type`, `content-length`, `accept`,
    `last-event-id`, `x-goblin-request`, `x-goblin-operation` and `x-mcp-caller`, plus the edge's reference in
    `x-goblin-ref` (the request's cf-ray, or a random id where there is none), `x-goblin-forwarded: owner` and who it
-   comes from: the member (`x-goblin-member`: their user ID and role) or the key (`x-goblin-caller`). Cookies and
-   authorization stay at the edge. Only an `/api/*` path that is not an account API's is forwarded, as the parsed URL
+   comes from: the member (`x-goblin-member`: their user ID, role, name and whether the workspace is shared, ADR
+   0094) or the key (`x-goblin-caller`). Cookies and authorization stay at the edge. Only an `/api/*` path that is not an account API's is forwarded, as the parsed URL
    names it; anything else is a 404.
 
 Every answer carries `x-goblin-ref`, `cache-control: no-store` and `nosniff`. Each failed one, the edge's refusals and

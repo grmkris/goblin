@@ -14,7 +14,8 @@ _Avoid_: team, org, account (for this)
 **Member**:
 A person in a workspace, with a role: an `owner` (who may also delete it), an `admin` (who changes what its agent may do
 with the owners: connections, grants, Sources, the model, Start; ADR 0093) or a `member`, who works in every channel
-with the workspace's connections. One sign-in reaches every workspace its person is a member of.
+with the workspace's connections. One sign-in reaches every workspace its person is a member of. Once a workspace has
+several, each one's messages name who wrote them (ADR 0094).
 
 **Owner**:
 A member with the `owner` role: they may delete the workspace and govern everyone in it. A workspace always keeps one.
@@ -81,7 +82,8 @@ A Topic's one long-lived chat. It never closes and keeps a memory instead of an 
 
 **Main**:
 Personal's Conversation, chat `1`. The owner's browser and inbound clients talk in it, each message from
-anyone but the owner's browser labelled with its author.
+anyone but the owner's browser labelled with its author, and in a workspace of several people each member's too
+(`[from member <name> · <id>]`, ADR 0094).
 _Avoid_: root session
 
 **Channel**:
