@@ -49,8 +49,12 @@ const rowOf = (event: RunEvent): Row => ({
 const attributeIs = (key: string, value: string | number) =>
   sql`json_extract(${appRunEvents.attributes}, ${`$."${key}"`}) = ${value}`
 
-/** `text` as a LIKE pattern that matches it literally, with `\` as the escape character. */
-const literal = (text: string): string => text.replaceAll(/[\\%_]/gu, (char) => `\\${char}`)
+/**
+ * Above every character an operation id can hold after `prefix`: ids that start with `prefix` sort between it and
+ * `prefix` with this added. A range, not a LIKE pattern, since Cloudflare's SQLite refuses a pattern over 50 bytes and
+ * an operation id runs to 200.
+ */
+const PAST = '\u{10FFFF}'
 /** Bound on the operations one read links to another. */
 const RELATED = 20
 
@@ -257,7 +261,7 @@ export class RunLedger<RunResult = unknown> implements RunSink {
     return this.#db
       .selectDistinct({ operationId: appRunEvents.operationId })
       .from(appRunEvents)
-      .where(sql`${appRunEvents.operationId} LIKE ${`${literal(prefix)}%`} ESCAPE '\\'`)
+      .where(and(gte(appRunEvents.operationId, prefix), lt(appRunEvents.operationId, `${prefix}${PAST}`)))
       .limit(RELATED)
       .all()
       .flatMap((row) => (row.operationId === null ? [] : [row.operationId]))

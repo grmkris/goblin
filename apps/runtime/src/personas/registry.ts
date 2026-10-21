@@ -40,9 +40,6 @@ export type PersonaPageQuery = {
   readonly limit: number
 }
 
-/** `text` as a LIKE pattern that matches it literally, with `\` as the escape character. */
-const literal = (text: string): string => text.replaceAll(/[\\%_]/gu, (char) => `\\${char}`)
-
 /** A name as stored: runs of whitespace become one space, ends trimmed. */
 const cleanName = (name: string): string => name.replaceAll(/\s+/gu, ' ').trim()
 
@@ -131,7 +128,9 @@ export class PersonaRegistry<RunResult = unknown> {
           query.key === undefined ? undefined : inArray(appPersonas.id, reachedIds(this.#db, query.key, 'persona')),
           query.name === undefined
             ? undefined
-            : sql`${appPersonas.name} LIKE ${`%${literal(cleanName(query.name))}%`} ESCAPE '\\'`,
+            : // Cloudflare's SQLite refuses a LIKE pattern over 50 bytes; `instr` has no such bound. ASCII case folds
+              // as LIKE's did.
+              sql`instr(lower(${appPersonas.name}), lower(${cleanName(query.name)})) > 0`,
           after(appPersonas, query.cursor),
         ),
       )

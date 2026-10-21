@@ -128,6 +128,18 @@ describe('Personas (ADR 0033)', () => {
     expect(receipts.list()).toEqual([])
   })
 
+  it('finds Personas whose name holds a search, ignoring case, with _ and % as plain characters', () => {
+    const { personas } = fixture()
+    const names = ['creative_logo_design_monoline', 'Creative Lockup', 'percent%off', 'Scout']
+    for (const [index, name] of names.entries())
+      personas.create({ ...scout, name, operationId: `op-${index}` }, 'owner', 10 + index)
+    const found = (name: string) => personas.page({ name, limit: 10 }).personas.map((persona) => persona.name)
+    expect(found('CREATIVE').toSorted()).toEqual(['Creative Lockup', 'creative_logo_design_monoline'])
+    expect(found('_logo_design_')).toEqual(['creative_logo_design_monoline'])
+    expect(found('%')).toEqual(['percent%off'])
+    expect(found('_'.repeat(30))).toEqual([])
+  })
+
   it('keeps names unique among active Personas, ignoring case, and frees an archived name', () => {
     const { personas } = fixture()
     personas.create({ ...scout, operationId: 'op-1' }, 'owner', 10)

@@ -54,6 +54,22 @@ describe('run ledger reads', () => {
     expect(ledger.skipped).toBe(4)
   })
 
+  it('finds the operations that start with a prefix, as long as a server key makes them and holding _ and %', () => {
+    const { ledger } = fixture()
+    const job = 'swarmm:dev:job:job_8df3bec61affd7618a69675ca5231978:1:first'
+    for (const operationId of [
+      `persona:${job}:16`,
+      `persona:${job}:17`,
+      `persona:${job}x:16`,
+      'persona:swarmm:dev:job:job%8df3:1:first:16',
+      job,
+    ])
+      ledger.ended({ ...turn, id: `turn:${operationId}`, operationId })
+    expect(ledger.operationsStarting(`persona:${job}:`).toSorted()).toEqual([`persona:${job}:16`, `persona:${job}:17`])
+    expect(ledger.operationsStarting(job)).toEqual([job])
+    expect(ledger.operationsStarting('persona:swarmm:dev:job:job_')).toHaveLength(3)
+  })
+
   it('keeps paging problems past a full page of unknown rows', () => {
     const { db, ledger } = fixture()
     ledger.ended({ ...turn, startedAt: 1 })
