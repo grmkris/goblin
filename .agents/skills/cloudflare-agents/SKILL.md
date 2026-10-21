@@ -12,9 +12,10 @@ Every program runs on the object's one `ManagedRuntime`, built lazily from `Agen
 outside the runtime enters it through the bridge (`runtime/bridge.ts`), a foreign callback wired inside a layer
 through `promiseWith` (`runtime/boundary.ts`).
 
-- One object per user, named by the authenticated user ID. The session user reaches only their own Agent;
-  inbound MCP uses the verified bearer-token subject, and hooks check the user-bound token before object lookup.
-  Never accept an Agent name from the request. Its SQLite is the durable boundary. Alchemy binds the class directly.
+- One object per workspace, named by the workspace's ID (ADR 0089). A session reaches a workspace's Agent through the
+  slug in its path (`/w/<slug>/api/…`) after a live membership check; a key or an OAuth token reaches its own
+  workspace's; hooks and file links check a token bound to the agent before object lookup. Never accept an Agent name
+  from the request. Its SQLite is the durable boundary. Alchemy binds the class directly.
 - An owner endpoint is an entry in its group (`packages/contracts/src/api/<group>.ts`) and a handler in its area's
   `api.ts`; never a new RPC method or Worker route. The Worker's edge (`http/api/edge.ts`) admits the request (Origin,
   the cookie session, CSRF on every write, the 64 KiB body cap) and forwards it with an allowlisted set of headers,

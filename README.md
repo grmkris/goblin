@@ -1,8 +1,9 @@
 # goblin
 
-Your own goblin, always on. Resident personal agents on Cloudflare. Each user signs up and gets their own agent: they
-talk to it in the browser, it keeps running, holds its own authority to use the MCP servers that user connected, and is
-itself an MCP server other tools can talk to.
+Your own goblin, always on. Resident agents on Cloudflare. Each user signs up and gets a workspace with its own agent:
+they talk to it in the browser, it keeps running, holds its own authority to use the MCP servers the workspace
+connected, and is itself an MCP server other tools can talk to. One sign-in can hold several workspaces, each with an
+agent of its own (ADR 0089).
 
 The agent has one stable main chat (`/c/1`); it resolves to the current Pi session. Side threads can start empty or branch from any message of any conversation, at
 any depth; they can share a note back to where they came from, and Close stops one with everything under it until it is
@@ -128,8 +129,8 @@ stage's name: its origin, mail, provider, model endpoint and the optional bindin
 metrics). See [development](docs/development.md) for the settings, the production guard and smoke.
 
 goblin has no plans and takes no payments ([ADR 0058](docs/adr/0058-no-plans-tokens-and-an-optional-cap.md)): the
-sign-up mode decides who gets an account, and every account reaches its own agent and everything in it. Each account's
-model tokens are counted per UTC day; a deployment may cap them (`GOBLIN_DAILY_TOKEN_CAP`), and once a capped day is
+sign-up mode decides who gets an account, and every person reaches the workspaces they belong to, each agent and
+everything in it. Each workspace's model tokens are counted per UTC day; a deployment may cap them (`GOBLIN_DAILY_TOKEN_CAP`), and once a capped day is
 spent goblin refuses new model calls until 00:00 UTC. Draft terms and privacy pages await operator review.
 
 Several connections to one MCP server are normal: each is the owner's account there, with its own label, sign-in,

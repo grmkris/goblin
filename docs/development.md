@@ -49,7 +49,7 @@ to override. To try sign-in through an OpenID Connect provider, set `GOBLIN_OIDC
 `GOBLIN_OIDC_CLIENT_SECRET` there, with `http://localhost:18971/api/auth/callback/oidc` allowed at the provider.
 
 Open the app and use **Create an account**, enter an email and the six-digit code captured under
-`apps/web/.alchemy/local/email/`. Each account gets its own agent. Smoke uses the session from
+`apps/web/.alchemy/local/email/`. Each account gets a workspace of its own, with its agent (ADR 0089). Smoke uses the session from
 an actual OTP login: store `{"origin":"http://localhost:18971","cookie":"<session cookie>"}` in
 `.local/local-session.json` with mode 600, then configure `GOBLIN_OWNER_EMAIL` and `GOBLIN_SMOKE_SESSION_FILE`. Never
 print or commit the cookie. Smoke validates the file origin and the authenticated owner before making agent calls.
@@ -110,7 +110,7 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_BETTER_AUTH_SECRET` | Better Auth's secret. |
 | `GOBLIN_MODEL_BASE_URL`, `GOBLIN_MODEL_ID`, `GOBLIN_MODEL_KEY` | Optional, all three or none: the deployment's own model endpoint (dev and prod: Railway LiteLLM and the dedicated capped key, never the master key). Without them each owner brings their own in Settings, and until they do every model call is refused with `NoModelEndpoint` (ADR 0064). |
 | `GOBLIN_MODELS` | More LiteLLM model names users may pick, comma-separated; `GOBLIN_MODEL_ID` stays the default. Allow each on the LiteLLM key too. |
-| `GOBLIN_OWNER_USER_ID`, `GOBLIN_OWNER_MODELS` | Optional: the deployment owner's account id (Better Auth's, private: keep it in `.local`) and comma-separated LiteLLM model names on the owner's own subscriptions, offered to that account alone and never in a server's work: through an API key, or in a Topic a key made (ADR 0087). A name also in `GOBLIN_MODELS` is everyone's. Allow each on the LiteLLM key too. |
+| `GOBLIN_OWNER_WORKSPACE_ID`, `GOBLIN_OWNER_MODELS` | Optional: the deployment owner's own workspace id (private: keep it in `.local`; for an account that existed before workspaces it is the account's id, ADR 0089) and comma-separated LiteLLM model names on the owner's own subscriptions, offered in that workspace alone and never in a server's work: through an API key, or in a Topic a key made (ADR 0087). A name also in `GOBLIN_MODELS` is everyone's. Allow each on the LiteLLM key too. |
 | `GOBLIN_DAILY_TOKEN_CAP` | The most model tokens one account may use in a UTC day, a positive whole number; unset or anything else, no cap (ADR 0058). Once a capped day is spent, model calls are refused until 00:00 UTC. |
 | `GOBLIN_MEMORY_MODEL` | The offered model for thread names, Topic Conversation memory summaries and skill-draft decisions. It is not selected by price; unset or not offered uses the default. |
 | `GOBLIN_SMOKE_MODEL` | Optional model for smoke turns. It must be one of the offered models; unset keeps the owner's pick. |

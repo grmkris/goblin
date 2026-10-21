@@ -3,12 +3,18 @@
 ## The owner API
 
 The browser's API is one typed Effect HttpApi contract ([ADR 0038](../adr/0038-typed-owner-api-served-by-the-agent.md)),
-in `packages/contracts/src/api`: `OwnerApi`, which each user's agent serves, `AccountApi`, which the Worker serves,
-and `errors.ts`, the failure vocabulary (`AppError`) and its envelope.
+in `packages/contracts/src/api`: `OwnerApi`, which each workspace's agent serves, `AccountApi` (a person's) and
+`WorkspaceAccountApi` (a workspace's own records), which the Worker serves, and `errors.ts`, the failure vocabulary
+(`AppError`) and its envelope.
 
-**The edge** (`http/api/edge.ts`, built once per isolate). The account API's groups are answered in the Worker
-(`http/api/account.ts`): `clients` and `keys` for any signed-in account (never for an API key), and `clientErrors`, a
-browser crash report, without a session. Every other `/api/*` request is admitted in this order, then forwarded:
+**The edge** (`http/api/edge.ts`, built once per isolate; [ADR 0089](../adr/0089-workspaces-own-agents.md)). The
+account API is answered in the Worker (`http/api/account.ts`): `workspaces` for any signed-in person, and
+`clientErrors`, a browser crash report, without a session. A member's request names its workspace's slug in its path
+(`/w/<slug>/api/…`): the edge admits the session as below, then reads the person's membership of that workspace (a 404
+when there is none), answers the workspace account API's groups itself (`keys`, for an owner or admin, and `clients`,
+the OAuth clients the member connected to it) and forwards every other path to the workspace's agent as `/api/…`. A
+server's request reaches `/api/…` with its key alone, and goes to the key's workspace. Every request on its way to an
+agent is admitted in this order, then forwarded:
 
 1. a write whose `Origin` names another site is refused;
 2. the session comes from the cookie alone, and any `Authorization` header but a server API key is refused. A
@@ -18,11 +24,12 @@ browser crash report, without a session. Every other `/api/*` request is admitte
    request's caller in `x-goblin-caller` (ADR 0086), which `/mcp` also sets for an OAuth client of the owner;
 3. every write needs the app's own `Origin` and `x-goblin-csrf: 1` (`http/csrf.ts`), which the web sends on every write;
 4. a body is capped at 64 KiB, except file bytes, which stream through to the agent's own limits;
-5. `AGENTS.getByName(userId).fetch` gets the request with only `content-type`, `content-length`, `accept`,
+5. `AGENTS.getByName(workspaceId).fetch` gets the request with only `content-type`, `content-length`, `accept`,
    `last-event-id`, `x-goblin-request`, `x-goblin-operation` and `x-mcp-caller`, plus the edge's reference in
-   `x-goblin-ref` (the request's cf-ray, or a random id where there is none) and `x-goblin-forwarded: owner`. Cookies
-   and authorization stay at the edge. Only an `/api/*` path that is not the account API's is forwarded, as the parsed
-   URL names it; anything else is a 404.
+   `x-goblin-ref` (the request's cf-ray, or a random id where there is none), `x-goblin-forwarded: owner` and who it
+   comes from: the member (`x-goblin-member`: their user ID and role) or the key (`x-goblin-caller`). Cookies and
+   authorization stay at the edge. Only an `/api/*` path that is not an account API's is forwarded, as the parsed URL
+   names it; anything else is a 404.
 
 Every answer carries `x-goblin-ref`, `cache-control: no-store` and `nosniff`. Each failed one, the edge's refusals and
 the agent's answers alike, is one `http.failure` log line: route template, method, status, code, reference, the
@@ -33,7 +40,9 @@ handlers of the owner and internal APIs (`http/api/groups.ts`), built once insid
 layers, never at module level.
 Each group's handlers (`HttpApiBuilder.group`) live in their area (`<area>/api.ts`) and read the agent's services
 from context. Owner admission (the `OwnerAdmission` middleware, `http/api/middleware.ts`) admits every request
-before its handler, and before its body is decoded: a grant of resident authority, except where an endpoint is
+before its handler, and before its body is decoded. A forward that names neither a member nor a caller, or names one in
+a header that does not decode, is `Unauthenticated` (`principal`), never taken for the owner. A member's request gets a
+grant of resident authority, except where an endpoint is
 annotated `GrantsResident: false` (`POST /api/agent/resident`, the event streams, the entries read, the files group and the
 OAuth callback). A request from a caller (ADR 0086: a server's key, or an OAuth client of the owner on `/mcp`) never
 grants it; owner admission admits it only to an endpoint whose `EndpointScope` it holds (else `scope`) and counts its

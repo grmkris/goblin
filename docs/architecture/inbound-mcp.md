@@ -19,10 +19,12 @@ server for every caller ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)): a
 Code, claude.ai, Cursor) or a server's API key.
 
 - **Signing in.** Clients register dynamically (open, and restricted to `/mcp`); a registration whose redirects are
-  all http loopback is marked native, which is how Claude Code registers. The owner signs in and consents at
-  `/consent`. A Bearer token is accepted only if it verifies against the local JWKS, names `/mcp` as audience, comes
-  from an enabled client and the owner's consent still exists; its scopes count only while that consent still grants
-  them (`auth/service.ts`).
+  all http loopback is marked native, which is how Claude Code registers. The person signs in, picks the workspace the
+  client is for when they have more than one (`/consent/workspace`, the provider's post-login step; [ADR
+  0089](../adr/0089-workspaces-own-agents.md)), and consents at `/consent`. The consent is stored for that workspace
+  and the token carries it (`workspace`). A Bearer token is accepted only if it verifies against the local JWKS, names
+  `/mcp` as audience, comes from an enabled client, and the person's consent for its workspace still exists while they
+  are its member; its scopes count only while that consent still grants them (`auth/service.ts`).
 - **Scopes.** `/mcp` advertises `goblin:topics`, `goblin:conversations`, `goblin:personas` and `goblin:inspect` in
   its metadata, and an unauthenticated request gets a 401 naming the metadata and every scope. The consent page offers
   each `goblin:*` scope a client asks for as its own switch, off until the owner turns it on; Allow grants the rest
@@ -45,8 +47,9 @@ Code, claude.ai, Cursor) or a server's API key.
   | `inspect` | `inspect_turns`, `inspect_turn`, `inspect_problems`, `inspect_flows`, `inspect_details` | both |
   | `transcripts` | `inspect_conversations`, `inspect_conversation` | OAuth clients |
 
-- **Reach.** An OAuth client acts as the user who consented, with the owner's reach: every Topic, chat and Persona,
-  those the owner's keys made included. A key reaches only what it made (below). A message an OAuth client sends into
+- **Reach.** An OAuth client acts as the person who consented (`ownerCall` forwards them as its member), with the
+  owner's reach in that one workspace: every Topic, chat and Persona, those the workspace's keys made included. A key
+  belongs to one workspace and reaches only what it made there (below). A message an OAuth client sends into
   a chat carries its registered name, as `ask_agent`'s does. `ask_agent` submits into main and waits up to 110 seconds
   for the answer; a stable `operationId` makes retries idempotent, and it runs the model, so it counts toward the
   day's tokens. The inspection tools never call a model; the server's instructions tell clients that returned text is
@@ -56,8 +59,8 @@ Code, claude.ai, Cursor) or a server's API key.
   them it is refused with `rate_limited` and `retryAfter` (seconds), with `Retry-After` on `/api` and in the tool's
   error result on `/mcp`. A tool outside the caller's scopes is not listed, and calling it is refused with `scope`.
   No caller grants resident authority.
-- **Revoking.** Revoking a client in Settings deletes your consent to it and revokes its refresh tokens for you
-  (`auth/clients.ts`); its next call gets a 401. Consenting again with fewer scopes takes the rest from tokens already
+- **Revoking.** Revoking a client in a workspace's Settings deletes your consent to it for that workspace and revokes
+  its refresh tokens for it (`auth/clients.ts`); its next call gets a 401. Consenting again with fewer scopes takes the rest from tokens already
   issued.
 
 ## API keys

@@ -53,8 +53,10 @@ infrastructure. Read
   decides, as for the hackathon release (owner, 2026-10-12) and the channel-info baseline (owner, 2026-10-20): export
   its auth D1 into `.local` (`wrangler d1 export goblin-prod-auth --remote`), pause CI, then
   `GOBLIN_BREAK_GLASS=1 GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset`, re-create it with a
-  break-glass `deploy:prod` of the same sha, and promote that sha once CI is back on. A user only ever reaches their
-  own agent; never add a route that takes an agent name from the request.
+  break-glass `deploy:prod` of the same sha, and promote that sha once CI is back on. A workspace owns its agent, named
+  by the workspace's ID (ADR 0089): a request reaches it only through its credential's workspace (a key's, a consent's)
+  or, for a browser session, the slug in its path after a live membership check. Never add a route that takes an agent
+  name from the request.
   Telemetry never carries content ([ADR 0024](docs/adr/0024-observing-conversations.md)).
 
 ## Quality

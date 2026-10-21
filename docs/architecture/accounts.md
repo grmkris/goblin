@@ -37,18 +37,35 @@ comes back to `/login?error=signup_disabled`. A provider's account is created on
 verified (`validateUserInfo`, else `email_not_verified`), and it joins an existing account with the same email only when
 the provider says the email is verified and the account's own is verified too (else `account_not_linked`); no provider
 is trusted past that. So whoever signs in by code and by the provider with the same verified email reaches one
-account. The sign-up mode is the only access control: every signed-in account reaches its own agent and everything in
-it ([ADR 0058](../adr/0058-no-plans-tokens-and-an-optional-cap.md)).
+account. The sign-up mode is the only access control: every signed-in person reaches the workspaces they belong to,
+each agent and everything in it ([ADR 0058](../adr/0058-no-plans-tokens-and-an-optional-cap.md)).
+
+### Workspaces
+
+A workspace owns one agent, the `PersonalAgent` object named by its ID ([ADR
+0089](../adr/0089-workspaces-own-agents.md)). Its records are Better Auth's `organization()` plugin tables in the auth
+D1 (`organization`, `member`, `invitation`; `auth/workspaces.ts` reads and writes them, the plugin's own routes are not
+served); a unique index keeps one membership per person and workspace. `GET /api/workspaces` lists the person's, oldest
+membership first, and gives a person with none a first one (named after them, its slug from their address) in one D1
+batch that runs only while they still have none. `POST /api/workspaces` makes another, `PATCH` renames it or moves its
+slug (an owner or admin), `DELETE` deletes it (an owner): its agent is erased first, then its keys, its members' OAuth
+consents to it and its memberships. Every account that existed before ADR 0089 got a workspace whose ID is its user ID
+(`0002_workspaces.sql`), so its agent, files, Events hooks and sealed model endpoint stayed where they were.
+
+Which agent a request reaches comes from its credential: a browser session names the workspace's slug in its path
+(`/w/<slug>/api/…`), checked against the person's membership in one D1 read on every request; an API key belongs to
+one workspace; an OAuth client's consent names one (the consent page asks, `/consent/workspace`, when the person has
+more than one), and its token carries it in a `workspace` claim, honoured only while the person is still a member.
 
 The browser's OAuth provider client carries an MCP client's authorization query through either sign-in to consent: a
 provider's sign-in keeps it in the sign-in's state and the callback goes on to the authorization.
 
-The agent a request reaches derives from the session's user ID or the inbound token's subject. The MCP Events hook
-verifies a token bound to its user ID and connection before selecting an agent. Deleting an account requires a sign-in from the last
-600 seconds, with an explicit Settings confirmation. It first erases the user's agent through `Agent.destroy()`:
-Pi, Agents and application tables, its alarm and isolate. Only then does Better Auth delete the user and D1 cascade
-sessions, consents and tokens. Agent-erasure failure leaves the account intact for retry. Outbound OAuth tokens are
-forgotten, not revoked remotely. Conversations, credentials, grants and resident authority belong to one user.
+The MCP Events hook and file links verify a token bound to the agent (the workspace's ID) before selecting it. Deleting
+an account requires a sign-in from the last 600 seconds, with an explicit Settings confirmation. It first deletes every
+workspace the account alone owns, each agent erased through `Agent.destroy()` (Pi, Agents and application tables, its
+alarm and isolate) before its records. Only then does Better Auth delete the user and D1 cascade sessions, other
+memberships, consents and tokens. Agent-erasure failure leaves the account intact for retry. Outbound OAuth tokens are
+forgotten, not revoked remotely. Conversations, credentials, grants and resident authority belong to one workspace.
 
 ### A public landing at `/`
 

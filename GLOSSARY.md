@@ -1,16 +1,25 @@
 # goblin
 
-goblin gives every user a resident personal agent: their own Cloudflare Durable Object that talks with them, keeps
-working while they are away and acts with the MCP connections they granted. These are the words the code, the docs
-and the app use for it.
+goblin gives every workspace a resident agent: its own Cloudflare Durable Object that talks with its people, keeps
+working while they are away and acts with the MCP connections the workspace granted. Everyone starts with a workspace
+of their own. These are the words the code, the docs and the app use for it.
 
 ## People and authority
 
+**Workspace**:
+What owns an agent (ADR 0089): a Better Auth organization with a name, a slug (its pages live at `/w/<slug>/`) and its
+members. Everything the agent holds is the workspace's. A signed-in person with none is given one.
+_Avoid_: team, org, account (for this)
+
+**Member**:
+A person in a workspace, with a role: an `owner` (who may also delete it), an `admin` (who manages it with the owners)
+or a `member`. One sign-in reaches every workspace its person is a member of.
+
 **Owner**:
-The user an agent belongs to. Every signed-up user owns exactly one agent and reaches only that one.
+A member with the `owner` role. Until members can be invited, every workspace has exactly one: the person who made it.
 
 **Agent**:
-The owner's resident agent, one `PersonalAgent` Durable Object named by the owner's user ID.
+A workspace's resident agent, one `PersonalAgent` Durable Object named by the workspace's ID.
 _Avoid_: bot, assistant instance
 
 **Resident authority**:
@@ -18,13 +27,12 @@ The agent's own standing permission to use the owner's MCP connections while the
 signed-in action grants it, and it lasts until the owner revokes it in Settings (ADR 0088).
 
 **Inbound client**:
-An MCP client (Claude Code, another agent) the owner authorized to call goblin's `/mcp`. Settings lists them as
-Connected clients.
+An MCP client (Claude Code, another agent) a member authorized to call goblin's `/mcp` for one workspace, which its
+consent names (ADR 0089). Settings lists them as Connected clients.
 _Avoid_: apps that use your agent
 
 **API key**:
-A `gbk_` key the owner makes in Settings for a server they run (ADR 0081). It reaches only the Topics, chats and
-Personas it made, over `/api` or `/mcp`, and never keeps the agent active. Its scopes can change and it keeps what it
+A `gbk_` key an owner makes in Settings for a server the workspace runs (ADR 0081). It belongs to that workspace (ADR 0089) and reaches only the Topics, chats and Personas it made, over `/api` or `/mcp`, and never keeps the agent active. Its scopes can change and it keeps what it
 made (ADR 0084). With an OAuth client of the owner it is one of `/mcp`'s two kinds of caller (ADR 0086).
 _Avoid_: token, service account
 
@@ -374,8 +382,8 @@ under the same sign-up mode. goblin keeps none of its tokens. Not to be confused
 signs in MCP clients to `/mcp`.
 
 **Sign-up mode**:
-`open`, `invite` (an invite code is required) or `closed`: who gets an account, by either sign-in method. Every account
-reaches its own agent and everything in it (ADR 0058).
+`open`, `invite` (an invite code is required) or `closed`: who gets an account, by either sign-in method. Every person
+reaches the workspaces they belong to and everything in them (ADRs 0058, 0089).
 
 **Daily usage**:
 The model tokens an account's agent spent in the current UTC day, input, output and cached alike (ADR 0058).
