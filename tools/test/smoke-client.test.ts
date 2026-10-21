@@ -18,14 +18,19 @@ const answer = (response: ServerResponse, status: number, body: unknown, ref?: s
   response.end(JSON.stringify(body))
 }
 
-/** A stand-in for the stage: the session read, two owner endpoints, and a failure in the error envelope. */
+/**
+ * A stand-in for the stage: the session read, the owner's one workspace, two owner endpoints under it (ADR 0089), and a
+ * failure in the error envelope.
+ */
 const server = createServer((request, response) => {
   seen.push({ method: request.method ?? '', url: request.url ?? '', headers: request.headers })
   const route = `${request.method} ${request.url}`
   if (route === 'GET /api/auth/get-session')
     return answer(response, 200, { user: { email: OWNER }, session: { expiresAt: '2999-01-01T00:00:00Z' } })
-  if (route === 'GET /api/agent/resident') return answer(response, 200, { state: 'active' }, 'ref-resident')
-  if (route === 'PUT /api/agent/model')
+  if (route === 'GET /api/workspaces')
+    return answer(response, 200, [{ id: 'ws-1', name: "Owner's workspace", slug: 'owner', role: 'owner' }])
+  if (route === 'GET /w/owner/api/agent/resident') return answer(response, 200, { state: 'active' }, 'ref-resident')
+  if (route === 'PUT /w/owner/api/agent/model')
     return answer(response, 200, { current: 'm', default: 'm', options: [] }, 'ref-model')
   const missing = { error: { code: 'not_found', message: 'That does not exist.', what: 'chat', ref: 'ref-missing' } }
   return answer(response, 404, missing, 'ref-missing')
@@ -57,6 +62,7 @@ describe('DevClient', () => {
     expect((await dev.owner((api) => api.resident.status())).state).toBe('active')
     expect((await dev.owner((api) => api.agent.chooseModel({ payload: { model: 'm' } }))).current).toBe('m')
     const [read, write] = seen
+    expect([read?.url, write?.url]).toEqual(['/w/owner/api/agent/resident', '/w/owner/api/agent/model'])
     expect(read?.headers).toMatchObject({ cookie: COOKIE, origin: expect.stringMatching(/^http:\/\/localhost:/u) })
     expect(read?.headers['x-goblin-request']).toMatch(/^[0-9a-f]{8}$/u)
     expect(read?.headers['x-goblin-csrf']).toBeUndefined()

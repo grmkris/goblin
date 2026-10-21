@@ -59,6 +59,14 @@ export class DevClient {
     this.#account = HttpApiClient.make(WorkspaceAccountApi, options).pipe(Effect.provide(FetchHttpClient.layer))
   }
 
+  /** A typed call's URL, a path or an absolute one, with its path under the owner's workspace (`#inWorkspace`). */
+  #urlInWorkspace(url: string): string {
+    if (!/^https?:\/\//u.test(url)) return this.#inWorkspace(url)
+    const absolute = new URL(url)
+    absolute.pathname = this.#inWorkspace(absolute.pathname)
+    return absolute.toString()
+  }
+
   /** `path` as the owner's browser sends it: a member's `/api/…` path under their workspace once signed in. */
   #inWorkspace(path: string): string {
     const member = path.startsWith('/api/') && !PERSON_PATHS.some((prefix) => path.startsWith(prefix))
@@ -131,19 +139,18 @@ export class DevClient {
 
   readonly #typed = (client: HttpClient.HttpClient): HttpClient.HttpClient =>
     client.pipe(
-      HttpClient.mapRequest((request) => {
-        const url = new URL(request.url)
-        url.pathname = this.#inWorkspace(url.pathname)
-        return HttpClientRequest.setHeaders(
-          HttpClientRequest.setUrl(request, url.toString()),
+      HttpClient.mapRequest((request) =>
+        HttpClientRequest.setHeaders(
+          HttpClientRequest.setUrl(request, this.#urlInWorkspace(request.url)),
           this.#headers(request.method, true, true),
-        )
-      }),
+        ),
+      ),
       HttpClient.tap((response) =>
         Effect.sync(() =>
           this.#log(
             response.request.method,
-            new URL(response.request.url).pathname,
+            // A step names the API path, the same in every workspace.
+            new URL(response.request.url).pathname.replace(/^\/w\/[^/]+/u, ''),
             response.status,
             response.headers['x-goblin-ref'],
           ),
