@@ -12,11 +12,17 @@ members. Everything the agent holds is the workspace's. A signed-in person with 
 _Avoid_: team, org, account (for this)
 
 **Member**:
-A person in a workspace, with a role: an `owner` (who may also delete it), an `admin` (who manages it with the owners)
-or a `member`. One sign-in reaches every workspace its person is a member of.
+A person in a workspace, with a role: an `owner` (who may also delete it), an `admin` (who changes what its agent may do
+with the owners: connections, grants, Sources, the model, Start; ADR 0093) or a `member`, who works in every channel
+with the workspace's connections. One sign-in reaches every workspace its person is a member of.
 
 **Owner**:
-A member with the `owner` role. Until members can be invited, every workspace has exactly one: the person who made it.
+A member with the `owner` role: they may delete the workspace and govern everyone in it. A workspace always keeps one.
+
+**Invitation**:
+A workspace's invitation of one address, with a role, for seven days (ADR 0093). Its link (`/invite/<id>`) works for
+that address alone, which may sign up to take it whatever the sign-up mode.
+_Avoid_: invite code (the sign-up mode's shared code is another thing)
 
 **Agent**:
 A workspace's resident agent, one `PersonalAgent` Durable Object named by the workspace's ID.

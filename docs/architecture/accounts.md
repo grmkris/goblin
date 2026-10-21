@@ -57,6 +57,22 @@ Which agent a request reaches comes from its credential: a browser session names
 one workspace; an OAuth client's consent names one (the consent page asks, `/consent/workspace`, when the person has
 more than one), and its token carries it in a `workspace` claim, honoured only while the person is still a member.
 
+### Members and invitations
+
+A workspace's people ([ADR 0093](../adr/0093-members-invitations-and-roles.md)) are its `member` rows, each with a role;
+`auth/members.ts` reads and writes them. `GET /w/<slug>/api/members` lists them for any member; owners and admins
+change roles (`PATCH …/members/:userId`) and remove (`DELETE`), an admin only members and an owner anyone, and the last
+owner stays; anyone else may leave (`POST …/members/leave`). Removing someone deletes their OAuth consents and revokes
+their refresh tokens for the workspace in the same batch.
+
+`POST /w/<slug>/api/members/invitations` invites addresses with a role (only an owner invites an admin): one
+`invitation` row each for seven days, replacing one still waiting for that address, mailed from the deployment's sender
+with the link `/invite/<id>`; the answer says per address whether its mail went out. A person's invitations are
+`/api/invitations`: `GET` lists those waiting for their address, `GET /api/invitations/:id` previews one with or
+without a session (the link is all a visitor has), and `accept` or `decline` needs a session of the address it is for.
+The email-code gate (`auth/email-code.ts`) lets an address with an invitation waiting sign up whatever the sign-up
+mode, and `workspacesOf` gives such a person no first workspace of their own.
+
 The browser's OAuth provider client carries an MCP client's authorization query through either sign-in to consent: a
 provider's sign-in keeps it in the sign-in's state and the callback goes on to the authorization.
 

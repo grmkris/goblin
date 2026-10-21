@@ -18,7 +18,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0010](0010-per-conversation-capabilities-and-thread-notes.md) | Per-conversation capabilities, and main learns the names of threads started with "+" | Accepted; its per-conversation switches superseded by 0040 |
 | [0011](0011-mcp-events.md) | MCP Events consumer | Accepted; amended by 0066 and 0073 |
 | [0012](0012-routines.md) | Confirmed routines and isolated run threads | Accepted |
-| [0014](0014-members-and-workspace-authority.md) | Members and workspace authority | Withdrawn |
+| [0014](0014-members-and-workspace-authority.md) | Members and workspace authority | Withdrawn; members came with 0093 |
 | [0016](0016-workspace-layout-with-trellis.md) | Workspace layout with Trellis | Superseded by 0019, then 0036 |
 | [0017](0017-conversation-tree-and-one-close.md) | A tree of conversations, threads from anywhere, one Close | Accepted |
 | [0018](0018-subagents-nest-steer-and-close.md) | Subagents nest, steer and close | Accepted |
@@ -80,6 +80,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0086](0086-one-mcp-for-every-caller.md) | One /mcp for every caller | Accepted; amended by 0089, 0090 |
 | [0087](0087-the-owners-own-subscription-models.md) | The owner's own subscription models | Accepted; amended by 0089 |
 | [0088](0088-resident-authority-lasts-until-revoked.md) | Resident authority lasts until revoked | Accepted |
-| [0089](0089-workspaces-own-agents.md) | Workspaces own agents | Accepted |
+| [0089](0089-workspaces-own-agents.md) | Workspaces own agents | Accepted; amended by 0093 |
 | [0090](0090-a-key-names-closes-and-reads-back-its-threads.md) | A key names, closes and reads back its threads | Accepted |
 | [0091](0091-a-key-names-the-mcp-servers-its-threads-may-use.md) | A key names the MCP servers its threads may use | Accepted |
+| [0093](0093-members-invitations-and-roles.md) | Members, invitations and roles | Accepted |
