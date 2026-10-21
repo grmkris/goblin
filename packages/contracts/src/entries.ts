@@ -8,7 +8,8 @@ import { PersonaHold, PersonaInvocationView } from './personas.ts'
  * left out.
  *
  * - `message`: the owner's or the agent's words. `final` says the agent's turn ended there rather than in a tool call;
- *   an owner message names its author when it came from someone other than the owner's own composer.
+ *   an owner message names its author when it came from someone other than the owner's own composer, and the Personas
+ *   it tagged (`to`) when it went to them rather than to the agent (ADR 0090).
  * - `persona`: a Persona's attributed answer at the revision it answered with, what it stopped on when it needs the
  *   owner (ADR 0041), and what it asked with `ask_user` (ADR 0082), which the next message tagging it answers.
  * - `question`: what `ask_user` asked; the turn ended there and the next message answers it.
@@ -20,6 +21,7 @@ export const ConversationEntryView = Schema.Union([
     role: Schema.Literals(['owner', 'agent']),
     text: Schema.String,
     author: Schema.optional(Schema.String),
+    to: Schema.optional(Schema.Array(Schema.Struct({ id: PersonaId, name: Schema.String }))),
     final: Schema.Boolean,
   }),
   Schema.Struct({

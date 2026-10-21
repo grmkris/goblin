@@ -74,3 +74,43 @@ describe('what a server reads of a Persona that asks (ADR 0082)', () => {
     expect(entryViews(answer(false))[0]).not.toHaveProperty('questions')
   })
 })
+
+/** A message to Scout and Owl (`app.persona_ask`), entry 7, with `content` as the model reads it. */
+const tag = (content: unknown) =>
+  entry(7, 'app.persona_ask', {
+    data: {
+      personas: [
+        { id: 4, name: 'Scout', revision: 2 },
+        { id: 5, name: 'Owl', revision: 1 },
+      ],
+      order: 'parallel',
+    },
+    // SAFETY: Pi stores the owner's user message as the model reads it; the views read only its role and content.
+    model: [{ role: 'user', content, timestamp: 1 }] as NonNullable<EntryRecord['model']>,
+  })
+
+describe('what a server reads of a message to Personas (ADR 0090)', () => {
+  it("is the owner's message without the [to …] the model reads, saying whom it went to", () => {
+    expect(entryViews(tag('[to @Scout, @Owl] find the venue'))).toEqual([
+      {
+        kind: 'message',
+        id: 7,
+        role: 'owner',
+        text: 'find the venue',
+        to: [
+          { id: 4, name: 'Scout' },
+          { id: 5, name: 'Owl' },
+        ],
+        final: true,
+      },
+    ])
+  })
+
+  it('keeps the author a message from elsewhere names first', () => {
+    const authored = [
+      { type: 'text', text: '[from Swarmm]' },
+      { type: 'text', text: '[to @Scout, @Owl] find the venue' },
+    ]
+    expect(entryViews(tag(authored))).toMatchObject([{ author: 'Swarmm', text: 'find the venue' }])
+  })
+})
