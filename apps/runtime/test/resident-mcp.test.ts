@@ -1,5 +1,5 @@
 import { EVERYTHING, type ServerView, type TopicSetup } from '@goblin/contracts'
-import { createMcpHandler } from '@modelcontextprotocol/server'
+import { ProtocolError, ProtocolErrorCode, createMcpHandler } from '@modelcontextprotocol/server'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
@@ -31,10 +31,26 @@ import { executeTool, inConversation } from './pi-tool.ts'
 /** The tools the notes server ran, in order. */
 const ran: string[] = []
 
+/** `move`'s input: a nested required field and a count, and no other fields. */
+const MOVE = {
+  type: 'object' as const,
+  properties: {
+    step: {
+      type: 'object',
+      properties: { source: { type: 'object', properties: { treeId: { type: 'string' } }, required: ['treeId'] } },
+      required: ['source'],
+    },
+    count: { type: 'integer' },
+  },
+  required: ['step'],
+  additionalProperties: false,
+}
+
 /**
  * A notes server: `read` is granted, `write` exists but is not, `panel` is for its App only, `admin` is granted but
  * needs more than the sign-in's scope, and `share` is granted but asks the owner to open a link first, when the call
- * can take a URL request. It offers Events through the extension, and sends seventy event streams.
+ * can take a URL request. `move` is granted and takes only arguments that fit its schema, and `strict` is granted but
+ * answers every call with a JSON-RPC error. It offers Events through the extension, and sends seventy event streams.
  */
 const notes = createMcpHandler(() => {
   const server = lowLevelServer(
@@ -49,10 +65,17 @@ const notes = createMcpHandler(() => {
       { name: 'admin', inputSchema: { type: 'object', properties: {} } },
       { name: 'share', inputSchema: { type: 'object', properties: {} } },
       { name: 'export', inputSchema: { type: 'object', properties: {} } },
+      { name: 'move', inputSchema: MOVE },
+      { name: 'strict', inputSchema: { type: 'object', properties: {} } },
     ],
   }))
   server.setRequestHandler('tools/call', (request, ctx) => {
     ran.push(request.params.name)
+    if (request.params.name === 'strict')
+      throw new ProtocolError(
+        ProtocolErrorCode.InvalidParams,
+        'Unknown folder\u0000 "inbox".\nUse one of: notes, drafts',
+      )
     if (request.params.name === 'share' && declaresUrlElicitation(ctx.mcpReq.envelope))
       // SAFETY: the 2026 server seam takes a hand-built input_required result in place of a CallToolResult.
       return {
@@ -162,6 +185,8 @@ const host = mcpHost({
     { connectionId: 'notes', capability: 'tool', name: 'admin' },
     { connectionId: 'notes', capability: 'tool', name: 'share' },
     { connectionId: 'notes', capability: 'tool', name: 'export' },
+    { connectionId: 'notes', capability: 'tool', name: 'move' },
+    { connectionId: 'notes', capability: 'tool', name: 'strict' },
     { connectionId: 'jobs', capability: 'tool', name: 'job.0', askFirst: true },
     { connectionId: 'jobs', capability: 'tool', name: 'job.1' },
   ]),
@@ -236,6 +261,9 @@ const execute = (tool: string, input: Record<string, unknown>, conversationId: n
 }
 const call = (name: string, conversationId = 7) =>
   execute('mcp_call', { connectionId: 'notes', name, arguments: {} }, conversationId)
+/** A model's call of the notes server's `move` with `args`. */
+const move = (args: Record<string, unknown>) =>
+  execute('mcp_call', { connectionId: 'notes', name: 'move', arguments: args }, 7)
 /** What the model reads of an `mcp_list` call. */
 const listedText = async (input: Record<string, unknown>, conversationId: number): Promise<string> => {
   const result = await execute('mcp_list', input, conversationId)
@@ -340,6 +368,36 @@ describe('mcp_call and the owner grant (unit)', () => {
     expect(await listed({ connectionId: 'jobs', events: true }, 7)).not.toHaveProperty('sendsEvents')
   })
 
+  it("refuses arguments that do not fit the tool's input schema, telling the model every problem (ADR 0092)", async () => {
+    ran.length = 0
+    const refused = await move({ step: { source: {} }, count: 1.5, extra: true })
+    expect(refused).toMatchObject({ isError: true, diagnostics: [{ code: 'invalid_arguments' }] })
+    expect(refused.output).toEqual([
+      {
+        type: 'text',
+        text: [
+          "The arguments do not match move's input schema; fix them and call again:",
+          '- /step/source: Instance does not have required property "treeId".',
+          '- /count: Instance type "number" is invalid. Expected "integer".',
+          '- /: Property "extra" is not allowed.',
+        ].join('\n'),
+      },
+    ])
+    expect(ran).toEqual([])
+    // Fixed, the call goes out.
+    expect((await move({ step: { source: { treeId: 't1' } }, count: 2 })).isError).toBe(false)
+    expect(ran).toEqual(['move'])
+  })
+  it("shows the model what a server's JSON-RPC error says, as the server's words (ADR 0092)", async () => {
+    const result = await call('strict')
+    expect(result).toMatchObject({ isError: true, diagnostics: [{ code: 'UpstreamMcp:remote-rpc' }] })
+    expect(result.output).toEqual([
+      {
+        type: 'text',
+        text: 'UpstreamMcp (connectionId: notes, reason: remote-rpc, code: -32602): the server says: "Unknown folder \\"inbox\\". Use one of: notes, drafts"',
+      },
+    ])
+  })
   it('never asks the owner about a tool that is missing or meant for an App only', async () => {
     // A failure is an error result the model reads, with no details for the web to turn into an Allow card.
     for (const name of ['missing', 'panel']) {

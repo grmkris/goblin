@@ -81,7 +81,9 @@ no endpoint names is a 404 in the envelope.
 A failure answers the envelope `{ error: { code, message, recovery?, …safe fields, ref? } }`: `code` is the
 `AppError` tag in lower_snake_case, which the typed client decodes back into the class, `message` and `recovery` are
 fixed copy (`ERROR_COPY`), and the safe fields are the ones the UI uses (`reason`, `what`, `connectionId`, `name`,
-`state`, `limit`, `resetsAt`, `rpcCode`). Of a request that does not decode, a path parameter that does
+`state`, `limit`, `resetsAt`, `rpcCode`, and `problems` of an MCP tool call whose arguments do not fit its schema,
+`invalid_arguments`). A remote server's own words (`UpstreamMcp.serverMessage`, ADR 0092) never enter the envelope.
+Of a request that does not decode, a path parameter that does
 not parse is 404, and a body, query or header that does not match is 400. A
 failure from stored data, a response that does not encode, or a defect is a 500 `Internal`, reported with its stack
 locations and never its message. The Worker's own routes (`/mcp`'s failures aside) answer the same envelope.

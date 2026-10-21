@@ -6,6 +6,7 @@ import * as Option from 'effect/Option'
 import type * as Scope from 'effect/Scope'
 import { type AppError, GrantDenied, Internal, NotFound, type UpstreamMcp, attemptSync } from '../../http/errors.ts'
 import { SingleFlight } from '../../observability/single-flight.ts'
+import type { ArgumentChecks } from './arguments.ts'
 import { DispatchGuards } from './dispatch.ts'
 import { mapMcpError } from './errors.ts'
 import type { GrantCapability } from '../grants/grants.ts'
@@ -82,6 +83,8 @@ export type Manager = {
   opened: number
   /** The digest of each connection's last whole tool list, to tell a change from a list that came back the same. */
   readonly digests: Map<string, string>
+  /** Each listed tool's compiled input-schema check (mcp/connections/arguments.ts, ADR 0092). */
+  readonly argumentChecks: ArgumentChecks
 }
 
 /** The connections as the host that owns them uses them: also adding and removing the servers offered. */
@@ -356,6 +359,7 @@ export const managerState = Effect.fnUntraced(function* (options: McpManagerOpti
     listenIdleMs: options.listenIdleMs ?? 60_000,
     opened: 0,
     digests: new Map(),
+    argumentChecks: new WeakMap(),
   }
   yield* Effect.addFinalizer(() => closeAll(manager))
   return manager

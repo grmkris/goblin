@@ -74,6 +74,7 @@ export const EXPECTED_ERROR_TAGS: ReadonlySet<string> = new Set([
   'NotFound',
   'Conflict',
   'InvalidInput',
+  'InvalidArguments',
   'PayloadTooLarge',
   'ResidentInactive',
   'BudgetExhausted',

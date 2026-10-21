@@ -46,19 +46,50 @@ export const challengeScope = (scope: string | undefined): string =>
     .join(' ')
     .slice(0, SCOPE_CHARS)
 
+/**
+ * A remote text as one line of at most `max` characters: control characters and runs of space become one space, and a
+ * longer text is cut at a whole character and ends in `…`.
+ */
+export const oneLine = (text: string, max: number): string => {
+  const read = text.slice(0, max * 4)
+  const folded = Array.from(read.replaceAll(/[\s\p{Cc}]+/gu, ' ').trim())
+  return folded.length <= max && read.length === text.length
+    ? folded.join('')
+    : `${folded
+        .slice(0, max - 1)
+        .join('')
+        .trimEnd()}…`
+}
+
+/** At most this many characters of a server's JSON-RPC error are kept. */
+const SERVER_MESSAGE = 500
+
+/**
+ * What a server's JSON-RPC error says, as one bounded line: its message, and its `data` when that is text; nothing else
+ * of `data`. None when it says nothing.
+ */
+const serverMessageOf = (error: ProtocolError): { readonly serverMessage?: string } => {
+  const parts = [error.message, Predicate.isString(error.data) ? error.data : ''].filter((part) => part.trim() !== '')
+  const said = oneLine(parts.join(' — '), SERVER_MESSAGE)
+  return said === '' ? {} : { serverMessage: said }
+}
+
 /** A request timeout's data names the deadline it missed: one request's (`timeout`) or the whole call's. */
 const missedDeadline = (data: unknown): boolean =>
   Predicate.isObject(data) && ('timeout' in data || 'maxTotalTimeout' in data)
 
 /**
  * Map an SDK or transport failure to a safe `UpstreamMcp`, or a call beyond the granted scope to `ScopeRequired`; app
- * errors raised by our own code pass through. The remote payload, token, request and response are never retained.
+ * errors raised by our own code pass through. The token, request and response are never retained. Of a server's
+ * JSON-RPC error, its code is kept, and its message as one bounded line in its own words (`serverMessage`, ADR 0092):
+ * the model reads it as the server's, and it never enters the API's envelope, telemetry or logs.
  */
 export const mapMcpError = (error: unknown, connectionId: string): AppError => {
   if (InsufficientScopeError.isInstance(error))
     return new ScopeRequired({ connectionId, scope: challengeScope(error.requiredScope) })
   if (UnauthorizedError.isInstance(error)) return new UpstreamMcp({ connectionId, reason: 'unauthorized' })
-  if (ProtocolError.isInstance(error)) return new UpstreamMcp({ connectionId, reason: 'remote-rpc', code: error.code })
+  if (ProtocolError.isInstance(error))
+    return new UpstreamMcp({ connectionId, reason: 'remote-rpc', code: error.code, ...serverMessageOf(error) })
   if (SdkHttpError.isInstance(error)) return new UpstreamMcp({ connectionId, reason: 'transport' })
   // The SDK reports a caller's abort as a timeout too; only a deadline it (or goblin) set carries how long it was.
   if (SdkError.isInstance(error) && error.code === SdkErrorCode.RequestTimeout)

@@ -21,6 +21,7 @@ import {
   Forbidden,
   GrantDenied,
   Internal,
+  InvalidArguments,
   InvalidInput,
   NeedsAuthorization,
   NoModelEndpoint,
@@ -44,6 +45,14 @@ const CASES: readonly (readonly [AppError, number])[] = [
   [new NotFound({ what: 'topic' }), 404],
   [new Conflict({ reason: 'topic_name_taken', ref: '7f3a9c12' }), 409],
   [new InvalidInput({ reason: 'personal_topic' }), 400],
+  [
+    new InvalidArguments({
+      connectionId: 'myplan',
+      name: 'move',
+      problems: ['/step/source: Instance does not have required property "treeId".'],
+    }),
+    400,
+  ],
   [new PayloadTooLarge({ limit: 65_536 }), 413],
   [new ResidentInactive({ state: 'revoked' }), 409],
   [new BudgetExhausted({ limit: 1000, resetsAt: 86_400 }), 429],
@@ -55,6 +64,15 @@ const CASES: readonly (readonly [AppError, number])[] = [
   [new Internal({ reason: 'unexpected' }), 500],
 ]
 
+/** A server's own words on a failure: kept for the model, never answered to a caller (ADR 0092). */
+const SAID = new UpstreamMcp({
+  connectionId: 'myplan',
+  reason: 'remote-rpc',
+  code: -32_602,
+  serverMessage: 'Unknown folder "inbox".',
+})
+const FAILURES = [...CASES.map(([error]) => error), SAID]
+
 /** An API whose one endpoint fails with the case it is asked for, served and called through real HttpApi encoding. */
 const Probe = HttpApi.make('probe').add(
   HttpApiGroup.make('probe').add(
@@ -63,7 +81,7 @@ const Probe = HttpApi.make('probe').add(
 )
 const ProbeHandlers = HttpApiBuilder.group(Probe, 'probe', (handlers) =>
   handlers.handle('fail', ({ payload }) => {
-    const failure = CASES[payload.index]?.[0]
+    const failure = FAILURES[payload.index]
     return failure === undefined ? Effect.die('no such case') : Effect.fail(failure)
   }),
 )
@@ -132,6 +150,23 @@ describe('the API error envelope', () => {
         ref: '7f3a9c12',
       },
     })
+  })
+
+  it("never answers a server's own words: the client decodes the failure without them", async () => {
+    const index = FAILURES.indexOf(SAID)
+    const response = await server.handler(
+      new Request('http://probe.test/fail', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ index }),
+      }),
+    )
+    expect(response.status).toBe(502)
+    expect(await response.text()).not.toContain('Unknown folder')
+    expect(JSON.stringify(envelopeOf(SAID))).not.toContain('Unknown folder')
+    expect(await Effect.runPromise(Effect.flip(call(index)))).toEqual(
+      new UpstreamMcp({ connectionId: 'myplan', reason: 'remote-rpc', code: -32_602 }),
+    )
   })
 
   it('says an MCP server that was not reached could not be, and to try again', () => {

@@ -83,4 +83,5 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0089](0089-workspaces-own-agents.md) | Workspaces own agents | Accepted; amended by 0093 |
 | [0090](0090-a-key-names-closes-and-reads-back-its-threads.md) | A key names, closes and reads back its threads | Accepted |
 | [0091](0091-a-key-names-the-mcp-servers-its-threads-may-use.md) | A key names the MCP servers its threads may use | Accepted |
+| [0092](0092-mcp-calls-are-checked-against-their-schema-and-keep-the-servers-message.md) | MCP calls are checked against their schema and keep the server's message | Accepted |
 | [0093](0093-members-invitations-and-roles.md) | Members, invitations and roles | Accepted |

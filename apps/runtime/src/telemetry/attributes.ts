@@ -60,14 +60,24 @@ export const statusOfStop = (stop: string): 'ok' | 'error' | 'interrupted' => {
 
 const MAX_ERROR = 300
 const OWN_TEXT = new Set(['_tag', 'name', 'message', 'stack', 'cause'])
+/** The field that holds a server's own words (`UpstreamMcp`), bounded where it is kept: shown whole, as theirs. */
+const SAID = 'serverMessage'
 
 /** A tagged failure's scalar fields (`reason: timeout`), the part of it that says what went wrong. */
 const fieldsOf = (error: object): string[] =>
   Object.entries(error).flatMap(([key, field]) =>
-    !OWN_TEXT.has(key) && (Predicate.isString(field) || Predicate.isNumber(field) || Predicate.isBoolean(field))
+    !OWN_TEXT.has(key) &&
+    key !== SAID &&
+    (Predicate.isString(field) || Predicate.isNumber(field) || Predicate.isBoolean(field))
       ? [`${key}: ${String(field).slice(0, 80)}`]
       : [],
   )
+
+/** What a server said of a failure, when it said something. */
+const saidOf = (error: unknown): string | undefined =>
+  Predicate.isObject(error) && SAID in error && Predicate.isString(error[SAID]) && error[SAID] !== ''
+    ? error[SAID]
+    : undefined
 
 function describeOne(error: unknown): string {
   if (Predicate.isString(error)) return error
@@ -82,27 +92,33 @@ function describeOne(error: unknown): string {
 
 /**
  * A private tool failure as one bounded line, for Pi and conversation inspection: its tag or name, a tagged failure's
- * scalar fields, its message, then its causes. Never `[object Object]`. Remote error text stays data (ADR 0024).
+ * scalar fields, its message, then its causes. Never `[object Object]`. What a server said of it (`serverMessage`,
+ * ADR 0092) follows whole, quoted as the server's words. Remote error text stays data (ADR 0024).
  */
 export function describeError(error: unknown): string {
   const parts: string[] = []
+  let said: string | undefined
   let current = error
   for (let depth = 0; depth < 4 && current !== undefined; depth += 1) {
     parts.push(describeOne(current))
+    said ??= saidOf(current)
     current = Predicate.isObject(current) && 'cause' in current ? current.cause : undefined
   }
-  return parts.join(', caused by ').slice(0, MAX_ERROR)
+  const line = parts.join(', caused by ').slice(0, MAX_ERROR)
+  return said === undefined ? line : `${line}: the server says: ${JSON.stringify(said)}`
 }
 
 /**
  * A failure's telemetry code: its type (`safeErrorType`) when telemetry has a summary for it, an `UpstreamMcp` failure
- * with its finite reason, anything else `error`. Never its message, stack or cause.
+ * with its finite reason, arguments that do not fit a tool's schema `invalid_arguments`, anything else `error`. Never
+ * its message, fields, stack or cause.
  */
 export function outcomeOf(error: unknown): string {
   const type = safeErrorType(error)
   const reason = type === 'UpstreamMcp' && Predicate.isObject(error) && 'reason' in error ? error.reason : undefined
   const upstream = Predicate.isString(reason) ? safeFailureCode(`${type}:${reason}`) : 'error'
-  return upstream === 'error' ? safeFailureCode(type) : upstream
+  if (upstream !== 'error') return upstream
+  return safeFailureCode(type === 'InvalidArguments' ? 'invalid_arguments' : type)
 }
 
 /** Full private error descriptions above are for tool results; these fixed summaries alone enter telemetry. */

@@ -165,6 +165,7 @@ describe('the error kinds of goblin codes', () => {
     not_found: 'not_found',
     conflict: 'conflict',
     invalid_input: 'validation',
+    invalid_arguments: 'validation',
     payload_too_large: 'validation',
     resident_inactive: 'forbidden',
     budget_exhausted: 'plan_limit',

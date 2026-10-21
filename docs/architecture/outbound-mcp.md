@@ -109,6 +109,20 @@ is `UpstreamMcp` `timeout`, a caller who stopped waiting `cancelled` (`mcp/conne
 Neither drops the connection; a second timeout in a row does. A call that timed out or lost its connection may still
 have run, so `mcp_call` tells the model to check the server's state before calling it again.
 
+**Arguments and the server's words** ([ADR 0092](../adr/0092-mcp-calls-are-checked-against-their-schema-and-keep-the-servers-message.md)).
+Every tool call (the model's, an approved held call, a URL request's retry, an App's, goblin's own) has its arguments
+checked against the tool's input schema as listed, right before it is sent (`callTool`, `mcp/connections/arguments.ts`),
+with the MCP SDK's Workers-safe validator reporting every problem. Arguments that do not fit go nowhere: the call fails
+`InvalidArguments` (400 `invalid_arguments`) with at most twelve problems, each one line of at most 200 characters,
+`<pointer>: <problem>`, and `mcp_call` gives the model all of them to fix in one more call. A schema the validator
+cannot compile (another dialect, a duplicate `$id`) lets the call go unchecked, as before; each compiled check is kept
+with the schema object it came from, so a new listing compiles anew. When a server answers a JSON-RPC error,
+`mapMcpError` keeps its code and, as `serverMessage`, its message (and `data` when that is text) on one line of at most
+500 characters, control characters dropped. The model reads it after the failure, quoted as the server's:
+`UpstreamMcp (connectionId: x, reason: remote-rpc, code: -32602): the server says: "…"`. Telemetry and logs record only
+`invalid_arguments` or `UpstreamMcp:remote-rpc`, never a problem or the server's words, and the API's envelope never
+carries `serverMessage`.
+
 **Files from results** ([ADR 0065](../adr/0065-files-from-mcp-content.md), `mcp/content/materialize.ts`). After a model's `mcp_call`
 completes, `materialize` keeps each `resource_link`, embedded blob, embedded text over 16 K characters and `audio` block
 of its result (never an App's own `ui://` resource) in the owner's files, at most eight, one at a time, under

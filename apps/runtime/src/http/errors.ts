@@ -19,6 +19,7 @@ export {
   Forbidden,
   GrantDenied,
   Internal,
+  InvalidArguments,
   InvalidInput,
   NeedsAuthorization,
   NoModelEndpoint,

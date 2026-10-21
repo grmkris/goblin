@@ -18,6 +18,7 @@ import {
   attemptSync,
 } from '../../http/errors.ts'
 import { type SkillEntry, skillsListStandard } from '../../skills/protocol.ts'
+import { checkArguments } from './arguments.ts'
 import { timed } from './log.ts'
 import {
   type Connection,
@@ -187,6 +188,8 @@ const callTool = <A>(
     // An answer the server asked for goes to the tool as it was listed then: finishing its step may have removed it.
     const tool = found ?? call.held
     if (tool === undefined) return yield* new NotFound({ what: `tool ${name}` })
+    // Arguments that do not fit the tool's input schema go nowhere: every problem is the caller's to fix (ADR 0092).
+    yield* checkArguments(manager.argumentChecks, connectionId, tool, checks.frozen())
     yield* fits(connectionId, args, manager.maxResultBytes)
     return yield* withDeadline(manager, request, (deadlined) =>
       remote(manager, live, () =>

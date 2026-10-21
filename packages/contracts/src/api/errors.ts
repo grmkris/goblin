@@ -33,6 +33,16 @@ export class GrantDenied extends Schema.TaggedError<GrantDenied>()('GrantDenied'
 export class NotFound extends Schema.TaggedError<NotFound>()('NotFound', { what: Schema.String, ref }) {}
 export class Conflict extends Schema.TaggedError<Conflict>()('Conflict', { reason: Schema.String, ref }) {}
 export class InvalidInput extends Schema.TaggedError<InvalidInput>()('InvalidInput', { reason: Schema.String, ref }) {}
+/**
+ * A tool call whose arguments do not fit the remote tool's input schema, refused before it is sent (ADR 0092): `name`
+ * is the tool, `problems` what is wrong, each `<path>: <problem>` on one bounded line.
+ */
+export class InvalidArguments extends Schema.TaggedError<InvalidArguments>()('InvalidArguments', {
+  connectionId: Schema.String,
+  name: Schema.String,
+  problems: Schema.Array(Schema.String),
+  ref,
+}) {}
 export class PayloadTooLarge extends Schema.TaggedError<PayloadTooLarge>()('PayloadTooLarge', {
   limit: Schema.Number,
   ref,
@@ -73,10 +83,15 @@ export const UpstreamReason = Schema.Literals([
   'unsupported',
   'content-limit',
 ])
+/**
+ * `code` is the remote server's JSON-RPC error code; `serverMessage` its message, one bounded line in the server's own
+ * words (ADR 0092), which the model reads as the server's and which never crosses the API's envelope or enters telemetry.
+ */
 export class UpstreamMcp extends Schema.TaggedError<UpstreamMcp>()('UpstreamMcp', {
   connectionId: Schema.String,
   reason: UpstreamReason,
   code: Schema.optional(Schema.Number),
+  serverMessage: Schema.optional(Schema.String),
   ref,
 }) {}
 export class Internal extends Schema.TaggedError<Internal>()('Internal', { reason: Schema.String, ref }) {}
@@ -88,6 +103,7 @@ export const AppError = Schema.Union([
   NotFound,
   Conflict,
   InvalidInput,
+  InvalidArguments,
   PayloadTooLarge,
   ResidentInactive,
   BudgetExhausted,
@@ -111,6 +127,10 @@ export const ERROR_COPY = {
   NotFound: { message: 'That does not exist.' },
   Conflict: { message: 'That clashes with something that is already there.', recovery: 'Refresh and try again.' },
   InvalidInput: { message: 'The request was not valid.' },
+  InvalidArguments: {
+    message: "The arguments do not match the tool's input schema.",
+    recovery: 'Fix them and call again.',
+  },
   PayloadTooLarge: { message: 'That is too large.' },
   ResidentInactive: { message: 'Resident authority is off.', recovery: 'Re-enable it in Settings.' },
   BudgetExhausted: { message: "You have used today's model budget.", recovery: 'It resets at 00:00 UTC.' },
@@ -155,6 +175,7 @@ export const statusOf = (error: AppError | typeof AppError.Encoded): number =>
       NotFound: () => 404,
       Conflict: () => 409,
       InvalidInput: () => 400,
+      InvalidArguments: () => 400,
       PayloadTooLarge: () => 413,
       ResidentInactive: () => 409,
       BudgetExhausted: () => 429,
@@ -168,7 +189,9 @@ export const statusOf = (error: AppError | typeof AppError.Encoded): number =>
 
 /**
  * The safe detail fields the classes carry, as they cross the wire. UpstreamMcp's numeric `code` (the remote server's
- * JSON-RPC code) crosses as `rpcCode`, because `code` is the envelope's own.
+ * JSON-RPC code) crosses as `rpcCode`, because `code` is the envelope's own; its `serverMessage` stays behind (`toWire`),
+ * so a caller never reads a remote server's words, while `problems` (InvalidArguments) are goblin's account of the
+ * caller's own arguments.
  */
 const DETAIL_FIELDS = {
   recovery: Schema.optionalKey(Schema.String),
@@ -182,6 +205,7 @@ const DETAIL_FIELDS = {
   retryAfter: Schema.optionalKey(Schema.Number),
   rpcCode: Schema.optionalKey(Schema.Number),
   scope: Schema.optionalKey(Schema.String),
+  problems: Schema.optionalKey(Schema.Array(Schema.String)),
   ref,
 }
 
@@ -206,11 +230,13 @@ export const failureCopy = (
 ): { readonly message: string; readonly recovery?: string } =>
   unreached(error) ? UNREACHED_COPY : ERROR_COPY[error._tag]
 
-/** The envelope body of an encoded failure: its code and fixed copy, then its own safe fields. */
+/** The envelope body of an encoded failure: its code and fixed copy, then its own safe fields, never a server's words. */
 const toWire = (encoded: typeof AppError.Encoded): ErrorEnvelope => {
   const { _tag, ...fields } = encoded
   const rpc = Predicate.hasProperty(fields, 'code') && Predicate.isNumber(fields.code) ? { rpcCode: fields.code } : {}
-  return { error: { ...fields, ...rpc, code: codeOf(_tag), ...failureCopy(encoded) } }
+  const { serverMessage: _server, ...safe } =
+    'serverMessage' in fields ? fields : { ...fields, serverMessage: undefined }
+  return { error: { ...safe, ...rpc, code: codeOf(_tag), ...failureCopy(encoded) } }
 }
 
 /** The class's encoded form from a wire detail; the target schema validates it right after. */
@@ -274,7 +300,7 @@ const envelope = <const Members extends readonly [AppErrorClass, ...AppErrorClas
 
 /** One envelope per status the API answers a failure with. */
 export const ApiErrors = {
-  invalidInput: envelope(400, [InvalidInput]),
+  invalidInput: envelope(400, [InvalidInput, InvalidArguments]),
   unauthenticated: envelope(401, [Unauthenticated]),
   forbidden: envelope(403, [Forbidden, GrantDenied, ScopeRequired]),
   notFound: envelope(404, [NotFound]),

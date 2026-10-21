@@ -16,6 +16,7 @@ import type { SetupScope } from '../setup/scope.ts'
 import { Setups } from '../setup/service.ts'
 import {
   type GrantDenied,
+  InvalidArguments,
   type NeedsAuthorization,
   NotFound,
   type ScopeRequired,
@@ -369,13 +370,18 @@ const connectionListing = (snapshot: McpConnectionSnapshot, input: ListInput, co
   })
 
 /**
- * What the model reads of a failed call. A call that timed out or lost its connection may still have reached the
- * server, so it is told to look before calling again: in the showcase run it sent a slow `create_agent` twice.
+ * What the model reads of a failed call. Arguments that do not fit the tool's input schema were sent nowhere: it reads
+ * every problem, one per line, to fix them in one more call (ADR 0092). A call that timed out or lost its connection
+ * may still have reached the server, so it is told to look before calling again: in the showcase run it sent a slow
+ * `create_agent` twice.
  */
-const callFailure = (cause: unknown): string =>
-  cause instanceof UpstreamMcp && (cause.reason === 'timeout' || cause.reason === 'transport')
+const callFailure = (cause: unknown): string => {
+  if (cause instanceof InvalidArguments)
+    return `The arguments do not match ${cause.name}'s input schema; fix them and call again:\n${cause.problems.map((problem) => `- ${problem}`).join('\n')}`
+  return cause instanceof UpstreamMcp && (cause.reason === 'timeout' || cause.reason === 'transport')
     ? `${describeError(cause)}. The call may have reached the server and taken effect: check its state with a read-only tool before calling it again, and never repeat a paid or one-time action blind.`
     : describeError(cause)
+}
 
 /**
  * Whether the model answering this conversation sees images: its Pi model takes image input (`pi/model.ts`), as pi-ai

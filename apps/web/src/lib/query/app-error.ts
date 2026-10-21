@@ -39,6 +39,7 @@ export const ERROR_KINDS: ErrorKindTable<ApiCode> = {
   not_found: 'not_found',
   conflict: 'conflict',
   invalid_input: 'validation',
+  invalid_arguments: 'validation',
   payload_too_large: 'validation',
   resident_inactive: 'forbidden',
   budget_exhausted: 'plan_limit',
