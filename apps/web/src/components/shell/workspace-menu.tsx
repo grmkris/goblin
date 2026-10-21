@@ -11,7 +11,9 @@ import {
   DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Field,
@@ -21,8 +23,8 @@ import {
   GoblinMark,
   Input,
 } from '@goblin/ui'
-import { CheckIcon, ChevronsUpDownIcon, PlusIcon, SettingsIcon } from 'lucide-react'
-import { createWorkspaceMutation, workspacesQuery } from '../../account/queries.ts'
+import { CheckIcon, ChevronsUpDownIcon, MailIcon, PlusIcon, SettingsIcon } from 'lucide-react'
+import { createWorkspaceMutation, myInvitationsQuery, workspacesQuery } from '../../account/queries.ts'
 import { rememberWorkspace } from '../../lib/last-workspace.ts'
 import { messageOf, withRef } from '../../lib/query/app-error.ts'
 import { currentSlug, inWorkspace } from '../../lib/workspace-path.ts'
@@ -124,11 +126,13 @@ function CreateWorkspace({
 }
 
 /**
- * The sidebar's head (ADR 0089): the workspace this page is in, and a menu of the person's others, a new one and this
- * one's settings. Choosing another opens it in this tab; each tab can be in a different one.
+ * The sidebar's head (ADR 0089): the workspace this page is in, and a menu of the person's others, the invitations
+ * waiting for them (ADR 0093), a new one and this one's settings. Choosing another opens it in this tab; each tab can
+ * be in a different one.
  */
 export function WorkspaceMenu() {
   const workspaces = useQuery(workspacesQuery)
+  const invitations = useQuery(myInvitationsQuery).data ?? []
   const [creating, setCreating] = useState(false)
   const slug = currentSlug()
   const current = workspaces.data?.find((workspace) => workspace.slug === slug)
@@ -159,6 +163,23 @@ export function WorkspaceMenu() {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
+          {invitations.length > 0 && (
+            <>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Invitations</DropdownMenuLabel>
+                {invitations.map((invitation) => (
+                  <DropdownMenuItem
+                    key={invitation.id}
+                    render={<Link to="/invite/$id" params={{ id: invitation.id }} />}
+                  >
+                    <MailIcon aria-hidden />
+                    {invitation.workspace}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuItem onClick={() => setCreating(true)}>
             <PlusIcon aria-hidden />
             New workspace
