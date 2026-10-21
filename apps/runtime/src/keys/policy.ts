@@ -40,6 +40,15 @@ export const requestKey: Effect.Effect<KeyGrant | undefined> = Effect.map(reques
 )
 
 /**
+ * Where a request's flow comes from (ADR 0037): a caller's (ADR 0086: an OAuth client or a server's key) is an MCP
+ * client's, anyone else's the owner's in the app.
+ */
+export const requestFlowOrigin: Effect.Effect<{ readonly via: 'app' | 'mcp'; readonly actor: 'owner' | 'client' }> =
+  Effect.map(requestCaller, (caller) =>
+    caller === undefined ? ({ via: 'app', actor: 'owner' } as const) : ({ via: 'mcp', actor: 'client' } as const),
+  )
+
+/**
  * Who a request's message is by, which its content carries first: an OAuth client by the name it registered (ADR 0086,
  * and for whom in a workspace of several people), or in such a workspace a member by name and ID (ADR 0094); none for a
  * member alone in their workspace, or any other request.

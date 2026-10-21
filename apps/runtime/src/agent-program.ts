@@ -24,7 +24,7 @@ import { AgentInput } from './runtime/input.ts'
 import { conversationId } from './pi/context.ts'
 import { PiSessions, fromPi } from './pi/sessions.ts'
 import type { HeldCallOutcome } from './mcp/connections/types.ts'
-import { requestAuthor } from './keys/policy.ts'
+import { requestAuthor, requestFlowOrigin } from './keys/policy.ts'
 import { type SharedContext, outcomeContent, ownerContent, withAuthor } from './pi/content.ts'
 import { askPersonas } from './personas/ask.ts'
 
@@ -215,6 +215,7 @@ export const submitOwner = (input: OwnerSubmit) =>
     const selections = yield* resolveSelections(session, picks)
     const view = Option.getOrUndefined(yield* conversations.view(input.thread))
     const content = withAuthor(yield* requestAuthor, ownerContent(input.text, shared, attachments, selections))
+    const origin = yield* requestFlowOrigin
     if (personaIds.length > 0) {
       if (view?.kind === 'subagent') return yield* new InvalidInput({ reason: 'persona_subagent' })
       return yield* askPersonas(input, personaIds, personaOrder, content)
@@ -227,7 +228,7 @@ export const submitOwner = (input: OwnerSubmit) =>
       chat: input.thread,
       operationId: input.operationId,
       receipt: { kind: 'send', origin: 'owner', ...(input.parentOp === undefined ? {} : { parentOp: input.parentOp }) },
-      flow: { flow: 'send', via: 'app', actor: 'owner' },
+      flow: { flow: 'send', ...origin },
       content,
       answer: routineAnswer(input.operationId, input.text),
       ...(relay === undefined ? {} : { relay }),
