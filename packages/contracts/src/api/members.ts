@@ -10,7 +10,8 @@ const InvitationId = Schema.String.check(Schema.isPattern(/^[a-f0-9]{32}$/u))
 
 /**
  * A workspace's members and invitations (ADR 0093), served by the Worker under `/w/<slug>`. Paths are relative to the
- * API's `/api` prefix. Every member reads them; owners and admins change them.
+ * API's `/api` prefix. Every member reads the members; owners and admins invite and remove, and only an owner changes
+ * a role.
  *
  * - `list`: `GET /api/members`, every member, owners first.
  * - `update`: `PATCH /api/members/:userId`, a member's new role. Only an owner makes or unmakes an owner, and the last

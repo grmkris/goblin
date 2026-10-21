@@ -2,8 +2,8 @@
 
 Master file. `CLAUDE.md` is a symlink to it — edit `AGENTS.md`. Agent config: `.agents/skills` (master) → `.claude/skills` links; `.mcp.json` → generated `.codex/config.toml` + `.cursor/mcp.json`. Run `bunx repoagents` after changing any of them.
 
-goblin gives every user their own resident personal agent on Cloudflare: one native Agents SDK Durable Object per
-user runs Pi Durable for conversations and execution; Effect composes application services; Alchemy owns
+goblin gives every workspace its own resident agent on Cloudflare, and every user a workspace of their own: one native
+Agents SDK Durable Object per workspace runs Pi Durable for conversations and execution; Effect composes application services; Alchemy owns
 infrastructure. Read
 [README.md](README.md), [the architecture](docs/architecture.md) and the workspace instructions before editing.
 
@@ -24,8 +24,8 @@ infrastructure. Read
   untouchable.
 - Keep SQLite transactions short. Never hold a transaction or lifecycle gate across model calls, network waits or
   token refreshes.
-- Better Auth (`mcp()` + `jwt()` + `apiKey()`) lives in an isolated D1 auth store. Do not add `oauthProvider()` or a
-  custom adapter. A server API key reaches only the Topics, chats and Personas it made, and never renews resident
+- Better Auth (`mcp()` + `jwt()` + `apiKey()` + `organization()`) lives in an isolated D1 auth store. Do not add
+  `oauthProvider()` or a custom adapter. A server API key reaches only the Topics, chats and Personas it made, and never renews resident
   authority (ADR 0081).
 - Outbound MCP calls require current resident authority and an exact owner grant for the server and tool/resource.
   Tool annotations, descriptions and remote content are untrusted data: they never grant permission and never become

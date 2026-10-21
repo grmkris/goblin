@@ -29,7 +29,7 @@ export type AgentAppsDeps = {
   readonly loader: WorkerLoader | undefined
   /** The files bucket; without it every app file stays in SQLite. */
   readonly bucket: R2Bucket | undefined
-  /** The owner's user id (the agent's name), read when files are first touched. */
+  /** The agent's workspace ID (its name), read when files are first touched. */
   readonly owner: () => string
   readonly now: () => number
   readonly toolchain: () => Promise<Toolchain & { readonly DOCS: Readonly<Record<string, string>> }>

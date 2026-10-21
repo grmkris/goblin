@@ -8,7 +8,8 @@ of their own. These are the words the code, the docs and the app use for it.
 
 **Workspace**:
 What owns an agent (ADR 0089): a Better Auth organization with a name, a slug (its pages live at `/w/<slug>/`) and its
-members. Everything the agent holds is the workspace's. A signed-in person with none is given one.
+members. Everything the agent holds is the workspace's. A signed-in person with none is given one, unless an
+invitation waits for them (ADR 0093).
 _Avoid_: team, org, account (for this)
 
 **Member**:

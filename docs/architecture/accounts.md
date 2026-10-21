@@ -37,8 +37,9 @@ comes back to `/login?error=signup_disabled`. A provider's account is created on
 verified (`validateUserInfo`, else `email_not_verified`), and it joins an existing account with the same email only when
 the provider says the email is verified and the account's own is verified too (else `account_not_linked`); no provider
 is trusted past that. So whoever signs in by code and by the provider with the same verified email reaches one
-account. The sign-up mode is the only access control: every signed-in person reaches the workspaces they belong to,
-each agent and everything in it ([ADR 0058](../adr/0058-no-plans-tokens-and-an-optional-cap.md)).
+account. The sign-up mode decides who may make an account, and an invitation waiting for an address lets it in
+whatever the mode (ADR 0093); every signed-in person reaches the workspaces they are a member of, each agent and
+everything in it, within their role ([ADR 0058](../adr/0058-no-plans-tokens-and-an-optional-cap.md)).
 
 ### Workspaces
 
@@ -49,8 +50,7 @@ served); a unique index keeps one membership per person and workspace. `GET /api
 membership first, and gives a person with none a first one (named after them, its slug from their address) in one D1
 batch that runs only while they still have none. `POST /api/workspaces` makes another, `PATCH` renames it or moves its
 slug (an owner or admin), `DELETE` deletes it (an owner): its agent is erased first, then its keys, its members' OAuth
-consents to it and its memberships. Every account that existed before ADR 0089 got a workspace whose ID is its user ID
-(`0002_workspaces.sql`), so its agent, files, Events hooks and sealed model endpoint stayed where they were.
+consents to it and its memberships.
 
 Which agent a request reaches comes from its credential: a browser session names the workspace's slug in its path
 (`/w/<slug>/api/…`), checked against the person's membership in one D1 read on every request; an API key belongs to
@@ -60,9 +60,10 @@ more than one), and its token carries it in a `workspace` claim, honoured only w
 ### Members and invitations
 
 A workspace's people ([ADR 0093](../adr/0093-members-invitations-and-roles.md)) are its `member` rows, each with a role;
-`auth/members.ts` reads and writes them. `GET /w/<slug>/api/members` lists them for any member; owners and admins
-change roles (`PATCH …/members/:userId`) and remove (`DELETE`), an admin only members and an owner anyone, and the last
-owner stays; anyone else may leave (`POST …/members/leave`). Removing someone deletes their OAuth consents and revokes
+`auth/members.ts` reads and writes them. `GET /w/<slug>/api/members` lists them for any member; owners change roles
+(`PATCH …/members/:userId`), owners and admins remove (`DELETE`), an admin only members and an owner anyone, and the
+last owner stays, as it does when its account is deleted (refused while others work in the workspace); anyone else may
+leave (`POST …/members/leave`). Removing someone deletes their OAuth consents and revokes
 their refresh tokens for the workspace in the same batch.
 
 `POST /w/<slug>/api/members/invitations` invites addresses with a role (only an owner invites an admin): one

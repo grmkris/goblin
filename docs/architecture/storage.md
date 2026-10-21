@@ -18,14 +18,14 @@
 | Agent DO SQLite | `app_mcp_event_grants`, `app_mcp_event_subscriptions`, `app_event_deliveries`, `app_mcp_event_consumers`, `app_event_consumer_receipts` | Drizzle: exact Events grants, leases, encrypted receipts and independent acknowledgements. |
 | Agent DO SQLite | `app_skill_catalog_state` | Drizzle: durable catalog invalidation generations. |
 | Agent DO SQLite | `cf_workspace_files` | `@cloudflare/shell`'s Workspace: the owner's files (ADR 0022), vendor-owned like `pi_*`. |
-| R2 `files` | `agents/<userId>/files/…`, `agents/<userId>/app_<name>/…` | Shell: the owner's and each app's files over 128 KiB. Deleting the account empties the prefix. |
+| R2 `files` | `agents/<workspaceId>/files/…`, `agents/<workspaceId>/app_<name>/…` | Shell: the workspace's and each app's files over 128 KiB. Deleting the workspace empties the prefix. |
 | Agent DO SQLite | `app_agent_apps`, `app_agent_releases`, `app_agent_artifacts`, `app_agent_views`, `app_agent_state`, `app_agent_snapshots`, `app_agent_receipts`, `app_agent_events`, `app_agent_powers`, `app_agent_usage`, `app_agent_jobs` | Drizzle: agent apps, their releases, code and views, state and revisions, rollback snapshots, receipts, events, the owner's answers to their powers, their daily usage and their schedules (ADR 0021). |
 | Agent DO SQLite | `cf_workspace_app_<name>` | Shell: each agent app's own files. |
 | Agent DO SQLite | `app_registry` | Drizzle: every App the workspace shows, by source: an MCP App per Pi session and call, with logical `chat_id` placement, an agent app per name (ADRs 0020, 0021, 0030). |
 | Agent DO SQLite | `app_run_events` | Drizzle: the run ledger, turns, model attempts and tool calls without content, 30 days (ADR 0024). |
-| D1 `goblinAuth` | `user`, `session`, `account`, `verification`, `jwks`, `rateLimit`, `oauth*` | Better Auth, `apps/runtime/migrations/0000_baseline.sql`. |
+| D1 `goblinAuth` | `user`, `session`, `account`, `verification`, `jwks`, `rateLimit`, `oauth*`, `apikey`, `organization`, `member`, `invitation` | Better Auth, `apps/runtime/migrations/` (`0002_workspaces.sql`: the workspaces, their members and invitations, ADRs 0089, 0093). |
 
-The auth D1 baseline contains the current schema: withdrawn billing, workspace, member and wallet tables are absent.
+The auth D1 migrations hold the current schema: the withdrawn billing and wallet tables are absent.
 The disposable dev reset recreates this baseline; prod remains frozen until its separate reset decision.
 The auth migration unit tests apply the baseline to SQLite, compare it with the installed Better Auth schema and
 exercise constraints and MCP client registration. This verifies local schema behavior, not a deployed reset.

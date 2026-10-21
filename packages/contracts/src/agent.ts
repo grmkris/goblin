@@ -12,7 +12,7 @@ export const ResidentStatus = Schema.Struct({
 export type ResidentStatus = typeof ResidentStatus.Type
 
 /**
- * The tokens the user's agent spent on models today (UTC), the deployment's daily cap (null: none), and when the day
+ * The tokens the workspace's agent spent on models today (UTC), the deployment's daily cap (null: none), and when the day
  * resets (epoch seconds).
  */
 export const UsageToday = Schema.Struct({
@@ -39,7 +39,7 @@ export const ModelOption = Schema.Struct({
 export type ModelOption = typeof ModelOption.Type
 
 /**
- * The model the user's agent answers with, the endpoint's default, and every model on offer (default first). With no
+ * The model the workspace's agent answers with, the endpoint's default, and every model on offer (default first). With no
  * model endpoint (ADR 0064) nothing is on offer: `options` is empty and there is no `current` or `default`.
  */
 export const ModelChoice = Schema.Struct({

@@ -275,7 +275,7 @@ export class ModelChoiceStore implements ChoiceLedger {
 }
 
 /**
- * The model this user's agent answers with, among `options` (the endpoint's, its default first). A stored pick the
+ * The model this workspace's agent answers with, among `options` (the endpoint's, its default first). A stored pick the
  * endpoint no longer offers falls back to the default, so a model that goes never strands anyone.
  */
 export class ModelPicker {

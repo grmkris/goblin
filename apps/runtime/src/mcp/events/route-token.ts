@@ -5,7 +5,7 @@ const PURPOSE = 'goblin/mcp-events-hook/connection'
 
 /**
  * The route token of one connection's Events webhook (ADR 0041): purpose-separated from the credential key, bound to
- * the user and the connection, and checked before the Worker looks up this user's object.
+ * the workspace and the connection, and checked before the Worker looks up that workspace's agent.
  */
 export const eventsHookToken = (credentialKey: string, workspaceId: string, connectionId: string): Promise<string> =>
   purposeMac(credentialKey, PURPOSE, `${workspaceId}\n${connectionId}`)
