@@ -210,6 +210,7 @@ export const McpHostLive: Layer.Layer<
       shelf: shelfOf(env.MCP_SHELF),
       authorizeTool: heldCalls(approvals, grants),
       appUrl: env.APP_URL,
+      workspaceId: input.workspaceId,
       fetch: input.mcpFetch,
       report: mcpReporter(input.telemetry),
       toolsChanged: (connectionId, digest) => changes.publish('mcp.tools', { connectionId, digest }),

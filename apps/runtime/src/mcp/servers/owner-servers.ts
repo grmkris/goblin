@@ -101,6 +101,8 @@ export type OwnerServers = {
   readonly credentials: Credentials
   readonly grants: Grants
   readonly appUrl: string
+  /** The workspace whose agent this is: every sign-in's state names it (`signInState`, ADR 0089). */
+  readonly workspaceId: string
   readonly fetch: typeof fetch
   readonly registries: AddedRegistries
   /** Servers the owner added; without it, the server list is fixed. */
@@ -274,7 +276,10 @@ const beginConnect = (owner: OwnerServers, connectionId: string, chosen?: readon
     const narrowed = chosen === undefined ? undefined : yield* chosenScope(owner, server.endpoint, chosen)
     yield* owner.manager.close(connectionId)
     if (yield* connectsOpenly(owner, connectionId)) return {}
-    const provider = new StoredOAuthProvider(owner.credentials, connectionId, owner.appUrl, { kind: 'interactive' })
+    const provider = new StoredOAuthProvider(owner.credentials, connectionId, owner.appUrl, {
+      kind: 'interactive',
+      workspaceId: owner.workspaceId,
+    })
     const result = yield* attempt(async () => {
       const scope = narrowed ?? (await offeredScope(server.endpoint, owner.fetch))
       return auth(provider, {
@@ -297,7 +302,10 @@ const beginConnect = (owner: OwnerServers, connectionId: string, chosen?: readon
 const beginStepUp = (owner: OwnerServers, connectionId: string, required: string) =>
   Effect.gen(function* () {
     const server = yield* owner.manager.server(connectionId)
-    const provider = new StoredOAuthProvider(owner.credentials, connectionId, owner.appUrl, { kind: 'interactive' })
+    const provider = new StoredOAuthProvider(owner.credentials, connectionId, owner.appUrl, {
+      kind: 'interactive',
+      workspaceId: owner.workspaceId,
+    })
     const result = yield* attempt(async () => {
       const held = await owner.credentials.tokens(connectionId)
       const offered = await offeredScope(server.endpoint, owner.fetch)

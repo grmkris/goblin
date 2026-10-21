@@ -7,6 +7,7 @@ import { McpConnections } from '../../src/mcp/service.ts'
 import { MemoryCredentials, MemoryGrants } from './memory.ts'
 import { lowLevelServer } from './low-level-server.ts'
 import { hostOf } from './manager.ts'
+import { stateWorkspace } from '../../src/mcp/oauth/sign-in.ts'
 
 const BASE = 'https://fixture.test'
 const RESOURCE_METADATA = `${BASE}/.well-known/oauth-protected-resource/mcp`
@@ -150,6 +151,9 @@ const setup = () => {
     const params = new URL(authorizationUrl ?? '').searchParams
     expect(params.get('code_challenge_method')).toBe('S256')
     expect(params.get('scope')).toBe('notes offline_access')
+    // One address for every workspace; the state names this agent's, which the edge routes the callback by (ADR 0089).
+    expect(params.get('redirect_uri')).toBe('https://goblin.test/api/mcp/oauth/callback')
+    expect(stateWorkspace(params.get('state'))).toBe('workspace')
     const approval = authorizationServer.approve(authorizationUrl ?? '')
     await servers.finishConnect(approval.state, approval.code, undefined)
     return approval

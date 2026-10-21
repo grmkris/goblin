@@ -24,6 +24,7 @@ import { readBytes } from '../body.ts'
 import { crossOrigin, forgedWrite } from '../csrf.ts'
 import { attempt, isAppError } from '../errors.ts'
 import type { Person } from '../../auth/workspaces.ts'
+import { stateWorkspace } from '../../mcp/oauth/sign-in.ts'
 import { AccountApiLayer, AccountRequest, type AccountRecords, WorkspaceAccountApiLayer } from './account.ts'
 import {
   RequestContext,
@@ -52,7 +53,8 @@ import { answer, refusal, secured } from './render.ts'
  * the account APIs itself. It forwards every other request to the agent of one workspace, marked as an owner forward so
  * the agent never takes it for an internal request, with who it comes from. The credential decides the workspace: a
  * member's session names it in the path (`/w/<workspace slug>/api/…`), checked against their membership; a server's API
- * key (ADR 0081) belongs to one and reaches it at `/api/…`.
+ * key (ADR 0081) belongs to one and reaches it at `/api/…`. An outbound sign-in comes back to one address for every
+ * workspace, its `state` naming the workspace, checked against the person's membership the same way.
  */
 
 /**
@@ -77,6 +79,8 @@ export interface Edge {
   readonly key: (key: string) => Effect.Effect<KeyGrant & { readonly workspaceId: string }, AppError>
   /** A person's membership of the workspace at a slug, read now: the workspace and their role, or none. */
   readonly membership: (userId: string, slug: string) => Effect.Effect<WorkspaceView | undefined, AppError>
+  /** A person's membership of the workspace with an ID, read now: the workspace and their role, or none. */
+  readonly membershipOf: (userId: string, workspaceId: string) => Effect.Effect<WorkspaceView | undefined, AppError>
   /** A workspace's agent, the one named by its ID. */
   readonly agent: (workspaceId: string) => AgentFetch
   /** The account's own records, for the account APIs. */
@@ -148,19 +152,21 @@ const admitPerson = (request: Request, edge: Edge): Effect.Effect<Person, AppErr
   })
 
 /**
- * A member of the workspace at `slug` (ADR 0089): the person's session, then their membership, read now; `NotFound` if
- * none.
+ * A member of a workspace, at its slug or with its ID (ADR 0089): the person's session, then their membership, read
+ * now; `NotFound` if none.
  */
 const admitMember = (
   request: Request,
   edge: Edge,
-  slug: string,
+  workspace: { readonly slug: string } | { readonly id: string },
 ): Effect.Effect<{ readonly person: Person; readonly workspace: WorkspaceView }, AppError> =>
   Effect.gen(function* () {
     const person = yield* admitPerson(request, edge)
-    const workspace = yield* edge.membership(person.id, slug)
-    if (workspace === undefined) return yield* new NotFound({ what: 'workspace' })
-    return { person, workspace }
+    const member = yield* 'slug' in workspace
+      ? edge.membership(person.id, workspace.slug)
+      : edge.membershipOf(person.id, workspace.id)
+    if (member === undefined) return yield* new NotFound({ what: 'workspace' })
+    return { person, workspace: member }
   })
 
 /**
@@ -302,6 +308,11 @@ export interface EdgeHttp {
    */
   readonly workspace: (request: Request, edge: Edge) => Effect.Effect<Response>
   /**
+   * Admits an outbound sign-in coming back (`SIGN_IN_CALLBACK`): the workspace its `state` names, the person's session
+   * and their membership of it, read now; then forwards it to that workspace's agent as a member's request.
+   */
+  readonly signIn: (request: Request, edge: Edge) => Effect.Effect<Response>
+  /**
    * Admits a server's request by its API key and forwards it to the agent of the key's workspace. Only an `/api/*` path
    * that is not the account API's is forwarded, as the parsed URL names it (`..` and `%2e%2e` already resolved); any
    * other is a 404 in the envelope, and so is one without a key: a session names its workspace in the path.
@@ -344,6 +355,47 @@ const forward = ({ request, ref, path, search, principal, agent }: Forward) =>
     const response = yield* attempt(() => agent.fetch(new Request(`https://agent${path}${search}`, init)))
     return secured(yield* withRetryAfter(response), ref)
   })
+
+/**
+ * An agent's redirect into the app, sent to the workspace's own pages (`/w/<slug>/…`, ADR 0089): an agent knows its
+ * workspace by ID, never by the slug a member may change.
+ */
+const toWorkspacePages = (response: Response, slug: string, origin: string): Response => {
+  const location = response.headers.get('location')
+  if (location === null) return response
+  const target = new URL(location, origin)
+  if (target.origin !== origin || target.pathname.startsWith('/w/')) return response
+  const headers = new Headers(response.headers)
+  headers.set('location', `${origin}/w/${slug}${target.pathname}${target.search}${target.hash}`)
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+}
+
+/** One admitted member's request on its way to their workspace's agent, as its `/api/…` `path` and `search`. */
+interface MemberForward {
+  readonly request: Request
+  readonly ref: string
+  readonly path: string
+  readonly search: string
+  readonly person: Person
+  readonly member: WorkspaceView
+  readonly edge: Edge
+}
+
+/** Forwards a member's request with who they are, and sends the agent's redirects to the workspace's pages. */
+const forwardMember = ({ request, ref, path, search, person, member, edge }: MemberForward) =>
+  Effect.map(
+    forward({
+      request,
+      ref,
+      path,
+      search,
+      principal: {
+        member: { user: person.id, role: member.role, name: memberName(person), shared: member.members > 1 },
+      },
+      agent: edge.agent(member.id),
+    }),
+    (response) => toWorkspacePages(response, member.slug, edge.origin),
+  )
 
 /** An account API's router: it reads the request's account records and facts. */
 type AccountHttp = Effect.Effect<
@@ -407,19 +459,10 @@ const workspaceOf =
     const served = settle(request, facts, (known) =>
       Effect.gen(function* () {
         if (slug === '' || isAccountPath(path)) return yield* new NotFound({ what: 'route' })
-        const { person, workspace: member } = yield* admitMember(request, edge, slug)
+        const { person, workspace: member } = yield* admitMember(request, edge, { slug })
         known(member.id)
         if (!inAccount)
-          return yield* forward({
-            request,
-            ref: facts.ref,
-            path,
-            search: url.search,
-            principal: {
-              member: { user: person.id, role: member.role, name: memberName(person), shared: member.members > 1 },
-            },
-            agent: edge.agent(member.id),
-          })
+          return yield* forwardMember({ request, ref: facts.ref, path, search: url.search, person, member, edge })
         if (route === undefined) return yield* new NotFound({ what: 'route' })
         const body = yield* bounded(request, JSON_BODY_LIMIT)
         const admitted = new Request(`https://edge${path}${url.search}`, {
@@ -436,6 +479,31 @@ const workspaceOf =
           admitted,
           facts,
         )
+      }),
+    )
+    return Effect.provideContext(served, observed)
+  }
+
+const signInOf =
+  ({ ownerRoute, observed }: Built): EdgeHttp['signIn'] =>
+  (request, edge) => {
+    const url = new URL(request.url)
+    const facts = { ...requestFacts(request, ownerRoute(request) ?? routeTemplate(url.pathname)), ref: refOf(request) }
+    const served = settle(request, facts, (known) =>
+      Effect.gen(function* () {
+        const id = stateWorkspace(url.searchParams.get('state'))
+        if (id === undefined) return yield* new NotFound({ what: 'workspace' })
+        const { person, workspace: member } = yield* admitMember(request, edge, { id })
+        known(member.id)
+        return yield* forwardMember({
+          request,
+          ref: facts.ref,
+          path: url.pathname,
+          search: url.search,
+          person,
+          member,
+          edge,
+        })
       }),
     )
     return Effect.provideContext(served, observed)
@@ -491,5 +559,11 @@ export const makeEdgeHttp: Effect.Effect<EdgeHttp> = Effect.gen(function* () {
     ownerRoute: routeNames(OwnerApi),
     ownerScopes: endpointScopes(OwnerApi),
   }
-  return { account: accountOf(built), workspace: workspaceOf(built), owner: ownerOf(built), route: routeOf(built) }
+  return {
+    account: accountOf(built),
+    workspace: workspaceOf(built),
+    signIn: signInOf(built),
+    owner: ownerOf(built),
+    route: routeOf(built),
+  }
 })

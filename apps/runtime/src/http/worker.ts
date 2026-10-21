@@ -6,7 +6,7 @@ import { readBytes } from './body.ts'
 import { NotFound, attempt } from './errors.ts'
 import { accountRecords } from './api/account.ts'
 import { type Edge, type EdgeHttp, isAccountPath, isWorkspacePath, makeEdgeHttp, runAtEdge } from './api/edge.ts'
-import { membershipAt } from '../auth/workspaces.ts'
+import { membershipAt, membershipOf } from '../auth/workspaces.ts'
 import { secured } from './api/render.ts'
 import { nowSeconds } from '../clock.ts'
 import { fileLinkClaims } from '../files/link-token.ts'
@@ -14,6 +14,7 @@ import { deliverEvents, linkedFile } from '../inbound/client.ts'
 import { handleInboundMcp } from '../inbound/route.ts'
 import { eventsHookTokenValid } from '../mcp/events/route-token.ts'
 import { EVENT_BODY_BYTES } from '../mcp/events/webhook.ts'
+import { SIGN_IN_CALLBACK } from '../mcp/oauth/sign-in.ts'
 import { canonicalRedirect } from './canonical.ts'
 import { healthOf } from './health.ts'
 
@@ -33,6 +34,7 @@ const edgeOf = (env: RuntimeEnv): Edge => ({
     ),
   key: (key) => attempt(() => verifyKey(env, key)),
   membership: (userId, slug) => attempt(() => membershipAt(env.AUTH_DB, userId, slug)),
+  membershipOf: (userId, workspaceId) => attempt(() => membershipOf(env.AUTH_DB, userId, workspaceId)),
   agent: (workspaceId) => agentOf(env, workspaceId),
   records: accountRecords(env),
 })
@@ -123,6 +125,7 @@ export const worker = {
     // workspace's path, answered here or forwarded to its agent; and a key's `/api/*` requests forwarded to its own.
     if (isAccountPath(url.pathname)) return runAtEdge((await edge()).account(request, edgeOf(env)))
     if (isWorkspacePath(url.pathname)) return runAtEdge((await edge()).workspace(request, edgeOf(env)))
+    if (url.pathname === SIGN_IN_CALLBACK) return runAtEdge((await edge()).signIn(request, edgeOf(env)))
     if (url.pathname.startsWith('/api/')) return runAtEdge((await edge()).owner(request, edgeOf(env)))
 
     // Every answer quotes the request's reference (its cf-ray), which its failure line carries too.

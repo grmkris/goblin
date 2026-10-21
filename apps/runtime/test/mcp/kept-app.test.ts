@@ -63,6 +63,7 @@ const fixture = async () => {
     registries: new MemoryRegistries(),
     labels: new MemoryLabels(),
     appUrl: 'https://goblin.test',
+    workspaceId: 'workspace',
     fetch: server.fetch,
     // The dispatch of an approved call claims its one dispatch, as the agent's own check does.
     authorizeTool: (_call, approvalId, dispatch) =>

@@ -8,17 +8,19 @@ import type {
 import { nowSeconds } from '../../clock.ts'
 import { Internal, UpstreamMcp } from '../../http/errors.ts'
 import type { Credentials } from './credentials.ts'
+import { SIGN_IN_CALLBACK, signInState } from './sign-in.ts'
 
 /**
  * How one OAuth exchange runs:
- * - `interactive`: the owner pressed Connect; the authorization URL is captured for the browser redirect.
+ * - `interactive`: the owner pressed Connect; the authorization URL is captured for the browser redirect, its `state`
+ *   naming the agent's workspace (`signInState`) so the callback finds its way back to it.
  * - `background`: refresh during a call; if the server wants a new authorization the server is marked `needs_auth`.
  *   The SDK also asks for a new authorization when the refresh never got an answer (the network, a 5xx): `reached`
  *   then says so, and the refresh fails as that transport failure instead, keeping the credentials.
  * - `callback`: completing an authorization with the PKCE verifier stored for its `state`.
  */
 export type OAuthMode =
-  | { readonly kind: 'interactive' }
+  | { readonly kind: 'interactive'; readonly workspaceId: string }
   | { readonly kind: 'background'; readonly reached?: () => boolean }
   | { readonly kind: 'callback'; readonly codeVerifier: string }
 
@@ -46,7 +48,7 @@ export class StoredOAuthProvider implements OAuthClientProvider {
     this.#store = store
     this.#connectionId = connectionId
     this.#appUrl = appUrl.replace(/\/$/u, '')
-    this.#redirectUrl = `${this.#appUrl}/api/mcp/oauth/callback`
+    this.#redirectUrl = `${this.#appUrl}${SIGN_IN_CALLBACK}`
     this.#mode = mode
   }
 
@@ -66,7 +68,7 @@ export class StoredOAuthProvider implements OAuthClientProvider {
   }
 
   state(): string {
-    return crypto.randomUUID()
+    return this.#mode.kind === 'interactive' ? signInState(this.#mode.workspaceId) : crypto.randomUUID()
   }
 
   clientInformation(): Promise<StoredOAuthClientInformation | undefined> {

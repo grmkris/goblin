@@ -48,6 +48,7 @@ function notificationHost(
   return mcpHost({
     servers: [{ connectionId: 'chat', endpoint: 'https://notification.test/mcp' }],
     appUrl: 'https://goblin.test',
+    workspaceId: 'workspace',
     credentials,
     grants: new MemoryGrants([{ connectionId: 'chat', capability: 'tool', name: 'message_send' }]),
     registries: new MemoryRegistries(),

@@ -68,6 +68,7 @@ const fixture = async (fetcher: typeof fetch, held: Readonly<Record<string, stri
     registries: new MemoryRegistries(),
     labels: new MemoryLabels(),
     appUrl: 'https://goblin.test',
+    workspaceId: 'workspace',
     fetch: async (input, init) => docs.fetch(new Request(input, init)),
   })
   const files = memoryFiles(held)

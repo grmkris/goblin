@@ -88,6 +88,7 @@ const fixture = async () => {
     registries: new MemoryRegistries(),
     labels: new MemoryLabels(),
     appUrl: 'https://goblin.test',
+    workspaceId: 'workspace',
     fetch: fetcher,
   })
   const disabled: (string | undefined)[] = []

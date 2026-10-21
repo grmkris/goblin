@@ -101,6 +101,7 @@ const learnerAt = () => {
     labels: new MemoryLabels(),
     skillsEnabled: (connectionId) => state.enabled(connectionId),
     appUrl: 'https://goblin.test',
+    workspaceId: 'workspace',
     fetch: async (input, init) => skills.fetch(new Request(input, init)),
   })
   const services = servicesOf(

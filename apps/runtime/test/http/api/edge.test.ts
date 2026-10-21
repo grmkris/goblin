@@ -116,6 +116,8 @@ const deployment = (
         : Effect.fail(new Unauthenticated({ reason: 'key' })),
     membership: (userId, slug) =>
       Effect.succeed(userId === OWNER && slug === MEMBERSHIP.slug ? { ...MEMBERSHIP, role } : undefined),
+    membershipOf: (userId, workspaceId) =>
+      Effect.succeed(userId === OWNER && workspaceId === WS ? { ...MEMBERSHIP, role } : undefined),
     agent: (workspaceId) => ({
       fetch: async (request) => {
         seen.push(request)
@@ -131,7 +133,7 @@ const deployment = (
 const built = Effect.runPromise(makeEdgeHttp)
 /** One request through the edge: its response and the lines it logged. */
 const through = async (
-  side: 'account' | 'workspace' | 'owner',
+  side: 'account' | 'workspace' | 'signIn' | 'owner',
   request: Request,
   edge: Edge,
 ): Promise<{ readonly response: Response; readonly lines: readonly unknown[] }> => {
@@ -223,16 +225,41 @@ describe("a member's forward (ADR 0089)", () => {
     expect(seen).toHaveLength(status === 404 ? 0 : 1)
   })
 
-  it("hands the agent's redirect to the browser instead of following it into the agent", async () => {
-    const connected = `${APP}/w/owner/connections?connected=sidequest`
-    const { seen, edge } = deployment(() => new Response(null, { status: 302, headers: { location: connected } }))
+  it("hands the agent's redirect to the browser, at the workspace's pages, instead of following it into the agent", async () => {
+    const { seen, edge } = deployment(
+      () => new Response(null, { status: 302, headers: { location: `${APP}/connections?connected=sidequest` } }),
+    )
     const request = new Request(`${APP}${BASE}/api/mcp/oauth/callback?state=s&code=c`, {
       headers: { cookie: 'session=owner' },
     })
     const { response } = await through('workspace', request, edge)
     expect(seen.map((forwarded) => forwarded.redirect)).toEqual(['manual'])
     expect(response.status).toBe(302)
-    expect(response.headers.get('location')).toBe(connected)
+    expect(response.headers.get('location')).toBe(`${APP}${BASE}/connections?connected=sidequest`)
+  })
+
+  it("brings an outbound sign-in back to the workspace its state names, after the person's membership of it", async () => {
+    const redirect = () =>
+      new Response(null, { status: 302, headers: { location: `${APP}/start/connect?connected=x` } })
+    const { seen, agents, edge } = deployment(redirect)
+    const state = `${WS}.${crypto.randomUUID()}`
+    const back = (query: string, headers: Record<string, string> = { cookie: 'session=owner' }) =>
+      through('signIn', new Request(`${APP}/api/mcp/oauth/callback?${query}`, { headers }), edge)
+    const { response } = await back(`code=c&state=${state}`)
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe(`${APP}${BASE}/start/connect?connected=x`)
+    expect(agents).toEqual([WS])
+    expect(new URL(seen[0]?.url ?? '').pathname).toBe('/api/mcp/oauth/callback')
+    expect(new URL(seen[0]?.url ?? '').searchParams.get('state')).toBe(state)
+    expect(JSON.parse(seen[0]?.headers.get('x-goblin-member') ?? '{}')).toMatchObject({ user: OWNER, role: 'owner' })
+    // Another workspace's sign-in, a state goblin did not make and no session reach no agent.
+    const refused = [
+      await back(`code=c&state=ws-other.${crypto.randomUUID()}`),
+      await back('code=c&state=s'),
+      await back(`code=c&state=${state}`, {}),
+    ]
+    expect(refused.map(({ response: each }) => each.status)).toEqual([404, 404, 401])
+    expect(agents).toEqual([WS])
   })
 
   it('makes up a reference where there is no cf-ray', async () => {

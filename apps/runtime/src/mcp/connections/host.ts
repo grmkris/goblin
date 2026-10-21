@@ -28,6 +28,8 @@ export type McpHostOptions = {
   readonly credentials: Credentials
   readonly grants: Grants
   readonly appUrl: string
+  /** The workspace whose agent this is, which every sign-in's state names (ADR 0089). */
+  readonly workspaceId: string
   readonly fetch: typeof fetch
   /** The registries the owner added, searched after the built-in ones. */
   readonly registries: AddedRegistries
@@ -264,6 +266,7 @@ export const mcpHost = (
         credentials,
         grants,
         appUrl: options.appUrl,
+        workspaceId: options.workspaceId,
         fetch: options.fetch,
         registries: options.registries,
         ...(options.added === undefined ? {} : { added: options.added }),

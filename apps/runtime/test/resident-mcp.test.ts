@@ -193,6 +193,7 @@ const host = mcpHost({
   registries: new MemoryRegistries(),
   labels: new MemoryLabels(),
   appUrl: 'https://goblin.test',
+  workspaceId: 'workspace',
   fetch: fetcher,
 })
 /** Resident authority that is always current. */

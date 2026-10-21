@@ -50,6 +50,7 @@ export const hostOf = (
     registries: new MemoryRegistries(),
     labels: new MemoryLabels(),
     appUrl: 'https://goblin.test',
+    workspaceId: 'workspace',
     ...options,
   })
   const { run, dispose } = servicesOf(host.pipe(Layer.provideMerge(SingleFlight.layer)))

@@ -61,6 +61,7 @@ const fixture = async () => {
     registries: new MemoryRegistries(),
     labels: new MemoryLabels(),
     appUrl: 'https://goblin.test',
+    workspaceId: 'workspace',
     fetch: server.fetch,
   })
   const layer = host.pipe(

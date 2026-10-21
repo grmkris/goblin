@@ -60,7 +60,9 @@ const REMOTE = [ApiErrors.upstream, ApiErrors.upstreamTimeout, ApiErrors.conflic
  * itself produces. Remote results are the server's, untrusted, and answered whole.
  *
  * `oauthCallback`: `GET /api/mcp/oauth/callback`, an outbound sign-in coming back, answered with a redirect to
- * Connections (with `?error=` and the request's `ref` when it failed). It does not grant resident authority.
+ * Connections (with `?error=` and the request's `ref` when it failed). The browser reaches it at that one address for
+ * every workspace: the Worker forwards it by the workspace its `state` names (ADR 0089). It does not grant resident
+ * authority.
  */
 export class McpGroup extends HttpApiGroup.make('mcp').add(
   HttpApiEndpoint.get('servers', '/mcp/servers', { success: Schema.Array(ServerView) }),
