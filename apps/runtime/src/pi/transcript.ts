@@ -1,9 +1,7 @@
 import type { Conversation, EntryRecord } from '@earendil-works/pi-durable'
-import { QuestionSpec, authorOf } from '@goblin/contracts'
+import { authorOf } from '@goblin/contracts'
 import type { TranscriptMessage } from '@goblin/contracts'
 import { Predicate } from 'effect'
-import * as Option from 'effect/Option'
-import * as Schema from 'effect/Schema'
 import { BACKGROUND } from './context.ts'
 
 /** A user or assistant message, as the internal API answers main's newest ones (`recent`). */
@@ -107,45 +105,6 @@ export function cutOff(entries: readonly EntryRecord[]): boolean {
       if (message.role === 'assistant') return message.stopReason === 'length'
   }
   return false
-}
-
-const AskDetails = Schema.Struct({ kind: Schema.Literal('question'), questions: Schema.Array(QuestionSpec) })
-const decodeAsk = Schema.decodeUnknownOption(AskDetails)
-
-/** A single-choice question, with its options. */
-type Choice = {
-  readonly prompt: string
-  readonly options: readonly { readonly id: string; readonly label: string }[]
-}
-
-/** The one single-choice question an `ask_user` result's details asked; none for several, or one of another kind. */
-function choiceOf(details: unknown): Choice | undefined {
-  const questions = Option.match(decodeAsk(details), { onNone: () => [], onSome: (asked) => asked.questions })
-  const [question] = questions
-  const options = question?.options ?? []
-  if (questions.length !== 1 || question?.kind !== 'single' || options.length < 2) return undefined
-  return { prompt: question.prompt, options: options.map(({ id, label }) => ({ id, label })) }
-}
-
-/** The details of the `ask_user` result the newest turn of `entries` (oldest first) ended on; none when it asked nothing. */
-function askDetails(entries: readonly EntryRecord[]): { readonly details: unknown } | undefined {
-  for (const entry of entries.toReversed()) {
-    if (entry.kind === 'pi.user') return undefined
-    const asked = (entry.model ?? []).find(
-      (message) => message.role === 'toolResult' && message.toolName === 'ask_user',
-    )
-    if (asked?.role === 'toolResult') return { details: asked.details }
-  }
-  return undefined
-}
-
-/**
- * The one single-choice question the newest turn of `entries` (oldest first) asked with `ask_user`, with its options,
- * as buttons can ask it; none when that turn asked nothing, or several questions, or one of another kind.
- */
-export function askedChoice(entries: readonly EntryRecord[]): Choice | undefined {
-  const asked = askDetails(entries)
-  return asked === undefined ? undefined : choiceOf(asked.details)
 }
 
 /**

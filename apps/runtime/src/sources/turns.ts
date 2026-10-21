@@ -14,7 +14,7 @@ import { askPersonas } from '../personas/ask.ts'
 import { Invocations, Personas } from '../personas/service.ts'
 import { type KeptAttachments, messageContent } from '../pi/content.ts'
 import { type PiFailure, PiSessions } from '../pi/sessions.ts'
-import { askedChoice, askedText, cutOff } from '../pi/transcript.ts'
+import { askedText, cutOff } from '../pi/transcript.ts'
 
 /**
  * One message from the owner into a goblin Topic: where, under which operation, from whom, its words, and what goblin
@@ -28,14 +28,8 @@ export type Turn = {
   readonly kept?: KeptAttachments
 }
 
-/** A single-choice question an answer ended on, as buttons can ask it. */
-type AskedChoice = {
-  readonly prompt: string
-  readonly options: readonly { readonly id: string; readonly label: string }[]
-}
-
-/** How a turn ended: its words, and the question with buttons it asked when it stopped on one. */
-export type Answer = { readonly text: string; readonly question?: AskedChoice }
+/** How a turn ended: its words (what it asked the owner, when it stopped on a question). */
+export type Answer = { readonly text: string }
 
 /** Which turn an answer belongs to: its operation, the goblin chat it ran in and the Persona that answers it. */
 export type ReplyRef = { readonly operationId: string; readonly chatId?: string; readonly personaId?: number }
@@ -83,8 +77,8 @@ const turnSession = (chat: string, operationId: string, receipt: TurnOrigin['rec
 
 /**
  * How goblin's turn in `chat` ended, as the place it came from should hear it: its final text, or what it asked the
- * owner when it stopped on a question (with its buttons when it was one single choice), and whether it was cut off;
- * none while it runs (it has not settled within 200 ms).
+ * owner when it stopped on a question, and whether it was cut off; none while it runs (it has not settled within
+ * 200 ms).
  */
 const goblinAnswer = (chat: string, operationId: string, receipt: TurnOrigin['receipt']) =>
   Effect.gen(function* () {
@@ -96,10 +90,8 @@ const goblinAnswer = (chat: string, operationId: string, receipt: TurnOrigin['re
       return { text: `(No answer: ${result.reason ?? 'the turn ended without one'}.)` } satisfies Answer
     const entries = yield* (yield* PiSessions).messages(session).pipe(Effect.catchTag('PiFailure', piFailure))
     const final = result.text?.trim() ?? ''
-    const question = final === '' ? askedChoice(entries) : undefined
     const text = final === '' ? askedText(entries) : final
-    const answer = withCutOff(text, cutOff(entries))
-    return { text: answer, ...(question === undefined ? {} : { question }) } satisfies Answer
+    return { text: withCutOff(text, cutOff(entries)) } satisfies Answer
   })
 
 const decodeAnswer = Schema.decodeUnknownOption(PersonaAnswerData)
