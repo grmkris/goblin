@@ -36,10 +36,12 @@ const AUTH_PAGES = new Set(['/login', '/consent', '/consent/workspace', '/terms'
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   // A workspace's page asked for without its workspace (`/c/12`, a link from before ADR 0089) opens home, which opens a
-  // workspace: only a person's own pages and home live outside one.
-  beforeLoad: ({ location }) => {
+  // workspace: only a person's own pages and home live outside one. A path that is no page (only the root matches)
+  // stays the not-found it was.
+  beforeLoad: ({ location, matches }) => {
     const outside = workspaceOf(new URL(location.publicHref, 'https://goblin.invalid').pathname) === undefined
-    if (outside && location.pathname !== '/' && !AUTH_PAGES.has(location.pathname)) throw redirect({ to: '/' })
+    const page = matches.length > 1 && location.pathname !== '/' && !AUTH_PAGES.has(location.pathname)
+    if (outside && page) throw redirect({ to: '/' })
   },
   head: () => ({
     meta: [
