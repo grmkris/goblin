@@ -198,16 +198,33 @@ export const authorTag = (author: string): string => `[from ${author.replaceAll(
 /** The author named by a leading tag block, if that is what the block is. */
 export const authorOf = (block: string): string | undefined => AUTHOR_TAG.exec(block)?.[1]
 
-/**
- * The author of a member's message in a workspace of several people (ADR 0094): `member <name> · <user id>`, which
- * goblin writes in front of every such message, so the agent knows who speaks and the web whose it is.
- */
-export const memberAuthor = (name: string, userId: string): string =>
-  `member ${name
+/** A chosen name inside an author: no `]` to end the tag, no line break, and no `·`, which joins a member to their ID. */
+const plainName = (name: string): string =>
+  name
     .replaceAll(/[\]\n·]/gu, ' ')
     .replaceAll(/\s+/gu, ' ')
     .trim()
-    .slice(0, 50)} · ${userId}`
+
+/** The words that start the authors goblin writes itself; a name someone chose never starts with one. */
+const OWN_AUTHORS = /^(?:(?:member|persona|subagent|thread)\b[\s:]*)+/iu
+
+/**
+ * The author of a member's message in a workspace of several people (ADR 0094): `member <name> · <user id>`, which
+ * goblin writes in front of every such message, so the agent knows who speaks and the web whose it is. The name is
+ * cut so the whole ID fits in the tag (`authorTag` keeps 80 characters).
+ */
+export const memberAuthor = (name: string, userId: string): string =>
+  `member ${plainName(name).slice(0, Math.max(1, Math.min(50, 70 - userId.length)))} · ${userId}`
+
+/**
+ * The author of an OAuth client's message (ADRs 0086, 0094): the name its registrant chose, never one that reads as an
+ * author goblin writes (a member's, a Persona's, a subagent's, a thread's), and in a workspace of several people the
+ * member it acts for.
+ */
+export const clientAuthor = (client: string, member?: string): string => {
+  const name = plainName(client).replace(OWN_AUTHORS, '').slice(0, 40) || 'client'
+  return member === undefined ? name : `${name} for ${plainName(member).slice(0, 30)}`
+}
 
 const MEMBER_AUTHOR = /^member (.{1,50}) · ([\w-]{1,200})$/u
 

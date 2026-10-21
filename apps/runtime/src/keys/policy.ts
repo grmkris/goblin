@@ -1,4 +1,11 @@
-import { type SetupItem, type TopicSetup, type TopicSetupEdit, memberAuthor, serverOriginOf } from '@goblin/contracts'
+import {
+  type SetupItem,
+  type TopicSetup,
+  type TopicSetupEdit,
+  clientAuthor,
+  memberAuthor,
+  serverOriginOf,
+} from '@goblin/contracts'
 import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
@@ -43,7 +50,7 @@ export const requestAuthor: Effect.Effect<string | undefined> = Effect.map(
     const facts = Option.getOrUndefined(context)
     const member = facts?.member
     const caller = facts?.caller
-    if (caller?.kind === 'client') return member?.shared === true ? `${caller.name} for ${member.name}` : caller.name
+    if (caller?.kind === 'client') return clientAuthor(caller.name, member?.shared === true ? member.name : undefined)
     if (caller === undefined && member?.shared === true) return memberAuthor(member.name, member.user)
     return undefined
   },

@@ -78,9 +78,18 @@ const ForwardedMember = Schema.fromJsonString(
   }),
 )
 
-/** The header value that forwards `member`. */
+/** `\u` escapes for every code unit outside ASCII, so a header carries any name as it is (JSON reads them back). */
+const asciiJson = (value: unknown): string => {
+  const json = JSON.stringify(value)
+  return Array.from({ length: json.length }, (_, index) => {
+    const code = json.charCodeAt(index)
+    return code < 0x7f ? json.charAt(index) : `\\u${code.toString(16).padStart(4, '0')}`
+  }).join('')
+}
+
+/** The header value that forwards `member`: ASCII whatever their name. */
 export const memberHeader = (member: Member): string =>
-  JSON.stringify({ user: member.user, role: member.role, name: member.name, shared: member.shared })
+  asciiJson({ user: member.user, role: member.role, name: member.name, shared: member.shared })
 
 /** A person's name as a member's messages carry it: theirs, or their address's local part. */
 export const memberName = (person: { readonly name: string; readonly email: string }): string =>
