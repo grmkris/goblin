@@ -78,6 +78,8 @@ export type Part =
       readonly outcome?: McpOutcome
       /** The owner's own turn that came from elsewhere (a Source's message, ADR 0066), by goblin's mark. */
       readonly own?: true
+      /** The member who wrote it, in a workspace of several people (ADR 0094); shown by name unless it is the viewer. */
+      readonly member?: { readonly name: string; readonly userId: string }
       /**
        * The outcome waits for the agent's next turn: it was kept because nothing could pay for one, and nothing came
        * after it yet (`conversation-parts.ts`).
@@ -220,6 +222,7 @@ const sameUser = (a: UserPart, b: UserPart) =>
   a.author === b.author &&
   a.outcome === b.outcome &&
   a.own === b.own &&
+  a.member?.userId === b.member?.userId &&
   a.kept === b.kept &&
   a.thread === b.thread &&
   a.at === b.at

@@ -38,7 +38,12 @@ const connect = async (caller: Caller, reply: (request: Request) => Response = (
   const handler = createMcpHandler(() =>
     mcpServer(caller.scopes, (call) =>
       Effect.runPromise(
-        ownerCall(agent, caller, caller.kind === 'client' ? { user: 'owner', role: 'owner' } : undefined, call),
+        ownerCall(
+          agent,
+          caller,
+          caller.kind === 'client' ? { user: 'owner', role: 'owner', name: 'Owner', shared: false } : undefined,
+          call,
+        ),
       ),
     ),
   )

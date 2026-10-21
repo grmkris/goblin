@@ -60,7 +60,7 @@ export const serve = (http: Layer.Layer<AgentHttp>) => {
 
 const memberOf = (headers: Headers): Headers => {
   const with_ = new Headers(headers)
-  with_.set('x-goblin-member', JSON.stringify({ user: 'owner', role: 'owner' }))
+  with_.set('x-goblin-member', JSON.stringify({ user: 'owner', role: 'owner', name: 'Owner', shared: false }))
   return with_
 }
 

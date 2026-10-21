@@ -199,6 +199,25 @@ export const authorTag = (author: string): string => `[from ${author.replaceAll(
 export const authorOf = (block: string): string | undefined => AUTHOR_TAG.exec(block)?.[1]
 
 /**
+ * The author of a member's message in a workspace of several people (ADR 0094): `member <name> · <user id>`, which
+ * goblin writes in front of every such message, so the agent knows who speaks and the web whose it is.
+ */
+export const memberAuthor = (name: string, userId: string): string =>
+  `member ${name
+    .replaceAll(/[\]\n·]/gu, ' ')
+    .replaceAll(/\s+/gu, ' ')
+    .trim()
+    .slice(0, 50)} · ${userId}`
+
+const MEMBER_AUTHOR = /^member (.{1,50}) · ([\w-]{1,200})$/u
+
+/** The member an author names, when it is a member's (`memberAuthor`). */
+export const memberOf = (author: string): { readonly name: string; readonly userId: string } | undefined => {
+  const [, name, userId] = MEMBER_AUTHOR.exec(author) ?? []
+  return name === undefined || userId === undefined ? undefined : { name, userId }
+}
+
+/**
  * Where the owner's own turn that came from elsewhere came from, as its receipt's origin says: `source`, a Source's
  * message the speaks-for-me rule the owner confirmed matched (ADR 0066).
  */

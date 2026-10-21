@@ -1,6 +1,7 @@
 import { Schema } from 'effect'
 import { expect } from 'vitest'
-import { call, ownerFetch, person, workspaceOf, type Person } from './owner-requests.ts'
+import { callOwner } from '../owner-client.ts'
+import { call, ownerFetch, person, showing, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 
 const APP = 'https://goblin.test'
 const CLOSED = { 'x-fixture-signup': 'closed' }
@@ -24,18 +25,18 @@ async function signIn(base: string, email: string): Promise<{ readonly sent: num
   const { code } = Schema.decodeUnknownSync(Schema.Struct({ code: Schema.String }))(
     await (await ownerFetch(`${base}/__test/auth/mail?email=${encodeURIComponent(email)}`)).json(),
   )
-  const signedIn = await ownerFetch(`${base}/api/auth/sign-in/email-otp`, {
+  const session = await ownerFetch(`${base}/api/auth/sign-in/email-otp`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ email, otp: code }),
   })
-  expect(signedIn.status).toBe(200)
-  const cookie = signedIn.headers
+  expect(session.status).toBe(200)
+  const cookie = session.headers
     .getSetCookie()
     .map((value) => value.split(';')[0])
     .join('; ')
   const { user } = Schema.decodeUnknownSync(Schema.Struct({ user: Schema.Struct({ id: Schema.String }) }))(
-    await signedIn.json(),
+    await session.json(),
   )
   return { sent: 200, who: { userId: user.id, cookie, ip, email, workspace: '', slug: '' } }
 }
@@ -47,8 +48,8 @@ const workspacesOf = async (base: string, who: Person) =>
 /**
  * Members and invitations (ADR 0093) through the Worker and the real auth D1: an owner invites an address while sign-up
  * is closed, which lets that address sign up and nothing else; the invited person gets no workspace of their own,
- * joins the owner's, works in its agent (the owner sees the Topic they made) within a member's role, and once removed
- * reaches it no more.
+ * joins the owner's, works in its agent (the owner sees the Topic they made, and their message by name, ADR 0094) within
+ * a member's role, and once removed reaches it no more.
  */
 export async function membersCase(url: string): Promise<void> {
   const owner = await person(url)
@@ -74,6 +75,13 @@ export async function membersCase(url: string): Promise<void> {
   const name = `Guest topic ${crypto.randomUUID().slice(0, 8)}`
   expect((await call(url, member, '/api/topics', { name, operationId: crypto.randomUUID() })).status).toBe(201)
   expect((await workspaceOf(url, owner)).topics?.some((topic) => topic.name === name)).toBe(true)
+  // The workspace has two people now: each one's message carries who wrote it, by name and ID (ADR 0094).
+  const words = `Hello from the guest ${crypto.randomUUID().slice(0, 8)}`
+  await callOwner(signedIn(url, member), (api) =>
+    api.conversations.submit({ params: { id: '1' }, payload: { input: words, operationId: crypto.randomUUID() } }),
+  )
+  const seen = await showing(signedIn(url, owner), '1', words)
+  expect(seen).toContain(`[from member ${email.split('@')[0] ?? ''} · ${guest.userId}]`)
   const refused = await call(url, member, '/api/agent/resident', { enabled: false })
   expect(refused.status).toBe(403)
   expect(await refused.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })

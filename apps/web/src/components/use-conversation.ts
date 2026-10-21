@@ -1,5 +1,5 @@
 import { type RefObject, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
-import { useInfiniteQuery, useMutation } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
 import type { AppContext, ComposerSelection } from '@goblin/contracts'
 import {
   historyQuery,
@@ -21,6 +21,7 @@ import { branchPoints, fromEntry } from '../lib/threads.ts'
 import { SubmissionRetry } from '../lib/submission-retry.ts'
 import { useKeyboardInset } from './use-keyboard.ts'
 import { apiPath } from '../lib/workspace-path.ts'
+import { sessionPersonQuery } from '../auth/queries.ts'
 
 type MessageContext = {
   readonly appContext?: readonly AppContext[]
@@ -96,6 +97,8 @@ export function useConversation(thread: string, visible = true) {
   }, [thread])
   useEffect(() => lease.current?.setVisible(visible), [visible])
   const submit = useMutation(submitMutation).mutateAsync
+  // Who sends, so the echo waits for their own message, never another member's (ADR 0094).
+  const me = useQuery(sessionPersonQuery).data?.id
   const stopping = useMutation(stopMutation).mutateAsync
   const removing = useMutation(removeQueuedMutation).mutateAsync
   /** Replies retain their supplied operation; an unchanged failed draft reuses its browser operation. */
@@ -103,7 +106,7 @@ export function useConversation(thread: string, visible = true) {
     const id = operationId ?? retry.current.operation({ thread, input, context })
     // Shown at once when it starts a turn; a message that queues behind a running one shows in the queue instead.
     if (state.projection !== undefined && startsTurn(state.projection))
-      setEcho({ id: `echo:${id}`, text: input, after: newestEntry(state.projection) })
+      setEcho({ id: `echo:${id}`, text: input, after: newestEntry(state.projection), by: me })
     try {
       await submit({ id: thread, message: messageBody(input, id, context) })
       retry.current.accepted(id)

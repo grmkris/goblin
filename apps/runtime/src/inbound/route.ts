@@ -4,7 +4,7 @@ import { challengeOf, clientName, verifyClientToken } from '../auth/index.ts'
 import { callerScopesOf } from '../auth/resources.ts'
 import type { RuntimeEnv } from '../env.ts'
 import { runAtEdge } from '../http/api/edge.ts'
-import { type Caller, type Member, bearerKey, callerId } from '../http/api/principal.ts'
+import { type Caller, type Member, bearerKey, callerId, memberName } from '../http/api/principal.ts'
 import { membershipOf } from '../auth/workspaces.ts'
 import { ownerCall } from './client.ts'
 import { mcpServer } from './mcp-server.ts'
@@ -50,11 +50,19 @@ const admit = async (request: Request, env: RuntimeEnv): Promise<Admitted | unde
   }
   const name = (await clientName(principal.clientId, env)) ?? 'an MCP client'
   const membership = await membershipOf(env.AUTH_DB, principal.subject, principal.workspaceId)
-  if (membership === undefined) return undefined
+  const person = await env.AUTH_DB.prepare('SELECT name, email FROM user WHERE id = ?')
+    .bind(principal.subject)
+    .first<{ name: string; email: string }>()
+  if (membership === undefined || person === null) return undefined
   return {
     workspaceId: principal.workspaceId,
     caller: { kind: 'client', clientId: principal.clientId, name, scopes: callerScopesOf(principal.scopes) },
-    member: { user: principal.subject, role: membership.role },
+    member: {
+      user: principal.subject,
+      role: membership.role,
+      name: memberName(person),
+      shared: membership.members > 1,
+    },
     token,
     expiresAt: principal.expiresAt,
   }

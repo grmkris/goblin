@@ -166,12 +166,16 @@ export const WorkspaceName = Schema.String.check(
   Schema.isPattern(/^\S(?:.*\S)?$/u),
 )
 
-/** A workspace as one of its members sees it: what it is called, its address and their role in it. */
+/**
+ * A workspace as one of its members sees it: what it is called, its address, their role in it and how many people it
+ * has (ADR 0094: its members' messages then name who wrote them).
+ */
 export const WorkspaceView = Schema.Struct({
   id: WorkspaceId,
   name: Schema.String,
   slug: Schema.String,
   role: WorkspaceRole,
+  members: Schema.Int,
 })
 export type WorkspaceView = typeof WorkspaceView.Type
 

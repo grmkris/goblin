@@ -34,6 +34,7 @@ interface Row {
   readonly name: string
   readonly slug: string
   readonly role: string
+  readonly members: number
 }
 
 const ROLES: readonly string[] = ['owner', 'admin', 'member'] satisfies readonly WorkspaceRole[]
@@ -41,9 +42,16 @@ const roleOf = (role: string): WorkspaceRole =>
   // SAFETY: checked against the roles just above; the plugin writes no other.
   (ROLES.includes(role) ? role : 'member') as WorkspaceRole
 
-const viewOf = (row: Row): WorkspaceView => ({ id: row.id, name: row.name, slug: row.slug, role: roleOf(row.role) })
+const viewOf = (row: Row): WorkspaceView => ({
+  id: row.id,
+  name: row.name,
+  slug: row.slug,
+  role: roleOf(row.role),
+  members: row.members,
+})
 
-const SELECT = `SELECT o.id AS id, o.name AS name, o.slug AS slug, m.role AS role
+const SELECT = `SELECT o.id AS id, o.name AS name, o.slug AS slug, m.role AS role,
+    (SELECT COUNT(*) FROM member c WHERE c.organizationId = o.id) AS members
   FROM member m JOIN organization o ON o.id = m.organizationId`
 
 /**
@@ -125,7 +133,7 @@ export const createWorkspace = async (
     if (isSlugTaken(cause)) throw new Conflict({ reason: 'slug' })
     throw cause
   }
-  return { id, name: input.name, slug: input.slug, role: 'owner' }
+  return { id, name: input.name, slug: input.slug, role: 'owner', members: 1 }
 }
 
 /** A name for a person's first workspace: theirs, or their address's local part. */

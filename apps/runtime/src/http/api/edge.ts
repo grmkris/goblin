@@ -43,6 +43,7 @@ import {
   bearerKey,
   callerHeader,
   memberHeader,
+  memberName,
 } from './principal.ts'
 import { answer, refusal, secured } from './render.ts'
 
@@ -414,7 +415,9 @@ const workspaceOf =
             ref: facts.ref,
             path,
             search: url.search,
-            principal: { member: { user: person.id, role: member.role } },
+            principal: {
+              member: { user: person.id, role: member.role, name: memberName(person), shared: member.members > 1 },
+            },
             agent: edge.agent(member.id),
           })
         if (route === undefined) return yield* new NotFound({ what: 'route' })

@@ -663,6 +663,15 @@
     color: var(--muted-foreground);
     font-size: 0.75rem;
   }
+  /* Another member's message, in a workspace of several people (ADR 0094): on the other side, by name. */
+  .message-author-member {
+    align-self: flex-start;
+  }
+  .bubble-member {
+    align-self: flex-start;
+    border-radius: 1.125rem 1.125rem 1.125rem 0.375rem;
+    background: var(--muted);
+  }
   /* A note shared from a thread: its label opens the thread. */
   .message-author-link {
     text-decoration: underline;

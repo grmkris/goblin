@@ -60,17 +60,31 @@ export const callerHeader = (caller: Caller): string => JSON.stringify(caller)
 export interface Member {
   readonly user: string
   readonly role: WorkspaceRole
+  /** Their name as the workspace's people see it (ADR 0094). */
+  readonly name: string
+  /** Whether the workspace has other people too: then each of the member's messages carries who wrote it. */
+  readonly shared: boolean
 }
 
 /** The header the Worker forwards a member in. */
 export const MEMBER_HEADER = 'x-goblin-member'
 
 const ForwardedMember = Schema.fromJsonString(
-  Schema.Struct({ user: Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u)), role: WorkspaceRole }),
+  Schema.Struct({
+    user: Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u)),
+    role: WorkspaceRole,
+    name: Schema.String.check(Schema.isMaxLength(80)),
+    shared: Schema.Boolean,
+  }),
 )
 
 /** The header value that forwards `member`. */
-export const memberHeader = (member: Member): string => JSON.stringify({ user: member.user, role: member.role })
+export const memberHeader = (member: Member): string =>
+  JSON.stringify({ user: member.user, role: member.role, name: member.name, shared: member.shared })
+
+/** A person's name as a member's messages carry it: theirs, or their address's local part. */
+export const memberName = (person: { readonly name: string; readonly email: string }): string =>
+  (person.name.trim() === '' ? (person.email.split('@')[0] ?? '') : person.name.trim()).slice(0, 80)
 
 /**
  * Who a forwarded request comes from, as its headers say (ADR 0089): a member (a session), a caller (a key), or a

@@ -1,4 +1,4 @@
-import { type SetupItem, type TopicSetup, type TopicSetupEdit, serverOriginOf } from '@goblin/contracts'
+import { type SetupItem, type TopicSetup, type TopicSetupEdit, memberAuthor, serverOriginOf } from '@goblin/contracts'
 import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
@@ -32,9 +32,21 @@ export const requestKey: Effect.Effect<KeyGrant | undefined> = Effect.map(reques
   caller?.kind === 'key' ? caller : undefined,
 )
 
-/** The name a request's OAuth client registered, which its messages carry (ADR 0086); none for any other request. */
-export const requestAuthor: Effect.Effect<string | undefined> = Effect.map(requestCaller, (caller) =>
-  caller?.kind === 'client' ? caller.name : undefined,
+/**
+ * Who a request's message is by, which its content carries first: an OAuth client by the name it registered (ADR 0086,
+ * and for whom in a workspace of several people), or in such a workspace a member by name and ID (ADR 0094); none for a
+ * member alone in their workspace, or any other request.
+ */
+export const requestAuthor: Effect.Effect<string | undefined> = Effect.map(
+  Effect.serviceOption(RequestContext),
+  (context) => {
+    const facts = Option.getOrUndefined(context)
+    const member = facts?.member
+    const caller = facts?.caller
+    if (caller?.kind === 'client') return member?.shared === true ? `${caller.name} for ${member.name}` : caller.name
+    if (caller === undefined && member?.shared === true) return memberAuthor(member.name, member.user)
+    return undefined
+  },
 )
 
 /**

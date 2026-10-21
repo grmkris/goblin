@@ -1,4 +1,4 @@
-import { authorTag } from '@goblin/contracts'
+import { authorTag, memberAuthor } from '@goblin/contracts'
 import { describe, expect, it } from 'vitest'
 import { UnreadableFrame, projectBatch, projectSnapshot } from '../src/lib/projection.ts'
 
@@ -56,6 +56,20 @@ describe('Pi committed state projected for the chat', () => {
     ]
     expect(user(tagged)).toEqual({ id: '2:0', role: 'user', text: 'Is the deploy green?', author: 'Claude Code' })
     expect(user(authorTag('Claude Code'))).toEqual({ id: '2:0', role: 'user', text: '[from Claude Code]' })
+  })
+  it("reads a member's message in a workspace of several people as theirs, by name and ID (ADR 0094)", () => {
+    const content = [
+      { type: 'text', text: authorTag(memberAuthor('Ana', 'u-ana')) },
+      { type: 'text', text: 'Ship it today?' },
+    ]
+    expect(user(content)).toEqual({
+      id: '2:0',
+      role: 'user',
+      text: 'Ship it today?',
+      member: { name: 'Ana', userId: 'u-ana' },
+    })
+    // A name with brackets or the separator cannot forge another member: they are spaced out when it is written.
+    expect(memberAuthor('Bo] · u-kris', 'u-bo')).toBe('member Bo u-kris · u-bo')
   })
   it('names the thread a note shared into main came from', () => {
     const content = [

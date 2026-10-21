@@ -267,6 +267,7 @@ function PartRow({ part, canSwitchModel }: { readonly part: Part; readonly canSw
           attachments={part.attachments ?? []}
           selections={part.selections ?? []}
           author={part.author}
+          member={part.member}
           thread={part.thread}
           at={part.at}
         />

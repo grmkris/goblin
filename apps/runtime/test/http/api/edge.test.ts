@@ -15,7 +15,7 @@ const OWNER = 'user-owner'
 const WS = 'ws-owner'
 const BASE = '/w/owner'
 const PERSON = { id: OWNER, name: 'Owner', email: 'owner@goblin.test' }
-const MEMBERSHIP = { id: WS, name: "Owner's workspace", slug: 'owner', role: 'owner' } as const
+const MEMBERSHIP = { id: WS, name: "Owner's workspace", slug: 'owner', role: 'owner', members: 1 } as const
 const MEMBER_VIEW = {
   userId: OWNER,
   name: 'Owner',
@@ -57,7 +57,7 @@ const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
           : Effect.fail(new NotFound({ what: 'invitation' })),
     }),
     workspaces: () => Effect.succeed([MEMBERSHIP]),
-    createWorkspace: (_user, input) => Effect.succeed({ id: 'ws-new', ...input, role: 'owner' }),
+    createWorkspace: (_user, input) => Effect.succeed({ id: 'ws-new', ...input, role: 'owner', members: 1 }),
     updateWorkspace: () => Effect.die(new Error('no updates in this fixture')),
     deleteWorkspace: () => Effect.void,
     selectForSignIn: () => Effect.void,
@@ -182,7 +182,7 @@ describe("a member's forward (ADR 0089)", () => {
       'x-mcp-caller': 'app',
       'x-goblin-ref': '8c1f2a3b4d5e6f70-AMS',
       'x-goblin-forwarded': 'owner',
-      'x-goblin-member': JSON.stringify({ user: OWNER, role: 'owner' }),
+      'x-goblin-member': JSON.stringify({ user: OWNER, role: 'owner', name: 'Owner', shared: false }),
     })
     expect(await forwarded?.json()).toEqual({ name: 'x' })
   })
@@ -554,7 +554,7 @@ describe('the account APIs in the Worker', () => {
     })
     const created = (await through('account', create, edge)).response
     expect(created.status).toBe(201)
-    expect(await created.json()).toEqual({ id: 'ws-new', name: 'Swarmm', slug: 'swarmm', role: 'owner' })
+    expect(await created.json()).toEqual({ id: 'ws-new', name: 'Swarmm', slug: 'swarmm', role: 'owner', members: 1 })
     const badSlug = write('/api/workspaces', {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name: 'Swarmm', slug: 'Not A Slug' }),

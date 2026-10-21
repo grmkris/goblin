@@ -1,3 +1,4 @@
+import { authorTag, memberAuthor } from '@goblin/contracts'
 import { describe, expect, it } from 'vitest'
 import { delivered, newestEntry, startsTurn } from '../src/lib/echo.ts'
 import { projectSnapshot } from '../src/lib/projection.ts'
@@ -5,6 +6,19 @@ import { projectSnapshot } from '../src/lib/projection.ts'
 const snapshot = (entries: readonly unknown[], extra: Record<string, unknown> = {}) =>
   projectSnapshot({ type: 'snapshot', entries, tools: [], inbox: [], ...extra })
 const said = (id: number, content: string) => ({ id, model: [{ role: 'user', content }] })
+/** A member's message in a workspace of several people (ADR 0094), its author block first. */
+const saidBy = (id: number, member: string) => ({
+  id,
+  model: [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: authorTag(memberAuthor(member, member)) },
+        { type: 'text', text: 'words' },
+      ],
+    },
+  ],
+})
 
 describe('the echo of a sent message', () => {
   it('reads the newest entry, which a message sent now comes after', () => {
@@ -22,6 +36,11 @@ describe('the echo of a sent message', () => {
     expect(delivered(echo, none)).toBeUndefined()
     const landed = snapshot([said(1, 'old'), said(2, 'older'), said(3, 'hello there')]).messages
     expect(delivered(echo, landed)).toMatchObject({ id: '3:0' })
+  })
+  it("waits for its sender's own message, never another member's (ADR 0094)", () => {
+    const echo = { id: 'echo:op', text: 'hello', after: 0, by: 'u-kris' }
+    expect(delivered(echo, snapshot([saidBy(1, 'u-ana')]).messages)).toBeUndefined()
+    expect(delivered(echo, snapshot([saidBy(1, 'u-ana'), saidBy(2, 'u-kris')]).messages)).toMatchObject({ id: '2:0' })
   })
   it('is not delivered by a message another author wrote', () => {
     const echo = { id: 'echo:op', text: 'hello', after: 0 }

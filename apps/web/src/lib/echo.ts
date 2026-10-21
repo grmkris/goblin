@@ -4,8 +4,16 @@
 import type { ChatMessage } from './chat-messages.ts'
 import type { ConversationProjection } from './projection.ts'
 
-/** A message sent and not yet read back: its own id (the row's React key), its words, and the newest entry before it. */
-export type Echo = { readonly id: string; readonly text: string; readonly after: number }
+/**
+ * A message sent and not yet read back: its own id (the row's React key), its words, the newest entry before it, and
+ * who sent it (their user ID), since in a workspace of several people (ADR 0094) another's message may come first.
+ */
+export type Echo = {
+  readonly id: string
+  readonly text: string
+  readonly after: number
+  readonly by?: string | undefined
+}
 
 /** The entry number a message's id starts with (`"12:0"` is entry 12). */
 const entryOf = (id: string): number => Number.parseInt(id, 10)
@@ -25,9 +33,16 @@ export function newestEntry(projection: ConversationProjection): number {
 export const startsTurn = (projection: ConversationProjection): boolean =>
   !projection.running && projection.inbox.length === 0
 
-/** The owner's message the stream has delivered for `echo`: the first of theirs after the entry it was sent behind. */
+/**
+ * The message the stream has delivered for `echo`: the first of its sender's after the entry it was sent behind (one
+ * with no member is theirs too: a workspace of one marks none).
+ */
 export function delivered(echo: Echo, messages: readonly ChatMessage[]): ChatMessage | undefined {
   return messages.find(
-    (message) => message.role === 'user' && message.author === undefined && entryOf(message.id) > echo.after,
+    (message) =>
+      message.role === 'user' &&
+      message.author === undefined &&
+      (message.member === undefined || message.member.userId === echo.by) &&
+      entryOf(message.id) > echo.after,
   )
 }

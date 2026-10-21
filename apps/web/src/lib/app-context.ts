@@ -9,6 +9,7 @@ import {
   OwnTurnMark,
   ReceivedBlock,
   authorOf,
+  memberOf,
 } from '@goblin/contracts'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
@@ -98,6 +99,8 @@ export function sharedContext(content: unknown): {
   readonly attachments?: readonly Attachment[]
   readonly selections?: readonly ComposerOption[]
   readonly author?: string
+  /** The member who wrote it, in a workspace of several people (ADR 0094): their messages are turns, not notes. */
+  readonly member?: { readonly name: string; readonly userId: string }
   /** How a held call ended, when this is its outcome: only from an author, never the owner's own words. */
   readonly outcome?: McpOutcome
   /** The owner's own turn that came from elsewhere (a Source's, ADR 0066): only with an author, by goblin's mark. */
@@ -107,10 +110,13 @@ export function sharedContext(content: unknown): {
   const blocks = records(content)
     .filter((block) => block.type === 'text' && isString(block.text))
     .map((block) => String(block.text))
-  const author = blocks.length > 1 ? authorOf(blocks[0] ?? '') : undefined
-  const [first, ...rest] = author === undefined ? blocks : blocks.slice(1)
+  const tagged = blocks.length > 1 ? authorOf(blocks[0] ?? '') : undefined
+  const [first, ...rest] = tagged === undefined ? blocks : blocks.slice(1)
   const shared = rest.map(sharedBlock)
-  const by = author === undefined ? {} : { author }
+  // A member's message is theirs as a typed one is the owner's; any other author names where it came from.
+  const member = tagged === undefined ? undefined : memberOf(tagged)
+  const author = member === undefined ? tagged : undefined
+  const by = member !== undefined ? { member } : author === undefined ? {} : { author }
   if (!shared.every((block) => block !== undefined)) return { text: [first, ...rest].join('\n'), context: [], ...by }
   const { context, attachments, composer, outcome, own } = collected(shared)
   return {
@@ -118,6 +124,7 @@ export function sharedContext(content: unknown): {
     context,
     ...(composer === undefined ? {} : { selections: composer.selections }),
     ...(attachments.length > 0 && { attachments }),
+    ...(member === undefined ? {} : { member }),
     ...(author === undefined ? {} : fromElsewhere(author, outcome, own)),
   }
 }

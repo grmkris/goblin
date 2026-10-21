@@ -44,6 +44,8 @@ export type ChatMessage =
       readonly outcome?: McpOutcome
       /** The owner's own turn that came from elsewhere (a Source's), by goblin's mark. */
       readonly own?: true
+      /** The member who wrote it, in a workspace of several people (ADR 0094). */
+      readonly member?: { readonly name: string; readonly userId: string }
       /** The outcome was kept for the agent's next turn (`app.mcp_outcome`): nothing could pay for one then. */
       readonly kept?: true
       /** The thread a note shared into main came from. */

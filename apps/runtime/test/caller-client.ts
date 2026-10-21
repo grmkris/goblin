@@ -13,7 +13,7 @@ export const fixtureClient = (name = 'fixture-client'): Caller => ({
 })
 
 /** The person an OAuth client of the probes acts for (ADR 0089). */
-const PROBE_MEMBER = { user: 'probe-owner', role: 'owner' } as const
+const PROBE_MEMBER = { user: 'probe-owner', role: 'owner', name: 'Owner', shared: false } as const
 
 /**
  * One owner API call as `caller`, as /mcp makes it, answered in the shape the probes assert on: `{ ok: true, value }`,

@@ -10,6 +10,8 @@ import { ChatMarkdown } from './markdown.tsx'
 import { useConversations } from '../../lib/workspace/hooks.ts'
 import { useMinute } from '../use-now.ts'
 import { relativeTime } from '../../lib/format.ts'
+import { useQuery } from '@tanstack/react-query'
+import { sessionPersonQuery } from '../../auth/queries.ts'
 
 /**
  * Assistant text as GitHub-flavoured Markdown, set by shadcn/typeset (`ChatMarkdown`), with the little HTML ADR 0039 allows.
@@ -115,6 +117,7 @@ export function UserText({
   attachments = [],
   selections = [],
   author,
+  member,
   thread,
   at,
 }: {
@@ -123,15 +126,20 @@ export function UserText({
   readonly attachments?: readonly Attachment[]
   readonly selections?: readonly ComposerOption[]
   readonly author?: string | undefined
+  /** The member who wrote it, in a workspace of several people (ADR 0094): another's shows on the left by name. */
+  readonly member?: { readonly name: string; readonly userId: string } | undefined
   readonly thread?: string | undefined
   readonly at?: number | undefined
 }) {
+  const me = useQuery(sessionPersonQuery).data?.id
   const reporter = reporterOf(author)
   if (reporter !== undefined) return <SubagentReport name={reporter} text={text} at={at} />
+  const other = member !== undefined && member.userId !== me
   return (
     <>
       {author !== undefined && <Author author={author} thread={thread} />}
-      <article className="bubble bubble-user">
+      {other && <p className="message-author message-author-member">{member.name}</p>}
+      <article className={other ? 'bubble bubble-user bubble-member' : 'bubble bubble-user'}>
         {selections.length > 0 && (
           <ul className="flex flex-wrap gap-1 text-xs" aria-label="Selected references">
             {selections.map(({ selection, label }) => (

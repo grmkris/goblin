@@ -14,7 +14,9 @@ export type AgentFetch = { readonly fetch: (request: Request) => Promise<Respons
 export type OwnerClient = HttpApiClient.ForApi<typeof OwnerApi>
 
 /** The member a test's request acts for, as the Worker edge forwards a session's (ADR 0089): the workspace's owner. */
-export const OWNER_MEMBER = { 'x-goblin-member': JSON.stringify({ user: 'owner', role: 'owner' }) } as const
+export const OWNER_MEMBER = {
+  'x-goblin-member': JSON.stringify({ user: 'owner', role: 'owner', name: 'Owner', shared: false }),
+} as const
 
 /** `init` with the owner's member header, for a test's own request to an agent's API. */
 export const asOwner = (init: RequestInit = {}): RequestInit => ({

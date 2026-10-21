@@ -86,13 +86,17 @@ export const sessionQuery = queryOptions({
   meta: { auth: 'optional' },
 })
 
-const SessionPerson = Schema.Struct({ user: Schema.Struct({ email: Schema.String, name: Schema.String }) })
+const SessionPerson = Schema.Struct({
+  user: Schema.Struct({ id: Schema.String, email: Schema.String, name: Schema.String }),
+})
 const decodeSessionPerson = Schema.decodeUnknownOption(SessionPerson)
 
 /** Who is signed in (ADR 0093: an invitation is for one address), or none. */
 export const sessionPersonQuery = queryOptions({
   queryKey: [...authKeys.session, 'person'] as const,
-  queryFn: async ({ signal }): Promise<{ readonly email: string; readonly name: string } | null> => {
+  queryFn: async ({
+    signal,
+  }): Promise<{ readonly id: string; readonly email: string; readonly name: string } | null> => {
     const { data } = await authCall((fetchOptions) => authClient.getSession({ fetchOptions }), { signal })
     return Option.match(decodeSessionPerson(data), { onNone: () => null, onSome: (session) => session.user })
   },

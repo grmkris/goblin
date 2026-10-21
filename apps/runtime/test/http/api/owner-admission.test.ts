@@ -26,7 +26,7 @@ const countingResident = (db: Database, grants: number[]) =>
 
 /** A request's member header, for Ana with `role`, and `extra` headers. */
 const as = (role: string, extra: Record<string, string> = {}) => ({
-  'x-goblin-member': JSON.stringify({ user: 'ana', role }),
+  'x-goblin-member': JSON.stringify({ user: 'ana', role, name: 'Ana', shared: false }),
   ...extra,
 })
 
@@ -54,7 +54,7 @@ describe('owner admission', () => {
     ['a malformed member', { 'x-goblin-member': '{"user":"owner","role":"king"}' }],
     [
       'a malformed caller beside a member',
-      { 'x-goblin-member': '{"user":"owner","role":"owner"}', 'x-goblin-caller': '{' },
+      { 'x-goblin-member': '{"user":"owner","role":"owner","name":"Owner","shared":false}', 'x-goblin-caller': '{' },
     ],
     ['a member that is not JSON', { 'x-goblin-member': 'owner' }],
   ] as const)('refuses %s without granting resident authority', async (_case, headers) => {
