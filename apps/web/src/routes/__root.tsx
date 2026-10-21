@@ -15,6 +15,7 @@ import { LinkConfirmProvider } from '../components/parts/link-confirm.tsx'
 import { ShellNavigation } from '../components/shell/navigation.tsx'
 import { ShellFrame } from '../components/shell/shell.tsx'
 import { COLLAPSE_SCRIPT } from '../components/shell/sidebar-state.ts'
+import { YourWorkspace } from '../components/not-your-workspace.tsx'
 import { WorkspaceFeedProvider } from '../components/workspace-feed.tsx'
 import { useSession } from '../auth/hooks.ts'
 import { workspaceOf } from '../lib/workspace-path.ts'
@@ -103,16 +104,18 @@ function Shell({ children }: { readonly children: ReactNode }) {
   if (start) return <main className="start-root">{children}</main>
   const enabled = state === 'signed-in'
   return (
-    <WorkspaceFeedProvider enabled={enabled}>
-      <ShellNavigation>
-        <AppHost>
-          <LinkConfirmProvider>
-            <ShellFrame>{children}</ShellFrame>
-          </LinkConfirmProvider>
-          <AppLayer />
-        </AppHost>
-      </ShellNavigation>
-    </WorkspaceFeedProvider>
+    <YourWorkspace signedIn={enabled}>
+      <WorkspaceFeedProvider enabled={enabled}>
+        <ShellNavigation>
+          <AppHost>
+            <LinkConfirmProvider>
+              <ShellFrame>{children}</ShellFrame>
+            </LinkConfirmProvider>
+            <AppLayer />
+          </AppHost>
+        </ShellNavigation>
+      </WorkspaceFeedProvider>
+    </YourWorkspace>
   )
 }
 

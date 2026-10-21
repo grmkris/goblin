@@ -78,7 +78,7 @@
   color: var(--shell-foreground);
   touch-action: manipulation;
 }
-.sidebar-brand > svg {
+.sidebar-brand > svg:not(.sidebar-title-chevron) {
   flex: none;
   width: 1.875rem;
   height: 1.875rem;
