@@ -1,4 +1,4 @@
-import { NotFound, Unauthenticated } from '@goblin/contracts/api'
+import { InvalidInput, NotFound, Unauthenticated } from '@goblin/contracts/api'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -53,6 +53,13 @@ const refusal = (promise: Promise<unknown>) =>
     (error: unknown) => (error instanceof Unauthenticated ? error.reason : error),
   )
 
+/** Why `promise` was refused as invalid input, or the failure itself when it was something else. */
+const invalidFor = (promise: Promise<unknown>) =>
+  promise.then(
+    () => undefined,
+    (error: unknown) => (error instanceof InvalidInput ? error.reason : error),
+  )
+
 describe('server API keys (ADR 0081)', () => {
   it('makes a hashed gbk_ key whose secret admits its workspace with its scopes and servers, once shown', async () => {
     const { db, env } = fixture()
@@ -63,13 +70,14 @@ describe('server API keys (ADR 0081)', () => {
     expect(Date.parse(key.expiresAt ?? '') - Date.now()).toBeGreaterThan(29 * 86_400_000)
     const stored = db.prepare('SELECT key, referenceId, metadata FROM apikey').get()
     expect(stored?.['referenceId']).toBe('w1')
-    expect(JSON.parse(String(stored?.['metadata']))).toEqual({ servers: ['mycut'], createdBy: 'u1' })
+    expect(JSON.parse(String(stored?.['metadata']))).toEqual({ servers: ['mycut'], origins: [], createdBy: 'u1' })
     expect(stored?.['key']).not.toContain(secret.slice(4))
     expect(await verifyKey(env, secret)).toEqual({
       workspaceId: 'w1',
       keyId: key.id,
       scopes: ['topics', 'conversations'],
       servers: ['mycut'],
+      origins: [],
     })
     expect(await listKeys(env, 'w1')).toEqual([expect.objectContaining({ id: key.id, name: 'service-dev' })])
     expect(JSON.stringify(await listKeys(env, 'w1'))).not.toContain(secret)
@@ -93,9 +101,37 @@ describe('server API keys (ADR 0081)', () => {
       keyId: key.id,
       scopes: ['topics', 'inspect'],
       servers: ['mycut'],
+      origins: [],
     })
     await expect(updateKey(env, 'w2', 'u2', key.id, { scopes: ['personas'] })).rejects.toBeInstanceOf(NotFound)
     expect((await verifyKey(env, secret)).scopes).toEqual(['topics', 'inspect'])
+  })
+
+  it('keeps the MCP origins the owner grants a key, normalized, beside its servers and maker (ADR 0091)', async () => {
+    const { db, env } = fixture()
+    const origins = [{ origin: 'https://MCP.swarmm.app/', tools: ['job_submit', 'job_status'] }]
+    const { key, secret } = await createKey(env, 'w1', 'u1', { ...KEY, origins })
+    const granted = [{ origin: 'https://mcp.swarmm.app', tools: ['job_submit', 'job_status'] }]
+    expect(key.origins).toEqual(granted)
+    expect((await verifyKey(env, secret)).origins).toEqual(granted)
+    // Changing the scopes keeps the origins; changing the origins keeps the scopes, servers and maker.
+    await updateKey(env, 'w1', 'u1', key.id, { scopes: ['personas'] })
+    const moved = [{ origin: 'https://dev.swarmm.app', tools: ['job_submit'] }]
+    const { before, after } = await updateKey(env, 'w1', 'u1', key.id, { origins: moved })
+    expect([before.origins, after.origins]).toEqual([granted, moved])
+    expect(await verifyKey(env, secret)).toMatchObject({ scopes: ['personas'], servers: ['mycut'], origins: moved })
+    const stored = db.prepare('SELECT metadata FROM apikey').get()
+    expect(JSON.parse(String(stored?.['metadata']))).toEqual({ servers: ['mycut'], origins: moved, createdBy: 'u1' })
+  })
+
+  it('refuses origins no key may hold, and leaves the key as it was', async () => {
+    const { env } = fixture()
+    const local = [{ origin: 'https://10.0.0.2', tools: ['job_submit'] }]
+    expect(await invalidFor(createKey(env, 'w1', 'u1', { ...KEY, origins: local }))).toBe('key_origin')
+    const { key, secret } = await createKey(env, 'w1', 'u1', KEY)
+    const everything = [{ origin: 'https://mcp.swarmm.app', tools: ['all'] }]
+    expect(await invalidFor(updateKey(env, 'w1', 'u1', key.id, { origins: everything }))).toBe('key_origin_tools')
+    expect((await verifyKey(env, secret)).origins).toEqual([])
   })
 
   it("keeps admitting a key whose plugin counter is full: its rate limit is its agent's (ADR 0085)", async () => {

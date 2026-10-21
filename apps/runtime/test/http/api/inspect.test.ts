@@ -106,7 +106,7 @@ describe('the inspect group served by the agent', () => {
 /** The grant the edge forwards for a key (ADR 0081) with `scopes`. */
 const keyed = (scopes: readonly string[] = ['inspect']) => ({
   'x-goblin-ref': 'ref-1',
-  'x-goblin-caller': JSON.stringify({ kind: 'key', keyId: 'key-1', scopes, servers: ['mycut'] }),
+  'x-goblin-caller': JSON.stringify({ kind: 'key', keyId: 'key-1', scopes, servers: ['mycut'], origins: [] }),
 })
 
 /** A run event of operation `operationId` in Pi session `session`, from `start` to `end` ms, `ok`. */

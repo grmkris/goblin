@@ -2,22 +2,25 @@ import {
   type ApiKeyView,
   type CreateApiKey,
   type CreatedApiKey,
+  KeyOrigin,
   KeyScope,
   KeyServer,
   type UpdateApiKey,
+  keyOriginsOf,
 } from '@goblin/contracts'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type { RuntimeEnv } from '../env.ts'
-import { NotFound, Unauthenticated } from '../http/errors.ts'
+import { InvalidInput, NotFound, Unauthenticated } from '../http/errors.ts'
 import type { KeyGrant } from '../http/api/principal.ts'
 import { createAuth } from './options.ts'
 
 /**
  * Server API keys (ADR 0081), on Better Auth's apiKey() plugin in the auth D1, read and written through Better Auth's
  * own adapter. A key belongs to a workspace (ADR 0089): its `referenceId` is the workspace's ID. Its permissions are
- * its scopes (`{ goblin: [...] }`) and its metadata its server ceiling and who made it (`{ servers: [...],
- * createdBy }`); none of it is ever taken from a request.
+ * its scopes (`{ goblin: [...] }`) and its metadata its ceiling and who made it (`{ servers: [...], origins: [...],
+ * createdBy }`: the MCP connections its setups may name, and the MCP origins with their tools its threads may connect
+ * to, ADR 0091); none of it is ever taken from a request but the owner's.
  */
 
 const DAY_SECONDS = 86_400
@@ -29,7 +32,10 @@ export interface KeyPrincipal extends KeyGrant {
 }
 
 const Permissions = Schema.Struct({ goblin: Schema.Array(KeyScope) })
-const Metadata = Schema.Struct({ servers: Schema.Array(KeyServer) })
+const Metadata = Schema.Struct({
+  servers: Schema.Array(KeyServer),
+  origins: Schema.optional(Schema.Array(KeyOrigin)),
+})
 /** The plugin hands permissions back parsed from some calls and as their JSON text from the adapter. */
 const json = (value: unknown): unknown => {
   if (typeof value !== 'string') return value
@@ -45,11 +51,20 @@ const scopesOf = (permissions: unknown): readonly KeyScope[] =>
     onNone: () => [],
     onSome: (decoded) => decoded.goblin,
   })
-const serversOf = (metadata: unknown): readonly string[] =>
+const ceilingOf = (
+  metadata: unknown,
+): { readonly servers: readonly string[]; readonly origins: readonly KeyOrigin[] } =>
   Option.match(Schema.decodeUnknownOption(Metadata)(json(metadata)), {
-    onNone: () => [],
-    onSome: (decoded) => decoded.servers,
+    onNone: () => ({ servers: [], origins: [] }),
+    onSome: (decoded) => ({ servers: decoded.servers, origins: decoded.origins ?? [] }),
   })
+
+/** Origins as a key stores them (ADR 0091), or the owner's input refused for its first problem. */
+const checkedOrigins = (origins: readonly KeyOrigin[]): readonly KeyOrigin[] => {
+  const checked = keyOriginsOf(origins)
+  if ('problem' in checked) throw new InvalidInput({ reason: checked.problem })
+  return checked.origins
+}
 
 /**
  * The principal a key admits: valid, unexpired, and of a workspace that still exists. Anything else is
@@ -67,7 +82,7 @@ export const verifyKey = async (env: RuntimeEnv, key: string): Promise<KeyPrinci
     workspaceId,
     keyId: result.key.id,
     scopes: scopesOf(result.key.permissions),
-    servers: serversOf(result.key.metadata),
+    ...ceilingOf(result.key.metadata),
   }
 }
 
@@ -88,7 +103,7 @@ const viewOf = (key: KeyRecord): ApiKeyView => ({
   name: key.name ?? '',
   ...(key.start === null ? {} : { start: key.start }),
   scopes: scopesOf(key.permissions),
-  servers: serversOf(key.metadata),
+  ...ceilingOf(key.metadata),
   createdAt: new Date(key.createdAt).toISOString(),
   ...(key.expiresAt === null ? {} : { expiresAt: new Date(key.expiresAt).toISOString() }),
   ...(key.lastRequest === null ? {} : { lastUsedAt: new Date(key.lastRequest).toISOString() }),
@@ -122,7 +137,11 @@ export const createKey = async (
       name: input.name,
       expiresIn: input.expiresInDays * DAY_SECONDS,
       permissions: { goblin: [...new Set(input.scopes)] },
-      metadata: { servers: [...new Set(input.servers)], createdBy: userId },
+      metadata: {
+        servers: [...new Set(input.servers)],
+        origins: checkedOrigins(input.origins ?? []),
+        createdBy: userId,
+      },
     },
   })
   return { key: viewOf(created), secret: created.key }
@@ -135,8 +154,9 @@ export interface KeyChange {
 }
 
 /**
- * New scopes for one of the workspace's keys (ADR 0084), by `userId`: the same key, so what it made stays within its
- * reach. A key of another workspace's, or one that is gone, is `NotFound`.
+ * New scopes (ADR 0084) or MCP origins (ADR 0091) for one of the workspace's keys, by `userId`: the same key, so what
+ * it made stays within its reach, and the rest of its metadata (servers, who made it) is kept. A key of another
+ * workspace's, or one that is gone, is `NotFound`; origins with a problem are `InvalidInput`.
  */
 export const updateKey = async (
   env: RuntimeEnv,
@@ -155,8 +175,17 @@ export const updateKey = async (
     ],
   })
   if (before === null) throw new NotFound({ what: 'key' })
+  const origins = change.origins === undefined ? undefined : checkedOrigins(change.origins)
+  const metadata = json(before.metadata)
   const after = await auth.api.updateApiKey({
-    body: { keyId, userId, permissions: { goblin: [...new Set(change.scopes)] } },
+    body: {
+      keyId,
+      userId,
+      ...(change.scopes === undefined ? {} : { permissions: { goblin: [...new Set(change.scopes)] } }),
+      ...(origins === undefined
+        ? {}
+        : { metadata: { ...(typeof metadata === 'object' && metadata !== null ? metadata : {}), origins } }),
+    },
   })
   return { before: viewOf(before), after: viewOf(after) }
 }

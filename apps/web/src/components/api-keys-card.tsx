@@ -1,7 +1,7 @@
 // The Settings card for API keys (ADR 0081): what a server the owner runs uses instead of a browser session.
 import { Fragment, type SubmitEvent, useState } from 'react'
 import { useMutation, useQuery, useSuspenseQuery } from '@tanstack/react-query'
-import type { KeyScope } from '@goblin/contracts'
+import { type KeyOrigin, type KeyScope, keyOriginsOf } from '@goblin/contracts'
 import {
   Alert,
   AlertDescription,
@@ -70,27 +70,155 @@ function ShownSecret(props: { readonly name: string; readonly secret: string; re
   )
 }
 
-/** A new key: its name, scopes, the servers its setups may use and its lifetime; then its secret, once. */
+/** One origin being edited: its address and its tools as typed, comma-separated. */
+type OriginRow = { readonly origin: string; readonly tools: string }
+
+const rowsOf = (origins: readonly KeyOrigin[]): readonly OriginRow[] =>
+  origins.map(({ origin, tools }) => ({ origin, tools: tools.join(', ') }))
+const originsOf = (rows: readonly OriginRow[]): readonly KeyOrigin[] =>
+  rows
+    .filter((row) => row.origin.trim() !== '' || row.tools.trim() !== '')
+    .map((row) => ({
+      origin: row.origin.trim(),
+      tools: row.tools
+        .split(',')
+        .map((tool) => tool.trim())
+        .filter((tool) => tool !== ''),
+    }))
+
+/** What is wrong with `rows` as a key's origins, in words, before anything is sent (`keyOriginsOf`). */
+const ORIGIN_PROBLEMS = {
+  key_origin: 'Each server needs its own https address of a public host, like https://mcp.example.com, at most 8.',
+  key_origin_tools: 'Each server needs 1 to 50 tool names, separated by commas.',
+} as const
+const originProblem = (rows: readonly OriginRow[]): string => {
+  const checked = keyOriginsOf(originsOf(rows))
+  return 'problem' in checked ? ORIGIN_PROBLEMS[checked.problem] : ''
+}
+
+/**
+ * The MCP servers a key's threads may connect to (ADR 0091): each an https origin with exactly the tools they may call
+ * there, as rows to edit.
+ */
+function OriginFields(props: {
+  readonly id: string
+  readonly rows: readonly OriginRow[]
+  readonly onChange: (rows: readonly OriginRow[]) => void
+}) {
+  const set = (index: number, row: OriginRow) =>
+    props.onChange(props.rows.map((each, at) => (at === index ? row : each)))
+  return (
+    <>
+      <p className="text-sm text-muted-foreground">
+        MCP servers its threads may connect to, and the tools they may call
+      </p>
+      {props.rows.map((row, index) => (
+        // The rows have no ids of their own; their order is their identity while editing.
+        <Field key={index} orientation="horizontal">
+          <Input
+            aria-label="Server address"
+            placeholder="https://mcp.example.com"
+            value={row.origin}
+            onChange={(event) => set(index, { ...row, origin: event.target.value })}
+          />
+          <Input
+            aria-label="Tools"
+            placeholder="job_submit, job_status"
+            value={row.tools}
+            onChange={(event) => set(index, { ...row, tools: event.target.value })}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => props.onChange(props.rows.filter((_, at) => at !== index))}
+          >
+            Remove
+          </Button>
+        </Field>
+      ))}
+      <Field orientation="horizontal">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          id={`${props.id}-add-origin`}
+          onClick={() => props.onChange([...props.rows, { origin: '', tools: '' }])}
+        >
+          Add a server
+        </Button>
+      </Field>
+    </>
+  )
+}
+
+/** One key's MCP servers, changed in place (ADR 0091): the same key, which keeps what it made. */
+function KeyServers(props: {
+  readonly keyId: string
+  readonly origins: readonly KeyOrigin[]
+  readonly onDone: () => void
+}) {
+  const update = useMutation(updateKeyMutation)
+  const [rows, setRows] = useState(rowsOf(props.origins))
+  const problem = originProblem(rows)
+  const failure = update.error === null ? '' : messageOf(update.error, 'change that key')
+  function submit(event: SubmitEvent<HTMLFormElement>): void {
+    event.preventDefault()
+    update.mutate({ keyId: props.keyId, origins: [...originsOf(rows)] }, { onSuccess: props.onDone })
+  }
+  return (
+    <form onSubmit={submit}>
+      <FieldGroup>
+        {(failure || problem) && (
+          <Alert variant="destructive">
+            <AlertDescription>{failure || problem}</AlertDescription>
+          </Alert>
+        )}
+        <OriginFields id={`key-${props.keyId}`} rows={rows} onChange={setRows} />
+        <Field orientation="horizontal">
+          <Button type="submit" size="sm" pending={update.isPending} disabled={problem !== ''}>
+            Save servers
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={props.onDone}>
+            Cancel
+          </Button>
+        </Field>
+      </FieldGroup>
+    </form>
+  )
+}
+
+/**
+ * A new key: its name, scopes, the servers its setups may use and the MCP servers its threads may connect to (ADR 0091)
+ * and its lifetime; then its secret, once. */
 function NewKey() {
   const create = useMutation(createKeyMutation)
   const servers = useQuery(setupCatalogQuery).data?.servers ?? []
   const [name, setName] = useState('')
   const [scopes, setScopes] = useState<readonly KeyScope[]>(['topics', 'conversations', 'personas'])
   const [chosen, setChosen] = useState<readonly string[]>([])
+  const [origins, setOrigins] = useState<readonly OriginRow[]>([])
   const [days, setDays] = useState('90')
+  const problem = originProblem(origins)
   const failure = create.error === null ? '' : messageOf(create.error, 'make that key')
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault()
-    create.mutate({ name: name.trim(), scopes: [...scopes], servers: [...chosen], expiresInDays: Number(days) })
+    create.mutate({
+      name: name.trim(),
+      scopes: [...scopes],
+      servers: [...chosen],
+      origins: [...originsOf(origins)],
+      expiresInDays: Number(days),
+    })
   }
   if (create.data !== undefined)
     return <ShownSecret name={create.data.key.name} secret={create.data.secret} onDone={() => create.reset()} />
   return (
     <form onSubmit={submit}>
       <FieldGroup>
-        {failure && (
+        {(failure || problem) && (
           <Alert variant="destructive">
-            <AlertDescription>{failure}</AlertDescription>
+            <AlertDescription>{failure || problem}</AlertDescription>
           </Alert>
         )}
         <Field>
@@ -116,6 +244,7 @@ function NewKey() {
             onChange={(on) => setChosen(toggled(chosen, server.connectionId, on))}
           />
         ))}
+        <OriginFields id="key-new" rows={origins} onChange={setOrigins} />
         <Field>
           <FieldLabel htmlFor="key-days">Expires after (days)</FieldLabel>
           <Input
@@ -128,7 +257,11 @@ function NewKey() {
           />
         </Field>
         <Field orientation="horizontal">
-          <Button type="submit" pending={create.isPending} disabled={name.trim() === '' || scopes.length === 0}>
+          <Button
+            type="submit"
+            pending={create.isPending}
+            disabled={name.trim() === '' || scopes.length === 0 || problem !== ''}
+          >
             Make key
           </Button>
         </Field>
@@ -180,11 +313,11 @@ function KeyScopes(props: {
   )
 }
 
-/** The owner's keys, each revocable, and each one's scopes changeable. */
+/** The owner's keys, each revocable, and each one's scopes and MCP servers changeable. */
 function Keys() {
   const keys = useSuspenseQuery(keysQuery).data
   const revoke = useMutation(revokeKeyMutation)
-  const [editing, setEditing] = useState('')
+  const [editing, setEditing] = useState<{ readonly id: string; readonly what: 'scopes' | 'servers' }>()
   const revoking = revoke.isPending ? revoke.variables : ''
   const failure = revoke.error === null ? '' : messageOf(revoke.error, 'revoke that key')
   return (
@@ -207,12 +340,26 @@ function Keys() {
                   <span className="grant-about">
                     {key.scopes.join(', ')}
                     {key.servers.length > 0 && ` · ${key.servers.join(', ')}`}
+                    {key.origins.length > 0 && ` · ${key.origins.map(({ origin }) => new URL(origin).host).join(', ')}`}
                     {key.expiresAt && ` · expires ${new Date(key.expiresAt).toLocaleDateString()}`}
                     {key.lastUsedAt && ` · used ${new Date(key.lastUsedAt).toLocaleDateString()}`}
                   </span>
                 </span>
-                <Button size="sm" variant="ghost" disabled={editing === key.id} onClick={() => setEditing(key.id)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={editing?.id === key.id && editing.what === 'scopes'}
+                  onClick={() => setEditing({ id: key.id, what: 'scopes' })}
+                >
                   Change scopes
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={editing?.id === key.id && editing.what === 'servers'}
+                  onClick={() => setEditing({ id: key.id, what: 'servers' })}
+                >
+                  Change servers
                 </Button>
                 <Button
                   size="sm"
@@ -224,9 +371,13 @@ function Keys() {
                   Revoke
                 </Button>
               </li>
-              {editing === key.id && (
+              {editing?.id === key.id && (
                 <li>
-                  <KeyScopes keyId={key.id} scopes={key.scopes} onDone={() => setEditing('')} />
+                  {editing.what === 'scopes' ? (
+                    <KeyScopes keyId={key.id} scopes={key.scopes} onDone={() => setEditing(undefined)} />
+                  ) : (
+                    <KeyServers keyId={key.id} origins={key.origins} onDone={() => setEditing(undefined)} />
+                  )}
                 </li>
               )}
             </Fragment>

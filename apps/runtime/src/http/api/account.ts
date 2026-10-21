@@ -266,21 +266,24 @@ const ClientsHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'clients', (ha
 )
 
 /**
- * A key's new scopes, as a manager's change of it is audited (ADR 0084): one `api_key` line with the key, its scopes
- * before and after, the workspace, who changed it and the request's reference. Never its secret.
+ * A key's new scopes (ADR 0084) or MCP origins (ADR 0091), as a manager's change of it is audited: one `api_key` line
+ * for each it changed, with the key, the workspace, who changed it and the request's reference; for scopes they before
+ * and after, for origins how many there were and are. Never its secret, and no origin or tool name.
  */
-const changeScopes = (keyId: string, change: UpdateApiKey) =>
+const changeKey = (keyId: string, change: UpdateApiKey) =>
   Effect.gen(function* () {
     const { records, person, workspace } = yield* manager
     const { before, after } = yield* records.updateKey(workspace.id, person.id, keyId, change)
-    yield* logEvent('info', 'api_key', {
-      kind: 'scopes',
-      id: keyId,
-      agent: workspace.id,
-      by: person.id,
-      scopes: after.scopes,
-      'scopes.before': before.scopes,
-    })
+    const line = { id: keyId, agent: workspace.id, by: person.id }
+    if (change.scopes !== undefined)
+      yield* logEvent('info', 'api_key', {
+        ...line,
+        kind: 'scopes',
+        scopes: after.scopes,
+        'scopes.before': before.scopes,
+      })
+    if (change.origins !== undefined)
+      yield* logEvent('info', 'api_key', { ...line, kind: 'origins', count: after.origins.length })
     return after
   })
 
@@ -294,7 +297,7 @@ const KeysHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'keys', (handlers
         ),
       ),
     )
-    .handle('update', ({ params, payload }) => quoted(changeScopes(params.keyId, payload)))
+    .handle('update', ({ params, payload }) => quoted(changeKey(params.keyId, payload)))
     .handle('revoke', ({ params }) =>
       quoted(
         Effect.flatMap(manager, ({ records, workspace }) =>

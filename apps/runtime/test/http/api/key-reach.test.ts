@@ -10,7 +10,7 @@ const scout = { name: 'Scout', avatar: { glyph: 'S', hue: 120 }, role: 'Finds th
 
 /** The grant the edge forwards for a key (ADR 0081): every scope, and one server it may name in a setup. */
 const grant = (keyId = 'key-1', scopes = ['topics', 'conversations', 'personas']) => ({
-  'x-goblin-caller': JSON.stringify({ kind: 'key', keyId, scopes, servers: ['mycut'] }),
+  'x-goblin-caller': JSON.stringify({ kind: 'key', keyId, scopes, servers: ['mycut'], origins: [] }),
 })
 const KEY = grant()
 const OTHER = grant('key-2')

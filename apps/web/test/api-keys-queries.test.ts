@@ -15,6 +15,7 @@ const KEY: ApiKeyView = {
   name: 'swarm',
   scopes: ['topics', 'conversations', 'personas'],
   servers: ['mycut'],
+  origins: [],
   createdAt: '2026-10-20T00:00:00.000Z',
 }
 
@@ -30,7 +31,11 @@ const fakeAccount = () => {
       list: () => Effect.succeed([state.key]),
       update: ({ params, payload }) => {
         if (params.keyId !== state.key.id) return Effect.fail(new NotFound({ what: 'key' }))
-        state.key = { ...state.key, scopes: payload.scopes }
+        state.key = {
+          ...state.key,
+          scopes: payload.scopes ?? state.key.scopes,
+          origins: payload.origins ?? state.key.origins,
+        }
         return Effect.succeed(state.key)
       },
     }),

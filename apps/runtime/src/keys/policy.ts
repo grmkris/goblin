@@ -1,4 +1,4 @@
-import type { SetupItem, TopicSetup, TopicSetupEdit } from '@goblin/contracts'
+import { type SetupItem, type TopicSetup, type TopicSetupEdit, serverOriginOf } from '@goblin/contracts'
 import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
@@ -112,6 +112,26 @@ export const confineSetupEdit = (edit: TopicSetupEdit) =>
   ceiling((key) =>
     'set' in edit ? setupWithin(key, edit.set) : 'add' in edit ? edit.add.every((item) => itemWithin(key, item)) : true,
   )
+
+/**
+ * An MCP server a key's thread declares (ADR 0091): only on an origin the owner granted the key, and only tools of that
+ * origin's list. The origin and the tools it may call, which are the declared ones or, when it names none, the whole
+ * list. A request that is not a key's is refused (`key_only`), as is any other origin (`key_origin`) or tool
+ * (`key_origin_tool`).
+ *
+ * @internal The endpoints that take a thread's servers call it; until they land, only its tests do.
+ */
+export const confineThreadServer = (url: string, tools: readonly string[] | undefined) =>
+  Effect.gen(function* () {
+    const key = yield* requestKey
+    if (key === undefined) return yield* new Forbidden({ reason: 'key_only' })
+    const origin = serverOriginOf(url)
+    const granted = key.origins.find((each) => each.origin === origin)
+    if (granted === undefined) return yield* new Forbidden({ reason: 'key_origin' })
+    if (tools !== undefined && !tools.every((tool) => granted.tools.includes(tool)))
+      return yield* new Forbidden({ reason: 'key_origin_tool' })
+    return { origin: granted.origin, tools: tools ?? granted.tools }
+  })
 
 /** A key's change of one of its chats (ADR 0090): a title, closing or reopening; pinning a subagent open is the owner's. */
 export const confineUpdate = (change: { readonly keepOpen?: boolean | undefined }) =>

@@ -18,7 +18,14 @@ const MEMBERSHIP = { id: WS, name: "Owner's workspace", slug: 'owner', role: 'ow
 const SECRET = 'secret-words'
 const KEY = `gbk_${'k'.repeat(64)}`
 
-const KEY_VIEW = { id: 'key-1', name: 'svc', scopes: [], servers: ['mycut'], createdAt: '2026-10-20T00:00:00.000Z' }
+const KEY_VIEW = {
+  id: 'key-1',
+  name: 'svc',
+  scopes: [],
+  servers: ['mycut'],
+  origins: [],
+  createdAt: '2026-10-20T00:00:00.000Z',
+}
 
 /** The account's records, keeping the crash points asked for: each one's user, if the report came with a session. */
 const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
@@ -37,7 +44,11 @@ const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
       keyId === 'key-1'
         ? Effect.succeed({
             before: { ...KEY_VIEW, scopes: ['topics', 'personas'] },
-            after: { ...KEY_VIEW, scopes: change.scopes },
+            after: {
+              ...KEY_VIEW,
+              scopes: change.scopes ?? ['topics', 'personas'],
+              origins: change.origins ?? [],
+            },
           })
         : Effect.fail(new NotFound({ what: 'key' })),
     revokeKey: () => Effect.void,
@@ -70,7 +81,13 @@ const deployment = (
     },
     key: (key) =>
       key === KEY
-        ? Effect.succeed({ workspaceId: WS, keyId: 'key-1', scopes: ['topics', 'conversations'], servers: ['mycut'] })
+        ? Effect.succeed({
+            workspaceId: WS,
+            keyId: 'key-1',
+            scopes: ['topics', 'conversations'],
+            servers: ['mycut'],
+            origins: [],
+          })
         : Effect.fail(new Unauthenticated({ reason: 'key' })),
     membership: (userId, slug) =>
       Effect.succeed(userId === OWNER && slug === MEMBERSHIP.slug ? { ...MEMBERSHIP, role } : undefined),
@@ -324,6 +341,7 @@ describe("a server's API key (ADR 0081)", () => {
       keyId: 'key-1',
       scopes: ['topics', 'conversations'],
       servers: ['mycut'],
+      origins: [],
     })
   })
 
@@ -388,6 +406,14 @@ describe("a server's API key (ADR 0081)", () => {
   })
 })
 
+/** A manager's change of key `key-1`, as Settings sends it. */
+const patchKey = (body: unknown) =>
+  write(`${BASE}/api/keys/key-1`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
 describe('the account APIs in the Worker', () => {
   it("gives a workspace's key new scopes and audits who did it, never for a foreign Origin (ADR 0084)", async () => {
     const { edge } = deployment()
@@ -425,6 +451,20 @@ describe('the account APIs in the Worker', () => {
       body: JSON.stringify({ scopes: [] }),
     })
     expect((await through('workspace', empty, edge)).response.status).toBe(400)
+  })
+
+  it('gives a key MCP origins and audits only how many, never naming one; a change naming nothing is refused (ADR 0091)', async () => {
+    const { edge } = deployment()
+    const origins = [{ origin: 'https://mcp.swarmm.app', tools: ['job_submit'] }]
+    const { response, lines } = await through('workspace', patchKey({ origins }), edge)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ id: 'key-1', origins })
+    expect(lines).toContainEqual(
+      expect.objectContaining({ event: 'api_key', kind: 'origins', id: 'key-1', agent: WS, by: OWNER, count: 1 }),
+    )
+    expect(JSON.stringify(lines)).not.toContain('swarmm')
+    expect(lines).not.toContainEqual(expect.objectContaining({ kind: 'scopes' }))
+    expect((await through('workspace', patchKey({}), edge)).response.status).toBe(400)
   })
 
   it("keeps a workspace's keys from a member who is not an owner or admin", async () => {

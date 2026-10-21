@@ -11,7 +11,13 @@ import { ownerCall } from '../../src/inbound/client.ts'
 import { mcpServer } from '../../src/inbound/mcp-server.ts'
 import { TOOLS } from '../../src/inbound/tools.ts'
 
-const KEY: Caller = { kind: 'key', keyId: 'key-1', scopes: ['topics', 'conversations', 'personas'], servers: ['mycut'] }
+const KEY: Caller = {
+  kind: 'key',
+  keyId: 'key-1',
+  scopes: ['topics', 'conversations', 'personas'],
+  servers: ['mycut'],
+  origins: [],
+}
 /** An OAuth client the owner consented to with `scopes` (ADR 0086). */
 const client = (scopes: readonly string[]): Caller => ({
   kind: 'client',

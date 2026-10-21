@@ -1,16 +1,18 @@
-import { CallerScope, KeyScope, KeyServer, WorkspaceRole } from '@goblin/contracts'
+import { CallerScope, KeyOrigin, KeyScope, KeyServer, WorkspaceRole } from '@goblin/contracts'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { KEY_PREFIX } from '../../auth/resources.ts'
 
 /**
- * A server's API key as the agent sees it (ADR 0081): which key, its scopes and its server ceiling. The edge verifies
- * the key and forwards it as the request's caller; the agent never sees the secret.
+ * A server's API key as the agent sees it (ADR 0081): which key, its scopes and its ceiling, the connections its setups
+ * may name and the MCP origins (with their tools) its threads may connect to (ADR 0091). The edge verifies the key and
+ * forwards it as the request's caller; the agent never sees the secret.
  */
 export interface KeyGrant {
   readonly keyId: string
   readonly scopes: readonly KeyScope[]
   readonly servers: readonly string[]
+  readonly origins: readonly KeyOrigin[]
 }
 
 /** An OAuth client of the owner on /mcp (ADR 0086): which client, the name it registered and what its consent grants. */
@@ -37,6 +39,7 @@ const ForwardedCaller = Schema.fromJsonString(
       keyId: Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u)),
       scopes: Schema.Array(KeyScope),
       servers: Schema.Array(KeyServer),
+      origins: Schema.Array(KeyOrigin),
     }),
     Schema.Struct({
       kind: Schema.Literal('client'),
