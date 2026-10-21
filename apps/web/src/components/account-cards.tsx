@@ -81,7 +81,12 @@ export function DeleteAccountCard() {
       ? ''
       : deleting.error instanceof AuthRefused && (deleting.error.status === 400 || deleting.error.status === 401)
         ? withRef('Sign in again with an emailed code, then delete within 10 minutes.', deleting.error)
-        : messageOf(deleting.error, 'delete your account')
+        : deleting.error instanceof AuthRefused && deleting.error.status === 409
+          ? withRef(
+              'You are the last owner of a workspace other people work in: make one of them an owner first.',
+              deleting.error,
+            )
+          : messageOf(deleting.error, 'delete your account')
   function remove(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault()
     deleting.mutate(undefined, { onSuccess: () => window.location.assign('/') })

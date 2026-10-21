@@ -15,6 +15,7 @@ import {
   leaveWorkspace,
   membersOf,
   removeMember,
+  renewInvitation,
   updateMemberRole,
 } from '../src/auth/members.ts'
 import { createWorkspace, membershipOf, workspacesOf } from '../src/auth/workspaces.ts'
@@ -112,6 +113,24 @@ describe('invitations (ADR 0093)', () => {
     await expect(inviteMembers(db, admin, ANA.id, { emails: [BO.email], role: 'admin' }, NOW)).rejects.toEqual(
       new Forbidden({ reason: 'role' }),
     )
+  })
+
+  it("renews only an invitation still waiting, and an admin's only for an owner", async () => {
+    const { db, workspace } = await withAna('admin')
+    const [made] = await inviteMembers(db, workspace, KRIS.id, { emails: [BO.email], role: 'admin' }, NOW)
+    const id = made?.id ?? ''
+    const ana = { ...workspace, role: 'admin' as const }
+    await expect(renewInvitation(db, ana, id, NOW)).rejects.toEqual(new Forbidden({ reason: 'role' }))
+    await expect(renewInvitation(db, workspace, id, WEEK_LATER)).rejects.toEqual(new NotFound({ what: 'invitation' }))
+    expect((await renewInvitation(db, workspace, id, NOW)).state).toBe('pending')
+  })
+
+  it('takes a status goblin does not write for one that no longer waits', async () => {
+    const { db, sqlite, workspace } = await fixture()
+    const [made] = await inviteMembers(db, workspace, KRIS.id, { emails: [ANA.email], role: 'member' }, NOW)
+    sqlite.prepare("UPDATE invitation SET status = 'rejected' WHERE id = ?").run(made?.id ?? '')
+    expect((await invitationPreview(db, made?.id ?? '', NOW)).state).toBe('canceled')
+    await expect(acceptInvitation(db, ANA, made?.id ?? '', NOW)).rejects.toEqual(new Conflict({ reason: 'canceled' }))
   })
 
   it('gives a person with an invitation waiting no first workspace of their own, until they have none waiting', async () => {

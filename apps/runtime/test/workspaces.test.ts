@@ -146,6 +146,20 @@ describe('workspaces (ADR 0089)', () => {
     expect(await membershipOf(db, ANA.id, shared.id)).toMatchObject({ name: 'Ours', role: 'owner' })
   })
 
+  it('lets no account go while it is the last owner of a workspace other people work in (ADR 0093)', async () => {
+    const { db, sqlite } = fixture()
+    await createWorkspace(db, KRIS.id, { name: 'Mine', slug: 'mine' }, NOW)
+    const team = await createWorkspace(db, KRIS.id, { name: 'Team', slug: 'team' }, NOW)
+    sqlite
+      .prepare("INSERT INTO member (id, organizationId, userId, role, createdAt) VALUES ('m', ?, ?, 'member', ?)")
+      .run(team.id, ANA.id, NOW.toISOString())
+    const { erased, eraseAgent } = agents()
+    await expect(deleteOwnedAlone({ db, eraseAgent }, KRIS.id, NOW)).rejects.toEqual(
+      new Conflict({ reason: 'last_owner' }),
+    )
+    expect(erased).toEqual([])
+  })
+
   it('names the workspace an OAuth sign-in is for: the only one, or the chosen one once chosen', async () => {
     const { db } = fixture()
     const [first] = await workspacesOf(db, KRIS, NOW)

@@ -3,6 +3,7 @@ import { apiKey } from '@better-auth/api-key'
 import { mcp } from '@better-auth/mcp'
 import { type Account, betterAuth, type BetterAuthPlugin } from 'better-auth'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
+import { Conflict } from '../http/errors.ts'
 import { emailOTP, jwt, organization } from 'better-auth/plugins'
 import type { RuntimeEnv } from '../env.ts'
 import { writeLine } from '../observability/logger.ts'
@@ -195,6 +196,23 @@ export type AuthNeeds = {
 }
 
 /**
+ * Before an account goes: the workspaces it alone owns, each agent erased first (`deleteOwnedAlone`). The last owner of
+ * a workspace other people work in is refused (409), so nobody's workspace goes with someone else's account.
+ */
+const beforeAccountDelete = (env: AuthEnvironment, database: D1Database) => async (user: { id: string }) => {
+  try {
+    await deleteOwnedAlone(
+      { db: database, eraseAgent: (workspaceId) => deleteAgentOf(env, workspaceId) },
+      user.id,
+      new Date(),
+    )
+  } catch (cause) {
+    if (cause instanceof Conflict) throw new APIError('CONFLICT', { message: 'last_owner', code: 'LAST_OWNER' })
+    throw cause
+  }
+}
+
+/**
  * Better Auth is instantiated per request: Worker I/O promises cannot outlive their request. The D1 adapter owns
  * auth tables; application Drizzle never adopts/migrates them. mcp() already includes OAuth provider functionality.
  */
@@ -250,13 +268,7 @@ const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeed
     user: {
       deleteUser: {
         enabled: true,
-        beforeDelete: async (user: { id: string }) => {
-          await deleteOwnedAlone(
-            { db: database, eraseAgent: (workspaceId) => deleteAgentOf(env, workspaceId) },
-            user.id,
-            new Date(),
-          )
-        },
+        beforeDelete: beforeAccountDelete(env, database),
       },
       validateUserInfo: refuseUnverifiedOidcUser,
     },

@@ -15,6 +15,7 @@ import {
   cancelInvitation,
   declineInvitation,
   invitationPreview,
+  invitationWorkspace,
   invitationsFor,
   invitationsOf,
   inviteMembers,
@@ -100,10 +101,20 @@ export const memberRecords = (env: RuntimeEnv): MemberRecords => {
       }),
     cancel: (workspaceId, id) => attempt(() => cancelInvitation(db, workspaceId, id)),
     resend: (actor, person, id) =>
-      attempt(async () => mail(actor, person, await renewInvitation(db, actor.id, id, new Date()))),
+      attempt(async () => {
+        if (offersOwnerModels(env, actor.id)) throw new Conflict({ reason: 'owner_models' })
+        return mail(actor, person, await renewInvitation(db, actor, id, new Date()))
+      }),
     mine: (person) => attempt(() => invitationsFor(db, person.email, new Date())),
     preview: (id) => attempt(() => invitationPreview(db, id, new Date())),
-    accept: (person, id) => attempt(() => acceptInvitation(db, person, id, new Date())),
+    accept: (person, id) =>
+      attempt(async () => {
+        // An invitation made before the fence, or into a workspace named the owner's since, takes no one in either.
+        const workspaceId = await invitationWorkspace(db, id)
+        if (workspaceId !== undefined && offersOwnerModels(env, workspaceId))
+          throw new Conflict({ reason: 'owner_models' })
+        return acceptInvitation(db, person, id, new Date())
+      }),
     decline: (person, id) => attempt(() => declineInvitation(db, person, id, new Date())),
   }
 }

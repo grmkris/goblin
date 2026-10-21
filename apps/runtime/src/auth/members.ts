@@ -21,7 +21,7 @@ import { type Person, membershipOf } from './workspaces.ts'
 type Database = RuntimeEnv['AUTH_DB']
 
 /** How long an invitation waits. */
-export const INVITATION_DAYS = 7
+const INVITATION_DAYS = 7
 const DAY_MS = 86_400_000
 
 const ROLES: readonly string[] = ['owner', 'admin', 'member'] satisfies readonly WorkspaceRole[]
@@ -139,9 +139,10 @@ interface InvitationRow {
   readonly organizationId: string
 }
 
+/** An invitation's state; a status goblin does not write is one that no longer waits, never one that does. */
 const stateOf = (row: InvitationRow, now: Date): InvitationState => {
-  if (row.status === 'pending' && new Date(row.expiresAt).getTime() <= now.getTime()) return 'expired'
-  return row.status === 'accepted' || row.status === 'declined' || row.status === 'canceled' ? row.status : 'pending'
+  if (row.status === 'pending') return new Date(row.expiresAt).getTime() <= now.getTime() ? 'expired' : 'pending'
+  return row.status === 'accepted' || row.status === 'declined' ? row.status : 'canceled'
 }
 
 const INVITATION = `SELECT i.id AS id, i.email AS email, i.role AS role, i.status AS status, i.expiresAt AS expiresAt,
@@ -240,21 +241,33 @@ export const cancelInvitation = async (db: Database, workspaceId: string, id: st
     .run()
 }
 
-/** One of the workspace's invitations, waiting for seven days from now; `NotFound` when it is not waiting any more. */
+/**
+ * One of `actor`'s workspace's invitations, waiting for seven days from now: `NotFound` when it is not waiting any more,
+ * and an admin's invitation only an owner renews (`Forbidden`), as only an owner makes one.
+ */
 export const renewInvitation = async (
   db: Database,
-  workspaceId: string,
+  actor: WorkspaceView,
   id: string,
   now: Date,
 ): Promise<InvitationView> => {
+  const waiting = (await invitationsOf(db, actor.id, now)).find((view) => view.id === id)
+  if (waiting === undefined) throw new NotFound({ what: 'invitation' })
+  if (waiting.role === 'admin' && actor.role !== 'owner') throw new Forbidden({ reason: 'role' })
+  const expiresAt = later(now)
   await db
-    .prepare("UPDATE invitation SET expiresAt = ? WHERE id = ? AND organizationId = ? AND status = 'pending'")
-    .bind(later(now), id, workspaceId)
+    .prepare(
+      "UPDATE invitation SET expiresAt = ? WHERE id = ? AND organizationId = ? AND status = 'pending' AND expiresAt > ?",
+    )
+    .bind(expiresAt, id, actor.id, now.toISOString())
     .run()
-  const renewed = (await invitationsOf(db, workspaceId, now)).find((view) => view.id === id)
-  if (renewed === undefined) throw new NotFound({ what: 'invitation' })
-  return renewed
+  return { ...waiting, expiresAt }
 }
+
+/** The workspace an invitation is for, if it names one. */
+export const invitationWorkspace = async (db: Database, id: string): Promise<string | undefined> =>
+  (await db.prepare('SELECT organizationId FROM invitation WHERE id = ?').bind(id).first<string>('organizationId')) ??
+  undefined
 
 /** The invitation `id` for `person`: it must be for their address (`Forbidden`) and still wait (`Conflict`). */
 const waitingFor = async (db: Database, person: Person, id: string, now: Date) => {
@@ -267,23 +280,27 @@ const waitingFor = async (db: Database, person: Person, id: string, now: Date) =
 }
 
 /**
- * Joins `person` to the workspace an invitation is for, with its role, in one batch that takes the invitation only
- * while it waits; joining again is no second membership. The workspace they joined.
+ * Joins `person` to the workspace an invitation is for, with its role, in one batch that adds the membership only while
+ * the invitation still waits (one canceled or replaced meanwhile adds none); joining again is no second membership.
+ * The workspace they joined.
  */
 export const acceptInvitation = async (db: Database, person: Person, id: string, now: Date): Promise<WorkspaceView> => {
   const row = await waitingFor(db, person, id, now)
+  const at = now.toISOString()
   await db.batch([
     db
       .prepare(
         `INSERT INTO member (id, organizationId, userId, role, createdAt)
-         SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM member WHERE organizationId = ? AND userId = ?)`,
+         SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM member WHERE organizationId = ? AND userId = ?)
+           AND EXISTS (SELECT 1 FROM invitation WHERE id = ? AND status = 'pending' AND expiresAt > ?)`,
       )
-      .bind(newId(), row.organizationId, person.id, roleOf(row.role), now.toISOString(), row.organizationId, person.id),
+      .bind(newId(), row.organizationId, person.id, roleOf(row.role), at, row.organizationId, person.id, id, at),
     db.prepare("UPDATE invitation SET status = 'accepted' WHERE id = ? AND status = 'pending'").bind(id),
   ])
   const joined = await membershipOf(db, person.id, row.organizationId)
-  if (joined === undefined) throw new NotFound({ what: 'workspace' })
-  return joined
+  if (joined !== undefined) return joined
+  await waitingFor(db, person, id, now)
+  throw new NotFound({ what: 'workspace' })
 }
 
 /** Turns an invitation down, for the person it is for. */

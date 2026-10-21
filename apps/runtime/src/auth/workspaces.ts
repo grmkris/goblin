@@ -248,17 +248,21 @@ export const deleteWorkspace = async (deletion: Deletion, userId: string, worksp
 }
 
 /**
- * Before an account goes: every workspace it alone owns is deleted as `deleteWorkspace` deletes one. Its other
- * memberships go with the account itself.
+ * Before an account goes: every workspace it alone owns is deleted as `deleteWorkspace` deletes one, and its other
+ * memberships go with the account itself. While it is the last owner of a workspace other people work in, nothing goes
+ * (`Conflict`, `last_owner`, ADR 0093): one of them is made an owner first.
  */
 export const deleteOwnedAlone = async (deletion: Deletion, userId: string, now: Date): Promise<void> => {
   const { results } = await deletion.db
     .prepare(
-      `SELECT m.organizationId AS id FROM member m WHERE m.userId = ? AND m.role = 'owner' AND NOT EXISTS
+      `SELECT m.organizationId AS id,
+          (SELECT COUNT(*) FROM member p WHERE p.organizationId = m.organizationId) AS members
+        FROM member m WHERE m.userId = ? AND m.role = 'owner' AND NOT EXISTS
        (SELECT 1 FROM member o WHERE o.organizationId = m.organizationId AND o.role = 'owner' AND o.userId <> ?)`,
     )
     .bind(userId, userId)
-    .all<{ id: string }>()
+    .all<{ id: string; members: number }>()
+  if (results.some(({ members }) => members > 1)) throw new Conflict({ reason: 'last_owner' })
   for (const { id } of results) {
     await deletion.eraseAgent(id)
     await removeRecords(deletion.db, id, now)
