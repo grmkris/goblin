@@ -85,6 +85,8 @@ const FIELDS: Readonly<Record<string, Check>> = {
   request: token(64),
   ref: token(64),
   agent: token(64),
+  /** Who made a change the line audits (ADR 0089): a person's ID, never their name or address. */
+  by: token(64),
   conversation: token(40),
   task: token(80),
   id: token(200),

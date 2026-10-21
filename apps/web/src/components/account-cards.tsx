@@ -91,8 +91,8 @@ export function DeleteAccountCard() {
       <CardHeader>
         <CardTitle>Delete account</CardTitle>
         <CardDescription>
-          Deletes your account and personal agent, with its conversations, connections, permissions and usage. Cancel
-          your subscription first. This cannot be undone.
+          Deletes your account and every workspace only you own, each agent with its conversations, connections,
+          permissions and usage. Cancel your subscription first. This cannot be undone.
         </CardDescription>
       </CardHeader>
       <CardContent>

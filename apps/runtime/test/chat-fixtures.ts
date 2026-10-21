@@ -49,7 +49,7 @@ export const portServices = ({ db, harness, flows = FlowEvents.noop }: PortInsta
     harness,
     applied: new Map(),
     env: PROBE_MODEL,
-    userId: 'probe-owner',
+    workspaceId: 'probe-owner',
   } as AgentInputs)
   const cipher = Layer.effect(
     Cipher,

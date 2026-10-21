@@ -6,12 +6,24 @@ import { ownerSnapshot } from './probe-reads.ts'
 import { waitFor } from './until.ts'
 
 const Signup = Schema.Struct({ user: Schema.Struct({ id: Schema.String }) })
+const Workspaces = Schema.Array(Schema.Struct({ id: Schema.String, slug: Schema.String }))
 export interface Person {
   readonly userId: string
   readonly cookie: string
   readonly ip: string
   readonly email: string
+  /** The workspace the person was given at their first sign-in (ADR 0089): its ID, which names its agent. */
+  readonly workspace: string
+  /** That workspace's slug, under which their browser's requests go. */
+  readonly slug: string
 }
+
+/** The paths a person's browser sends as they are; every other `/api/` path is a member's, under their workspace. */
+const PERSON_PATHS = ['/api/auth/', '/api/workspaces', '/api/client-errors']
+
+/** `path` as `who`'s browser sends it: a member's `/api/…` path under `/w/<their workspace's slug>` (ADR 0089). */
+export const inWorkspace = (who: Person, path: string): string =>
+  path.startsWith('/api/') && !PERSON_PATHS.some((prefix) => path.startsWith(prefix)) ? `/w/${who.slug}${path}` : path
 
 /** The owner stack's app (`APP_URL`): the web's requests come from its origin. */
 const APP = 'https://goblin.test'
@@ -41,14 +53,23 @@ export async function person(base: string): Promise<Person> {
     body: JSON.stringify({ email, otp: mail.code }),
   })
   expect(response.status).toBe(200)
+  const cookie = response.headers
+    .getSetCookie()
+    .map((value) => value.split(';')[0])
+    .join('; ')
+  const listed = await ownerFetch(`${base}/api/workspaces`, {
+    headers: { cookie, origin: APP, 'cf-connecting-ip': ip },
+  })
+  expect(listed.status).toBe(200)
+  const [workspace] = Schema.decodeUnknownSync(Workspaces)(await listed.json())
+  if (workspace === undefined) throw new Error('no first workspace')
   return {
     userId: Schema.decodeUnknownSync(Signup)(await response.json()).user.id,
     ip,
     email,
-    cookie: response.headers
-      .getSetCookie()
-      .map((value) => value.split(';')[0])
-      .join('; '),
+    cookie,
+    workspace: workspace.id,
+    slug: workspace.slug,
   }
 }
 
@@ -62,20 +83,21 @@ const browserHeaders = (who: Person) => ({
 })
 
 /**
- * One request of `who`'s browser to `path` on the Worker at `base`, exactly as written: a GET, or a POST of `body` as
- * JSON. For what the typed client cannot say (an edge refusal's status, the auth routes, the test levers).
+ * One request of `who`'s browser to `path` on the Worker at `base`, a member's `/api/…` path under their workspace
+ * (`inWorkspace`): a GET, or a POST of `body` as JSON. For what the typed client cannot say (an edge refusal's status,
+ * the auth routes, the test levers).
  */
 export const call = (base: string, who: Person, path: string, body?: unknown, headers: Record<string, string> = {}) =>
-  ownerFetch(`${base}${path}`, {
+  ownerFetch(`${base}${inWorkspace(who, path)}`, {
     method: body === undefined ? 'GET' : 'POST',
     headers: { ...browserHeaders(who), ...headers },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
 
 /**
- * The owner API as `who`'s browser reaches it: through the Worker at `base`, with what `call` sends, and `headers` on
- * top. It stands where an agent's `fetch` does, so the typed client (`callOwner`, `ownerResult`) and the reads of
- * `probe-reads.ts` take it.
+ * The owner API as `who`'s browser reaches it: through the Worker at `base`, under their workspace, with what `call`
+ * sends, and `headers` on top. It stands where an agent's `fetch` does, so the typed client (`callOwner`,
+ * `ownerResult`) and the reads of `probe-reads.ts` take it.
  */
 export const signedIn = (base: string, who: Person, headers: Record<string, string> = {}): AgentFetch => ({
   fetch: async (request) => {
@@ -83,7 +105,11 @@ export const signedIn = (base: string, who: Person, headers: Record<string, stri
     const sent = new Headers(request.headers)
     for (const [name, value] of Object.entries({ ...browserHeaders(who), ...headers })) sent.set(name, value)
     const body = request.method === 'GET' || request.method === 'HEAD' ? {} : { body: await request.arrayBuffer() }
-    return ownerFetch(`${base}${pathname}${search}`, { method: request.method, headers: sent, ...body })
+    return ownerFetch(`${base}${inWorkspace(who, pathname)}${search}`, {
+      method: request.method,
+      headers: sent,
+      ...body,
+    })
   },
 })
 

@@ -11,6 +11,7 @@ export default {
     const url = new URL(request.url)
     if (
       url.pathname.startsWith('/api/') ||
+      /^\/w\/[^/]+\/api\//u.test(url.pathname) ||
       url.pathname.startsWith('/hooks/') ||
       url.pathname.startsWith('/files/link/') ||
       url.pathname.startsWith('/.well-known/') ||

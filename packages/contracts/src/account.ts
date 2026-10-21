@@ -80,3 +80,45 @@ export type ApiKeyView = typeof ApiKeyView.Type
 /** A new key and its secret, which is shown this once. */
 export const CreatedApiKey = Schema.Struct({ key: ApiKeyView, secret: Schema.String })
 export type CreatedApiKey = typeof CreatedApiKey.Type
+
+/**
+ * A member's role in a workspace (ADR 0089): an owner may delete it, an owner or admin manages it, a member works in
+ * it.
+ */
+export const WorkspaceRole = Schema.Literals(['owner', 'admin', 'member'])
+export type WorkspaceRole = typeof WorkspaceRole.Type
+
+/** A workspace's ID, which also names its agent. */
+export const WorkspaceId = Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u))
+export type WorkspaceId = typeof WorkspaceId.Type
+
+/** A workspace's address in the app's pages (`/w/<slug>/…`): 3 to 40 lowercase letters, digits and inner hyphens. */
+export const WorkspaceSlug = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/u))
+export type WorkspaceSlug = typeof WorkspaceSlug.Type
+
+/** A workspace's name, as its members see it. */
+export const WorkspaceName = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(64),
+  Schema.isPattern(/^\S(?:.*\S)?$/u),
+)
+
+/** A workspace as one of its members sees it: what it is called, its address and their role in it. */
+export const WorkspaceView = Schema.Struct({
+  id: WorkspaceId,
+  name: Schema.String,
+  slug: Schema.String,
+  role: WorkspaceRole,
+})
+export type WorkspaceView = typeof WorkspaceView.Type
+
+/** `POST /api/workspaces`: a new workspace with its own agent, its maker its owner. A taken slug is a conflict. */
+export const CreateWorkspace = Schema.Struct({ name: WorkspaceName, slug: WorkspaceSlug })
+export type CreateWorkspace = typeof CreateWorkspace.Type
+
+/** `PATCH /api/workspaces/:workspaceId`: a new name, a new slug, or both. A taken slug is a conflict. */
+export const UpdateWorkspace = Schema.Struct({
+  name: Schema.optional(WorkspaceName),
+  slug: Schema.optional(WorkspaceSlug),
+})
+export type UpdateWorkspace = typeof UpdateWorkspace.Type

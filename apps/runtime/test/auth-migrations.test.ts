@@ -64,6 +64,14 @@ const SQL_TYPES: Readonly<Record<string, string>> = {
   date: 'DATE',
 }
 
+/**
+ * Indexes goblin adds past Better Auth's schema, each for a reason of its own: one membership per person and workspace
+ * (ADR 0089), which the plugin checks only by reading first.
+ */
+const OWN_INDEXES: Readonly<Record<string, readonly { unique: boolean; columns: readonly string[] }[]>> = {
+  member: [{ unique: true, columns: ['organizationId', 'userId'] }],
+}
+
 /** Compare the SQL to the installed Better Auth schema, not to a second manually maintained column list. */
 function checkTable(db: DatabaseSync, table: string, schema: ReturnType<typeof getSchema>[string]) {
   const columns = db.prepare('SELECT name, UPPER(type) AS type, "notnull", pk FROM pragma_table_info(?)').all(table)
@@ -86,6 +94,7 @@ function checkTable(db: DatabaseSync, table: string, schema: ReturnType<typeof g
       unique: unique ?? false,
       columns: indexColumns,
     })),
+    ...(OWN_INDEXES[table] ?? []),
   ]
   expect(indexes(db, table), table).toEqual(expect.arrayContaining(expectedIndexes))
   expect(indexes(db, table), table).toHaveLength(expectedIndexes.length)
@@ -125,7 +134,7 @@ const registration = (auth: ReturnType<typeof createAuth>, changes: Record<strin
 
 describe('auth D1 baseline', () => {
   it('contains exactly the configured Better Auth schema, including columns, indexes and foreign keys', async () => {
-    expect(migrations).toEqual(['0000_baseline.sql', '0001_api_keys.sql'])
+    expect(migrations).toEqual(['0000_baseline.sql', '0001_api_keys.sql', '0002_workspaces.sql'])
     const { db, auth } = fixture()
     await auth.$context
     const schema = getSchema(auth.options)
@@ -180,6 +189,45 @@ describe('auth D1 baseline', () => {
     db.exec("DELETE FROM oauthClient WHERE id = 'c1'")
     expect(db.prepare('SELECT COUNT(*) AS count FROM oauthClientResource').get()).toEqual({ count: 0 })
     expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+  })
+
+  it('gives every existing account a workspace with its own id, owned by it, with its keys and consents (ADR 0089)', () => {
+    const db = new DatabaseSync(':memory:')
+    databases.push(db)
+    const [workspaces, ...before] = migrations.toReversed()
+    for (const name of before.toReversed()) db.exec(readFileSync(join(DIR, name), 'utf8'))
+    db.exec(`
+      INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt)
+        VALUES ('AbCd1234', 'Kris', 'kris.k+goblin@example.test', 1, '${NOW}', '${NOW}'),
+               ('Zy98', '', 'swarmm_dev@example.test', 1, '${NOW}', '${NOW}'),
+               ('Q1w2E3r4t5', '', 'odd!one@example.test', 1, '${NOW}', '${NOW}');
+      INSERT INTO apikey (id, configId, referenceId, key, createdAt, updatedAt, metadata)
+        VALUES ('k1', 'default', 'Zy98', 'hash', '${NOW}', '${NOW}', '{"servers":["mycut"]}');
+      INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]');
+      INSERT INTO oauthConsent (id, clientId, userId, scopes, createdAt, updatedAt)
+        VALUES ('consent-1', 'client-1', 'AbCd1234', '[]', '${NOW}', '${NOW}');
+    `)
+    db.exec(readFileSync(join(DIR, String(workspaces)), 'utf8'))
+    expect(db.prepare('SELECT id, name, slug FROM organization ORDER BY id').all()).toEqual([
+      { id: 'AbCd1234', name: "Kris's workspace", slug: 'kris-k-goblin-abcd' },
+      { id: 'Q1w2E3r4t5', name: "odd!one's workspace", slug: 'ws-q1w2e3r4' },
+      { id: 'Zy98', name: "swarmm_dev's workspace", slug: 'swarmm-dev-zy98' },
+    ])
+    expect(db.prepare('SELECT organizationId, userId, role FROM member ORDER BY userId').all()).toEqual([
+      { organizationId: 'AbCd1234', userId: 'AbCd1234', role: 'owner' },
+      { organizationId: 'Q1w2E3r4t5', userId: 'Q1w2E3r4t5', role: 'owner' },
+      { organizationId: 'Zy98', userId: 'Zy98', role: 'owner' },
+    ])
+    expect(JSON.parse(String(db.prepare('SELECT metadata FROM apikey').get()?.['metadata']))).toEqual({
+      servers: ['mycut'],
+      createdBy: 'Zy98',
+    })
+    expect(db.prepare('SELECT referenceId FROM oauthConsent').get()).toEqual({ referenceId: 'AbCd1234' })
+    expect(() =>
+      db
+        .prepare('INSERT INTO member (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, ?, ?)')
+        .run('m2', 'AbCd1234', 'AbCd1234', 'member', NOW),
+    ).toThrow()
   })
 
   it('registers current clients for one /mcp resource with inspection available and no pre-granted consent', async () => {

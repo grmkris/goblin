@@ -3,13 +3,18 @@ import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { describe, expect, it } from 'vitest'
 import { type AccountRecords, crashPoint } from '../../../src/http/api/account.ts'
-import { type Edge, isAccountPath, makeEdgeHttp } from '../../../src/http/api/edge.ts'
+import { type Edge, isAccountPath, isWorkspacePath, makeEdgeHttp } from '../../../src/http/api/edge.ts'
 import { attempt } from '../../../src/http/errors.ts'
 import { FlowPointFailure } from '../../../src/observability/ae.ts'
 import { withLines } from '../../observability/lines.ts'
 
 const APP = 'https://goblin.test'
 const OWNER = 'user-owner'
+/** The owner's workspace (ADR 0089): its ID, which names its agent, and its pages' API prefix, by its slug. */
+const WS = 'ws-owner'
+const BASE = '/w/owner'
+const PERSON = { id: OWNER, name: 'Owner', email: 'owner@goblin.test' }
+const MEMBERSHIP = { id: WS, name: "Owner's workspace", slug: 'owner', role: 'owner' } as const
 const SECRET = 'secret-words'
 const KEY = `gbk_${'k'.repeat(64)}`
 
@@ -19,11 +24,16 @@ const KEY_VIEW = { id: 'key-1', name: 'svc', scopes: [], servers: ['mycut'], cre
 const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
   const crashes: (string | undefined)[] = []
   const records: AccountRecords = {
+    workspaces: () => Effect.succeed([MEMBERSHIP]),
+    createWorkspace: (_user, input) => Effect.succeed({ id: 'ws-new', ...input, role: 'owner' }),
+    updateWorkspace: () => Effect.die(new Error('no updates in this fixture')),
+    deleteWorkspace: () => Effect.void,
+    selectForSignIn: () => Effect.void,
     clients: () => Effect.succeed([{ clientId: 'client.1', name: 'Claude' }]),
     revokeClient: () => Effect.void,
     keys: () => Effect.succeed([]),
     createKey: () => Effect.die(new Error('no keys in this fixture')),
-    updateKey: (_user, keyId, change) =>
+    updateKey: (_workspace, _user, keyId, change) =>
       keyId === 'key-1'
         ? Effect.succeed({
             before: { ...KEY_VIEW, scopes: ['topics', 'personas'] },
@@ -39,39 +49,47 @@ const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
   return { records, crashes }
 }
 
-/** The deployment as the edge sees it, with an agent that records what reached it and answers `reply`. */
+/**
+ * The deployment as the edge sees it, with an agent that records what reached it (and which workspace's) and answers
+ * `reply`. The owner is a member of `WS` alone, with `role`.
+ */
 const deployment = (
   reply: () => Response = () => Response.json({ ok: true }),
   { records, crashes } = accountRecords(),
+  role: 'owner' | 'admin' | 'member' = 'owner',
 ) => {
   const seen: Request[] = []
+  const agents: string[] = []
   const edge: Edge = {
     origin: APP,
     session: (request) => {
       const cookie = request.headers.get('cookie')
       if (request.headers.has('authorization') || cookie === null)
         return Effect.fail(new Unauthenticated({ reason: 'session required' }))
-      return Effect.succeed(OWNER)
+      return Effect.succeed(PERSON)
     },
     key: (key) =>
       key === KEY
-        ? Effect.succeed({ userId: OWNER, keyId: 'key-1', scopes: ['topics', 'conversations'], servers: ['mycut'] })
+        ? Effect.succeed({ workspaceId: WS, keyId: 'key-1', scopes: ['topics', 'conversations'], servers: ['mycut'] })
         : Effect.fail(new Unauthenticated({ reason: 'key' })),
-    agent: () => ({
+    membership: (userId, slug) =>
+      Effect.succeed(userId === OWNER && slug === MEMBERSHIP.slug ? { ...MEMBERSHIP, role } : undefined),
+    agent: (workspaceId) => ({
       fetch: async (request) => {
         seen.push(request)
+        agents.push(workspaceId)
         return reply()
       },
     }),
     records,
   }
-  return { seen, edge, crashes }
+  return { seen, agents, edge, crashes }
 }
 
 const built = Effect.runPromise(makeEdgeHttp)
 /** One request through the edge: its response and the lines it logged. */
 const through = async (
-  side: 'account' | 'owner',
+  side: 'account' | 'workspace' | 'owner',
   request: Request,
   edge: Edge,
 ): Promise<{ readonly response: Response; readonly lines: readonly unknown[] }> => {
@@ -93,10 +111,10 @@ const write = (path: string, init: { headers?: Record<string, string>; body?: Bo
     ...(init.body === undefined ? {} : { body: init.body }),
   })
 
-describe('the owner forward', () => {
-  it('forwards only the allowlisted headers, with the edge reference and the owner mark, and never a credential', async () => {
-    const { seen, edge } = deployment()
-    const request = write('/api/mcp/myplan/tools/call?x=1', {
+describe("a member's forward (ADR 0089)", () => {
+  it('forwards only the allowlisted headers, with the edge reference, the owner mark and the member, never a credential', async () => {
+    const { seen, agents, edge } = deployment()
+    const request = write(`${BASE}/api/mcp/myplan/tools/call?x=1`, {
       headers: {
         'cf-ray': '8c1f2a3b4d5e6f70-AMS',
         'content-type': 'application/json',
@@ -105,12 +123,14 @@ describe('the owner forward', () => {
         'x-mcp-caller': 'app',
         'x-goblin-ref': 'forged',
         'x-goblin-forwarded': 'forged',
+        'x-goblin-member': '{"user":"forged","role":"owner"}',
       },
       body: JSON.stringify({ name: 'x' }),
     })
-    const { response } = await through('owner', request, edge)
+    const { response } = await through('workspace', request, edge)
     expect(response.headers.get('x-goblin-ref')).toBe('8c1f2a3b4d5e6f70-AMS')
     const [forwarded] = seen
+    expect(agents).toEqual([WS])
     expect(forwarded?.url).toBe('https://agent/api/mcp/myplan/tools/call?x=1')
     expect(forwarded?.method).toBe('POST')
     expect(Object.fromEntries(forwarded?.headers ?? [])).toEqual({
@@ -120,31 +140,38 @@ describe('the owner forward', () => {
       'x-mcp-caller': 'app',
       'x-goblin-ref': '8c1f2a3b4d5e6f70-AMS',
       'x-goblin-forwarded': 'owner',
+      'x-goblin-member': JSON.stringify({ user: OWNER, role: 'owner' }),
     })
     expect(await forwarded?.json()).toEqual({ name: 'x' })
   })
 
+  it('tells a member path from any other', () => {
+    expect([`${BASE}/api/topics`, '/w/a_b-1/api/x'].every(isWorkspacePath)).toBe(true)
+    expect(['/api/topics', `${BASE}/api`, `${BASE}/topics`, '/w//api/x', '/w/a b/api/x'].some(isWorkspacePath)).toBe(
+      false,
+    )
+  })
+
   // Whatever a path says, the agent sees only `/api/*` as the parsed URL names it, marked as the owner's forward: an
-  // internal path never reaches it from the owner's session (the agent refuses a marked one too, `internal.test.ts`).
+  // internal path never reaches it from a member's session (the agent refuses a marked one too, `internal.test.ts`).
   it.each([
-    ['/internal/x', 404],
-    ['/api/../internal/x', 404],
-    ['/api/%2e%2e/internal/x', 404],
-    ['/api/%2E%2E/internal/x', 404],
-    ['/api/.%2e/internal/x', 404],
-    ['//../internal/x', 404],
-    ['/API/internal/x', 404],
-    ['/api%2Finternal/x', 404],
-    ['/api\\..\\internal\\x', 404],
-    ['/api/clients', 404],
-    ['/api/internal/x', 200],
-    ['/api/%2F..%2Finternal/x', 200],
+    [`${BASE}/internal/x`, 404],
+    [`${BASE}/api/../internal/x`, 404],
+    [`${BASE}/api/%2e%2e/internal/x`, 404],
+    [`${BASE}/api/%2E%2E/internal/x`, 404],
+    [`${BASE}/api/.%2e/internal/x`, 404],
+    [`${BASE}/API/internal/x`, 404],
+    [`${BASE}/api%2Finternal/x`, 404],
+    [`${BASE}/api\\..\\internal\\x`, 404],
+    [`${BASE}/api/workspaces`, 404],
+    [`${BASE}/api/internal/x`, 200],
+    [`${BASE}/api/%2F..%2Finternal/x`, 200],
   ] as const)('forwards %s only under /api/ and marked as the owner', async (path, status) => {
     const { seen, edge } = deployment()
     const request = new Request(`${APP}${path}`, {
       headers: { cookie: 'session=owner', 'x-goblin-forwarded': 'internal' },
     })
-    const { response } = await through('owner', request, edge)
+    const { response } = await through('workspace', request, edge)
     expect(response.status).toBe(status)
     if (status === 404) expect(await response.json()).toMatchObject({ error: { code: 'not_found', what: 'route' } })
     for (const forwarded of seen) {
@@ -155,12 +182,12 @@ describe('the owner forward', () => {
   })
 
   it("hands the agent's redirect to the browser instead of following it into the agent", async () => {
-    const connected = `${APP}/connections?connected=sidequest`
+    const connected = `${APP}/w/owner/connections?connected=sidequest`
     const { seen, edge } = deployment(() => new Response(null, { status: 302, headers: { location: connected } }))
-    const request = new Request(`${APP}/api/mcp/oauth/callback?state=s&code=c`, {
+    const request = new Request(`${APP}${BASE}/api/mcp/oauth/callback?state=s&code=c`, {
       headers: { cookie: 'session=owner' },
     })
-    const { response } = await through('owner', request, edge)
+    const { response } = await through('workspace', request, edge)
     expect(seen.map((forwarded) => forwarded.redirect)).toEqual(['manual'])
     expect(response.status).toBe(302)
     expect(response.headers.get('location')).toBe(connected)
@@ -168,28 +195,46 @@ describe('the owner forward', () => {
 
   it('makes up a reference where there is no cf-ray', async () => {
     const { seen, edge } = deployment()
-    await through('owner', new Request(`${APP}/api/topics`, { headers: { cookie: 'session=owner' } }), edge)
+    await through('workspace', new Request(`${APP}${BASE}/api/topics`, { headers: { cookie: 'session=owner' } }), edge)
     expect(seen[0]?.headers.get('x-goblin-ref')).toMatch(/^[0-9a-f]{16}$/u)
   })
 
   it.each([
-    ['no session', new Request(`${APP}/api/topics`), 401, 'unauthenticated'],
+    ['no session', new Request(`${APP}${BASE}/api/topics`), 401, 'unauthenticated'],
     [
       'a bearer token beside the cookie',
-      new Request(`${APP}/api/topics`, { headers: { cookie: 'session=owner', authorization: 'Bearer x' } }),
+      new Request(`${APP}${BASE}/api/topics`, { headers: { cookie: 'session=owner', authorization: 'Bearer x' } }),
       401,
       'unauthenticated',
     ],
     [
       'a write without the CSRF header',
-      write('/api/topics/7', { method: 'PATCH', headers: { 'x-goblin-csrf': '' } }),
+      write(`${BASE}/api/topics/7`, { method: 'PATCH', headers: { 'x-goblin-csrf': '' } }),
       403,
       'forbidden',
     ],
-    ['a write from another site', write('/api/topics', { headers: { origin: 'https://evil.test' } }), 403, 'forbidden'],
-  ] as const)('refuses %s without waking the agent', async (_case, request, status, code) => {
+    [
+      'a write from another site',
+      write(`${BASE}/api/topics`, { headers: { origin: 'https://evil.test' } }),
+      403,
+      'forbidden',
+    ],
+    [
+      'a workspace the person is not a member of',
+      new Request(`${APP}/w/ws-someone-else/api/topics`, { headers: { cookie: 'session=owner' } }),
+      404,
+      'not_found',
+    ],
+    [
+      'a session on a path with no workspace',
+      new Request(`${APP}/api/topics`, { headers: { cookie: 'session=owner' } }),
+      404,
+      'not_found',
+    ],
+  ] as const)('refuses %s without waking an agent', async (_case, request, status, code) => {
     const { seen, edge } = deployment()
-    const { response } = await through('owner', request, edge)
+    const side = isWorkspacePath(new URL(request.url).pathname) ? 'workspace' : 'owner'
+    const { response } = await through(side, request, edge)
     expect(response.status).toBe(status)
     expect(await response.json()).toMatchObject({ error: { code } })
     expect(seen).toHaveLength(0)
@@ -199,15 +244,15 @@ describe('the owner forward', () => {
     const { seen, edge } = deployment()
     const big = 'x'.repeat(70_000)
     const { response } = await through(
-      'owner',
-      write('/api/topics', { body: big, headers: { 'cf-ray': 'ray-413' } }),
+      'workspace',
+      write(`${BASE}/api/topics`, { body: big, headers: { 'cf-ray': 'ray-413' } }),
       edge,
     )
     expect(response.status).toBe(413)
     expect(response.headers.get('x-goblin-ref')).toBe('ray-413')
     expect(await response.json()).toMatchObject({ error: { code: 'payload_too_large', limit: 65_536, ref: 'ray-413' } })
     expect(seen).toHaveLength(0)
-    await through('owner', write('/api/files/uploads/a.txt', { method: 'PUT', body: big }), edge)
+    await through('workspace', write(`${BASE}/api/files/uploads/a.txt`, { method: 'PUT', body: big }), edge)
     expect(await seen[0]?.text()).toHaveLength(70_000)
   })
 
@@ -215,12 +260,12 @@ describe('the owner forward', () => {
     const { edge } = deployment(() =>
       Response.json(envelopeOf(new NotFound({ what: SECRET, ref: 'ray-1' })), { status: 404 }),
     )
-    const request = write('/api/topics/7', {
+    const request = write(`${BASE}/api/topics/7`, {
       method: 'PATCH',
       headers: { 'cf-ray': 'ray-1', 'x-goblin-request': 'r1', 'x-goblin-operation': 'op-1' },
       body: JSON.stringify({ name: SECRET }),
     })
-    const { response, lines } = await through('owner', request, edge)
+    const { response, lines } = await through('workspace', request, edge)
     expect(response.status).toBe(404)
     expect(lines).toEqual([
       {
@@ -233,7 +278,7 @@ describe('the owner forward', () => {
         ref: 'ray-1',
         request: 'r1',
         operation: 'op-1',
-        agent: OWNER,
+        agent: WS,
       },
     ])
     expect(JSON.stringify(lines)).not.toContain(SECRET)
@@ -241,7 +286,7 @@ describe('the owner forward', () => {
 
   it('names a path that is no endpoint by its area only', async () => {
     const { edge } = deployment()
-    const { lines } = await through('owner', new Request(`${APP}/api/agent-apps/${SECRET}/nothing`), edge)
+    const { lines } = await through('workspace', new Request(`${APP}${BASE}/api/agent-apps/${SECRET}/nothing`), edge)
     expect(lines).toMatchObject([{ route: '/api/agent-apps/{path}', status: 401, code: 'unauthenticated' }])
     expect(JSON.stringify(lines)).not.toContain(SECRET)
   })
@@ -256,20 +301,23 @@ describe("a server's API key (ADR 0081)", () => {
       ...(init.body === undefined ? {} : { body: init.body }),
     })
 
-  it("reaches its user's agent without a CSRF header, forwarding its grant and never the key or an App mark", async () => {
-    const { seen, edge } = deployment()
+  it("reaches its workspace's agent without a CSRF header, forwarding its grant and never the key, a member or an App mark", async () => {
+    const { seen, agents, edge } = deployment()
     const request = server('/api/topics', {
       headers: {
         'x-mcp-caller': 'app',
         'x-goblin-caller': '{"kind":"key","keyId":"forged","scopes":["personas"],"servers":[]}',
+        'x-goblin-member': '{"user":"forged","role":"owner"}',
       },
       body: JSON.stringify({ name: 'x' }),
     })
     const { response } = await through('owner', request, edge)
     expect(response.status).toBe(200)
+    expect(agents).toEqual([WS])
     const [forwarded] = seen
     expect(forwarded?.headers.get('authorization')).toBeNull()
     expect(forwarded?.headers.get('x-mcp-caller')).toBeNull()
+    expect(forwarded?.headers.get('x-goblin-member')).toBeNull()
     expect(forwarded?.headers.get('x-goblin-forwarded')).toBe('owner')
     expect(JSON.parse(forwarded?.headers.get('x-goblin-caller') ?? '')).toEqual({
       kind: 'key',
@@ -281,10 +329,10 @@ describe("a server's API key (ADR 0081)", () => {
 
   it('never forwards a grant a session request names', async () => {
     const { seen, edge } = deployment()
-    const request = write('/api/topics', {
+    const request = write(`${BASE}/api/topics`, {
       headers: { 'x-goblin-caller': '{"kind":"key","keyId":"forged","scopes":[],"servers":[]}' },
     })
-    await through('owner', request, edge)
+    await through('workspace', request, edge)
     expect(seen[0]?.headers.get('x-goblin-caller')).toBeNull()
   })
 
@@ -304,8 +352,8 @@ describe("a server's API key (ADR 0081)", () => {
     [
       'an inbound OAuth token',
       server('/api/topics', { headers: { authorization: 'Bearer eyJhbGciOi.eyJzdWIiOi.c2ln' } }),
-      401,
-      'session required',
+      404,
+      'route',
     ],
   ] as const)('refuses %s without waking the agent', async (_case, request, status, reason) => {
     const { seen, edge } = deployment()
@@ -324,30 +372,33 @@ describe("a server's API key (ADR 0081)", () => {
     expect(await response.json()).toMatchObject({ error: { reason: 'rate_limited', retryAfter: 17 } })
   })
 
-  it('never reaches the account API: a key cannot list, make or change keys', async () => {
-    const { edge } = deployment()
+  it('never reaches the account APIs: a key cannot list, make or change keys, nor use a member path', async () => {
+    const { seen, edge } = deployment()
     for (const request of [
-      server('/api/keys', { method: 'GET' }),
-      server('/api/keys', { body: '{}' }),
-      server('/api/keys/key-1', { method: 'PATCH', body: JSON.stringify({ scopes: ['inspect'] }) }),
+      server(`${BASE}/api/keys`, { method: 'GET' }),
+      server(`${BASE}/api/keys`, { body: '{}' }),
+      server(`${BASE}/api/keys/key-1`, { method: 'PATCH', body: JSON.stringify({ scopes: ['inspect'] }) }),
+      server(`${BASE}/api/topics`, { method: 'GET' }),
     ]) {
-      const { response } = await through('account', request, edge)
+      const { response } = await through('workspace', request, edge)
       expect(response.status).toBe(401)
     }
+    expect((await through('account', server('/api/workspaces', { method: 'GET' }), edge)).response.status).toBe(401)
+    expect(seen).toHaveLength(0)
   })
 })
 
-describe('the account API in the Worker', () => {
-  it("gives the signed-in owner's key new scopes and audits the change, never for a foreign Origin (ADR 0084)", async () => {
+describe('the account APIs in the Worker', () => {
+  it("gives a workspace's key new scopes and audits who did it, never for a foreign Origin (ADR 0084)", async () => {
     const { edge } = deployment()
     const change = JSON.stringify({ scopes: ['topics', 'personas', 'inspect'] })
     const patch = (headers: Record<string, string> = {}) =>
-      write('/api/keys/key-1', {
+      write(`${BASE}/api/keys/key-1`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json', ...headers },
         body: change,
       })
-    const { response, lines } = await through('account', patch(), edge)
+    const { response, lines } = await through('workspace', patch(), edge)
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ id: 'key-1', scopes: ['topics', 'personas', 'inspect'] })
     expect(lines).toContainEqual(
@@ -355,24 +406,51 @@ describe('the account API in the Worker', () => {
         event: 'api_key',
         kind: 'scopes',
         id: 'key-1',
-        agent: OWNER,
+        agent: WS,
+        by: OWNER,
         scopes: ['topics', 'personas', 'inspect'],
         'scopes.before': ['topics', 'personas'],
       }),
     )
-    expect((await through('account', patch({ origin: 'https://evil.test' }), edge)).response.status).toBe(403)
-    const gone = write('/api/keys/key-9', {
+    expect((await through('workspace', patch({ origin: 'https://evil.test' }), edge)).response.status).toBe(403)
+    const gone = write(`${BASE}/api/keys/key-9`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: change,
     })
-    expect((await through('account', gone, edge)).response.status).toBe(404)
-    const empty = write('/api/keys/key-1', {
+    expect((await through('workspace', gone, edge)).response.status).toBe(404)
+    const empty = write(`${BASE}/api/keys/key-1`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ scopes: [] }),
     })
-    expect((await through('account', empty, edge)).response.status).toBe(400)
+    expect((await through('workspace', empty, edge)).response.status).toBe(400)
+  })
+
+  it("keeps a workspace's keys from a member who is not an owner or admin", async () => {
+    const { edge } = deployment(undefined, accountRecords(), 'member')
+    const list = new Request(`${APP}${BASE}/api/keys`, { headers: { cookie: 'session=owner' } })
+    const { response } = await through('workspace', list, edge)
+    expect(response.status).toBe(403)
+    expect(await response.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
+  })
+
+  it("answers a person's workspaces, and makes one", async () => {
+    const { edge } = deployment()
+    const list = new Request(`${APP}/api/workspaces`, { headers: { cookie: 'session=owner' } })
+    expect(await (await through('account', list, edge)).response.json()).toEqual([MEMBERSHIP])
+    const create = write('/api/workspaces', {
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Swarmm', slug: 'swarmm' }),
+    })
+    const created = (await through('account', create, edge)).response
+    expect(created.status).toBe(201)
+    expect(await created.json()).toEqual({ id: 'ws-new', name: 'Swarmm', slug: 'swarmm', role: 'owner' })
+    const badSlug = write('/api/workspaces', {
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Swarmm', slug: 'Not A Slug' }),
+    })
+    expect((await through('account', badSlug, edge)).response.status).toBe(400)
   })
 
   const report = {
@@ -406,7 +484,7 @@ describe('the account API in the Worker', () => {
     ])
   })
 
-  it("writes a signed-in report's point under its user, and still takes a report whose point cannot be written", async () => {
+  it("writes a signed-in report's point under its person, and still takes a report whose point cannot be written", async () => {
     const body = JSON.stringify(report)
     const signedIn = deployment()
     const withSession = write('/api/client-errors', { headers: { 'content-type': 'application/json' }, body })
@@ -458,25 +536,28 @@ describe('the account API in the Worker', () => {
     expect((await through('account', big, edge)).response.status).toBe(413)
   })
 
-  it('answers clients for a signed-in account, and revokes one', async () => {
-    const { edge } = deployment()
-    const list = new Request(`${APP}/api/clients`, { headers: { cookie: 'session=owner' } })
-    expect(await (await through('account', list, edge)).response.json()).toEqual([
+  it('answers the clients a member connected to the workspace, and revokes one, without waking the agent', async () => {
+    const { seen, edge } = deployment()
+    const list = new Request(`${APP}${BASE}/api/clients`, { headers: { cookie: 'session=owner' } })
+    expect(await (await through('workspace', list, edge)).response.json()).toEqual([
       { clientId: 'client.1', name: 'Claude' },
     ])
-    const revoke = write('/api/clients/client.1', { method: 'DELETE' })
-    expect(await (await through('account', revoke, edge)).response.json()).toEqual({ revoked: true })
-    const forged = write('/api/clients/client.1', { method: 'DELETE', headers: { 'x-goblin-csrf': '' } })
-    expect((await through('account', forged, edge)).response.status).toBe(403)
+    const revoke = write(`${BASE}/api/clients/client.1`, { method: 'DELETE' })
+    expect(await (await through('workspace', revoke, edge)).response.json()).toEqual({ revoked: true })
+    const forged = write(`${BASE}/api/clients/client.1`, { method: 'DELETE', headers: { 'x-goblin-csrf': '' } })
+    expect((await through('workspace', forged, edge)).response.status).toBe(403)
+    expect(seen).toHaveLength(0)
   })
 
   it('owns its paths: anything else under them is a 404 in the envelope', async () => {
-    expect(['/api/clients', '/api/clients/x', '/api/client-errors'].every(isAccountPath)).toBe(true)
-    expect(['/api/billing/state', '/api/topics', '/api/clientsx'].some(isAccountPath)).toBe(false)
+    expect(['/api/workspaces', '/api/workspaces/x', '/api/client-errors'].every(isAccountPath)).toBe(true)
+    expect(['/api/clients', '/api/keys', '/api/topics', '/api/workspacesx'].some(isAccountPath)).toBe(false)
     const { edge } = deployment()
-    const { response } = await through('account', new Request(`${APP}/api/clients/x/y`), edge)
+    const { response } = await through('account', new Request(`${APP}/api/workspaces/x/y/z`), edge)
     expect(response.status).toBe(404)
     expect(await response.json()).toMatchObject({ error: { code: 'not_found' } })
+    const unknown = new Request(`${APP}${BASE}/api/clients/x/y`, { headers: { cookie: 'session=owner' } })
+    expect((await through('workspace', unknown, edge)).response.status).toBe(404)
   })
 })
 

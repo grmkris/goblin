@@ -4,7 +4,7 @@ import * as Context from 'effect/Context'
 import * as FindMyWay from 'effect/http/FindMyWay'
 import * as HttpApi from 'effect/http-api/HttpApi'
 import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
-import type { Caller } from './principal.ts'
+import type { Caller, Member } from './principal.ts'
 
 /** What one owner API request says about itself, for logs and error references. Never content. */
 export interface RequestFacts {
@@ -16,8 +16,10 @@ export interface RequestFacts {
   readonly operation: string | undefined
   /** The endpoint the request reached, as `<group>.<endpoint>` (`topics.update`). */
   readonly route: string
-  /** The caller the Worker admitted the request for, a key or an OAuth client (ADR 0086); none for the owner's session. */
+  /** The caller the Worker admitted the request for, a key or an OAuth client (ADR 0086); none for a member's session. */
   readonly caller?: Caller | undefined
+  /** The member the request acts for (ADR 0089): a session's person, or the person an OAuth client acts for. */
+  readonly member?: Member | undefined
 }
 
 /**

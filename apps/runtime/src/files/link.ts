@@ -20,9 +20,9 @@ import { Files } from './service.ts'
 export const fileLink = Effect.fn('files.link')(function* (path: string) {
   yield* requireResident
   const entry = yield* Files.use((files) => files.stat(path))
-  const { env, userId } = yield* AgentInput
+  const { env, workspaceId } = yield* AgentInput
   const expiresAt = (yield* epochSeconds) + FILE_LINK_SECONDS
-  const token = yield* attempt(() => fileLinkToken(env.CREDENTIAL_KEY, { userId, path: entry.path, expiresAt }))
+  const token = yield* attempt(() => fileLinkToken(env.CREDENTIAL_KEY, { workspaceId, path: entry.path, expiresAt }))
   return {
     url: fileLinkUrl(env.APP_URL, token, entry.name),
     expiresAt: DateTime.formatIso(DateTime.makeUnsafe(expiresAt * 1000)),

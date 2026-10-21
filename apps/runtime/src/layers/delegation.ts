@@ -65,7 +65,7 @@ const stores: Effect.Effect<DelegationStores, never, AgentInput | Db | Conversat
       db,
       topicPorts(db, { conversations: yield* Conversations, memories: yield* Memories }),
     )
-    const personas = new PersonaRegistry(db, offeredModels(db, deploymentModelIds(input.env, input.userId)))
+    const personas = new PersonaRegistry(db, offeredModels(db, deploymentModelIds(input.env, input.workspaceId)))
     const receipts = new OrganizeReceipts(db, (kind, target) => {
       if (kind === 'source.route') return routeRevision(db, target)
       try {

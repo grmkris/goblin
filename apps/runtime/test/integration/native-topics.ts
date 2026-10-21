@@ -1,7 +1,7 @@
 import { Attention, PRIMARY_CHAT } from '@goblin/contracts'
 import { Effect, Result, Schema } from 'effect'
 import { expect } from 'vitest'
-import { type AgentFetch, callOwner, workspaceSnapshot } from '../owner-client.ts'
+import { type AgentFetch, asOwner, callOwner, workspaceSnapshot } from '../owner-client.ts'
 import { ModelRequest, requestTurns } from './conversation-checks.ts'
 import { type NativeCase, probeOf } from './native-case.ts'
 import { type Probes, type ProbeStub, inWorker } from './probe.ts'
@@ -164,7 +164,9 @@ async function kickoffSequence(agent: ProbeStub) {
   const taken = await callOwner(agent, (api) =>
     Effect.result(api.onboarding.kickoff({ payload: { ...kickoff, operationId: 'kickoff-again' } })),
   )
-  const { topics } = await workspaceSnapshot(await agent.fetch(new Request('https://agent/api/workspace/events')))
+  const { topics } = await workspaceSnapshot(
+    await agent.fetch(new Request('https://agent/api/workspace/events', asOwner())),
+  )
   return {
     description: first.topic.description ?? '',
     status: first.view.status,

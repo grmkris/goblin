@@ -42,7 +42,7 @@ const event = (eventId: string, title: string, at = new Date()) => ({
   data: { title, url: 'https://sidequest.test/jobs/12' },
 })
 
-/** The connection a webhook was sent for, from its callback URL (`/hooks/mcp-events/<user>/<connection>/<token>`). */
+/** The connection a webhook was sent for, from its callback URL (`/hooks/mcp-events/<workspace>/<connection>/<token>`). */
 const connectionOf = (url: string): string => decodeURIComponent(new URL(url).pathname.split('/')[4] ?? '')
 
 /** Both connections, labelled and signed in, with the producer's webhooks routed into the agent by their URL. */

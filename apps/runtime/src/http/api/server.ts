@@ -8,7 +8,7 @@ import * as HttpRouter from 'effect/http/HttpRouter'
 import type * as HttpServerRequest from 'effect/http/HttpServerRequest'
 import type * as HttpServerResponse from 'effect/http/HttpServerResponse'
 import { RequestContext, type RouteNames, forwardedRef, requestFacts, routeNames } from './context.ts'
-import { forwardedCaller } from './principal.ts'
+import { forwardedPrincipal } from './principal.ts'
 import { AgentApiLayer } from './groups.ts'
 import { answer, refusal } from './render.ts'
 
@@ -50,8 +50,9 @@ export class AgentHttp extends Context.Service<
             const route = internal && request.headers.has(FORWARDED_HEADER) ? undefined : routeOf(request)
             if (route === undefined)
               return Effect.succeed(refusal(new NotFound({ what: 'route' }), forwardedRef(request)))
-            // The caller the edge or /mcp admitted the request for, read here and nowhere at the edge.
-            const facts = { ...requestFacts(request, route), caller: forwardedCaller(request) }
+            // Who the edge or /mcp admitted the request for, read here and nowhere at the edge; owner admission refuses
+            // a request that says no one.
+            const facts = { ...requestFacts(request, route), ...forwardedPrincipal(request) }
             // SAFETY: `services` is this layer's context, which holds every service the router's handlers require
             // (`R`'s `Requires`), and neither API declares a global middleware: what is left is the request and its
             // scope, which `answer` provides.

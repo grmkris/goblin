@@ -9,6 +9,7 @@ import { PersonalAgent } from '../../src/agent.ts'
 import { queueModel } from './queue-model.ts'
 import { approvalsProbe } from './approvals-probe.ts'
 import { requireUserSession } from '../../src/auth/index.ts'
+import { workspacesOf } from '../../src/auth/workspaces.ts'
 import { AppsMcpFixture } from './apps-mcp.ts'
 import { permutePrimary, profileEnabled } from './primary-profile.ts'
 import { chatSession } from '../../src/chats/directory.ts'
@@ -137,6 +138,14 @@ export class OwnerAgent extends PersonalAgent {
     return this.#mcp.fetch
   }
 }
+/** The agent of the signed-in person's first workspace (ADR 0089): the one a test lever acts on. */
+const leverAgent = async (input: Request, env: RuntimeEnv) => {
+  const { person } = await requireUserSession(input, env)
+  const [first] = await workspacesOf(env.AUTH_DB, person, new Date())
+  if (first === undefined) throw new Error('no workspace')
+  return env.AGENTS.getByName(first.id)
+}
+
 export default {
   async fetch(request: Request, env: RuntimeEnv) {
     const url = new URL(request.url)
@@ -148,34 +157,28 @@ export default {
       const authProbe = await authFixtureRoute(input, env)
       if (authProbe !== undefined) return authProbe
       if (url.pathname === '/__test/primary-profile') {
-        const { userId } = await requireUserSession(input, env)
-        return env.AGENTS.getByName(userId).fetch('https://agent/test/primary-profile')
+        return (await leverAgent(input, env)).fetch('https://agent/test/primary-profile')
       }
       if (url.pathname.startsWith('/__test/topics/')) {
-        const { userId } = await requireUserSession(input, env)
-        return env.AGENTS.getByName(userId).fetch(
+        return (await leverAgent(input, env)).fetch(
           new Request(`https://agent/test/topics/${url.pathname.split('/').at(-1)}`, input),
         )
       }
       if (url.pathname === '/__test/retrieval/excerpts') {
-        const { userId } = await requireUserSession(input, env)
-        return env.AGENTS.getByName(userId).fetch('https://agent/test/retrieval/excerpts')
+        return (await leverAgent(input, env)).fetch('https://agent/test/retrieval/excerpts')
       }
       if (url.pathname.startsWith('/__test/move/')) {
-        const { userId } = await requireUserSession(input, env)
-        return env.AGENTS.getByName(userId).fetch(
+        return (await leverAgent(input, env)).fetch(
           new Request(`https://agent/test/move/${url.pathname.split('/').at(-1)}`, input),
         )
       }
       if (url.pathname.startsWith('/__test/queue/')) {
-        const { userId } = await requireUserSession(input, env)
-        return env.AGENTS.getByName(userId).fetch(
+        return (await leverAgent(input, env)).fetch(
           new Request(`https://agent/test/queue/${url.pathname.split('/').at(-1)}`, input),
         )
       }
       if (url.pathname.startsWith('/__test/approvals/')) {
-        const { userId } = await requireUserSession(input, env)
-        return env.AGENTS.getByName(userId).fetch(`https://agent/test/approvals/${url.pathname.split('/').at(-1)}`)
+        return (await leverAgent(input, env)).fetch(`https://agent/test/approvals/${url.pathname.split('/').at(-1)}`)
       }
       return await runtime.fetch(input, env)
     } catch (cause) {

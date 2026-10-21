@@ -28,11 +28,11 @@ const optionsOf = (endpoint: ResolvedEndpoint): ModelOptions => {
 }
 
 /**
- * The deployment's own endpoint as account `userId`'s model calls use it (its owner's subscriptions included for the
- * owner alone, ADR 0087), or `none` when it has none (ADR 0064).
+ * The deployment's own endpoint as workspace `workspaceId`'s model calls use it (the deployment owner's subscriptions
+ * included in their workspace alone, ADRs 0087, 0089), or `none` when it has none (ADR 0064).
  */
-const deploymentOf = (env: RuntimeEnv, userId: string): CurrentEndpoint => {
-  const own = offeredEndpoint(env, userId)
+const deploymentOf = (env: RuntimeEnv, workspaceId: string): CurrentEndpoint => {
+  const own = offeredEndpoint(env, workspaceId)
   if (own === undefined) return { source: 'none' }
   const [first, ...rest] = own.options
   return {
@@ -51,11 +51,11 @@ const deploymentOf = (env: RuntimeEnv, userId: string): CurrentEndpoint => {
 const InferenceLive: Layer.Layer<Inference, never, AgentInput | Db | Cipher> = Layer.effect(
   Inference,
   Effect.gen(function* () {
-    const { env, userId, mcpFetch } = yield* AgentInput
+    const { env, workspaceId, mcpFetch } = yield* AgentInput
     const store = endpointStore(yield* Db)
     const cipher = yield* Cipher
-    const aad = `model-endpoint:${userId}`
-    const deployment = deploymentOf(env, userId)
+    const aad = `model-endpoint:${workspaceId}`
+    const deployment = deploymentOf(env, workspaceId)
     const kept = yield* Ref.make<CurrentEndpoint | undefined>(undefined)
     const endpoint = Effect.gen(function* () {
       const known = yield* Ref.get(kept)

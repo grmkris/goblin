@@ -1,11 +1,14 @@
-const KEY = 'goblin:recent-threads'
+import { workspaceKey } from './workspace-path.ts'
+
+/** Kept per workspace (ADR 0089): each has its own threads. */
+const key = () => workspaceKey('recent-threads')
 /** How many recently opened threads the browser remembers. */
 const KEPT = 20
 
 /** The threads this browser opened recently, newest first (a convenience: without storage there are none). */
 export function recentThreads(): readonly string[] {
   try {
-    const stored: unknown = JSON.parse(localStorage.getItem(KEY) ?? '[]')
+    const stored: unknown = JSON.parse(localStorage.getItem(key()) ?? '[]')
     return Array.isArray(stored)
       ? stored.filter((id): id is string => typeof id === 'string' && /^\d{1,12}$/u.test(id))
       : []
@@ -19,7 +22,7 @@ export function recentThreads(): readonly string[] {
 export function rememberThread(thread: string): void {
   try {
     const next = [thread, ...recentThreads().filter((id) => id !== thread)].slice(0, KEPT)
-    localStorage.setItem(KEY, JSON.stringify(next))
+    localStorage.setItem(key(), JSON.stringify(next))
   } catch {
     // expected: storage is off or full, so only the sidebar's recent list is lost
   }

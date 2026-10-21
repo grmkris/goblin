@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { WorkspaceSnapshot } from '@goblin/contracts'
 import { BrowserPiEvents } from '../lib/conversation-stream.ts'
+import { apiPath } from '../lib/workspace-path.ts'
 import { workspaceSync } from '../lib/workspace/sync.ts'
 
 /**
@@ -25,7 +26,7 @@ export function WorkspaceFeedProvider({
   })
   useEffect(() => {
     if (!enabled) return
-    return workspaceSync(queryClient).connect(() => new BrowserPiEvents('/api/workspace/events'))
+    return workspaceSync(queryClient).connect(() => new BrowserPiEvents(apiPath('/api/workspace/events')))
   }, [enabled, queryClient])
   return children
 }

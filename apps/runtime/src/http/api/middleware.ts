@@ -45,11 +45,12 @@ const admitted = <A, E, R, E1, R1>(
   })
 
 /**
- * Owner admission (`OwnerAdmission` in the contract): a grant of resident authority unless the endpoint says
- * otherwise (`GrantsResident`: changing it must not grant first), then the handler. A request from a caller (ADR 0086:
- * a server's key or an OAuth client of the owner) is admitted only to an endpoint whose `EndpointScope` the caller
- * holds (else `scope`), within its requests for the minute (else `rate_limited` with `retryAfter`, ADR 0085), and never
- * grants it: a caller is not the owner's presence. What it reaches past admission is its kind's (`keys/policy.ts`).
+ * Owner admission (`OwnerAdmission` in the contract): a request says who it comes from (ADR 0089), else it is
+ * `Unauthenticated` (`principal`). A member's session grants resident authority unless the endpoint says otherwise
+ * (`GrantsResident`: changing it must not grant first), then the handler runs. A request from a caller (ADR 0086: a
+ * server's key or an OAuth client) is admitted only to an endpoint whose `EndpointScope` the caller holds (else
+ * `scope`), within its requests for the minute (else `rate_limited` with `retryAfter`, ADR 0085), and never grants
+ * it: a caller is not a member's presence. What it reaches past admission is its kind's (`keys/policy.ts`).
  */
 export const OwnerAdmissionLive = Layer.effect(
   OwnerAdmission,
@@ -58,8 +59,12 @@ export const OwnerAdmissionLive = Layer.effect(
     const take = callerMinutes()
     const admit = (annotations: Context.Context<never>) =>
       Effect.flatMap(Effect.serviceOption(RequestContext), (context): Effect.Effect<void, AppError> => {
-        const caller = Option.getOrUndefined(context)?.caller
-        if (caller === undefined) return Context.get(annotations, GrantsResident) ? resident.grant() : Effect.void
+        const facts = Option.getOrUndefined(context)
+        const caller = facts?.caller
+        if (caller === undefined) {
+          if (facts?.member === undefined) return Effect.fail(new Unauthenticated({ reason: 'principal' }))
+          return Context.get(annotations, GrantsResident) ? resident.grant() : Effect.void
+        }
         const scope = Context.get(annotations, EndpointScope)
         if (scope === undefined || !caller.scopes.some((held) => held === scope))
           return Effect.fail(new Forbidden({ reason: 'scope' }))

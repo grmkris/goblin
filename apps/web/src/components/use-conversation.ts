@@ -20,6 +20,7 @@ import { type ConversationProjection, historyStart } from '../lib/projection.ts'
 import { branchPoints, fromEntry } from '../lib/threads.ts'
 import { SubmissionRetry } from '../lib/submission-retry.ts'
 import { useKeyboardInset } from './use-keyboard.ts'
+import { apiPath } from '../lib/workspace-path.ts'
 
 type MessageContext = {
   readonly appContext?: readonly AppContext[]
@@ -48,7 +49,7 @@ export function messageBody(
 /** Every conversation the browser follows, shared by the panes and inline threads that show it. */
 const streams = new StreamPool((thread) => ({
   ...streamReads(thread),
-  events: () => new BrowserPiEvents(`/api/conversations/${thread}/events`),
+  events: () => new BrowserPiEvents(apiPath(`/api/conversations/${thread}/events`)),
 }))
 
 /** Starts every followed conversation again from a fresh snapshot, while the page is visible. */

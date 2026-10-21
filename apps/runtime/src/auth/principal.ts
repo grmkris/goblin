@@ -1,10 +1,15 @@
 import { Predicate } from 'effect'
 import { Unauthenticated } from '../http/errors.ts'
 
-/** An inbound MCP client acting for the owner with a Better Auth access token. Never an owner session. */
+/**
+ * An inbound MCP client acting for a person in one workspace (ADR 0089) with a Better Auth access token. Never a
+ * session.
+ */
 export type ClientPrincipal = {
   readonly clientId: string
   readonly subject: string
+  /** The workspace the consent behind the token names (`workspace` claim). */
+  readonly workspaceId: string
   readonly scopes: readonly string[]
   readonly expiresAt: number
 }
@@ -17,6 +22,7 @@ export interface TokenClaims {
   readonly scope?: unknown
   readonly exp?: unknown
   readonly cnf?: unknown
+  readonly workspace?: unknown
 }
 const text = (value: unknown): value is string => Predicate.isString(value) && value.length > 0
 const audiences = (value: unknown): readonly string[] =>
@@ -34,10 +40,12 @@ export const clientFromClaims = (
     throw new Unauthenticated({ reason: 'expired' })
   if (!text(claims.sub)) throw new Unauthenticated({ reason: 'subject' })
   if (!text(clientId)) throw new Unauthenticated({ reason: 'client' })
+  if (!text(claims.workspace)) throw new Unauthenticated({ reason: 'workspace' })
   if (claims.cnf !== undefined) throw new Unauthenticated({ reason: 'sender-constrained tokens are not supported' })
   return {
     clientId,
     subject: claims.sub,
+    workspaceId: claims.workspace,
     scopes: Predicate.isString(claims.scope) ? claims.scope.split(/\s+/u).filter(Boolean) : [],
     expiresAt: claims.exp,
   }

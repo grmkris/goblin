@@ -38,8 +38,8 @@ import type { Skills } from '../skills/service.ts'
  */
 const FlowsLive = Layer.unwrap(
   Effect.gen(function* () {
-    const { telemetry, env, userId } = yield* AgentInput
-    const analytics = yield* flowAnalytics(env, userId)
+    const { telemetry, env, workspaceId } = yield* AgentInput
+    const analytics = yield* flowAnalytics(env, workspaceId)
     return FlowEvents.layerWith((event) =>
       Effect.map(Clock.currentTimeMillis, (at) =>
         telemetry.record(flowRunEvent(event, telemetry.id('flow', at), at)),

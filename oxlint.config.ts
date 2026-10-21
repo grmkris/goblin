@@ -190,7 +190,7 @@ export default defineConfig({
               { pattern: '^DrawerTrigger$', allow: ['layout', 'message-action', 'turn-map-tab'] },
               {
                 pattern: '^DropdownMenuTrigger$',
-                allow: ['layout', 'block-action', 'sidebar-place', 'sidebar-row', 'sidebar-row-more'],
+                allow: ['layout', 'block-action', 'sidebar-brand', 'sidebar-place', 'sidebar-row', 'sidebar-row-more'],
               },
               { pattern: '^PopoverTrigger$', allow: ['layout', 'sidebar-row', 'turn-map-trigger', 'usage-indicator'] },
             ],

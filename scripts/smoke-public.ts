@@ -20,7 +20,8 @@ export async function publicSmoke(
   const signIn = health['signIn']
   if ((signup !== 'invite' && signup !== 'open') || !Array.isArray(signIn) || signIn.length === 0)
     throw new Error('prod_admission_policy_mismatch')
-  const probe = await dev.send('/api/agent/usage', { owner: false })
+  // A member's path without a session (ADR 0089): refused before any workspace is looked up.
+  const probe = await dev.send('/w/smoke-probe/api/agent/usage', { owner: false })
   if (probe.status !== 401) throw new Error('anonymous_auth_probe_not_refused')
   await internalChecks(dev.origin, steps)
   if (signup === 'invite') await refusedSignup()

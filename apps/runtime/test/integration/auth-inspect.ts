@@ -164,7 +164,7 @@ const management = (tools: readonly string[]) => tools.filter((name) => MANAGEME
 /** A Persona one of the owner's own API keys made (ADR 0081), by its name. */
 async function keyMadePersona(base: string, who: Person): Promise<string> {
   const browser = { cookie: who.cookie, origin: APP, 'x-goblin-csrf': '1', 'cf-connecting-ip': who.ip }
-  const made = await fetch(`${base}/api/keys`, {
+  const made = await fetch(`${base}/w/${who.slug}/api/keys`, {
     method: 'POST',
     headers: { ...browser, 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'service', scopes: ['personas'], servers: [], expiresInDays: 1 }),
@@ -281,7 +281,7 @@ export async function inspectAuthCase(base: string) {
   } finally {
     await reading.close()
   }
-  const revoked = await fetch(`${base}/api/clients/${clientId}`, {
+  const revoked = await fetch(`${base}/w/${owner.slug}/api/clients/${clientId}`, {
     method: 'DELETE',
     headers: { cookie: owner.cookie, origin: APP, 'x-goblin-csrf': '1', 'cf-connecting-ip': owner.ip },
   })

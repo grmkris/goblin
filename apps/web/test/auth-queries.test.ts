@@ -71,7 +71,7 @@ describe("a sign-in through the deployment's provider", () => {
     expect(await request?.json()).toMatchObject({
       provider: 'oidc',
       callbackURL: '/',
-      newUserCallbackURL: '/start/welcome',
+      newUserCallbackURL: '/?welcome=1',
       errorCallbackURL: '/login?new=1',
       disableRedirect: true,
     })

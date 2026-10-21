@@ -260,7 +260,7 @@ function watchFeed(url: string, owner: Person) {
   const controller = new AbortController()
   const changes: WorkspaceChange[] = []
   const done = (async () => {
-    const response = await fetch(`${url}/api/workspace/events`, {
+    const response = await fetch(`${url}/w/${owner.slug}/api/workspace/events`, {
       headers: { cookie: owner.cookie, origin: 'https://goblin.test', 'cf-connecting-ip': owner.ip },
       signal: controller.signal,
     })

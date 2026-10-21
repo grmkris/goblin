@@ -10,6 +10,7 @@ import * as Schema from 'effect/Schema'
 import { owner, requestId } from './api.ts'
 import { answerRef } from './query/app-error.ts'
 import { pad } from './format.ts'
+import { apiPath } from './workspace-path.ts'
 
 /** The day's upload folder, by the owner's local date. */
 export function uploadFolder(now: Date): string {
@@ -17,7 +18,7 @@ export function uploadFolder(now: Date): string {
 }
 
 /** Where a stored file downloads from (only plain images open in place). */
-export const fileUrl = (path: string): string => `/api/files/content?path=${encodeURIComponent(path)}`
+export const fileUrl = (path: string): string => apiPath(`/api/files/content?path=${encodeURIComponent(path)}`)
 
 /** A size for people: bytes, KB or MB. */
 export function fileSize(bytes: number): string {

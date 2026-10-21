@@ -10,7 +10,7 @@ import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { isAppError } from '../../src/http/errors.ts'
 import type { RpcResult } from '../../src/http/rpc.ts'
-import { type AgentFetch, type OwnerClient, ownerApi, workspaceSnapshot } from '../owner-client.ts'
+import { type AgentFetch, type OwnerClient, asOwner, ownerApi, workspaceSnapshot } from '../owner-client.ts'
 import type { ProbeStub } from './probe.ts'
 import { until } from './until.ts'
 
@@ -53,7 +53,8 @@ export const ownerSend = (
 
 /** Every registered chat, closed ones included, as the workspace feed's snapshot lists them. */
 export const workspaceConversations = async (agent: AgentFetch): Promise<readonly ConversationView[]> =>
-  (await workspaceSnapshot(await agent.fetch(new Request('https://agent/api/workspace/events')))).conversations
+  (await workspaceSnapshot(await agent.fetch(new Request('https://agent/api/workspace/events', asOwner()))))
+    .conversations
 
 /** A Thread, empty or branched from an entry: `POST /api/conversations`. */
 export const ownerCreate = (agent: AgentFetch, input: CreateConversation) =>

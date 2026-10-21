@@ -4,7 +4,10 @@ import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { useState } from 'react'
 
-const KEY = 'goblin:start-draft'
+import { workspaceKey } from '../lib/workspace-path.ts'
+
+/** Kept per workspace (ADR 0089): each has its own Start. */
+const key = () => workspaceKey('start-draft')
 
 /** Only these typed kickoff refusals prove no channel was created. A generic 400/409 may follow a partial kickoff. */
 export const kickoffAllowsEdit = (error: unknown): boolean =>
@@ -35,7 +38,7 @@ const decode = Schema.decodeUnknownOption(Schema.fromJsonString(StartDraft))
 /** Kept in this tab across model setup and a connection's OAuth return; never stores a model key. */
 function read(): StartDraft {
   try {
-    return Option.getOrElse(decode(sessionStorage.getItem(KEY) ?? ''), empty)
+    return Option.getOrElse(decode(sessionStorage.getItem(key()) ?? ''), empty)
   } catch {
     // expected: storage can be unavailable
     return empty()
@@ -44,7 +47,7 @@ function read(): StartDraft {
 
 export function clearStartDraft(): void {
   try {
-    sessionStorage.removeItem(KEY)
+    sessionStorage.removeItem(key())
   } catch {
     /* expected: storage is unavailable */
   }
@@ -55,7 +58,7 @@ export function useStartDraft() {
   const store = (next: StartDraft) => {
     setDraft(next)
     try {
-      sessionStorage.setItem(KEY, JSON.stringify(next))
+      sessionStorage.setItem(key(), JSON.stringify(next))
     } catch {
       /* expected: storage is unavailable; the mounted page keeps the draft */
     }

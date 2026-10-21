@@ -43,12 +43,25 @@ afterEach(async () => {
 /** Runs `dispose` after the test, after anything registered later (last in, first out). */
 export const cleanup = (dispose: () => unknown): void => void disposals.push(dispose)
 
-/** Requests answered through `http`, as the agent answers them; disposed after each test. */
+/**
+ * Requests answered through `http`, as the agent answers them; disposed after each test. A request that names neither
+ * a caller nor a member acts for the workspace's owner, as a member's session forwarded by the edge does (ADR 0089).
+ */
 export const serve = (http: Layer.Layer<AgentHttp>) => {
   const runtime = ManagedRuntime.make(http)
   cleanup(() => runtime.dispose())
-  const fetch = (request: Request) => runtime.runPromise(AgentHttp.use((agent) => agent.handle(request)))
+  const fetch = (request: Request) => {
+    const named = request.headers.has('x-goblin-caller') || request.headers.has('x-goblin-member')
+    const admitted = named ? request : new Request(request, { headers: memberOf(request.headers) })
+    return runtime.runPromise(AgentHttp.use((agent) => agent.handle(admitted)))
+  }
   return { fetch }
+}
+
+const memberOf = (headers: Headers): Headers => {
+  const with_ = new Headers(headers)
+  with_.set('x-goblin-member', JSON.stringify({ user: 'owner', role: 'owner' }))
+  return with_
 }
 
 const Unrouted = Schema.Struct({

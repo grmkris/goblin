@@ -12,15 +12,18 @@ import {
   type TokenClaims,
 } from './principal.ts'
 import { mcpResource, protectedResourceMetadata } from './resources.ts'
+import type { Person } from './workspaces.ts'
 
 type UserSession = {
   readonly userId: string
+  readonly person: Person
   readonly expiresAt: number
 }
 
 /**
- * A signed-in user's browser session (cookie): that user owns one agent. Bearer tokens never count: a request that
- * carries one is rejected here, so inbound MCP clients cannot reach owner routes or outbound credentials.
+ * A signed-in person's browser session (cookie), which reaches the workspaces they belong to (ADR 0089). Bearer tokens
+ * never count: a request that carries one is rejected here, so inbound MCP clients cannot reach owner routes or
+ * outbound credentials.
  */
 export const requireUserSession = async (request: Request, env: RuntimeEnv): Promise<UserSession> => {
   if (request.headers.has('authorization')) throw new Unauthenticated({ reason: 'session required' })
@@ -29,14 +32,16 @@ export const requireUserSession = async (request: Request, env: RuntimeEnv): Pro
     throw new Unauthenticated({ reason: 'session required' })
   return {
     userId: session.user.id,
+    person: { id: session.user.id, name: session.user.name, email: session.user.email },
     expiresAt: Math.floor(session.session.expiresAt.getTime() / 1000),
   }
 }
 
 /**
  * An inbound MCP client's access token: a signature from our own JWKS (read locally, no self-fetch), our issuer and
- * /mcp audience, an enabled client and the user's standing consent. Its scopes count only while that consent still
- * grants them, so revoking the client, or consenting again more narrowly, ends inspection at once.
+ * /mcp audience, an enabled client, and the person's standing consent for the token's workspace while they are still
+ * its member (ADR 0089), in one read. Its scopes count only while that consent still grants them, so revoking the
+ * client, consenting again more narrowly or leaving the workspace ends its access at once.
  */
 export const verifyClientToken = async (token: string, env: RuntimeEnv): Promise<ClientPrincipal> => {
   const auth = createAuth(env, env.AUTH_DB)
@@ -56,8 +61,12 @@ export const verifyClientToken = async (token: string, env: RuntimeEnv): Promise
     .bind(principal.clientId)
     .first<{ disabled: number | null }>()
   if (client === null || client.disabled === 1) throw new Unauthenticated({ reason: 'client revoked' })
-  const consent = await env.AUTH_DB.prepare('SELECT scopes FROM oauthConsent WHERE clientId = ? AND userId = ?')
-    .bind(principal.clientId, principal.subject)
+  const consent = await env.AUTH_DB.prepare(
+    `SELECT o.scopes AS scopes FROM oauthConsent o
+       JOIN member m ON m.organizationId = o.referenceId AND m.userId = o.userId
+      WHERE o.clientId = ? AND o.userId = ? AND o.referenceId = ?`,
+  )
+    .bind(principal.clientId, principal.subject, principal.workspaceId)
     .first<ConsentRow>()
   if (consent === null) throw new Unauthenticated({ reason: 'consent revoked' })
   const granted = grantedScopes(consent)
@@ -70,8 +79,10 @@ export const verifyClientToken = async (token: string, env: RuntimeEnv): Promise
  */
 export const handleAuth = (request: Request, env: RuntimeEnv): Promise<Response> => {
   const path = new URL(request.url).pathname
-  // API keys are made and ended only through the account API (ADR 0081): none of the plugin's own routes is served.
-  if (path.startsWith(`${AUTH_BASE_PATH}/api-key/`)) return Promise.resolve(new Response('Not found', { status: 404 }))
+  // API keys and workspaces are made, changed and ended only through the account APIs (ADRs 0081, 0089): none of
+  // their plugins' own routes is served.
+  if (path.startsWith(`${AUTH_BASE_PATH}/api-key/`) || path.startsWith(`${AUTH_BASE_PATH}/organization/`))
+    return Promise.resolve(new Response('Not found', { status: 404 }))
   const provider = path.startsWith(`${AUTH_BASE_PATH}/`) && isOidcPath(path.slice(AUTH_BASE_PATH.length))
   return createAuth(env, env.AUTH_DB, { provider }).handler(request)
 }

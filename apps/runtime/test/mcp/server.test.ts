@@ -30,7 +30,11 @@ const connect = async (caller: Caller, reply: (request: Request) => Response = (
     },
   }
   const handler = createMcpHandler(() =>
-    mcpServer(caller.scopes, (call) => Effect.runPromise(ownerCall(agent, caller, call))),
+    mcpServer(caller.scopes, (call) =>
+      Effect.runPromise(
+        ownerCall(agent, caller, caller.kind === 'client' ? { user: 'owner', role: 'owner' } : undefined, call),
+      ),
+    ),
   )
   const mcp = new Client({ name: 'probe', version: '1.0.0' })
   await mcp.connect(

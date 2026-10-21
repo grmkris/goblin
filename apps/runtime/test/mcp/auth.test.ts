@@ -5,7 +5,15 @@ import { clientFromClaims } from '../../src/auth/principal.ts'
 
 describe('inbound client claims (unit)', () => {
   const expected = { issuer: 'https://dev.example/api/auth', resource: 'https://dev.example/mcp', now: 100 }
-  const valid = { iss: expected.issuer, sub: 'owner', azp: 'cli', aud: expected.resource, exp: 101, scope: 'openid' }
+  const valid = {
+    iss: expected.issuer,
+    sub: 'owner',
+    azp: 'cli',
+    aud: expected.resource,
+    exp: 101,
+    scope: 'openid',
+    workspace: 'w1',
+  }
   const reason = (claims: object) => {
     try {
       clientFromClaims(claims, expected)
@@ -19,6 +27,7 @@ describe('inbound client claims (unit)', () => {
     expect(clientFromClaims(valid, expected)).toEqual({
       clientId: 'cli',
       subject: 'owner',
+      workspaceId: 'w1',
       scopes: ['openid'],
       expiresAt: 101,
     })
@@ -28,6 +37,8 @@ describe('inbound client claims (unit)', () => {
     expect(reason({ ...valid, aud: 'https://dev.example/other' })).toBe('audience')
     expect(reason({ ...valid, exp: 100 })).toBe('expired')
     expect(reason({ ...valid, azp: undefined })).toBe('client')
+    // A token from before workspaces, or one whose consent named none, reaches no agent (ADR 0089).
+    expect(reason({ ...valid, workspace: undefined })).toBe('workspace')
     expect(reason({ ...valid, cnf: { jkt: 'x' } })).toBe('sender-constrained tokens are not supported')
   })
 })

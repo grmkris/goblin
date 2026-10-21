@@ -70,8 +70,22 @@ async function swipe(page: Page, from: readonly [number, number], to: readonly [
   await cdp.detach()
 }
 
+/** The signed-in owner's first workspace's slug, read once with the page's own session (ADR 0089). */
+let ownWorkspace: string | undefined
+async function workspaceSlug(page: Page, origin: string): Promise<string> {
+  if (ownWorkspace !== undefined) return ownWorkspace
+  const listed: unknown = await (await page.request.get(`${origin}/api/workspaces`)).json()
+  const first: unknown = Array.isArray(listed) ? listed[0] : undefined
+  const slug = typeof first === 'object' && first !== null && 'slug' in first ? first.slug : undefined
+  if (typeof slug !== 'string') throw new Error('no_workspace')
+  ownWorkspace = slug
+  return slug
+}
+
+/** Opens `route`, a page of the owner's workspace, under its prefix (`/w/<slug>/…`). */
 async function visit(page: Page, origin: string, route: string): Promise<void> {
-  await page.goto(`${origin}${route}`, { waitUntil: 'networkidle', timeout: 60_000 })
+  const prefixed = route.startsWith('/w/') ? route : `/w/${await workspaceSlug(page, origin)}${route}`
+  await page.goto(`${origin}${prefixed}`, { waitUntil: 'networkidle', timeout: 60_000 })
   await page.waitForTimeout(SETTLE_MS)
 }
 
@@ -80,15 +94,17 @@ async function visit(page: Page, origin: string, route: string): Promise<void> {
  * one: the first snapshot of the workspace feed the page itself follows.
  */
 async function threadRoute(page: Page): Promise<string | undefined> {
+  // The page's workspace is the first part of its address (`/w/<slug>`, ADR 0089), and its feed is under it.
+  const prefix = /^\/w\/[^/]+/u.exec(new URL(page.url()).pathname)?.[0] ?? ''
   const id = await page.evaluate(
-    () =>
+    (feedPath) =>
       new Promise<string | undefined>((resolve) => {
         // The page's own EventSource; the script's Bun typings give its constructor no URL.
         const Feed: new (url: string) => {
           addEventListener: (type: string, listener: (event: { readonly data: string }) => void) => void
           close: () => void
         } = EventSource
-        const feed = new Feed('/api/workspace/events')
+        const feed = new Feed(feedPath)
         const settle = (found: string | undefined) => {
           feed.close()
           resolve(found)
@@ -103,6 +119,7 @@ async function threadRoute(page: Page): Promise<string | undefined> {
         feed.addEventListener('error', () => settle(undefined))
         setTimeout(() => settle(undefined), 10_000)
       }),
+    `${prefix}/api/workspace/events`,
   )
   return id === undefined ? undefined : `/c/${id}`
 }

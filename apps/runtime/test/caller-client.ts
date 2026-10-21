@@ -12,6 +12,9 @@ export const fixtureClient = (name = 'fixture-client'): Caller => ({
   scopes: ['agent', 'topics', 'conversations', 'personas', 'inspect', 'transcripts'],
 })
 
+/** The person an OAuth client of the probes acts for (ADR 0089). */
+const PROBE_MEMBER = { user: 'probe-owner', role: 'owner' } as const
+
 /**
  * One owner API call as `caller`, as /mcp makes it, answered in the shape the probes assert on: `{ ok: true, value }`,
  * or `{ ok: false, error }` with the encoded failure.
@@ -20,7 +23,10 @@ const callerResult = async <A, E>(
   agent: AgentFetch,
   caller: Caller,
   call: (api: OwnerClient) => Effect.Effect<A, E>,
-): Promise<RpcResult<A>> => encodeExit(await Effect.runPromiseExit(ownerCall(agent, caller, call)))
+): Promise<RpcResult<A>> =>
+  encodeExit(
+    await Effect.runPromiseExit(ownerCall(agent, caller, caller.kind === 'client' ? PROBE_MEMBER : undefined, call)),
+  )
 
 /** A client's question in main (`POST /api/agent/ask`), as /mcp's `ask_agent` asks it, labelled `author`. */
 export const askResult = (agent: AgentFetch, author: string, input: string, operationId: string, waitMs: number) =>

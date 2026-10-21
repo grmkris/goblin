@@ -189,7 +189,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       memory: this.#memory,
       subagentTools: this.#subagents.tools,
       helperExtensions: this.#subagents.members(),
-      userId: this.name,
+      workspaceId: this.name,
       scheduleEvents: (at) => this.#scheduleWake('mcpEventsWake', at),
       scheduleSources: (seconds) => void this.schedule(seconds, 'sourcesWake'),
       mcpFetch: this.mcpFetch(),

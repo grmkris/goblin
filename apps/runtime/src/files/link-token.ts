@@ -13,7 +13,7 @@ export const FILE_LINK_SECONDS = 900
 const PURPOSE = 'goblin/files/link'
 
 /** What a link's token says: whose file, which one, and until when (epoch seconds). */
-type LinkClaims = { readonly userId: string; readonly path: string; readonly expiresAt: number }
+type LinkClaims = { readonly workspaceId: string; readonly path: string; readonly expiresAt: number }
 
 /** The claims as the token carries them, in short keys. */
 const Claims = Schema.Struct({
@@ -26,10 +26,10 @@ const decodeClaims = Schema.decodeUnknownOption(Schema.fromJsonString(Claims))
 /** A token's two parts: its claims as base64url JSON, and their HMAC. */
 const FILE_LINK_TOKEN = /^([\w-]{1,4096})\.([\w-]{43})$/u
 
-/** The token of a link to `claims.path` of `claims.userId`, valid until `claims.expiresAt`. */
+/** The token of a link to `claims.path` of workspace `claims.workspaceId`'s agent, valid until `claims.expiresAt`. */
 export async function fileLinkToken(credentialKey: string, claims: LinkClaims): Promise<string> {
   const body = base64url(
-    new TextEncoder().encode(JSON.stringify({ u: claims.userId, p: claims.path, e: claims.expiresAt })),
+    new TextEncoder().encode(JSON.stringify({ u: claims.workspaceId, p: claims.path, e: claims.expiresAt })),
   )
   return `${body}.${await purposeMac(credentialKey, PURPOSE, body)}`
 }
@@ -48,7 +48,7 @@ export async function fileLinkClaims(
   // Only a body goblin signed is read, so it is base64url JSON.
   const claims = Option.getOrUndefined(decodeClaims(new TextDecoder().decode(bytesOfBase64url(body))))
   if (claims === undefined || claims.e <= now || claims.e > now + FILE_LINK_SECONDS) return undefined
-  return { userId: claims.u, path: claims.p, expiresAt: claims.e }
+  return { workspaceId: claims.u, path: claims.p, expiresAt: claims.e }
 }
 
 /**

@@ -55,12 +55,17 @@ describe("the deployment's own model endpoint (unit)", () => {
   })
 
   it("offers the owner's own subscriptions to the owner's account alone, after every account's (ADR 0087)", () => {
-    const owner = { ...house, MODELS: 'glm-5.3', OWNER_USER_ID: 'u_owner', OWNER_MODELS: 'sub/grok-4.7, glm-5.3 ,' }
+    const owner = {
+      ...house,
+      MODELS: 'glm-5.3',
+      OWNER_WORKSPACE_ID: 'u_owner',
+      OWNER_MODELS: 'sub/grok-4.7, glm-5.3 ,',
+    }
     expect(ownerModelIds(owner)).toEqual(['sub/grok-4.7'])
     expect(deploymentModelIds(owner, 'u_owner')).toEqual(['gemini-3.8-flash', 'glm-5.3', 'sub/grok-4.7'])
     expect(deploymentModelIds(owner, 'u_other')).toEqual(['gemini-3.8-flash', 'glm-5.3'])
     // Without an owner named, nobody is offered them.
-    expect(deploymentModelIds({ ...owner, OWNER_USER_ID: '' }, '')).toEqual(['gemini-3.8-flash', 'glm-5.3'])
+    expect(deploymentModelIds({ ...owner, OWNER_WORKSPACE_ID: '' }, '')).toEqual(['gemini-3.8-flash', 'glm-5.3'])
     expect(offeredEndpoint(owner, 'u_owner')?.options.at(-1)).toMatchObject({ route: 'Your subscription' })
   })
 

@@ -107,9 +107,9 @@ export const routineRunsOf = (store: RoutineRunStore) =>
  */
 export const RoutineRunsLive: Layer.Layer<RoutineRuns | RoutineUsage, never, AgentInput | Db> = Layer.effectContext(
   Effect.gen(function* () {
-    const { harness, userId } = yield* AgentInput
+    const { harness, workspaceId } = yield* AgentInput
     const db = yield* Db
-    const runs = new RunStore(db, userId)
+    const runs = new RunStore(db, workspaceId)
     const projection = new UsageProjection(db, runs, harness)
     yield* Effect.promise(() => installRoutineUsage(harness, projection, runs))
     const usage = RoutineUsage.of({
@@ -131,9 +131,9 @@ export const RoutinesLive: Layer.Layer<
   Exclude<RoutineControlServices, Routines | Notices> | Db
 > = Layer.effectContext(
   Effect.gen(function* () {
-    const { userId } = yield* AgentInput
+    const { workspaceId } = yield* AgentInput
     const db = yield* Db
-    const store = new RoutineStore(db, userId)
+    const store = new RoutineStore(db, workspaceId)
     const routines = routinesOf(store)
     const notices = noticesOf(new NoticeStore(db))
     const control = yield* makeRoutineControl(store).pipe(

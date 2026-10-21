@@ -3,7 +3,7 @@ import { request as httpRequest } from 'node:http'
 import { expect } from 'vitest'
 import { eventsHookToken } from '../../src/mcp/events/route-token.ts'
 import { callOwner } from '../owner-client.ts'
-import { call, ownerFetch, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
+import { call, inWorkspace, ownerFetch, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 
 const APP = 'https://goblin.test'
 const Detail = Schema.Struct({ error: Schema.Struct({ code: Schema.String, ref: Schema.optional(Schema.String) }) })
@@ -67,7 +67,7 @@ const write = (
   path: string,
   init: { method: string; body: unknown; headers: Record<string, string> },
 ) =>
-  ownerFetch(`${url}${path}`, {
+  ownerFetch(`${url}${inWorkspace(who, path)}`, {
     method: init.method,
     headers: { cookie: who.cookie, 'cf-connecting-ip': who.ip, 'content-type': 'application/json', ...init.headers },
     body: JSON.stringify(init.body),
@@ -148,7 +148,7 @@ export async function internalRefusalCase(url: string): Promise<void> {
   const deliver = async () =>
     hook(
       url,
-      `/hooks/mcp-events/${owner.userId}/fixture/${await eventsHookToken(CREDENTIAL_KEY, owner.userId, 'fixture')}`,
+      `/hooks/mcp-events/${owner.workspace}/fixture/${await eventsHookToken(CREDENTIAL_KEY, owner.workspace, 'fixture')}`,
       { 'x-mcp-subscription-id': 'remote-1', 'webhook-id': 'msg_1', 'webhook-timestamp': '0', 'webhook-signature': '' },
       '{}',
     )

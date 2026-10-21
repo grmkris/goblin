@@ -41,4 +41,27 @@ describe('owner admission', () => {
     expect(await revoked.json()).toMatchObject({ state: 'revoked' })
     expect(grants).toHaveLength(renewed)
   })
+
+  // A forward that says no one, or says it in a header that does not decode, is refused, never taken for the owner
+  // (ADR 0089); `serve` sends the owner's member header only when a request names neither a caller nor a member.
+  it.each([
+    ['a malformed member', { 'x-goblin-member': '{"user":"owner","role":"king"}' }],
+    [
+      'a malformed caller beside a member',
+      { 'x-goblin-member': '{"user":"owner","role":"owner"}', 'x-goblin-caller': '{' },
+    ],
+    ['a member that is not JSON', { 'x-goblin-member': 'owner' }],
+  ] as const)('refuses %s without granting resident authority', async (_case, headers) => {
+    const grants: number[] = []
+    const events = stub(Events, { disableServer: () => Effect.void })
+    const { fetch } = serve(
+      served([ResidentGroup], ResidentHandlers).pipe(
+        Layer.provide(Layer.mergeAll(countingResident(database(), grants), events)),
+      ),
+    )
+    const refused = await fetch(new Request('https://agent/api/agent/resident', { headers }))
+    expect(refused.status).toBe(401)
+    expect(await refused.json()).toMatchObject({ error: { code: 'unauthenticated', reason: 'principal' } })
+    expect(grants).toHaveLength(0)
+  })
 })

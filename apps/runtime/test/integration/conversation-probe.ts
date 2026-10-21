@@ -1,5 +1,5 @@
 import { type ConversationView, PRIMARY_CHAT } from '@goblin/contracts'
-import type { AgentFetch } from '../owner-client.ts'
+import { type AgentFetch, asOwner } from '../owner-client.ts'
 import { type Probes, type ProbeStub, agentProbe, inWorker } from './probe.ts'
 import {
   branchMain,
@@ -311,7 +311,7 @@ async function* sseEvents(response: Response, deadline: number) {
  * working then idle (with its replies counted again), and its Close.
  */
 async function feedSequence(agent: ProbeStub) {
-  const events = sseEvents(await agent.fetch('https://agent/api/workspace/events'), Date.now() + 8000)
+  const events = sseEvents(await agent.fetch('https://agent/api/workspace/events', asOwner()), Date.now() + 8000)
   const first = await events.next()
   const created = await ownerCreate(agent, {})
   if (!created.ok) return { created }

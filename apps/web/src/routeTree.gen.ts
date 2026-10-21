@@ -24,6 +24,7 @@ import { Route as AAppIdRouteImport } from './routes/a.$appId'
 import { Route as AppsIndexRouteImport } from './routes/apps.index'
 import { Route as AppsNameRouteImport } from './routes/apps.$name'
 import { Route as CChatIdRouteImport } from './routes/c.$chatId'
+import { Route as ConsentWorkspaceRouteImport } from './routes/consent_.workspace'
 import { Route as PIdRouteImport } from './routes/p.$id'
 import { Route as StartIndexRouteImport } from './routes/start.index'
 import { Route as StartStepRouteImport } from './routes/start.$step'
@@ -104,6 +105,11 @@ const CChatIdRoute = CChatIdRouteImport.update({
   path: '/c/$chatId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConsentWorkspaceRoute = ConsentWorkspaceRouteImport.update({
+  id: '/consent_/workspace',
+  path: '/consent/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PIdRoute = PIdRouteImport.update({
   id: '/p/$id',
   path: '/p/$id',
@@ -141,6 +147,7 @@ export interface FileRoutesByFullPath {
   '/a/$appId': typeof AAppIdRoute
   '/apps/$name': typeof AppsNameRoute
   '/c/$chatId': typeof CChatIdRoute
+  '/consent/workspace': typeof ConsentWorkspaceRoute
   '/p/$id': typeof PIdRoute
   '/start/$step': typeof StartStepRoute
   '/apps/': typeof AppsIndexRoute
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/a/$appId': typeof AAppIdRoute
   '/apps/$name': typeof AppsNameRoute
   '/c/$chatId': typeof CChatIdRoute
+  '/consent/workspace': typeof ConsentWorkspaceRoute
   '/p/$id': typeof PIdRoute
   '/start/$step': typeof StartStepRoute
   '/apps': typeof AppsIndexRoute
@@ -184,6 +192,7 @@ export interface FileRoutesById {
   '/a/$appId': typeof AAppIdRoute
   '/apps/$name': typeof AppsNameRoute
   '/c/$chatId': typeof CChatIdRoute
+  '/consent_/workspace': typeof ConsentWorkspaceRoute
   '/p/$id': typeof PIdRoute
   '/start/$step': typeof StartStepRoute
   '/apps/': typeof AppsIndexRoute
@@ -207,6 +216,7 @@ export interface FileRouteTypes {
     | '/a/$appId'
     | '/apps/$name'
     | '/c/$chatId'
+    | '/consent/workspace'
     | '/p/$id'
     | '/start/$step'
     | '/apps/'
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/a/$appId'
     | '/apps/$name'
     | '/c/$chatId'
+    | '/consent/workspace'
     | '/p/$id'
     | '/start/$step'
     | '/apps'
@@ -249,6 +260,7 @@ export interface FileRouteTypes {
     | '/a/$appId'
     | '/apps/$name'
     | '/c/$chatId'
+    | '/consent_/workspace'
     | '/p/$id'
     | '/start/$step'
     | '/apps/'
@@ -271,6 +283,7 @@ export interface RootRouteChildren {
   AAppIdRoute: typeof AAppIdRoute
   AppsNameRoute: typeof AppsNameRoute
   CChatIdRoute: typeof CChatIdRoute
+  ConsentWorkspaceRoute: typeof ConsentWorkspaceRoute
   PIdRoute: typeof PIdRoute
   StartStepRoute: typeof StartStepRoute
   AppsIndexRoute: typeof AppsIndexRoute
@@ -385,6 +398,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CChatIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/consent_/workspace': {
+      id: '/consent_/workspace'
+      path: '/consent/workspace'
+      fullPath: '/consent/workspace'
+      preLoaderRoute: typeof ConsentWorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/p/$id': {
       id: '/p/$id'
       path: '/p/$id'
@@ -431,6 +451,7 @@ const rootRouteChildren: RootRouteChildren = {
   AAppIdRoute: AAppIdRoute,
   AppsNameRoute: AppsNameRoute,
   CChatIdRoute: CChatIdRoute,
+  ConsentWorkspaceRoute: ConsentWorkspaceRoute,
   PIdRoute: PIdRoute,
   StartStepRoute: StartStepRoute,
   AppsIndexRoute: AppsIndexRoute,

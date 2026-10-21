@@ -1,8 +1,10 @@
-import { AccountApi, OwnerApi } from '@goblin/contracts/api'
-import type * as HttpClientRequest from 'effect/http/HttpClientRequest'
+import { AccountApi, OwnerApi, WorkspaceAccountApi } from '@goblin/contracts/api'
+import * as HttpClient from 'effect/http/HttpClient'
+import * as HttpClientRequest from 'effect/http/HttpClientRequest'
 import * as HttpApiClient from 'effect/http-api/HttpApiClient'
 import { makeApiQuery } from './query/api-query.ts'
 import { crashReporter } from './query/crash-report.ts'
+import { apiPath } from './workspace-path.ts'
 
 /**
  * A short id for one request, sent as `x-goblin-request` by every call the browser makes (the typed clients, Better
@@ -23,9 +25,22 @@ const apiHeaders = (
   ...(operation === undefined ? {} : { 'x-goblin-operation': operation }),
 })
 
-/** The owner's API, served by their own agent: same-origin, with the session cookie. */
-export const owner = makeApiQuery({ id: 'goblin/OwnerApi', client: HttpApiClient.make(OwnerApi), headers: apiHeaders })
-/** The account's own API, answered by the Worker without waking the agent: inbound clients and crash reports. */
+/** Every call under this page's workspace (`/w/<slug>/api/…`, ADR 0089): the address says which workspace it is. */
+const inThisWorkspace = HttpClient.mapRequest((request) => HttpClientRequest.setUrl(request, apiPath(request.url)))
+
+/** The workspace's API, served by its agent: same-origin, with the session cookie, under the page's workspace. */
+export const owner = makeApiQuery({
+  id: 'goblin/OwnerApi',
+  client: HttpApiClient.make(OwnerApi, { transformClient: inThisWorkspace }),
+  headers: apiHeaders,
+})
+/** The workspace's own records the Worker answers without waking its agent: its API keys and the member's clients. */
+export const workspaceAccount = makeApiQuery({
+  id: 'goblin/WorkspaceAccountApi',
+  client: HttpApiClient.make(WorkspaceAccountApi, { transformClient: inThisWorkspace }),
+  headers: apiHeaders,
+})
+/** The person's own API, answered by the Worker: their workspaces, and crash reports. */
 export const account = makeApiQuery({
   id: 'goblin/AccountApi',
   client: HttpApiClient.make(AccountApi),

@@ -183,7 +183,7 @@ export function modelOptions(models: string | undefined, defaultId: string): Mod
 export type DeploymentEndpoint = { readonly baseUrl: string; readonly apiKey: string; readonly options: ModelOptions }
 
 type DeploymentEnvironment = Partial<
-  Pick<RuntimeEnv, 'MODEL_BASE_URL' | 'MODEL_ID' | 'MODEL_KEY' | 'MODELS' | 'OWNER_USER_ID' | 'OWNER_MODELS'>
+  Pick<RuntimeEnv, 'MODEL_BASE_URL' | 'MODEL_ID' | 'MODEL_KEY' | 'MODELS' | 'OWNER_WORKSPACE_ID' | 'OWNER_MODELS'>
 >
 
 /**
@@ -208,20 +208,24 @@ export const ownerModelIds = (env: DeploymentEnvironment): readonly string[] => 
 }
 
 /**
- * The deployment's endpoint as account `userId` is offered it (ADR 0087): every account's models, and to the
- * deployment's owner (`OWNER_USER_ID`) alone also its own subscriptions (`ownerModelIds`), after the others.
+ * The deployment's endpoint as workspace `workspaceId` is offered it (ADRs 0087, 0089): every workspace's models, and
+ * in the deployment owner's own workspace (`OWNER_WORKSPACE_ID`) alone also their subscriptions (`ownerModelIds`),
+ * after the others.
  */
-export function offeredEndpoint(env: DeploymentEnvironment, userId: string): DeploymentEndpoint | undefined {
+export function offeredEndpoint(env: DeploymentEnvironment, workspaceId: string): DeploymentEndpoint | undefined {
   const shared = deploymentEndpoint(env)
-  const owner = env.OWNER_USER_ID?.trim() ?? ''
-  if (shared === undefined || owner === '' || userId !== owner) return shared
+  const owner = env.OWNER_WORKSPACE_ID?.trim() ?? ''
+  if (shared === undefined || owner === '' || workspaceId !== owner) return shared
   const [first, ...rest] = shared.options
   return { ...shared, options: [first, ...rest, ...ownerModelIds(env).map(optionOf)] }
 }
 
-/** The ids of the models the deployment offers account `userId`, its default first; none without its own endpoint. */
-export const deploymentModelIds = (env: DeploymentEnvironment, userId: string): readonly string[] =>
-  offeredEndpoint(env, userId)?.options.map((option) => option.id) ?? []
+/**
+ * The ids of the models the deployment offers workspace `workspaceId`, its default first; none without its own
+ * endpoint.
+ */
+export const deploymentModelIds = (env: DeploymentEnvironment, workspaceId: string): readonly string[] =>
+  offeredEndpoint(env, workspaceId)?.options.map((option) => option.id) ?? []
 
 /**
  * The model id a call names when the deployment offers none: whatever endpoint answers it serves its own default in

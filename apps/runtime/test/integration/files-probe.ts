@@ -1,5 +1,5 @@
 import { FileStore } from '../../src/files/store.ts'
-import { callOwner } from '../owner-client.ts'
+import { asOwner, callOwner } from '../owner-client.ts'
 import { type Probes, type ProbeStub, filesBucket, inAgent, inWorker } from './probe.ts'
 
 const KIB = 1024
@@ -53,11 +53,10 @@ async function filesStoreProbe(sql: SqlStorage, bucket: R2Bucket, owner: string)
 }
 
 const put = (agent: ProbeStub, path: string, body: Uint8Array, type: string) =>
-  agent.fetch(`https://agent/api/files/content?path=${encodeURIComponent(path)}`, {
-    method: 'PUT',
-    body,
-    headers: { 'content-type': type },
-  })
+  agent.fetch(
+    `https://agent/api/files/content?path=${encodeURIComponent(path)}`,
+    asOwner({ method: 'PUT', body, headers: { 'content-type': type } }),
+  )
 
 /**
  * The owner's files over the agent's HTTP routes: small files stay in SQLite and larger ones spill to R2 under the
@@ -74,15 +73,25 @@ async function filesSequence(agent: ProbeStub, bucket: R2Bucket, owner: string) 
   ]
   const listing = await callOwner(agent, (api) => api.files.list({ query: { dir: '/uploads' } }))
   const spilled = await keysOf(bucket, owner)
-  const bigRead = await agent.fetch(`https://agent/api/files/content?path=${encodeURIComponent('/uploads/big.bin')}`)
+  const bigRead = await agent.fetch(
+    `https://agent/api/files/content?path=${encodeURIComponent('/uploads/big.bin')}`,
+    asOwner(),
+  )
   const bigBytes = (await bigRead.arrayBuffer()).byteLength
-  const png = await agent.fetch(`https://agent/api/files/content?path=${encodeURIComponent('/uploads/dot.png')}`)
+  const png = await agent.fetch(
+    `https://agent/api/files/content?path=${encodeURIComponent('/uploads/dot.png')}`,
+    asOwner(),
+  )
   await png.arrayBuffer()
-  const deleted = await agent.fetch(`https://agent/api/files/content?path=${encodeURIComponent('/uploads/big.bin')}`, {
-    method: 'DELETE',
-  })
+  const deleted = await agent.fetch(
+    `https://agent/api/files/content?path=${encodeURIComponent('/uploads/big.bin')}`,
+    asOwner({ method: 'DELETE' }),
+  )
   const afterDelete = await keysOf(bucket, owner)
-  const gone = await agent.fetch(`https://agent/api/files/content?path=${encodeURIComponent('/uploads/big.bin')}`)
+  const gone = await agent.fetch(
+    `https://agent/api/files/content?path=${encodeURIComponent('/uploads/big.bin')}`,
+    asOwner(),
+  )
   await gone.arrayBuffer()
   await put(agent, '/uploads/big-again.bin', big, 'application/octet-stream')
   const beforeErase = await keysOf(bucket, owner)

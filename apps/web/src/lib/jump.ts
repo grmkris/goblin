@@ -84,6 +84,7 @@ const SECTIONS: readonly { readonly to: PagePath; readonly hash: string; readonl
   { to: '/settings', hash: 'usage', label: 'Usage and model' },
   { to: '/settings', hash: 'agent', label: 'Your agent' },
   { to: '/settings', hash: 'clients', label: 'Apps that use your agent' },
+  { to: '/settings', hash: 'workspace', label: 'Workspace' },
   { to: '/settings', hash: 'account', label: 'Account' },
 ]
 

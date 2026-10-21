@@ -249,7 +249,7 @@ export const McpEventsLive: Layer.Layer<
   Effect.gen(function* () {
     const input = yield* AgentInput
     const context = yield* Effect.context<AgentInput | Resident | Skills>()
-    const { env, userId } = input
+    const { env, workspaceId } = input
     const servers = yield* McpServers
     const store = new SqliteEventStore(yield* Db)
     const hooks = new Map<string, string>()
@@ -257,8 +257,8 @@ export const McpEventsLive: Layer.Layer<
       Effect.promise(async () => {
         const known = hooks.get(connectionId)
         if (known !== undefined) return known
-        const token = await eventsHookToken(env.CREDENTIAL_KEY, userId, connectionId)
-        const url = eventsHookUrl(env.APP_URL, userId, connectionId, token)
+        const token = await eventsHookToken(env.CREDENTIAL_KEY, workspaceId, connectionId)
+        const url = eventsHookUrl(env.APP_URL, workspaceId, connectionId, token)
         hooks.set(connectionId, url)
         return url
       })
@@ -273,7 +273,7 @@ export const McpEventsLive: Layer.Layer<
       connections: yield* McpConnections,
       store,
       cipher: yield* Cipher,
-      principal: userId,
+      principal: workspaceId,
       callback,
       wake: (at) => attempt(() => input.scheduleEvents(at)),
       authority,

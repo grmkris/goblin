@@ -1,12 +1,15 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect, useRouterState } from '@tanstack/react-router'
 import { PRIMARY_CHAT } from '@goblin/contracts'
 import { createServerOnlyFn } from '@tanstack/react-start'
 import { getCookie } from '@tanstack/react-start/server'
+import { useSession } from '../auth/hooks.ts'
 import { Landing } from '../components/landing/landing.tsx'
+import { OpenWorkspace } from '../components/open-workspace.tsx'
 import { sessionQuery } from '../auth/queries.ts'
 import { lastChannel } from '../lib/last-channel.ts'
-import { hasSessionCookie, homeFor } from '../lib/home.ts'
+import { hasSessionCookie } from '../lib/home.ts'
 import { deploymentOrigin } from '../lib/origin.ts'
+import { workspaceOf } from '../lib/workspace-path.ts'
 
 const TITLE = 'goblin: your own agent, always on'
 const DESCRIPTION =
@@ -16,22 +19,28 @@ const DESCRIPTION =
 const requestHasSession = createServerOnlyFn(() => hasSessionCookie(getCookie))
 
 /**
- * Home. A signed-in owner goes straight to the channel this tab showed last (Personal's at first); a visitor who is
- * signed out gets goblin's landing page. The server decides from the session cookie, before any page is drawn; in the
- * browser, the session as the cache knows it. Neither grants anything: `OwnerGate` still decides on every owner page,
- * so a stale cookie lands on sign-in there.
+ * Home. In a workspace (`/w/<slug>/`, ADR 0089) it opens the channel this tab showed last there (its first channel at
+ * first); `OwnerGate` on that page asks a signed-out visitor to sign in. At the deployment's own `/`, a signed-in person
+ * opens a workspace (`OpenWorkspace`) and a visitor who is signed out gets goblin's landing page. The server decides
+ * signed in from the session cookie, before any page is drawn; in the browser, the session as the cache knows it.
+ * Neither grants anything.
  */
 export const Route = createFileRoute('/')({
-  beforeLoad: ({ context }) => {
+  beforeLoad: ({ context, location }) => {
     const server = typeof window === 'undefined'
+    if (workspaceOf(new URL(location.publicHref, 'https://goblin.invalid').pathname) !== undefined)
+      // The server cannot know the tab's last channel, so it opens the first.
+      throw redirect({
+        to: '/c/$chatId',
+        params: { chatId: server ? PRIMARY_CHAT : lastChannel() },
+        statusCode: 307,
+      })
     // In the browser this never waits on the network, so the page it hydrates is never held up: the session the cache
-    // already knows decides here, and the landing itself leaves for the channel if a check under way says signed in.
+    // already knows decides here, and a check still under way decides when it ends.
     const signedIn = server
       ? requestHasSession()
       : context.queryClient.getQueryData(sessionQuery.queryKey) === 'signed-in'
-    // The server cannot know the tab's last channel, so it opens Personal's.
-    const home = homeFor(signedIn, server ? PRIMARY_CHAT : lastChannel())
-    if (home !== undefined) throw redirect({ to: '/c/$chatId', params: { chatId: home }, statusCode: 307 })
+    return { signedIn }
   },
   head: () => {
     // The deployment's own address, whoever deploys it.
@@ -63,7 +72,14 @@ export const Route = createFileRoute('/')({
   component: Home,
 })
 
-/** The landing on the deployment's own origin, which the server reads from its request (`lib/origin.ts`). */
+/**
+ * The landing on the deployment's own origin, which the server reads from its request (`lib/origin.ts`), for a visitor
+ * who is signed out; a signed-in person's workspace opens instead (`?welcome=1` on Start, for an account just made).
+ */
 function Home() {
+  const { signedIn } = Route.useRouteContext()
+  const { state } = useSession()
+  const welcome = useRouterState({ select: (router) => new URLSearchParams(router.location.searchStr).get('welcome') })
+  if (state === 'signed-in' || (state === 'checking' && signedIn)) return <OpenWorkspace welcome={welcome === '1'} />
   return <Landing origin={deploymentOrigin()} />
 }

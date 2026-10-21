@@ -13,14 +13,24 @@ export type AgentFetch = { readonly fetch: (request: Request) => Promise<Respons
 /** The owner API's typed client, as the tests see it. */
 export type OwnerClient = HttpApiClient.ForApi<typeof OwnerApi>
 
+/** The member a test's request acts for, as the Worker edge forwards a session's (ADR 0089): the workspace's owner. */
+export const OWNER_MEMBER = { 'x-goblin-member': JSON.stringify({ user: 'owner', role: 'owner' }) } as const
+
+/** `init` with the owner's member header, for a test's own request to an agent's API. */
+export const asOwner = (init: RequestInit = {}): RequestInit => ({
+  ...init,
+  headers: { ...Object.fromEntries(new Headers(init.headers)), ...OWNER_MEMBER },
+})
+
 /**
  * The typed owner API over one agent's own `fetch`, with what the Worker edge adds to a forwarded request: its
- * reference (`x-goblin-ref`). No cookie reaches the agent; the tests stand where the Worker's admission stood.
+ * reference (`x-goblin-ref`) and the member it acts for. No cookie reaches the agent; the tests stand where the
+ * Worker's admission stood.
  */
 export const ownerApi = (agent: AgentFetch, ref = 'integration-probe') =>
   HttpApiClient.make(OwnerApi, {
     baseUrl: 'https://agent',
-    transformClient: HttpClient.mapRequest(HttpClientRequest.setHeader('x-goblin-ref', ref)),
+    transformClient: HttpClient.mapRequest(HttpClientRequest.setHeaders({ 'x-goblin-ref': ref, ...OWNER_MEMBER })),
   }).pipe(
     Effect.provide(FetchHttpClient.layer),
     Effect.provideService(FetchHttpClient.Fetch, (input, init) => agent.fetch(new Request(input, init))),

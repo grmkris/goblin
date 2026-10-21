@@ -1,34 +1,57 @@
-import type { CallerScope } from '@goblin/contracts'
-import { AccountApi, AppError, ErrorEnvelope, Forbidden, NotFound, OwnerApi } from '@goblin/contracts/api'
+import type { CallerScope, WorkspaceView } from '@goblin/contracts'
+import {
+  AccountApi,
+  AppError,
+  ErrorEnvelope,
+  Forbidden,
+  NotFound,
+  OwnerApi,
+  WorkspaceAccountApi,
+} from '@goblin/contracts/api'
 import { FORWARDED_HEADER } from '@goblin/contracts/internal'
+import type * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import * as Scope from 'effect/Scope'
 import * as HttpRouter from 'effect/http/HttpRouter'
+import type * as HttpServerRequest from 'effect/http/HttpServerRequest'
+import type * as HttpServerResponse from 'effect/http/HttpServerResponse'
 import { type LineLevel, LoggerLive, logEvent } from '../../observability/logger.ts'
 import { ReporterLive } from '../../observability/report.ts'
 import { readBytes } from '../body.ts'
 import { crossOrigin, forgedWrite } from '../csrf.ts'
 import { attempt, isAppError } from '../errors.ts'
-import { AccountApiLayer, AccountRequest, type AccountRecords } from './account.ts'
+import type { Person } from '../../auth/workspaces.ts'
+import { AccountApiLayer, AccountRequest, type AccountRecords, WorkspaceAccountApiLayer } from './account.ts'
 import {
   RequestContext,
   type RequestFacts,
+  type RouteNames,
   endpointScopes,
   requestFacts,
   routeNames,
   routeTemplate,
 } from './context.ts'
-import { CALLER_HEADER, type Caller, type KeyGrant, bearerKey, callerHeader } from './principal.ts'
+import {
+  CALLER_HEADER,
+  type Caller,
+  type KeyGrant,
+  MEMBER_HEADER,
+  type Member,
+  bearerKey,
+  callerHeader,
+  memberHeader,
+} from './principal.ts'
 import { answer, refusal, secured } from './render.ts'
 
 /**
- * The Worker side of the typed API (ADR 0038). The Worker keeps the session, origin and CSRF checks, answers the
- * account API itself and forwards every owner `/api/*` request to the owner's own agent, marked as an owner forward so
- * the agent never takes it for an internal request. A server may come with an API key instead of a session (ADR 0081):
- * the edge verifies it and its scope and forwards its grant.
+ * The Worker side of the typed API (ADRs 0038, 0089). The Worker keeps the session, origin and CSRF checks and answers
+ * the account APIs itself. It forwards every other request to the agent of one workspace, marked as an owner forward so
+ * the agent never takes it for an internal request, with who it comes from. The credential decides the workspace: a
+ * member's session names it in the path (`/w/<workspace slug>/api/…`), checked against their membership; a server's API
+ * key (ADR 0081) belongs to one and reaches it at `/api/…`.
  */
 
 /**
@@ -44,13 +67,18 @@ type AgentFetch = { readonly fetch: (request: Request) => Promise<Response> }
 export interface Edge {
   /** The app's own origin: every browser write comes from it. */
   readonly origin: string
-  /** The signed-in user of a request, from its session cookie alone: any `Authorization` header is refused. */
-  readonly session: (request: Request) => Effect.Effect<string, AppError>
-  /** The user a server's API key was made by, and what it may reach; `Unauthenticated` for any key that does not admit. */
-  readonly key: (key: string) => Effect.Effect<KeyGrant & { readonly userId: string }, AppError>
-  /** The user's own agent: the only one their requests reach. */
-  readonly agent: (userId: string) => AgentFetch
-  /** The account's own records, for the account API. */
+  /** The signed-in person of a request, from its session cookie alone: any `Authorization` header is refused. */
+  readonly session: (request: Request) => Effect.Effect<Person, AppError>
+  /**
+   * The workspace a server's API key belongs to, and what it may reach; `Unauthenticated` for any key that does not
+   * admit.
+   */
+  readonly key: (key: string) => Effect.Effect<KeyGrant & { readonly workspaceId: string }, AppError>
+  /** A person's membership of the workspace at a slug, read now: the workspace and their role, or none. */
+  readonly membership: (userId: string, slug: string) => Effect.Effect<WorkspaceView | undefined, AppError>
+  /** A workspace's agent, the one named by its ID. */
+  readonly agent: (workspaceId: string) => AgentFetch
+  /** The account's own records, for the account APIs. */
   readonly records: AccountRecords
 }
 
@@ -74,17 +102,25 @@ const FILES = '/api/files'
 /** The owner paths the edge forwards: under `/api/`, never the account API's. */
 const OWNER_PREFIX = '/api/'
 
+/** A member's path: a workspace's slug, then the API path its agent or the workspace account API answers. */
+const WORKSPACE_PATH = /^\/w\/([\w-]{1,200})(\/api\/.*)$/u
+
+/** Who a forwarded request comes from: a member (a session) or a caller (a key). */
+type Principal = { readonly member: Member } | { readonly caller: Caller }
+
 /**
- * The headers an owner request carries to its agent: the edge's reference, the owner-forward mark and `FORWARDED`; for
- * a key, its grant, and never an App's caller mark.
+ * The headers an owner request carries to its agent: the edge's reference, the owner-forward mark and `FORWARDED`;
+ * then its member, or a key's grant and never an App's caller mark.
  */
-const forwardedHeaders = (request: Request, ref: string, caller: Caller | undefined): Headers => {
+const forwardedHeaders = (request: Request, ref: string, principal: Principal): Headers => {
   const headers = new Headers({ 'x-goblin-ref': ref, [FORWARDED_HEADER]: 'owner' })
+  const keyed = 'caller' in principal
   for (const name of FORWARDED) {
     const value = request.headers.get(name)
-    if (value !== null && !(caller !== undefined && name === 'x-mcp-caller')) headers.set(name, value)
+    if (value !== null && !(keyed && name === 'x-mcp-caller')) headers.set(name, value)
   }
-  if (caller !== undefined) headers.set(CALLER_HEADER, callerHeader(caller))
+  if (keyed) headers.set(CALLER_HEADER, callerHeader(principal.caller))
+  else headers.set(MEMBER_HEADER, memberHeader(principal.member))
   return headers
 }
 
@@ -99,35 +135,51 @@ const refusedWrite = (request: Request, edge: Edge): Effect.Effect<void, AppErro
     : Effect.void
 
 /**
- * Admission of a signed-in user, in this order: a write from a foreign Origin, the session, then the CSRF header on
- * every write. The user it admitted. No plan is read here: the agent checks it where something needs one.
+ * Admission of a signed-in person, in this order: a write from a foreign Origin, the session, then the CSRF header on
+ * every write. The person it admitted. No plan is read here: the agent checks it where something needs one.
  */
-const admitUser = (request: Request, edge: Edge): Effect.Effect<string, AppError> =>
+const admitPerson = (request: Request, edge: Edge): Effect.Effect<Person, AppError> =>
   Effect.gen(function* () {
     if (crossOrigin(request, edge.origin)) return yield* new Forbidden({ reason: 'origin' })
-    const userId = yield* edge.session(request)
+    const person = yield* edge.session(request)
     yield* refusedWrite(request, edge)
-    return userId
+    return person
+  })
+
+/**
+ * A member of the workspace at `slug` (ADR 0089): the person's session, then their membership, read now; `NotFound` if
+ * none.
+ */
+const admitMember = (
+  request: Request,
+  edge: Edge,
+  slug: string,
+): Effect.Effect<{ readonly person: Person; readonly workspace: WorkspaceView }, AppError> =>
+  Effect.gen(function* () {
+    const person = yield* admitPerson(request, edge)
+    const workspace = yield* edge.membership(person.id, slug)
+    if (workspace === undefined) return yield* new NotFound({ what: 'workspace' })
+    return { person, workspace }
   })
 
 /**
  * Admission of a server by its API key (ADR 0081): a key is a server's, so a browser's cookie or Origin with it is
  * refused; the key must admit, and hold the scope of the endpoint the request names (`scope`, none for an endpoint no
- * key reaches). The user the key was made by, and the key as the request's caller (ADR 0086).
+ * key reaches). The workspace the key belongs to, and the key as the request's caller (ADR 0086).
  */
 const admitKey = (
   request: Request,
   edge: Edge,
   key: string,
   scope: CallerScope | undefined,
-): Effect.Effect<{ readonly userId: string; readonly caller: Caller }, AppError> =>
+): Effect.Effect<{ readonly workspaceId: string; readonly caller: Caller }, AppError> =>
   Effect.gen(function* () {
     if (request.headers.has('cookie') || request.headers.has('origin'))
       return yield* new Forbidden({ reason: 'key_browser' })
-    const { userId, ...grant } = yield* edge.key(key)
+    const { workspaceId, ...grant } = yield* edge.key(key)
     if (scope === undefined || !grant.scopes.some((held) => held === scope))
       return yield* new Forbidden({ reason: 'scope' })
-    return { userId, caller: { kind: 'key', ...grant } }
+    return { workspaceId, caller: { kind: 'key', ...grant } }
   })
 
 /** A body read up to `limit` bytes; past it, `PayloadTooLarge` (`readBytes`). */
@@ -191,17 +243,17 @@ const failureLine = (response: Response, facts: RequestFacts, method: string, ag
 
 /**
  * Runs `serve` for one request: its response, or the envelope of the `AppError` it failed with, quoting the edge's
- * reference, then the failure line. `serve` names the user once it knows them.
+ * reference, then the failure line. `serve` names the agent (a workspace's ID) once it knows it.
  */
 const settle = (
   request: Request,
   facts: RequestFacts,
-  serve: (known: (userId: string) => void) => Effect.Effect<Response, AppError>,
+  serve: (known: (agent: string) => void) => Effect.Effect<Response, AppError>,
 ): Effect.Effect<Response> =>
   Effect.gen(function* () {
     let agent: string | undefined
-    const served = serve((userId) => {
-      agent = userId
+    const served = serve((name) => {
+      agent = name
     })
     // expected: an AppError is answered as its envelope, and failureLine below logs it.
     const response = yield* Effect.catchIf(served, isAppError, (error) => Effect.succeed(refusal(error, facts.ref)))
@@ -209,33 +261,48 @@ const settle = (
     return response
   })
 
-/** The account API's paths; anything else under them is a 404 in the envelope. */
-const ACCOUNT_PATHS = ['/api/clients', '/api/keys', '/api/client-errors'] as const
+/** The account API's paths, a person's; anything else under them is a 404 in the envelope. */
+const ACCOUNT_PATHS = ['/api/workspaces', '/api/client-errors'] as const
+/** The workspace account API's paths, under `/w/<workspace slug>`: answered by the Worker, never the agent. */
+const WORKSPACE_ACCOUNT_PATHS = ['/api/clients', '/api/keys'] as const
 const under = (path: string, prefix: string): boolean => path === prefix || path.startsWith(`${prefix}/`)
 export const isAccountPath = (path: string): boolean => ACCOUNT_PATHS.some((prefix) => under(path, prefix))
+const isWorkspaceAccountPath = (path: string): boolean => WORKSPACE_ACCOUNT_PATHS.some((prefix) => under(path, prefix))
+
+/** Whether `path` is a member's (`/w/<workspace slug>/api/…`), which `EdgeHttp.workspace` answers. */
+export const isWorkspacePath = (path: string): boolean => WORKSPACE_PATH.test(path)
 
 /**
- * Each account group's admission: clients and API keys for any signed-in account (a key never reaches them), crash
- * reports for anyone. A crash
- * report needs no session, but one that comes with a session names its user (its flow point is indexed by the agent's
- * hash).
+ * Each account group's admission: a person's workspaces for any signed-in person (a key never reaches them), crash
+ * reports for anyone. A crash report needs no session, but one that comes with a session names its person (its flow
+ * point is indexed by their hash).
  */
-const admitAccount = (group: string, request: Request, edge: Edge): Effect.Effect<Option.Option<string>, AppError> =>
+const admitAccount = (group: string, request: Request, edge: Edge): Effect.Effect<Option.Option<Person>, AppError> =>
   group === 'clientErrors'
-    ? Effect.andThen(refusedWrite(request, edge), sessionUser(request, edge))
-    : Effect.map(admitUser(request, edge), Option.some)
+    ? Effect.andThen(refusedWrite(request, edge), sessionPerson(request, edge))
+    : Effect.map(admitPerson(request, edge), Option.some)
 
-/** The signed-in user of a request that may come without a session: none for no cookie, or one that does not admit. */
-const sessionUser = (request: Request, edge: Edge): Effect.Effect<Option.Option<string>> =>
+/** The signed-in person of a request that may come without a session: none for no cookie, or one that does not admit. */
+const sessionPerson = (request: Request, edge: Edge): Effect.Effect<Option.Option<Person>> =>
   request.headers.has('cookie') ? Effect.option(edge.session(request)) : Effect.succeedNone
 
+/** `request` at `path` instead, for naming its route; its body stays with the original. */
+const atPath = (request: Request, path: string, search: string): Request =>
+  new Request(`https://edge${path}${search}`, { method: request.method })
+
 export interface EdgeHttp {
-  /** Answers a request under the account API's paths (`isAccountPath`) in the Worker, without waking the agent. */
+  /** Answers a request under the account API's paths (`isAccountPath`) in the Worker, without waking an agent. */
   readonly account: (request: Request, edge: Edge) => Effect.Effect<Response>
   /**
-   * Admits an owner request and forwards it to the owner's own agent, which answers it. Only an `/api/*` path that is
-   * not the account API's is forwarded, as the parsed URL names it (`..` and `%2e%2e` already resolved); any other is a
-   * 404 in the envelope.
+   * Admits a member's request (`/w/<workspace slug>/api/…`, `isWorkspacePath`) by their session and membership, then
+   * answers the workspace account API's paths in the Worker and forwards every other to the workspace's agent with the
+   * member, under its `/api/…` path.
+   */
+  readonly workspace: (request: Request, edge: Edge) => Effect.Effect<Response>
+  /**
+   * Admits a server's request by its API key and forwards it to the agent of the key's workspace. Only an `/api/*` path
+   * that is not the account API's is forwarded, as the parsed URL names it (`..` and `%2e%2e` already resolved); any
+   * other is a 404 in the envelope, and so is one without a key: a session names its workspace in the path.
    */
   readonly owner: (request: Request, edge: Edge) => Effect.Effect<Response>
   /**
@@ -249,34 +316,73 @@ export interface EdgeHttp {
   ) => Effect.Effect<Response>
 }
 
-/**
- * The edge, built once per isolate: the account API's router lives for the isolate, in a scope that is never closed,
- * with goblin's logger and failure reporter.
- */
-export const makeEdgeHttp: Effect.Effect<EdgeHttp> = Effect.gen(function* () {
-  const scope = Scope.makeUnsafe()
-  const http = yield* HttpRouter.toHttpEffect(AccountApiLayer).pipe(Scope.provide(scope))
-  const observed = yield* Layer.build(Layer.mergeAll(LoggerLive, ReporterLive)).pipe(Scope.provide(scope))
-  const accountRoute = routeNames(AccountApi)
-  const ownerRoute = routeNames(OwnerApi)
-  const ownerScopes = endpointScopes(OwnerApi)
+/** One admitted request on its way to an agent: as its `/api/…` `path` and `search`, for `principal`. */
+interface Forward {
+  readonly request: Request
+  readonly ref: string
+  readonly path: string
+  readonly search: string
+  readonly principal: Principal
+  readonly agent: AgentFetch
+}
 
-  const account = (request: Request, edge: Edge): Effect.Effect<Response> => {
+/**
+ * Forwards a request to its agent: its body bounded unless it is a file upload, which streams through to the agent's
+ * own limits.
+ */
+const forward = ({ request, ref, path, search, principal, agent }: Forward) =>
+  Effect.gen(function* () {
+    const files = path === FILES || path.startsWith(`${FILES}/`)
+    const body = files ? request.body : yield* bounded(request, JSON_BODY_LIMIT)
+    const headers = forwardedHeaders(request, ref, principal)
+    // A streamed body needs `duplex` outside workerd (Node, the unit tests); workerd ignores it and its types omit it.
+    // The agent's redirect (an outbound sign-in's callback, to Connections) goes to the browser: a followed one would
+    // ask the agent for a page it does not serve.
+    const init = { method: request.method, headers, body, duplex: 'half', redirect: 'manual' } as const
+    const response = yield* attempt(() => agent.fetch(new Request(`https://agent${path}${search}`, init)))
+    return secured(yield* withRetryAfter(response), ref)
+  })
+
+/** An account API's router: it reads the request's account records and facts. */
+type AccountHttp = Effect.Effect<
+  HttpServerResponse.HttpServerResponse,
+  unknown,
+  Scope.Scope | HttpServerRequest.HttpServerRequest | AccountRequest | RequestContext
+>
+
+/** What the edge's routes share once built: the account APIs' routers, its logger and reporter, and route names. */
+interface Built {
+  readonly accountHttp: AccountHttp
+  readonly workspaceHttp: AccountHttp
+  readonly observed: Context.Context<never>
+  readonly accountRoute: RouteNames
+  readonly workspaceAccountRoute: RouteNames
+  readonly ownerRoute: RouteNames
+  readonly ownerScopes: ReadonlyMap<string, CallerScope>
+}
+
+const accountOf =
+  ({ accountHttp, accountRoute, observed }: Built): EdgeHttp['account'] =>
+  (request, edge) => {
     const path = new URL(request.url).pathname
     const route = accountRoute(request)
     const facts = { ...requestFacts(request, route ?? routeTemplate(path)), ref: refOf(request) }
-    const served = settle(request, facts, (known) =>
+    const served = settle(request, facts, () =>
       Effect.gen(function* () {
         if (route === undefined) return yield* new NotFound({ what: 'route' })
         const group = route.slice(0, route.indexOf('.'))
-        const userId = yield* admitAccount(group, request, edge)
-        if (Option.isSome(userId)) known(userId.value)
+        const person = yield* admitAccount(group, request, edge)
         const limit = group === 'clientErrors' ? REPORT_BODY_LIMIT : JSON_BODY_LIMIT
         const body = yield* bounded(request, limit)
         const admitted = new Request(request.url, { method: request.method, headers: request.headers, body })
         return yield* answer(
-          http.pipe(
-            Effect.provideService(AccountRequest, { records: edge.records, userId }),
+          accountHttp.pipe(
+            Effect.provideService(AccountRequest, {
+              records: edge.records,
+              person,
+              workspace: Option.none(),
+              headers: request.headers,
+            }),
             Effect.provideService(RequestContext, facts),
           ),
           admitted,
@@ -287,35 +393,78 @@ export const makeEdgeHttp: Effect.Effect<EdgeHttp> = Effect.gen(function* () {
     return Effect.provideContext(served, observed)
   }
 
-  const owner = (request: Request, edge: Edge): Effect.Effect<Response> => {
+const workspaceOf =
+  ({ workspaceHttp, workspaceAccountRoute, ownerRoute, observed }: Built): EdgeHttp['workspace'] =>
+  (request, edge) => {
     const url = new URL(request.url)
-    const facts = { ...requestFacts(request, ownerRoute(request) ?? routeTemplate(url.pathname)), ref: refOf(request) }
+    const [, slug = '', path = url.pathname] = WORKSPACE_PATH.exec(url.pathname) ?? []
+    const named = atPath(request, path, url.search)
+    const inAccount = isWorkspaceAccountPath(path)
+    const route = inAccount ? workspaceAccountRoute(named) : ownerRoute(named)
+    const facts = { ...requestFacts(request, route ?? routeTemplate(path)), ref: refOf(request) }
     const served = settle(request, facts, (known) =>
       Effect.gen(function* () {
-        if (!url.pathname.startsWith(OWNER_PREFIX) || isAccountPath(url.pathname))
-          return yield* new NotFound({ what: 'route' })
-        const token = bearerKey(request)
-        const { userId, caller } =
-          token === undefined
-            ? { userId: yield* admitUser(request, edge), caller: undefined }
-            : yield* admitKey(request, edge, token, ownerScopes.get(facts.route))
-        known(userId)
-        const files = url.pathname === FILES || url.pathname.startsWith(`${FILES}/`)
-        const body = files ? request.body : yield* bounded(request, JSON_BODY_LIMIT)
-        const headers = forwardedHeaders(request, facts.ref, caller)
-        // A streamed body needs `duplex` outside workerd (Node, the unit tests); workerd ignores it and its types omit it.
-        // The agent's redirect (an outbound sign-in's callback, to Connections) goes to the browser: a followed one would
-        // ask the agent for a page it does not serve.
-        const init = { method: request.method, headers, body, duplex: 'half', redirect: 'manual' } as const
-        const forwarded = new Request(`https://agent${url.pathname}${url.search}`, init)
-        const response = yield* attempt(() => edge.agent(userId).fetch(forwarded))
-        return secured(yield* withRetryAfter(response), facts.ref)
+        if (slug === '' || isAccountPath(path)) return yield* new NotFound({ what: 'route' })
+        const { person, workspace: member } = yield* admitMember(request, edge, slug)
+        known(member.id)
+        if (!inAccount)
+          return yield* forward({
+            request,
+            ref: facts.ref,
+            path,
+            search: url.search,
+            principal: { member: { user: person.id, role: member.role } },
+            agent: edge.agent(member.id),
+          })
+        if (route === undefined) return yield* new NotFound({ what: 'route' })
+        const body = yield* bounded(request, JSON_BODY_LIMIT)
+        const admitted = new Request(`https://edge${path}${url.search}`, {
+          method: request.method,
+          headers: request.headers,
+          body,
+        })
+        const account = { records: edge.records, person: Option.some(person), workspace: Option.some(member) }
+        return yield* answer(
+          workspaceHttp.pipe(
+            Effect.provideService(AccountRequest, { ...account, headers: request.headers }),
+            Effect.provideService(RequestContext, facts),
+          ),
+          admitted,
+          facts,
+        )
       }),
     )
     return Effect.provideContext(served, observed)
   }
 
-  const route: EdgeHttp['route'] = (request, serve) => {
+const ownerOf =
+  ({ ownerRoute, ownerScopes, observed }: Built): EdgeHttp['owner'] =>
+  (request, edge) => {
+    const url = new URL(request.url)
+    const facts = { ...requestFacts(request, ownerRoute(request) ?? routeTemplate(url.pathname)), ref: refOf(request) }
+    const served = settle(request, facts, (known) =>
+      Effect.gen(function* () {
+        const token = bearerKey(request)
+        if (!url.pathname.startsWith(OWNER_PREFIX) || isAccountPath(url.pathname) || token === undefined)
+          return yield* new NotFound({ what: 'route' })
+        const { workspaceId, caller } = yield* admitKey(request, edge, token, ownerScopes.get(facts.route))
+        known(workspaceId)
+        return yield* forward({
+          request,
+          ref: facts.ref,
+          path: url.pathname,
+          search: url.search,
+          principal: { caller },
+          agent: edge.agent(workspaceId),
+        })
+      }),
+    )
+    return Effect.provideContext(served, observed)
+  }
+
+const routeOf =
+  ({ observed }: Built): EdgeHttp['route'] =>
+  (request, serve) => {
     const facts = { ...requestFacts(request, routeTemplate(new URL(request.url).pathname)), ref: refOf(request) }
     const served = settle(request, facts, () =>
       Effect.map(serve(facts.ref), (response) => secured(response, facts.ref)),
@@ -323,5 +472,20 @@ export const makeEdgeHttp: Effect.Effect<EdgeHttp> = Effect.gen(function* () {
     return Effect.provideContext(served, observed)
   }
 
-  return { account, owner, route }
+/**
+ * The edge, built once per isolate: the account APIs' routers live for the isolate, in a scope that is never closed,
+ * with goblin's logger and failure reporter.
+ */
+export const makeEdgeHttp: Effect.Effect<EdgeHttp> = Effect.gen(function* () {
+  const scope = Scope.makeUnsafe()
+  const built: Built = {
+    accountHttp: yield* HttpRouter.toHttpEffect(AccountApiLayer).pipe(Scope.provide(scope)),
+    workspaceHttp: yield* HttpRouter.toHttpEffect(WorkspaceAccountApiLayer).pipe(Scope.provide(scope)),
+    observed: yield* Layer.build(Layer.mergeAll(LoggerLive, ReporterLive)).pipe(Scope.provide(scope)),
+    accountRoute: routeNames(AccountApi),
+    workspaceAccountRoute: routeNames(WorkspaceAccountApi),
+    ownerRoute: routeNames(OwnerApi),
+    ownerScopes: endpointScopes(OwnerApi),
+  }
+  return { account: accountOf(built), workspace: workspaceOf(built), owner: ownerOf(built), route: routeOf(built) }
 })

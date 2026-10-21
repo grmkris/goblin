@@ -22,7 +22,8 @@ import type { Instrument } from './instrument.ts'
 export interface AgentInputs {
   readonly storage: DurableObjectStorage
   readonly env: RuntimeEnv
-  readonly userId: string
+  /** The workspace the agent belongs to (ADR 0089): its ID, which is the agent's name. */
+  readonly workspaceId: string
   readonly harness: PiHarness
   readonly pi: PiModels
   readonly thread: Extension

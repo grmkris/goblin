@@ -27,12 +27,13 @@ const bytesOfBase64 = (text: string): Uint8Array<ArrayBuffer> =>
   Uint8Array.from(atob(text.trim()), (char) => char.charCodeAt(0))
 
 /**
- * The agent's id in Analytics Engine: HMAC-SHA-256 of its user id under a key derived with HKDF-SHA-256 from
- * `CREDENTIAL_KEY` and `info`, as 16 hex characters. Stable for one key and label; the user id cannot be read back.
+ * An id in Analytics Engine: HMAC-SHA-256 of an agent's name (its workspace's ID) or a person's ID under a key derived
+ * with HKDF-SHA-256 from `CREDENTIAL_KEY` and `info`, as 16 hex characters. Stable for one key and label; the ID cannot
+ * be read back.
  */
 export const agentHash = (
   credentialKey: string,
-  userId: string,
+  name: string,
   info: string = AGENT_HASH_INFO,
 ): Effect.Effect<string, FlowPointFailure> =>
   Effect.tryPromise({
@@ -45,7 +46,7 @@ export const agentHash = (
         false,
         ['sign'],
       )
-      const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(userId))
+      const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(name))
       return hex(new Uint8Array(mac)).slice(0, HASH_LENGTH)
     },
     catch: (cause) => new FlowPointFailure({ step: 'hash', cause }),
@@ -114,13 +115,13 @@ function pointWriter(
  */
 export const flowAnalytics = (
   env: Pick<RuntimeEnv, 'FLOWS' | 'CREDENTIAL_KEY' | 'STAGE'>,
-  userId: string,
+  workspaceId: string,
   build = '',
 ): Effect.Effect<FlowPointWriter> => {
   const dataset = env.FLOWS
   if (dataset === undefined) return Effect.succeed(() => Effect.void)
   const context = { stage: env.STAGE ?? 'local', build }
-  return Effect.map(Effect.cached(agentHash(env.CREDENTIAL_KEY, userId)), (agent) =>
+  return Effect.map(Effect.cached(agentHash(env.CREDENTIAL_KEY, workspaceId)), (agent) =>
     pointWriter(dataset, agent, context),
   )
 }

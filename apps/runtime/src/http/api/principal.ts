@@ -1,4 +1,4 @@
-import { CallerScope, KeyScope, KeyServer } from '@goblin/contracts'
+import { CallerScope, KeyScope, KeyServer, WorkspaceRole } from '@goblin/contracts'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { KEY_PREFIX } from '../../auth/resources.ts'
@@ -50,10 +50,42 @@ const ForwardedCaller = Schema.fromJsonString(
 /** The header value that forwards `caller`. */
 export const callerHeader = (caller: Caller): string => JSON.stringify(caller)
 
-/** The caller a forwarded request carries; none for the owner's session. */
-export const forwardedCaller = (request: Request): Caller | undefined => {
-  const value = request.headers.get(CALLER_HEADER)
-  return value === null ? undefined : Option.getOrUndefined(Schema.decodeUnknownOption(ForwardedCaller)(value))
+/**
+ * The person a request acts for in its workspace (ADR 0089): their user ID and role. The edge forwards it for a
+ * member's session, and `/mcp` for the person an OAuth client acts for.
+ */
+export interface Member {
+  readonly user: string
+  readonly role: WorkspaceRole
+}
+
+/** The header the Worker forwards a member in. */
+export const MEMBER_HEADER = 'x-goblin-member'
+
+const ForwardedMember = Schema.fromJsonString(
+  Schema.Struct({ user: Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u)), role: WorkspaceRole }),
+)
+
+/** The header value that forwards `member`. */
+export const memberHeader = (member: Member): string => JSON.stringify({ user: member.user, role: member.role })
+
+/**
+ * Who a forwarded request comes from, as its headers say (ADR 0089): a member (a session), a caller (a key), or a
+ * caller and the member it acts for (an OAuth client). `undefined` for a request that says neither, or whose header
+ * does not decode: it is refused, never taken for the owner.
+ */
+export const forwardedPrincipal = (
+  request: Request,
+): { readonly caller?: Caller; readonly member?: Member } | undefined => {
+  const callerValue = request.headers.get(CALLER_HEADER)
+  const memberValue = request.headers.get(MEMBER_HEADER)
+  const caller =
+    callerValue === null ? undefined : Option.getOrUndefined(Schema.decodeUnknownOption(ForwardedCaller)(callerValue))
+  const member =
+    memberValue === null ? undefined : Option.getOrUndefined(Schema.decodeUnknownOption(ForwardedMember)(memberValue))
+  if ((callerValue !== null && caller === undefined) || (memberValue !== null && member === undefined)) return undefined
+  if (caller === undefined && member === undefined) return undefined
+  return { ...(caller === undefined ? {} : { caller }), ...(member === undefined ? {} : { member }) }
 }
 
 /** One name for a caller across both kinds, for its per-minute count. */

@@ -3,15 +3,17 @@ import { apiKey } from '@better-auth/api-key'
 import { mcp } from '@better-auth/mcp'
 import { type Account, betterAuth, type BetterAuthPlugin } from 'better-auth'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
-import { emailOTP, jwt } from 'better-auth/plugins'
+import { emailOTP, jwt, organization } from 'better-auth/plugins'
 import type { RuntimeEnv } from '../env.ts'
 import { writeLine } from '../observability/logger.ts'
 import { safeErrorType } from '../observability/report.ts'
-import { deleteAgentOf } from './account.ts'
 import { CODE_SEND, CODE_SIGN_IN, guardEmailCode } from './email-code.ts'
 import { codeMail, mailerOf } from './mail.ts'
 import { guardOidc, oidcPlugin, oidcProviderOf, refuseUnverifiedOidcUser, withoutProviderTokens } from './oidc.ts'
 import { KEY_PREFIX, MCP_SCOPES, mcpResource } from './resources.ts'
+import { workspaceAccess } from './roles.ts'
+import { deleteAgentOf } from './account.ts'
+import { deleteOwnedAlone, personOf, signInWorkspace } from './workspaces.ts'
 
 export const AUTH_BASE_PATH = '/api/auth'
 export const authIssuer = (appUrl: string): string => `${appUrl.replace(/\/$/u, '')}${AUTH_BASE_PATH}`
@@ -107,6 +109,9 @@ const DAY_SECONDS = 86_400
  */
 const keyPlugin = () =>
   apiKey({
+    // A key belongs to a workspace (ADR 0089): its `referenceId` is the workspace's ID, and who made it is in its
+    // metadata.
+    references: 'organization',
     defaultPrefix: KEY_PREFIX,
     requireName: true,
     maximumNameLength: 64,
@@ -115,6 +120,19 @@ const keyPlugin = () =>
     startingCharactersConfig: { shouldStore: true, charactersLength: 10 },
     keyExpiration: { defaultExpiresIn: 90 * DAY_SECONDS, minExpiresIn: 1, maxExpiresIn: 365 },
     rateLimit: { enabled: false },
+  })
+
+/**
+ * Workspaces (ADR 0089): each is an organization that owns one agent, named by its ID; a person belongs to it with a
+ * role. The plugin keeps the records and checks a role's permissions; none of its own routes is served (`handleAuth`),
+ * and the Worker's account API reads and writes its tables itself (`auth/workspaces.ts`), in one D1 batch where a
+ * change spans rows.
+ */
+const workspacePlugin = () =>
+  organization({
+    ...workspaceAccess,
+    creatorRole: 'owner',
+    disableOrganizationDeletion: true,
   })
 
 /**
@@ -202,6 +220,19 @@ const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeed
     allowUnauthenticatedClientRegistration: true,
     clientRegistrationAllowedResources: [resource],
     clientRegistrationDefaultScopes: [...MCP_SCOPES],
+    // A consent names one workspace (ADR 0089): a person in several picks it after signing in, a person in one
+    // needs no choice. The token carries it, and /mcp reaches only that workspace's agent.
+    postLogin: {
+      page: '/consent/workspace',
+      shouldRedirect: async ({ user, session, isContinuation }) =>
+        (await signInWorkspace(database, personOf(user), session, isContinuation)) === undefined,
+      consentReferenceId: async ({ user, session }) => {
+        const chosen = await signInWorkspace(database, personOf(user), session, true)
+        if (chosen === undefined) throw new APIError('FORBIDDEN', { message: 'Choose a workspace first.' })
+        return chosen
+      },
+    },
+    customAccessTokenClaims: ({ referenceId }) => (referenceId === undefined ? {} : { workspace: referenceId }),
   })
   return {
     appName: 'goblin',
@@ -212,16 +243,19 @@ const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeed
     trustedOrigins: [env.APP_URL],
     logger: { disabled: true },
     emailAndPassword: { enabled: false },
-    // Deleting an account erases its agent first (conversations, MCP credentials, grants, usage); D1 then cascades
-    // the user's sessions, consents and tokens. It requires a sign-in from the last 10 minutes.
+    // Deleting an account first deletes every workspace it alone owns, each agent erased before its records (ADR
+    // 0089); D1 then cascades the person's other memberships, sessions, consents and tokens. It requires a sign-in from
+    // the last 10 minutes.
     session: { freshAge: 600 },
     user: {
       deleteUser: {
         enabled: true,
-        // The user's API keys go with them: no key outlives the account that made it.
         beforeDelete: async (user: { id: string }) => {
-          await deleteAgentOf(env, user.id)
-          await database.prepare('DELETE FROM apikey WHERE referenceId = ?').bind(user.id).run()
+          await deleteOwnedAlone(
+            { db: database, eraseAgent: (workspaceId) => deleteAgentOf(env, workspaceId) },
+            user.id,
+            new Date(),
+          )
         },
       },
       validateUserInfo: refuseUnverifiedOidcUser,
@@ -252,6 +286,7 @@ const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeed
       // SAFETY: Better Auth 1.7.6 MCP endpoint metadata types violate exactOptionalPropertyTypes; runtime shape is the pinned official plugin.
       oauthPlugin as BetterAuthPlugin,
       codePlugin(env, delivery),
+      workspacePlugin(),
       keyPlugin(),
       ...(provider === undefined ? [] : [oidcPlugin(provider)]),
     ],

@@ -40,7 +40,7 @@ const PHOTO = {
   updatedAt: 1,
 }
 
-const claims = (expiresAt = NOW + FILE_LINK_SECONDS) => ({ userId: 'user-1', path: PHOTO.path, expiresAt })
+const claims = (expiresAt = NOW + FILE_LINK_SECONDS) => ({ workspaceId: 'user-1', path: PHOTO.path, expiresAt })
 
 /** `token` with the character at `index` changed. */
 const flipped = (token: string, index: number): string =>
@@ -73,7 +73,7 @@ describe('a file link token (ADR 0070)', () => {
 /** The agent's inputs a link reads: the deployment's key and URL, and whose agent it is. */
 const inputs = Layer.succeed(
   AgentInput,
-  fake<AgentInputs>({ env: fake<RuntimeEnv>({ CREDENTIAL_KEY: KEY, APP_URL: `${APP}/` }), userId: 'user-1' }),
+  fake<AgentInputs>({ env: fake<RuntimeEnv>({ CREDENTIAL_KEY: KEY, APP_URL: `${APP}/` }), workspaceId: 'user-1' }),
 )
 const resident = (current: boolean) =>
   stub(Resident, { require: () => (current ? Effect.void : Effect.fail(new ResidentInactive({ state: 'revoked' }))) })
@@ -176,7 +176,7 @@ const deployment = (agents: Readonly<Record<string, ReturnType<typeof agent>>>) 
 }
 
 const linkTo = async (expiresAt: number, user = 'user-1') =>
-  `${APP}/files/link/${await fileLinkToken(KEY, { userId: user, path: PHOTO.path, expiresAt })}/photo.png`
+  `${APP}/files/link/${await fileLinkToken(KEY, { workspaceId: user, path: PHOTO.path, expiresAt })}/photo.png`
 
 const now = () => Math.floor(Date.now() / 1000)
 

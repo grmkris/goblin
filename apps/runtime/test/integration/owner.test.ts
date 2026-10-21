@@ -25,7 +25,7 @@ import {
   moveStopCase,
   moveTopicCase,
 } from './move-case.ts'
-import { call, lever, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
+import { call, lever, ownerFetch, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 import { clientErrorsCase, conversationEventsCase, csrfCase, internalRefusalCase } from './edge-case.ts'
 
 const harness = Test.make({
@@ -159,23 +159,36 @@ async function ownerRoutingCase(url: string): Promise<void> {
   const thread = await callOwner(me, (api) => api.conversations.create({ payload: {} }))
   const sentinel = `private-owner-${crypto.randomUUID()}`
   await callOwner(me, (api) => api.conversations.update({ params: { id: thread.id }, payload: { title: sentinel } }))
-  const selection = { 'x-goblin-workspace': owner.userId }
+  const selection = { 'x-goblin-workspace': owner.workspace }
   // What each account's workspace feed shows, as JSON.
   const shown = async (who: Person, path?: string, headers?: Record<string, string>) =>
     JSON.stringify(await workspaceOf(url, who, path, headers))
-  const foreign = `/api/workspace/events?agent=${owner.userId}&workspaceId=${owner.userId}`
+  const foreign = `/api/workspace/events?agent=${owner.workspace}&workspaceId=${owner.workspace}`
   expect(await shown(other, foreign, selection)).not.toContain(sentinel)
   expect(await shown(owner, undefined, selection)).toContain(sentinel)
   const created = await call(
     url,
     other,
     '/api/conversations',
-    { agent: owner.userId, workspaceId: owner.userId },
+    { agent: owner.workspace, workspaceId: owner.workspace },
     selection,
   )
   expect(created.status).toBe(201)
   expect(await shown(other)).not.toContain(sentinel)
-  for (const path of ['/api/workspaces', '/api/members', '/api/invitations/admission', '/api/interactions'])
+  // The owner's workspace is no route for another person, by its path or as a session with no workspace (ADR 0089).
+  for (const path of [`/w/${owner.slug}/api/workspace/events`, `/w/${owner.slug}/api/conversations`])
+    expect((await call(url, other, path)).status).toBe(404)
+  expect(
+    (await ownerFetch(`${url}/api/conversations`, { headers: { cookie: owner.cookie, 'cf-connecting-ip': owner.ip } }))
+      .status,
+  ).toBe(404)
+  // Each person lists their own workspace alone.
+  const Listed = Schema.Array(Schema.Struct({ id: Schema.String }))
+  const listed = async (who: Person) =>
+    Schema.decodeUnknownSync(Listed)(await (await call(url, who, '/api/workspaces')).json())
+  expect((await listed(owner)).map((each) => each.id)).toEqual([owner.workspace])
+  expect((await listed(other)).map((each) => each.id)).toEqual([other.workspace])
+  for (const path of ['/api/members', '/api/invitations/admission', '/api/interactions'])
     expect((await call(url, owner, path)).status).toBe(404)
   expect(
     (await call(url, owner, `/api/invitations/${crypto.randomUUID()}/preview`, { proof: 'old-proof' })).status,

@@ -16,7 +16,7 @@ function Login() {
     <Authentication
       creating={search.get('new') === '1'}
       providerError={search.get('error') ?? undefined}
-      onAuthenticated={(created) => window.location.assign(created ? '/start/welcome' : '/')}
+      onAuthenticated={(created) => window.location.assign(created ? '/?welcome=1' : '/')}
     />
   )
 }

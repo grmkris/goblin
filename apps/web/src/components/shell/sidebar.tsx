@@ -7,7 +7,6 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  GoblinMark,
   TooltipProvider,
 } from '@goblin/ui'
 import {
@@ -28,6 +27,7 @@ import type { NavRow } from '../../lib/nav-highlight.ts'
 import { JumpToButton } from './jump-to.tsx'
 import { Count, EXACT, Here, Strip, Tip, useCurrent } from './sidebar-parts.tsx'
 import { Pinned } from './sidebar-pins.tsx'
+import { WorkspaceMenu } from './workspace-menu.tsx'
 import { toggleCollapsed, useCollapsed, useHighlight, useNavCounts } from './sidebar-state.ts'
 import { Topics, TopicsInStrip } from './sidebar-topics.tsx'
 
@@ -186,12 +186,7 @@ export function Sidebar({ place }: { readonly place: 'column' | 'drawer' }) {
         <TooltipProvider>
           <nav className="shell-sidebar" aria-label="Navigation" data-place={place}>
             <header className="sidebar-head">
-              <Tip label="goblin">
-                <Link activeOptions={EXACT} to="/" className="sidebar-brand" aria-label="goblin, the last channel">
-                  <GoblinMark />
-                  <span className="sidebar-title">goblin</span>
-                </Link>
-              </Tip>
+              <WorkspaceMenu />
               {place === 'column' && <CollapseButton />}
             </header>
             <Places counts={counts} />

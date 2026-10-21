@@ -4,7 +4,8 @@ import { challengeOf, clientName, verifyClientToken } from '../auth/index.ts'
 import { callerScopesOf } from '../auth/resources.ts'
 import type { RuntimeEnv } from '../env.ts'
 import { runAtEdge } from '../http/api/edge.ts'
-import { type Caller, bearerKey, callerId } from '../http/api/principal.ts'
+import { type Caller, type Member, bearerKey, callerId } from '../http/api/principal.ts'
+import { membershipOf } from '../auth/workspaces.ts'
 import { ownerCall } from './client.ts'
 import { mcpServer } from './mcp-server.ts'
 
@@ -13,10 +14,14 @@ export const inboundHosts = (appUrl: string) => ({
   allowedOriginHostnames: [new URL(appUrl).hostname],
 })
 
-/** Who a bearer on /mcp is, and the user whose agent it reaches. */
+/**
+ * Who a bearer on /mcp is, and the workspace whose agent it reaches (ADR 0089): a key's own, or the one its person's
+ * consent names, with that person as the member an OAuth client acts for.
+ */
 type Admitted = {
-  readonly userId: string
+  readonly workspaceId: string
   readonly caller: Caller
+  readonly member?: Member
   readonly token: string
   readonly expiresAt?: number
 }
@@ -30,8 +35,8 @@ type Admitted = {
 const admit = async (request: Request, env: RuntimeEnv): Promise<Admitted | undefined> => {
   const key = bearerKey(request)
   if (key !== undefined) {
-    const { userId, ...grant } = await verifyKey(env, key)
-    return { userId, caller: { kind: 'key', ...grant }, token: key }
+    const { workspaceId, ...grant } = await verifyKey(env, key)
+    return { workspaceId, caller: { kind: 'key', ...grant }, token: key }
   }
   const header = request.headers.get('authorization') ?? ''
   if (!header.startsWith('Bearer ')) return undefined
@@ -44,9 +49,12 @@ const admit = async (request: Request, env: RuntimeEnv): Promise<Admitted | unde
     return undefined
   }
   const name = (await clientName(principal.clientId, env)) ?? 'an MCP client'
+  const membership = await membershipOf(env.AUTH_DB, principal.subject, principal.workspaceId)
+  if (membership === undefined) return undefined
   return {
-    userId: principal.subject,
+    workspaceId: principal.workspaceId,
     caller: { kind: 'client', clientId: principal.clientId, name, scopes: callerScopesOf(principal.scopes) },
+    member: { user: principal.subject, role: membership.role },
     token,
     expiresAt: principal.expiresAt,
   }
@@ -54,15 +62,15 @@ const admit = async (request: Request, env: RuntimeEnv): Promise<Admitted | unde
 
 /**
  * `/mcp` (ADR 0086): one server for every caller, its tools those the caller's scopes reach, each an owner API call as
- * that caller to the agent of the user it acts for. A key or a token reaches only its own user's agent.
+ * that caller to the agent of its workspace. A key or a token reaches only its own workspace's agent (ADR 0089).
  */
 export const handleInboundMcp = async (request: Request, env: RuntimeEnv): Promise<Response> => {
   const admitted = await admit(request, env)
   if (admitted === undefined) return challengeOf(env.APP_URL)
-  const { userId, caller, token, expiresAt } = admitted
-  const agent = env.AGENTS.getByName(userId)
+  const { workspaceId, caller, member, token, expiresAt } = admitted
+  const agent = env.AGENTS.getByName(workspaceId)
   const handler = createMcpHandler(
-    () => mcpServer(caller.scopes, (call) => runAtEdge(ownerCall(agent, caller, call))),
+    () => mcpServer(caller.scopes, (call) => runAtEdge(ownerCall(agent, caller, member, call))),
     {
       route: '/mcp',
       // The canonical host is configuration, not the request's Host/Origin. This keeps custom domains valid while

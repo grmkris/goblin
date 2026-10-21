@@ -4,6 +4,7 @@ import {
   Outlet,
   Scripts,
   createRootRouteWithContext,
+  redirect,
   useRouter,
   useRouterState,
 } from '@tanstack/react-router'
@@ -16,6 +17,7 @@ import { ShellFrame } from '../components/shell/shell.tsx'
 import { COLLAPSE_SCRIPT } from '../components/shell/sidebar-state.ts'
 import { WorkspaceFeedProvider } from '../components/workspace-feed.tsx'
 import { useSession } from '../auth/hooks.ts'
+import { workspaceOf } from '../lib/workspace-path.ts'
 import { startupImages } from '../lib/startup-images.ts'
 import { reportCrash } from '../lib/api.ts'
 import { reportUncaught } from '../lib/query/crash-report.ts'
@@ -29,7 +31,16 @@ interface RouterContext {
   readonly queryClient: QueryClient
 }
 
+/** Pages that are part of signing in: no app navigation there. */
+const AUTH_PAGES = new Set(['/login', '/consent', '/consent/workspace', '/terms', '/privacy'])
+
 export const Route = createRootRouteWithContext<RouterContext>()({
+  // A workspace's page asked for without its workspace (`/c/12`, a link from before ADR 0089) opens home, which opens a
+  // workspace: only a person's own pages and home live outside one.
+  beforeLoad: ({ location }) => {
+    const outside = workspaceOf(new URL(location.publicHref, 'https://goblin.invalid').pathname) === undefined
+    if (outside && location.pathname !== '/' && !AUTH_PAGES.has(location.pathname)) throw redirect({ to: '/' })
+  },
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
@@ -55,8 +66,6 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   component: Root,
   shellComponent: Document,
 })
-/** Pages that are part of signing in: no app navigation there. */
-const AUTH_PAGES = new Set(['/login', '/consent', '/terms', '/privacy'])
 
 function Root() {
   const router = useRouter()

@@ -52,7 +52,7 @@ type AuthAnswer<A> = { readonly data: A; readonly error: { readonly status: numb
  * Runs one Better Auth call: its data with the reference its answer quotes, or its refusal (or silence) as an
  * AuthRefused with that reference.
  */
-async function authCall<A>(
+export async function authCall<A>(
   call: (fetchOptions: AuthFetch) => Promise<AuthAnswer<A>>,
   options: AuthCallOptions = {},
 ): Promise<{ readonly data: A; readonly ref: string }> {
@@ -209,7 +209,7 @@ export const signInWithProvider = async (inviteCode: string, errorPath: string, 
       authClient.signIn.social({
         provider: OIDC_PROVIDER_ID,
         callbackURL: '/',
-        newUserCallbackURL: '/start/welcome',
+        newUserCallbackURL: '/?welcome=1',
         errorCallbackURL: errorPath,
         disableRedirect: true,
         fetchOptions,

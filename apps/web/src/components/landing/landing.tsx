@@ -1,14 +1,10 @@
-// goblin's public front door at `/` for a visitor who is signed out (a signed-in owner goes straight to their chat):
+// goblin's public front door at `/` for a visitor who is signed out (a signed-in person's workspace opens instead):
 // what goblin does differently, in ten seconds, that it is real (open source), and the way in, Meet your goblin. The
 // hero is goblin's own shell at large scale with a short session playing in it; everything after it is quiet: a
 // heading, a little copy and one real visual per section. Built from the shared marketing parts in @goblin/ui.
 import { type ReactNode, useEffect, useState, useSyncExternalStore } from 'react'
 import { CheckIcon, CopyIcon } from 'lucide-react'
-import { useNavigate } from '@tanstack/react-router'
 import { GoblinMark, MossFrame, Section, SiteBar, SiteButton, SiteFooter, type SiteLink } from '@goblin/ui'
-import { useSession } from '../../auth/hooks.ts'
-import { lastChannel } from '../../lib/last-channel.ts'
-import { reportUnexpected } from '../../lib/unexpected.ts'
 import { HeroComposer, HeroSession, HeroStatus, useHeroSession } from './hero-session.tsx'
 import { ServerList } from './server-list.tsx'
 import lisbonDark from '../../assets/landing/lisbon-dark.webp'
@@ -33,19 +29,8 @@ const useOrigin = (rendered: string | undefined): string =>
     () => rendered ?? '',
   )
 
-/** A session that turns out to be signed in (a check still under way when Home opened) leaves for its channel. */
-function useLeaveWhenSignedIn() {
-  const { state } = useSession()
-  const navigate = useNavigate()
-  useEffect(() => {
-    if (state === 'signed-in')
-      navigate({ to: '/c/$chatId', params: { chatId: lastChannel() }, replace: true }).catch(reportUnexpected)
-  }, [state, navigate])
-}
-
 /** The landing, with `origin` the deployment's own as its route read it (for the server's render). */
 export function Landing({ origin }: { readonly origin?: string | undefined } = {}) {
-  useLeaveWhenSignedIn()
   const session = useHeroSession()
   return (
     <>

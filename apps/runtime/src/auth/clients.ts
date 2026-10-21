@@ -7,15 +7,19 @@ type Row = { clientId: string; name: string | null; uri: string | null; consente
 const text = (value: string | number | null): string | undefined =>
   value === null ? undefined : typeof value === 'number' ? new Date(value).toISOString() : value
 
-/** MCP clients this user has consented to and not revoked. */
-export const listInboundClients = async (env: RuntimeEnv, userId: string): Promise<readonly InboundClient[]> => {
+/** MCP clients this person has consented to for this workspace (ADR 0089) and not revoked. */
+export const listInboundClients = async (
+  env: RuntimeEnv,
+  userId: string,
+  workspaceId: string,
+): Promise<readonly InboundClient[]> => {
   const { results } = await env.AUTH_DB.prepare(
     `SELECT c.clientId AS clientId, c.name AS name, c.uri AS uri, MIN(o.createdAt) AS consentedAt
        FROM oauthConsent o JOIN oauthClient c ON c.clientId = o.clientId
-      WHERE o.userId = ? AND (c.disabled IS NULL OR c.disabled = 0)
+      WHERE o.userId = ? AND o.referenceId = ? AND (c.disabled IS NULL OR c.disabled = 0)
       GROUP BY c.clientId, c.name, c.uri ORDER BY consentedAt DESC`,
   )
-    .bind(userId)
+    .bind(userId, workspaceId)
     .all<Row>()
   return results.map((row) => {
     const consentedAt = text(row.consentedAt)
@@ -29,16 +33,25 @@ export const listInboundClients = async (env: RuntimeEnv, userId: string): Promi
 }
 
 /**
- * End a client's access to this user's agent now: the user's consent goes and their refresh tokens for it are revoked.
- * Access tokens stop working at once because every /mcp request checks the consent. Other users of the same client
- * registration are untouched.
+ * End a client's access to this workspace's agent for this person now: their consent for it goes and their refresh
+ * tokens for it are revoked. Access tokens stop working at once because every /mcp request checks the consent. Their
+ * consents to other workspaces, and other people's, are untouched.
  */
-export const revokeInboundClient = async (env: RuntimeEnv, userId: string, clientId: string): Promise<void> => {
+export const revokeInboundClient = async (
+  env: RuntimeEnv,
+  userId: string,
+  workspaceId: string,
+  clientId: string,
+): Promise<void> => {
   const revokedAt = new Date(nowSeconds() * 1000).toISOString()
   await env.AUTH_DB.batch([
-    env.AUTH_DB.prepare('DELETE FROM oauthConsent WHERE clientId = ? AND userId = ?').bind(clientId, userId),
+    env.AUTH_DB.prepare('DELETE FROM oauthConsent WHERE clientId = ? AND userId = ? AND referenceId = ?').bind(
+      clientId,
+      userId,
+      workspaceId,
+    ),
     env.AUTH_DB.prepare(
-      'UPDATE oauthRefreshToken SET revoked = ? WHERE clientId = ? AND userId = ? AND revoked IS NULL',
-    ).bind(revokedAt, clientId, userId),
+      'UPDATE oauthRefreshToken SET revoked = ? WHERE clientId = ? AND userId = ? AND referenceId = ? AND revoked IS NULL',
+    ).bind(revokedAt, clientId, userId, workspaceId),
   ])
 }

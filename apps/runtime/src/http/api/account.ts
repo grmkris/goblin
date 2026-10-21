@@ -1,11 +1,14 @@
-import { AccountApi, type AppError, withRef } from '@goblin/contracts/api'
+import { AccountApi, type AppError, WorkspaceAccountApi, withRef } from '@goblin/contracts/api'
 import type {
   ApiKeyView,
   ClientErrorReport,
   CreateApiKey,
   CreatedApiKey,
+  CreateWorkspace,
   InboundClient,
   UpdateApiKey,
+  UpdateWorkspace,
+  WorkspaceView,
 } from '@goblin/contracts'
 import type { FlowEvent } from '@goblin/contracts/telemetry'
 import * as Context from 'effect/Context'
@@ -16,26 +19,57 @@ import * as HttpServer from 'effect/http/HttpServer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { type KeyChange, createKey, listKeys, revokeKey, updateKey } from '../../auth/api-keys.ts'
 import { listInboundClients, revokeInboundClient } from '../../auth/clients.ts'
+import { deleteAgentOf } from '../../auth/account.ts'
+import { createAuth } from '../../auth/options.ts'
+import {
+  type Person,
+  createWorkspace,
+  deleteWorkspace,
+  membershipOf,
+  updateWorkspace,
+  workspacesOf,
+} from '../../auth/workspaces.ts'
 import type { RuntimeEnv } from '../../env.ts'
 import { logEvent } from '../../observability/logger.ts'
 import { reportAndRecover } from '../../observability/report.ts'
 import { FlowPointFailure, agentHash, flowPoint } from '../../observability/ae.ts'
-import { Unauthenticated, attempt } from '../errors.ts'
+import { Forbidden, NotFound, Unauthenticated, attempt } from '../errors.ts'
 import { RequestContext } from './context.ts'
 
-/** The account's own records the Worker answers from: auth D1 and Analytics Engine, never the agent. */
+/** The account's own records the Worker answers from: auth D1 and Analytics Engine, never an agent. */
 export interface AccountRecords {
-  readonly clients: (userId: string) => Effect.Effect<readonly InboundClient[], AppError>
-  readonly revokeClient: (userId: string, clientId: string) => Effect.Effect<void, AppError>
-  /** The user's API keys (ADR 0081), and making and ending one. */
-  readonly keys: (userId: string) => Effect.Effect<readonly ApiKeyView[], AppError>
-  readonly createKey: (userId: string, input: CreateApiKey) => Effect.Effect<CreatedApiKey, AppError>
-  /** New scopes for one of the user's keys (ADR 0084), before and after. */
-  readonly updateKey: (userId: string, keyId: string, change: UpdateApiKey) => Effect.Effect<KeyChange, AppError>
-  readonly revokeKey: (userId: string, keyId: string) => Effect.Effect<void, AppError>
+  /** The person's workspaces (ADR 0089), a first one made when they have none. */
+  readonly workspaces: (person: Person) => Effect.Effect<readonly WorkspaceView[], AppError>
+  readonly createWorkspace: (userId: string, input: CreateWorkspace) => Effect.Effect<WorkspaceView, AppError>
+  readonly updateWorkspace: (
+    userId: string,
+    workspaceId: string,
+    change: UpdateWorkspace,
+  ) => Effect.Effect<WorkspaceView, AppError>
+  readonly deleteWorkspace: (userId: string, workspaceId: string) => Effect.Effect<void, AppError>
+  /** Chooses the workspace the session's OAuth sign-in in progress is for; one the person is not in is not found. */
+  readonly selectForSignIn: (session: Headers, userId: string, workspaceId: string) => Effect.Effect<void, AppError>
+  /** The OAuth clients a member connected to a workspace, and ending one's access to it. */
+  readonly clients: (userId: string, workspaceId: string) => Effect.Effect<readonly InboundClient[], AppError>
+  readonly revokeClient: (userId: string, workspaceId: string, clientId: string) => Effect.Effect<void, AppError>
+  /** A workspace's API keys (ADRs 0081, 0089), and making and ending one. */
+  readonly keys: (workspaceId: string) => Effect.Effect<readonly ApiKeyView[], AppError>
+  readonly createKey: (
+    workspaceId: string,
+    userId: string,
+    input: CreateApiKey,
+  ) => Effect.Effect<CreatedApiKey, AppError>
+  /** New scopes for one of the workspace's keys (ADR 0084), before and after. */
+  readonly updateKey: (
+    workspaceId: string,
+    userId: string,
+    keyId: string,
+    change: UpdateApiKey,
+  ) => Effect.Effect<KeyChange, AppError>
+  readonly revokeKey: (workspaceId: string, keyId: string) => Effect.Effect<void, AppError>
   /**
-   * A browser crash's `client_error` flow point (ADR 0037), under the hash of `userId`'s agent when the report came
-   * with a session; nothing without the `FLOWS` binding.
+   * A browser crash's `client_error` flow point (ADR 0037), under the hash of the person when the report came with a
+   * session; nothing without the `FLOWS` binding.
    */
   readonly crash: (report: ClientErrorReport, userId: Option.Option<string>) => Effect.Effect<void, FlowPointFailure>
 }
@@ -79,30 +113,76 @@ export const accountRecords = (env: RuntimeEnv): AccountRecords => {
               catch: (cause) => new FlowPointFailure({ step: 'write', cause }),
             })
           }),
-    clients: (userId) => attempt(() => listInboundClients(env, userId)),
-    revokeClient: (userId, clientId) => attempt(() => revokeInboundClient(env, userId, clientId)),
-    keys: (userId) => attempt(() => listKeys(env, userId)),
-    createKey: (userId, input) => attempt(() => createKey(env, userId, input)),
-    updateKey: (userId, keyId, change) => attempt(() => updateKey(env, userId, keyId, change)),
-    revokeKey: (userId, keyId) => attempt(() => revokeKey(env, userId, keyId)),
+    workspaces: (person) => attempt(() => workspacesOf(env.AUTH_DB, person, new Date())),
+    createWorkspace: (userId, input) => attempt(() => createWorkspace(env.AUTH_DB, userId, input, new Date())),
+    updateWorkspace: (userId, workspaceId, change) =>
+      attempt(() => updateWorkspace(env.AUTH_DB, userId, workspaceId, change)),
+    deleteWorkspace: (userId, workspaceId) =>
+      attempt(() =>
+        deleteWorkspace(
+          { db: env.AUTH_DB, eraseAgent: (id) => deleteAgentOf(env, id) },
+          userId,
+          workspaceId,
+          new Date(),
+        ),
+      ),
+    selectForSignIn: (session, userId, workspaceId) =>
+      attempt(async () => {
+        if ((await membershipOf(env.AUTH_DB, userId, workspaceId)) === undefined)
+          throw new NotFound({ what: 'workspace' })
+        await createAuth(env, env.AUTH_DB).api.setActiveOrganization({
+          headers: session,
+          body: { organizationId: workspaceId },
+        })
+      }),
+    clients: (userId, workspaceId) => attempt(() => listInboundClients(env, userId, workspaceId)),
+    revokeClient: (userId, workspaceId, clientId) =>
+      attempt(() => revokeInboundClient(env, userId, workspaceId, clientId)),
+    keys: (workspaceId) => attempt(() => listKeys(env, workspaceId)),
+    createKey: (workspaceId, userId, input) => attempt(() => createKey(env, workspaceId, userId, input)),
+    updateKey: (workspaceId, userId, keyId, change) =>
+      attempt(() => updateKey(env, workspaceId, userId, keyId, change)),
+    revokeKey: (workspaceId, keyId) => attempt(() => revokeKey(env, workspaceId, keyId)),
   }
 }
 
 /**
- * What one account request carries past the edge's admission: the records, and the signed-in user when the endpoint
- * needs one (every endpoint but a client error report).
+ * What one account request carries past the edge's admission: the records, the signed-in person when the endpoint
+ * needs one (every endpoint but a client error report), and for the workspace account API the workspace in the path
+ * with the person's role in it.
  */
 export class AccountRequest extends Context.Service<
   AccountRequest,
-  { readonly records: AccountRecords; readonly userId: Option.Option<string> }
+  {
+    readonly records: AccountRecords
+    readonly person: Option.Option<Person>
+    readonly workspace: Option.Option<WorkspaceView>
+    /** The request's own headers, which carry its session: only choosing a sign-in's workspace reads them. */
+    readonly headers: Headers
+  }
 >()('goblin/http/AccountRequest') {}
 
-/** The signed-in user. Admission has checked the session already; this only says so to the types. */
-const signedIn = AccountRequest.use(({ records, userId }) =>
-  Option.match(userId, {
+/** The signed-in person. Admission has checked the session already; this only says so to the types. */
+const signedIn = AccountRequest.use(({ records, person }) =>
+  Option.match(person, {
     onNone: () => Effect.fail(new Unauthenticated({ reason: 'session required' })),
-    onSome: (user) => Effect.succeed({ records, user }),
+    onSome: (signed) => Effect.succeed({ records, person: signed }),
   }),
+)
+
+/** The member and the workspace of the path. Admission has checked the membership already. */
+const member = Effect.flatMap(signedIn, ({ records, person }) =>
+  AccountRequest.use(({ workspace }) =>
+    Option.match(workspace, {
+      onNone: () => Effect.fail(new Unauthenticated({ reason: 'session required' })),
+      onSome: (current) => Effect.succeed({ records, person, workspace: current }),
+    }),
+  ),
+)
+
+/** The member, when they are one of the workspace's owners or admins: who manage its keys. */
+const manager = Effect.flatMap(member, (admitted) =>
+  admitted.workspace.role === 'member' ? Effect.fail(new Forbidden({ reason: 'role' })) : Effect.succeed(admitted),
 )
 
 /** `self`, its failure quoting the request's reference, as owner admission quotes it. */
@@ -123,9 +203,12 @@ const location = (frame: string): string => frame.replace(/[?#][^\s]*?(?=:\d{1,7
 const takeReport = (report: ClientErrorReport) =>
   Effect.andThen(
     logReport(report),
-    AccountRequest.use(({ records, userId }) => records.crash(report, userId)).pipe(
-      reportAndRecover('http.clientErrors', undefined),
-    ),
+    AccountRequest.use(({ records, person }) =>
+      records.crash(
+        report,
+        Option.map(person, (signed) => signed.id),
+      ),
+    ).pipe(reportAndRecover('http.clientErrors', undefined)),
   )
 
 const logReport = (report: ClientErrorReport) =>
@@ -137,47 +220,85 @@ const logReport = (report: ClientErrorReport) =>
     ...(report.ref === undefined ? {} : { ref: report.ref }),
   })
 
-const ClientsHandlers = HttpApiBuilder.group(AccountApi, 'clients', (handlers) =>
+const WorkspacesHandlers = HttpApiBuilder.group(AccountApi, 'workspaces', (handlers) =>
   handlers
-    .handle('list', () => quoted(Effect.flatMap(signedIn, ({ records, user }) => records.clients(user))))
+    .handle('list', () => quoted(Effect.flatMap(signedIn, ({ records, person }) => records.workspaces(person))))
+    .handle('create', ({ payload }) =>
+      quoted(Effect.flatMap(signedIn, ({ records, person }) => records.createWorkspace(person.id, payload))),
+    )
+    .handle('update', ({ params, payload }) =>
+      quoted(
+        Effect.flatMap(signedIn, ({ records, person }) =>
+          records.updateWorkspace(person.id, params.workspaceId, payload),
+        ),
+      ),
+    )
+    .handle('delete', ({ params }) =>
+      quoted(
+        Effect.flatMap(signedIn, ({ records, person }) =>
+          Effect.as(records.deleteWorkspace(person.id, params.workspaceId), { deleted: true as const }),
+        ),
+      ),
+    )
+    .handle('select', ({ params }) =>
+      quoted(
+        Effect.flatMap(signedIn, ({ records, person }) =>
+          AccountRequest.use(({ headers }) =>
+            Effect.as(records.selectForSignIn(headers, person.id, params.workspaceId), { selected: true as const }),
+          ),
+        ),
+      ),
+    ),
+)
+
+const ClientsHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'clients', (handlers) =>
+  handlers
+    .handle('list', () =>
+      quoted(Effect.flatMap(member, ({ records, person, workspace }) => records.clients(person.id, workspace.id))),
+    )
     .handle('revoke', ({ params }) =>
       quoted(
-        Effect.flatMap(signedIn, ({ records, user }) =>
-          Effect.as(records.revokeClient(user, params.clientId), { revoked: true as const }),
+        Effect.flatMap(member, ({ records, person, workspace }) =>
+          Effect.as(records.revokeClient(person.id, workspace.id, params.clientId), { revoked: true as const }),
         ),
       ),
     ),
 )
 
 /**
- * A key's new scopes, as the owner's change of it is audited (ADR 0084): one `api_key` line with the key, its scopes
- * before and after, the user and the request's reference. Never its secret.
+ * A key's new scopes, as a manager's change of it is audited (ADR 0084): one `api_key` line with the key, its scopes
+ * before and after, the workspace, who changed it and the request's reference. Never its secret.
  */
 const changeScopes = (keyId: string, change: UpdateApiKey) =>
   Effect.gen(function* () {
-    const { records, user } = yield* signedIn
-    const { before, after } = yield* records.updateKey(user, keyId, change)
+    const { records, person, workspace } = yield* manager
+    const { before, after } = yield* records.updateKey(workspace.id, person.id, keyId, change)
     yield* logEvent('info', 'api_key', {
       kind: 'scopes',
       id: keyId,
-      agent: user,
+      agent: workspace.id,
+      by: person.id,
       scopes: after.scopes,
       'scopes.before': before.scopes,
     })
     return after
   })
 
-const KeysHandlers = HttpApiBuilder.group(AccountApi, 'keys', (handlers) =>
+const KeysHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'keys', (handlers) =>
   handlers
-    .handle('list', () => quoted(Effect.flatMap(signedIn, ({ records, user }) => records.keys(user))))
+    .handle('list', () => quoted(Effect.flatMap(manager, ({ records, workspace }) => records.keys(workspace.id))))
     .handle('create', ({ payload }) =>
-      quoted(Effect.flatMap(signedIn, ({ records, user }) => records.createKey(user, payload))),
+      quoted(
+        Effect.flatMap(manager, ({ records, person, workspace }) =>
+          records.createKey(workspace.id, person.id, payload),
+        ),
+      ),
     )
     .handle('update', ({ params, payload }) => quoted(changeScopes(params.keyId, payload)))
     .handle('revoke', ({ params }) =>
       quoted(
-        Effect.flatMap(signedIn, ({ records, user }) =>
-          Effect.as(records.revokeKey(user, params.keyId), { revoked: true as const }),
+        Effect.flatMap(manager, ({ records, workspace }) =>
+          Effect.as(records.revokeKey(workspace.id, params.keyId), { revoked: true as const }),
         ),
       ),
     ),
@@ -189,6 +310,12 @@ const ClientErrorsHandlers = HttpApiBuilder.group(AccountApi, 'clientErrors', (h
 
 /** The account API's routes, served by the Worker (`edge.ts`). */
 export const AccountApiLayer = HttpApiBuilder.layer(AccountApi).pipe(
-  Layer.provide([ClientsHandlers, KeysHandlers, ClientErrorsHandlers]),
+  Layer.provide([WorkspacesHandlers, ClientErrorsHandlers]),
+  Layer.provide(HttpServer.layerServices),
+)
+
+/** The workspace account API's routes, served by the Worker for a member (`edge.ts`). */
+export const WorkspaceAccountApiLayer = HttpApiBuilder.layer(WorkspaceAccountApi).pipe(
+  Layer.provide([ClientsHandlers, KeysHandlers]),
   Layer.provide(HttpServer.layerServices),
 )

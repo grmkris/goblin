@@ -37,11 +37,13 @@ async function conversationCase(url: string, owner: Person, other: Person, id: s
   if (target === undefined || following === undefined) throw new Error('missing queued native inputs')
   expect(await queue(them, '1')).toEqual([])
   expect(await remove(them, '1', target)).toBe('not_found')
-  // A selector for the owner's agent, in the query and a header, still reaches the caller's own.
-  const selected = await call(url, other, `/api/conversations/1/queue?agent=${owner.userId}`, undefined, {
-    'x-goblin-workspace': owner.userId,
+  // A selector for the owner's agent, in the query and a header, still reaches the caller's own; the owner's workspace
+  // path is no route for them (ADR 0089).
+  const selected = await call(url, other, `/api/conversations/1/queue?agent=${owner.workspace}`, undefined, {
+    'x-goblin-workspace': owner.workspace,
   })
   expect(selected.status).toBe(200)
+  expect((await call(url, other, `/w/${owner.slug}/api/conversations/1/queue`)).status).toBe(404)
   expect(await answerOf(me, (api) => api.conversations.queue({ params: { id: '999999' } }))).toBe('NotFound')
   const another = await callOwner(me, (api) => api.conversations.create({ payload: {} }))
   expect(await remove(me, another.id, target)).toBe('not_found')
@@ -69,7 +71,7 @@ async function conversationCase(url: string, owner: Person, other: Person, id: s
 
 /** A raw `DELETE …/queue` of `body`, as `who` with `headers`: what the typed client would not send. */
 const deleteQueued = (url: string, who: Person, body: unknown, headers: Record<string, string>) =>
-  ownerFetch(`${url}/api/conversations/1/queue`, {
+  ownerFetch(`${url}/w/${who.slug}/api/conversations/1/queue`, {
     method: 'DELETE',
     headers: { cookie: who.cookie, 'content-type': 'application/json', ...headers },
     body: JSON.stringify(body),
