@@ -5,7 +5,9 @@ import { ModelEndpointCard } from './model-endpoint-card.tsx'
 import { NotifySinkCard } from './notify-sink-card.tsx'
 import { PageSection } from './page-section.tsx'
 import { SetupSettingsCard } from './start/setup-cards.tsx'
+import { MembersCard } from './members-card.tsx'
 import { WorkspaceCard } from './workspace-cards.tsx'
+import { useCurrentWorkspace } from '../lib/current-workspace.ts'
 
 /**
  * The workspace's settings, most used first: today's usage, Start and the model, its agent (and where its notices go),
@@ -13,17 +15,20 @@ import { WorkspaceCard } from './workspace-cards.tsx'
  * account. Routines are on Work.
  */
 export function Settings() {
+  const workspace = useCurrentWorkspace()
+  // What the agent may do is its owners' and admins' to change (ADR 0093); a member sees what is theirs.
+  const managing = workspace !== undefined && workspace.role !== 'member'
   return (
     <div className="page-stack">
       <PageSection id="usage" title="Usage and model">
-        <SetupSettingsCard />
+        {managing && <SetupSettingsCard />}
         <UsageCard />
-        <ModelEndpointCard />
+        {managing && <ModelEndpointCard />}
       </PageSection>
       <PageSection id="agent" title="Your agent">
-        <ResidentCard />
+        {managing && <ResidentCard />}
         <MemoryCard />
-        <NotifySinkCard />
+        {managing && <NotifySinkCard />}
       </PageSection>
       <PageSection
         id="clients"
@@ -48,10 +53,15 @@ export function Settings() {
           </>
         }
       >
-        <ApiKeysCard />
+        {managing ? (
+          <ApiKeysCard />
+        ) : (
+          <p className="text-sm text-muted-foreground">Only the workspace's owners and admins make keys.</p>
+        )}
       </PageSection>
       <PageSection id="workspace" title="Workspace">
         <WorkspaceCard />
+        {workspace !== undefined && <MembersCard workspace={workspace} />}
       </PageSection>
       <PageSection id="account" title="Account">
         <DeleteAccountCard />

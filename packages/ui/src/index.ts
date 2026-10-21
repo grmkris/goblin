@@ -36,6 +36,7 @@ export {
   DropdownMenuTrigger,
 } from './components/dropdown-menu.tsx'
 export { Composer, ComposerActions, ComposerInput } from './components/composer.tsx'
+export { CopyButton } from './components/copy-button.tsx'
 export { Count } from './components/count.tsx'
 export { Duration } from './components/duration.tsx'
 export { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from './components/empty.tsx'

@@ -3,6 +3,7 @@ import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { ResidentStatus } from '../agent.ts'
 import { ResidentChange } from '../mcp.ts'
+import { EndpointRole } from './role.ts'
 
 /**
  * Whether owner admission grants resident authority before the endpoint runs (`OwnerAdmission` in `owner.ts`): the
@@ -21,8 +22,7 @@ export const GrantsResident = Context.Reference<boolean>('goblin/api/GrantsResid
  */
 export class ResidentGroup extends HttpApiGroup.make('resident').add(
   HttpApiEndpoint.get('status', '/agent/resident', { success: ResidentStatus }),
-  HttpApiEndpoint.post('set', '/agent/resident', { payload: ResidentChange, success: ResidentStatus }).annotate(
-    GrantsResident,
-    false,
-  ),
+  HttpApiEndpoint.post('set', '/agent/resident', { payload: ResidentChange, success: ResidentStatus })
+    .annotate(EndpointRole, 'admin')
+    .annotate(GrantsResident, false),
 ) {}

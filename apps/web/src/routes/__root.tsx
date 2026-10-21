@@ -34,6 +34,8 @@ interface RouterContext {
 
 /** Pages that are part of signing in: no app navigation there. */
 const AUTH_PAGES = new Set(['/login', '/consent', '/consent/workspace', '/terms', '/privacy'])
+/** Whether `path` is a person's own page, outside any workspace: signing in, consenting, an invitation (ADR 0093). */
+const isAuthPage = (path: string): boolean => AUTH_PAGES.has(path) || path.startsWith('/invite/')
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   // A workspace's page asked for without its workspace (`/c/12`, a link from before ADR 0089) opens home, which opens a
@@ -41,7 +43,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   // stays the not-found it was.
   beforeLoad: ({ location, matches }) => {
     const outside = workspaceOf(new URL(location.publicHref, 'https://goblin.invalid').pathname) === undefined
-    const page = matches.length > 1 && location.pathname !== '/' && !AUTH_PAGES.has(location.pathname)
+    const page = matches.length > 1 && location.pathname !== '/' && !isAuthPage(location.pathname)
     if (outside && page) throw redirect({ to: '/' })
   },
   head: () => ({
@@ -100,7 +102,7 @@ function Shell({ children }: { readonly children: ReactNode }) {
   })
   // goblin's landing (routes/index.tsx) is a whole page of its own, drawn edge to edge; a signed-in owner never sees it.
   if (path === '/') return <main className="landing-root">{children}</main>
-  if (state === 'signed-out' || AUTH_PAGES.has(path)) return <main className="shell">{children}</main>
+  if (state === 'signed-out' || isAuthPage(path)) return <main className="shell">{children}</main>
   if (start) return <main className="start-root">{children}</main>
   const enabled = state === 'signed-in'
   return (

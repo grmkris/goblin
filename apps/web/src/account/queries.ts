@@ -1,4 +1,11 @@
-import type { CreateApiKey, CreateWorkspace, UpdateApiKey, UpdateWorkspace } from '@goblin/contracts'
+import type {
+  CreateApiKey,
+  CreateWorkspace,
+  InviteMembers,
+  UpdateApiKey,
+  UpdateWorkspace,
+  WorkspaceRole,
+} from '@goblin/contracts'
 import { mutationOptions } from '@tanstack/react-query'
 import { account, workspaceAccount } from '../lib/api.ts'
 
@@ -9,6 +16,9 @@ import { account, workspaceAccount } from '../lib/api.ts'
  */
 const accountKeys = {
   workspaces: ['account', 'workspaces'] as const,
+  members: ['account', 'members'] as const,
+  invitations: ['account', 'invitations'] as const,
+  mine: ['account', 'invitations', 'mine'] as const,
   clients: ['account', 'clients'] as const,
   keys: ['account', 'keys'] as const,
 }
@@ -84,4 +94,80 @@ export const updateKeyMutation = mutationOptions({
 export const revokeKeyMutation = mutationOptions({
   ...workspaceAccount.apiMutation({ mutationFn: (api, keyId: string) => api.keys.revoke({ params: { keyId } }) }),
   onSuccess: (_revoked, _keyId, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),
+})
+
+/** The workspace's members (ADR 0093), owners first. */
+export const membersQuery = workspaceAccount.apiQuery({
+  queryKey: accountKeys.members,
+  queryFn: (api) => api.members.list(),
+})
+
+/** The workspace's invitations still waiting, for its owners and admins. */
+export const invitationsQuery = workspaceAccount.apiQuery({
+  queryKey: accountKeys.invitations,
+  queryFn: (api) => api.members.invitations(),
+})
+
+/** Invitations for addresses, each mailed with its link. */
+export const inviteMutation = mutationOptions({
+  ...workspaceAccount.apiMutation({ mutationFn: (api, payload: InviteMembers) => api.members.invite({ payload }) }),
+  onSuccess: (_sent, _payload, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.invitations }),
+})
+
+/** Withdraws an invitation. */
+export const cancelInvitationMutation = mutationOptions({
+  ...workspaceAccount.apiMutation({ mutationFn: (api, id: string) => api.members.cancel({ params: { id } }) }),
+  onSuccess: (_canceled, _id, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.invitations }),
+})
+
+/** Mails an invitation again, for seven days from now. */
+export const resendInvitationMutation = mutationOptions({
+  ...workspaceAccount.apiMutation({ mutationFn: (api, id: string) => api.members.resend({ params: { id } }) }),
+  onSuccess: (_sent, _id, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.invitations }),
+})
+
+/** A member's new role. */
+export const updateMemberMutation = mutationOptions({
+  ...workspaceAccount.apiMutation({
+    mutationFn: (api, { userId, role }: { readonly userId: string; readonly role: WorkspaceRole }) =>
+      api.members.update({ params: { userId }, payload: { role } }),
+  }),
+  onSuccess: (_member, _change, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.members }),
+})
+
+/** Ends a member's membership. */
+export const removeMemberMutation = mutationOptions({
+  ...workspaceAccount.apiMutation({ mutationFn: (api, userId: string) => api.members.remove({ params: { userId } }) }),
+  onSuccess: (_removed, _userId, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.members }),
+})
+
+/** Ends the person's own membership of this workspace. */
+export const leaveWorkspaceMutation = mutationOptions({
+  ...workspaceAccount.apiMutation({ mutationFn: (api, _: void) => api.members.leave() }),
+})
+
+/** The invitations waiting for the signed-in person's address. */
+export const myInvitationsQuery = account.apiQuery({
+  queryKey: accountKeys.mine,
+  queryFn: (api) => api.invitations.mine(),
+})
+
+/** One invitation, as its link shows it; it needs no session. */
+export const invitationQuery = (id: string) => ({
+  ...account.apiQuery({
+    queryKey: ['account', 'invitation', id] as const,
+    queryFn: (api) => api.invitations.preview({ params: { id } }),
+  }),
+  meta: { auth: 'optional' as const },
+})
+
+/** Joins the workspace an invitation is for; the workspace joined. */
+export const acceptInvitationMutation = mutationOptions({
+  ...account.apiMutation({ mutationFn: (api, id: string) => api.invitations.accept({ params: { id } }) }),
+})
+
+/** Turns an invitation down. */
+export const declineInvitationMutation = mutationOptions({
+  ...account.apiMutation({ mutationFn: (api, id: string) => api.invitations.decline({ params: { id } }) }),
+  onSuccess: (_declined, _id, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.mine }),
 })

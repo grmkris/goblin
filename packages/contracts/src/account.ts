@@ -185,3 +185,60 @@ export const UpdateWorkspace = Schema.Struct({
   slug: Schema.optional(WorkspaceSlug),
 })
 export type UpdateWorkspace = typeof UpdateWorkspace.Type
+
+/** A member as the workspace's members see them (ADR 0093): who they are, their role and since when. */
+export const MemberView = Schema.Struct({
+  userId: Schema.String,
+  name: Schema.String,
+  email: Schema.String,
+  role: WorkspaceRole,
+  joinedAt: Schema.String,
+})
+export type MemberView = typeof MemberView.Type
+
+/** An invitation's state: waiting for its person, taken, turned down, withdrawn, or past its seven days. */
+export const InvitationState = Schema.Literals(['pending', 'accepted', 'declined', 'canceled', 'expired'])
+export type InvitationState = typeof InvitationState.Type
+
+/** An invitation as the workspace's owners and admins see it. */
+export const InvitationView = Schema.Struct({
+  id: Schema.String,
+  email: Schema.String,
+  role: WorkspaceRole,
+  state: InvitationState,
+  invitedBy: Schema.String,
+  expiresAt: Schema.String,
+})
+export type InvitationView = typeof InvitationView.Type
+
+/** An address an invitation goes to. */
+const InviteEmail = Schema.String.check(Schema.isMaxLength(254), Schema.isPattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/u))
+
+/** `POST /w/<slug>/api/members/invitations`: invitations for these addresses, each with `role` (never `owner`). */
+export const InviteMembers = Schema.Struct({
+  emails: Schema.Array(InviteEmail).check(Schema.isMinLength(1), Schema.isMaxLength(20)),
+  role: Schema.Literals(['admin', 'member']),
+})
+export type InviteMembers = typeof InviteMembers.Type
+
+/** What inviting did for one address: its invitation, and whether its mail went out (else share its link). */
+export const InviteSent = Schema.Struct({ invitation: InvitationView, mailed: Schema.Boolean })
+export type InviteSent = typeof InviteSent.Type
+
+/** `PATCH /w/<slug>/api/members/:userId`: a member's new role. */
+export const UpdateMember = Schema.Struct({ role: WorkspaceRole })
+export type UpdateMember = typeof UpdateMember.Type
+
+/**
+ * An invitation as its link shows it, signed in or not (ADR 0093): the workspace, who invited, the address it is for,
+ * its role and state. The link's ID is the only proof; joining needs a session of that address.
+ */
+export const InvitationPreview = Schema.Struct({
+  id: Schema.String,
+  workspace: Schema.String,
+  invitedBy: Schema.String,
+  email: Schema.String,
+  role: WorkspaceRole,
+  state: InvitationState,
+})
+export type InvitationPreview = typeof InvitationPreview.Type

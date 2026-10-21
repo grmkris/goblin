@@ -35,9 +35,12 @@ import { reportAndRecover } from '../../observability/report.ts'
 import { FlowPointFailure, agentHash, flowPoint } from '../../observability/ae.ts'
 import { Forbidden, NotFound, Unauthenticated, attempt } from '../errors.ts'
 import { RequestContext } from './context.ts'
+import { type MemberRecords, memberRecords } from './member-records.ts'
 
 /** The account's own records the Worker answers from: auth D1 and Analytics Engine, never an agent. */
 export interface AccountRecords {
+  /** Workspaces' members and invitations, and a person's invitations (ADR 0093). */
+  readonly members: MemberRecords
   /** The person's workspaces (ADR 0089), a first one made when they have none. */
   readonly workspaces: (person: Person) => Effect.Effect<readonly WorkspaceView[], AppError>
   readonly createWorkspace: (userId: string, input: CreateWorkspace) => Effect.Effect<WorkspaceView, AppError>
@@ -103,6 +106,7 @@ export const crashPoint = (
 export const accountRecords = (env: RuntimeEnv): AccountRecords => {
   const flows = env.FLOWS
   return {
+    members: memberRecords(env),
     crash: (report, userId) =>
       flows === undefined
         ? Effect.void
@@ -180,7 +184,7 @@ const member = Effect.flatMap(signedIn, ({ records, person }) =>
   ),
 )
 
-/** The member, when they are one of the workspace's owners or admins: who manage its keys. */
+/** The member, when they are one of the workspace's owners or admins: who manage its keys and members. */
 const manager = Effect.flatMap(member, (admitted) =>
   admitted.workspace.role === 'member' ? Effect.fail(new Forbidden({ reason: 'role' })) : Effect.succeed(admitted),
 )
@@ -307,18 +311,89 @@ const KeysHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'keys', (handlers
     ),
 )
 
+/** The person's invitations (ADR 0093): one's preview needs no session, the rest the person it is for. */
+const InvitationsHandlers = HttpApiBuilder.group(AccountApi, 'invitations', (handlers) =>
+  handlers
+    .handle('mine', () => quoted(Effect.flatMap(signedIn, ({ records, person }) => records.members.mine(person))))
+    .handle('preview', ({ params }) => quoted(AccountRequest.use(({ records }) => records.members.preview(params.id))))
+    .handle('accept', ({ params }) =>
+      quoted(Effect.flatMap(signedIn, ({ records, person }) => records.members.accept(person, params.id))),
+    )
+    .handle('decline', ({ params }) =>
+      quoted(
+        Effect.flatMap(signedIn, ({ records, person }) =>
+          Effect.as(records.members.decline(person, params.id), { declined: true as const }),
+        ),
+      ),
+    ),
+)
+
+/**
+ * A workspace's members and invitations (ADR 0093): every member reads its members and may leave; its owners and
+ * admins invite, change and remove (and `auth/members.ts` decides who may change whom).
+ */
+const MembersHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'members', (handlers) =>
+  handlers
+    .handle('list', () =>
+      quoted(Effect.flatMap(member, ({ records, workspace }) => records.members.list(workspace.id))),
+    )
+    .handle('update', ({ params, payload }) =>
+      quoted(
+        Effect.flatMap(manager, ({ records, workspace }) =>
+          records.members.update(workspace, params.userId, payload.role),
+        ),
+      ),
+    )
+    .handle('remove', ({ params }) =>
+      quoted(
+        Effect.flatMap(manager, ({ records, person, workspace }) =>
+          Effect.as(records.members.remove(workspace, person, params.userId), { removed: true as const }),
+        ),
+      ),
+    )
+    .handle('leave', () =>
+      quoted(
+        Effect.flatMap(member, ({ records, person, workspace }) =>
+          Effect.as(records.members.leave(workspace, person), { left: true as const }),
+        ),
+      ),
+    )
+    .handle('invitations', () =>
+      quoted(Effect.flatMap(manager, ({ records, workspace }) => records.members.invitations(workspace.id))),
+    )
+    .handle('invite', ({ payload }) =>
+      quoted(
+        Effect.flatMap(manager, ({ records, person, workspace }) => records.members.invite(workspace, person, payload)),
+      ),
+    )
+    .handle('cancel', ({ params }) =>
+      quoted(
+        Effect.flatMap(manager, ({ records, workspace }) =>
+          Effect.as(records.members.cancel(workspace.id, params.id), { canceled: true as const }),
+        ),
+      ),
+    )
+    .handle('resend', ({ params }) =>
+      quoted(
+        Effect.flatMap(manager, ({ records, person, workspace }) =>
+          records.members.resend(workspace, person, params.id),
+        ),
+      ),
+    ),
+)
+
 const ClientErrorsHandlers = HttpApiBuilder.group(AccountApi, 'clientErrors', (handlers) =>
   handlers.handle('report', ({ payload }) => takeReport(payload)),
 )
 
 /** The account API's routes, served by the Worker (`edge.ts`). */
 export const AccountApiLayer = HttpApiBuilder.layer(AccountApi).pipe(
-  Layer.provide([WorkspacesHandlers, ClientErrorsHandlers]),
+  Layer.provide([WorkspacesHandlers, InvitationsHandlers, ClientErrorsHandlers]),
   Layer.provide(HttpServer.layerServices),
 )
 
 /** The workspace account API's routes, served by the Worker for a member (`edge.ts`). */
 export const WorkspaceAccountApiLayer = HttpApiBuilder.layer(WorkspaceAccountApi).pipe(
-  Layer.provide([ClientsHandlers, KeysHandlers]),
+  Layer.provide([ClientsHandlers, KeysHandlers, MembersHandlers]),
   Layer.provide(HttpServer.layerServices),
 )

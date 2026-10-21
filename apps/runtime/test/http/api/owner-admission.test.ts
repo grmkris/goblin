@@ -24,6 +24,12 @@ const countingResident = (db: Database, grants: number[]) =>
     }),
   ).pipe(Layer.provide(ResidentLive.pipe(Layer.provide(sqliteDb(db)))))
 
+/** A request's member header, for Ana with `role`, and `extra` headers. */
+const as = (role: string, extra: Record<string, string> = {}) => ({
+  'x-goblin-member': JSON.stringify({ user: 'ana', role }),
+  ...extra,
+})
+
 describe('owner admission', () => {
   it('grants resident authority before an owner endpoint, but not before changing it (GrantsResident)', async () => {
     const grants: number[] = []
@@ -63,5 +69,25 @@ describe('owner admission', () => {
     expect(refused.status).toBe(401)
     expect(await refused.json()).toMatchObject({ error: { code: 'unauthenticated', reason: 'principal' } })
     expect(grants).toHaveLength(0)
+  })
+
+  it("refuses a member below an endpoint's role, and an OAuth client acting for one (ADR 0093)", async () => {
+    const grants: number[] = []
+    const events = stub(Events, { disableServer: () => Effect.void })
+    const { fetch } = serve(
+      served([ResidentGroup], ResidentHandlers).pipe(
+        Layer.provide(Layer.mergeAll(countingResident(database(), grants), events)),
+      ),
+    )
+    // Reading resident authority is any member's; changing it is an owner's or an admin's.
+    expect((await fetch(get('/api/agent/resident', as('member')))).status).toBe(200)
+    const refused = await fetch(post('/api/agent/resident', { enabled: false }, as('member')))
+    expect(refused.status).toBe(403)
+    expect(await refused.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
+    expect((await fetch(post('/api/agent/resident', { enabled: false }, as('admin')))).status).toBe(200)
+    const client = as('member', {
+      'x-goblin-caller': JSON.stringify({ kind: 'client', clientId: 'c', name: 'Claude', scopes: ['agent'] }),
+    })
+    expect((await fetch(post('/api/agent/resident', { enabled: true }, client))).status).toBe(403)
   })
 })

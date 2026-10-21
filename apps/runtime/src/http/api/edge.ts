@@ -262,9 +262,9 @@ const settle = (
   })
 
 /** The account API's paths, a person's; anything else under them is a 404 in the envelope. */
-const ACCOUNT_PATHS = ['/api/workspaces', '/api/client-errors'] as const
+const ACCOUNT_PATHS = ['/api/workspaces', '/api/invitations', '/api/client-errors'] as const
 /** The workspace account API's paths, under `/w/<workspace slug>`: answered by the Worker, never the agent. */
-const WORKSPACE_ACCOUNT_PATHS = ['/api/clients', '/api/keys'] as const
+const WORKSPACE_ACCOUNT_PATHS = ['/api/clients', '/api/keys', '/api/members'] as const
 const under = (path: string, prefix: string): boolean => path === prefix || path.startsWith(`${prefix}/`)
 export const isAccountPath = (path: string): boolean => ACCOUNT_PATHS.some((prefix) => under(path, prefix))
 const isWorkspaceAccountPath = (path: string): boolean => WORKSPACE_ACCOUNT_PATHS.some((prefix) => under(path, prefix))
@@ -273,12 +273,13 @@ const isWorkspaceAccountPath = (path: string): boolean => WORKSPACE_ACCOUNT_PATH
 export const isWorkspacePath = (path: string): boolean => WORKSPACE_PATH.test(path)
 
 /**
- * Each account group's admission: a person's workspaces for any signed-in person (a key never reaches them), crash
- * reports for anyone. A crash report needs no session, but one that comes with a session names its person (its flow
- * point is indexed by their hash).
+ * Each account endpoint's admission: a person's workspaces and invitations for any signed-in person (a key never
+ * reaches them); crash reports, and an invitation's preview (its link is all a visitor has, ADR 0093), for anyone. One
+ * that needs no session but comes with one names its person (a crash's flow point is indexed by their hash).
  */
-const admitAccount = (group: string, request: Request, edge: Edge): Effect.Effect<Option.Option<Person>, AppError> =>
-  group === 'clientErrors'
+const OPEN_ROUTES = new Set(['clientErrors.report', 'invitations.preview'])
+const admitAccount = (route: string, request: Request, edge: Edge): Effect.Effect<Option.Option<Person>, AppError> =>
+  OPEN_ROUTES.has(route)
     ? Effect.andThen(refusedWrite(request, edge), sessionPerson(request, edge))
     : Effect.map(admitPerson(request, edge), Option.some)
 
@@ -371,7 +372,7 @@ const accountOf =
       Effect.gen(function* () {
         if (route === undefined) return yield* new NotFound({ what: 'route' })
         const group = route.slice(0, route.indexOf('.'))
-        const person = yield* admitAccount(group, request, edge)
+        const person = yield* admitAccount(route, request, edge)
         const limit = group === 'clientErrors' ? REPORT_BODY_LIMIT : JSON_BODY_LIMIT
         const body = yield* bounded(request, limit)
         const admitted = new Request(request.url, { method: request.method, headers: request.headers, body })

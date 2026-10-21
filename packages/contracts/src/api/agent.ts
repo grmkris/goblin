@@ -14,6 +14,7 @@ import {
 import { NonEmptyString } from '../ids.ts'
 import { ApiErrors } from './errors.ts'
 import { EndpointScope } from './scope.ts'
+import { EndpointRole } from './role.ts'
 
 /** `?limit=`: how many of the newest messages, 1 to 50. */
 const RecentQuery = {
@@ -50,14 +51,20 @@ export class AgentGroup extends HttpApiGroup.make('agent').add(
     payload: ModelPick,
     success: ModelChoice,
     error: [ApiErrors.invalidInput],
-  }),
-  HttpApiEndpoint.get('modelEndpoint', '/agent/model-endpoint', { success: ModelEndpointView }),
+  }).annotate(EndpointRole, 'admin'),
+  HttpApiEndpoint.get('modelEndpoint', '/agent/model-endpoint', { success: ModelEndpointView }).annotate(
+    EndpointRole,
+    'admin',
+  ),
   HttpApiEndpoint.put('setModelEndpoint', '/agent/model-endpoint', {
     payload: ModelEndpointInput,
     success: ModelEndpointView,
     error: [ApiErrors.invalidInput],
-  }),
-  HttpApiEndpoint.delete('clearModelEndpoint', '/agent/model-endpoint', { success: ModelEndpointView }),
+  }).annotate(EndpointRole, 'admin'),
+  HttpApiEndpoint.delete('clearModelEndpoint', '/agent/model-endpoint', { success: ModelEndpointView }).annotate(
+    EndpointRole,
+    'admin',
+  ),
   HttpApiEndpoint.get('models', '/models', { success: ModelOffer }).annotate(EndpointScope, 'personas'),
   HttpApiEndpoint.post('ask', '/agent/ask', {
     payload: AgentAsk,

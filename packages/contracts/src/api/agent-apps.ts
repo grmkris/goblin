@@ -3,6 +3,7 @@ import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { AgentAppChange, AgentAppDeleted, AgentAppDetail, AgentAppSummary, DeleteAgentApp } from '../agent-apps.ts'
 import { ApiErrors } from './errors.ts'
+import { EndpointRole } from './role.ts'
 
 /** An agent app's name in a path: kebab-case, 2 to 24 characters. */
 const NameParam = { name: Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]{1,23}$/u)) }
@@ -29,11 +30,11 @@ export class AgentAppsGroup extends HttpApiGroup.make('agentApps').add(
     payload: AgentAppChange,
     success: AgentAppDetail,
     error: [ApiErrors.notFound, ApiErrors.invalidInput, ApiErrors.conflict],
-  }),
+  }).annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.delete('delete', '/agent-apps/:name', {
     params: NameParam,
     payload: DeleteAgentApp,
     success: AgentAppDeleted,
     error: [ApiErrors.notFound, ApiErrors.invalidInput],
-  }),
+  }).annotate(EndpointRole, 'admin'),
 ) {}

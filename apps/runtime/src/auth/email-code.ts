@@ -1,6 +1,7 @@
 import { APIError, type createAuthMiddleware } from 'better-auth/api'
 import { Predicate } from 'effect'
 import type { AuthEnvironment } from './options.ts'
+import { invitedEmail } from './members.ts'
 import { canonicalEmail, signupAllowed, signupMode } from './signup.ts'
 
 type HookContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0]
@@ -49,7 +50,12 @@ export async function guardEmailCode(
   context.body.email = email
   const known = await context.context.internalAdapter.findUserByEmail(email)
   const presented = context.headers?.get('x-invite-code') ?? ''
-  if (known === null && !signupAllowed(signupMode(env.SIGNUP_MODE), env.SIGNUP_INVITE_CODE ?? '', presented))
+  // An address with an invitation waiting (ADR 0093) may sign up to take it, whatever the sign-up mode.
+  if (
+    known === null &&
+    !signupAllowed(signupMode(env.SIGNUP_MODE), env.SIGNUP_INVITE_CODE ?? '', presented) &&
+    !(await invitedEmail(database, email, new Date(now)))
+  )
     throw new APIError('FORBIDDEN', { message: 'Sign-up is closed.' })
   if (sending && now - (await lastCodeAt(database, email)) < CODE_COOLDOWN_MS)
     throw new APIError('TOO_MANY_REQUESTS', { message: 'A code was just sent. Wait a minute before asking again.' })

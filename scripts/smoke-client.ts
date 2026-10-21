@@ -29,7 +29,7 @@ export type SendInit = RequestInit & { readonly owner?: boolean; readonly csrf?:
 const JsonObject = Schema.Record(Schema.String, Schema.MutableJson)
 const Workspaces = Schema.Array(Schema.Struct({ slug: Schema.String }))
 /** A person's own paths, which no workspace prefix goes in front of. */
-const PERSON_PATHS = ['/api/auth/', '/api/workspaces', '/api/client-errors']
+const PERSON_PATHS = ['/api/auth/', '/api/workspaces', '/api/invitations', '/api/client-errors']
 const object = Schema.decodeUnknownSync(JsonObject)
 const string = Schema.decodeUnknownSync(Schema.String)
 const REQUEST_TIMEOUT_MS = 150_000

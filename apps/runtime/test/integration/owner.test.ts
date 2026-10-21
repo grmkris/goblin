@@ -11,6 +11,7 @@ import { agentAppViewCase } from './agent-app-view-case.ts'
 import { queueCase } from './queue-case.ts'
 import { topicsCase } from './topics-case.ts'
 import { keyThreadsCase } from './key-threads-case.ts'
+import { membersCase } from './members-case.ts'
 import { threadHeadsCase } from './thread-heads-case.ts'
 import { organizeCase, personasCase } from './persona-case.ts'
 import { personaHoldsCase } from './persona-holds-case.ts'
@@ -35,6 +36,10 @@ const harness = Test.make({
   dev: true,
 })
 const stack = harness.beforeAll(harness.deploy(Stack))
+harness.test(
+  'native: an invited address signs up while sign-up is closed, joins the workspace as a member and is removed (ADR 0093)',
+  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => membersCase(url)))),
+)
 harness.test(
   'native: queued follow-ups remain visible, safe removal preserves active work, placement wins, and owners stay isolated',
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => queueCase(url)))),
@@ -188,7 +193,8 @@ async function ownerRoutingCase(url: string): Promise<void> {
     Schema.decodeUnknownSync(Listed)(await (await call(url, who, '/api/workspaces')).json())
   expect((await listed(owner)).map((each) => each.id)).toEqual([owner.workspace])
   expect((await listed(other)).map((each) => each.id)).toEqual([other.workspace])
-  for (const path of ['/api/members', '/api/invitations/admission', '/api/interactions'])
+  // ADR 0014's withdrawn routes are none; a workspace's members (ADR 0093) live under its own path.
+  for (const path of ['/api/invitations/admission', '/api/interactions'])
     expect((await call(url, owner, path)).status).toBe(404)
   expect(
     (await call(url, owner, `/api/invitations/${crypto.randomUUID()}/preview`, { proof: 'old-proof' })).status,

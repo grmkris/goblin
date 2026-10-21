@@ -14,6 +14,7 @@ import {
   SourceView,
 } from '../sources.ts'
 import { ApiErrors } from './errors.ts'
+import { EndpointRole } from './role.ts'
 
 const params = { id: SourceId }
 
@@ -38,19 +39,19 @@ export class SourcesGroup extends HttpApiGroup.make('sources').add(
     payload: SourceRevision,
     success: SourceView,
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput, ApiErrors.forbidden, ApiErrors.upstream],
-  }),
+  }).annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.post('refuse', '/sources/:id/refuse', {
     params,
     payload: SourceRevision,
     success: SourceView,
     error: [ApiErrors.notFound, ApiErrors.conflict],
-  }),
+  }).annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.put('replyResult', '/sources/:id/reply-result', {
     params,
     payload: SourceReplyResultChange,
     success: SourceView,
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput],
-  }),
+  }).annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.get('routes', '/sources/:id/routes', {
     params,
     success: SourceRoutes,
@@ -61,22 +62,22 @@ export class SourcesGroup extends HttpApiGroup.make('sources').add(
     payload: SourceRoutePick,
     success: SourceRouteView,
     error: [ApiErrors.notFound, ApiErrors.invalidInput],
-  }),
+  }).annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.post('pause', '/sources/:id/pause', {
     params,
     success: SourceView,
     error: [ApiErrors.notFound, ApiErrors.conflict],
-  }),
+  }).annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.post('resume', '/sources/:id/resume', {
     params,
     success: SourceView,
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput, ApiErrors.forbidden, ApiErrors.upstream],
-  }),
+  }).annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.delete('remove', '/sources/:id', {
     params,
     success: Schema.Null,
     error: [ApiErrors.notFound],
-  }),
+  }).annotate(EndpointRole, 'admin'),
 ) {}
 
 /**
@@ -94,6 +95,6 @@ export class NotifyGroup extends HttpApiGroup.make('notify').add(
     payload: NotifySink,
     success: NotifySinkView,
     error: [ApiErrors.notFound, ApiErrors.invalidInput, ApiErrors.conflict, ApiErrors.upstream],
-  }),
-  HttpApiEndpoint.delete('clear', '/notify-sink', { success: Schema.Null }),
+  }).annotate(EndpointRole, 'admin'),
+  HttpApiEndpoint.delete('clear', '/notify-sink', { success: Schema.Null }).annotate(EndpointRole, 'admin'),
 ) {}

@@ -1,4 +1,5 @@
 import {
+  EndpointRole,
   EndpointScope,
   Forbidden,
   OwnerAdmission,
@@ -19,7 +20,7 @@ import { type AppError, NotFound, isAppError } from '../errors.ts'
 import { callerMinutes } from '../../keys/rate.ts'
 import { Resident } from '../../mcp/service.ts'
 import { RequestContext } from './context.ts'
-import { callerId } from './principal.ts'
+import { type Caller, type Member, callerId } from './principal.ts'
 
 /**
  * `handler` behind `admit`, as every API of the agent runs it: its logs carry the endpoint, the operation and the
@@ -44,14 +45,39 @@ const admitted = <A, E, R, E1, R1>(
     )
   })
 
+/** Whether `role` reaches an endpoint that needs `needed` (ADR 0093): an owner counts as an admin. */
+const reaches = (role: Member['role'], needed: 'member' | 'admin'): boolean => needed === 'member' || role !== 'member'
+
 /**
  * Owner admission (`OwnerAdmission` in the contract): a request says who it comes from (ADR 0089), else it is
- * `Unauthenticated` (`principal`). A member's session grants resident authority unless the endpoint says otherwise
- * (`GrantsResident`: changing it must not grant first), then the handler runs. A request from a caller (ADR 0086: a
- * server's key or an OAuth client) is admitted only to an endpoint whose `EndpointScope` the caller holds (else
- * `scope`), within its requests for the minute (else `rate_limited` with `retryAfter`, ADR 0085), and never grants
- * it: a caller is not a member's presence. What it reaches past admission is its kind's (`keys/policy.ts`).
+ * `Unauthenticated` (`principal`). A member reaches an endpoint only with the role it needs (`EndpointRole`, ADR 0093;
+ * else `Forbidden`, `role`), and so does an OAuth client acting for them. A member's session grants resident authority
+ * unless the endpoint says otherwise (`GrantsResident`: changing it must not grant first), then the handler runs. A
+ * request from a caller (ADR 0086: a server's key or an OAuth client) is admitted only to an endpoint whose
+ * `EndpointScope` the caller holds (else `scope`), within its requests for the minute (else `rate_limited` with
+ * `retryAfter`, ADR 0085), and never grants it: a caller is not a member's presence. What it reaches past admission is
+ * its kind's (`keys/policy.ts`).
  */
+/**
+ * A caller's admission (ADR 0086): the endpoint's `EndpointScope` must be one it holds (else `scope`), and it must be
+ * within its requests for the minute (else `rate_limited` with `retryAfter`, ADR 0085).
+ */
+const admitCaller = (
+  caller: Caller,
+  annotations: Context.Context<never>,
+  take: ReturnType<typeof callerMinutes>,
+): Effect.Effect<void, AppError> => {
+  const scope = Context.get(annotations, EndpointScope)
+  if (scope === undefined || !caller.scopes.some((held) => held === scope))
+    return Effect.fail(new Forbidden({ reason: 'scope' }))
+  return Effect.flatMap(Clock.currentTimeMillis, (now) => {
+    const retryAfter = take(callerId(caller), now)
+    return retryAfter === undefined
+      ? Effect.void
+      : Effect.fail(new Unauthenticated({ reason: 'rate_limited', retryAfter }))
+  })
+}
+
 export const OwnerAdmissionLive = Layer.effect(
   OwnerAdmission,
   Effect.gen(function* () {
@@ -60,20 +86,12 @@ export const OwnerAdmissionLive = Layer.effect(
     const admit = (annotations: Context.Context<never>) =>
       Effect.flatMap(Effect.serviceOption(RequestContext), (context): Effect.Effect<void, AppError> => {
         const facts = Option.getOrUndefined(context)
-        const caller = facts?.caller
-        if (caller === undefined) {
-          if (facts?.member === undefined) return Effect.fail(new Unauthenticated({ reason: 'principal' }))
-          return Context.get(annotations, GrantsResident) ? resident.grant() : Effect.void
-        }
-        const scope = Context.get(annotations, EndpointScope)
-        if (scope === undefined || !caller.scopes.some((held) => held === scope))
-          return Effect.fail(new Forbidden({ reason: 'scope' }))
-        return Effect.flatMap(Clock.currentTimeMillis, (now) => {
-          const retryAfter = take(callerId(caller), now)
-          return retryAfter === undefined
-            ? Effect.void
-            : Effect.fail(new Unauthenticated({ reason: 'rate_limited', retryAfter }))
-        })
+        const member = facts?.member
+        if (member !== undefined && !reaches(member.role, Context.get(annotations, EndpointRole)))
+          return Effect.fail(new Forbidden({ reason: 'role' }))
+        if (facts?.caller !== undefined) return admitCaller(facts.caller, annotations, take)
+        if (member === undefined) return Effect.fail(new Unauthenticated({ reason: 'principal' }))
+        return Context.get(annotations, GrantsResident) ? resident.grant() : Effect.void
       })
     return OwnerAdmission.of((handler, names) => admitted(handler, admit(names.endpoint.annotations), names))
   }),

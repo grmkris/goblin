@@ -43,7 +43,10 @@ const fakeAccount = () => {
   const Clients = HttpApiBuilder.group(WorkspaceAccountApi, 'clients', (handlers) =>
     handlers.handleAll(unusedHandlers(WorkspaceAccountApi.groups.clients)),
   )
-  const served = fakeHttpApi(WorkspaceAccountApi, Layer.mergeAll(Keys, Clients))
+  const Members = HttpApiBuilder.group(WorkspaceAccountApi, 'members', (handlers) =>
+    handlers.handleAll(unusedHandlers(WorkspaceAccountApi.groups.members)),
+  )
+  const served = fakeHttpApi(WorkspaceAccountApi, Layer.mergeAll(Keys, Clients, Members))
   const fetch: typeof globalThis.fetch = Object.assign(
     (input: RequestInfo | URL, init?: RequestInit) => {
       const request = new Request(input instanceof Request ? input : new URL(String(input), 'http://app.test'), init)

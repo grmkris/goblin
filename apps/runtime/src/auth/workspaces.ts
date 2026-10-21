@@ -135,13 +135,19 @@ const firstName = (person: Person): string => {
 }
 
 /**
- * Every workspace `person` belongs to, oldest membership first. A person with none is given one first: in one batch
- * that runs only while they still have none, so two requests at once make one. Its slug is from their address, with
- * a random ending when that one is taken.
+ * Every workspace `person` belongs to, oldest membership first. A person with none, and no invitation waiting for
+ * their address (ADR 0093: they choose to join or to start their own), is given one first: in one batch that runs only
+ * while they still have none, so two requests at once make one. Its slug is from their address, with a random ending
+ * when that one is taken.
  */
 export const workspacesOf = async (db: Database, person: Person, now: Date): Promise<readonly WorkspaceView[]> => {
   const listed = await listOf(db, person.id)
   if (listed.length > 0) return listed
+  const invited = await db
+    .prepare("SELECT 1 AS found FROM invitation WHERE email = ? AND status = 'pending' AND expiresAt > ? LIMIT 1")
+    .bind(person.email.trim().toLowerCase(), now.toISOString())
+    .first<{ found: number }>()
+  if (invited !== null) return []
   const base = slugFrom(person.email.split('@')[0] ?? '')
   const guard = 'NOT EXISTS (SELECT 1 FROM member WHERE userId = ?)'
   for (const slug of [base, `${base}-${suffix()}`, `${base}-${suffix()}`]) {

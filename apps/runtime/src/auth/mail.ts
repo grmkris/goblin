@@ -39,3 +39,29 @@ export const codeMail = (
     'It expires in 10 minutes and works once. If you did not try to sign in, ignore this email.',
   ].join('\n'),
 })
+
+/**
+ * An invitation to a workspace (ADR 0093): who invited, to which workspace, and its link, which works for this address
+ * alone for seven days.
+ */
+export const inviteMail = (
+  input: {
+    readonly from: string
+    readonly to: string
+    readonly workspace: string
+    readonly inviter: string
+    readonly link: string
+    readonly appUrl: string
+  } & MailStage,
+): MailMessage => ({
+  from: input.from,
+  to: input.to,
+  subject: `${subjectPrefix(input)}${input.inviter} invited you to ${input.workspace} on goblin`,
+  text: [
+    `${input.inviter} invited you to the workspace ${input.workspace} on goblin, where its people work with one agent.`,
+    '',
+    `Join: ${input.link}`,
+    '',
+    `Sign in with this address (${input.to}) to join. The invitation works for seven days. If you did not expect it, ignore this email.`,
+  ].join('\n'),
+})

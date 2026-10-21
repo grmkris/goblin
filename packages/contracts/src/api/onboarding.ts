@@ -9,6 +9,7 @@ import {
   OnboardingView,
 } from '../onboarding.ts'
 import { ApiErrors } from './errors.ts'
+import { EndpointRole } from './role.ts'
 
 /**
  * First-run Start (ADR 0062). Paths are relative to the API's `/api` prefix.
@@ -22,15 +23,18 @@ import { ApiErrors } from './errors.ts'
  */
 export class OnboardingGroup extends HttpApiGroup.make('onboarding').add(
   HttpApiEndpoint.get('view', '/onboarding', { success: OnboardingView }),
-  HttpApiEndpoint.put('change', '/onboarding', { payload: OnboardingChange, success: OnboardingView }),
+  HttpApiEndpoint.put('change', '/onboarding', { payload: OnboardingChange, success: OnboardingView }).annotate(
+    EndpointRole,
+    'admin',
+  ),
   HttpApiEndpoint.post('kickoff', '/onboarding/kickoff', {
     payload: OnboardingKickoff,
     success: OnboardingKickedOff,
     error: [ApiErrors.conflict, ApiErrors.invalidInput, ApiErrors.notFound, ApiErrors.budgetExhausted],
-  }),
+  }).annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.post('connect', '/onboarding/connect', {
     payload: OnboardingConnect,
     success: ConnectStart,
     error: [ApiErrors.notFound, ApiErrors.invalidInput, ApiErrors.upstream, ApiErrors.upstreamTimeout],
-  }),
+  }).annotate(EndpointRole, 'admin'),
 ) {}

@@ -7,6 +7,7 @@ import { type Edge, isAccountPath, isWorkspacePath, makeEdgeHttp } from '../../.
 import { attempt } from '../../../src/http/errors.ts'
 import { FlowPointFailure } from '../../../src/observability/ae.ts'
 import { withLines } from '../../observability/lines.ts'
+import { fake } from '../../fake.ts'
 
 const APP = 'https://goblin.test'
 const OWNER = 'user-owner'
@@ -15,6 +16,21 @@ const WS = 'ws-owner'
 const BASE = '/w/owner'
 const PERSON = { id: OWNER, name: 'Owner', email: 'owner@goblin.test' }
 const MEMBERSHIP = { id: WS, name: "Owner's workspace", slug: 'owner', role: 'owner' } as const
+const MEMBER_VIEW = {
+  userId: OWNER,
+  name: 'Owner',
+  email: 'owner@goblin.test',
+  role: 'owner',
+  joinedAt: '2026-10-21T00:00:00.000Z',
+} as const
+const INVITATION = {
+  id: 'a'.repeat(32),
+  email: 'ana@goblin.test',
+  role: 'member',
+  state: 'pending',
+  invitedBy: 'Owner',
+  expiresAt: '2026-10-28T00:00:00.000Z',
+} as const
 const SECRET = 'secret-words'
 const KEY = `gbk_${'k'.repeat(64)}`
 
@@ -31,6 +47,15 @@ const KEY_VIEW = {
 const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
   const crashes: (string | undefined)[] = []
   const records: AccountRecords = {
+    members: fake<AccountRecords['members']>({
+      list: () => Effect.succeed([MEMBER_VIEW]),
+      invite: (_actor, _person, input) =>
+        Effect.succeed(input.emails.map((email) => ({ invitation: { ...INVITATION, email }, mailed: true }))),
+      preview: (id) =>
+        id === INVITATION.id
+          ? Effect.succeed({ ...INVITATION, workspace: MEMBERSHIP.name })
+          : Effect.fail(new NotFound({ what: 'invitation' })),
+    }),
     workspaces: () => Effect.succeed([MEMBERSHIP]),
     createWorkspace: (_user, input) => Effect.succeed({ id: 'ws-new', ...input, role: 'owner' }),
     updateWorkspace: () => Effect.die(new Error('no updates in this fixture')),
@@ -473,6 +498,50 @@ describe('the account APIs in the Worker', () => {
     const { response } = await through('workspace', list, edge)
     expect(response.status).toBe(403)
     expect(await response.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
+  })
+
+  it("lists a workspace's members for any member, and invites only for an owner or admin (ADR 0093)", async () => {
+    const owner = deployment()
+    const list = new Request(`${APP}${BASE}/api/members`, { headers: { cookie: 'session=owner' } })
+    expect(await (await through('workspace', list, owner.edge)).response.json()).toEqual([MEMBER_VIEW])
+    const invite = (edge: Edge) =>
+      through(
+        'workspace',
+        write(`${BASE}/api/members/invitations`, {
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ emails: ['ana@goblin.test'], role: 'member' }),
+        }),
+        edge,
+      )
+    const sent = (await invite(owner.edge)).response
+    expect(sent.status).toBe(201)
+    expect(await sent.json()).toEqual([{ invitation: INVITATION, mailed: true }])
+    const member = deployment(undefined, accountRecords(), 'member')
+    expect(await (await through('workspace', list, member.edge)).response.json()).toEqual([MEMBER_VIEW])
+    const refused = (await invite(member.edge)).response
+    expect(refused.status).toBe(403)
+    expect(await refused.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
+    expect([...owner.seen, ...member.seen]).toHaveLength(0)
+  })
+
+  it("shows an invitation's link to a visitor with no session, and nothing else of the person's", async () => {
+    const { edge } = deployment()
+    const preview = await through('account', new Request(`${APP}/api/invitations/${INVITATION.id}`), edge)
+    expect(preview.response.status).toBe(200)
+    expect(await preview.response.json()).toMatchObject({ workspace: MEMBERSHIP.name, email: 'ana@goblin.test' })
+    const unknown = await through('account', new Request(`${APP}/api/invitations/${'b'.repeat(32)}`), edge)
+    expect(unknown.response.status).toBe(404)
+    const mine = await through('account', new Request(`${APP}/api/invitations`), edge)
+    expect(mine.response.status).toBe(401)
+    const accept = await through(
+      'account',
+      new Request(`${APP}/api/invitations/${INVITATION.id}/accept`, {
+        method: 'POST',
+        headers: { origin: APP, 'x-goblin-csrf': '1' },
+      }),
+      edge,
+    )
+    expect(accept.response.status).toBe(401)
   })
 
   it("answers a person's workspaces, and makes one", async () => {
