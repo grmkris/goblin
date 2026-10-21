@@ -208,14 +208,22 @@ export const ownerModelIds = (env: DeploymentEnvironment): readonly string[] => 
 }
 
 /**
+ * Whether workspace `workspaceId` is offered the deployment owner's own subscriptions: it is the owner's own
+ * (`OWNER_WORKSPACE_ID`, ADRs 0087, 0089) and the deployment has an endpoint and subscriptions to offer. Such a
+ * workspace takes no other members (ADR 0095).
+ */
+export const offersOwnerModels = (env: DeploymentEnvironment, workspaceId: string): boolean => {
+  const owner = env.OWNER_WORKSPACE_ID?.trim() ?? ''
+  return owner !== '' && workspaceId === owner && deploymentEndpoint(env) !== undefined && ownerModelIds(env).length > 0
+}
+
+/**
  * The deployment's endpoint as workspace `workspaceId` is offered it (ADRs 0087, 0089): every workspace's models, and
- * in the deployment owner's own workspace (`OWNER_WORKSPACE_ID`) alone also their subscriptions (`ownerModelIds`),
- * after the others.
+ * in the deployment owner's own workspace alone also their subscriptions (`offersOwnerModels`), after the others.
  */
 export function offeredEndpoint(env: DeploymentEnvironment, workspaceId: string): DeploymentEndpoint | undefined {
   const shared = deploymentEndpoint(env)
-  const owner = env.OWNER_WORKSPACE_ID?.trim() ?? ''
-  if (shared === undefined || owner === '' || workspaceId !== owner) return shared
+  if (shared === undefined || !offersOwnerModels(env, workspaceId)) return shared
   const [first, ...rest] = shared.options
   return { ...shared, options: [first, ...rest, ...ownerModelIds(env).map(optionOf)] }
 }

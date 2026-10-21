@@ -8,6 +8,7 @@ import {
   memoryModelId,
   modelOptions,
   offeredEndpoint,
+  offersOwnerModels,
   ownerModelIds,
 } from '../src/models.ts'
 
@@ -67,6 +68,11 @@ describe("the deployment's own model endpoint (unit)", () => {
     // Without an owner named, nobody is offered them.
     expect(deploymentModelIds({ ...owner, OWNER_WORKSPACE_ID: '' }, '')).toEqual(['gemini-3.8-flash', 'glm-5.3'])
     expect(offeredEndpoint(owner, 'u_owner')?.options.at(-1)).toMatchObject({ route: 'Your subscription' })
+    // That workspace takes no other members (ADR 0095); without subscriptions to offer, it may.
+    expect(offersOwnerModels(owner, 'u_owner')).toBe(true)
+    expect(offersOwnerModels(owner, 'u_other')).toBe(false)
+    expect(offersOwnerModels({ ...owner, OWNER_MODELS: 'glm-5.3' }, 'u_owner')).toBe(false)
+    expect(offersOwnerModels({ ...owner, MODEL_KEY: '' }, 'u_owner')).toBe(false)
   })
 
   it("writes memory with the memory model when offered, else the default, else the endpoint's own default", () => {

@@ -7,7 +7,7 @@ import type {
   WorkspaceRole,
   WorkspaceView,
 } from '@goblin/contracts'
-import type { AppError } from '@goblin/contracts/api'
+import { type AppError, Conflict } from '@goblin/contracts/api'
 import type * as Effect from 'effect/Effect'
 import { inviteMail, mailerOf } from '../../auth/mail.ts'
 import {
@@ -26,6 +26,7 @@ import {
 } from '../../auth/members.ts'
 import type { Person } from '../../auth/workspaces.ts'
 import type { RuntimeEnv } from '../../env.ts'
+import { offersOwnerModels } from '../../models.ts'
 import { writeLine } from '../../observability/logger.ts'
 import { safeErrorType } from '../../observability/report.ts'
 import { attempt } from '../errors.ts'
@@ -92,6 +93,8 @@ export const memberRecords = (env: RuntimeEnv): MemberRecords => {
     invitations: (workspaceId) => attempt(() => invitationsOf(db, workspaceId, new Date())),
     invite: (actor, person, input) =>
       attempt(async () => {
+        // The owner's own subscriptions serve them alone, so their workspace stays theirs alone (ADR 0095).
+        if (offersOwnerModels(env, actor.id)) throw new Conflict({ reason: 'owner_models' })
         const made = await inviteMembers(db, actor, person.id, input, new Date())
         return Promise.all(made.map((invitation) => mail(actor, person, invitation)))
       }),

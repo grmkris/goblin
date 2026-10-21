@@ -50,6 +50,11 @@ function refusal(failure: unknown, action: string): string {
     return withRef('A workspace keeps at least one owner: make someone else an owner first.', failure)
   if (failure instanceof Conflict && failure.reason === 'member')
     return withRef('One of those addresses is already a member.', failure)
+  if (failure instanceof Conflict && failure.reason === 'owner_models')
+    return withRef(
+      'This workspace has your own subscription models, which serve only you. Make another workspace to work with others.',
+      failure,
+    )
   return messageOf(failure, action)
 }
 

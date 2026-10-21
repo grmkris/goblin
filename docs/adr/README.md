@@ -84,5 +84,6 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0090](0090-a-key-names-closes-and-reads-back-its-threads.md) | A key names, closes and reads back its threads | Accepted |
 | [0091](0091-a-key-names-the-mcp-servers-its-threads-may-use.md) | A key names the MCP servers its threads may use | Accepted |
 | [0092](0092-mcp-calls-are-checked-against-their-schema-and-keep-the-servers-message.md) | MCP calls are checked against their schema and keep the server's message | Accepted |
-| [0093](0093-members-invitations-and-roles.md) | Members, invitations and roles | Accepted |
+| [0093](0093-members-invitations-and-roles.md) | Members, invitations and roles | Accepted; amended by 0095 |
 | [0094](0094-a-members-message-names-who-wrote-it.md) | A member's message names who wrote it | Accepted |
+| [0095](0095-the-owners-subscription-workspace-takes-no-members.md) | The owner's subscription workspace takes no members | Accepted |

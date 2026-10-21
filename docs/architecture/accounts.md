@@ -67,7 +67,9 @@ their refresh tokens for the workspace in the same batch.
 
 `POST /w/<slug>/api/members/invitations` invites addresses with a role (only an owner invites an admin): one
 `invitation` row each for seven days, replacing one still waiting for that address, mailed from the deployment's sender
-with the link `/invite/<id>`; the answer says per address whether its mail went out. A person's invitations are
+with the link `/invite/<id>`; the answer says per address whether its mail went out. The deployment owner's own
+workspace refuses invitations while it is offered their subscription models (`offersOwnerModels`, `Conflict`
+`owner_models`, [ADR 0095](../adr/0095-the-owners-subscription-workspace-takes-no-members.md)). A person's invitations are
 `/api/invitations`: `GET` lists those waiting for their address, `GET /api/invitations/:id` previews one with or
 without a session (the link is all a visitor has), and `accept` or `decline` needs a session of the address it is for.
 The email-code gate (`auth/email-code.ts`) lets an address with an invitation waiting sign up whatever the sign-up
