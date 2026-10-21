@@ -3,7 +3,7 @@ import { verifyKey } from '../auth/api-keys.ts'
 import { challengeOf, clientName, verifyClientToken } from '../auth/index.ts'
 import { callerScopesOf } from '../auth/resources.ts'
 import type { RuntimeEnv } from '../env.ts'
-import { runAtEdge } from '../http/api/edge.ts'
+import { refOf, runAtEdge } from '../http/api/edge.ts'
 import { type Caller, type Member, bearerKey, callerId, memberName } from '../http/api/principal.ts'
 import { membershipOf } from '../auth/workspaces.ts'
 import { ownerCall } from './client.ts'
@@ -77,8 +77,9 @@ export const handleInboundMcp = async (request: Request, env: RuntimeEnv): Promi
   if (admitted === undefined) return challengeOf(env.APP_URL)
   const { workspaceId, caller, member, token, expiresAt } = admitted
   const agent = env.AGENTS.getByName(workspaceId)
+  const ref = refOf(request)
   const handler = createMcpHandler(
-    () => mcpServer(caller.scopes, (call) => runAtEdge(ownerCall(agent, caller, member, call))),
+    () => mcpServer(caller.scopes, (call) => runAtEdge(ownerCall(agent, caller, member, call, { ref }))),
     {
       route: '/mcp',
       // The canonical host is configuration, not the request's Host/Origin. This keeps custom domains valid while

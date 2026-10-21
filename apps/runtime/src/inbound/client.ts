@@ -57,14 +57,16 @@ export type OwnerClient = HttpApiClient.ForApi<typeof OwnerApi>
 /**
  * One call of the owner API over `agent`'s own `fetch` for a caller on /mcp (ADR 0086): an owner forward carrying the
  * caller, and for an OAuth client the member it acts for (ADR 0089), as the edge forwards a request, so owner
- * admission, the caller's scopes and its reach apply as they do over HTTP. Its value, or the `AppError` the agent
- * answered; anything else is reported, and `Internal`.
+ * admission, the caller's scopes and its reach apply as they do over HTTP. It quotes the request's reference (`ref`,
+ * as the edge's forward does) and the call's operation, so the agent's logs and refusals join them. Its value, or the
+ * `AppError` the agent answered; anything else is reported, and `Internal`.
  */
 export const ownerCall = <A, E>(
   agent: AgentFetch,
   caller: Caller,
   member: Member | undefined,
   call: (api: OwnerClient) => Effect.Effect<A, E>,
+  quoted: { readonly ref?: string; readonly operation?: string } = {},
 ): Effect.Effect<A, AppError> =>
   HttpApiClient.make(OwnerApi, {
     baseUrl: 'https://agent',
@@ -73,6 +75,8 @@ export const ownerCall = <A, E>(
         [FORWARDED_HEADER]: 'owner',
         [CALLER_HEADER]: callerHeader(caller),
         ...(member === undefined ? {} : { [MEMBER_HEADER]: memberHeader(member) }),
+        ...(quoted.ref === undefined ? {} : { 'x-goblin-ref': quoted.ref }),
+        ...(quoted.operation === undefined ? {} : { 'x-goblin-operation': quoted.operation }),
       }),
     ),
   }).pipe(

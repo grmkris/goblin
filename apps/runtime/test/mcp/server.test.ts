@@ -43,6 +43,7 @@ const connect = async (caller: Caller, reply: (request: Request) => Response = (
           caller,
           caller.kind === 'client' ? { user: 'owner', role: 'owner', name: 'Owner', shared: false } : undefined,
           call,
+          { ref: 'ref-edge' },
         ),
       ),
     ),
@@ -113,6 +114,8 @@ describe('/mcp for every caller (ADR 0086)', () => {
         expect(url.pathname).toBe('/api/personas')
         expect(Object.fromEntries(url.searchParams)).toEqual({ limit: '10', name: 'edit' })
         expect(request?.headers.get('x-goblin-forwarded')).toBe('owner')
+        // The agent's refusals and logs quote the edge's reference for the request.
+        expect(request?.headers.get('x-goblin-ref')).toBe('ref-edge')
         expect(JSON.parse(request?.headers.get('x-goblin-caller') ?? '')).toEqual(caller)
         expect(request?.headers.get('authorization')).toBeNull()
       } finally {
