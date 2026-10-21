@@ -10,6 +10,7 @@ import { appsCase } from './apps-case.ts'
 import { agentAppViewCase } from './agent-app-view-case.ts'
 import { queueCase } from './queue-case.ts'
 import { topicsCase } from './topics-case.ts'
+import { keyThreadsCase } from './key-threads-case.ts'
 import { threadHeadsCase } from './thread-heads-case.ts'
 import { organizeCase, personasCase } from './persona-case.ts'
 import { personaHoldsCase } from './persona-holds-case.ts'
@@ -90,6 +91,10 @@ harness.test(
 harness.test(
   'native: start thread posts a head in its chat, answers in the Thread, and one operation makes one Thread',
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => threadHeadsCase(url)))),
+)
+harness.test(
+  'native: a key titles, renames, closes and reopens its own threads, and reads back its message to a Persona (ADR 0090)',
+  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => keyThreadsCase(url)))),
 )
 harness.test(
   'native: cross-Topic retrieval indexes owned entries, searches active Topics unless named, records sources and injects reranked ones',

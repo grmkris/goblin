@@ -77,7 +77,8 @@ const EntriesQuery = {
  * - `events`: `GET …/:id/events`, server-sent: Pi's `snapshot`, then a `batch` per commit, until the browser goes away.
  *   A chat keeps its Pi session, so this is its session's stream. It does not grant resident authority.
  *
- * An API key with the `conversations` scope reaches `submit`, `startThread`, `stop` and `entries` (ADR 0081).
+ * A caller with the `conversations` scope reaches `update`, `submit`, `startThread`, `stop` and `entries` (ADRs 0081,
+ * 0086, 0090): a key only in its own Topics, and never `keepOpen`.
  */
 export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
   HttpApiEndpoint.post('create', '/conversations', {
@@ -90,7 +91,7 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     payload: UpdateConversation,
     success: ConversationView,
     error: [ApiErrors.notFound, ApiErrors.invalidInput],
-  }),
+  }).annotate(EndpointScope, 'conversations'),
   HttpApiEndpoint.post('submit', '/conversations/:id/messages', {
     params,
     payload: SendMessage,

@@ -106,6 +106,22 @@ describe('/mcp for every caller (ADR 0086)', () => {
     }
   })
 
+  it('renames or closes a chat as the caller, a key and an OAuth client with goblin:conversations alike (ADR 0090)', async () => {
+    for (const caller of [KEY, client(['goblin:conversations'])]) {
+      const { mcp, seen } = await connect(caller, () => Response.json({ id: '12', title: 'Job 1, done' }))
+      try {
+        expect(await listed(caller)).toContain('conversation_update')
+        await mcp.callTool({ name: 'conversation_update', arguments: { chat: '12', change: { closed: true } } })
+        const [request] = seen
+        expect([request?.method, new URL(request?.url ?? '').pathname]).toEqual(['PATCH', '/api/conversations/12'])
+        expect(await request?.json()).toEqual({ closed: true })
+      } finally {
+        await mcp.close()
+      }
+    }
+    expect(await listed(client([]))).not.toContain('conversation_update')
+  })
+
   it('asks the agent in main with a bounded wait, and reads main back', async () => {
     const answer = { status: 'done', operationId: 'op-1', text: 'pong' }
     const { mcp, seen } = await connect(client([]), (request) =>

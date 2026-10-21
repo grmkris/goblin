@@ -16,7 +16,7 @@ import { epochSeconds } from './clock.ts'
 import { ChatOperations, Conversations } from './chats/service.ts'
 import { resolveSelections, type ResolvedSelections } from './composer.ts'
 import { Files } from './files/service.ts'
-import { withFlow } from './observability/flows.ts'
+import { FlowEvents, withFlow } from './observability/flows.ts'
 import { InvalidInput, attempt } from './http/errors.ts'
 import { Invocations } from './personas/service.ts'
 import { RoutineControl, RoutineRuns } from './routines/service.ts'
@@ -53,7 +53,19 @@ export const updateOwnerConversation = (id: string, change: UpdateConversation) 
       const control = yield* RoutineControl
       for (const run of live) yield* control.stop(run.id, 'Closed by owner')
     }
-    return (yield* conversations.update(id, change)).view
+    const { view } = yield* conversations.update(id, change)
+    if (change.title !== undefined) yield* announceNamed(id)
+    return view
+  })
+
+/**
+ * A "+" Thread that still owes its Topic's Conversation the note naming it writes it now that it has a title (ADR
+ * 0090), as its agent does after its first answer; once only, and the `thread_announce` flow only when this wrote it.
+ */
+export const announceNamed = (thread: string) =>
+  Effect.gen(function* () {
+    if (yield* (yield* Conversations).announce(thread))
+      yield* FlowEvents.record({ flow: 'thread_announce', via: 'app', actor: 'owner', chat: thread, status: 'ok' })
   })
 
 /** The owner has seen a conversation's newest reply. */

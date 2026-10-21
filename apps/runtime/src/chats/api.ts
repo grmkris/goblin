@@ -20,7 +20,7 @@ import {
   updateOwnerConversation,
 } from '../agent-program.ts'
 import { composerOptions } from '../composer.ts'
-import { confineChat, confineMessage } from '../keys/policy.ts'
+import { confineChat, confineMessage, confineUpdate } from '../keys/policy.ts'
 import { ownerQueue, removeOwnerQueuedInput } from '../conversation-queue.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { Retrieval } from '../retrieval/service.ts'
@@ -75,6 +75,7 @@ const threadStart = ({ params, payload }: ChatWrite<StartThread>) => {
     startThread({
       parent: params.id,
       anchor: payload.anchor,
+      title: payload.title,
       text: payload.message.input,
       operationId: payload.operationId,
       context,
@@ -83,7 +84,12 @@ const threadStart = ({ params, payload }: ChatWrite<StartThread>) => {
 }
 
 const create = ({ payload }: { readonly payload: CreateConversation }) => createOwnerConversation(payload)
-const update = ({ params, payload }: ChatWrite<UpdateConversation>) => updateOwnerConversation(params.id, payload)
+/** Rename, close or reopen: a key only its own chats, and never pinning a subagent open (ADR 0090). */
+const update = ({ params, payload }: ChatWrite<UpdateConversation>) =>
+  Effect.andThen(
+    Effect.andThen(confineChat(params.id), confineUpdate(payload)),
+    updateOwnerConversation(params.id, payload),
+  )
 const move = ({ params, payload }: ChatWrite<MoveToThread>) => moveToThread(params.id, payload)
 const stop = ({ params, payload }: ChatWrite<StopConversation>) =>
   Effect.andThen(

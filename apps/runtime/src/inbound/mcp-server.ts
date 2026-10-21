@@ -8,6 +8,7 @@ import {
   StartThread,
   StopConversation,
   TopicSetupEdit,
+  UpdateConversation,
   UpdatePersona,
   UpdateTopic,
 } from '@goblin/contracts'
@@ -118,8 +119,21 @@ const topicTools = (server: McpServer, add: Add, reply: Reply) => {
   )
 }
 
-/** `conversation_send`, `thread_start`, `conversation_entries` and `conversation_stop`. */
+/** `conversation_update`, `conversation_send`, `thread_start`, `conversation_entries` and `conversation_stop`. */
 const conversationTools = (server: McpServer, add: Add, reply: Reply) => {
+  add('conversation_update', () =>
+    server.registerTool(
+      'conversation_update',
+      {
+        title: 'Rename or close a chat',
+        description:
+          "Rename a thread within reach, or close or reopen it: closing stops its work and everything under it, and it stays readable. A Topic's Conversation is never renamed or closed. Renaming a thread started empty announces it in its Topic's Conversation once.",
+        inputSchema: standard(Schema.Struct({ chat: ChatId, change: UpdateConversation })),
+        annotations: writes,
+      },
+      ({ chat, change }) => reply((api) => api.conversations.update({ params: { id: chat }, payload: change })),
+    ),
+  )
   add('conversation_send', () =>
     server.registerTool(
       'conversation_send',
@@ -137,7 +151,8 @@ const conversationTools = (server: McpServer, add: Add, reply: Reply) => {
       'thread_start',
       {
         title: 'Start a thread',
-        description: 'A Thread from a chat within reach, its first message answered there.',
+        description:
+          "A Thread from a chat within reach, its first message answered there. A `title` names it at once; a titled thread started `empty` is announced in its Topic's Conversation in the same operation.",
         inputSchema: standard(Schema.Struct({ chat: ChatId, thread: StartThread })),
         annotations: writes,
       },

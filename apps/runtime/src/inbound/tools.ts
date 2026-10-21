@@ -39,6 +39,7 @@ export const TOOLS = {
   topic_create: 'topics.create',
   topic_update: 'topics.update',
   topic_set_setup: 'topics.setSetup',
+  conversation_update: 'conversations.update',
   conversation_send: 'conversations.submit',
   thread_start: 'conversations.startThread',
   conversation_entries: 'conversations.entries',

@@ -178,6 +178,8 @@ const registryWrites = (db: Database, calls: Calls): Partial<Conversations['Serv
         view: view(chat, change.title === undefined ? {} : { title: change.title }),
         closed: [],
       })),
+    // No thread here owes its announcement (ADR 0090), so naming one writes no note.
+    announce: () => Effect.succeed(false),
     markRead: (id) => Effect.map(known(id), (chat) => void calls.push(`read:${chat}`)),
     startThread,
     stopSubagents: (id) => Effect.sync(() => void calls.push(`subagents:${id}`)),

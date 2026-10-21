@@ -3,7 +3,7 @@ import type { Conversation, EntryId } from '@earendil-works/pi-durable'
 import type { StartedThread, ThreadHeadData } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
-import { type OwnerSubmit, submitOwner } from '../agent-program.ts'
+import { type OwnerSubmit, announceNamed, submitOwner } from '../agent-program.ts'
 import { InvalidInput } from '../http/errors.ts'
 import { threadHeadContent } from '../pi/content.ts'
 import { BACKGROUND } from '../pi/context.ts'
@@ -56,7 +56,11 @@ export async function submitThreadHead(
  * returns the same Thread and receipt.
  */
 export const startThread = (
-  input: Omit<OwnerSubmit, 'thread' | 'parentOp'> & { readonly parent: string; readonly anchor: ThreadAnchor },
+  input: Omit<OwnerSubmit, 'thread' | 'parentOp'> & {
+    readonly parent: string
+    readonly anchor: ThreadAnchor
+    readonly title?: string | undefined
+  },
 ) =>
   Effect.gen(function* () {
     yield* requireBudget
@@ -65,6 +69,11 @@ export const startThread = (
     const conversations = yield* Conversations
     const { parent, anchor, operationId } = input
     const thread = yield* conversations.startThread(parent, operationId, anchor)
+    // A title names the Thread before its first message, and an empty one announces itself at once (ADR 0090).
+    if (input.title !== undefined) {
+      yield* conversations.update(thread.id, { title: input.title })
+      yield* announceNamed(thread.id)
+    }
     if (anchor === 'latest') {
       const head = { thread: thread.id, text: input.text.slice(0, HEAD_TEXT), operationId }
       const write = threadHeadWrite(head, threadHeadContent(input.text))

@@ -113,6 +113,13 @@ export const confineSetupEdit = (edit: TopicSetupEdit) =>
     'set' in edit ? setupWithin(key, edit.set) : 'add' in edit ? edit.add.every((item) => itemWithin(key, item)) : true,
   )
 
+/** A key's change of one of its chats (ADR 0090): a title, closing or reopening; pinning a subagent open is the owner's. */
+export const confineUpdate = (change: { readonly keepOpen?: boolean | undefined }) =>
+  Effect.gen(function* () {
+    if ((yield* requestKey) !== undefined && change.keepOpen !== undefined)
+      return yield* new Forbidden({ reason: 'key_keep_open' })
+  })
+
 /** What may come with a key's message: Persona tags of its own Personas only, no files and no App context. */
 export const confineMessage = (context: {
   readonly selections: readonly { readonly kind: string; readonly personaId?: number }[]

@@ -155,11 +155,13 @@ export type ThreadAnchor = typeof ThreadAnchor.Type
  * The thread operation (ADR 0034), `POST /api/conversations/:id/threads`, for Reply, "+" and Start thread: start the
  * Thread at `anchor` of the chat, then send `message` as its first message, answered there. The same `operationId`
  * finds the same Thread, so a double click or a retry never makes two. The first message's own operation id derives
- * from `operationId`.
+ * from `operationId`. A `title` names the Thread at once (ADR 0090); an `empty` one then announces itself in its
+ * Topic's Conversation in the same operation, once.
  */
 export const StartThread = Schema.Struct({
   operationId: OperationId,
   anchor: ThreadAnchor,
+  title: Schema.optional(NonEmptyString(120)),
   message: Schema.Struct({
     input: SendMessage.fields.input,
     appContext: SendMessage.fields.appContext,
