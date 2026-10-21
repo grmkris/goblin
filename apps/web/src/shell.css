@@ -841,6 +841,15 @@
   flex: none;
   color: var(--muted-foreground);
 }
+/* A channel's card names its thread (ADR 0090): the name may be long, so it is the one piece that shrinks. */
+.thread-summary-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .thread-summary-count {
   flex: none;
   color: var(--moss);

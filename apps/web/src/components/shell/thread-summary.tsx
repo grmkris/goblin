@@ -70,17 +70,42 @@ function summaryLabel(view: ConversationView, working: boolean, unread: boolean)
 }
 
 /**
- * A thread under the message it started from, as Slack shows one: "3 replies", then "Last reply 5 minutes ago" (its
- * name in its place until anyone replied), a dot while it has unread replies and a pulse while it works. A click opens it
- * in the panel.
+ * What a summary says beside its reply count: a `named` one its thread's name first, then when it was last replied to
+ * and whether it is closed; any other the name only until anyone replied.
+ *
+ * @internal Exported for its unit test; `ThreadSummary` is its one caller.
  */
-export function ThreadSummary({ view, lead }: { readonly view: ConversationView; readonly lead?: string }) {
+export const summaryText = (
+  view: ConversationView,
+  now: number,
+  named: boolean,
+): { readonly title?: string; readonly meta: string } => {
+  const replied = view.lastReplyAt === undefined ? undefined : `Last reply ${relativeTime(view.lastReplyAt, now)}`
+  const last = named ? replied : (replied ?? threadTitle(view))
+  const meta = [last, isClosed(view) ? 'closed' : undefined].filter((part) => part !== undefined).join(' · ')
+  return named ? { title: threadTitle(view), meta } : { meta }
+}
+
+/**
+ * A thread under the message it started from, as Slack shows one: "3 replies", then "Last reply 5 minutes ago" (its
+ * name in its place until anyone replied), a dot while it has unread replies and a pulse while it works. A `named` one
+ * keeps its name after its lead, its replies beside it, for a channel where the card is all that names the thread
+ * (ADR 0090). A click opens it in the panel.
+ */
+export function ThreadSummary({
+  view,
+  lead,
+  named = false,
+}: {
+  readonly view: ConversationView
+  readonly lead?: string
+  readonly named?: boolean
+}) {
   const panel = usePanel()
   const now = useMinute()
   const working = useActivity(view.id) !== undefined
   const unread = isUnread(view)
-  const closed = isClosed(view)
-  const last = view.lastReplyAt === undefined ? threadTitle(view) : `Last reply ${relativeTime(view.lastReplyAt, now)}`
+  const { title, meta } = summaryText(view, now, named)
   return (
     <button
       type="button"
@@ -90,13 +115,14 @@ export function ThreadSummary({ view, lead }: { readonly view: ConversationView;
       aria-label={summaryLabel(view, working, unread)}
     >
       {lead !== undefined && <span className="thread-summary-lead">{lead}</span>}
+      {title !== undefined && <span className="thread-summary-title">{title}</span>}
       {justMoved(view) ? (
         <span className="thread-summary-count">View thread</span>
       ) : (
         <>
           <span className="thread-summary-count">{repliesLabel(view.replies)}</span>
           {/* One piece, so on a narrow screen it moves to the second line whole rather than leaving "· closed" alone. */}
-          <span className="thread-summary-meta">{closed ? `${last} · closed` : last}</span>
+          {meta !== '' && <span className="thread-summary-meta">{meta}</span>}
         </>
       )}
       {working && <span className="thread-busy" aria-label="Working" />}
@@ -186,15 +212,15 @@ export function MessageFooter({ part, threads }: { readonly part: Part; readonly
 }
 
 /**
- * Where the channel noted a thread the owner started (`app.thread_started`): the thread as it is now, its summary
- * opening it. The model saw only the name it had then.
+ * Where the channel noted a thread the owner started (`app.thread_started`): the thread as it is now, named, its
+ * summary opening it. The model saw only the name it had then.
  */
 export function ThreadStartedRow({ thread }: { readonly thread: string }) {
   const view = useConversation(thread)
   if (view === undefined) return null
   return (
     <div className="thread-summaries">
-      <ThreadSummary view={view} lead="Started a thread" />
+      <ThreadSummary view={view} lead="Started a thread" named />
     </div>
   )
 }
