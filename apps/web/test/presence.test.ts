@@ -15,6 +15,7 @@ const projection = (extra: Partial<ConversationProjection> = {}): ConversationPr
   branchable: new Set(),
   omitted: new Set(),
   newestEntry: 0,
+  children: [],
   ...extra,
 })
 const running = (target?: { connectionId: string; name: string }): ToolPart => ({

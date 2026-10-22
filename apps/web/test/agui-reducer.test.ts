@@ -95,6 +95,27 @@ describe("the runtime's goldens, read by the browser", () => {
     expect(messages.some((message) => message.role === 'persona')).toBe(true)
   })
 
+  it("keeps a Persona's work in its fork apart: a child while it works, its answer the chat's own", () => {
+    const { full, answers } = golden('fork')
+    const states = stepwise(full)
+    const working = states.filter((state) => state.children.length > 0)
+    expect(working.length).toBeGreaterThan(0)
+    expect(working[0]?.children).toEqual([
+      { id: '9', name: 'Squarewave', persona: { id: 4, avatar: { glyph: 'S', hue: 210 } }, partial: '' },
+    ])
+    // What its answer in flight says stays with it; the chat itself streams nothing and runs nothing meanwhile.
+    expect(working.map((state) => state.children[0]?.partial)).toContain('Launch on Monday.')
+    for (const state of working)
+      expect(state).toMatchObject({ running: false, partial: '', partialReasoning: '', tools: [] })
+    const roles = states.at(-1)?.messages.map((message) => message.role)
+    expect(roles).toEqual(['user', 'persona'])
+    expect(states.at(-1)?.children).toEqual([])
+    // The answers tier shows it working by its lifecycle alone.
+    const tiered = stepwise(answers)
+    expect(tiered.some((state) => state.children.some((child) => child.name === 'Squarewave'))).toBe(true)
+    expect(tiered.at(-1)?.children).toEqual([])
+  })
+
   it('carries what a message brought: its files', () => {
     const messages = new Projector().apply(golden('attachments').full, 0).messages
     expect(messages.find((message) => message.role === 'user')).toMatchObject({ attachments: [expect.anything()] })
@@ -137,6 +158,32 @@ describe('the reducer', () => {
     expect(after.partial).toBe('Hi')
     expect(after.messages).toBe(before.messages)
     expect(after.branchable).toBe(before.branchable)
+  })
+
+  it("keeps a child's own events with it, and forgets its children at an epoch's opening", () => {
+    const chat = follow([said(1, 'go')])
+    const child = { subagentRunId: '7' }
+    const working = chat.next([
+      { type: 'SUBAGENT_STARTED', name: 'scout', ...child },
+      { type: 'TEXT_MESSAGE_START', messageId: '7:a5', role: 'assistant', ...child },
+      { type: 'TEXT_MESSAGE_CONTENT', messageId: '7:a5', delta: 'Looking', ...child },
+      { type: 'TOOL_CALL_START', toolCallId: '7:c1', toolCallName: 'fetch', parentMessageId: '7:a5', ...child },
+      { ...started('7:c1'), ...child },
+    ])
+    expect(working.children).toEqual([{ id: '7', name: 'scout', partial: 'Looking' }])
+    expect(working).toMatchObject({ partial: '', tools: [] })
+    const ended = chat.next([
+      { type: 'TEXT_MESSAGE_END', messageId: '7:a5', ...child },
+      { type: 'SUBAGENT_FINISHED', outcome: { type: 'success' }, ...child },
+    ])
+    expect(ended.children).toEqual([])
+    expect(ended.messages.map((message) => message.role)).toEqual(['user'])
+    // The events of a child never started, or one an epoch's opening forgot, are read past.
+    chat.next([{ type: 'SUBAGENT_STARTED', name: 'scout', ...child }])
+    const reopened = chat.next([{ type: 'MESSAGES_SNAPSHOT', messages: [said(1, 'go')] }])
+    expect(reopened.children).toEqual([])
+    const stray = chat.next([{ type: 'TEXT_MESSAGE_START', messageId: '7:a6', role: 'assistant', ...child }])
+    expect(stray).toMatchObject({ children: [], partial: '' })
   })
 
   it('ends a nested call’s live row with its result, without a transcript message', () => {

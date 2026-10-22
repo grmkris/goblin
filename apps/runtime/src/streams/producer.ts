@@ -10,8 +10,17 @@ import { chatSession } from '../chats/directory.ts'
 import { type AppError, attempt, toAppError } from '../http/errors.ts'
 import { reportAndRecover } from '../observability/report.ts'
 import type { PiSessions } from '../pi/sessions.ts'
-import { type Hints, type StreamCursor, reconcile, startCursor, translate } from './agui.ts'
+import {
+  type ChildSent,
+  type Hints,
+  type StreamCursor,
+  type Translation,
+  reconcile,
+  startCursor,
+  translate,
+} from './agui.ts'
 import { bodiesOf, bytesOf, cursorJson, isBoundary, isRunEnd, movedBody, opening, storedCursor } from './bodies.ts'
+import { ChildFollow, type ChildMessage, type ChildPorts } from './child-follow.ts'
 import { type StoredStream, appendWrites, beginEpoch, streamKey, streamsOf } from './store.ts'
 import type { QueuedParts } from './state.ts'
 import { coalesce, forTier } from './tiers.ts'
@@ -62,8 +71,9 @@ type ChatState = {
   lastBatchAt: number
 }
 
-/** What the producer's one fiber takes, in order. */
+/** What the producer's one fiber takes, in order: its chats' and their children's (`child-follow.ts`). */
 type Message =
+  | ChildMessage
   | { readonly kind: 'commit'; readonly session: string }
   | { readonly kind: 'batch'; readonly chat: string; readonly gen: number; readonly events: readonly AgentEvent[] }
   | { readonly kind: 'flush'; readonly chat: string; readonly tier: StreamTier }
@@ -88,6 +98,8 @@ export type ProducerPorts = {
   readonly rotateBytes: number | undefined
   /** What the session's queued inputs say now (`InboxDoc`), by submission id: the `/queue` of its streams. */
   readonly queued: (session: string) => Effect.Effect<ReadonlyMap<number, QueuedParts>>
+  /** The Persona invocations and revisions the chats' children are named by. */
+  readonly personas: Pick<ChildPorts, 'working' | 'invocation' | 'persona' | 'promptEntry'>
 }
 
 export type { Message as ProducerMessage }
@@ -196,8 +208,20 @@ export class Producer {
   /** Every Pi session of a chat with streams, and the ones a watch follows now. */
   readonly #sessions = new Map<string, string>()
   readonly #watching = new Set<string>()
+  /** The chats whose work the chats' streams carry: Personas' forks and subagents. */
+  readonly #children: ChildFollow
   constructor(ports: ProducerPorts) {
     this.#ports = ports
+    const { db, pi, scope, queue, personas } = ports
+    const offer = (message: ChildMessage) => void Queue.offerUnsafe(queue, message)
+    this.#children = new ChildFollow(
+      { db, pi, scope, offer, ...personas },
+      {
+        streamed: (chat) => this.#stateOf(chat) !== undefined,
+        carried: (chat) => this.#carried(chat),
+        step: (chat, step) => this.#step(chat, step),
+      },
+    )
   }
 
   /** The fiber's work: every message in turn; one that fails is reported and the next one taken. */
@@ -209,10 +233,10 @@ export class Producer {
     )
   }
 
-  /** Pi's commit, inside it: the sessions with streams and no watch are noted, nothing more. */
+  /** Pi's commit, inside it: the sessions with streams, or children's, and no watch are noted, nothing more. */
   noticed(publication: CommitPublication): void {
     for (const session of touchedSessions(publication))
-      if (this.#sessions.has(session) && !this.#watching.has(session))
+      if ((this.#sessions.has(session) && !this.#watching.has(session)) || this.#children.idle(session))
         Queue.offerUnsafe(this.#ports.queue, { kind: 'commit', session })
   }
 
@@ -264,6 +288,42 @@ export class Producer {
         return this.#ports.drain(streamKey(row.chat, row.tier))
       }),
     )
+  }
+
+  /** The children the chat's streams carry now, each as the first stream that carries it has it. */
+  #carried(chat: string): ReadonlyMap<string, ChildSent> {
+    const carried = new Map<string, ChildSent>()
+    for (const row of this.#chats.get(chat)?.rows.values() ?? [])
+      for (const [child, sent] of Object.entries(row.cursor.children ?? {}))
+        if (!carried.has(child)) carried.set(child, sent)
+    return carried
+  }
+
+  /**
+   * `step` over the cursor of each of the chat's streams (one waiting for a new epoch takes the step there): what it
+   * answers pending in the row's tier, appended at once at a boundary or armed for `FLUSH_MS`.
+   */
+  #step(chat: string, step: (cursor: StreamCursor) => Translation): Effect.Effect<void> {
+    const rows = [...(this.#chats.get(chat)?.rows.values() ?? [])].filter(({ begin }) => begin === undefined)
+    return Effect.forEach(
+      rows,
+      (row) => {
+        const stepped = step(row.cursor)
+        row.cursor = stepped.cursor
+        return this.#pend(row, forTier(stepped.events, row.tier))
+      },
+      { discard: true },
+    )
+  }
+
+  /** `events` pending in the row: appended at once when one is a boundary, else with the next flush. */
+  #pend(row: Row, events: readonly AguiEvent[]): Effect.Effect<void> {
+    if (events.length === 0) return Effect.void
+    row.pending.push(...events)
+    if (events.some(isBoundary)) return this.#flush(row)
+    const arm = row.armed ? Effect.void : this.#later(FLUSH_MS, { kind: 'flush', chat: row.chat, tier: row.tier })
+    row.armed = true
+    return arm
   }
 
   /** Catches the row up from `snapshot`: what happened since its cursor, appended at once. */
@@ -324,6 +384,7 @@ export class Producer {
       state.lastBatchAt = now
       this.#follow(state, stream)
       yield* this.#armIdle(state)
+      yield* this.#children.attached(state.chat)
     })
   }
 
@@ -335,15 +396,8 @@ export class Producer {
     const translated = translate(row.cursor, events, hints)
     row.cursor = translated.cursor
     const mine = forTier(translated.events, row.tier)
-    if (mine.length === 0) return Effect.succeed(false)
-    row.pending.push(...mine)
-    if (!mine.some(isBoundary)) {
-      const arm = row.armed ? Effect.void : this.#later(FLUSH_MS, { kind: 'flush', chat: row.chat, tier: row.tier })
-      row.armed = true
-      return Effect.as(arm, false)
-    }
     const past = row.bytes >= (this.#ports.rotateBytes ?? ROTATE_BYTES) || now - row.startedAt >= ROTATE_AGE_MS
-    return Effect.as(this.#flush(row), past && mine.some(isRunEnd) && row.cursor.run === undefined)
+    return Effect.as(this.#pend(row, mine), past && mine.some(isRunEnd) && row.cursor.run === undefined)
   }
 
   /** One batch of the chat's watch, translated once per tier; a run's end past an epoch's limits moves it on. */
@@ -406,9 +460,11 @@ export class Producer {
     return this.#attach(state)
   }
 
+  /** A commit of a session without a watch: a chat with streams is attached again, a child is followed again. */
   #onCommit(session: string): Effect.Effect<void, AppError> {
     const chat = this.#sessions.get(session)
-    const state = chat === undefined ? undefined : this.#stateOf(chat)
+    if (chat === undefined) return this.#children.committed(session)
+    const state = this.#stateOf(chat)
     return state === undefined || state.watch !== undefined ? Effect.void : this.#attach(state)
   }
 
@@ -441,6 +497,12 @@ export class Producer {
           onFailure: (error) => Deferred.fail(message.done, error),
           onSuccess: (epoch) => Deferred.succeed(message.done, epoch),
         })
+      case 'child-batch':
+      case 'child-closed':
+      case 'child-idle':
+      case 'invocations':
+      case 'conversations':
+        return this.#children.handle(message)
     }
   }
 }

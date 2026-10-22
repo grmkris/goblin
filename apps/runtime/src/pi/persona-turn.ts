@@ -376,14 +376,18 @@ const registerPhase =
     }, context)
   }
 
+/** The request id of the prompt one invocation asks its fork with: to answer, or to go on after a hold. */
+export const personaPromptId = (operationId: string, persona: number, resumed: boolean): string =>
+  `${resumed ? 'persona-resume' : 'persona'}:${operationId}:${String(persona)}`
+
 /** What the fork is asked: to answer the owner's message, or to go on from the owner's reply to its hold. */
 const promptOf = ({ operationId, persona, resume }: Input) =>
   resume === undefined
     ? {
         content: `Answer the owner's message above as @${persona.name}.`,
-        requestId: `persona:${operationId}:${String(persona.id)}`,
+        requestId: personaPromptId(operationId, persona.id, false),
       }
-    : { content: resume.text, requestId: `persona-resume:${operationId}:${String(persona.id)}` }
+    : { content: resume.text, requestId: personaPromptId(operationId, persona.id, true) }
 
 /**
  * Prompts the fork and takes its answer, and what it stopped on when it needs the owner first (ADR 0041); a stopped,

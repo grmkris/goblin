@@ -6,10 +6,12 @@ import {
   CustomName,
   EventType,
   type GoblinState,
+  type PersonaAnswerData,
   type TokenCounts,
   type ToolProgress,
 } from '@goblin/contracts'
 import { settleAttention } from './attention.ts'
+import { type ChildInfo, attribute, endedEvent } from './lifecycle.ts'
 import { type MessageSent, applyChange, beginMessage, endMessage, syncBlock } from './live.ts'
 import {
   entryMarks,
@@ -20,6 +22,7 @@ import {
   omittedBy,
   outcomeOf,
   personaAnswer,
+  personaMark,
   runIdOf,
   stopOf,
   toolResultId,
@@ -59,9 +62,10 @@ type RunSent = {
 
 /**
  * Where a chat's stream is: what it carried last (`lastEntryId`), the run and the answer in flight, the operation ids
- * of inputs it saw admitted (by submission id, newest kept), the compaction tasks behind `state.compactions.running`
- * and the STATE document as sent. Plain JSON, so the producer can keep it between appends. `translate`, `reconcile`
- * and `open` never change the cursor they are given; they answer a new one.
+ * of inputs it saw admitted (by submission id, newest kept), the compaction tasks behind `state.compactions.running`,
+ * the STATE document as sent, and the children whose work it carries now (`children.ts`). Plain JSON, so the
+ * producer can keep it between appends. `translate`, `reconcile` and `open` never change the cursor they are given;
+ * they answer a new one.
  */
 export type StreamCursor = {
   readonly chat: string
@@ -71,7 +75,12 @@ export type StreamCursor = {
   operations: Record<string, string>
   compactionTasks: number[]
   state: GoblinState
+  /** By child chat (the `subagentRunId`). */
+  children?: Record<string, ChildSent> | undefined
 }
+
+/** A child whose work the stream carries (started, not ended): who it is, and its own cursor over its own chat. */
+export type ChildSent = Omit<ChildInfo, 'chat'> & { cursor: StreamCursor }
 
 /** What the producer knows that Pi's events do not say: what queued inputs say (from `InboxDoc`), by id. */
 export type Hints = { readonly queued?: ReadonlyMap<number, QueuedParts> }
@@ -197,7 +206,54 @@ function attentionAfter(w: Work, entry: EntryRecord): void {
   setState(w, 'attention', after)
 }
 
-/** A committed entry, once: its messages' events, then what it settles or raises. */
+/**
+ * Closes what is still open in a stream: its answer in flight and its step; a run that never ended ends (its
+ * RUN_FINISHED, which a child's part of its parent's stream leaves out).
+ */
+function closeOpen(w: Work): void {
+  if (w.cursor.run !== undefined) return runEnded(w, new Map())
+  if (w.cursor.message !== undefined) endMessage(w.cursor.message, w.out)
+  w.cursor.message = undefined
+}
+
+/** A child's work ends in its parent's stream: what it left open closes, then its SUBAGENT_* end. */
+export function childClosed(chat: string, child: ChildSent): AguiEvent[] {
+  const w = work(child.cursor, {})
+  closeOpen(w)
+  return attribute(chat, w.out)
+}
+
+/** The child chat whose work a Persona's answer ends: its fork, or the one carried for its operation. */
+function answeringChild(children: Record<string, ChildSent>, answer: PersonaAnswerData): string | undefined {
+  if (answer.fork !== undefined) return Object.hasOwn(children, answer.fork) ? answer.fork : undefined
+  return Object.keys(children).find((chat) => {
+    const persona = children[chat]?.persona
+    return persona?.id === answer.persona && persona.operationId === answer.operationId
+  })
+}
+
+/**
+ * A Persona's answer ends the work of its fork, when the stream carries it: after the answer, SUBAGENT_FINISHED with
+ * the answer's entry, suspended on what the answer raised when it waits for the owner.
+ */
+function childAnswered(w: Work, entry: EntryRecord): void {
+  const answer = personaAnswer(entry)
+  const { children } = w.cursor
+  if (answer === undefined || children === undefined) return
+  const chat = answeringChild(children, answer)
+  const child = chat === undefined ? undefined : children[chat]
+  if (chat === undefined || child === undefined) return
+  const entryId = Number(entry.id)
+  const interrupts = w.cursor.state.attention.flatMap(({ id, metadata }) =>
+    metadata.goblin.entryId === entryId ? [id] : [],
+  )
+  const outcome = interrupts.length === 0 ? 'success' : 'suspended'
+  const end = { outcome, entryId, interrupts, persona: personaMark(answer) } as const
+  w.out.push(...childClosed(chat, child), endedEvent({ ...child, chat }, end))
+  delete children[chat]
+}
+
+/** A committed entry, once: its messages' events, then what it settles or raises, and the child work it ends. */
 function entryCommitted(w: Work, entry: EntryRecord): void {
   const id = Number(entry.id)
   if (id <= w.cursor.lastEntryId) return
@@ -207,6 +263,7 @@ function entryCommitted(w: Work, entry: EntryRecord): void {
   else for (const message of entryMessages(w.cursor.chat, entry)) w.out.push(...messageEvents(message, id))
   if (entry.kind === 'pi.compaction') setState(w, 'compactions', { ...w.cursor.state.compactions, failure: null })
   attentionAfter(w, entry)
+  childAnswered(w, entry)
 }
 
 /** A goblin CUSTOM event: a running tool's progress. */

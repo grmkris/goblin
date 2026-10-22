@@ -7,7 +7,9 @@ import { createModels, createProvider } from '@earendil-works/pi-ai/models'
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream'
 import {
   type AgentEvent,
+  type AgentEventStream,
   type Conversation,
+  type ConversationId,
   type EntryDraft,
   Harness,
   MemoryStorage,
@@ -24,14 +26,30 @@ import { typedTool } from '../../src/pi/typed-tool.ts'
 import { model } from '../integration/model.ts'
 
 /**
+ * A child's work recorded beside its parent's (a Persona's fork): its batches, the snapshot its watch began with, which
+ * watch delivered each batch in the order they came (`order`, the parent's and the child's interleaved), a snapshot
+ * of it taken with the parent's `mid` (`after` its batches delivered by then), and its snapshot once it was idle.
+ */
+export type ChildRecording = {
+  readonly chat: string
+  readonly start: SnapshotEvent
+  readonly batches: readonly (readonly AgentEvent[])[]
+  readonly order: readonly ('parent' | 'child')[]
+  readonly mid?: { readonly after: number; readonly snapshot: SnapshotEvent }
+  readonly final: SnapshotEvent
+}
+
+/**
  * One recorded conversation: every batch its watch saw from the start, a snapshot taken mid-answer (`after` the
- * batches delivered by then) where the scenario takes one, and the snapshot of the conversation once it was idle.
+ * batches delivered by then) where the scenario takes one, and the snapshot of the conversation once it was idle; and
+ * its child's work where the scenario forks one.
  */
 export type Recording = {
   readonly chat: string
   readonly batches: readonly (readonly AgentEvent[])[]
   readonly mid?: { readonly after: number; readonly snapshot: SnapshotEvent }
   readonly final: SnapshotEvent
+  readonly child?: ChildRecording
 }
 
 /** A part of a scripted answer: text or thinking in chunks, or a tool call whose arguments grow step by step. */
@@ -199,8 +217,16 @@ const forecast = typedTool({
 })
 const tools = defineExtension({ name: 'streams.fixture', tools: [forecast] })
 
-/** What a scenario does with the root conversation, the model and the clock. */
-type Driver = { readonly root: Conversation; readonly model: ScriptedModel; readonly now: () => number }
+/**
+ * What a scenario does with the root conversation, the model and the clock; `fork` forks the root at its newest entry,
+ * as a Persona's turn does, and records the fork's work beside the root's.
+ */
+type Driver = {
+  readonly root: Conversation
+  readonly model: ScriptedModel
+  readonly now: () => number
+  readonly fork: () => Promise<Conversation>
+}
 
 /** A passive write into the root conversation, with one user model message. */
 async function write(driver: Driver, entry: Omit<EntryDraft, 'model'>, text: string, requestId: string): Promise<void> {
@@ -324,6 +350,32 @@ export const scenarios = {
       await write(driver, { kind: 'app.shared', data: { thread: '7' } }, 'Shared from the thread', 'share-1')
     },
   },
+  fork: {
+    replies: [
+      {
+        parts: [
+          { text: ['Checking', ' the sky.'] },
+          { call: { id: 'call-1', name: 'forecast', steps: [{ city: 'Tal' }, { city: 'Tallinn' }] } },
+        ],
+      },
+      { parts: [{ thinking: ['Sunny,', ' so Monday.'] }, { text: ['Launch', ' on', ' Monday.'] }], pause: 3 },
+    ],
+    run: async (driver, snapshotMid) => {
+      const ask = { personas: [{ id: 4, name: 'Squarewave', revision: 2 }], order: 'parallel' }
+      await write(driver, { kind: 'app.persona_ask', data: ask }, '[to @Squarewave] plan the launch', 'op-fork')
+      const fork = await driver.fork()
+      const prompt = "Answer the owner's message above as @Squarewave."
+      const asked = await fork.submit({ type: 'input', content: prompt, requestId: 'persona:op-fork:4' }, BACKGROUND)
+      await driver.model.paused.promise
+      await tick(80)
+      await snapshotMid()
+      driver.model.release()
+      await asked.wait(BACKGROUND)
+      await fork.waitForIdle(BACKGROUND)
+      const answer = { ...PERSONA, operationId: 'op-fork', fork: String(fork.id), text: 'Launch on Monday.' }
+      await write(driver, { kind: 'app.persona', data: answer }, 'Launch on Monday.', 'persona:op-fork:4')
+    },
+  },
   overflow: {
     replies: [{ parts: [{ text: ['One', ' two', ' three', ' four'] }], pause: 2 }],
     run: async (driver, snapshotMid) => {
@@ -354,11 +406,40 @@ export const scenarios = {
 
 export type ScenarioName = keyof typeof scenarios
 
-/** Runs one scenario on a fresh Harness and returns what its root conversation's watch saw. */
-export async function record(name: ScenarioName): Promise<Recording> {
-  const scenario: Scenario = scenarios[name]
-  const now = clock()
-  const scripted = new ScriptedModel(scenario.replies, now)
+/** A JSON copy of what Pi handed a listener, as a fixture keeps it. */
+const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value))
+
+/** A conversation's snapshot now, from a watch attached and stopped at once. */
+async function snapshotOf(harness: Harness, id: ConversationId): Promise<SnapshotEvent> {
+  const watch = await watchEvents(harness, id, BACKGROUND)
+  await watch.stop()
+  return copy(watch.snapshot)
+}
+
+/** The batches of the root's watch and, once the scenario forks one, its child's, in the order they came. */
+class Watches {
+  readonly order: ('parent' | 'child')[] = []
+  readonly parent: (readonly AgentEvent[])[] = []
+  readonly child: (readonly AgentEvent[])[] = []
+  readonly #watches: AgentEventStream[] = []
+
+  async follow(harness: Harness, id: ConversationId, who: 'parent' | 'child'): Promise<SnapshotEvent> {
+    const watch = await watchEvents(harness, id, BACKGROUND)
+    this.#watches.push(watch)
+    watch.start(async (events) => {
+      this[who].push(copy(events))
+      this.order.push(who)
+    })
+    return copy(watch.snapshot)
+  }
+
+  async stop(): Promise<void> {
+    for (const watch of this.#watches) await watch.stop()
+  }
+}
+
+/** A fresh Harness on `scripted`, with the tools the scenarios call. */
+function harnessOf(scripted: ScriptedModel, now: () => number): Promise<Harness> {
   const models = createModels()
   models.setProvider(
     createProvider({
@@ -376,29 +457,58 @@ export async function record(name: ScenarioName): Promise<Recording> {
     progress: { partialIntervalMs: 5, outputIntervalMs: 5 },
     retry: { enabled: true, maxRetries: 1, baseDelayMs: 20 },
   }
-  const harness = await Harness.open(new MemoryStorage(), { models, registry, settings, now }, BACKGROUND)
+  return Harness.open(new MemoryStorage(), { models, registry, settings, now }, BACKGROUND)
+}
+
+/** Runs one scenario on a fresh Harness and returns what its root conversation's watch saw, and its child's. */
+export async function record(name: ScenarioName): Promise<Recording> {
+  const scenario: Scenario = scenarios[name]
+  const now = clock()
+  const scripted = new ScriptedModel(scenario.replies, now)
+  const harness = await harnessOf(scripted, now)
   try {
     const root = await harness.root(BACKGROUND, {
       agent: { model: { provider: model.provider, modelId: model.id }, thinkingLevel: 'off' },
     })
-    const watch = await watchEvents(harness, root.id, BACKGROUND)
-    const batches: AgentEvent[][] = []
-    watch.start(async (events) => {
-      batches.push(JSON.parse(JSON.stringify(events)))
-    })
-    const snapshotNow = async (): Promise<SnapshotEvent> => {
-      const second = await watchEvents(harness, root.id, BACKGROUND)
-      await second.stop()
-      return JSON.parse(JSON.stringify(second.snapshot))
+    const watches = new Watches()
+    await watches.follow(harness, root.id, 'parent')
+    let child: { readonly id: ConversationId; readonly start: SnapshotEvent } | undefined
+    const fork = async () => {
+      const at = (await snapshotOf(harness, root.id)).entries.at(-1)?.id
+      if (at === undefined) throw new Error('the root has no entry to fork at')
+      const forked = await root.fork(at, { ownership: { kind: 'ownerless' } }, BACKGROUND)
+      child = { id: forked.id, start: await watches.follow(harness, forked.id, 'child') }
+      return forked
     }
     let mid: Recording['mid']
-    await scenario.run({ root, model: scripted, now }, async () => {
-      mid = { after: batches.length, snapshot: await snapshotNow() }
+    let childMid: ChildRecording['mid']
+    await scenario.run({ root, model: scripted, now, fork }, async () => {
+      mid = { after: watches.parent.length, snapshot: await snapshotOf(harness, root.id) }
+      if (child !== undefined) childMid = { after: watches.child.length, snapshot: await snapshotOf(harness, child.id) }
     })
     await root.waitForIdle(BACKGROUND)
     await tick(80)
-    await watch.stop()
-    return { chat: '1', batches, ...(mid === undefined ? {} : { mid }), final: await snapshotNow() }
+    await watches.stop()
+    const forked =
+      child === undefined
+        ? {}
+        : {
+            child: {
+              chat: String(child.id),
+              start: child.start,
+              batches: watches.child,
+              order: watches.order,
+              ...(childMid === undefined ? {} : { mid: childMid }),
+              final: await snapshotOf(harness, child.id),
+            },
+          }
+    return {
+      chat: '1',
+      batches: watches.parent,
+      ...(mid === undefined ? {} : { mid }),
+      final: await snapshotOf(harness, root.id),
+      ...forked,
+    }
   } finally {
     await harness.close(BACKGROUND)
   }

@@ -1,7 +1,8 @@
 // A chat's AG-UI events (docs/architecture/streams.md) as the browser follows it: the messages committed so far, the
-// answer in flight, the tools running, the queue and the run's progress, as one projection the transcript and the
-// composer read. One `Projector` per followed chat keeps what the events built; every batch answers a new projection.
-import type { QueueItem } from '@goblin/contracts'
+// answer in flight, the tools running, the queue and the run's progress, and the children working in it (Personas'
+// forks, subagents), as one projection the transcript and the composer read. One `Projector` per followed chat keeps
+// what the events built; every batch answers a new projection.
+import type { PersonaAvatar, QueueItem } from '@goblin/contracts'
 import type { ChatMessage } from '../chat-messages.ts'
 import { identifier, isNumber, isString, record, records, text } from '../values.ts'
 import { type Wire, chatMessages, entriesOf, marksOf, reasoningOwner } from './messages.ts'
@@ -24,6 +25,18 @@ const TOOL_TIMES_KEPT = 200
 
 /** One queued input, by its id and how it waits. */
 type Queued = { readonly id: number; readonly mode: 'steer' | 'followUp' }
+
+/**
+ * A child working in the chat now (a Persona answering in its fork, a subagent's run), from its SUBAGENT_STARTED to its
+ * end: its `subagentRunId`, its name, a Persona's id and avatar, and what its answer in flight says so far. Its own
+ * events stay with it and never enter the transcript; its answer arrives as a message of the chat's own.
+ */
+export type LiveChild = {
+  readonly id: string
+  readonly name: string
+  readonly persona?: { readonly id: number; readonly avatar: PersonaAvatar } | undefined
+  readonly partial: string
+}
 
 export type ConversationProjection = {
   /** The committed messages, without the entries a later entry leaves out. */
@@ -52,6 +65,8 @@ export type ConversationProjection = {
   readonly newestEntry: number
   /** The entry older history is read before, a page at a time; none when the snapshot starts at the beginning. */
   readonly historyBefore?: number | undefined
+  /** The children working in the chat now, in the order they started. */
+  readonly children: readonly LiveChild[]
 }
 
 export const queuedProgress = (queuedCount: number): string =>
@@ -81,9 +96,30 @@ function progressed(output: string, update: unknown): string {
   return output.slice(trim) + (isString(change.append) ? change.append : '')
 }
 
+/** A child's state as its events built it: who it is, and its answer in flight. */
+type Child = { readonly view: Omit<LiveChild, 'partial'>; answer?: string | undefined; partial: string }
+
+/** The child an event belongs to: `subagentRunId` on any event but a child's lifecycle, which is its parent's. */
+const childOf = (event: Wire): string | undefined =>
+  isString(event.subagentRunId) && !identifier(event.type).startsWith('SUBAGENT_') ? event.subagentRunId : undefined
+
+/** A child as its SUBAGENT_STARTED names it. */
+function startedChild(event: Wire): Child {
+  const persona = marksOf(event).persona
+  return {
+    view: {
+      id: identifier(event.subagentRunId),
+      name: identifier(event.name),
+      ...(persona === undefined ? {} : { persona: { id: persona.id, avatar: persona.avatar } }),
+    },
+    partial: '',
+  }
+}
+
 /** The followed chat's projection, built from its events in order. */
 export class Projector {
   #committed: Wire[] = []
+  readonly #children = new Map<string, Child>()
   readonly #building = new Map<string, Building>()
   readonly #calls = new Map<string, Call>()
   #tools: LiveTool[] = []
@@ -101,6 +137,8 @@ export class Projector {
   }
 
   #apply(event: Wire, now: number): void {
+    const child = childOf(event)
+    if (child !== undefined) return this.#childEvent(child, event)
     switch (event.type) {
       case 'MESSAGES_SNAPSHOT':
         return this.#snapshot(event)
@@ -130,9 +168,31 @@ export class Projector {
     }
   }
 
-  /** Tool calls, their progress and results, and the entries the app draws. */
+  /** A child starts or ends its work: its own events are kept with it until then. */
+  #lifecycle(event: Wire): void {
+    const id = identifier(event.subagentRunId)
+    if (event.type === 'SUBAGENT_STARTED') this.#children.set(id, startedChild(event))
+    else this.#children.delete(id)
+  }
+
+  /** One of a child's own events: what its answer in flight says; everything else of it stays out of the chat. */
+  #childEvent(id: string, event: Wire): void {
+    const child = this.#children.get(id)
+    if (child === undefined) return
+    if (event.type === 'TEXT_MESSAGE_START' && event.role === 'assistant') {
+      child.answer = identifier(event.messageId)
+      child.partial = ''
+    } else if (event.type === 'TEXT_MESSAGE_CONTENT' && event.messageId === child.answer && isString(event.delta))
+      child.partial += event.delta
+  }
+
+  /** Tool calls, their progress and results, the entries the app draws, and the children's lifecycle. */
   #applyTools(event: Wire, now: number): void {
     switch (event.type) {
+      case 'SUBAGENT_STARTED':
+      case 'SUBAGENT_FINISHED':
+      case 'SUBAGENT_ERROR':
+        return this.#lifecycle(event)
       case 'TOOL_CALL_START':
         return this.#called(event)
       case 'TOOL_CALL_ARGS':
@@ -155,13 +215,17 @@ export class Projector {
     }
   }
 
-  /** An epoch's opening: the messages it starts from replace what was built, and nothing runs until it says so. */
+  /**
+   * An epoch's opening: the messages it starts from replace what was built, and nothing runs until it says so (the
+   * children working are started again after it).
+   */
   #snapshot(event: Wire): void {
     this.#committed = records(event.messages)
     this.#building.clear()
     this.#calls.clear()
     this.#tools = []
     this.#running = false
+    this.#children.clear()
     this.#before = marksOf(event).before
   }
 
@@ -371,6 +435,7 @@ export class Projector {
       inbox,
       queued,
       historyBefore: this.#before,
+      children: [...this.#children.values()].map(({ view, partial }) => ({ ...view, partial })),
     }
   }
 }

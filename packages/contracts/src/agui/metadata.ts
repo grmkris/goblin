@@ -3,7 +3,7 @@ import { ComposerOption } from '../composer.ts'
 import { Attachment } from '../files.ts'
 import { ChatId, EntryId, OperationId, PersonaId } from '../ids.ts'
 import { McpOutcome } from '../mcp.ts'
-import { PersonaAskData, PersonaAvatar, PersonaHold } from '../personas.ts'
+import { PersonaAskData, PersonaAvatar, PersonaFailure, PersonaHold } from '../personas.ts'
 import { QuestionSpec } from '../conversations.ts'
 import { TokenCounts } from './state.ts'
 
@@ -22,6 +22,16 @@ export const PersonaMark = Schema.Struct({
   questions: Schema.optionalKey(Schema.Array(QuestionSpec)),
 })
 export type PersonaMark = typeof PersonaMark.Type
+
+/**
+ * Where a Persona's invocation is (`PersonaInvocationView`'s `state` and `reason`), on its `SUBAGENT_*` events: started
+ * (`running`), answered (also an answer that waits on the owner), failed with why, or stopped.
+ */
+export const InvocationMark = Schema.Struct({
+  state: Schema.Literals(['running', 'answered', 'failed', 'stopped']),
+  reason: Schema.optionalKey(PersonaFailure),
+})
+export type InvocationMark = typeof InvocationMark.Type
 
 /**
  * Why an assistant message has no whole answer: the model call failed (`error`, with the provider's first line), was
@@ -48,6 +58,11 @@ export type StopMark = typeof StopMark.Type
  *   the agent, ADR 0090).
  * - An assistant message: `persona` (a Persona's answer), `stop` (why it has no whole answer) and `usage` (the tokens
  *   its model call used, as Pi counts them).
+ * - A child's final answer in its parent (a Persona's answer, a Delegate's result): `subagentRunId`, the child chat
+ *   whose `SUBAGENT_*` events it follows. The message is the parent's own, so it carries no AG-UI `subagentRunId`.
+ * - A Persona's `SUBAGENT_*` events: `persona` (who answers, for which operation; on its end what it stopped on or
+ *   asked, as on its answer), `invocation` (its state and why it failed) and, on `SUBAGENT_FINISHED`, `entryId`, its
+ *   answer's entry.
  * - `branchable`: a Thread may start at the message's entry (ADR 0034): the owner's own words and the agent's answers.
  * - `omits`: the entries a later entry leaves out of the chat (a turn moved to a Thread, ADR 0034), on that entry's
  *   message: a reader hides the messages of those entries, wherever it read them.
@@ -71,6 +86,8 @@ export const GoblinMetadata = Schema.Struct({
   thread: Schema.optionalKey(ChatId),
   ask: Schema.optionalKey(PersonaAskData),
   persona: Schema.optionalKey(PersonaMark),
+  subagentRunId: Schema.optionalKey(ChatId),
+  invocation: Schema.optionalKey(InvocationMark),
   stop: Schema.optionalKey(StopMark),
   usage: Schema.optionalKey(TokenCounts),
   branchable: Schema.optionalKey(Schema.Literal(true)),

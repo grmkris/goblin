@@ -1,6 +1,6 @@
 // What every translated stream must be, whatever the case: valid AG-UI 1.0 events (by `@ag-ui/core`'s own schemas),
 // goblin's parts valid by their contracts, and a well-formed sequence (every message, call, span, step and run that
-// opens closes once, in order).
+// opens closes once, in order; a child's own, under its `subagentRunId`, between its SUBAGENT_STARTED and its end).
 import { EventSchema } from '@ag-ui/core/schemas'
 import {
   type AguiEvent,
@@ -16,6 +16,8 @@ import {
 import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { type StreamCursor, translate } from '../../src/streams/agui.ts'
+import { childBatch, childStarted } from '../../src/streams/children.ts'
+import type { ChildInfo } from '../../src/streams/lifecycle.ts'
 import type { Recording } from './scenarios.ts'
 
 /** A STATE patch's operations, each on a member of the document and, when it replaces one, valid as that member. */
@@ -70,16 +72,38 @@ class Ledger {
 
 type Rule = (ledger: Ledger, event: AguiEvent, args: Map<string, number>) => void
 
-/** The key a message, span or call event is about. */
-const about = (event: AguiEvent): string =>
-  'toolCallId' in event ? `call:${event.toolCallId}` : 'messageId' in event ? event.messageId : ''
+/** The child an event is attributed to, if any: its lifecycle events name it but belong to its parent. */
+const childOf = (event: AguiEvent): string | undefined =>
+  event.type === EventType.SUBAGENT_STARTED ||
+  event.type === EventType.SUBAGENT_FINISHED ||
+  event.type === EventType.SUBAGENT_ERROR ||
+  !('subagentRunId' in event)
+    ? undefined
+    : event.subagentRunId
 
-/** A run ends with nothing of it left open. */
+/** Where an event's opens and closes are kept: its child's own, or its parent's (no prefix). */
+const scope = (event: AguiEvent): string => {
+  const child = childOf(event)
+  return child === undefined ? '' : `sub:${child}|`
+}
+
+/** The key a message, span or call event is about, in its scope. */
+const about = (event: AguiEvent): string =>
+  scope(event) + ('toolCallId' in event ? `call:${event.toolCallId}` : 'messageId' in event ? event.messageId : '')
+
+/** A run ends with nothing of it left open (a child's work is its own). */
 const runEnds: Rule = (ledger) => {
   expect(ledger.open('message:'), 'messages left open at the run end').toEqual([])
   expect(ledger.open('call:'), 'tool calls left open at the run end').toEqual([])
   expect(ledger.open('step'), 'a step left open at the run end').toEqual([])
   ledger.closes('run')
+}
+
+/** A child's work ends with nothing of it left open. */
+const childEnds: Rule = (ledger, event) => {
+  const child = 'subagentRunId' in event ? event.subagentRunId : ''
+  expect(ledger.open(`sub:${child}|`), `${child}'s work left open at its end`).toEqual([])
+  ledger.closes(`sub:${child}`)
 }
 
 /** A call's arguments arrive once, as JSON, while it is open. */
@@ -96,11 +120,16 @@ const RULES: Partial<Record<EventType, Rule>> = {
   [EventType.RUN_STARTED]: (ledger) => ledger.opens('run'),
   [EventType.RUN_FINISHED]: runEnds,
   [EventType.RUN_ERROR]: runEnds,
-  [EventType.STEP_STARTED]: (ledger) => {
-    ledger.within('run')
-    ledger.opens('step')
+  [EventType.SUBAGENT_STARTED]: (ledger, event) =>
+    ledger.opens(`sub:${'subagentRunId' in event ? event.subagentRunId : ''}`),
+  [EventType.SUBAGENT_FINISHED]: childEnds,
+  [EventType.SUBAGENT_ERROR]: childEnds,
+  [EventType.STEP_STARTED]: (ledger, event) => {
+    const child = childOf(event)
+    ledger.within(child === undefined ? 'run' : `sub:${child}`)
+    ledger.opens(`${scope(event)}step`)
   },
-  [EventType.STEP_FINISHED]: (ledger) => ledger.closes('step'),
+  [EventType.STEP_FINISHED]: (ledger, event) => ledger.closes(`${scope(event)}step`),
   [EventType.TEXT_MESSAGE_START]: (ledger, event) => ledger.opens(`message:${about(event)}`),
   [EventType.TEXT_MESSAGE_CONTENT]: (ledger, event) => ledger.within(`message:${about(event)}`),
   [EventType.TEXT_MESSAGE_END]: (ledger, event) => ledger.closes(`message:${about(event)}`),
@@ -126,6 +155,9 @@ export function checked(events: readonly AguiEvent[], tier: StreamTier = 'full')
     expect(parsed.success, `${event.type}: ${parsed.error?.message ?? ''}`).toBe(true)
     goblinParts(event, tier)
     if (tier === 'answers') expect(event.type).not.toMatch(FULL_ONLY)
+    if (tier === 'answers') expect(childOf(event), `${event.type} of a child in answers`).toBeUndefined()
+    const child = childOf(event)
+    if (child !== undefined) ledger.within(`sub:${child}`)
     RULES[event.type]?.(ledger, event, args)
   }
   return events
@@ -153,3 +185,37 @@ export const textOf = (events: readonly AguiEvent[], messageId: string): string 
         : [],
     )
     .join('')
+
+/** The fork the `fork` scenario's Persona answers in, as its parent's stream names it (the producer reads the rest). */
+export const forkChild = (chat: string): ChildInfo => ({
+  chat,
+  name: 'Squarewave',
+  persona: { id: 4, name: 'Squarewave', revision: 2, avatar: { glyph: 'S', hue: 210 }, operationId: 'op-fork' },
+})
+
+/**
+ * A recording's parent and child batches translated in the order their watches delivered them, as the producer
+ * carries them. A Persona's fork starts before its first batch, from the snapshot its watch began with (its invocation
+ * started); with `runs`, the child's work is its runs, as a subagent's is.
+ */
+export function replayFamily(cursor: StreamCursor, recording: Recording, child: ChildInfo, runs = false) {
+  const kid = recording.child
+  if (kid === undefined) throw new Error('the recording has no child')
+  const after = Math.max(0, ...kid.start.entries.map(({ id }) => Number(id)))
+  const parents = [...recording.batches]
+  const children = [...kid.batches]
+  let at = cursor
+  let started = runs
+  const events: AguiEvent[] = []
+  const take = (step: { readonly events: readonly AguiEvent[]; readonly cursor: StreamCursor }) => {
+    events.push(...step.events)
+    at = step.cursor
+  }
+  for (const who of kid.order) {
+    if (who === 'child' && !started) take(childStarted(at, child, { snapshot: kid.start }))
+    started ||= who === 'child'
+    const batch = (who === 'parent' ? parents : children).shift() ?? []
+    take(who === 'parent' ? translate(at, batch) : childBatch(at, child, batch, { runs, after }))
+  }
+  return { events, cursor: at }
+}

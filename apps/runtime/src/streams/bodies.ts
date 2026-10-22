@@ -26,6 +26,9 @@ const BOUNDARIES: ReadonlySet<EventType> = new Set([
   EventType.MESSAGES_SNAPSHOT,
   EventType.STATE_SNAPSHOT,
   EventType.CUSTOM,
+  EventType.SUBAGENT_STARTED,
+  EventType.SUBAGENT_FINISHED,
+  EventType.SUBAGENT_ERROR,
 ])
 export const isBoundary = (event: AguiEvent): boolean => BOUNDARIES.has(event.type)
 

@@ -1,0 +1,1651 @@
+{
+  "pi": "1.3.0",
+  "chat": "1",
+  "batches": [
+    [
+      {
+        "type": "message_start",
+        "message": {
+          "role": "user",
+          "content": "[to @Squarewave] plan the launch",
+          "timestamp": 1760000000021
+        }
+      },
+      {
+        "type": "message_end",
+        "entry": {
+          "kind": "app.persona_ask",
+          "data": {
+            "personas": [
+              {
+                "id": 4,
+                "name": "Squarewave",
+                "revision": 2
+              }
+            ],
+            "order": "parallel"
+          },
+          "model": [
+            {
+              "role": "user",
+              "content": "[to @Squarewave] plan the launch",
+              "timestamp": 1760000000021
+            }
+          ],
+          "id": 7,
+          "conversationId": 1
+        }
+      },
+      {
+        "type": "submission",
+        "record": {
+          "conversationId": 1,
+          "requestId": "op-fork",
+          "type": "write",
+          "status": "done",
+          "entry": 7,
+          "id": 8
+        }
+      }
+    ],
+    [
+      {
+        "type": "message_start",
+        "message": {
+          "role": "user",
+          "content": "Launch on Monday.",
+          "timestamp": 1760000000179
+        }
+      },
+      {
+        "type": "message_end",
+        "entry": {
+          "kind": "app.persona",
+          "data": {
+            "persona": 4,
+            "name": "Squarewave",
+            "revision": 2,
+            "avatar": {
+              "glyph": "S",
+              "hue": 210
+            },
+            "operationId": "op-fork",
+            "fork": "9",
+            "text": "Launch on Monday."
+          },
+          "model": [
+            {
+              "role": "user",
+              "content": "Launch on Monday.",
+              "timestamp": 1760000000179
+            }
+          ],
+          "id": 24,
+          "conversationId": 1
+        }
+      },
+      {
+        "type": "submission",
+        "record": {
+          "conversationId": 1,
+          "requestId": "persona:op-fork:4",
+          "type": "write",
+          "status": "done",
+          "entry": 24,
+          "id": 25
+        }
+      }
+    ]
+  ],
+  "mid": {
+    "after": 1,
+    "snapshot": {
+      "type": "snapshot",
+      "entries": [
+        {
+          "kind": "app.persona_ask",
+          "data": {
+            "personas": [
+              {
+                "id": 4,
+                "name": "Squarewave",
+                "revision": 2
+              }
+            ],
+            "order": "parallel"
+          },
+          "model": [
+            {
+              "role": "user",
+              "content": "[to @Squarewave] plan the launch",
+              "timestamp": 1760000000021
+            }
+          ],
+          "id": 7,
+          "conversationId": 1
+        }
+      ],
+      "tools": [],
+      "nestedTools": [],
+      "compactions": [],
+      "inbox": [],
+      "agent": {
+        "model": {
+          "provider": "fixture",
+          "modelId": "lifecycle-fixture"
+        },
+        "thinkingLevel": "off"
+      },
+      "usage": {
+        "models": {},
+        "tools": {}
+      }
+    }
+  },
+  "final": {
+    "type": "snapshot",
+    "entries": [
+      {
+        "kind": "app.persona_ask",
+        "data": {
+          "personas": [
+            {
+              "id": 4,
+              "name": "Squarewave",
+              "revision": 2
+            }
+          ],
+          "order": "parallel"
+        },
+        "model": [
+          {
+            "role": "user",
+            "content": "[to @Squarewave] plan the launch",
+            "timestamp": 1760000000021
+          }
+        ],
+        "id": 7,
+        "conversationId": 1
+      },
+      {
+        "kind": "app.persona",
+        "data": {
+          "persona": 4,
+          "name": "Squarewave",
+          "revision": 2,
+          "avatar": {
+            "glyph": "S",
+            "hue": 210
+          },
+          "operationId": "op-fork",
+          "fork": "9",
+          "text": "Launch on Monday."
+        },
+        "model": [
+          {
+            "role": "user",
+            "content": "Launch on Monday.",
+            "timestamp": 1760000000179
+          }
+        ],
+        "id": 24,
+        "conversationId": 1
+      }
+    ],
+    "tools": [],
+    "nestedTools": [],
+    "compactions": [],
+    "inbox": [],
+    "agent": {
+      "model": {
+        "provider": "fixture",
+        "modelId": "lifecycle-fixture"
+      },
+      "thinkingLevel": "off"
+    },
+    "usage": {
+      "models": {},
+      "tools": {}
+    }
+  },
+  "child": {
+    "chat": "9",
+    "start": {
+      "type": "snapshot",
+      "entries": [
+        {
+          "kind": "app.persona_ask",
+          "data": {
+            "personas": [
+              {
+                "id": 4,
+                "name": "Squarewave",
+                "revision": 2
+              }
+            ],
+            "order": "parallel"
+          },
+          "model": [
+            {
+              "role": "user",
+              "content": "[to @Squarewave] plan the launch",
+              "timestamp": 1760000000021
+            }
+          ],
+          "id": 7,
+          "conversationId": 1
+        }
+      ],
+      "tools": [],
+      "nestedTools": [],
+      "compactions": [],
+      "inbox": [],
+      "agent": {
+        "model": {
+          "provider": "fixture",
+          "modelId": "lifecycle-fixture"
+        },
+        "thinkingLevel": "off"
+      },
+      "usage": {
+        "models": {},
+        "tools": {}
+      }
+    },
+    "batches": [
+      [
+        {
+          "type": "message_start",
+          "message": {
+            "role": "user",
+            "content": "Answer the owner's message above as @Squarewave.",
+            "timestamp": 1760000000042
+          }
+        },
+        {
+          "type": "message_end",
+          "entry": {
+            "model": [
+              {
+                "role": "user",
+                "content": "Answer the owner's message above as @Squarewave.",
+                "timestamp": 1760000000042
+              }
+            ],
+            "kind": "pi.user",
+            "id": 15,
+            "conversationId": 9
+          }
+        },
+        {
+          "type": "submission",
+          "record": {
+            "conversationId": 9,
+            "requestId": "persona:op-fork:4",
+            "type": "input",
+            "status": "placed",
+            "entry": 15,
+            "id": 16
+          }
+        },
+        {
+          "type": "run_start",
+          "inputs": [16]
+        },
+        {
+          "type": "turn_start"
+        }
+      ],
+      [
+        {
+          "type": "message_start",
+          "message": {
+            "role": "system",
+            "content": "",
+            "sections": {
+              "asking": "<asking>\nWhen you cannot continue without a decision or a missing detail from the owner, ask with `ask_user` instead of in prose: short questions, with choices wherever you can offer them. Call it on its own and stop; the answers arrive as their next message. Ask only for real decisions, never to confirm something you were already asked to do.\n</asking>"
+            },
+            "toolsAdded": [
+              {
+                "name": "ask_user",
+                "description": "Ask the owner one to five short questions when you cannot continue without their decision or a missing detail. Offer 2-8 options for a choice. Call it alone, then stop: their answers arrive as their next message.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "questions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "prompt": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["single", "multi", "text"]
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "label": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 120
+                                },
+                                "description": {
+                                  "type": "string",
+                                  "maxLength": 300
+                                }
+                              },
+                              "required": ["id", "label"],
+                              "additionalProperties": true
+                            },
+                            "maxItems": 8
+                          },
+                          "allowOther": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": ["id", "prompt", "kind"],
+                        "additionalProperties": true
+                      },
+                      "minItems": 1,
+                      "maxItems": 5
+                    }
+                  },
+                  "required": ["questions"],
+                  "additionalProperties": true
+                }
+              },
+              {
+                "name": "forecast",
+                "description": "The forecast for a city.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "city": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["city"],
+                  "additionalProperties": true
+                }
+              }
+            ],
+            "timestamp": 1760000000058
+          }
+        },
+        {
+          "type": "message_end",
+          "entry": {
+            "model": [
+              {
+                "role": "system",
+                "content": "",
+                "sections": {
+                  "asking": "<asking>\nWhen you cannot continue without a decision or a missing detail from the owner, ask with `ask_user` instead of in prose: short questions, with choices wherever you can offer them. Call it on its own and stop; the answers arrive as their next message. Ask only for real decisions, never to confirm something you were already asked to do.\n</asking>"
+                },
+                "toolsAdded": [
+                  {
+                    "name": "ask_user",
+                    "description": "Ask the owner one to five short questions when you cannot continue without their decision or a missing detail. Offer 2-8 options for a choice. Call it alone, then stop: their answers arrive as their next message.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "questions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "prompt": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": ["single", "multi", "text"]
+                              },
+                              "options": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 64
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 120
+                                    },
+                                    "description": {
+                                      "type": "string",
+                                      "maxLength": 300
+                                    }
+                                  },
+                                  "required": ["id", "label"],
+                                  "additionalProperties": true
+                                },
+                                "maxItems": 8
+                              },
+                              "allowOther": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["id", "prompt", "kind"],
+                            "additionalProperties": true
+                          },
+                          "minItems": 1,
+                          "maxItems": 5
+                        }
+                      },
+                      "required": ["questions"],
+                      "additionalProperties": true
+                    }
+                  },
+                  {
+                    "name": "forecast",
+                    "description": "The forecast for a city.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "city": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["city"],
+                      "additionalProperties": true
+                    }
+                  }
+                ],
+                "timestamp": 1760000000058
+              }
+            ],
+            "kind": "pi.system",
+            "id": 18,
+            "conversationId": 9,
+            "byTaskId": 17
+          }
+        }
+      ],
+      [
+        {
+          "type": "message_start",
+          "message": {
+            "role": "assistant",
+            "api": "openai-completions",
+            "provider": "fixture",
+            "model": "lifecycle-fixture",
+            "content": [
+              {
+                "type": "text",
+                "text": "Checking"
+              }
+            ],
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "stop",
+            "timestamp": 1760000000068
+          }
+        }
+      ],
+      [
+        {
+          "type": "message_update",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "changes": [
+            {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " the sky."
+            }
+          ]
+        }
+      ],
+      [
+        {
+          "type": "message_update",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "changes": [
+            {
+              "type": "toolcall_start",
+              "contentIndex": 1,
+              "block": {
+                "type": "toolCall",
+                "id": "call-1",
+                "name": "forecast",
+                "arguments": {
+                  "city": "Tal"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      [
+        {
+          "type": "message_update",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "changes": [
+            {
+              "type": "toolcall_delta",
+              "contentIndex": 1,
+              "path": ["city"],
+              "delta": "linn"
+            }
+          ]
+        }
+      ],
+      [
+        {
+          "type": "message_end",
+          "entry": {
+            "model": [
+              {
+                "role": "assistant",
+                "api": "openai-completions",
+                "provider": "fixture",
+                "model": "lifecycle-fixture",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Checking the sky."
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call-1",
+                    "name": "forecast",
+                    "arguments": {
+                      "city": "Tallinn"
+                    }
+                  }
+                ],
+                "usage": {
+                  "input": 10,
+                  "output": 5,
+                  "cacheRead": 2,
+                  "cacheWrite": 0,
+                  "totalTokens": 17,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "toolUse",
+                "timestamp": 1760000000068
+              }
+            ],
+            "kind": "pi.assistant",
+            "id": 19,
+            "conversationId": 9,
+            "byTaskId": 17
+          }
+        },
+        {
+          "type": "usage_changed",
+          "usage": {
+            "models": {
+              "fixture/lifecycle-fixture": {
+                "input": 10,
+                "output": 5,
+                "cacheRead": 2,
+                "cacheWrite": 0,
+                "totalTokens": 17,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              }
+            },
+            "tools": {}
+          }
+        }
+      ],
+      [
+        {
+          "type": "tool_execution_start",
+          "toolCallId": "call-1",
+          "toolName": "forecast",
+          "taskId": 20,
+          "args": {
+            "city": "Tallinn"
+          }
+        }
+      ],
+      [
+        {
+          "type": "tool_execution_update",
+          "toolCallId": "call-1",
+          "toolName": "forecast",
+          "taskId": 20,
+          "output": {
+            "set": "Looking up "
+          }
+        }
+      ],
+      [
+        {
+          "type": "tool_execution_update",
+          "toolCallId": "call-1",
+          "toolName": "forecast",
+          "taskId": 20,
+          "details": {
+            "kind": "forecast",
+            "step": 1
+          }
+        }
+      ],
+      [
+        {
+          "type": "tool_execution_update",
+          "toolCallId": "call-1",
+          "toolName": "forecast",
+          "taskId": 20,
+          "output": {
+            "append": "Tallinn"
+          }
+        }
+      ],
+      [
+        {
+          "type": "tool_execution_end",
+          "toolCallId": "call-1",
+          "toolName": "forecast",
+          "taskId": 20,
+          "entry": {
+            "model": [
+              {
+                "role": "toolResult",
+                "toolCallId": "call-1",
+                "toolName": "forecast",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Tallinn: sunny"
+                  }
+                ],
+                "details": {
+                  "kind": "forecast",
+                  "structuredContent": {
+                    "city": "Tallinn",
+                    "sky": "sunny"
+                  }
+                },
+                "isError": false,
+                "durationMs": 71,
+                "timestamp": 1760000000110
+              }
+            ],
+            "data": {
+              "diagnostics": []
+            },
+            "kind": "pi.tool-result",
+            "id": 21,
+            "conversationId": 9,
+            "byTaskId": 20
+          }
+        },
+        {
+          "type": "message_start",
+          "message": {
+            "role": "toolResult",
+            "toolCallId": "call-1",
+            "toolName": "forecast",
+            "content": [
+              {
+                "type": "text",
+                "text": "Tallinn: sunny"
+              }
+            ],
+            "details": {
+              "kind": "forecast",
+              "structuredContent": {
+                "city": "Tallinn",
+                "sky": "sunny"
+              }
+            },
+            "isError": false,
+            "durationMs": 71,
+            "timestamp": 1760000000110
+          }
+        },
+        {
+          "type": "message_end",
+          "entry": {
+            "model": [
+              {
+                "role": "toolResult",
+                "toolCallId": "call-1",
+                "toolName": "forecast",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Tallinn: sunny"
+                  }
+                ],
+                "details": {
+                  "kind": "forecast",
+                  "structuredContent": {
+                    "city": "Tallinn",
+                    "sky": "sunny"
+                  }
+                },
+                "isError": false,
+                "durationMs": 71,
+                "timestamp": 1760000000110
+              }
+            ],
+            "data": {
+              "diagnostics": []
+            },
+            "kind": "pi.tool-result",
+            "id": 21,
+            "conversationId": 9,
+            "byTaskId": 20
+          }
+        }
+      ],
+      [
+        {
+          "type": "turn_end"
+        },
+        {
+          "type": "turn_start"
+        }
+      ],
+      [
+        {
+          "type": "message_start",
+          "message": {
+            "role": "assistant",
+            "api": "openai-completions",
+            "provider": "fixture",
+            "model": "lifecycle-fixture",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "Sunny,"
+              }
+            ],
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "stop",
+            "timestamp": 1760000000152
+          }
+        }
+      ],
+      [
+        {
+          "type": "message_update",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "changes": [
+            {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " so Monday."
+            }
+          ]
+        }
+      ],
+      [
+        {
+          "type": "message_update",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "changes": [
+            {
+              "type": "text_start",
+              "contentIndex": 1,
+              "block": {
+                "type": "text",
+                "text": "Launch"
+              }
+            }
+          ]
+        }
+      ],
+      [
+        {
+          "type": "message_update",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "changes": [
+            {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": " on"
+            }
+          ]
+        }
+      ],
+      [
+        {
+          "type": "message_update",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "changes": [
+            {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": " Monday."
+            }
+          ]
+        }
+      ],
+      [
+        {
+          "type": "message_end",
+          "entry": {
+            "model": [
+              {
+                "role": "assistant",
+                "api": "openai-completions",
+                "provider": "fixture",
+                "model": "lifecycle-fixture",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "Sunny, so Monday."
+                  },
+                  {
+                    "type": "text",
+                    "text": "Launch on Monday."
+                  }
+                ],
+                "usage": {
+                  "input": 10,
+                  "output": 5,
+                  "cacheRead": 2,
+                  "cacheWrite": 0,
+                  "totalTokens": 17,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "stop",
+                "timestamp": 1760000000152
+              }
+            ],
+            "kind": "pi.assistant",
+            "id": 23,
+            "conversationId": 9,
+            "byTaskId": 22
+          }
+        },
+        {
+          "type": "turn_end"
+        },
+        {
+          "type": "run_end",
+          "inputs": [16]
+        },
+        {
+          "type": "submission",
+          "record": {
+            "conversationId": 9,
+            "requestId": "persona:op-fork:4",
+            "type": "input",
+            "status": "done",
+            "entry": 15,
+            "id": 16,
+            "answer": 23
+          }
+        },
+        {
+          "type": "usage_changed",
+          "usage": {
+            "models": {
+              "fixture/lifecycle-fixture": {
+                "input": 20,
+                "output": 10,
+                "cacheRead": 4,
+                "cacheWrite": 0,
+                "totalTokens": 34,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              }
+            },
+            "tools": {}
+          }
+        }
+      ]
+    ],
+    "order": [
+      "parent",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "child",
+      "parent"
+    ],
+    "mid": {
+      "after": 16,
+      "snapshot": {
+        "type": "snapshot",
+        "entries": [
+          {
+            "kind": "app.persona_ask",
+            "data": {
+              "personas": [
+                {
+                  "id": 4,
+                  "name": "Squarewave",
+                  "revision": 2
+                }
+              ],
+              "order": "parallel"
+            },
+            "model": [
+              {
+                "role": "user",
+                "content": "[to @Squarewave] plan the launch",
+                "timestamp": 1760000000021
+              }
+            ],
+            "id": 7,
+            "conversationId": 1
+          },
+          {
+            "model": [
+              {
+                "role": "user",
+                "content": "Answer the owner's message above as @Squarewave.",
+                "timestamp": 1760000000042
+              }
+            ],
+            "kind": "pi.user",
+            "id": 15,
+            "conversationId": 9
+          },
+          {
+            "model": [
+              {
+                "role": "system",
+                "content": "",
+                "sections": {
+                  "asking": "<asking>\nWhen you cannot continue without a decision or a missing detail from the owner, ask with `ask_user` instead of in prose: short questions, with choices wherever you can offer them. Call it on its own and stop; the answers arrive as their next message. Ask only for real decisions, never to confirm something you were already asked to do.\n</asking>"
+                },
+                "toolsAdded": [
+                  {
+                    "name": "ask_user",
+                    "description": "Ask the owner one to five short questions when you cannot continue without their decision or a missing detail. Offer 2-8 options for a choice. Call it alone, then stop: their answers arrive as their next message.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "questions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "prompt": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": ["single", "multi", "text"]
+                              },
+                              "options": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 64
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 120
+                                    },
+                                    "description": {
+                                      "type": "string",
+                                      "maxLength": 300
+                                    }
+                                  },
+                                  "required": ["id", "label"],
+                                  "additionalProperties": true
+                                },
+                                "maxItems": 8
+                              },
+                              "allowOther": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["id", "prompt", "kind"],
+                            "additionalProperties": true
+                          },
+                          "minItems": 1,
+                          "maxItems": 5
+                        }
+                      },
+                      "required": ["questions"],
+                      "additionalProperties": true
+                    }
+                  },
+                  {
+                    "name": "forecast",
+                    "description": "The forecast for a city.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "city": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["city"],
+                      "additionalProperties": true
+                    }
+                  }
+                ],
+                "timestamp": 1760000000058
+              }
+            ],
+            "kind": "pi.system",
+            "id": 18,
+            "conversationId": 9,
+            "byTaskId": 17
+          },
+          {
+            "model": [
+              {
+                "role": "assistant",
+                "api": "openai-completions",
+                "provider": "fixture",
+                "model": "lifecycle-fixture",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Checking the sky."
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call-1",
+                    "name": "forecast",
+                    "arguments": {
+                      "city": "Tallinn"
+                    }
+                  }
+                ],
+                "usage": {
+                  "input": 10,
+                  "output": 5,
+                  "cacheRead": 2,
+                  "cacheWrite": 0,
+                  "totalTokens": 17,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "toolUse",
+                "timestamp": 1760000000068
+              }
+            ],
+            "kind": "pi.assistant",
+            "id": 19,
+            "conversationId": 9,
+            "byTaskId": 17
+          },
+          {
+            "model": [
+              {
+                "role": "toolResult",
+                "toolCallId": "call-1",
+                "toolName": "forecast",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Tallinn: sunny"
+                  }
+                ],
+                "details": {
+                  "kind": "forecast",
+                  "structuredContent": {
+                    "city": "Tallinn",
+                    "sky": "sunny"
+                  }
+                },
+                "isError": false,
+                "durationMs": 71,
+                "timestamp": 1760000000110
+              }
+            ],
+            "data": {
+              "diagnostics": []
+            },
+            "kind": "pi.tool-result",
+            "id": 21,
+            "conversationId": 9,
+            "byTaskId": 20
+          }
+        ],
+        "run": {
+          "inputs": [16]
+        },
+        "generation": {
+          "attempt": 1,
+          "message": {
+            "role": "assistant",
+            "api": "openai-completions",
+            "provider": "fixture",
+            "model": "lifecycle-fixture",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "Sunny, so Monday."
+              },
+              {
+                "type": "text",
+                "text": "Launch"
+              }
+            ],
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "stop",
+            "timestamp": 1760000000152
+          }
+        },
+        "tools": [],
+        "nestedTools": [],
+        "compactions": [],
+        "inbox": [],
+        "agent": {
+          "model": {
+            "provider": "fixture",
+            "modelId": "lifecycle-fixture"
+          },
+          "thinkingLevel": "off"
+        },
+        "usage": {
+          "models": {
+            "fixture/lifecycle-fixture": {
+              "input": 10,
+              "output": 5,
+              "cacheRead": 2,
+              "cacheWrite": 0,
+              "totalTokens": 17,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            }
+          },
+          "tools": {}
+        }
+      }
+    },
+    "final": {
+      "type": "snapshot",
+      "entries": [
+        {
+          "kind": "app.persona_ask",
+          "data": {
+            "personas": [
+              {
+                "id": 4,
+                "name": "Squarewave",
+                "revision": 2
+              }
+            ],
+            "order": "parallel"
+          },
+          "model": [
+            {
+              "role": "user",
+              "content": "[to @Squarewave] plan the launch",
+              "timestamp": 1760000000021
+            }
+          ],
+          "id": 7,
+          "conversationId": 1
+        },
+        {
+          "model": [
+            {
+              "role": "user",
+              "content": "Answer the owner's message above as @Squarewave.",
+              "timestamp": 1760000000042
+            }
+          ],
+          "kind": "pi.user",
+          "id": 15,
+          "conversationId": 9
+        },
+        {
+          "model": [
+            {
+              "role": "system",
+              "content": "",
+              "sections": {
+                "asking": "<asking>\nWhen you cannot continue without a decision or a missing detail from the owner, ask with `ask_user` instead of in prose: short questions, with choices wherever you can offer them. Call it on its own and stop; the answers arrive as their next message. Ask only for real decisions, never to confirm something you were already asked to do.\n</asking>"
+              },
+              "toolsAdded": [
+                {
+                  "name": "ask_user",
+                  "description": "Ask the owner one to five short questions when you cannot continue without their decision or a missing detail. Offer 2-8 options for a choice. Call it alone, then stop: their answers arrive as their next message.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "questions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "prompt": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 500
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["single", "multi", "text"]
+                            },
+                            "options": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 120
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  }
+                                },
+                                "required": ["id", "label"],
+                                "additionalProperties": true
+                              },
+                              "maxItems": 8
+                            },
+                            "allowOther": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["id", "prompt", "kind"],
+                          "additionalProperties": true
+                        },
+                        "minItems": 1,
+                        "maxItems": 5
+                      }
+                    },
+                    "required": ["questions"],
+                    "additionalProperties": true
+                  }
+                },
+                {
+                  "name": "forecast",
+                  "description": "The forecast for a city.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "city": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["city"],
+                    "additionalProperties": true
+                  }
+                }
+              ],
+              "timestamp": 1760000000058
+            }
+          ],
+          "kind": "pi.system",
+          "id": 18,
+          "conversationId": 9,
+          "byTaskId": 17
+        },
+        {
+          "model": [
+            {
+              "role": "assistant",
+              "api": "openai-completions",
+              "provider": "fixture",
+              "model": "lifecycle-fixture",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Checking the sky."
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call-1",
+                  "name": "forecast",
+                  "arguments": {
+                    "city": "Tallinn"
+                  }
+                }
+              ],
+              "usage": {
+                "input": 10,
+                "output": 5,
+                "cacheRead": 2,
+                "cacheWrite": 0,
+                "totalTokens": 17,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 1760000000068
+            }
+          ],
+          "kind": "pi.assistant",
+          "id": 19,
+          "conversationId": 9,
+          "byTaskId": 17
+        },
+        {
+          "model": [
+            {
+              "role": "toolResult",
+              "toolCallId": "call-1",
+              "toolName": "forecast",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Tallinn: sunny"
+                }
+              ],
+              "details": {
+                "kind": "forecast",
+                "structuredContent": {
+                  "city": "Tallinn",
+                  "sky": "sunny"
+                }
+              },
+              "isError": false,
+              "durationMs": 71,
+              "timestamp": 1760000000110
+            }
+          ],
+          "data": {
+            "diagnostics": []
+          },
+          "kind": "pi.tool-result",
+          "id": 21,
+          "conversationId": 9,
+          "byTaskId": 20
+        },
+        {
+          "model": [
+            {
+              "role": "assistant",
+              "api": "openai-completions",
+              "provider": "fixture",
+              "model": "lifecycle-fixture",
+              "content": [
+                {
+                  "type": "thinking",
+                  "thinking": "Sunny, so Monday."
+                },
+                {
+                  "type": "text",
+                  "text": "Launch on Monday."
+                }
+              ],
+              "usage": {
+                "input": 10,
+                "output": 5,
+                "cacheRead": 2,
+                "cacheWrite": 0,
+                "totalTokens": 17,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1760000000152
+            }
+          ],
+          "kind": "pi.assistant",
+          "id": 23,
+          "conversationId": 9,
+          "byTaskId": 22
+        }
+      ],
+      "tools": [],
+      "nestedTools": [],
+      "compactions": [],
+      "inbox": [],
+      "agent": {
+        "model": {
+          "provider": "fixture",
+          "modelId": "lifecycle-fixture"
+        },
+        "thinkingLevel": "off"
+      },
+      "usage": {
+        "models": {
+          "fixture/lifecycle-fixture": {
+            "input": 20,
+            "output": 10,
+            "cacheRead": 4,
+            "cacheWrite": 0,
+            "totalTokens": 34,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        },
+        "tools": {}
+      }
+    }
+  }
+}

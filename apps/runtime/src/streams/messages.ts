@@ -10,6 +10,7 @@ import {
   NoticeData,
   PersonaAnswerData,
   PersonaAskData,
+  type PersonaMark,
   type StopMark,
   ThreadHeadData,
   ThreadStartedData,
@@ -182,15 +183,10 @@ function modelMessages(
   }
 }
 
-/** A Persona's attributed answer (`app.persona`, ADR 0033): an assistant message in its name. */
-const personaMessage = (
-  chat: string,
-  entry: EntryRecord,
-  answer: PersonaAnswerData,
-  marks: GoblinMetadata,
-): AguiMessage => {
-  const { persona, name, revision, avatar, operationId, routine, hold, questions, text } = answer
-  const mark = {
+/** Who answered a Persona's answer, at which revision, for which operation, and what it stopped on or asked. */
+export function personaMark(answer: PersonaAnswerData): PersonaMark {
+  const { persona, name, revision, avatar, operationId, routine, hold, questions } = answer
+  return {
     id: persona,
     name,
     revision,
@@ -200,15 +196,40 @@ const personaMessage = (
     ...(hold === undefined ? {} : { hold }),
     ...(questions === undefined ? {} : { questions }),
   }
+}
+
+/**
+ * A Persona's attributed answer (`app.persona`, ADR 0033): an assistant message in its name, naming the fork it
+ * answered in, whose work streamed under that `subagentRunId`.
+ */
+const personaMessage = (
+  chat: string,
+  entry: EntryRecord,
+  answer: PersonaAnswerData,
+  marks: GoblinMetadata,
+): AguiMessage => {
   const at = entry.model?.[0]?.timestamp
+  const mark = {
+    entryId: Number(entry.id),
+    ...(at === undefined ? {} : { at }),
+    persona: personaMark(answer),
+    ...(answer.fork === undefined ? {} : { subagentRunId: answer.fork }),
+    ...marks,
+  }
   return {
     id: entryMessageId(chat, Number(entry.id)),
     role: 'assistant',
-    name,
-    content: text,
-    ...goblin({ entryId: Number(entry.id), ...(at === undefined ? {} : { at }), persona: mark, ...marks }),
+    name: answer.name,
+    content: answer.text,
+    ...goblin(mark),
   }
 }
+
+/** A Delegate's result names the subagent whose work streamed under that `subagentRunId`: its chat. */
+const delegateMark = (entry: EntryRecord): GoblinMetadata =>
+  entry.kind === 'app.delegate_result' && Schema.is(DelegateResultData)(entry.data)
+    ? { subagentRunId: entry.data.delegate }
+    : {}
 
 /** An entry the app draws itself, as its activity message; none when its data is not its contract's. */
 function activityMessage(chat: string, entry: EntryRecord, marks: GoblinMetadata): AguiMessage[] | undefined {
@@ -216,7 +237,7 @@ function activityMessage(chat: string, entry: EntryRecord, marks: GoblinMetadata
   if (activity === undefined) return undefined
   if (!Schema.is(activity.data)(entry.data) || !Predicate.isReadonlyObject(entry.data)) return []
   const at = entry.model?.[0]?.timestamp
-  const mark = { entryId: Number(entry.id), ...(at === undefined ? {} : { at }), ...marks }
+  const mark = { entryId: Number(entry.id), ...(at === undefined ? {} : { at }), ...delegateMark(entry), ...marks }
   return [
     {
       id: entryMessageId(chat, Number(entry.id)),

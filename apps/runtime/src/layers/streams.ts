@@ -2,16 +2,22 @@ import type { StreamTier } from '@goblin/contracts'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
+import * as Option from 'effect/Option'
 import * as Queue from 'effect/Queue'
 import { chatSession } from '../chats/directory.ts'
 import { type AppError, Conflict, Internal, attempt, toAppError } from '../http/errors.ts'
 import { reportAndRecover } from '../observability/report.ts'
 import { SingleFlight } from '../observability/single-flight.ts'
-import { PiSessions } from '../pi/sessions.ts'
+import { Invocations, Personas } from '../personas/service.ts'
+import { BACKGROUND, conversationId } from '../pi/context.ts'
+import { personaPromptId } from '../pi/persona-turn.ts'
+import { PiSessions, fromPi } from '../pi/sessions.ts'
+import { Changes } from '../runtime/changes.ts'
 import { Db } from '../runtime/db.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { queuedInputs } from '../conversation-queue.ts'
 import { storedCursor } from '../streams/bodies.ts'
+import type { ChildPorts } from '../streams/child-follow.ts'
 import type { QueuedParts } from '../streams/state.ts'
 import { queuedParts } from '../streams/user.ts'
 import { keyParts, outbox } from '../streams/outbox.ts'
@@ -76,8 +82,10 @@ export const StreamsLive = Layer.effect(
       drain: out.request,
       rotateBytes: rotateBytesOf(env.STREAM_ROTATE_BYTES),
       queued,
+      personas: yield* personaPorts,
     })
     yield* Effect.forkScoped(produce.run)
+    yield* childChanges(queue)
     yield* start(produce, pi, queue).pipe(reportAndRecover('streams.start', undefined))
     for (const key of unsentStreams(db)) yield* out.request(key)
 
@@ -126,9 +134,55 @@ export const StreamsLive = Layer.effect(
   }),
 )
 
+/** Invocations that start or settle, and subagents that open or close, move the children the streams carry. */
+const childChanges = (queue: Queue.Queue<ProducerMessage>) =>
+  Effect.gen(function* () {
+    const changes = yield* Changes
+    const invocations = yield* Invocations
+    // Each invocation as the change left it, read in the writer's step: by the producer's turn it may have moved on.
+    yield* changes.on('invocations.changed', ({ ids }) =>
+      Effect.forEach(ids, ({ operationId, persona }) => invocations.get(operationId, persona)).pipe(
+        Effect.flatMap((found) => Queue.offer(queue, { kind: 'invocations', views: found.flatMap(Option.toArray) })),
+      ),
+    )
+    yield* changes.on('conversations.changed', ({ ids }) => Queue.offer(queue, { kind: 'conversations', ids }))
+  })
+
+/** The prompt an invocation asked its fork with, as Pi placed it: its entry, once it has one. */
+const promptEntry = (pi: PiSessions['Service'], fork: string, operationId: string, persona: number) =>
+  Effect.gen(function* () {
+    const harness = yield* fromPi(pi.pi)
+    for (const resumed of [false, true]) {
+      const requestId = personaPromptId(operationId, persona, resumed)
+      const record = yield* attempt(() =>
+        harness.commit((tx) => tx.submissionByRequest(conversationId(fork), requestId), BACKGROUND),
+      )
+      if (record?.entry !== undefined) return Number(record.entry)
+    }
+    return undefined
+  }).pipe(reportAndRecover('streams.prompt', undefined))
+
+/** The Persona invocations and revisions a chat's children are named by: what the producer reads of them. */
+const personaPorts = Effect.gen(function* () {
+  const invocations = yield* Invocations
+  const personas = yield* Personas
+  const pi = yield* PiSessions
+  return {
+    promptEntry: (fork: string, operationId: string, persona: number) => promptEntry(pi, fork, operationId, persona),
+    working: invocations.working,
+    invocation: (operationId, persona) => Effect.map(invocations.get(operationId, persona), Option.getOrUndefined),
+    persona: (id, revision) =>
+      personas.revision(id, revision).pipe(
+        Effect.map(({ name, avatar }) => ({ name, avatar })),
+        // expected: a revision that cannot be read names no child; its work is not carried
+        Effect.orElseSucceed(() => undefined),
+      ),
+  } satisfies Pick<ChildPorts, 'working' | 'invocation' | 'persona' | 'promptEntry'>
+})
+
 /**
  * Pi's commits from now on, and the chats with streams: each is known by its session, and one whose streams saw a run
- * in flight is caught up at once (the run went on, or ended, while the agent was away).
+ * in flight, or carried a child's work, is caught up at once (it went on, or ended, while the agent was away).
  */
 const start = (produce: Producer, pi: PiSessions['Service'], queue: Queue.Queue<ProducerMessage>) =>
   Effect.gen(function* () {
@@ -140,7 +194,7 @@ const start = (produce: Producer, pi: PiSessions['Service'], queue: Queue.Queue<
       const session = yield* attempt(async () => chatSession(db, stream.chat))
       produce.know(stream.chat, session)
       const cursor = storedCursor(stream.cursorJson)
-      if (cursor?.run !== undefined || cursor?.message !== undefined)
+      if (cursor?.run !== undefined || cursor?.message !== undefined || cursor?.children !== undefined)
         yield* Queue.offer(queue, { kind: 'commit', session })
     }
   })
