@@ -1,9 +1,11 @@
 // A Source's setup checked against what its connection offers (ADR 0066): its event (which goblin must be able to
-// subscribe to by poll and webhook), its tools, and each pointer against the event's payload schema or the read tool's
-// output schema when the server gives one. The templates' placeholders are checked by the contract itself.
-import type { SourceSetup } from '@goblin/contracts'
+// subscribe to by poll and webhook), its tools, each pointer against the event's payload schema or the read tool's
+// output schema when the server gives one, and the reply's result rules against the reply tool's (ADR 0096). The
+// templates' placeholders are checked by the contract itself.
+import type { SourceMatch, SourceSetup } from '@goblin/contracts'
 import type { Tool } from '@modelcontextprotocol/client'
 import type { EventDescriptor } from '../mcp/events/protocol.ts'
+import { isRecord } from '../runtime/digest.ts'
 import { type SchemaAt, itemsAt, schemaAt } from './pointer.ts'
 
 /** What a connection offers a Source: its event streams and its tools. */
@@ -35,15 +37,72 @@ function messageSchema(setup: SourceSetup, event: EventDescriptor, tool: Offered
 /** What the owner reads of a tool the connection does not offer. */
 const missing = (name: string) => `The connection does not offer the tool ${name}.`
 
-/** Result pointers are checked against the reply tool's structured output schema when it declares one. */
+/** How many of a value's allowed choices, and of a schema's fields that have some, a problem names. */
+const NAMED = 6
+
+/** A value as a problem names it: its JSON, cut short. */
+const shown = (value: unknown): string => {
+  const json = JSON.stringify(value) ?? String(value)
+  return json.length <= 40 ? json : `${json.slice(0, 39)}…`
+}
+
+/**
+ * The values a schema allows, when it lists them: its `enum`, its `const`, or those of every branch of its `anyOf` or
+ * `oneOf` when each branch lists its own. None when any part of it allows more.
+ */
+function allowedOf(schema: Readonly<Record<string, unknown>>): readonly unknown[] | undefined {
+  const listed: unknown = schema['enum']
+  if (Array.isArray(listed)) return listed.map((value: unknown) => value)
+  if ('const' in schema) return [schema['const']]
+  const branches = [schema['anyOf'], schema['oneOf']].find(Array.isArray)
+  if (branches === undefined || branches.length === 0) return undefined
+  const lists = branches.map((branch: unknown) => (isRecord(branch) ? allowedOf(branch) : undefined))
+  return lists.every((list) => list !== undefined) ? lists.flat() : undefined
+}
+
+/** The fields of an output schema, at most two levels down, that list the values they allow: `/status` (`"sent"`, …). */
+function choicesOf(schema: unknown, at = '', depth = 0): readonly string[] {
+  if (!isRecord(schema) || depth > 1 || !isRecord(schema['properties'])) return []
+  return Object.entries(schema['properties']).flatMap(([field, child]) => {
+    const pointer = `${at}/${field.replaceAll('~', '~0').replaceAll('/', '~1')}`
+    const allowed = isRecord(child) ? allowedOf(child) : undefined
+    if (allowed !== undefined) return [`${pointer} (${allowed.slice(0, NAMED).map(shown).join(', ')})`]
+    return choicesOf(child, pointer, depth + 1)
+  })
+}
+
+/** Why a rule's value is not one the pointed schema allows, when it lists the values it allows. */
+function equalsProblem(name: string, rule: SourceMatch, at: SchemaAt): string | undefined {
+  if (at.at !== 'known') return undefined
+  const allowed = allowedOf(at.schema)
+  if (allowed === undefined || allowed.some((value) => value === rule.equals)) return undefined
+  const choices = allowed.slice(0, NAMED).map(shown).join(', ')
+  return `reply.result.${name} equals ${shown(rule.equals)}, which ${rule.pointer} never is: it is one of ${choices}.`
+}
+
+/**
+ * Result rules checked against the reply tool's structured output schema when it declares one (ADRs 0072, 0096): then
+ * rules are required, since without them every answer sent is an unknown outcome the owner is told about; each pointer
+ * must be in the schema, and each value one the pointed field allows when it lists them.
+ */
 function resultProblems(reply: SourceSetup['reply'], offered: Offered): readonly string[] {
-  if (reply?.result === undefined) return []
+  if (reply === undefined) return []
   const schema = offered.tools.find((each) => each.name === reply.tool)?.outputSchema
+  if (reply.result === undefined) {
+    if (schema === undefined) return []
+    const choices = choicesOf(schema).slice(0, NAMED)
+    const hint = choices.length === 0 ? '' : ` Its output schema lists ${choices.join('; ')}.`
+    return [
+      `reply.result is required: ${reply.tool} declares an output schema, so say which value of its result means the answer was accepted (and which mean retryable or rejected, when it has them).${hint}`,
+    ]
+  }
   return Object.entries(reply.result).flatMap(([name, rule]) => {
     const pointer = typeof rule === 'string' ? rule : rule.pointer
-    return schemaAt(schema, pointer).at === 'absent'
-      ? [`reply.result.${name} points at ${pointer}, which the tool's output schema does not have.`]
-      : []
+    const at = schemaAt(schema, pointer)
+    if (at.at === 'absent')
+      return [`reply.result.${name} points at ${pointer}, which the tool's output schema does not have.`]
+    const problem = typeof rule === 'string' ? undefined : equalsProblem(name, rule, at)
+    return problem === undefined ? [] : [problem]
   })
 }
 

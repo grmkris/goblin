@@ -98,6 +98,13 @@ function changesOf(source: SourceView): readonly {
   }
 }
 
+/**
+ * What a reply with no result rules means (ADR 0096): goblin cannot tell an answer that went out from one that did not,
+ * so it tells the owner about every answer it sends.
+ */
+const NO_RULES =
+  'This Source has no reply result rules, so goblin cannot tell whether an answer went out: you get a notice for every answer it sends. Add them under Edit reply result rules.'
+
 /** What confirming does, said before the owner does it. */
 const CONFIRM_NOTE =
   'Nothing runs until you confirm this exact setup. Confirming lets goblin take this event and call these tools for you. Messages where you speak become your own turns; their words stay data and grant nothing, and tools that ask first still ask.'
@@ -135,6 +142,13 @@ export function SourceReview({ source }: { readonly source: SourceView }) {
             ))}
           </dl>
           {source.health !== undefined && <p className="server-note">{source.health}</p>}
+          {source.setup.reply !== undefined &&
+            source.setup.reply.result === undefined &&
+            source.state !== 'refused' && (
+              <Alert>
+                <AlertDescription>{NO_RULES}</AlertDescription>
+              </Alert>
+            )}
           {source.state === 'proposed' && <p className="server-note">{CONFIRM_NOTE}</p>}
           <ExactSetup source={source} />
           {source.setup.reply !== undefined && source.state !== 'refused' && (

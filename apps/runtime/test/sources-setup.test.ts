@@ -94,6 +94,42 @@ describe("a Source's setup (ADR 0066)", () => {
     ])
   })
 
+  it('requires result rules when the reply tool declares its result, naming the values its schema lists (ADR 0096)', () => {
+    const declared = {
+      name: 'post_reply',
+      outputSchema: {
+        type: 'object' as const,
+        properties: {
+          status: { type: 'string', enum: ['accepted', 'retryable', 'rejected'] },
+          receipt: { type: 'object', properties: { kind: { oneOf: [{ const: 'sent' }, { const: 'queued' }] } } },
+          retryAt: { type: 'integer' },
+        },
+      },
+    }
+    const declaring = { events: [POST_CREATED], tools: [FEED_READ, declared] }
+    const { result: _, ...bare } = PAYLOAD_SETUP.reply ?? { tool: '', arguments: {}, maxChars: 100 }
+    expect(setupProblems({ ...PAYLOAD_SETUP, reply: bare }, declaring)).toEqual([
+      'reply.result is required: post_reply declares an output schema, so say which value of its result means the answer was accepted (and which mean retryable or rejected, when it has them). Its output schema lists /status ("accepted", "retryable", "rejected"); /receipt/kind ("sent", "queued").',
+    ])
+    // A reply tool that says nothing of its result may go without rules: its outcomes stay unknown.
+    expect(setupProblems({ ...PAYLOAD_SETUP, reply: bare }, offered)).toEqual([])
+    expect(setupProblems(PAYLOAD_SETUP, declaring)).toEqual([])
+    const rules = (accepted: { pointer: string; equals: string | number | boolean | null }) => ({
+      ...PAYLOAD_SETUP,
+      reply: { ...bare, result: { accepted, retryAt: '/retryAt' } },
+    })
+    expect(setupProblems(rules({ pointer: '/receipt/kind', equals: 'queued' }), declaring)).toEqual([])
+    expect(setupProblems(rules({ pointer: '/status', equals: 'sent' }), declaring)).toEqual([
+      'reply.result.accepted equals "sent", which /status never is: it is one of "accepted", "retryable", "rejected".',
+    ])
+    expect(setupProblems(rules({ pointer: '/receipt/kind', equals: 'delivered' }), declaring)).toEqual([
+      'reply.result.accepted equals "delivered", which /receipt/kind never is: it is one of "sent", "queued".',
+    ])
+    expect(setupProblems(rules({ pointer: '/state', equals: 'ok' }), declaring)).toEqual([
+      "reply.result.accepted points at /state, which the tool's output schema does not have.",
+    ])
+  })
+
   it('takes placeholders only as whole string values, and only the ones its use names', () => {
     expect(accepts(reply({ text: 'Re: {{text}}' }))).toBe(false)
     expect(accepts(reply({ text: '{{text}}', chat: '{{key.room}}' }))).toBe(false)
