@@ -1,16 +1,19 @@
 /**
- * Manual acceptance against the retained dev Worker (`smoke:dev`) or the local stack (`smoke:local`). Never imported
- * by CI or the deployed Worker. It reads the owner's state and changes one thing for the length of its agent turns:
- * with `GOBLIN_SMOKE_MODEL` set, the agent answers on that model, and the owner's own pick is put back afterwards,
- * whatever failed. Grants stay as the owner set them. Turns run in main and a side thread closed afterwards; the throwaway
- * inbound client is revoked before the script exits, and the one file it uploads is deleted again.
+ * Acceptance against the retained dev Worker (`smoke:dev`), which every dev deploy runs, or the local stack
+ * (`smoke:local`). Never imported by the deployed Worker. By default it makes no model call (ADR 0106): it reads the
+ * owner's state, round-trips a file, checks the edge and the MCP servers, and drives an inbound client up to its tool
+ * list and an inspection read. With `GOBLIN_SMOKE_TURNS=1` it also runs the agent turns, and with `GOBLIN_SMOKE_MODEL`
+ * set they answer on that model, the owner's own pick put back afterwards, whatever failed. Grants stay as the owner set
+ * them. Turns run in main and a side thread closed afterwards; the throwaway inbound client is revoked before the script
+ * exits, and the one file it uploads is deleted again.
  */
 import { Config, Effect, Option, Redacted, Schema } from 'effect'
-import { createHash, randomBytes } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { chmod, stat, writeFile } from 'node:fs/promises'
 import type { ToolView } from '../packages/contracts/src/mcp.ts'
 import { appChecks } from './smoke-apps.ts'
 import { DevClient, type Step } from './smoke-client.ts'
+import { InboundClient, SMOKE_CLIENT_NAME, base64url, operationId } from './smoke-inbound.ts'
 import { edgeChecks, internalChecks } from './smoke-edge.ts'
 import { delegateReported } from './smoke-entries.ts'
 import { publicSmoke } from './smoke-public.ts'
@@ -18,14 +21,11 @@ import { clientBuild, flowsCheck } from './smoke-release.ts'
 
 const ObjectSchema = Schema.Record(Schema.String, Schema.MutableJson)
 type JsonObject = typeof ObjectSchema.Type
-const object = Schema.decodeUnknownSync(ObjectSchema)
 const objects = Schema.decodeUnknownSync(Schema.Array(ObjectSchema))
 const string = Schema.decodeUnknownSync(Schema.String)
 
-const REDIRECT_URI = 'http://127.0.0.1:9/callback'
 const DEV_MARKER = 'GOBLIN_DEV_OK'
 const MCP_MARKER = 'GOBLIN_MCP_OK'
-const SMOKE_CLIENT_NAME = 'goblin-smoke'
 /** Main's newest page of history. */
 const MAIN_HISTORY = { params: { id: '1' }, query: { before: 2_147_483_647 } } as const
 
@@ -34,6 +34,7 @@ type Settings = {
   readonly url: string
   readonly email: Redacted.Redacted
   readonly sessionFile: string
+  readonly turns: boolean
 }
 
 const settings = Effect.gen(function* () {
@@ -42,6 +43,8 @@ const settings = Effect.gen(function* () {
     url: yield* Config.String('GOBLIN_APP_URL'),
     email: yield* Config.Redacted('GOBLIN_OWNER_EMAIL').pipe(Config.withDefault(Redacted.make(''))),
     sessionFile: yield* Config.String('GOBLIN_SMOKE_SESSION_FILE').pipe(Config.withDefault('')),
+    /** Whether the smoke runs agent turns, which spend model tokens (ADR 0106); off unless `GOBLIN_SMOKE_TURNS=1`. */
+    turns: yield* Config.Boolean('GOBLIN_SMOKE_TURNS').pipe(Config.withDefault(false)),
     /** The model the smoke's agent turns run on (dev: an Alibaba Token Plan model); unset: the owner's own pick. */
     smokeModel: Option.getOrUndefined(yield* Config.option(Config.String('GOBLIN_SMOKE_MODEL'))),
   }
@@ -55,123 +58,6 @@ function targetUrl(config: Settings): URL {
   if ((!deployed && !local) || url.pathname !== '/' || url.search || url.hash || url.username || url.password)
     throw new Error('stage_app_origin_required')
   return url
-}
-
-const base64url = (bytes: Buffer): string => bytes.toString('base64url')
-
-/** An inbound MCP client: dynamic registration, owner consent, PKCE code exchange, then Streamable HTTP calls. */
-class InboundClient {
-  readonly #dev: DevClient
-  readonly clientId: string
-  #token = ''
-  #nextId = 1
-  constructor(dev: DevClient, clientId: string) {
-    this.#dev = dev
-    this.clientId = clientId
-  }
-
-  static async register(dev: DevClient): Promise<InboundClient> {
-    const registered = await dev.json('/api/auth/oauth2/register', {
-      method: 'POST',
-      owner: false,
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        client_name: SMOKE_CLIENT_NAME,
-        redirect_uris: [REDIRECT_URI],
-        token_endpoint_auth_method: 'none',
-        grant_types: ['authorization_code', 'refresh_token'],
-        response_types: ['code'],
-      }),
-    })
-    return new InboundClient(dev, string(registered['client_id']))
-  }
-
-  async authorize(): Promise<void> {
-    const verifier = base64url(randomBytes(48))
-    const challenge = base64url(createHash('sha256').update(verifier).digest())
-    const resource = `${this.#dev.origin}/mcp`
-    const query = new URLSearchParams({
-      response_type: 'code',
-      client_id: this.clientId,
-      redirect_uri: REDIRECT_URI,
-      scope: 'openid offline_access goblin:agent goblin:inspect goblin:transcripts',
-      state: base64url(randomBytes(16)),
-      code_challenge: challenge,
-      code_challenge_method: 'S256',
-      resource,
-    })
-    const authorize = await this.#dev.send(`/api/auth/oauth2/authorize?${query.toString()}`)
-    const location = authorize.headers.get('location') ?? ''
-    if (!location.startsWith('/consent?')) throw new Error('consent_redirect_missing')
-    // As the consent page does (ADR 0097): the client reaches the owner's one workspace, so its calls name none.
-    await this.#dev.person((api) =>
-      api.clients.reach({
-        params: { clientId: this.clientId },
-        payload: { all: false, workspaces: [this.#dev.workspaceId] },
-      }),
-    )
-    const consent = await this.#dev.json('/api/auth/oauth2/consent', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ accept: true, oauth_query: location.slice('/consent?'.length) }),
-    })
-    const code = new URL(string(consent['url'])).searchParams.get('code')
-    if (code === null) throw new Error('authorization_code_missing')
-    const token = await this.#dev.json('/api/auth/oauth2/token', {
-      method: 'POST',
-      owner: false,
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        client_id: this.clientId,
-        redirect_uri: REDIRECT_URI,
-        code_verifier: verifier,
-        resource,
-      }).toString(),
-    })
-    this.#token = string(token['access_token'])
-  }
-
-  /** One JSON-RPC call; the stateless server answers with JSON or a one-event SSE stream. */
-  async rpc(method: string, params: JsonObject = {}): Promise<{ status: number; result?: JsonObject }> {
-    const response = await this.#dev.send('/mcp', {
-      method: 'POST',
-      owner: false,
-      headers: {
-        authorization: `Bearer ${this.#token}`,
-        'content-type': 'application/json',
-        accept: 'application/json, text/event-stream',
-      },
-      body: JSON.stringify({ jsonrpc: '2.0', id: this.#nextId++, method, params }),
-    })
-    if (!response.ok) return { status: response.status }
-    const body = await response.text()
-    const payload = response.headers.get('content-type')?.includes('text/event-stream')
-      ? (body
-          .split('\n')
-          .filter((line) => line.startsWith('data: '))
-          .at(-1)
-          ?.slice('data: '.length) ?? '{}')
-      : body
-    const message = object(JSON.parse(payload))
-    if (message['error'] !== undefined) throw new Error(`mcp_rpc_error: ${method}`)
-    return { status: response.status, result: object(message['result']) }
-  }
-
-  async tool(name: string, args: JsonObject): Promise<JsonObject> {
-    const { result } = await this.rpc('tools/call', { name, arguments: args })
-    if (result === undefined) throw new Error(`inbound_tool_failed: ${name}`)
-    const [first] = objects(result['content'])
-    // A tool error is goblin's encoded error: report its tag (`BudgetExhausted`), never the rest of what it says.
-    const tag = /"_tag":"(\w+)"/u.exec(string(first?.['text'] ?? ''))?.[1]
-    if (result['isError'] === true) throw new Error(`inbound_tool_failed: ${name}: ${tag ?? 'unknown'}`)
-    return object(JSON.parse(string(first?.['text'])))
-  }
-
-  async ask(input: string): Promise<JsonObject> {
-    return this.tool('ask_agent', { input, operationId: operationId('inbound'), waitSeconds: 100 })
-  }
 }
 
 type ServerReport = {
@@ -248,8 +134,6 @@ async function residentToolTurn(client: InboundClient, servers: readonly ServerR
 }
 
 const wait = (milliseconds: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, milliseconds))
-
-const operationId = (step: string): string => `smoke-${step}-${base64url(randomBytes(9))}`
 
 /** Reads with `read` until `ready`, or fails with `reason` once `milliseconds` have passed. */
 async function poll<A>(
@@ -375,7 +259,17 @@ function notTheMarker(reply: JsonObject): string | undefined {
   return `${JSON.stringify(reply['status'])}:${JSON.stringify(why)}`
 }
 
-async function inboundChecks(dev: DevClient, client: InboundClient, servers: readonly ServerReport[]) {
+/** The inbound client without a model call (ADR 0106): opened, main's recent messages read, then revoked. */
+async function inboundReads(dev: DevClient, client: InboundClient) {
+  await inboundOpen(client)
+  const recent = await client.tool('get_recent_messages', { limit: 10 })
+  if (!Array.isArray(recent['messages'])) throw new Error('inbound_history_missing')
+  await inboundRevoked(dev, client)
+  return { initialized: true, modelTurn: 'skipped', residentTool: 'skipped', history: 'read', revokedThen401: true }
+}
+
+/** Consent, token, `initialize`, the tool list with the seven inspection tools, and an inspection read. */
+async function inboundOpen(client: InboundClient): Promise<void> {
   await client.authorize()
   const init = await client.rpc('initialize', {
     protocolVersion: '2025-06-18',
@@ -391,6 +285,18 @@ async function inboundChecks(dev: DevClient, client: InboundClient, servers: rea
   const inspection = names.filter((name) => typeof name === 'string' && name.startsWith('inspect_'))
   const problems = inspection.length === 7 ? await client.tool('inspect_problems', {}) : {}
   if (!Array.isArray(problems['problems'])) throw new Error('inbound_inspection_missing')
+}
+
+/** The client revoked, and `/mcp` answering it 401 from then on. */
+async function inboundRevoked(dev: DevClient, client: InboundClient): Promise<void> {
+  const revoked = await revokeClient(dev, client.clientId)
+  const after = await client.rpc('tools/list')
+  if (!revoked.revoked || after.status !== 401) throw new Error('inbound_revocation_failed')
+}
+
+/** The inbound client with its model turns (`GOBLIN_SMOKE_TURNS=1`): an answer, a tool call, history and authorship. */
+async function inboundChecks(dev: DevClient, client: InboundClient, servers: readonly ServerReport[]) {
+  await inboundOpen(client)
   const smokeInput = `Reply with exactly: ${DEV_MARKER}`
   const reply = await client.ask(smokeInput)
   const unexpected = notTheMarker(reply)
@@ -402,9 +308,7 @@ async function inboundChecks(dev: DevClient, client: InboundClient, servers: rea
   if (!texts.includes(DEV_MARKER)) throw new Error('inbound_history_missing')
   const smokeMessage = messages.findLast((message) => message['role'] === 'user' && message['text'] === smokeInput)
   if (smokeMessage?.['author'] !== SMOKE_CLIENT_NAME) throw new Error('inbound_author_missing')
-  const revoked = await revokeClient(dev, client.clientId)
-  const after = await client.rpc('tools/list')
-  if (!revoked.revoked || after.status !== 401) throw new Error('inbound_revocation_failed')
+  await inboundRevoked(dev, client)
   return { initialized: true, modelTurn: 'ok', residentTool, history: 'ok', author: 'ok', revokedThen401: true }
 }
 
@@ -476,15 +380,16 @@ type Receipt = {
   readonly signup: string
   readonly resident: string
   readonly servers: readonly ServerReport[]
-  readonly inbound: Awaited<ReturnType<typeof inboundChecks>>
-  readonly thread: ThreadCheck['thread']
-  readonly shared: ThreadCheck['shared']
-  readonly subagent: SubagentCheck['subagent']
-  readonly memory: MemoryCheck['memory']
+  readonly inbound: Awaited<ReturnType<typeof inboundChecks>> | Awaited<ReturnType<typeof inboundReads>>
+  /** The agent turns' checks, run only with `GOBLIN_SMOKE_TURNS=1` (ADR 0106). */
+  readonly thread?: ThreadCheck['thread']
+  readonly shared?: ThreadCheck['shared']
+  readonly subagent?: SubagentCheck['subagent']
+  readonly memory?: MemoryCheck['memory']
   readonly files: FileCheck['files']
   readonly edge: Awaited<ReturnType<typeof edgeChecks>>['edge']
   readonly internal: Awaited<ReturnType<typeof internalChecks>>['internal']
-  readonly app: 'ok'
+  readonly app?: 'ok'
   /** The commit the deployed client bundle names, or why it was not checked. */
   readonly build: string
   /** `ok`: the smoke's sends reached the flows dataset; or why it was not checked. */
@@ -534,6 +439,23 @@ async function smokeDev(
   const servers = await serverReports(dev)
   const client = await InboundClient.register(dev)
   try {
+    if (!config.turns) {
+      const inbound = await inboundReads(dev, client)
+      const flows = 'skipped: no agent turns ran (GOBLIN_SMOKE_TURNS unset)'
+      return {
+        stage: config.stage,
+        model: 'none',
+        signup,
+        resident,
+        servers,
+        files,
+        edge,
+        internal,
+        build,
+        flows,
+        inbound,
+      }
+    }
     const checks = await withModel(dev, config.smokeModel, async () => {
       const inbound = await inboundChecks(dev, client, servers)
       const thread = await threadChecks(dev)

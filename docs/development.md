@@ -113,6 +113,7 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_OWNER_WORKSPACE_ID`, `GOBLIN_OWNER_MODELS` | Optional: the deployment owner's own workspace ID (private: keep it in `.local`; `GET /api/workspaces` names it) and comma-separated LiteLLM model names on the owner's own subscriptions, offered in that workspace alone and never in a server's work: through an API key, or in a Topic a key made (ADR 0087). A name also in `GOBLIN_MODELS` is everyone's. Allow each on the LiteLLM key too. |
 | `GOBLIN_DAILY_TOKEN_CAP` | The most model tokens one account may use in a UTC day, a positive whole number; unset or anything else, no cap (ADR 0058). Once a capped day is spent, model calls are refused until 00:00 UTC. |
 | `GOBLIN_MEMORY_MODEL` | The offered model for thread names, Topic Conversation memory summaries and skill-draft decisions. It is not selected by price; unset or not offered uses the default. |
+| `GOBLIN_SMOKE_TURNS` | `1` runs the smoke's agent turns, which spend model tokens; unset, the smoke makes no model call (ADR 0106). |
 | `GOBLIN_SMOKE_MODEL` | Optional model for smoke turns. It must be one of the offered models; unset keeps the owner's pick. |
 | `GOBLIN_MCP_SERVERS` | JSON list of outbound servers every account starts with (`[]` for none): `[{"connectionId":"notes","endpoint":"https://mcp.example.com/mcp","label":"Notes"}]`. Each owner still signs in, and grants start empty; nothing in code depends on which servers they are (ADR 0063). |
 | `GOBLIN_MCP_SHELF` | Optional JSON list of shelf entries (`id`, `title`, `description`, `endpoint`, `group`, `signIn`): one with the id of goblin's own entry replaces it, the others are added after (ADR 0061). Unset, the shelf is goblin's. |
@@ -165,7 +166,7 @@ Keep Alchemy pinned to the version shared with myapps. A reset changes only `gob
    `gh secret set GOBLIN_SMOKE_SESSION --repo grmkris/goblin --env dev < .local/dev-session.json`.
    Update `GOBLIN_STAGE_ENV` through the same file-input mechanism if its configuration changed.
 6. Run authenticated `bun run smoke:dev` and `bun run drift:dev`. Reconnect and grant any services required by the
-   smoke, or record their explicit skips. Smoke's model calls require a configured endpoint. A public health check
+   smoke, or record their explicit skips. The smoke's agent turns (`GOBLIN_SMOKE_TURNS=1`) require a configured model endpoint. A public health check
    alone is not authenticated acceptance.
 7. Re-enable `ci.yml` with `gh workflow enable ci.yml --repo grmkris/goblin`, then push the checked dev commit. CI must
    pass Check and Deploy dev for that exact SHA. Its `dev-acceptance` receipt must name that SHA and live Worker

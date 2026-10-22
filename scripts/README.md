@@ -56,11 +56,14 @@ then save `{"origin":"https://dev.goblin.surf","cookie":"<session cookie>"}` in 
 Smoke checks that origin, validates the live session and verifies its owner email before agent requests. It never
 requests a login code or creates an account. Local uses `http://localhost:18971` and Alchemy's captured `.eml` code.
 
-The smoke spends model tokens and writes conversation history: turns in main, a new side thread and a background
-subagent. It leaves the owner's grants unchanged and renews resident authority through owner requests. With
-`GOBLIN_SMOKE_MODEL` set, it temporarily selects that offered model (`GOBLIN_MODEL_ID` or `GOBLIN_MODELS`) and
-attempts to restore the owner's effective pick in `finally`, including after a failed step. Unset, turns use the
-owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
+By default the smoke makes no model call ([ADR 0106](../docs/adr/0106-the-deploy-smoke-makes-no-model-call.md)): it
+runs steps 1 to 3 and step 4 without its turns (consent, token, `initialize`, the tool list, an inspection read, a read
+of main's recent messages, revocation and a 401). That is what every dev deploy runs. With `GOBLIN_SMOKE_TURNS=1` it
+also runs the agent turns in steps 4 to 9, which spend model tokens and write conversation history: turns in main, a
+new side thread and a background subagent. It leaves the owner's grants unchanged and renews resident authority
+through owner requests. With `GOBLIN_SMOKE_MODEL` set, the turns temporarily select that offered model
+(`GOBLIN_MODEL_ID` or `GOBLIN_MODELS`) and the owner's effective pick is restored in `finally`, including after a failed
+step. Unset, turns use the owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
 
 1. health; the deployed client bundle names this checkout's commit (`VITE_GOBLIN_BUILD`, which `scripts/stage.ts`
    sets for every deployed stage, so crash reports name their release; skipped on the local stack); unless sign-up is
@@ -95,14 +98,14 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 
 | Receipt field                          | What it checks or records                                                                                      |
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `stage`, `signup`, `resident`, `model` | Target stage, sign-up mode, active authority and smoke model or `owner pick`.                                  |
+| `stage`, `signup`, `resident`, `model` | Target stage, sign-up mode, active authority and smoke model, `owner pick`, or `none` without turns.           |
 | `build`                                | The commit the deployed client bundle names, or `skipped: <reason>` on the local stack.                        |
 | `flows`                                | `ok`: a `send` point of the smoke reached the flows dataset; or `skipped: <reason>`.                           |
 | `servers`                              | Server statuses, tool/grant counts and probe outcome (`ok`, `error` or `none`) with the tool probed.           |
 | `files`                                | `ok`: the owner's file round trip, the file deleted again.                                                     |
 | `edge`                                 | `envelope: ok` and `csrf: refused`: failures answer in the envelope with their ref; CSRF on every write.       |
 | `app`                                  | `ok`: an agent app built, run by the owner (revision +1) and deleted.                                          |
-| `inbound`                              | Initialization, inspection read, model turn, optional resident tool call, recent history and 401 after revoke. |
+| `inbound`                              | Initialization, inspection read, model turn and resident tool call (`skipped` without turns), history, 401.    |
 | `inbound.author`                       | `ok`: the smoke user's message has author `goblin-smoke`.                                                      |
 | `thread`, `shared`                     | `ok` and `true`: the empty thread ran and wrote a new `app.shared` entry to main.                              |
 | `subagent`                             | `reported`: the Delegate's result reached main (passively, or answered when synthesis was asked for).          |
