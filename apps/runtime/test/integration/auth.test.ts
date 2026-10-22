@@ -7,7 +7,7 @@ import { expect } from 'vitest'
 import Stack from './auth-stack.ts'
 import { call, person, signedIn } from './owner-requests.ts'
 import { answerOf } from './probe-reads.ts'
-import { inspectAuthCase } from './auth-inspect.ts'
+import { inspectAuthCase, reachCase } from './auth-inspect.ts'
 
 const harness = Test.make({
   providers: Cloudflare.providers(),
@@ -220,5 +220,6 @@ harness.test(
   Effect.gen(function* () {
     const { url } = yield* stack
     yield* Effect.promise(() => inspectAuthCase(url))
+    yield* Effect.promise(() => reachCase(url))
   }),
 )

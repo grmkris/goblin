@@ -18,17 +18,6 @@ export interface Person {
   readonly email: string
 }
 
-/** The person a Better Auth user record names. */
-export const personOf = (user: {
-  readonly id: string
-  readonly name?: string | null
-  readonly email: string
-}): Person => ({
-  id: user.id,
-  name: user.name ?? '',
-  email: user.email,
-})
-
 interface Row {
   readonly id: string
   readonly name: string
@@ -74,6 +63,35 @@ export const membershipOf = async (
     .bind(userId, workspaceId)
     .first<Row>()
   return row === null ? undefined : viewOf(row)
+}
+
+/** The workspaces an MCP client reaches for its person now (ADR 0097), and whether its reach is all of theirs. */
+export interface Reached {
+  readonly all: boolean
+  readonly workspaces: readonly WorkspaceView[]
+}
+
+/**
+ * What `userId`'s consent to MCP client `clientId` reaches now (ADR 0097): every workspace they are a member of when its
+ * reach is `all` (ones joined since included), else those it lists that they still are; none without a reach. One D1
+ * round trip, read on every call.
+ */
+export const reachedBy = async (db: Database, userId: string, clientId: string): Promise<Reached | undefined> => {
+  const [reach, listed] = await db.batch<Row & { readonly everything?: number }>([
+    db.prepare('SELECT "all" AS everything FROM mcpReach WHERE clientId = ? AND userId = ?').bind(clientId, userId),
+    db
+      .prepare(
+        `${SELECT} WHERE m.userId = ? AND (
+          EXISTS (SELECT 1 FROM mcpReach r WHERE r.clientId = ? AND r.userId = m.userId AND r."all" = 1)
+          OR EXISTS (SELECT 1 FROM mcpReachWorkspace w
+            WHERE w.clientId = ? AND w.userId = m.userId AND w.workspaceId = o.id))
+        ORDER BY m.createdAt, o.id`,
+      )
+      .bind(userId, clientId, clientId),
+  ])
+  const [row] = reach?.results ?? []
+  if (row === undefined) return undefined
+  return { all: row.everything === 1, workspaces: (listed?.results ?? []).map(viewOf) }
 }
 
 const listOf = async (db: Database, userId: string): Promise<readonly WorkspaceView[]> =>
@@ -170,26 +188,6 @@ export const workspacesOf = async (db: Database, person: Person, now: Date): Pro
   throw new Conflict({ reason: 'slug' })
 }
 
-/**
- * The workspace an OAuth client's sign-in in progress is for (ADR 0089): the person's only one, or once they have
- * chosen (`chosen`: they came back from the choice), the one their session holds while they are its member. None
- * while a person in several has not chosen.
- */
-export const signInWorkspace = async (
-  db: Database,
-  person: Person,
-  session: Readonly<Record<string, unknown>>,
-  chosen: boolean,
-): Promise<string | undefined> => {
-  const workspaces = await workspacesOf(db, person, new Date())
-  const [only] = workspaces
-  if (workspaces.length === 1 && only !== undefined) return only.id
-  const active = session['activeOrganizationId']
-  return chosen && typeof active === 'string' && workspaces.some((workspace) => workspace.id === active)
-    ? active
-    : undefined
-}
-
 /** `userId`'s membership of `workspaceId` when their role is one of `roles`; `NotFound` or `Forbidden` otherwise. */
 const requireRole = async (db: Database, userId: string, workspaceId: string, roles: readonly WorkspaceRole[]) => {
   const membership = await membershipOf(db, userId, workspaceId)
@@ -218,16 +216,13 @@ export const updateWorkspace = async (
 }
 
 /**
- * Removes a workspace's records once its agent is gone: its keys, the OAuth consents and refresh tokens its members
- * gave clients for it, and the workspace, whose memberships and invitations go with it.
+ * Removes a workspace's records once its agent is gone: its keys, its place in MCP clients' reaches (ADR 0097), and
+ * the workspace, whose memberships and invitations go with it.
  */
-const removeRecords = (db: Database, workspaceId: string, now: Date) =>
+const removeRecords = (db: Database, workspaceId: string) =>
   db.batch([
     db.prepare('DELETE FROM apikey WHERE referenceId = ?').bind(workspaceId),
-    db.prepare('DELETE FROM oauthConsent WHERE referenceId = ?').bind(workspaceId),
-    db
-      .prepare('UPDATE oauthRefreshToken SET revoked = ? WHERE referenceId = ? AND revoked IS NULL')
-      .bind(now.toISOString(), workspaceId),
+    db.prepare('DELETE FROM mcpReachWorkspace WHERE workspaceId = ?').bind(workspaceId),
     db.prepare('DELETE FROM organization WHERE id = ?').bind(workspaceId),
   ])
 
@@ -241,10 +236,10 @@ export interface Deletion {
  * Deletes a workspace, by its owner: its agent is erased first (a failure leaves everything as it was, to try again),
  * then its records.
  */
-export const deleteWorkspace = async (deletion: Deletion, userId: string, workspaceId: string, now: Date) => {
+export const deleteWorkspace = async (deletion: Deletion, userId: string, workspaceId: string) => {
   await requireRole(deletion.db, userId, workspaceId, ['owner'])
   await deletion.eraseAgent(workspaceId)
-  await removeRecords(deletion.db, workspaceId, now)
+  await removeRecords(deletion.db, workspaceId)
 }
 
 /**
@@ -252,7 +247,7 @@ export const deleteWorkspace = async (deletion: Deletion, userId: string, worksp
  * memberships go with the account itself. While it is the last owner of a workspace other people work in, nothing goes
  * (`Conflict`, `last_owner`, ADR 0093): one of them is made an owner first.
  */
-export const deleteOwnedAlone = async (deletion: Deletion, userId: string, now: Date): Promise<void> => {
+export const deleteOwnedAlone = async (deletion: Deletion, userId: string): Promise<void> => {
   const { results } = await deletion.db
     .prepare(
       `SELECT m.organizationId AS id,
@@ -265,6 +260,6 @@ export const deleteOwnedAlone = async (deletion: Deletion, userId: string, now: 
   if (results.some(({ members }) => members > 1)) throw new Conflict({ reason: 'last_owner' })
   for (const { id } of results) {
     await deletion.eraseAgent(id)
-    await removeRecords(deletion.db, id, now)
+    await removeRecords(deletion.db, id)
   }
 }

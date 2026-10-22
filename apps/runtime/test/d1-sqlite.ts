@@ -35,12 +35,19 @@ export const d1Of = (db: DatabaseSync): D1Database => {
   const batch = <T>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> => {
     db.exec('BEGIN')
     try {
-      for (const each of statements) {
+      // As D1's batch does: each statement's rows, none for a write.
+      const answers = statements.map((each) => {
         const { sql, params } = bound.get(each) ?? { sql: '', params: [] }
-        db.prepare(sql).run(...params)
-      }
+        const prepared = db.prepare(sql)
+        if (!/^\s*(?:select|with)\b/iu.test(sql)) {
+          prepared.run(...params)
+          return fake<D1Result<T>>({ success: true, results: [] })
+        }
+        // SAFETY: as for `all`, the caller names the rows' shape.
+        return fake<D1Result<T>>({ success: true, results: prepared.all(...params) as T[] })
+      })
       db.exec('COMMIT')
-      return Promise.resolve(statements.map(() => fake<D1Result<T>>({ success: true, results: [] })))
+      return Promise.resolve(answers)
     } catch (cause) {
       db.exec('ROLLBACK')
       return Promise.reject(cause)

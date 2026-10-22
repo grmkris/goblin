@@ -19,7 +19,7 @@ export interface Person {
 }
 
 /** The paths a person's browser sends as they are; every other `/api/` path is a member's, under their workspace. */
-const PERSON_PATHS = ['/api/auth/', '/api/workspaces', '/api/invitations', '/api/client-errors']
+const PERSON_PATHS = ['/api/auth/', '/api/workspaces', '/api/invitations', '/api/clients', '/api/client-errors']
 
 /** `path` as `who`'s browser sends it: a member's `/api/…` path under `/w/<their workspace's slug>` (ADR 0089). */
 export const inWorkspace = (who: Person, path: string): string =>

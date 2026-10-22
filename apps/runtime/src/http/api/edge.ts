@@ -269,9 +269,9 @@ const settle = (
   })
 
 /** The account API's paths, a person's; anything else under them is a 404 in the envelope. */
-const ACCOUNT_PATHS = ['/api/workspaces', '/api/invitations', '/api/client-errors'] as const
+const ACCOUNT_PATHS = ['/api/workspaces', '/api/invitations', '/api/clients', '/api/client-errors'] as const
 /** The workspace account API's paths, under `/w/<workspace slug>`: answered by the Worker, never the agent. */
-const WORKSPACE_ACCOUNT_PATHS = ['/api/clients', '/api/keys', '/api/members'] as const
+const WORKSPACE_ACCOUNT_PATHS = ['/api/keys', '/api/members'] as const
 const under = (path: string, prefix: string): boolean => path === prefix || path.startsWith(`${prefix}/`)
 export const isAccountPath = (path: string): boolean => ACCOUNT_PATHS.some((prefix) => under(path, prefix))
 const isWorkspaceAccountPath = (path: string): boolean => WORKSPACE_ACCOUNT_PATHS.some((prefix) => under(path, prefix))

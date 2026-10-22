@@ -22,15 +22,6 @@ export const ClientErrorReport = Schema.Struct({
 )
 export type ClientErrorReport = typeof ClientErrorReport.Type
 
-/** An MCP client the owner has authorized to use goblin's /mcp server. */
-export const InboundClient = Schema.Struct({
-  clientId: Schema.String,
-  name: Schema.optional(Schema.String),
-  uri: Schema.optional(Schema.String),
-  consentedAt: Schema.optional(Schema.String),
-})
-export type InboundClient = typeof InboundClient.Type
-
 /**
  * What a server's API key may reach (ADR 0081): each scope opens its area's annotated owner endpoints. `inspect` reads
  * how the key's own chats ran, content-free (ADR 0084).
@@ -178,6 +169,34 @@ export const WorkspaceView = Schema.Struct({
   members: Schema.Int,
 })
 export type WorkspaceView = typeof WorkspaceView.Type
+
+/**
+ * The workspaces an MCP client's consent reaches (ADR 0097): `all` of the person's, ones they join later included, or
+ * those listed, while they are still a member of each. A reach of none reaches nothing until it is changed.
+ */
+export const ClientReach = Schema.Struct({
+  all: Schema.Boolean,
+  workspaces: Schema.Array(WorkspaceId).check(Schema.isMaxLength(200)),
+})
+export type ClientReach = typeof ClientReach.Type
+
+/** A workspace a client reaches, as its person's list shows it. */
+export const ReachedWorkspace = Schema.Struct({ id: WorkspaceId, slug: Schema.String, name: Schema.String })
+export type ReachedWorkspace = typeof ReachedWorkspace.Type
+
+/**
+ * An MCP client a person authorized to use goblin's /mcp server (ADRs 0024, 0097): what it registered as, when they
+ * consented, the `goblin:*` scopes their consent grants and the workspaces it reaches now.
+ */
+export const InboundClient = Schema.Struct({
+  clientId: Schema.String,
+  name: Schema.optional(Schema.String),
+  uri: Schema.optional(Schema.String),
+  consentedAt: Schema.optional(Schema.String),
+  scopes: Schema.Array(Schema.String),
+  reach: Schema.Struct({ all: Schema.Boolean, workspaces: Schema.Array(ReachedWorkspace) }),
+})
+export type InboundClient = typeof InboundClient.Type
 
 /** `POST /api/workspaces`: a new workspace with its own agent, its maker its owner. A taken slug is a conflict. */
 export const CreateWorkspace = Schema.Struct({ name: WorkspaceName, slug: WorkspaceSlug })

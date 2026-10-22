@@ -72,6 +72,9 @@ const OWN_INDEXES: Readonly<Record<string, readonly { unique: boolean; columns: 
   member: [{ unique: true, columns: ['organizationId', 'userId'] }],
 }
 
+/** goblin's own tables in the auth D1, beside Better Auth's: what each OAuth client's consent reaches (ADR 0097). */
+const OWN_TABLES = ['mcpReach', 'mcpReachWorkspace'] as const
+
 /** Compare the SQL to the installed Better Auth schema, not to a second manually maintained column list. */
 function checkTable(db: DatabaseSync, table: string, schema: ReturnType<typeof getSchema>[string]) {
   const columns = db.prepare('SELECT name, UPPER(type) AS type, "notnull", pk FROM pragma_table_info(?)').all(table)
@@ -134,7 +137,7 @@ const registration = (auth: ReturnType<typeof createAuth>, changes: Record<strin
 
 describe('auth D1 baseline', () => {
   it('contains exactly the configured Better Auth schema, including columns, indexes and foreign keys', async () => {
-    expect(migrations).toEqual(['0000_baseline.sql', '0001_api_keys.sql', '0002_workspaces.sql'])
+    expect(migrations).toEqual(['0000_baseline.sql', '0001_api_keys.sql', '0002_workspaces.sql', '0003_mcp_reach.sql'])
     const { db, auth } = fixture()
     await auth.$context
     const schema = getSchema(auth.options)
@@ -142,7 +145,7 @@ describe('auth D1 baseline', () => {
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
       .all()
       .map((row) => row['name'])
-    expect(tables).toEqual(Object.keys(schema).toSorted())
+    expect(tables).toEqual([...Object.keys(schema), ...OWN_TABLES].toSorted())
     for (const [table, fields] of Object.entries(schema)) checkTable(db, table, fields)
     expect(tables).toContain('rateLimit')
     expect(tables.some((name) => String(name).startsWith('app_'))).toBe(false)
@@ -194,8 +197,9 @@ describe('auth D1 baseline', () => {
   it('gives every existing account a workspace with its own id, owned by it, with its keys and consents (ADR 0089)', () => {
     const db = new DatabaseSync(':memory:')
     databases.push(db)
-    const [workspaces, ...before] = migrations.toReversed()
-    for (const name of before.toReversed()) db.exec(readFileSync(join(DIR, name), 'utf8'))
+    const workspaces = '0002_workspaces.sql'
+    for (const name of migrations.slice(0, migrations.indexOf(workspaces)))
+      db.exec(readFileSync(join(DIR, name), 'utf8'))
     db.exec(`
       INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt)
         VALUES ('AbCd1234', 'Kris', 'kris.k+goblin@example.test', 1, '${NOW}', '${NOW}'),
@@ -207,7 +211,7 @@ describe('auth D1 baseline', () => {
       INSERT INTO oauthConsent (id, clientId, userId, scopes, createdAt, updatedAt)
         VALUES ('consent-1', 'client-1', 'AbCd1234', '[]', '${NOW}', '${NOW}');
     `)
-    db.exec(readFileSync(join(DIR, String(workspaces)), 'utf8'))
+    db.exec(readFileSync(join(DIR, workspaces), 'utf8'))
     expect(db.prepare('SELECT id, name, slug FROM organization ORDER BY id').all()).toEqual([
       { id: 'AbCd1234', name: "Kris's workspace", slug: 'kris-k-goblin-abcd' },
       { id: 'Q1w2E3r4t5', name: "odd!one's workspace", slug: 'ws-q1w2e3r4' },
@@ -228,6 +232,38 @@ describe('auth D1 baseline', () => {
         .prepare('INSERT INTO member (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, ?, ?)')
         .run('m2', 'AbCd1234', 'AbCd1234', 'member', NOW),
     ).toThrow()
+  })
+
+  it("ends ADR 0089's workspace-named consents, keeps reaches to members' workspaces, and cascades them (ADR 0097)", () => {
+    const db = new DatabaseSync(':memory:')
+    databases.push(db)
+    const reach = '0003_mcp_reach.sql'
+    for (const name of migrations.slice(0, migrations.indexOf(reach))) db.exec(readFileSync(join(DIR, name), 'utf8'))
+    db.exec(`
+      INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt)
+        VALUES ('u1', 'Kris', 'kris@example.test', 1, '${NOW}', '${NOW}');
+      INSERT INTO organization (id, name, slug, createdAt) VALUES ('w1', 'Mine', 'mine', '${NOW}');
+      INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]');
+      INSERT INTO oauthConsent (id, clientId, userId, referenceId, scopes, createdAt, updatedAt)
+        VALUES ('consent-1', 'client-1', 'u1', 'w1', '[]', '${NOW}', '${NOW}');
+      INSERT INTO oauthRefreshToken (id, token, clientId, userId, referenceId, expiresAt, createdAt, scopes)
+        VALUES ('refresh-1', 'refresh-token-1', 'client-1', 'u1', 'w1', '${NOW}', '${NOW}', '[]');
+    `)
+    db.exec(readFileSync(join(DIR, reach), 'utf8'))
+    db.exec('PRAGMA foreign_keys = ON')
+    expect(db.prepare('SELECT COUNT(*) AS count FROM oauthConsent').get()).toEqual({ count: 0 })
+    expect(db.prepare('SELECT revoked IS NOT NULL AS revoked FROM oauthRefreshToken').get()).toEqual({ revoked: 1 })
+    db.exec(`
+      INSERT INTO mcpReach (clientId, userId, "all", updatedAt) VALUES ('client-1', 'u1', 0, '${NOW}');
+      INSERT INTO mcpReachWorkspace (clientId, userId, workspaceId) VALUES ('client-1', 'u1', 'w1');
+    `)
+    expect(() =>
+      db.exec(`INSERT INTO mcpReachWorkspace (clientId, userId, workspaceId) VALUES ('client-1', 'u1', 'nowhere')`),
+    ).toThrow()
+    db.exec(`DELETE FROM organization WHERE id = 'w1'`)
+    expect(db.prepare('SELECT COUNT(*) AS count FROM mcpReachWorkspace').get()).toEqual({ count: 0 })
+    db.exec(`DELETE FROM oauthClient WHERE clientId = 'client-1'`)
+    expect(db.prepare('SELECT COUNT(*) AS count FROM mcpReach').get()).toEqual({ count: 0 })
   })
 
   it('registers current clients for one /mcp resource with inspection available and no pre-granted consent', async () => {

@@ -89,8 +89,8 @@ export const memberRecords = (env: RuntimeEnv): MemberRecords => {
   return {
     list: (workspaceId) => attempt(() => membersOf(db, workspaceId)),
     update: (actor, userId, role) => attempt(() => updateMemberRole(db, actor, userId, role)),
-    remove: (actor, person, userId) => attempt(() => removeMember(db, actor, person.id, userId, new Date())),
-    leave: (workspace, person) => attempt(() => leaveWorkspace(db, workspace, person.id, new Date())),
+    remove: (actor, person, userId) => attempt(() => removeMember(db, actor, person.id, userId)),
+    leave: (workspace, person) => attempt(() => leaveWorkspace(db, workspace, person.id)),
     invitations: (workspaceId) => attempt(() => invitationsOf(db, workspaceId, new Date())),
     invite: (actor, person, input) =>
       attempt(async () => {

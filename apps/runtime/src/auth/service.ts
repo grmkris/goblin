@@ -39,9 +39,9 @@ export const requireUserSession = async (request: Request, env: RuntimeEnv): Pro
 
 /**
  * An inbound MCP client's access token: a signature from our own JWKS (read locally, no self-fetch), our issuer and
- * /mcp audience, an enabled client, and the person's standing consent for the token's workspace while they are still
- * its member (ADR 0089), in one read. Its scopes count only while that consent still grants them, so revoking the
- * client, consenting again more narrowly or leaving the workspace ends its access at once.
+ * /mcp audience, an enabled client, and the person's standing consent to it (ADR 0097: a consent names no workspace).
+ * Its scopes count only while that consent still grants them, so revoking the client or consenting again more narrowly
+ * ends its access at once; which workspaces it reaches is its reach, read on every call.
  */
 export const verifyClientToken = async (token: string, env: RuntimeEnv): Promise<ClientPrincipal> => {
   const auth = createAuth(env, env.AUTH_DB)
@@ -62,11 +62,9 @@ export const verifyClientToken = async (token: string, env: RuntimeEnv): Promise
     .first<{ disabled: number | null }>()
   if (client === null || client.disabled === 1) throw new Unauthenticated({ reason: 'client revoked' })
   const consent = await env.AUTH_DB.prepare(
-    `SELECT o.scopes AS scopes FROM oauthConsent o
-       JOIN member m ON m.organizationId = o.referenceId AND m.userId = o.userId
-      WHERE o.clientId = ? AND o.userId = ? AND o.referenceId = ?`,
+    'SELECT scopes FROM oauthConsent WHERE clientId = ? AND userId = ? AND referenceId IS NULL',
   )
-    .bind(principal.clientId, principal.subject, principal.workspaceId)
+    .bind(principal.clientId, principal.subject)
     .first<ConsentRow>()
   if (consent === null) throw new Unauthenticated({ reason: 'consent revoked' })
   const granted = grantedScopes(consent)

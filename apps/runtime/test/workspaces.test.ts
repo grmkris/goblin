@@ -9,7 +9,7 @@ import {
   deleteOwnedAlone,
   deleteWorkspace,
   membershipOf,
-  signInWorkspace,
+  reachedBy,
   slugFrom,
   updateWorkspace,
   workspacesOf,
@@ -22,6 +22,8 @@ const databases: DatabaseSync[] = []
 afterEach(() => {
   for (const db of databases.splice(0)) db.close()
 })
+
+const byId = (a: string, b: string) => a.localeCompare(b)
 
 const KRIS = { id: 'u-kris', name: 'Kris', email: 'kris.k@example.test' }
 const ANA = { id: 'u-ana', name: '', email: 'ana@example.test' }
@@ -110,26 +112,26 @@ describe('workspaces (ADR 0089)', () => {
     )
   })
 
-  it('deletes a workspace for its owner: its agent first, then its keys, consents and memberships', async () => {
+  it("deletes a workspace for its owner: its agent first, then its keys, clients' reach of it and memberships", async () => {
     const { db, sqlite } = fixture()
     const made = await createWorkspace(db, KRIS.id, { name: 'Swarmm', slug: 'swarmm' }, NOW)
     sqlite.exec(`
       INSERT INTO apikey (id, configId, referenceId, key, createdAt, updatedAt) VALUES ('k1', 'default', '${made.id}', 'h', 'x', 'x');
       INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]');
-      INSERT INTO oauthConsent (id, clientId, userId, referenceId, scopes, createdAt, updatedAt)
-        VALUES ('consent-1', 'client-1', 'u-kris', '${made.id}', '[]', 'x', 'x');
+      INSERT INTO mcpReach (clientId, userId, "all", updatedAt) VALUES ('client-1', 'u-kris', 0, 'x');
+      INSERT INTO mcpReachWorkspace (clientId, userId, workspaceId) VALUES ('client-1', 'u-kris', '${made.id}');
     `)
     const failing = agents(made.id)
-    await expect(deleteWorkspace({ db, eraseAgent: failing.eraseAgent }, KRIS.id, made.id, NOW)).rejects.toThrow()
+    await expect(deleteWorkspace({ db, eraseAgent: failing.eraseAgent }, KRIS.id, made.id)).rejects.toThrow()
     expect(count(sqlite, 'organization')).toBe(1)
     expect(count(sqlite, 'apikey')).toBe(1)
     const working = agents()
-    await expect(deleteWorkspace({ db, eraseAgent: working.eraseAgent }, ANA.id, made.id, NOW)).rejects.toEqual(
+    await expect(deleteWorkspace({ db, eraseAgent: working.eraseAgent }, ANA.id, made.id)).rejects.toEqual(
       new NotFound({ what: 'workspace' }),
     )
-    await deleteWorkspace({ db, eraseAgent: working.eraseAgent }, KRIS.id, made.id, NOW)
+    await deleteWorkspace({ db, eraseAgent: working.eraseAgent }, KRIS.id, made.id)
     expect(working.erased).toEqual([made.id])
-    for (const table of ['organization', 'member', 'apikey', 'oauthConsent'])
+    for (const table of ['organization', 'member', 'apikey', 'mcpReachWorkspace'])
       expect(count(sqlite, table), table).toBe(0)
   })
 
@@ -141,7 +143,7 @@ describe('workspaces (ADR 0089)', () => {
       .prepare("INSERT INTO member (id, organizationId, userId, role, createdAt) VALUES ('m', ?, ?, 'owner', ?)")
       .run(shared.id, ANA.id, NOW.toISOString())
     const { erased, eraseAgent } = agents()
-    await deleteOwnedAlone({ db, eraseAgent }, KRIS.id, NOW)
+    await deleteOwnedAlone({ db, eraseAgent }, KRIS.id)
     expect(erased).toEqual([alone.id])
     expect(await membershipOf(db, ANA.id, shared.id)).toMatchObject({ name: 'Ours', role: 'owner' })
   })
@@ -154,21 +156,33 @@ describe('workspaces (ADR 0089)', () => {
       .prepare("INSERT INTO member (id, organizationId, userId, role, createdAt) VALUES ('m', ?, ?, 'member', ?)")
       .run(team.id, ANA.id, NOW.toISOString())
     const { erased, eraseAgent } = agents()
-    await expect(deleteOwnedAlone({ db, eraseAgent }, KRIS.id, NOW)).rejects.toEqual(
-      new Conflict({ reason: 'last_owner' }),
-    )
+    await expect(deleteOwnedAlone({ db, eraseAgent }, KRIS.id)).rejects.toEqual(new Conflict({ reason: 'last_owner' }))
     expect(erased).toEqual([])
   })
 
-  it('names the workspace an OAuth sign-in is for: the only one, or the chosen one once chosen', async () => {
-    const { db } = fixture()
+  it("reaches, for an MCP client, all of a person's workspaces live, or those listed while they are a member (ADR 0097)", async () => {
+    const { db, sqlite } = fixture()
     const [first] = await workspacesOf(db, KRIS, NOW)
-    expect(await signInWorkspace(db, KRIS, {}, false)).toBe(first?.id)
     const second = await createWorkspace(db, KRIS.id, { name: 'Swarmm', slug: 'swarmm' }, NOW)
-    expect(await signInWorkspace(db, KRIS, { activeOrganizationId: second.id }, false)).toBeUndefined()
-    expect(await signInWorkspace(db, KRIS, { activeOrganizationId: second.id }, true)).toBe(second.id)
     const foreign = await createWorkspace(db, ANA.id, { name: 'Ana', slug: 'ana' }, NOW)
-    expect(await signInWorkspace(db, KRIS, { activeOrganizationId: foreign.id }, true)).toBeUndefined()
+    sqlite.exec(`INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]')`)
+    expect(await reachedBy(db, KRIS.id, 'client-1')).toBeUndefined()
+    sqlite.exec(`
+      INSERT INTO mcpReach (clientId, userId, "all", updatedAt) VALUES ('client-1', 'u-kris', 0, 'x');
+      INSERT INTO mcpReachWorkspace (clientId, userId, workspaceId) VALUES ('client-1', 'u-kris', '${second.id}');
+      INSERT INTO mcpReachWorkspace (clientId, userId, workspaceId) VALUES ('client-1', 'u-kris', '${foreign.id}');
+    `)
+    // A listed workspace the person is no member of is never reached.
+    expect((await reachedBy(db, KRIS.id, 'client-1'))?.workspaces.map((workspace) => workspace.slug)).toEqual([
+      'swarmm',
+    ])
+    sqlite.exec(`UPDATE mcpReach SET "all" = 1`)
+    const later = await createWorkspace(db, KRIS.id, { name: 'Later', slug: 'later' }, NOW)
+    const all = await reachedBy(db, KRIS.id, 'client-1')
+    expect(all?.all).toBe(true)
+    expect(all?.workspaces.map((workspace) => workspace.id).toSorted(byId)).toEqual(
+      [first?.id ?? '', second.id, later.id].toSorted(byId),
+    )
   })
 
   it('makes a slug of lowercase letters, digits and single hyphens, three characters at least', () => {

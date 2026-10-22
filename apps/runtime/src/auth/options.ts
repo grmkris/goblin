@@ -14,7 +14,7 @@ import { guardOidc, oidcPlugin, oidcProviderOf, refuseUnverifiedOidcUser, withou
 import { KEY_PREFIX, MCP_SCOPES, mcpResource } from './resources.ts'
 import { workspaceAccess } from './roles.ts'
 import { deleteAgentOf } from './account.ts'
-import { deleteOwnedAlone, personOf, signInWorkspace } from './workspaces.ts'
+import { deleteOwnedAlone } from './workspaces.ts'
 
 export const AUTH_BASE_PATH = '/api/auth'
 export const authIssuer = (appUrl: string): string => `${appUrl.replace(/\/$/u, '')}${AUTH_BASE_PATH}`
@@ -201,11 +201,7 @@ export type AuthNeeds = {
  */
 const beforeAccountDelete = (env: AuthEnvironment, database: D1Database) => async (user: { id: string }) => {
   try {
-    await deleteOwnedAlone(
-      { db: database, eraseAgent: (workspaceId) => deleteAgentOf(env, workspaceId) },
-      user.id,
-      new Date(),
-    )
+    await deleteOwnedAlone({ db: database, eraseAgent: (workspaceId) => deleteAgentOf(env, workspaceId) }, user.id)
   } catch (cause) {
     if (cause instanceof Conflict) throw new APIError('CONFLICT', { message: 'last_owner', code: 'LAST_OWNER' })
     throw cause
@@ -238,19 +234,8 @@ const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeed
     allowUnauthenticatedClientRegistration: true,
     clientRegistrationAllowedResources: [resource],
     clientRegistrationDefaultScopes: [...MCP_SCOPES],
-    // A consent names one workspace (ADR 0089): a person in several picks it after signing in, a person in one
-    // needs no choice. The token carries it, and /mcp reaches only that workspace's agent.
-    postLogin: {
-      page: '/consent/workspace',
-      shouldRedirect: async ({ user, session, isContinuation }) =>
-        (await signInWorkspace(database, personOf(user), session, isContinuation)) === undefined,
-      consentReferenceId: async ({ user, session }) => {
-        const chosen = await signInWorkspace(database, personOf(user), session, true)
-        if (chosen === undefined) throw new APIError('FORBIDDEN', { message: 'Choose a workspace first.' })
-        return chosen
-      },
-    },
-    customAccessTokenClaims: ({ referenceId }) => (referenceId === undefined ? {} : { workspace: referenceId }),
+    // A consent names no workspace (ADR 0097): which of the person's workspaces a client reaches is its reach, which
+    // the consent page sets first and every /mcp call reads, so the standard consent and its re-authorization apply.
   })
   return {
     appName: 'goblin',

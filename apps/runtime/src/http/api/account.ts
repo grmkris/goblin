@@ -2,6 +2,7 @@ import { AccountApi, type AppError, WorkspaceAccountApi, withRef } from '@goblin
 import type {
   ApiKeyView,
   ClientErrorReport,
+  ClientReach,
   CreateApiKey,
   CreatedApiKey,
   CreateWorkspace,
@@ -18,22 +19,14 @@ import * as Option from 'effect/Option'
 import * as HttpServer from 'effect/http/HttpServer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { type KeyChange, createKey, listKeys, revokeKey, updateKey } from '../../auth/api-keys.ts'
-import { listInboundClients, revokeInboundClient } from '../../auth/clients.ts'
+import { listInboundClients, revokeInboundClient, setClientReach } from '../../auth/clients.ts'
 import { deleteAgentOf } from '../../auth/account.ts'
-import { createAuth } from '../../auth/options.ts'
-import {
-  type Person,
-  createWorkspace,
-  deleteWorkspace,
-  membershipOf,
-  updateWorkspace,
-  workspacesOf,
-} from '../../auth/workspaces.ts'
+import { type Person, createWorkspace, deleteWorkspace, updateWorkspace, workspacesOf } from '../../auth/workspaces.ts'
 import type { RuntimeEnv } from '../../env.ts'
 import { logEvent } from '../../observability/logger.ts'
 import { reportAndRecover } from '../../observability/report.ts'
 import { FlowPointFailure, agentHash, flowPoint } from '../../observability/ae.ts'
-import { Forbidden, NotFound, Unauthenticated, attempt } from '../errors.ts'
+import { Forbidden, Unauthenticated, attempt } from '../errors.ts'
 import { RequestContext } from './context.ts'
 import { type MemberRecords, memberRecords } from './member-records.ts'
 
@@ -50,11 +43,14 @@ export interface AccountRecords {
     change: UpdateWorkspace,
   ) => Effect.Effect<WorkspaceView, AppError>
   readonly deleteWorkspace: (userId: string, workspaceId: string) => Effect.Effect<void, AppError>
-  /** Chooses the workspace the session's OAuth sign-in in progress is for; one the person is not in is not found. */
-  readonly selectForSignIn: (session: Headers, userId: string, workspaceId: string) => Effect.Effect<void, AppError>
-  /** The OAuth clients a member connected to a workspace, and ending one's access to it. */
-  readonly clients: (userId: string, workspaceId: string) => Effect.Effect<readonly InboundClient[], AppError>
-  readonly revokeClient: (userId: string, workspaceId: string, clientId: string) => Effect.Effect<void, AppError>
+  /** The MCP clients a person connected, the workspaces each reaches, and changing or ending that (ADR 0097). */
+  readonly clients: (userId: string) => Effect.Effect<readonly InboundClient[], AppError>
+  readonly setClientReach: (
+    person: Person,
+    clientId: string,
+    reach: ClientReach,
+  ) => Effect.Effect<ClientReach, AppError>
+  readonly revokeClient: (userId: string, clientId: string) => Effect.Effect<void, AppError>
   /** A workspace's API keys (ADRs 0081, 0089), and making and ending one. */
   readonly keys: (workspaceId: string) => Effect.Effect<readonly ApiKeyView[], AppError>
   readonly createKey: (
@@ -123,25 +119,11 @@ export const accountRecords = (env: RuntimeEnv): AccountRecords => {
       attempt(() => updateWorkspace(env.AUTH_DB, userId, workspaceId, change)),
     deleteWorkspace: (userId, workspaceId) =>
       attempt(() =>
-        deleteWorkspace(
-          { db: env.AUTH_DB, eraseAgent: (id) => deleteAgentOf(env, id) },
-          userId,
-          workspaceId,
-          new Date(),
-        ),
+        deleteWorkspace({ db: env.AUTH_DB, eraseAgent: (id) => deleteAgentOf(env, id) }, userId, workspaceId),
       ),
-    selectForSignIn: (session, userId, workspaceId) =>
-      attempt(async () => {
-        if ((await membershipOf(env.AUTH_DB, userId, workspaceId)) === undefined)
-          throw new NotFound({ what: 'workspace' })
-        await createAuth(env, env.AUTH_DB).api.setActiveOrganization({
-          headers: session,
-          body: { organizationId: workspaceId },
-        })
-      }),
-    clients: (userId, workspaceId) => attempt(() => listInboundClients(env, userId, workspaceId)),
-    revokeClient: (userId, workspaceId, clientId) =>
-      attempt(() => revokeInboundClient(env, userId, workspaceId, clientId)),
+    clients: (userId) => attempt(() => listInboundClients(env, userId)),
+    setClientReach: (person, clientId, reach) => attempt(() => setClientReach(env, person, clientId, reach)),
+    revokeClient: (userId, clientId) => attempt(() => revokeInboundClient(env, userId, clientId)),
     keys: (workspaceId) => attempt(() => listKeys(env, workspaceId)),
     createKey: (workspaceId, userId, input) => attempt(() => createKey(env, workspaceId, userId, input)),
     updateKey: (workspaceId, userId, keyId, change) =>
@@ -243,27 +225,22 @@ const WorkspacesHandlers = HttpApiBuilder.group(AccountApi, 'workspaces', (handl
           Effect.as(records.deleteWorkspace(person.id, params.workspaceId), { deleted: true as const }),
         ),
       ),
-    )
-    .handle('select', ({ params }) =>
-      quoted(
-        Effect.flatMap(signedIn, ({ records, person }) =>
-          AccountRequest.use(({ headers }) =>
-            Effect.as(records.selectForSignIn(headers, person.id, params.workspaceId), { selected: true as const }),
-          ),
-        ),
-      ),
     ),
 )
 
-const ClientsHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'clients', (handlers) =>
+/** A person's MCP clients and the workspaces each reaches (ADR 0097): theirs alone, whatever workspace they are in. */
+const ClientsHandlers = HttpApiBuilder.group(AccountApi, 'clients', (handlers) =>
   handlers
-    .handle('list', () =>
-      quoted(Effect.flatMap(member, ({ records, person, workspace }) => records.clients(person.id, workspace.id))),
+    .handle('list', () => quoted(Effect.flatMap(signedIn, ({ records, person }) => records.clients(person.id))))
+    .handle('reach', ({ params, payload }) =>
+      quoted(
+        Effect.flatMap(signedIn, ({ records, person }) => records.setClientReach(person, params.clientId, payload)),
+      ),
     )
     .handle('revoke', ({ params }) =>
       quoted(
-        Effect.flatMap(member, ({ records, person, workspace }) =>
-          Effect.as(records.revokeClient(person.id, workspace.id, params.clientId), { revoked: true as const }),
+        Effect.flatMap(signedIn, ({ records, person }) =>
+          Effect.as(records.revokeClient(person.id, params.clientId), { revoked: true as const }),
         ),
       ),
     ),
@@ -388,12 +365,12 @@ const ClientErrorsHandlers = HttpApiBuilder.group(AccountApi, 'clientErrors', (h
 
 /** The account API's routes, served by the Worker (`edge.ts`). */
 export const AccountApiLayer = HttpApiBuilder.layer(AccountApi).pipe(
-  Layer.provide([WorkspacesHandlers, InvitationsHandlers, ClientErrorsHandlers]),
+  Layer.provide([WorkspacesHandlers, InvitationsHandlers, ClientsHandlers, ClientErrorsHandlers]),
   Layer.provide(HttpServer.layerServices),
 )
 
 /** The workspace account API's routes, served by the Worker for a member (`edge.ts`). */
 export const WorkspaceAccountApiLayer = HttpApiBuilder.layer(WorkspaceAccountApi).pipe(
-  Layer.provide([ClientsHandlers, KeysHandlers, MembersHandlers]),
+  Layer.provide([KeysHandlers, MembersHandlers]),
   Layer.provide(HttpServer.layerServices),
 )

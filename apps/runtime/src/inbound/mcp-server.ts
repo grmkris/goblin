@@ -12,11 +12,24 @@ import {
   UpdatePersona,
   UpdateTopic,
 } from '@goblin/contracts'
-import { type CallerScope } from '@goblin/contracts'
+import { type CallerScope, type WorkspaceView } from '@goblin/contracts'
 import { McpServer } from '@modelcontextprotocol/server'
 import * as Schema from 'effect/Schema'
 import { flowTools, runTools, transcriptTools } from './inspect-tools.ts'
-import { type Add, Limit, type OwnerCaller, type Reply, adder, reads, replyWith, standard, writes } from './tools.ts'
+import {
+  type Add,
+  type CallTarget,
+  Limit,
+  type OwnerCaller,
+  type Reply,
+  adder,
+  reads,
+  replyWith,
+  sourceOf,
+  standard,
+  text,
+  writes,
+} from './tools.ts'
 
 /**
  * goblin's /mcp (ADR 0086): one server for every caller, a server's API key or an OAuth client of the owner, with one
@@ -319,11 +332,95 @@ const agentTools = (server: McpServer, add: Add, reply: Reply) => {
   )
 }
 
-/** The tools a caller holding `scopes` may call, each over `call` as that caller. */
-export const mcpServer = (scopes: readonly CallerScope[], call: OwnerCaller): McpServer => {
-  const server = new McpServer({ name: 'goblin', version: '0.1.0' }, { instructions: GUIDE })
+/**
+ * The workspaces an OAuth client reaches (ADR 0097), as its calls name them: all of its person's or those its consent
+ * lists, each with their role. `named` when a call must say which: unless the client reaches exactly one it was given.
+ */
+export interface CallerReach {
+  readonly all: boolean
+  readonly workspaces: readonly WorkspaceView[]
+  readonly named: boolean
+}
+
+/** What the guide adds for a client: the workspaces it reaches and how a call names one. */
+const reachGuide = (reach: CallerReach): string => {
+  const named = reach.workspaces.map(({ slug, name, role }) => `${slug} (${name}, ${role})`).join(', ')
+  if (reach.workspaces.length === 0)
+    return ' This client reaches no workspace now: its person changes that in Settings → Account → Connected apps.'
+  const which = reach.all ? `all of its person's workspaces, ones they join later included: ${named}` : named
+  return reach.named
+    ? ` This client reaches ${which}. Every tool takes \`workspace\`, a workspace's id or slug, naming the one the call is for; workspace_list lists them.`
+    : ` This client reaches one workspace: ${named}.`
+}
+
+/**
+ * Makes each tool registered on `server` from now on also take `workspace` (ADR 0097) when the caller must name one:
+ * the argument is taken out of the tool's arguments and becomes the call's workspace (`target`) while the call starts.
+ */
+const naming = (server: McpServer, reach: CallerReach | undefined, target: CallTarget): void => {
+  if (reach === undefined || !reach.named) return
+  const workspace = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)).annotate({
+    description: `The workspace this call is for, by id or slug: ${reach.workspaces.map(({ slug }) => slug).join(', ') || 'none now'}.`,
+  })
+  // oxlint-disable-next-line typescript/no-deprecated -- the SDK's overloads include a deprecated Zod raw-shape form; goblin registers Standard Schemas only
+  const original = server.registerTool.bind(server)
+  const register = (
+    name: string,
+    config: { readonly inputSchema?: object } & Record<string, unknown>,
+    handler: (args: Record<string, unknown>, extra: unknown) => unknown,
+  ) => {
+    const source = config.inputSchema === undefined ? undefined : sourceOf(config.inputSchema)
+    // SAFETY: every tool's input is a Struct `standard` made (the registry test lists each); its fields widen as they are.
+    const fields = (source as Schema.Struct<Schema.Struct.Fields> | undefined)?.fields ?? {}
+    const named = (args: Record<string, unknown>, extra: unknown) => {
+      const { workspace: chosen, ...rest } = args
+      target.current = typeof chosen === 'string' ? chosen : undefined
+      try {
+        return handler(rest, extra)
+      } finally {
+        target.current = undefined
+      }
+    }
+    const widened = { ...config, inputSchema: standard(Schema.Struct({ ...fields, workspace })) }
+    // SAFETY: the widened schema decodes the tool's own arguments and `workspace`, which `named` takes back out.
+    return original(name, widened as never, named as never)
+  }
+  // SAFETY: `register` takes every registration McpServer's own does and only widens the input it is given.
+  // oxlint-disable-next-line typescript/no-deprecated -- as above: the type names every overload, the deprecated one among them
+  server.registerTool = register as McpServer['registerTool']
+}
+
+/** `workspace_list`: the workspaces an OAuth client reaches now, with its person's role in each (ADR 0097). */
+const workspaceList = (server: McpServer, reach: CallerReach) =>
+  server.registerTool(
+    'workspace_list',
+    {
+      title: 'Workspaces this client reaches',
+      description:
+        "The workspaces this client reaches now, with its person's role and how many people each has; `all` when it reaches every one of its person's, ones they join later included. Name one by its id or slug in a tool's `workspace`.",
+      inputSchema: standard(Schema.Struct({})),
+      annotations: reads,
+    },
+    () =>
+      text({
+        all: reach.all,
+        workspaces: reach.workspaces.map(({ id, slug, name, role, members }) => ({ id, slug, name, role, members })),
+      }),
+  )
+
+/**
+ * The tools a caller holding `scopes` may call, each over `call` as that caller; for an OAuth client, in the
+ * workspaces its consent reaches (`reach`, ADR 0097).
+ */
+export const mcpServer = (scopes: readonly CallerScope[], call: OwnerCaller, reach?: CallerReach): McpServer => {
+  const guide = reach === undefined ? GUIDE : `${GUIDE}${reachGuide(reach)}`
+  const server = new McpServer({ name: 'goblin', version: '0.1.0' }, { instructions: guide })
+  const target: CallTarget = { current: undefined }
+  // `workspace_list` first: it names no workspace, and every tool after it does when the client must name one.
+  if (reach !== undefined) workspaceList(server, reach)
+  naming(server, reach, target)
   const add = adder(scopes)
-  const reply = replyWith(call)
+  const reply = replyWith(call, target)
   agentTools(server, add, reply)
   topicTools(server, add, reply)
   conversationTools(server, add, reply)

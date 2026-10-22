@@ -3,7 +3,7 @@ import { InspectConversations } from '@goblin/contracts/inspect'
 import { Schema } from 'effect'
 import { createHash } from 'node:crypto'
 import { expect } from 'vitest'
-import { type Person, person } from './owner-requests.ts'
+import { type Person, call, person } from './owner-requests.ts'
 
 const APP = 'https://goblin.test'
 const REDIRECT = 'http://127.0.0.1:9/callback'
@@ -56,6 +56,24 @@ type Authorization = {
   readonly prompt?: 'consent'
   /** The scopes the owner grants on the consent page, when narrower than requested. */
   readonly grant?: string
+  /** The workspaces the consent page lets it reach (ADR 0097); the person's own one by default. */
+  readonly reach?: { readonly all: boolean; readonly workspaces: readonly string[] }
+}
+
+/** What the consent page does before the consent itself (ADR 0097): the workspaces the client will reach. */
+async function reachOf(base: string, who: Person, clientId: string, reach: Authorization['reach']) {
+  const set = await fetch(`${base}/api/clients/${clientId}/reach`, {
+    method: 'PUT',
+    headers: {
+      cookie: who.cookie,
+      origin: APP,
+      'x-goblin-csrf': '1',
+      'cf-connecting-ip': who.ip,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(reach ?? { all: false, workspaces: [who.workspace] }),
+  })
+  expect(set.status, await set.clone().text()).toBe(200)
 }
 
 /** One sign-in of a registered client to /mcp: authorize, the consent page when the owner must answer, token. */
@@ -82,6 +100,7 @@ async function authorize(base: string, who: Person, clientId: string, request: A
     // What the consent page reads to say what the client asks for.
     expect(landing.searchParams.get('scope')).toBe(request.scope)
     expect(landing.searchParams.getAll('resource')).toEqual([RESOURCE])
+    await reachOf(base, who, clientId, request.reach)
     const consented = await auth(base, who, '/oauth2/consent', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -224,7 +243,11 @@ export async function inspectAuthCase(base: string) {
   // Connected for sign-in scopes only, as every client was before inspection joined /mcp: ask, but not inspect.
   const asking = await authorize(base, owner, clientId, { scope: SIGN_IN_SCOPES })
   expect(asking.asked).toBe(true)
-  expect([...(await toolsOf(base, asking.access))].toSorted()).toEqual(['ask_agent', 'get_recent_messages'])
+  expect([...(await toolsOf(base, asking.access))].toSorted()).toEqual([
+    'ask_agent',
+    'get_recent_messages',
+    'workspace_list',
+  ])
 
   expect(management(await toolsOf(base, asking.access))).toEqual([])
 
@@ -248,7 +271,10 @@ export async function inspectAuthCase(base: string) {
     expect(conversations.isError, JSON.stringify(conversations)).toBeFalsy()
     expect(Schema.is(InspectConversations)(conversations.structuredContent)).toBe(true)
     const missing = await client.callTool({ name: 'inspect_turn', arguments: { operation: 'no-such-turn' } })
-    expect(missing).toMatchObject({ isError: true, content: [{ text: '{"_tag":"NotFound","what":"turn"}' }] })
+    expect(missing.isError).toBe(true)
+    // The refusal quotes the request's reference, as it does over HTTP.
+    const [refusal] = Schema.decodeUnknownSync(Schema.Array(Schema.Struct({ text: Schema.String })))(missing.content)
+    expect(JSON.parse(refusal?.text ?? '{}')).toMatchObject({ _tag: 'NotFound', what: 'turn', ref: expect.any(String) })
   } finally {
     await client.close()
   }
@@ -281,7 +307,7 @@ export async function inspectAuthCase(base: string) {
   } finally {
     await reading.close()
   }
-  const revoked = await fetch(`${base}/w/${owner.slug}/api/clients/${clientId}`, {
+  const revoked = await fetch(`${base}/api/clients/${clientId}`, {
     method: 'DELETE',
     headers: { cookie: owner.cookie, origin: APP, 'x-goblin-csrf': '1', 'cf-connecting-ip': owner.ip },
   })
@@ -290,6 +316,73 @@ export async function inspectAuthCase(base: string) {
     method: 'POST',
     headers: {
       authorization: `Bearer ${refreshed.access_token}`,
+      accept: 'application/json, text/event-stream',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+  })
+  expect(after.status).toBe(401)
+}
+
+/** A tool call's structured answer, or its error result's text. */
+const answerOf = async (client: Client, name: string, args: Record<string, unknown>) => {
+  const result = await client.callTool({ name, arguments: args })
+  return result.isError === true ? { error: JSON.stringify(result.content) } : result.structuredContent
+}
+
+/**
+ * One /mcp for several workspaces (ADR 0097): a client given two of the person's reaches each by the workspace a call
+ * names, and nothing else; given all, it reaches one made after it signed in; revoked, nothing.
+ */
+export async function reachCase(base: string) {
+  const owner = await person(base)
+  const madeAt = async (name: string) => {
+    const made = await call(base, owner, '/api/workspaces', {
+      name,
+      slug: `${name.toLowerCase()}-${crypto.randomUUID().slice(0, 6)}`,
+    })
+    expect(made.status).toBe(201)
+    return Schema.decodeUnknownSync(Schema.Struct({ id: Schema.String, slug: Schema.String }))(await made.json())
+  }
+  const team = await madeAt('Team')
+  const clientId = await register(base, owner)
+  const granted = await authorize(base, owner, clientId, {
+    scope: `${SIGN_IN_SCOPES} goblin:topics`,
+    reach: { all: false, workspaces: [owner.workspace, team.id] },
+  })
+  const client = await connect(base, granted.access)
+  try {
+    const listed = await answerOf(client, 'workspace_list', {})
+    expect(JSON.stringify(listed)).toContain(team.slug)
+    expect(JSON.stringify(listed)).toContain(owner.slug)
+    const name = `Team only ${crypto.randomUUID().slice(0, 6)}`
+    await answerOf(client, 'topic_create', { workspace: team.slug, name, operationId: crypto.randomUUID() })
+    expect(JSON.stringify(await answerOf(client, 'topic_list', { workspace: team.id }))).toContain(name)
+    expect(JSON.stringify(await answerOf(client, 'topic_list', { workspace: owner.slug }))).not.toContain(name)
+    // Several reached, so a call names its workspace (its schema requires it); one it does not reach is not there.
+    expect(JSON.stringify(await answerOf(client, 'topic_list', {}))).toContain('workspace: Missing key')
+    expect(JSON.stringify(await answerOf(client, 'topic_list', { workspace: 'elsewhere' }))).toContain('NotFound')
+  } finally {
+    await client.close()
+  }
+  // All of the person's workspaces, a later one included, without signing in again.
+  await reachOf(base, owner, clientId, { all: true, workspaces: [] })
+  const later = await madeAt('Later')
+  const again = await connect(base, granted.access)
+  try {
+    expect(JSON.stringify(await answerOf(again, 'workspace_list', {}))).toContain(later.slug)
+  } finally {
+    await again.close()
+  }
+  const revoked = await fetch(`${base}/api/clients/${clientId}`, {
+    method: 'DELETE',
+    headers: { cookie: owner.cookie, origin: APP, 'x-goblin-csrf': '1', 'cf-connecting-ip': owner.ip },
+  })
+  expect(revoked.status).toBe(200)
+  const after = await fetch(`${base}/mcp`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${granted.access}`,
       accept: 'application/json, text/event-stream',
       'content-type': 'application/json',
     },

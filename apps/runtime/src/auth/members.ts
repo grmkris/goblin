@@ -82,14 +82,14 @@ const targetOf = async (db: Database, workspaceId: string, userId: string): Prom
 const governs = (actor: WorkspaceView, target: WorkspaceRole): boolean =>
   actor.role === 'owner' || (actor.role === 'admin' && target === 'member')
 
-/** Ends `userId`'s membership, and the OAuth consents and refresh tokens they gave clients for this workspace. */
-const endMembership = (db: Database, workspaceId: string, userId: string, now: Date) =>
+/**
+ * Ends `userId`'s membership, and takes the workspace out of the reaches they gave MCP clients (ADR 0097): a reach of
+ * all of theirs drops it with the membership, and joining again never brings back one that listed it.
+ */
+const endMembership = (db: Database, workspaceId: string, userId: string) =>
   db.batch([
     db.prepare('DELETE FROM member WHERE organizationId = ? AND userId = ?').bind(workspaceId, userId),
-    db.prepare('DELETE FROM oauthConsent WHERE referenceId = ? AND userId = ?').bind(workspaceId, userId),
-    db
-      .prepare('UPDATE oauthRefreshToken SET revoked = ? WHERE referenceId = ? AND userId = ? AND revoked IS NULL')
-      .bind(now.toISOString(), workspaceId, userId),
+    db.prepare('DELETE FROM mcpReachWorkspace WHERE workspaceId = ? AND userId = ?').bind(workspaceId, userId),
   ])
 
 /**
@@ -114,18 +114,18 @@ export const updateMemberRole = async (
 }
 
 /** Removes a member, by `actor` as `updateMemberRole` decides who may; never the last owner, nor oneself (leave). */
-export const removeMember = async (db: Database, actor: WorkspaceView, actorId: string, userId: string, now: Date) => {
+export const removeMember = async (db: Database, actor: WorkspaceView, actorId: string, userId: string) => {
   if (userId === actorId) throw new Conflict({ reason: 'leave' })
   const target = await targetOf(db, actor.id, userId)
   if (!governs(actor, target.role)) throw new Forbidden({ reason: 'role' })
   if (target.role === 'owner' && (await owners(db, actor.id)) <= 1) throw new Conflict({ reason: 'last_owner' })
-  await endMembership(db, actor.id, userId, now)
+  await endMembership(db, actor.id, userId)
 }
 
 /** Ends the signed-in person's own membership; the last owner cannot leave (`Conflict`, `last_owner`). */
-export const leaveWorkspace = async (db: Database, workspace: WorkspaceView, userId: string, now: Date) => {
+export const leaveWorkspace = async (db: Database, workspace: WorkspaceView, userId: string) => {
   if (workspace.role === 'owner' && (await owners(db, workspace.id)) <= 1) throw new Conflict({ reason: 'last_owner' })
-  await endMembership(db, workspace.id, userId, now)
+  await endMembership(db, workspace.id, userId)
 }
 
 interface InvitationRow {

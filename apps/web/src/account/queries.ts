@@ -1,4 +1,5 @@
 import type {
+  ClientReach,
   CreateApiKey,
   CreateWorkspace,
   InviteMembers,
@@ -10,9 +11,9 @@ import { mutationOptions } from '@tanstack/react-query'
 import { account, workspaceAccount } from '../lib/api.ts'
 
 /**
- * The person's workspaces (`AccountApi`), and this workspace's inbound clients and API keys (`WorkspaceAccountApi`),
- * answered by the Worker: keys are `['account', kind]`, and each change refreshes what it changed before it settles.
- * One page is one workspace's (ADR 0089), so its clients and keys need no workspace in their keys.
+ * The person's workspaces and MCP clients (`AccountApi`), and this workspace's API keys and members
+ * (`WorkspaceAccountApi`), answered by the Worker: keys are `['account', kind]`, and each change refreshes what it
+ * changed before it settles. One page is one workspace's (ADR 0089), so its keys need no workspace in their keys.
  */
 const accountKeys = {
   workspaces: ['account', 'workspaces'] as const,
@@ -51,22 +52,24 @@ export const deleteWorkspaceMutation = mutationOptions({
   }),
 })
 
-/** Chooses the workspace an OAuth client's sign-in in progress is for (the consent page's choice). */
-export const selectWorkspaceMutation = mutationOptions({
-  ...account.apiMutation({
-    mutationFn: (api, workspaceId: string) => api.workspaces.select({ params: { workspaceId } }),
-  }),
-})
-
-/** The MCP clients the person let use this workspace's agent. */
-export const clientsQuery = workspaceAccount.apiQuery({
+/** The MCP clients the person let use goblin, with the workspaces each reaches (ADR 0097). */
+export const clientsQuery = account.apiQuery({
   queryKey: accountKeys.clients,
   queryFn: (api) => api.clients.list(),
 })
 
+/** Which of the person's workspaces a client reaches: the consent page's choice first, Settings' change later. */
+export const clientReachMutation = mutationOptions({
+  ...account.apiMutation({
+    mutationFn: (api, { clientId, ...payload }: ClientReach & { readonly clientId: string }) =>
+      api.clients.reach({ params: { clientId }, payload }),
+  }),
+  onSuccess: (_reach, _change, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.clients }),
+})
+
 /** Ends one client's access at once. */
 export const revokeClientMutation = mutationOptions({
-  ...workspaceAccount.apiMutation({
+  ...account.apiMutation({
     mutationFn: (api, clientId: string) => api.clients.revoke({ params: { clientId } }),
   }),
   onSuccess: (_revoked, _clientId, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.clients }),

@@ -1,7 +1,11 @@
 import { useState } from 'react'
+import type { ClientReach } from '@goblin/contracts'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Alert, AlertDescription, Button, Switch } from '@goblin/ui'
+import { Link } from '@tanstack/react-router'
+import { Alert, AlertDescription, Button, Skeleton, Switch } from '@goblin/ui'
+import { clientReachMutation, workspacesQuery } from '../account/queries.ts'
 import { AuthRefused, consentClientQuery, consentMutation } from '../auth/queries.ts'
+import { ReachChooser, initialReach, reachesAny } from './client-reach.tsx'
 import { type OptionalScope, consentBody, offeredScopes, requestedScopes } from '../lib/consent-scope.ts'
 import { messageOf, withRef } from '../lib/query/app-error.ts'
 import { AuthShell } from './auth-shell.tsx'
@@ -87,8 +91,66 @@ function ScopeChoice(props: {
 }
 
 /**
- * Ask the owner whether an MCP client may use goblin, saying what the requested scopes grant. Each `goblin:*` scope it
- * asks for is a separate opt-in (ADR 0086). Client-supplied names and URLs are shown as untrusted.
+ * Which workspaces the client will reach (ADR 0097): the person's choice among theirs, or all of them. A person with
+ * none yet (an invitation waiting) is pointed to it instead.
+ */
+function Workspaces(props: {
+  readonly reach: ClientReach | undefined
+  readonly onChange: (reach: ClientReach) => void
+}) {
+  const workspaces = useQuery(workspacesQuery)
+  if (workspaces.data === undefined) return <Skeleton className="h-16" />
+  if (workspaces.data.length === 0)
+    return (
+      <Alert>
+        <AlertDescription>
+          You are in no workspace yet. <Link to="/">Join the one you were invited to</Link>, or start your own, then
+          connect this app again.
+        </AlertDescription>
+      </Alert>
+    )
+  return (
+    <div className="flex flex-col gap-2">
+      <p>It reaches the workspaces you choose:</p>
+      <ReachChooser
+        workspaces={workspaces.data}
+        value={props.reach ?? initialReach(workspaces.data)}
+        onChange={props.onChange}
+      />
+    </div>
+  )
+}
+
+/**
+ * The person's answer: on Allow the reach first (a consent without one reaches nothing, and one without a consent is
+ * harmless), then the consent; on Deny the refusal alone. Which button is busy, and why it failed.
+ */
+function useDecision(clientId: string, requested: readonly string[], on: readonly string[], reach: ClientReach) {
+  const reaching = useMutation(clientReachMutation)
+  const deciding = useMutation(consentMutation)
+  const [choice, setChoice] = useState<'allow' | 'deny'>()
+  // A decision that succeeded is leaving for the client, so its button stays busy.
+  const pending = reaching.isPending || deciding.isPending || deciding.isSuccess ? choice : undefined
+  const error =
+    reaching.error !== null
+      ? messageOf(reaching.error, 'set the workspaces it reaches')
+      : deciding.error === null
+        ? ''
+        : messageOf(deciding.error, 'complete the authorization')
+  function decide(accept: boolean): void {
+    setChoice(accept ? 'allow' : 'deny')
+    const consent = () =>
+      deciding.mutate(consentBody(requested, accept, on), { onSuccess: (next) => window.location.assign(next) })
+    if (accept) reaching.mutate({ clientId, ...reach }, { onSuccess: consent })
+    else consent()
+  }
+  return { decide, pending, error }
+}
+
+/**
+ * Ask the person whether an MCP client may use goblin, saying what the requested scopes grant and which of their
+ * workspaces it reaches (ADR 0097). Each `goblin:*` scope it asks for is a separate opt-in (ADR 0086). Client-supplied
+ * names and URLs are shown as untrusted.
  */
 export function Consent() {
   const query = new URLSearchParams(window.location.search)
@@ -97,15 +159,10 @@ export function Consent() {
   const lookup = useClient(clientId)
   const client = lookup.kind === 'found' ? lookup.client : undefined
   const [on, setOn] = useState<readonly string[]>([])
-  const deciding = useMutation(consentMutation)
-  const [choice, setChoice] = useState<'allow' | 'deny'>()
-  // A decision that succeeded is leaving for the client, so its button stays busy.
-  const pending = deciding.isPending || deciding.isSuccess ? choice : undefined
-  const error = deciding.error === null ? '' : messageOf(deciding.error, 'complete the authorization')
-  function decide(accept: boolean): void {
-    setChoice(accept ? 'allow' : 'deny')
-    deciding.mutate(consentBody(requested, accept, on), { onSuccess: (next) => window.location.assign(next) })
-  }
+  const workspaces = useQuery(workspacesQuery).data ?? []
+  const [chosen, setChosen] = useState<ClientReach | undefined>(undefined)
+  const reach = chosen ?? initialReach(workspaces)
+  const { decide, pending, error } = useDecision(clientId, requested, on, reach)
   return (
     <AuthShell
       size="lg"
@@ -125,6 +182,7 @@ export function Consent() {
             <li key={line}>{line}</li>
           ))}
         </ul>
+        <Workspaces reach={chosen} onChange={setChosen} />
         {offeredScopes(requested).map((scope) => (
           <ScopeChoice
             key={scope}
@@ -142,7 +200,7 @@ export function Consent() {
           <Button
             size="lg"
             pending={pending === 'allow'}
-            disabled={pending !== undefined || client === undefined}
+            disabled={pending !== undefined || client === undefined || !reachesAny(reach)}
             onClick={() => decide(true)}
           >
             Allow

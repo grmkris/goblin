@@ -20,7 +20,7 @@ const KEY: ApiKeyView = {
 }
 
 /**
- * The real keys group served in memory over one key, and the clients group it never reaches, under a workspace's
+ * The real keys group served in memory over one key, and the members group it never reaches, under a workspace's
  * prefix as the edge serves them (ADR 0089): a call that is not under `/w/kris` is no route.
  */
 const fakeAccount = () => {
@@ -40,13 +40,10 @@ const fakeAccount = () => {
       },
     }),
   )
-  const Clients = HttpApiBuilder.group(WorkspaceAccountApi, 'clients', (handlers) =>
-    handlers.handleAll(unusedHandlers(WorkspaceAccountApi.groups.clients)),
-  )
   const Members = HttpApiBuilder.group(WorkspaceAccountApi, 'members', (handlers) =>
     handlers.handleAll(unusedHandlers(WorkspaceAccountApi.groups.members)),
   )
-  const served = fakeHttpApi(WorkspaceAccountApi, Layer.mergeAll(Keys, Clients, Members))
+  const served = fakeHttpApi(WorkspaceAccountApi, Layer.mergeAll(Keys, Members))
   const fetch: typeof globalThis.fetch = Object.assign(
     (input: RequestInfo | URL, init?: RequestInit) => {
       const request = new Request(input instanceof Request ? input : new URL(String(input), 'http://app.test'), init)

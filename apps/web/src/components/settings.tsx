@@ -11,8 +11,8 @@ import { useCurrentWorkspace } from '../lib/current-workspace.ts'
 
 /**
  * The workspace's settings, most used first: today's usage, Start and the model, its agent (and where its notices go),
- * the clients connected to it, the API keys of servers it runs, the workspace itself (ADR 0089), and last the person's
- * account. Routines are on Work.
+ * the API keys of servers it runs, the workspace itself (ADR 0089), then the person's own: the MCP clients they
+ * connected and the workspaces each reaches (ADR 0097), and their account. Routines are on Work.
  */
 export function Settings() {
   const workspace = useCurrentWorkspace()
@@ -29,18 +29,6 @@ export function Settings() {
         {managing && <ResidentCard />}
         <MemoryCard />
         {managing && <NotifySinkCard />}
-      </PageSection>
-      <PageSection
-        id="clients"
-        title="Connected clients"
-        note={
-          <>
-            External MCP clients you allowed to use this workspace at <code>{`${window.location.origin}/mcp`}</code>{' '}
-            (each one asks which workspace when you sign it in). Revoking one ends its access at once.
-          </>
-        }
-      >
-        <ClientsCard />
       </PageSection>
       <PageSection
         id="keys"
@@ -62,6 +50,19 @@ export function Settings() {
       <PageSection id="workspace" title="Workspace">
         <WorkspaceCard />
         {workspace !== undefined && <MembersCard workspace={workspace} />}
+      </PageSection>
+      <PageSection
+        id="clients"
+        title="Connected clients"
+        note={
+          <>
+            External MCP clients you allowed to use goblin at <code>{`${window.location.origin}/mcp`}</code>, each
+            reaching the workspaces you chose, or all of yours. They are yours, whichever workspace you are in; revoking
+            one ends its access at once.
+          </>
+        }
+      >
+        <ClientsCard />
       </PageSection>
       <PageSection id="account" title="Account">
         <DeleteAccountCard />

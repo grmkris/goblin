@@ -16,6 +16,13 @@ const WS = 'ws-owner'
 const BASE = '/w/owner'
 const PERSON = { id: OWNER, name: 'Owner', email: 'owner@goblin.test' }
 const MEMBERSHIP = { id: WS, name: "Owner's workspace", slug: 'owner', role: 'owner', members: 1 } as const
+/** One MCP client the owner connected, reaching their workspace (ADR 0097). */
+const CLIENT_VIEW = {
+  clientId: 'client.1',
+  name: 'Claude',
+  scopes: ['goblin:topics'],
+  reach: { all: false, workspaces: [{ id: WS, slug: 'owner', name: "Owner's workspace" }] },
+}
 const MEMBER_VIEW = {
   userId: OWNER,
   name: 'Owner',
@@ -60,8 +67,8 @@ const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
     createWorkspace: (_user, input) => Effect.succeed({ id: 'ws-new', ...input, role: 'owner', members: 1 }),
     updateWorkspace: () => Effect.die(new Error('no updates in this fixture')),
     deleteWorkspace: () => Effect.void,
-    selectForSignIn: () => Effect.void,
-    clients: () => Effect.succeed([{ clientId: 'client.1', name: 'Claude' }]),
+    clients: () => Effect.succeed([CLIENT_VIEW]),
+    setClientReach: (_person, _clientId, reach) => Effect.succeed(reach),
     revokeClient: () => Effect.void,
     keys: () => Effect.succeed([]),
     createKey: () => Effect.die(new Error('no keys in this fixture')),
@@ -672,27 +679,33 @@ describe('the account APIs in the Worker', () => {
     expect((await through('account', big, edge)).response.status).toBe(413)
   })
 
-  it('answers the clients a member connected to the workspace, and revokes one, without waking the agent', async () => {
+  it("answers a person's clients and their reach, changes one's reach and revokes one, without waking an agent", async () => {
     const { seen, edge } = deployment()
-    const list = new Request(`${APP}${BASE}/api/clients`, { headers: { cookie: 'session=owner' } })
-    expect(await (await through('workspace', list, edge)).response.json()).toEqual([
-      { clientId: 'client.1', name: 'Claude' },
-    ])
-    const revoke = write(`${BASE}/api/clients/client.1`, { method: 'DELETE' })
-    expect(await (await through('workspace', revoke, edge)).response.json()).toEqual({ revoked: true })
-    const forged = write(`${BASE}/api/clients/client.1`, { method: 'DELETE', headers: { 'x-goblin-csrf': '' } })
-    expect((await through('workspace', forged, edge)).response.status).toBe(403)
+    const list = new Request(`${APP}/api/clients`, { headers: { cookie: 'session=owner' } })
+    expect(await (await through('account', list, edge)).response.json()).toEqual([CLIENT_VIEW])
+    const reach = write('/api/clients/client.1/reach', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ all: false, workspaces: [WS] }),
+    })
+    expect(await (await through('account', reach, edge)).response.json()).toEqual({ all: false, workspaces: [WS] })
+    const revoke = write('/api/clients/client.1', { method: 'DELETE' })
+    expect(await (await through('account', revoke, edge)).response.json()).toEqual({ revoked: true })
+    const forged = write('/api/clients/client.1', { method: 'DELETE', headers: { 'x-goblin-csrf': '' } })
+    expect((await through('account', forged, edge)).response.status).toBe(403)
     expect(seen).toHaveLength(0)
   })
 
   it('owns its paths: anything else under them is a 404 in the envelope', async () => {
-    expect(['/api/workspaces', '/api/workspaces/x', '/api/client-errors'].every(isAccountPath)).toBe(true)
-    expect(['/api/clients', '/api/keys', '/api/topics', '/api/workspacesx'].some(isAccountPath)).toBe(false)
+    expect(['/api/workspaces', '/api/workspaces/x', '/api/clients', '/api/client-errors'].every(isAccountPath)).toBe(
+      true,
+    )
+    expect(['/api/clientsx', '/api/keys', '/api/topics', '/api/workspacesx'].some(isAccountPath)).toBe(false)
     const { edge } = deployment()
     const { response } = await through('account', new Request(`${APP}/api/workspaces/x/y/z`), edge)
     expect(response.status).toBe(404)
     expect(await response.json()).toMatchObject({ error: { code: 'not_found' } })
-    const unknown = new Request(`${APP}${BASE}/api/clients/x/y`, { headers: { cookie: 'session=owner' } })
+    const unknown = new Request(`${APP}${BASE}/api/keys/x/y/z`, { headers: { cookie: 'session=owner' } })
     expect((await through('workspace', unknown, edge)).response.status).toBe(404)
   })
 })

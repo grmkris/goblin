@@ -6,9 +6,18 @@ import { endpointScopes } from '../http/api/context.ts'
 import { AppError, toAppError } from '../http/errors.ts'
 import type { OwnerClient } from './client.ts'
 
+/** Each Standard Schema `standard` made, by the schema it came from, so a tool's input can be widened (ADR 0097). */
+const sources = new WeakMap<object, Schema.Top>()
+
 /** A schema as the MCP SDK's Standard Schema with JSON Schema, for a tool's input or output. */
-export const standard = <S extends Schema.Top & Schema.ConstraintDecoder<unknown>>(schema: S) =>
-  Schema.toStandardJSONSchemaV1(Schema.toStandardSchemaV1(schema))
+export const standard = <S extends Schema.Top & Schema.ConstraintDecoder<unknown>>(schema: S) => {
+  const made = Schema.toStandardJSONSchemaV1(Schema.toStandardSchemaV1(schema))
+  sources.set(made, schema)
+  return made
+}
+
+/** The schema a tool's input was made from by `standard`, when it was. */
+export const sourceOf = (input: object): Schema.Top | undefined => sources.get(input)
 
 /** A result as one JSON text block, and as structured content when it is an object, which the goblin CLI renders. */
 export const text = (value: unknown) => {
@@ -23,8 +32,19 @@ const encodeError = Schema.encodeSync(AppError)
 /** A failure as the tool's result: the error's tag and fields, never a stack or a foreign message. */
 export const failed = (cause: unknown) => ({ isError: true, ...text(encodeError(toAppError(cause))) })
 
-/** One typed owner API call as the caller: its value, or a rejection with the agent's `AppError`. */
-export type OwnerCaller = <A>(call: (api: OwnerClient) => Effect.Effect<A, unknown>) => Promise<A>
+/**
+ * One typed owner API call as the caller, to the workspace a call names (ADR 0097; none for a caller that reaches
+ * one): its value, or a rejection with the agent's `AppError`.
+ */
+export type OwnerCaller = <A>(
+  call: (api: OwnerClient) => Effect.Effect<A, unknown>,
+  workspace: string | undefined,
+) => Promise<A>
+
+/** The workspace the tool call being started names, which its `reply` takes as the call starts. */
+export interface CallTarget {
+  current: string | undefined
+}
 
 /**
  * Each tool, by the endpoint it calls (`<group>.<endpoint>`).
@@ -71,12 +91,14 @@ export const adder =
     if (scope !== undefined && scopes.includes(scope)) register()
   }
 
-/** One call's answer as the tool's result, or the agent's refusal as its error result. */
+/** One call's answer as the tool's result, or the agent's refusal as its error result, in the call's workspace. */
 export const replyWith =
-  (call: OwnerCaller) =>
+  (call: OwnerCaller, target: CallTarget) =>
   async <A>(run: (api: OwnerClient) => Effect.Effect<A, unknown>) => {
+    // Read before the first await: the call that started this reply names its workspace only while it starts.
+    const workspace = target.current
     try {
-      return text(await call(run))
+      return text(await call(run, workspace))
     } catch (cause) {
       // expected: the failure is the tool's error result, its tag and safe fields only (tools.ts).
       return failed(cause)

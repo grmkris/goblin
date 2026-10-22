@@ -8,8 +8,9 @@ import { callerScopesOf } from '../../src/auth/resources.ts'
 import { endpointScopes } from '../../src/http/api/context.ts'
 import type { Caller } from '../../src/http/api/principal.ts'
 import { ownerCall } from '../../src/inbound/client.ts'
-import { mcpServer } from '../../src/inbound/mcp-server.ts'
-import { TOOLS } from '../../src/inbound/tools.ts'
+import { type CallerReach, mcpServer } from '../../src/inbound/mcp-server.ts'
+import { workspaceFor } from '../../src/inbound/route.ts'
+import { type OwnerCaller, TOOLS } from '../../src/inbound/tools.ts'
 
 const KEY: Caller = {
   kind: 'key',
@@ -191,5 +192,68 @@ describe('/mcp for every caller (ADR 0086)', () => {
     } finally {
       await mcp.close()
     }
+  })
+})
+
+const A = { id: 'ws-a', slug: 'swarmm', name: 'Swarmm', role: 'owner', members: 2 } as const
+const B = { id: 'ws-b', slug: 'sidequest', name: 'Sidequest', role: 'member', members: 3 } as const
+
+/** A client reaching `workspaces`, every call recorded with the workspace it named. */
+const reaching = async (reach: CallerReach) => {
+  const calls: (string | undefined)[] = []
+  const call: OwnerCaller = async (_run, workspace) => {
+    calls.push(workspace)
+    // SAFETY: the tools under test only pass the answer on as their result.
+    return {} as never
+  }
+  const handler = createMcpHandler(() => mcpServer(['agent', 'topics'], call, reach))
+  const mcp = new Client({ name: 'probe', version: '1.0.0' })
+  await mcp.connect(
+    new StreamableHTTPClientTransport(new URL('https://goblin.test/mcp'), {
+      fetch: async (input, init) => handler.fetch(new Request(input, init)),
+    }),
+  )
+  return { mcp, calls }
+}
+
+describe('one /mcp, the workspaces a consent reaches (ADR 0097)', () => {
+  it('has every tool name the workspace a call is for when the client reaches several, and lists them', async () => {
+    const { mcp, calls } = await reaching({ all: true, workspaces: [A, B], named: true })
+    try {
+      const { tools } = await mcp.listTools()
+      const topics = tools.find((tool) => tool.name === 'topic_list')
+      expect(topics?.inputSchema.required).toContain('workspace')
+      const list = tools.find((tool) => tool.name === 'workspace_list')
+      expect(list?.inputSchema.properties ?? {}).not.toHaveProperty('workspace')
+      await mcp.callTool({ name: 'topic_list', arguments: { workspace: 'sidequest' } })
+      expect(calls).toEqual(['sidequest'])
+      const listedReach = textOf(await mcp.callTool({ name: 'workspace_list', arguments: {} }))
+      expect(listedReach).toEqual({ all: true, workspaces: [A, B] })
+      expect(mcp.getInstructions()).toContain("all of its person's workspaces")
+    } finally {
+      await mcp.close()
+    }
+  })
+
+  it('takes no workspace from a client given exactly one', async () => {
+    const { mcp, calls } = await reaching({ all: false, workspaces: [A], named: false })
+    try {
+      const { tools } = await mcp.listTools()
+      expect(tools.find((tool) => tool.name === 'topic_list')?.inputSchema.properties).not.toHaveProperty('workspace')
+      await mcp.callTool({ name: 'topic_list', arguments: {} })
+      expect(calls).toEqual([undefined])
+    } finally {
+      await mcp.close()
+    }
+  })
+
+  it('resolves a call to a workspace the consent reaches, by id or slug, and refuses anything else', () => {
+    const named: CallerReach = { all: false, workspaces: [A, B], named: true }
+    expect(workspaceFor(named, 'ws-b')).toBe(B)
+    expect(workspaceFor(named, 'swarmm')).toBe(A)
+    expect(() => workspaceFor(named, undefined)).toThrow(expect.objectContaining({ reason: 'workspace' }))
+    expect(() => workspaceFor(named, 'elsewhere')).toThrow(expect.objectContaining({ what: 'workspace' }))
+    expect(workspaceFor({ all: false, workspaces: [A], named: false }, undefined)).toBe(A)
+    expect(() => workspaceFor({ all: false, workspaces: [], named: true }, undefined)).toThrow()
   })
 })

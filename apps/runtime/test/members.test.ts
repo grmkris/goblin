@@ -158,24 +158,28 @@ describe('members and their roles (ADR 0093)', () => {
     expect((await updateMemberRole(db, workspace, KRIS.id, 'member')).role).toBe('member')
   })
 
-  it('removes a member with their consents for the workspace, never oneself or the last owner', async () => {
+  it("removes a member and takes the workspace out of their clients' reaches, never oneself or the last owner", async () => {
     const { db, sqlite, workspace } = await withAna()
     sqlite.exec(`
       INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]');
-      INSERT INTO oauthConsent (id, clientId, userId, referenceId, scopes, createdAt, updatedAt)
-        VALUES ('consent-1', 'client-1', 'u-ana', '${workspace.id}', '[]', 'x', 'x');
+      INSERT INTO oauthConsent (id, clientId, userId, scopes, createdAt, updatedAt)
+        VALUES ('consent-1', 'client-1', 'u-ana', '[]', 'x', 'x');
+      INSERT INTO mcpReach (clientId, userId, "all", updatedAt) VALUES ('client-1', 'u-ana', 0, 'x');
+      INSERT INTO mcpReachWorkspace (clientId, userId, workspaceId) VALUES ('client-1', 'u-ana', '${workspace.id}');
     `)
-    await expect(removeMember(db, workspace, KRIS.id, KRIS.id, NOW)).rejects.toEqual(new Conflict({ reason: 'leave' }))
-    await removeMember(db, workspace, KRIS.id, ANA.id, NOW)
+    await expect(removeMember(db, workspace, KRIS.id, KRIS.id)).rejects.toEqual(new Conflict({ reason: 'leave' }))
+    await removeMember(db, workspace, KRIS.id, ANA.id)
     expect(await membershipOf(db, ANA.id, workspace.id)).toBeUndefined()
-    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM oauthConsent').get()).toEqual({ count: 0 })
-    await expect(leaveWorkspace(db, workspace, KRIS.id, NOW)).rejects.toEqual(new Conflict({ reason: 'last_owner' }))
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM mcpReachWorkspace').get()).toEqual({ count: 0 })
+    // The consent is the person's, for whatever else its reach names.
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM oauthConsent').get()).toEqual({ count: 1 })
+    await expect(leaveWorkspace(db, workspace, KRIS.id)).rejects.toEqual(new Conflict({ reason: 'last_owner' }))
   })
 
   it('lets a member leave, and keeps an admin from removing anyone but a member', async () => {
     const { db, workspace, joined } = await withAna('admin')
-    await expect(removeMember(db, joined, ANA.id, KRIS.id, NOW)).rejects.toEqual(new Forbidden({ reason: 'role' }))
-    await leaveWorkspace(db, joined, ANA.id, NOW)
+    await expect(removeMember(db, joined, ANA.id, KRIS.id)).rejects.toEqual(new Forbidden({ reason: 'role' }))
+    await leaveWorkspace(db, joined, ANA.id)
     expect((await membersOf(db, workspace.id)).map((member) => member.userId)).toEqual([KRIS.id])
   })
 })

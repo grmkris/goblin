@@ -33,7 +33,7 @@ interface RouterContext {
 }
 
 /** Pages that are part of signing in: no app navigation there. */
-const AUTH_PAGES = new Set(['/login', '/consent', '/consent/workspace', '/terms', '/privacy'])
+const AUTH_PAGES = new Set(['/login', '/consent', '/terms', '/privacy'])
 /** Whether `path` is a person's own page, outside any workspace: signing in, consenting, an invitation (ADR 0093). */
 const isAuthPage = (path: string): boolean => AUTH_PAGES.has(path) || path.startsWith('/invite/')
 

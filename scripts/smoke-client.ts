@@ -16,20 +16,21 @@ import * as HttpClient from 'effect/http/HttpClient'
 import * as HttpClientRequest from 'effect/http/HttpClientRequest'
 import * as HttpApiClient from 'effect/http-api/HttpApiClient'
 import { randomBytes } from 'node:crypto'
-import { OwnerApi, WorkspaceAccountApi } from '../packages/contracts/src/api/index.ts'
+import { AccountApi, OwnerApi, WorkspaceAccountApi } from '../packages/contracts/src/api/index.ts'
 import { readSession } from './session.ts'
 
 /** One request the smoke sent: its status, and the reference the answer quoted (`goblin lookup <ref>`). */
 export type Step = { readonly step: string; readonly status: number; readonly ref?: string }
 export type OwnerClient = HttpApiClient.ForApi<typeof OwnerApi>
 export type AccountClient = HttpApiClient.ForApi<typeof WorkspaceAccountApi>
+export type PersonClient = HttpApiClient.ForApi<typeof AccountApi>
 /** A plain request: `owner: false` leaves out the session cookie, `csrf: false` the header every write carries. */
 export type SendInit = RequestInit & { readonly owner?: boolean; readonly csrf?: boolean }
 
 const JsonObject = Schema.Record(Schema.String, Schema.MutableJson)
-const Workspaces = Schema.Array(Schema.Struct({ slug: Schema.String }))
+const Workspaces = Schema.Array(Schema.Struct({ id: Schema.String, slug: Schema.String }))
 /** A person's own paths, which no workspace prefix goes in front of. */
-const PERSON_PATHS = ['/api/auth/', '/api/workspaces', '/api/invitations', '/api/client-errors']
+const PERSON_PATHS = ['/api/auth/', '/api/workspaces', '/api/invitations', '/api/clients', '/api/client-errors']
 const object = Schema.decodeUnknownSync(JsonObject)
 const string = Schema.decodeUnknownSync(Schema.String)
 const REQUEST_TIMEOUT_MS = 150_000
@@ -46,10 +47,12 @@ export class DevClient {
   readonly #url: URL
   readonly #steps: Step[]
   #cookie = ''
-  /** The owner's first workspace's slug, once signed in. */
+  /** The owner's first workspace's slug and id, once signed in. */
   #slug = ''
+  #workspaceId = ''
   readonly #owner: Effect.Effect<OwnerClient>
   readonly #account: Effect.Effect<AccountClient>
+  readonly #person: Effect.Effect<PersonClient>
 
   constructor(url: URL, steps: Step[]) {
     this.#url = url
@@ -57,6 +60,7 @@ export class DevClient {
     const options = { baseUrl: url.origin, transformClient: this.#typed }
     this.#owner = HttpApiClient.make(OwnerApi, options).pipe(Effect.provide(FetchHttpClient.layer))
     this.#account = HttpApiClient.make(WorkspaceAccountApi, options).pipe(Effect.provide(FetchHttpClient.layer))
+    this.#person = HttpApiClient.make(AccountApi, options).pipe(Effect.provide(FetchHttpClient.layer))
   }
 
   /** A typed call's URL, a path or an absolute one, with its path under the owner's workspace (`#inWorkspace`). */
@@ -82,9 +86,19 @@ export class DevClient {
     return this.#run(Effect.flatMap(this.#owner, call), signal)
   }
 
-  /** One workspace account API call (its inbound clients and keys), as `owner` runs one. */
+  /** One workspace account API call (its keys and members), as `owner` runs one. */
   account<A, E>(call: (api: AccountClient) => Effect.Effect<A, E>, signal?: AbortSignal): Promise<A> {
     return this.#run(Effect.flatMap(this.#account, call), signal)
+  }
+
+  /** One of the person's own account API calls (their workspaces and MCP clients, ADR 0097), as `owner` runs one. */
+  person<A, E>(call: (api: PersonClient) => Effect.Effect<A, E>, signal?: AbortSignal): Promise<A> {
+    return this.#run(Effect.flatMap(this.#person, call), signal)
+  }
+
+  /** The owner's first workspace's id, once signed in. */
+  get workspaceId(): string {
+    return this.#workspaceId
   }
 
   async send(path: string, init: SendInit = {}): Promise<Response> {
@@ -120,6 +134,7 @@ export class DevClient {
     const [first] = Schema.decodeUnknownSync(Workspaces)(await (await this.send('/api/workspaces')).json())
     if (first === undefined) throw new Error('no_workspace')
     this.#slug = first.slug
+    this.#workspaceId = first.id
   }
 
   /** What every request carries; the cookie is read when the request goes out, so it follows `useSession`. */

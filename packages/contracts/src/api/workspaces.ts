@@ -16,8 +16,6 @@ import { API_ERRORS } from './errors.ts'
  *   used the old slug stop working; keys and MCP clients do not use it.
  * - `delete`: `DELETE /api/workspaces/:workspaceId`, for its owner: its agent is erased first, then its keys, its
  *   members' OAuth consents to it and its memberships.
- * - `select`: `POST /api/workspaces/:workspaceId/select` chooses the workspace an OAuth client's sign-in in progress is
- *   for (the consent page's choice); it changes nothing else.
  */
 export class WorkspacesGroup extends HttpApiGroup.make('workspaces').add(
   HttpApiEndpoint.get('list', '/workspaces', { success: Schema.Array(WorkspaceView), error: API_ERRORS }),
@@ -35,11 +33,6 @@ export class WorkspacesGroup extends HttpApiGroup.make('workspaces').add(
   HttpApiEndpoint.delete('delete', '/workspaces/:workspaceId', {
     params: { workspaceId: WorkspaceId },
     success: Schema.Struct({ deleted: Schema.Literal(true) }),
-    error: API_ERRORS,
-  }),
-  HttpApiEndpoint.post('select', '/workspaces/:workspaceId/select', {
-    params: { workspaceId: WorkspaceId },
-    success: Schema.Struct({ selected: Schema.Literal(true) }),
     error: API_ERRORS,
   }),
 ) {}

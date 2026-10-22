@@ -29,7 +29,7 @@ describe("a page's workspace (ADR 0089)", () => {
     expect(pathOf(rewrite.output?.({ url: url('/c/7') }))).toBe('/w/kris/c/7')
     expect(pathOf(rewrite.output?.({ url: url('/') }))).toBe('/w/kris/')
     // A person's own pages are no workspace's.
-    for (const page of ['/login', '/consent', '/consent/workspace', '/terms', '/privacy'])
+    for (const page of ['/login', '/consent', '/terms', '/privacy'])
       expect(rewrite.output?.({ url: url(page) })).toBeUndefined()
     // Outside any workspace nothing is added, and nothing is taken off.
     expect(rewrite.input?.({ url: url('/login') })).toBeUndefined()

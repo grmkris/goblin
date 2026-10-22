@@ -103,6 +103,13 @@ class InboundClient {
     const authorize = await this.#dev.send(`/api/auth/oauth2/authorize?${query.toString()}`)
     const location = authorize.headers.get('location') ?? ''
     if (!location.startsWith('/consent?')) throw new Error('consent_redirect_missing')
+    // As the consent page does (ADR 0097): the client reaches the owner's one workspace, so its calls name none.
+    await this.#dev.person((api) =>
+      api.clients.reach({
+        params: { clientId: this.clientId },
+        payload: { all: false, workspaces: [this.#dev.workspaceId] },
+      }),
+    )
     const consent = await this.#dev.json('/api/auth/oauth2/consent', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -355,7 +362,7 @@ async function memoryChecks(dev: DevClient): Promise<MemoryCheck> {
 }
 
 const revokeClient = (dev: DevClient, clientId: string) =>
-  dev.account((api) => api.clients.revoke({ params: { clientId } }))
+  dev.person((api) => api.clients.revoke({ params: { clientId } }))
 
 /**
  * Why an inbound answer is not the smoke's marker, or nothing when it is: its status and the reason it went unanswered
