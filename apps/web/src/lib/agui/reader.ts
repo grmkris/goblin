@@ -3,6 +3,7 @@
 // over server-sent events or, where those fail, long polls. A dropped read resumes from the last offset it applied; an
 // expired link, a closed stream or `goblin.stream.moved` joins again, and a new epoch starts from its beginning.
 import { CustomName, type ConversationStream } from '@goblin/contracts'
+import * as Data from 'effect/Data'
 import { withRef } from '../query/app-error.ts'
 import { type ReconnectScheduler, browserScheduler, reconnectDelay } from '../reconnect.ts'
 import { reportUnexpected } from '../unexpected.ts'
@@ -42,7 +43,7 @@ const moved = (events: readonly unknown[]): boolean =>
   records(events).some((event) => event.type === 'CUSTOM' && event.name === CustomName.streamMoved)
 
 /** A read that was refused or that the stream ended: the reader joins again. */
-class Rejoin extends Error {}
+class Rejoin extends Data.TaggedError('Rejoin')<{ readonly reason: string }> {}
 
 /**
  * Reads one chat's stream and hands each batch of events to `receive`, in order, once. `reconnect` (re)starts reading
@@ -147,10 +148,11 @@ export class StreamReader {
 
   /** `page`'s events, applied; a refusal, the stream's end or its move asks for a join. */
   #apply(page: StreamPage): void {
-    if (page.status === 401 || page.status === 403 || page.status === 404) throw new Rejoin(`HTTP ${page.status}`)
+    if (page.status === 401 || page.status === 403 || page.status === 404)
+      throw new Rejoin({ reason: `HTTP ${page.status}` })
     if (page.status >= 400) throw new Error(`Stream read failed: HTTP ${page.status}`)
     this.#take(page.events, page.next)
-    if (page.closed || moved(page.events)) throw new Rejoin('The stream moved')
+    if (page.closed || moved(page.events)) throw new Rejoin({ reason: 'The stream moved' })
   }
 
   #take(events: readonly unknown[], next: string | undefined): void {
