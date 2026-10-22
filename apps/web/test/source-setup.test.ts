@@ -42,15 +42,15 @@ const persona = (id: number, name: string, archivedAt?: number): PersonaView => 
   ...(archivedAt !== undefined && { archivedAt }),
 })
 
-/** An inbox-style setup: a message event, keyed by chat, the owner's when `/from/isOwner` is true, answered back. */
+/** A feed-style setup: a post event, keyed by chat, the owner's when `/author/kind` is `self`, answered back. */
 const SETUP: SourceSetup = {
-  wake: { event: 'message.received', arguments: {} },
+  wake: { event: 'post.created', arguments: {} },
   key: [{ name: 'chat', pointer: '/chat' }],
-  speaksForMe: { pointer: '/from/isOwner', equals: true },
+  speaksForMe: { pointer: '/author/kind', equals: 'self' },
   others: 'notice',
   read: { from: 'payload', text: '/text' },
   reply: {
-    tool: 'message_send',
+    tool: 'post_reply',
     arguments: { chat: '{{key.chat}}', text: '{{text}}', operationId: '{{operationId}}' },
     maxChars: 3500,
     result: {
@@ -86,7 +86,7 @@ describe('a Source in words (ADR 0066)', () => {
   })
 
   it('says each fact of a setup, with every pointer and tool as it is', () => {
-    const facts = setupFacts(SETUP, { event: 'Message received', newKeys: (newKeys) => newKeys.to })
+    const facts = setupFacts(SETUP, { event: 'Post created', newKeys: (newKeys) => newKeys.to })
     expect(facts.map((fact) => fact.term)).toEqual([
       'Wakes on',
       'Conversations',
@@ -96,9 +96,9 @@ describe('a Source in words (ADR 0066)', () => {
       'Answers',
       'New conversations',
     ])
-    expect(facts[2]?.text).toBe('When /from/isOwner is true: those become your own turns')
+    expect(facts[2]?.text).toBe('When /author/kind is "self": those become your own turns')
     expect(facts[5]?.text).toBe(
-      'Sent back with message_send, in pieces of at most 3,500 characters; results: accepted when /status is "accepted"; retryable when /status is "retryable"; rejected when /status is "rejected"',
+      'Sent back with post_reply, in pieces of at most 3,500 characters; results: accepted when /status is "accepted"; retryable when /status is "retryable"; rejected when /status is "rejected"',
     )
     expect(facts[6]?.text).toBe('held')
   })
@@ -106,15 +106,15 @@ describe('a Source in words (ADR 0066)', () => {
   it("names a setup's title and attachments pointers, and a new Topic for each new conversation", () => {
     const setup: SourceSetup = {
       ...SETUP,
-      read: { from: 'payload', text: '/text', title: '/chatTitle', attachments: '/attachments' },
+      read: { from: 'payload', text: '/text', title: '/title', attachments: '/attachments' },
       newKeys: { to: 'topic-per-key' },
     }
     const facts = setupFacts(setup, {
-      event: 'Message received',
+      event: 'Post created',
       newKeys: (newKeys) => newKeysWords(newKeys, TOPICS, []),
     })
     expect(facts[4]?.text).toBe(
-      "From the event's data: the event is one message, its words at /text, its conversation's name at /chatTitle, what it brought at /attachments, kept in your files",
+      "From the event's data: the event is one message, its words at /text, its conversation's name at /title, what it brought at /attachments, kept in your files",
     )
     expect(facts[6]?.text).toBe('Each in a new Topic of its own, named after it, answered by goblin')
     expect(newKeysWords({ to: 'listen', topic: 2 }, TOPICS, [])).toBe('Kept as notes in #Travel')
@@ -213,7 +213,7 @@ describe('Notify me via', () => {
   it("copies a Source's reply with one conversation's key filled in, keeping the notice's own placeholders", () => {
     expect(sinkFromSource(source(), { chat: 'dm' })).toEqual({
       connectionId: 'chat',
-      tool: 'message_send',
+      tool: 'post_reply',
       arguments: { chat: 'dm', text: '{{text}}', operationId: '{{operationId}}' },
       result: SETUP.reply?.result,
       echo: SETUP.wake,

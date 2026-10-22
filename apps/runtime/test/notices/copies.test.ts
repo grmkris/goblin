@@ -32,7 +32,7 @@ const RULES = {
   rejected: { pointer: '/status', equals: 'rejected' },
   retryAt: '/retryAt',
 }
-const ECHO = { event: 'mygram.message.received', arguments: { chat: 'dm' } }
+const ECHO = { event: 'notes.post.created', arguments: { chat: 'dm' } }
 
 /** What one call through the sink answers: the server's result, or a failure. */
 type Answer = McpToolResult | AppError
@@ -53,7 +53,7 @@ const world = () => {
     { content: [], structuredContent: { id: 'remote-1', delivery: 'accepted', status: 'sent', extra: 1 } },
   ]
   const hooks: { beforeCheck: () => void } = { beforeCheck: () => undefined }
-  const setSink = (connectionId: string, args: unknown, updatedAt: number, tool = 'message_send') => {
+  const setSink = (connectionId: string, args: unknown, updatedAt: number, tool = 'post_reply') => {
     const row = {
       id: 1,
       connectionId,
@@ -129,7 +129,7 @@ describe("a notice's copy through Notify me via (ADR 0070)", () => {
         expect(calls).toEqual([
           {
             connectionId: 'chat',
-            tool: 'message_send',
+            tool: 'post_reply',
             args: {
               chat: 'dm',
               text: 'Sidequest: Picked <safe>',
@@ -254,21 +254,21 @@ describe("a notice's copy through Notify me via (ADR 0070)", () => {
     }),
   )
 
-  it.effect('suppresses only the configured stream on a multiplexed MySI connection', () =>
+  it.effect('suppresses only the configured stream on a multiplexed gateway connection', () =>
     Effect.gen(function* () {
       const { notices, calls, setSink, notice, deliver } = world()
-      setSink('mysi', SINK, 1, 'mygram_message_send')
-      yield* notice('sidequest', 'mysi', { event: 'sidequest.inbox', arguments: {} })
-      yield* notice('mygram-dm', 'mysi', ECHO)
-      yield* notice('mygram-group', 'mysi', { event: ECHO.event, arguments: { chat: 'group' } })
-      yield* notice('other-connection', 'another-mysi', ECHO)
+      setSink('gateway', SINK, 1, 'notes_post_reply')
+      yield* notice('tasks', 'gateway', { event: 'tasks.inbox', arguments: {} })
+      yield* notice('feed-dm', 'gateway', ECHO)
+      yield* notice('feed-group', 'gateway', { event: ECHO.event, arguments: { chat: 'group' } })
+      yield* notice('other-connection', 'another-gateway', ECHO)
       yield* deliver
-      expect(notices.get('sidequest')?.copyState).toBe('accepted')
-      expect(notices.get('mygram-dm')?.copyState).toBe('suppressed')
-      expect(notices.get('mygram-group')?.copyState).toBe('accepted')
+      expect(notices.get('tasks')?.copyState).toBe('accepted')
+      expect(notices.get('feed-dm')?.copyState).toBe('suppressed')
+      expect(notices.get('feed-group')?.copyState).toBe('accepted')
       expect(notices.get('other-connection')?.copyState).toBe('accepted')
       expect(calls).toHaveLength(3)
-      expect(calls.every((call) => call.connectionId === 'mysi' && call.tool === 'mygram_message_send')).toBe(true)
+      expect(calls.every((call) => call.connectionId === 'gateway' && call.tool === 'notes_post_reply')).toBe(true)
     }),
   )
 

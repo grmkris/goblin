@@ -24,7 +24,7 @@ type InboxEntry = {
 /**
  * A producer of the draft Events profile. It declares Events as top-level `capabilities.events`, or with `spelling`
  * `extension` as the SEP-3415 `io.modelcontextprotocol/events` extension; `payloadSchema` may be left out. Its
- * `inbox_read` lists the inbox after a cursor, and every tool call is kept with its arguments (`toolCalls`).
+ * `feed_read` lists the inbox after a cursor, and every tool call is kept with its arguments (`toolCalls`).
  */
 export class EventsFixture {
   readonly subscriptions = new Map<string, { secret: string; url: string }>()
@@ -48,7 +48,7 @@ export class EventsFixture {
   receiver: ((request: Request) => Promise<Response>) | undefined
   readonly #handler = createMcpHandler(() => {
     const server = lowLevelServer(
-      { name: 'mygram-events-fixture', version: '1' },
+      { name: 'feed-events-fixture', version: '1' },
       { capabilities: { tools: {}, resources: {}, extensions: { [SKILLS_EXTENSION]: {} } } },
     )
     server.setRequestHandler('skills/list', { params: Params }, () => ({ skills: this.skills, ttlMs: 60_000 }))
@@ -60,7 +60,7 @@ export class EventsFixture {
       ],
     }))
     server.setRequestHandler('tools/list', () => ({
-      tools: ['inbox_read', 'message_send', 'subscribe', 'unsubscribe'].map((name) => ({
+      tools: ['feed_read', 'post_reply', 'subscribe', 'unsubscribe'].map((name) => ({
         name,
         inputSchema: { type: 'object' as const },
       })),
@@ -68,16 +68,16 @@ export class EventsFixture {
     server.setRequestHandler('tools/call', (request) => {
       this.calls.push(request.params.name)
       this.toolCalls.push({ name: request.params.name, arguments: { ...request.params.arguments } })
-      if (request.params.name === 'message_send') return this.replyResult({ ...request.params.arguments })
+      if (request.params.name === 'post_reply') return this.replyResult({ ...request.params.arguments })
       const content =
-        request.params.name === 'inbox_read'
+        request.params.name === 'feed_read'
           ? { messages: request.params.arguments?.cursor === this.cursor ? [] : this.inbox, nextCursor: this.cursor }
           : { status: 'subscribed' }
       return { content: [], structuredContent: content }
     })
     server.setRequestHandler('events/list', { params: Params }, () => ({
       resultType: 'complete',
-      events: ['message.received', 'question.answered', 'skills.updated', 'skills.list_changed'].map((name) => ({
+      events: ['post.created', 'post.liked', 'skills.updated', 'skills.list_changed'].map((name) => ({
         name,
         description: name,
         inputSchema: this.inputSchema,

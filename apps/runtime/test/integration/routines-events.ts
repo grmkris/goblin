@@ -17,7 +17,7 @@ const includesPublicTokens = (metadata: string, modelData: string) =>
 const definition: RoutineDefinition = {
   title: 'Native event routine',
   timezone: 'UTC',
-  trigger: { kind: 'event', connectionId: 'routine-events', name: 'message.received', arguments: {} },
+  trigger: { kind: 'event', connectionId: 'routine-events', name: 'post.created', arguments: {} },
   tellMe: { on: false, copy: false },
   handTo: {
     kind: 'goblin',
@@ -82,13 +82,13 @@ async function routineEventsProbe(
   const lease = state.events.activeConsumer(`routine:${first.id}`)
   const shared = lease?.subscriptionId === state.events.activeConsumer(`routine:${second.id}`)?.subscriptionId
   await changeRoutine(agent, second.id, { revision: 1, operationId: 'second-pause' }, 'pause')
-  const leavingSharedKeptRemote = fixture.subscriptions.has('sub_message.received')
+  const leavingSharedKeptRemote = fixture.subscriptions.has('sub_post.created')
   const deliver = (id: string, signature?: string) =>
     fixture.deliver(
-      'sub_message.received',
+      'sub_post.created',
       {
         eventId: id,
-        name: 'message.received',
+        name: 'post.created',
         timestamp: new Date().toISOString(),
         data: {
           entryIds: ['fixture-1'],
@@ -145,15 +145,11 @@ async function routineEventsProbe(
   const drainedActive =
     state.routines.get(first.id).state === 'active' && state.routines.get(first.id).pendingTrigger === null
   const callsBeforeGap = seen.length
-  await fixture.deliver('sub_message.received', { type: 'gap', cursor: '0' }, 'msg_gap_routine')
+  await fixture.deliver('sub_post.created', { type: 'gap', cursor: '0' }, 'msg_gap_routine')
   await agent.mcpEventsWake()
   const gapNoModel = seen.length === callsBeforeGap
   const pollRecovery = fixture.calls.includes('events/poll')
-  await fixture.deliver(
-    'sub_message.received',
-    { type: 'terminated', error: { code: -32012 } },
-    'msg_terminated_routine',
-  )
+  await fixture.deliver('sub_post.created', { type: 'terminated', error: { code: -32012 } }, 'msg_terminated_routine')
   await agent.mcpEventsWake()
   await agent.routinesWake()
   const paused = state.routines.view(first.id)
@@ -184,7 +180,7 @@ async function routineEventsProbe(
   }
   const invalid = await draft(agent, 'invalid', {
     ...definition,
-    trigger: { kind: 'event', connectionId: 'routine-events', name: 'message.received', arguments: { botId: 7 } },
+    trigger: { kind: 'event', connectionId: 'routine-events', name: 'post.created', arguments: { botId: 7 } },
   })
   const callsBeforeInvalid = fixture.calls.filter((call) => call === 'events/subscribe').length
   const invalidConfirmationRefused = await changeRefused(

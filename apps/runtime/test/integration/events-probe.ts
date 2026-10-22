@@ -27,7 +27,7 @@ import { type Probes, inAgent } from './probe.ts'
 const KEY = 'Z29ibGluLXRlc3QtZml4dHVyZS1rZXkhISEhISEhISE='
 const occurrence = (fixture: EventsFixture, eventId: string): EventEnvelope => ({
   eventId,
-  name: 'message.received',
+  name: 'post.created',
   timestamp: new Date(fixture.now).toISOString(),
   data: { inboxCursor: fixture.cursor },
   cursor: fixture.cursor,
@@ -49,7 +49,7 @@ async function setup(storage: DurableObjectStorage) {
       McpConnections,
       Effect.orDie(
         makeManager({
-          servers: [{ connectionId: 'mygram', endpoint: 'https://events.test/mcp' }],
+          servers: [{ connectionId: 'feed', endpoint: 'https://events.test/mcp' }],
           allows: () => true,
           skillsEnabled: (connectionId) => skillState.enabled(connectionId),
           auth: () => ({ token: async () => 'synthetic-fixture-bearer' }),
@@ -82,7 +82,7 @@ async function setup(storage: DurableObjectStorage) {
     const exit = await run(
       Effect.exit(
         events.receive({
-          connectionId: 'mygram',
+          connectionId: 'feed',
           body: new Uint8Array(await request.arrayBuffer()),
           id: request.headers.get('webhook-id') ?? '',
           timestamp: request.headers.get('webhook-timestamp') ?? '',
@@ -127,13 +127,13 @@ async function setup(storage: DurableObjectStorage) {
 export type EventsProbeState = Awaited<ReturnType<typeof setup>>
 
 async function subscribeMessages(state: Awaited<ReturnType<typeof setup>>) {
-  for (const name of ['message.received', 'question.answered']) {
-    state.store.grant('mygram', name, '{}', true, state.fixture.now)
+  for (const name of ['post.created', 'post.liked']) {
+    state.store.grant('feed', name, '{}', true, state.fixture.now)
     await state.run(
       state.events.subscribe({
         consumerId: `fixture:${name}`,
         revision: 1,
-        connectionId: 'mygram',
+        connectionId: 'feed',
         name,
         arguments: {},
         handlerKey: 'fixture-message',
@@ -144,8 +144,8 @@ async function subscribeMessages(state: Awaited<ReturnType<typeof setup>>) {
     state.events.subscribe({
       consumerId: 'second-consumer',
       revision: 1,
-      connectionId: 'mygram',
-      name: 'message.received',
+      connectionId: 'feed',
+      name: 'post.created',
       arguments: {},
       handlerKey: 'fixture-message',
     }),
@@ -157,41 +157,37 @@ async function exercise(state: Awaited<ReturnType<typeof setup>>) {
   const first = fixture.now
   fixture.cursor = '1'
   const envelope = occurrence(fixture, 'evt_1')
-  const received = await fixture.deliver('sub_message.received', envelope, 'evt_1')
+  const received = await fixture.deliver('sub_post.created', envelope, 'evt_1')
   await run(events.dispatch())
-  const replayed = await fixture.deliver('sub_message.received', envelope, 'evt_1')
+  const replayed = await fixture.deliver('sub_post.created', envelope, 'evt_1')
   await run(events.dispatch())
-  const bad = await fixture.deliver('sub_message.received', occurrence(fixture, 'evt_bad'), 'evt_bad', {
+  const bad = await fixture.deliver('sub_post.created', occurrence(fixture, 'evt_bad'), 'evt_bad', {
     signature: 'v1,invalid',
   })
-  const old = await fixture.deliver('sub_message.received', occurrence(fixture, 'evt_old'), 'evt_old', {
+  const old = await fixture.deliver('sub_post.created', occurrence(fixture, 'evt_old'), 'evt_old', {
     timestamp: String(Math.floor(first / 1000) - 301),
   })
   fixture.cursor = '2'
   fixture.journal.push({
     eventId: 'evt_2',
-    name: 'message.received',
+    name: 'post.created',
     timestamp: new Date(first).toISOString(),
     data: { inboxCursor: '2' },
     cursor: '2',
   })
-  await fixture.deliver('sub_message.received', { type: 'gap', cursor: '1' }, 'msg_gap_fixture')
+  await fixture.deliver('sub_post.created', { type: 'gap', cursor: '1' }, 'msg_gap_fixture')
   await run(events.maintain())
   const beforeRefresh = fixture.calls.filter((m) => m === 'events/subscribe').length
   await state.clock(first + 3_600_000 - 299_000)
   await run(events.maintain())
   const refreshedEarly = fixture.calls.filter((m) => m === 'events/subscribe').length > beforeRefresh
-  await fixture.deliver(
-    'sub_message.received',
-    { type: 'terminated', error: { code: -32012 } },
-    'msg_terminated_fixture',
-  )
+  await fixture.deliver('sub_post.created', { type: 'terminated', error: { code: -32012 } }, 'msg_terminated_fixture')
   await run(events.maintain())
-  const terminated = store.selector('mygram', 'message.received', '{}')?.status
-  const cleanup = await run(events.unsubscribe({ consumerId: 'fixture:message.received', revision: 1 }))
-  const sharedPreserved = fixture.subscriptions.has('sub_message.received')
+  const terminated = store.selector('feed', 'post.created', '{}')?.status
+  const cleanup = await run(events.unsubscribe({ consumerId: 'fixture:post.created', revision: 1 }))
+  const sharedPreserved = fixture.subscriptions.has('sub_post.created')
   await run(events.unsubscribe({ consumerId: 'second-consumer', revision: 1 }))
-  await run(events.unsubscribe({ consumerId: 'fixture:question.answered', revision: 1 }))
+  await run(events.unsubscribe({ consumerId: 'fixture:post.liked', revision: 1 }))
   return {
     received: received.status,
     replayed: replayed.status,
@@ -217,7 +213,7 @@ async function eventsProbe(storage: DurableObjectStorage) {
   const state = await setup(storage)
   try {
     await subscribeMessages(state)
-    const discovered = offersEvents(await state.run(state.connections.connect('mygram')))
+    const discovered = offersEvents(await state.run(state.connections.connect('feed')))
     const result = await exercise(state)
     const skills = await eventsSkillsProbe(state)
     const recovery = await eventsRecoveryProbe(state)

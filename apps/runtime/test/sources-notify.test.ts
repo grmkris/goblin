@@ -15,7 +15,7 @@ import { sourceWorld } from './sources-fixture.ts'
 const accepts = Schema.is(NotifySink)
 
 /** The owner's own chat on a messaging server, as a Source's reply to the private chat fills it in. */
-const DM = { connectionId: 'chat', tool: 'message_send', arguments: { chat: 'dm', text: '{{text}}' } }
+const DM = { connectionId: 'chat', tool: 'post_reply', arguments: { chat: 'dm', text: '{{text}}' } }
 
 describe('Notify me via (ADR 0066)', () => {
   it('takes `{{text}}` and `{{operationId}}` as whole values, and needs `{{text}}`', () => {
@@ -31,7 +31,7 @@ describe('Notify me via (ADR 0066)', () => {
       const { db } = yield* sourceWorld()
       const granted: string[] = []
       const snapshot = fake<McpConnectionSnapshot>({
-        tools: [{ name: 'message_send', inputSchema: { type: 'object' } }],
+        tools: [{ name: 'post_reply', inputSchema: { type: 'object' } }],
       })
       const services = Layer.mergeAll(
         CryptoLive,
@@ -42,7 +42,7 @@ describe('Notify me via (ADR 0066)', () => {
       )
       expect(yield* notifySinkView.pipe(Effect.provide(services))).toBeNull()
       expect(yield* setNotifySink(DM).pipe(Effect.provide(services))).toMatchObject({ ...DM, label: 'Chat' })
-      expect(granted).toEqual(['chat:message_send'])
+      expect(granted).toEqual(['chat:post_reply'])
       const first = yield* notifySink.pipe(Effect.provide(services))
       if (first === undefined) throw new Error('missing sink')
       const firstRevision = yield* sinkRevision(first)
@@ -64,7 +64,7 @@ describe('Notify me via (ADR 0066)', () => {
         ),
       )
       expect(oversized).toMatchObject({ _tag: 'InvalidInput' })
-      expect(yield* notifySinkView.pipe(Effect.provide(services))).toMatchObject({ tool: 'message_send' })
+      expect(yield* notifySinkView.pipe(Effect.provide(services))).toMatchObject({ tool: 'post_reply' })
       yield* clearNotifySink.pipe(Effect.provide(services))
       expect(yield* notifySinkView.pipe(Effect.provide(services))).toBeNull()
     }),

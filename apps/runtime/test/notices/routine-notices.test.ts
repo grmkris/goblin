@@ -42,7 +42,7 @@ const world = (sink?: string) => {
       .values({
         id: 1,
         connectionId: sink,
-        tool: 'message_send',
+        tool: 'post_reply',
         arguments: '{"text":"{{text}}"}',
         policy: JSON.stringify({ echo: { event: 'sidequest.inbox', arguments: {} } }),
         updatedAt: 1,

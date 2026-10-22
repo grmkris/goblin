@@ -23,7 +23,7 @@ describe('the suggested servers', () => {
   it('offers mysi once instead of each my* app', () => {
     const ids = shelf.map((item) => item.id)
     expect(ids).toContain('mysi')
-    for (const app of ['myplan', 'mytab', 'mygram', 'myinbox', 'myskills']) expect(ids).not.toContain(app)
+    for (const id of ids) expect(id === 'mysi' || !id.startsWith('my'), id).toBe(true)
   })
   it('suggests only https endpoints, each id once', () => {
     expect(new Set(shelf.map((item) => item.id)).size).toBe(shelf.length)

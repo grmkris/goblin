@@ -45,7 +45,7 @@ const events = (server: Effect.Effect<McpServerConfig, NotFound | Internal>) => 
     id: 'sub-1',
     remoteId: WEBHOOK.subscriptionId,
     connectionId: 'notes',
-    name: 'message.received',
+    name: 'post.created',
     argumentsJson: '{}',
     endpoint: 'https://notes.test/mcp',
     status: 'active',

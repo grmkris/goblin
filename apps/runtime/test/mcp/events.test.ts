@@ -15,7 +15,7 @@ import { managerOf } from './manager.ts'
 
 const SECRET = `whsec_${Buffer.from(Array.from({ length: 32 }, (_, i) => i + 1)).toString('base64')}`
 const BODY = new TextEncoder().encode(
-  '{ "eventId": "evt_vector", "name": "message.received", "timestamp": "2026-10-05T12:00:00Z", "data": {"inboxCursor":"1"} }',
+  '{ "eventId": "evt_vector", "name": "post.created", "timestamp": "2026-10-05T12:00:00Z", "data": {"inboxCursor":"1"} }',
 )
 const TIMESTAMP = '1791201600'
 const HEADERS = {
@@ -83,7 +83,7 @@ describe('actual MCP Events connection manager (unit)', () => {
       },
     })
     const authorize = Effect.suspend(() =>
-      allowed ? Effect.void : Effect.fail(new GrantDenied({ connectionId: 'fixture', name: 'message.received' })),
+      allowed ? Effect.void : Effect.fail(new GrantDenied({ connectionId: 'fixture', name: 'post.created' })),
     )
     try {
       await expect(connections.events('fixture', 'events/list', {}, EventsListResult, authorize)).rejects.toMatchObject(
@@ -98,7 +98,7 @@ describe('actual MCP Events connection manager (unit)', () => {
       expect(snapshot.capabilities.events).toEqual({})
       const answer = await connections.events('fixture', 'events/list', {}, EventsListResult, authorize)
       const catalog = Schema.decodeUnknownSync(EventsListResult)(answer)
-      expect(catalog.events.map((e) => e.name)).toContain('question.answered')
+      expect(catalog.events.map((e) => e.name)).toContain('post.liked')
     } finally {
       await dispose()
     }
@@ -147,12 +147,12 @@ describe('actual MCP Events connection manager (unit)', () => {
     try {
       const catalog = await Effect.runPromise(catalogEvents(client, 'fixture'))
       expect(catalog.map((event) => event.name)).toEqual([
-        'message.received',
-        'question.answered',
+        'post.created',
+        'post.liked',
         'skills.updated',
         'skills.list_changed',
       ])
-      await expect(Effect.runPromise(listEvents(client, 'fixture', 'message.received', {}))).rejects.toMatchObject({
+      await expect(Effect.runPromise(listEvents(client, 'fixture', 'post.created', {}))).rejects.toMatchObject({
         _tag: 'GrantDenied',
       })
     } finally {

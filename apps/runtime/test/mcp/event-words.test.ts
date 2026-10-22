@@ -3,7 +3,7 @@ import * as Schema from 'effect/Schema'
 import { type EventDescriptor, EventsListResult, eventWords } from '../../src/mcp/events/protocol.ts'
 
 const descriptor = (extra: Partial<EventDescriptor>): EventDescriptor => ({
-  name: 'mygram.message.received',
+  name: 'notes.post.created',
   inputSchema: {},
   delivery: ['poll', 'webhook'],
   ...extra,
@@ -11,9 +11,10 @@ const descriptor = (extra: Partial<EventDescriptor>): EventDescriptor => ({
 
 describe("an event's own words, by its standard fields only (ADR 0068)", () => {
   it('reads the title folded to one bounded line and the description cut', () => {
-    expect(
-      eventWords(descriptor({ title: 'Message\nreceived\u0000', description: 'A message reached your bot' })),
-    ).toEqual({ title: 'Message received', description: 'A message reached your bot' })
+    expect(eventWords(descriptor({ title: 'Post\ncreated\u0000', description: 'A post reached your feed' }))).toEqual({
+      title: 'Post created',
+      description: 'A post reached your feed',
+    })
     expect(eventWords(descriptor({ title: 'x'.repeat(500) })).title).toHaveLength(120)
     expect(eventWords(descriptor({ description: 'y'.repeat(900) })).description).toHaveLength(500)
   })
@@ -23,7 +24,7 @@ describe("an event's own words, by its standard fields only (ADR 0068)", () => {
     const decoded = Schema.decodeUnknownSync(EventsListResult)({
       events: [
         {
-          name: 'message.received',
+          name: 'post.created',
           inputSchema: {},
           delivery: ['poll', 'webhook'],
           _meta: { suggest: { title: 'Suggested', recommended: true, tellMe: true, rate: 'often' } },

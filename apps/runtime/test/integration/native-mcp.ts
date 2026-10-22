@@ -141,8 +141,8 @@ export const cases: readonly NativeCase[] = [
         bad: 400,
         old: 400,
         delivered: [
-          'fixture:message.received:evt_1',
-          'fixture:message.received:evt_2',
+          'fixture:post.created:evt_1',
+          'fixture:post.created:evt_2',
           'second-consumer:evt_1',
           'second-consumer:evt_2',
         ],

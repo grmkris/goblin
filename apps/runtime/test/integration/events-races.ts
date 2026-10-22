@@ -36,7 +36,7 @@ async function delayed(state: EventsProbeState, method: 'events/list' | 'events/
 const input = (consumerId: string, name: string, revision: number) => ({
   consumerId,
   revision,
-  connectionId: 'mygram',
+  connectionId: 'feed',
   name,
   arguments: {},
   handlerKey: 'fixture-message',
@@ -45,11 +45,11 @@ const input = (consumerId: string, name: string, revision: number) => ({
 /** A slow older discovery cannot retire the consumer installed by the newer completed subscription. */
 async function staleConsumer(state: EventsProbeState) {
   const { events, run, store } = state
-  await run(events.grant('mygram', 'message.received', {}, true))
+  await run(events.grant('feed', 'post.created', {}, true))
   const wait = await delayed(state, 'events/list')
-  const first = run(Effect.result(wait.events.subscribe(input('race-monotonic', 'message.received', 1))))
+  const first = run(Effect.result(wait.events.subscribe(input('race-monotonic', 'post.created', 1))))
   await wait.entered()
-  const newer = await run(events.subscribe(input('race-monotonic', 'message.received', 2)))
+  const newer = await run(events.subscribe(input('race-monotonic', 'post.created', 2)))
   await wait.release()
   const older = await first
   await run(events.unsubscribe({ consumerId: 'race-monotonic', revision: 1 }))
@@ -58,20 +58,20 @@ async function staleConsumer(state: EventsProbeState) {
     Predicate.isTagged(older.failure, 'Conflict') &&
     store.activeConsumer('race-monotonic')?.revision === 2 &&
     store.get(newer.subscriptionId)?.status === 'active' &&
-    state.fixture.subscriptions.has('sub_message.received')
+    state.fixture.subscriptions.has('sub_post.created')
   )
 }
 
 /** A replacement uses a different callback URL, so a delayed old unsubscribe cannot remove it. */
 async function cleanupWait(state: EventsProbeState) {
   const { events, run, store } = state
-  await run(events.grant('mygram', 'question.answered', {}, true))
-  const first = await run(events.subscribe(input('race-cleanup', 'question.answered', 1)))
+  await run(events.grant('feed', 'post.liked', {}, true))
+  const first = await run(events.subscribe(input('race-cleanup', 'post.liked', 1)))
   const wait = await delayed(state, 'events/unsubscribe')
   const retiring = run(wait.events.unsubscribe({ consumerId: 'race-cleanup', revision: 1 }))
   await wait.entered()
   const tombstoned = store.get(first.subscriptionId)?.status === 'tombstone'
-  const newer = await run(events.subscribe(input('race-cleanup', 'question.answered', 2)))
+  const newer = await run(events.subscribe(input('race-cleanup', 'post.liked', 2)))
   await wait.release()
   await retiring
   const current = store.get(newer.subscriptionId)
@@ -90,7 +90,7 @@ async function cleanupWait(state: EventsProbeState) {
 async function stalePoll(state: EventsProbeState, terminated = false) {
   const { events, run, store, fixture } = state
   const consumerId = terminated ? 'race-poll-terminated' : 'race-poll'
-  const first = await run(events.subscribe(input(consumerId, 'question.answered', 1)))
+  const first = await run(events.subscribe(input(consumerId, 'post.liked', 1)))
   const remoteId = store.get(first.subscriptionId)?.remoteId
   if (remoteId === undefined || remoteId === null) return false
   const entered = await run(Deferred.make<void>())
@@ -102,7 +102,7 @@ async function stalePoll(state: EventsProbeState, terminated = false) {
     events: (connectionId, method, params, schema, authorize) =>
       Effect.gen(function* () {
         const result = yield* state.connections.events(connectionId, method, params, schema, authorize)
-        if (method === 'events/poll' && params['name'] === 'question.answered') pollReturned = true
+        if (method === 'events/poll' && params['name'] === 'post.liked') pollReturned = true
         return result
       }),
   }
@@ -125,7 +125,7 @@ async function stalePoll(state: EventsProbeState, terminated = false) {
   fixture.cursor = terminated ? 'race-poll-terminated' : 'race-poll'
   fixture.journal.push({
     eventId,
-    name: 'question.answered',
+    name: 'post.liked',
     timestamp: new Date(fixture.now).toISOString(),
     data: { inboxCursor: fixture.cursor },
     cursor: fixture.cursor,
@@ -138,7 +138,7 @@ async function stalePoll(state: EventsProbeState, terminated = false) {
     await run(events.dispatch())
   } else {
     await run(events.unsubscribe({ consumerId, revision: 1 }))
-    await run(events.subscribe(input(consumerId, 'question.answered', 2)))
+    await run(events.subscribe(input(consumerId, 'post.liked', 2)))
   }
   await run(Deferred.succeed(release, undefined))
   await polling
@@ -147,7 +147,7 @@ async function stalePoll(state: EventsProbeState, terminated = false) {
     store.activeConsumer(consumerId)?.revision === (terminated ? 1 : 2) &&
     store.delivery(first.subscriptionId, eventId) === undefined &&
     store.snapshots(first.subscriptionId, eventId).length === 0
-  if (terminated) await run(events.subscribe(input(consumerId, 'question.answered', 1)))
+  if (terminated) await run(events.subscribe(input(consumerId, 'post.liked', 1)))
   const resumed = store.get(first.subscriptionId)?.status === 'active'
   await run(events.unsubscribe({ consumerId, revision: terminated ? 1 : 2 }))
   return intact && resumed
@@ -171,7 +171,7 @@ async function staleControl(state: EventsProbeState, replace: boolean) {
       }),
     ),
   )
-  const args = { ...input(consumerId, 'question.answered', 1), handlerKey: consumerId }
+  const args = { ...input(consumerId, 'post.liked', 1), handlerKey: consumerId }
   const first = await run(events.subscribe(args))
   const remoteId = store.get(first.subscriptionId)?.remoteId
   if (remoteId === undefined || remoteId === null) return false
@@ -179,7 +179,7 @@ async function staleControl(state: EventsProbeState, replace: boolean) {
     remoteId,
     {
       eventId: `evt_${consumerId}`,
-      name: 'question.answered',
+      name: 'post.liked',
       timestamp: new Date(fixture.now).toISOString(),
       data: {},
       cursor: fixture.cursor,
@@ -205,8 +205,8 @@ async function staleControl(state: EventsProbeState, replace: boolean) {
 /** Failed cleanup survives reconstruction without blocking a new, independently addressed lease. */
 async function cleanupRecovery(state: EventsProbeState) {
   const { events, run, store } = state
-  await run(events.grant('mygram', 'question.answered', {}, true))
-  const first = await run(events.subscribe(input('race-recovery', 'question.answered', 1)))
+  await run(events.grant('feed', 'post.liked', {}, true))
+  const first = await run(events.subscribe(input('race-recovery', 'post.liked', 1)))
   const oldCallback = store.get(first.subscriptionId)?.callbackUrl
   const connections: EventsOptions['connections'] = {
     server: state.connections.server,
@@ -218,7 +218,7 @@ async function cleanupRecovery(state: EventsProbeState) {
   const broken = await run(makeEvents({ ...state.eventOptions, connections }))
   const cleanup = await run(broken.unsubscribe({ consumerId: 'race-recovery', revision: 1 }))
   const reconstructed = await run(makeEvents({ ...state.eventOptions, store: new SqliteEventStore(state.db) }))
-  const newer = await run(reconstructed.subscribe(input('race-recovery', 'question.answered', 2)))
+  const newer = await run(reconstructed.subscribe(input('race-recovery', 'post.liked', 2)))
   const intact =
     !cleanup.remoteCleanup &&
     store.get(newer.subscriptionId)?.callbackUrl !== oldCallback &&
@@ -247,10 +247,10 @@ async function inFlightSubscribe(state: EventsProbeState) {
       }),
   }
   const delayedEvents = await run(makeEvents({ ...state.eventOptions, connections }))
-  const first = run(Effect.result(delayedEvents.subscribe(input('race-in-flight', 'question.answered', 1))))
+  const first = run(Effect.result(delayedEvents.subscribe(input('race-in-flight', 'post.liked', 1))))
   await run(Deferred.await(entered))
   const cleanup = await run(events.unsubscribe({ consumerId: 'race-in-flight', revision: 1 }))
-  const newer = await run(events.subscribe(input('race-in-flight', 'question.answered', 2)))
+  const newer = await run(events.subscribe(input('race-in-flight', 'post.liked', 2)))
   const current = store.get(newer.subscriptionId)
   await run(Deferred.succeed(release, undefined))
   const old = await first

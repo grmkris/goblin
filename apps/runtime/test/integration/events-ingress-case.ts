@@ -7,7 +7,7 @@ import { type Probes, inAgent } from './probe.ts'
 
 /** A webhook for a subscription the agent does not know: ingress answers it from the authority checks alone. */
 const WEBHOOK: EventWebhook = {
-  connectionId: 'mygram',
+  connectionId: 'feed',
   body: new Uint8Array(),
   subscriptionId: 'remote-transient',
   id: 'evt_transient',

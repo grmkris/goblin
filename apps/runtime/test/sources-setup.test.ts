@@ -3,15 +3,15 @@ import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import { schemaAt, valueAt } from '../src/sources/pointer.ts'
 import { setupProblems } from '../src/sources/setup.ts'
-import { INBOX_READ, MESSAGE_RECEIVED, PAYLOAD_SETUP } from './sources-fixture.ts'
+import { FEED_READ, MAIL_RECEIVED, MAIL_SETUP, POST_CREATED, PAYLOAD_SETUP } from './sources-fixture.ts'
 
 const accepts = Schema.is(SourceSetup)
-const offered = { events: [MESSAGE_RECEIVED], tools: [INBOX_READ, { name: 'message_send' }] }
+const offered = { events: [POST_CREATED], tools: [FEED_READ, { name: 'post_reply' }] }
 
 /** A tool read of the inbox from its cursor, as a Source over a chat server's inbox would read it. */
 const TOOL_READ = {
   from: 'tool' as const,
-  tool: 'inbox_read',
+  tool: 'feed_read',
   arguments: { chat: 'all', cursor: '{{cursor}}' },
   items: '/messages',
   cursor: '/nextCursor',
@@ -22,7 +22,7 @@ const TOOL_READ = {
 /** The payload setup with its reply's arguments as `args`. */
 const reply = (args: Record<string, unknown>) => ({
   ...PAYLOAD_SETUP,
-  reply: { tool: 'message_send', arguments: args, maxChars: 100 },
+  reply: { tool: 'post_reply', arguments: args, maxChars: 100 },
 })
 
 describe('JSON pointers (RFC 6901)', () => {
@@ -59,9 +59,19 @@ describe("a Source's setup (ADR 0066)", () => {
     expect(setupProblems({ ...noReply, key: [{ name: 'room', pointer: '/room' }] }, offered)).toEqual([
       "key.room points at /room, which the server's schema does not have.",
     ])
-    const speaks = { ...PAYLOAD_SETUP, speaksForMe: { pointer: '/from/role', equals: 'owner' } }
+    const speaks = { ...PAYLOAD_SETUP, speaksForMe: { pointer: '/author/role', equals: 'owner' } }
     expect(setupProblems(speaks, offered)).toEqual([
-      "speaksForMe points at /from/role, which the server's schema does not have.",
+      "speaksForMe points at /author/role, which the server's schema does not have.",
+    ])
+  })
+
+  it("holds for mail read from its event's data, with no tool, no cursor and no reply", () => {
+    const mailbox = { events: [MAIL_RECEIVED], tools: [] }
+    expect(accepts(MAIL_SETUP)).toBe(true)
+    expect(setupProblems(MAIL_SETUP, mailbox)).toEqual([])
+    const named = { ...MAIL_SETUP, speaksForMe: { pointer: '/from/name', equals: 'Me' } }
+    expect(setupProblems(named, mailbox)).toEqual([
+      "speaksForMe points at /from/name, which the server's schema does not have.",
     ])
   })
 

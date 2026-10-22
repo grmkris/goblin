@@ -30,7 +30,7 @@ const part = <S>(service: Partial<S>): S =>
 /** The owner's own chat on a messaging server: Notify me via, its words and operation id as whole values. */
 const SINK = {
   connectionId: 'chat',
-  tool: 'message_send',
+  tool: 'post_reply',
   arguments: { chat: 'dm', text: '{{text}}', op: '{{operationId}}' },
 }
 
@@ -155,7 +155,7 @@ describe("an agent app's notify power through Notify me via (ADR 0070)", () => {
     expect(calls).toEqual([
       {
         connectionId: 'chat',
-        name: 'message_send',
+        name: 'post_reply',
         args: { chat: 'dm', text: '<b>Done</b> & dusted', op: 'app-tally-op-1' },
         authorized: true,
       },
@@ -191,6 +191,6 @@ describe("an agent app's notify power through Notify me via (ADR 0070)", () => {
       onCall: (db) => void db.update(appNotifySink).set({ updatedAt: 2 }).run(),
     })
     await expect(powers.notify('op-1', 'hi')).rejects.toBeInstanceOf(AppCodeError)
-    expect(calls).toEqual([{ connectionId: 'chat', name: 'message_send', args: expect.any(Object), authorized: false }])
+    expect(calls).toEqual([{ connectionId: 'chat', name: 'post_reply', args: expect.any(Object), authorized: false }])
   })
 })

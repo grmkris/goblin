@@ -29,7 +29,7 @@ function notificationHandler(calls: Record<string, unknown>[]) {
   return createMcpHandler(() => {
     const server = lowLevelServer({ name: 'notification-fixture', version: '1' }, { capabilities: { tools: {} } })
     server.setRequestHandler('tools/list', () => ({
-      tools: ['inbox_read', 'message_send'].map((name) => ({ name, inputSchema: { type: 'object' as const } })),
+      tools: ['feed_read', 'post_reply'].map((name) => ({ name, inputSchema: { type: 'object' as const } })),
     }))
     server.setRequestHandler('tools/call', (request) => {
       calls.push(request.params.arguments ?? {})
@@ -50,7 +50,7 @@ function notificationHost(
     appUrl: 'https://goblin.test',
     workspaceId: 'workspace',
     credentials,
-    grants: new MemoryGrants([{ connectionId: 'chat', capability: 'tool', name: 'message_send' }]),
+    grants: new MemoryGrants([{ connectionId: 'chat', capability: 'tool', name: 'post_reply' }]),
     registries: new MemoryRegistries(),
     labels: new MemoryLabels(),
     fetch: async (input, init) => {
@@ -85,7 +85,7 @@ async function setupNotifications(storage: DurableObjectStorage) {
     .values({
       id: 1,
       connectionId: 'chat',
-      tool: 'message_send',
+      tool: 'post_reply',
       arguments: JSON.stringify({ chat: 'dm', text: '{{text}}', operationId: '{{operationId}}' }),
       policy: JSON.stringify({ result: { accepted: { pointer: '/delivery', equals: 'accepted' } } }),
       revision: '1',

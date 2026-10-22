@@ -25,20 +25,20 @@ async function skillVersion(state: EventsProbeState, version: string) {
 export async function eventsSkillsProbe(state: EventsProbeState) {
   const { skillState, fixture, events, run } = state
   const library = await run(makeSkills(skillState))
-  await run(library.setEnabled('mygram', true))
+  await run(library.setEnabled('feed', true))
   await run(
     installEventConsumers(events, {
       skills: { enabled: library.enabled, invalidate: library.invalidate },
     }),
   )
   await skillVersion(state, '1')
-  const first = await run(library.activate('skills-old', 'mygram:events-test'))
-  await run(events.grant('mygram', 'skills.updated', {}, true))
+  const first = await run(library.activate('skills-old', 'feed:events-test'))
+  await run(events.grant('feed', 'skills.updated', {}, true))
   await run(
     events.subscribe({
       consumerId: 'skills:updates',
       revision: 1,
-      connectionId: 'mygram',
+      connectionId: 'feed',
       name: 'skills.updated',
       arguments: {},
       handlerKey: 'skills-refresh',
@@ -53,14 +53,14 @@ export async function eventsSkillsProbe(state: EventsProbeState) {
   }
   await fixture.deliver('sub_skills.updated', envelope, envelope.eventId)
   await run(events.dispatch())
-  const dirty = new SqliteSkillState(state.db).catalogState('mygram').dirty
+  const dirty = new SqliteSkillState(state.db).catalogState('feed').dirty
   await fixture.deliver('sub_skills.updated', envelope, envelope.eventId)
   await run(events.dispatch())
-  const replayDirty = skillState.catalogState('mygram').dirty
+  const replayDirty = skillState.catalogState('feed').dirty
   const reconstructed = await run(makeSkills(new SqliteSkillState(state.db)))
-  const second = await run(reconstructed.activate('skills-new', 'mygram:events-test'))
-  const retained = await run(reconstructed.read('skills-old', 'mygram:events-test', 'SKILL.md'))
-  const refreshed = skillState.catalogState('mygram').refreshed
+  const second = await run(reconstructed.activate('skills-new', 'feed:events-test'))
+  const retained = await run(reconstructed.read('skills-old', 'feed:events-test', 'SKILL.md'))
+  const refreshed = skillState.catalogState('feed').refreshed
   await fixture.deliver('sub_skills.updated', { type: 'terminated', error: { code: -32012 } }, 'msg_terminated_skills')
   await run(events.dispatch())
   return {
@@ -70,20 +70,20 @@ export async function eventsSkillsProbe(state: EventsProbeState) {
     dirty,
     replayDirty,
     refreshed,
-    terminated: skillState.catalogState('mygram').unavailable,
+    terminated: skillState.catalogState('feed').unavailable,
   }
 }
 
 /** Rebuild services over real DO SQLite after acceptance, including handler failure and retention beyond eight days. */
 export async function eventsRecoveryProbe(state: EventsProbeState) {
   const { events, fixture, store, run } = state
-  await run(events.grant('mygram', 'skills.list_changed', {}, true))
+  await run(events.grant('feed', 'skills.list_changed', {}, true))
   await run(events.register('recover-test', () => Effect.die(new Error('injected handler interruption'))))
   const binding = { consumerId: 'recovery-test', revision: 1 }
   const subscribed = await run(
     events.subscribe({
       ...binding,
-      connectionId: 'mygram',
+      connectionId: 'feed',
       name: 'skills.list_changed',
       arguments: {},
       handlerKey: 'recover-test',

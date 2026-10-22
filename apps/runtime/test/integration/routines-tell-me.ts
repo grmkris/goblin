@@ -29,7 +29,7 @@ const CONNECTIONS = [
 const told = (connectionId: string): RoutineDefinition => ({
   title: `Messages for ${connectionId}`,
   timezone: 'UTC',
-  trigger: { kind: 'event', connectionId, name: 'message.received', arguments: {} },
+  trigger: { kind: 'event', connectionId, name: 'post.created', arguments: {} },
   tellMe: { on: true, copy: false },
   handTo: { kind: 'none' },
 })
@@ -37,7 +37,7 @@ const told = (connectionId: string): RoutineDefinition => ({
 /** A message event the producer sends: its producer-convention title and link (ADR 0041), occurred at `at`. */
 const event = (eventId: string, title: string, at = new Date()) => ({
   eventId,
-  name: 'message.received',
+  name: 'post.created',
   timestamp: at.toISOString(),
   data: { title, url: 'https://sidequest.test/jobs/12' },
 })
@@ -93,7 +93,7 @@ async function tellMeProbe(storage: DurableObjectStorage, agent: PersonalAgent, 
     await changeRoutine(agent, draft.id, { revision: 1, operationId: `tell-${connectionId}-confirm` }, 'confirm')
     routines.push(draft.id)
   }
-  const urls = [...fixture.subscriptions.entries()].filter(([id]) => id.startsWith('sub_message.received'))
+  const urls = [...fixture.subscriptions.entries()].filter(([id]) => id.startsWith('sub_post.created'))
   const [hirer, worker] = urls.map(([id]) => id)
   if (hirer === undefined || worker === undefined) throw new Error('two subscriptions expected')
   // An occurrence's webhook id is its event id; the worker's is delivered twice, and an old one replayed.

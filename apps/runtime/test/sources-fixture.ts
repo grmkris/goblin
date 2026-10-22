@@ -17,11 +17,11 @@ afterEach(() => {
 })
 
 /**
- * A chat server's `message.received`, as a producer of the draft Events profile describes it (the shape of
+ * A feed server's `post.created`, as a producer of the draft Events profile describes it (the shape of
  * `mcp/events-fixture.ts`): each event carries one message with its chat, its forum thread, who sent it and its words.
  */
-export const MESSAGE_RECEIVED: EventDescriptor = {
-  name: 'message.received',
+export const POST_CREATED: EventDescriptor = {
+  name: 'post.created',
   inputSchema: { type: 'object', properties: { chat: { type: 'string' } } },
   payloadSchema: {
     type: 'object',
@@ -30,15 +30,15 @@ export const MESSAGE_RECEIVED: EventDescriptor = {
       chat: { type: 'string' },
       threadId: { type: ['integer', 'null'] },
       text: { type: 'string' },
-      from: { type: 'object', properties: { isOwner: { type: 'boolean' }, name: { type: 'string' } } },
+      author: { type: 'object', properties: { kind: { enum: ['self', 'other'] }, name: { type: 'string' } } },
     },
   },
   delivery: ['poll', 'webhook'],
 }
 
-/** The inbox tool the same server reads from a cursor, with the output schema it declares. */
-export const INBOX_READ = {
-  name: 'inbox_read',
+/** The feed tool the same server reads from a cursor, with the output schema it declares. */
+export const FEED_READ = {
+  name: 'feed_read',
   outputSchema: {
     type: 'object' as const,
     properties: {
@@ -52,7 +52,7 @@ export const INBOX_READ = {
             threadId: { type: ['integer', 'null'] },
             text: { type: 'string' },
             direction: { type: 'string' },
-            from: { type: 'object', properties: { isOwner: { type: 'boolean' } } },
+            author: { type: 'object', properties: { kind: { enum: ['self', 'other'] } } },
           },
         },
       },
@@ -61,18 +61,18 @@ export const INBOX_READ = {
   },
 }
 
-/** A Source read from each event's data: the owner speaks when `/from/isOwner` is true; answers go back by chat. */
+/** A Source read from each event's data: the owner speaks when `/author/kind` is `self`; answers go back by chat. */
 export const PAYLOAD_SETUP: SourceSetup = {
-  wake: { event: 'message.received', arguments: { chat: 'all' } },
+  wake: { event: 'post.created', arguments: { chat: 'all' } },
   key: [
     { name: 'chat', pointer: '/chat' },
     { name: 'thread', pointer: '/threadId' },
   ],
-  speaksForMe: { pointer: '/from/isOwner', equals: true },
+  speaksForMe: { pointer: '/author/kind', equals: 'self' },
   others: 'notice',
   read: { from: 'payload', id: '/id', text: '/text' },
   reply: {
-    tool: 'message_send',
+    tool: 'post_reply',
     arguments: { chat: '{{key.chat}}', threadId: '{{key.thread}}', text: '{{text}}', operationId: '{{operationId}}' },
     maxChars: 100,
     result: {
@@ -90,7 +90,48 @@ export const message = (id: string, extra: Record<string, unknown> = {}) => ({
   chat: 'dm',
   threadId: null,
   text: `text of ${id}`,
-  from: { isOwner: true, name: 'Owner' },
+  author: { kind: 'self', name: 'Owner' },
+  ...extra,
+})
+
+/**
+ * A mail server's `mail.received`, a shape unlike the feed's: each event's data is one mail, read from it with no tool
+ * and no cursor, its conversation its thread, its words in its body and its name its subject.
+ */
+export const MAIL_RECEIVED: EventDescriptor = {
+  name: 'mail.received',
+  inputSchema: { type: 'object' },
+  payloadSchema: {
+    type: 'object',
+    properties: {
+      messageId: { type: 'string' },
+      threadId: { type: 'string' },
+      subject: { type: 'string' },
+      from: { type: 'object', properties: { address: { type: 'string' } }, additionalProperties: false },
+      body: { type: 'object', properties: { text: { type: 'string' } } },
+    },
+    additionalProperties: false,
+  },
+  delivery: ['poll', 'webhook'],
+}
+
+/** A Source of the owner's mail: read from each event's data, a conversation per thread, the owner's from their address. */
+export const MAIL_SETUP: SourceSetup = {
+  wake: { event: 'mail.received', arguments: {} },
+  key: [{ name: 'thread', pointer: '/threadId' }],
+  speaksForMe: { pointer: '/from/address', equals: 'me@example.com' },
+  others: 'drop',
+  read: { from: 'payload', id: '/messageId', text: '/body/text', title: '/subject' },
+  newKeys: { to: 'held' },
+}
+
+/** One mail as the server's event carries it, from the owner's own address unless `extra` says otherwise. */
+export const mail = (id: string, extra: Record<string, unknown> = {}) => ({
+  messageId: id,
+  threadId: 't1',
+  subject: 'Lunch on Friday',
+  from: { address: 'me@example.com' },
+  body: { text: `body of ${id}` },
   ...extra,
 })
 

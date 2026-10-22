@@ -26,7 +26,7 @@ import type { TopicView } from '@goblin/contracts'
 import { Topics } from '../src/topics/service.ts'
 import { fake } from './fake.ts'
 import { stub } from './http/api/fixture.ts'
-import { INBOX_READ, MESSAGE_RECEIVED, PAYLOAD_SETUP, message, sourceWorld } from './sources-fixture.ts'
+import { FEED_READ, POST_CREATED, PAYLOAD_SETUP, message, sourceWorld } from './sources-fixture.ts'
 
 /** What the fakes of the MCP host saw: grants, tools allowed, subscriptions made and ended, alarms and offers. */
 type Calls = {
@@ -43,13 +43,13 @@ type EventWaits = {
   readonly unsubscribe?: (revision: number) => Effect.Effect<void>
 }
 
-/** The chat server's connection: `message.received`, its inbox and its send tool. */
+/** The chat server's connection: `post.created`, its inbox and its send tool. */
 const SNAPSHOT: McpConnectionSnapshot = {
   config: { connectionId: 'chat', endpoint: 'https://chat.example/mcp' },
   capabilities: { events: {} },
   tools: [
-    { ...INBOX_READ, inputSchema: { type: 'object' } },
-    { name: 'message_send', inputSchema: { type: 'object' } },
+    { ...FEED_READ, inputSchema: { type: 'object' } },
+    { name: 'post_reply', inputSchema: { type: 'object' } },
   ],
   resources: [],
   resourceTemplates: [],
@@ -60,7 +60,7 @@ const SNAPSHOT: McpConnectionSnapshot = {
 const fakeEvents = (calls: Calls, leases: Map<string, Subscription['status']>, waits: EventWaits) => {
   const consumers = new Map<string, Consumer>()
   return stub(Events, {
-    catalog: () => Effect.succeed([MESSAGE_RECEIVED]),
+    catalog: () => Effect.succeed([POST_CREATED]),
     grant: (_id, name, args) => Effect.sync(() => void calls.grants.push(`${name}:${JSON.stringify(args)}`)),
     subscribe: (input) =>
       Effect.gen(function* () {
@@ -113,8 +113,8 @@ const programWorld = (waits: EventWaits = {}) =>
     const world = yield* sourceWorld()
     const calls: Calls = { grants: [], tools: [], subscribed: [], unsubscribed: [], scheduled: [], settled: [] }
     const versions = new Map([
-      ['message_send', 'v1'],
-      ['inbox_read', 'v1'],
+      ['post_reply', 'v1'],
+      ['feed_read', 'v1'],
     ])
     const leases = new Map<string, Subscription['status']>()
     const services = Layer.mergeAll(
@@ -133,7 +133,7 @@ const programWorld = (waits: EventWaits = {}) =>
 
 /** A delivery to the Source's subscription at `revision`, as the Events dispatcher hands one to its handler. */
 const delivery = (sourceId: string, revision: number, envelope: EventContext['envelope']): EventContext => ({
-  subscription: fake<Subscription>({ id: `sub-${String(revision)}`, name: 'message.received' }),
+  subscription: fake<Subscription>({ id: `sub-${String(revision)}`, name: 'post.created' }),
   consumer: fake<Consumer>({ consumerId: `source:${sourceId}`, revision }),
   receipt: fake<Receipt>({}),
   envelope,
@@ -142,7 +142,7 @@ const delivery = (sourceId: string, revision: number, envelope: EventContext['en
 /** The owner's message `m1` in the private chat, as the server's event carries it. */
 const OCCURRENCE = {
   eventId: 'e1',
-  name: 'message.received',
+  name: 'post.created',
   timestamp: new Date(0).toISOString(),
   data: message('m1'),
 }
@@ -231,8 +231,8 @@ describe('proposing and confirming a Source (ADR 0066)', () => {
       })
       const confirmed = yield* run(confirmSource(engine, ports, proposed.id, 1))
       expect(confirmed).toMatchObject({ state: 'active', bound: { endpoint: 'https://chat.example/mcp' } })
-      expect(calls.grants).toEqual(['message.received:{"chat":"all"}'])
-      expect(calls.tools).toEqual(['message_send'])
+      expect(calls.grants).toEqual(['post.created:{"chat":"all"}'])
+      expect(calls.tools).toEqual(['post_reply'])
       expect(calls.subscribed).toEqual([
         { consumerId: `source:${proposed.id}`, revision: expect.any(Number), handlerKey: SOURCE_HANDLER },
       ])
@@ -320,7 +320,7 @@ describe('keeping a Source bound (ADR 0066)', () => {
       const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-1' }, {}))
       yield* run(confirmSource(engine, ports, proposed.id, 1))
       const binding = sourceRow(db, proposed.id)?.binding ?? 0
-      versions.set('message_send', 'v2')
+      versions.set('post_reply', 'v2')
       yield* run(consumeSourceEvent(engine, ports, delivery(proposed.id, binding, OCCURRENCE)))
       expect(sourceRow(db, proposed.id)).toMatchObject({ state: 'paused', paused: 'review' })
       expect(seen.turns).toEqual([])

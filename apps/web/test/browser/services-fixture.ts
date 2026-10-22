@@ -5,7 +5,7 @@ export const SHELF = [
     'mysi',
     'yours',
     true,
-    'Your my* apps in one connection: notes, browsers, Telegram, email, skills and terminals.',
+    'Your my* apps in one connection: notes, browsers, chats, email, skills and terminals.',
   ],
   [
     'cloudflare',

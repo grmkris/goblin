@@ -29,10 +29,10 @@ const CHAT = {
 /** What the agent proposed for a Source on the chat server's messages: keyed by chat, the owner's when they say so. */
 const PROPOSED = {
   key: [{ name: 'chat', pointer: '/chat' }],
-  speaksForMe: { pointer: '/from/isOwner', equals: true },
+  speaksForMe: { pointer: '/author/kind', equals: 'self' },
   read: { from: 'payload', text: '/text' },
   reply: {
-    tool: 'message_send',
+    tool: 'post_reply',
     arguments: { chat: '{{key.chat}}', text: '{{text}}', operationId: '{{operationId}}' },
     maxChars: 3500,
     result: {
@@ -44,13 +44,13 @@ const PROPOSED = {
 }
 const STREAMS = [
   {
-    name: 'message.received',
+    name: 'post.created',
     inputSchema: { type: 'object', properties: { chat: { type: 'string' } } },
     subscribable: true,
     title: 'Messages',
   },
 ]
-const TOOLS = [{ name: 'message_send', suggested: 'ask', modelVisible: true, granted: true }]
+const TOOLS = [{ name: 'post_reply', suggested: 'ask', modelVisible: true, granted: true }]
 
 type Json = Record<string, unknown>
 
@@ -73,7 +73,7 @@ const ACTIVE = 'src_00000000000000aa'
 const REVIEW = 'src_00000000000000bb'
 const SETUP = {
   ...PROPOSED,
-  wake: { event: 'message.received', arguments: { chat: 'all' } },
+  wake: { event: 'post.created', arguments: { chat: 'all' } },
   others: 'notice',
   newKeys: { to: 'held' },
 }
@@ -173,8 +173,8 @@ async function connection(browser: Browser, origin: string, label: string, optio
   const page = await browser.newPage(options)
   await serve(page, label, new Map([[PROPOSAL, sourceOf(PROPOSAL, SETUP, 'proposed')]]))
   await page.goto(`${origin}sources.html?at=/connections`)
-  await page.getByText('When /from/isOwner is true: those become your own turns').waitFor()
-  await page.getByText('Sent back with message_send, in pieces of at most 3,500 characters').waitFor()
+  await page.getByText('When /author/kind is "self": those become your own turns').waitFor()
+  await page.getByText('Sent back with post_reply, in pieces of at most 3,500 characters').waitFor()
   await page.getByText('Held until you choose where they go').waitFor()
   await page.getByRole('button', { name: 'Edit reply result rules' }).click()
   await page.getByLabel('Reply result rules', { exact: true }).fill('{invalid')
@@ -244,7 +244,7 @@ async function settings(browser: Browser, origin: string, label: string, options
   assert.equal(await page.getByRole('link', { name: 'Connections', exact: true }).getAttribute('href'), '/connections')
   await page.getByLabel('Copy a Source’s answers').selectOption({ label: 'Messages from Chat' })
   await page.getByLabel('Which conversation notices go to').selectOption({ label: 'chat dm' })
-  assert.equal(await page.getByLabel('Tool').inputValue(), 'message_send', `${label}: tool not copied`)
+  assert.equal(await page.getByLabel('Tool').inputValue(), 'post_reply', `${label}: tool not copied`)
   assert.match(await page.getByLabel('Arguments').inputValue(), /"chat": "dm"/u, `${label}: key not filled`)
   assert.deepEqual(
     JSON.parse(await page.getByLabel('Delivery and echo rules').inputValue()).result,
@@ -258,7 +258,7 @@ async function settings(browser: Browser, origin: string, label: string, options
       rejected: { pointer: '/status', equals: 'rejected' },
       retryAt: '/retryAt',
     },
-    echo: { event: 'message.received', arguments: { chat: 'all' } },
+    echo: { event: 'post.created', arguments: { chat: 'all' } },
   }
   await page.getByLabel('Delivery and echo rules').fill(JSON.stringify(policy, null, 2))
   await noSidewaysScroll(page, label)
@@ -291,7 +291,7 @@ try {
   ])
   assert.deepEqual(sinks[0], {
     connectionId: 'chat',
-    tool: 'message_send',
+    tool: 'post_reply',
     arguments: { chat: 'dm', text: '{{text}}', operationId: '{{operationId}}' },
     result: {
       accepted: { pointer: '/status', equals: 'sent' },
@@ -299,7 +299,7 @@ try {
       rejected: { pointer: '/status', equals: 'rejected' },
       retryAt: '/retryAt',
     },
-    echo: { event: 'message.received', arguments: { chat: 'all' } },
+    echo: { event: 'post.created', arguments: { chat: 'all' } },
   })
   writeSync(STDOUT, `${JSON.stringify({ ok: true, out, routes: routes.length })}\n`)
 } finally {
