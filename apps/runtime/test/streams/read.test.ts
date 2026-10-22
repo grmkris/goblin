@@ -36,7 +36,9 @@ describe('the tier a request reads', () => {
     const client = { kind: 'client', clientId: 'c-1', name: 'Viewer' } as const
     expect(tierOf({ ...client, scopes: ['conversations', 'transcripts'] })).toBe('full')
     expect(tierOf({ ...client, scopes: ['conversations'] })).toBe('answers')
-    expect(tierOf({ kind: 'key', keyId: 'k-1', scopes: ['conversations'], servers: [], origins: [] })).toBe('answers')
+    expect(
+      tierOf({ kind: 'key', keyId: 'k-1', name: 'shop', scopes: ['conversations'], servers: [], origins: [] }),
+    ).toBe('answers')
   })
 })
 
