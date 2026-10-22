@@ -25,6 +25,13 @@ export interface RuntimeEnv {
    * Optional (ADR 0064): without it the agent has no app or `code_run` tools.
    */
   readonly LOADER?: WorkerLoader
+  /**
+   * Each chat's AG-UI stream, one Durable Streams object per stream epoch, keyed by its path (`streams/writer.ts`).
+   * Every stage binds it; without it (a fixture that does not) no chat streams.
+   */
+  readonly STREAMS?: DurableObjectNamespace
+  /** Fixtures only: the bytes after which a stream moves to a new epoch at the end of a run (`streams/producer.ts`). */
+  readonly STREAM_ROTATE_BYTES?: string
   readonly APP_URL: string
   readonly BETTER_AUTH_SECRET: string
   /** Cloudflare Email Sending; with `MAIL_SENDER` it turns on email verification (`auth/mail.ts`). */

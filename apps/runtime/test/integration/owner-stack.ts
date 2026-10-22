@@ -21,6 +21,7 @@ export const ownerStack = (name: string, offset: number) =>
         env: {
           AGENTS: Cloudflare.DurableObject('OwnerAgent'),
           AUTH_DB: auth,
+          STREAMS: Cloudflare.DurableObject('StreamObject'),
           FILES: files,
           LOADER: Cloudflare.WorkerLoader(),
           APP_URL: 'https://goblin.test',

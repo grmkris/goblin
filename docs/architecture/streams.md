@@ -1,11 +1,10 @@
 # Chat streams
 
-> **Draft.** This is the profile third parties will implement against. What is built today is the translator from
-> Pi's events to AG-UI (`apps/runtime/src/streams/`) and goblin's parts of it in the contracts
-> (`packages/contracts/src/agui/`), proven by golden tests. Nothing serves these streams yet: the transport (a
-> Durable Streams JSON stream per chat, read through a short-lived signed URL), the producer that appends to it, the
-> join endpoint and the web's reader land next, with the ADR that decides them. Until then names and shapes here may
-> still change.
+> **Draft.** This is the profile third parties will implement against. Built: the translator from Pi's events to
+> AG-UI (`apps/runtime/src/streams/agui.ts`), goblin's parts of it in the contracts (`packages/contracts/src/agui/`)
+> and the producer that appends a joined chat's events to its streams (below). The reader's way in (the join endpoint
+> and the signed stream URL) and the web's reader land next, with the ADR that decides them. Until then names and
+> shapes here may still change.
 
 ## What a stream is
 
@@ -116,11 +115,35 @@ one). The owner's next message settles every item before it, and is how a questi
 settles its own; a held call's outcome settles the items on that call. Approvals, grants, URL requests and sign-ins
 are answered through the app's own controls.
 
+## How a stream is produced
+
+Each epoch of a chat's stream in a tier is its own Durable Streams object (`@durable-streams/server-cloudflare`'s
+`StreamObject`, pinned at 0.1.1, bound as `STREAMS`), keyed by its path `/s/<workspace>/<chat>/<tier>/<epoch>`. The
+agent writes it directly through the object's stub and never mounts the library's router: a JSON stream, created with
+a seven-day sliding TTL, each append a JSON array of events sent with the producer headers (`Producer-Id` `goblin`,
+`Producer-Epoch` 0, `Producer-Seq` from 0), so a retry of the same bytes is answered 204 and counted as sent.
+
+The producer (`streams/producer.ts`, one fiber per agent) follows only chats someone joined (a row in
+`app_streams`). Pi's commits say which of them have activity (`subscribeCommits`, which only notes them); a watch
+(`watchEvents`) then follows that chat, and stops after 30 idle seconds with nothing running. Each batch is translated
+once per tier and appended at most every 250 ms, or at once at a boundary (`RUN_*`, `TEXT_MESSAGE_END`, a snapshot,
+a CUSTOM event); an overflow's snapshot, a new watch and a restart of the agent catch up from the stored cursor. An
+append is first an outbox row (`app_stream_outbox`, written with the row's new cursor in one short transaction), sent
+outside any transaction by one drain per stream, and deleted once the stream answered 2xx; a write that may not have
+arrived goes again, the same bytes, after a backoff.
+
+An epoch begins when a chat's stream is first joined, at the end of a run once the epoch passed 4 MiB or a day, when
+its stream is gone (expired or erased: 404 or 410) or out of step (409, 403), and when its stored cursor cannot be
+read. It begins from a new watch's snapshot (so nothing the old watch still delivered is sent twice), and the old
+epoch, unless its stream was lost, ends with `goblin.stream.moved` and is closed after what it still had to send.
+Erasing the agent erases every epoch of every stream it made.
+
 ## What the producer adds
 
 Pi's events do not carry everything; the producer supplies, or the stream leaves out:
 
-- a queued input's words (`/queue` `text`), from the owner queue read (`InboxDoc`);
+- a queued input's words (`/queue` `text`): the translator takes them as a hint, which the producer does not pass yet
+  (the owner queue read, `InboxDoc`, has them);
 - a run's `operations` when its inputs were admitted before the stream was attached (left out);
 - a held call decided outside the transcript before its outcome message arrives (it stays in `/attention` until then);
 - on a catch-up, tools already running (their progress resumes with the next update; a nested call started meanwhile

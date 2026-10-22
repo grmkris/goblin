@@ -104,6 +104,8 @@ export default Alchemy.Stack(
     // Dynamic Workers for agent apps and `code_run` (ADR 0021): open beta, Workers Paid.
     const loader = (yield* switchedOn('GOBLIN_AGENT_APPS')) ? { LOADER: Cloudflare.WorkerLoader() } : {}
     const agents = Cloudflare.DurableObject('PersonalAgent', { className: 'PersonalAgent' })
+    // One Durable Streams object per chat stream epoch (docs/architecture/streams.md), SQLite-backed as every new class.
+    const streams = Cloudflare.DurableObject('StreamObject', { className: 'StreamObject' })
     const web = yield* Cloudflare.Website.Vite('Web', {
       name: stage.workerName,
       rootDir: root,
@@ -127,6 +129,7 @@ export default Alchemy.Stack(
       },
       env: {
         AGENTS: agents,
+        STREAMS: streams,
         AUTH_DB: db,
         ...files,
         ...flows,

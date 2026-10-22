@@ -22,6 +22,8 @@ import { ownerSend } from './probe-reads.ts'
 import { addUsage, utcDay } from '../../src/budget.ts'
 import { BACKGROUND, conversationId } from '../../src/pi/context.ts'
 
+export { StreamObject } from '@durable-streams/server-cloudflare'
+
 /** Tokens the `approvals/spent` lever adds to today: more than the owner stack's daily cap (`owner-stack.ts`). */
 const SPENT_TOKENS = 1_000_000_000
 

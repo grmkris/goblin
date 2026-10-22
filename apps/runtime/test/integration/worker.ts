@@ -43,6 +43,7 @@ import { probes as subagentProbes } from './subagent-probe.ts'
 import { probes as telemetryProbes } from './telemetry-probe.ts'
 
 export { NativeLifecycleProbe } from './lifecycle-probe.ts'
+export { StreamObject } from '@durable-streams/server-cloudflare'
 
 /** Every probe of the native worker by name (`GET /probe/<name>?name=<agent>`). */
 const PROBES = registry(

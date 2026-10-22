@@ -14,6 +14,7 @@ import type { SubagentKit } from '../pi/subagents.ts'
 import type { RoutineSchedules } from '../routines/scheduler.ts'
 import type { ToolSets } from '../setup/scope.ts'
 import type { RunTelemetry } from '../telemetry/events.ts'
+import type { StreamsFetch } from '../streams/writer.ts'
 import type { Instrument } from './instrument.ts'
 
 /**
@@ -47,6 +48,8 @@ export interface AgentInputs {
   /** Schedules the Sources' alarm (sourcesWake) in `seconds` (ADR 0066). */
   readonly scheduleSources: (seconds: number) => void
   readonly mcpFetch: typeof fetch
+  /** How the chat streams' writes reach their stream objects (`streams/writer.ts`); none without the binding. */
+  readonly streamsFetch?: StreamsFetch | undefined
   /**
    * The origins key `keyId` of this workspace grants now (ADR 0091), none once it is gone or expired: what a thread's
    * declared servers are checked against at every use (ADR 0103).

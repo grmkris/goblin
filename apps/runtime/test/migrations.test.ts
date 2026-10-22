@@ -155,6 +155,7 @@ describe('fresh application baseline', () => {
       '20261022160000_asker_role',
       '20261022170000_thread_servers',
       '20261022180000_rooms',
+      '20261022190000_streams',
     ])
     // An additive migration that alters a table names it too, so a table may be named more than once.
     const owned = [...new Set(MIGRATIONS.flatMap((migration) => migration.tables))]

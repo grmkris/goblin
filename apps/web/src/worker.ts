@@ -3,6 +3,8 @@ import runtime from '@goblin/runtime/worker'
 import { canonicalRedirect } from '@goblin/runtime/canonical'
 import { robotsTxt } from './lib/robots.ts'
 export { PersonalAgent } from '@goblin/runtime/agent'
+// Each chat's AG-UI stream (docs/architecture/streams.md), one object per epoch, which the agent appends to.
+export { StreamObject } from '@durable-streams/server-cloudflare'
 
 export default {
   async fetch(request: Request, env: Parameters<typeof runtime.fetch>[1]): Promise<Response> {

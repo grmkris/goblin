@@ -15,6 +15,7 @@ import { RoutineRunsLive, RoutinesLive } from './routines.ts'
 import { LearnerLive, SkillsLive } from './skills.ts'
 import { SourcesLive } from './sources.ts'
 import { WorkspaceLive } from '../workspace/live.ts'
+import { StreamsLive } from './streams.ts'
 
 /** `step`, built after and over everything `built` provides; the result provides both. */
 const then =
@@ -60,7 +61,8 @@ const start = (input: AgentInputs) =>
  * picker (a send's admission reads them), then each area's layer in turn, each built
  * after and over everything before it: the skill learner after the owner's files and the routines' notices it writes,
  * and the Sources after the routines' notices they post and the owner's files they keep attachments in (their Events
- * handler is registered there, before the agent runs anything).
+ * handler is registered there, before the agent runs anything). The chat streams come last before the HTTP API, which
+ * joins them.
  */
 export const AgentLive = (input: AgentInputs) =>
   start(input).pipe(
@@ -76,6 +78,7 @@ export const AgentLive = (input: AgentInputs) =>
     then(LearnerLive),
     then(WorkspaceLive),
     then(OnboardingLive),
+    then(StreamsLive),
     then(AgentHttp.layer),
   )
 
