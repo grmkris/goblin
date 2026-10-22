@@ -309,9 +309,11 @@ server are told apart by them; ADR 0041), connected ones first, so a connection 
 one the owner connected; it names no server of its own accord (ADR 0063). A connection's tools come in brief, since the result stays in the model's
 context and is paid for again on every later call: each tool's name, its description cut to one line of 160
 characters, and only the flags that differ (`granted: false`, `askFirst: true`), with no
-schemas. The tools the model names in `tools` come in full, with their input schemas (the server's, untrusted data),
-and names it is not offered come back as `unknown`; the persona tells it to ask for the schemas of the tools it will
-call. Asked with `events: true`, for a connection whose server offers Events, it adds the first 64 event streams with
+schemas. The tools the model names in `tools` come in full, with their input schemas and the output schemas of their
+structured results when they declare one (the server's, untrusted data; a Source's pointers and result rules point
+into them, ADR 0096), and names it is not offered come back as `unknown`; the persona tells it to ask for the schemas
+of the tools it will call. A listing that names no tools carries the server's own `instructions` from its
+`initialize` (untrusted, cut to 2000 characters), which say what it offers and where its guide skills are. Asked with `events: true`, for a connection whose server offers Events, it adds the first 64 event streams with
 their argument schemas (`events`, from `Events.catalog`, also untrusted), so the model can propose a routine on one;
 unasked, `sendsEvents` says there are some. A catalog the connection's sign-in or the server does not let it read
 leaves `events` out and the tools listed. A connection with more than forty tools whose names fall into services

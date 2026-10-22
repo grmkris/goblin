@@ -102,7 +102,8 @@ itself authorize model spend, external messages, deployment or production change
   (`events: true`). goblin reads a descriptor's standard fields only (`name`, `title`, `description`, `inputSchema`,
   `payloadSchema`, `delivery`; ADR 0068), never its `_meta`: the title and description (`eventWords`) are claims for
   the owner's eyes, and nothing a server says picks, grants or confirms a selector. `mcp_list` lists a connection's tools in brief (name, one-line description, flags that differ) and
-  gives input schemas only for the tools named in `tools`: its result stays in the model's context. Its list of
+  gives input and output schemas only for the tools named in `tools`: its result stays in the model's context. A
+  listing that names no tools carries the server's `instructions`, untrusted and cut to 2000 characters (ADR 0096). Its list of
   connections puts connected ones first, so a configured connection never signed in does not win.
 
 - Per-call approvals (ADR 0028): only owner-selected `askFirst` policy pauses a granted tool. Prepare the encrypted

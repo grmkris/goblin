@@ -127,9 +127,14 @@ const JOBS = Array.from({ length: 60 }, (_, index) => ({
   inputSchema: LARGE,
   outputSchema: LARGE,
 }))
+/** The jobs server's own instructions: longer than a listing shows, and as untrusted as its descriptions. */
+const JOBS_INSTRUCTIONS = `Hire through the jobs-guide skill. ${'Each job takes a quote first. '.repeat(100)}`
 /** A large server: `job.0` is granted and asks first, `job.1` is granted, the rest are not. */
 const jobs = createMcpHandler(() => {
-  const server = lowLevelServer({ name: 'jobs', version: '1.0.0' }, { capabilities: { tools: {} } })
+  const server = lowLevelServer(
+    { name: 'jobs', version: '1.0.0' },
+    { capabilities: { tools: {} }, instructions: JOBS_INSTRUCTIONS },
+  )
   server.setRequestHandler('tools/list', () => ({ tools: JOBS }))
   return server
 })
@@ -413,9 +418,10 @@ describe('mcp_call and the owner grant (unit)', () => {
 describe('mcp_list keeps what the model reads small (unit)', () => {
   it("lists a large server's tools in brief: names, short descriptions and the flags that differ, no schemas", async () => {
     const text = await listedText({ connectionId: 'jobs' }, 7)
-    // The server lists over half a megabyte; the model reads names and a line of each, about 220 characters a tool.
+    // The server lists over half a megabyte; the model reads names and a line of each, about 220 characters a tool,
+    // and the server's instructions, at most 2000 characters.
     expect(JSON.stringify(JOBS).length).toBeGreaterThan(500_000)
-    expect(text.length).toBeLessThan(JOBS.length * 220)
+    expect(text.length).toBeLessThan(JOBS.length * 220 + 2000)
     const shown = toolsOf(JSON.parse(text))
     expect(shown).toHaveLength(JOBS.length)
     const short = expect.stringMatching(/^Line 0 of how this job runs[^\n]*…$/u)
@@ -429,8 +435,8 @@ describe('mcp_list keeps what the model reads small (unit)', () => {
       origin: 'jobs',
       trusted: false,
       tools: [
-        { name: 'job.0', description: LONG, inputSchema: LARGE, askFirst: true },
-        { name: 'job.1', description: LONG, inputSchema: LARGE },
+        { name: 'job.0', description: LONG, inputSchema: LARGE, outputSchema: LARGE, askFirst: true },
+        { name: 'job.1', description: LONG, inputSchema: LARGE, outputSchema: LARGE },
       ],
       unknown: ['missing'],
     })
@@ -439,6 +445,24 @@ describe('mcp_list keeps what the model reads small (unit)', () => {
       tools: [],
       unknown: ['panel'],
     })
+  })
+})
+
+describe("what mcp_list shows of a server's own words (unit, ADR 0096)", () => {
+  it("carries the server's instructions as untrusted data, cut to 2000 characters, unless the model named its tools", async () => {
+    expect(JOBS_INSTRUCTIONS.length).toBeGreaterThan(2000)
+    const brief = Schema.decodeUnknownSync(
+      Schema.Struct({ trusted: Schema.Literal(false), instructions: Schema.String }),
+    )(await listed({ connectionId: 'jobs' }, 7))
+    expect(brief.instructions).toHaveLength(2000)
+    expect(brief.instructions.startsWith('Hire through the jobs-guide skill.')).toBe(true)
+    expect(brief.instructions.endsWith('…')).toBe(true)
+    expect(await listed({ connectionId: 'jobs', tools: ['job.1'] }, 7)).not.toHaveProperty('instructions')
+    // A server that gives none lists none, and a tool with no output schema shows none.
+    expect(await listed({ connectionId: 'notes' }, 7)).not.toHaveProperty('instructions')
+    expect(toolsOf(await listed({ connectionId: 'notes', tools: ['read'] }, 7))).toEqual([
+      { name: 'read', inputSchema: { type: 'object', properties: {} } },
+    ])
   })
 })
 
