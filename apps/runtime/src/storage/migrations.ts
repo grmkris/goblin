@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/durable-sqlite'
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator'
 import { ASKER_ROLE } from './migrations/asker-role.ts'
 import { BASELINE } from './migrations/baseline.ts'
+import { INVOCATION_FORK } from './migrations/invocation-fork.ts'
 import { INVOCATION_REASON } from './migrations/invocation-reason.ts'
 import { KEY_REACH } from './migrations/key-reach.ts'
 import { PERSONA_THINKING } from './migrations/persona-thinking.ts'
@@ -16,8 +17,8 @@ import { assertApplicationTable } from './vendor.ts'
 
 /**
  * The fresh application baseline, then the forward migrations production needed without a reset (ADRs 0068, 0081, 0083,
- * 0088, 0099, 0100, 0101, 0102, 0103, 0108) and the chat streams. An edit to the baseline ships only with a disposable
- * dev reset.
+ * 0088, 0099, 0100, 0101, 0102, 0103, 0108), the chat streams and the fork a Persona's work streams from. An edit to the
+ * baseline ships only with a disposable dev reset.
  *
  * @internal Unit tests apply these same statements to SQLite and compare them with the live Drizzle declarations.
  */
@@ -34,6 +35,7 @@ export const MIGRATIONS = [
   THREAD_SERVERS,
   ROOMS,
   STREAMS,
+  INVOCATION_FORK,
 ] as const
 
 export function runApplicationMigrations(storage: DurableObjectStorage): void {

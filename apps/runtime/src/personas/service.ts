@@ -150,10 +150,12 @@ export class Invocations extends Context.Service<
     readonly live: Effect.Effect<readonly PersonaInvocationView[]>
     /** Every invocation of one send, in order. */
     readonly of: (operationId: string) => Effect.Effect<readonly PersonaInvocationView[]>
+    /** The invocations working in `chat` now, each in its fork, oldest first. */
+    readonly working: (chat: string) => Effect.Effect<readonly PersonaInvocationView[]>
     /** The newest `limit` invocations asked in `chat`, newest first. */
     readonly ofChat: (chat: string, limit: number) => Effect.Effect<readonly PersonaInvocationView[]>
-    /** The Persona started working; only a pending invocation moves. */
-    readonly running: (operationId: string, persona: number) => Effect.Effect<void>
+    /** The Persona started working in its chat `fork`; only a pending invocation moves. */
+    readonly running: (operationId: string, persona: number, fork: string) => Effect.Effect<void>
     /** Settles one invocation; a settled one stays as it is. Whether this call settled it. */
     readonly settle: (
       operationId: string,
@@ -189,11 +191,14 @@ export class Invocations extends Context.Service<
         of: Effect.fn('Invocations.of')(function* (operationId: string) {
           return yield* Effect.sync(() => store.of(operationId))
         }),
+        working: Effect.fn('Invocations.working')(function* (chat: string) {
+          return yield* Effect.sync(() => store.working(chat))
+        }),
         ofChat: Effect.fn('Invocations.ofChat')(function* (chat: string, limit: number) {
           return yield* Effect.sync(() => store.ofChat(chat, limit))
         }),
-        running: Effect.fn('Invocations.running')(function* (operationId: string, persona: number) {
-          yield* written(() => store.running(operationId, persona))
+        running: Effect.fn('Invocations.running')(function* (operationId: string, persona: number, fork: string) {
+          yield* written(() => store.running(operationId, persona, fork))
         }),
         settle: Effect.fn('Invocations.settle')(function* (
           operationId: string,

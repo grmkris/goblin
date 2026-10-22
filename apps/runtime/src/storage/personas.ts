@@ -61,6 +61,8 @@ export const appPersonaInvocations = sqliteTable(
     answerEntry: integer('answer_entry'),
     /** Why a failed invocation gave no answer (ADR 0083). */
     reason: text('reason', { enum: ['no_answer', 'model_error', 'budget', 'unavailable'] }),
+    /** The chat the Persona answers in, its fork, once it started (the `subagentRunId` its work streams under). */
+    fork: text('fork'),
     createdAt: integer('created_at').notNull(),
     settledAt: integer('settled_at'),
   },

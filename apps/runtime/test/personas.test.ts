@@ -261,16 +261,26 @@ describe('Persona invocations', () => {
         yield* invocations.insert([asked], 10)
         yield* invocations.insert([{ ...asked, revision: 5 }], 11)
         const live = yield* invocations.live
-        yield* invocations.running('op', 1)
+        yield* invocations.running('op', 1, '12')
+        const working = yield* invocations.working('1')
         const settled = yield* invocations.settle('op', 1, { state: 'answered', entry: 77 }, 12)
         const again = yield* invocations.settle('op', 1, { state: 'stopped' }, 13)
-        return { live, settled, again }
+        return { live, working, settled, again }
       }).pipe(Effect.provideService(Changes, changes)),
     )
     expect(seen.live).toHaveLength(1)
+    // Once it starts, the invocation names the chat the Persona answers in: what the chat's stream follows.
+    expect(seen.working).toEqual([expect.objectContaining({ operationId: 'op', state: 'running', fork: '12' })])
     expect([seen.settled, seen.again]).toEqual([true, false])
-    expect(store.get('op', 1)).toMatchObject({ state: 'answered', answerEntry: 77, settledAt: 12, revision: 1 })
+    expect(store.get('op', 1)).toMatchObject({
+      state: 'answered',
+      fork: '12',
+      answerEntry: 77,
+      settledAt: 12,
+      revision: 1,
+    })
     expect(store.live()).toEqual([])
+    expect(store.working('1')).toEqual([])
     expect(told).toEqual(['op/1', 'op/1', 'op/1'])
   })
 

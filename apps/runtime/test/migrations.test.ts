@@ -134,6 +134,20 @@ describe('a room knows its key (ADR 0108)', () => {
   })
 })
 
+describe("a Persona's invocation knows its fork", () => {
+  it('keeps every invocation, which names no fork until its Persona starts', () => {
+    const { sqlite, rest } = before('20261022200000_invocation_fork')
+    sqlite.exec(
+      "INSERT INTO app_persona_invocations (operation_id, persona_id, revision, chat_id, ord, state, created_at) VALUES ('op', 1, 1, '1', 0, 'running', 1)",
+    )
+    rest()
+    expect(sqlite.prepare('SELECT operation_id, state, fork FROM app_persona_invocations').all()).toEqual([
+      { operation_id: 'op', state: 'running', fork: null },
+    ])
+    sqlite.close()
+  })
+})
+
 describe('fresh application baseline', () => {
   it('creates exactly the live application tables and declares its complete ownership', async () => {
     const sqlite = database()
@@ -156,6 +170,7 @@ describe('fresh application baseline', () => {
       '20261022170000_thread_servers',
       '20261022180000_rooms',
       '20261022190000_streams',
+      '20261022200000_invocation_fork',
     ])
     // An additive migration that alters a table names it too, so a table may be named more than once.
     const owned = [...new Set(MIGRATIONS.flatMap((migration) => migration.tables))]

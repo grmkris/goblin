@@ -186,7 +186,7 @@ export const resumePersona = Effect.fn('personas.resume')(function* (fork: strin
   const invocations = yield* Invocations
   const asked = { operationId, persona: persona.id, revision: persona.revision, chat: found.parent, order: 0 }
   yield* invocations.insert([asked], yield* epochSeconds)
-  yield* invocations.running(operationId, persona.id)
+  yield* invocations.running(operationId, persona.id, fork)
   const parent = conversationId(yield* chats.session(found.parent))
   const forked = conversationId(yield* chats.session(fork))
   const harness = yield* (yield* PiSessions).pi.pipe(

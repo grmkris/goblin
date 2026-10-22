@@ -142,6 +142,8 @@ type State =
       readonly text: string
       readonly hold?: PersonaHold
       readonly questions?: readonly QuestionSpec[]
+      /** The fork it answered in, which its answer names (a turn that reached this phase before had none). */
+      readonly fork?: ConversationId
     }
 
 /**
@@ -253,7 +255,7 @@ const registerFork = (input: Input, fork: ConversationId) =>
       name,
       setup: setup ?? NOTHING,
     })
-    yield* (yield* Invocations).running(input.operationId, input.persona.id)
+    yield* (yield* Invocations).running(input.operationId, input.persona.id, String(fork))
   })
 
 /**
@@ -411,7 +413,7 @@ const askPhase =
       const answer = await readAnswer(tx, fork, requestId, final)
       read.answered = answer !== undefined
       if (answer === undefined) return failed('The Persona gave no answer.')
-      return { status: 'running', checkpoint: { phase: 'write', ...answer } }
+      return { status: 'running', checkpoint: { phase: 'write', ...answer, fork } }
     }, context)
     if (!read.answered) {
       const aborted = settled.status === 'unanswered' && settled.reason === 'aborted'
@@ -426,7 +428,7 @@ const askPhase =
 const writePhase =
   (run: RunProgram): Phase<'write'> =>
   async (task, runtime, context) => {
-    const { text, hold, questions } = task.state.checkpoint
+    const { text, hold, questions, fork } = task.state.checkpoint
     const { operationId, chat, persona } = task.input
     const data = {
       persona: persona.id,
@@ -437,6 +439,7 @@ const writePhase =
       text,
       ...(hold === undefined ? {} : { hold: holdJson(hold) }),
       ...(questions === undefined ? {} : { questions: questions.map(questionJson) }),
+      ...(fork === undefined ? {} : { fork: String(fork) }),
     } satisfies PersonaAnswerData
     const entry = await run(
       Effect.gen(function* () {

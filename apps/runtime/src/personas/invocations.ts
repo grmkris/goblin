@@ -15,6 +15,7 @@ const view = (row: Row): PersonaInvocationView => ({
   chat: row.chatId,
   order: row.ord,
   state: row.state,
+  ...(row.fork === null ? {} : { fork: row.fork }),
   ...(row.answerEntry === null ? {} : { answerEntry: row.answerEntry }),
   ...(row.reason === null ? {} : { reason: row.reason }),
   createdAt: row.createdAt,
@@ -99,6 +100,18 @@ export class PersonaInvocations<RunResult = unknown> {
       .map(view)
   }
 
+  /** The invocations working in `chat` now, each in its fork: what the chat's stream follows. */
+  working(chat: string): readonly PersonaInvocationView[] {
+    return this.#db
+      .select()
+      .from(appPersonaInvocations)
+      .where(and(eq(appPersonaInvocations.chatId, chat), eq(appPersonaInvocations.state, 'running')))
+      .orderBy(asc(appPersonaInvocations.createdAt), asc(appPersonaInvocations.ord))
+      .all()
+      .map(view)
+      .filter((each) => each.fork !== undefined)
+  }
+
   /** The newest invocations asked in `chat`, newest first: what a server reading the chat sees settle (ADR 0081). */
   ofChat(chat: string, limit: number): readonly PersonaInvocationView[] {
     return this.#db
@@ -122,11 +135,11 @@ export class PersonaInvocations<RunResult = unknown> {
       .map(view)
   }
 
-  /** The Persona started working. Only a pending invocation moves. */
-  running(operationId: string, persona: number): readonly PersonaInvocationView[] {
+  /** The Persona started working in its chat `fork`. Only a pending invocation moves. */
+  running(operationId: string, persona: number, fork: string): readonly PersonaInvocationView[] {
     return this.#db
       .update(appPersonaInvocations)
-      .set({ state: 'running' })
+      .set({ state: 'running', fork })
       .where(
         and(
           eq(appPersonaInvocations.operationId, operationId),

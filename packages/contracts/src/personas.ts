@@ -149,8 +149,9 @@ export type PersonaFailure = typeof PersonaFailure.Type
 
 /**
  * One tagged Persona answering one owner message: `order` is its place when the owner asked them in sequence ("then"),
- * otherwise they answer in parallel. `answerEntry` is the attributed answer written into `chat`; `reason` says why a
- * failed one gave none.
+ * otherwise they answer in parallel. `fork` is the Persona's own chat once it started, the `subagentRunId` its work
+ * streams under in `chat`'s stream (docs/architecture/streams.md). `answerEntry` is the attributed answer written into
+ * `chat`; `reason` says why a failed one gave none.
  */
 export const PersonaInvocationView = Schema.Struct({
   operationId: OperationId,
@@ -159,6 +160,7 @@ export const PersonaInvocationView = Schema.Struct({
   chat: ChatId,
   order: Schema.Int,
   state: Schema.Literals(['pending', 'running', 'answered', 'failed', 'stopped']),
+  fork: Schema.optional(ChatId),
   answerEntry: Schema.optional(EntryId),
   reason: Schema.optional(PersonaFailure),
   createdAt: Schema.Number,
@@ -216,6 +218,11 @@ export const PersonaAnswerData = Schema.Struct({
   hold: Schema.optional(PersonaHold),
   /** What the Persona asked with `ask_user` (ADR 0082): the answer ends there and the owner's next tag answers it. */
   questions: Schema.optional(Schema.Array(QuestionSpec)),
+  /**
+   * The Persona's own chat it answered in (its fork, ADR 0033), when it answered in one rather than in a routine's run:
+   * the `subagentRunId` its work streamed under (docs/architecture/streams.md).
+   */
+  fork: Schema.optional(ChatId),
 })
 export type PersonaAnswerData = typeof PersonaAnswerData.Type
 
