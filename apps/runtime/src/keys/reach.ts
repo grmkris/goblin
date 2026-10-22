@@ -19,7 +19,7 @@ export const hasReach = (db: DrizzleSqliteDODatabase, keyId: string, kind: Reach
  * Whether Topic `topic` is a room (ADR 0108): a server's key made it, so every chat under it reaches only it, and its
  * work is a server's (ADR 0087).
  */
-export const roomOf = (db: DrizzleSqliteDODatabase, topic: number): boolean =>
+export const roomOf = <RunResult>(db: SQLiteAsyncDatabase<'sync', RunResult>, topic: number): boolean =>
   db
     .select({ keyId: appKeyReach.keyId })
     .from(appKeyReach)

@@ -4,6 +4,7 @@ import type { PiHarness } from 'agents/harness/pi'
 import { and, count, desc, eq, gte, ne, sql } from 'drizzle-orm'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Schema from 'effect/Schema'
+import { roomOf } from '../keys/reach.ts'
 import { BACKGROUND, conversationId, entryId } from '../pi/context.ts'
 import { appConversations } from '../storage/schema.ts'
 import { appRetrievalUses, appTranscriptExcerpts, appTranscriptIndex } from '../storage/retrieval.ts'
@@ -59,7 +60,16 @@ const HITS = 20
 const NEIGHBOURS = 2
 
 /** Where a search looks: every chat but `exclude` in the default Topics, or only in `topic` when one is named. */
-export type SearchScope = { readonly exclude?: string; readonly topic?: number; readonly limit: number }
+/**
+ * What a search covers: never the chat `exclude`; Topic `topic` alone when one is named; and in a room (ADR 0108) the
+ * room alone, which no search from outside it covers unless it names the room.
+ */
+export type SearchScope = {
+  readonly exclude?: string
+  readonly topic?: number
+  readonly room?: number
+  readonly limit: number
+}
 
 /** A use as recorded: its stable id, where it happened and what it found. */
 export type UseRecord = Omit<SourceUse, 'chat'> & { readonly chat: string; readonly session: string }
@@ -84,13 +94,15 @@ type IndexDb = SQLiteAsyncDatabase<'sync', unknown>
 export const chatForSession = (
   db: IndexDb,
   session: string,
-): { readonly chat: string; readonly persona: boolean } | undefined => {
+): { readonly chat: string; readonly persona: boolean; readonly room?: number } | undefined => {
   const row = db
-    .select({ chat: appConversations.chatId, role: appConversations.role })
+    .select({ chat: appConversations.chatId, role: appConversations.role, topic: appConversations.topicId })
     .from(appConversations)
     .where(eq(appConversations.piSession, session))
     .get()
-  return row === undefined ? undefined : { chat: row.chat, persona: row.role === 'persona' }
+  if (row === undefined) return undefined
+  // Every chat under a Topic is registered in it, so a chat's Topic is its chain root's: the room it works in.
+  return { chat: row.chat, persona: row.role === 'persona', ...(roomOf(db, row.topic) ? { room: row.topic } : {}) }
 }
 
 const indexedThrough = (db: IndexDb, session: string): number | undefined =>

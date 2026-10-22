@@ -26,12 +26,12 @@ const TOOL_SOURCES = 5
 /** Entries one catch-up reads at most: of one session after a response, or of all chats together before a search. */
 const CATCH_UP_ENTRIES = 400
 
-/** What `search_chats` looks for: words, and a Topic when one is named. */
-type SearchInput = { readonly query: string; readonly topic?: number }
+/** What `search_chats` looks for: words, a Topic when one is named, and in a room (ADR 0108) the room it covers. */
+type SearchInput = { readonly query: string; readonly topic?: number; readonly room?: number }
 /** Where a `search_chats` call ran: its session, the chat that session is, and the call's stable use id. */
 type SearchPlace = { readonly session: string; readonly chat?: string; readonly useId: string }
-/** The chat automatic retrieval serves, and the session it runs in. */
-type AutoPlace = { readonly session: string; readonly chat: string }
+/** The chat automatic retrieval serves, the session it runs in, and the room it works in, if any (ADR 0108). */
+type AutoPlace = { readonly session: string; readonly chat: string; readonly room?: number }
 /** An owner input as the index keeps it: its entry id and its indexed text. */
 type IndexedInput = { readonly entry: number; readonly text: string }
 
@@ -55,10 +55,13 @@ export class Retrieval extends Context.Service<
     ) => Effect.Effect<SourceUse | undefined, AppError>
     /** Indexes `session`'s new entries, a bounded number at a time: `more` when some are left. */
     readonly catchUp: (session: string) => Effect.Effect<'more' | 'done', AppError>
-    /** The chat `session` is registered as, and whether it is a Persona's fork; none for an unknown session. */
+    /**
+     * The chat `session` is registered as, whether it is a Persona's fork, and the room it works in (ADR 0108); none for
+     * an unknown session.
+     */
     readonly chatFor: (
       session: string,
-    ) => Effect.Effect<{ readonly chat: string; readonly persona: boolean } | undefined>
+    ) => Effect.Effect<{ readonly chat: string; readonly persona: boolean; readonly room?: number } | undefined>
     /** The Topic a name or id names, archived ones included. */
     readonly topicNamed: (name: string) => Effect.Effect<number | undefined>
     /** The newest owner input among `session`'s last entries, as the index keeps it. */
@@ -136,6 +139,7 @@ const searchRecorded = (
     {
       ...(where.chat === undefined ? {} : { exclude: where.chat }),
       ...(input.topic === undefined ? {} : { topic: input.topic }),
+      ...(input.room === undefined ? {} : { room: input.room }),
       limit: TOOL_SOURCES,
     },
     now,
@@ -147,8 +151,8 @@ const searchRecorded = (
 
 /**
  * Automatic retrieval for the owner input `input` of `chat`, over the index as it is (the service catches it up
- * first): FTS over the default Topics (never this chat), the bm25 gate, then the cheap model's rerank, which may
- * abstain. A selection is recorded as the input's use and returned.
+ * first): FTS over the default Topics, or in a room the room alone (never this chat), the bm25 gate, then the cheap
+ * model's rerank, which may abstain. A selection is recorded as the input's use and returned.
  */
 const automaticRecorded = async (
   { db, model }: RetrievalDeps,
@@ -156,7 +160,12 @@ const automaticRecorded = async (
   input: IndexedInput & { readonly now: number },
   signal?: AbortSignal,
 ): Promise<SourceUse | undefined> => {
-  const candidates = searchTranscripts(db, input.text, { exclude: where.chat, limit: AUTO_CANDIDATES }, input.now)
+  const scope = {
+    exclude: where.chat,
+    ...(where.room === undefined ? {} : { room: where.room }),
+    limit: AUTO_CANDIDATES,
+  }
+  const candidates = searchTranscripts(db, input.text, scope, input.now)
   if (candidates.length === 0) return undefined
   const chosen = await chooseSources(input.text, candidates, gateFor(indexSize(db)), model, signal)
   if (chosen.length === 0) return undefined

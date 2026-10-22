@@ -24,18 +24,27 @@ const Ids = Schema.Array(Schema.Struct({ id: Schema.Number }))
 const Sessions = Schema.Array(Schema.Struct({ session: Schema.String }))
 
 /**
+ * The Topics a search covers: in a room (ADR 0108) the room alone; else a named Topic alone, whatever its state (a
+ * deliberate request overrides archive and opt-out); else the active Topics that take part in search, and no room.
+ */
+const topicsOf = (scope: { readonly topic?: number; readonly room?: number }) => {
+  if (scope.room !== undefined) return sql`t.id = ${scope.room}`
+  if (scope.topic !== undefined) return sql`t.id = ${scope.topic}`
+  return sql`t.archived_at IS NULL AND t.search_excluded = 0
+      AND NOT EXISTS (SELECT 1 FROM app_key_reach r WHERE r.kind = 'topic' AND r.resource_id = t.id)`
+}
+
+/**
  * The best `limit` hits for an FTS5 `match` (built by `ftsQuery`, so it is literal terms only), never in a persona
- * fork or the excluded chat. Without a named Topic only active Topics that take part in search are searched; a named
- * Topic is searched alone, whatever its state (a deliberate request overrides archive and opt-out).
+ * fork or the excluded chat, in the Topics `topicsOf` says.
  */
 export function searchHits<R>(
   db: Db<R>,
   match: string,
-  scope: { readonly exclude?: string; readonly topic?: number },
+  scope: { readonly exclude?: string; readonly topic?: number; readonly room?: number },
   limit: number,
 ): readonly Hit[] {
-  const topics =
-    scope.topic === undefined ? sql`t.archived_at IS NULL AND t.search_excluded = 0` : sql`t.id = ${scope.topic}`
+  const topics = topicsOf(scope)
   const rows = db.all(sql`
     SELECT e.entry_id AS entryId, e.chat_id AS chat, bm25(app_transcript_fts) AS score
     FROM app_transcript_fts
