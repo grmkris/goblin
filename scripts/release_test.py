@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 import release
-from release import (acceptance_run, directories, pick_database, prod_push, require_check,
+from release import (acceptance_run, directories, merged_runs, pick_database, prod_push, require_check,
                      require_clean_checkout, require_dev, require_existing, require_fast_forward, require_ref,
                      require_signup, resources, safe_plan, smoke_until_settled, tail, failure_reason)
 
@@ -11,6 +11,14 @@ A, B = "a" * 40, "b" * 40
 
 
 class ReleaseTest(unittest.TestCase):
+    def test_runs_asked_two_ways_count_each_run_once_and_either_listing_suffices(self):
+        one = {"id": 1, "head_sha": A}
+        two = {"id": 2, "head_sha": B}
+        self.assertEqual(merged_runs([[one], [two, one]]), [one, two])
+        self.assertEqual(merged_runs([[], [one]]), [one])
+        self.assertEqual(merged_runs([[one], []]), [one])
+        self.assertEqual(merged_runs([[], []]), [])
+
     def test_only_a_passed_check_job_of_the_exact_dev_push_is_accepted(self):
         good = {"id": 1, "head_sha": A, "head_branch": "dev", "event": "push", "conclusion": None}
         jobs = {1: [{"name": "Check", "conclusion": "success"}, {"name": "Deploy dev", "conclusion": None}]}

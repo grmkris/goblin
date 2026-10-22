@@ -126,9 +126,29 @@ def compare(base, head):
     return gh(f"repos/{REPO}/compare/{base}...{head}")["status"]
 
 
+def merged_runs(listings):
+    """The runs of several listings, each once by id, in the order first seen."""
+    seen = {}
+    for listing in listings:
+        for item in listing:
+            seen.setdefault(item.get("id"), item)
+    return list(seen.values())
+
+
+def runs_of(sha, branch, limit=100):
+    """
+    The ci.yml runs that may be `sha`'s push on `branch`, asked two ways and merged, each with one filter: GitHub's
+    listing has answered some combinations of filters with nothing while others worked (2026-10-22). Callers match
+    `sha`, branch and event on every run, so neither listing alone decides.
+    """
+    base = f"repos/{REPO}/actions/workflows/{WORKFLOW}/runs"
+    by_sha = gh(f"{base}?head_sha={sha}&per_page={limit}")["workflow_runs"]
+    by_branch = gh(f"{base}?branch={branch}&per_page={limit}")["workflow_runs"]
+    return merged_runs([by_sha, by_branch])
+
+
 def runs(sha):
-    return gh(f"repos/{REPO}/actions/workflows/{WORKFLOW}/runs?head_sha={sha}&event=push&branch=dev&per_page=100")[
-        "workflow_runs"]
+    return runs_of(sha, "dev")
 
 
 def jobs(run_id):

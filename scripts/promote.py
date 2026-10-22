@@ -8,7 +8,7 @@ import subprocess
 import time
 
 from release import (REPO, SHA, WORKFLOW, checked_source, cloud_config, compare, dev_acceptance, gh, ref, require_dev,
-                     require_fast_forward, run, version)
+                     require_fast_forward, run, runs_of, version)
 
 
 class GitHub:
@@ -33,9 +33,10 @@ class GitHub:
     def deploy_run(self, sha):
         # Best effort: the push run takes a few seconds to appear.
         for _ in range(10):
-            found = gh(f'repos/{REPO}/actions/workflows/{WORKFLOW}/runs?head_sha={sha}&event=push&branch=prod')
-            if found['workflow_runs']:
-                return found['workflow_runs'][0]['html_url']
+            matching = [item for item in runs_of(sha, 'prod', 20)
+                        if item.get('head_sha') == sha and item.get('event') == 'push']
+            if matching:
+                return matching[0]['html_url']
             time.sleep(3)
         return f'https://github.com/{REPO}/actions/workflows/{WORKFLOW}?query=branch%3Aprod'
 
