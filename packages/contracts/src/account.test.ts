@@ -24,6 +24,9 @@ describe("a key's MCP origins (ADR 0091)", () => {
     ['localhost', 'https://localhost'],
     ['a local name', 'https://printer.local'],
     ['an internal name', 'https://db.corp.internal'],
+    ['localhost with a trailing dot', 'https://localhost.'],
+    ['a localhost name with a trailing dot', 'https://api.localhost.'],
+    ['an internal name with a trailing dot', 'https://db.corp.internal.'],
     ['no address at all', 'mcp.swarmm.app'],
   ])('refuses %s as key_origin', (_case, origin) => {
     expect(keyOriginsOf([job(origin)])).toEqual({ problem: 'key_origin' })

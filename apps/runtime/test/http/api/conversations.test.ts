@@ -1,4 +1,5 @@
 import type { FlowEvent } from '@goblin/contracts/telemetry'
+import { Cipher } from '../../../src/mcp/oauth/cipher.ts'
 import { ConversationView } from '@goblin/contracts'
 import { ConversationsGroup, InvalidInput, NotFound, UpstreamMcp } from '@goblin/contracts/api'
 import type { PiHarness } from 'agents/harness/pi'
@@ -230,6 +231,8 @@ const fakeHarness = (record: PiRecord, calls: Calls): PiHarness => {
 /** The other lanes' services the conversation programs read: everything allowed, nothing running, `personas` to tag. */
 const services = (calls: Calls, personas: readonly PersonaView[]) =>
   Layer.mergeAll(
+    // No request here declares a thread's servers (ADR 0102), so their tokens are never sealed or opened.
+    stub(Cipher),
     // No message here carries files or App context, so neither is read.
     stub(Files),
     stub(Apps),

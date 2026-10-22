@@ -15,7 +15,13 @@ import { drizzle } from 'drizzle-orm/durable-sqlite'
 import * as Effect from 'effect/Effect'
 import type * as Schema from 'effect/Schema'
 import { epochSeconds, nowSeconds } from '../clock.ts'
+import { chatRow } from '../chats/directory.ts'
+import { hasReach } from '../keys/reach.ts'
+import { Conversations } from '../chats/service.ts'
+import { NotFound } from '../http/errors.ts'
+import { mcpModelResult } from '../mcp/connections/extension.ts'
 import { toolOffered } from '../mcp/connections/remote.ts'
+import { callThreadTool, threadEndpoint, threadEndpoints, threadServerId, threadTools } from '../mcp/thread-servers.ts'
 import { McpConnections, McpGrants, McpServers } from '../mcp/service.ts'
 import {
   type FrozenTool,
@@ -23,6 +29,7 @@ import {
   type ToolSet,
   forkSetOf,
   forkToolOf,
+  personaOfChat,
   recentSets,
   saveForkSet,
   storedTools,
@@ -44,7 +51,7 @@ import {
   nativeSchema,
   suffixedAlias,
 } from './native-tools.ts'
-import { type ToolContext, callFailure, callRemoteTool } from './remote-call.ts'
+import { type ToolContext, callFailure, callRemoteTool, executionAuthority } from './remote-call.ts'
 
 // A Persona fork's MCP tools as its own (ADR 0101). When the fork is registered, its set is built from what its scope
 // holds (its Topic's setup joined with the Persona's) of the owner's connections, the tools each lists that the model
@@ -65,26 +72,49 @@ export type LeftOut = {
   readonly reason: Refusal | 'unlisted' | 'not_granted'
 }
 
-/** A connection a set is built from: its id, the name its server gives itself, and the tools it lists. */
-export type ToolSource = { readonly connectionId: string; readonly serverName: string; readonly tools: readonly Tool[] }
+/**
+ * A server a set is built from: a connection (its id and the name its server gives itself), or a server the fork's
+ * thread declared (ADR 0102: `thread`, its declared name, which is its alias as it is), and the tools it lists.
+ */
+export type ToolSource = {
+  readonly connectionId: string
+  readonly serverName: string
+  readonly tools: readonly Tool[]
+  readonly thread?: string
+}
 
 /** A set as it was built: its tools, and what of the scope it left out. */
 export type BuiltSet = { readonly tools: readonly FrozenTool[]; readonly left: readonly LeftOut[] }
 
 /**
- * Each connection's alias: its server's own name as `aliasOf` gives it; when two connections, or a connection and a
- * name in `reserved`, would share one, each such connection's gets a short hash of its id (`suffixedAlias`).
+ * Each server's alias. A connection's is its server's own name as `aliasOf` gives it; when two connections, or a
+ * connection and a name in `reserved`, would share one, each such connection's gets a short hash of its id
+ * (`suffixedAlias`). A thread's server keeps the name its key declared it with, unless a connection's alias is that
+ * name: the owner's connections keep their names, and the thread's takes the hash (ADR 0103).
  */
 const aliasesOf = (sources: readonly ToolSource[], reserved: ReadonlySet<string>): ReadonlyMap<string, string> => {
-  const base = new Map(sources.map((source) => [source.connectionId, aliasOf(source.serverName)]))
+  const connections = sources.filter((source) => source.thread === undefined)
+  const base = new Map(connections.map((source) => [source.connectionId, aliasOf(source.serverName)]))
   const counts = new Map<string, number>()
   for (const alias of base.values()) counts.set(alias, (counts.get(alias) ?? 0) + 1)
-  return new Map(
-    [...base].map(([connectionId, alias]) => [
+  const owned = new Map(
+    [...base].map(([connectionId, alias]): [string, string] => [
       connectionId,
       (counts.get(alias) ?? 0) > 1 || reserved.has(alias) ? suffixedAlias(alias, connectionId) : alias,
     ]),
   )
+  const taken = new Set(owned.values())
+  const declared = sources.flatMap((source): [string, string][] =>
+    source.thread === undefined
+      ? []
+      : [
+          [
+            source.connectionId,
+            taken.has(source.thread) ? suffixedAlias(source.thread, source.connectionId) : source.thread,
+          ],
+        ],
+  )
+  return new Map([...owned, ...declared])
 }
 
 /**
@@ -119,6 +149,22 @@ const ordered = (tools: readonly FrozenTool[], own: Own, left: LeftOut[]): Froze
 /** Whether a tool is the Persona's own: its own setup holds it, not only its Topic's. */
 type Own = (connectionId: string, tool: string) => boolean
 
+/** One remote tool as a set freezes it under `alias`, or why it cannot be. */
+const frozenTool = (source: ToolSource, alias: string, tool: Tool): FrozenTool | LeftOut => {
+  const name = nativeName(alias, tool.name)
+  const schema = nativeSchema(tool.inputSchema)
+  if (typeof schema === 'string') return { connectionId: source.connectionId, tool: tool.name, reason: schema }
+  if (!NATIVE_NAME.test(name)) return { connectionId: source.connectionId, tool: tool.name, reason: 'name' }
+  return {
+    name,
+    connectionId: source.connectionId,
+    tool: tool.name,
+    description: cleanText(tool.description ?? tool.title ?? '', MAX_DESCRIPTION),
+    inputSchema: schema,
+    ...(source.thread === undefined ? {} : { thread: source.thread }),
+  }
+}
+
 export function composeSet(
   sources: readonly ToolSource[],
   reserved: ReadonlySet<string> = new Set(),
@@ -131,19 +177,9 @@ export function composeSet(
   for (const source of sources) {
     const alias = aliases.get(source.connectionId) ?? aliasOf(source.serverName)
     for (const tool of source.tools) {
-      const name = nativeName(alias, tool.name)
-      const schema = nativeSchema(tool.inputSchema)
-      if (typeof schema === 'string') left.push({ connectionId: source.connectionId, tool: tool.name, reason: schema })
-      else if (!NATIVE_NAME.test(name))
-        left.push({ connectionId: source.connectionId, tool: tool.name, reason: 'name' })
-      else
-        made.push({
-          name,
-          connectionId: source.connectionId,
-          tool: tool.name,
-          description: cleanText(tool.description ?? tool.title ?? '', MAX_DESCRIPTION),
-          inputSchema: schema,
-        })
+      const frozen = frozenTool(source, alias, tool)
+      if ('reason' in frozen) left.push(frozen)
+      else made.push(frozen)
     }
   }
   const counts = new Map<string, number>()
@@ -207,24 +243,64 @@ const sourcesFor = (allow: Allow) =>
     return { sources, left }
   })
 
-/** The set `allow` gives now, and everything it leaves out. */
-const buildSet = (allow: Allow, own: Own = () => true) =>
-  Effect.map(sourcesFor(allow), ({ sources, left }) => {
-    const built = composeSet(sources, new Set(), new Set(), own)
-    return { tools: built.tools, left: [...left, ...built.left] }
+/**
+ * The servers thread `chat` declared (ADR 0103), each with the tools it lists now that the thread may call, and those
+ * that could not be listed: the thread's Persona forks call them natively, act-only.
+ */
+const threadSourcesFor = (chat: string | undefined, persona: number | undefined) =>
+  Effect.gen(function* () {
+    if (chat === undefined || persona === undefined) return { sources: [], left: [] }
+    // Only a Persona the declaring key reaches gets its servers' tools (ADR 0103).
+    const reached = yield* Db.useSync((db) => (keyId: string) => hasReach(db, keyId, 'persona', persona))
+    const endpoints = (yield* threadEndpoints(chat)).filter((endpoint) => reached(endpoint.keyId))
+    const listed = yield* Effect.forEach(
+      endpoints,
+      (endpoint) =>
+        threadTools(endpoint).pipe(
+          Effect.map((tools) => ({ endpoint, tools })),
+          // expected: a declared server that cannot be listed now offers no native tool; the set says it left it out.
+          Effect.orElseSucceed(() => ({ endpoint, tools: undefined })),
+        ),
+      { concurrency: 4 },
+    )
+    const left: LeftOut[] = []
+    const sources: ToolSource[] = []
+    for (const { endpoint, tools } of listed) {
+      const connectionId = threadServerId(endpoint.name)
+      if (tools === undefined) left.push({ connectionId, reason: 'unlisted' })
+      else sources.push({ connectionId, serverName: endpoint.name, tools, thread: endpoint.name })
+    }
+    return { sources, left }
   })
+
+/** Sources and what they left out. */
+type Sourced = { readonly sources: readonly ToolSource[]; readonly left: readonly LeftOut[] }
+
+/**
+ * The set of `owned` (connections) and `declared` (a thread's servers), and everything it leaves out: the Persona's own
+ * tools first (`own`, and its thread's servers, which are its own too).
+ */
+const setOf = (owned: Sourced, declared: Sourced = { sources: [], left: [] }, own: Own = () => true) => {
+  const mine: Own = (connectionId, tool) => connectionId.startsWith('thread:') || own(connectionId, tool)
+  const built = composeSet([...declared.sources, ...owned.sources], new Set(), new Set(), mine)
+  return { tools: built.tools, left: [...owned.left, ...declared.left, ...built.left] }
+}
 
 /** A frozen set: its tools under the id that is their hash, and what the fork's scope held that it left out. */
 export type Frozen = { readonly set: ToolSet; readonly left: readonly LeftOut[] }
 
 /**
- * Builds and freezes the set of Persona fork `fork` (its chat, whose Pi session has the same id): from its scope now,
- * the Persona's own tools (`own`, its own setup) first, stored by its hash and recorded as the fork's. Called once the
- * fork is registered, so its scope is the Persona's.
+ * Builds and freezes the set of Persona fork `fork` (its chat, whose Pi session has the same id): from its scope now and
+ * the servers the thread it answers in declared (ADR 0103), the Persona's own tools (`own`, its own setup, and its
+ * thread's servers) first, stored by its hash and recorded as the fork's. Called once the fork is registered, so its
+ * scope is the Persona's.
  */
 export const freezeForkTools = Effect.fn('ForkTools.freeze')(function* (fork: string, own: Allow) {
   const scope = yield* (yield* Setups).scope(fork)
-  const built = yield* buildSet(scope, own.tool)
+  // The chat the Persona answers in: the thread whose declared servers its fork calls (ADR 0103).
+  const asked = yield* Db.useSync((db) => chatRow(db, fork)?.parentSession ?? undefined)
+  const persona = yield* Db.useSync((db) => personaOfChat(db, fork))
+  const built = setOf(yield* sourcesFor(scope), yield* threadSourcesFor(asked, persona), own.tool)
   const id = (yield* Effect.promise(() => sha256Hex(storedTools(built.tools)))).slice(0, 32)
   const set = { id, tools: built.tools }
   const now = yield* epochSeconds
@@ -237,7 +313,7 @@ export const freezeForkTools = Effect.fn('ForkTools.freeze')(function* (fork: st
  * Topic that adds nothing offers. A Topic that adds servers can add tools, and an alias it shares gets a suffix.
  */
 export const exposedTools = Effect.fn('ForkTools.exposed')(function* (setup: PersonaSetup) {
-  const built = yield* buildSet(setupAllows(setup))
+  const built = setOf(yield* sourcesFor(setupAllows(setup)))
   return built.tools.map((tool) => tool.name)
 })
 
@@ -248,7 +324,8 @@ export const exposedTools = Effect.fn('ForkTools.exposed')(function* (setup: Per
 export const nativeCall = Effect.fn('ForkTools.call')(function* (session: string, name: string, args: unknown) {
   if (!name.includes(SEPARATOR) || !isRecord(args)) return undefined
   const tool = yield* Db.useSync((db) => forkToolOf(db, session, name))
-  if (tool === undefined) return undefined
+  // A thread's server is act-only (ADR 0103): nothing of it is held for the owner.
+  if (tool === undefined || tool.thread !== undefined) return undefined
   // SAFETY: Pi checked the call's arguments against the tool's object schema; they arrived as JSON.
   return { connectionId: tool.connectionId, name: tool.tool, arguments: args as Record<string, Schema.Json> }
 })
@@ -298,6 +375,29 @@ const failedCall = (cause: unknown): ToolExecutionResult => {
   }
 }
 
+/**
+ * One call of a native tool of a server the fork's thread declared (ADR 0103), checked at each call: resident authority
+ * (a key's thread runs under it too), the thread still open with that server declared and the tool on its list, and
+ * the arguments against the frozen schema. Act-only: nothing is held for the owner. Its result is the server's,
+ * untrusted, as an `mcp_call`'s.
+ */
+const callDeclared = (
+  tool: FrozenTool,
+  server: string,
+  input: { readonly name: string; readonly arguments: Record<string, Schema.Json> },
+  api: ToolExecutionApi,
+) =>
+  Effect.gen(function* () {
+    const session = String(api.conversationId)
+    yield* executionAuthority(session)
+    yield* (yield* Conversations).requireActing(session)
+    const thread = yield* Db.useSync((db) => chatRow(db, session)?.parentSession ?? undefined)
+    if (thread === undefined) return yield* new NotFound({ what: 'thread' })
+    const endpoint = yield* threadEndpoint(thread, server)
+    const result = yield* callThreadTool(endpoint, { name: input.name, inputSchema: tool.inputSchema }, input.arguments)
+    return mcpModelResult(threadServerId(server), result)
+  })
+
 /** A frozen tool as Pi registers it: deferred when the set froze it so (`ordered`). */
 const registration = (run: RunProgram, tool: FrozenTool): ToolRegistration =>
   defineTool({
@@ -312,7 +412,9 @@ const registration = (run: RunProgram, tool: FrozenTool): ToolRegistration =>
       // SAFETY: Pi checked the arguments against the tool's object schema; they arrived as JSON.
       const input = { connectionId: tool.connectionId, name: tool.tool, arguments: args as Record<string, Schema.Json> }
       try {
-        return withTarget(await run(callRemoteTool(input, api, context)), tool)
+        const called =
+          tool.thread === undefined ? callRemoteTool(input, api, context) : callDeclared(tool, tool.thread, input, api)
+        return withTarget(await run(called), tool)
       } catch (cause) {
         // expected: a call that failed is the model's to read, in `describeError`'s words (`callFailure`); `run`
         // reported anything unexpected.

@@ -1,5 +1,6 @@
 import type { Extension, ToolRegistration } from '@earendil-works/pi-durable'
 import type { PiHarness } from 'agents/harness/pi'
+import type { KeyOrigin } from '@goblin/contracts'
 import * as Context from 'effect/Context'
 import type { AgentApps } from '../agent-apps/engine.ts'
 import type { Applied } from '../agent-model.ts'
@@ -43,6 +44,11 @@ export interface AgentInputs {
   /** Schedules the Sources' alarm (sourcesWake) in `seconds` (ADR 0066). */
   readonly scheduleSources: (seconds: number) => void
   readonly mcpFetch: typeof fetch
+  /**
+   * The origins key `keyId` of this workspace grants now (ADR 0091), none once it is gone or expired: what a thread's
+   * declared servers are checked against at every use (ADR 0103).
+   */
+  readonly keyOrigins: (keyId: string) => Promise<readonly KeyOrigin[] | undefined>
   /** The agent's apps, made before Pi opened (their tools are Pi's). */
   readonly agentApps: AgentApps
   /** The run ledger and log lines the agent's services report to (ADR 0024). */

@@ -11,6 +11,7 @@ import { agentAppViewCase } from './agent-app-view-case.ts'
 import { queueCase } from './queue-case.ts'
 import { topicsCase } from './topics-case.ts'
 import { keyThreadsCase } from './key-threads-case.ts'
+import { threadServersCase } from './thread-servers-case.ts'
 import { membersCase } from './members-case.ts'
 import { threadHeadsCase } from './thread-heads-case.ts'
 import { organizeCase, personasCase } from './persona-case.ts'
@@ -100,6 +101,11 @@ harness.test(
 harness.test(
   'native: a key titles, renames, closes and reopens its own threads, reads back its message to a Persona (ADR 0090), and keeps them rotated (ADR 0105)',
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => keyThreadsCase(url)))),
+)
+harness.test(
+  "native: a key's thread declares an MCP server its native Persona calls by name, a retry with a new token is the same thread, and closing drops it",
+  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => threadServersCase(url)))),
+  { timeout: 240_000 },
 )
 harness.test(
   'native: cross-Topic retrieval indexes owned entries, searches active Topics unless named, records sources and injects reranked ones',

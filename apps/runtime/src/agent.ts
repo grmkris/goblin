@@ -28,6 +28,7 @@ import { type PersonaTurnKit, organizingKit } from './organize/kit.ts'
 import { type MemoryKit, memoryExtensions } from './pi/memory.ts'
 import { residentMcpExtension } from './pi/resident-mcp.ts'
 import { forkToolsKit } from './pi/fork-tools.ts'
+import { keyOriginsNow } from './mcp/key-origins.ts'
 import { skillLearningExtension, skillsExtension } from './pi/skills.ts'
 import { AgentLive } from './layers/index.ts'
 import type { AgentServices } from './layers/index.ts'
@@ -195,6 +196,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       scheduleEvents: (at) => this.#scheduleWake('mcpEventsWake', at),
       scheduleSources: (seconds) => void this.schedule(seconds, 'sourcesWake'),
       mcpFetch: this.mcpFetch(),
+      keyOrigins: async (keyId) => keyOriginsNow(this.env, this.name, keyId),
       agentApps: this.#apps,
       telemetry: this.#telemetry.telemetry,
       moves: {

@@ -9,11 +9,12 @@ import { PERSONA_TOOL_MODE } from './migrations/persona-tool-mode.ts'
 import { PERSONA_TOOLS } from './migrations/persona-tools.ts'
 import { RESIDENT_UNTIL_REVOKED } from './migrations/resident-until-revoked.ts'
 import { SOURCE_PROPOSER } from './migrations/source-proposer.ts'
+import { THREAD_SERVERS } from './migrations/thread-servers.ts'
 import { assertApplicationTable } from './vendor.ts'
 
 /**
  * The fresh application baseline, then the forward migrations production needed without a reset (ADRs 0068, 0081, 0083,
- * 0088, 0099, 0100, 0101, 0102). An edit to the baseline ships only with a disposable dev reset.
+ * 0088, 0099, 0100, 0101, 0102, 0103). An edit to the baseline ships only with a disposable dev reset.
  *
  * @internal Unit tests apply these same statements to SQLite and compare them with the live Drizzle declarations.
  */
@@ -27,6 +28,7 @@ export const MIGRATIONS = [
   PERSONA_TOOLS,
   PERSONA_TOOL_MODE,
   ASKER_ROLE,
+  THREAD_SERVERS,
 ] as const
 
 export function runApplicationMigrations(storage: DurableObjectStorage): void {

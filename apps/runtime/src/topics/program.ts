@@ -13,6 +13,7 @@ import {
 } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
+import { dropTopicServers } from '../mcp/thread-servers.ts'
 import * as Option from 'effect/Option'
 import { stopChat } from '../agent-program.ts'
 import { Chats, Conversations } from '../chats/service.ts'
@@ -101,6 +102,9 @@ export const updateTopic = (id: number, change: UpdateTopic, provenance: Provena
     const organized = after.name !== before.name || after.archivedAt !== before.archivedAt
     if (after.revision !== before.revision && organized) yield* receipts.record(topicReceipt(before, after, provenance))
     if (change.archived !== true) return after
+    // Its threads keep no MCP servers a key declared on them (ADR 0103), whatever stopping them does; restoring it
+    // brings none back.
+    yield* dropTopicServers(id)
     const stops: Exit.Exit<boolean, AppError>[] = []
     // A run that archives its own Topic is not stopped from inside itself: it ends with its turn.
     for (const thread of (yield* (yield* Conversations).openIn(id)).filter((open) => open !== chat))

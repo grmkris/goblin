@@ -81,7 +81,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0087](0087-the-owners-own-subscription-models.md) | The owner's own subscription models | Accepted; amended by 0089 |
 | [0088](0088-resident-authority-lasts-until-revoked.md) | Resident authority lasts until revoked | Accepted |
 | [0089](0089-workspaces-own-agents.md) | Workspaces own agents | Accepted; amended by 0093; its consent naming one workspace superseded by 0097 |
-| [0090](0090-a-key-names-closes-and-reads-back-its-threads.md) | A key names, closes and reads back its threads | Accepted |
+| [0090](0090-a-key-names-closes-and-reads-back-its-threads.md) | A key names, closes and reads back its threads | Accepted; amended by 0103 |
 | [0091](0091-a-key-names-the-mcp-servers-its-threads-may-use.md) | A key names the MCP servers its threads may use | Accepted |
 | [0092](0092-mcp-calls-are-checked-against-their-schema-and-keep-the-servers-message.md) | MCP calls are checked against their schema and keep the server's message | Accepted |
 | [0093](0093-members-invitations-and-roles.md) | Members, invitations and roles | Accepted; amended by 0095, 0097, 0098 |
@@ -94,5 +94,6 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0100](0100-a-persona-thinks-at-its-own-level.md) | A Persona thinks at its own level | Accepted |
 | [0101](0101-a-persona-forks-mcp-tools-are-its-own.md) | A Persona fork's MCP tools are its own | Accepted; amended by 0102 |
 | [0102](0102-native-tools-are-a-personas-choice.md) | Native tools are a Persona's choice | Accepted |
+| [0103](0103-a-thread-declares-its-mcp-servers.md) | A thread declares the MCP servers its Personas call | Accepted |
 | [0104](0104-routine-data-stays-as-its-producer-sent-it.md) | Routine data stays as its producer sent it | Accepted |
 | [0105](0105-a-keys-secret-rotates-in-place.md) | A key's secret rotates in place | Accepted |

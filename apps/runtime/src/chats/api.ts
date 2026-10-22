@@ -1,10 +1,12 @@
 import type {
+  ConversationView,
   CreateConversation,
   MoveToThread,
   QueueRemoval,
   SendMessage,
   StartThread,
   StopConversation,
+  ThreadServer,
   UpdateConversation,
 } from '@goblin/contracts'
 import { OwnerApi } from '@goblin/contracts/api'
@@ -21,10 +23,19 @@ import {
 } from '../agent-program.ts'
 import { composerOptions } from '../composer.ts'
 import { confineChat, confineMessage, confineUpdate } from '../keys/policy.ts'
+import {
+  applyServers,
+  checkApply,
+  dropThreadServers,
+  prepareServers,
+  requireThread,
+  threadServerViews,
+} from '../mcp/thread-servers.ts'
+import { Db } from '../runtime/db.ts'
 import { ownerQueue, removeOwnerQueuedInput } from '../conversation-queue.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { Retrieval } from '../retrieval/service.ts'
-import { attempt, toAppError } from '../http/errors.ts'
+import { InvalidInput, attempt, toAppError } from '../http/errors.ts'
 import { entryViews } from '../pi/entry-view.ts'
 import { piEventResponse, sessionSnapshot } from '../pi/events.ts'
 import { PiSessions } from '../pi/sessions.ts'
@@ -64,32 +75,84 @@ const submit = ({ params, payload }: ChatWrite<SendMessage>) =>
     sendOwnerMessage(params.id, { text: payload.input, operationId: payload.operationId, context: contextOf(payload) }),
   )
 
+/** `view` with the thread's declared servers (ADR 0103), when it has any; never a token. */
+const withServers = (view: ConversationView) =>
+  Effect.map(
+    Db.useSync((db) => threadServerViews(db, view.id)),
+    (servers) => (servers.length === 0 ? view : { ...view, mcpServers: servers }),
+  )
+
+/**
+ * The servers a thread operation declares, on the thread it makes or finds, before its first message is sent, so the
+ * Personas it tags freeze them with their tools (ADR 0103); a replay with new tokens makes those the live ones.
+ */
+const declareOn = (parent: string, payload: StartThread, servers: readonly ThreadServer[]) =>
+  Effect.gen(function* () {
+    // Every server is checked against the key first: one refused makes no thread.
+    const prepared = yield* prepareServers(servers)
+    const conversations = yield* Conversations
+    const thread = yield* conversations.startThread(parent, payload.operationId, payload.anchor)
+    yield* conversations.requireActing(thread.id)
+    yield* applyServers(thread.id, payload.operationId, prepared)
+  })
+
 /**
  * The thread operation from a chat (ADR 0034): Reply at an entry, "+" empty, or Start thread at the chat's newest
- * settled entry, the first message answered in the Thread, its Personas in the order it asks (`personaOrder`).
+ * settled entry, the first message answered in the Thread, its Personas in the order it asks (`personaOrder`), with the
+ * MCP servers a key declares on it (ADR 0103).
  */
 const threadStart = ({ params, payload }: ChatWrite<StartThread>) => {
   const context = contextOf({ ...payload.message, personaOrder: payload.personaOrder })
-  return Effect.andThen(
-    confined(params.id, context),
-    startThread({
+  const servers = payload.mcpServers ?? []
+  return Effect.gen(function* () {
+    yield* confined(params.id, context)
+    if (servers.length > 0) yield* declareOn(params.id, payload, servers)
+    const started = yield* startThread({
       parent: params.id,
       anchor: payload.anchor,
       title: payload.title,
       text: payload.message.input,
       operationId: payload.operationId,
       context,
-    }),
-  )
+    })
+    return { ...started, thread: yield* withServers(started.thread) }
+  })
 }
 
 const create = ({ payload }: { readonly payload: CreateConversation }) => createOwnerConversation(payload)
-/** Rename, close or reopen: a key only its own chats, and never pinning a subagent open (ADR 0090). */
+/**
+ * A change of a thread's declared servers (ADR 0103), checked before the request writes anything: a Thread only, open,
+ * every server within the key's grant (the owner may only clear them), and an operation that may still set them.
+ */
+const preparedFor = (chat: string, change: NonNullable<UpdateConversation['mcpServers']>, closing: boolean) =>
+  Effect.gen(function* () {
+    if (closing && change.set.length > 0) return yield* new InvalidInput({ reason: 'thread_servers_closed' })
+    yield* requireThread(chat)
+    const prepared = yield* prepareServers(change.set)
+    yield* Conversations.use((conversations) => conversations.requireActing(chat))
+    yield* checkApply(chat, change.operationId, prepared)
+    return prepared
+  })
+
+/**
+ * Rename, close or reopen: a key only its own chats, and never pinning a subagent open (ADR 0090); a key also replaces
+ * its thread's declared servers, and the owner may clear them (ADR 0103), checked before anything is written. Closing
+ * drops the servers of the thread and every chat under it, and reopening restores none.
+ */
 const update = ({ params, payload }: ChatWrite<UpdateConversation>) =>
-  Effect.andThen(
-    Effect.andThen(confineChat(params.id), confineUpdate(payload)),
-    updateOwnerConversation(params.id, payload),
-  )
+  Effect.gen(function* () {
+    const { mcpServers, ...change } = payload
+    yield* confineChat(params.id)
+    yield* confineUpdate(change)
+    const prepared =
+      mcpServers === undefined ? undefined : yield* preparedFor(params.id, mcpServers, change.closed === true)
+    const closing = change.closed === true ? yield* Conversations.use((each) => each.subtree(params.id)) : []
+    const view = yield* updateOwnerConversation(params.id, change)
+    if (mcpServers !== undefined && prepared !== undefined)
+      yield* applyServers(params.id, mcpServers.operationId, prepared)
+    if (closing.length > 0) yield* dropThreadServers(closing)
+    return yield* withServers(view)
+  })
 const move = ({ params, payload }: ChatWrite<MoveToThread>) => moveToThread(params.id, payload)
 const stop = ({ params, payload }: ChatWrite<StopConversation>) =>
   Effect.andThen(

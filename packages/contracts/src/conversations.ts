@@ -12,6 +12,37 @@ export const ConversationKind = Schema.Literals(['main', 'thread', 'subagent'])
 export type ConversationKind = typeof ConversationKind.Type
 
 /**
+ * An MCP server a server's key declares on one of its threads (ADR 0103): `name` is what its tools are called by in the
+ * thread's Persona forks (`<name>__<tool>`, ADR 0101), `url` its Streamable HTTP endpoint on an origin the owner granted
+ * the key (ADR 0091), `token` the bearer it is called with, and `tools` the ones of that origin's list it may call (all
+ * of them when absent). The token is kept encrypted and never answered back.
+ */
+export const ThreadServer = Schema.Struct({
+  name: Schema.String.check(Schema.isPattern(/^[a-z](?:[a-z0-9-]|_(?!_)){0,19}$/u)),
+  url: NonEmptyString(2048),
+  token: NonEmptyString(4096),
+  tools: Schema.optional(Schema.Array(NonEmptyString(256)).check(Schema.isMinLength(1), Schema.isMaxLength(50))),
+})
+export type ThreadServer = typeof ThreadServer.Type
+
+/** A thread's declared server as it is answered: its name, endpoint and tools, never its token. */
+export const ThreadServerView = Schema.Struct({
+  name: Schema.String,
+  url: Schema.String,
+  tools: Schema.Array(Schema.String),
+})
+export type ThreadServerView = typeof ThreadServerView.Type
+
+/** At most this many servers on one thread. */
+export const MAX_THREAD_SERVERS = 4
+
+/** A thread's declared servers: at most {@link MAX_THREAD_SERVERS}, each name once. */
+export const ThreadServers = Schema.Array(ThreadServer).check(
+  Schema.isMaxLength(MAX_THREAD_SERVERS),
+  Schema.makeFilter((servers) => new Set(servers.map((server) => server.name)).size === servers.length),
+)
+
+/**
  * A conversation of the agent the owner can open. `parent` is the conversation it came from: the one a thread branched
  * from (or main for one started empty) and the spawner of a subagent; only main has none. `forkEntry` is the entry of
  * the parent a thread branched at. `replies` are the messages written in it (the owner's and the agent's, not the
@@ -42,14 +73,21 @@ export const ConversationView = Schema.Struct({
   attention: Schema.optional(Schema.Array(Attention)),
   /** A Thread a running or finished turn was moved into: the chat it left and the move's operation id. */
   movedFrom: Schema.optional(Schema.Struct({ chat: ChatId, operationId: Schema.String })),
+  /** The MCP servers a key declared on it (ADR 0103), answered to the thread operation and its change. */
+  mcpServers: Schema.optional(Schema.Array(ThreadServerView)),
 })
 export type ConversationView = typeof ConversationView.Type
 
-/** Rename, close or reopen (with everything under it), or pin a subagent open. */
+/**
+ * Rename, close or reopen (with everything under it), or pin a subagent open. A key may also replace its thread's
+ * declared MCP servers as a whole (ADR 0103): `set` is every server it has from then on (`[]` removes them all), and
+ * the same `operationId` changes them once.
+ */
 export const UpdateConversation = Schema.Struct({
   title: Schema.optional(NonEmptyString(120)),
   closed: Schema.optional(Schema.Boolean),
   keepOpen: Schema.optional(Schema.Boolean),
+  mcpServers: Schema.optional(Schema.Struct({ operationId: OperationId, set: ThreadServers })),
 })
 export type UpdateConversation = typeof UpdateConversation.Type
 
@@ -169,6 +207,11 @@ export const StartThread = Schema.Struct({
     selections: SendMessage.fields.selections,
   }),
   personaOrder: SendMessage.fields.personaOrder,
+  /**
+   * The MCP servers the Thread's Persona forks call natively (ADR 0103), a key's alone. A replay of the operation with
+   * new tokens for the same servers keeps the Thread and makes the newest tokens the live ones.
+   */
+  mcpServers: Schema.optional(ThreadServers),
 })
 export type StartThread = typeof StartThread.Type
 

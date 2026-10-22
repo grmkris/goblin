@@ -28,11 +28,13 @@ import { Sources } from '../src/sources/service.ts'
 import { Invocations, Personas } from '../src/personas/service.ts'
 import { Topics } from '../src/topics/service.ts'
 import { appConversations } from '../src/storage/schema.ts'
+import { appThreadServers } from '../src/storage/thread-servers.ts'
+import type { Db } from '../src/runtime/db.ts'
 import { RequestContext } from '../src/http/api/context.ts'
 import type { KeyGrant } from '../src/http/api/principal.ts'
 import { updateTopic } from '../src/topics/program.ts'
 import { TopicRegistry } from '../src/topics/registry.ts'
-import { chatDatabase } from './chats-sqlite.ts'
+import { chatDatabase, sqliteDb } from './chats-sqlite.ts'
 import { unread } from './fake.ts'
 
 const cleanups: (() => void)[] = []
@@ -456,18 +458,19 @@ type Provided =
   | PiSessions
   | FlowEvents
   | Sources
+  | Db
 const run = <A, E>(layer: Layer.Layer<Provided>, program: Effect.Effect<A, E, Provided>) =>
   Effect.runPromise(Effect.provide(program, layer))
 const fails = <A, E>(layer: Layer.Layer<Provided>, program: Effect.Effect<A, E, Provided>) =>
   Effect.runPromise(Effect.flip(Effect.provide(program, layer)))
 
-/** The services Undo runs over: real registries on real SQLite, no Pi. */
-const services = () => {
+/** The services Undo runs over: real registries on real SQLite, no Pi. `open` are the chats an archive would stop. */
+const services = (open: readonly string[] = []) => {
   const parts = fixture()
-  // Stop is never reached here: no Undo here archives a Topic with chats.
+  // Stop is never reached here unless `open` names a chat, which then cannot stop: this registry has no Stop.
   // SAFETY: renaming a Topic never reaches the chat registry; only an archive reads its open chats (`openIn`).
   const conversations = Object.assign(Object.create(null) as Conversations['Service'], {
-    openIn: () => Effect.succeed([]),
+    openIn: () => Effect.succeed(open),
   })
   const layer = Layer.mergeAll(
     Layer.effect(Topics, Topics.make(parts.topics)),
@@ -489,6 +492,8 @@ const services = () => {
     // Only a Source's route receipt reaches the Sources.
     Layer.succeed(Sources, unread),
     FlowEvents.noop,
+    // An archive drops what its threads declared (ADR 0102), in the agent's database.
+    sqliteDb(parts.db),
   ).pipe(Layer.provide(Layer.merge(KeyedLock.layer, Layer.succeed(Changes, makeChanges()))))
   return { ...parts, layer }
 }
@@ -552,6 +557,29 @@ describe('organize receipts and Undo', () => {
     await run(layer, createPersona({ ...scout, operationId: 'op-1' }, { actor: 'agent' }))
     await run(layer, undoReceipt(receipts.list()[0]?.id ?? ''))
     expect(personas.get(1).archivedAt).toBeTypeOf('number')
+  })
+
+  it("drops what a key declared on an archived Topic's threads first, so a chat that cannot stop keeps none (ADR 0103)", async () => {
+    const { layer, topics, db } = services(['30'])
+    await Effect.runPromise(topics.create({ name: 'Customer', operationId: 'topic-9' }, 'owner', 5))
+    db.insert(appConversations)
+      .values({ chatId: '30', piSession: '30', kind: 'thread', topicId: 2, createdAt: 6 })
+      .run()
+    const declared = {
+      name: 'swarmm',
+      url: 'https://dev.swarmm.test/mcp',
+      origin: 'https://dev.swarmm.test',
+      tools: '[]',
+      token: 'sealed',
+      keyId: 'key-1',
+      createdAt: 6,
+    }
+    db.insert(appThreadServers)
+      .values({ ...declared, chatId: '30' })
+      .run()
+    // Stopping the thread fails here: the archive fails with it, and its servers are gone all the same.
+    await expect(run(layer, updateTopic(2, { archived: true }, { actor: 'owner' }))).rejects.toBeDefined()
+    expect(db.select().from(appThreadServers).all()).toEqual([])
   })
 
   it('undoes a Topic rename and refuses once the Topic was renamed again', async () => {

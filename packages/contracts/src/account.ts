@@ -56,11 +56,16 @@ const MAX_ORIGINS = 8
 const MAX_TOOLS = 50
 
 /** A host no key's thread may reach: an IP literal, a single label, or a name kept for local and private networks. */
-const privateHost = (host: string): boolean =>
-  !host.includes('.') ||
-  /^\d{1,3}(\.\d{1,3}){3}$/u.test(host) ||
-  host.startsWith('[') ||
-  ['.localhost', '.local', '.internal', '.home.arpa', '.lan'].some((suffix) => `.${host}`.endsWith(suffix))
+const privateHost = (name: string): boolean => {
+  // A trailing dot names the same host (`localhost.`, `api.internal.`): it is no way around the checks below.
+  const host = name.replace(/\.+$/u, '')
+  return (
+    !host.includes('.') ||
+    /^\d{1,3}(\.\d{1,3}){3}$/u.test(host) ||
+    host.startsWith('[') ||
+    ['.localhost', '.local', '.internal', '.home.arpa', '.lan'].some((suffix) => `.${host}`.endsWith(suffix))
+  )
+}
 
 /** `text`'s https origin (scheme, host and port), or none when it is anything more or less than one. */
 const originOf = (text: string): string | undefined => {

@@ -137,6 +137,7 @@ describe('fresh application baseline', () => {
       '20261022130000_persona_tools',
       '20261022150000_persona_tool_mode',
       '20261022160000_asker_role',
+      '20261022170000_thread_servers',
     ])
     // An additive migration that alters a table names it too, so a table may be named more than once.
     const owned = [...new Set(MIGRATIONS.flatMap((migration) => migration.tables))]

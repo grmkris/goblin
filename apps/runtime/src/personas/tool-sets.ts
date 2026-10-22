@@ -3,6 +3,7 @@ import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { appPersonaForkTools, appPersonaToolSets } from '../storage/persona-tools.ts'
+import { appPersonaChats } from '../storage/personas.ts'
 
 // The native tool sets Persona forks freeze (ADR 0101): stored once per distinct set, and the set each fork answers
 // with. A plain store over the agent's database, read synchronously by the Pi kit at start, by the run recorder inside
@@ -22,6 +23,8 @@ export const FrozenTool = Schema.Struct({
   inputSchema: Schema.Record(Schema.String, Schema.Json),
   /** Not offered until `tool_search` loads it: a tool beyond the first 20, the Persona's own first (ADR 0102). */
   deferred: Schema.optionalKey(Schema.Literal(true)),
+  /** The declared name of the server the fork's thread declared it from (ADR 0103); none for a connection's. */
+  thread: Schema.optionalKey(Schema.String),
 })
 export type FrozenTool = typeof FrozenTool.Type
 
@@ -89,3 +92,8 @@ export function recentSets(db: Db, since: number): readonly ToolSet[] {
     .all()
     .map((row) => ({ id: row.id, tools: toolsOf(row.tools) }))
 }
+
+/** The Persona that answers in `chat` (its fork), when one does. */
+export const personaOfChat = (db: Db, chat: string): number | undefined =>
+  db.select({ persona: appPersonaChats.personaId }).from(appPersonaChats).where(eq(appPersonaChats.chatId, chat)).get()
+    ?.persona
