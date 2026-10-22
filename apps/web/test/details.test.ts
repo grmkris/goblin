@@ -1,6 +1,6 @@
 import type { InspectDetails } from '@goblin/contracts/inspect'
 import { describe, expect, it } from 'vitest'
-import { detailSteps, detailSummary, relatedText } from '../src/lib/details.ts'
+import { detailSteps, detailSummary, ranWithText, relatedText } from '../src/lib/details.ts'
 import { durationText } from '../src/lib/format.ts'
 
 const DETAILS: InspectDetails = {
@@ -68,6 +68,42 @@ describe("a message's details, in the owner's words", () => {
       '1200 in · 80 out tokens · 1 error',
     ])
     expect(detailSummary({ ...DETAILS, turn: undefined })).toEqual(['A written note: no model ran for it.'])
+  })
+  it("places each step on the turn's timeline when the turn's wall time is known", () => {
+    const spent = { totalMs: 4_200, modelMs: 1_800, toolMs: 400, servers: [], otherMs: 2_000 }
+    const [attempt, tool, flow] = detailSteps({ ...DETAILS, spent }, 6_000)
+    expect(attempt).toMatchObject({ offsetMs: 100, bar: { left: (100 / 4_200) * 100, width: (1_800 / 4_200) * 100 } })
+    expect(tool?.bar?.left).toBeCloseTo((2_000 / 4_200) * 100)
+    // A step with no end runs to now, never past the end of the timeline; an instant still shows.
+    expect(flow?.bar).toEqual({ left: (4_000 / 4_200) * 100, width: 100 - (4_000 / 4_200) * 100 })
+    expect(detailSteps(DETAILS)[0]?.bar).toBeUndefined()
+  })
+  it('says what the turn ran with, and what changed under it (ADR 0107)', () => {
+    const ranWith = {
+      versions: ['3f8f88b1c0ffee', '5d6e7f8a9b0c1d'],
+      endpoints: ['deployment' as const],
+      thinking: ['medium'],
+      promptChanges: 2,
+      servers: [{ server: 'mycut', name: 'my_cut', version: '1.4.2' }],
+    }
+    expect(ranWithText(ranWith)).toBe(
+      'Build 3f8f88b · restarted into 5d6e7f8 · goblin’s model endpoint · thinking medium · prompt or tools changed before 2 attempts · my_cut 1.4.2',
+    )
+    expect(detailSummary({ ...DETAILS, ranWith }).at(-1)).toBe(`Ran with ${ranWithText(ranWith)}`)
+    const changed = detailSteps({
+      ...DETAILS,
+      events: [
+        {
+          id: 'e5',
+          kind: 'model.attempt',
+          status: 'ok',
+          startedAt: 1_100,
+          endedAt: 2_000,
+          attributes: { 'goblin.tools.added': 1, 'goblin.tools.changed': 'mycut__job_submit' },
+        },
+      ],
+    })
+    expect(changed[0]?.detail).toBe('prompt or tools changed before it')
   })
   it('reads related operations and durations plainly', () => {
     expect(relatedText({ operation: 'op-2', kind: 'start', state: 'settled' })).toBe('start · settled')

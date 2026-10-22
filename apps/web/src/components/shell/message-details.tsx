@@ -18,7 +18,10 @@ import { QueryError } from '../../lib/query/query-boundary.tsx'
 import { useOpenChat } from './panel.tsx'
 import { durationText } from '../../lib/format.ts'
 
-/** One step: what it was, how it ended and how long it took, and a line of detail under it. */
+/**
+ * One step: what it was, how it ended and how long it took, a line of detail under it, and where it sits on the
+ * turn's timeline (a bar from its start to its end, drawn to scale; its start is said in words for a screen reader).
+ */
 function Step({ step }: { readonly step: DetailStep }) {
   const failed = step.status === 'error' || step.status === 'blocked' || step.status === 'interrupted'
   return (
@@ -28,6 +31,18 @@ function Step({ step }: { readonly step: DetailStep }) {
         <Badge variant={failed ? 'destructive' : 'outline'}>{step.status}</Badge>
         {step.ms !== undefined && <span className="text-muted-foreground tabular-nums">{durationText(step.ms)}</span>}
       </span>
+      {step.bar !== undefined && (
+        <svg aria-hidden className="h-1 w-full" viewBox="0 0 100 1" preserveAspectRatio="none">
+          <rect width="100" height="1" className="fill-muted" />
+          <rect
+            x={step.bar.left}
+            width={step.bar.width}
+            height="1"
+            className={failed ? 'fill-destructive' : 'fill-primary'}
+          />
+        </svg>
+      )}
+      {step.offsetMs !== undefined && <span className="sr-only">started {durationText(step.offsetMs)} in</span>}
       {step.detail !== undefined && <span className="text-xs text-muted-foreground">{step.detail}</span>}
     </li>
   )
