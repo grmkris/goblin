@@ -279,15 +279,15 @@ export default defineConfig({
       },
     },
     // The transport modules: the typed client (lib/api*.ts) and its query bridge (lib/query/), each feature's query
-    // factories (queries.ts); the owner's file bytes, which the JSON API does not carry (lib/files.ts); and the
-    // EventSource streams (lib/conversation-stream.ts), which feed the views and invalidate query keys.
+    // factories (queries.ts); the owner's file bytes, which the JSON API does not carry (lib/files.ts); and the live
+    // reads (lib/event-streams.ts): a chat's AG-UI stream and the workspace feed, which feed the views.
     {
       files: [
         'apps/web/src/lib/api*.ts',
         'apps/web/src/lib/query/**',
         'apps/web/src/**/queries.ts',
         'apps/web/src/lib/files.ts',
-        'apps/web/src/lib/conversation-stream.ts',
+        'apps/web/src/lib/event-streams.ts',
       ],
       rules: { 'goblin/no-transport-outside-client': 'off' },
     },

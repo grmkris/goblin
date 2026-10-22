@@ -8,10 +8,10 @@ transport boundary.
 
 `lib/api.ts` has two clients: `owner` (the agent's `OwnerApi`) and `account` (the Worker's `AccountApi`: inbound
 clients, crash reports). Each request carries `x-goblin-request`, the CSRF header on every write and, with
-`withOperation`, the operation id. Nothing else calls an `/api` path, except four transports: the owner's file bytes
-(`lib/files.ts`), the conversation stream (`lib/conversation-stream.ts`), the workspace stream (opened by
-`WorkspaceFeedProvider`, `components/workspace-feed.tsx`, over the same `BrowserPiEvents`, and kept by
-`lib/workspace/`) and Better Auth's client. Untyped values (stream frames, App messages, tool payloads) are read with `lib/values.ts`, never
+`withOperation`, the operation id. Nothing else calls the server, except four transports: the owner's file bytes
+(`lib/files.ts`), the live reads in `lib/event-streams.ts` (a chat's AG-UI stream at the URL its join answered, read by
+`lib/agui/reader.ts`, and the workspace stream, opened by `WorkspaceFeedProvider`, `components/workspace-feed.tsx`, over
+`BrowserFeedSource` and kept by `lib/workspace/`) and Better Auth's client. Untyped values (stream frames, App messages, tool payloads) are read with `lib/values.ts`, never
 decoded as API answers.
 
 ## Factories and keys
@@ -85,8 +85,10 @@ feed.
 - **Other reads.** A workspace change that makes another feature's reads stale invalidates them through the module's
   one map (`staleAfter`, `lib/workspace/invalidations.ts`); no component bridges the feed and Query itself.
 
-The conversation stream (`lib/conversation-stream.ts`) follows one chat's Pi events. It invalidates queries and holds
-no owner data that a query also holds.
+A chat's stream ([chat streams](../architecture/streams.md)) is read beside the cache: `lib/agui/reader.ts` joins it
+(`streamJoin`, `conversations/queries.ts`) and reads its AG-UI events, `lib/agui/reducer.ts` folds them into the
+transcript's projection, and `lib/stream-pool.ts` shares one reader per chat among the panes that show it. It holds no
+owner data that a query also holds; older pages come from the history query, in the same message mapping.
 
 ## Failures
 

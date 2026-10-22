@@ -139,9 +139,14 @@ const registryReads = (): Partial<Conversations['Service']> => ({
   kindOf: (id) => Effect.map(known(id), (chat) => CHATS[chat]?.kind ?? 'thread'),
   view: (id) => Effect.sync(() => Option.fromNullishOr(id === NEW ? view(NEW, { forkEntry: 3 }) : CHATS[id])),
   subtree: (id) => Effect.succeed([id]),
-  // SAFETY: the handler passes Pi's records through as they are; these stand in for them.
-  history: (id, before) =>
-    Effect.succeed({ entries: [{ id: before - 1, kind: 'pi.user', chat: id }] as never, more: true }),
+  // SAFETY: the handler maps Pi's records to AG-UI messages; this one stands in for the owner's message before `before`.
+  history: (_id, before) =>
+    Effect.succeed({
+      entries: [
+        { id: before - 1, kind: 'pi.user', model: [{ role: 'user', content: 'older words', timestamp: 5 }] },
+      ] as never,
+      more: true,
+    }),
   // SAFETY: as `history`: Pi's records are normalized by the handler; these stand in for them.
   after: (id, from) => Effect.map(known(id), () => RECORDS.filter((record) => record.id > from) as never),
 })
@@ -507,17 +512,25 @@ describe('the conversations API served by the agent', () => {
     expect(await renamed.json()).toMatchObject({ id: '2', title: 'Trips' })
   })
 
-  it('reads history before an entry, the snapshot and the sources of a registered chat', async () => {
+  it('reads history before an entry as AG-UI messages, and the sources of a registered chat', async () => {
     const { fetch } = fixture()
     const page = await fetch(json('GET', '/api/conversations/2/history?before=10'))
     expect(page.status).toBe(200)
-    expect(await page.json()).toEqual({ entries: [{ id: 9, kind: 'pi.user', chat: '2' }], more: true })
+    expect(await page.json()).toEqual({
+      messages: [
+        {
+          id: '2:e9',
+          role: 'user',
+          content: 'older words',
+          metadata: { goblin: { entryId: 9, at: 5, branchable: true } },
+        },
+      ],
+      next: 9,
+      more: true,
+    })
     for (const query of ['?before=0', '?before=x', '?before=1.5', ''])
       expect((await fetch(json('GET', `/api/conversations/2/history${query}`))).status).toBe(400)
     expect((await fetch(json('GET', '/api/conversations/77/history?before=10'))).status).toBe(404)
-    const snapshot = await fetch(json('GET', '/api/conversations/2/snapshot'))
-    expect(await snapshot.json()).toEqual({ session: '2', entries: [{ id: 1, kind: 'pi.user' }] })
-    expect((await fetch(json('GET', '/api/conversations/77/snapshot'))).status).toBe(404)
     expect(await (await fetch(json('GET', '/api/conversations/2/sources'))).json()).toEqual([])
   })
 
@@ -603,6 +616,10 @@ describe('the conversations API served by the agent', () => {
     const page = await callOwner(agent, (api) =>
       api.conversations.history({ params: { id: '2' }, query: { before: 3 } }),
     )
-    expect(page).toEqual({ entries: [{ id: 2, kind: 'pi.user', chat: '2' }], more: true })
+    expect(page).toMatchObject({
+      messages: [{ id: '2:e2', role: 'user', content: 'older words' }],
+      next: 2,
+      more: true,
+    })
   })
 })

@@ -17,7 +17,7 @@ import { parseArgs } from 'node:util'
 import { type Browser, type CDPSession, chromium, type Page } from 'playwright-core'
 import { install, PROFILES, serve } from './perf/browser.ts'
 import { build, cleanUp, receiptDirectory, revision } from './perf/revision.ts'
-import { history, type Sample } from './perf/transcript-fixture.ts'
+import { history, lastEntry, type Sample } from './perf/transcript-fixture.ts'
 
 /** Where this script reports, and its progress (@cloudflare/workers-types makes `process` `any`). */
 const STDOUT = 1
@@ -136,7 +136,7 @@ async function measure(browser: Browser, { variant, scenario, size, profile }: J
     await install(page, entries)
     await page.goto(`${variant.origin}/?parts=${parts}`)
     await page.waitForFunction(() => window.perf.ready !== undefined, null, { timeout: 180_000 })
-    const metrics = await SCENARIOS[scenario]({ page, cdp, lastId: entries.length })
+    const metrics = await SCENARIOS[scenario]({ page, cdp, lastId: lastEntry(entries) })
     if (errors.length > 0) throw new Error(`${variant.label} ${scenario}: ${errors.join('; ')}`)
     return metrics
   } finally {

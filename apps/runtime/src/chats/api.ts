@@ -12,7 +12,6 @@ import type {
 import { OwnerApi } from '@goblin/contracts/api'
 import * as DateTime from 'effect/DateTime'
 import * as Effect from 'effect/Effect'
-import * as HttpServerResponse from 'effect/http/HttpServerResponse'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import {
   createOwnerConversation,
@@ -38,7 +37,7 @@ import { AgentInput } from '../runtime/input.ts'
 import { Retrieval } from '../retrieval/service.ts'
 import { InvalidInput, attempt, toAppError } from '../http/errors.ts'
 import { entryViews } from '../pi/entry-view.ts'
-import { piEventResponse, sessionSnapshot } from '../pi/events.ts'
+import { entryMessages } from '../streams/messages.ts'
 import { PiSessions } from '../pi/sessions.ts'
 import { Invocations } from '../personas/service.ts'
 import { epochSeconds } from '../clock.ts'
@@ -168,16 +167,22 @@ const removeQueued = ({ params, payload }: ChatWrite<QueueRemoval>) => removeOwn
 const markRead = ({ params }: ChatRequest) => Effect.map(markOwnerRead(params.id), (read) => ({ read }))
 const composer = ({ params }: ChatRequest) => composerOptions(params.id)
 
-/** A registered chat's Pi snapshot. */
-const snapshot = ({ params }: ChatRequest) =>
-  Effect.flatMap(registeredConversation(params.id), (session) =>
-    AgentInput.use(({ harness }) => attempt(() => sessionSnapshot(harness, session))),
-  )
-
-/** A page of a registered chat's history before entry `before`. */
+/**
+ * A page of a registered chat's history before entry `before`, as AG-UI messages mapped as its stream maps them
+ * (`streams/messages.ts`), with the entry the next page starts before.
+ */
 const history = ({ params, query }: ChatRequest & { readonly query: { readonly before: number } }) =>
   Conversations.use((conversations) =>
-    Effect.andThen(conversations.require(params.id), conversations.history(params.id, query.before)),
+    Effect.gen(function* () {
+      yield* conversations.require(params.id)
+      const { entries, more } = yield* conversations.history(params.id, query.before)
+      const [oldest] = entries
+      return {
+        messages: entries.flatMap((entry) => entryMessages(params.id, entry)),
+        next: oldest === undefined ? query.before : Number(oldest.id),
+        more,
+      }
+    }),
   )
 
 /** How many entries a forward read answers unless it asks for fewer, and how many of the chat's invocations. */
@@ -238,19 +243,6 @@ const joinStream = ({ params }: ChatRequest) =>
   })
 
 /**
- * A registered chat's Pi event stream, server-sent. The stream is its own: it runs until the browser goes away, past
- * the request's scope, and stops Pi's stream then.
- */
-const events = ({ params }: ChatRequest) =>
-  Effect.gen(function* () {
-    const session = yield* registeredConversation(params.id)
-    const stream = yield* PiSessions.use((pi) => pi.events(session)).pipe(
-      Effect.catchTag('PiFailure', (failure) => Effect.fail(toAppError(failure.cause))),
-    )
-    return HttpServerResponse.raw(piEventResponse(stream))
-  })
-
-/**
  * The `conversations` group (ADRs 0030, 0032, 0034). Owner admission has already admitted the request; the
  * conversation services do the work, and a chat's snapshot is read from Pi through `AgentInput`.
  */
@@ -266,10 +258,8 @@ export const ConversationsHandlers = HttpApiBuilder.group(OwnerApi, 'conversatio
     .handle('removeQueued', removeQueued)
     .handle('markRead', markRead)
     .handle('composer', composer)
-    .handle('snapshot', snapshot)
     .handle('history', history)
     .handle('entries', entries)
     .handle('sources', sources)
-    .handle('stream', joinStream)
-    .handleRaw('events', events),
+    .handle('stream', joinStream),
 )

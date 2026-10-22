@@ -225,7 +225,7 @@ export function ConversationDock({
   return (
     <div className="chat-dock" ref={ref} data-app-cover>
       <DockCards
-        notices={[notice, projection?.queueNotice ?? '', ...notices]}
+        notices={[notice, ...notices]}
         setup={closed === undefined && <FinishSetupRow />}
         open={closed === undefined}
         waiting={waiting}

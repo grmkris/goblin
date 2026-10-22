@@ -1,8 +1,11 @@
 /**
- * A deterministic synthetic conversation for the performance harness: Pi entries as the snapshot carries them, and a
- * reply streamed as Pi batches. Shared by the runner (`../ui-perf.ts`, which serves the snapshot) and the page
- * (`transcript.tsx`, which plays the batches), so both sides agree on what the transcript holds.
+ * A deterministic synthetic conversation for the performance harness, as the chat's AG-UI stream carries it: the
+ * messages its epoch opens with, and a reply streamed as batches of events. Shared by the runner (`../ui-perf.ts`, which
+ * serves the stream) and the page (`transcript.tsx`, which plays the batches), so both sides agree on what the
+ * transcript holds.
  */
+
+import { marksOf } from '../../src/lib/agui/messages.ts'
 
 /** When the synthetic conversation starts (epoch ms); each turn is a minute after the last. */
 const START = 1_760_000_000_000
@@ -66,42 +69,51 @@ function answer(turn: number): string {
   return parts.join('\n\n')
 }
 
-type Entry = Record<string, unknown>
-const user = (id: number, at: number, text: string): Entry => ({
-  id,
-  kind: 'pi.user',
-  model: [{ role: 'user', content: text, timestamp: at }],
+/** A message or event as the chat's stream carries it (AG-UI, docs/architecture/streams.md). */
+type Wire = Record<string, unknown>
+const CHAT = '1'
+const marks = (goblin: Record<string, unknown>) => ({ metadata: { goblin } })
+const USAGE = { input: 900, output: 300, cacheRead: 0, cacheWrite: 0, totalTokens: 1200 }
+
+const user = (entry: number, at: number, text: string): Wire => ({
+  id: `${CHAT}:e${entry}`,
+  role: 'user',
+  content: text,
+  ...marks({ entryId: entry, at, branchable: true }),
 })
-const assistant = (id: number, at: number, content: readonly Entry[]): Entry => ({
+const callOf = (id: string, name: string, args: unknown) => ({
   id,
-  kind: 'pi.assistant',
-  model: [
-    {
-      role: 'assistant',
-      content,
-      timestamp: at,
-      usage: { input: 900, output: 300, cacheRead: 0, cacheWrite: 0, totalTokens: 1200 },
-    },
-  ],
+  type: 'function',
+  function: { name, arguments: JSON.stringify(args) },
 })
-const toolResult = (id: number, at: number, call: string): Entry => ({
-  id,
-  kind: 'pi.toolResult',
-  model: [
-    {
-      role: 'toolResult',
-      toolCallId: call,
-      toolName: 'web_fetch',
-      isError: false,
-      content: [{ type: 'text', text: `# Fetched page\n\n${PROSE.join(' ')}\n\n${TABLE}` }],
-      timestamp: at,
-    },
-  ],
+type Call = ReturnType<typeof callOf>
+/** An assistant message of `entry`: its thinking first, then its words and calls. */
+const assistant = (
+  entry: number,
+  at: number,
+  { text, thinking, calls = [] }: { text?: string; thinking?: string; calls?: readonly Call[] },
+): Wire[] => [
+  ...(thinking === undefined ? [] : [{ id: `${CHAT}:a${at}:r0`, role: 'reasoning', content: thinking }]),
+  {
+    id: `${CHAT}:a${at}`,
+    role: 'assistant',
+    ...(text === undefined ? {} : { content: text }),
+    ...(calls.length === 0 ? {} : { toolCalls: calls }),
+    ...marks({ entryId: entry, at, branchable: true, usage: USAGE }),
+  },
+]
+const FETCHED = `# Fetched page\n\n${PROSE.join(' ')}\n\n${TABLE}`
+const toolResult = (entry: number, at: number, call: string, toolName = 'web_fetch'): Wire => ({
+  id: `${CHAT}:t${call}`,
+  role: 'tool',
+  toolCallId: call,
+  content: FETCHED,
+  ...marks({ entryId: entry, at, toolName, isError: false }),
 })
 
 /** A conversation of at least `parts` transcript rows, with how many it has: every other turn calls a tool first. */
-export function history(parts: number): { readonly entries: readonly Entry[]; readonly parts: number } {
-  const entries: Entry[] = []
+export function history(parts: number): { readonly entries: readonly Wire[]; readonly parts: number } {
+  const entries: Wire[] = []
   let rows = 0
   let id = 1
   for (let turn = 0; rows < parts; turn += 1) {
@@ -109,19 +121,34 @@ export function history(parts: number): { readonly entries: readonly Entry[]; re
     entries.push(user(id++, at, QUESTIONS[turn % QUESTIONS.length] ?? ''))
     if (turn % 2 === 1) {
       const call = `call-${turn}`
-      const thinking = { type: 'thinking', thinking: 'The saved notes probably have this; fetch the page to be sure.' }
-      const request = { type: 'toolCall', id: call, name: 'web_fetch', arguments: { url: 'https://example.com/plans' } }
-      entries.push(assistant(id++, at + 1_000, [thinking, request]), toolResult(id++, at + 2_000, call))
+      const thinking = 'The saved notes probably have this; fetch the page to be sure.'
+      const request = callOf(call, 'web_fetch', { url: 'https://example.com/plans' })
+      entries.push(...assistant(id++, at + 1_000, { thinking, calls: [request] }), toolResult(id++, at + 2_000, call))
       rows += 2 // the Thoughts and the tool card; the result folds into the card
     }
-    entries.push(assistant(id++, at + 3_000, [{ type: 'text', text: answer(turn) }]))
+    entries.push(...assistant(id++, at + 3_000, { text: answer(turn) }))
     rows += 2 // the question and the answer
   }
   return { entries, parts: rows }
 }
 
-/** The snapshot the stream opens with: the whole history, nothing running. */
-export const snapshot = (entries: readonly Entry[]) => ({ type: 'snapshot', entries, tools: [], inbox: [] })
+/** The newest entry `messages` hold. */
+export const lastEntry = (messages: readonly Wire[]): number =>
+  Math.max(0, ...messages.map((message) => marksOf(message).entryId ?? 0))
+
+const STATE = {
+  queue: [],
+  generation: null,
+  compactions: { running: [], failure: null },
+  agent: {},
+  usage: { models: {}, tools: {} },
+  attention: [],
+}
+/** The events the stream's epoch opens with: the whole history, nothing running. */
+export const snapshot = (entries: readonly Wire[]): Wire[] => [
+  { type: 'MESSAGES_SNAPSHOT', messages: entries },
+  { type: 'STATE_SNAPSHOT', snapshot: STATE },
+]
 
 /** The reply the Stream scenario plays: about 4,800 characters with every block kind, including a figure. */
 export function streamedReply(): string {
@@ -130,53 +157,67 @@ export function streamedReply(): string {
 
 /** Characters per batch: pi-durable commits a partial at most every 100 ms; ~50 characters is a brisk model's pace. */
 export const BATCH_CHARACTERS = 48
-/** pi-durable's partial throttle (`PARTIAL_THROTTLE_MS`). */
+/** pi-durable's partial throttle (`PARTIAL_THROTTLE_MS`), which the stream's 250 ms coalescing follows closely enough. */
 export const BATCH_INTERVAL_MS = 100
 
+/** A user message committed whole, as the stream writes one. */
+const said = (message: Wire): Wire[] => [
+  { type: 'TEXT_MESSAGE_START', messageId: message.id, role: 'user', metadata: message.metadata },
+  { type: 'TEXT_MESSAGE_CONTENT', messageId: message.id, delta: message.content },
+  { type: 'TEXT_MESSAGE_END', messageId: message.id, metadata: message.metadata },
+]
+const RUN = { threadId: CHAT, runId: `${CHAT}:run` }
+const started = { type: 'RUN_STARTED', ...RUN }
+const finished = { type: 'RUN_FINISHED', ...RUN }
+/** The answer `at` begins. */
+const opened = (at: number): Wire => ({
+  type: 'TEXT_MESSAGE_START',
+  messageId: `${CHAT}:a${at}`,
+  role: 'assistant',
+  ...marks({ at }),
+})
+const textUpdate = (at: number, delta: string): Wire => ({
+  type: 'TEXT_MESSAGE_CONTENT',
+  messageId: `${CHAT}:a${at}`,
+  delta,
+})
+/** The answer `at` ends as entry `entry`. */
+const ended = (at: number, entry: number): Wire => ({
+  type: 'TEXT_MESSAGE_END',
+  messageId: `${CHAT}:a${at}`,
+  ...marks({ entryId: entry, branchable: true, usage: USAGE }),
+})
+
 /**
- * The batches of one owner turn and its streamed reply, as the runtime sends them: the owner's message, the run
- * starting, the reply growing a slice at a time, then its commit and the run's end.
+ * The batches of one owner turn and its streamed reply, as the stream carries them: the owner's message, the run
+ * starting, the reply growing a slice at a time, then its end and the run's end.
  */
-export function streamBatches(lastId: number): readonly (readonly Entry[])[] {
+export function streamBatches(lastId: number): readonly (readonly Wire[])[] {
   const at = START + 10_000_000
-  const question = user(lastId + 1, at, 'Pull it all together into one overview I can keep.')
   const reply = streamedReply()
-  const batches: Entry[][] = [
-    [{ type: 'entry_appended', entry: question }, { type: 'run_start' }],
-    [{ type: 'message_start', message: { role: 'assistant', content: [], timestamp: at + 1_000 } }],
+  const batches: Wire[][] = [
+    [started, ...said(user(lastId + 1, at, 'Pull it all together into one overview I can keep.'))],
   ]
+  batches.push([opened(at + 1_000)])
   for (let offset = 0; offset < reply.length; offset += BATCH_CHARACTERS)
-    batches.push([
-      {
-        type: 'message_update',
-        changes: [{ type: 'text_delta', contentIndex: 0, delta: reply.slice(offset, offset + BATCH_CHARACTERS) }],
-      },
-    ])
-  const committed = assistant(lastId + 2, at + 1_000, [{ type: 'text', text: reply }])
-  batches.push([{ type: 'message_end', entry: committed }, { type: 'run_end' }])
+    batches.push([textUpdate(at + 1_000, reply.slice(offset, offset + BATCH_CHARACTERS))])
+  batches.push([ended(at + 1_000, lastId + 2), finished])
   return batches
 }
 
 /** One step of a scripted stream: a batch, how long the server stays quiet after it, and the dock's height from then on. */
-export type Step = { readonly batch: readonly Entry[]; readonly wait: number; readonly dock?: string }
-const step = (batch: readonly Entry[], wait = BATCH_INTERVAL_MS, dock?: string): Step => ({
+export type Step = { readonly batch: readonly Wire[]; readonly wait: number; readonly dock?: string }
+const step = (batch: readonly Wire[], wait = BATCH_INTERVAL_MS, dock?: string): Step => ({
   batch,
   wait,
   ...(dock !== undefined && { dock }),
 })
 
-/** The reply's text as `message_update` batches of one block, `BATCH_CHARACTERS` at a time. */
-function textSteps(reply: string, contentIndex: number): Step[] {
+/** The reply's text, `BATCH_CHARACTERS` at a time, into the answer `at`. */
+function textSteps(reply: string, at: number): Step[] {
   const steps: Step[] = []
   for (let offset = 0; offset < reply.length; offset += BATCH_CHARACTERS)
-    steps.push(
-      step([
-        {
-          type: 'message_update',
-          changes: [{ type: 'text_delta', contentIndex, delta: reply.slice(offset, offset + BATCH_CHARACTERS) }],
-        },
-      ]),
-    )
+    steps.push(step([textUpdate(at, reply.slice(offset, offset + BATCH_CHARACTERS))]))
   return steps
 }
 
@@ -198,10 +239,10 @@ export type FollowScenario = (typeof FOLLOW_SCENARIOS)[number]
  * answer: a turn of the kind that fills a screen with rows. `long-first`: the answer is already longer than the screen
  * when its first batch arrives. `dock`: the baseline while the composer grows (a queued message, an attachment) partway
  * through. `same-batch`: the owner's turn and more than a screen of its reply arrive together (a Source turn, a queued
- * one starting). `resnapshot`: the tab comes back from the background and the stream starts again from a snapshot that
- * already holds the turn and a long partial reply, which then keeps streaming.
+ * one starting). `resnapshot`: the stream moves to a new epoch whose opening already holds the turn and a long partial
+ * reply, which then keeps streaming.
  */
-export function followSteps(scenario: FollowScenario, entries: readonly Entry[]): readonly Step[] {
+export function followSteps(scenario: FollowScenario, entries: readonly Wire[]): readonly Step[] {
   return SCENARIOS[scenario](turnOf(entries))
 }
 
@@ -213,71 +254,82 @@ const THINKING = 'The saved notes probably have this; fetch the page to be sure.
 
 /** The owner turn a scenario plays: the history it follows, its message, and the reply it streams. */
 type Turn = {
-  readonly entries: readonly Entry[]
+  readonly entries: readonly Wire[]
   readonly lastId: number
-  readonly question: Entry
+  readonly question: Wire
   readonly opening: Step
   readonly reply: string
 }
-function turnOf(entries: readonly Entry[]): Turn {
-  const lastId = entries.length
+function turnOf(entries: readonly Wire[]): Turn {
+  const lastId = lastEntry(entries)
   const question = user(lastId + 1, TURN_AT, 'Pull it all together into one overview I can keep.')
-  return {
-    entries,
-    lastId,
-    question,
-    opening: step([{ type: 'entry_appended', entry: question }, { type: 'run_start' }]),
-    reply: streamedReply(),
-  }
+  return { entries, lastId, question, opening: step([started, ...said(question)]), reply: streamedReply() }
 }
 
-const messageStart = (when: number): Entry => ({
-  type: 'message_start',
-  message: { role: 'assistant', content: [], timestamp: when },
-})
-const textUpdate = (delta: string): Entry => ({
-  type: 'message_update',
-  changes: [{ type: 'text_delta', contentIndex: 0, delta }],
-})
-/** Thinking streaming in, as the two batches that start the block and then fill it. */
-const thinkingSteps = (thinking: string): Step[] => [
+/** Thinking streaming in for the answer `at`, as the two batches that start the block and then fill it. */
+const thinkingSteps = (at: number, thinking: string): Step[] => [
   step([
-    {
-      type: 'message_update',
-      changes: [{ type: 'thinking_start', contentIndex: 0, block: { type: 'thinking', thinking: '' } }],
-    },
+    { type: 'REASONING_START', messageId: `${CHAT}:a${at}:s0` },
+    { type: 'REASONING_MESSAGE_START', messageId: `${CHAT}:a${at}:r0`, role: 'reasoning', ...marks({ at }) },
   ]),
-  step([{ type: 'message_update', changes: [{ type: 'thinking_delta', contentIndex: 0, delta: thinking }] }]),
+  step([{ type: 'REASONING_MESSAGE_CONTENT', messageId: `${CHAT}:a${at}:r0`, delta: thinking }]),
 ]
+/** The thinking of the answer `at` ends, and the answer asks for `calls` and ends as entry `entry`. */
+const asked = (at: number, entry: number, calls: readonly Call[]): Step =>
+  step([
+    { type: 'REASONING_MESSAGE_END', messageId: `${CHAT}:a${at}:r0` },
+    { type: 'REASONING_END', messageId: `${CHAT}:a${at}:s0` },
+    opened(at),
+    ...calls.map((call) => ({
+      type: 'TOOL_CALL_START',
+      toolCallId: call.id,
+      toolCallName: call.function.name,
+      parentMessageId: `${CHAT}:a${at}`,
+    })),
+    ended(at, entry),
+    ...calls.flatMap((call) => [
+      { type: 'TOOL_CALL_ARGS', toolCallId: call.id, delta: call.function.arguments },
+      { type: 'TOOL_CALL_END', toolCallId: call.id },
+    ]),
+  ])
+const running = (call: string): Wire => ({
+  type: 'CUSTOM',
+  name: 'goblin.tool_progress',
+  value: { toolCallId: call, status: 'running' },
+})
+/** A tool's result committed as entry `entry`. */
+const resulted = (result: Wire): Wire => ({
+  type: 'TOOL_CALL_RESULT',
+  messageId: result.id,
+  toolCallId: result.toolCallId,
+  content: result.content,
+  role: 'tool',
+  metadata: result.metadata,
+})
 /** The reply committing and the run ending. */
-const committed = (turn: Turn, id: number, when: number): Step =>
-  step([{ type: 'message_end', entry: assistant(id, when, [{ type: 'text', text: turn.reply }]) }, { type: 'run_end' }])
+const committed = (entry: number, at: number): Step => step([ended(at, entry), finished])
 
 const streamed = (turn: Turn): Step[] => [
   turn.opening,
-  step([messageStart(TURN_AT + 1_000)]),
-  ...textSteps(turn.reply, 0),
-  committed(turn, turn.lastId + 2, TURN_AT + 1_000),
+  step([opened(TURN_AT + 1_000)]),
+  ...textSteps(turn.reply, TURN_AT + 1_000),
+  committed(turn.lastId + 2, TURN_AT + 1_000),
 ]
 
 /** A slow provider, thinking, one tool that takes a while, then the answer. */
 function tools(turn: Turn): Step[] {
   const call = 'call-follow'
-  const request = { type: 'toolCall', id: call, name: 'web_fetch', arguments: { url: 'https://example.com/plans' } }
-  const first = assistant(turn.lastId + 2, TURN_AT + 1_000, [{ type: 'thinking', thinking: THINKING }, request])
+  const request = callOf(call, 'web_fetch', { url: 'https://example.com/plans' })
+  const at = TURN_AT + 1_000
   return [
     { ...turn.opening, wait: 3_000 }, // the provider's quiet stretch before anything streams
-    step([messageStart(TURN_AT + 1_000)]),
-    ...thinkingSteps(THINKING),
-    step([{ type: 'message_end', entry: first }]),
-    step([{ type: 'tool_execution_start', toolCallId: call, toolName: 'web_fetch', args: request.arguments }], 1_500),
-    step(
-      [{ type: 'tool_execution_end', toolCallId: call, entry: toolResult(turn.lastId + 3, TURN_AT + 2_500, call) }],
-      2_500,
-    ),
-    step([messageStart(TURN_AT + 3_000)]),
-    ...textSteps(turn.reply, 0),
-    committed(turn, turn.lastId + 4, TURN_AT + 3_000),
+    ...thinkingSteps(at, THINKING),
+    asked(at, turn.lastId + 2, [request]),
+    step([running(call)], 1_500),
+    step([resulted(toolResult(turn.lastId + 3, TURN_AT + 2_500, call))], 2_500),
+    step([opened(TURN_AT + 3_000)]),
+    ...textSteps(turn.reply, TURN_AT + 3_000),
+    committed(turn.lastId + 4, TURN_AT + 3_000),
   ]
 }
 
@@ -285,37 +337,18 @@ const STORM_TOOLS = ['list_messages', 'list_tasks', 'list_gaps', 'whoami']
 /** One round of the storm: the model thinks, asks for four calls to one server, and they finish one by one. */
 function stormRound(round: number, firstId: number): Step[] {
   const when = TURN_AT + 1_000 + round * 10_000
-  const calls = STORM_TOOLS.map((name, index) => ({
-    type: 'toolCall',
-    id: `storm-${round}-${index}`,
-    name: 'mcp_call',
-    arguments: { connectionId: 'dev-sidequest-exchange', name, arguments: {} },
-  }))
-  const asking = assistant(firstId, when, [{ type: 'thinking', thinking: 'Checking the next set of pages.' }, ...calls])
+  const calls = STORM_TOOLS.map((name, index) =>
+    callOf(`storm-${round}-${index}`, 'mcp_call', { connectionId: 'dev-sidequest-exchange', name, arguments: {} }),
+  )
   return [
-    step([messageStart(when)]),
-    ...thinkingSteps('Checking the next set of pages.'),
-    step([{ type: 'message_end', entry: asking }]),
+    ...thinkingSteps(when, 'Checking the next set of pages.'),
+    asked(when, firstId, calls),
     step(
-      calls.map((one) => ({
-        type: 'tool_execution_start',
-        toolCallId: one.id,
-        toolName: 'mcp_call',
-        args: one.arguments,
-      })),
+      calls.map((one) => running(one.id)),
       400,
     ),
     ...calls.map((one, index) =>
-      step(
-        [
-          {
-            type: 'tool_execution_end',
-            toolCallId: one.id,
-            entry: toolResult(firstId + 1 + index, when + 2_000, one.id),
-          },
-        ],
-        250,
-      ),
+      step([resulted(toolResult(firstId + 1 + index, when + 2_000, one.id, 'mcp_call'))], 250),
     ),
   ]
 }
@@ -328,44 +361,35 @@ function toolStorm(turn: Turn): Step[] {
   return [
     turn.opening,
     ...rounds,
-    step([messageStart(TURN_AT + 40_000)]),
-    ...textSteps(turn.reply, 0),
-    committed(turn, answerId, TURN_AT + 40_000),
+    step([opened(TURN_AT + 40_000)]),
+    ...textSteps(turn.reply, TURN_AT + 40_000),
+    committed(answerId, TURN_AT + 40_000),
   ]
 }
 
 /** The owner's turn and the start of the reply in one batch, so the reply is already past the fold when it lands. */
 const sameBatch = (turn: Turn): Step[] => [
   step([
-    { type: 'entry_appended', entry: turn.question },
-    { type: 'run_start' },
-    messageStart(TURN_AT + 1_000),
-    textUpdate(turn.reply.slice(0, FIRST_SLICE)),
+    started,
+    ...said(turn.question),
+    opened(TURN_AT + 1_000),
+    textUpdate(TURN_AT + 1_000, turn.reply.slice(0, FIRST_SLICE)),
   ]),
-  ...textSteps(turn.reply.slice(FIRST_SLICE), 0),
-  committed(turn, turn.lastId + 2, TURN_AT + 1_000),
+  ...textSteps(turn.reply.slice(FIRST_SLICE), TURN_AT + 1_000),
+  committed(turn.lastId + 2, TURN_AT + 1_000),
 ]
 
-/** The stream starting again from a snapshot that already holds the turn and a long partial reply. */
+/** A new epoch whose opening already holds the turn and a long partial reply, as after the stream moved. */
 const resnapshot = (turn: Turn): Step[] => [
   step([
-    {
-      type: 'snapshot',
-      entries: [...turn.entries, turn.question],
-      tools: [],
-      inbox: [],
-      run: {},
-      generation: {
-        message: {
-          role: 'assistant',
-          content: [{ type: 'text', text: turn.reply.slice(0, FIRST_SLICE) }],
-          timestamp: TURN_AT + 1_000,
-        },
-      },
-    },
+    { type: 'MESSAGES_SNAPSHOT', messages: [...turn.entries, turn.question] },
+    { type: 'STATE_SNAPSHOT', snapshot: STATE },
+    started,
+    opened(TURN_AT + 1_000),
+    textUpdate(TURN_AT + 1_000, turn.reply.slice(0, FIRST_SLICE)),
   ]),
-  ...textSteps(turn.reply.slice(FIRST_SLICE), 0),
-  committed(turn, turn.lastId + 2, TURN_AT + 1_000),
+  ...textSteps(turn.reply.slice(FIRST_SLICE), TURN_AT + 1_000),
+  committed(turn.lastId + 2, TURN_AT + 1_000),
 ]
 
 /** The baseline, with the composer growing a third of the way through. */
@@ -381,9 +405,9 @@ const SCENARIOS: Record<FollowScenario, (turn: Turn) => Step[]> = {
   'tool-storm': toolStorm,
   'long-first': (turn) => [
     turn.opening,
-    step([messageStart(TURN_AT + 1_000), textUpdate(turn.reply.slice(0, FIRST_SLICE))]),
-    ...textSteps(turn.reply.slice(FIRST_SLICE), 0),
-    committed(turn, turn.lastId + 2, TURN_AT + 1_000),
+    step([opened(TURN_AT + 1_000), textUpdate(TURN_AT + 1_000, turn.reply.slice(0, FIRST_SLICE))]),
+    ...textSteps(turn.reply.slice(FIRST_SLICE), TURN_AT + 1_000),
+    committed(turn.lastId + 2, TURN_AT + 1_000),
   ],
   dock: dockGrows,
   'same-batch': sameBatch,

@@ -1,34 +1,19 @@
-import { authorTag, memberAuthor } from '@goblin/contracts'
 import { describe, expect, it } from 'vitest'
-import { delivered, newestEntry, startsTurn } from '../src/lib/echo.ts'
-import { projectSnapshot } from '../src/lib/projection.ts'
+import { delivered, startsTurn } from '../src/lib/echo.ts'
+import { said, snapshot } from './agui-fixtures.ts'
 
-const snapshot = (entries: readonly unknown[], extra: Record<string, unknown> = {}) =>
-  projectSnapshot({ type: 'snapshot', entries, tools: [], inbox: [], ...extra })
-const said = (id: number, content: string) => ({ id, model: [{ role: 'user', content }] })
-/** A member's message in a workspace of several people (ADR 0094), its author block first. */
-const saidBy = (id: number, member: string) => ({
-  id,
-  model: [
-    {
-      role: 'user',
-      content: [
-        { type: 'text', text: authorTag(memberAuthor(member, member)) },
-        { type: 'text', text: 'words' },
-      ],
-    },
-  ],
-})
+/** A member's message in a workspace of several people (ADR 0094). */
+const saidBy = (entry: number, member: string) => said(entry, 'words', { member: { name: member, userId: member } })
 
 describe('the echo of a sent message', () => {
   it('reads the newest entry, which a message sent now comes after', () => {
-    expect(newestEntry(snapshot([]))).toBe(0)
-    expect(newestEntry(snapshot([said(3, 'a'), said(9, 'b'), said(5, 'c')]))).toBe(9)
+    expect(snapshot([]).newestEntry).toBe(0)
+    expect(snapshot([said(3, 'a'), said(9, 'b'), said(5, 'c')]).newestEntry).toBe(9)
   })
   it('starts a turn only when nothing runs and nothing waits; otherwise the send queues', () => {
     expect(startsTurn(snapshot([]))).toBe(true)
-    expect(startsTurn(snapshot([], { run: {} }))).toBe(false)
-    expect(startsTurn(snapshot([], { inbox: [{ id: 4, mode: 'followUp' }] }))).toBe(false)
+    expect(startsTurn(snapshot([], { running: true }))).toBe(false)
+    expect(startsTurn(snapshot([], { queue: [{ id: 4, mode: 'followUp', text: 'later' }] }))).toBe(false)
   })
   it('is delivered by the owner’s first message after the entry it was sent behind, whatever its words', () => {
     const echo = { id: 'echo:op', text: 'hello', after: 2 }
@@ -44,11 +29,6 @@ describe('the echo of a sent message', () => {
   })
   it('is not delivered by a message another author wrote', () => {
     const echo = { id: 'echo:op', text: 'hello', after: 0 }
-    const note = { id: 1, model: [{ role: 'user', content: 'note', author: 'mcp' }] }
-    const messages = snapshot([note]).messages
-    // Whether a message carries an author is the projection's reading; an authored one is not the owner's.
-    expect(messages.some((message) => message.role === 'user' && message.author !== undefined)).toBe(
-      delivered(echo, messages) === undefined,
-    )
+    expect(delivered(echo, snapshot([said(1, 'note', { author: 'mcp' })]).messages)).toBeUndefined()
   })
 })

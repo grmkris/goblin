@@ -1,18 +1,18 @@
 import { useState } from 'react'
-import type { QueuedInput } from '@goblin/contracts'
+import type { QueueItem } from '@goblin/contracts'
 import { selectionKey } from '@goblin/contracts'
 import { Button } from '@goblin/ui'
 import { Trash2Icon } from 'lucide-react'
-import { sharedContext, contextPreview } from '../lib/app-context.ts'
+import { contextPreview } from '../lib/app-context.ts'
 import { reportUnexpected } from '../lib/unexpected.ts'
 import { MessageFiles } from './attachments.tsx'
 
-/** Pending Pi inputs belong beside the composer; they become transcript messages only when Pi places them. */
+/** Queued inputs belong beside the composer; they become transcript messages only when their turn takes them. */
 export function QueuedMessages({
   inputs,
   onRemove,
 }: {
-  readonly inputs: readonly QueuedInput[]
+  readonly inputs: readonly QueueItem[]
   readonly onRemove?: (id: number) => Promise<boolean>
 }) {
   if (inputs.length === 0) return null
@@ -23,24 +23,24 @@ export function QueuedMessages({
       </p>
       <ol>
         {inputs.map((input, index) => {
-          const message = sharedContext(input.content)
+          const context = input.context ?? []
           return (
             <li key={input.id} data-submission={input.id}>
               <div className="queue-meta">
                 <span>
-                  {message.author ?? 'You'} · {input.mode === 'steer' ? 'Steering' : 'Follow-up'}
+                  {input.author ?? 'You'} · {input.mode === 'steer' ? 'Steering' : 'Follow-up'}
                 </span>
                 {onRemove !== undefined && <RemoveQueued id={input.id} index={index} onRemove={onRemove} />}
               </div>
               <details>
                 <summary aria-label={`Expand queued message ${index + 1}`}>
-                  <span className="queue-preview">{message.text || 'Selected skill'}</span>
+                  <span className="queue-preview">{input.text || 'Selected skill'}</span>
                 </summary>
               </details>
-              {message.attachments !== undefined && <MessageFiles files={message.attachments} />}
-              {(message.selections?.length ?? 0) > 0 && (
+              {input.attachments !== undefined && <MessageFiles files={input.attachments} />}
+              {(input.selections?.length ?? 0) > 0 && (
                 <ul className="queue-references" aria-label="Selected references">
-                  {message.selections?.map((option) => (
+                  {input.selections?.map((option) => (
                     <li key={selectionKey(option.selection)}>
                       {option.selection.kind === 'skill' ? '/' : '@'}
                       {option.label}
@@ -48,11 +48,11 @@ export function QueuedMessages({
                   ))}
                 </ul>
               )}
-              {message.context.length > 0 && (
+              {context.length > 0 && (
                 <ul className="queue-references" aria-label="Shared context">
-                  {message.context.map((context, at) => (
-                    <li key={`${at}:${context.from}`} title={context.text}>
-                      {context.from} · {contextPreview(context.text)}
+                  {context.map((shared, at) => (
+                    <li key={`${at}:${shared.from}`} title={shared.text}>
+                      {shared.from} · {contextPreview(shared.text)}
                     </li>
                   ))}
                 </ul>

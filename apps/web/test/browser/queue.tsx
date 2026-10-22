@@ -6,7 +6,7 @@ import { useConversation, useDockInsets } from '../../src/components/use-convers
 import { withQueryClient } from './with-query-client.tsx'
 import '../../src/styles.css'
 
-/** Real shared hooks, queue and composer, with HTTP/event fixtures supplied by the browser test. */
+/** Real shared hooks, queue and composer, with HTTP and stream fixtures supplied by the browser test. */
 function Dock({ inline }: { readonly inline: boolean }) {
   const pane = useRef<HTMLElement>(null)
   const dock = useRef<HTMLDivElement>(null)
@@ -22,7 +22,6 @@ function Dock({ inline }: { readonly inline: boolean }) {
       <div className={inline ? undefined : 'chat-dock'} ref={dock}>
         <div className={inline ? undefined : 'dock-cards'}>
           {conversation.notice !== '' && <p role="alert">{conversation.notice}</p>}
-          {conversation.projection?.queueNotice !== '' && <p role="status">{conversation.projection?.queueNotice}</p>}
           <QueuedMessages inputs={conversation.projection?.queued ?? []} onRemove={conversation.removeQueued} />
         </div>
         <div className="dock-composer">

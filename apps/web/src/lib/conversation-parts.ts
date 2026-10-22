@@ -11,7 +11,7 @@ import {
   isNativeTool,
   partKey,
 } from './parts.ts'
-import type { ConversationProjection, LiveTool, ToolTimes } from './projection.ts'
+import type { ConversationProjection, LiveTool, ToolTimes } from './agui/reducer.ts'
 import { isString, record } from './values.ts'
 
 type AssistantMessage = Extract<ChatMessage, { role: 'assistant' }>

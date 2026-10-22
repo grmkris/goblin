@@ -29,7 +29,7 @@ import {
   moveTopicCase,
 } from './move-case.ts'
 import { call, lever, ownerFetch, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
-import { clientErrorsCase, conversationEventsCase, csrfCase, internalRefusalCase } from './edge-case.ts'
+import { clientErrorsCase, csrfCase, internalRefusalCase } from './edge-case.ts'
 import { streamsCase } from './streams-case.ts'
 
 const harness = Test.make({
@@ -157,10 +157,6 @@ harness.test(
 harness.test(
   'native: /internal is refused from outside, signed in or not, while the hooks still reach the agent',
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => internalRefusalCase(url)))),
-)
-harness.test(
-  "native: a chat's event stream through the Worker stays open and carries later commits",
-  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => conversationEventsCase(url)))),
 )
 harness.test(
   "native: a chat's AG-UI stream is joined in its tier, resumed from an offset, moves epochs at a run's end, refuses a bad token and keeps a lost acknowledgement's append once",

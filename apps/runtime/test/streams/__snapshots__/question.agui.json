@@ -145,6 +145,7 @@
         "goblin": {
           "entryId": 13,
           "at": 1760000000071,
+          "toolName": "ask_user",
           "details": {
             "kind": "question",
             "questions": [
@@ -489,6 +490,7 @@
             "goblin": {
               "entryId": 13,
               "at": 1760000000071,
+              "toolName": "ask_user",
               "details": {
                 "kind": "question",
                 "questions": [

@@ -181,6 +181,7 @@
         "goblin": {
           "entryId": 13,
           "at": 1760000000089,
+          "toolName": "forecast",
           "details": {
             "kind": "forecast",
             "structuredContent": {
@@ -486,6 +487,7 @@
             "goblin": {
               "entryId": 13,
               "at": 1760000000089,
+              "toolName": "forecast",
               "details": {
                 "kind": "forecast",
                 "structuredContent": {

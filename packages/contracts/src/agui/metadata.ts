@@ -54,7 +54,8 @@ export type StopMark = typeof StopMark.Type
  * - `MESSAGES_SNAPSHOT`: `before`, the entry older history is read before, a page at a time (the history endpoint);
  *   absent when the snapshot starts at the chat's beginning.
  * - `RUN_STARTED`: `operations`, the operation ids of the inputs that started it, when the stream saw them admitted.
- * - A tool call or result: `details` (Pi's details for UIs), `isError`, `parentToolCallId` (a nested call's caller).
+ * - A tool call or result: `details` (Pi's details for UIs), `isError`, `parentToolCallId` (a nested call's caller);
+ *   a result names its tool (`toolName`), for a reader that does not hold the call.
  */
 export const GoblinMetadata = Schema.Struct({
   entryId: Schema.optionalKey(EntryId),
@@ -78,6 +79,7 @@ export const GoblinMetadata = Schema.Struct({
   operations: Schema.optionalKey(Schema.Array(OperationId)),
   details: Schema.optionalKey(Schema.Json),
   isError: Schema.optionalKey(Schema.Boolean),
+  toolName: Schema.optionalKey(Schema.String),
   parentToolCallId: Schema.optionalKey(Schema.String),
 })
 export type GoblinMetadata = typeof GoblinMetadata.Type

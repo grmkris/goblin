@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import type { ConversationView } from '@goblin/contracts'
 import type { Part, ToolPart } from '../src/lib/parts.ts'
 import {
-  branchPoints,
   closedBy,
   entryOfPart,
   fromEntry,
@@ -47,17 +46,6 @@ describe('threads in main', () => {
     expect(byFork.get(40)?.map(({ id }) => id)).toEqual(['9', '5'])
     expect(byFork.get(12)?.map(({ id }) => id)).toEqual(['6'])
     expect(byFork.size).toBe(2)
-  })
-
-  it('branches only from what the owner or the agent said, never from a note shared into main', () => {
-    const points = branchPoints([
-      { id: 3, kind: 'pi.user' },
-      { id: 4, kind: 'pi.assistant' },
-      { id: 5, kind: 'app.shared' },
-      { id: 6, kind: 'pi.tool' },
-      { id: 'x', kind: 'pi.user' },
-    ])
-    expect([...points]).toEqual([3, 4])
   })
 
   it('shows a branched thread from the message it branched at, without the main history before it', () => {

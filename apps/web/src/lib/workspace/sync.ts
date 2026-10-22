@@ -1,6 +1,6 @@
 import { type QueryClient, queryOptions } from '@tanstack/react-query'
 import type { AppView, WorkspaceChange, WorkspaceSnapshot } from '@goblin/contracts'
-import type { PiEventSource } from '../conversation-stream.ts'
+import type { FeedSource } from '../event-streams.ts'
 import { reportUnexpected } from '../unexpected.ts'
 import { WorkspaceFeedConnection } from './connection.ts'
 import { type Cached, staleAfter } from './invalidations.ts'
@@ -109,7 +109,7 @@ class WorkspaceSync {
   }
 
   /** Follows the feed `events` opens until the returned function is called; one connection at a time. */
-  connect(events: () => PiEventSource): () => void {
+  connect(events: () => FeedSource): () => void {
     this.#connection?.dispose()
     const connection = new WorkspaceFeedConnection(events, this)
     this.#connection = connection

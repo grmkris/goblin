@@ -1,5 +1,6 @@
-// The committed messages of a conversation as the transcript reads them, projected from Pi's messages: the owner's,
-// the assistant's (with its tool calls, thinking, usage and why it has no answer) and tool results.
+// The committed messages of a conversation as the transcript reads them (`agui/messages.ts` maps the chat's AG-UI
+// messages to them): the owner's, the assistant's (with its tool calls, thinking, usage and why it has no answer), tool
+// results, and the entries the app draws itself.
 import type {
   Attachment,
   ComposerOption,
@@ -11,8 +12,7 @@ import type {
   TopicSeedData,
   McpOutcome,
 } from '@goblin/contracts'
-import { type SharedContext, sharedContext } from './app-context.ts'
-import { identifier, isNumber, isString, record, records, text } from './values.ts'
+import type { SharedContext } from './app-context.ts'
 
 /** A tool call the assistant made, with its raw arguments. */
 export type ToolCallView = { readonly id: string; readonly name: string; readonly arguments: Record<string, unknown> }
@@ -141,99 +141,4 @@ export function failureReason(raw: string): TurnFailure {
     text: line === '' ? 'The model call failed.' : `The model call failed: ${line.slice(0, 200)}`,
     provider: false,
   }
-}
-
-/** A turn that ended without an answer, or was cut short, says why instead of rendering nothing. */
-function assistantFailure(message: Record<string, unknown>): TurnFailure | undefined {
-  if (message.stopReason === 'error') return failureReason(isString(message.errorMessage) ? message.errorMessage : '')
-  if (message.stopReason === 'aborted') return { text: 'Stopped before answering.', provider: false, stopped: true }
-  // A response with no answer never gets here: the runtime asks again, then fails with its own words (ADR 0083).
-  if (message.stopReason === 'length')
-    return { text: 'Cut off at the output limit. Ask it to continue.', provider: false, cutOff: true }
-  return undefined
-}
-
-/** The visible thinking in content blocks; redacted thinking is an opaque payload, not text for the owner. */
-export function reasoningText(blocks: unknown): string {
-  return records(blocks)
-    .filter((block) => block.type === 'thinking' && block.redacted !== true && isString(block.thinking))
-    .map((block) => text(block.thinking).trim())
-    .filter((thought) => thought !== '')
-    .join('\n\n')
-}
-
-const count = (value: unknown): number => (isNumber(value) && Number.isFinite(value) ? value : 0)
-function tokenUsage(value: unknown): TokenUsage | undefined {
-  const usage = record(value)
-  if (usage === undefined) return undefined
-  return {
-    input: count(usage.input),
-    output: count(usage.output),
-    cacheRead: count(usage.cacheRead),
-    cacheWrite: count(usage.cacheWrite),
-    totalTokens: count(usage.totalTokens),
-  }
-}
-/** The message's own timestamp (epoch ms), as a field to spread, when it has one. */
-export const stamped = (message: Record<string, unknown>) =>
-  isNumber(message.timestamp) && Number.isFinite(message.timestamp) ? { timestamp: message.timestamp } : {}
-
-function assistantMessage(message: Record<string, unknown>, id: string, content: string): ChatMessage {
-  const toolCalls = records(message.content)
-    .filter((block) => block.type === 'toolCall')
-    .map((block) => ({
-      id: identifier(block.id),
-      name: identifier(block.name),
-      arguments: record(block.arguments) ?? {},
-    }))
-  const failure = assistantFailure(message)
-  const reasoning = reasoningText(message.content)
-  const usage = tokenUsage(message.usage)
-  return {
-    id,
-    role: 'assistant',
-    text: content,
-    toolCalls,
-    ...(reasoning === '' ? {} : { reasoning }),
-    ...(usage === undefined ? {} : { usage }),
-    ...stamped(message),
-    ...(failure === undefined ? {} : { failure }),
-  }
-}
-
-/**
- * A user message as the transcript shows it: its words and what `sharedContext` read with them (each field only when it
- * has one), and the thread a shared note came from.
- */
-function userMessage(message: Record<string, unknown>, id: string, thread: string | undefined): ChatMessage {
-  const { context, ...shared } = sharedContext(message.content)
-  return {
-    id,
-    role: 'user',
-    ...shared,
-    ...(context.length === 0 ? {} : { context }),
-    ...(thread === undefined ? {} : { thread }),
-    ...stamped(message),
-  }
-}
-
-/** The messages one of Pi's messages makes: `id` is the transcript's, `thread` the thread a shared note came from. */
-export function entryMessage(message: Record<string, unknown>, id: string, thread?: string): ChatMessage[] {
-  const content = text(message.content)
-  if (message.role === 'toolResult')
-    return [
-      {
-        id,
-        role: 'tool',
-        text: content,
-        toolCallId: identifier(message.toolCallId),
-        toolName: identifier(message.toolName),
-        isError: message.isError === true,
-        details: message.details,
-        ...stamped(message),
-      },
-    ]
-  if (message.role === 'assistant') return [assistantMessage(message, id, content)]
-  if (message.role === 'user') return [userMessage(message, id, thread)]
-  return []
 }

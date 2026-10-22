@@ -3,7 +3,7 @@ import { DelegateResultData, PersonaAnswerData, PersonaAskData, ThreadHeadData, 
 import { Schema } from 'effect'
 import { conversationParts } from '../src/lib/conversation-parts.ts'
 import { isOwnTurn, samePart } from '../src/lib/parts.ts'
-import { projectSnapshot } from '../src/lib/projection.ts'
+import { activity, answer as reply, said, snapshot } from './agui-fixtures.ts'
 
 // Every fixture's data is the contract's own shape: it decodes with the schema the runtime writes it with.
 const head = Schema.decodeUnknownSync(ThreadHeadData)({ thread: '12', text: 'Plan the trip', operationId: 'op-1' })
@@ -40,33 +40,31 @@ const result = Schema.decodeUnknownSync(DelegateResultData)({
   text: 'Three options.',
 })
 
-const snapshot = (entries: readonly unknown[]) => projectSnapshot({ type: 'snapshot', entries, tools: [], inbox: [] })
-const user = (id: number, content: string) => ({ id, kind: 'pi.user', model: [{ role: 'user', content }] })
-const held = (id: number, persona: number, hold?: object) => ({
-  id,
-  kind: 'app.persona',
-  data: Schema.decodeUnknownSync(PersonaAnswerData)({
-    ...answer,
-    persona,
-    operationId: `op-${String(id)}`,
-    ...(hold === undefined ? {} : { hold }),
-  }),
-})
+/** A Persona's answer as the stream carries it: an assistant message with its Persona's mark. */
+const spoke = (entry: number, data: PersonaAnswerData) => {
+  const { persona, text, ...mark } = data
+  return reply(entry, { text, at: entry * 1_000, marks: { persona: { id: persona, ...mark } } })
+}
+const held = (entry: number, persona: number, hold?: object) =>
+  spoke(
+    entry,
+    Schema.decodeUnknownSync(PersonaAnswerData)({
+      ...answer,
+      persona,
+      operationId: `op-${String(entry)}`,
+      ...(hold === undefined ? {} : { hold }),
+    }),
+  )
 
 describe('entries the app writes into a chat', () => {
   it('draws a thread head, a Persona ask and answer, a Topic brief and a Delegate result as their own parts', () => {
     const parts = conversationParts(
       snapshot([
-        { id: 1, kind: 'app.topic_seed', data: seed },
-        { id: 2, kind: 'app.thread_head', data: head, model: [{ role: 'user', content: '[thread]', timestamp: 7 }] },
-        {
-          id: 3,
-          kind: 'app.persona_ask',
-          data: ask,
-          model: [{ role: 'user', content: '[to @Critic, then @Coach]\nIs this good?' }],
-        },
-        { id: 4, kind: 'app.persona', data: answer },
-        { id: 5, kind: 'app.delegate_result', data: result },
+        activity(1, 'goblin.topic_seed', seed),
+        activity(2, 'goblin.thread_head', head, { at: 7 }),
+        said(3, 'Is this good?', { ask }),
+        spoke(4, answer),
+        activity(5, 'goblin.delegate_result', result),
       ]),
     )
     expect(parts.map((part) => part.kind)).toEqual([
@@ -113,16 +111,7 @@ describe('entries the app writes into a chat', () => {
       body: 'Job 12: Write docs',
       url: 'https://sidequest.test/jobs/12',
     }
-    const [part] = conversationParts(
-      snapshot([
-        {
-          id: 6,
-          kind: 'app.notice',
-          data: notice,
-          model: [{ role: 'user', content: '[notice from "Sidequest · Worker"]', timestamp: 9000 }],
-        },
-      ]),
-    )
+    const [part] = conversationParts(snapshot([activity(6, 'goblin.notice', notice, { at: 9000 })]))
     expect(part).toEqual({
       kind: 'notice',
       id: '6:0',
@@ -137,32 +126,30 @@ describe('entries the app writes into a chat', () => {
   })
 
   it("marks a moved turn's head as moved and keeps who wrote it", () => {
-    const [part] = conversationParts(snapshot([{ id: 9, kind: 'app.thread_head', data: moved }]))
+    const [part] = conversationParts(snapshot([activity(9, 'goblin.thread_head', moved)]))
     expect(part).toMatchObject({ kind: 'thread-head', thread: '13', moved: true, author: 'Kris' })
   })
 
   it('leaves out an entry whose data does not have its contract shape', () => {
     const parts = conversationParts(
       snapshot([
-        { id: 1, kind: 'app.thread_head', data: { thread: 'not digits', text: 'x', operationId: 'op' } },
-        { id: 2, kind: 'app.persona', data: { name: 'nobody' } },
-        user(3, 'still here'),
+        activity(1, 'goblin.thread_head', { thread: 'not digits', text: 'x', operationId: 'op' }),
+        reply(2, { text: 'x', marks: { persona: { name: 'nobody' } } }),
+        said(3, 'still here'),
       ]),
     )
     expect(parts.map((part) => [part.kind, part.id])).toEqual([['user', '3:0']])
   })
 
   it("counts the owner's message to Personas as the owner's turn", () => {
-    const [part] = conversationParts(
-      snapshot([{ id: 3, kind: 'app.persona_ask', data: ask, model: [{ role: 'user', content: 'Hi' }] }]),
-    )
+    const [part] = conversationParts(snapshot([said(3, 'Hi', { ask })]))
     expect(part !== undefined && isOwnTurn(part)).toBe(true)
   })
 
   it('draws an unchanged app entry once across batches', () => {
-    const entries = [{ id: 2, kind: 'app.thread_head', data: head }]
-    const [first] = conversationParts(snapshot(entries))
-    const [again] = conversationParts(snapshot(structuredClone(entries)))
+    const messages = [activity(2, 'goblin.thread_head', head)]
+    const [first] = conversationParts(snapshot(messages))
+    const [again] = conversationParts(snapshot(structuredClone(messages)))
     expect(first !== undefined && again !== undefined && samePart(first, again)).toBe(true)
   })
 })
@@ -171,19 +158,11 @@ describe('a turn moved out of the chat', () => {
   it('hides the entries a later entry omits, and shows the head in their place', () => {
     const parts = conversationParts(
       snapshot([
-        user(1, 'before'),
-        user(2, 'Compare flights'),
-        { id: 3, kind: 'pi.assistant', model: [{ role: 'assistant', content: 'Working on it', stopReason: 'stop' }] },
-        {
-          id: 4,
-          kind: 'app.thread_head',
-          data: moved,
-          edits: [
-            { target: 2, action: 'omit' },
-            { target: 3, action: 'omit' },
-          ],
-        },
-        user(5, 'after'),
+        said(1, 'before'),
+        said(2, 'Compare flights'),
+        reply(3, { text: 'Working on it' }),
+        activity(4, 'goblin.thread_head', moved, { omits: [2, 3] }),
+        said(5, 'after'),
       ]),
     )
     expect(parts.map((part) => [part.kind, part.id])).toEqual([

@@ -1,11 +1,12 @@
-/** Real source UI with controlled owner HTTP and native event fixtures; no account or model calls. */
+/** Real queue UI with controlled owner HTTP and an AG-UI stream fixture; no account or model calls. */
 import assert from 'node:assert/strict'
 import { mkdirSync, writeFileSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { chromium, type Page, type Route } from 'playwright-core'
-import { ConversationQueue, type QueuedInput } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
+import { opening } from './agui-fixtures.ts'
+import { FixtureStream, dropLiveReads, installLiveReads } from './agui-route.ts'
 
 /** The file descriptor this script's result line goes to (@cloudflare/workers-types makes `process` `any`). */
 const STDOUT = 1
@@ -14,83 +15,38 @@ const out = path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance
 mkdirSync(out, { recursive: true, mode: 0o700 })
 const results: unknown[] = []
 const errors: string[] = []
-const content = [
-  { type: 'text', text: 'Long queued message. '.repeat(70) },
+/** The queued inputs as the stream's `/queue` carries them: their words and what came with them, read by the server. */
+type Queued = Record<string, unknown> & { readonly id: number }
+const long = 'Long queued message. '.repeat(70)
+const queued: readonly Queued[] = [
   {
-    type: 'text',
-    text: JSON.stringify({
-      composer: {
-        text: 'Long queued message. '.repeat(70),
-        selections: [
-          { label: 'Notes', description: 'Fixture notes', selection: { kind: 'connection', connectionId: 'notes' } },
-        ],
-        context: [],
-      },
-    }),
+    id: 5,
+    mode: 'followUp',
+    text: long,
+    selections: [
+      { label: 'Notes', description: 'Fixture notes', selection: { kind: 'connection', connectionId: 'notes' } },
+    ],
+    attachments: [{ path: '/uploads/2026-01-01/notes.txt', name: 'notes.txt', size: 4, mimeType: 'text/plain' }],
   },
-  {
-    type: 'text',
-    text: JSON.stringify({
-      attachments: [{ path: '/uploads/2026-01-01/notes.txt', name: 'notes.txt', size: 4, mimeType: 'text/plain' }],
-    }),
-  },
+  { id: 6, mode: 'followUp', text: 'duplicate' },
+  { id: 7, mode: 'followUp', text: 'duplicate' },
+  { id: 8, mode: 'followUp', text: 'phone message', author: 'Chat · Trip planning' },
 ]
 
-async function events(page: Page, inputs: readonly QueuedInput[]) {
-  await page.evaluate(
-    (items) =>
-      window.dispatchEvent(
-        new MessageEvent('fixture-batch', {
-          data: JSON.stringify([{ type: 'inbox_update', items: items.map(({ id, mode }) => ({ id, mode })) }]),
-        }),
-      ),
-    inputs,
-  )
-}
 async function install(page: Page) {
-  let inputs = Schema.decodeUnknownSync(ConversationQueue)({
-    inputs: [
-      { id: 5, mode: 'followUp', content },
-      { id: 6, mode: 'followUp', content: 'duplicate' },
-      { id: 7, mode: 'followUp', content: 'duplicate' },
-      {
-        id: 8,
-        mode: 'followUp',
-        content: [
-          { type: 'text', text: '[from Chat · Trip planning]' },
-          { type: 'text', text: 'phone message' },
-          { type: 'text', text: JSON.stringify({ ownTurn: { via: 'source' } }) },
-        ],
-      },
-    ],
-  }).inputs
-  let reads = 0
+  let inputs = queued
+  const stream = new FixtureStream('1', opening([], { running: true, queue: inputs }))
   const submissions: unknown[] = []
   let hold: (() => void) | undefined
   let failNext = false
-  let failReads = false
   let removal: Promise<void> | undefined
   let releaseRemoval: (() => void) | undefined
   let refuseRemoval = false
-  await page.addInitScript(() => {
-    let opened = 0
-    class Events extends EventTarget {
-      readonly forward = (event: Event) => {
-        if (!(event instanceof MessageEvent)) return
-        const data: unknown = event.data
-        this.dispatchEvent(new MessageEvent('batch', { data }))
-      }
-      constructor() {
-        super()
-        document.documentElement.dataset['streams'] = String(++opened)
-        window.addEventListener('fixture-batch', this.forward)
-      }
-      close() {
-        window.removeEventListener('fixture-batch', this.forward)
-      }
-    }
-    Object.defineProperty(window, 'EventSource', { value: Events })
-  })
+  /** The queue as the stream says it changed. */
+  const changed = () =>
+    stream.write(page, { type: 'STATE_DELTA', delta: [{ op: 'replace', path: '/queue', value: inputs }] })
+  await installLiveReads(page)
+  await page.route('**/streams/1**', (route) => stream.read(route))
   const remove = async (route: Route) => {
     const { submissionId } = Schema.decodeUnknownSync(Schema.Struct({ submissionId: Schema.Int }))(
       route.request().postDataJSON(),
@@ -102,7 +58,7 @@ async function install(page: Page) {
     }
     inputs = inputs.filter(({ id }) => id !== submissionId)
     await route.fulfill({ json: { status: 'removed' } })
-    await events(page, inputs)
+    await changed()
   }
   const submit = async (route: Route) => {
     const message = Schema.decodeUnknownSync(Schema.Struct({ input: Schema.String, operationId: Schema.String }))(
@@ -116,29 +72,15 @@ async function install(page: Page) {
     await new Promise<void>((resolve) => {
       hold = resolve
     })
-    inputs = [...inputs, { id: 9, mode: 'followUp', content: message.input }]
+    inputs = [...inputs, { id: 9, mode: 'followUp', text: message.input }]
     await route.fulfill({ status: 202, json: { accepted: true, session: '1', operationId: message.operationId } })
-    await events(page, inputs)
+    await changed()
   }
   await page.route('**/api/conversations/1/**', async (route: Route) => {
     const request = route.request()
     const action = new URL(request.url()).pathname.split('/').at(-1)
-    if (action === 'snapshot')
-      return route.fulfill({
-        json: {
-          type: 'snapshot',
-          entries: [],
-          tools: [],
-          inbox: inputs.map(({ id, mode }) => ({ id, mode })),
-          run: { inputs: [1] },
-        },
-      })
+    if (action === 'stream') return route.fulfill({ json: stream.link(new URL(request.url()).origin) })
     if (action === 'queue' && request.method() === 'DELETE') return remove(route)
-    if (action === 'queue') {
-      reads += 1
-      if (failReads) return route.fulfill({ status: 503, json: { error: 'Unavailable' } })
-      return route.fulfill({ json: { inputs } })
-    }
     if (action === 'composer') return route.fulfill({ json: { options: [], unavailable: [] } })
     if (action === 'messages') return submit(route)
     return route.fulfill({ json: {} })
@@ -163,15 +105,11 @@ async function install(page: Page) {
     fail: () => {
       failNext = true
     },
-    failReads: (next: boolean) => {
-      failReads = next
-    },
-    invalidate: () => events(page, inputs),
     placed: async () => {
       inputs = inputs.filter(({ id }) => id !== 5)
-      await events(page, inputs)
+      await changed()
     },
-    reads: () => reads,
+    reads: () => stream.reads,
     submissions,
   }
 }
@@ -185,8 +123,8 @@ async function matrix(origin: string, page: Page, label: string, dark: boolean) 
   await full.locator('[data-submission="5"]').waitFor()
   assert.equal(await full.locator('[data-submission]').count(), 4)
   assert.equal(await inline.locator('[data-submission]').count(), 4)
-  assert.equal(await page.locator('html').getAttribute('data-streams'), '1', 'full and inline share one SSE')
-  assert.equal(fixture.reads(), 1, 'full and inline share one initial content read')
+  assert.equal(await page.locator('html').getAttribute('data-streams'), '1', 'full and inline share one live read')
+  assert.equal(fixture.reads(), 1, 'full and inline share one catch-up read')
   assert(await full.getByRole('link', { name: 'notes.txt' }).isVisible())
   assert(await full.getByLabel('Selected references').getByText('@Notes').isVisible())
   assert(await full.getByText('Chat · Trip planning · Follow-up').isVisible())
@@ -209,14 +147,12 @@ async function matrix(origin: string, page: Page, label: string, dark: boolean) 
   assert(!bounds.overflow, 'narrow queue has no horizontal overflow')
   await page.screenshot({ path: path.join(out, `${label}.png`) })
   await summary.press('Enter')
-  fixture.failReads(true)
-  await fixture.invalidate()
-  // The notice ends with the failed read's reference, then 'Retrying…'.
-  await full.getByText(/^Queued messages could not be refreshed/u).waitFor()
+  // A dropped live read reads on from its offset, once for both panes, and the queue stays as it was.
+  await dropLiveReads(page)
+  await page.waitForFunction(() => document.documentElement.dataset['streams'] === '2')
+  assert.equal(fixture.reads(), 2, 'one catch-up read after the drop')
   assert.equal(await full.locator('[data-submission]').count(), 4)
-  fixture.failReads(false)
-  await fixture.invalidate()
-  await full.getByText(/^Queued messages could not be refreshed/u).waitFor({ state: 'hidden' })
+  assert.equal(await inline.locator('[data-submission]').count(), 4)
   const field = full.getByRole('textbox', { name: 'Message' })
   await field.fill('new follow-up')
   fixture.fail()
@@ -273,7 +209,7 @@ try {
 } finally {
   writeFileSync(
     path.join(out, 'receipt.json'),
-    JSON.stringify({ evidence: 'local Chromium with HTTP/native-event fixtures', results, errors }, null, 2),
+    JSON.stringify({ evidence: 'local Chromium with HTTP and AG-UI stream fixtures', results, errors }, null, 2),
   )
   await browser.close()
   await server.close()

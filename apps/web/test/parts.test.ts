@@ -11,44 +11,26 @@ import {
   type ToolPart,
   type ToolState,
 } from '../src/lib/parts.ts'
-import { projectBatch, projectSnapshot } from '../src/lib/projection.ts'
+import {
+  CHAT,
+  activity,
+  answer,
+  asking,
+  finished,
+  follow,
+  result,
+  said,
+  snapshot,
+  started,
+  streaming,
+} from './agui-fixtures.ts'
 
-const call = (id: string, args: Record<string, unknown> = {}) => ({
-  type: 'toolCall',
-  id,
-  name: 'mcp_call',
-  arguments: args,
-})
-const asking = (id: number, calls: readonly Record<string, unknown>[], extra: Record<string, unknown> = {}) => ({
-  id,
-  model: [{ role: 'assistant', content: calls, stopReason: 'toolUse', timestamp: 1_000, ...extra }],
-})
-const result = (id: number, toolCallId: string, isError = false) => ({
-  id,
-  model: [{ role: 'toolResult', toolCallId, toolName: 'mcp_call', isError, content: 'out', timestamp: 4_500 }],
-})
-const snapshot = (entries: readonly unknown[], extra: Record<string, unknown> = {}) =>
-  projectSnapshot({ type: 'snapshot', entries, tools: [], inbox: [], ...extra })
+const call = (id: string, args: Record<string, unknown> = {}) => ({ id, arguments: args })
 
 /** A Persona fork's native call of `name` (ADR 0101) and its result, whose details say what it reached. */
 const native = (name: string, args: Record<string, unknown>, details: unknown, isError = false) => [
-  {
-    id: 2,
-    model: [
-      {
-        role: 'assistant',
-        content: [{ type: 'toolCall', id: 'n1', name, arguments: args }],
-        stopReason: 'toolUse',
-        timestamp: 1_000,
-      },
-    ],
-  },
-  {
-    id: 3,
-    model: [
-      { role: 'toolResult', toolCallId: 'n1', toolName: name, isError, content: 'out', details, timestamp: 2_000 },
-    ],
-  },
+  asking(2, [{ id: 'n1', name, arguments: args }]),
+  result(3, 'n1', { toolName: name, isError, details, at: 2_000 }),
 ]
 
 describe("a Persona fork's native MCP calls (ADR 0101)", () => {
@@ -83,13 +65,7 @@ describe('the transcript as render parts', () => {
 
   it('folds each result into the call that asked for it, with the MCP target and its timing', () => {
     const args = { connectionId: 'myplan', name: 'myplan_open', arguments: { note: 'n1' } }
-    const parts = conversationParts(
-      snapshot([
-        { id: 1, model: [{ role: 'user', content: 'open it' }] },
-        asking(2, [call('c1', args)]),
-        result(3, 'c1'),
-      ]),
-    )
+    const parts = conversationParts(snapshot([said(1, 'open it'), asking(2, [call('c1', args)]), result(3, 'c1')]))
     expect(parts.map((part) => [part.kind, part.id])).toEqual([
       ['user', '1:0'],
       ['tool', 'tool:c1'],
@@ -103,12 +79,10 @@ describe('the transcript as render parts', () => {
     })
   })
   it('tells a failed, a queued, a running and a stopped call apart', () => {
-    const entries = [asking(1, [call('bad'), call('queued'), call('live')]), result(2, 'bad', true)]
-    const running = projectBatch(
-      snapshot(entries, { run: { inputs: [1] } }),
-      [{ type: 'tool_execution_start', toolCallId: 'live', toolName: 'mcp_call', args: {} }],
-      2_000,
-    )
+    const chat = follow([asking(1, [call('bad'), call('queued'), call('live')]), result(2, 'bad', { isError: true })], {
+      running: true,
+    })
+    const running = chat.next([started('live')], 2_000)
     expect(
       conversationParts(running).map((part) => (part.kind === 'tool' ? [part.id, part.state] : part.kind)),
     ).toEqual([
@@ -118,62 +92,32 @@ describe('the transcript as render parts', () => {
     ])
     const live = conversationParts(running).find((part) => part.id === 'tool:live')
     expect(live).toMatchObject({ startedAt: 2_000 })
-    const ended = projectBatch(running, [{ type: 'run_end' }])
+    const ended = chat.next([finished])
     expect(conversationParts(ended).find((part) => part.id === 'tool:queued')).toMatchObject({ state: 'stopped' })
   })
   it('shows the streaming thinking and text, then a live tool whose asking message is not committed yet', () => {
-    const next = projectBatch(snapshot([], { run: { inputs: [1] } }), [
-      { type: 'tool_execution_start', toolCallId: 'early', toolName: 'mcp_list', args: { connectionId: 'x' } },
-      {
-        type: 'message_update',
-        changes: [
-          { type: 'thinking_start', contentIndex: 0, block: { type: 'thinking', thinking: 'Plan' } },
-          { type: 'text_start', contentIndex: 1, block: { type: 'text', text: 'Hi' } },
-        ],
-      },
+    const next = follow([], { running: true }).next([
+      ...streaming(7_000, { thought: 'Plan', text: 'Hi' }),
+      { type: 'TOOL_CALL_START', toolCallId: 'early', toolCallName: 'mcp_list', parentMessageId: `${CHAT}:a7000` },
+      started('early'),
     ])
     // The order a committed message has, so the tool row does not change places when its message commits.
     expect(conversationParts(next)).toEqual([
-      { kind: 'reasoning', id: 'partial:reasoning', text: 'Plan', live: true },
-      { kind: 'text', id: 'partial:text', text: 'Hi', live: true },
+      { kind: 'reasoning', id: 'partial:reasoning', key: 'at:7000:reasoning', text: 'Plan', live: true },
+      { kind: 'text', id: 'partial:text', key: 'at:7000:text', text: 'Hi', live: true },
       expect.objectContaining({
         kind: 'tool',
         id: 'tool:early',
         state: 'running',
-        call: { id: 'early', name: 'mcp_list', arguments: { connectionId: 'x' } },
+        call: { id: 'early', name: 'mcp_list', arguments: {} },
       }),
     ])
   })
   it('keeps one React key for a message from its first token to its commit, so an open Thoughts stays open', () => {
-    const message = { role: 'assistant', timestamp: 7_000, content: [] }
-    const streaming = projectBatch(snapshot([], { run: { inputs: [1] } }), [
-      { type: 'message_start', message },
-      {
-        type: 'message_update',
-        changes: [
-          { type: 'thinking_start', contentIndex: 0, block: { type: 'thinking', thinking: 'Plan' } },
-          { type: 'text_start', contentIndex: 1, block: { type: 'text', text: 'Hi' } },
-        ],
-      },
-    ])
-    const live = conversationParts(streaming).map(partKey)
-    const committed = projectBatch(streaming, [
-      {
-        type: 'message_end',
-        entry: {
-          id: 5,
-          model: [
-            {
-              ...message,
-              content: [
-                { type: 'thinking', thinking: 'Plan' },
-                { type: 'text', text: 'Hi' },
-              ],
-              stopReason: 'stop',
-            },
-          ],
-        },
-      },
+    const chat = follow([], { running: true })
+    const live = conversationParts(chat.next(streaming(7_000, { thought: 'Plan', text: 'Hi' }))).map(partKey)
+    const committed = chat.next([
+      { type: 'TEXT_MESSAGE_END', messageId: `${CHAT}:a7000`, metadata: { goblin: { entryId: 5, branchable: true } } },
     ])
     const parts = conversationParts(committed)
     expect(live).toEqual(['at:7000:reasoning', 'at:7000:text'])
@@ -193,7 +137,7 @@ describe('the transcript as render parts', () => {
   })
   it('keeps a result whose call was compacted away, and puts a failure after the turn it ended', () => {
     const parts = conversationParts(
-      snapshot([result(1, 'gone'), { id: 2, model: [{ role: 'assistant', content: [], stopReason: 'aborted' }] }]),
+      snapshot([result(1, 'gone'), answer(2, { marks: { stop: { reason: 'aborted' } } })]),
     )
     expect(parts.map((part) => [part.kind, part.id])).toEqual([
       ['tool', 'tool:gone'],
@@ -212,12 +156,7 @@ const toolAt = (state: ToolState, times: { readonly startedAt?: number; readonly
 
 describe('a thread started with + in main', () => {
   it('is its own part between the messages around it', () => {
-    const parts = conversationParts(
-      snapshot([
-        { id: 1, model: [{ role: 'user', content: 'hello' }] },
-        { id: 2, kind: 'app.thread_started', data: { thread: '7' }, model: [{ role: 'user', content: 'x' }] },
-      ]),
-    )
+    const parts = conversationParts(snapshot([said(1, 'hello'), activity(2, 'goblin.thread_started', { thread: '7' })]))
     expect(parts.map((part) => part.kind)).toEqual(['user', 'thread-started'])
     expect(parts[1]).toEqual({ kind: 'thread-started', id: '2:0', thread: '7' })
   })
@@ -229,23 +168,19 @@ describe("a decided call's outcome kept for the next turn", () => {
     origin: { connectionId: 'board', trust: 'untrusted' },
     result: { posted: true },
   }
-  const content = [
-    { type: 'text', text: '[from Board]' },
-    { type: 'text', text: 'Approved "Board" (board) · post; the held call returned.' },
-    { type: 'text', text: JSON.stringify(outcome) },
-  ]
-  const kept = { id: 3, kind: 'app.mcp_outcome', data: outcome.continuation, model: [{ role: 'user', content }] }
+  const words = 'Approved "Board" (board) · post; the held call returned.'
+  const kept = said(3, words, { author: 'Board', outcome, kept: true })
   it('is its outcome row, marked as waiting for the next turn while nothing came after it', () => {
     const [part] = conversationParts(snapshot([kept]))
     expect(part).toMatchObject({ kind: 'user', author: 'Board', outcome, kept: true })
   })
   it('reads as any other outcome once something follows it', () => {
-    const next = { id: 4, model: [{ role: 'user', content: 'what did it say?' }] }
+    const next = said(4, 'what did it say?')
     const [part] = conversationParts(snapshot([kept, next]))
     expect(part).toMatchObject({ kind: 'user', outcome })
     expect(part).not.toHaveProperty('kept')
     // The same outcome sent as a turn is never marked.
-    const sent = { id: 3, model: [{ role: 'user', content }] }
+    const sent = said(3, words, { author: 'Board', outcome })
     expect(conversationParts(snapshot([sent]))[0]).not.toHaveProperty('kept')
   })
 })
@@ -317,11 +252,9 @@ describe("the owner's own turns", () => {
   })
 })
 
-const build = (id: string) => ({ type: 'toolCall', id, name: 'app_build', arguments: { name: 'tapper' } })
-const built = (id: number, toolCallId: string, text: string) => ({
-  id,
-  model: [{ role: 'toolResult', toolCallId, toolName: 'app_build', isError: false, content: text, timestamp: 4_500 }],
-})
+const build = (id: string) => ({ id, name: 'app_build', arguments: { name: 'tapper' } })
+const built = (entry: number, toolCallId: string, text: string) =>
+  result(entry, toolCallId, { content: text, toolName: 'app_build' })
 const active = (version: number, ui: boolean) =>
   JSON.stringify({ status: 'active', app: 'tapper', release: 'r_1', version, tools: [], revision: 1, ui })
 
@@ -329,13 +262,13 @@ describe('app builds in the transcript', () => {
   it('shows an app view under the newest build that has one, and reads failed builds as none', () => {
     const parts = conversationParts(
       snapshot([
-        asking(1, [build('b1')]),
+        asking(1, [build('b1')], 1_000),
         built(2, 'b1', active(1, true)),
-        asking(3, [build('b2')]),
+        asking(3, [build('b2')], 3_000),
         built(4, 'b2', JSON.stringify({ status: 'failed', app: 'tapper', problems: [] })),
-        asking(5, [build('b3')]),
+        asking(5, [build('b3')], 5_000),
         built(6, 'b3', active(2, true)),
-        asking(7, [build('b4')]),
+        asking(7, [build('b4')], 7_000),
         built(8, 'b4', active(3, false)),
       ]),
     ).filter((part): part is ToolPart => part.kind === 'tool')
@@ -348,34 +281,26 @@ describe('app builds in the transcript', () => {
   })
 })
 
-const answered = (id: number, text: string) => ({
-  id,
-  model: [{ role: 'assistant', content: [{ type: 'text', text }], stopReason: 'stop', timestamp: 2_000 }],
-})
+const answered = (entry: number, text: string) => answer(entry, { text, at: 2_000 })
 
 describe('the working row and the echo of a sent message', () => {
-  const owner = { id: 1, model: [{ role: 'user', content: 'hello' }] }
+  const owner = said(1, 'hello')
   it('says the turn is under way after the owner’s message and after a tool result, until something streams', () => {
-    const afterMessage = conversationParts(snapshot([owner], { run: {} }))
+    const afterMessage = conversationParts(snapshot([owner], { running: true }))
     expect(afterMessage.map((part) => part.kind)).toEqual(['user', 'working'])
-    const afterTool = conversationParts(snapshot([owner, asking(2, [call('c1')]), result(3, 'c1')], { run: {} }))
+    const afterTool = conversationParts(snapshot([owner, asking(2, [call('c1')]), result(3, 'c1')], { running: true }))
     expect(afterTool.map((part) => part.kind)).toEqual(['user', 'tool', 'working'])
   })
   it('does not say it while idle, while something shows, or after an answer a finishing turn leaves last', () => {
     expect(conversationParts(snapshot([owner])).some((part) => part.kind === 'working')).toBe(false)
-    const streaming = projectBatch(snapshot([owner], { run: {} }), [
-      { type: 'message_start', message: { role: 'assistant', timestamp: 7_000, content: [] } },
-      {
-        type: 'message_update',
-        changes: [{ type: 'text_start', contentIndex: 0, block: { type: 'text', text: 'Hi' } }],
-      },
-    ])
-    expect(conversationParts(streaming).some((part) => part.kind === 'working')).toBe(false)
-    const running = projectBatch(snapshot([owner], { run: {} }), [
-      { type: 'tool_execution_start', toolCallId: 'c1', toolName: 'mcp_call', args: {} },
+    const writing = follow([owner], { running: true }).next(streaming(7_000, { text: 'Hi' }))
+    expect(conversationParts(writing).some((part) => part.kind === 'working')).toBe(false)
+    const running = follow([owner], { running: true }).next([
+      { type: 'TOOL_CALL_START', toolCallId: 'c1', toolCallName: 'mcp_call' },
+      started('c1'),
     ])
     expect(conversationParts(running).some((part) => part.kind === 'working')).toBe(false)
-    const ending = snapshot([owner, answered(2, 'Done.')], { run: {} })
+    const ending = snapshot([owner, answered(2, 'Done.')], { running: true })
     expect(conversationParts(ending).some((part) => part.kind === 'working')).toBe(false)
   })
   it('shows a message just sent before the stream delivers it, and keeps its key for the server’s entry', () => {
@@ -385,7 +310,7 @@ describe('the working row and the echo of a sent message', () => {
       { kind: 'user', id: 'echo:op-1', key: 'echo:op-1', text: 'hello' },
       { kind: 'working', id: 'working' },
     ])
-    const delivered = conversationParts(snapshot([owner], { run: {} }), echo)
+    const delivered = conversationParts(snapshot([owner], { running: true }), echo)
     expect(delivered.map((part) => [part.kind, part.id, partKey(part)])).toEqual([
       ['user', '1:0', 'echo:op-1'],
       ['working', 'working', 'working'],
@@ -406,16 +331,26 @@ const toolOf = (state: ReturnType<typeof snapshot>) =>
 describe('a tool row’s time', () => {
   it('keeps the start and end this browser saw after the run ends, not the asking message’s start and the server’s end', () => {
     // The asking message began at 1_000 and the server stamped the result 4_500; the tool ran 10_000 to 19_500 here.
-    let state = snapshot([{ id: 1, model: [{ role: 'user', content: 'go' }] }], { run: {} })
-    state = projectBatch(state, [{ type: 'message_end', entry: asking(2, [call('c1')]) }], 5_000)
-    state = projectBatch(
-      state,
-      [{ type: 'tool_execution_start', toolCallId: 'c1', toolName: 'mcp_call', args: {} }],
-      10_000,
+    const chat = follow([said(1, 'go')], { running: true })
+    const asked = `${CHAT}:a1000`
+    chat.next(
+      [
+        { type: 'TEXT_MESSAGE_START', messageId: asked, role: 'assistant', metadata: { goblin: { at: 1_000 } } },
+        { type: 'TOOL_CALL_START', toolCallId: 'c1', toolCallName: 'mcp_call', parentMessageId: asked },
+        { type: 'TEXT_MESSAGE_END', messageId: asked, metadata: { goblin: { entryId: 2, branchable: true } } },
+        { type: 'TOOL_CALL_ARGS', toolCallId: 'c1', delta: '{}' },
+        { type: 'TOOL_CALL_END', toolCallId: 'c1' },
+      ],
+      5_000,
     )
-    state = projectBatch(state, [{ type: 'tool_execution_end', toolCallId: 'c1', entry: result(3, 'c1') }], 19_500)
+    chat.next([started('c1')], 10_000)
+    const { metadata, ...done } = result(3, 'c1')
+    const state = chat.next(
+      [{ type: 'TOOL_CALL_RESULT', messageId: done.id, toolCallId: 'c1', content: 'out', metadata }],
+      19_500,
+    )
     expect(toolOf(state)).toMatchObject({ state: 'done', startedAt: 10_000, endedAt: 19_500 })
-    const ended = projectBatch(state, [{ type: 'run_end' }], 20_000)
+    const ended = chat.next([finished], 20_000)
     expect(toolOf(ended)).toMatchObject({ state: 'done', startedAt: 10_000, endedAt: 19_500 })
   })
   it('falls back to the asking message and the result’s own stamp for a tool this browser did not see run', () => {

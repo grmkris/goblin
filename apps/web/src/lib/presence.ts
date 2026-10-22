@@ -1,6 +1,6 @@
-import type { StreamStatus } from './conversation-stream.ts'
+import type { StreamStatus } from './agui/reader.ts'
 import type { Named, Part } from './parts.ts'
-import { queuedProgress, type ConversationProjection } from './projection.ts'
+import { queuedProgress, type ConversationProjection } from './agui/reducer.ts'
 
 /** What the agent is doing, as the presence orb and its label show it. */
 export type Presence =

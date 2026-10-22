@@ -3,7 +3,10 @@ import assert from 'node:assert/strict'
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
-import { chromium } from 'playwright-core'
+import { type Page, chromium } from 'playwright-core'
+import { marksOf } from '../src/lib/agui/messages.ts'
+import { activity, answer, asking, opening, result, said } from './agui-fixtures.ts'
+import { FixtureStream, installLiveReads } from './agui-route.ts'
 
 const baseline = process.argv.includes('--before')
 const out = path.resolve(
@@ -12,52 +15,69 @@ const out = path.resolve(
   `channel-${baseline ? 'before' : 'after'}-${Date.now()}`,
 )
 mkdirSync(out, { recursive: true })
-const entries = [
+const attachment = {
+  path: '/uploads/lisbon-guide.pdf',
+  name: 'Lisbon guide.pdf',
+  mimeType: 'application/pdf',
+  size: 342000,
+}
+const questions = [
   {
-    id: 10,
-    kind: 'pi.user',
-    model: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: 'Let’s plan a week in Lisbon. I’d like a quiet neighborhood, good food and time to explore.',
-          },
-          {
-            type: 'text',
-            text: JSON.stringify({
-              attachments: [
-                {
-                  path: '/uploads/lisbon-guide.pdf',
-                  name: 'Lisbon guide.pdf',
-                  mimeType: 'application/pdf',
-                  size: 342000,
-                },
-              ],
-            }),
-          },
-        ],
-        timestamp: 1792310000000,
-      },
+    id: 'pace',
+    prompt: 'How busy should the days be?',
+    kind: 'single',
+    options: [
+      { id: 'slow', label: 'Slow mornings' },
+      { id: 'full', label: 'Full days' },
     ],
   },
-  {
-    id: 11,
-    kind: 'pi.assistant',
-    model: [
-      {
-        role: 'assistant',
-        content: [
-          {
-            type: 'text',
-            text: 'Start with **Príncipe Real** or **Estrela** for a quieter base. Both put cafés, gardens and great places to eat within walking distance.\n\nI’ll keep hotel options in a thread so we can compare them without losing the overall plan. The [Lisbon visitor guide](https://www.visitlisboa.com/) is a useful starting point.',
-          },
-        ],
-        timestamp: 1792310001000,
-      },
+]
+const notice = {
+  notice: 'notice:rt_1:evt-1',
+  routine: 'rt_1',
+  source: 'event',
+  from: { connectionId: 'notes', label: 'Notes' },
+  title: 'Flight prices dropped',
+  body: 'TAP to Lisbon is €40 cheaper on the 12th.',
+}
+/** The chat's newest entries (AG-UI, as `apps/runtime/src/streams/` writes them), from 10: what its stream opens with. */
+const recent = [
+  said(10, 'Let’s plan a week in Lisbon. I’d like a quiet neighborhood, good food and time to explore.', {
+    attachments: [attachment],
+    at: 1792310000000,
+  }),
+  answer(11, {
+    at: 1792310001000,
+    thinking: ['Quiet and walkable: Príncipe Real and Estrela fit; keep hotels in a thread.'],
+    text: 'Start with **Príncipe Real** or **Estrela** for a quieter base. Both put cafés, gardens and great places to eat within walking distance.\n\nI’ll keep hotel options in a thread so we can compare them without losing the overall plan. The [Lisbon visitor guide](https://www.visitlisboa.com/) is a useful starting point.',
+    marks: { usage: { input: 28000, output: 131, cacheRead: 0, cacheWrite: 0, totalTokens: 28131 } },
+  }),
+  said(12, 'Save that to my notes, and ask me how busy the days should be.', { at: 1792310010000 }),
+  asking(
+    13,
+    [
+      { id: 'c-notes', arguments: { connectionId: 'notes', name: 'write', arguments: { title: 'Lisbon' } } },
+      { id: 'c-ask', name: 'ask_user', arguments: { questions } },
     ],
-  },
+    1792310011000,
+  ),
+  result(14, 'c-notes', { content: 'Remote MCP request failed (timeout).', isError: true, at: 1792310012000 }),
+  result(15, 'c-ask', {
+    toolName: 'ask_user',
+    content: 'Asked the owner.',
+    details: { kind: 'question', questions },
+    at: 1792310013000,
+  }),
+  activity(16, 'goblin.notice', notice, { at: 1792310020000 }),
+].flat()
+const opened = opening(recent, { before: 10 })
+/** The page before entry 10, which the history endpoint answers in the same mapping. */
+const older = [
+  said(8, 'Which neighbourhoods are walkable?', { at: 1792300000000 }),
+  ...answer(9, {
+    at: 1792300001000,
+    text: 'Most of central Lisbon is, if you do not mind hills: Alfama and Chiado most of all.',
+  }),
 ]
 const catalog = {
   servers: [
@@ -130,6 +150,107 @@ const details = {
   coverage: { complete: true, gaps: [] },
   related: [{ operation: 'owner:op-12', kind: 'start', chat: '31', state: 'ok' }],
 }
+/** Every message of chat 30's history, oldest first, in the stream's mapping (what the opening shows and before). */
+const everything = [...older, ...recent]
+/** The history endpoint's page before entry `before`: all of it, which fits one page. */
+function historyPage(before: number) {
+  const messages = everything.filter((message) => {
+    const entry = marksOf(message).entryId
+    return entry === undefined || entry < before
+  })
+  return { messages, next: 8, more: false }
+}
+
+const ASKED = '1:a1792310030000'
+/** The owner's next message, as the stream writes a committed one. */
+const sent = [
+  { type: 'RUN_STARTED', threadId: '30', runId: '30:17' },
+  {
+    type: 'TEXT_MESSAGE_START',
+    messageId: '30:e17',
+    role: 'user',
+    metadata: { goblin: { entryId: 17, at: 1792310029000, branchable: true } },
+  },
+  { type: 'TEXT_MESSAGE_CONTENT', messageId: '30:e17', delta: 'Find a quiet hotel near Príncipe Real.' },
+  { type: 'TEXT_MESSAGE_END', messageId: '30:e17', metadata: { goblin: { entryId: 17 } } },
+]
+/** The answer in flight: its thinking, its first words and a tool it runs. */
+const streaming = [
+  { type: 'REASONING_START', messageId: `${ASKED}:s0` },
+  {
+    type: 'REASONING_MESSAGE_START',
+    messageId: `${ASKED}:r0`,
+    role: 'reasoning',
+    metadata: { goblin: { at: 1792310030000 } },
+  },
+  { type: 'REASONING_MESSAGE_CONTENT', messageId: `${ASKED}:r0`, delta: 'Check the saved shortlist before searching.' },
+  { type: 'REASONING_MESSAGE_END', messageId: `${ASKED}:r0` },
+  { type: 'REASONING_END', messageId: `${ASKED}:s0` },
+  { type: 'TEXT_MESSAGE_START', messageId: ASKED, role: 'assistant', metadata: { goblin: { at: 1792310030000 } } },
+  { type: 'TEXT_MESSAGE_CONTENT', messageId: ASKED, delta: 'Looking at your shortlist first.' },
+  { type: 'TOOL_CALL_START', toolCallId: 'c-read', toolCallName: 'mcp_call', parentMessageId: ASKED },
+  { type: 'TEXT_MESSAGE_END', messageId: ASKED, metadata: { goblin: { entryId: 18, branchable: true } } },
+  {
+    type: 'TOOL_CALL_ARGS',
+    toolCallId: 'c-read',
+    delta: JSON.stringify({ connectionId: 'notes', name: 'read', arguments: { title: 'Hotels' } }),
+  },
+  { type: 'TOOL_CALL_END', toolCallId: 'c-read' },
+  { type: 'CUSTOM', name: 'goblin.tool_progress', value: { toolCallId: 'c-read', status: 'running' } },
+  {
+    type: 'CUSTOM',
+    name: 'goblin.tool_progress',
+    value: { toolCallId: 'c-read', output: { append: 'Reading “Hotels”…' } },
+  },
+  {
+    type: 'STATE_DELTA',
+    delta: [
+      { op: 'replace', path: '/queue', value: [{ id: 21, mode: 'followUp', text: 'Under €200 a night, please.' }] },
+    ],
+  },
+]
+/** The run settles: the tool's result, the answer, the queued input taken, the run's end. */
+const settled = [
+  {
+    type: 'TOOL_CALL_RESULT',
+    messageId: '30:tc-read',
+    toolCallId: 'c-read',
+    role: 'tool',
+    content: 'Memmo Príncipe Real; Casa do Jardim',
+    metadata: { goblin: { entryId: 19, at: 1792310032000, toolName: 'mcp_call', isError: false } },
+  },
+  {
+    type: 'TEXT_MESSAGE_START',
+    messageId: '1:a1792310033000',
+    role: 'assistant',
+    metadata: { goblin: { at: 1792310033000 } },
+  },
+  {
+    type: 'TEXT_MESSAGE_CONTENT',
+    messageId: '1:a1792310033000',
+    delta: 'Two from your shortlist are quiet and close: **Memmo Príncipe Real** and **Casa do Jardim**.',
+  },
+  { type: 'TEXT_MESSAGE_END', messageId: '1:a1792310033000', metadata: { goblin: { entryId: 20, branchable: true } } },
+  { type: 'RUN_FINISHED', threadId: '30', runId: '30:17' },
+  { type: 'STATE_DELTA', delta: [{ op: 'replace', path: '/queue', value: [] }] },
+]
+
+/** A run streamed into the open chat: screenshots while it runs (with a queued follow-up) and once it settled. */
+async function live(page: Page, stream: FixtureStream, label: string) {
+  await page.waitForFunction(() => document.documentElement.dataset['streams'] !== undefined)
+  await stream.write(page, ...sent, ...streaming)
+  await page.getByText('Looking at your shortlist first.').waitFor()
+  await page.getByText('Under €200 a night, please.').waitFor()
+  await page.screenshot({ path: path.join(out, `${label}-live.png`) })
+  await stream.write(page, ...settled)
+  await page.getByText('Casa do Jardim', { exact: false }).last().waitFor()
+  await page.getByText('Under €200 a night, please.').waitFor({ state: 'hidden' })
+  await page.screenshot({ path: path.join(out, `${label}-settled.png`) })
+  // A reload reads the whole epoch again and draws the same transcript.
+  await page.reload()
+  await page.getByText('Two from your shortlist').waitFor()
+}
+
 const server = await createServer({ configFile: path.join(import.meta.dirname, 'browser/vite.config.ts') })
 await server.listen()
 const origin = server.resolvedUrls?.local[0]
@@ -137,16 +258,33 @@ assert(origin)
 const browser = await chromium.launch()
 const errors: string[] = []
 try {
-  for (const width of [1440, 390]) {
-    const label = width === 390 ? 'phone' : 'desktop'
+  for (const [width, scheme] of [
+    [1440, 'light'],
+    [390, 'light'],
+    [1440, 'dark'],
+    [390, 'dark'],
+  ] as const) {
+    const label = `${width === 390 ? 'phone' : 'desktop'}${scheme === 'dark' ? '-dark' : ''}`
     const page = await browser.newPage({
       viewport: { width, height: width === 390 ? 844 : 900 },
       hasTouch: width === 390,
       isMobile: width === 390,
-      colorScheme: 'light',
+      colorScheme: scheme,
       reducedMotion: 'reduce',
     })
     page.on('pageerror', (error) => errors.push(error.message))
+    const stream = new FixtureStream('30', opened)
+    // Every other chat (the thread the panel opens) streams an empty opening.
+    const streams = new Map([['30', stream]])
+    const streamOf = (chat: string) => {
+      const known = streams.get(chat) ?? new FixtureStream(chat, opening([]))
+      streams.set(chat, known)
+      return known
+    }
+    await installLiveReads(page)
+    await page.route('**/streams/**', (route) =>
+      streamOf(new URL(route.request().url()).pathname.split('/').at(-1) ?? '').read(route),
+    )
     await page.route(
       (url) => url.pathname.startsWith('/api/'),
       (route) => {
@@ -209,11 +347,9 @@ try {
           },
         }
         if (at in responses) return json(responses[at])
-        if (at.endsWith('/snapshot')) return json({ type: 'snapshot', entries, tools: [], inbox: [] })
-        if (at.endsWith('/events')) return route.fulfill({ contentType: 'text/event-stream', body: ': fixture\n\n' })
-        if (at.endsWith('/queue')) return json({ inputs: [] })
+        if (at.endsWith('/stream')) return json(streamOf(at.split('/').at(-2) ?? '').link(origin))
         if (at.endsWith('/sources')) return json([])
-        if (at.endsWith('/history')) return json({ entries, more: false })
+        if (at.endsWith('/history')) return json(historyPage(Number(url.searchParams.get('before'))))
         if (at.endsWith('/read')) return json({ read: true })
         if (at.endsWith('/composer')) return json({ options: [] })
         errors.push(`Unexpected API request: ${at}`)
@@ -222,9 +358,16 @@ try {
     )
     await page.goto(`${origin}channel.html`)
     await page.getByPlaceholder('Message #Travel').waitFor()
+    // The page before the stream's window, read from the history endpoint, comes first.
+    await page.getByText('Which neighbourhoods are walkable?', { exact: true }).waitFor()
+    await page.getByText('How busy should the days be?').first().waitFor()
+    await page.getByText('Flight prices dropped').waitFor()
+    await page.getByText('Which neighbourhoods are walkable?', { exact: true }).scrollIntoViewIfNeeded()
+    await page.screenshot({ path: path.join(out, `${label}-history.png`) })
     await page.getByPlaceholder('Message #Travel').fill('Keep my draft while I check channel info')
-    await page.screenshot({ path: path.join(out, `${label}-chat.png`) })
-    if (!baseline) {
+    await page.screenshot({ path: path.join(out, `${label}-chat.png`), fullPage: true })
+    if (!baseline && scheme === 'dark') await live(page, stream, label)
+    if (!baseline && scheme === 'light') {
       await page.getByRole('button', { name: 'Info for #Travel' }).click()
       const panel = page.getByRole('dialog', { name: '#Travel' })
       await panel.waitFor()
@@ -271,6 +414,7 @@ try {
       await page.screenshot({ path: path.join(out, `${label}-details.png`) })
       await page.keyboard.press('Escape')
       await sheet.waitFor({ state: 'detached' })
+      await live(page, stream, label)
     }
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0)
     await page.close()

@@ -22,16 +22,20 @@ import { MoveReceipt, MoveToThread } from '../threads.ts'
 import { ApiErrors } from './errors.ts'
 import { EndpointScope } from './scope.ts'
 import { GrantsResident } from './resident.ts'
-import { EventStream } from './stream.ts'
 
 /** The chat a path names: a logical chat id of 1 to 12 digits. */
 const params = { id: ChatId }
 
 /**
- * A page of a chat's history before entry `before`, oldest first, and whether older entries remain. The entries are
- * Pi's own records, as Pi writes them; the web reads them with its transcript projection.
+ * A page of a chat's history before entry `before`, oldest first: its AG-UI messages, mapped as the chat's stream maps
+ * them (docs/architecture/streams.md), the entry to read the next page before (`next`), and whether older entries
+ * remain.
  */
-const ConversationHistory = Schema.Struct({ entries: Schema.Array(Schema.Unknown), more: Schema.Boolean })
+const ConversationHistory = Schema.Struct({
+  messages: Schema.Array(Schema.Unknown),
+  next: Schema.Int,
+  more: Schema.Boolean,
+})
 
 /** `?before=<entry>`: a positive safe integer. */
 const HistoryQuery = {
@@ -70,13 +74,10 @@ const EntriesQuery = {
  * - `queue` / `removeQueued`: `GET` and `DELETE …/:id/queue`: the owner's queued inputs, and withdrawing one.
  * - `markRead`: `PUT …/:id/read`: the owner has seen the newest reply.
  * - `composer`: `GET …/:id/composer`: what the composer can tag in the chat.
- * - `snapshot`: `GET …/:id/snapshot`: the chat's Pi snapshot, as JSON.
- * - `history`: `GET …/:id/history?before=`: a page of older entries.
+ * - `history`: `GET …/:id/history?before=`: a page of older messages, as AG-UI messages.
  * - `entries`: `GET …/:id/entries?after=&limit=`: entries after a cursor, oldest first, normalized for a server
  *   (`ConversationEntries`), with the chat's activity and Persona invocations. It does not grant resident authority.
  * - `sources`: `GET …/:id/sources`: what retrieval gave the chat's answers (ADR 0035), newest first.
- * - `events`: `GET …/:id/events`, server-sent: Pi's `snapshot`, then a `batch` per commit, until the browser goes away.
- *   A chat keeps its Pi session, so this is its session's stream. It does not grant resident authority.
  * - `stream`: `GET …/:id/stream`: joins the chat's AG-UI stream and answers where to read it (`ConversationStream`,
  *   docs/architecture/streams.md): a session and an OAuth client holding `transcripts` read the `full` tier, a key and
  *   any other client `answers`. `Conflict` `stream_starting` when its stream could not be made in time. It does not
@@ -142,11 +143,6 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     success: ComposerOptions,
     error: [ApiErrors.notFound, ApiErrors.conflict],
   }),
-  HttpApiEndpoint.get('snapshot', '/conversations/:id/snapshot', {
-    params,
-    success: Schema.JsonObject,
-    error: [ApiErrors.notFound],
-  }),
   HttpApiEndpoint.get('history', '/conversations/:id/history', {
     params,
     query: HistoryQuery,
@@ -173,9 +169,4 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
   })
     .annotate(EndpointScope, 'conversations')
     .annotate(GrantsResident, false),
-  HttpApiEndpoint.get('events', '/conversations/:id/events', {
-    params,
-    success: EventStream,
-    error: [ApiErrors.notFound],
-  }).annotate(GrantsResident, false),
 ) {}

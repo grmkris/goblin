@@ -5,22 +5,22 @@ import {
   historyQuery,
   removeQueuedMutation,
   stopMutation,
-  streamReads,
+  streamJoin,
   submitMutation,
 } from '../conversations/queries.ts'
-import { isNumber, records } from '../lib/values.ts'
-import { BrowserPiEvents, type StreamStatus } from '../lib/conversation-stream.ts'
+import { records } from '../lib/values.ts'
+import type { StreamStatus } from '../lib/agui/reader.ts'
+import { browserTransport } from '../lib/event-streams.ts'
+import { chatMessages, entriesOf } from '../lib/agui/messages.ts'
+import type { ConversationProjection } from '../lib/agui/reducer.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { reportUnexpected } from '../lib/unexpected.ts'
 import { type Lease, type StreamState, StreamPool } from '../lib/stream-pool.ts'
 import { conversationParts } from '../lib/conversation-parts.ts'
-import { type Echo, newestEntry, startsTurn } from '../lib/echo.ts'
-import { entryMessages, omittedEntries } from '../lib/entry-messages.ts'
-import { type ConversationProjection, historyStart } from '../lib/projection.ts'
-import { branchPoints, fromEntry } from '../lib/threads.ts'
+import { type Echo, startsTurn } from '../lib/echo.ts'
+import { fromEntry } from '../lib/threads.ts'
 import { SubmissionRetry } from '../lib/submission-retry.ts'
 import { useKeyboardInset } from './use-keyboard.ts'
-import { apiPath } from '../lib/workspace-path.ts'
 import { sessionPersonQuery } from '../auth/queries.ts'
 
 type MessageContext = {
@@ -48,18 +48,15 @@ export function messageBody(
 }
 
 /** Every conversation the browser follows, shared by the panes and inline threads that show it. */
-const streams = new StreamPool((thread) => ({
-  ...streamReads(thread),
-  events: () => new BrowserPiEvents(apiPath(`/api/conversations/${thread}/events`)),
-}))
+const streams = new StreamPool((thread) => ({ join: streamJoin(thread), transport: browserTransport }))
 
-/** Starts every followed conversation again from a fresh snapshot, while the page is visible. */
+/** Reads every followed conversation on from where it was, while the page is visible. */
 const resume = () => {
   if (document.visibilityState === 'visible') streams.resume()
 }
 
 let resuming = false
-/** Coming back to the tab, or back online, every followed conversation starts again from a fresh snapshot. */
+/** Coming back to the tab, or back online, every followed conversation reads what it missed. */
 function resumeWithThePage(): void {
   if (resuming) return
   resuming = true
@@ -70,8 +67,8 @@ function resumeWithThePage(): void {
 const FOLLOWING: StreamState = { projection: undefined, status: 'connecting', notice: '' }
 
 /**
- * One conversation of the agent as the browser follows it, from the shared stream pool: a Pi snapshot, then the
- * event stream, with sending and stopping. `visible` says whether it is on screen; one nobody sees for a while stops
+ * One conversation of the agent as the browser follows it, from the shared stream pool: its AG-UI stream
+ * (`lib/agui/`), with sending and stopping. `visible` says whether it is on screen; one nobody sees for a while stops
  * following until it is (its last state stays).
  */
 export function useConversation(thread: string, visible = true) {
@@ -106,11 +103,10 @@ export function useConversation(thread: string, visible = true) {
     const id = operationId ?? retry.current.operation({ thread, input, context })
     // Shown at once when it starts a turn; a message that queues behind a running one shows in the queue instead.
     if (state.projection !== undefined && startsTurn(state.projection))
-      setEcho({ id: `echo:${id}`, text: input, after: newestEntry(state.projection), by: me })
+      setEcho({ id: `echo:${id}`, text: input, after: state.projection.newestEntry, by: me })
     try {
       await submit({ id: thread, message: messageBody(input, id, context) })
       retry.current.accepted(id)
-      streams.refreshQueue(thread)
       setFailure('')
       return true
     } catch (error) {
@@ -130,7 +126,6 @@ export function useConversation(thread: string, visible = true) {
   async function removeQueued(submissionId: number): Promise<boolean> {
     try {
       const result = await removing({ id: thread, removal: { submissionId } })
-      streams.refreshQueue(thread)
       setFailure(
         result.status === 'removed'
           ? ''
@@ -160,9 +155,9 @@ export function useConversation(thread: string, visible = true) {
 }
 
 /**
- * The conversation before what its snapshot shows: once a memory view or a summary starts the model's context later,
- * the snapshot starts there too. The page before `start` loads on its own; `earlier` loads the next older one. A failed
- * page is reported as the conversation's notice.
+ * The conversation before what its stream opened with (its newest entries, or fewer once a memory view or a summary
+ * starts the model's context later), as AG-UI messages. The page before `start` loads on its own; `earlier` loads the
+ * next older one. A failed page is reported as the conversation's notice.
  */
 function useHistory(thread: string, start: number | undefined, report: (text: string) => void) {
   const history = useInfiniteQuery(historyQuery(thread, start))
@@ -170,20 +165,20 @@ function useHistory(thread: string, start: number | undefined, report: (text: st
   useEffect(() => {
     if (error !== null) report(messageOf(error, 'load earlier messages'))
   }, [error, report])
-  const entries = useMemo(() => (data?.pages ?? []).toReversed().flatMap((page) => records(page.entries)), [data])
+  const messages = useMemo(() => (data?.pages ?? []).toReversed().flatMap((page) => records(page.messages)), [data])
   const earlier = hasNextPage
     ? () => {
         fetchNextPage().catch(reportUnexpected)
       }
     : undefined
-  return { entries, earlier }
+  return { messages, earlier }
 }
 
 /**
- * The transcript's parts: the history pages loaded so far, then the snapshot and what streamed since. With `floor` (a
- * branched thread in its panel) it starts at that entry, the message the thread branched from, and reads no history
- * from before it. `branchable` holds the entries a thread may start from. `echo` is a message just sent, shown until
- * the stream delivers it.
+ * The transcript's parts: the history pages loaded so far, then what the stream opened with and what streamed since.
+ * With `floor` (a branched thread in its panel) it starts at that entry, the message the thread branched from, and
+ * reads no history from before it. `branchable` holds the entries a thread may start from. `echo` is a message just
+ * sent, shown until the stream delivers it.
  */
 export function useTranscript(
   thread: string,
@@ -192,25 +187,25 @@ export function useTranscript(
   floor?: number,
   echo?: Echo,
 ) {
-  const start = projection === undefined ? undefined : historyStart(projection)
+  const start = projection?.historyBefore
   const needed = floor === undefined || (start !== undefined && start > floor) ? start : undefined
   const history = useHistory(thread, needed, report)
+  // What the older pages say of their entries: which a thread may start at, and which a later entry leaves out.
+  const older = useMemo(() => entriesOf(history.messages), [history.messages])
   const parts = useMemo(() => {
     if (projection === undefined) return []
-    // A later entry's edits may omit an older one from a page of history (a turn moved out of this chat).
-    const omitted = omittedEntries([...history.entries, ...projection.entries])
-    const messages = [...entryMessages(history.entries, omitted), ...projection.messages]
+    const omitted = new Set([...older.omitted, ...projection.omitted])
+    const messages = [...chatMessages(history.messages, omitted), ...projection.messages]
     return conversationParts(
       { ...projection, messages: floor === undefined ? messages : fromEntry(messages, floor) },
       echo,
     )
-  }, [projection, history.entries, floor, echo])
-  // Which of the parts' entries a thread can branch from (a shared note in main cannot). Keyed on the entries, which
-  // keep their identity across a streamed batch, so the transcript's footers do not render again with every batch.
-  const entries = projection?.entries
-  const branchable = useMemo(() => branchPoints([...history.entries, ...(entries ?? [])]), [entries, history.entries])
-  const oldest = history.entries[0]?.id
-  const reachedFloor = floor !== undefined && isNumber(oldest) && oldest <= floor
+  }, [projection, history.messages, older, floor, echo])
+  // Keyed on the sets, which keep their identity while no message is committed, so the transcript's footers do not
+  // render again with every streamed batch.
+  const latest = projection?.branchable
+  const branchable = useMemo(() => new Set([...older.branchable, ...(latest ?? [])]), [older, latest])
+  const reachedFloor = floor !== undefined && older.oldest !== undefined && older.oldest <= floor
   return { parts, branchable, earlier: reachedFloor ? undefined : history.earlier }
 }
 

@@ -130,7 +130,14 @@ function toolMessage(chat: string, entry: number, message: ToolResultMessage, ma
     toolCallId: message.toolCallId,
     content,
     ...(message.isError ? { error: content === '' ? 'The tool failed.' : content } : {}),
-    ...goblin({ entryId: entry, at: message.timestamp, ...details, isError: message.isError, ...marks }),
+    ...goblin({
+      entryId: entry,
+      at: message.timestamp,
+      toolName: message.toolName,
+      ...details,
+      isError: message.isError,
+      ...marks,
+    }),
   }
 }
 

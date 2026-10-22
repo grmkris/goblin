@@ -38,15 +38,6 @@ export function threadsByFork(
   return byFork
 }
 
-/** The entries a thread can branch from: what the owner or the agent said (Pi's `pi.user` and `pi.assistant`). */
-export function branchPoints(entries: readonly Record<string, unknown>[]): ReadonlySet<number> {
-  return new Set(
-    entries.flatMap((entry) =>
-      (entry.kind === 'pi.user' || entry.kind === 'pi.assistant') && typeof entry.id === 'number' ? [entry.id] : [],
-    ),
-  )
-}
-
 /** "3 replies", "1 reply", "No replies yet". */
 export function repliesLabel(count: number): string {
   if (count === 0) return 'No replies yet'

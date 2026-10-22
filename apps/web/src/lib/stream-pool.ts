@@ -1,11 +1,6 @@
-import {
-  ConversationStream,
-  type PiStreamDependencies,
-  type ReconnectScheduler,
-  type StreamStatus,
-  browserScheduler,
-} from './conversation-stream.ts'
-import type { ConversationProjection } from './projection.ts'
+import { type StreamDependencies, StreamReader, type StreamStatus } from './agui/reader.ts'
+import { type ReconnectScheduler, browserScheduler } from './reconnect.ts'
+import { type ConversationProjection, Projector } from './agui/reducer.ts'
 import { reportUnexpected } from './unexpected.ts'
 
 /** What everyone following a conversation sees: its projection, the stream's state and what went wrong. */
@@ -24,7 +19,7 @@ export type Lease = {
 }
 
 type Entry = {
-  readonly stream: ConversationStream
+  readonly stream: StreamReader
   readonly listeners: Map<symbol, { visible: boolean; listener: (state: StreamState) => void }>
   state: StreamState
   live: boolean
@@ -45,10 +40,10 @@ export type StreamPoolOptions = {
 const INITIAL: StreamState = { projection: undefined, status: 'connecting', notice: '' }
 
 /**
- * One stream per conversation, however many panes and inline threads follow it, so the browser holds as few event
- * streams as the screen needs. A conversation nobody has on screen keeps following for `idleMs` and then is suspended;
- * at most `max` follow at once, the least recently seen suspended first, never one on screen. Coming back on screen
- * resumes from a fresh snapshot. The last consumer's release ends it.
+ * One stream per conversation, however many panes and inline threads follow it, so the browser holds as few live reads
+ * as the screen needs. A conversation nobody has on screen keeps following for `idleMs` and then is suspended; at most
+ * `max` follow at once, the least recently seen suspended first, never one on screen. Coming back on screen reads on
+ * from where it stopped. The last consumer's release ends it.
  */
 export class StreamPool {
   readonly #entries = new Map<string, Entry>()
@@ -58,7 +53,7 @@ export class StreamPool {
   readonly #now: () => number
 
   constructor(
-    readonly dependencies: (id: string) => PiStreamDependencies,
+    readonly dependencies: (id: string) => StreamDependencies,
     options: StreamPoolOptions = {},
   ) {
     this.#max = options.max ?? 8
@@ -90,15 +85,9 @@ export class StreamPool {
     }
   }
 
-  /** Every following conversation starts again from a fresh snapshot (the tab came back, the network returned). */
+  /** Every following conversation reads on from where it was (the tab came back, the network returned). */
   resume(): void {
     for (const entry of this.#entries.values()) if (entry.live) entry.stream.reconnect().catch(reportUnexpected)
-  }
-
-  /** A send or removal changed the native inbox; share its next content read with every consumer. */
-  refreshQueue(id: string): void {
-    const entry = this.#entries.get(id)
-    if (entry?.live) entry.stream.refreshQueue().catch(reportUnexpected)
   }
 
   /** How many conversations follow now. */
@@ -107,15 +96,16 @@ export class StreamPool {
   }
 
   #create(id: string): Entry {
+    const projector = new Projector()
     const entry: Entry = {
       listeners: new Map(),
       state: INITIAL,
       live: false,
       seenAt: this.#now(),
       cancelSuspend: undefined,
-      stream: new ConversationStream(
+      stream: new StreamReader(
         this.dependencies(id),
-        (projection) => this.#publish(entry, { projection }),
+        (events) => this.#publish(entry, { projection: projector.apply(events, this.#now()) }),
         (status, detail) =>
           this.#publish(entry, {
             status,

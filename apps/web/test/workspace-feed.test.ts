@@ -17,7 +17,8 @@ import {
 import { usageQuery } from '../src/agent/queries.ts'
 import { agentAppQuery, agentAppsQuery } from '../src/agent-apps/queries.ts'
 import { conversationKeys } from '../src/conversations/queries.ts'
-import type { PiEventSource, ReconnectScheduler } from '../src/lib/conversation-stream.ts'
+import type { ReconnectScheduler } from '../src/lib/reconnect.ts'
+import type { FeedSource } from '../src/lib/event-streams.ts'
 import { testQueryClient } from './query/testing.ts'
 import { WorkspaceFeedConnection } from '../src/lib/workspace/connection.ts'
 import { decodeChanges, decodeSnapshot } from '../src/lib/workspace/decode.ts'
@@ -56,7 +57,7 @@ const TOPIC = {
   createdAt: 0,
 }
 
-class FixtureEvents implements PiEventSource {
+class FixtureEvents implements FeedSource {
   readonly listeners = new Map<string, (event: MessageEvent<string>) => void>()
   closed = false
   errorListener: (() => void) | undefined

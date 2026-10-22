@@ -1,14 +1,17 @@
 import type { ConversationView } from '@goblin/contracts'
 import { infiniteQueryOptions } from '@tanstack/react-query'
 import { owner } from '../lib/api.ts'
-import { entryMessages, omittedEntries } from '../lib/entry-messages.ts'
+import { type Wire, chatMessages, entriesOf, marksOf } from '../lib/agui/messages.ts'
 import { sharedItems } from '../lib/channel-shared.ts'
-import { isNumber, records } from '../lib/values.ts'
+import { records } from '../lib/values.ts'
 
 const sharedKeys = {
   channel: (chats: readonly ConversationView[]) =>
     ['conversations', 'shared', chats.map((chat) => [chat.id, chat.forkEntry, chat.lastReplyAt])] as const,
 }
+
+/** Whether a fork's message is its own: at or after the entry it forked at (reasoning marks none; it goes with its answer). */
+const fromFork = (message: Wire, forkEntry: number): boolean => (marksOf(message).entryId ?? forkEntry) >= forkEntry
 
 /** One bounded history page per request; a channel can be read all the way back, independently of compaction. */
 export const sharedQuery = (chats: readonly ConversationView[]) =>
@@ -17,25 +20,24 @@ export const sharedQuery = (chats: readonly ConversationView[]) =>
     initialPageParam: { chat: 0, before: Number.MAX_SAFE_INTEGER },
     queryFn: async ({ pageParam, signal }) => {
       const chat = chats.at(pageParam.chat)
-      if (chat === undefined) return { chat: '', entries: [], next: undefined }
+      if (chat === undefined) return { chat: '', messages: [], next: undefined }
       const page = await owner.run(
         (api) => api.conversations.history({ params: { id: chat.id }, query: { before: pageParam.before } }),
         signal,
       )
-      const entries = records(page.entries)
-      const oldest = entries[0]?.id
+      const messages = records(page.messages)
+      const oldest = page.next
       // Forks retain inherited entries. Index only their own portion; the channel already owns the earlier messages.
-      const more = page.more && isNumber(oldest) && oldest < pageParam.before && oldest > (chat.forkEntry ?? 0)
+      const more = page.more && oldest < pageParam.before && oldest > (chat.forkEntry ?? 0)
       const next = more
         ? { chat: pageParam.chat, before: oldest }
         : pageParam.chat + 1 < chats.length
           ? { chat: pageParam.chat + 1, before: Number.MAX_SAFE_INTEGER }
           : undefined
+      const { forkEntry } = chat
       return {
         chat: chat.id,
-        entries: entries.filter(
-          (entry) => chat.forkEntry === undefined || (isNumber(entry.id) && entry.id >= chat.forkEntry),
-        ),
+        messages: forkEntry === undefined ? messages : messages.filter((message) => fromFork(message, forkEntry)),
         next,
       }
     },
@@ -48,14 +50,12 @@ export const sharedQuery = (chats: readonly ConversationView[]) =>
  * in one message, a fork's branch entry, which shares its source's entry id, and an entry moved into a thread, which
  * keeps its id there.
  */
-export function sharedPages(
-  pages: readonly { readonly chat: string; readonly entries: readonly Record<string, unknown>[] }[],
-) {
-  const byChat = new Map<string, Record<string, unknown>[]>()
-  for (const page of pages) byChat.set(page.chat, [...page.entries, ...(byChat.get(page.chat) ?? [])])
+export function sharedPages(pages: readonly { readonly chat: string; readonly messages: readonly Wire[] }[]) {
+  const byChat = new Map<string, Wire[]>()
+  for (const page of pages) byChat.set(page.chat, [...page.messages, ...(byChat.get(page.chat) ?? [])])
   const seen = new Set<string>()
   return [...byChat]
-    .flatMap(([chat, entries]) => sharedItems(entryMessages(entries, omittedEntries(entries)), chat))
+    .flatMap(([chat, messages]) => sharedItems(chatMessages(messages, entriesOf(messages).omitted), chat))
     .filter((item) => {
       if (seen.has(item.key)) return false
       seen.add(item.key)

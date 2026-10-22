@@ -87,9 +87,25 @@ const decodeEntries = Schema.decodeUnknownSync(
   Schema.Struct({ entries: Schema.optionalKey(Schema.Array(EntrySchema)) }),
 )
 
-/** A conversation's Pi snapshot through the owner API (`GET /api/conversations/:id/snapshot`), as JSON. */
-export const ownerSnapshot = (agent: AgentFetch, chat: string) =>
-  Effect.runPromise(Effect.flatMap(ownerApi(agent), (api) => api.conversations.snapshot({ params: { id: chat } })))
+/**
+ * A lever's answer for `chat` (`snapshot-lever.ts`). A chat not registered yet answers 404: it is registered as any
+ * owner read of it does (main is made on its first), and read again.
+ */
+async function lever(agent: AgentFetch, path: string, chat: string): Promise<Response> {
+  const first = await agent.fetch(new Request(`https://agent${path}`))
+  if (first.status !== 404) return first
+  await Effect.runPromise(
+    Effect.flatMap(ownerApi(agent), (api) => api.conversations.history({ params: { id: chat }, query: { before: 1 } })),
+  )
+  return agent.fetch(new Request(`https://agent${path}`))
+}
+
+/** A conversation's Pi snapshot, as JSON, from the test agent's own lever (`snapshot-lever.ts`). */
+export const ownerSnapshot = async (agent: AgentFetch, chat: string): Promise<unknown> => {
+  const answer = await lever(agent, `/test/snapshot/${chat}`, chat)
+  if (!answer.ok) throw new Error(`no snapshot of chat ${chat}: ${answer.status}`)
+  return answer.json()
+}
 
 /** A conversation's snapshot, as far as its entries. */
 export const snapshotOf = async (
@@ -101,19 +117,16 @@ export const snapshotOf = async (
 export const linesOf = (records: readonly Entry[]) =>
   records.flatMap((entry) => (entry.model ?? []).map((message) => `${entry.kind}: ${JSON.stringify(message.content)}`))
 
-/** A conversation's history before entry `before`, through the owner API (`GET …/history?before=`). */
+/** A conversation's raw Pi history before entry `before`, from the test agent's own lever (`snapshot-lever.ts`). */
 export const historyOf = async (
   agent: AgentFetch,
   session: string,
   before = 2 ** 31,
-): Promise<{ readonly entries?: readonly Entry[] }> =>
-  decodeEntries(
-    await Effect.runPromise(
-      Effect.flatMap(ownerApi(agent), (api) =>
-        api.conversations.history({ params: { id: session }, query: { before } }),
-      ),
-    ),
-  )
+): Promise<{ readonly entries?: readonly Entry[] }> => {
+  const answer = await lever(agent, `/test/history/${session}?before=${before}`, session)
+  if (!answer.ok) throw new Error(`no history of chat ${session}: ${answer.status}`)
+  return decodeEntries(await answer.json())
+}
 
 /** A conversation's newest entries as people read them, in order, whatever the model's context starts with now. */
 export const transcript = async (agent: AgentFetch, session: string): Promise<string[]> =>

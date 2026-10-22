@@ -3,7 +3,7 @@ import { request as httpRequest } from 'node:http'
 import { expect } from 'vitest'
 import { eventsHookToken } from '../../src/mcp/events/route-token.ts'
 import { callOwner } from '../owner-client.ts'
-import { call, inWorkspace, ownerFetch, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
+import { inWorkspace, ownerFetch, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 
 const APP = 'https://goblin.test'
 const Detail = Schema.Struct({ error: Schema.Struct({ code: Schema.String, ref: Schema.optional(Schema.String) }) })
@@ -154,45 +154,4 @@ export async function internalRefusalCase(url: string): Promise<void> {
     )
   await callOwner(signedIn(url, owner), (api) => api.resident.set({ payload: { enabled: false } }))
   expect((await deliver()).status).toBe(410)
-}
-
-/** The text of the server-sent events on `response` so far: `until` reads on until `seen` holds or `ms` pass. */
-function eventText(response: Response) {
-  const reader = response.body?.getReader()
-  const decoder = new TextDecoder()
-  let text = ''
-  const until = async (seen: (text: string) => boolean, ms: number): Promise<string> => {
-    if (reader === undefined) return text
-    const deadline = Date.now() + ms
-    while (!seen(text) && Date.now() < deadline) {
-      const timeout = new Promise<undefined>((resolve) => setTimeout(resolve, Math.max(0, deadline - Date.now())))
-      const read = await Promise.race([reader.read(), timeout])
-      if (read === undefined || read.done) break
-      text += decoder.decode(read.value, { stream: true })
-    }
-    return text
-  }
-  return { until, close: () => reader?.cancel() }
-}
-
-/**
- * A chat's event stream through the real Worker stays open past the request that opened it: its snapshot first, then
- * the batch Pi commits when the owner sends a message afterwards.
- */
-export async function conversationEventsCase(url: string): Promise<void> {
-  const owner = await person(url)
-  const stream = await call(url, owner, '/api/conversations/1/events')
-  expect(stream.status).toBe(200)
-  expect(stream.headers.get('content-type')).toBe('text/event-stream')
-  const events = eventText(stream)
-  try {
-    expect(await events.until((text) => text.includes('event: snapshot'), 5000)).toContain('event: snapshot')
-    const sent = await callOwner(signedIn(url, owner), (api) =>
-      api.conversations.submit({ params: { id: '1' }, payload: { input: 'hello stream', operationId: 'sse-1' } }),
-    )
-    expect(sent).toMatchObject({ accepted: true })
-    expect(await events.until((text) => text.includes('event: batch'), 10_000)).toContain('event: batch')
-  } finally {
-    await events.close()
-  }
 }

@@ -1,10 +1,6 @@
 import type { WorkspaceChange, WorkspaceSnapshot } from '@goblin/contracts'
-import {
-  type PiEventSource,
-  type ReconnectScheduler,
-  browserScheduler,
-  reconnectDelay,
-} from '../conversation-stream.ts'
+import { type ReconnectScheduler, browserScheduler, reconnectDelay } from '../reconnect.ts'
+import type { FeedSource } from '../event-streams.ts'
 import { reportUnexpected } from '../unexpected.ts'
 import { decodeChanges, decodeSnapshot } from './decode.ts'
 
@@ -20,7 +16,7 @@ type FeedSink = {
  * unreadable stream reconnects on its own with backoff and starts again from a fresh snapshot.
  */
 export class WorkspaceFeedConnection {
-  #source: PiEventSource | undefined
+  #source: FeedSource | undefined
   /** Whether the open stream sent its snapshot: a change before it has nothing to apply to. */
   #synced = false
   #cancelRetry: (() => void) | undefined
@@ -28,7 +24,7 @@ export class WorkspaceFeedConnection {
   #disposed = false
 
   constructor(
-    readonly events: () => PiEventSource,
+    readonly events: () => FeedSource,
     readonly sink: FeedSink,
     readonly scheduler: ReconnectScheduler = browserScheduler,
   ) {}
@@ -72,7 +68,7 @@ export class WorkspaceFeedConnection {
    * fresh snapshot and is reported: the server sent it, so it is a bug or a frame shape this tab does not know, never
    * the network.
    */
-  #read<A>(source: PiEventSource, decode: () => A): A | undefined {
+  #read<A>(source: FeedSource, decode: () => A): A | undefined {
     if (this.#source !== source) return undefined
     try {
       return decode()

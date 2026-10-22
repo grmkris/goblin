@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import type { Part, ToolPart } from '../src/lib/parts.ts'
 import { presenceOf } from '../src/lib/presence.ts'
-import type { ConversationProjection } from '../src/lib/projection.ts'
+import type { ConversationProjection } from '../src/lib/agui/reducer.ts'
 
 const projection = (extra: Partial<ConversationProjection> = {}): ConversationProjection => ({
   messages: [],
-  entries: [],
   tools: [],
   running: false,
   partial: '',
   partialReasoning: '',
-  partialBlocks: [],
   progress: '',
   inbox: [],
   queued: [],
-  queueNotice: '',
+  branchable: new Set(),
+  omitted: new Set(),
+  newestEntry: 0,
   ...extra,
 })
 const running = (target?: { connectionId: string; name: string }): ToolPart => ({

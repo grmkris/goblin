@@ -1,74 +1,43 @@
 import { describe, expect, it } from 'vitest'
-import type { PiEventSource, ReconnectScheduler } from '../src/lib/conversation-stream.ts'
 import { type StreamState, StreamPool } from '../src/lib/stream-pool.ts'
-
-class FixtureEvents implements PiEventSource {
-  closed = false
-  addEventListener(): void {}
-  onError(): void {}
-  close(): void {
-    this.closed = true
-  }
-}
-
-/** Timers that run only when the test says so. */
-class Clock implements ReconnectScheduler {
-  now = 0
-  readonly #timers = new Set<{ at: number; run: () => void }>()
-  schedule = (run: () => void, delayMs: number) => {
-    const timer = { at: this.now + delayMs, run }
-    this.#timers.add(timer)
-    return () => void this.#timers.delete(timer)
-  }
-  advance(ms: number): void {
-    this.now += ms
-    for (const timer of [...this.#timers].filter(({ at }) => at <= this.now)) {
-      this.#timers.delete(timer)
-      timer.run()
-    }
-  }
-}
-
-const snapshot = { type: 'snapshot', entries: [], tools: [], inbox: [] }
+import { opening, said } from './agui-fixtures.ts'
+import { Clock, FakeStream, settle } from './stream-fake.ts'
 
 function fixture(max = 8) {
   const clock = new Clock()
-  const opened: Record<string, FixtureEvents[]> = {}
+  const streams: Record<string, FakeStream> = {}
   const pool = new StreamPool(
-    (id) => ({
-      snapshot: async () => snapshot,
-      queue: async () => ({ inputs: [] }),
-      events: () => {
-        const source = new FixtureEvents()
-        opened[id] = [...(opened[id] ?? []), source]
-        return source
-      },
-    }),
+    (id) => {
+      const stream = (streams[id] ??= new FakeStream())
+      if (stream.epochs[0]?.length === 0) stream.write(...opening([said(1, `hello ${id}`)]))
+      return stream.dependencies
+    },
     { max, idleMs: 10_000, scheduler: clock, now: () => clock.now },
   )
-  return { clock, opened, pool }
+  return { clock, streams, pool }
 }
 
-const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+const open = (stream: FakeStream | undefined) => stream?.live.filter(({ closed }) => !closed) ?? []
 
 describe('the stream pool', () => {
   it('shares one stream among everyone following a conversation, until the last lets go', async () => {
-    const { opened, pool } = fixture()
+    const { streams, pool } = fixture()
     const seen: StreamState[] = []
     const pane = pool.acquire('7', true, (state) => seen.push(state))
     const inline = pool.acquire('7', true, () => undefined)
     await settle()
-    expect(opened['7']).toHaveLength(1)
+    expect(streams['7']?.live).toHaveLength(1)
     expect(seen.at(-1)?.status).toBe('connected')
+    expect(seen.at(-1)?.projection?.messages).toMatchObject([{ id: '1:0', text: 'hello 7' }])
     pane.release()
-    expect(opened['7']?.[0]?.closed).toBe(false)
+    expect(open(streams['7'])).toHaveLength(1)
     inline.release()
-    expect(opened['7']?.[0]?.closed).toBe(true)
+    expect(open(streams['7'])).toHaveLength(0)
     expect(pool.live).toBe(0)
   })
 
-  it('suspends a conversation nobody has on screen after a while, and resumes it from a fresh snapshot', async () => {
-    const { clock, opened, pool } = fixture()
+  it('suspends a conversation nobody has on screen after a while, and reads on from where it stopped', async () => {
+    const { clock, streams, pool } = fixture()
     const states: StreamState[] = []
     const lease = pool.acquire('7', true, (state) => states.push(state))
     await settle()
@@ -82,10 +51,21 @@ describe('the stream pool', () => {
     clock.advance(10_000)
     expect(pool.live).toBe(0)
     expect(states.at(-1)?.status).toBe('suspended')
-    expect(opened['7']?.[0]?.closed).toBe(true)
+    expect(open(streams['7'])).toHaveLength(0)
+    streams['7']?.write({
+      type: 'TEXT_MESSAGE_START',
+      messageId: '1:e2',
+      role: 'user',
+      metadata: { goblin: { entryId: 2 } },
+    })
+    streams['7']?.write({ type: 'TEXT_MESSAGE_CONTENT', messageId: '1:e2', delta: 'missed' })
+    streams['7']?.write({ type: 'TEXT_MESSAGE_END', messageId: '1:e2' })
     lease.setVisible(true)
     await settle()
-    expect(opened['7']).toHaveLength(2)
+    expect(streams['7']?.live).toHaveLength(2)
+    // The same epoch, read from the offset it stopped at: nothing twice, nothing missed.
+    expect(streams['7']?.reads.at(-1)?.offset).toBe('0002')
+    expect(states.at(-1)?.projection?.messages.map((message) => message.id)).toEqual(['1:0', '2:0'])
     expect(states.at(-1)?.status).toBe('connected')
   })
 

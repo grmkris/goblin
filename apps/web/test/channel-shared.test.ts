@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { sharedItems } from '../src/lib/channel-shared.ts'
 import { sharedPages } from '../src/conversations/shared.ts'
 
+/** Entry 10 of chat `chat`: the owner's message with a link. */
+const said = (chat: string) => ({
+  id: `${chat}:e10`,
+  role: 'user',
+  content: 'https://example.com/guide',
+  metadata: { goblin: { entryId: 10, branchable: true } },
+})
+
 describe('channel shared items', () => {
   it('parses Markdown URLs without unsafe schemes or previews, including balanced parentheses and reference links', () => {
     const items = sharedItems(
@@ -54,27 +62,34 @@ describe('channel shared items', () => {
     expect(items[0]?.href).toBe('/api/files/content?path=%2Fuploads%2Fguide.pdf')
   })
   it('applies later omission edits across history pages and retains moved entries in their thread', () => {
-    const entry = { id: 10, kind: 'pi.user', model: [{ role: 'user', content: 'https://example.com/guide' }] }
+    const head = {
+      id: '30:e20',
+      role: 'activity',
+      activityType: 'goblin.thread_head',
+      content: {},
+      metadata: { goblin: { entryId: 20, omits: [10] } },
+    }
     const moved = sharedPages([
-      { chat: '30', entries: [{ id: 20, kind: 'app.thread_head', edits: [{ action: 'omit', target: 10 }] }] },
-      { chat: '30', entries: [entry] },
-      { chat: '31', entries: [entry] },
+      { chat: '30', messages: [head] },
+      { chat: '30', messages: [said('30')] },
+      { chat: '31', messages: [said('31')] },
     ])
     expect(moved).toHaveLength(1)
     expect(moved[0]?.conversation).toBe('31')
     expect(
       sharedPages([
-        { chat: '30', entries: [entry] },
-        { chat: '31', entries: [entry] },
+        { chat: '30', messages: [said('30')] },
+        { chat: '31', messages: [said('31')] },
       ]),
     ).toHaveLength(1)
   })
   it('keeps a link written twice in one message once', () => {
     const twice = {
-      id: 12,
-      kind: 'pi.user',
-      model: [{ role: 'user', content: 'https://example.com/a and https://example.com/a' }],
+      id: '30:e12',
+      role: 'user',
+      content: 'https://example.com/a and https://example.com/a',
+      metadata: { goblin: { entryId: 12 } },
     }
-    expect(sharedPages([{ chat: '30', entries: [twice] }])).toHaveLength(1)
+    expect(sharedPages([{ chat: '30', messages: [twice] }])).toHaveLength(1)
   })
 })

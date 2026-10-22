@@ -22,6 +22,7 @@ import { ownerSend } from './probe-reads.ts'
 import { addUsage, utcDay } from '../../src/budget.ts'
 import { BACKGROUND, conversationId } from '../../src/pi/context.ts'
 import type { StreamsFetch } from '../../src/streams/writer.ts'
+import { leverChat, leverResponse } from './snapshot-lever.ts'
 
 export { StreamObject } from '@durable-streams/server-cloudflare'
 
@@ -73,6 +74,8 @@ export class OwnerAgent extends PersonalAgent {
   }
   override async onRequest(request: Request): Promise<Response> {
     const path = new URL(request.url).pathname
+    const chat = leverChat(path)
+    if (chat !== undefined) return leverResponse(this.harness, this.ctx.storage, new URL(request.url), chat)
     if (path === '/test/primary-profile' && profileEnabled(this.env)) {
       const operationId = 'permuted-owner-proof'
       await ownerSend(this, '1', 'prove the owner primary binding', operationId)
@@ -204,6 +207,10 @@ export default {
     try {
       const authProbe = await authFixtureRoute(input, env)
       if (authProbe !== undefined) return authProbe
+      // A chat's Pi snapshot or raw history (`snapshot-lever.ts`), from the signed-in person's own agent.
+      if (leverChat(url.pathname) !== undefined) {
+        return (await leverAgent(input, env)).fetch(`https://agent${url.pathname}${url.search}`)
+      }
       if (url.pathname === '/__test/primary-profile') {
         return (await leverAgent(input, env)).fetch('https://agent/test/primary-profile')
       }

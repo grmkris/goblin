@@ -27,6 +27,7 @@ import { probes as memoryProbes } from './native-memory.ts'
 import { probes as scopeProbes } from './native-scopes.ts'
 import { probes as topicProbes } from './native-topics.ts'
 import { permutePrimary, profileEnabled } from './primary-profile.ts'
+import { leverChat, leverResponse } from './snapshot-lever.ts'
 import { type Inside, type ProbeEnv, registry } from './probe.ts'
 import { probes as routineEventsProbes } from './routines-events.ts'
 import { probes as routineExecutionProbes } from './routines-execution.ts'
@@ -183,7 +184,10 @@ export class PersonalAgentProbe extends PersonalAgent {
 
   /** `/test/startup` checks the start (`startupCheck`); every other path is the real agent's. */
   override async onRequest(request: Request): Promise<Response> {
-    if (new URL(request.url).pathname !== '/test/startup') return super.onRequest(request)
+    const path = new URL(request.url).pathname
+    const chat = leverChat(path)
+    if (chat !== undefined) return leverResponse(this.harness, this.ctx.storage, new URL(request.url), chat)
+    if (path !== '/test/startup') return super.onRequest(request)
     return startupCheck(this.ctx.storage, this.#constructed, this.#api)
   }
 }

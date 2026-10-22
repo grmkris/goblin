@@ -493,7 +493,8 @@ workspace/agent request selectors. Removed workspace, invitation and interaction
 These keyless deterministic tests are local evidence; deployed smoke and real provider acceptance are separate.
 
 `heavy bun apps/web/test/ui-queue.ts` renders the real queue and composers in local Chromium with controlled HTTP and
-native event fixtures. It checks full/inline shared reads, refresh, failed sends, removal and failed-removal retry at desktop/phone widths in
+an AG-UI stream fixture (`test/agui-route.ts`). It checks one shared read for the full and inline docks, reading on
+after a dropped live read, failed sends, removal and failed-removal retry at desktop/phone widths in
 light/dark with reduced motion. Private receipts go under `.local/goblin-acceptance/queue-*`; this is browser fixture
 evidence, separate from signed-in deployed acceptance and real-device checks.
 
@@ -562,14 +563,14 @@ speed alone. Both scripts build two revisions (`--base`, default `HEAD`; `--cand
 includes other agents' edits) in scratch worktrees under `/tmp/goblin-perf-worktrees` with today's harness copied in.
 
 - `heavy bun apps/web/test/ui-perf.ts` builds `apps/web/test/perf/` for production (the real `useConversation`,
-  projection and `Conversation` over a faked stream, `react-dom/profiling` so `<Profiler>` reports) and measures A
+  stream reader, reducer and `Conversation` over a faked AG-UI stream, `react-dom/profiling` so `<Profiler>` reports) and measures A
   and B interleaved on a 390px phone profile at 4× CPU slowdown and on desktop: opening 100–1,600 parts, streaming a
   reply at pi-durable's 100 ms batches while typing, wheel-scrolling 1,000 parts, and idle work after a reply. A win
   or a regression needs the medians to differ by more than either side's spread; this box is shared, so only compare
   numbers from one run. The same revision on both sides gives the noise floor.
 - `heavy bun apps/web/test/ui-follow.ts` plays scripted owner turns against the same fixture (a streamed reply, a tool
   round after a slow provider, a storm of parallel calls, a reply already past the fold when its turn lands, a
-  re-snapshot after the tab was away, the composer growing mid-stream) on the phone and desktop profiles and reports,
+  new epoch opening mid-reply, the composer growing mid-stream) on the phone and desktop profiles and reports,
   frame by frame, how far the newest row sat under the composer, whether the jump-to-end arrow was offered while
   streaming, whether the view was pulled back up, how many rows the turn takes, and how often the gap between two rows
   that are both on screen changed (a visible jump; rows above the screen settling are not one, the scroller keeps the
@@ -668,6 +669,8 @@ Chromium and does not call a model or prove authenticated deployment behavior. T
 renderer and has its own built/deployed browser check documented in its README. `check:patches` verifies the OpenUI
 inspector patch in both normal gates; review it when upgrading the dependency.
 
-`heavy bun apps/web/test/ui-channel.ts` exercises the real channel with synthetic API responses at desktop and 390px:
-opening info, reading capabilities and shared content, closing/back, draft retention and thread restoration. These local
+`heavy bun apps/web/test/ui-channel.ts` exercises the real channel with synthetic API responses and an AG-UI stream
+fixture at desktop and 390px, light and dark: older history read in a page before the stream's window, a question, a
+failed tool call and a notice, a run streamed live (thinking, words, a running tool, a queued follow-up) until it
+settles, opening info, reading capabilities and shared content, closing/back, draft retention and thread restoration. These local
 Chromium checks do not establish installed iPhone or deployed acceptance.
