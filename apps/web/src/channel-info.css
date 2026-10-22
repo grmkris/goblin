@@ -45,6 +45,24 @@
   color: var(--muted-foreground);
   font-size: 0.75rem;
 }
+/* The channel's name, and for a key's room (ADR 0108) a quiet Room beside it; its one line opens the Overview. */
+.channel-info-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.channel-info-name > [data-slot='dialog-title'] {
+  min-width: 0;
+  overflow: clip;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channel-info-room {
+  margin: 0 0 1rem;
+  color: var(--muted-foreground);
+  text-wrap: pretty;
+}
 .channel-info-scroll {
   flex: 1;
   min-height: 0;

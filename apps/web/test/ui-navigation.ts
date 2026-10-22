@@ -3,13 +3,14 @@
  * strip and its shortcut, the Topics popover, and the phone's drawer and dot. The page is in a workspace
  * (`/w/swarmm-prod/…`, ADR 0089) where the person is an admin, with two more workspaces and two invitations waiting
  * (ADR 0093): the workspace menu's count, roles and tooltip, and the invitations answered in place there and in
- * Activity. Screenshots land in .local.
+ * Activity. Two server keys made rooms and Personas (ADR 0108): each key's rooms fold under the Topics, filter and page
+ * once open, a room's info says what it is, and the Personas page folds each key's. Screenshots land in .local.
  */
 import assert from 'node:assert/strict'
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
-import { type Page, type Route, chromium } from 'playwright-core'
+import { type Locator, type Page, type Route, chromium } from 'playwright-core'
 import {
   type InvitationPreview,
   ONBOARDING_STEPS,
@@ -148,6 +149,9 @@ async function inWorkspaces(page: Page, origin: string, errors: string[]) {
   await page.route((url) => /^(?:\/w\/[a-z0-9-]+)?\/api\//u.test(url.pathname), fakeApi(errors))
 }
 
+/** The text each of `rows` shows, its runs of white space as one space. */
+const words = async (rows: Locator) => (await rows.allInnerTexts()).map((row) => row.replace(/\s+/gu, ' ').trim())
+
 /** The workspace menu's trigger: the sidebar's head. */
 const brand = (page: Page) => page.locator('nav.shell-sidebar .sidebar-brand').first()
 
@@ -195,6 +199,7 @@ try {
     await at('/personas')
     assert.deepEqual(await current(page), ['page Personas'])
     assert.equal(await page.locator('.list-row').count(), 2, 'active Personas listed, the archived folded')
+    assert.deepEqual(await page.locator('.list-fold').allInnerTexts(), ['Made by swarmm-prod (2)', 'Archived (1)'])
     await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-personas.png`) })
 
     // Counts: Activity (two invitations, an unread notification and a schedule in trouble), Work (a Delegate at
@@ -215,6 +220,45 @@ try {
     assert.deepEqual(pins, ['mysi', 'Trip tracker', 'Old boardClosed', 'Cloud consoleSigned out'])
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
     assert.equal(overflow, 0)
+
+    // A key's rooms: a folded section each under the Topics, the key active last first, with a dot while a room has
+    // unread replies; folded, the room the page shows keeps its row.
+    const rooms = page.locator('nav.shell-sidebar [data-section="rooms"]')
+    assert.deepEqual(await words(rooms.locator('.sidebar-section-toggle')), [
+      'swarmm-prod · 24 rooms , unread replies',
+      'sidequest-dev · 2 rooms',
+    ])
+    assert.equal(await rooms.locator('.sidebar-row').count(), 0)
+    await at('/c/1070')
+    assert.deepEqual(await current(page), ['page deal-08'])
+    assert.equal(await rooms.first().locator('.sidebar-row').count(), 1)
+    // Open: a filter field, then the rooms active last first, twenty at a time.
+    await rooms.first().locator('.sidebar-section-toggle').click()
+    const names = rooms.first().locator('a.sidebar-row .sidebar-row-name')
+    assert.equal(await names.count(), 20)
+    assert.deepEqual((await names.allTextContents()).slice(0, 3), ['deal-08', 'deal-24', 'deal-23'])
+    await rooms.first().evaluate((section) => section.scrollIntoView({ block: 'start' }))
+    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-rooms.png`) })
+    await rooms.first().getByRole('button', { name: 'Show 4 more' }).click()
+    assert.equal(await names.count(), 24)
+    const filter = rooms.first().getByRole('searchbox', { name: 'Filter the rooms of swarmm-prod' })
+    await filter.fill('DEAL-1')
+    assert.deepEqual(
+      await names.allTextContents(),
+      Array.from({ length: 10 }, (_, n) => `deal-${String(19 - n)}`),
+    )
+    await filter.fill('nothing')
+    await rooms.first().getByText('No rooms match.').waitFor()
+    await rooms.first().evaluate((section) => section.scrollIntoView({ block: 'start' }))
+    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-rooms-filtered.png`) })
+    await rooms.first().locator('.sidebar-section-toggle').click()
+
+    // A room's info: the Room chip beside its name and what goblin reaches there.
+    await at('/room-info')
+    const info = page.getByRole('dialog', { name: '#deal-08' })
+    await info.getByText('goblin here reaches only this Topic.').waitFor()
+    assert.equal(await info.locator('[data-slot="badge"]').textContent(), 'Room')
+    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-room-info.png`) })
 
     // The strip: ⌘B or Ctrl+B, remembered across a reload, names in tooltips, the Topics behind one `#`.
     await at('/c/1')
@@ -251,23 +295,19 @@ try {
     await menu.waitFor()
     await page.waitForTimeout(200)
     await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-workspace-menu.png`) })
-    const rows = await menu.locator('[role="menuitem"]').allInnerTexts()
-    assert.deepEqual(
-      rows.map((row) => row.replace(/\s+/gu, ' ').trim()),
-      [
-        'Aurora studio From Grace, as a member',
-        'No thanks',
-        'Join',
-        'Lab notes From Linus, as an admin',
-        'No thanks',
-        'Join',
-        "Ada's workspace Owner",
-        'Swarmm Admin',
-        'Sidequest team Member',
-        'New workspace',
-        'Workspace settings',
-      ],
-    )
+    assert.deepEqual(await words(menu.locator('[role="menuitem"]')), [
+      'Aurora studio From Grace, as a member',
+      'No thanks',
+      'Join',
+      'Lab notes From Linus, as an admin',
+      'No thanks',
+      'Join',
+      "Ada's workspace Owner",
+      'Swarmm Admin',
+      'Sidequest team Member',
+      'New workspace',
+      'Workspace settings',
+    ])
     // Joining a workspace whose owner's own models take no members is refused in place, in words.
     await menu.getByRole('group', { name: 'Lab notes' }).getByRole('menuitem', { name: 'Join' }).click()
     await menu.getByRole('alert').filter({ hasText: "Lab notes offers its owner's own subscription models" }).waitFor()
@@ -306,6 +346,9 @@ try {
     await page.goto(`${origin}w/${HERE}/navigation.html?at=/activity`)
     await page.locator('.invitation-row').nth(1).waitFor()
     await page.screenshot({ path: path.join(out, `phone-${colorScheme}-activity.png`), fullPage: true })
+    await page.goto(`${origin}w/${HERE}/navigation.html?at=/room-info`)
+    await page.getByText('goblin here reaches only this Topic.').waitFor()
+    await page.screenshot({ path: path.join(out, `phone-${colorScheme}-room-info.png`) })
     await page.goto(`${origin}w/${HERE}/navigation.html?at=/apps`)
     const menu = page.getByRole('button', { name: /^Open navigation/u })
     await menu.waitFor()

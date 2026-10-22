@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import type { TopicView } from '@goblin/contracts'
 import {
+  Badge,
   Button,
   Dialog,
   DialogPanel,
@@ -12,6 +13,7 @@ import {
   useIsMobile,
 } from '@goblin/ui'
 import { ArrowLeftIcon, XIcon } from 'lucide-react'
+import { isRoom } from '../../lib/topics.ts'
 import { TopicSetupDrawer } from '../topic-setup.tsx'
 import { ChannelDetails } from './channel-details.tsx'
 import { ChannelTools } from './channel-tools.tsx'
@@ -74,6 +76,7 @@ export function ChannelInfo({
             )}
             <TabsContent value="overview" keepMounted>
               <section className="channel-info-section">
+                {isRoom(topic) && <p className="channel-info-room">goblin here reaches only this Topic.</p>}
                 <ChannelDetails topic={topic} />
               </section>
             </TabsContent>
@@ -114,7 +117,10 @@ function InfoHeader({
       )}
       <div>
         <p className="channel-info-kicker">Channel info</p>
-        <DialogTitle>#{topic.name}</DialogTitle>
+        <span className="channel-info-name">
+          <DialogTitle>#{topic.name}</DialogTitle>
+          {isRoom(topic) && <Badge variant="secondary">Room</Badge>}
+        </span>
       </div>
       <ChannelMenu topic={topic} onFailure={onFailure} />
       {!narrow && (

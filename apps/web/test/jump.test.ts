@@ -156,6 +156,17 @@ describe('the places Jump to lists', () => {
     expect(apps.map((item) => item.tile)).toEqual(['mysi', 'mysi', 'tracker', 'draft'])
   })
 
+  it("lists a key's rooms after the Topics, by key, found by a query but not before one is typed", () => {
+    const rooms = [
+      topic(4, 'deal-4', '40', { room: { key: 'swarmm-prod' } }),
+      topic(5, 'deal-5', '50', { room: { key: 'swarmm-prod' }, archivedAt: 9 }),
+    ]
+    const items = jumpItems(sources({ topics: [...TOPICS, ...rooms] }))
+    expect(rows(of(items, 'topic'))).toEqual(['Personal — Topic', 'Travel — Topic', 'deal-4 — Room of swarmm-prod'])
+    expect(ranked(items, '')).toEqual(ranked(jumpItems(sources()), ''))
+    expect(ranked(items, 'deal')).toEqual(['Topics: deal-4'])
+  })
+
   it('lists fewer Apps, never none of the rest, while the servers and built apps are not read', () => {
     const items = jumpItems(sources({ servers: undefined, built: undefined }))
     expect(of(items, 'app')).toEqual([])

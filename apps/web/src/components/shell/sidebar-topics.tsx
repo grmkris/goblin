@@ -1,15 +1,15 @@
 // The sidebar's Topics (ADR 0078): each channel with its live threads, the archived folded, Add topic and All threads;
-// in the strip, one `#` that lists them beside it.
+// in the strip, one `#` that lists them beside it. Under them, each key's rooms (ADR 0108), folded.
 import { use, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { ConversationView, TopicView } from '@goblin/contracts'
 import { Popover, PopoverContent, PopoverTrigger } from '@goblin/ui'
-import { ChevronRightIcon, HashIcon, MessagesSquareIcon, PlusIcon } from 'lucide-react'
+import { ChevronDownIcon, ChevronRightIcon, HashIcon, MessagesSquareIcon, PlusIcon } from 'lucide-react'
 import { isUnread, threadTitle } from '../../lib/threads.ts'
-import { channels, topicThreads } from '../../lib/topics.ts'
+import { type RoomGroup, channelOf, channels, matchingRooms, roomGroups, topicThreads } from '../../lib/topics.ts'
 import { useActivities, useActivity, useConversation, useConversations, useTopics } from '../../lib/workspace/hooks.ts'
 import { Count, EXACT, Here, Section, Strip, Tip, useCurrent } from './sidebar-parts.tsx'
-import { useRecentThreads } from './sidebar-state.ts'
+import { useFolded, useRecentThreads } from './sidebar-state.ts'
 import { TopicDialog } from './topic-dialog.tsx'
 
 /** A Topic's channel: `#` and its name, bold with a dot while it has replies the owner has not read. */
@@ -126,19 +126,120 @@ function AllThreads({ unread }: { readonly unread: number }) {
   )
 }
 
-/** The Topics as channels: Personal first, each with its live threads under it, the archived folded, then the rest. */
+/** How many of a key's rooms show when its section opens; Show more adds as many again. */
+const ROOMS_SHOWN = 20
+
+/** The channel of the page, when it shows a channel or a thread of one. */
+function useShowingChannel(): string | undefined {
+  const here = use(Here)
+  const conversations = useConversations()
+  const topics = useTopics()
+  if (here === undefined) return undefined
+  if (here.row.startsWith('topic:')) return here.row.slice('topic:'.length)
+  if (here.row.startsWith('thread:')) return channelOf(here.row.slice('thread:'.length), conversations, topics)
+  return undefined
+}
+
+/** A key's open rooms: a filter field, then the rooms whose name holds it, a few at a time. */
+function RoomList({ group, recent }: { readonly group: RoomGroup; readonly recent: ReadonlySet<string> }) {
+  const [filter, setFilter] = useState('')
+  const [shown, setShown] = useState(ROOMS_SHOWN)
+  const matching = matchingRooms(group.rooms, filter)
+  return (
+    <>
+      <li>
+        <input
+          type="search"
+          className="sidebar-filter"
+          value={filter}
+          placeholder="Filter rooms"
+          aria-label={`Filter the rooms of ${group.key}`}
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(event) => setFilter(event.target.value)}
+        />
+      </li>
+      {matching.length === 0 && <li className="sidebar-rows-note">No rooms match.</li>}
+      {matching.slice(0, shown).map((room) => (
+        <ChannelWithThreads key={room.id} topic={room} recent={recent} />
+      ))}
+      {matching.length > shown && (
+        <li>
+          <button type="button" className="sidebar-row" onClick={() => setShown((count) => count + ROOMS_SHOWN)}>
+            <ChevronDownIcon className="sidebar-row-mark" aria-hidden />
+            <span className="sidebar-row-name">Show {Math.min(ROOMS_SHOWN, matching.length - shown)} more</span>
+          </button>
+        </li>
+      )}
+    </>
+  )
+}
+
+/**
+ * One key's rooms (ADR 0108), a section under the Topics that starts folded (the owner's choice is remembered in this
+ * browser): the key's name and how many rooms, with a dot while any has replies the owner has not read. Open, a filter
+ * field and the rooms, the latest active first; folded, the room the page shows keeps its row, so the page's place
+ * still shows.
+ */
+function Rooms({ group, recent }: { readonly group: RoomGroup; readonly recent: ReadonlySet<string> }) {
+  const [folded, toggle] = useFolded(`rooms:${group.key}`, true)
+  const views = useConversations()
+  const showing = useShowingChannel()
+  const unread = new Set(views.filter(isUnread).map((view) => view.id))
+  const anyUnread = group.rooms.some((room) => unread.has(room.conversation))
+  const here = group.rooms.find((room) => room.conversation === showing)
+  const count = group.rooms.length
+  return (
+    <section className="sidebar-section" aria-label={`Rooms of ${group.key}`} data-section="rooms">
+      <div className="sidebar-section-head">
+        <button type="button" className="sidebar-section-toggle" aria-expanded={!folded} onClick={toggle}>
+          <ChevronRightIcon aria-hidden />
+          <span className="sidebar-rooms-key">{group.key}</span>
+          <span className="sidebar-rooms-count">
+            · {count} {count === 1 ? 'room' : 'rooms'}
+          </span>
+          {anyUnread && folded && (
+            <>
+              <span className="sidebar-row-unread" aria-hidden />
+              <span className="sr-only">, unread replies</span>
+            </>
+          )}
+        </button>
+      </div>
+      <ul className="sidebar-rows">
+        {folded ? (
+          here !== undefined && <ChannelWithThreads topic={here} recent={recent} />
+        ) : (
+          <RoomList group={group} recent={recent} />
+        )}
+      </ul>
+    </section>
+  )
+}
+
+/**
+ * The Topics as channels: Personal first, each with its live threads under it, the archived folded, then the rest;
+ * under them each key's rooms, the key with the latest activity first.
+ */
 export function Topics({ unread }: { readonly unread: number }) {
   const recent = useRecentThreads()
-  const { active, archived } = channels(useTopics())
+  const topics = useTopics()
+  const { active, archived } = channels(topics)
+  const rooms = roomGroups(topics, useConversations())
   return (
-    <Section id="topics" label="Topics">
-      {active.map((topic) => (
-        <ChannelWithThreads key={topic.id} topic={topic} recent={recent} />
+    <>
+      <Section id="topics" label="Topics">
+        {active.map((topic) => (
+          <ChannelWithThreads key={topic.id} topic={topic} recent={recent} />
+        ))}
+        <Archived topics={archived} />
+        <AddTopic />
+        <AllThreads unread={unread} />
+      </Section>
+      {rooms.map((group) => (
+        <Rooms key={group.key} group={group} recent={recent} />
       ))}
-      <Archived topics={archived} />
-      <AddTopic />
-      <AllThreads unread={unread} />
-    </Section>
+    </>
   )
 }
 

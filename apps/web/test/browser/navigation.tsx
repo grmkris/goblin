@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   Outlet,
@@ -8,8 +8,16 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router'
-import { type AppView, type ConversationView, EVERYTHING, type WorkspaceSnapshot } from '@goblin/contracts'
+import {
+  type AppView,
+  type ConversationView,
+  EVERYTHING,
+  type PersonaView,
+  type TopicView,
+  type WorkspaceSnapshot,
+} from '@goblin/contracts'
 import { PageBar } from '../../src/components/page-bar.tsx'
+import { ChannelInfo } from '../../src/components/shell/channel-info.tsx'
 import { ActivityPage } from '../../src/components/shell/pages/activity-page.tsx'
 import { PersonasPage } from '../../src/components/shell/pages/personas-page.tsx'
 import { ShellNavigation } from '../../src/components/shell/navigation.tsx'
@@ -37,9 +45,43 @@ const mcpView = (id: string, conversation: string, title: string, overrides: Par
   ...overrides,
 })
 
+/** A room a server's key made (ADR 0108): its Topic, made by the agent for the key. */
+const room = (id: number, name: string, key: string): TopicView => ({
+  id,
+  name,
+  conversation: String(id * 10),
+  searchExcluded: false,
+  revision: 0,
+  setup: EVERYTHING,
+  createdBy: 'agent',
+  createdAt: NOW - 86_400 + id,
+  room: { key },
+})
+/** 24 rooms of one key (a few more than its section shows at once) and 2 of another, made a day ago. */
+const ROOMS: TopicView[] = [
+  ...Array.from({ length: 24 }, (_, n) => room(100 + n, `deal-${String(n + 1).padStart(2, '0')}`, 'swarmm-prod')),
+  room(200, 'quest-board', 'sidequest-dev'),
+  room(201, 'quest-review', 'sidequest-dev'),
+]
+
+/** A Persona; `key` names the server's key that made it (ADR 0108). */
+const persona = (id: number, name: string, role: string, key?: string): PersonaView => ({
+  id,
+  name,
+  avatar: { glyph: name.slice(0, 1).toUpperCase(), hue: id * 37 },
+  role,
+  instructions: 'Help.',
+  setup: { mcpServers: [], skills: [], apps: [] },
+  revision: 1,
+  createdAt: 1,
+  updatedAt: 1,
+  ...(key !== undefined && { madeBy: { key } }),
+})
+
 /**
  * An owner with three Topics (one archived), threads (one unread, one a Delegate at work), pins in every state, an agent
- * app, recent App views, two Personas and an unread notification: every row and count the sidebar draws.
+ * app, recent App views, two Personas and an unread notification: every row and count the sidebar draws. Two server
+ * keys made rooms (one replied to a minute ago, unread) and two more Personas.
  */
 const WORKSPACE: WorkspaceSnapshot = {
   conversations: [
@@ -54,6 +96,8 @@ const WORKSPACE: WorkspaceSnapshot = {
     }),
     chat('32', { parent: '1', title: 'Weekend plan', replies: 2, lastReplyAt: NOW - 900, readAt: NOW - 800 }),
     chat('40', { kind: 'subagent', parent: '1', title: 'Compare flights' }),
+    chat('1070', { kind: 'main', conversation: true, topic: 107, lastReplyAt: NOW - 60, readAt: NOW - 600 }),
+    chat('2010', { kind: 'main', conversation: true, topic: 201, lastReplyAt: NOW - 3000, readAt: NOW }),
   ],
   activity: [{ id: '40', state: 'working', since: NOW - 30 }],
   apps: [
@@ -132,6 +176,7 @@ const WORKSPACE: WorkspaceSnapshot = {
       createdBy: 'owner',
       createdAt: 3,
     },
+    ...ROOMS,
   ],
   personas: [
     {
@@ -168,6 +213,8 @@ const WORKSPACE: WorkspaceSnapshot = {
       updatedAt: 1,
       archivedAt: NOW - 100,
     },
+    persona(20, 'scout', 'Finds deals for the room', 'swarmm-prod'),
+    persona(21, 'closer', 'Writes the offer', 'swarmm-prod'),
   ],
   invocations: [],
   receipts: [],
@@ -203,6 +250,32 @@ function Page({ title, children }: { readonly title: string; readonly children?:
       <PageBar title={title} />
       <div className="shell">{children ?? <p className="page-empty">{title}</p>}</div>
     </>
+  )
+}
+
+/** A room's channel info (ADR 0079), open beside an empty channel: the Room chip and its one line. */
+function RoomInfo() {
+  const [layout, setLayout] = useState<HTMLDivElement | null>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const topic = ROOMS[7]
+  if (topic === undefined) return null
+  return (
+    <div ref={setLayout} className="channel-layout" data-info>
+      <div className="channel-column">
+        <button ref={trigger} type="button" className="sr-only">
+          Info
+        </button>
+      </div>
+      <ChannelInfo
+        topic={topic}
+        open
+        onOpenChange={() => undefined}
+        trigger={trigger}
+        container={layout}
+        failure=""
+        onFailure={() => undefined}
+      />
+    </div>
   )
 }
 
@@ -242,6 +315,7 @@ const router = createRouter({
     page('/personas', 'Personas', () => <PersonasPage />),
     page('/p/$id', 'Persona'),
     page('/settings', 'Settings'),
+    createRoute({ getParentRoute: () => root, path: '/room-info', component: RoomInfo }),
   ]),
   history: createMemoryHistory({ initialEntries: [new URLSearchParams(location.search).get('at') ?? '/c/1'] }),
 })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PersonaView, SourcesDetails, SourceUse } from '@goblin/contracts'
 import { Schema } from 'effect'
-import { activePersonas, taggedPersonas } from '../src/lib/personas.ts'
+import { activePersonas, personasByMaker, taggedPersonas } from '../src/lib/personas.ts'
 import { sourcePlaces, sourceTopics, sourcesOf } from '../src/lib/sources.ts'
 
 // Every fixture decodes with the contract schema the runtime answers with.
@@ -29,7 +29,7 @@ const use = (inputEntry: number | undefined, topicName = 'Japan', mode = 'auto')
     sources: [source(topicName, '20', 4)],
     retrievedAt: 100,
   })
-const persona = (id: number, name: string, archivedAt?: number) =>
+const persona = (id: number, name: string, archivedAt?: number, key?: string) =>
   Schema.decodeUnknownSync(PersonaView)({
     id,
     name,
@@ -41,6 +41,7 @@ const persona = (id: number, name: string, archivedAt?: number) =>
     createdAt: 1,
     updatedAt: 1,
     ...(archivedAt !== undefined && { archivedAt }),
+    ...(key !== undefined && { madeBy: { key } }),
   })
 const PARTS = [
   { id: '3:0', kind: 'user' },
@@ -79,6 +80,21 @@ describe('Personas in the composer', () => {
     const offered = activePersonas([persona(2, 'critic'), persona(1, 'Coach'), persona(3, 'Old', 5)])
     expect(offered.map(({ name }) => name)).toEqual(['Coach', 'critic'])
     expect(activePersonas([])).toEqual([])
+  })
+
+  it("lists the owner's own Personas apart from each key's, by key and then by name, never an archived one", () => {
+    const { own, keys } = personasByMaker([
+      persona(1, 'coach'),
+      persona(2, 'scout', undefined, 'swarmm-prod'),
+      persona(3, 'Analyst', undefined, 'swarmm-prod'),
+      persona(4, 'old', 5, 'swarmm-prod'),
+      persona(5, 'runner', undefined, 'Sidequest'),
+    ])
+    expect(own.map(({ name }) => name)).toEqual(['coach'])
+    expect(keys.map(({ key, personas }) => [key, personas.map(({ name }) => name)])).toEqual([
+      ['Sidequest', ['runner']],
+      ['swarmm-prod', ['Analyst', 'scout']],
+    ])
   })
 
   it('counts the Personas a draft tags, for the together-or-in-turn choice', () => {

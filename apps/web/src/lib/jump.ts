@@ -7,7 +7,7 @@ import { activePersonas } from './personas.ts'
 import type { ShownPin } from './pins.ts'
 import { threadList } from './rail.ts'
 import { threadTitle } from './threads.ts'
-import { channelOf, channels, topicOfChannel } from './topics.ts'
+import { channelOf, channels, roomGroups, topicOfChannel } from './topics.ts'
 
 /** A page the switcher opens as a whole. */
 type PagePath = '/activity' | '/work' | '/apps' | '/connections' | '/personas' | '/settings' | '/threads'
@@ -39,6 +39,8 @@ export type JumpItem = {
   readonly detail: string
   readonly link: JumpLink
   readonly tile?: string
+  /** Listed only for a query that finds it, never before anything is typed: a key's room (ADR 0108). */
+  readonly asked?: true
 }
 
 /** One group of results under its heading. */
@@ -148,7 +150,7 @@ function apps({ pins, servers, built, agentApps }: JumpSources): JumpItem[] {
 }
 
 /**
- * Every place, in each kind's own order: the pages; the active Topics; the open threads (unread first, then newest),
+ * Every place, in each kind's own order: the pages; the active Topics, then each key's rooms (ADR 0108); the open threads (unread first, then newest),
  * each in its Topic's channel; the Apps; the Personas; and the sections of Settings and Work.
  */
 export function jumpItems(sources: JumpSources): readonly JumpItem[] {
@@ -169,6 +171,16 @@ export function jumpItems(sources: JumpSources): readonly JumpItem[] {
     detail: 'Topic',
     link: { to: '/c/$chatId', params: { chatId: topic.conversation } },
   }))
+  const rooms = roomGroups(topics, views).flatMap((group) =>
+    group.rooms.map((room): JumpItem => ({
+      id: `topic:${String(room.id)}`,
+      kind: 'topic',
+      label: room.name,
+      detail: `Room of ${group.key}`,
+      link: { to: '/c/$chatId', params: { chatId: room.conversation } },
+      asked: true,
+    })),
+  )
   const { unread, read } = threadList(views)
   const threads = [...unread, ...read].map((view): JumpItem => {
     const channel = channelOf(view.id, views, topics)
@@ -195,7 +207,7 @@ export function jumpItems(sources: JumpSources): readonly JumpItem[] {
     detail: `Section in ${to === '/work' ? 'Work' : 'Settings'}`,
     link: { to, hash },
   }))
-  return [...pages, ...active, ...threads, ...apps(sources), ...personas, ...sections]
+  return [...pages, ...active, ...rooms, ...threads, ...apps(sources), ...personas, ...sections]
 }
 
 /**
@@ -234,7 +246,7 @@ export function jumpResults(items: readonly JumpItem[], query: string): readonly
   const ranked =
     folded === ''
       ? items
-          .filter((item) => item.kind === 'destination' || item.kind === 'topic')
+          .filter((item) => (item.kind === 'destination' || item.kind === 'topic') && item.asked !== true)
           .map((item, order) => ({ item, score: 0, order }))
       : items.flatMap((item, order) => {
           const score = rank(item.label, folded)

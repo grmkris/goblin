@@ -29,27 +29,29 @@ const subscribeFolds = (listener: () => void) => {
     foldListeners.delete(listener)
   }
 }
-function storedFold(key: string): boolean {
+function storedFold(key: string, foldedFirst: boolean): boolean {
   const chosen = foldedHere.get(key)
   if (chosen !== undefined) return chosen
   try {
-    return localStorage.getItem(key) === 'folded'
+    const stored = localStorage.getItem(key)
+    return stored === null ? foldedFirst : stored === 'folded'
   } catch {
-    // expected: storage is off in this browser, so every section starts open
-    return false
+    // expected: storage is off in this browser, so every section starts as it does before anyone chose
+    return foldedFirst
   }
 }
 
 /**
- * The sections the owner folded, remembered in this browser (a convenience: without storage they open on reload). The
- * server, and the first render in the browser, show them open; the browser's choice follows.
+ * The sections the owner folded or opened, remembered in this browser (a convenience: without storage each starts as
+ * it does before anyone chose). A section starts open unless `foldedFirst` (a key's rooms, ADR 0108). The server, and
+ * the first render in the browser, show it that way; the browser's choice follows.
  */
-export function useFolded(section: string): readonly [boolean, () => void] {
+export function useFolded(section: string, foldedFirst = false): readonly [boolean, () => void] {
   const key = `goblin:sidebar:${section}`
   const folded = useSyncExternalStore(
     subscribeFolds,
-    () => storedFold(key),
-    () => false,
+    () => storedFold(key, foldedFirst),
+    () => foldedFirst,
   )
   const toggle = () => {
     foldedHere.set(key, !folded)

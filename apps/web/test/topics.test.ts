@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { type ConversationView, EVERYTHING, type TopicView } from '@goblin/contracts'
-import { PERSONAL, channelOf, channels, isChannel, topicOfChannel, topicThreads, topicsOf } from '../src/lib/topics.ts'
+import {
+  PERSONAL,
+  channelOf,
+  channels,
+  isChannel,
+  matchingRooms,
+  roomGroups,
+  topicOfChannel,
+  topicThreads,
+  topicsOf,
+} from '../src/lib/topics.ts'
 
 const topic = (id: number, name: string, conversation: string, extra: Partial<TopicView> = {}): TopicView => ({
   id,
@@ -103,5 +113,53 @@ describe("a Topic's threads in the sidebar", () => {
       ...Array.from({ length: 8 }, (_, n) => view(String(30 + n), { lastReplyAt: n + 1 })),
     ]
     expect(topicThreads('1', many, [], {}, new Set()).map(({ id }) => id)).toEqual(['37', '36', '35', '34', '33'])
+  })
+})
+
+/** A room a server's key made (ADR 0108). */
+const room = (id: number, name: string, key: string, extra: Partial<TopicView> = {}) =>
+  topic(id, name, String(id * 10), { room: { key }, createdBy: 'agent', createdAt: id, ...extra })
+
+describe("a key's rooms in the sidebar", () => {
+  const ROOMS = [
+    ...TOPICS,
+    room(5, 'deal-5', 'swarmm-prod'),
+    room(6, 'deal-6', 'swarmm-prod'),
+    room(7, 'Deal-7', 'swarmm-prod', { archivedAt: 99 }),
+    room(8, 'quest-8', 'sidequest'),
+    room(9, 'quest-9', 'sidequest'),
+  ]
+  const views = [
+    view('50', { kind: 'main', conversation: true, parent: undefined, topic: 5, lastReplyAt: 40 }),
+    view('60', { kind: 'main', conversation: true, parent: undefined, topic: 6, lastReplyAt: 30 }),
+    view('61', { parent: '60', topic: 6, lastReplyAt: 70 }),
+    view('80', { kind: 'main', conversation: true, parent: undefined, topic: 8, lastReplyAt: 50 }),
+  ]
+
+  it("keeps the owner's own channels as they were, without any room", () => {
+    expect(channels(ROOMS)).toEqual(channels(TOPICS))
+  })
+
+  it('groups the active rooms by key, the latest active first, a reply in a thread counting for its room', () => {
+    const groups = roomGroups(ROOMS, views)
+    expect(groups.map(({ key, rooms, latest }) => ({ key, rooms: rooms.map(({ name }) => name), latest }))).toEqual([
+      { key: 'swarmm-prod', rooms: ['deal-6', 'deal-5'], latest: 70 },
+      { key: 'sidequest', rooms: ['quest-8', 'quest-9'], latest: 50 },
+    ])
+  })
+
+  it('counts a room with no chat yet from when it was made, and has no group without rooms', () => {
+    expect(roomGroups(ROOMS, []).map(({ key, rooms }) => [key, rooms.map(({ id }) => id)])).toEqual([
+      ['sidequest', [9, 8]],
+      ['swarmm-prod', [6, 5]],
+    ])
+    expect(roomGroups(TOPICS, views)).toEqual([])
+  })
+
+  it('filters rooms by name whatever the case, and keeps them all while the filter is blank', () => {
+    const rooms = roomGroups(ROOMS, views)[0]?.rooms ?? []
+    expect(matchingRooms(rooms, ' DEAL-5 ').map(({ id }) => id)).toEqual([5])
+    expect(matchingRooms(rooms, '  ')).toBe(rooms)
+    expect(matchingRooms(rooms, 'nothing')).toEqual([])
   })
 })

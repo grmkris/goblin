@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Navigate, useNavigate } from '@tanstack/react-router'
 import type { ConversationView, TopicView } from '@goblin/contracts'
-import { Button, TopBar, TopBarTitle } from '@goblin/ui'
+import { Badge, Button, TopBar, TopBarTitle } from '@goblin/ui'
 import { HashIcon, InfoIcon } from 'lucide-react'
 import { reportUnexpected } from '../../lib/unexpected.ts'
 import { rememberChannel } from '../../lib/last-channel.ts'
 import { type PanelSearch, panelItems } from '../../lib/panel.ts'
-import { channelOf, isArchived, isChannel, topicOfChannel } from '../../lib/topics.ts'
+import { channelOf, isArchived, isChannel, isRoom, topicOfChannel } from '../../lib/topics.ts'
 import { useActivity, useConversation, useConversations, useTopics } from '../../lib/workspace/hooks.ts'
 import { ArchivedBanner } from './channel-menu.tsx'
 import { ChatView } from './chat-view.tsx'
@@ -15,12 +15,24 @@ import { NavigationButton } from './shell.tsx'
 import { ThreadPanel } from './thread-panel.tsx'
 import { ChannelInfo } from './channel-info.tsx'
 
-/** The channel's name as its bar shows it: `#` and the Topic's name, with a pulse while its agent works. */
-function ChannelName({ name, working }: { readonly name: string; readonly working: boolean }) {
+/**
+ * The channel's name as its bar shows it: `#` and the Topic's name, a quiet Room for a key's room (ADR 0108), and a
+ * pulse while its agent works.
+ */
+function ChannelName({
+  name,
+  room,
+  working,
+}: {
+  readonly name: string
+  readonly room: boolean
+  readonly working: boolean
+}) {
   return (
     <span className="channel-title">
       <HashIcon aria-hidden />
       <span className="truncate">{name}</span>
+      {room && <Badge variant="secondary">Room</Badge>}
       {working && <span className="thread-busy" aria-label="Working" />}
     </span>
   )
@@ -45,7 +57,11 @@ function ChannelHeader({
     <TopBar floating data-app-cover>
       <NavigationButton />
       <TopBarTitle>
-        <ChannelName name={topic?.name ?? view.title ?? 'Personal'} working={working} />
+        <ChannelName
+          name={topic?.name ?? view.title ?? 'Personal'}
+          room={topic !== undefined && isRoom(topic)}
+          working={working}
+        />
       </TopBarTitle>
       <Button
         variant="ghost"

@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import type { PersonaView } from '@goblin/contracts'
 import { Button } from '@goblin/ui'
 import { ChevronRightIcon, PlusIcon } from 'lucide-react'
-import { activePersonas } from '../../../lib/personas.ts'
+import { type KeyPersonas, personasByMaker } from '../../../lib/personas.ts'
 import { usePersonas } from '../../../lib/workspace/hooks.ts'
 import { PageSection } from '../../page-section.tsx'
 import { PersonaAvatar } from '../../persona-avatar.tsx'
@@ -46,13 +46,33 @@ function Archived({ personas }: { readonly personas: readonly PersonaView[] }) {
   )
 }
 
+/** The Personas one server's key made (ADR 0108), folded under the key's name until asked for. */
+function MadeByKey({ group }: { readonly group: KeyPersonas }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section className="page-section" aria-label={`Personas ${group.key} made`}>
+      <button type="button" className="list-fold" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <ChevronRightIcon aria-hidden />
+        Made by {group.key} ({group.personas.length})
+      </button>
+      {open && (
+        <ul className="list-rows">
+          {group.personas.map((persona) => (
+            <PersonaRow key={persona.id} persona={persona} />
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
 /**
  * `/personas` (ADR 0078): the specialists the owner calls into a conversation with `@name`, by name, each opening its
- * profile to edit; the archived folded at the end.
+ * profile to edit; then those each server's key made, folded under the key (ADR 0108); the archived folded at the end.
  */
 export function PersonasPage() {
   const personas = usePersonas()
-  const active = activePersonas(personas)
+  const { own: active, keys } = personasByMaker(personas)
   const archived = personas.filter((persona) => persona.archivedAt !== undefined)
   return (
     <div className="page-stack">
@@ -78,6 +98,9 @@ export function PersonasPage() {
           </ul>
         )}
       </PageSection>
+      {keys.map((group) => (
+        <MadeByKey key={group.key} group={group} />
+      ))}
       <Archived personas={archived} />
     </div>
   )

@@ -21,18 +21,70 @@ export const topicsOf = (topics: readonly TopicView[]): readonly TopicView[] =>
 
 export const isArchived = (topic: TopicView): boolean => topic.archivedAt !== undefined
 
+/** When a chat was last active: its last reply, or its start. */
+const latest = (view: ConversationView) => view.lastReplyAt ?? view.createdAt
+
 const byName = (a: TopicView, b: TopicView) =>
   Number(b.personal === true) - Number(a.personal === true) ||
   a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) ||
   a.id - b.id
 
-/** The sidebar's channels: the active Topics, Personal first and then by name, and apart from them the archived ones. */
+/** A Topic a server's API key made: a room, whose chats reach only it (ADR 0108). */
+export const isRoom = (topic: TopicView): boolean => topic.room !== undefined
+
+/**
+ * The sidebar's channels: the owner's own active Topics, Personal first and then by name, and apart from them the
+ * archived ones. A key's rooms are not among them: `roomGroups` lists those.
+ */
 export function channels(topics: readonly TopicView[]): {
   readonly active: readonly TopicView[]
   readonly archived: readonly TopicView[]
 } {
-  const all = topicsOf(topics).toSorted(byName)
+  const all = topicsOf(topics)
+    .filter((topic) => !isRoom(topic))
+    .toSorted(byName)
   return { active: all.filter((topic) => !isArchived(topic)), archived: all.filter(isArchived) }
+}
+
+/** One key's rooms (ADR 0108): the key's name, its active rooms with the latest active first, and when that was. */
+export type RoomGroup = { readonly key: string; readonly rooms: readonly TopicView[]; readonly latest: number }
+
+/** When each channel was last active: its own last reply or start, or a later one in a thread right under it. */
+function lastActive(views: readonly ConversationView[]): ReadonlyMap<string, number> {
+  const last = new Map<string, number>()
+  for (const view of views) {
+    const channel = isChannel(view) ? view.id : view.parent
+    if (channel !== undefined) last.set(channel, Math.max(last.get(channel) ?? 0, latest(view)))
+  }
+  return last
+}
+
+/**
+ * The active rooms, one group per key that made them, the group with the latest activity first and in each the room
+ * with the latest activity first (a room with no chat yet counts from when it was made). An archived room is in none.
+ */
+export function roomGroups(topics: readonly TopicView[], views: readonly ConversationView[]): readonly RoomGroup[] {
+  const last = lastActive(views)
+  const at = (topic: TopicView) => Math.max(last.get(topic.conversation) ?? 0, topic.createdAt)
+  const byKey = new Map<string, TopicView[]>()
+  for (const topic of topics) {
+    if (topic.room === undefined || isArchived(topic)) continue
+    const group = byKey.get(topic.room.key)
+    if (group === undefined) byKey.set(topic.room.key, [topic])
+    else group.push(topic)
+  }
+  return [...byKey]
+    .map(([key, rooms]) => {
+      const sorted = rooms.toSorted((a, b) => at(b) - at(a) || b.id - a.id)
+      return { key, rooms: sorted, latest: Math.max(...sorted.map(at)) }
+    })
+    .toSorted((a, b) => b.latest - a.latest || a.key.localeCompare(b.key))
+}
+
+/** The rooms whose name holds `filter`, whatever the case; all of them while it is blank. */
+export function matchingRooms(rooms: readonly TopicView[], filter: string): readonly TopicView[] {
+  const wanted = filter.trim().toLocaleLowerCase()
+  return wanted === '' ? rooms : rooms.filter((room) => room.name.toLocaleLowerCase().includes(wanted))
 }
 
 /** Whether a chat is a Topic's one Conversation (its channel) rather than a thread or a subagent. */
@@ -60,7 +112,6 @@ export const topicOfChannel = (channel: string, topics: readonly TopicView[]): T
 
 /** How many of a Topic's threads the sidebar lists under it. */
 const LISTED = 5
-const latest = (view: ConversationView) => view.lastReplyAt ?? view.createdAt
 
 /**
  * The threads the sidebar lists under a Topic's channel, one flat level: those at work, with unread replies, recently
