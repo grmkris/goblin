@@ -166,7 +166,8 @@ describe("an API key's reach (ADR 0081)", () => {
     expect(topics.get(2).room).toEqual({ key: 'key-1' })
     const made = await fetch(post('/api/topics', { name: 'Customer 1', operationId: 'svc:topic:1' }, named))
     expect(await made.json()).toMatchObject({ id: 3, room: { key: 'swarmm-prod' } })
-    expect(topics.get(2).room).toEqual({ key: 'swarmm-prod' })
+    // The naming of what came before runs beside the request, never in it.
+    await expect.poll(() => topics.get(2).room, { timeout: 1000 }).toEqual({ key: 'swarmm-prod' })
     const persona = await fetch(post('/api/personas', { ...scout, operationId: 'svc:p:1' }, named))
     expect(await persona.json()).toMatchObject({ id: 1, madeBy: { key: 'swarmm-prod' } })
     await fetch(post('/api/topics', { name: 'Trips', operationId: 'owner-topic' }))

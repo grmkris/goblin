@@ -11,12 +11,13 @@ import { nameReach } from './reach.ts'
 /**
  * The names of the keys that made the agent's Topics and Personas (ADR 0108), learnt from each key's first request in
  * the object's lifetime: whatever the key made before names were kept is named then, and the views of what that named
- * are told. A key's name never changes, so once is enough; a restart only names nothing again.
+ * are told. A key's name never changes, so once is enough; a restart only names nothing again. The naming runs beside
+ * the request, never in it: a key that made hundreds of Topics would otherwise wait for every view to be told.
  */
 export class KeyNames extends Context.Service<
   KeyNames,
   {
-    /** Names what `key` made without a name, the first time it asks in this lifetime; never fails its request. */
+    /** Names what `key` made without a name, the first time it asks in this lifetime; never fails or holds its request. */
     readonly learn: (key: KeyGrant) => Effect.Effect<void>
   }
 >()('goblin/keys/KeyNames') {
@@ -25,18 +26,24 @@ export class KeyNames extends Context.Service<
     Effect.gen(function* () {
       const db = yield* Db
       const changes = yield* Changes
+      const scope = yield* Effect.scope
       const learnt = new Set<string>()
       return KeyNames.of({
-        learn: (key) =>
-          learnt.has(key.keyId)
-            ? Effect.void
-            : Effect.gen(function* () {
-                const named = yield* attemptSync(() => nameReach(db, key))
-                learnt.add(key.keyId)
-                const ids = (kind: 'topic' | 'persona') => named.filter((row) => row.kind === kind).map((row) => row.id)
-                if (ids('topic').length > 0) yield* changes.publish('topics.changed', { ids: ids('topic') })
-                if (ids('persona').length > 0) yield* changes.publish('personas.changed', { ids: ids('persona') })
-              }).pipe(reportAndRecover('keys.learn', undefined)),
+        learn: (key) => {
+          if (learnt.has(key.keyId)) return Effect.void
+          learnt.add(key.keyId)
+          const naming = Effect.gen(function* () {
+            const named = yield* attemptSync(() => nameReach(db, key))
+            const ids = (kind: 'topic' | 'persona') => named.filter((row) => row.kind === kind).map((row) => row.id)
+            if (ids('topic').length > 0) yield* changes.publish('topics.changed', { ids: ids('topic') })
+            if (ids('persona').length > 0) yield* changes.publish('personas.changed', { ids: ids('persona') })
+          }).pipe(
+            // A failed naming is tried again by the key's next request in this lifetime.
+            Effect.tapError(() => Effect.sync(() => learnt.delete(key.keyId))),
+            reportAndRecover('keys.learn', undefined),
+          )
+          return Effect.asVoid(Effect.forkIn(naming, scope))
+        },
       })
     }),
   )
