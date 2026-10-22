@@ -110,7 +110,9 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   `goblin.persona-turn` tasks (guarded by `app.persona-asks`); it starts no Goblin run. A turn forks in a task commit
   (`tx.forkConversation`, task-owned), edits the fork's stored selection **by name** (`personaSelection`: `agent.extensions`
   and `agent.tools` are replaced as a whole, never merged by `configure`), puts the frozen revision in the context tail
-  through a `beforeRequest` hook keyed on the `app.persona-turn` document, and writes the answer back as `app.persona`.
+  through a `beforeRequest` hook keyed on the `app.persona-turn` document, and writes the answer back as `app.persona`,
+  naming its fork (`fork`, which its invocation keeps too once it starts: the `subagentRunId` the fork's work streams
+  under in the chat's stream, `docs/architecture/streams.md`).
   The fork is a hidden `persona`-role thread with a `subagents` exclusion; it never has the delegating, organizing or
   asking tools. A task's passive writes go through `Conversations.writeEntry`, because a task's conversation
   handle submits inputs only. Delegate reports are passive `app.delegate_result` writes unless the spawn set

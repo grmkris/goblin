@@ -138,9 +138,10 @@ under the message until the turn changes. The transcript draws what those runtim
 (`components/parts/drawn-parts.tsx`): a thread's head with the thread's summary ("Moved to a thread" for a moved
 turn, whose own entries a later entry's edits omit), the owner's message to Personas with whom it went to, a Persona's
 answer and a Delegate's result as attributed messages (a mark, a name, Persona or Delegate), and a Topic's brief.
-Personas still answering show after the transcript ("answering…", from the feed's invocations). With Personas on the
-server the composer offers them as `@` references (with their avatars), and with two or more tagged a Together or
-In turn choice that is sent as `personaOrder`. What an answer used from other chats shows as a strip under it: a
+Personas still answering and subagents at work show after the transcript ("answering…", "working…", from the
+chat's stream, [chat streams](streams.md); a Persona waiting its turn in a sequence from the feed's invocations). With
+Personas on the server the composer offers them as `@` references (with their avatars), and with two or more tagged a
+Together or In turn choice that is sent as `personaOrder`. What an answer used from other chats shows as a strip under it: a
 `search_chats` call's `SourcesDetails`, and automatic retrieval from `GET /api/conversations/:id/sources`
 (`lib/sources.ts`), each source opening its chat.
 A thread started with "+" tells its channel its name once it has one (ADR 0010): the channel gets one
@@ -363,7 +364,7 @@ has no `ask_user`.
 The browser URL, stream, history and queue use chat ids. A chat's stream is AG-UI events in a Durable Streams object
 per epoch ([chat streams](streams.md), [ADR 0109](../adr/0109-every-chat-streams-ag-ui-through-a-durable-stream.md)):
 an epoch opens with its newest entries as `MESSAGES_SNAPSHOT` and the STATE document, then carries what the chat's Pi
-session commits and streams. A reader that drops reads on from its last offset; one whose link expired, or whose epoch
+session commits and streams, and the work of its Personas' forks and subagents under their `subagentRunId`. A reader that drops reads on from its last offset; one whose link expired, or whose epoch
 moved, joins again. The workspace feed maps Pi task activity back to current chat ownership. `ConversationView.primary` is an optional boolean; `WorkspaceSnapshot.primary` is an optional
 chat id for compatible readers.
 

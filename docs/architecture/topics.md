@@ -105,7 +105,9 @@ revision, `registerPersona` keeps it in `app_persona_chats` (by the fork's chat)
 fork's scope is its Topic's setup, read live, joined with it, never with subagents; its refusals are words only.
 Stop aborts the chat's turns and marks their invocations `stopped`. An invocation settles as one typed outcome
 (`Settlement`, `personas/invocations.ts`): answered with its entry, failed with its reason (`no_answer`, `model_error`,
-`budget`, `unavailable`; ADR 0083), or stopped, and every invocation view carries the reason.
+`budget`, `unavailable`; ADR 0083), or stopped, and every invocation view carries the reason. Once it starts, the
+invocation names its fork (`fork`), as its answer does (`PersonaAnswerData.fork`): the `subagentRunId` the fork's work
+streams under in the chat's stream ([chat streams](streams.md)).
 
 A Persona's turn can need the owner (ADR 0041). A fork acts while the chat it answers in is open
 (`actingChatSession`, `Conversations.requireActing`), so an ask-first call it makes is held as any other. When its

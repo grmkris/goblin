@@ -3,9 +3,9 @@
 The profile third parties implement against, and the only way goblin's own web app follows a chat
 ([ADR 0109](../adr/0109-every-chat-streams-ag-ui-through-a-durable-stream.md)). Built: the translator from Pi's events
 to AG-UI (`apps/runtime/src/streams/agui.ts`), goblin's parts of it in the contracts (`packages/contracts/src/agui/`),
-the producer that appends a joined chat's events to its streams, the reader's way in (the join endpoint, its MCP tool
-and the signed stream URL), and the web's reader (`apps/web/src/lib/agui/`). The workspace feed is still its own
-stream.
+the producer that appends a joined chat's events to its streams, with its children's work (Personas' forks and
+subagents), the reader's way in (the join endpoint, its MCP tool and the signed stream URL), and the web's reader
+(`apps/web/src/lib/agui/`). The workspace feed is still its own stream.
 
 ## What a stream is
 
@@ -14,13 +14,16 @@ Every chat has one stream of [AG-UI 1.0](https://docs.ag-ui.com/concepts/events)
 same stream serves goblin's own web app and any other reader (a server's app such as Swarmm or Sidequest).
 
 It follows the chat, not one call: runs come and go, and some messages arrive between runs (a Persona's answer, a
-routine's notice, a note shared from a thread), so events outside a `RUN_STARTED`…`RUN_FINISHED` pair are normal.
+routine's notice, a note shared from a thread), so events outside a `RUN_STARTED`…`RUN_FINISHED` pair are normal. So
+are a child's (below): a Persona answers without a run of the chat's, and a subagent goes on after the run that
+started it ended.
 
 A stream lives in **epochs**. An epoch begins with:
 
 1. `MESSAGES_SNAPSHOT`: the messages of the chat's newest entries (a window; older history is read in pages);
 2. `STATE_SNAPSHOT`: the whole STATE document;
-3. when a run is in flight, its `RUN_STARTED` and the answer so far (`TEXT_MESSAGE_START` and its content).
+3. when a run is in flight, its `RUN_STARTED` and the answer so far (`TEXT_MESSAGE_START` and its content);
+4. for each child working now, its `SUBAGENT_STARTED` and, in `full`, what it did so far (below).
 
 An epoch ends with the CUSTOM event `goblin.stream.moved` `{ epoch }`, and the chat goes on in that epoch's stream.
 
@@ -32,7 +35,7 @@ An epoch ends with the CUSTOM event `goblin.stream.moved` `{ epoch }`, and the c
 | `answers` | `RUN_*`; `TEXT_MESSAGE_*` (people's and agents' messages, assistant and user); `ACTIVITY_*`; `SUBAGENT_*` lifecycle; `goblin.stream.moved`; `MESSAGES_SNAPSHOT` without reasoning and tool messages and without tool calls; STATE `/attention` only | servers' keys, OAuth clients without `transcripts` |
 
 `answers` drops `REASONING_*`, `TOOL_CALL_*` (with `TOOL_CALL_RESULT`), `STEP_*`, `RAW`, `goblin.tool_progress`, the
-other STATE members, and everything a subagent does but start, finish or fail (its answer reaches the parent as a
+other STATE members, and everything a child does but start, finish or fail (its answer reaches the parent as a
 message of its own). An assistant turn that only called tools is an empty message in `answers`.
 
 ## Reading a stream
@@ -65,10 +68,11 @@ message of its own). An assistant turn that only called tools is an empty messag
 | `runId` | `<chat>:<submission>`, the run's first input; Pi always names one (`<chat>:0` stands in for none) |
 | assistant message | `<chat>:a<timestamp>`: Pi keeps the request's start time (epoch ms) from the first partial to the committed entry, so the id is the same streaming, at `TEXT_MESSAGE_END` and in every snapshot |
 | reasoning message | `<assistant>:r<index>` (the thinking block's index in the message); its span is `<assistant>:s<index>` |
-| tool call | Pi's call id (the provider's; `<parent>/<key>` for a call a running tool made) |
+| tool call | Pi's call id (the provider's; `<parent>/<key>` for a call a running tool made); a child's is `<child>:<call id>` |
 | tool result message | `<chat>:t<call id>` |
 | any other message | `<chat>:e<entry>` (`:<n>` for an entry's `n`th model message after its first) |
 | interrupt | `<chat>:i<entry>`, the entry that raised it |
+| `subagentRunId` | the child's chat: a Persona's fork, or a subagent's chat (`<chat>` in a child's own ids is that chat, so they never meet the parent's) |
 
 `metadata.goblin.entryId` names the Pi entry of every committed message (on `TEXT_MESSAGE_END`, `TOOL_CALL_RESULT`,
 `ACTIVITY_SNAPSHOT` and in snapshots), so a reader can page history before it.
@@ -84,7 +88,7 @@ Pi's events are its experimental `watchEvents` (spec §9.4), one batch per commi
 | `turn_start`, `turn_end` | `STEP_STARTED`, `STEP_FINISHED`, named `turn <n>` | full |
 | `message_start`, `message_update` (assistant) | the answer streamed block by block: `TEXT_MESSAGE_START` (at its first text or tool call), `TEXT_MESSAGE_CONTENT`; each visible thinking block `REASONING_START`, `REASONING_MESSAGE_START`, `REASONING_MESSAGE_CONTENT`, closed when the next block begins; each tool call `TOOL_CALL_START` with `parentMessageId` | text both, the rest full |
 | `message_end` (assistant) | the rest of each block, `TEXT_MESSAGE_END` (`entryId`, and `stop` when it failed, was stopped or cut off), then each tool call's `TOOL_CALL_ARGS` (the whole JSON, once: Pi's argument deltas are paths, not JSON text) and `TOOL_CALL_END` | as above |
-| `message_end`, `entry_appended` (other entries) | the entry's messages, each written at once: user `TEXT_MESSAGE_*`; a Persona's answer an assistant `TEXT_MESSAGE_*` with `name`; a tool result `TOOL_CALL_RESULT`; an entry the app draws `ACTIVITY_SNAPSHOT`. Markers (memory view, compaction summary, reset) and system messages make none | as their kind |
+| `message_end`, `entry_appended` (other entries) | the entry's messages, each written at once: user `TEXT_MESSAGE_*`; a Persona's answer an assistant `TEXT_MESSAGE_*` with `name` (then `SUBAGENT_FINISHED` for its fork, when the stream carries it); a tool result `TOOL_CALL_RESULT`; an entry the app draws `ACTIVITY_SNAPSHOT`. Markers (memory view, compaction summary, reset) and system messages make none | as their kind |
 | `tool_execution_start` | CUSTOM `goblin.tool_progress` `{ status: 'running' }`; a nested call (one a running tool made) is opened, given its arguments and closed here, with `metadata.goblin.parentToolCallId` | full |
 | `tool_execution_update` | CUSTOM `goblin.tool_progress` with its output, details and diagnostics | full |
 | `tool_execution_end` | a nested call's `TOOL_CALL_RESULT`; a model-issued call's result is its entry | full |
@@ -108,6 +112,8 @@ Pi's events are its experimental `watchEvents` (spec §9.4), one batch per commi
   Personas it went to instead of the agent. Its text is the words alone, without the tags and blocks the model reads;
 - an assistant message: `persona` (a Persona's answer: id, name, revision, avatar, operation, routine, hold,
   questions), `stop` and `usage` (its model call's tokens, as Pi counts them);
+- a child's final answer (a Persona's answer, a Delegate's result): `subagentRunId`, the child it closes;
+- a Persona's `SUBAGENT_*` events: `persona`, `invocation` and, on its end, `entryId` (below);
 - `branchable` on the owner's own words and the agent's answers: a Thread may start at their entry (ADR 0034);
 - `omits` on the messages of an entry that leaves earlier entries out of the chat (a turn moved to a Thread): a reader
   hides the messages of those entries, also ones it read in older history;
@@ -179,7 +185,49 @@ Pi's events do not carry everything; the producer supplies, or the stream leaves
   is not opened);
 - event `timestamp`s: messages carry `metadata.goblin.at` instead.
 
-Persona forks and subagents will be carried in their parent's stream, attributed by `subagentRunId`, in a later step.
+## Children: Personas' forks and subagents
+
+A Persona tagged in a chat answers in a fork of the chat (ADR 0033), and a subagent works in a chat of its own; their
+work is carried in their parent chat's stream with AG-UI's subagent attribution, and their final answer arrives in the
+parent as a message of its own.
+
+- **Lifecycle.** `SUBAGENT_STARTED` (`subagentRunId`, `name`: the Persona's, or the subagent's), then the child's
+  work, then `SUBAGENT_FINISHED` (`outcome` `success`, or `suspended` with the `/attention` items its answer raised in
+  `interruptIds`) or `SUBAGENT_ERROR` (`code` and a line to show). A Persona's work starts when its invocation starts
+  (its fork registered, before its model is asked) and ends at its answer, after the answer's message, or when its
+  invocation fails (`code` its `reason`: `no_answer`, `model_error`, `budget`, `unavailable`) or is stopped
+  (`stopped`). A subagent's work is its runs: each starts at its run's start and ends at its run's end (`model_error`
+  or `task_failed` when the run failed, `stopped` when it was stopped); its result arrives in the parent later, once
+  its own helpers are done, as `goblin.delegate_result` (or as an input the agent answers, when it was spawned to be
+  synthesized). Lifecycle events go out at once, like a run's.
+- **`subagentRunId`** is the child's chat id: the fork's (`PersonaInvocationView.fork`, `PersonaAnswerData.fork`) or
+  the subagent's (`DelegateResultData.delegate`). A child given more work later starts again under the same id: a
+  Persona going on after its hold (AG-UI's `suspended` outcome, continued), a subagent's next job.
+- **Its work** (`full` only): the child's own events as its own stream would have them, each carrying
+  `subagentRunId`: its input (a Persona's prompt, a subagent's job) and answers (`TEXT_MESSAGE_*`), `REASONING_*`,
+  `TOOL_CALL_*` with its results, `STEP_*` and `goblin.tool_progress`; never its runs (its lifecycle stands for them),
+  snapshots or STATE. Its message ids start with its chat, and its tool call ids are prefixed with it
+  (`<child>:<call id>`, `parentToolCallId` too).
+- **`metadata.goblin` on a Persona's lifecycle**: `persona` (`id`, `name`, `revision`, `avatar`, `operationId`; on its
+  end, `hold` and `questions` as its answer has them), `invocation` (`{ state, reason? }`: `running` on its start,
+  then `answered`, `failed` with its `reason`, or `stopped`: the state and reason `PersonaInvocationView` gives in the
+  forward read's `invocations`), and on `SUBAGENT_FINISHED` `entryId`, the answer's entry (the `id` of its `persona`
+  entry in `entries?after=`, the invocation's `answerEntry`). A subagent's lifecycle carries none.
+- **Pairing a child with its answer.** The answer is the parent's own message: an assistant message with `name` for
+  a Persona, the `goblin.delegate_result` activity for a subagent, without AG-UI's `subagentRunId` (so `answers`
+  keeps it) and with `metadata.goblin.subagentRunId`, the child it closes. A reader that persists answers once keys
+  them by `entryId`; `operationId` with the Persona's `id` names the invocation.
+- **Tiers.** `full` carries all of it. `answers` carries the lifecycle with its `metadata.goblin` and the answer, and
+  none of the child's work: nothing a key could not already read of the answer and the forward read. A room's
+  children are its Personas' forks (a room has no subagents), in the room's own stream only.
+- **Late joiners.** An epoch opens with each child working then: `SUBAGENT_STARTED`, then in `full` what it did so
+  far: a Persona's work from its invocation's prompt on, a subagent's run in flight with its answer so far.
+- **Producing them** (`streams/children.ts`, `streams/child-follow.ts`): the producer follows the children of each
+  chat with streams: Personas' forks from their invocation's start to its end (`invocations.changed`, each change
+  read as the write left it), and open subagents (`conversations.changed` and the chat registry), each with a watch of
+  its own over the same translator, its cursor kept in the parent's (`StreamCursor.children`) and its events appended
+  to every stream of the parent through the same outbox. A watch with nothing carried stops after 30 idle seconds,
+  and a child's commit starts it again. A subagent's own subagents are not carried yet.
 
 ## goblin's web app
 
@@ -192,8 +240,11 @@ The web reads the `full` tier as any reader does (`apps/web/src/lib/`):
   a new epoch is read from its start. The transports themselves are in `event-streams.ts`.
 - `agui/reducer.ts` folds the events into the transcript's projection: the committed messages (an epoch's
   `MESSAGES_SNAPSHOT` replaces them), the answer and thinking in flight, the tools running (with the times this browser
-  saw), the queue and the run's progress from STATE, and from the marks the entries a Thread may start at, those left
-  out and where older history starts. `agui/messages.ts` maps AG-UI messages to the transcript's, once per message, for
+  saw), the queue and the run's progress from STATE, from the marks the entries a Thread may start at, those left
+  out and where older history starts, and the children working (`children`: each one's name, a Persona's avatar and
+  its answer so far, from its `SUBAGENT_*` lifecycle; its own events stay with it). The rows after the transcript show
+  them ("answering…", "working…"), with a Persona that waits its turn in a sequence from the workspace feed.
+  `agui/messages.ts` maps AG-UI messages to the transcript's, once per message, for
   the projection and for older pages alike; the transcript keeps its ids (`<entry>:<index>`) from `entryId`.
 - `stream-pool.ts` shares one reader per chat among the panes that show it; one nobody sees for a while is suspended
   and reads on from its offset when it is seen again.
@@ -203,14 +254,24 @@ The web reads the `full` tier as any reader does (`apps/web/src/lib/`):
 `apps/runtime/test/streams/`: Pi batches recorded on a real Pi 1.3.0 Harness (in memory, in the test process, with a
 scripted model that streams block by block; not workerd) for a plain reply, reasoning, a tool call with progress, a
 member's message with attachments, a run that asks, a stopped run, a failed model call after a retry, Persona answers
-and a hold, activities, a queued follow-up and an overflow mid-answer. The goldens keep each case's `full` and `answers`
-events and an epoch opened on the idle chat; every event is checked against `@ag-ui/core`'s own schemas, goblin's parts
-against their contracts, and the sequence for well-formed runs, messages, spans and calls. The same cases also run
-against the installed Pi on every test run. `bun apps/runtime/test/streams/record.ts` records the fixtures again.
+and a hold, activities, a queued follow-up, an overflow mid-answer, and a Persona's fork (a tool call, then thinking
+and an answer) recorded beside its parent. The goldens keep each case's `full` and `answers` events and an epoch opened
+on the idle chat; every event is checked against `@ag-ui/core`'s own schemas, goblin's parts against their contracts,
+and the sequence for well-formed runs, messages, spans and calls, a child's within its own lifecycle. The same cases
+also run against the installed Pi on every test run. `bun apps/runtime/test/streams/record.ts` records the fixtures
+again. `children.test.ts` holds the fork's work under its `subagentRunId` (its ids its own), its `answers` tier to the
+lifecycle and the answer, a late joiner's opening mid-answer and one taken after the fork worked, its failure and stop,
+and the same batches as a subagent's run.
+
+In local workerd (`apps/runtime/test/integration/streams-children-case.ts`): the owner tags a Persona held at its model
+call and reads its start, its work, its end naming the answer and the answer; a server's key reads the same of its
+room in `answers`, lifecycle and answer alone, matching the forward read's invocation and entry; a subagent's run
+streams the same way, and the epoch after the run that spawned it opens with it in flight.
 
 The web holds its reducer to the same goldens (`apps/web/test/agui-reducer.test.ts`): for every case the transcript
 built from the live events, all at once or one event at a time, is the one the next epoch opens with, and the
-`answers` tier gives the same transcript without thinking and tools; the reader is tested against an in-memory stream
+`answers` tier gives the same transcript without thinking and tools; a child's events stay with it
+(`ConversationProjection.children`), never in the transcript; the reader is tested against an in-memory stream
 (`agui-reader.test.ts`: resume from the offset, a moved epoch, a refused link, an expiring one, long polls). The
 browser fixtures `apps/web/test/ui-channel.ts` and `ui-queue.ts` serve the real components AG-UI events over the
 protocol's reads (`agui-route.ts`) and screenshot them at 1440 and 390 px, light and dark.

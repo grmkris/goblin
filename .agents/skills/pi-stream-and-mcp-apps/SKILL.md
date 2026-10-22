@@ -35,6 +35,14 @@ a conversation outside it.
 - The stream is authoritative. Do not keep a second transcript. Something the UI needs of an entry that the stream
   does not carry is added to `metadata.goblin` or STATE on the server (`apps/runtime/src/streams/`), for every reader,
   never read from Pi's entries in the browser.
+- A chat's children (a Persona's fork, a subagent) stream into it under AG-UI's subagent attribution: `subagentRunId`
+  is the child's chat, `SUBAGENT_STARTED` and `SUBAGENT_FINISHED`/`SUBAGENT_ERROR` bound its work, and its answer is the
+  chat's own message naming it in `metadata.goblin.subagentRunId`. The runtime translates a child over its own cursor
+  (`streams/children.ts`, kept in the parent's) and follows it with a watch of its own (`streams/child-follow.ts`:
+  Personas by `invocations.changed`, subagents by `conversations.changed`); `answers` keeps its lifecycle alone. The
+  reducer keeps a child's events with it (`ConversationProjection.children`), never in the transcript; the rows after
+  the transcript (`components/shell/answering.tsx`) show who works from it, and a Persona waiting its turn from the
+  workspace feed. A new epoch starts the children working then; never infer a child from Pi's entries in the browser.
 - Queued inputs and what they say come from STATE `/queue` (the producer reads `InboxDoc`). Render the queue above both
   composers, outside the transcript and turn map. Normal Send stays a follow-up; unchanged failed drafts reuse their
   operation IDs. Row removal uses the owner DELETE queue API and disables only that row while pending; the stream shows
@@ -49,8 +57,9 @@ a conversation outside it.
 - A dropped live read reads on from the last offset it applied; only a 401/403/404, a closed stream or
   `goblin.stream.moved` joins again, and a new epoch (whose `MESSAGES_SNAPSHOT` resets the reducer) is read from its
   start. Back off between failed attempts (`lib/reconnect.ts`). Verify with `test/agui-reader.test.ts`, the reducer
-  against the runtime's goldens (`test/agui-reducer.test.ts`), and the browser fixtures `test/ui-channel.ts` and
-  `test/ui-queue.ts`, which serve AG-UI over the protocol's reads (`test/agui-route.ts`).
+  against the runtime's goldens (`test/agui-reducer.test.ts`, the `fork` golden for a child), and the browser fixtures
+  `test/ui-channel.ts` and `test/ui-queue.ts`, which serve AG-UI over the protocol's reads (`test/agui-route.ts`). A
+  child's translation is held by `apps/runtime/test/streams/children.test.ts` and, in workerd, `streams-children-case.ts`.
 - MCP Apps are tool-associated `ui://` resources from the originating server. Render them in the sandboxed iframe
   with its CSP; validate message origin and source.
 - Apps are kept per call in the runtime registry (`apps/registry.ts`, ADR 0020) and listed by the workspace feed;
