@@ -16,6 +16,8 @@ import { Events, Resident } from '../../../src/mcp/service.ts'
 import { Notices } from '../../../src/notices/service.ts'
 import { ResidentHandlers } from '../../../src/mcp/resident-api.ts'
 import { PiSessions } from '../../../src/pi/sessions.ts'
+import { PublishInternalHandlers } from '../../../src/publish/api.ts'
+import { Published } from '../../../src/publish/service.ts'
 import { Changes } from '../../../src/runtime/changes.ts'
 import { AgentInput } from '../../../src/runtime/input.ts'
 import { currentResident, get, post, serve, served, stub, unrouted } from './fixture.ts'
@@ -26,10 +28,12 @@ const servedInternal = <Handlers, R>(handlers: Layer.Layer<Handlers, never, R>) 
     [routeNames(InternalApi)],
     HttpApiBuilder.layer(InternalApi).pipe(
       Layer.provide(handlers),
+      // The published Events' group (ADR 0112) answers nothing these cases ask.
+      Layer.provide(PublishInternalHandlers),
       Layer.provide(InternalGateLive),
       Layer.provide(HttpServer.layerServices),
     ),
-  )
+  ).pipe(Layer.provide(stub(Published)))
 
 /** Handlers that only record which endpoint ran, so the gate is what the test sees. */
 const recording = () => {

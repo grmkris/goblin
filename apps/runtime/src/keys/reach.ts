@@ -8,7 +8,12 @@ import { appKeyReach } from '../storage/keys.ts'
 export type ReachKind = 'topic' | 'persona'
 
 /** Whether key `keyId` made the `kind` with `id`. */
-export const hasReach = (db: DrizzleSqliteDODatabase, keyId: string, kind: ReachKind, id: number): boolean =>
+export const hasReach = <RunResult>(
+  db: SQLiteAsyncDatabase<'sync', RunResult>,
+  keyId: string,
+  kind: ReachKind,
+  id: number,
+): boolean =>
   db
     .select({ keyId: appKeyReach.keyId })
     .from(appKeyReach)

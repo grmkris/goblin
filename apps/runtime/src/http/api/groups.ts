@@ -23,6 +23,7 @@ import { TopicsHandlers } from '../../topics/api.ts'
 import { NoticesHandlers } from '../../notices/api.ts'
 import { OnboardingHandlers } from '../../onboarding/api.ts'
 import { WorkspaceHandlers } from '../../workspace/api.ts'
+import { EventsHandlers, PublishInternalHandlers } from '../../publish/api.ts'
 import { KeyNames } from '../../keys/names.ts'
 import { InternalGateLive, OwnerAdmissionLive } from './middleware.ts'
 
@@ -49,13 +50,14 @@ const OwnerApiLayer = HttpApiBuilder.layer(OwnerApi).pipe(
     SidebarHandlers,
     SourcesHandlers,
     NotifyHandlers,
+    EventsHandlers,
   ]),
   Layer.provide(OwnerAdmissionLive.pipe(Layer.provide(KeyNames.layer))),
 )
 
 /** The internal API's handlers behind the internal gate. */
 const InternalApiLayer = HttpApiBuilder.layer(InternalApi).pipe(
-  Layer.provide(InboundHandlers),
+  Layer.provide([InboundHandlers, PublishInternalHandlers]),
   Layer.provide(InternalGateLive),
 )
 

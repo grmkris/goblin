@@ -24,7 +24,11 @@ describe('the owner and internal APIs', () => {
     const internal = routesOf(InternalApi)
     const account = routesOf(AccountApi)
     expect(owner.length).toBeGreaterThan(0)
-    expect(internal.map(pathOf).toSorted()).toEqual(['/internal/files/linked', '/internal/mcp-events/:connectionId'])
+    expect(internal.map(pathOf).toSorted()).toEqual([
+      '/internal/files/linked',
+      '/internal/mcp-events/:connectionId',
+      '/internal/publish/terminate',
+    ])
     for (const route of [...owner, ...account]) expect(pathOf(route)).toMatch(/^\/api\//u)
     for (const route of internal) expect(pathOf(route).startsWith(`${INTERNAL_PREFIX}/`)).toBe(true)
     const internalPaths = new Set(internal.map(pathOf))

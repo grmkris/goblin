@@ -14,6 +14,7 @@ import type { SubagentKit } from '../pi/subagents.ts'
 import type { RoutineSchedules } from '../routines/scheduler.ts'
 import type { ToolSets } from '../setup/scope.ts'
 import type { RunTelemetry } from '../telemetry/events.ts'
+import type { PublishFetch } from '../publish/deliver.ts'
 import type { Instrument } from './instrument.ts'
 
 /**
@@ -44,6 +45,10 @@ export interface AgentInputs {
   /** Starts a routine run's Pi work: the routines kit's, made before Pi opened (routines/kit.ts). */
   readonly startRoutine: StartRoutine
   readonly scheduleEvents: (at: number) => Promise<void>
+  /** Arms the published Events' alarm (`publishWake`, ADR 0112) no later than `at` (epoch ms). */
+  readonly schedulePublish: (at: number) => Promise<void>
+  /** How the published Events' webhooks leave the agent (`publish/deliver.ts`); the harness points it at a receiver. */
+  readonly publishFetch: PublishFetch
   /** Schedules the Sources' alarm (sourcesWake) in `seconds` (ADR 0066). */
   readonly scheduleSources: (seconds: number) => void
   readonly mcpFetch: typeof fetch

@@ -16,6 +16,7 @@ import { type CallerScope, type WorkspaceView } from '@goblin/contracts'
 import { McpServer } from '@modelcontextprotocol/server'
 import * as Schema from 'effect/Schema'
 import { routineTools, setupTools } from './config-tools.ts'
+import { EVENTS_GUIDE, eventMethods } from './events-methods.ts'
 import { flowTools, runTools, transcriptTools } from './inspect-tools.ts'
 import {
   type Add,
@@ -421,8 +422,9 @@ const workspaceList = (server: McpServer, reach: CallerReach) =>
  * workspaces its consent reaches (`reach`, ADR 0097).
  */
 export const mcpServer = (scopes: readonly CallerScope[], call: OwnerCaller, reach?: CallerReach): McpServer => {
-  const guide = reach === undefined ? GUIDE : `${GUIDE}${reachGuide(reach)}`
+  const guide = `${reach === undefined ? GUIDE : `${GUIDE}${reachGuide(reach)}`}${EVENTS_GUIDE(scopes)}`
   const server = new McpServer({ name: 'goblin', version: '0.1.0' }, { instructions: guide })
+  eventMethods(server, scopes, call, reach)
   const target: CallTarget = { current: undefined }
   // `workspace_list` first: it names no workspace, and every tool after it does when the client must name one.
   if (reach !== undefined) workspaceList(server, reach)

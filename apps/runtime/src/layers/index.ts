@@ -16,6 +16,7 @@ import { LearnerLive, SkillsLive } from './skills.ts'
 import { SourcesLive } from './sources.ts'
 import { WorkspaceLive } from '../workspace/live.ts'
 import { StreamsLive } from './streams.ts'
+import { PublishLive } from './publish.ts'
 
 /** `step`, built after and over everything `built` provides; the result provides both. */
 const then =
@@ -78,6 +79,7 @@ export const AgentLive = (input: AgentInputs) =>
     then(LearnerLive),
     then(WorkspaceLive),
     then(OnboardingLive),
+    then(PublishLive),
     then(StreamsLive),
     then(AgentHttp.layer),
   )

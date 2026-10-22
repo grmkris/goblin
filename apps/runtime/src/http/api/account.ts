@@ -21,7 +21,16 @@ import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { type KeyChange, createKey, listKeys, revokeKey, rotateKey, updateKey } from '../../auth/api-keys.ts'
 import { listInboundClients, revokeInboundClient, setClientReach } from '../../auth/clients.ts'
 import { deleteAgentOf } from '../../auth/account.ts'
-import { type Person, createWorkspace, deleteWorkspace, updateWorkspace, workspacesOf } from '../../auth/workspaces.ts'
+import {
+  type Person,
+  createWorkspace,
+  deleteWorkspace,
+  reachedBy,
+  updateWorkspace,
+  workspacesOf,
+} from '../../auth/workspaces.ts'
+import type { LeaseHolder } from '@goblin/contracts/internal'
+import { internalCall } from '../../inbound/client.ts'
 import type { RuntimeEnv } from '../../env.ts'
 import { logEvent } from '../../observability/logger.ts'
 import { reportAndRecover } from '../../observability/report.ts'
@@ -100,6 +109,27 @@ export const crashPoint = (
   return agent === undefined ? { ...point, indexes: [] } : point
 }
 
+/**
+ * Ends every published Events lease `holder` holds in workspace `workspaceId` (ADR 0112), before their access ends: one
+ * `terminated` control goes to each. A failure is reported and the access still ends; a lease it missed lapses at its
+ * end, a day at most.
+ */
+const endLeases = (env: RuntimeEnv, workspaceId: string, holder: LeaseHolder) =>
+  internalCall(env.AGENTS.getByName(workspaceId), (api) => api.publish.terminate({ payload: { holder } })).pipe(
+    Effect.asVoid,
+    reportAndRecover('publish.terminate', undefined),
+  )
+
+/** A key as the leases it holds name it. */
+const key = (keyId: string): LeaseHolder => ({ kind: 'key', keyId })
+
+/** The workspaces client `clientId` reaches for `userId` now: where its leases are. */
+const clientWorkspaces = (env: RuntimeEnv, userId: string, clientId: string) =>
+  attempt(() => reachedBy(env.AUTH_DB, userId, clientId)).pipe(
+    Effect.map((reached) => reached?.workspaces ?? []),
+    reportAndRecover('publish.reach', []),
+  )
+
 /** The records as the deployment keeps them. */
 export const accountRecords = (env: RuntimeEnv): AccountRecords => {
   const flows = env.FLOWS
@@ -125,13 +155,32 @@ export const accountRecords = (env: RuntimeEnv): AccountRecords => {
       ),
     clients: (userId) => attempt(() => listInboundClients(env, userId)),
     setClientReach: (person, clientId, reach) => attempt(() => setClientReach(env, person, clientId, reach)),
-    revokeClient: (userId, clientId) => attempt(() => revokeInboundClient(env, userId, clientId)),
+    revokeClient: (userId, clientId) =>
+      Effect.gen(function* () {
+        const holder = { kind: 'client' as const, clientId, user: userId }
+        for (const workspace of yield* clientWorkspaces(env, userId, clientId))
+          yield* endLeases(env, workspace.id, holder)
+        yield* attempt(() => revokeInboundClient(env, userId, clientId))
+      }),
     keys: (workspaceId) => attempt(() => listKeys(env, workspaceId)),
     createKey: (workspaceId, userId, input) => attempt(() => createKey(env, workspaceId, userId, input)),
     updateKey: (workspaceId, userId, keyId, change) =>
-      attempt(() => updateKey(env, workspaceId, userId, keyId, change)),
-    rotateKey: (workspaceId, keyId) => attempt(() => rotateKey(env, workspaceId, keyId)),
-    revokeKey: (workspaceId, keyId) => attempt(() => revokeKey(env, workspaceId, keyId)),
+      Effect.andThen(
+        change.scopes === undefined || change.scopes.includes('conversations')
+          ? Effect.void
+          : endLeases(env, workspaceId, key(keyId)),
+        attempt(() => updateKey(env, workspaceId, userId, keyId, change)),
+      ),
+    rotateKey: (workspaceId, keyId) =>
+      Effect.andThen(
+        endLeases(env, workspaceId, key(keyId)),
+        attempt(() => rotateKey(env, workspaceId, keyId)),
+      ),
+    revokeKey: (workspaceId, keyId) =>
+      Effect.andThen(
+        endLeases(env, workspaceId, key(keyId)),
+        attempt(() => revokeKey(env, workspaceId, keyId)),
+      ),
   }
 }
 

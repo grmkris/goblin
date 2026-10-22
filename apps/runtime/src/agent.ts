@@ -15,6 +15,8 @@ import { appPorts } from './agent-apps/ports.ts'
 import { JOB_CALLBACK, type JobSchedules, type JobSlot } from './agent-apps/jobs.ts'
 import { reconcileAppJobs, runAppJob } from './agent-apps/wake.ts'
 import { mcpEventsWake } from './mcp/events/wake.ts'
+import { publishWake } from './publish/wake.ts'
+import type { PublishFetch } from './publish/deliver.ts'
 import { routineSchedulePorts, routinesWake, runRoutine, runRoutineDeadline } from './routines/wake.ts'
 import { appsExtension, appExecutionExtension } from './pi/apps.ts'
 import { serversExtension } from './pi/servers.ts'
@@ -174,6 +176,10 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
   protected modelStreams(): ProviderStreams {
     return LITELLM_STREAMS
   }
+  /** How the published Events' webhooks leave (ADR 0112); the integration harness points it at its own receiver. */
+  protected publishFetch(): PublishFetch {
+    return async (url, init) => fetch(url, init)
+  }
   /** The normal platform boundary; tests inject an official SDK fixture without changing authorization. */
   protected mcpFetch(): typeof fetch {
     // SAFETY: SDK transport alone adds OAuth tokens; binding platform fetch preserves its execution context.
@@ -184,6 +190,8 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     // Reconstruct lease and receipt recovery without opening Pi or waiting on outbound network calls.
     await this.#scheduleWake('mcpEventsWake', Date.now() + 1000)
     await this.#scheduleWake('routinesWake', Date.now() + 1000)
+    // The published Events' deliveries and leases are looked at again after a restart (ADR 0112).
+    await this.#scheduleWake('publishWake', Date.now() + 1000)
     // The Sources' subscriptions and the answers they owe are looked at again after a restart.
     await this.schedule(1, 'sourcesWake')
     await reconcileAppJobs(this.#apps)
@@ -211,6 +219,8 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       helperExtensions: this.#subagents.members(),
       workspaceId: this.name,
       scheduleEvents: (at) => this.#scheduleWake('mcpEventsWake', at),
+      schedulePublish: (at) => this.#scheduleWake('publishWake', at),
+      publishFetch: this.publishFetch(),
       scheduleSources: (seconds) => void this.schedule(seconds, 'sourcesWake'),
       mcpFetch: this.mcpFetch(),
       keyOrigins: async (keyId) => keyOriginsNow(this.env, this.name, keyId),
@@ -237,7 +247,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
   /** A move committed `phase`; the integration harness stops the object here to prove a restart finishes it. */
   protected async moveBoundary(_phase: MovePhase, _operation: string): Promise<void> {}
   /** One earliest Events wake. Agent schedules are durable and reconstructed independently of Pi. */
-  async #scheduleWake(callback: 'mcpEventsWake' | 'routinesWake', at: number): Promise<void> {
+  async #scheduleWake(callback: 'mcpEventsWake' | 'routinesWake' | 'publishWake', at: number): Promise<void> {
     // listSchedules includes the currently executing wake; only future jobs can replace the next sweep.
     const now = nowSeconds()
     const pending = (await this.listSchedules()).filter((job) => job.callback === callback && job.time > now)
@@ -250,6 +260,9 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
   // The schedule callbacks: the Agents SDK calls them by name; each body lives in its area's wake.ts.
   async mcpEventsWake(): Promise<void> {
     await this.#bridge.run(mcpEventsWake)
+  }
+  async publishWake(): Promise<void> {
+    await this.#bridge.run(publishWake)
   }
   async routinesWake(): Promise<void> {
     await routinesWake(this.#bridge.run, (at) => this.#scheduleWake('routinesWake', at))

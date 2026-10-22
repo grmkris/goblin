@@ -11,6 +11,7 @@ import { ownerCall } from '../../src/inbound/client.ts'
 import { type CallerReach, mcpServer } from '../../src/inbound/mcp-server.ts'
 import { workspaceFor } from '../../src/inbound/route.ts'
 import { type OwnerCaller, STREAMED, TOOLS } from '../../src/inbound/tools.ts'
+import { EVENT_METHODS } from '../../src/inbound/events-methods.ts'
 
 const KEY: Caller = {
   kind: 'key',
@@ -81,9 +82,11 @@ const textOf = (result: { readonly content?: unknown }): unknown =>
   JSON.parse((result.content as readonly { readonly text: string }[])[0]?.text ?? 'null')
 
 describe('/mcp for every caller (ADR 0086)', () => {
-  it('has exactly one tool for each owner endpoint a caller reaches, but the streams it reads over HTTP', () => {
+  it('has exactly one tool or Events method for each owner endpoint a caller reaches, but the streams it reads over HTTP', () => {
     const scoped = [...endpointScopes(OwnerApi).keys()]
-    expect(Object.values(TOOLS).toSorted()).toEqual(scoped.filter((endpoint) => !STREAMED.has(endpoint)).toSorted())
+    expect([...Object.values(TOOLS), ...Object.values(EVENT_METHODS)].toSorted()).toEqual(
+      scoped.filter((endpoint) => !STREAMED.has(endpoint)).toSorted(),
+    )
     expect(scoped).toEqual(expect.arrayContaining([...STREAMED]))
   })
 

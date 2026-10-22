@@ -8,6 +8,7 @@ import { KEY_REACH } from './migrations/key-reach.ts'
 import { PERSONA_THINKING } from './migrations/persona-thinking.ts'
 import { PERSONA_TOOL_MODE } from './migrations/persona-tool-mode.ts'
 import { PERSONA_TOOLS } from './migrations/persona-tools.ts'
+import { PUBLISH } from './migrations/publish.ts'
 import { RESIDENT_UNTIL_REVOKED } from './migrations/resident-until-revoked.ts'
 import { ROOMS } from './migrations/rooms.ts'
 import { SOURCE_PROPOSER } from './migrations/source-proposer.ts'
@@ -37,6 +38,7 @@ export const MIGRATIONS = [
   ROOMS,
   INVOCATION_FORK,
   STREAMS_DROPPED,
+  PUBLISH,
 ] as const
 
 export function runApplicationMigrations(storage: DurableObjectStorage): void {

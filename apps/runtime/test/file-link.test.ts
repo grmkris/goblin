@@ -21,6 +21,8 @@ import { eventsHookToken } from '../src/mcp/events/route-token.ts'
 import { Events, Resident } from '../src/mcp/service.ts'
 import { Notices } from '../src/notices/service.ts'
 import { PiSessions } from '../src/pi/sessions.ts'
+import { PublishInternalHandlers } from '../src/publish/api.ts'
+import { Published } from '../src/publish/service.ts'
 import { Changes } from '../src/runtime/changes.ts'
 import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
 import { fake } from './fake.ts'
@@ -131,7 +133,7 @@ const agent = (current = true) => {
   const http = AgentHttp.serve(
     [routeNames(InternalApi)],
     HttpApiBuilder.layer(InternalApi).pipe(
-      Layer.provide(InboundHandlers),
+      Layer.provide([InboundHandlers, PublishInternalHandlers]),
       Layer.provide(InternalGateLive),
       Layer.provide(HttpServer.layerServices),
     ),
@@ -149,6 +151,7 @@ const agent = (current = true) => {
         stub(Conversations),
         stub(Notices),
         stub(Changes),
+        stub(Published),
       ),
     ),
   )

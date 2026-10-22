@@ -75,8 +75,36 @@ export class InboundGroup extends HttpApiGroup.make('inbound').add(
   }),
 ) {}
 
+/**
+ * Who a published Events lease belongs to (ADR 0112), as the Worker names one whose access it is about to end: a
+ * server's key, or an OAuth client acting for a person.
+ */
+export const LeaseHolder = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('key'), keyId: Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u)) }),
+  Schema.Struct({
+    kind: Schema.Literal('client'),
+    clientId: Schema.String.check(Schema.isPattern(/^[\w.:-]{1,200}$/u)),
+    user: Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u)),
+  }),
+])
+export type LeaseHolder = typeof LeaseHolder.Type
+
+/**
+ * The Events goblin publishes, as the Worker ends them (ADR 0112).
+ *
+ * - `terminate`: `POST /internal/publish/terminate`, before a key is revoked, rotated or loses `conversations`, or an
+ *   OAuth client is revoked: every lease of `holder` ends, its pending deliveries are dropped and one `terminated`
+ *   control goes to each. Answers how many leases it ended.
+ */
+export class PublishGroup extends HttpApiGroup.make('publish').add(
+  HttpApiEndpoint.post('terminate', '/publish/terminate', {
+    payload: Schema.Struct({ holder: LeaseHolder }),
+    success: Schema.Struct({ terminated: Schema.Int }),
+  }),
+) {}
+
 /** The agent's internal API, served by the agent beside `OwnerApi` and called only by the Worker. */
 export class InternalApi extends HttpApi.make('goblin-internal')
-  .add(InboundGroup)
+  .add(InboundGroup, PublishGroup)
   .prefix(INTERNAL_PREFIX)
   .middleware(InternalGate) {}
