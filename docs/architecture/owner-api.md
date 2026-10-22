@@ -45,7 +45,9 @@ a header that does not decode, is `Unauthenticated` (`principal`), never taken f
 endpoint's `EndpointRole` (`admin` for what changes the agent's authority, ADR 0093, and what it works with: Personas,
 a Topic's setup, routine writes, ADR 0098) is `Forbidden` (`role`), and so is an OAuth client acting for one. Where one
 endpoint serves both, `requireAdminFor` (`keys/policy.ts`) refuses a member the admin's part: a Topic's description,
-guidance or setup on create and update, and Undo of a receipt whose change took an admin. A member's request gets a
+guidance or setup on create and update, and Undo of a receipt whose change took an admin. The agent's own tools for
+those changes refuse on a member's turn the same way (ADR 0099, `pi/asker.ts`): each admission records the role of the
+member who asked on its receipt, and a tool reads its run's inputs back to them. A member's request gets a
 grant of resident authority, except where an endpoint is
 annotated `GrantsResident: false` (`POST /api/agent/resident`, the event streams, the entries read, the files group and the
 OAuth callback). A request from a caller (ADR 0086: a server's key, or an OAuth client of the owner on `/mcp`) never

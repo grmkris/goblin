@@ -3,6 +3,7 @@ import {
   RECEIPT_RETENTION,
   admitReceipt,
   advanceReceipt,
+  askedByMember,
   receiptIn,
   receiptOf,
   relatedReceipts,
@@ -90,5 +91,59 @@ describe('chat operation receipts (unit)', () => {
       existing: true,
     })
     expect(receiptOf(db, 'old')).toBeUndefined()
+  })
+
+  it("keeps the role of the member who asked, and finds a member's operation in any chat (ADR 0099)", () => {
+    const { db } = database()
+    admitReceipt(db, {
+      chat: '1',
+      operationId: 'mine',
+      receipt: { ...send, role: 'owner' },
+      session: () => '41',
+      now: 1,
+    })
+    admitReceipt(db, {
+      chat: '1',
+      operationId: 'source',
+      receipt: { kind: 'source', origin: 'source' },
+      session: () => '41',
+      now: 1,
+    })
+    admitReceipt(db, {
+      chat: '7',
+      operationId: 'theirs',
+      receipt: { ...send, role: 'member' },
+      session: () => '47',
+      now: 1,
+    })
+    expect(receiptIn(db, '1', 'mine')).toMatchObject({ role: 'owner' })
+    expect(receiptIn(db, '1', 'source')).not.toHaveProperty('role')
+    expect(receiptOf(db, 'theirs')).toMatchObject({ chat: '7', role: 'member' })
+    expect(askedByMember(db, [])).toBe(false)
+    expect(askedByMember(db, ['mine', 'source', 'missing'])).toBe(false)
+    expect(askedByMember(db, ['mine', 'theirs'])).toBe(true)
+  })
+
+  it("marks an operation a member replays as theirs, and never unmarks a member's", () => {
+    const { db, sqlite } = database()
+    const member = { ...send, role: 'member' } as const
+    admitReceipt(db, { chat: '1', operationId: 'reused', receipt: send, session: () => '41', now: 1 })
+    expect(askedByMember(db, ['reused'])).toBe(false)
+    expect(
+      admitReceipt(db, { chat: '1', operationId: 'reused', receipt: member, session: () => '43', now: 2 }),
+    ).toEqual({
+      session: '41',
+      existing: true,
+    })
+    expect(receiptIn(db, '1', 'reused')).toMatchObject({ role: 'member', admittedAt: 1 })
+    admitReceipt(db, {
+      chat: '1',
+      operationId: 'reused',
+      receipt: { ...send, role: 'owner' },
+      session: () => '41',
+      now: 3,
+    })
+    expect(askedByMember(db, ['reused'])).toBe(true)
+    expect(() => sqlite.exec("UPDATE app_chat_operations SET role = 'guest'")).toThrow(/CHECK/u)
   })
 })

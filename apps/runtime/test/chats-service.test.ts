@@ -14,6 +14,8 @@ import { settledWithin } from '../src/chats/instance.ts'
 import { moveEnd } from '../src/chats/mover.ts'
 import { ChatOperations, Chats, Conversations, Moves } from '../src/chats/service.ts'
 import { Conflict } from '../src/http/errors.ts'
+import { RequestContext } from '../src/http/api/context.ts'
+import type { Member } from '../src/http/api/principal.ts'
 import type { FoundationServices } from '../src/layers/core.ts'
 import { ConversationLive } from '../src/layers/conversation.ts'
 import { Budget } from '../src/budget.ts'
@@ -527,4 +529,43 @@ describe('a bounded wait for an operation (C2, C3)', () => {
       expect(failed).toMatchObject({ _tag: 'Internal' })
     }),
   )
+})
+
+/** A program run as a request `member` sent, as the owner API serves one. */
+const asking = (member: Member) =>
+  Effect.provideService(RequestContext, {
+    ref: undefined,
+    request: undefined,
+    operation: undefined,
+    route: 'r',
+    member,
+  })
+
+describe('an admission keeps the role of the member who asked (ADR 0099)', () => {
+  it.effect("records a member's or an admin's role from their request, and none for work no member sent", () => {
+    const { layer, db } = services([])
+    return Effect.gen(function* () {
+      const operations = yield* ChatOperations
+      const send = (operationId: string) =>
+        operations.send({
+          chat: '2',
+          operationId,
+          receipt: { kind: 'send', origin: 'owner' },
+          flow: { flow: 'send', via: 'app', actor: 'owner' },
+          content: 'hello',
+        })
+      yield* send('op-member').pipe(asking({ user: 'u-2', role: 'member', name: 'Guest', shared: true }))
+      yield* send('op-admin').pipe(asking({ user: 'u-3', role: 'admin', name: 'Ada', shared: true }))
+      yield* send('op-system')
+      const roles = db
+        .select({ operationId: appChatOperations.operationId, role: appChatOperations.role })
+        .from(appChatOperations)
+        .all()
+      expect(roles.toSorted((a, b) => a.operationId.localeCompare(b.operationId))).toEqual([
+        { operationId: 'op-admin', role: 'admin' },
+        { operationId: 'op-member', role: 'member' },
+        { operationId: 'op-system', role: null },
+      ])
+    }).pipe(Effect.provide(layer))
+  })
 })

@@ -1,7 +1,17 @@
 import { Schema } from 'effect'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
-import { call, ownerFetch, person, showing, signedIn, workspaceOf, type Person } from './owner-requests.ts'
+import {
+  call,
+  ownerFetch,
+  person,
+  showing,
+  signedIn,
+  snapshotText,
+  workspaceOf,
+  type Person,
+} from './owner-requests.ts'
+import { waitFor } from './until.ts'
 
 const APP = 'https://goblin.test'
 const CLOSED = { 'x-fixture-signup': 'closed' }
@@ -45,11 +55,56 @@ async function signIn(base: string, email: string): Promise<{ readonly sent: num
 const workspacesOf = async (base: string, who: Person) =>
   Schema.decodeUnknownSync(Listed)(await (await call(base, who, '/api/workspaces')).json())
 
+/** How often `words` occur in main's snapshot as `who` reads it. */
+const occurrences = async (url: string, who: Person, words: string) =>
+  (await snapshotText(signedIn(url, who), '1')).split(words).length - 1
+
+/** `who` says `input` in main, as their browser sends it; then, until one more answer there says `words`. */
+async function answered(url: string, owner: Person, who: Person, input: string, words: string): Promise<void> {
+  const before = await occurrences(url, owner, words)
+  await callOwner(signedIn(url, who), (api) =>
+    api.conversations.submit({ params: { id: '1' }, payload: { input, operationId: crypto.randomUUID() } }),
+  )
+  await waitFor(
+    () => occurrences(url, owner, words),
+    (now) => now > before,
+    words,
+    10_000,
+  )
+}
+
+/** A message the scripted model answers by calling `persona_create` for a Persona named `name`. */
+const personaCall = (name: string) =>
+  `call persona_create {"name":"${name}","role":"Asked for","instructions":"Be brief."}`
+
+/** The scripted model's answer to a tool's refusal on a member's turn (`pi/asker.ts`). */
+const refusal = (what: string) => `done: Changing ${what} takes an admin of this workspace`
+
+/**
+ * The agent's own tools take an admin as the owner API does (ADR 0099): on a member's turn the scripted model's
+ * `persona_create`, `app_build` and `app_rollback` are refused in words it relays and change nothing, while a plain
+ * Topic is made; on the owner's turn the Persona is made.
+ */
+async function agentToolsTakeAnAdmin(url: string, owner: Person, member: Person): Promise<void> {
+  await answered(url, owner, member, personaCall('Askbot'), refusal('Personas'))
+  await answered(url, owner, member, 'call app_build {"name":"askers","files":{"app.ts":"export {}"}}', refusal('apps'))
+  await answered(url, owner, member, 'call app_rollback {"app":"askers","release":"r1"}', refusal('apps'))
+  // A plain Topic stays every member's to make (ADR 0098), on their turn too.
+  const topic = `Asked topic ${crypto.randomUUID().slice(0, 8)}`
+  await answered(url, owner, member, `call topic_create {"name":"${topic}"}`, 'done: Created topic')
+  await answered(url, owner, owner, personaCall('Ownerbot'), 'done: Created persona @Ownerbot')
+  const workspace = await workspaceOf(url, owner)
+  expect(workspace.topics?.some((made) => made.name === topic)).toBe(true)
+  const names = (workspace.personas ?? []).map((made) => made.name)
+  expect(names).toContain('Ownerbot')
+  expect(names).not.toContain('Askbot')
+}
+
 /**
  * Members and invitations (ADR 0093) through the Worker and the real auth D1: an owner invites an address while sign-up
  * is closed, which lets that address sign up and nothing else; the invited person gets no workspace of their own,
  * joins the owner's, works in its agent (the owner sees the Topic they made, and their message by name, ADR 0094) within
- * a member's role, and once removed reaches it no more.
+ * a member's role, on the agent's tools too (ADR 0099), and once removed reaches it no more.
  */
 export async function membersCase(url: string): Promise<void> {
   const owner = await person(url)
@@ -107,6 +162,7 @@ export async function membersCase(url: string): Promise<void> {
     operationId: crypto.randomUUID(),
   })
   expect(described.status).toBe(403)
+  await agentToolsTakeAnAdmin(url, owner, member)
 
   const removed = await ownerFetch(`${url}/w/${owner.slug}/api/members/${guest.userId}`, {
     method: 'DELETE',

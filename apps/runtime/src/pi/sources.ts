@@ -24,6 +24,7 @@ import { routeWords } from '../sources/program.ts'
 import { Sources } from '../sources/service.ts'
 import { describeError } from '../telemetry/attributes.ts'
 import { topicNamed } from '../topics/program.ts'
+import { adminOnly, requireAdminTurn } from './asker.ts'
 import { byAgent } from './organize.ts'
 import { typedTool } from './typed-tool.ts'
 
@@ -231,10 +232,11 @@ const routeTool = (run: RunProgram) =>
     input: RouteInput,
     output: Done,
     replay: 'safe',
-    execute: async (input, api) => {
+    execute: async (input, api, context) => {
       await run(requireResident)
       return run(
         Effect.gen(function* () {
+          yield* requireAdminTurn(api, context)
           if (input.to === 'persona' && input.persona === undefined)
             return yield* new InvalidInput({ reason: 'source_route_persona' })
           const route = yield* routeOfAsked(askedOf(input))
@@ -249,12 +251,15 @@ const routeTool = (run: RunProgram) =>
     },
     text: ({ summary }) => `${summary}. The owner can undo it from Activity.`,
     details: () => ({ kind: 'organize' }),
+    failure: adminOnly("where a Source's conversations go"),
   })
 
 /**
  * goblin proposes Sources and shows and changes their routes on the owner's direct request (ADR 0066):
  * `source_propose` drafts a setup the owner confirms, `source_routes` lists each Source's conversations and where they
- * go, `source_route` sets one with an organizing receipt the owner can undo. A Persona's fork has none of them.
+ * go, `source_route` sets one with an organizing receipt the owner can undo. A Persona's fork has none of them. A route
+ * takes an admin (ADR 0093), so `source_route` refuses on a member's turn (ADR 0099); proposing does not, since
+ * confirming takes one.
  */
 export function sourcesExtension(run: RunProgram) {
   return defineExtension({

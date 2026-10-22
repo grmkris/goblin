@@ -89,8 +89,8 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0095](0095-the-owners-subscription-workspace-takes-no-members.md) | The owner's subscription workspace takes no members | Accepted |
 | [0096](0096-a-source-configures-itself-from-its-servers-guide.md) | A Source configures itself from its server's guide | Accepted |
 | [0097](0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md) | One /mcp reaches the workspaces its consent chooses | Accepted |
-| [0098](0098-admin-for-configuration-and-every-mcp-power-opt-in.md) | Admin for configuration on every surface; every MCP power is opt-in | Accepted; its gap on the agent's own tools is 0099 |
-| [0099](0099-a-members-turn-gets-a-members-tools.md) | A member's turn gets a member's tools | Proposed (not built); would amend 0098 |
+| [0098](0098-admin-for-configuration-and-every-mcp-power-opt-in.md) | Admin for configuration on every surface; every MCP power is opt-in | Accepted; amended by 0099 |
+| [0099](0099-a-members-turn-gets-a-members-tools.md) | A member's turn gets a member's tools | Accepted; built; amends 0098 |
 | [0100](0100-a-persona-thinks-at-its-own-level.md) | A Persona thinks at its own level | Accepted |
 | [0101](0101-a-persona-forks-mcp-tools-are-its-own.md) | A Persona fork's MCP tools are its own | Accepted; amended by 0102 |
 | [0102](0102-native-tools-are-a-personas-choice.md) | Native tools are a Persona's choice | Accepted |

@@ -8,6 +8,7 @@ import { problemText } from '../agent-apps/queue.ts'
 import { ScriptResult, runScript } from '../agent-apps/script.ts'
 import { withContext } from './context-tail.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
+import { adminOnly, requireAdminTurn } from './asker.ts'
 import { reportAndRecover } from '../observability/report.ts'
 import { Setups } from '../setup/service.ts'
 import { newAppJoinsTopic } from '../topics/program.ts'
@@ -82,7 +83,8 @@ const buildTool = (apps: AgentApps, run: RunProgram) =>
     }),
     output: BuildResult,
     replay: 'safe',
-    execute: async (request, api) => {
+    execute: async (request, api, context) => {
+      await run(requireAdminTurn(api, context))
       const session = String(api.conversationId)
       const built = await apps.build(request, { session, callId: api.callId })
       // A new app joins a Topic that lists its apps; failing that leaves the build as it is, and the owner can add it.
@@ -94,7 +96,7 @@ const buildTool = (apps: AgentApps, run: RunProgram) =>
         )
       return built
     },
-    failure: problemText,
+    failure: adminOnly('apps', problemText),
   })
 
 /** `app_inspect`: an app's version, members and, on request, its source, state, events and releases. */
@@ -111,15 +113,18 @@ const inspectTool = (apps: AgentApps) =>
   })
 
 /** `app_rollback`: an earlier release active again. */
-const rollbackTool = (apps: AgentApps) =>
+const rollbackTool = (apps: AgentApps, run: RunProgram) =>
   typedTool({
     name: 'app_rollback',
     description: 'Make an earlier release of an app active again (app_inspect with "releases" lists them).',
     input: Schema.Struct({ app: AppName, release: Schema.String.check(Schema.isMaxLength(40)) }),
     output: RolledBack,
     replay: 'safe',
-    execute: async ({ app, release }) => apps.rollback(app, release),
-    failure: problemText,
+    execute: async ({ app, release }, api, context) => {
+      await run(requireAdminTurn(api, context))
+      return apps.rollback(app, release)
+    },
+    failure: adminOnly('apps', problemText),
   })
 
 /** `code_run`: one-off JavaScript over the owner's files. */
@@ -138,13 +143,14 @@ const codeTool = (apps: AgentApps) =>
 
 /**
  * Owner app management, on main and threads (ADR 0021). Without Dynamic Workers (`buildable` false, ADR 0064) no app
- * can be built or run, so there is none.
+ * can be built or run, so there is none. Changing an app takes an admin (ADR 0093), so building and rolling back refuse
+ * on a member's turn (ADR 0099).
  */
 export function appsExtension(apps: AgentApps, run: RunProgram, buildable = true) {
   const extension = defineExtension({
     name: 'goblin.apps',
     sections: [section('apps', () => GUIDE)],
-    tools: [docsTool(apps), buildTool(apps, run), inspectTool(apps), rollbackTool(apps)],
+    tools: [docsTool(apps), buildTool(apps, run), inspectTool(apps), rollbackTool(apps, run)],
   })
   return buildable ? [extension] : []
 }

@@ -102,6 +102,22 @@ describe('a Persona thinks at its own level (ADR 0100)', () => {
   })
 })
 
+describe('a receipt keeps who asked, by role (ADR 0099)', () => {
+  it('keeps every receipt, which names no role until a member admits one', () => {
+    const { sqlite, rest } = before('20261022160000_asker_role')
+    sqlite.exec(
+      "INSERT INTO app_chat_operations (chat_id, operation_id, session_id, admitted_at, kind, origin, state) VALUES ('1', 'op', '41', 1, 'send', 'owner', 'settled')",
+    )
+    rest()
+    expect(sqlite.prepare('SELECT operation_id, kind, state, role FROM app_chat_operations').all()).toEqual([
+      { operation_id: 'op', kind: 'send', state: 'settled', role: null },
+    ])
+    sqlite.exec("UPDATE app_chat_operations SET role = 'member'")
+    expect(() => sqlite.exec("UPDATE app_chat_operations SET role = 'guest'")).toThrow(/CHECK/u)
+    sqlite.close()
+  })
+})
+
 describe('fresh application baseline', () => {
   it('creates exactly the live application tables and declares its complete ownership', async () => {
     const sqlite = database()
@@ -120,6 +136,7 @@ describe('fresh application baseline', () => {
       '20261022120000_persona_thinking',
       '20261022130000_persona_tools',
       '20261022150000_persona_tool_mode',
+      '20261022160000_asker_role',
     ])
     // An additive migration that alters a table names it too, so a table may be named more than once.
     const owned = [...new Set(MIGRATIONS.flatMap((migration) => migration.tables))]

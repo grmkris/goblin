@@ -1,7 +1,7 @@
 # ADR 0099: A member's turn gets a member's tools
 
-Status: Proposed 2026-10-22, not built. It would amend ADR 0098, whose admin rule holds on the web and on `/mcp` but
-not yet for what the agent does on a member's turn.
+Status: Accepted 2026-10-22; built. It amends ADR 0098, whose admin rule held on the web and on `/mcp` but not yet for
+what the agent does on a member's turn.
 
 ## Context
 
@@ -23,7 +23,7 @@ What limits it today:
 - When this was written, no workspace on prod had a plain member: the deployment owner's subscription workspace takes
   none (ADR 0095), and the people invited elsewhere are admins.
 
-## Decision (proposed)
+## Decision
 
 The asker's role travels with the turn. When a member's message is accepted, its submission's receipt in
 `app_chat_operations` records the member's role, through a forward agent-storage migration. A turn from a Source, a
@@ -43,3 +43,19 @@ not the submission whose run it serves. The spike checks whether Pi's run for th
   owner's call.
 - The roles test (`test/http/api/roles.test.ts`) covers only endpoints. Building this adds a matching test for the agent
   tools.
+
+## Built
+
+- Every admission records the role of the member whose request it came in, in `ChatOperations.record`
+  (`chats/operations.ts`, through `requestRole` in `keys/policy.ts`) rather than at each caller: the `role` column of
+  `app_chat_operations`, added by the forward migration `20261022160000_asker_role`. A Source's, a routine's, a server
+  key's and the system's work records none, and a member's replay of an operation id marks it theirs.
+- A tool finds who asked through its own call (`pi/asker.ts`): Pi's `pi.live` document gives the run's input
+  submissions, each one's request id its operation (a Persona's turn, the operation that tagged it), and a receipt among
+  them marked `member` makes it a member's turn. That holds for the run's first input and for one steered in later, so
+  a run that batched an owner's and a member's input is a member's. No live run, or no marked receipt, refuses nothing.
+- `requireAdminTurn` refuses with `Forbidden` (`role`) and `adminOnly` gives the model the words. `test/asker.test.ts`
+  pins the tools, and the workerd members case refuses a member's `persona_create`, `app_build` and `app_rollback` and
+  makes the owner's Persona.
+- Not covered: a member's reply to a Persona's hold (`POST /api/personas/reply`) admits no receipt, so the resumed fork,
+  which keeps `app_build` and `app_rollback`, does not see it as a member's turn.

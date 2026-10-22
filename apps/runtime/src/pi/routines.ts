@@ -1,4 +1,5 @@
 import { defineExtension, section } from '@earendil-works/pi-durable'
+import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import {
   PersonaName,
@@ -11,6 +12,7 @@ import {
 } from '@goblin/contracts'
 import { changeRoutine, proposeAsked, routinesList } from '../routines/program.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
+import { adminOnly, requireAdminTurn } from './asker.ts'
 import { typedTool } from './typed-tool.ts'
 
 const operationOf = (api: { readonly conversationId: unknown; readonly callId: string }) =>
@@ -49,14 +51,20 @@ const proposeTool = (run: RunProgram) =>
     input: Asked,
     output: Proposed,
     replay: 'safe',
-    execute: async (asked, api) => {
-      const draft = await run(proposeAsked(asked, operationOf(api), String(api.conversationId)))
+    execute: async (asked, api, context) => {
+      const draft = await run(
+        Effect.andThen(
+          requireAdminTurn(api, context),
+          proposeAsked(asked, operationOf(api), String(api.conversationId)),
+        ),
+      )
       return { routineId: draft.id, revision: draft.revision, title: draft.definition.title }
     },
     text: ({ title, revision }) =>
       `Proposed routine "${title}", revision ${String(revision)}. The owner must review and confirm it in Work → Routines.`,
     details: ({ routineId, revision }) => ({ kind: 'routine-proposal', routineId, revision }),
     terminate: () => true,
+    failure: adminOnly('routines'),
   })
 
 const listTool = (run: RunProgram) =>
@@ -76,11 +84,20 @@ const pauseTool = (run: RunProgram) =>
     input: Schema.Struct({ id: Schema.String.check(Schema.isMaxLength(100)), revision: Schema.Int }),
     output: RoutineView,
     replay: 'safe',
-    execute: async ({ id, revision }, api) =>
-      run(changeRoutine(id, { revision, operationId: operationOf(api) }, 'pause')),
+    execute: async ({ id, revision }, api, context) =>
+      run(
+        Effect.andThen(
+          requireAdminTurn(api, context),
+          changeRoutine(id, { revision, operationId: operationOf(api) }, 'pause'),
+        ),
+      ),
+    failure: adminOnly('routines'),
   })
 
-/** The model proposes a draft; only the authenticated owner's review may confirm it. */
+/**
+ * The model proposes a draft; only the authenticated owner's review may confirm it. Drafting and pausing take an admin
+ * (ADR 0098), so on a member's turn they refuse (ADR 0099); listing does not.
+ */
 export function routinesExtension(run: RunProgram) {
   return defineExtension({
     name: 'goblin.routines',

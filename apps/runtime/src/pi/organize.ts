@@ -21,6 +21,7 @@ import { defaultAvatar } from '../personas/registry.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { createTopic, editTopicSetup, topicNamed, updateTopic } from '../topics/program.ts'
 import { discussionSeed } from '../topics/seed.ts'
+import { adminOnly, requireAdminTurn } from './asker.ts'
 import { PiSessions, fromPi } from './sessions.ts'
 import { typedTool } from './typed-tool.ts'
 
@@ -87,10 +88,12 @@ const topicTools = (run: RunProgram) => [
     }),
     output: Done,
     replay: 'safe',
-    execute: async ({ name, brief, setup }, api) => {
+    execute: async ({ name, brief, setup }, api, context) => {
       await run(requireResident)
       const topic = await run(
         Effect.gen(function* () {
+          // A Topic is every member's to make; one with a setup takes an admin (ADR 0098), also on a member's turn.
+          if (setup !== undefined) yield* requireAdminTurn(api, context)
           const found = yield* fromPi(PiSessions.use((pi) => pi.conversation(String(api.conversationId))))
           const conversation = Option.getOrUndefined(found)
           const { operationId, ...by } = yield* byAgent(api)
@@ -106,6 +109,7 @@ const topicTools = (run: RunProgram) => [
     },
     text: said,
     details: ({ id }) => ({ kind: 'organize', topic: id }),
+    failure: adminOnly("a Topic's setup"),
   }),
   typedTool({
     name: 'topic_rename',
@@ -163,10 +167,11 @@ const setupTools = (run: RunProgram) => [
     }),
     output: Done,
     replay: 'safe',
-    execute: async ({ topic, set, add, remove }, api) => {
+    execute: async ({ topic, set, add, remove }, api, context) => {
       await run(requireResident)
       const saved = await run(
         Effect.gen(function* () {
+          yield* requireAdminTurn(api, context)
           const found = yield* topicNamed(topic)
           const edit = setupEdit(found, { set, add, remove })
           if (edit === undefined) return yield* new InvalidInput({ reason: 'setup_edit' })
@@ -177,6 +182,7 @@ const setupTools = (run: RunProgram) => [
     },
     text: said,
     details: ({ id }) => ({ kind: 'organize', topic: id }),
+    failure: adminOnly("a Topic's setup"),
   }),
 ]
 
@@ -220,10 +226,11 @@ const personaTools = (run: RunProgram) => [
     }),
     output: Done,
     replay: 'safe',
-    execute: async ({ name, role, instructions, model, setup }, api) => {
+    execute: async ({ name, role, instructions, model, setup }, api, context) => {
       await run(requireResident)
       const persona = await run(
         Effect.gen(function* () {
+          yield* requireAdminTurn(api, context)
           const { operationId, ...by } = yield* byAgent(api)
           const definition = {
             name,
@@ -240,6 +247,7 @@ const personaTools = (run: RunProgram) => [
     },
     text: said,
     details: ({ id }) => ({ kind: 'organize', persona: id }),
+    failure: adminOnly('Personas'),
   }),
   typedTool({
     name: 'persona_update',
@@ -256,10 +264,11 @@ const personaTools = (run: RunProgram) => [
     }),
     output: Done,
     replay: 'safe',
-    execute: async ({ persona, ...change }, api) => {
+    execute: async ({ persona, ...change }, api, context) => {
       await run(requireResident)
       const updated = await run(
         Effect.gen(function* () {
+          yield* requireAdminTurn(api, context)
           const found = yield* personaNamed(persona)
           return yield* updatePersona(found.id, { ...change, expectedRevision: found.revision }, yield* byAgent(api))
         }),
@@ -268,13 +277,15 @@ const personaTools = (run: RunProgram) => [
     },
     text: said,
     details: ({ id }) => ({ kind: 'organize', persona: id }),
+    failure: adminOnly('Personas'),
   }),
 ]
 
 /**
  * Goblin organizes the workspace on the owner's direct request (ADR 0033): create, rename and archive Topics, change a
  * Topic's setup (ADR 0040), create and update Personas. Every change writes an organize receipt (actor `agent`) the owner can undo from Activity. A tool
- * call that runs twice finds the receipt it made.
+ * call that runs twice finds the receipt it made. A setup and a Persona take an admin (ADR 0098), so on a member's turn
+ * those tools refuse (ADR 0099).
  */
 export function organizeExtension(run: RunProgram) {
   return defineExtension({

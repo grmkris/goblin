@@ -16,7 +16,7 @@ import { PiSessions, fromPi } from '../pi/sessions.ts'
 import { Db } from '../runtime/db.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { SessionId, chatSession, openChatSession, topicOfChat } from './directory.ts'
-import { serverWorkIn } from '../keys/policy.ts'
+import { requestRole, serverWorkIn } from '../keys/policy.ts'
 import { epochSeconds } from '../clock.ts'
 import {
   type ReceiptChange,
@@ -34,10 +34,17 @@ const chatLock =
   <A, E, R>(chat: string, effect: Effect.Effect<A, E, R>) =>
     locks.withLock(`chat:${chat}`)(effect).pipe(Effect.withSpan('ChatOperations.withChat'))
 
-/** The receipts in the agent's SQLite (chats/receipts.ts), each read or write with the Clock's time. */
+/**
+ * The receipts in the agent's SQLite (chats/receipts.ts), each read or write with the Clock's time. Every admission
+ * records the role of the member whose request it came in (ADR 0099), here for all of them rather than at each caller:
+ * the agent's tools read it to tell a member's turn, whatever admitted it. Each role is kept, not only a member's, so a
+ * receipt tells an owner's or an admin's request from work no member sent.
+ */
 const receiptsOf = (db: Db['Service']) => ({
-  record: Effect.fn('ChatOperations.record')(function* (chat: string, operationId: string, receipt: ReceiptInput) {
+  record: Effect.fn('ChatOperations.record')(function* (chat: string, operationId: string, input: ReceiptInput) {
     const now = yield* epochSeconds
+    const role = yield* requestRole
+    const receipt = role === undefined ? input : { ...input, role }
     const admitted = yield* attemptSync(() =>
       admitReceipt(db, { chat, operationId, receipt, session: () => chatSession(db, chat), now }),
     )

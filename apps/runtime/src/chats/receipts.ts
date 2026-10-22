@@ -1,4 +1,5 @@
-import { and, asc, eq, lt, ne } from 'drizzle-orm'
+import { WorkspaceRole } from '@goblin/contracts'
+import { and, asc, eq, inArray, lt, ne } from 'drizzle-orm'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Schema from 'effect/Schema'
 import { Internal } from '../http/errors.ts'
@@ -45,6 +46,11 @@ export type ReceiptState = typeof ReceiptState.Type
 export type ReceiptInput = {
   readonly kind: OperationKind
   readonly origin: ReceiptOrigin
+  /**
+   * The role of the member whose request admitted it (ADR 0099), which tells a member's turn from an admin's; none for
+   * work no member sent: a Source's, a routine's, a server key's, the system's.
+   */
+  readonly role?: WorkspaceRole
   /** The operation this one was made by (a thread's first message by its start, a write by its turn). */
   readonly parentOp?: string
   /** The chat the operation made or reached, when that is another one (a started thread, a move's Thread). */
@@ -59,6 +65,7 @@ export type Receipt = {
   readonly admittedAt: number
   readonly kind: OperationKind
   readonly origin?: ReceiptOrigin
+  readonly role?: WorkspaceRole
   readonly targetChat?: string
   readonly parentOp?: string
   readonly state: ReceiptState
@@ -70,6 +77,7 @@ export type Receipt = {
 const KNOWN_KINDS: ReadonlySet<string> = new Set(OPERATION_KINDS)
 const isOperationKind = (value: string): value is OperationKind => value.startsWith('write:') || KNOWN_KINDS.has(value)
 const isOrigin = Schema.is(ReceiptOrigin)
+const isRole = Schema.is(WorkspaceRole)
 const isState = Schema.is(ReceiptState)
 
 /**
@@ -87,6 +95,7 @@ export const decodeReceipt = (row: Row): Receipt => {
     admittedAt: row.admittedAt,
     kind,
     ...(row.origin !== null && isOrigin(row.origin) ? { origin: row.origin } : {}),
+    ...(row.role !== null && isRole(row.role) ? { role: row.role } : {}),
     ...(row.targetChat === null ? {} : { targetChat: row.targetChat }),
     ...(row.parentOp === null ? {} : { parentOp: row.parentOp }),
     state,
@@ -141,8 +150,24 @@ export type Admission = {
 }
 
 /**
+ * Whether a member below admin asked for any of `operationIds` (ADR 0099): one of them has a receipt, in any chat, whose
+ * admission came from such a member's request.
+ */
+export function askedByMember<RunResult>(db: Database<RunResult>, operationIds: readonly string[]): boolean {
+  if (operationIds.length === 0) return false
+  const row = db
+    .select({ operationId: appChatOperations.operationId })
+    .from(appChatOperations)
+    .where(and(inArray(appChatOperations.operationId, [...operationIds]), eq(appChatOperations.role, 'member')))
+    .limit(1)
+    .get()
+  return row !== undefined
+}
+
+/**
  * Records an operation's intent in its chat before Pi sees it, in one transaction, dropping every receipt past the
- * retention but this one. A replay finds its first receipt, so it keeps its first session.
+ * retention but this one. A replay finds its first receipt, so it keeps its first session; a member's replay of an
+ * operation someone else admitted marks it as theirs, so reusing an operation id never hides who asked (ADR 0099).
  */
 export function admitReceipt<RunResult>(
   db: Database<RunResult>,
@@ -156,7 +181,14 @@ export function admitReceipt<RunResult>(
       )
       .run()
     const previous = receiptIn(db, chat, operationId)
-    if (previous !== undefined) return { session: previous.session, existing: true }
+    if (previous !== undefined) {
+      if (receipt.role === 'member' && previous.role !== 'member')
+        db.update(appChatOperations)
+          .set({ role: 'member' })
+          .where(and(eq(appChatOperations.chatId, chat), eq(appChatOperations.operationId, operationId)))
+          .run()
+      return { session: previous.session, existing: true }
+    }
     const session = admission.session()
     db.insert(appChatOperations)
       .values({
@@ -166,6 +198,7 @@ export function admitReceipt<RunResult>(
         admittedAt: now,
         kind: receipt.kind,
         origin: receipt.origin,
+        role: receipt.role ?? null,
         targetChat: receipt.targetChat ?? null,
         parentOp: receipt.parentOp ?? null,
         state: 'admitted',

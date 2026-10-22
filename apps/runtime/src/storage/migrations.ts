@@ -1,5 +1,6 @@
 import { drizzle } from 'drizzle-orm/durable-sqlite'
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator'
+import { ASKER_ROLE } from './migrations/asker-role.ts'
 import { BASELINE } from './migrations/baseline.ts'
 import { INVOCATION_REASON } from './migrations/invocation-reason.ts'
 import { KEY_REACH } from './migrations/key-reach.ts'
@@ -12,7 +13,7 @@ import { assertApplicationTable } from './vendor.ts'
 
 /**
  * The fresh application baseline, then the forward migrations production needed without a reset (ADRs 0068, 0081, 0083,
- * 0088, 0100, 0101, 0102). An edit to the baseline ships only with a disposable dev reset.
+ * 0088, 0099, 0100, 0101, 0102). An edit to the baseline ships only with a disposable dev reset.
  *
  * @internal Unit tests apply these same statements to SQLite and compare them with the live Drizzle declarations.
  */
@@ -25,6 +26,7 @@ export const MIGRATIONS = [
   PERSONA_THINKING,
   PERSONA_TOOLS,
   PERSONA_TOOL_MODE,
+  ASKER_ROLE,
 ] as const
 
 export function runApplicationMigrations(storage: DurableObjectStorage): void {
