@@ -27,7 +27,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0021](0021-agent-apps.md) | Agent apps | Accepted; amended by 0070 and 0078 |
 | [0022](0022-owner-files-shell-and-r2.md) | The owner's files, in Shell's Workspace and R2 | Accepted; amended by 0065 |
 | [0023](0023-chat-blocks-and-one-kit.md) | Chat blocks, one kit | Accepted |
-| [0024](0024-observing-conversations.md) | Observing conversations | Accepted; amended by 0084, 0086 |
+| [0024](0024-observing-conversations.md) | Observing conversations | Accepted; amended by 0084, 0086, 0107 |
 | [0027](0027-typed-tools.md) | Typed tools and one `app_call` | Accepted; amended by 0067 and 0101 |
 | [0028](0028-mcp-call-approvals.md) | Owner approval for an exact MCP call | Accepted |
 | [0029](0029-composer-commands-and-references.md) | Composer commands, references and helper execution | Accepted; amended by 0067 |
@@ -75,7 +75,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0081](0081-api-keys-and-the-same-operations-over-mcp.md) | Scoped API keys for servers, and the same operations over /mcp | Accepted; amended by 0084, 0085, 0086, 0089, 0090, 0091, 0105 |
 | [0082](0082-personas-ask-with-ask-user.md) | A tagged Persona asks with ask_user | Accepted |
 | [0083](0083-bounded-thinking-and-a-turn-that-answers.md) | Bounded thinking, and a turn that answers | Accepted; amended by 0100 |
-| [0084](0084-a-key-reads-back-what-it-made-and-how-it-ran.md) | A key reads back what it made, and how its chats ran | Accepted; amended by 0091 |
+| [0084](0084-a-key-reads-back-what-it-made-and-how-it-ran.md) | A key reads back what it made, and how its chats ran | Accepted; amended by 0091, 0107 |
 | [0085](0085-a-keys-rate-limit-is-a-fixed-minute-counted-by-its-agent.md) | A key's rate limit is a fixed minute, counted by its agent | Accepted; amended by 0086 |
 | [0086](0086-one-mcp-for-every-caller.md) | One /mcp for every caller | Accepted; amended by 0089, 0090, 0094, 0097, 0098 |
 | [0087](0087-the-owners-own-subscription-models.md) | The owner's own subscription models | Accepted; amended by 0089 |
@@ -98,3 +98,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0104](0104-routine-data-stays-as-its-producer-sent-it.md) | Routine data stays as its producer sent it | Accepted |
 | [0105](0105-a-keys-secret-rotates-in-place.md) | A key's secret rotates in place | Accepted |
 | [0106](0106-the-deploy-smoke-makes-no-model-call.md) | The deploy smoke makes no model call | Accepted |
+| [0107](0107-a-turn-says-what-it-ran-with-and-reads-as-an-opentelemetry-trace.md) | A turn says what it ran with, and reads as an OpenTelemetry trace | Accepted |
