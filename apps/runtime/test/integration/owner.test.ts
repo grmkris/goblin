@@ -32,6 +32,7 @@ import { call, lever, ownerFetch, person, signedIn, workspaceOf, type Person } f
 import { clientErrorsCase, csrfCase, internalRefusalCase } from './edge-case.ts'
 import { streamChildrenCase } from './streams-children-case.ts'
 import { streamsCase } from './streams-case.ts'
+import { publishCase } from './publish-case.ts'
 
 const harness = Test.make({
   providers: Cloudflare.providers(),
@@ -167,6 +168,11 @@ harness.test(
 harness.test(
   "native: a Persona's fork and a subagent stream into their chat under their subagentRunId, a key reads its room's fork in full, and a new reader opens with a child in flight",
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => streamChildrenCase(url)))),
+  { timeout: 240_000 },
+)
+harness.test(
+  "native: goblin's own Events consumer subscribes to goblin's conversation.updated with a key: the challenge, a signed wake within a second and an idle one, no other room, REST and MCP polls alike, retries then a gap, and terminated on revoke (ADR 0112)",
+  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => publishCase(url)))),
   { timeout: 240_000 },
 )
 harness.test(

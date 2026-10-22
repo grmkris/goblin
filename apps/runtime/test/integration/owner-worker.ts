@@ -22,6 +22,8 @@ import { ownerSend } from './probe-reads.ts'
 import { addUsage, utcDay } from '../../src/budget.ts'
 import { BACKGROUND, conversationId } from '../../src/pi/context.ts'
 import { leverChat, leverResponse } from './snapshot-lever.ts'
+import type { PublishFetch } from '../../src/publish/deliver.ts'
+import { PublishReceiver } from './publish-receiver.ts'
 
 /** Tokens the `approvals/spent` lever adds to today: more than the owner stack's daily cap (`owner-stack.ts`). */
 const SPENT_TOKENS = 1_000_000_000
@@ -33,6 +35,8 @@ export class OwnerAgent extends PersonalAgent {
   /** The move boundary at which the next move waits for `/test/move/resume`, and the phase it waits at. */
   #pauseAt: MovePhase | undefined
   #paused: { readonly phase: MovePhase; readonly resume: () => void } | undefined
+  /** The published Events' webhooks, as this harness's receiver took them (`publish-receiver.ts`). */
+  readonly #receiver = new PublishReceiver()
   protected override async moveBoundary(phase: MovePhase): Promise<void> {
     if (this.#pauseAt === phase) {
       this.#pauseAt = undefined
@@ -51,6 +55,10 @@ export class OwnerAgent extends PersonalAgent {
   override async onStart(): Promise<void> {
     await super.onStart()
     if (profileEnabled(this.env)) await permutePrimary(this.ctx.storage, this.harness)
+  }
+  /** The published Events' webhooks go to the harness's own receiver, never the network. */
+  protected override publishFetch(): PublishFetch {
+    return this.#receiver.fetch
   }
   protected override modelStreams() {
     return queueModel(this).streams
@@ -96,6 +104,7 @@ export class OwnerAgent extends PersonalAgent {
       return Response.json({ released: queueModel(this).release(input) })
     }
     if (path.startsWith('/test/rooms/')) return this.#roomsProbe(path, request)
+    if (path === '/test/publish/received') return Response.json(this.#receiver.received)
     if (path.startsWith('/test/approvals/')) return this.#approvalsLever(path, request)
     return super.onRequest(request)
   }
@@ -219,6 +228,9 @@ export default {
             () => Response.json({ restarted: true }),
           )
         return agent.fetch(new Request(`https://agent/test/rooms/${name ?? ''}`, input))
+      }
+      if (url.pathname === '/__test/publish/received') {
+        return (await leverAgent(input, env)).fetch('https://agent/test/publish/received')
       }
       if (url.pathname.startsWith('/__test/approvals/')) {
         return (await leverAgent(input, env)).fetch(`https://agent/test/approvals/${url.pathname.split('/').at(-1)}`)

@@ -35,6 +35,8 @@ export const ownerStack = (name: string, offset: number) =>
           DAILY_TOKEN_CAP: '1000000',
           MCP_SERVERS: '[{"connectionId":"apps-fixture","endpoint":"https://apps-fixture.test/mcp"}]',
           CREDENTIAL_KEY: 'Z29ibGluLXRlc3QtZml4dHVyZS1rZXkhISEhISEhISE=',
+          // A published Events delivery is retried within seconds, so giving up is seen (`publish-case.ts`).
+          PUBLISH_RETRY_MS: '100',
         },
       })
       return { url: worker.url.as<string>() }
