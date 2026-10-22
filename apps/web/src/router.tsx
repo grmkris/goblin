@@ -3,6 +3,8 @@ import { createRouter } from '@tanstack/react-router'
 import { makeQueryClient } from './lib/query/api-query.ts'
 import { ReportedRouteError } from './lib/query/route-error.tsx'
 import { reportUnexpected } from './lib/unexpected.ts'
+// Read before the router exists: it rewrites the consent page's signed query (`signed-query.ts`).
+import './lib/signed-query.ts'
 import { workspaceRewrite } from './lib/workspace-path.ts'
 import { routeTree } from './routeTree.gen'
 
