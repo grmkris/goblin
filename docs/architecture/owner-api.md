@@ -64,6 +64,7 @@ messages carry `[from server <key name>]` (ADR 0108); an OAuth client reaches wh
 | --- | --- | --- |
 | `conversations` | `/conversations`, `/conversations/:id`, and under it `messages`, `threads`, `move`, `stop`, `queue`, `read`, `composer`, `history` (older pages, as AG-UI messages), `entries`, `sources`, `stream` (its AG-UI events as server-sent events, every one to every reader that reaches the chat, [chat streams](streams.md)) | `chats/api.ts` |
 | `inspect` | `GET /inspect/conversations`, `/inspect/conversation`, `/inspect/turns`, `/inspect/turn`, `/inspect/problems`, `/inspect/flows`, `/inspect/details` | `inspect/api.ts` |
+| `events` | `GET /events`, `POST /events/subscribe`, `/events/unsubscribe`, `/events/poll` ([published events](published-events.md), scope `conversations`, ADR 0112) | `publish/api.ts` |
 | `topics` | `/topics`, `/topics/:id`, `/topics/:id/setup` | `topics/api.ts` |
 | `setup` | `GET /setup/catalog` | `setup/api.ts` |
 | `personas` | `/personas`, `/personas/:id` | `personas/api.ts` |
@@ -97,7 +98,9 @@ locations and never its message. The Worker's own routes (`/mcp`'s failures asid
 Callers that are not the owner's browser reach the agent through its internal API (`InternalApi`, `/internal`, exported
 only from `@goblin/contracts/internal`), which the Worker calls on the agent's stub with a typed client
 (`inbound/client.ts`) after its own check of the caller (a bearer token, a hook's route token, a file link's token):
-`ask`, `recent` and `inspect` (inbound `/mcp`), `mcpEvents` (the Events hook) and `linkedFile` (a file link, ADR 0070). Its gate (`InternalGate`, `http/api/middleware.ts`)
+`ask`, `recent` and `inspect` (inbound `/mcp`), `mcpEvents` (the Events hook), `linkedFile` (a file link, ADR 0070) and
+`publish.terminate` (`POST /internal/publish/terminate`, ADR 0112), which the account API calls before it revokes,
+rotates or narrows a key, or revokes an OAuth client, so the holder's Events leases end with `terminated` first. Its gate (`InternalGate`, `http/api/middleware.ts`)
 refuses a request carrying the owner forward's mark; it never grants resident authority. One Durable Object RPC
 method remains, `deleteAgentData` (account deletion): Workers RPC drops custom error classes, so it returns an encoded
 `RpcResult` (`http/rpc.ts`) that the Worker unwraps.

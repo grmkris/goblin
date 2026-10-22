@@ -1,5 +1,8 @@
 # MCP Events
 
+goblin as an Events client: what it consumes from the servers it connects. What it publishes for others, the
+`conversation.updated` wake, is [published events](published-events.md) (ADR 0112).
+
 Any connected server that advertises Events can offer streams for Sources, routines and skill invalidation.
 Selectors are granted explicitly; a server name or a subscription already in use grants nothing. Sources carry
 messages and answers through owner-reviewed mappings ([sources.md](sources.md), ADRs 0066, 0069).

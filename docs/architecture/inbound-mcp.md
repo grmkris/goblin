@@ -60,6 +60,14 @@ Code, claude.ai, Cursor) or a server's API key.
   | `inspect` | `inspect_turns`, `inspect_turn`, `inspect_problems`, `inspect_flows`, `inspect_details` | both |
   | `transcripts` | `inspect_conversations`, `inspect_conversation` | OAuth clients |
 
+- **Events.** A caller holding `conversations` is also an Events client of goblin's ([published
+  events](published-events.md), [ADR 0112](../adr/0112-goblin-publishes-mcp-events.md)): `/mcp` declares
+  `capabilities.events` and the `io.modelcontextprotocol/events` extension to it, which the server SDK keeps on the
+  wire, and serves `events/list`, `events/subscribe`, `events/unsubscribe` and `events/poll` (`inbound/events-methods.ts`),
+  each calling its `events` endpoint as the caller, as a tool does; `events/stream` answers -32014. A client that names
+  its workspace names it inside `arguments`. The methods are not tools: the parity test holds tools and methods
+  together to the annotated endpoints. Revoking a client ends its leases first, in every workspace it reached.
+
 - **Reach.** An OAuth client acts as the person who consented (`ownerCall` forwards them as its member), with the
   owner's reach in that one workspace: every Topic, chat and Persona, those the workspace's keys made included. A key
   belongs to one workspace and reaches only what it made there (below). A message an OAuth client sends into
@@ -82,7 +90,9 @@ A server the owner runs uses an API key instead of a session ([ADR 0081](../adr/
 The owner makes one in Settings: a name, its scopes (`topics`, `conversations`, `personas`, `inspect`), the connected
 MCP servers its setups may name, and a lifetime of at most a year. Change scopes on a key gives it other scopes later
 (`PATCH /api/keys/:keyId`, [ADR 0084](../adr/0084-a-key-reads-back-what-it-made-and-how-it-ran.md)): the same key, so it
-keeps what it made, and the change is logged as one `api_key` line. Rotate secret gives a key a new secret
+keeps what it made, and the change is logged as one `api_key` line. A key that follows its rooms subscribes to their
+`conversation.updated` wakes instead of polling ([published events](published-events.md), ADR 0112); revoking or
+rotating it, or a change of scopes that drops `conversations`, ends its leases first, each told `terminated`. Rotate secret gives a key a new secret
 (`POST /api/keys/:keyId/rotate`, [ADR 0105](../adr/0105-a-keys-secret-rotates-in-place.md)), shown once: the same key,
 with its scopes, servers, origins, expiry and reach, and the old secret is refused at once. Better Auth's `apiKey()`
 plugin keeps it hashed in the auth D1 (`auth/api-keys.ts`); its own routes are not served. The owner may also grant it

@@ -23,6 +23,7 @@
 | Agent DO SQLite | `cf_workspace_app_<name>` | Shell: each agent app's own files. |
 | Agent DO SQLite | `app_registry` | Drizzle: every App the workspace shows, by source: an MCP App per Pi session and call, with logical `chat_id` placement, an agent app per name (ADRs 0020, 0021, 0030). |
 | Agent DO SQLite | `app_run_events` | Drizzle: the run ledger, turns, model attempts and tool calls without content, 30 days (ADR 0024). |
+| Agent DO SQLite | `app_publish_position`, `app_publish_journal`, `app_publish_dirty`, `app_publish_subscriptions`, `app_publish_deliveries` | Drizzle (`storage/publish.ts`): the Events goblin publishes, their journal (seven days) and its position, the chats waiting to be looked at, integrators' leases with sealed secrets, and the deliveries owed to them (ADR 0112), added by the forward migration `20261022230000_publish`. |
 | D1 `goblinAuth` | `user`, `session`, `account`, `verification`, `jwks`, `rateLimit`, `oauth*`, `apikey`, `organization`, `member`, `invitation` | Better Auth, `apps/runtime/migrations/` (`0002_workspaces.sql`: the workspaces, their members and invitations, ADRs 0089, 0093). |
 
 The auth D1 migrations hold the current schema: the withdrawn billing and wallet tables are absent.

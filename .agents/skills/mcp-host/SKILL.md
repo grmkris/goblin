@@ -58,6 +58,14 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   which goblin declares too (ADR 0041). Signed controls have separate schemas; payloads never grant or become
   instructions. Each subscription generation adds an opaque random `goblin_generation` query value to the connection's
   authenticated hook path. The marker grants nothing; it keeps an old subscribe or unsubscribe from changing a replacement.
+- goblin also publishes Events (`publish/`, ADR 0112, [published events](../../../docs/architecture/published-events.md)):
+  one thin `conversation.updated` wake (`{ chat, topic, entry, activity, attention }`, never content), served as the
+  owner API's `events` group and on `/mcp` (`inbound/events-methods.ts`, which declares `capabilities.events` and the
+  extension to a caller holding `conversations`). What a wake says is pure (`publish/payload.ts`), apart from the
+  journal and fan-out that take it (`publish/journal.ts`); a key's leases reach only its rooms. Leases are verified by
+  a signed challenge outside any transaction; deliveries are claimed, sent through `publishFetch` and settled under
+  their claim, never inside a transaction. The account API ends a holder's leases (`/internal/publish/terminate`)
+  before it revokes, rotates or narrows a key or revokes a client; keep that ahead of any new way access ends.
 - Sources (`sources/`, ADRs 0066, 0069) are how any server's events carry the owner's own messages: an owner-confirmed setup
   of JSON pointers and whole-value argument templates (`SourceSetup`), never a server's name. Confirmation grants the
   wake selector and the read and reply tools, subscribes `source:<id>` (handler `source-wake`) and binds the Source to

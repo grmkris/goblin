@@ -36,6 +36,9 @@ through `promiseWith` (`runtime/boundary.ts`).
   module-level mutable state in the object's code. Work that outlives its caller is finite: no loops or timers meant
   to outlive the object.
 - Alarm and schedule callbacks are one-line delegations into their area's `wake.ts`; the Agents SDK calls them by name.
+  `#scheduleWake` keeps one earliest wake per callback (`mcpEventsWake`, `routinesWake`, `publishWake` for the Events
+  goblin publishes, ADR 0112), and `onStart` arms each again after a restart. Outbound webhooks leave through an
+  overridable port (`publishFetch`), as MCP does (`mcpFetch`); the harness points it at its own receiver.
 - Inbound user authentication, the agent's resident authority and outbound MCP authorization are three separate
   things. Check them at the boundary that owns them.
 - Conversation routes carry stable logical chat ids. Resolve a chat through `Chats` before reaching Pi, and admit owner,

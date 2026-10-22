@@ -35,6 +35,8 @@ flowchart LR
 - [Models](architecture/models.md): model calls and daily token usage.
 - [Authority and inbound MCP](architecture/inbound-mcp.md): resident authority and goblin as an MCP server.
 - [MCP Events](architecture/events.md): signed subscriptions, consumers and the event picker.
+- [Published events](architecture/published-events.md): `conversation.updated`, the Events goblin publishes for
+  integrators, by signed webhook or poll.
 - [Sources](architecture/sources.md): any connection's events as the owner's own messages, routed to Topics and answered
   back.
 - [Run ledger](architecture/observability.md): run ledger, logs, failures and inspection.
