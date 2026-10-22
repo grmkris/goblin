@@ -83,6 +83,8 @@ const piConversation = {
 }
 /** The cheap model's answer, and how many times it was asked. */
 const model = { answer: '{"action":"none"}', calls: 0 }
+/** The Pi sessions that work in a room (ADR 0108). */
+let rooms = new Set<string>()
 
 const state = new MemorySkillState()
 const credentials = new MemoryCredentials()
@@ -113,6 +115,7 @@ const learnerAt = () => {
           drafts,
           state,
           skills: skillsService,
+          room: (session) => rooms.has(session),
           // The learner only calls `complete`, which this fixture answers.
           model: fake<CheapModel>({
             complete: async () => {
@@ -172,6 +175,7 @@ beforeEach(() => {
   model.calls = 0
   model.answer = '{"action":"none"}'
   drafts = new MemoryDraftLog()
+  rooms = new Set()
   state.setEnabled('lib', true)
   exchange = [
     { role: 'user', text: 'Do the weekly review.' },
@@ -186,6 +190,14 @@ afterEach(async () => {
 })
 
 describe('the skill learner (unit)', () => {
+  it("never drafts from a room's conversation, and never asks the model there (ADR 0108)", async () => {
+    model.answer = NEW_SKILL
+    rooms.add(String(MAIN))
+    expect(await consider(MAIN)).toBe('skipped')
+    expect(model.calls).toBe(0)
+    expect(owner.files.size).toBe(0)
+  })
+
   it('observes malformed model replies as failed without exposing the reply or holding up the answer', async () => {
     model.answer = 'private malformed model reply, with no decision JSON'
     const outcomes: LearnOutcome[] = []

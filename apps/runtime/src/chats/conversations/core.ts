@@ -1,11 +1,11 @@
-import type { Extension, ToolRegistration } from '@earendil-works/pi-durable'
+import type { Extension } from '@earendil-works/pi-durable'
 import type { ConversationView } from '@goblin/contracts'
 import type { PiHarness } from 'agents/harness/pi'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { connectionLabels, labelled, storedAsks } from '../../attention.ts'
-import { type PiTools, piToolsFor } from '../../setup/scope.ts'
+import { type PiTools, type ToolSets, piToolsFor } from '../../setup/scope.ts'
 import { type AppError, InvalidInput, NotFound, attempt, attemptSync } from '../../http/errors.ts'
 import { BACKGROUND } from '../../pi/context.ts'
 import { PiSessions, fromPi } from '../../pi/sessions.ts'
@@ -26,8 +26,8 @@ export const labelOf = (row: StoredChat): string =>
 
 /**
  * What every part of the registry works with, made once by its layer: the agent's database and Pi, the change bus,
- * the thread extensions and subagent tools a new thread is configured with, and each chat's reply tally, which the
- * registry keeps for as long as the agent is awake.
+ * the thread extensions and the tool sets a new thread's filter removes (ADR 0108), and each chat's reply tally, which
+ * the registry keeps for as long as the agent is awake.
  */
 export type RegistryCore = {
   readonly db: Db['Service']
@@ -37,14 +37,14 @@ export type RegistryCore = {
   readonly changes: Changes['Service']
   readonly thread: Extension
   readonly recall: Extension
-  readonly subagentTools: readonly ToolRegistration[]
+  readonly toolSets: ToolSets
   readonly replies: ReplyLedger
 }
 
 /** The registry's core over the agent's services and instance input. */
 export const makeRegistryCore: Effect.Effect<RegistryCore, never, Db | PiSessions | Changes | AgentInput> = Effect.gen(
   function* () {
-    const { harness, thread, memory, subagentTools } = yield* AgentInput
+    const { harness, thread, memory, toolSets } = yield* AgentInput
     return {
       db: yield* Db,
       pi: yield* PiSessions,
@@ -52,7 +52,7 @@ export const makeRegistryCore: Effect.Effect<RegistryCore, never, Db | PiSession
       changes: yield* Changes,
       thread,
       recall: memory.recall,
-      subagentTools,
+      toolSets,
       replies: new ReplyLedger(),
     }
   },
@@ -114,9 +114,8 @@ export const describe = Effect.fn('Conversations.describe')(function* (core: Reg
   } satisfies ConversationView
 })
 
-/** Pi's tool filter for a new conversation that works like `chat` (its subagent switch). */
-export const piTools = (core: RegistryCore, chat: string) =>
-  attemptSync(() => piToolsFor(core.db, core.subagentTools, chat))
+/** Pi's tool filter for a new conversation that works like `chat` (its subagent switch, and whether it is a room). */
+export const piTools = (core: RegistryCore, chat: string) => attemptSync(() => piToolsFor(core.db, core.toolSets, chat))
 
 /** A new top-level Pi session (not a fork) with `extensions` added and `like`'s tool filter, or `tools` given. */
 export const newSession = Effect.fn('Conversations.newSession')(function* (

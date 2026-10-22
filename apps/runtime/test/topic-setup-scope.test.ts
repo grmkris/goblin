@@ -1,8 +1,11 @@
 import { EVERYTHING, type TopicSetup } from '@goblin/contracts'
+import { Type } from '@earendil-works/pi-ai'
+import { defineTool } from '@earendil-works/pi-durable'
 import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it } from 'vitest'
 import { openAsks } from '../src/attention.ts'
-import { chatScope, piToolsFor, routinesOutside, sessionScope } from '../src/setup/scope.ts'
+import { type ToolSets, chatScope, piToolsFor, routinesOutside, sessionScope } from '../src/setup/scope.ts'
+import { recordReach } from '../src/keys/reach.ts'
 import { outsideScopeResult } from '../src/pi/setup.ts'
 import { appPersonaChats } from '../src/storage/personas.ts'
 import { appRoutineRuns, appRoutines } from '../src/storage/routines.ts'
@@ -221,10 +224,60 @@ describe("a chat's scope follows its Topic's setup (ADR 0040)", () => {
 
   it("removes the subagent tools from Pi where the Topic's setup does not allow subagents", () => {
     const { db } = fixture()
-    // SAFETY: the filter only passes the registrations through; no member of one is read.
-    const tools = [{ name: 'subagent_spawn' }] as never
-    expect(piToolsFor(db, tools, '1')).toBeNull()
-    expect(piToolsFor(db, tools, '21')).toEqual({ remove: tools })
+    const sets = toolSets()
+    expect(piToolsFor(db, sets, '1')).toBeNull()
+    expect(piToolsFor(db, sets, '21')).toEqual({ remove: sets.subagents })
+  })
+})
+
+/** A registration whose name alone the filter reads. */
+const named = (name: string) =>
+  defineTool({ name, description: '', parameters: Type.Object({}), execute: async () => ({ output: [] }) })
+
+/** The tool sets a filter removes. */
+const toolSets = (): ToolSets => ({
+  subagents: [named('subagent_spawn')],
+  room: [named('subagent_spawn'), named('files_list'), named('topic_create')],
+})
+
+/** The fixture with Topic 2 made by a key, and with subagents and an app in its setup all the same. */
+const room = () => {
+  const made = forks()
+  made
+    .update(appTopics)
+    .set({ setup: storedSetup({ ...WORK, subagents: true }) })
+    .where(eq(appTopics.id, 2))
+    .run()
+  recordReach(made, { keyId: 'key-1', name: 'swarmm' }, 'topic', 2, 1)
+  return made
+}
+
+describe('a Topic a key made is a room (ADR 0108)', () => {
+  it('is the place of every chat under it: its Conversation, threads, subagents, Persona forks and routine runs', () => {
+    const db = room()
+    for (const chat of ['20', '21', '22', '23', '24', '25']) expect(chatScope(db, chat).room, chat).toBe(2)
+    expect(sessionScope(db, 's22').room).toBe(2)
+    expect(chatScope(db, '1').room).toBeUndefined()
+  })
+
+  it('never starts subagents or uses apps there, whatever its setup holds, and keeps the rest of the setup', () => {
+    const db = room()
+    for (const chat of ['20', '21', '24']) {
+      expect(chatScope(db, chat).subagents(), chat).toBe(false)
+      expect(chatScope(db, chat).app('tracker'), chat).toBe(false)
+    }
+    expect(chatScope(db, '20').tool('notes', 'read')).toBe(true)
+    expect(chatScope(db, '24').tool('mail', 'send')).toBe(true)
+    // A routine's run keeps its own allowed tools within the room's setup.
+    expect(chatScope(db, '23').tool('notes', 'read')).toBe(true)
+    expect(chatScope(db, '23').tool('mail', 'send')).toBe(false)
+  })
+
+  it("removes from Pi every tool a room does not offer, subagents' among them; elsewhere only what it did", () => {
+    const db = room()
+    const sets = toolSets()
+    for (const chat of ['20', '21', '22']) expect(piToolsFor(db, sets, chat), chat).toEqual({ remove: sets.room })
+    expect(piToolsFor(db, sets, '1')).toBeNull()
   })
 })
 

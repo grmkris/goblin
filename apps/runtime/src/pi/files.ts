@@ -25,6 +25,8 @@ const GUIDE = [
 
 const Path = Schema.String.check(Schema.isMaxLength(512))
 
+const FILE_TOOLS: readonly string[] = ['files_list', 'files_read', 'files_write', 'file_link', 'files_delete']
+
 /** A part of a text file and where the next part starts, or the entry of a file whose bytes are not text. */
 const FilePart = Schema.Struct({
   entry: FileEntry,
@@ -49,7 +51,12 @@ const FileLink = Schema.Struct({
 export function filesExtension(run: RunProgram) {
   return defineExtension({
     name: 'goblin.files',
-    sections: [section('files', () => GUIDE)],
+    // Only where the tools are offered: a room has them filtered out (ADR 0108).
+    sections: [
+      section('files', (input) =>
+        input.agent.tools.some((offered) => FILE_TOOLS.includes(offered.name)) ? GUIDE : undefined,
+      ),
+    ],
     tools: [
       typedTool({
         name: 'files_list',

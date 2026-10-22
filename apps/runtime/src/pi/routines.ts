@@ -101,11 +101,12 @@ const pauseTool = (run: RunProgram) =>
 export function routinesExtension(run: RunProgram) {
   return defineExtension({
     name: 'goblin.routines',
+    // Only where the tools are offered: a room has them filtered out (ADR 0108).
     sections: [
-      section(
-        'routines',
-        () =>
-          'Use routine_propose to propose a reminder, a schedule, or what happens when a connection sends an event: tell the owner (Tell me), hand the work to Goblin or a Persona (Hand to), or both. When the owner connects something that sends events, offer to set one up. The owner reviews and confirms the exact definition in Work → Routines before it can run. You may list (routine_list) or pause (routine_pause) routines; you cannot activate them.',
+      section('routines', (input) =>
+        input.agent.tools.some((offered) => offered.name === 'routine_propose')
+          ? 'Use routine_propose to propose a reminder, a schedule, or what happens when a connection sends an event: tell the owner (Tell me), hand the work to Goblin or a Persona (Hand to), or both. When the owner connects something that sends events, offer to set one up. The owner reviews and confirms the exact definition in Work → Routines before it can run. You may list (routine_list) or pause (routine_pause) routines; you cannot activate them.'
+          : undefined,
       ),
     ],
     tools: [proposeTool(run), listTool(run), pauseTool(run)],

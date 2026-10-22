@@ -26,12 +26,25 @@ import { topicSetupOf } from '../topics/setup.ts'
 import { chatOfSession, chatSession } from '../chats/directory.ts'
 import { InvalidInput } from '../http/errors.ts'
 import { definitionOf } from '../routines/store.ts'
+import { roomOf } from '../keys/reach.ts'
 
 type Kind = ExclusionTarget['kind']
 type Db = DrizzleSqliteDODatabase
 
-/** A conversation's Pi tool filter: the subagent tools removed, or none (`null` clears an inherited one). */
+/**
+ * A conversation's Pi tool filter: the subagent tools removed, or every tool a room does not offer (ADR 0108), or none
+ * (`null` clears an inherited one).
+ */
 export type PiTools = { readonly remove: readonly ToolRegistration[] } | null
+
+/**
+ * The tools Pi's filter removes: the subagent tools where subagents are off, and in a room every tool it does not offer
+ * (`pi/room.ts`, ADR 0108), the subagent tools among them. Pi stores a filter by name, so these are what it names.
+ */
+export type ToolSets = {
+  readonly subagents: readonly ToolRegistration[]
+  readonly room: readonly ToolRegistration[]
+}
 
 /** One thing switched off in a conversation, as stored: `connectionId` empty for subagents, `name` set only for a tool. */
 export type Exclusion = { readonly kind: Kind; readonly connectionId: string; readonly name: string }
@@ -63,9 +76,10 @@ export type ScopeTopic = {
  * What a chat's agent may use: its Topic's setup, narrowed by its switches and those of every spawner above a subagent,
  * and by a routine's allowed tools. The one gate every tool and section asks. It only chooses among the owner's grants,
  * which the MCP manager still checks. `editable`: the owner can act on a refusal here (not in a subagent, which follows
- * the chats above it). `topic` is the Topic whose setup bounds it.
+ * the chats above it). `topic` is the Topic whose setup bounds it. `room` is that Topic's id when it is a room (ADR
+ * 0108): the chat reaches only it, whoever writes there, and never starts subagents or uses apps.
  */
-export type SetupScope = Allow & { readonly editable: boolean; readonly topic?: ScopeTopic }
+export type SetupScope = Allow & { readonly editable: boolean; readonly topic?: ScopeTopic; readonly room?: number }
 
 /** A conversation the agent does not know may use nothing. */
 export const CLOSED: SetupScope = {
@@ -237,6 +251,7 @@ const routineScope = (db: Db, scope: SetupScope, runId: string): SetupScope => {
   return {
     editable: false,
     ...(scope.topic === undefined ? {} : { topic: scope.topic }),
+    ...(scope.room === undefined ? {} : { room: scope.room }),
     server: (id) => scope.server(id) && allowedTools.some((tool) => tool.connectionId === id),
     tool: (id, name) =>
       scope.tool(id, name) && allowedTools.some((tool) => tool.connectionId === id && tool.name === name),
@@ -302,7 +317,9 @@ const appsOffIn = (db: Db, sessions: readonly string[]): ReadonlySet<string> =>
 /**
  * The scope of a registered chat (ADR 0040): its Topic's setup, read live (joined, in a Persona's fork, with the setup
  * the ask froze), narrowed by its own switches and, for a subagent, those of every spawner above it; a routine's thread
- * is narrowed to its allowed tools as well.
+ * is narrowed to its allowed tools as well. A chat whose chain's root is in a room (ADR 0108) says so, by place and
+ * never by who writes: its Conversation, threads, subagents, Persona forks and routine runs, with subagents and apps
+ * off whatever the setup holds.
  */
 export const chatScope = (db: Db, chat: string): SetupScope => {
   const chain = chainOf(db, chat)
@@ -321,7 +338,10 @@ export const chatScope = (db: Db, chat: string): SetupScope => {
       chain.map((link) => link.session),
     ),
   )
-  const scope: SetupScope = { ...both(allow, switches), editable, topic }
+  const bound: SetupScope = { ...both(allow, switches), editable, topic }
+  const scope: SetupScope = roomOf(db, root.topicId)
+    ? { ...bound, subagents: () => false, app: () => false, room: root.topicId }
+    : bound
   return root.routineRunId === null ? scope : routineScope(db, scope, root.routineRunId)
 }
 
@@ -334,23 +354,29 @@ export const sessionScope = (db: Db, session: string): SetupScope => {
 /** App calls follow the same live chain and Topic setup as MCP and skills; routine scopes do not acquire app powers. */
 export const appAllowed = (db: Db, session: string, app: string): boolean => sessionScope(db, session).app(app)
 
-/** Pi's tool filter for `chat`: without `subagentTools` when subagents are off where it works, else none. */
-export const piToolsFor = (db: Db, subagentTools: readonly ToolRegistration[], chat: string): PiTools =>
-  chatScope(db, chat).subagents() ? null : { remove: subagentTools }
+/**
+ * Pi's tool filter for `chat`: in a room (ADR 0108) without every tool a room does not offer, else without the subagent
+ * tools when subagents are off where it works, else none.
+ */
+export const piToolsFor = (db: Db, toolSets: ToolSets, chat: string): PiTools => {
+  const scope = chatScope(db, chat)
+  if (scope.room !== undefined) return { remove: toolSets.room }
+  return scope.subagents() ? null : { remove: toolSets.subagents }
+}
 
 /**
- * What applying the switches to Pi takes: the database, the subagent tools Pi's tool filter removes where subagents
- * are off, and `retool`, which sets a Pi conversation's filter (outside any SQLite transaction).
+ * What applying the switches to Pi takes: the database, the tools Pi's tool filter removes (`ToolSets`), and `retool`,
+ * which sets a Pi conversation's filter (outside any SQLite transaction).
  */
 export type Retooling = {
   readonly db: Db
-  readonly subagentTools: readonly ToolRegistration[]
+  readonly toolSets: ToolSets
   readonly retool: (session: string, tools: PiTools) => Promise<void>
 }
 
 /** Applies `session`'s tool filter to its Pi conversation, after the switches are stored. */
-export const syncPi = async ({ db, subagentTools, retool }: Retooling, session: string): Promise<void> => {
-  await retool(chatSession(db, session), piToolsFor(db, subagentTools, session))
+export const syncPi = async ({ db, toolSets, retool }: Retooling, session: string): Promise<void> => {
+  await retool(chatSession(db, session), piToolsFor(db, toolSets, session))
 }
 
 /** Only the direct parent can configure a registered helper. Exclusions cannot widen any ancestor's ceiling. */
@@ -370,24 +396,41 @@ export const configureHelper = async (
 }
 
 /**
- * The registered chats whose Pi tool filter follows their scope: all but Persona forks and routine runs, whose filters
- * are set when they are made (a Persona's leaves out the tools it never has). A chat not registered yet (a new agent's
- * main) has nothing to apply.
+ * Whether a chat's Pi filter follows its scope: all but Persona forks and routine runs, whose filters are set when they
+ * are made (a Persona's leaves out the tools it never has).
+ */
+const followsScope = (row: { readonly role: string | null; readonly run: string | null }): boolean =>
+  row.role !== 'persona' && row.run === null
+
+/**
+ * The registered chats whose Pi tool filter follows their scope. A chat not registered yet (a new agent's main) has
+ * nothing to apply.
  */
 const filteredChats = (db: Db): readonly string[] =>
   db
     .select({ chat: appConversations.chatId, role: appConversations.role, run: appConversations.routineRunId })
     .from(appConversations)
     .all()
-    .filter((row) => row.role !== 'persona' && row.run === null)
+    .filter(followsScope)
     .map((row) => row.chat)
+
+/** Whether registered chat `chat`'s Pi filter follows its scope (`followsScope`); an unknown one's does not. */
+export const filterFollowsScope = (db: Db, chat: string): boolean => {
+  const row = db
+    .select({ role: appConversations.role, run: appConversations.routineRunId })
+    .from(appConversations)
+    .where(eq(appConversations.chatId, chat))
+    .get()
+  return row !== undefined && followsScope(row)
+}
 
 /**
  * Applies the Pi filter again to every chat of `topic` whose filter follows its scope, after its setup's subagents
- * changed (ADR 0040). One that fails to apply is left as it was; the next change applies it again.
+ * changed (ADR 0040) or it became a room (ADR 0108). One that fails to apply is left as it was; the next change, or
+ * the chat's next turn after a restart (`useRoomTools`), applies it again.
  */
 export const retoolTopic = async (retooling: Retooling, topic: number): Promise<void> => {
-  const { db, subagentTools, retool } = retooling
+  const { db, toolSets, retool } = retooling
   const inTopic = new Set(
     db
       .select({ chat: appConversations.chatId })
@@ -397,7 +440,7 @@ export const retoolTopic = async (retooling: Retooling, topic: number): Promise<
       .map(({ chat }) => chat),
   )
   for (const chat of filteredChats(db).filter((each) => inTopic.has(each)))
-    await retool(chatSession(db, chat), piToolsFor(db, subagentTools, chat))
+    await retool(chatSession(db, chat), piToolsFor(db, toolSets, chat))
 }
 
 /** The routines a setup would leave without some of their allowed tools: the ones not done, of `topic`. */

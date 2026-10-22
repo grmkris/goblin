@@ -21,7 +21,7 @@ async function helperExclusionsProbe(storage: DurableObjectStorage) {
       { chatId: '703', piSession: '703', kind: 'thread', parentSession: '702', createdAt: 1 },
     ])
     .run()
-  const retooling: Retooling = { db, subagentTools: [], retool: async () => undefined }
+  const retooling: Retooling = { db, toolSets: { subagents: [], room: [] }, retool: async () => undefined }
   const configure = (parent: string, session: string, exclusions: HelperExclusion[], now: number) =>
     configureHelper(retooling, { parent, session, exclusions }, now)
   await configure(

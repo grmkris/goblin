@@ -11,6 +11,7 @@ import {
   requestKey,
   requireAdminFor,
 } from '../keys/policy.ts'
+import { Setups } from '../setup/service.ts'
 import { createTopic, editTopicSetup, madeTopic, updateTopic } from './program.ts'
 import { Topics } from './service.ts'
 
@@ -45,6 +46,9 @@ const create = (input: CreateTopic) =>
     yield* confineSetup(keyed.setup)
     const made = yield* madeTopic(keyed, { actor: 'owner' })
     yield* claim('topic', made.topic.id, made.created)
+    // Its Conversation was opened before the claim made it a room: it now leaves out what a room does not offer. A
+    // replay applies it again, so a create that failed here puts it right.
+    yield* Setups.use((setups) => setups.retoolTopic(made.topic.id))
     return yield* Topics.use((topics) => topics.get(made.topic.id))
   })
 

@@ -1,9 +1,9 @@
-import type { Extension, ToolRegistration } from '@earendil-works/pi-durable'
+import type { Extension } from '@earendil-works/pi-durable'
 import type { PiHarness } from 'agents/harness/pi'
 import type { KeyOrigin } from '@goblin/contracts'
 import * as Context from 'effect/Context'
 import type { AgentApps } from '../agent-apps/engine.ts'
-import type { Applied } from '../agent-model.ts'
+import type { Applied, Retooled } from '../agent-model.ts'
 import type { MoverPorts } from '../chats/mover.ts'
 import type { RuntimeEnv } from '../env.ts'
 import type { PersonaTurnKit } from '../organize/kit.ts'
@@ -12,6 +12,7 @@ import type { MemoryKit } from '../pi/memory.ts'
 import type { StartRoutine } from '../pi/routine-run.ts'
 import type { SubagentKit } from '../pi/subagents.ts'
 import type { RoutineSchedules } from '../routines/scheduler.ts'
+import type { ToolSets } from '../setup/scope.ts'
 import type { RunTelemetry } from '../telemetry/events.ts'
 import type { Instrument } from './instrument.ts'
 
@@ -29,13 +30,15 @@ export interface AgentInputs {
   readonly pi: PiModels
   readonly thread: Extension
   readonly memory: MemoryKit
-  /** The subagent tools, which Pi's tool filter removes where subagents are switched off. */
-  readonly subagentTools: readonly ToolRegistration[]
+  /** What Pi's tool filter removes: the subagent tools where subagents are off, and in a room (ADR 0108). */
+  readonly toolSets: ToolSets
   readonly helperExtensions: readonly Extension[]
   readonly subagents: SubagentKit
   readonly personas: PersonaTurnKit
   /** The model each session was last put on (agent-model.ts). */
   readonly applied: Applied
+  /** The sessions whose tool filter this lifetime applied before a turn (agent-model.ts, ADR 0108). */
+  readonly retooled: Retooled
   /** The native schedules the routines arm and cancel, and their sweep's alarm (routines/wake.ts). */
   readonly routineSchedules: RoutineSchedules
   /** Starts a routine run's Pi work: the routines kit's, made before Pi opened (routines/kit.ts). */

@@ -4,7 +4,7 @@ import * as Layer from 'effect/Layer'
 import { Conversations } from '../chats/service.ts'
 import { offeredModels } from '../inference/store.ts'
 import { Memories } from '../memory/service.ts'
-import { madeByKey } from '../keys/reach.ts'
+import { roomOf } from '../keys/reach.ts'
 import { deploymentModelIds, ownerModelIds } from '../models.ts'
 import type { KeyedLock } from '../observability/lock.ts'
 import { OrganizeReceipts } from '../organize/receipts.ts'
@@ -78,7 +78,7 @@ const stores: Effect.Effect<DelegationStores, never, AgentInput | Db | Conversat
     const owned = new Set(ownerModelIds(input.env))
     const fence = {
       ownerOnly: (id: string) => owned.has(id),
-      keyTopic: (topic: number) => madeByKey(db, 'topic', topic),
+      keyTopic: (topic: number) => roomOf(db, topic),
     }
     return { topics, personas, fence, invocations: new PersonaInvocations(db), receipts } satisfies DelegationStores
   },

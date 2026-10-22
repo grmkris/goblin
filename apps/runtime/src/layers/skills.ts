@@ -9,6 +9,7 @@ import type { SingleFlight } from '../observability/single-flight.ts'
 import type { PiSessions } from '../pi/sessions.ts'
 import type { Changes } from '../runtime/changes.ts'
 import { Db } from '../runtime/db.ts'
+import { sessionScope } from '../setup/scope.ts'
 import { makeLearner } from '../skills/learner.ts'
 import { makeSkills } from '../skills/library.ts'
 import { Learner, Skills } from '../skills/service.ts'
@@ -40,6 +41,7 @@ export const LearnerLive: Layer.Layer<
       state: new SqliteSkillState(db),
       skills: yield* Skills,
       model: cheap('skill'),
+      room: (session) => sessionScope(db, session).room !== undefined,
     })
   }),
 )

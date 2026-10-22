@@ -23,6 +23,7 @@ import type { KeptAttachments } from '../pi/content.ts'
 import type { PiSessions } from '../pi/sessions.ts'
 import { writeNotice } from '../routines/notices.ts'
 import type { Changes } from '../runtime/changes.ts'
+import type { Db } from '../runtime/db.ts'
 import type { AgentInput } from '../runtime/input.ts'
 import { sourceTopicFor } from './places.ts'
 import type { SourceNotice, SourcePorts } from './types.ts'
@@ -33,6 +34,7 @@ type TopicServices = Effect.Services<ReturnType<typeof sourceTopicFor>>
 
 /** What the ports' programs read, captured once when the ports are made. */
 export type PortServices =
+  | Db
   | Chats
   | ChatOperations
   | Conversations

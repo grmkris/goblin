@@ -331,7 +331,7 @@ export const registryThreads = (core: RegistryCore, ports: ThreadPorts) => ({
   startThread: (parent: string, operationId: string, anchor: ThreadAnchor) =>
     startThread(core, ports, { parent, operationId, anchor }),
   openConversation: (subagents: boolean) =>
-    newSession(core, [], { tools: subagents ? null : { remove: core.subagentTools } }).pipe(
+    newSession(core, [], { tools: subagents ? null : { remove: core.toolSets.subagents } }).pipe(
       Effect.withSpan('Conversations.openConversation'),
     ),
   registerSubagent: (session: string, parent: string, name: string, exclusions: readonly HelperExclusion[] = []) =>

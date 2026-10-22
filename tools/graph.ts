@@ -82,6 +82,7 @@ export const nodes: readonly Node[] = [
           'src/pi/persona-turn.ts',
           'src/pi/resident-mcp.ts',
           'src/pi/retrieval.ts',
+          'src/pi/room.ts',
           'src/pi/routine-budget.ts',
           'src/pi/routine-run.ts',
           'src/pi/routines.ts',

@@ -21,7 +21,9 @@ import { serversExtension } from './pi/servers.ts'
 import { type PiModels, makePiHarness } from './pi/harness.ts'
 import { type AgentTelemetry, agentTelemetry } from './telemetry/agent.ts'
 import { LITELLM_STREAMS, makePiModels } from './pi/model.ts'
+import { askUserExtension } from './pi/ask-user.ts'
 import { personaExtension } from './pi/persona.ts'
+import { outsideRooms, roomGuardExtension, roomTools } from './pi/room.ts'
 import { type SubagentKit, subagentsExtension } from './pi/subagents.ts'
 import { threadExtension } from './pi/thread.ts'
 import { type PersonaTurnKit, organizingKit } from './organize/kit.ts'
@@ -45,13 +47,14 @@ import { budgetExtension } from './pi/budget.ts'
 import { onboardingExtension } from './pi/onboarding.ts'
 import { topicContextExtension } from './pi/topic-context.ts'
 import { retrievalExtension } from './pi/retrieval.ts'
-import { type Applied } from './agent-model.ts'
+import { type Applied, type Retooled } from './agent-model.ts'
 import { routinesExtension } from './pi/routines.ts'
 import { requireRoutine } from './routines/authority.ts'
 import { Inference, servedFailure } from './inference/service.ts'
 import type { RoutineSlot } from './routines/scheduler.ts'
 import { routineExtensions } from './routines/kit.ts'
 import type { StartRoutine } from './pi/routine-run.ts'
+import type { ToolSets } from './setup/scope.ts'
 
 type Runtime = ManagedRuntime.ManagedRuntime<AgentServices, never>
 
@@ -72,6 +75,9 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
   readonly #subagents: SubagentKit
   readonly #personas: PersonaTurnKit
   readonly #applied: Applied = new Map()
+  readonly #retooled: Retooled = new Set()
+  /** The tools Pi's filter removes where subagents are off, and in a room (ADR 0108). */
+  readonly #toolSets: ToolSets
   /** How a routine run's Pi work starts (the routines kit's, routines/kit.ts). */
   readonly #routineStart: StartRoutine
   readonly #apps: AgentApps
@@ -97,7 +103,11 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
         }),
     )
     const residentTools = residentMcpExtension(run)
-    const tools = [residentTools, budgetExtension(run)]
+    // Every conversation, helper and routine run selects the room guard (ADR 0108): in a room it refuses each tool a
+    // room does not offer, and each such tool of the agent's extensions refuses there too (`outsideRooms`).
+    const roomGuard = roomGuardExtension(run)
+    const outside = (extension: Extension) => outsideRooms(run, extension)
+    const tools = [residentTools, budgetExtension(run), roomGuard]
     this.#thread = threadExtension(run)
     this.#memory = memoryExtensions(run)
     const { memory, recall } = this.#memory
@@ -107,7 +117,8 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     const guidance = topicContextExtension(run, async (task, context) =>
       (await this.harness.pi()).abortTask(task, context),
     )
-    const routineKit = routineExtensions(run, residentTools, personas.extension, env.CREDENTIAL_KEY, guidance)
+    const every = [guidance, roomGuard]
+    const routineKit = routineExtensions(run, residentTools, personas.extension, env.CREDENTIAL_KEY, every)
     this.#routineStart = routineKit.start
     const apps = agentApps(ctx.storage, env, () => this.name, {
       schedules: this.#jobSchedules(),
@@ -123,7 +134,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       skillsExtension(run),
       filesExtension(run),
       ...(appsRun ? [appExecutionExtension(apps, run)] : []),
-    ]
+    ].map(outside)
     this.#subagents = subagentsExtension(run, (self) => [
       personaExtension,
       ...execution,
@@ -134,15 +145,20 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     const retrieval = retrievalExtension(run)
     const base = [
       ...execution,
-      skillLearningExtension(run),
-      ...appsExtension(apps, run, appsRun),
-      organize,
-      sourcesExtension(run),
-      retrieval,
-      onboardingExtension(run),
+      ...[
+        skillLearningExtension(run),
+        ...appsExtension(apps, run, appsRun),
+        organize,
+        sourcesExtension(run),
+        retrieval,
+        onboardingExtension(run),
+      ].map(outside),
     ]
-    const own = [serversExtension(run), subagents, routinesExtension(run), this.#telemetry.diagnose]
+    const own = [serversExtension(run), subagents, routinesExtension(run), this.#telemetry.diagnose].map(outside)
     const extras = [this.#thread, memory, recall, this.#personas.extension, ...routineKit.extra]
+    // In a room, Pi's filter removes every tool of the agent's a room does not offer, so a later one is left out too.
+    const room = roomTools([personaExtension, askUserExtension, ...base, ...own, ...extras, ...apps.extensions()])
+    this.#toolSets = { subagents: this.#subagents.tools, room }
     this.harness = makePiHarness(this.#pi, [...base, ...own], extras, [apps, forkTools], this.#telemetry.recorder)
     this.lifecycle.use(this.harness)
   }
@@ -190,7 +206,8 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       pi: this.#pi,
       thread: this.#thread,
       memory: this.#memory,
-      subagentTools: this.#subagents.tools,
+      toolSets: this.#toolSets,
+      retooled: this.#retooled,
       helperExtensions: this.#subagents.members(),
       workspaceId: this.name,
       scheduleEvents: (at) => this.#scheduleWake('mcpEventsWake', at),

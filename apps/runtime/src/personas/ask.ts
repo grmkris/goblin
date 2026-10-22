@@ -2,12 +2,15 @@ import type { TextContent } from '@earendil-works/pi-ai'
 import { type PersonaAskData, type PersonaRevisionView, type PersonaSetup, authorOf } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
+import { useRoomTools } from '../agent-model.ts'
 import { epochSeconds } from '../clock.ts'
 import { ChatOperations, Chats, Conversations } from '../chats/service.ts'
-import { InvalidInput, NotFound, attempt, toAppError } from '../http/errors.ts'
+import { InvalidInput, NotFound, attempt, attemptSync, toAppError } from '../http/errors.ts'
+import { roomOf } from '../keys/reach.ts'
 import { conversationId } from '../pi/context.ts'
 import { PiSessions } from '../pi/sessions.ts'
 import type { FrozenPersona } from '../pi/persona-turn.ts'
+import { Db } from '../runtime/db.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { Invocations, Personas } from './service.ts'
 
@@ -104,8 +107,10 @@ const askEntry = (
 /**
  * The owner tagged Personas (in the app, or through a Source route that a Persona answers, `from`): each
  * answers once, attributed, in this chat, and Goblin does not (ADR 0033). Admitted once per operation
- * (`ChatOperations.admit`, under the chat's lock): record who was asked, write the ask into the chat as a passive
- * `app.persona_ask` entry (no run starts) and create one Persona turn per Persona. Nothing here waits for a model.
+ * (`ChatOperations.admit`, under the chat's lock): record who was asked, put the chat's tool filter right (its first
+ * turn in this lifetime, ADR 0108; a fork copies it), write the ask into the chat as a passive `app.persona_ask` entry
+ * (no run starts) and create one Persona turn per Persona, each told in a room which tools a room does not offer.
+ * Nothing here waits for a model.
  */
 export const askPersonas = (
   input: Ask,
@@ -116,10 +121,13 @@ export const askPersonas = (
 ) =>
   Effect.gen(function* () {
     const invocations = yield* Invocations
-    const { personas } = yield* AgentInput
+    const { personas, toolSets, retooled } = yield* AgentInput
     const pi = yield* PiSessions
+    const db = yield* Db
     const now = yield* epochSeconds
-    const frozen = yield* freeze(ids, yield* (yield* Chats).topicOf(input.thread))
+    const topic = yield* (yield* Chats).topicOf(input.thread)
+    const frozen = yield* freeze(ids, topic)
+    const room = (yield* attemptSync(() => roomOf(db, topic))) ? toolSets.room.map((tool) => tool.name) : undefined
     if (frozen.length > 8) return yield* new InvalidInput({ reason: 'persona_count' })
     const admission = {
       chat: input.thread,
@@ -140,6 +148,7 @@ export const askPersonas = (
           order: index,
         }))
         yield* invocations.insert(asked, now)
+        yield* useRoomTools({ pi, db, toolSets, retooled }, input.thread, admitted.session)
         const write = { requestId: input.operationId, entry: askEntry(frozen, order, content, now) }
         const harness = yield* Effect.andThen(pi.write(admitted.session, write), pi.pi).pipe(
           Effect.catchTag('PiFailure', (failure) => Effect.fail(toAppError(failure.cause))),
@@ -152,6 +161,7 @@ export const askPersonas = (
             parent,
             personas: frozen,
             order,
+            ...(room === undefined ? {} : { room }),
           }),
         )
         return { session: admitted.session, operationId: input.operationId, accepted: true }

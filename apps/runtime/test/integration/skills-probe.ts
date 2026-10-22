@@ -228,6 +228,7 @@ export async function skillsLearnerDraftProbe(storage: DurableObjectStorage, har
           state,
           skills,
           model: new CheapModel(scripted.models, scripted.model.id, () => undefined),
+          room: () => false,
         })
         return Context.merge(Skills.context(skills), Learner.context(learner))
       }),

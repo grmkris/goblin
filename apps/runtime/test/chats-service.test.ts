@@ -130,7 +130,8 @@ const services = (calls: Calls, models = fake<Models['Service']>({ current: Effe
     fake<AgentInputs>({
       harness,
       applied: new Map(),
-      subagentTools: [],
+      toolSets: { subagents: [], room: [] },
+      retooled: new Set(),
       thread: extension,
       memory: { memory: extension, recall: extension },
       moves: { handover: async () => [] },
@@ -289,7 +290,8 @@ describe('the conversation services', () => {
       yield* operations.send(input)
       // A routine's question waiting in the chat takes `op-r` as its answer, so Pi never sees it.
       yield* operations.send({ ...input, operationId: 'op-r', answer: () => Effect.succeed(true) })
-      expect(calls).toEqual(['model:42:model-a', 'submit:42:op-1', 'submit:42:op-1'])
+      // The chat's first turn in this lifetime puts its tool filter right (ADR 0108); the next ones do not again.
+      expect(calls).toEqual(['model:42:model-a', 'configure:42', 'submit:42:op-1', 'submit:42:op-1'])
       expect(yield* operations.receipt('2', 'op-1')).toMatchObject(Option.some({ kind: 'send', state: 'submitted' }))
       expect(yield* operations.receipt('2', 'op-r')).toMatchObject(Option.some({ state: 'submitted' }))
       const refused = yield* Effect.flip(operations.send({ ...input, chat: '3', operationId: 'op-2' }))

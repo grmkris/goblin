@@ -34,14 +34,18 @@ const GUIDE = [
 
 /**
  * The apps this chat may call as they are now, for the trailing context block: they change with every build and the
- * Topic's setup (ADR 0040), the guide never does.
+ * Topic's setup (ADR 0040), the guide never does. A room (ADR 0108) lists none and says nothing of apps.
  */
-const appsNow = (apps: AgentApps, run: RunProgram, session: string): Promise<string> =>
+const appsNow = (apps: AgentApps, run: RunProgram, session: string): Promise<string | undefined> =>
   run(Setups.use((setups) => setups.scope(session))).then(
-    (scope) => apps.summary((name) => scope.app(name)) || '(none here)',
+    (scope) => (scope.room === undefined ? apps.summary((name) => scope.app(name)) || '(none here)' : undefined),
     // expected: the listing is optional context; run reported anything unexpected
     () => '(none here)',
   )
+
+/** Whether `input`'s agent is offered tool `name`: an extension's guide is said only where its tools are. */
+const offers = (input: { readonly agent: { readonly tools: readonly { readonly name: string }[] } }, name: string) =>
+  input.agent.tools.some((offered) => offered.name === name)
 
 const AppName = Schema.String.check(Schema.isMaxLength(24))
 
@@ -149,7 +153,8 @@ const codeTool = (apps: AgentApps) =>
 export function appsExtension(apps: AgentApps, run: RunProgram, buildable = true) {
   const extension = defineExtension({
     name: 'goblin.apps',
-    sections: [section('apps', () => GUIDE)],
+    // Only where the tools are offered: a room has them filtered out (ADR 0108).
+    sections: [section('apps', (input) => (offers(input, 'app_build') ? GUIDE : undefined))],
     tools: [docsTool(apps), buildTool(apps, run), inspectTool(apps), rollbackTool(apps, run)],
   })
   return buildable ? [extension] : []
@@ -160,18 +165,19 @@ export function appExecutionExtension(apps: AgentApps, run: RunProgram) {
   return defineExtension({
     name: 'goblin.app-execution',
     sections: [
-      section(
-        'code',
-        () =>
-          '`code_run` runs JavaScript over owner files. `app_call` executes approved app actions and views listed under <apps>; app powers still require owner approval.',
+      section('code', (input) =>
+        offers(input, 'code_run')
+          ? '`code_run` runs JavaScript over owner files. `app_call` executes approved app actions and views listed under <apps>; app powers still require owner approval.'
+          : undefined,
       ),
     ],
     tools: [codeTool(apps)],
     hooks: [
       hook(GenerationTask, {
-        beforeRequest: async ({ messages }, api) => ({
-          messages: withContext(messages, 'apps', await appsNow(apps, run, String(api.conversationId))),
-        }),
+        beforeRequest: async ({ messages }, api) => {
+          const listed = await appsNow(apps, run, String(api.conversationId))
+          return listed === undefined ? undefined : { messages: withContext(messages, 'apps', listed) }
+        },
       }),
     ],
   })

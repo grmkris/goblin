@@ -20,6 +20,8 @@ import { KeyedLock } from '../src/observability/lock.ts'
 import { PiSessions } from '../src/pi/sessions.ts'
 import { Db } from '../src/runtime/db.ts'
 import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
+import { fake } from './fake.ts'
+import type { RuntimeEnv } from '../src/env.ts'
 
 /** A probe's own instances, which the Source ports' programs read (sources/turns.ts). */
 type PortInstances = {
@@ -43,14 +45,19 @@ const PROBE_MODEL = {
  * (`ModelBudgetLive`, with the probe's model settings), and Pi as its sessions. Flows go to `flows`, else nowhere.
  */
 export const portServices = ({ db, harness, flows = FlowEvents.noop }: PortInstances) => {
-  // SAFETY: admission reads only Pi's harness and the models it applied from the instance input, and the model layers
-  // only the deployment's model settings and the owner; no probe sets an owner endpoint, and no routine answers.
-  const input = Layer.succeed(AgentInput, {
-    harness,
-    applied: new Map(),
-    env: PROBE_MODEL,
-    workspaceId: 'probe-owner',
-  } as AgentInputs)
+  // Admission reads only Pi's harness, the models it applied and the tool filters from the instance input, and the model
+  // layers only the deployment's model settings and the owner; no probe sets an owner endpoint, and no routine answers.
+  const input = Layer.succeed(
+    AgentInput,
+    fake<AgentInputs>({
+      harness,
+      applied: new Map(),
+      toolSets: { subagents: [], room: [] },
+      retooled: new Set(),
+      env: fake<RuntimeEnv>(PROBE_MODEL),
+      workspaceId: 'probe-owner',
+    }),
+  )
   const cipher = Layer.effect(
     Cipher,
     Effect.promise(() => CredentialCipher.fromBase64(btoa('\0'.repeat(32)))),
@@ -85,5 +92,6 @@ export const portServices = ({ db, harness, flows = FlowEvents.noop }: PortInsta
     topics,
     input,
     flows,
+    Layer.succeed(Db, db),
   )
 }

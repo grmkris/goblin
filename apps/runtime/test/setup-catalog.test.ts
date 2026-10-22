@@ -1,7 +1,7 @@
 import { type Allowed, EVERYTHING, NOTHING, type TopicSetup } from '@goblin/contracts'
 import { describe, expect, it } from 'vitest'
 import { allows, unallowed } from '../src/setup/catalog.ts'
-import { PERSONA_DENIED_TOOLS } from '../src/pi/persona-turn.ts'
+import { PERSONA_DENIED_TOOLS } from '../src/pi/persona-selection.ts'
 
 const allowed: Allowed = {
   servers: [{ connectionId: 'notes', tools: [{ name: 'read' }] }],

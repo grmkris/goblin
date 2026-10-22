@@ -15,12 +15,15 @@ export const hasReach = (db: DrizzleSqliteDODatabase, keyId: string, kind: Reach
     .where(and(eq(appKeyReach.keyId, keyId), eq(appKeyReach.kind, kind), eq(appKeyReach.resourceId, id)))
     .get() !== undefined
 
-/** Whether any server key made the `kind` with `id` (ADR 0087). */
-export const madeByKey = (db: DrizzleSqliteDODatabase, kind: ReachKind, id: number): boolean =>
+/**
+ * Whether Topic `topic` is a room (ADR 0108): a server's key made it, so every chat under it reaches only it, and its
+ * work is a server's (ADR 0087).
+ */
+export const roomOf = (db: DrizzleSqliteDODatabase, topic: number): boolean =>
   db
     .select({ keyId: appKeyReach.keyId })
     .from(appKeyReach)
-    .where(and(eq(appKeyReach.kind, kind), eq(appKeyReach.resourceId, id)))
+    .where(and(eq(appKeyReach.kind, 'topic'), eq(appKeyReach.resourceId, topic)))
     .get() !== undefined
 
 /** A key as what it made records it: its id and its name (ADR 0108). */

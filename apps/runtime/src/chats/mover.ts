@@ -1,15 +1,8 @@
-import type {
-  Conversation,
-  EntryId,
-  EntryRecord,
-  Extension,
-  Harness,
-  ToolRegistration,
-} from '@earendil-works/pi-durable'
+import type { Conversation, EntryId, EntryRecord, Extension, Harness } from '@earendil-works/pi-durable'
 import { authorOf, type MoveReceipt, type MoveToThread } from '@goblin/contracts'
 import { and, eq } from 'drizzle-orm'
 import * as Effect from 'effect/Effect'
-import { piToolsFor } from '../setup/scope.ts'
+import { type ToolSets, piToolsFor } from '../setup/scope.ts'
 import { epochSeconds } from '../clock.ts'
 import { Conflict, NotFound, attempt, attemptSync } from '../http/errors.ts'
 import { forgetFrom, rememberedThrough } from '../memory/store.ts'
@@ -92,7 +85,7 @@ type Mover = {
   readonly changes: Changes['Service']
   readonly thread: Extension
   readonly recall: Extension
-  readonly subagentTools: readonly ToolRegistration[]
+  readonly toolSets: ToolSets
   readonly ports: MoverPorts
 }
 
@@ -192,7 +185,7 @@ const fork = Effect.fn('Moves.fork')(function* (mover: Mover, pi: Harness, row: 
   const agent = {
     extensions: { add: recall ? [mover.thread, mover.recall] : [mover.thread] },
     instructions: null,
-    tools: yield* attemptSync(() => piToolsFor(db, mover.subagentTools, row.chatId)),
+    tools: yield* attemptSync(() => piToolsFor(db, mover.toolSets, row.chatId)),
   }
   const input = { operation: row.operationId, source: conversationId(source), agent }
   const forked = yield* attempt(() =>
@@ -341,7 +334,7 @@ export const moveEnd = (receipt: MoveReceipt) =>
  * call.
  */
 export const makeMoves = Effect.gen(function* () {
-  const { thread, memory, subagentTools, moves } = yield* AgentInput
+  const { thread, memory, toolSets, moves } = yield* AgentInput
   const flows = yield* FlowEvents
   const mover: Mover = {
     db: yield* Db,
@@ -351,7 +344,7 @@ export const makeMoves = Effect.gen(function* () {
     changes: yield* Changes,
     thread,
     recall: memory.recall,
-    subagentTools,
+    toolSets,
     ports: moves,
   }
   yield* Effect.forkScoped(reconcile(mover))

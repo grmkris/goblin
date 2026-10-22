@@ -5,7 +5,7 @@ import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
 import * as Option from 'effect/Option'
-import { type Applied, useModel } from '../agent-model.ts'
+import { type Applied, type Retooling, useModel, useRoomTools } from '../agent-model.ts'
 import { Budget } from '../budget.ts'
 import { type AppError, attemptSync, toAppError } from '../http/errors.ts'
 import { Models } from '../models.ts'
@@ -152,7 +152,10 @@ const admitWith =
     return flowed(flows, admission, withChat(chat, admitted)).pipe(Effect.withSpan('ChatOperations.admit'))
   }
 
-/** What an input's hand-on reads: the budget, Pi, the owner's model and whose work the chat's Topic holds. */
+/**
+ * What an input's hand-on reads: the budget, Pi, the owner's model, whose work the chat's Topic holds, and the tool
+ * filter its first turn in this lifetime applies (ADR 0108).
+ */
 type Sending = {
   readonly admit: ReturnType<typeof admitWith>
   readonly budget: Budget['Service']
@@ -160,11 +163,12 @@ type Sending = {
   readonly pi: PiSessions['Service']
   readonly applied: Applied
   readonly db: Db['Service']
+  readonly retooling: Retooling
 }
 
 /** `ChatOperations.send`: the one admission sequence of an input (ADR 0030). */
 const sendWith =
-  ({ admit, budget, models, pi, applied, db }: Sending) =>
+  ({ admit, budget, models, pi, applied, db, retooling }: Sending) =>
   <R = never>(input: Submit<R>): Effect.Effect<PiReceipt, AppError, R> =>
     Effect.gen(function* () {
       yield* budget.require(yield* epochSeconds)
@@ -175,6 +179,7 @@ const sendWith =
             return { session, operationId, accepted: true } satisfies PiReceipt
           const server = yield* serverWorkIn(db, yield* attemptSync(() => topicOfChat(db, input.chat)))
           yield* useModel(pi, applied, session, server).pipe(Effect.provideService(Models, models))
+          yield* useRoomTools(retooling, input.chat, session)
           if (relay !== undefined) return yield* relay(session)
           return yield* fromPi(pi.submit(session, content, { operationId }))
         }),
@@ -189,13 +194,14 @@ export const makeChatOperations = Effect.gen(function* () {
   const db = yield* Db
   const pi = yield* PiSessions
   const flows = yield* FlowEvents
-  const { applied } = yield* AgentInput
+  const { applied, toolSets, retooled } = yield* AgentInput
   const withChat = chatLock(yield* KeyedLock)
   const receipts = receiptsOf(db)
   const written = writeHeld(receipts, pi)
   const tracked = trackedWith(receipts)
   const admit = admitWith({ withChat, tracked, flows, requireOpen: (chat) => openChatSession(db, chat) })
-  const sending = { admit, budget: yield* Budget, models: yield* Models, pi, applied, db }
+  const retooling = { pi, db, toolSets, retooled }
+  const sending = { admit, budget: yield* Budget, models: yield* Models, pi, applied, db, retooling }
   return ChatOperations.of({
     ...receipts,
     tracked,

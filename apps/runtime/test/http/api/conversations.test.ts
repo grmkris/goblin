@@ -200,6 +200,8 @@ const fakeHarness = (record: PiRecord, calls: Calls): PiHarness => {
       record.writes.push({ conversation: id, requestId: write.requestId, kind: write.entry.kind })
       return { id: record.writes.length }
     },
+    // A chat's first turn in the object's lifetime puts its tool filter right (ADR 0108).
+    configure: async () => void calls.push(`configure:${String(id)}`),
   })
   const inbox = {
     items: [
@@ -212,7 +214,8 @@ const fakeHarness = (record: PiRecord, calls: Calls): PiHarness => {
       record.submitted.push({ session, operationId, content })
       return { session, operationId, accepted: true }
     },
-    // SAFETY: the programs under test read only `conversation` and `snapshot` from Pi's own harness.
+    // SAFETY: the programs under test read only `conversation` (to submit and configure) and `snapshot` from Pi's own
+    // harness.
     pi: async () => ({ conversation: async (id: number) => conversation(id), snapshot: async () => inbox }) as never,
     // SAFETY: a session is asked only for its events (the snapshot), whether it is busy, and to change model.
     session: (session) =>
@@ -289,7 +292,13 @@ const instance = (harness: PiHarness, calls: Calls) => {
     drop: async () => calls.push('personas:drop'),
     start: async (_pi, ask) => void calls.push(`personas:${ask.order}`),
   })
-  return fake<AgentInputs>({ harness, applied: new Map(), personas })
+  return fake<AgentInputs>({
+    harness,
+    applied: new Map(),
+    toolSets: { subagents: [], room: [] },
+    retooled: new Set(),
+    personas,
+  })
 }
 
 /**
@@ -471,7 +480,8 @@ describe('the conversations API served by the agent', () => {
     const body = { operationId: 'op-p', anchor: 'latest', message, personaOrder: 'sequence' }
     const response = await fetch(post('/api/conversations/1/threads', body))
     expect(response.status).toBe(201)
-    expect(calls).toEqual(['start:1:op-p:latest', 'asked:5', 'personas:sequence'])
+    // The Thread's tool filter is put right before the ask, so the forks copy it (ADR 0108).
+    expect(calls).toEqual(['start:1:op-p:latest', 'asked:5', 'configure:9', 'personas:sequence'])
     expect(record.writes.map(({ conversation, kind }) => [conversation, kind])).toEqual([
       [1, 'app.thread_head'],
       [9, 'app.persona_ask'],
