@@ -26,7 +26,7 @@ type MessageContext = {
   readonly personaOrder?: 'parallel' | 'sequence'
 }
 
-/** The body of an owner message (`SendMessage`), with nothing empty in it. */
+/** An owner message as plain fields (`PlainSend`), with nothing empty in it: the mutation sends it as AG-UI input. */
 export function messageBody(
   input: string,
   operationId: string,

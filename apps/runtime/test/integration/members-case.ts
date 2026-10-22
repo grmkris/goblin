@@ -1,3 +1,4 @@
+import { runInput } from '@goblin/contracts'
 import { Schema } from 'effect'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
@@ -63,7 +64,10 @@ const occurrences = async (url: string, who: Person, words: string) =>
 async function answered(url: string, owner: Person, who: Person, input: string, words: string): Promise<void> {
   const before = await occurrences(url, owner, words)
   await callOwner(signedIn(url, who), (api) =>
-    api.conversations.submit({ params: { id: '1' }, payload: { input, operationId: crypto.randomUUID() } }),
+    api.conversations.submit({
+      params: { id: '1' },
+      payload: runInput('1', { input, operationId: crypto.randomUUID() }),
+    }),
   )
   await waitFor(
     () => occurrences(url, owner, words),
@@ -133,7 +137,10 @@ export async function membersCase(url: string): Promise<void> {
   // The workspace has two people now: each one's message carries who wrote it, by name and ID (ADR 0094).
   const words = `Hello from the guest ${crypto.randomUUID().slice(0, 8)}`
   await callOwner(signedIn(url, member), (api) =>
-    api.conversations.submit({ params: { id: '1' }, payload: { input: words, operationId: crypto.randomUUID() } }),
+    api.conversations.submit({
+      params: { id: '1' },
+      payload: runInput('1', { input: words, operationId: crypto.randomUUID() }),
+    }),
   )
   const seen = await showing(signedIn(url, owner), '1', words)
   expect(seen).toContain(`[from member ${email.split('@')[0] ?? ''} · ${guest.userId}]`)

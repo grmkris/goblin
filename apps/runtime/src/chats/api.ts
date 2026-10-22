@@ -3,9 +3,10 @@ import type {
   CreateConversation,
   MoveToThread,
   QueueRemoval,
-  SendMessage,
+  RunInput,
   StartThread,
   StopConversation,
+  ThreadAnchor,
   ThreadServer,
   UpdateConversation,
 } from '@goblin/contracts'
@@ -25,6 +26,7 @@ import {
 } from '../agent-program.ts'
 import { composerOptions } from '../composer.ts'
 import { confineChat, confineMessage, confineUpdate } from '../keys/policy.ts'
+import { sendOf } from './run-input.ts'
 import {
   applyServers,
   checkApply,
@@ -51,32 +53,22 @@ import { startThread } from './thread-heads.ts'
 type ChatRequest = { readonly params: { readonly id: string } }
 type ChatWrite<Payload> = ChatRequest & { readonly payload: Payload }
 
-/** What came with the owner's message: App context, files and composer tags, and `personaOrder` when the body had one. */
-const contextOf = ({
-  appContext = [],
-  attachments = [],
-  selections = [],
-  personaOrder,
-}: Pick<SendMessage, 'appContext' | 'attachments' | 'selections' | 'personaOrder'>) => ({
-  appContext,
-  attachments,
-  selections,
-  ...(personaOrder === undefined ? {} : { personaOrder }),
-})
-
 /**
- * What an API key's request may touch (ADR 0081): a chat of its own Topics, with tags of its own Personas only. Nothing
- * for the owner's session.
+ * A send into a chat, read from its AG-UI input (ADR 0111): what an API key's request may touch (ADR 0081) is checked
+ * first, a chat of its own Topics, then what came with it, tags of its own Personas only. Nothing for the owner's
+ * session.
  */
-const confined = (chat: string, context: ReturnType<typeof contextOf>) =>
-  Effect.andThen(confineChat(chat), confineMessage(context))
+const confinedSend = (chat: string, input: RunInput) =>
+  Effect.gen(function* () {
+    yield* confineChat(chat)
+    const send = yield* sendOf(chat, input)
+    yield* confineMessage(send.context)
+    return send
+  })
 
 /** The owner's message into a chat, or an ask of the Personas it tags. */
-const submit = ({ params, payload }: ChatWrite<SendMessage>) =>
-  Effect.andThen(
-    confined(params.id, contextOf(payload)),
-    sendOwnerMessage(params.id, { text: payload.input, operationId: payload.operationId, context: contextOf(payload) }),
-  )
+const submit = ({ params, payload }: ChatWrite<RunInput>) =>
+  Effect.flatMap(confinedSend(params.id, payload), (send) => sendOwnerMessage(params.id, send))
 
 /** `view` with the thread's declared servers (ADR 0103), when it has any; never a token. */
 const withServers = (view: ConversationView) =>
@@ -89,33 +81,32 @@ const withServers = (view: ConversationView) =>
  * The servers a thread operation declares, on the thread it makes or finds, before its first message is sent, so the
  * Personas it tags freeze them with their tools (ADR 0103); a replay with new tokens makes those the live ones.
  */
-const declareOn = (parent: string, payload: StartThread, servers: readonly ThreadServer[]) =>
+const declareOn = (parent: string, operationId: string, anchor: ThreadAnchor, servers: readonly ThreadServer[]) =>
   Effect.gen(function* () {
     // Every server is checked against the key first: one refused makes no thread.
     const prepared = yield* prepareServers(servers)
     const conversations = yield* Conversations
-    const thread = yield* conversations.startThread(parent, payload.operationId, payload.anchor)
+    const thread = yield* conversations.startThread(parent, operationId, anchor)
     yield* conversations.requireActing(thread.id)
-    yield* applyServers(thread.id, payload.operationId, prepared)
+    yield* applyServers(thread.id, operationId, prepared)
   })
 
 /**
  * The thread operation from a chat (ADR 0034): Reply at an entry, "+" empty, or Start thread at the chat's newest
- * settled entry, the first message answered in the Thread, its Personas in the order it asks (`personaOrder`), with the
- * MCP servers a key declares on it (ADR 0103).
+ * settled entry, the first message (a send, its run id the operation's) answered in the Thread, its Personas in the
+ * order it asks (`personaOrder`), with the MCP servers a key declares on it (ADR 0103).
  */
 const threadStart = ({ params, payload }: ChatWrite<StartThread>) => {
-  const context = contextOf({ ...payload.message, personaOrder: payload.personaOrder })
   const servers = payload.mcpServers ?? []
   return Effect.gen(function* () {
-    yield* confined(params.id, context)
-    if (servers.length > 0) yield* declareOn(params.id, payload, servers)
+    const { text, operationId, context } = yield* confinedSend(params.id, payload.message)
+    if (servers.length > 0) yield* declareOn(params.id, operationId, payload.anchor, servers)
     const started = yield* startThread({
       parent: params.id,
       anchor: payload.anchor,
       title: payload.title,
-      text: payload.message.input,
-      operationId: payload.operationId,
+      text,
+      operationId,
       context,
     })
     return { ...started, thread: yield* withServers(started.thread) }

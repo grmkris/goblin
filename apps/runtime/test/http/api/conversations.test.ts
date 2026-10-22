@@ -1,6 +1,6 @@
 import type { FlowEvent } from '@goblin/contracts/telemetry'
 import { Cipher } from '../../../src/mcp/oauth/cipher.ts'
-import { ConversationView } from '@goblin/contracts'
+import { ConversationView, runInput, threadStart } from '@goblin/contracts'
 import { ConversationsGroup, InvalidInput, NotFound, UpstreamMcp } from '@goblin/contracts/api'
 import type { PiHarness } from 'agents/harness/pi'
 import * as Effect from 'effect/Effect'
@@ -354,11 +354,12 @@ const fixture = (options: { readonly personas?: readonly PersonaView[] } = {}) =
 }
 
 /** A message that tags a skill of `connectionId`. */
-const skill = (connectionId: string) => ({
-  input: 'use it',
-  operationId: `op-${connectionId}`,
-  selections: [{ kind: 'skill', connectionId, uri: 'skill://plan' }],
-})
+const skill = (connectionId: string) =>
+  runInput('2', {
+    input: 'use it',
+    operationId: `op-${connectionId}`,
+    selections: [{ kind: 'skill', connectionId, uri: 'skill://plan' }],
+  })
 
 describe('the conversations API served by the agent', () => {
   it('creates a Thread with 201, empty or branched from an entry', async () => {
@@ -374,7 +375,9 @@ describe('the conversations API served by the agent', () => {
   it("sends the owner's message with 202 and Pi's receipt, admitted once per operation", async () => {
     const { fetch, record, operations, resident } = fixture()
     const response = await fetch(
-      post('/api/conversations/2/messages', { input: 'hello', operationId: 'op-1' }, { 'x-goblin-ref': 'r-1' }),
+      post('/api/conversations/2/messages', runInput('2', { input: 'hello', operationId: 'op-1' }), {
+        'x-goblin-ref': 'r-1',
+      }),
     )
     expect(response.status).toBe(202)
     expect(await response.json()).toEqual({ operationId: 'op-1', session: '2', accepted: true })
@@ -387,11 +390,22 @@ describe('the conversations API served by the agent', () => {
   it('refuses an empty or closed send (400), an unknown chat (404) and a path id or body that does not decode', async () => {
     const { fetch, record } = fixture()
     const answers = [
-      ['/api/conversations/2/messages', { input: '  ', operationId: 'op-1' }, 400, 'empty_message'],
-      ['/api/conversations/3/messages', { input: 'hi', operationId: 'op-2' }, 400, 'conversation_closed'],
-      ['/api/conversations/77/messages', { input: 'hi', operationId: 'op-3' }, 404, undefined],
-      ['/api/conversations/abc/messages', { input: 'hi', operationId: 'op-4' }, 404, undefined],
-      ['/api/conversations/2/messages', { input: 'hi' }, 400, 'body does not match the expected shape'],
+      ['/api/conversations/2/messages', runInput('2', { input: '  ', operationId: 'op-1' }), 400, 'empty_message'],
+      [
+        '/api/conversations/3/messages',
+        runInput('3', { input: 'hi', operationId: 'op-2' }),
+        400,
+        'conversation_closed',
+      ],
+      ['/api/conversations/77/messages', runInput('77', { input: 'hi', operationId: 'op-3' }), 404, undefined],
+      ['/api/conversations/abc/messages', runInput('abc', { input: 'hi', operationId: 'op-4' }), 404, undefined],
+      [
+        '/api/conversations/2/messages',
+        { input: 'hi', operationId: 'op-5' },
+        400,
+        'body does not match the expected shape',
+      ],
+      ['/api/conversations/2/messages', runInput('3', { input: 'hi', operationId: 'op-6' }), 400, 'thread_mismatch'],
     ] as const
     for (const [path, body, status, reason] of answers) {
       const response = await fetch(post(path, body))
@@ -416,7 +430,7 @@ describe('the conversations API served by the agent', () => {
 
   it('starts a Thread with 201 in one call: the head goes into the chat, the first message into the Thread', async () => {
     const { fetch, calls, record, operations, flows } = fixture()
-    const body = { operationId: 'op-t', anchor: 'latest', message: { input: 'plan it' } }
+    const body = threadStart('1', { operationId: 'op-t', anchor: 'latest', message: { input: 'plan it' } })
     const response = await fetch(post('/api/conversations/1/threads', body))
     expect(response.status).toBe(201)
     const started = Schema.decodeUnknownSync(Schema.Struct({ thread: ConversationView, receipt: Schema.Unknown }))(
@@ -457,9 +471,9 @@ describe('the conversations API served by the agent', () => {
 
   it('replies at an entry and starts "+" empty with no head; a create with an operation id is the same operation (C4)', async () => {
     const { fetch, calls, record } = fixture()
-    const reply = { operationId: 'op-r', anchor: { entry: 4 }, message: { input: 'about this' } }
+    const reply = threadStart('2', { operationId: 'op-r', anchor: { entry: 4 }, message: { input: 'about this' } })
     expect((await fetch(post('/api/conversations/2/threads', reply))).status).toBe(201)
-    const plus = { operationId: 'op-e', anchor: 'empty', message: { input: 'new idea' } }
+    const plus = threadStart('1', { operationId: 'op-e', anchor: 'empty', message: { input: 'new idea' } })
     expect((await fetch(post('/api/conversations/1/threads', plus))).status).toBe(201)
     expect(record.writes).toEqual([])
     expect(record.submitted.map(({ operationId }) => operationId)).toEqual(['op-r:first', 'op-e:first'])
@@ -484,8 +498,8 @@ describe('the conversations API served by the agent', () => {
       setup: { mcpServers: [], skills: [], apps: [] },
     })
     const { fetch, calls, record } = fixture({ personas: [ada] })
-    const message = { input: 'compare them', selections: [{ kind: 'persona', personaId: 5 }] }
-    const body = { operationId: 'op-p', anchor: 'latest', message, personaOrder: 'sequence' }
+    const message = { input: 'compare them', selections: [{ kind: 'persona' as const, personaId: 5 }] }
+    const body = threadStart('1', { operationId: 'op-p', anchor: 'latest', message, personaOrder: 'sequence' })
     const response = await fetch(post('/api/conversations/1/threads', body))
     expect(response.status).toBe(201)
     // The Thread's tool filter is put right before the ask, so the forks copy it (ADR 0108).
@@ -606,11 +620,13 @@ describe('the conversations API served by the agent', () => {
   it("serves the probes' typed client: a refusal decodes as the InvalidInput class with its reference", async () => {
     const agent = fixture()
     const receipt = await callOwner(agent, (api) =>
-      api.conversations.submit({ params: { id: '2' }, payload: { input: 'hi', operationId: 'op-c' } }),
+      api.conversations.submit({ params: { id: '2' }, payload: runInput('2', { input: 'hi', operationId: 'op-c' }) }),
     )
     expect(receipt).toEqual({ operationId: 'op-c', session: '2', accepted: true })
     const refused = await callOwner(agent, (api) =>
-      Effect.flip(api.conversations.submit({ params: { id: '3' }, payload: { input: 'hi', operationId: 'op-d' } })),
+      Effect.flip(
+        api.conversations.submit({ params: { id: '3' }, payload: runInput('3', { input: 'hi', operationId: 'op-d' }) }),
+      ),
     )
     expect(refused).toMatchObject({ _tag: 'InvalidInput', reason: 'conversation_closed', ref: 'integration-probe' })
     const page = await callOwner(agent, (api) =>

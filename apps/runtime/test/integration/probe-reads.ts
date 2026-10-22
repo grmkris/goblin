@@ -2,8 +2,9 @@ import {
   type ConversationView,
   type CreateConversation,
   PRIMARY_CHAT,
-  type SendMessage,
+  type SendExtras,
   type UpdateConversation,
+  runInput,
 } from '@goblin/contracts'
 import { AppError } from '@goblin/contracts/api'
 import * as Effect from 'effect/Effect'
@@ -45,10 +46,10 @@ export const ownerSend = (
   chat: string,
   input: string,
   operationId: string,
-  extra: Omit<SendMessage, 'input' | 'operationId'> = {},
+  extra: SendExtras = {},
 ) =>
   ownerResult(agent, (api) =>
-    api.conversations.submit({ params: { id: chat }, payload: { input, operationId, ...extra } }),
+    api.conversations.submit({ params: { id: chat }, payload: runInput(chat, { input, operationId, ...extra }) }),
   )
 
 /** Every registered chat, closed ones included, as the workspace feed's snapshot lists them. */

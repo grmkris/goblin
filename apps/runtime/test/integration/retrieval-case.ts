@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import * as Schema from 'effect/Schema'
-import { SourcesDetails, type TopicView } from '@goblin/contracts'
+import { SourcesDetails, type TopicView, runInput } from '@goblin/contracts'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
 import { lever, person, showing, signedIn, type Person } from './owner-requests.ts'
 import { answerOf, ownerSnapshot } from './probe-reads.ts'
@@ -28,7 +28,10 @@ const decodeEntries = Schema.decodeUnknownSync(
 /** Sends `input` to `chat` and waits for the scripted model's echo of it. */
 async function say(me: AgentFetch, chat: string, input: string, reply = `echo: ${input}`): Promise<void> {
   const sent = await callOwner(me, (api) =>
-    api.conversations.submit({ params: { id: chat }, payload: { input, operationId: crypto.randomUUID() } }),
+    api.conversations.submit({
+      params: { id: chat },
+      payload: runInput(chat, { input, operationId: crypto.randomUUID() }),
+    }),
   )
   expect(sent.accepted).toBe(true)
   await showing(me, chat, reply)

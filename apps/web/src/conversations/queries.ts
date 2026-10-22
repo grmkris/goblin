@@ -1,4 +1,12 @@
-import type { MoveToThread, QueueRemoval, SendMessage, StartThread, UpdateConversation } from '@goblin/contracts'
+import {
+  type MoveToThread,
+  type PlainSend,
+  type PlainThreadStart,
+  type QueueRemoval,
+  type UpdateConversation,
+  runInput,
+  threadStart,
+} from '@goblin/contracts'
 import { infiniteQueryOptions, queryOptions, skipToken } from '@tanstack/react-query'
 import { owner } from '../lib/api.ts'
 import { withOperation } from '../lib/query/api-query.ts'
@@ -51,12 +59,14 @@ export const historyQuery = (id: string, start: number | undefined) =>
   })
 
 /** The owner's message to chat `id`, as its operation: a retry with the same id is the same message. */
-type Submission = { readonly id: string; readonly message: SendMessage }
+type Submission = { readonly id: string; readonly message: PlainSend }
 
-/** Sends the owner's message; the chat's stream shows it. */
+/** Sends the owner's message, as the AG-UI input the endpoint takes (ADR 0111); the chat's stream shows it. */
 export const submitMutation = owner.apiMutation({
   mutationFn: (api, { id, message }: Submission) =>
-    api.conversations.submit({ params: { id }, payload: message }).pipe(withOperation(message.operationId)),
+    api.conversations
+      .submit({ params: { id }, payload: runInput(id, message) })
+      .pipe(withOperation(message.operationId)),
 })
 
 /**
@@ -64,8 +74,10 @@ export const submitMutation = owner.apiMutation({
  * entry, "+" empty, Start thread at the chat's newest settled entry) and sends its first message, answered there.
  */
 export const startThreadMutation = owner.apiMutation({
-  mutationFn: (api, { id, start }: { readonly id: string; readonly start: StartThread }) =>
-    api.conversations.startThread({ params: { id }, payload: start }).pipe(withOperation(start.operationId)),
+  mutationFn: (api, { id, start }: { readonly id: string; readonly start: PlainThreadStart }) =>
+    api.conversations
+      .startThread({ params: { id }, payload: threadStart(id, start) })
+      .pipe(withOperation(start.operationId)),
 })
 
 /** Move to thread: the owner's message `entry` of chat `id`, and the turn it started. */

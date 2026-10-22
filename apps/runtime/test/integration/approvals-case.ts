@@ -1,7 +1,7 @@
 import { approvalsBackground } from './approvals-background.ts'
 import { expect } from 'vitest'
 import { Predicate, Schema } from 'effect'
-import { ApprovalView } from '@goblin/contracts'
+import { ApprovalView, runInput } from '@goblin/contracts'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
 import { call, lever, person, showing, signedIn, type Person } from './owner-requests.ts'
 import { answerOf } from './probe-reads.ts'
@@ -53,7 +53,10 @@ async function hold(me: AgentFetch, inputArgs: unknown = args) {
   const thread = await callOwner(me, (api) => api.conversations.create({ payload: {} }))
   const input = `call mcp_call ${JSON.stringify({ connectionId: SERVER, name: TOOL, arguments: inputArgs })}`
   const sent = await callOwner(me, (api) =>
-    api.conversations.submit({ params: { id: thread.id }, payload: { input, operationId: crypto.randomUUID() } }),
+    api.conversations.submit({
+      params: { id: thread.id },
+      payload: runInput(thread.id, { input, operationId: crypto.randomUUID() }),
+    }),
   )
   expect(sent.accepted).toBe(true)
   const id = await heldIn(me, thread.id)
@@ -188,7 +191,7 @@ export async function approvalKeptCase(base: string): Promise<void> {
   const sent = await callOwner(me, (api) =>
     api.conversations.submit({
       params: { id: held.thread },
-      payload: { input: next, operationId: crypto.randomUUID() },
+      payload: runInput(held.thread, { input: next, operationId: crypto.randomUUID() }),
     }),
   )
   expect(sent.accepted).toBe(true)

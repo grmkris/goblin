@@ -3,6 +3,9 @@
 // the page's `fetch` answers each stream request itself (Playwright cannot hold a response open), its opening read
 // from `/__fixture/streams/<chat>`, which the test routes. Only the stream's transport is faked; the page's reader,
 // reducer and components are the real ones.
+import { RunInput } from '@goblin/contracts'
+import * as Predicate from 'effect/Predicate'
+import * as Schema from 'effect/Schema'
 import type { Page, Route } from 'playwright-core'
 
 /** Where the page's stand-in reads a chat's opening; route it to the chat's `FixtureStream.opening`. */
@@ -113,3 +116,16 @@ export class FixtureStream {
 
 /** Every stream the page holds fails, as when the network drops. */
 export const dropLiveReads = (page: Page) => page.evaluate(() => window.dispatchEvent(new Event('fixture-agui-drop')))
+
+const decodeSend = Schema.decodeUnknownSync(RunInput)
+
+/**
+ * What the page sent in a send's body (AG-UI's `RunAgentInput`, ADR 0111): its last message's words as `input`, its
+ * run id as `operationId`, and goblin's parts from `forwardedProps.goblin`.
+ */
+export function sentOf(body: unknown) {
+  const send = decodeSend(body)
+  const last = send.messages.at(-1)
+  const input = Predicate.hasProperty(last, 'content') && typeof last.content === 'string' ? last.content : ''
+  return { input, operationId: send.runId, ...send.forwardedProps?.goblin }
+}

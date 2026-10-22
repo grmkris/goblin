@@ -1,3 +1,4 @@
+import { runInput } from '@goblin/contracts'
 import { expect } from 'vitest'
 import { type AgentFetch, type OwnerClient, callOwner } from '../owner-client.ts'
 import { BOARD } from './apps-mcp.ts'
@@ -19,7 +20,10 @@ async function keptApp(base: string, owner: Person) {
   const thread = await callOwner(me, (api) => api.conversations.create({ payload: {} }))
   const input = `call mcp_call ${JSON.stringify({ connectionId: 'apps-fixture', name: 'board', arguments: { marker: 'kept' } })}`
   await callOwner(me, (api) =>
-    api.conversations.submit({ params: { id: thread.id }, payload: { input, operationId: crypto.randomUUID() } }),
+    api.conversations.submit({
+      params: { id: thread.id },
+      payload: runInput(thread.id, { input, operationId: crypto.randomUUID() }),
+    }),
   )
   await showing(me, thread.id, 'fixture-board')
   const [app] = (await workspaceOf(base, owner)).apps
@@ -77,11 +81,11 @@ export async function appsCase(base: string): Promise<void> {
   const crossed = await answerOf(me, (api) =>
     api.conversations.submit({
       params: { id: '1' },
-      payload: {
+      payload: runInput('1', {
         input: 'Continue with the saved MyPlan answer.',
         operationId: crypto.randomUUID(),
         appContext: [{ app: app.id, text: 'receipt from another conversation' }],
-      },
+      }),
     }),
   )
   expect(crossed).toBe('NotFound')

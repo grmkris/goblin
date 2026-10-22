@@ -1,8 +1,8 @@
 import * as Schema from 'effect/Schema'
-import { ComposerSelections } from './composer.ts'
-import { FilePath, ReceivedFiles } from './files.ts'
-import { AppId, ChatId, EntryId, NonEmptyString, OperationId, TopicId } from './ids.ts'
+import { ReceivedFiles } from './files.ts'
+import { ChatId, EntryId, NonEmptyString, OperationId, TopicId } from './ids.ts'
 import { Attention } from './threads.ts'
+import { PlainSend, RunInput, runInput } from './agui/run-input.ts'
 
 /** Stable primary chat id for URLs and application metadata; its current Pi session is resolved by the runtime. */
 export const PRIMARY_CHAT = '1'
@@ -135,35 +135,6 @@ export function questionText(questions: readonly QuestionSpec[]): string {
 }
 
 /**
- * What an open App shared for the agent (`ui/update-model-context`), sent with the owner's next message by its App id.
- * The runtime finds where the App comes from (its server, or the agent app it is) and passes the text to the model as
- * a separate block labelled untrusted, never as the owner's words.
- */
-export const AppContext = Schema.Struct({
-  app: AppId,
-  text: NonEmptyString(8192),
-})
-export type AppContext = typeof AppContext.Type
-
-/**
- * The body of an owner message: `POST /api/conversations/:id/messages`, and `…/threads` to post it as the head of a new
- * Thread whose reply lands in that Thread. With Persona selections the tagged Personas answer instead of Goblin, in
- * parallel unless `personaOrder` is `sequence` ("then").
- */
-/** The most Apps whose context one owner message carries. */
-export const MAX_APP_CONTEXT = 2
-
-export const SendMessage = Schema.Struct({
-  input: Schema.String.check(Schema.isMaxLength(20_000)),
-  operationId: OperationId,
-  appContext: Schema.optional(Schema.Array(AppContext).check(Schema.isMaxLength(MAX_APP_CONTEXT))),
-  attachments: Schema.optional(Schema.Array(FilePath).check(Schema.isMaxLength(8))),
-  selections: Schema.optional(ComposerSelections),
-  personaOrder: Schema.optional(Schema.Literals(['parallel', 'sequence'])),
-})
-export type SendMessage = typeof SendMessage.Type
-
-/**
  * Pi's receipt for the owner's message: the session it went to, its operation id, and whether this call admitted it
  * (`false` when the operation id was already submitted).
  */
@@ -191,22 +162,16 @@ export type ThreadAnchor = typeof ThreadAnchor.Type
 
 /**
  * The thread operation (ADR 0034), `POST /api/conversations/:id/threads`, for Reply, "+" and Start thread: start the
- * Thread at `anchor` of the chat, then send `message` as its first message, answered there. The same `operationId`
- * finds the same Thread, so a double click or a retry never makes two. The first message's own operation id derives
- * from `operationId`. A `title` names the Thread at once (ADR 0090); an `empty` one then announces itself in its
- * Topic's Conversation in the same operation, once.
+ * Thread at `anchor` of the chat, then send `message` as its first message, answered there. `message` is a send as
+ * `…/messages` takes it (`RunInput`, ADR 0111): its `threadId` the chat the path names, its `runId` the operation's id,
+ * so the same run id finds the same Thread and a double click or a retry never makes two; the first message's own
+ * operation id derives from it. A `title` names the Thread at once (ADR 0090); an `empty` one then announces itself in
+ * its Topic's Conversation in the same operation, once.
  */
 export const StartThread = Schema.Struct({
-  operationId: OperationId,
   anchor: ThreadAnchor,
   title: Schema.optional(NonEmptyString(120)),
-  message: Schema.Struct({
-    input: SendMessage.fields.input,
-    appContext: SendMessage.fields.appContext,
-    attachments: SendMessage.fields.attachments,
-    selections: SendMessage.fields.selections,
-  }),
-  personaOrder: SendMessage.fields.personaOrder,
+  message: RunInput,
   /**
    * The MCP servers the Thread's Persona forks call natively (ADR 0103), a key's alone. A replay of the operation with
    * new tokens for the same servers keeps the Thread and makes the newest tokens the live ones.
@@ -214,6 +179,37 @@ export const StartThread = Schema.Struct({
   mcpServers: Schema.optional(ThreadServers),
 })
 export type StartThread = typeof StartThread.Type
+
+/**
+ * A thread operation as plain fields, what the MCP tool `thread_start` takes: its operation id, anchor, title and
+ * servers, the first message's words and parts, and the order of the Personas it tags. `threadStart` makes the
+ * operation's body of it.
+ */
+export const PlainThreadStart = Schema.Struct({
+  operationId: OperationId,
+  anchor: ThreadAnchor,
+  title: Schema.optional(NonEmptyString(120)),
+  message: Schema.Struct({
+    input: PlainSend.fields.input,
+    appContext: PlainSend.fields.appContext,
+    attachments: PlainSend.fields.attachments,
+    selections: PlainSend.fields.selections,
+  }),
+  personaOrder: PlainSend.fields.personaOrder,
+  mcpServers: Schema.optional(ThreadServers),
+})
+export type PlainThreadStart = typeof PlainThreadStart.Type
+
+/** The body of `start` from chat `chat`: its first message a send (`runInput`) under the operation's id. */
+export function threadStart(chat: string, start: PlainThreadStart): StartThread {
+  const { operationId, anchor, title, message, personaOrder, mcpServers } = start
+  return {
+    anchor,
+    ...(title === undefined ? {} : { title }),
+    ...(mcpServers === undefined ? {} : { mcpServers }),
+    message: runInput(chat, { ...message, operationId, ...(personaOrder === undefined ? {} : { personaOrder }) }),
+  }
+}
 
 /** What a thread operation returns: the Thread as it is now and the receipt of the owner's message in it. */
 export const StartedThread = Schema.Struct({ thread: ConversationView, receipt: MessageReceipt })

@@ -3,7 +3,7 @@
 // SUBAGENT_STARTED and SUBAGENT_FINISHED, its answer after; a server's key reads the same of its room, the fork's own
 // work included, and the stream agrees with the forward read; a subagent's run streams the same way, and a reader that
 // connects while it works opens with it in flight.
-import { type AguiEvent, ConversationEntries, EventType, TopicView } from '@goblin/contracts'
+import { type AguiEvent, ConversationEntries, EventType, TopicView, runInput } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
@@ -55,11 +55,11 @@ async function personaInOwnersChat(url: string, owner: Person) {
   await callOwner(me, (api) =>
     api.conversations.submit({
       params: { id: '1' },
-      payload: {
+      payload: runInput('1', {
         input: 'queue-hold:streamer plan it',
         operationId,
         selections: [{ kind: 'persona', personaId: persona.id }],
-      },
+      }),
     }),
   )
   await holding(url, owner, 'queue-hold:streamer@Streamer')
@@ -120,11 +120,11 @@ async function personaInKeysRoom(url: string, owner: Person) {
   const stream = streamOf(await asKey('GET', `/api/conversations/${room}/stream`))
   await stream.until((events) => events.length >= 2)
   const operationId = 'children:ask'
-  await json('POST', `/api/conversations/${room}/messages`, {
-    input: 'find the venue',
-    operationId,
-    selections: [{ kind: 'persona', personaId: persona.id }],
-  })
+  await json(
+    'POST',
+    `/api/conversations/${room}/messages`,
+    runInput(room, { input: 'find the venue', operationId, selections: [{ kind: 'persona', personaId: persona.id }] }),
+  )
   const all = await stream.until(answered('Relay'))
   await stream.close()
   const [started] = ofType(all, EventType.SUBAGENT_STARTED)
@@ -172,7 +172,10 @@ async function subagentInOwnersChat(url: string, owner: Person) {
   const before = first.events.length
   const spawn = `call subagent_spawn ${JSON.stringify({ name: 'scout', message: 'queue-hold:scout' })}`
   await callOwner(me, (api) =>
-    api.conversations.submit({ params: { id: '1' }, payload: { input: spawn, operationId: 'stream:spawn' } }),
+    api.conversations.submit({
+      params: { id: '1' },
+      payload: runInput('1', { input: spawn, operationId: 'stream:spawn' }),
+    }),
   )
   await holding(url, owner, 'queue-hold:scout')
   await first.until((events) => ended(events.slice(before)))

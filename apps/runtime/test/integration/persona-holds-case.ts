@@ -1,6 +1,12 @@
 import { expect } from 'vitest'
 import * as Schema from 'effect/Schema'
-import { PersonaAnswerData, type PersonaDefinition, type PersonaView, type RoutineDefinition } from '@goblin/contracts'
+import {
+  PersonaAnswerData,
+  type PersonaDefinition,
+  type PersonaView,
+  type RoutineDefinition,
+  runInput,
+} from '@goblin/contracts'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
 import { decide, heldIn } from './approvals-case.ts'
 import { lever, person, signedIn, type Person } from './owner-requests.ts'
@@ -67,14 +73,14 @@ const tag = (me: AgentFetch, tagged: PersonaView, args: object, via: 'native' | 
   callOwner(me, (api) =>
     api.conversations.submit({
       params: { id: '1' },
-      payload: {
+      payload: runInput('1', {
         input:
           via === 'native'
             ? `persona-call ${NATIVE} ${JSON.stringify(args)}`
             : `persona-call mcp_call ${JSON.stringify({ connectionId: SERVER, name: TOOL, arguments: args })}`,
         operationId: crypto.randomUUID(),
         selections: [{ kind: 'persona', personaId: tagged.id }],
-      },
+      }),
     }),
   )
 

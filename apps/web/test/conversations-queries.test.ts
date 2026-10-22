@@ -26,8 +26,7 @@ const fakeOwner = () => {
   const Conversations = HttpApiBuilder.group(OwnerApi, 'conversations', (handlers) =>
     handlers.handleAll({
       ...unusedHandlers(OwnerApi.groups.conversations),
-      submit: ({ payload }) =>
-        Effect.succeed({ operationId: payload.operationId, session: 'session-7', accepted: true }),
+      submit: ({ payload }) => Effect.succeed({ operationId: payload.runId, session: 'session-7', accepted: true }),
       history: ({ query }) => Effect.succeed(page(query.before)),
     }),
   )

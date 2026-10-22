@@ -10,6 +10,7 @@
 import { Config, Effect, Option, Redacted, Schema } from 'effect'
 import { randomBytes } from 'node:crypto'
 import { chmod, stat, writeFile } from 'node:fs/promises'
+import { runInput } from '../packages/contracts/src/agui/run-input.ts'
 import type { ToolView } from '../packages/contracts/src/mcp.ts'
 import { appChecks } from './smoke-apps.ts'
 import { DevClient, type Step } from './smoke-client.ts'
@@ -179,7 +180,7 @@ const waitForIdle = (dev: DevClient, thread: string): Promise<void> =>
 const entriesOf = (messages: readonly JsonObject[]) => new Set(messages.map((message) => marksOf(message)['entryId']))
 
 async function submitMessage(dev: DevClient, thread: string, input: string, step: string): Promise<void> {
-  const payload = { input, operationId: operationId(step) }
+  const payload = runInput(thread, { input, operationId: operationId(step) })
   await dev
     .owner((api) => api.conversations.submit({ params: { id: thread }, payload }))
     .catch(() => {

@@ -100,6 +100,13 @@ const FORWARDED = [
 ] as const
 /** The JSON body bound of `http/body.ts`; file uploads stream through to the agent's own limits. */
 const JSON_BODY_LIMIT = 65_536
+/**
+ * A send's bound (ADR 0111): its body is AG-UI's `RunAgentInput`, and a stock client resends the whole conversation
+ * with each one, of which goblin reads only the last message.
+ */
+const SEND_BODY_LIMIT = 1_048_576
+/** The owner endpoints that take a send. */
+const SENDS: ReadonlySet<string> = new Set(['conversations.submit', 'conversations.startThread'])
 /** A crash report is at most 2 KiB of JSON (`ClientErrorReport`). */
 const REPORT_BODY_LIMIT = 4096
 const FILES = '/api/files'
@@ -333,6 +340,8 @@ export interface EdgeHttp {
 interface Forward {
   readonly request: Request
   readonly ref: string
+  /** The endpoint it names (`conversations.submit`), or the path's area when it names none. */
+  readonly route: string
   readonly path: string
   readonly search: string
   readonly principal: Principal
@@ -340,13 +349,14 @@ interface Forward {
 }
 
 /**
- * Forwards a request to its agent: its body bounded unless it is a file upload, which streams through to the agent's
- * own limits.
+ * Forwards a request to its agent: its body bounded (a send's higher) unless it is a file upload, which streams through
+ * to the agent's own limits.
  */
-const forward = ({ request, ref, path, search, principal, agent }: Forward) =>
+const forward = ({ request, ref, route, path, search, principal, agent }: Forward) =>
   Effect.gen(function* () {
     const files = path === FILES || path.startsWith(`${FILES}/`)
-    const body = files ? request.body : yield* bounded(request, JSON_BODY_LIMIT)
+    const limit = SENDS.has(route) ? SEND_BODY_LIMIT : JSON_BODY_LIMIT
+    const body = files ? request.body : yield* bounded(request, limit)
     const headers = forwardedHeaders(request, ref, principal)
     // A streamed body needs `duplex` outside workerd (Node, the unit tests); workerd ignores it and its types omit it.
     // The agent's redirect (an outbound sign-in's callback, to Connections) goes to the browser: a followed one would
@@ -374,6 +384,7 @@ const toWorkspacePages = (response: Response, slug: string, origin: string): Res
 interface MemberForward {
   readonly request: Request
   readonly ref: string
+  readonly route: string
   readonly path: string
   readonly search: string
   readonly person: Person
@@ -382,11 +393,12 @@ interface MemberForward {
 }
 
 /** Forwards a member's request with who they are, and sends the agent's redirects to the workspace's pages. */
-const forwardMember = ({ request, ref, path, search, person, member, edge }: MemberForward) =>
+const forwardMember = ({ request, ref, route, path, search, person, member, edge }: MemberForward) =>
   Effect.map(
     forward({
       request,
       ref,
+      route,
       path,
       search,
       principal: {
@@ -462,7 +474,16 @@ const workspaceOf =
         const { person, workspace: member } = yield* admitMember(request, edge, { slug })
         known(member.id)
         if (!inAccount)
-          return yield* forwardMember({ request, ref: facts.ref, path, search: url.search, person, member, edge })
+          return yield* forwardMember({
+            request,
+            ref: facts.ref,
+            route: facts.route,
+            path,
+            search: url.search,
+            person,
+            member,
+            edge,
+          })
         if (route === undefined) return yield* new NotFound({ what: 'route' })
         const body = yield* bounded(request, JSON_BODY_LIMIT)
         const admitted = new Request(`https://edge${path}${url.search}`, {
@@ -511,6 +532,7 @@ const signInOf =
         return yield* forwardMember({
           request,
           ref: facts.ref,
+          route: facts.route,
           path: url.pathname,
           search: url.search,
           person,
@@ -537,6 +559,7 @@ const ownerOf =
         return yield* forward({
           request,
           ref: facts.ref,
+          route: facts.route,
           path: url.pathname,
           search: url.search,
           principal: { caller },

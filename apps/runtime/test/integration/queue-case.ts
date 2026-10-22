@@ -1,3 +1,4 @@
+import { runInput } from '@goblin/contracts'
 import { expect } from 'vitest'
 import * as Schema from 'effect/Schema'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
@@ -7,7 +8,7 @@ import { answerOf, ownerSnapshot } from './probe-reads.ts'
 const active = Schema.decodeUnknownSync(Schema.Struct({ run: Schema.Struct({ inputs: Schema.Array(Schema.Int) }) }))
 const submit = (me: AgentFetch, id: string, input: string) =>
   callOwner(me, (api) =>
-    api.conversations.submit({ params: { id }, payload: { input, operationId: crypto.randomUUID() } }),
+    api.conversations.submit({ params: { id }, payload: runInput(id, { input, operationId: crypto.randomUUID() }) }),
   )
 const remove = async (me: AgentFetch, id: string, submissionId: number) =>
   (await callOwner(me, (api) => api.conversations.removeQueued({ params: { id }, payload: { submissionId } }))).status

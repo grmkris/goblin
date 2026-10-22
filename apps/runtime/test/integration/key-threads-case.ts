@@ -63,7 +63,13 @@ export async function keyThreadsCase(url: string): Promise<void> {
     )
 
   // A titled empty thread is named at once and announced in its Topic's Conversation once, also when replayed.
-  const start = { operationId: 'svc:job:1', anchor: 'empty', title: 'Job 1', message: { input: 'start the job' } }
+  // Literal AG-UI bodies, as a server's own code sends them (ADR 0111).
+  const message = (runId: string, content: string) => ({
+    threadId: channel,
+    runId,
+    messages: [{ id: `${runId}:user`, role: 'user', content }],
+  })
+  const start = { anchor: 'empty', title: 'Job 1', message: message('svc:job:1', 'start the job') }
   const started = await asKey(url, secret, 'POST', `/api/conversations/${channel}/threads`, start)
   expect(started.status, await started.clone().text()).toBe(201)
   const { thread } = Schema.decodeUnknownSync(StartedThread)(await started.json())
@@ -74,7 +80,7 @@ export async function keyThreadsCase(url: string): Promise<void> {
   expect(await notes()).toHaveLength(1)
 
   // An untitled empty thread owes its note until it is named; a rename (here the owner's) writes it, once.
-  const untitled = { ...start, operationId: 'svc:agent:1', title: undefined }
+  const untitled = { anchor: 'empty', message: message('svc:agent:1', 'start the job') }
   const plain = Schema.decodeUnknownSync(StartedThread)(
     await (await asKey(url, secret, 'POST', `/api/conversations/${channel}/threads`, untitled)).json(),
   ).thread
@@ -92,8 +98,9 @@ export async function keyThreadsCase(url: string): Promise<void> {
   })
   expect((await patch(secret, thread.id, { closed: true })).status).toBe(200)
   const closedSend = await asKey(url, secret, 'POST', `/api/conversations/${thread.id}/messages`, {
-    input: 'one more thing',
-    operationId: 'svc:msg:closed',
+    threadId: thread.id,
+    runId: 'svc:msg:closed',
+    messages: [{ id: 'closed', role: 'user', content: 'one more thing' }],
   })
   expect(await reasonOf(closedSend)).toBe('conversation_closed')
   expect((await asKey(url, secret, 'GET', `/api/conversations/${thread.id}/entries?after=0`)).status).toBe(200)
@@ -121,9 +128,10 @@ export async function keyThreadsCase(url: string): Promise<void> {
     ).json(),
   )
   const tagged = await asKey(url, secret, 'POST', `/api/conversations/${thread.id}/messages`, {
-    input: 'find the venue',
-    operationId: 'svc:msg:tagged',
-    selections: [{ kind: 'persona', personaId: persona.id }],
+    threadId: thread.id,
+    runId: 'svc:msg:tagged',
+    messages: [{ id: 'tagged', role: 'user', content: 'find the venue' }],
+    forwardedProps: { goblin: { selections: [{ kind: 'persona', personaId: persona.id }] } },
   })
   expect(tagged.status, await tagged.clone().text()).toBe(202)
   const read = Schema.decodeUnknownSync(ConversationEntries)(

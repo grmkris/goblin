@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import type { AppContext, ComposerSelection, StartThread as StartThreadOperation } from '@goblin/contracts'
+import type { AppContext, ComposerSelection, PlainThreadStart } from '@goblin/contracts'
 import { submitMutation } from '../../conversations/queries.ts'
 import { DraftThread } from '../../lib/draft-thread.ts'
 import { SubmissionRetry } from '../../lib/submission-retry.ts'
@@ -15,7 +15,7 @@ function threadMessage(
   attachments: readonly string[],
   selections: readonly ComposerSelection[],
   appContext: readonly AppContext[],
-): StartThreadOperation['message'] {
+): PlainThreadStart['message'] {
   return {
     input,
     ...(appContext.length > 0 && { appContext }),
@@ -56,7 +56,7 @@ export function useThreadStart(chat: string): StartThread {
 }
 
 /** What a draft thread's first send carries: the unified operation's anchor, message and order, less its id. */
-export type DraftStart = Omit<StartThreadOperation, 'operationId'>
+export type DraftStart = Omit<PlainThreadStart, 'operationId'>
 
 /**
  * A draft thread's sends, Reply on a message of `chat` or "+" in it (ADR 0034). The draft lives in the browser until

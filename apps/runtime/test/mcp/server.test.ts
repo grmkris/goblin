@@ -158,6 +158,34 @@ describe('/mcp for every caller (ADR 0086)', () => {
     expect(await listed(client([]))).not.toContain('conversation_update')
   })
 
+  it('sends and starts threads with plain fields, as the AG-UI input the endpoints take (ADR 0111)', async () => {
+    const receipt = { operationId: 'op-1', session: '12', accepted: true }
+    const { mcp, seen } = await connect(KEY, () => Response.json(receipt, { status: 202 }))
+    const selections = [{ kind: 'persona', personaId: 4 }]
+    try {
+      const message = { input: 'find the venue', operationId: 'op-1', selections }
+      await mcp.callTool({ name: 'conversation_send', arguments: { chat: '12', message } })
+      const thread = { operationId: 'op-2', anchor: 'empty', title: 'Job 2', message: { input: 'start' } }
+      await mcp.callTool({ name: 'thread_start', arguments: { chat: '12', thread } })
+      const [send, start] = seen
+      expect(new URL(send?.url ?? '').pathname).toBe('/api/conversations/12/messages')
+      expect(await send?.json()).toEqual({
+        threadId: '12',
+        runId: 'op-1',
+        messages: [{ id: 'op-1', role: 'user', content: 'find the venue' }],
+        forwardedProps: { goblin: { selections } },
+      })
+      expect(new URL(start?.url ?? '').pathname).toBe('/api/conversations/12/threads')
+      expect(await start?.json()).toEqual({
+        anchor: 'empty',
+        title: 'Job 2',
+        message: { threadId: '12', runId: 'op-2', messages: [{ id: 'op-2', role: 'user', content: 'start' }] },
+      })
+    } finally {
+      await mcp.close()
+    }
+  })
+
   it('asks the agent in main with a bounded wait, and reads main back', async () => {
     const answer = { status: 'done', operationId: 'op-1', text: 'pong' }
     const { mcp, seen } = await connect(client(['goblin:agent']), (request) =>

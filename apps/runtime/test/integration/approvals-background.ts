@@ -4,7 +4,7 @@ import { callOwner } from '../owner-client.ts'
 import { signedIn, workspaceUntil, type Person } from './owner-requests.ts'
 import { decide, heldIn } from './approvals-case.ts'
 import { waitFor } from './until.ts'
-import { PERSONAL_TOPIC } from '@goblin/contracts'
+import { PERSONAL_TOPIC, runInput } from '@goblin/contracts'
 
 /** The subagent the background run starts to hold a call. */
 const approver = (view: ConversationView) => view.kind === 'subagent' && view.title === 'approver'
@@ -59,7 +59,10 @@ export async function approvalsBackground(base: string, owner: Person) {
   const parent = await callOwner(me, (api) => api.conversations.create({ payload: {} }))
   const input = `call subagent_spawn ${JSON.stringify({ name: 'approver', message: toolInput('subagent-frozen') })}`
   const sent = await callOwner(me, (api) =>
-    api.conversations.submit({ params: { id: parent.id }, payload: { input, operationId: crypto.randomUUID() } }),
+    api.conversations.submit({
+      params: { id: parent.id },
+      payload: runInput(parent.id, { input, operationId: crypto.randomUUID() }),
+    }),
   )
   expect(sent.accepted).toBe(true)
   const child = (

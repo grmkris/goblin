@@ -1,5 +1,5 @@
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
-import { ConversationUpdated, TopicView } from '@goblin/contracts'
+import { ConversationUpdated, TopicView, runInput } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
@@ -194,7 +194,7 @@ export async function publishCase(url: string): Promise<void> {
   await callOwner(me, (api) =>
     api.conversations.submit({
       params: { id: roomA },
-      payload: { input: 'queue-hold:publish-1', operationId: 'publish:own:1' },
+      payload: runInput(roomA, { input: 'queue-hold:publish-1', operationId: 'publish:own:1' }),
     }),
   )
   await holding(url, owner, 'queue-hold:publish-1')
@@ -221,10 +221,13 @@ export async function publishCase(url: string): Promise<void> {
   }
 
   // Another key's room: the owner's poll sees its chat change; key A's deliveries and polls never do.
-  const sentB = await asKey(url, b.secret, 'POST', `/api/conversations/${roomB}/messages`, {
-    input: 'in room b',
-    operationId: 'publish:b:1',
-  })
+  const sentB = await asKey(
+    url,
+    b.secret,
+    'POST',
+    `/api/conversations/${roomB}/messages`,
+    runInput(roomB, { input: 'in room b', operationId: 'publish:b:1' }),
+  )
   expect(sentB.status, await sentB.clone().text()).toBe(202)
   await showing(me, roomB, 'echo: in room b')
   const ownerPoll = async () =>
@@ -253,7 +256,10 @@ export async function publishCase(url: string): Promise<void> {
   const failing = await consumerOf(mcp, `${RECEIVER}/failing`)
   await Effect.runPromise(subscribeEvents(failing.client, failing.lease()))
   await callOwner(me, (api) =>
-    api.conversations.submit({ params: { id: roomA }, payload: { input: 'once more', operationId: 'publish:own:2' } }),
+    api.conversations.submit({
+      params: { id: roomA },
+      payload: runInput(roomA, { input: 'once more', operationId: 'publish:own:2' }),
+    }),
   )
   const tried = await waitFor(
     () => receivedAt(url, owner, '/hooks/failing'),

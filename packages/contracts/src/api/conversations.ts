@@ -8,13 +8,13 @@ import {
   ConversationView,
   CreateConversation,
   MessageReceipt,
-  SendMessage,
   StartThread,
   StartedThread,
   StopConversation,
   UpdateConversation,
 } from '../conversations.ts'
 import { ConversationEntries } from '../entries.ts'
+import { RunInput } from '../agui/run-input.ts'
 import { ConversationQueue, QueueRemoval, QueueRemovalResult } from '../queue.ts'
 import { SourceUse } from '../retrieval.ts'
 import { MoveReceipt, MoveToThread } from '../threads.ts'
@@ -66,9 +66,12 @@ const EntriesQuery = {
  * - `create`: `POST /api/conversations`, 201: the thread operation without a message (`CreateConversation`), a Thread
  *   branched from an entry of an open chat or an empty one.
  * - `update`: `PATCH /api/conversations/:id` renames, closes or reopens, or pins a subagent open.
- * - `submit`: `POST …/:id/messages`, 202 with Pi's receipt: the owner's message, or an ask of the Personas it tags.
+ * - `submit`: `POST …/:id/messages`, a send as AG-UI's `RunAgentInput` (`RunInput`, ADR 0111): the owner's message, or
+ *   an ask of the Personas it tags. 202 with Pi's receipt; asked with `Accept: text/event-stream`, 200 and the run that
+ *   took the send as AG-UI events instead (docs/architecture/streams.md, "Driving a chat"), which the typed client
+ *   never asks for.
  * - `startThread`: `POST …/:id/threads`, 201: the thread operation (`StartThread`): one call makes the Thread once per
- *   operation id and sends the message as its first, answered there.
+ *   run id of its message and sends that message as its first, answered there.
  * - `move`: `POST …/:id/move`: Move to thread, as its receipt. The same operation id finds the same move.
  * - `stop`: `POST …/:id/stop`: Stop in the chat; `stopped` says whether anything was running.
  * - `queue` / `removeQueued`: `GET` and `DELETE …/:id/queue`: the owner's queued inputs, and withdrawing one.
@@ -100,9 +103,9 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
   }).annotate(EndpointScope, 'conversations'),
   HttpApiEndpoint.post('submit', '/conversations/:id/messages', {
     params,
-    payload: SendMessage,
+    payload: RunInput,
     success: MessageReceipt.pipe(HttpApiSchema.status(202)),
-    error: [ApiErrors.notFound, ApiErrors.invalidInput, ApiErrors.budgetExhausted],
+    error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput, ApiErrors.budgetExhausted],
   }).annotate(EndpointScope, 'conversations'),
   HttpApiEndpoint.post('startThread', '/conversations/:id/threads', {
     params,

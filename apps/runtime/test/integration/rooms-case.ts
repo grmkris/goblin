@@ -1,4 +1,4 @@
-import { TopicView } from '@goblin/contracts'
+import { TopicView, runInput } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { ROOM_TOOLS, roomAllows } from '../../src/pi/room.ts'
@@ -98,10 +98,13 @@ export async function roomsCase(url: string): Promise<void> {
   const room = Schema.decodeUnknownSync(TopicView)(await made.json())
   expect(room.room).toEqual({ key: 'rooms' })
   const say = async (input: string, operationId: string) => {
-    const sent = await asKey(url, secret, 'POST', `/api/conversations/${room.conversation}/messages`, {
-      input,
-      operationId,
-    })
+    const sent = await asKey(
+      url,
+      secret,
+      'POST',
+      `/api/conversations/${room.conversation}/messages`,
+      runInput(room.conversation, { input, operationId }),
+    )
     expect(sent.status, await sent.clone().text()).toBe(202)
   }
 
@@ -118,7 +121,10 @@ export async function roomsCase(url: string): Promise<void> {
   // The owner's main: every tool it is offered is one a room offers too, or one the room was not offered.
   const mine = 'what did we plan for the plum harvest in the orchard pick-sources'
   await callOwner(me, (api) =>
-    api.conversations.submit({ params: { id: '1' }, payload: { input: mine, operationId: 'own:msg:1' } }),
+    api.conversations.submit({
+      params: { id: '1' },
+      payload: runInput('1', { input: mine, operationId: 'own:msg:1' }),
+    }),
   )
   const owners = await requestFor(url, owner, mine)
   const denied = owners.tools.filter((tool) => !roomAllows(tool))

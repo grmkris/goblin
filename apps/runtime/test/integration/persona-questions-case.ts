@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import * as Schema from 'effect/Schema'
-import { type PersonaDefinition, PersonaAnswerData } from '@goblin/contracts'
+import { type PersonaDefinition, PersonaAnswerData, runInput, threadStart } from '@goblin/contracts'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
 import { lever, person, signedIn, type Person } from './owner-requests.ts'
 import { ownerSnapshot } from './probe-reads.ts'
@@ -67,7 +67,11 @@ const tag = (me: AgentFetch, chat: string, personaId: number, input: string) =>
   callOwner(me, (api) =>
     api.conversations.submit({
       params: { id: chat },
-      payload: { input, operationId: crypto.randomUUID(), selections: [{ kind: 'persona', personaId }] },
+      payload: runInput(chat, {
+        input,
+        operationId: crypto.randomUUID(),
+        selections: [{ kind: 'persona', personaId }],
+      }),
     }),
   )
 
@@ -76,11 +80,11 @@ const thread = (me: AgentFetch, chat: string, anchor: 'empty' | 'latest', person
   callOwner(me, (api) =>
     api.conversations.startThread({
       params: { id: chat },
-      payload: {
+      payload: threadStart(chat, {
         operationId: crypto.randomUUID(),
         anchor,
         message: { input, selections: [{ kind: 'persona', personaId }] },
-      },
+      }),
     }),
   )
 

@@ -343,6 +343,22 @@ describe("a member's forward (ADR 0089)", () => {
     expect(await seen[0]?.text()).toHaveLength(70_000)
   })
 
+  it('takes a send of up to 1 MiB, the whole history a stock AG-UI client resends (ADR 0111)', async () => {
+    const { seen, edge } = deployment()
+    const history = 'x'.repeat(200_000)
+    for (const path of ['/api/conversations/7/messages', '/api/conversations/7/threads'])
+      await through('workspace', write(`${BASE}${path}`, { body: history }), edge)
+    expect(await Promise.all(seen.map(async (request) => (await request.text()).length))).toEqual([200_000, 200_000])
+    const { response } = await through(
+      'workspace',
+      write(`${BASE}/api/conversations/7/messages`, { body: 'x'.repeat(1_048_577) }),
+      edge,
+    )
+    expect(response.status).toBe(413)
+    expect(await response.json()).toMatchObject({ error: { code: 'payload_too_large', limit: 1_048_576 } })
+    expect(seen).toHaveLength(2)
+  })
+
   it('logs one content-free line for a failure the agent answered, naming the endpoint and the agent', async () => {
     const { edge } = deployment(() =>
       Response.json(envelopeOf(new NotFound({ what: SECRET, ref: 'ray-1' })), { status: 404 }),

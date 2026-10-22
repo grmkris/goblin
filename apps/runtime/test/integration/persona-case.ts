@@ -1,6 +1,12 @@
 import { expect } from 'vitest'
 import * as Schema from 'effect/Schema'
-import { type PersonaDefinition, type PersonaView, type UpdatePersona, WorkspaceChange } from '@goblin/contracts'
+import {
+  type PersonaDefinition,
+  type PersonaView,
+  type UpdatePersona,
+  WorkspaceChange,
+  runInput,
+} from '@goblin/contracts'
 import { type OwnerClient, callOwner } from '../owner-client.ts'
 import { holding, lever, person, showing, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 import { answerOf, ownerSnapshot } from './probe-reads.ts'
@@ -115,7 +121,10 @@ const send = async (
   const operationId = crypto.randomUUID()
   const selections = personas.map((persona) => ({ kind: 'persona' as const, personaId: persona.id }))
   const answered = await answerOf(signedIn(url, owner), (api) =>
-    api.conversations.submit({ params: { id: chat }, payload: { input, operationId, selections, ...extra } }),
+    api.conversations.submit({
+      params: { id: chat },
+      payload: runInput(chat, { input, operationId, selections, ...extra }),
+    }),
   )
   return { answered, operationId }
 }

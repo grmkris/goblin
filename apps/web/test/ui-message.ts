@@ -5,6 +5,7 @@ import path from 'node:path'
 import { build, createServer } from 'vite'
 import { chromium } from 'playwright-core'
 import { record, records } from '../src/lib/values.ts'
+import { sentOf } from './agui-route.ts'
 
 /** Where this script reports (@cloudflare/workers-types makes `process` `any`). */
 const STDOUT = 1
@@ -68,13 +69,13 @@ try {
   })
   await page.route('**/api/conversations/*/messages', (route) => {
     assert.equal(new URL(route.request().url()).pathname, '/api/conversations/7/messages')
-    const body = record(route.request().postDataJSON())
+    const body = sentOf(route.request().postDataJSON())
     submissions.push(body)
     // The second try is answered with Pi's receipt, as the owner API's contract has it.
     return route.fulfill(
       submissions.length === 1
         ? { status: 503, json: { error: 'TemporaryFailure' } }
-        : { status: 202, json: { accepted: true, session: 'session-7', operationId: body?.operationId } },
+        : { status: 202, json: { accepted: true, session: 'session-7', operationId: body.operationId } },
     )
   })
   await page.goto(`${origin}message.html`)

@@ -6,12 +6,15 @@ import {
   CreateConversation,
   FilePath,
   PersonaName,
-  SendMessage,
+  PlainSend,
+  RunInput,
   StartThread,
   UpdatePersona,
   WorkspaceChange,
   personaAnswerText,
+  runInput,
   selectionKey,
+  threadStart,
 } from './index.ts'
 
 const ok = (path: string) => Schema.is(FilePath)(path)
@@ -65,9 +68,31 @@ describe('topics, personas and threads', () => {
     expect(Schema.is(UpdatePersona)({ name: 'Scout' })).toBe(false)
     expect(Schema.is(UpdatePersona)({ name: 'Scout', expectedRevision: 2 })).toBe(true)
   })
-  it('bounds a message body like the messages route always did', () => {
-    expect(Schema.is(SendMessage)({ input: 'hi', operationId: 'op-1', personaOrder: 'sequence' })).toBe(true)
-    expect(Schema.is(SendMessage)({ input: 'x'.repeat(20_001), operationId: 'op-1' })).toBe(false)
+  it('bounds a plain send like the messages route always did', () => {
+    expect(Schema.is(PlainSend)({ input: 'hi', operationId: 'op-1', personaOrder: 'sequence' })).toBe(true)
+    expect(Schema.is(PlainSend)({ input: 'x'.repeat(20_001), operationId: 'op-1' })).toBe(false)
+  })
+})
+
+describe('a send as AG-UI input (ADR 0111)', () => {
+  const selections = [{ kind: 'persona' as const, personaId: 3 }]
+  it('makes one user message under the operation id, with goblin parts only when there are any', () => {
+    expect(runInput('7', { input: 'hi', operationId: 'op-1' })).toEqual({
+      threadId: '7',
+      runId: 'op-1',
+      messages: [{ id: 'op-1', role: 'user', content: 'hi' }],
+    })
+    const tagged = runInput('7', { input: 'hi', operationId: 'op-1', selections, attachments: [], appContext: [] })
+    expect(tagged.forwardedProps).toEqual({ goblin: { selections } })
+    expect(Schema.is(RunInput)(tagged)).toBe(true)
+  })
+  it('takes any history and ignores keys goblin does not read, but bounds the run id and its parts', () => {
+    const decode = Schema.decodeUnknownSync(RunInput)
+    const input = { threadId: '7', runId: 'op-1', messages: [{ anything: true }], forwardedProps: { other: 1 } }
+    expect(decode({ ...input, context: [], tools: [], state: {} }).forwardedProps).toEqual({})
+    expect(Schema.is(RunInput)({ ...input, runId: 'x'.repeat(201) })).toBe(false)
+    expect(Schema.is(RunInput)({ ...input, forwardedProps: { goblin: { attachments: ['/etc/passwd'] } } })).toBe(false)
+    expect(Schema.is(RunInput)({ ...input, resume: [{ interruptId: '7:i3', status: 'answered' }] })).toBe(false)
   })
 })
 
@@ -76,15 +101,31 @@ describe('thread operations', () => {
     expect(Schema.is(CreateConversation)({ topic: 2 })).toBe(true)
     expect(Schema.is(CreateConversation)({ operationId: 'op-1', from: { conversation: '3', entry: 9 } })).toBe(true)
   })
-  it('starts a thread from an entry, empty or the latest entry, with the message fields of a send', () => {
-    const message = { input: 'hi', selections: [{ kind: 'persona', personaId: 3 }] }
-    expect(Schema.is(StartThread)({ operationId: 'op-1', anchor: { entry: 9 }, message })).toBe(true)
-    expect(Schema.is(StartThread)({ operationId: 'op-1', anchor: 'latest', message })).toBe(true)
-    expect(Schema.is(StartThread)({ operationId: 'op-1', anchor: 'empty', message, personaOrder: 'sequence' })).toBe(
-      true,
-    )
-    expect(Schema.is(StartThread)({ operationId: 'op-1', anchor: { entry: 0 }, message })).toBe(false)
-    expect(Schema.is(StartThread)({ operationId: '', anchor: 'empty', message })).toBe(false)
+  it('starts a thread from an entry, empty or the latest entry, its first message a send', () => {
+    const message = runInput('2', { input: 'hi', operationId: 'op-1', selections: [{ kind: 'persona', personaId: 3 }] })
+    expect(Schema.is(StartThread)({ anchor: { entry: 9 }, message })).toBe(true)
+    expect(Schema.is(StartThread)({ anchor: 'latest', message })).toBe(true)
+    expect(Schema.is(StartThread)({ anchor: { entry: 0 }, message })).toBe(false)
+    expect(Schema.is(StartThread)({ anchor: 'empty', message: { ...message, runId: '' } })).toBe(false)
+  })
+  it('makes the body of a plain thread operation, its Persona order with the first message', () => {
+    const start = threadStart('2', {
+      operationId: 'op-1',
+      anchor: 'empty',
+      title: 'Plan',
+      message: { input: 'hi', selections: [{ kind: 'persona', personaId: 3 }] },
+      personaOrder: 'sequence',
+    })
+    expect(start).toEqual({
+      anchor: 'empty',
+      title: 'Plan',
+      message: runInput('2', {
+        input: 'hi',
+        operationId: 'op-1',
+        selections: [{ kind: 'persona', personaId: 3 }],
+        personaOrder: 'sequence',
+      }),
+    })
   })
 })
 

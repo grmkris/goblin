@@ -1,3 +1,4 @@
+import { runInput } from '@goblin/contracts'
 import { expect } from 'vitest'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
 import { call, person, showing, signedIn, snapshotText, workspaceOf } from './owner-requests.ts'
@@ -52,7 +53,7 @@ const say = (me: AgentFetch, thread: string, tool: string, input: unknown) =>
   callOwner(me, (api) =>
     api.conversations.submit({
       params: { id: thread },
-      payload: { input: `call ${tool} ${JSON.stringify(input)}`, operationId: crypto.randomUUID() },
+      payload: runInput(thread, { input: `call ${tool} ${JSON.stringify(input)}`, operationId: crypto.randomUUID() }),
     }),
   )
 

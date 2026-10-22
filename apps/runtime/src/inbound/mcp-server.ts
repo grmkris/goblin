@@ -4,13 +4,15 @@ import {
   CreateTopic,
   NonEmptyString,
   PageCursor,
-  SendMessage,
-  StartThread,
+  PlainSend,
+  PlainThreadStart,
   StopConversation,
   TopicSetupEdit,
   UpdateConversation,
   UpdatePersona,
   UpdateTopic,
+  runInput,
+  threadStart,
 } from '@goblin/contracts'
 import { type CallerScope, type WorkspaceView } from '@goblin/contracts'
 import { McpServer } from '@modelcontextprotocol/server'
@@ -157,10 +159,12 @@ const conversationTools = (server: McpServer, add: Add, reply: Reply) => {
       {
         title: 'Send a message',
         description: 'A message into a chat within reach, or an ask of the Personas it tags.',
-        inputSchema: standard(Schema.Struct({ chat: ChatId, message: SendMessage })),
+        inputSchema: standard(Schema.Struct({ chat: ChatId, message: PlainSend })),
         annotations: writes,
       },
-      ({ chat, message }) => reply((api) => api.conversations.submit({ params: { id: chat }, payload: message })),
+      // One handler: the tool's plain fields are sent as the AG-UI input the endpoint takes (ADR 0111).
+      ({ chat, message }) =>
+        reply((api) => api.conversations.submit({ params: { id: chat }, payload: runInput(chat, message) })),
     ),
   )
   add('thread_start', () =>
@@ -170,10 +174,11 @@ const conversationTools = (server: McpServer, add: Add, reply: Reply) => {
         title: 'Start a thread',
         description:
           "A Thread from a chat within reach, its first message answered there. A `title` names it at once; a titled thread started `empty` is announced in its Topic's Conversation in the same operation.",
-        inputSchema: standard(Schema.Struct({ chat: ChatId, thread: StartThread })),
+        inputSchema: standard(Schema.Struct({ chat: ChatId, thread: PlainThreadStart })),
         annotations: writes,
       },
-      ({ chat, thread }) => reply((api) => api.conversations.startThread({ params: { id: chat }, payload: thread })),
+      ({ chat, thread }) =>
+        reply((api) => api.conversations.startThread({ params: { id: chat }, payload: threadStart(chat, thread) })),
     ),
   )
   add('conversation_entries', () =>

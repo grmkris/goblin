@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
 import { createServer } from 'vite'
+import { sentOf } from './agui-route.ts'
 
 const out = path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance', `openui-${Date.now()}`)
 const server = await createServer({ configFile: path.join(import.meta.dirname, 'browser/vite.config.ts') })
@@ -24,7 +25,7 @@ try {
     let release: (() => void) | undefined
     await page.route('**/api/conversations/*/messages', async (route) => {
       const request = route.request()
-      const body = JSON.parse(request.postData() ?? '{}')
+      const body = sentOf(JSON.parse(request.postData() ?? '{}'))
       submissions.push({
         url: request.url(),
         input: body.input,

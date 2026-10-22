@@ -6,7 +6,7 @@ import { createServer } from 'vite'
 import { chromium, type Page, type Route } from 'playwright-core'
 import * as Schema from 'effect/Schema'
 import { opening } from './agui-fixtures.ts'
-import { FixtureStream, OPENINGS, dropLiveReads, installLiveReads } from './agui-route.ts'
+import { FixtureStream, OPENINGS, dropLiveReads, installLiveReads, sentOf } from './agui-route.ts'
 
 /** The file descriptor this script's result line goes to (@cloudflare/workers-types makes `process` `any`). */
 const STDOUT = 1
@@ -61,9 +61,7 @@ async function install(page: Page) {
     await changed()
   }
   const submit = async (route: Route) => {
-    const message = Schema.decodeUnknownSync(Schema.Struct({ input: Schema.String, operationId: Schema.String }))(
-      route.request().postDataJSON(),
-    )
+    const message = sentOf(route.request().postDataJSON())
     submissions.push(message)
     if (failNext) {
       failNext = false

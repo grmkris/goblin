@@ -1,3 +1,4 @@
+import { runInput } from '@goblin/contracts'
 import { expect } from 'vitest'
 import * as Schema from 'effect/Schema'
 import type { TopicView } from '@goblin/contracts'
@@ -23,7 +24,10 @@ const decodeEntries = Schema.decodeUnknownSync(
 /** The owner's message into `chat`, as the owner API answered it. */
 const send = (me: AgentFetch, chat: string, input: string) =>
   answerOf(me, (api) =>
-    api.conversations.submit({ params: { id: chat }, payload: { input, operationId: crypto.randomUUID() } }),
+    api.conversations.submit({
+      params: { id: chat },
+      payload: runInput(chat, { input, operationId: crypto.randomUUID() }),
+    }),
   )
 /** Every Pi session in the owner's agent, to prove a create made exactly one. */
 const sessions = async (url: string, owner: Person) =>

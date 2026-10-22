@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import * as Schema from 'effect/Schema'
-import { ThreadHeadData } from '@goblin/contracts'
+import { ThreadHeadData, runInput, threadStart } from '@goblin/contracts'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
 import { holding, lever, person, showing, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 import { answerOf, ownerSnapshot } from './probe-reads.ts'
@@ -23,13 +23,16 @@ const decodeHead = Schema.decodeUnknownSync(ThreadHeadData)
 /** Start thread from `chat`'s composer: the unified thread operation at the chat's newest settled entry. */
 const startThread = (chat: string, input: string, operationId: string) => ({
   params: { id: chat },
-  payload: { operationId, anchor: 'latest' as const, message: { input } },
+  payload: threadStart(chat, { operationId, anchor: 'latest', message: { input } }),
 })
 const start = (me: AgentFetch, chat: string, input: string, operationId: string) =>
   callOwner(me, (api) => api.conversations.startThread(startThread(chat, input, operationId)))
 const send = (me: AgentFetch, chat: string, input: string) =>
   callOwner(me, (api) =>
-    api.conversations.submit({ params: { id: chat }, payload: { input, operationId: crypto.randomUUID() } }),
+    api.conversations.submit({
+      params: { id: chat },
+      payload: runInput(chat, { input, operationId: crypto.randomUUID() }),
+    }),
   )
 const entries = async (me: AgentFetch, chat: string) => decodeSnapshot(await ownerSnapshot(me, chat)).entries ?? []
 /** The thread heads written into `chat`, decoded. */

@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { URL as FileURL } from 'node:url'
 import { expect } from 'vitest'
 import * as Schema from 'effect/Schema'
-import { ThreadHeadData, type TopicView } from '@goblin/contracts'
+import { ThreadHeadData, type TopicView, runInput } from '@goblin/contracts'
 import { statusOf } from '@goblin/contracts/api'
 import { type OwnerClient, callOwner } from '../owner-client.ts'
 import { holding, lever, person, showing, signedIn, workspaceOf, type Person } from './owner-requests.ts'
@@ -49,7 +49,10 @@ const until = <A>(read: () => Promise<A>, done: (value: A) => boolean, what: str
 /** The owner's message into `chat`, admitted. */
 const send = async (url: string, owner: Person, chat: string, input: string) => {
   const receipt = await callOwner(signedIn(url, owner), (api) =>
-    api.conversations.submit({ params: { id: chat }, payload: { input, operationId: crypto.randomUUID() } }),
+    api.conversations.submit({
+      params: { id: chat },
+      payload: runInput(chat, { input, operationId: crypto.randomUUID() }),
+    }),
   )
   expect(receipt.accepted).toBe(true)
 }

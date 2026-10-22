@@ -12,6 +12,7 @@ import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { heldCall } from '../attention.ts'
 import { askedQuestions } from '../pi/entry-view.ts'
+import { outcomeOf, personaAnswer } from './messages.ts'
 
 // `/attention`: what in a chat waits for a person, read from the chat's own entries by goblin's markers only (the
 // same markers Activity reads, `attention.ts`), as AG-UI interrupts.
@@ -125,3 +126,10 @@ export function settleAttention(
   const raised = answer === undefined ? toolRaised(chat, entry) : personaRaised(chat, entry, answer)
   return raised === undefined ? kept : [...kept, raised]
 }
+
+/** What waits for a person in `chat` after `entries`, oldest first: each entry settles and raises in turn. */
+export const openAttention = (chat: string, entries: readonly EntryRecord[]): readonly AttentionItem[] =>
+  entries.reduce<readonly AttentionItem[]>(
+    (open, entry) => settleAttention(chat, open, entry, personaAnswer(entry), outcomeOf(entry)),
+    [],
+  )

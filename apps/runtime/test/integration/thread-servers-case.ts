@@ -1,4 +1,4 @@
-import { ConversationEntries, StartedThread, TopicView } from '@goblin/contracts'
+import { ConversationEntries, StartedThread, TopicView, runInput, threadStart } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
@@ -75,16 +75,17 @@ export async function threadServersCase(url: string): Promise<void> {
       })
     ).json(),
   )
-  const start = (token: string) => ({
-    operationId: 'svc:job:7',
-    anchor: 'empty',
-    title: 'Job 7',
-    message: {
-      input: `persona-call swarmm__board ${JSON.stringify({ operationKey: 'thread-server' })}`,
-      selections: [{ kind: 'persona', personaId: persona.id }],
-    },
-    mcpServers: [{ ...SERVER, token }],
-  })
+  const start = (token: string, chat = topic.conversation, operationId = 'svc:job:7', title = 'Job 7') =>
+    threadStart(chat, {
+      operationId,
+      anchor: 'empty',
+      title,
+      message: {
+        input: `persona-call swarmm__board ${JSON.stringify({ operationKey: 'thread-server' })}`,
+        selections: [{ kind: 'persona', personaId: persona.id }],
+      },
+      mcpServers: [{ ...SERVER, token }],
+    })
   const threads = `/api/conversations/${topic.conversation}/threads`
   const started = await asKey(url, secret, 'POST', threads, start('job-token-1'))
   expect(started.status, await started.clone().text()).toBe(201)
@@ -115,13 +116,11 @@ export async function threadServersCase(url: string): Promise<void> {
   expect(await reasonOf(await asKey(url, secret, 'POST', threads, other))).toBe('thread_servers')
 
   // The owner's own session declares none, and an origin the key was not granted is refused.
-  const mine = await call(url, owner, '/api/conversations/1/threads', { ...start('t'), operationId: 'own:job:1' })
+  const mine = await call(url, owner, '/api/conversations/1/threads', start('t', '1', 'own:job:1'))
   expect(mine.status).toBe(403)
   expect(await reasonOf(mine)).toBe('key_only')
   const elsewhere = {
-    ...start('t'),
-    operationId: 'svc:job:8',
-    title: 'Job 8',
+    ...start('t', topic.conversation, 'svc:job:8', 'Job 8'),
     mcpServers: [{ ...SERVER, url: 'https://evil.test/mcp', token: 't' }],
   }
   expect(await reasonOf(await asKey(url, secret, 'POST', threads, elsewhere))).toBe('key_origin')
@@ -145,11 +144,17 @@ export async function threadServersCase(url: string): Promise<void> {
       })
     ).json(),
   )
-  await asKey(url, secret, 'POST', `/api/conversations/${thread.id}/messages`, {
-    input: 'plain question',
-    operationId: 'svc:msg:plain',
-    selections: [{ kind: 'persona', personaId: plain.id }],
-  })
+  await asKey(
+    url,
+    secret,
+    'POST',
+    `/api/conversations/${thread.id}/messages`,
+    runInput(thread.id, {
+      input: 'plain question',
+      operationId: 'svc:msg:plain',
+      selections: [{ kind: 'persona', personaId: plain.id }],
+    }),
+  )
   const seen = async () => Schema.decodeUnknownSync(Seen)(await (await lever(url, owner, 'queue/seen')).json()).requests
   const plainRequest = (
     await until(
@@ -193,11 +198,11 @@ export async function threadServersCase(url: string): Promise<void> {
   await callOwner(me, (api) =>
     api.conversations.submit({
       params: { id: thread.id },
-      payload: {
+      payload: runInput(thread.id, {
         input: `persona-call swarmm__board ${JSON.stringify({ operationKey: 'after-revoke' })}`,
         operationId: 'own:msg:revoked',
         selections: [{ kind: 'persona', personaId: persona.id }],
-      },
+      }),
     }),
   )
   const asked = (requests: Awaited<ReturnType<typeof seen>>) =>

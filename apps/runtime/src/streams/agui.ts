@@ -10,7 +10,7 @@ import {
   type TokenCounts,
   type ToolProgress,
 } from '@goblin/contracts'
-import { settleAttention } from './attention.ts'
+import { openAttention, settleAttention } from './attention.ts'
 import { type ChildInfo, attribute, endedEvent } from './lifecycle.ts'
 import { type MessageSent, applyChange, beginMessage, endMessage, syncBlock } from './live.ts'
 import {
@@ -551,9 +551,7 @@ export function open(
   const w = work(startCursor(chat), options.hints ?? {})
   const omitted = new Set(snapshot.entries.flatMap(omittedBy))
   const visible = snapshot.entries.filter(({ id }) => !omitted.has(Number(id)))
-  let attention: readonly AttentionItem[] = []
-  for (const entry of snapshot.entries)
-    attention = settleAttention(chat, attention, entry, personaAnswer(entry), outcomeOf(entry))
+  const attention = openAttention(chat, snapshot.entries)
   const windowed = visible.slice(-Math.max(1, options.window))
   const messages = windowed.flatMap((entry) => entryMessages(chat, entry))
   const state = stateOf(snapshot, [...attention], w.hints.queued)

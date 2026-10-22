@@ -4,7 +4,7 @@
 // what came meanwhile; a server's key reads its own room's chat in full and no other chat; and a chat past the readers
 // it takes refuses one more as `stream_busy`.
 import { EventSchema } from '@ag-ui/core/schemas'
-import { type AguiEvent, ConversationEntries, EventType, TopicView } from '@goblin/contracts'
+import { type AguiEvent, ConversationEntries, EventType, TopicView, runInput } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
@@ -146,7 +146,10 @@ function opened(events: readonly AguiEvent[]) {
 /** A message into `chat` from `who`'s browser, as operation `stream:<input>`. */
 const send = (base: string, who: Person, chat: string, input: string) =>
   callOwner(signedIn(base, who), (api) =>
-    api.conversations.submit({ params: { id: chat }, payload: { input, operationId: `stream:${input}` } }),
+    api.conversations.submit({
+      params: { id: chat },
+      payload: runInput(chat, { input, operationId: `stream:${input}` }),
+    }),
   )
 
 /**
@@ -211,10 +214,11 @@ async function keyReads(url: string, owner: Person) {
   const stream = streamOf(await asKey('GET', `/api/conversations/${chat}/stream`))
   await stream.until((events) => events.length >= 2)
   opened(stream.events)
-  const sent = await asKey('POST', `/api/conversations/${chat}/messages`, {
-    input: 'think hello from a key',
-    operationId: 'streams:key:1',
-  })
+  const sent = await asKey(
+    'POST',
+    `/api/conversations/${chat}/messages`,
+    runInput(chat, { input: 'think hello from a key', operationId: 'streams:key:1' }),
+  )
   expect(sent.status, await sent.clone().text()).toBe(202)
   const run = await stream.until(ended)
   expect(answers(run)).toEqual(['echo: hello from a key'])

@@ -1,4 +1,4 @@
-import { PERSONAL_TOPIC, PRIMARY_CHAT } from '@goblin/contracts'
+import { PERSONAL_TOPIC, PRIMARY_CHAT, threadStart } from '@goblin/contracts'
 import { FlowRecord } from '@goblin/contracts/inspect'
 import type { FlowEvent } from '@goblin/contracts/telemetry'
 import type { PiHarness } from 'agents/harness/pi'
@@ -47,12 +47,12 @@ async function startOrderSequence(agent: AgentFetch) {
   const started = await ownerResult(agent, (api) =>
     api.conversations.startThread({
       params: { id: PRIMARY_CHAT },
-      payload: {
+      payload: threadStart(PRIMARY_CHAT, {
         operationId: 'start-order',
         anchor: 'latest',
         message: { input: 'compare the two plans', selections },
         personaOrder: 'sequence',
-      },
+      }),
     }),
   )
   if (!started.ok) return { started }
