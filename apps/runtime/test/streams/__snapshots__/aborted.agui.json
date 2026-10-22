@@ -1,5 +1,5 @@
 {
-  "full": [
+  "live": [
     {
       "type": "RUN_STARTED",
       "threadId": "1",
@@ -142,100 +142,6 @@
           }
         }
       ]
-    }
-  ],
-  "answers": [
-    {
-      "type": "RUN_STARTED",
-      "threadId": "1",
-      "runId": "1:8",
-      "metadata": {
-        "goblin": {
-          "operations": [
-            "op-abort"
-          ]
-        }
-      }
-    },
-    {
-      "type": "TEXT_MESSAGE_START",
-      "messageId": "1:e7",
-      "role": "user",
-      "metadata": {
-        "goblin": {
-          "entryId": 7,
-          "at": 1760000000021,
-          "branchable": true
-        }
-      }
-    },
-    {
-      "type": "TEXT_MESSAGE_CONTENT",
-      "messageId": "1:e7",
-      "delta": "write a book"
-    },
-    {
-      "type": "TEXT_MESSAGE_END",
-      "messageId": "1:e7",
-      "metadata": {
-        "goblin": {
-          "entryId": 7
-        }
-      }
-    },
-    {
-      "type": "TEXT_MESSAGE_START",
-      "messageId": "1:a1760000000047",
-      "role": "assistant",
-      "metadata": {
-        "goblin": {
-          "at": 1760000000047
-        }
-      }
-    },
-    {
-      "type": "TEXT_MESSAGE_CONTENT",
-      "messageId": "1:a1760000000047",
-      "delta": "Starting"
-    },
-    {
-      "type": "TEXT_MESSAGE_END",
-      "messageId": "1:a1760000000047",
-      "metadata": {
-        "goblin": {
-          "entryId": 11,
-          "stop": {
-            "reason": "aborted"
-          },
-          "usage": {
-            "input": 0,
-            "output": 0,
-            "cacheRead": 0,
-            "cacheWrite": 0,
-            "totalTokens": 0
-          },
-          "branchable": true
-        }
-      }
-    },
-    {
-      "type": "RUN_FINISHED",
-      "threadId": "1",
-      "runId": "1:8",
-      "usage": [
-        {
-          "provider": "fixture",
-          "model": "lifecycle-fixture",
-          "inputTokens": 0,
-          "outputTokens": 0,
-          "totalTokens": 0,
-          "cachedInputTokens": 0,
-          "cacheWriteInputTokens": 0
-        }
-      ],
-      "outcome": {
-        "type": "cancelled"
-      }
     }
   ],
   "open": [

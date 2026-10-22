@@ -1,6 +1,6 @@
 /**
- * Reading a chat in smoke checks as its stream maps it (AG-UI messages, docs/architecture/streams.md): whether a
- * Delegate reported, and whether the chat is idle by its stream's events.
+ * Reading a chat in smoke checks as its stream maps it (AG-UI messages, docs/architecture/streams.md): a connection's
+ * opening, whether a Delegate reported, and whether the chat is idle by its stream's events.
  */
 import { Schema } from 'effect'
 
@@ -56,7 +56,40 @@ function queuedAfter(event: JsonObject, queued: number): number {
   return change === undefined ? queued : objects(change['value'] ?? []).length
 }
 
-/** Whether `events`, a stream's epoch from its start, leave the chat idle: no run open and nothing queued. */
+/** The events of the whole `data:` frames at the front of `buffer`, and what is left of a frame still coming. */
+function eventsIn(buffer: string): { readonly events: readonly JsonObject[]; readonly rest: string } {
+  const frames = buffer.split('\n\n')
+  const rest = frames.pop() ?? ''
+  const data = frames.flatMap((frame) => frame.split('\n').filter((line) => line.startsWith('data: ')))
+  return { events: objects(data.map((line) => JSON.parse(line.slice('data: '.length)))), rest }
+}
+
+/**
+ * The opening of a chat's stream (`GET …/conversations/:id/stream`, server-sent): its events up to the end of the
+ * chunk that held `STATE_SNAPSHOT`, the server's one write of the chat's snapshots and the run in flight. The
+ * connection is let go then.
+ */
+export async function openingOf(body: ReadableStream<Uint8Array>): Promise<JsonObject[]> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  const events: JsonObject[] = []
+  let buffer = ''
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) throw new Error('stream_ended_before_its_opening')
+      const read = eventsIn(buffer + decoder.decode(value, { stream: true }))
+      events.push(...read.events)
+      buffer = read.rest
+      if (buffer === '' && events.some((event) => event['type'] === 'STATE_SNAPSHOT')) return events
+    }
+  } finally {
+    // expected: the connection may already be gone; the opening is all this read wanted
+    await reader.cancel().catch(() => undefined)
+  }
+}
+
+/** Whether `events`, a connection's opening, leave the chat idle: no run open and nothing queued. */
 export function idleAfter(events: readonly JsonObject[]): boolean {
   let running = false
   let queued = 0

@@ -55,8 +55,6 @@ import type { RoutineSlot } from './routines/scheduler.ts'
 import { routineExtensions } from './routines/kit.ts'
 import type { StartRoutine } from './pi/routine-run.ts'
 import type { ToolSets } from './setup/scope.ts'
-import { Streams } from './streams/service.ts'
-import { type StreamsFetch, streamsFetchOf } from './streams/writer.ts'
 
 type Runtime = ManagedRuntime.ManagedRuntime<AgentServices, never>
 
@@ -176,10 +174,6 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
   protected modelStreams(): ProviderStreams {
     return LITELLM_STREAMS
   }
-  /** How the chat streams reach their stream objects; the integration harness wraps it to lose acknowledgements. */
-  protected streamsFetch(): StreamsFetch | undefined {
-    return this.env.STREAMS === undefined ? undefined : streamsFetchOf(this.env.STREAMS)
-  }
   /** The normal platform boundary; tests inject an official SDK fixture without changing authorization. */
   protected mcpFetch(): typeof fetch {
     // SAFETY: SDK transport alone adds OAuth tokens; binding platform fetch preserves its execution context.
@@ -219,7 +213,6 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       scheduleEvents: (at) => this.#scheduleWake('mcpEventsWake', at),
       scheduleSources: (seconds) => void this.schedule(seconds, 'sourcesWake'),
       mcpFetch: this.mcpFetch(),
-      streamsFetch: this.streamsFetch(),
       keyOrigins: async (keyId) => keyOriginsNow(this.env, this.name, keyId),
       agentApps: this.#apps,
       telemetry: this.#telemetry.telemetry,
@@ -277,14 +270,10 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     await sourcesWake(this.#bridge.run, (seconds) => this.schedule(seconds, 'sourcesWake'))
   }
 
-  /**
-   * Erases the agent: its files in R2 and its chats' streams first (a failure leaves everything to retry), then services
-   * and storage.
-   */
+  /** Erases the agent: its files in R2 first (a failure leaves everything to retry), then services and storage. */
   async deleteAgentData(): Promise<RpcResult<true>> {
     try {
       await this.#apps.ownerFiles.purge()
-      await this.#bridge.run(Streams.use((streams) => streams.erase))
     } catch (cause) {
       return encodeExit(Exit.fail(toAppError(cause)))
     }

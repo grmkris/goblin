@@ -1,6 +1,6 @@
 // Golden tests of the AG-UI translator over Pi batches recorded on a real Pi Harness (`scenarios.ts`, `fixtures/`).
-// Each case's whole output (both tiers, and an epoch opened on the idle conversation) is kept in `__snapshots__/` and
-// reviewed as the public profile's examples; the assertions name what each case is for.
+// Each case's whole output (the live events, and a connection opened on the idle conversation) is kept in
+// `__snapshots__/` and reviewed as the public profile's examples; the assertions name what each case is for.
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { type AguiEvent, EventType, authorTag } from '@goblin/contracts'
@@ -8,7 +8,6 @@ import { describe, expect, it } from 'vitest'
 import { open, reconcile, startCursor, translate } from '../../src/streams/agui.ts'
 import { submissionId } from '../../src/pi/context.ts'
 import { queueView } from '../../src/streams/state.ts'
-import { coalesce, forTier } from '../../src/streams/tiers.ts'
 import { queuedParts } from '../../src/streams/user.ts'
 import { checked, replay, textOf } from './agui-check.ts'
 import type { Recording, ScenarioName } from './scenarios.ts'
@@ -20,12 +19,10 @@ const fixture = (name: ScenarioName): Recording =>
 async function golden(name: ScenarioName) {
   const recording = fixture(name)
   const { events, cursor } = replay(startCursor(recording.chat), recording.batches)
-  const answers = forTier(checked(events), 'answers')
   const opened = open(recording.chat, recording.final, { window: 50 }).events
-  checked(forTier(opened, 'answers'), 'answers')
-  const kept = { full: events, answers: checked(answers, 'answers'), open: checked(opened) }
+  const kept = { live: checked(events), open: checked(opened) }
   await expect(`${JSON.stringify(kept, null, 2)}\n`).toMatchFileSnapshot(`__snapshots__/${name}.agui.json`)
-  return { events, answers, cursor, recording }
+  return { events, cursor, recording }
 }
 
 const ofType = <T extends EventType>(events: readonly AguiEvent[], type: T) =>
@@ -60,7 +57,7 @@ describe('a chat as AG-UI events', () => {
         branchable: true,
       },
     })
-    // The id the answer streamed under is the one an epoch's snapshot gives the committed message.
+    // The id the answer streamed under is the one a connection's snapshot gives the committed message.
     const [snapshot] = ofType(open('1', recording.final, { window: 50 }).events, EventType.MESSAGES_SNAPSHOT)
     expect(snapshot?.messages.map(({ id }) => id)).toEqual(['1:e7', reply])
     expect(ofType(events, EventType.RUN_FINISHED).at(-1)).toMatchObject({
@@ -72,7 +69,7 @@ describe('a chat as AG-UI events', () => {
   })
 
   it('sends visible thinking as a reasoning message in its own span, before the answer', async () => {
-    const { events, answers } = await golden('reasoning')
+    const { events } = await golden('reasoning')
     const [reply] = assistantIds(events)
     const thought = `${reply}:r0`
     expect(textOf(events, thought)).toBe('Two and two.')
@@ -86,12 +83,10 @@ describe('a chat as AG-UI events', () => {
       `REASONING_MESSAGE_CONTENT ${thought}`,
       `REASONING_MESSAGE_CONTENT ${thought}`,
     ])
-    expect(answers.some(({ type }) => type.startsWith('REASONING'))).toBe(false)
-    expect(textOf(answers, reply ?? '')).toBe('It is four.')
   })
 
   it('opens a tool call as it streams, sends its arguments once, then its progress and result', async () => {
-    const { events, answers } = await golden('tool')
+    const { events } = await golden('tool')
     const [first, second] = assistantIds(events)
     expect(ofType(events, EventType.TOOL_CALL_START)).toEqual([
       { type: EventType.TOOL_CALL_START, toolCallId: 'call-1', toolCallName: 'forecast', parentMessageId: first },
@@ -118,9 +113,7 @@ describe('a chat as AG-UI events', () => {
     ])
     expect(ofType(events, EventType.STEP_STARTED).map(({ stepName }) => stepName)).toEqual(['turn 1', 'turn 2'])
     expect(textOf(events, second ?? '')).toBe('It is sunny.')
-    expect(answers.filter(({ type }) => type.startsWith('TOOL_CALL') || type.startsWith('STEP'))).toEqual([])
-    expect(ofType(answers, EventType.CUSTOM)).toEqual([])
-    expect(textOf(answers, first ?? '')).toBe('Checking.')
+    expect(textOf(events, first ?? '')).toBe('Checking.')
   })
 
   it("carries a member's message as their words, with who wrote it and the files it brought", async () => {
@@ -145,7 +138,7 @@ describe('a chat as AG-UI events', () => {
   })
 
   it('ends a run that asked the owner with the interrupt outcome, and keeps the question in /attention', async () => {
-    const { events, answers } = await golden('question')
+    const { events } = await golden('question')
     const interrupt = {
       id: '1:i13',
       reason: 'question',
@@ -157,11 +150,12 @@ describe('a chat as AG-UI events', () => {
       type: EventType.RUN_FINISHED,
       outcome: { type: 'interrupt', interrupts: [interrupt] },
     })
-    const attention = ofType(answers, EventType.STATE_DELTA)
+    const attention = ofType(events, EventType.STATE_DELTA).filter(({ delta }) =>
+      delta.some(({ path }) => path === '/attention'),
+    )
     expect(attention).toEqual([
       expect.objectContaining({ delta: [{ op: 'replace', path: '/attention', value: [interrupt] }] }),
     ])
-    expect(answers.at(-1)).toMatchObject({ outcome: { type: 'interrupt' } })
   })
 
   it('ends a stopped run as cancelled, its partial answer marked', async () => {
@@ -282,7 +276,7 @@ describe('catching up', () => {
     expect(translate(before.cursor, [mid.snapshot]).events).toEqual(caught.events)
   })
 
-  it('opens an epoch mid-answer with the snapshots, the run and the answer so far, then goes on', async () => {
+  it('opens a connection mid-answer with the snapshots, the run and the answer so far, then goes on', async () => {
     const { mid, batches, chat } = fixture('overflow')
     if (mid === undefined) throw new Error('the overflow fixture has no mid-answer snapshot')
     const opened = open(chat, mid.snapshot, { window: 50 })
@@ -316,7 +310,7 @@ describe('catching up', () => {
     expect(again.filter(({ type }) => type !== EventType.STATE_DELTA)).toEqual([])
   })
 
-  it('opens an epoch with a window of the newest entries, hiding what a later entry omits', () => {
+  it('opens a connection with a window of the newest entries, hiding what a later entry omits', () => {
     const { chat, final } = fixture('tool')
     const [snapshot] = ofType(open(chat, final, { window: 2 }).events, EventType.MESSAGES_SNAPSHOT)
     expect(snapshot?.messages.map(({ role }) => role)).toEqual(['tool', 'assistant'])
@@ -342,11 +336,6 @@ describe('catching up', () => {
       activityType: 'goblin.thread_head',
       metadata: { goblin: { entryId: 99, omits: [7] } },
     })
-    const [answers] = ofType(forTier(open(chat, final, { window: 50 }).events, 'answers'), EventType.MESSAGES_SNAPSHOT)
-    expect(answers?.messages.map(({ role }) => role)).toEqual(['user', 'assistant', 'assistant'])
-    expect(answers?.messages.some((message) => message.role === 'assistant' && message.toolCalls !== undefined)).toBe(
-      false,
-    )
   })
 })
 
@@ -382,21 +371,5 @@ describe('the queue', () => {
       { id: 12, mode: 'steer' },
     ])
     expect(queuedParts('plain words')).toEqual({ text: 'plain words' })
-  })
-})
-
-describe('coalescing', () => {
-  it('merges consecutive deltas of one message and keeps every other event as it is', () => {
-    const { events } = replay(startCursor('1'), fixture('reasoning').batches)
-    const merged = coalesce(events)
-    expect(merged.length).toBeLessThan(events.length)
-    for (const id of new Set(assistantIds(events))) {
-      expect(textOf(merged, id)).toBe(textOf(events, id))
-      expect(textOf(merged, `${id}:r0`)).toBe(textOf(events, `${id}:r0`))
-    }
-    expect(merged.filter(({ type }) => !type.endsWith('_CONTENT'))).toEqual(
-      events.filter(({ type }) => !type.endsWith('_CONTENT')),
-    )
-    checked(merged)
   })
 })

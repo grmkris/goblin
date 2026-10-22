@@ -45,6 +45,13 @@ function runningPresence(projection: ConversationProjection, parts: readonly Par
   return { state: 'thinking', label: 'Thinking…' }
 }
 
+/** What a stream that is not connected says. */
+const OFFLINE: Readonly<Record<Exclude<StreamStatus, 'connected'>, string>> = {
+  connecting: 'Connecting…',
+  reconnecting: 'Reconnecting…',
+  stopped: 'Disconnected',
+}
+
 /**
  * One state for the whole agent, most urgent first: a lost connection, then the owner being needed, then the run's
  * own progress, then how the last turn ended.
@@ -57,8 +64,7 @@ export function presenceOf({
   exhausted,
   named = (connectionId) => connectionId,
 }: PresenceInput): PresenceView {
-  if (status !== 'connected')
-    return { state: 'offline', label: status === 'connecting' ? 'Connecting…' : 'Reconnecting…' }
+  if (status !== 'connected') return { state: 'offline', label: OFFLINE[status] }
   if (projection === undefined) return { state: 'offline', label: 'Connecting…' }
   if (waiting > 0) return { state: 'waiting', label: 'Waiting for you' }
   if (projection.progress === 'Waiting for model retry') return { state: 'retrying', label: 'Retrying the model…' }

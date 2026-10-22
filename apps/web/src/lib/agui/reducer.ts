@@ -216,8 +216,8 @@ export class Projector {
   }
 
   /**
-   * An epoch's opening: the messages it starts from replace what was built, and nothing runs until it says so (the
-   * children working are started again after it).
+   * A connection's opening: the messages it starts from replace what was built, and nothing runs until it says so
+   * (the children working are started again after it).
    */
   #snapshot(event: Wire): void {
     this.#committed = records(event.messages)

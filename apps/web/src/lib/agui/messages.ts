@@ -1,5 +1,5 @@
-// A chat's AG-UI messages (docs/architecture/streams.md) as the transcript's messages (`ChatMessage`): the snapshot an
-// epoch opens with, what streamed since, and the older pages the history endpoint answers, all mapped here alike. The
+// A chat's AG-UI messages (docs/architecture/streams.md) as the transcript's messages (`ChatMessage`): the snapshot a
+// connection opens with, what streamed since, and the older pages the history endpoint answers, all mapped here alike. The
 // transcript keeps its ids, `<entry>:<index>`, from `metadata.goblin.entryId`, so a message keeps one id wherever it
 // was read. goblin's marks are decoded by their contract; anything a newer server adds is read past.
 import {

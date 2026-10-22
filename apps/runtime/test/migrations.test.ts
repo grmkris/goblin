@@ -169,12 +169,16 @@ describe('fresh application baseline', () => {
       '20261022160000_asker_role',
       '20261022170000_thread_servers',
       '20261022180000_rooms',
-      '20261022190000_streams',
       '20261022200000_invocation_fork',
+      '20261023000000_streams_dropped',
     ])
-    // An additive migration that alters a table names it too, so a table may be named more than once.
+    // An additive migration that alters a table names it too, so a table may be named more than once; one that drops
+    // a table names it, and it is no live table (ADR 0110's chat streams).
+    const dropped = ['app_streams', 'app_stream_outbox']
     const owned = [...new Set(MIGRATIONS.flatMap((migration) => migration.tables))]
-    expect(owned.toSorted()).toEqual([...tables.keys(), 'app_transcript_fts'].toSorted())
+    expect(owned.filter((name) => !dropped.includes(name)).toSorted()).toEqual(
+      [...tables.keys(), 'app_transcript_fts'].toSorted(),
+    )
     for (const name of owned) expect(() => assertApplicationTable(name)).not.toThrow()
   })
 
@@ -282,5 +286,33 @@ describe('fresh application baseline', () => {
     expect(matches('harbor')).toEqual([{ rowid: 1 }])
     sqlite.exec('DELETE FROM app_transcript_excerpts WHERE entry_id = 1')
     expect(matches('harbor')).toEqual([])
+  })
+})
+
+describe("the chat streams' tables go (ADR 0110)", () => {
+  it('drops the epochs and outbox an agent of ADR 0109 kept, and leaves the rest', () => {
+    const { sqlite, rest } = before('20261023000000_streams_dropped')
+    // The tables as ADR 0109's migration made them, with a stream and an unsent append in them.
+    sqlite.exec(
+      "CREATE TABLE app_streams (chat_id TEXT NOT NULL, tier TEXT NOT NULL CHECK (tier IN ('full', 'answers')), epoch INTEGER NOT NULL, next_seq INTEGER NOT NULL, bytes INTEGER NOT NULL, started_at INTEGER NOT NULL, cursor_json TEXT NOT NULL, PRIMARY KEY (chat_id, tier))",
+    )
+    sqlite.exec(
+      'CREATE TABLE app_stream_outbox (stream TEXT NOT NULL, epoch INTEGER NOT NULL, seq INTEGER NOT NULL, body TEXT NOT NULL, PRIMARY KEY (stream, epoch, seq))',
+    )
+    sqlite.exec("INSERT INTO app_streams VALUES ('1', 'full', 1, 0, 0, 1, '{}')")
+    sqlite.exec("INSERT INTO app_stream_outbox VALUES ('1/full', 1, 0, '[]')")
+    rest()
+    const tables = sqlite
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'app_stream%'")
+      .all()
+    expect(tables).toEqual([])
+    expect(sqlite.prepare('SELECT count(*) AS n FROM app_conversations').get()).toEqual({ n: 0 })
+    sqlite.close()
+  })
+
+  it('is a no-op for an agent that never had them', () => {
+    const { sqlite, rest } = before('20261023000000_streams_dropped')
+    expect(rest).not.toThrow()
+    sqlite.close()
   })
 })

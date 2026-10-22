@@ -49,18 +49,27 @@ function offeredTools(messages: readonly Message[]): string[] {
 
 /**
  * What the scripted model answers, from the newest turn: after a tool round, `done`; to `call <tool> <json>`, that
- * tool call; to anything else, `echo: <text>`. Deterministic, keyless, no network.
+ * tool call; to `think <rest>`, a visible thought and then its answer to `<rest>`; to anything else, `echo: <text>`.
+ * Deterministic, keyless, no network.
  */
 export function reply(messages: readonly Message[]): AssistantMessage['content'] {
   // Pi appends a changed system prompt after the newest turn, so the turn to answer is the last non-system message.
   const last = messages.findLast((message) => message.role !== 'system')
   if (last?.role === 'toolResult') return [{ type: 'text', text: `done: ${textOf(last)}` }]
   const text = last === undefined ? '' : (textOf(last).split('\n').at(-1) ?? '')
+  return answer(text, messages.length)
+}
+
+/** The answer to `text` in a request of `turns` messages: a tool call, a thought before an answer, or their echo. */
+function answer(text: string, turns: number): AssistantMessage['content'] {
+  const thought = /^think (.+)$/u.exec(text)?.[1]
+  if (thought !== undefined)
+    return [{ type: 'thinking', thinking: `Thinking about ${thought}.` }, ...answer(thought, turns)]
   const call = /^call (\w+) (\{.*\})$/u.exec(text)
   if (call === null) return [{ type: 'text', text: `echo: ${text}` }]
   const tool: ToolCall = {
     type: 'toolCall',
-    id: `call-${messages.length}`,
+    id: `call-${turns}`,
     name: call[1] ?? '',
     arguments: JSON.parse(call[2] ?? '{}'),
   }

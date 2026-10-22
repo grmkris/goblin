@@ -5,6 +5,7 @@ import path from 'node:path'
 import * as Redacted from 'effect/Redacted'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { DevClient, type Step } from '../../scripts/smoke-client.ts'
+import { idleAfter, openingOf } from '../../scripts/smoke-entries.ts'
 
 const OWNER = 'owner@example.com'
 const COOKIE = 'better-auth.session_token=secret-value'
@@ -18,9 +19,16 @@ const answer = (response: ServerResponse, status: number, body: unknown, ref?: s
   response.end(JSON.stringify(body))
 }
 
+/** Chat 1's stream opens with its snapshots, a run in flight, then stays open. */
+const OPENING = [
+  { type: 'MESSAGES_SNAPSHOT', messages: [] },
+  { type: 'STATE_SNAPSHOT', snapshot: { queue: [] } },
+  { type: 'RUN_STARTED', threadId: '1', runId: '1:4' },
+]
+
 /**
- * A stand-in for the stage: the session read, the owner's one workspace, two owner endpoints under it (ADR 0089), and a
- * failure in the error envelope.
+ * A stand-in for the stage: the session read, the owner's one workspace, two owner endpoints under it (ADR 0089), a
+ * chat's stream, and a failure in the error envelope.
  */
 const server = createServer((request, response) => {
   seen.push({ method: request.method ?? '', url: request.url ?? '', headers: request.headers })
@@ -32,6 +40,11 @@ const server = createServer((request, response) => {
   if (route === 'GET /w/owner/api/agent/resident') return answer(response, 200, { state: 'active' }, 'ref-resident')
   if (route === 'PUT /w/owner/api/agent/model')
     return answer(response, 200, { current: 'm', default: 'm', options: [] }, 'ref-model')
+  if (route === 'GET /w/owner/api/conversations/1/stream') {
+    response.writeHead(200, { 'content-type': 'text/event-stream', 'x-goblin-ref': 'ref-stream' })
+    response.write(OPENING.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''))
+    return
+  }
   const missing = { error: { code: 'not_found', message: 'That does not exist.', what: 'chat', ref: 'ref-missing' } }
   return answer(response, 404, missing, 'ref-missing')
 })
@@ -74,10 +87,21 @@ describe('DevClient', () => {
   })
 
   it('reports a refused call by its tag, never its text, and logs its reference', async () => {
-    await expect(dev.owner((api) => api.conversations.stream({ params: { id: '7' } }))).rejects.toThrow(
+    await expect(dev.owner((api) => api.conversations.composer({ params: { id: '7' } }))).rejects.toThrow(
       /^request_failed: NotFound$/u,
     )
-    expect(steps.at(-1)).toEqual({ step: 'GET /api/conversations/7/stream', status: 404, ref: 'ref-missing' })
+    expect(steps.at(-1)).toEqual({ step: 'GET /api/conversations/7/composer', status: 404, ref: 'ref-missing' })
+  })
+
+  it("reads a chat's stream directly: its opening, and whether the chat is idle by it", async () => {
+    const response = await dev.send('/api/conversations/1/stream', { headers: { accept: 'text/event-stream' } })
+    expect(response.headers.get('content-type')).toBe('text/event-stream')
+    if (response.body === null) throw new Error('a stream without a body')
+    const opening = await openingOf(response.body)
+    expect(opening).toEqual(OPENING)
+    expect(idleAfter(opening)).toBe(false)
+    expect(idleAfter(opening.slice(0, 2))).toBe(true)
+    expect(steps.at(-1)).toEqual({ step: 'GET /api/conversations/1/stream', status: 200, ref: 'ref-stream' })
   })
 
   it('leaves the session out of a request that asks for it', async () => {

@@ -15,7 +15,7 @@ import { appChecks } from './smoke-apps.ts'
 import { DevClient, type Step } from './smoke-client.ts'
 import { InboundClient, SMOKE_CLIENT_NAME, base64url, operationId } from './smoke-inbound.ts'
 import { edgeChecks, internalChecks } from './smoke-edge.ts'
-import { delegateReported, idleAfter, marksOf } from './smoke-entries.ts'
+import { delegateReported, idleAfter, marksOf, openingOf } from './smoke-entries.ts'
 import { publicSmoke } from './smoke-public.ts'
 import { clientBuild, flowsCheck } from './smoke-release.ts'
 
@@ -160,21 +160,16 @@ const mainHistory = (dev: DevClient, signal?: AbortSignal) =>
   dev.owner((api) => api.conversations.history(MAIN_HISTORY), signal)
 
 /**
- * Chat `thread`'s stream from the start of its epoch, as any reader reads it: joined, then read at its signed URL page
- * by page until up to date (docs/architecture/streams.md).
+ * Chat `thread`'s stream as any reader reads it: a connection to it, and the opening it begins with (the chat's
+ * snapshots and the run in flight, docs/architecture/streams.md); the connection is let go then.
  */
 async function streamEvents(dev: DevClient, thread: string, signal?: AbortSignal): Promise<JsonObject[]> {
-  const link = await dev.owner((api) => api.conversations.stream({ params: { id: thread } }), signal)
-  const events: JsonObject[] = []
-  for (let offset = '-1'; ;) {
-    const url = new URL(link.url)
-    url.searchParams.set('offset', offset)
-    const response = await fetch(url, signal === undefined ? {} : { signal })
-    if (!response.ok) throw new Error(`stream_read_${response.status}`)
-    events.push(...objects(await response.json()))
-    offset = response.headers.get('stream-next-offset') ?? offset
-    if (response.headers.get('stream-up-to-date') === 'true') return events
-  }
+  const response = await dev.send(`/api/conversations/${thread}/stream`, {
+    headers: { accept: 'text/event-stream' },
+    ...(signal === undefined ? {} : { signal }),
+  })
+  if (!response.ok || response.body === null) throw new Error(`stream_read_${response.status}`)
+  return openingOf(response.body)
 }
 
 const waitForIdle = (dev: DevClient, thread: string): Promise<void> =>

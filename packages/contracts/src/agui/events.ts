@@ -2,7 +2,7 @@ import type { Event, Interrupt, Message } from '@ag-ui/core'
 import * as Schema from 'effect/Schema'
 
 // A chat's stream speaks AG-UI 1.0 (`@ag-ui/core`, pinned): its events, messages and interrupts are AG-UI's own types,
-// used as they are. This package adds only goblin's parts: the tiers, the CUSTOM events, the activity types, the
+// used as they are. This package adds only goblin's parts: the CUSTOM events, the activity types, the
 // `metadata.goblin` fields and the STATE document (docs/architecture/streams.md).
 
 export { EventType } from '@ag-ui/core'
@@ -15,10 +15,8 @@ export type AguiInterrupt = Interrupt
 
 /** The CUSTOM event names goblin sends; any other name is not goblin's. */
 export const CustomName = {
-  /** A running tool's progress (`ToolProgress`), full tier only. */
+  /** A running tool's progress (`ToolProgress`). */
   toolProgress: 'goblin.tool_progress',
-  /** The last event of an epoch: the stream closes and the chat goes on in epoch `StreamMoved.epoch`. */
-  streamMoved: 'goblin.stream.moved',
 } as const
 
 /** A tool diagnostic as Pi records it: a remark about the call the model reads too. */
@@ -46,7 +44,3 @@ export const ToolProgress = Schema.Struct({
   diagnostics: Schema.optionalKey(Schema.Array(ToolDiagnostic)),
 })
 export type ToolProgress = typeof ToolProgress.Type
-
-/** `goblin.stream.moved`: the epoch the chat goes on in; a reader asks for its stream again. */
-export const StreamMoved = Schema.Struct({ epoch: Schema.Int.check(Schema.isGreaterThan(0)) })
-export type StreamMoved = typeof StreamMoved.Type

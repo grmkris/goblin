@@ -122,7 +122,7 @@ export type AttentionItem = typeof AttentionItem.Type
 
 /**
  * A chat's STATE document (`STATE_SNAPSHOT`, then RFC 6902 `STATE_DELTA`s that replace one top-level member at a
- * time). Every member is always present. `/attention` is the only member the `answers` tier carries.
+ * time). Every member is always present.
  */
 export const GoblinState = Schema.Struct({
   queue: Schema.Array(QueueItem),
@@ -133,6 +133,3 @@ export const GoblinState = Schema.Struct({
   attention: Schema.Array(AttentionItem),
 })
 export type GoblinState = typeof GoblinState.Type
-
-/** The STATE members the `answers` tier carries. */
-export const ANSWERS_STATE: readonly (keyof GoblinState)[] = ['attention']

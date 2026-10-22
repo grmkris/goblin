@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import path from 'node:path'
 import type { Browser, Page } from 'playwright-core'
+import { OPENINGS, installLiveReads } from '../agui-route.ts'
 import { snapshot } from './transcript-fixture.ts'
 
 const TYPES: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
@@ -35,47 +36,12 @@ export const PROFILES: Record<string, Profile> = {
 }
 
 /**
- * The fixture chat's stream as `ui-channel.ts` serves one (`../agui-route.ts`): the join, the epoch's opening at
- * `/streams/1`, and a live read the page's batches (`fixture-batch`) arrive on, each as one `data` frame and its
- * `control`.
+ * The fixture chat's stream as `ui-channel.ts` serves one (`../agui-route.ts`): its opening, then the page's batches
+ * (`fixture-batch`) as they come, each as its events' `data` frames.
  */
 export async function install(page: Page, entries: readonly Record<string, unknown>[]) {
-  await page.addInitScript(() => {
-    let written = 0
-    class Live extends EventTarget {
-      readonly forward = (event: Event) => {
-        if (!(event instanceof MessageEvent)) return
-        const data: unknown = event.data
-        if (typeof data !== 'string') return
-        written += 1
-        this.dispatchEvent(new MessageEvent('data', { data }))
-        const control = { streamNextOffset: `live-${written}`, upToDate: true }
-        this.dispatchEvent(new MessageEvent('control', { data: JSON.stringify(control) }))
-      }
-      constructor() {
-        super()
-        window.addEventListener('fixture-batch', this.forward)
-      }
-      close() {
-        window.removeEventListener('fixture-batch', this.forward)
-      }
-    }
-    Object.defineProperty(window, 'EventSource', { value: Live })
-  })
+  await installLiveReads(page)
   const body = JSON.stringify(snapshot(entries))
-  await page.route('**/streams/**', (route) =>
-    route.fulfill({
-      body,
-      contentType: 'application/json',
-      headers: { 'stream-next-offset': 'opening', 'stream-up-to-date': 'true' },
-    }),
-  )
-  await page.route('**/api/**', (route) => {
-    const url = new URL(route.request().url())
-    if (url.pathname.endsWith('/stream'))
-      return route.fulfill({
-        json: { url: `${url.origin}/streams/1`, epoch: 1, tier: 'full', expiresAt: '2099-01-01T00:00:00.000Z' },
-      })
-    return route.fulfill({ json: {} })
-  })
+  await page.route(OPENINGS, (route) => route.fulfill({ body, contentType: 'application/json' }))
+  await page.route('**/api/**', (route) => route.fulfill({ json: {} }))
 }

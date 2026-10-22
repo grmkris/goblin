@@ -55,6 +55,15 @@ export interface QueryClientOptions {
   readonly onUnauthenticated?: () => void | Promise<void>
 }
 
+/** What each client does with a failure outside its queries (`failedOutside`): what it does with a query's. */
+const outside = new WeakMap<QueryClient, (error: unknown) => void>()
+
+/**
+ * A failure of a read outside the query cache (a chat's stream, `lib/agui/reader.ts`), handled as a query's would be:
+ * a lost session goes to sign-in.
+ */
+export const failedOutside = (client: QueryClient, error: unknown): void => outside.get(client)?.(error)
+
 /** Where the owner signs in: a failure there never sends them to it again. */
 const SIGN_IN_PATH = '/login'
 
@@ -88,7 +97,7 @@ export const makeQueryClient = (options: QueryClientOptions = {}) => {
     signingIn = true
     signIn()
   }
-  return new QueryClient({
+  const client = new QueryClient({
     queryCache: new QueryCache({ onError: (error, query) => onError(error, query.meta) }),
     mutationCache: new MutationCache({
       onError: (error, _variables, _context, mutation) => onError(error, mutation.meta),
@@ -103,6 +112,8 @@ export const makeQueryClient = (options: QueryClientOptions = {}) => {
       mutations: { retry: false, networkMode: 'online' },
     },
   })
+  outside.set(client, (error) => onError(error, undefined))
+  return client
 }
 
 /** Headers for one outgoing request, given the operation it carries (`withOperation`), if any. */

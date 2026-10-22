@@ -6,7 +6,7 @@ import { createServer } from 'vite'
 import { chromium, type Page, type Route } from 'playwright-core'
 import * as Schema from 'effect/Schema'
 import { opening } from './agui-fixtures.ts'
-import { FixtureStream, dropLiveReads, installLiveReads } from './agui-route.ts'
+import { FixtureStream, OPENINGS, dropLiveReads, installLiveReads } from './agui-route.ts'
 
 /** The file descriptor this script's result line goes to (@cloudflare/workers-types makes `process` `any`). */
 const STDOUT = 1
@@ -46,7 +46,7 @@ async function install(page: Page) {
   const changed = () =>
     stream.write(page, { type: 'STATE_DELTA', delta: [{ op: 'replace', path: '/queue', value: inputs }] })
   await installLiveReads(page)
-  await page.route('**/streams/1**', (route) => stream.read(route))
+  await page.route(OPENINGS, (route) => stream.opening(route))
   const remove = async (route: Route) => {
     const { submissionId } = Schema.decodeUnknownSync(Schema.Struct({ submissionId: Schema.Int }))(
       route.request().postDataJSON(),
@@ -79,7 +79,6 @@ async function install(page: Page) {
   await page.route('**/api/conversations/1/**', async (route: Route) => {
     const request = route.request()
     const action = new URL(request.url()).pathname.split('/').at(-1)
-    if (action === 'stream') return route.fulfill({ json: stream.link(new URL(request.url()).origin) })
     if (action === 'queue' && request.method() === 'DELETE') return remove(route)
     if (action === 'composer') return route.fulfill({ json: { options: [], unavailable: [] } })
     if (action === 'messages') return submit(route)
@@ -123,8 +122,8 @@ async function matrix(origin: string, page: Page, label: string, dark: boolean) 
   await full.locator('[data-submission="5"]').waitFor()
   assert.equal(await full.locator('[data-submission]').count(), 4)
   assert.equal(await inline.locator('[data-submission]').count(), 4)
-  assert.equal(await page.locator('html').getAttribute('data-streams'), '1', 'full and inline share one live read')
-  assert.equal(fixture.reads(), 1, 'full and inline share one catch-up read')
+  assert.equal(await page.locator('html').getAttribute('data-streams'), '1', 'full and inline share one connection')
+  assert.equal(fixture.reads(), 1, 'full and inline share one opening')
   assert(await full.getByRole('link', { name: 'notes.txt' }).isVisible())
   assert(await full.getByLabel('Selected references').getByText('@Notes').isVisible())
   assert(await full.getByText('Chat · Trip planning · Follow-up').isVisible())
@@ -147,10 +146,10 @@ async function matrix(origin: string, page: Page, label: string, dark: boolean) 
   assert(!bounds.overflow, 'narrow queue has no horizontal overflow')
   await page.screenshot({ path: path.join(out, `${label}.png`) })
   await summary.press('Enter')
-  // A dropped live read reads on from its offset, once for both panes, and the queue stays as it was.
+  // A dropped connection connects again, once for both panes, and its fresh opening keeps the queue as it was.
   await dropLiveReads(page)
   await page.waitForFunction(() => document.documentElement.dataset['streams'] === '2')
-  assert.equal(fixture.reads(), 2, 'one catch-up read after the drop')
+  assert.equal(fixture.reads(), 2, 'one new opening after the drop')
   assert.equal(await full.locator('[data-submission]').count(), 4)
   assert.equal(await inline.locator('[data-submission]').count(), 4)
   const field = full.getByRole('textbox', { name: 'Message' })

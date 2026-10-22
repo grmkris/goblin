@@ -17,7 +17,7 @@ import { goblin } from './messages.ts'
 
 /**
  * Who a child is, as its parent's stream names it: its chat (the `subagentRunId`), its name, and a Persona's mark, which
- * its answer carries too (nothing the answers tier would not show of the answer).
+ * its answer carries too.
  */
 export type ChildInfo = {
   readonly chat: string

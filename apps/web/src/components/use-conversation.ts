@@ -1,19 +1,14 @@
 import { type RefObject, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
-import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AppContext, ComposerSelection } from '@goblin/contracts'
-import {
-  historyQuery,
-  removeQueuedMutation,
-  stopMutation,
-  streamJoin,
-  submitMutation,
-} from '../conversations/queries.ts'
+import { historyQuery, removeQueuedMutation, stopMutation, submitMutation } from '../conversations/queries.ts'
 import { records } from '../lib/values.ts'
 import type { StreamStatus } from '../lib/agui/reader.ts'
-import { browserTransport } from '../lib/event-streams.ts'
+import { chatStream, readEvents } from '../lib/event-streams.ts'
 import { chatMessages, entriesOf } from '../lib/agui/messages.ts'
 import type { ConversationProjection } from '../lib/agui/reducer.ts'
 import { messageOf } from '../lib/query/app-error.ts'
+import { failedOutside } from '../lib/query/api-query.ts'
 import { reportUnexpected } from '../lib/unexpected.ts'
 import { type Lease, type StreamState, StreamPool } from '../lib/stream-pool.ts'
 import { conversationParts } from '../lib/conversation-parts.ts'
@@ -48,15 +43,15 @@ export function messageBody(
 }
 
 /** Every conversation the browser follows, shared by the panes and inline threads that show it. */
-const streams = new StreamPool((thread) => ({ join: streamJoin(thread), transport: browserTransport }))
+const streams = new StreamPool((thread) => ({ open: chatStream(thread), read: readEvents }))
 
-/** Reads every followed conversation on from where it was, while the page is visible. */
+/** Connects every followed conversation again, for a fresh opening, while the page is visible. */
 const resume = () => {
   if (document.visibilityState === 'visible') streams.resume()
 }
 
 let resuming = false
-/** Coming back to the tab, or back online, every followed conversation reads what it missed. */
+/** Coming back to the tab, or back online, every followed conversation connects again and opens up to date. */
 function resumeWithThePage(): void {
   if (resuming) return
   resuming = true
@@ -65,6 +60,14 @@ function resumeWithThePage(): void {
 }
 
 const FOLLOWING: StreamState = { projection: undefined, status: 'connecting', notice: '' }
+
+/** A stream refused for good (`stopped`), handled as a refused query is: a lost session goes to sign-in. */
+function useRefusal(failure: unknown): void {
+  const queryClient = useQueryClient()
+  useEffect(() => {
+    if (failure !== undefined) failedOutside(queryClient, failure)
+  }, [queryClient, failure])
+}
 
 /**
  * One conversation of the agent as the browser follows it, from the shared stream pool: its AG-UI stream
@@ -93,6 +96,7 @@ export function useConversation(thread: string, visible = true) {
     }
   }, [thread])
   useEffect(() => lease.current?.setVisible(visible), [visible])
+  useRefusal(state.failure)
   const submit = useMutation(submitMutation).mutateAsync
   // Who sends, so the echo waits for their own message, never another member's (ADR 0094).
   const me = useQuery(sessionPersonQuery).data?.id

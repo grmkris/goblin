@@ -1,6 +1,5 @@
 import {
   type SetupItem,
-  type StreamTier,
   type TopicSetup,
   type TopicSetupEdit,
   type WorkspaceRole,
@@ -41,14 +40,6 @@ const requestCaller = Effect.map(
  */
 export const requestKey: Effect.Effect<KeyGrant | undefined> = Effect.map(requestCaller, (caller) =>
   caller?.kind === 'key' ? caller : undefined,
-)
-
-/**
- * The tier of a chat's stream the current request reads (docs/architecture/streams.md): a member's session and an OAuth
- * client holding `transcripts` read `full`; a server's key and any other client read `answers`.
- */
-export const requestTier: Effect.Effect<StreamTier> = Effect.map(requestCaller, (caller) =>
-  caller === undefined || (caller.kind === 'client' && caller.scopes.includes('transcripts')) ? 'full' : 'answers',
 )
 
 /**

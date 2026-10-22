@@ -24,7 +24,6 @@ export default Alchemy.Stack(
       env: {
         AGENTS: Cloudflare.DurableObject('PersonalAgentProbe'),
         AUTH_DB: auth,
-        STREAMS: Cloudflare.DurableObject('StreamObject'),
         FILES: files,
         LOADER: Cloudflare.WorkerLoader(),
         LIFECYCLE: Cloudflare.DurableObject('NativeLifecycleProbe'),

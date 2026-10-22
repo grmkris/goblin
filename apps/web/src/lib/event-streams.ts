@@ -1,73 +1,55 @@
 // The browser's live reads of the server, the transports the rest of the page reads through: a chat's AG-UI stream
-// (`agui/reader.ts`) over `fetch` and `EventSource` at the URL its join answered, and the workspace feed's
+// (`agui/reader.ts`), read with `fetch` from its endpoint under this page's workspace, and the workspace feed's
 // server-sent events (`workspace/connection.ts`). Every other server call goes through the typed client.
-import type { StreamTransport } from './agui/reader.ts'
-import { isString, record, records } from './values.ts'
+import { requestId } from './api.ts'
+import { isString } from './values.ts'
+import { apiPath } from './workspace-path.ts'
 
-const header = (response: Response, name: string): boolean => response.headers.get(name)?.toLowerCase() === 'true'
-
-/** `url` with the protocol's reading parameters. */
-function readUrl(url: string, offset: string, live?: 'long-poll' | 'sse'): string {
-  const target = new URL(url, globalThis.location?.href)
-  target.searchParams.set('offset', offset)
-  if (live !== undefined) target.searchParams.set('live', live)
-  return target.href
-}
-
-/** A server-sent event's text. */
-function textOf(event: Event): string | undefined {
-  if (!(event instanceof MessageEvent)) return undefined
-  const data: unknown = event.data
-  return isString(data) ? data : undefined
-}
-
-/** JSON as a value, or none. */
-function json(data: string): unknown {
-  try {
-    return JSON.parse(data)
-  } catch {
-    // expected: a frame that is not JSON is read as none and the read starts again from its offset
-    return undefined
-  }
-}
-
-/** The stream over `fetch` and `EventSource`, as the browser reads it. */
-export const browserTransport: StreamTransport = {
-  read: async (url, offset, longPoll, signal) => {
-    const response = await fetch(readUrl(url, offset, longPoll ? 'long-poll' : undefined), {
-      signal,
+/** Opens chat `id`'s stream: same origin, with the session's cookie, never cached. */
+export const chatStream =
+  (id: string) =>
+  (signal: AbortSignal): Promise<Response> =>
+    fetch(apiPath(`/api/conversations/${encodeURIComponent(id)}/stream`), {
+      headers: { accept: 'text/event-stream', 'x-goblin-request': requestId() },
+      credentials: 'same-origin',
       cache: 'no-store',
+      signal,
     })
-    const events = response.status === 200 ? records(await response.json()) : []
-    return {
-      status: response.status,
-      events,
-      next: response.headers.get('stream-next-offset') ?? undefined,
-      closed: header(response, 'stream-closed'),
-      upToDate: header(response, 'stream-up-to-date') || response.status === 204,
-    }
-  },
-  live: (url, offset, listener) => {
-    const source = new EventSource(readUrl(url, offset, 'sse'))
-    let pending: readonly unknown[] = []
-    source.addEventListener('data', (event) => {
-      const data = textOf(event)
-      if (data !== undefined) pending = [...pending, ...records(json(data))]
-    })
-    source.addEventListener('control', (event) => {
-      const data = textOf(event)
-      const control = data === undefined ? undefined : record(json(data))
-      if (control === undefined || !isString(control.streamNextOffset)) return
-      const events = pending
-      pending = []
-      listener.events(events, control.streamNextOffset, control.streamClosed === true)
-    })
-    source.addEventListener('error', () => {
-      source.close()
-      listener.error()
-    })
-    return () => source.close()
-  },
+
+/** A frame's data, joined across its `data:` lines; none for a frame without one (a comment, a heartbeat). */
+function dataOf(frame: string): string | undefined {
+  const lines = frame
+    .split('\n')
+    .flatMap((line) => (line.startsWith('data:') ? [line.slice(5).replace(/^ /u, '')] : []))
+  return lines.length === 0 ? undefined : lines.join('\n')
+}
+
+/** The whole frames at the front of `buffer`, and what is left of a frame still coming. */
+function framesOf(buffer: string): { readonly frames: string[]; readonly rest: string } {
+  const frames = buffer.split('\n\n')
+  const rest = frames.pop() ?? ''
+  return { frames, rest }
+}
+
+/**
+ * Reads a server-sent events body to its end: each chunk's whole frames, their `data:` as one JSON event each, handed
+ * to `events` (none for a chunk of comments alone, which still says the connection is alive). A frame that is not
+ * JSON fails the read: the server sent something this tab cannot follow, so it connects again for a fresh opening.
+ */
+export async function readEvents(response: Response, events: (events: readonly unknown[]) => void): Promise<void> {
+  const reader = response.body?.getReader()
+  if (reader === undefined) return
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (let read = await reader.read(); !read.done; read = await reader.read()) {
+    const chunk: unknown = read.value
+    if (!(chunk instanceof Uint8Array)) throw new TypeError('The stream is not bytes.')
+    const { frames, rest } = framesOf(buffer + decoder.decode(chunk, { stream: true }).replaceAll('\r\n', '\n'))
+    buffer = rest
+    const parsed: unknown[] = []
+    for (const data of frames.flatMap((frame) => dataOf(frame) ?? [])) parsed.push(JSON.parse(data))
+    events(parsed)
+  }
 }
 
 /** The workspace feed's server-sent events, as `WorkspaceFeedConnection` reads them; tests give their own. */

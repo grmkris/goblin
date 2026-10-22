@@ -21,7 +21,6 @@ export const ownerStack = (name: string, offset: number) =>
         env: {
           AGENTS: Cloudflare.DurableObject('OwnerAgent'),
           AUTH_DB: auth,
-          STREAMS: Cloudflare.DurableObject('StreamObject'),
           FILES: files,
           LOADER: Cloudflare.WorkerLoader(),
           APP_URL: 'https://goblin.test',
@@ -36,8 +35,6 @@ export const ownerStack = (name: string, offset: number) =>
           DAILY_TOKEN_CAP: '1000000',
           MCP_SERVERS: '[{"connectionId":"apps-fixture","endpoint":"https://apps-fixture.test/mcp"}]',
           CREDENTIAL_KEY: 'Z29ibGluLXRlc3QtZml4dHVyZS1rZXkhISEhISEhISE=',
-          // Every joined chat's stream moves to a new epoch at the end of each run (`streams-case.ts`).
-          STREAM_ROTATE_BYTES: '1',
         },
       })
       return { url: worker.url.as<string>() }

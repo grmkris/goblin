@@ -39,8 +39,8 @@ import {
 } from './state.ts'
 
 // A chat's Pi events as AG-UI 1.0 events (docs/architecture/streams.md): a pure translator, no services and no I/O.
-// The producer keeps its cursor between calls; `translate` follows Pi's committed batches, `reconcile` catches up from
-// a snapshot (a watch that overflowed), and `open` starts an epoch.
+// The producer keeps a cursor per reader between calls; `translate` follows Pi's committed batches, `reconcile` catches
+// up from a snapshot (a watch that overflowed, or opened again), and `open` starts a reader's connection.
 
 /** The run in flight, as far as the stream followed it. */
 type RunSent = {
@@ -63,8 +63,8 @@ type RunSent = {
 /**
  * Where a chat's stream is: what it carried last (`lastEntryId`), the run and the answer in flight, the operation ids
  * of inputs it saw admitted (by submission id, newest kept), the compaction tasks behind `state.compactions.running`,
- * the STATE document as sent, and the children whose work it carries now (`children.ts`). Plain JSON, so the
- * producer can keep it between appends. `translate`, `reconcile` and `open` never change the cursor they are given;
+ * the STATE document as sent, and the children whose work it carries now (`children.ts`). Plain JSON, kept by the
+ * producer for each reader between batches. `translate`, `reconcile` and `open` never change the cursor they are given;
  * they answer a new one.
  */
 export type StreamCursor = {
@@ -82,10 +82,16 @@ export type StreamCursor = {
 /** A child whose work the stream carries (started, not ended): who it is, and its own cursor over its own chat. */
 export type ChildSent = Omit<ChildInfo, 'chat'> & { cursor: StreamCursor }
 
-/** What the producer knows that Pi's events do not say: what queued inputs say (from `InboxDoc`), by id. */
-export type Hints = { readonly queued?: ReadonlyMap<number, QueuedParts> }
+/**
+ * What the producer knows that Pi's events do not say: what queued inputs say (from `InboxDoc`), and the operation ids
+ * of the inputs a snapshot names (its run's, the queue's), which a snapshot does not carry; each by submission id.
+ */
+export type Hints = {
+  readonly queued?: ReadonlyMap<number, QueuedParts>
+  readonly operations?: ReadonlyMap<number, string>
+}
 
-/** The events to append, and the cursor after them. */
+/** The events to send, and the cursor after them. */
 export type Translation = { readonly events: readonly AguiEvent[]; readonly cursor: StreamCursor }
 
 /** How many admitted inputs' operation ids a cursor keeps until their run starts. */
@@ -108,6 +114,16 @@ function setState<K extends keyof GoblinState>(w: Work, key: K, value: GoblinSta
   if (JSON.stringify(w.cursor.state[key]) === JSON.stringify(value)) return
   w.cursor.state[key] = value
   w.out.push({ type: EventType.STATE_DELTA, delta: [{ op: 'replace', path: `/${key}`, value }] })
+}
+
+/**
+ * The operation ids the producer read for inputs a snapshot names, kept for their run like those of inputs the stream
+ * saw admitted; never for the run the stream already follows.
+ */
+function hintedOperations(w: Work): void {
+  const { operations, run } = w.cursor
+  for (const [input, operation] of w.hints.operations ?? [])
+    if (!(run?.inputs.includes(input) ?? false)) operations[input] ??= operation
 }
 
 /** A run begins: one ended that the stream never saw end first. */
@@ -508,6 +524,7 @@ function catchUpMessage(w: Work, partial: AssistantMessage | undefined): void {
  */
 function reconcileWith(w: Work, snapshot: SnapshotEvent): void {
   const { cursor } = w
+  hintedOperations(w)
   const entries = snapshot.entries.filter(({ id }) => Number(id) > cursor.lastEntryId)
   catchUpEntries(w, entries, snapshot.run?.inputs.map(Number))
   catchUpMessage(w, snapshot.generation?.message)
@@ -515,7 +532,7 @@ function reconcileWith(w: Work, snapshot: SnapshotEvent): void {
   for (const key of ['queue', 'generation', 'compactions', 'agent', 'usage'] as const) setState(w, key, fresh[key])
 }
 
-/** Catch up from a snapshot of the chat: after a watch overflowed, or when the producer attaches again. */
+/** Catch up from a snapshot of the chat: after a watch overflowed, or when the producer watches the chat again. */
 export function reconcile(cursor: StreamCursor, snapshot: SnapshotEvent, hints: Hints = {}): Translation {
   const w = work(cursor, hints)
   reconcileWith(w, snapshot)
@@ -523,8 +540,8 @@ export function reconcile(cursor: StreamCursor, snapshot: SnapshotEvent, hints: 
 }
 
 /**
- * An epoch's first events from `snapshot`: `MESSAGES_SNAPSHOT` with the messages of the newest `window` entries (older
- * history is read in pages), `STATE_SNAPSHOT`, then the run in flight (RUN_STARTED, and its answer so far).
+ * A connection's first events from `snapshot`: `MESSAGES_SNAPSHOT` with the messages of the newest `window` entries
+ * (older history is read in pages), `STATE_SNAPSHOT`, then the run in flight (RUN_STARTED, and its answer so far).
  */
 export function open(
   chat: string,
@@ -550,6 +567,7 @@ export function open(
   )
   w.cursor.state = state
   w.cursor.lastEntryId = Math.max(0, ...snapshot.entries.map(({ id }) => Number(id)))
+  hintedOperations(w)
   if (snapshot.run !== undefined) runStarted(w, snapshot.run.inputs.map(Number))
   const partial = snapshot.generation?.message
   if (partial !== undefined) {

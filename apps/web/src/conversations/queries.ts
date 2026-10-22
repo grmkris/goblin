@@ -50,13 +50,6 @@ export const historyQuery = (id: string, start: number | undefined) =>
     getNextPageParam: (page) => (page.more ? page.next : undefined),
   })
 
-/**
- * Where chat `id`'s stream is read (`lib/agui/reader.ts`, a reader beside the cache): asked again whenever the reader
- * needs a new link.
- */
-export const streamJoin = (id: string) => (signal: AbortSignal) =>
-  owner.run((api) => api.conversations.stream({ params: { id } }), signal)
-
 /** The owner's message to chat `id`, as its operation: a retry with the same id is the same message. */
 type Submission = { readonly id: string; readonly message: SendMessage }
 

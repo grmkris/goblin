@@ -1,13 +1,14 @@
 import type { AgentEvent, AgentEventStream, CommitPublication, SnapshotEvent } from '@earendil-works/pi-durable'
-import type { AguiEvent, StreamTier } from '@goblin/contracts'
+import type { AguiEvent } from '@goblin/contracts'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
+import type * as Cause from 'effect/Cause'
 import * as Clock from 'effect/Clock'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import * as Queue from 'effect/Queue'
 import type * as Scope from 'effect/Scope'
 import { chatSession } from '../chats/directory.ts'
-import { type AppError, attempt, toAppError } from '../http/errors.ts'
+import { type AppError, Conflict, attempt, failureOf, toAppError } from '../http/errors.ts'
 import { reportAndRecover } from '../observability/report.ts'
 import type { PiSessions } from '../pi/sessions.ts'
 import {
@@ -19,56 +20,55 @@ import {
   startCursor,
   translate,
 } from './agui.ts'
-import { bodiesOf, bytesOf, cursorJson, isBoundary, isRunEnd, movedBody, opening, storedCursor } from './bodies.ts'
+import { bounded, opening } from './bodies.ts'
 import { ChildFollow, type ChildMessage, type ChildPorts } from './child-follow.ts'
-import { type StoredStream, appendWrites, beginEpoch, streamKey, streamsOf } from './store.ts'
 import type { QueuedParts } from './state.ts'
-import { coalesce, forTier } from './tiers.ts'
 
 // The producer of a workspace's chat streams (docs/architecture/streams.md). One fiber takes every message in turn, so
-// a chat's cursors, pending events and watch change in one place: Pi's commits say which chats have activity, a watch
-// (`watchEvents`) follows each such chat's events, each batch is translated once per tier and appended at most every
-// 250 ms or at once at a boundary, and an epoch begins with a snapshot when a stream is joined, moves on at a run's end
-// past its size or age, or loses its stream. Its writes go out through the outbox (`outbox.ts`).
+// each chat's readers, their cursors and the chat's watch change in one place. A reader joins a chat with a sink of its
+// own; a burst of joins opens one new watch (`watchEvents`) of the chat, whose snapshot opens each new reader and
+// catches every other up. Then each batch is translated over each reader's cursor and handed to its sink at once. The
+// fiber never waits on a reader: one whose sink is full is let go, as is one connected for fifteen minutes, and either
+// reconnects for a fresh opening. The last reader to leave stops the chat's watch and its children's.
 
-/** How long a batch's events wait for more before they are appended; a boundary sends them at once. */
-const FLUSH_MS = 250
 /** How long a watch outlives its chat's last batch once nothing runs there; a commit starts it again. */
 const IDLE_MS = 30_000
-/** An epoch past this many bytes, or this old, moves on at its next run's end. */
-const ROTATE_BYTES = 4 * 1024 * 1024
-const ROTATE_AGE_MS = 24 * 60 * 60 * 1000
+/**
+ * A reader's longest connection: then it is let go. It is the bound on a reader that went away unseen: a connection
+ * whose client is gone holds its place until it is let go, since the platform may never tell the agent.
+ */
+const LIFETIME_MS = 15 * 60 * 1000
+/** The readers one chat takes at once, and the agent; one more is `Conflict` `stream_busy`. */
+const CHAT_READERS = 32
+const AGENT_READERS = 256
+
+/** Where a reader's events go: its connection's batches, ended when the producer lets it go. */
+export type Sink = Queue.Queue<readonly AguiEvent[], Cause.Done>
 
 /**
- * Why a stream begins a new epoch: it has none yet (`new`), it outgrew its limits (`limit`), its row could not be read
- * (`unproven`), or its stream is gone or out of step (`lost`). Only a `lost` stream gets no `goblin.stream.moved`.
+ * One reader of a chat's stream: its connection's sink, its cursor, its join until its opening was sent, and how its
+ * connection is ended when the producer lets it go.
  */
-type Begin = 'new' | 'limit' | 'unproven' | 'lost'
-
-/** A chat's stream in one tier as the producer follows it: its row, the newest cursor and what is not appended yet. */
 type Row = {
-  readonly chat: string
-  readonly tier: StreamTier
-  epoch: number
-  nextSeq: number
-  bytes: number
-  startedAt: number
+  readonly id: number
+  readonly sink: Sink
   cursor: StreamCursor
-  pending: AguiEvent[]
-  /** A flush is armed. */
-  armed: boolean
-  begin?: Begin | undefined
+  opened: boolean
+  readonly join: Deferred.Deferred<void, AppError>
+  readonly release: () => void
 }
 
-/** A chat whose streams the producer follows: its Pi session, its streams, and its watch with its generation. */
+/** A chat with readers: its Pi session, its readers by id, and its watch with its generation. */
 type ChatState = {
   readonly chat: string
   readonly session: string
-  readonly rows: Map<StreamTier, Row>
+  readonly rows: Map<number, Row>
   /** Bumped by every new watch: a batch of an older one is stale. */
   gen: number
   watch?: AgentEventStream | undefined
   lastBatchAt: number
+  /** A new watch is coming for the readers that joined since the last. */
+  attaching: boolean
 }
 
 /** What the producer's one fiber takes, in order: its chats' and their children's (`child-follow.ts`). */
@@ -76,68 +76,45 @@ type Message =
   | ChildMessage
   | { readonly kind: 'commit'; readonly session: string }
   | { readonly kind: 'batch'; readonly chat: string; readonly gen: number; readonly events: readonly AgentEvent[] }
-  | { readonly kind: 'flush'; readonly chat: string; readonly tier: StreamTier }
   | { readonly kind: 'idle'; readonly chat: string; readonly gen: number; readonly at: number }
   | { readonly kind: 'closed'; readonly chat: string; readonly gen: number }
-  | { readonly kind: 'lost'; readonly chat: string; readonly tier: StreamTier; readonly epoch: number }
   | {
       readonly kind: 'join'
       readonly chat: string
-      readonly tier: StreamTier
-      readonly done: Deferred.Deferred<number, AppError>
+      readonly row: number
+      readonly sink: Sink
+      /** Answered once the reader's opening is in its sink, or with why it cannot follow the chat. */
+      readonly done: Deferred.Deferred<void, AppError>
+      /** Ends the reader's connection, read or not: the producer let it go. */
+      readonly release: () => void
     }
+  | { readonly kind: 'attach'; readonly chat: string }
+  | { readonly kind: 'leave'; readonly chat: string; readonly row: number }
 
 export type ProducerPorts = {
   readonly db: DrizzleSqliteDODatabase
   readonly pi: PiSessions['Service']
   readonly scope: Scope.Scope
   readonly queue: Queue.Queue<Message>
-  /** Starts a stream's drain (`outbox.ts`). */
-  readonly drain: (key: string) => Effect.Effect<void>
-  /** Bytes past which an epoch moves on; `ROTATE_BYTES` unless a fixture sets fewer. */
-  readonly rotateBytes: number | undefined
-  /** What the session's queued inputs say now (`InboxDoc`), by submission id: the `/queue` of its streams. */
+  /** What the session's queued inputs say now (`InboxDoc`), by submission id: the `/queue` of its stream. */
   readonly queued: (session: string) => Effect.Effect<ReadonlyMap<number, QueuedParts>>
+  /** The operation ids of inputs a snapshot names, by submission id: what its run's RUN_STARTED names. */
+  readonly operations: (inputs: readonly number[]) => Effect.Effect<ReadonlyMap<number, string>>
   /** The Persona invocations and revisions the chats' children are named by. */
   readonly personas: Pick<ChildPorts, 'working' | 'invocation' | 'persona' | 'promptEntry'>
 }
 
 export type { Message as ProducerMessage }
 
-/** The row as stored. */
-const storedOf = (row: Row): StoredStream => ({
-  chat: row.chat,
-  tier: row.tier,
-  epoch: row.epoch,
-  nextSeq: row.nextSeq,
-  bytes: row.bytes,
-  startedAt: row.startedAt,
-  cursorJson: cursorJson(row.cursor),
-})
-
-/** A stored row as the producer follows it; one it cannot read begins a new epoch. */
-const rowOf = (stored: StoredStream): Row => {
-  const cursor = storedCursor(stored.cursorJson)
-  return {
-    chat: stored.chat,
-    tier: stored.tier,
-    epoch: stored.epoch,
-    nextSeq: stored.nextSeq,
-    bytes: stored.bytes,
-    startedAt: stored.startedAt,
-    cursor: cursor ?? startCursor(stored.chat),
-    pending: [],
-    armed: false,
-    begin: cursor === undefined ? 'unproven' : undefined,
-  }
-}
-
 /** A batch that changed the queue to hold something. */
 const queues = (event: AgentEvent): boolean => event.type === 'inbox_update' && event.items.length > 0
 
-/** Whether anything runs in the chat as its streams saw last. */
+/** The chat's readers that have their opening. */
+const opened = (state: ChatState): Row[] => [...state.rows.values()].filter((row) => row.opened)
+
+/** Whether anything runs in the chat as its readers saw last. */
 const busy = (state: ChatState): boolean =>
-  [...state.rows.values()].some(({ cursor }) => cursor.run !== undefined || cursor.message !== undefined)
+  opened(state).some(({ cursor }) => cursor.run !== undefined || cursor.message !== undefined)
 
 /** The chats Pi's commit touched, by Pi session. */
 export const touchedSessions = (publication: CommitPublication): Set<string> => {
@@ -150,53 +127,9 @@ export const touchedSessions = (publication: CommitPublication): Set<string> => 
   return sessions
 }
 
-/** A row for a tier that has no stream yet: its first epoch begins with the next watch. */
-const newRow = (chat: string, tier: StreamTier): Row => ({
-  chat,
-  tier,
-  epoch: 0,
-  nextSeq: 0,
-  bytes: 0,
-  startedAt: 0,
-  cursor: startCursor(chat),
-  pending: [],
-  armed: false,
-  begin: 'new',
-})
-
-/** The size of `bodies` as the stream counts it. */
-const sizeOf = (bodies: readonly string[]): number => bodies.reduce((sum, body) => sum + bytesOf(body), 0)
-
-/**
- * A new epoch's writes for `row`, which takes it from `snapshot` at `now`: its opening events (the first body creates
- * the stream, any other is appended), and unless its stream was lost the old epoch's `goblin.stream.moved` and close.
- */
-function nextEpoch(row: Row, snapshot: SnapshotEvent, now: number, hints: Hints) {
-  const reason = row.begin ?? 'new'
-  const epoch = row.epoch + 1
-  const opened = opening(row.chat, snapshot, row.tier, hints)
-  const bodies = bodiesOf(opened.events)
-  const closing =
-    row.epoch === 0 || reason === 'lost'
-      ? undefined
-      : {
-          epoch: row.epoch,
-          writes: [
-            { seq: row.nextSeq, body: movedBody(epoch) },
-            { seq: row.nextSeq + 1, body: '' },
-          ],
-        }
-  Object.assign(row, {
-    epoch,
-    nextSeq: bodies.length - 1,
-    bytes: sizeOf(bodies),
-    startedAt: now,
-    cursor: opened.cursor,
-    pending: [],
-    begin: undefined,
-  })
-  return { writes: bodies.map((body, index) => ({ seq: index - 1, body })), closing }
-}
+/** The inputs a snapshot names: its run's and the queue's, by submission id. */
+const namedInputs = (snapshot: SnapshotEvent): number[] =>
+  [...(snapshot.run?.inputs ?? []), ...snapshot.inbox.map(({ id }) => id)].map(Number)
 
 /**
  * The producer: its chats, and what its fiber does with each message. Every method runs in the fiber's turn, so the
@@ -205,11 +138,13 @@ function nextEpoch(row: Row, snapshot: SnapshotEvent, now: number, hints: Hints)
 export class Producer {
   readonly #ports: ProducerPorts
   readonly #chats = new Map<string, ChatState>()
-  /** Every Pi session of a chat with streams, and the ones a watch follows now. */
+  /** Every chat with readers, by its Pi session, and the sessions a watch follows now. */
   readonly #sessions = new Map<string, string>()
   readonly #watching = new Set<string>()
   /** The chats whose work the chats' streams carry: Personas' forks and subagents. */
   readonly #children: ChildFollow
+  /** Readers of every chat, joined and not yet gone. */
+  #readers = 0
   constructor(ports: ProducerPorts) {
     this.#ports = ports
     const { db, pi, scope, queue, personas } = ports
@@ -217,32 +152,33 @@ export class Producer {
     this.#children = new ChildFollow(
       { db, pi, scope, offer, ...personas },
       {
-        streamed: (chat) => this.#stateOf(chat) !== undefined,
+        streamed: (chat) => this.#chats.has(chat),
         carried: (chat) => this.#carried(chat),
         step: (chat, step) => this.#step(chat, step),
       },
     )
   }
 
-  /** The fiber's work: every message in turn; one that fails is reported and the next one taken. */
+  /**
+   * The fiber's work: every message in turn, then every chat its readers all left let go; one that fails is reported
+   * and the next one taken.
+   */
   get run(): Effect.Effect<never> {
     return Effect.forever(
       Effect.flatMap(Queue.take(this.#ports.queue), (message) =>
-        Effect.suspend(() => this.#handle(message)).pipe(reportAndRecover('streams.produce', undefined)),
+        Effect.suspend(() => this.#handle(message)).pipe(
+          Effect.ensuring(Effect.suspend(() => this.#sweep())),
+          reportAndRecover('streams.produce', undefined),
+        ),
       ),
     )
   }
 
-  /** Pi's commit, inside it: the sessions with streams, or children's, and no watch are noted, nothing more. */
+  /** Pi's commit, inside it: the sessions with readers, or children's, and no watch are noted, nothing more. */
   noticed(publication: CommitPublication): void {
     for (const session of touchedSessions(publication))
       if ((this.#sessions.has(session) && !this.#watching.has(session)) || this.#children.idle(session))
         Queue.offerUnsafe(this.#ports.queue, { kind: 'commit', session })
-  }
-
-  /** The chat's streams are known, so its commits start a watch. */
-  know(chat: string, session: string): void {
-    this.#sessions.set(session, chat)
   }
 
   #later(ms: number, message: Message): Effect.Effect<void> {
@@ -251,87 +187,43 @@ export class Producer {
     )
   }
 
-  /** The chat's state, from its rows the first time; none for a chat without streams. */
-  #stateOf(chat: string): ChatState | undefined {
-    const known = this.#chats.get(chat)
-    if (known !== undefined) return known
-    const stored = streamsOf(this.#ports.db, chat)
-    if (stored.length === 0) return undefined
-    const session = chatSession(this.#ports.db, chat)
-    const state: ChatState = { chat, session, rows: new Map(), gen: 0, lastBatchAt: 0 }
-    for (const each of stored) state.rows.set(each.tier, rowOf(each))
-    this.#chats.set(chat, state)
-    this.#sessions.set(session, chat)
-    return state
+  /** `events` in the reader's sink at once, each small enough to send; a reader whose sink is full is let go. */
+  #send(state: ChatState, row: Row, events: readonly AguiEvent[]): void {
+    const kept = events.flatMap((event) => bounded(event) ?? [])
+    if (kept.length === 0 || Queue.offerUnsafe(row.sink, kept)) return
+    // It fell behind: what its sink holds is still read, then its connection ends and it reconnects for a new opening.
+    this.#remove(state, row)
   }
 
-  /** Appends the row's pending events to its current epoch. */
-  #flush(row: Row): Effect.Effect<void> {
-    if (row.pending.length === 0) return Effect.void
-    const bodies = bodiesOf(coalesce(row.pending))
-    const writes = bodies.map((body, index) => ({ seq: row.nextSeq + index, body }))
-    row.pending = []
-    row.nextSeq += bodies.length
-    row.bytes += sizeOf(bodies)
-    appendWrites(this.#ports.db, storedOf(row), writes)
-    return this.#ports.drain(streamKey(row.chat, row.tier))
+  /** The reader is gone: its sink ends and its connection with it, whether its client still reads or not. */
+  #remove(state: ChatState, row: Row): void {
+    if (!state.rows.delete(row.id)) return
+    this.#readers -= 1
+    Queue.endUnsafe(row.sink)
+    row.release()
   }
 
-  /** A new epoch from `snapshot`; what the old one still had is appended to it first, unless its stream was lost. */
-  #begin(row: Row, snapshot: SnapshotEvent, now: number, hints: Hints): Effect.Effect<void> {
-    const flushed = row.begin === 'lost' ? Effect.void : this.#flush(row)
-    return Effect.andThen(
-      flushed,
-      Effect.suspend(() => {
-        const { writes, closing } = nextEpoch(row, snapshot, now, hints)
-        beginEpoch(this.#ports.db, storedOf(row), writes, closing)
-        return this.#ports.drain(streamKey(row.chat, row.tier))
-      }),
-    )
-  }
-
-  /** The children the chat's streams carry now, each as the first stream that carries it has it. */
+  /** The children the chat's readers carry now, each as the first reader that carries it has it. */
   #carried(chat: string): ReadonlyMap<string, ChildSent> {
     const carried = new Map<string, ChildSent>()
-    for (const row of this.#chats.get(chat)?.rows.values() ?? [])
+    const state = this.#chats.get(chat)
+    for (const row of state === undefined ? [] : opened(state))
       for (const [child, sent] of Object.entries(row.cursor.children ?? {}))
         if (!carried.has(child)) carried.set(child, sent)
     return carried
   }
 
-  /**
-   * `step` over the cursor of each of the chat's streams but one waiting for a new epoch (which starts the children
-   * working then): what it answers pending in the row's tier, appended at once at a boundary or armed for `FLUSH_MS`.
-   */
+  /** `step` over the cursor of each of the chat's readers but one waiting for its opening (which starts its children). */
   #step(chat: string, step: (cursor: StreamCursor) => Translation): Effect.Effect<void> {
-    const rows = [...(this.#chats.get(chat)?.rows.values() ?? [])].filter(({ begin }) => begin === undefined)
-    return Effect.forEach(
-      rows,
-      (row) => {
+    return Effect.sync(() => {
+      const state = this.#chats.get(chat)
+      if (state === undefined) return
+      for (const row of opened(state)) {
         const stepped = step(row.cursor)
         row.cursor = stepped.cursor
-        return this.#pend(row, forTier(stepped.events, row.tier))
-      },
-      { discard: true },
-    )
-  }
-
-  /** `events` pending in the row: appended at once when one is a boundary, else with the next flush. */
-  #pend(row: Row, events: readonly AguiEvent[]): Effect.Effect<void> {
-    if (events.length === 0) return Effect.void
-    row.pending.push(...events)
-    if (events.some(isBoundary)) return this.#flush(row)
-    const arm = row.armed ? Effect.void : this.#later(FLUSH_MS, { kind: 'flush', chat: row.chat, tier: row.tier })
-    row.armed = true
-    return arm
-  }
-
-  /** Catches the row up from `snapshot`: what happened since its cursor, appended at once. */
-  #catchUp(row: Row, snapshot: SnapshotEvent, hints: Hints): Effect.Effect<void> {
-    const caught = reconcile(row.cursor, snapshot, hints)
-    row.cursor = caught.cursor
-    row.pending.push(...forTier(caught.events, row.tier))
-    return this.#flush(row)
+        this.#send(state, row, stepped.events)
+      }
+    })
   }
 
   /** No batch since `state.lastBatchAt` and nothing running: the watch stops after `IDLE_MS`. */
@@ -365,108 +257,149 @@ export class Producer {
     stream.closed.then(ended, ended)
   }
 
+  /** What a new watch's snapshot needs that it does not say: what its queued inputs say, and its inputs' operations. */
+  #snapshotHints(state: ChatState, snapshot: SnapshotEvent): Effect.Effect<Hints> {
+    return Effect.gen({ self: this }, function* () {
+      const inputs = namedInputs(snapshot)
+      const queued = snapshot.inbox.length > 0 ? yield* this.#ports.queued(state.session) : undefined
+      const operations = inputs.length > 0 ? yield* this.#ports.operations(inputs) : undefined
+      return { ...(queued === undefined ? {} : { queued }), ...(operations === undefined ? {} : { operations }) }
+    })
+  }
+
   /**
-   * A new watch of the chat: its snapshot begins each stream that needs a new epoch and catches up every other, and it
-   * is followed from there.
+   * A new watch of the chat: its snapshot opens each reader that joined since the last (its join is answered then) and
+   * catches every other up, and it is followed from there with the chat's children.
    */
   #attach(state: ChatState): Effect.Effect<void, AppError> {
     return Effect.gen({ self: this }, function* () {
+      state.attaching = false
       yield* this.#unwatch(state)
       const stream = yield* this.#ports.pi
         .events(state.session)
         .pipe(Effect.catchTag('PiFailure', (failure) => Effect.fail(toAppError(failure.cause))))
-      const now = yield* Clock.currentTimeMillis
-      const hints = yield* this.#hints(state, stream.snapshot.inbox.length > 0)
-      for (const row of state.rows.values())
-        yield* row.begin === undefined
-          ? this.#catchUp(row, stream.snapshot, hints)
-          : this.#begin(row, stream.snapshot, now, hints)
-      state.lastBatchAt = now
+      const { snapshot } = stream
+      const hints = yield* this.#snapshotHints(state, snapshot)
+      for (const row of state.rows.values()) {
+        const caught = row.opened ? reconcile(row.cursor, snapshot, hints) : opening(state.chat, snapshot, hints)
+        row.cursor = caught.cursor
+        this.#send(state, row, caught.events)
+        if (row.opened) continue
+        row.opened = true
+        yield* Deferred.succeed(row.join, undefined)
+      }
+      state.lastBatchAt = yield* Clock.currentTimeMillis
       this.#follow(state, stream)
       yield* this.#armIdle(state)
       yield* this.#children.attached(state.chat)
-    })
+    }).pipe(Effect.onError((cause) => this.#refuse(state, failureOf(cause))))
   }
 
   /**
-   * One batch for one row: its events in the row's tier pending, appended at once at a boundary or armed for
-   * `FLUSH_MS`. True when the batch ended a run with the epoch past its limits, so it moves on.
+   * The chat could not be watched (Pi failed, or a defect): the readers still waiting for their opening are refused
+   * with why, so no join waits forever.
    */
-  #take(row: Row, events: readonly AgentEvent[], now: number, hints: Hints): Effect.Effect<boolean> {
-    const translated = translate(row.cursor, events, hints)
-    row.cursor = translated.cursor
-    const mine = forTier(translated.events, row.tier)
-    const past = row.bytes >= (this.#ports.rotateBytes ?? ROTATE_BYTES) || now - row.startedAt >= ROTATE_AGE_MS
-    return Effect.as(this.#pend(row, mine), past && mine.some(isRunEnd) && row.cursor.run === undefined)
+  #refuse(state: ChatState, error: AppError): Effect.Effect<void> {
+    const waiting = [...state.rows.values()].filter((row) => !row.opened)
+    return Effect.forEach(
+      waiting,
+      (row) => {
+        this.#remove(state, row)
+        return Deferred.fail(row.join, error)
+      },
+      { discard: true },
+    )
   }
 
-  /** One batch of the chat's watch, translated once per tier; a run's end past an epoch's limits moves it on. */
-  #onBatch(state: ChatState, events: readonly AgentEvent[]): Effect.Effect<void, AppError> {
+  /** One batch of the chat's watch, translated over each reader's cursor and sent to it. */
+  #onBatch(state: ChatState, events: readonly AgentEvent[]): Effect.Effect<void> {
     return Effect.gen({ self: this }, function* () {
-      const now = yield* Clock.currentTimeMillis
-      state.lastBatchAt = now
-      let moves = false
-      const hints = yield* this.#hints(state, events.some(queues))
-      for (const row of state.rows.values())
-        if (yield* this.#take(row, events, now, hints)) {
-          row.begin = 'limit'
-          moves = true
-        }
-      yield* moves ? this.#attach(state) : this.#armIdle(state)
+      state.lastBatchAt = yield* Clock.currentTimeMillis
+      const queued = events.some(queues) ? yield* this.#ports.queued(state.session) : undefined
+      const hints: Hints = queued === undefined ? {} : { queued }
+      for (const row of opened(state)) {
+        const translated = translate(row.cursor, events, hints)
+        row.cursor = translated.cursor
+        this.#send(state, row, translated.events)
+      }
+      yield* this.#armIdle(state)
       yield* this.#children.settled(state.chat)
     })
   }
 
-  /** What the chat's queued inputs say, read only when something waits in its queue. */
-  #hints(state: ChatState, waiting: boolean): Effect.Effect<Hints> {
-    return waiting ? Effect.map(this.#ports.queued(state.session), (queued) => ({ queued })) : Effect.succeed({})
-  }
-
-  /** A join: the row for its tier, begun with a new watch when it is new, and the epoch a reader reads. */
-  #onJoin(chat: string, tier: StreamTier): Effect.Effect<number, AppError> {
+  /**
+   * A reader joins: it waits for the chat's next watch, which one message brings for every reader that joins before
+   * it. Past the readers a chat or the agent takes, `Conflict` `stream_busy`.
+   */
+  #onJoin(message: Extract<Message, { kind: 'join' }>): Effect.Effect<void, AppError> {
     return Effect.gen({ self: this }, function* () {
-      const session = yield* attempt(async () => chatSession(this.#ports.db, chat))
-      const state: ChatState = this.#stateOf(chat) ?? { chat, session, rows: new Map(), gen: 0, lastBatchAt: 0 }
-      this.#chats.set(chat, state)
-      this.#sessions.set(session, chat)
-      const row = state.rows.get(tier) ?? newRow(chat, tier)
-      state.rows.set(tier, row)
-      if (state.watch === undefined || row.begin !== undefined) yield* this.#attach(state)
-      return row.epoch
+      const { chat, row, sink, done, release } = message
+      const known = this.#chats.get(chat)
+      const full = this.#readers >= AGENT_READERS || (known?.rows.size ?? 0) >= CHAT_READERS
+      if (full) return yield* new Conflict({ reason: 'stream_busy' })
+      const state = known ?? (yield* this.#chatState(chat))
+      state.rows.set(row, { id: row, sink, cursor: startCursor(chat), opened: false, join: done, release })
+      this.#readers += 1
+      yield* this.#later(LIFETIME_MS, { kind: 'leave', chat, row })
+      if (state.attaching) return
+      state.attaching = true
+      yield* Queue.offer(this.#ports.queue, { kind: 'attach', chat })
     })
   }
 
-  /** The chat whose streams `message` is about, when it has a watch of `message.gen`. */
+  /** A chat that gets its first reader, known by its session from now on. */
+  #chatState(chat: string): Effect.Effect<ChatState, AppError> {
+    return Effect.map(
+      attempt(async () => chatSession(this.#ports.db, chat)),
+      (session) => {
+        const state: ChatState = { chat, session, rows: new Map(), gen: 0, lastBatchAt: 0, attaching: false }
+        this.#chats.set(chat, state)
+        this.#sessions.set(session, chat)
+        return state
+      },
+    )
+  }
+
+  /** The reader went away (its connection closed, or it never got its opening), or its connection reached its life. */
+  #onLeave(chat: string, id: number): void {
+    const state = this.#chats.get(chat)
+    const row = state?.rows.get(id)
+    if (state !== undefined && row !== undefined) this.#remove(state, row)
+  }
+
+  /** Every chat without readers is let go: its watch stops, its children are no longer followed. */
+  #sweep(): Effect.Effect<void> {
+    const left = [...this.#chats.values()].filter((state) => state.rows.size === 0)
+    return Effect.forEach(
+      left,
+      (state) => {
+        this.#chats.delete(state.chat)
+        this.#sessions.delete(state.session)
+        return Effect.andThen(this.#unwatch(state), this.#children.released(state.chat))
+      },
+      { discard: true },
+    )
+  }
+
+  /** The chat whose stream `message` is about, when it has a watch of `message.gen`. */
   #current(message: { readonly chat: string; readonly gen: number }): ChatState | undefined {
     const state = this.#chats.get(message.chat)
     return state?.gen === message.gen ? state : undefined
   }
 
-  /** The watch went quiet: what is pending goes out and the watch stops, unless a batch came or a run goes on. */
+  /** The watch went quiet: it stops, unless a batch came or a run goes on; its readers stay connected. */
   #onIdle(message: Extract<Message, { kind: 'idle' }>): Effect.Effect<void> {
     const state = this.#current(message)
     if (state === undefined || state.lastBatchAt !== message.at || busy(state)) return Effect.void
-    return Effect.andThen(
-      Effect.forEach(state.rows.values(), (row) => this.#flush(row)),
-      Effect.suspend(() => this.#unwatch(state)),
-    )
+    return this.#unwatch(state)
   }
 
-  /** The epoch's stream is gone or out of step: the chat's stream in that tier begins a new epoch. */
-  #onLost(message: Extract<Message, { kind: 'lost' }>): Effect.Effect<void, AppError> {
-    const state = this.#stateOf(message.chat)
-    const row = state?.rows.get(message.tier)
-    if (state === undefined || row?.epoch !== message.epoch) return Effect.void
-    row.begin = 'lost'
-    return this.#attach(state)
-  }
-
-  /** A commit of a session without a watch: a chat with streams is attached again, a child is followed again. */
+  /** A commit of a session without a watch: a chat with readers is watched again, a child is followed again. */
   #onCommit(session: string): Effect.Effect<void, AppError> {
     const chat = this.#sessions.get(session)
     if (chat === undefined) return this.#children.committed(session)
-    const state = this.#stateOf(chat)
-    return state === undefined || state.watch !== undefined ? Effect.void : this.#attach(state)
+    const state = this.#chats.get(chat)
+    return state === undefined || state.watch !== undefined || state.attaching ? Effect.void : this.#attach(state)
   }
 
   /** One message, in the fiber's turn. */
@@ -478,11 +411,6 @@ export class Producer {
         const state = this.#current(message)
         return state === undefined ? Effect.void : this.#onBatch(state, message.events)
       }
-      case 'flush': {
-        const row = this.#chats.get(message.chat)?.rows.get(message.tier)
-        if (row !== undefined) row.armed = false
-        return row === undefined ? Effect.void : this.#flush(row)
-      }
       case 'idle':
         return this.#onIdle(message)
       case 'closed': {
@@ -491,13 +419,14 @@ export class Producer {
         if (state !== undefined) state.watch = undefined
         return Effect.void
       }
-      case 'lost':
-        return this.#onLost(message)
       case 'join':
-        return Effect.matchEffect(this.#onJoin(message.chat, message.tier), {
-          onFailure: (error) => Deferred.fail(message.done, error),
-          onSuccess: (epoch) => Deferred.succeed(message.done, epoch),
-        })
+        return this.#onJoin(message).pipe(Effect.catch((error) => Deferred.fail(message.done, error)))
+      case 'attach': {
+        const state = this.#chats.get(message.chat)
+        return state?.attaching === true ? this.#attach(state) : Effect.void
+      }
+      case 'leave':
+        return Effect.sync(() => this.#onLeave(message.chat, message.row))
       case 'child-batch':
       case 'child-closed':
       case 'child-idle':

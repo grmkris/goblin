@@ -1,7 +1,8 @@
-// A chat's stream served in memory, as `/streams/<token>` serves it: epochs of AG-UI events with offsets, catch-up and
-// long-poll reads, and live reads the test drives. `join` answers the current epoch's link.
-import type { ConversationStream } from '@goblin/contracts'
-import type { LiveListener, StreamDependencies, StreamPage } from '../src/lib/agui/reader.ts'
+// A chat's stream served in memory, as the agent serves `GET /api/conversations/:id/stream`: each connection opens
+// with what `opening` holds then (the chat as it is), then gets every event the test writes, as server-sent events.
+// The test drops connections as the network does, ends them as the server does, or refuses new ones.
+import type { StreamDependencies } from '../src/lib/agui/reader.ts'
+import { readEvents } from '../src/lib/event-streams.ts'
 import type { ReconnectScheduler } from '../src/lib/reconnect.ts'
 
 /** Timers that run only when the test says so. */
@@ -22,111 +23,82 @@ export class Clock implements ReconnectScheduler {
   }
 }
 
-/** A live read the server holds open: what it was opened from, and whether the reader closed it. */
-export type Held = { readonly url: string; readonly offset: string; readonly listener: LiveListener; closed: boolean }
+/** One connection the server holds open: whether it is closed, by either side. */
+export type Held = { readonly controller: ReadableStreamDefaultController<Uint8Array>; closed: boolean }
 
-const offsetOf = (index: number) => String(index).padStart(4, '0')
-const indexOf = (offset: string) => (offset === '-1' ? 0 : Number(offset))
+const encoder = new TextEncoder()
+/** `events` as the server frames them: one `data:` frame each. */
+export const framesOf = (events: readonly unknown[]): string =>
+  events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join('')
 
 export class FakeStream {
-  /** Each epoch's events, in order; an offset is how many of them come before it. */
-  readonly epochs: unknown[][] = [[]]
-  readonly closed = new Set<number>()
-  readonly joins: number[] = []
-  readonly reads: { readonly url: string; readonly offset: string; readonly longPoll: boolean }[] = []
-  readonly live: Held[] = []
-  /** Answered instead of the stream's own page while set: a refusal, or a failure to reach it. */
+  /** What a new connection opens with: the chat's snapshots, as the server would make them now. */
+  opening: unknown[] = []
+  /** Every connection made, in order. */
+  readonly connections: Held[] = []
+  /** Answered instead of a stream while set: a refusal with that status, or a failure to reach the server. */
   refuse: number | 'network' | undefined
-  /** Live reads fail at once while set, as where server-sent events cannot pass. */
-  liveFails = false
-  /** Long polls wait for this, so a test controls when they answer. */
-  waiting: (() => void) | undefined
-  expiresAt = '2999-01-01T00:00:00.000Z'
 
-  get epoch(): number {
-    return this.epochs.length
+  /** The connections still open. */
+  get open(): Held[] {
+    return this.connections.filter(({ closed }) => !closed)
   }
 
-  /** Appends `events` to the current epoch and hands them to every live read open on it. */
+  /** Sends `text` as it is on every open connection. */
+  send(text: string): void {
+    for (const held of this.open) held.controller.enqueue(encoder.encode(text))
+  }
+
+  /** Sends `events` on every open connection, and keeps them in what the next opening holds. */
   write(...events: unknown[]): void {
-    this.#append(this.epoch, events, false)
+    this.opening.push(...events)
+    this.send(framesOf(events))
   }
 
-  /**
-   * The chat goes on in a new epoch opened with `events`; the old one ends with `goblin.stream.moved` and closes, as
-   * the producer moves a stream.
-   */
-  move(...events: unknown[]): void {
-    const old = this.epoch
-    this.epochs.push([...events])
-    this.closed.add(old)
-    this.#append(old, [{ type: 'CUSTOM', name: 'goblin.stream.moved', value: { epoch: old + 1 } }], true)
-  }
-
-  #append(epoch: number, events: readonly unknown[], closed: boolean): void {
-    const current = this.epochs[epoch - 1] ?? []
-    current.push(...events)
-    const next = offsetOf(current.length)
-    for (const held of this.live)
-      if (!held.closed && held.url === this.#url(epoch)) held.listener.events(events, next, closed)
-  }
-
-  /** Every open live read drops, as the network does. */
+  /** Every open connection fails, as when the network drops. */
   drop(): void {
-    for (const held of this.live.filter(({ closed }) => !closed)) {
+    for (const held of this.open) {
       held.closed = true
-      held.listener.error()
+      held.controller.error(new TypeError('network error'))
     }
   }
 
-  #url = (epoch: number) => `https://app.test/streams/e${epoch}`
-
-  #page(url: string, offset: string): StreamPage {
-    const epoch = Number(/e(\d+)$/u.exec(url)?.[1])
-    const events = this.epochs[epoch - 1] ?? []
-    const rest = events.slice(indexOf(offset))
-    return {
-      status: 200,
-      events: rest,
-      next: offsetOf(events.length),
-      closed: this.closed.has(epoch),
-      upToDate: true,
+  /** The server ends every open connection cleanly (its life is over, or it fell behind). */
+  end(): void {
+    for (const held of this.open) {
+      held.closed = true
+      held.controller.close()
     }
   }
 
   readonly dependencies: StreamDependencies = {
-    join: async () => {
-      this.joins.push(this.epoch)
-      const link: ConversationStream = {
-        url: this.#url(this.epoch),
-        epoch: this.epoch,
-        tier: 'full',
-        expiresAt: this.expiresAt,
-      }
-      return link
+    open: async (signal) => {
+      if (this.refuse === 'network') throw new TypeError('Failed to fetch')
+      if (this.refuse !== undefined)
+        return Response.json(
+          { error: { code: this.refuse === 404 ? 'not_found' : 'unauthenticated', message: 'No.', ref: 'ref-fake' } },
+          { status: this.refuse },
+        )
+      let held: Held | undefined
+      const opening = framesOf(this.opening)
+      const body = new ReadableStream<Uint8Array>({
+        start: (controller) => {
+          held = { controller, closed: false }
+          this.connections.push(held)
+          controller.enqueue(encoder.encode(opening))
+        },
+        cancel: () => {
+          if (held !== undefined) held.closed = true
+        },
+      })
+      signal.addEventListener('abort', () => {
+        if (held === undefined || held.closed) return
+        held.closed = true
+        held.controller.error(new DOMException('The connection was closed.', 'AbortError'))
+      })
+      return new Response(body, { headers: { 'content-type': 'text/event-stream' } })
     },
-    transport: {
-      read: async (url, offset, longPoll) => {
-        this.reads.push({ url, offset, longPoll })
-        if (this.refuse === 'network') throw new TypeError('Failed to fetch')
-        if (this.refuse !== undefined)
-          return { status: this.refuse, events: [], next: undefined, closed: false, upToDate: true }
-        if (longPoll && this.#page(url, offset).events.length === 0)
-          await new Promise<void>((resolve) => (this.waiting = resolve))
-        return this.#page(url, offset)
-      },
-      live: (url, offset, listener) => {
-        const held: Held = { url, offset, listener, closed: false }
-        this.live.push(held)
-        if (this.liveFails) {
-          held.closed = true
-          queueMicrotask(() => listener.error())
-        }
-        return () => {
-          held.closed = true
-        }
-      },
-    },
+    read: readEvents,
   }
 }
 

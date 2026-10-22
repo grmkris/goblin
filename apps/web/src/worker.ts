@@ -3,7 +3,8 @@ import runtime from '@goblin/runtime/worker'
 import { canonicalRedirect } from '@goblin/runtime/canonical'
 import { robotsTxt } from './lib/robots.ts'
 export { PersonalAgent } from '@goblin/runtime/agent'
-// Each chat's AG-UI stream (docs/architecture/streams.md): the agent appends to it, readers follow it at /streams/.
+// Dormant: nothing uses the Durable Streams class since ADR 0110; it and its binding go in a reviewed infra step,
+// since deleting a Durable Object class is a destructive plan (docs/architecture/infrastructure.md).
 export { StreamObject } from '@durable-streams/server-cloudflare'
 
 export default {
@@ -16,7 +17,6 @@ export default {
       /^\/w\/[^/]+\/api\//u.test(url.pathname) ||
       url.pathname.startsWith('/hooks/') ||
       url.pathname.startsWith('/files/link/') ||
-      url.pathname.startsWith('/streams/') ||
       url.pathname.startsWith('/.well-known/') ||
       url.pathname === '/health' ||
       url.pathname === '/mcp'

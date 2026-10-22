@@ -160,12 +160,12 @@ harness.test(
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => internalRefusalCase(url)))),
 )
 harness.test(
-  "native: a chat's AG-UI stream is joined in its tier, resumed from an offset, moves epochs at a run's end, refuses a bad token and keeps a lost acknowledgement's append once",
+  "native: a chat's AG-UI stream opens with its snapshots and carries everything live, a reconnect opens afresh, a key reads its own room's chat in full and no other, and a chat's 33rd reader is stream_busy",
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => streamsCase(url)))),
   { timeout: 240_000 },
 )
 harness.test(
-  "native: a Persona's fork and a subagent stream into their chat under their subagentRunId, a key's answers tier keeps their lifecycle and answer, and a new epoch opens with a child in flight",
+  "native: a Persona's fork and a subagent stream into their chat under their subagentRunId, a key reads its room's fork in full, and a new reader opens with a child in flight",
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => streamChildrenCase(url)))),
   { timeout: 240_000 },
 )

@@ -10,8 +10,10 @@ import type {
   UpdateConversation,
 } from '@goblin/contracts'
 import { OwnerApi } from '@goblin/contracts/api'
-import * as DateTime from 'effect/DateTime'
+import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
+import * as Stream from 'effect/Stream'
+import * as HttpServerResponse from 'effect/http/HttpServerResponse'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import {
   createOwnerConversation,
@@ -22,7 +24,7 @@ import {
   updateOwnerConversation,
 } from '../agent-program.ts'
 import { composerOptions } from '../composer.ts'
-import { confineChat, confineMessage, confineUpdate, requestTier } from '../keys/policy.ts'
+import { confineChat, confineMessage, confineUpdate } from '../keys/policy.ts'
 import {
   applyServers,
   checkApply,
@@ -33,15 +35,13 @@ import {
 } from '../mcp/thread-servers.ts'
 import { Db } from '../runtime/db.ts'
 import { ownerQueue, removeOwnerQueuedInput } from '../conversation-queue.ts'
-import { AgentInput } from '../runtime/input.ts'
 import { Retrieval } from '../retrieval/service.ts'
-import { InvalidInput, attempt, toAppError } from '../http/errors.ts'
+import { InvalidInput, toAppError } from '../http/errors.ts'
 import { entryViews } from '../pi/entry-view.ts'
 import { entryMessages } from '../streams/messages.ts'
 import { PiSessions } from '../pi/sessions.ts'
 import { Invocations } from '../personas/service.ts'
-import { epochSeconds } from '../clock.ts'
-import { STREAM_READ_SECONDS, streamReadToken, streamReadUrl } from '../streams/read-token.ts'
+import { sseFrames } from '../streams/frames.ts'
 import { Streams } from '../streams/service.ts'
 import { Conversations } from './service.ts'
 import { moveToThread } from './mover.ts'
@@ -223,28 +223,27 @@ const sources = ({ params }: ChatRequest) =>
     Retrieval.use((retrieval) => retrieval.uses(params.id)),
   )
 
+/** What a chat's stream is answered with: server-sent events, never cached. */
+const SSE_HEADERS = { 'cache-control': 'no-store', 'content-type': 'text/event-stream' }
+
 /**
- * Joins a registered chat's AG-UI stream in the caller's tier and answers where to read it: a URL whose token, signed
- * for that workspace, chat, tier and epoch, is valid for ten minutes (docs/architecture/streams.md). A key reaches only
- * its own Topics' chats.
+ * A registered chat's AG-UI stream as server-sent events (docs/architecture/streams.md): its opening, then everything
+ * that happens in it, until the reader goes away or the producer lets it go (then the connection ends, read or not);
+ * a reader that comes back connects again for a fresh opening. A key reaches only its own room's chats. The body runs
+ * on its own past the request's scope, and lets go of the chat when it ends.
  */
-const joinStream = ({ params }: ChatRequest) =>
+const stream = ({ params }: ChatRequest) =>
   Effect.gen(function* () {
     yield* confineChat(params.id)
     yield* registeredConversation(params.id)
-    const tier = yield* requestTier
-    const epoch = yield* Streams.use((streams) => streams.join(params.id, tier))
-    const { env, workspaceId } = yield* AgentInput
-    const expiresAt = (yield* epochSeconds) + STREAM_READ_SECONDS
-    const claims = { workspaceId, chat: params.id, tier, epoch, expiresAt }
-    const token = yield* attempt(() => streamReadToken(env.CREDENTIAL_KEY, claims))
-    const expires = DateTime.formatIso(DateTime.makeUnsafe(expiresAt * 1000))
-    return { url: streamReadUrl(env.APP_URL, token), epoch, tier, expiresAt: expires }
+    const { batches, released } = yield* Streams.use((streams) => streams.watch(params.id))
+    const body = Stream.toReadableStreamWith(sseFrames(batches), Context.empty(), { signal: released })
+    return HttpServerResponse.raw(new Response(body, { headers: SSE_HEADERS }))
   })
 
 /**
  * The `conversations` group (ADRs 0030, 0032, 0034). Owner admission has already admitted the request; the
- * conversation services do the work, and a chat's snapshot is read from Pi through `AgentInput`.
+ * conversation services do the work, and a chat's stream is the producer's (`Streams`, ADR 0110).
  */
 export const ConversationsHandlers = HttpApiBuilder.group(OwnerApi, 'conversations', (handlers) =>
   handlers
@@ -261,5 +260,5 @@ export const ConversationsHandlers = HttpApiBuilder.group(OwnerApi, 'conversatio
     .handle('history', history)
     .handle('entries', entries)
     .handle('sources', sources)
-    .handle('stream', joinStream),
+    .handleRaw('stream', stream),
 )

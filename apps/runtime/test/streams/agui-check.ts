@@ -9,8 +9,6 @@ import {
   GoblinActivity,
   GoblinMetadataOf,
   GoblinState,
-  StreamMoved,
-  type StreamTier,
   ToolProgress,
 } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
@@ -32,21 +30,17 @@ function statePatch(delta: Extract<AguiEvent, { type: EventType.STATE_DELTA }>['
   }
 }
 
-/** The STATE document a tier carries: all of it, or `/attention` alone. */
-const STATE_OF = {
-  full: GoblinState,
-  answers: Schema.Struct({ attention: GoblinState.fields.attention }).check(Schema.isMaxProperties(1)),
-} as const
-
 /** goblin's own part of `event`, decoded by its contract (a failure throws with the path). */
-function goblinParts(event: AguiEvent, tier: StreamTier): void {
+function goblinParts(event: AguiEvent): void {
   if (event.metadata !== undefined) Schema.decodeUnknownSync(GoblinMetadataOf)(event.metadata)
-  if (event.type === EventType.STATE_SNAPSHOT) Schema.decodeUnknownSync(STATE_OF[tier])(event.snapshot)
+  if (event.type === EventType.STATE_SNAPSHOT) Schema.decodeUnknownSync(GoblinState)(event.snapshot)
   if (event.type === EventType.STATE_DELTA) statePatch(event.delta)
   if (event.type === EventType.ACTIVITY_SNAPSHOT)
     Schema.decodeUnknownSync(GoblinActivity)({ activityType: event.activityType, content: event.content })
-  if (event.type === EventType.CUSTOM)
-    Schema.decodeUnknownSync(event.name === CustomName.toolProgress ? ToolProgress : StreamMoved)(event.value)
+  if (event.type === EventType.CUSTOM) {
+    expect(event.name).toBe(CustomName.toolProgress)
+    Schema.decodeUnknownSync(ToolProgress)(event.value)
+  }
   if (event.type !== EventType.MESSAGES_SNAPSHOT) return
   for (const message of event.messages) Schema.decodeUnknownSync(Schema.UndefinedOr(GoblinMetadataOf))(message.metadata)
 }
@@ -143,19 +137,14 @@ const RULES: Partial<Record<EventType, Rule>> = {
   [EventType.TOOL_CALL_END]: (ledger, event) => ledger.closes(about(event)),
 }
 
-/** What the `answers` tier never carries. */
-const FULL_ONLY = /^(?:REASONING_|TOOL_CALL_|STEP_|RAW$)/u
-
-/** Every event valid, and the sequence well formed, as `tier` carries it; answers the events for chaining. */
-export function checked(events: readonly AguiEvent[], tier: StreamTier = 'full'): readonly AguiEvent[] {
+/** Every event valid, and the sequence well formed; answers the events for chaining. */
+export function checked(events: readonly AguiEvent[]): readonly AguiEvent[] {
   const ledger = new Ledger()
   const args = new Map<string, number>()
   for (const event of events) {
     const parsed = EventSchema.safeParse(event)
     expect(parsed.success, `${event.type}: ${parsed.error?.message ?? ''}`).toBe(true)
-    goblinParts(event, tier)
-    if (tier === 'answers') expect(event.type).not.toMatch(FULL_ONLY)
-    if (tier === 'answers') expect(childOf(event), `${event.type} of a child in answers`).toBeUndefined()
+    goblinParts(event)
     const child = childOf(event)
     if (child !== undefined) ledger.within(`sub:${child}`)
     RULES[event.type]?.(ledger, event, args)

@@ -14,12 +14,12 @@ import type { ChildSent, StreamCursor, Translation } from './agui.ts'
 import { childBatch, childEnded, childFound } from './children.ts'
 import type { ChildEnd, ChildInfo } from './lifecycle.ts'
 
-// The producer's children (docs/architecture/streams.md): the chats whose work a joined chat's streams carry, a
+// The producer's children (docs/architecture/streams.md): the chats whose work a followed chat's stream carries, a
 // Persona's fork from its invocation's start to its end, and an open subagent's runs. Each is followed by a watch of
-// its own while it works, its batches carried in every stream of its parent through `children.ts`. Every method runs in
-// the producer's fiber, so what it keeps needs no lock.
+// its own while it works, its batches carried to every reader of its parent through `children.ts`. Every method runs
+// in the producer's fiber, so what it keeps needs no lock.
 
-/** How long a child's watch outlives its last batch once its parent's streams carry nothing of it. */
+/** How long a child's watch outlives its last batch once its parent's readers carry nothing of it. */
 const IDLE_MS = 30_000
 
 /** A Persona at the revision its invocation froze: what its `SUBAGENT_*` events name. */
@@ -53,12 +53,12 @@ export type ChildPorts = {
   readonly promptEntry: (fork: string, operationId: string, persona: number) => Effect.Effect<number | undefined>
 }
 
-/** What the producer lends its children: which chats have streams, what they carry, and a step over their cursors. */
+/** What the producer lends its children: which chats have readers, what they carry, and a step over their cursors. */
 export type ParentPorts = {
   readonly streamed: (chat: string) => boolean
-  /** The children the chat's streams carry now, each as one of them has it. */
+  /** The children the chat's readers carry now, each as one of them has it. */
   readonly carried: (chat: string) => ReadonlyMap<string, ChildSent>
-  /** `step` over the cursor of each of the chat's streams, what it answers appended in each one's tier. */
+  /** `step` over the cursor of each of the chat's readers, what it answers sent to each. */
   readonly step: (chat: string, step: (cursor: StreamCursor) => Translation) => Effect.Effect<void>
 }
 
@@ -103,7 +103,7 @@ function settledEnd(view: PersonaInvocationView): ChildEnd | undefined {
   return { outcome: 'failed', code: reason, message: FAILED[reason], reason }
 }
 
-/** The subagents open under `chat`: the ones its streams follow the runs of. */
+/** The subagents open under `chat`: the ones its stream follows the runs of. */
 const openSubagents = (db: DrizzleSqliteDODatabase, chat: string) =>
   db
     .select({ chat: appConversations.chatId, title: appConversations.title })
@@ -143,8 +143,8 @@ export class ChildFollow {
   }
 
   /**
-   * The parent's watch began anew: its children as the agent has them now, each followed and carried in every one of
-   * its streams (a new epoch starts them, the others catch up), and those it carried that are gone ended.
+   * The parent's watch began anew: its children as the agent has them now, each followed and carried to every one of
+   * its readers (a new reader starts them, the others catch up), and those it carried that are gone ended.
    */
   attached(parent: string): Effect.Effect<void, AppError> {
     return Effect.gen({ self: this }, function* () {
@@ -158,7 +158,7 @@ export class ChildFollow {
   }
 
   /**
-   * The parent's streams moved on (a batch of its, a new watch): a Persona's fork they no longer carry (its answer
+   * The parent's readers moved on (a batch of its, a new watch): a Persona's fork they no longer carry (its answer
    * ended its work there) is done with, and its watch stops.
    */
   settled(parent: string): Effect.Effect<void> {
@@ -167,6 +167,12 @@ export class ChildFollow {
       (child) => child.parent === parent && !child.runs && !carried.has(child.info.chat),
     )
     return Effect.forEach(done, (child) => this.#drop(child), { discard: true })
+  }
+
+  /** The parent has no readers left: none of its children is followed any more. */
+  released(parent: string): Effect.Effect<void> {
+    const mine = [...this.#children.values()].filter((child) => child.parent === parent)
+    return Effect.forEach(mine, (child) => this.#drop(child), { discard: true })
   }
 
   /** One message, in the producer's fiber. */
@@ -235,7 +241,7 @@ export class ChildFollow {
     )
   }
 
-  /** A new watch of the child: it is carried in its parent's streams from the watch's snapshot, then batch by batch. */
+  /** A new watch of the child: it is carried to its parent's readers from the watch's snapshot, then batch by batch. */
   #follow(child: ChildWatch): Effect.Effect<void, AppError> {
     return Effect.gen({ self: this }, function* () {
       yield* this.#unwatch(child)
@@ -253,11 +259,12 @@ export class ChildFollow {
 
   /**
    * Where a Persona's work begins in its fork: its invocation's prompt, once placed (the fork may have worked already
-   * when its start is taken, or answered before, for an earlier invocation). None for a subagent, or one carried.
+   * when its start is taken, or answered before, for an earlier invocation). Read whenever its watch begins, since a
+   * new reader starts it there while the others, which carry it, catch up. None for a subagent.
    */
   #promptOf(child: ChildWatch): Effect.Effect<number | undefined> {
     const { persona, chat } = child.info
-    if (persona === undefined || this.#carried(child)) return Effect.succeed(undefined)
+    if (persona === undefined) return Effect.succeed(undefined)
     return this.#ports.promptEntry(chat, persona.operationId, persona.id)
   }
 
@@ -290,7 +297,7 @@ export class ChildFollow {
     return child?.gen === message.gen ? child : undefined
   }
 
-  /** Whether the parent's streams still carry the child's work. */
+  /** Whether the parent's readers still carry the child's work. */
   #carried(child: ChildWatch): boolean {
     return this.#parent.carried(child.parent).has(child.info.chat)
   }
@@ -320,7 +327,7 @@ export class ChildFollow {
     return this.#unwatch(child)
   }
 
-  /** One batch of the child's watch, carried in each of its parent's streams. */
+  /** One batch of the child's watch, carried to each of its parent's readers. */
   #onBatch(message: Extract<ChildMessage, { kind: 'child-batch' }>): Effect.Effect<void> {
     const child = this.#current(message)
     if (child === undefined) return Effect.void
@@ -358,7 +365,7 @@ export class ChildFollow {
     })
   }
 
-  /** A chat changed: a subagent newly open under a chat with streams is followed, one closed is done with. */
+  /** A chat changed: a subagent newly open under a chat with readers is followed, one closed is done with. */
   #onConversation(id: string): Effect.Effect<void, AppError> {
     return Effect.gen({ self: this }, function* () {
       const row = yield* attempt(async () => chatRow(this.#ports.db, id))
@@ -376,7 +383,7 @@ export class ChildFollow {
   }
 
   /**
-   * A child the parent's streams carry that no longer works (it settled or closed while the agent was away): a
+   * A child the parent's readers carry that no longer works (it settled or closed while the watch was away): a
    * Persona's ends as its invocation did, a subagent's as done.
    */
   #gone(parent: string, chat: string, child: ChildSent): Effect.Effect<void, AppError> {

@@ -21,10 +21,7 @@ import { moveState, readRounds } from './move-probe.ts'
 import { ownerSend } from './probe-reads.ts'
 import { addUsage, utcDay } from '../../src/budget.ts'
 import { BACKGROUND, conversationId } from '../../src/pi/context.ts'
-import type { StreamsFetch } from '../../src/streams/writer.ts'
 import { leverChat, leverResponse } from './snapshot-lever.ts'
-
-export { StreamObject } from '@durable-streams/server-cloudflare'
 
 /** Tokens the `approvals/spent` lever adds to today: more than the owner stack's daily cap (`owner-stack.ts`). */
 const SPENT_TOKENS = 1_000_000_000
@@ -36,8 +33,6 @@ export class OwnerAgent extends PersonalAgent {
   /** The move boundary at which the next move waits for `/test/move/resume`, and the phase it waits at. */
   #pauseAt: MovePhase | undefined
   #paused: { readonly phase: MovePhase; readonly resume: () => void } | undefined
-  /** How many stream appends lose their acknowledgement next: the stream keeps them, the agent hears a failure. */
-  #loseAcks = 0
   protected override async moveBoundary(phase: MovePhase): Promise<void> {
     if (this.#pauseAt === phase) {
       this.#pauseAt = undefined
@@ -56,18 +51,6 @@ export class OwnerAgent extends PersonalAgent {
   override async onStart(): Promise<void> {
     await super.onStart()
     if (profileEnabled(this.env)) await permutePrimary(this.ctx.storage, this.harness)
-  }
-  /** The chat streams' writes, of which the next `#loseAcks` appends arrive but answer as if the network failed. */
-  protected override streamsFetch(): StreamsFetch | undefined {
-    const real = super.streamsFetch()
-    if (real === undefined) return undefined
-    return async (request) => {
-      const response = await real(request)
-      if (request.method !== 'POST' || this.#loseAcks === 0) return response
-      this.#loseAcks -= 1
-      await response.body?.cancel()
-      throw new Error('the acknowledgement was lost')
-    }
   }
   protected override modelStreams() {
     return queueModel(this).streams
@@ -113,7 +96,6 @@ export class OwnerAgent extends PersonalAgent {
       return Response.json({ released: queueModel(this).release(input) })
     }
     if (path.startsWith('/test/rooms/')) return this.#roomsProbe(path, request)
-    if (path.startsWith('/test/streams/')) return this.#streamsProbe(path, request)
     if (path.startsWith('/test/approvals/')) return this.#approvalsLever(path, request)
     return super.onRequest(request)
   }
@@ -144,21 +126,6 @@ export class OwnerAgent extends PersonalAgent {
     const conversation = await (await this.harness.pi()).conversation(conversationId(session), BACKGROUND)
     await conversation?.configure({ tools: null }, BACKGROUND)
     return Response.json({ stale: chat })
-  }
-  /** The chat streams' levers: lose the next appends' acknowledgements, how many are left, and evict the object. */
-  async #streamsProbe(path: string, request: Request): Promise<Response> {
-    if (path === '/test/streams/lose') {
-      const { appends } = Schema.decodeUnknownSync(Schema.Struct({ appends: Schema.Int }))(await request.json())
-      this.#loseAcks = appends
-      return Response.json({ losing: appends })
-    }
-    if (path === '/test/streams/losing') return Response.json({ losing: this.#loseAcks })
-    if (path === '/test/streams/evict') {
-      // The object stops here; the next request reconstructs it from storage, and Pi resumes the run in flight.
-      this.ctx.abort('streams restart')
-      return Response.json({ evicted: true })
-    }
-    return Response.json({ error: 'no such lever' }, { status: 404 })
   }
   /** Adds `tokens` to today's usage. */
   #spend(tokens: number): Response {
@@ -252,11 +219,6 @@ export default {
             () => Response.json({ restarted: true }),
           )
         return agent.fetch(new Request(`https://agent/test/rooms/${name ?? ''}`, input))
-      }
-      if (url.pathname.startsWith('/__test/streams/')) {
-        return (await leverAgent(input, env)).fetch(
-          new Request(`https://agent/test/streams/${url.pathname.split('/').at(-1)}`, input),
-        )
       }
       if (url.pathname.startsWith('/__test/approvals/')) {
         return (await leverAgent(input, env)).fetch(`https://agent/test/approvals/${url.pathname.split('/').at(-1)}`)

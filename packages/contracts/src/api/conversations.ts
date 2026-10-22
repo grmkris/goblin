@@ -14,12 +14,12 @@ import {
   StopConversation,
   UpdateConversation,
 } from '../conversations.ts'
-import { ConversationStream } from '../agui/join.ts'
 import { ConversationEntries } from '../entries.ts'
 import { ConversationQueue, QueueRemoval, QueueRemovalResult } from '../queue.ts'
 import { SourceUse } from '../retrieval.ts'
 import { MoveReceipt, MoveToThread } from '../threads.ts'
 import { ApiErrors } from './errors.ts'
+import { EventStream } from './stream.ts'
 import { EndpointScope } from './scope.ts'
 import { GrantsResident } from './resident.ts'
 
@@ -78,10 +78,10 @@ const EntriesQuery = {
  * - `entries`: `GET …/:id/entries?after=&limit=`: entries after a cursor, oldest first, normalized for a server
  *   (`ConversationEntries`), with the chat's activity and Persona invocations. It does not grant resident authority.
  * - `sources`: `GET …/:id/sources`: what retrieval gave the chat's answers (ADR 0035), newest first.
- * - `stream`: `GET …/:id/stream`: joins the chat's AG-UI stream and answers where to read it (`ConversationStream`,
- *   docs/architecture/streams.md): a session and an OAuth client holding `transcripts` read the `full` tier, a key and
- *   any other client `answers`. `Conflict` `stream_starting` when its stream could not be made in time. It does not
- *   grant resident authority.
+ * - `stream`: `GET …/:id/stream`, server-sent: the chat's AG-UI events, every one in full, one `data:` frame each
+ *   (docs/architecture/streams.md, ADR 0110). It opens with `MESSAGES_SNAPSHOT`, `STATE_SNAPSHOT` and the run in
+ *   flight, then follows the chat until the reader goes away (at most fifteen minutes; a reconnect opens afresh).
+ *   `Conflict` `stream_busy` past the readers a chat or the workspace takes. It does not grant resident authority.
  *
  * A caller with the `conversations` scope reaches `update`, `submit`, `startThread`, `stop`, `entries` and `stream`
  * (ADRs 0081, 0086, 0090): a key only in its own Topics, and never `keepOpen`.
@@ -164,7 +164,7 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
   }),
   HttpApiEndpoint.get('stream', '/conversations/:id/stream', {
     params,
-    success: ConversationStream,
+    success: EventStream,
     error: [ApiErrors.notFound, ApiErrors.conflict],
   })
     .annotate(EndpointScope, 'conversations')

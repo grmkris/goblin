@@ -9,6 +9,8 @@ export type StreamState = {
   /** `suspended`: nobody has looked at it for a while, so it stopped following until someone does. */
   readonly status: StreamStatus | 'suspended'
   readonly notice: string
+  /** Why the stream stopped, when it was refused for good (`stopped`): a lost session goes to sign-in. */
+  readonly failure?: unknown
 }
 
 /** One consumer of a conversation's stream: a pane or an inline thread. */
@@ -39,11 +41,18 @@ export type StreamPoolOptions = {
 
 const INITIAL: StreamState = { projection: undefined, status: 'connecting', notice: '' }
 
+/** What the conversation says of its stream: why it reconnects, or why it stopped. */
+const noticeOf = (status: StreamStatus, detail: string | undefined): string => {
+  if (status === 'reconnecting') return `${detail ?? 'Disconnected'}. Reconnecting…`
+  return status === 'stopped' ? `${detail ?? 'Disconnected'}.` : ''
+}
+
 /**
  * One stream per conversation, however many panes and inline threads follow it, so the browser holds as few live reads
- * as the screen needs. A conversation nobody has on screen keeps following for `idleMs` and then is suspended; at most
- * `max` follow at once, the least recently seen suspended first, never one on screen. Coming back on screen reads on
- * from where it stopped. The last consumer's release ends it.
+ * as the screen needs. A conversation nobody has on screen keeps following for `idleMs` and then is suspended (its
+ * connection closed); at most `max` follow at once, the least recently seen suspended first, never one on screen.
+ * Coming back on screen connects again, and the fresh opening brings it up to date. The last consumer's release ends
+ * it.
  */
 export class StreamPool {
   readonly #entries = new Map<string, Entry>()
@@ -85,7 +94,7 @@ export class StreamPool {
     }
   }
 
-  /** Every following conversation reads on from where it was (the tab came back, the network returned). */
+  /** Every following conversation connects again for a fresh opening (the tab came back, the network returned). */
   resume(): void {
     for (const entry of this.#entries.values()) if (entry.live) entry.stream.reconnect().catch(reportUnexpected)
   }
@@ -106,10 +115,11 @@ export class StreamPool {
       stream: new StreamReader(
         this.dependencies(id),
         (events) => this.#publish(entry, { projection: projector.apply(events, this.#now()) }),
-        (status, detail) =>
+        (status, detail, failure) =>
           this.#publish(entry, {
             status,
-            notice: status === 'reconnecting' ? `${detail ?? 'Disconnected'}. Reconnecting…` : '',
+            notice: noticeOf(status, detail),
+            failure,
           }),
         this.#scheduler,
       ),

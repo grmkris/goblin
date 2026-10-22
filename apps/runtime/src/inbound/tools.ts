@@ -49,7 +49,7 @@ export interface CallTarget {
 /**
  * Each tool, by the endpoint it calls (`<group>.<endpoint>`).
  *
- * @internal The parity test holds it to the endpoints annotated `EndpointScope`, one to one.
+ * @internal The parity test holds it to the endpoints annotated `EndpointScope`, one to one, but `STREAMED`.
  */
 export const TOOLS = {
   ask_agent: 'agent.ask',
@@ -64,7 +64,6 @@ export const TOOLS = {
   thread_start: 'conversations.startThread',
   conversation_entries: 'conversations.entries',
   conversation_stop: 'conversations.stop',
-  conversation_stream: 'conversations.stream',
   persona_list: 'personas.list',
   models_list: 'agent.models',
   persona_create: 'personas.create',
@@ -89,6 +88,14 @@ export const TOOLS = {
   routine_pause: 'routines.pause',
 } as const
 export type ToolName = keyof typeof TOOLS
+
+/**
+ * The scoped endpoints no tool calls: a chat's stream (ADR 0110), server-sent events a caller reads over HTTP with its
+ * own credential, which a tool's one answer cannot carry.
+ *
+ * @internal The parity test leaves these out of the tools it expects.
+ */
+export const STREAMED: ReadonlySet<string> = new Set(['conversations.stream'])
 
 /** The scope each tool's endpoint names, from its contract alone. */
 const SCOPES = endpointScopes(OwnerApi)

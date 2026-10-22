@@ -1,6 +1,6 @@
 // A chat's children in its stream (docs/architecture/streams.md): a Persona's fork recorded on a real Pi Harness
 // (`scenarios.ts`, `fork`), its work carried in its parent's stream under its `subagentRunId` between SUBAGENT_STARTED
-// and its end, kept as a golden beside the others; what the answers tier keeps of it; a late joiner's opening; and a
+// and its end, kept as a golden beside the others; what its lifecycle names; a late reader's opening; and a
 // subagent's runs.
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -8,7 +8,6 @@ import { type AguiEvent, EventType } from '@goblin/contracts'
 import { describe, expect, it } from 'vitest'
 import { type StreamCursor, open, startCursor, translate } from '../../src/streams/agui.ts'
 import { childBatch, childEnded, childStarted } from '../../src/streams/children.ts'
-import { forTier } from '../../src/streams/tiers.ts'
 import { checked, forkChild, replayFamily, textOf } from './agui-check.ts'
 import type { Recording } from './scenarios.ts'
 
@@ -36,14 +35,13 @@ const forkAnswers = (events: readonly AguiEvent[]) =>
     event.role === 'assistant' ? [event.messageId] : [],
   )
 
-/** The whole family translated, checked in both tiers, and kept as the `fork` golden. */
+/** The whole family translated, checked, and kept as the `fork` golden. */
 async function golden() {
   const { events, cursor } = replayFamily(startCursor(recording.chat), recording, child)
-  const answers = forTier(checked(events), 'answers')
   const opened = open(recording.chat, recording.final, { window: 50 }).events
-  const kept = { full: events, answers: checked(answers, 'answers'), open: checked(opened) }
+  const kept = { live: checked(events), open: checked(opened) }
   await expect(`${JSON.stringify(kept, null, 2)}\n`).toMatchFileSnapshot('__snapshots__/fork.agui.json')
-  return { events, answers, cursor }
+  return { events, cursor }
 }
 
 describe("a Persona's fork in its parent's stream", () => {
@@ -118,10 +116,10 @@ describe("a Persona's fork in its parent's stream", () => {
     ])
   })
 
-  it('leaves the answers tier only its lifecycle and its answer', async () => {
-    const { answers } = await golden()
-    expect(answers.filter((event) => 'subagentRunId' in event && !event.type.startsWith('SUBAGENT_'))).toEqual([])
-    expect(answers.map(({ type }) => type)).toEqual([
+  it('names who answers on its lifecycle, and the answer it ended with on its end', async () => {
+    const { events } = await golden()
+    const parents = events.filter((event) => !('subagentRunId' in event) || event.type.startsWith('SUBAGENT_'))
+    expect(parents.map(({ type }) => type)).toEqual([
       EventType.TEXT_MESSAGE_START,
       EventType.TEXT_MESSAGE_CONTENT,
       EventType.TEXT_MESSAGE_END,
@@ -131,15 +129,15 @@ describe("a Persona's fork in its parent's stream", () => {
       EventType.TEXT_MESSAGE_END,
       EventType.SUBAGENT_FINISHED,
     ])
-    const [started] = ofType(answers, EventType.SUBAGENT_STARTED)
+    const [started] = ofType(events, EventType.SUBAGENT_STARTED)
     expect(started?.metadata).toEqual({ goblin: { persona: child.persona, invocation: { state: 'running' } } })
-    const [finished] = ofType(answers, EventType.SUBAGENT_FINISHED)
+    const [finished] = ofType(events, EventType.SUBAGENT_FINISHED)
     expect(finished?.metadata).toMatchObject({
       goblin: { entryId: expect.any(Number), invocation: { state: 'answered' } },
     })
   })
 
-  it('opens a late joiner with the fork in flight: SUBAGENT_STARTED and its run so far, then goes on', () => {
+  it('opens a late reader with the fork in flight: SUBAGENT_STARTED and its run so far, then goes on', () => {
     const { mid } = recording
     if (mid === undefined || kid.mid === undefined) throw new Error('the fork fixture has no mid-answer snapshots')
     const opened = open(recording.chat, mid.snapshot, { window: 50 })
@@ -261,7 +259,6 @@ describe("a subagent's runs in its parent's stream", () => {
     const helper = { chat: FORK, name: 'Researcher' }
     const { events, cursor } = replayFamily(startCursor(recording.chat), recording, helper, true)
     checked(events)
-    checked(forTier(events, 'answers'), 'answers')
     const lifecycle = events.filter(({ type }) => type.startsWith('SUBAGENT_'))
     expect(lifecycle).toEqual([
       { type: EventType.SUBAGENT_STARTED, subagentRunId: FORK, name: 'Researcher' },

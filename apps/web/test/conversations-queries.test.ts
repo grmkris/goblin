@@ -4,7 +4,7 @@ import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { historyQuery, streamJoin, submitMutation } from '../src/conversations/queries.ts'
+import { historyQuery, submitMutation } from '../src/conversations/queries.ts'
 import { owner } from '../src/lib/api.ts'
 import { fakeHttpApi, testQueryClient } from './query/testing.ts'
 import { unusedHandlers } from './query/unused-handlers.ts'
@@ -28,13 +28,6 @@ const fakeOwner = () => {
       ...unusedHandlers(OwnerApi.groups.conversations),
       submit: ({ payload }) =>
         Effect.succeed({ operationId: payload.operationId, session: 'session-7', accepted: true }),
-      stream: () =>
-        Effect.succeed({
-          url: 'http://app.test/streams/t',
-          epoch: 1,
-          tier: 'full' as const,
-          expiresAt: '2026-10-22T12:10:00.000Z',
-        }),
       history: ({ query }) => Effect.succeed(page(query.before)),
     }),
   )
@@ -90,7 +83,7 @@ describe('conversation queries', () => {
     expect(calls()).toEqual([])
   })
 
-  it("send the owner's message as its operation, and join the chat's stream", async () => {
+  it("send the owner's message as its operation", async () => {
     const client = testQueryClient()
     const submit = new MutationObserver(client, submitMutation)
     await expect(submit.mutate({ id: '7', message: { input: 'Hello', operationId: 'op-7' } })).resolves.toEqual({
@@ -99,13 +92,5 @@ describe('conversation queries', () => {
       accepted: true,
     })
     expect(calls().at(-1)?.headers.get('x-goblin-operation')).toBe('op-7')
-    const join = streamJoin('7')
-    await expect(join(new AbortController().signal)).resolves.toEqual({
-      url: 'http://app.test/streams/t',
-      epoch: 1,
-      tier: 'full',
-      expiresAt: '2026-10-22T12:10:00.000Z',
-    })
-    expect(new URL(calls().at(-1)?.url ?? '').pathname).toBe('/api/conversations/7/stream')
   })
 })

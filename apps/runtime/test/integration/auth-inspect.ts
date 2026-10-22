@@ -270,10 +270,6 @@ export async function inspectAuthCase(base: string) {
     const conversations = await client.callTool({ name: 'inspect_conversations', arguments: {} })
     expect(conversations.isError, JSON.stringify(conversations)).toBeFalsy()
     expect(Schema.is(InspectConversations)(conversations.structuredContent)).toBe(true)
-    // A client holding transcripts follows a chat in the full tier (docs/architecture/streams.md).
-    const followed = await client.callTool({ name: 'conversation_stream', arguments: { chat: '1' } })
-    expect(followed.isError, JSON.stringify(followed)).toBeFalsy()
-    expect(followed.structuredContent).toMatchObject({ tier: 'full', epoch: 1 })
     const missing = await client.callTool({ name: 'inspect_turn', arguments: { operation: 'no-such-turn' } })
     expect(missing.isError).toBe(true)
     // The refusal quotes the request's reference, as it does over HTTP.

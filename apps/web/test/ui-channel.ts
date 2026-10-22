@@ -6,7 +6,7 @@ import { createServer } from 'vite'
 import { type Page, chromium } from 'playwright-core'
 import { marksOf } from '../src/lib/agui/messages.ts'
 import { activity, answer, asking, opening, result, said } from './agui-fixtures.ts'
-import { FixtureStream, installLiveReads } from './agui-route.ts'
+import { FixtureStream, OPENINGS, installLiveReads, openingChat } from './agui-route.ts'
 
 const baseline = process.argv.includes('--before')
 const out = path.resolve(
@@ -246,7 +246,7 @@ async function live(page: Page, stream: FixtureStream, label: string) {
   await page.getByText('Casa do Jardim', { exact: false }).last().waitFor()
   await page.getByText('Under €200 a night, please.').waitFor({ state: 'hidden' })
   await page.screenshot({ path: path.join(out, `${label}-settled.png`) })
-  // A reload reads the whole epoch again and draws the same transcript.
+  // A reload connects again, and its opening draws the same transcript.
   await page.reload()
   await page.getByText('Two from your shortlist').waitFor()
 }
@@ -282,9 +282,7 @@ try {
       return known
     }
     await installLiveReads(page)
-    await page.route('**/streams/**', (route) =>
-      streamOf(new URL(route.request().url()).pathname.split('/').at(-1) ?? '').read(route),
-    )
+    await page.route(OPENINGS, (route) => streamOf(openingChat(route)).opening(route))
     await page.route(
       (url) => url.pathname.startsWith('/api/'),
       (route) => {
@@ -347,7 +345,6 @@ try {
           },
         }
         if (at in responses) return json(responses[at])
-        if (at.endsWith('/stream')) return json(streamOf(at.split('/').at(-2) ?? '').link(origin))
         if (at.endsWith('/sources')) return json([])
         if (at.endsWith('/history')) return json(historyPage(Number(url.searchParams.get('before'))))
         if (at.endsWith('/read')) return json({ read: true })

@@ -6,7 +6,7 @@ import { TopicSeedData } from '../topics.ts'
 
 /**
  * goblin's activity types: the entries the app draws itself, sent as `ACTIVITY_SNAPSHOT` live and as `activity`
- * messages in `MESSAGES_SNAPSHOT` (never as CUSTOM events, which a reader that joins later never sees). Each content is
+ * messages in `MESSAGES_SNAPSHOT` (never as CUSTOM events, which a reader that connects later never sees). Each content is
  * the entry's data as its contract says.
  *
  * - `goblin.thread_head`: a Thread started here (ADR 0034); its head text and the Thread it links.
