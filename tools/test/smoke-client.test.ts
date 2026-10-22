@@ -74,10 +74,10 @@ describe('DevClient', () => {
   })
 
   it('reports a refused call by its tag, never its text, and logs its reference', async () => {
-    await expect(dev.owner((api) => api.conversations.snapshot({ params: { id: '7' } }))).rejects.toThrow(
+    await expect(dev.owner((api) => api.conversations.stream({ params: { id: '7' } }))).rejects.toThrow(
       /^request_failed: NotFound$/u,
     )
-    expect(steps.at(-1)).toEqual({ step: 'GET /api/conversations/7/snapshot', status: 404, ref: 'ref-missing' })
+    expect(steps.at(-1)).toEqual({ step: 'GET /api/conversations/7/stream', status: 404, ref: 'ref-missing' })
   })
 
   it('leaves the session out of a request that asks for it', async () => {

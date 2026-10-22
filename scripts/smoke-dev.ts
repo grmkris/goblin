@@ -15,7 +15,7 @@ import { appChecks } from './smoke-apps.ts'
 import { DevClient, type Step } from './smoke-client.ts'
 import { InboundClient, SMOKE_CLIENT_NAME, base64url, operationId } from './smoke-inbound.ts'
 import { edgeChecks, internalChecks } from './smoke-edge.ts'
-import { delegateReported } from './smoke-entries.ts'
+import { delegateReported, idleAfter, marksOf } from './smoke-entries.ts'
 import { publicSmoke } from './smoke-public.ts'
 import { clientBuild, flowsCheck } from './smoke-release.ts'
 
@@ -159,13 +159,29 @@ async function poll<A>(
 const mainHistory = (dev: DevClient, signal?: AbortSignal) =>
   dev.owner((api) => api.conversations.history(MAIN_HISTORY), signal)
 
+/**
+ * Chat `thread`'s stream from the start of its epoch, as any reader reads it: joined, then read at its signed URL page
+ * by page until up to date (docs/architecture/streams.md).
+ */
+async function streamEvents(dev: DevClient, thread: string, signal?: AbortSignal): Promise<JsonObject[]> {
+  const link = await dev.owner((api) => api.conversations.stream({ params: { id: thread } }), signal)
+  const events: JsonObject[] = []
+  for (let offset = '-1'; ;) {
+    const url = new URL(link.url)
+    url.searchParams.set('offset', offset)
+    const response = await fetch(url, signal === undefined ? {} : { signal })
+    if (!response.ok) throw new Error(`stream_read_${response.status}`)
+    events.push(...objects(await response.json()))
+    offset = response.headers.get('stream-next-offset') ?? offset
+    if (response.headers.get('stream-up-to-date') === 'true') return events
+  }
+}
+
 const waitForIdle = (dev: DevClient, thread: string): Promise<void> =>
-  poll(
-    (signal) => dev.owner((api) => api.conversations.snapshot({ params: { id: thread } }), signal),
-    (snapshot) => !snapshot['run'] && objects(snapshot['inbox']).length === 0,
-    120_000,
-    'thread_still_busy',
-  )
+  poll((signal) => streamEvents(dev, thread, signal), idleAfter, 120_000, 'thread_still_busy')
+
+/** The entries of a page of history's messages. */
+const entriesOf = (messages: readonly JsonObject[]) => new Set(messages.map((message) => marksOf(message)['entryId']))
 
 async function submitMessage(dev: DevClient, thread: string, input: string, step: string): Promise<void> {
   const payload = { input, operationId: operationId(step) }
@@ -197,12 +213,15 @@ async function threadChecks(dev: DevClient): Promise<ThreadCheck> {
       'thread',
     )
     await waitForIdle(dev, thread)
-    const before = await mainHistory(dev)
-    const seen = new Set(objects(before.entries).map((entry) => entry['id']))
+    const seen = entriesOf(objects((await mainHistory(dev)).messages))
     await submitMessage(dev, thread, 'Share what we concluded here with main.', 'thread_share')
+    // A shared note is a user message that names the thread it came from.
     await poll(
       (signal) => mainHistory(dev, signal),
-      (history) => objects(history.entries).some((entry) => entry['kind'] === 'app.shared' && !seen.has(entry['id'])),
+      (history) =>
+        objects(history.messages).some(
+          (message) => marksOf(message)['thread'] === thread && !seen.has(marksOf(message)['entryId']),
+        ),
       60_000,
       'thread_share_missing',
     )
@@ -216,8 +235,7 @@ async function threadChecks(dev: DevClient): Promise<ThreadCheck> {
 type SubagentCheck = { readonly subagent: 'reported' }
 
 async function subagentChecks(dev: DevClient): Promise<SubagentCheck> {
-  const before = await mainHistory(dev)
-  const seen = new Set(objects(before.entries).map((entry) => entry['id']))
+  const seen = entriesOf(objects((await mainHistory(dev)).messages))
   await submitMessage(
     dev,
     '1',
@@ -227,8 +245,8 @@ async function subagentChecks(dev: DevClient): Promise<SubagentCheck> {
   await poll(
     (signal) => mainHistory(dev, signal),
     (history) => {
-      const entries = objects(history.entries).filter((entry) => !seen.has(entry['id']))
-      return delegateReported(entries, 'smokecount')
+      const messages = objects(history.messages).filter((message) => !seen.has(marksOf(message)['entryId']))
+      return delegateReported(messages, 'smokecount')
     },
     120_000,
     'subagent_report_missing',
@@ -396,12 +414,12 @@ type Receipt = {
   readonly flows: string
 }
 
-/** Signed in: resident authority is active and main has a snapshot. */
+/** Signed in: resident authority is active and main's stream opens with its messages. */
 async function ownerReads(dev: DevClient): Promise<{ readonly resident: 'active' }> {
   const resident = await dev.owner((api) => api.resident.status())
   if (resident.state !== 'active') throw new Error('resident_authority_inactive')
-  const snapshot = await dev.owner((api) => api.conversations.snapshot({ params: { id: '1' } }))
-  if (snapshot['type'] !== 'snapshot') throw new Error('main_snapshot_missing')
+  const [opening] = await streamEvents(dev, '1')
+  if (opening?.['type'] !== 'MESSAGES_SNAPSHOT') throw new Error('main_stream_missing')
   return { resident: resident.state }
 }
 
