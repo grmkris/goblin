@@ -7,25 +7,36 @@ import { writeLine } from '../../observability/logger.ts'
 import { safeErrorType } from '../../observability/report.ts'
 import { outcomeOf } from '../../telemetry/attributes.ts'
 import { expectedFailure, safeFailureCode } from '../../telemetry/safety.ts'
-import type { McpStep } from '../../telemetry/report.ts'
+import { type McpReached, type McpStep, mcpStepAttributes } from '../../telemetry/report.ts'
 
 /** Where a finished MCP step goes: the run telemetry (`mcpReporter`), or a plain log line. */
 export type StepReport = (step: McpStep, outcome: string, startedAt: number, endedAt: number) => void
 
 /** One `mcp` log line per step, for a manager made without run telemetry: ids, outcome and duration only. */
-const logStep: StepReport = (step, outcome, startedAt, endedAt) => {
+export const logStep: StepReport = (step, outcome, startedAt, endedAt) => {
   const code = outcome === 'ok' ? 'ok' : safeFailureCode(outcome)
   writeLine(outcome === 'ok' || expectedFailure(code) ? 'info' : 'warn', {
     event: 'mcp',
     [RunAttribute.mcpStep]: step.step,
     [RunAttribute.mcpServer]: step.connectionId,
     ...(step.tool === undefined ? {} : { [RunAttribute.mcpTool]: step.tool }),
-    ...(step.method === undefined ? {} : { [RunAttribute.mcpMethod]: step.method }),
+    ...mcpStepAttributes(step),
     ...(step.sharedConnection === undefined ? {} : { [RunAttribute.sharedConnection]: step.sharedConnection }),
     code,
     ms: endedAt - startedAt,
   })
 }
+
+/**
+ * `report` with each step told the server it reached, as `reachedOf` knows it when the step ends: a connect that just
+ * opened names the server it opened (ADR 0107).
+ */
+export const reaching =
+  (report: StepReport, reachedOf: (connectionId: string) => McpReached | undefined): StepReport =>
+  (step, outcome, startedAt, endedAt) => {
+    const reached = reachedOf(step.connectionId)
+    report(reached === undefined ? step : { ...step, reached }, outcome, startedAt, endedAt)
+  }
 
 /** A sink that failed is reported and never fails the step it was told about. */
 const reportSafely = (report: StepReport, step: McpStep, outcome: string, startedAt: number, endedAt: number): void => {

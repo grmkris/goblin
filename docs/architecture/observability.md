@@ -37,7 +37,10 @@ Outside Pi, the agent's services report to the same telemetry (`telemetry/report
 - **Model calls outside a turn** (`model.aux`): one cheap model per purpose (`naming`, `memory`, `skill`,
   `app_llm`, `retrieval`), with tokens and errors (`memory/model.ts`).
 - **Remote MCP steps** (`mcp.request`): every connect, tool call, skills request and Events request, with server,
-  tool, outcome code (`UpstreamMcp:timeout`), expected blocked waits and duration (`mcp/connections/log.ts`). Resident callers pass
+  tool, the JSON-RPC method (`mcp.method.name`), outcome code (`UpstreamMcp:timeout`), expected blocked waits and
+  duration (`mcp/connections/log.ts`). Each also names the server as it last connected (ADR 0107): its own name as
+  an alias and version (`goblin.mcp.server.name`, `.version`), the protocol (`mcp.protocol.version`) and its tool
+  list's digest (`goblin.mcp.tools_digest`), never its address. Resident callers pass
   explicit conversation/task metadata, stripped before SDK dispatch; shared connection discovery is marked without
   attributing it to a turn. Reporter failures cannot change or retry the call.
 - **Sources** (`source.received`, `source.reply`): each message by its Source id and turn's operation id; each

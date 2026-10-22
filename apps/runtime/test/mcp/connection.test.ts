@@ -121,11 +121,13 @@ describe('official MCP SDK host interoperability (unit)', () => {
       ])
       const connected = reports.filter(({ step }) => step.step === 'connect')
       expect(connected).toHaveLength(3)
+      // Each step says which server it reached, as it reported itself when it connected (ADR 0107).
+      const reached = expect.objectContaining({ name: 'fixture', version: '1.0.0' })
       expect(connected).toEqual(
         expect.arrayContaining([
-          { step: { step: 'connect', connectionId: 'fixture', sharedConnection: true }, outcome: 'ok' },
-          { step: { step: 'connect', connectionId: 'fixture', scope: one }, outcome: 'ok' },
-          { step: { step: 'connect', connectionId: 'fixture', scope: two }, outcome: 'ok' },
+          { step: { step: 'connect', connectionId: 'fixture', sharedConnection: true, reached }, outcome: 'ok' },
+          { step: { step: 'connect', connectionId: 'fixture', scope: one, reached }, outcome: 'ok' },
+          { step: { step: 'connect', connectionId: 'fixture', scope: two, reached }, outcome: 'ok' },
         ]),
       )
       await manager.connections.callTool('fixture', 'read', {}, { runContext: two })
@@ -133,8 +135,11 @@ describe('official MCP SDK host interoperability (unit)', () => {
         _tag: 'GrantDenied',
       })
       expect(reports.filter(({ step }) => step.step === 'call')).toEqual([
-        { step: { step: 'call', connectionId: 'fixture', tool: 'read', scope: two }, outcome: 'ok' },
-        { step: { step: 'call', connectionId: 'fixture', tool: 'missing', scope: one }, outcome: 'GrantDenied' },
+        { step: { step: 'call', connectionId: 'fixture', tool: 'read', scope: two, reached }, outcome: 'ok' },
+        {
+          step: { step: 'call', connectionId: 'fixture', tool: 'missing', scope: one, reached },
+          outcome: 'GrantDenied',
+        },
       ])
     } finally {
       await manager.dispose()

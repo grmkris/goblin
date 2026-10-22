@@ -16,7 +16,7 @@ import { ranWith } from '../src/telemetry/ran-with.ts'
 import { auxReporter, mcpReporter } from '../src/telemetry/report.ts'
 import { CheapModel } from '../src/memory/model.ts'
 import { MODEL_PROVIDER } from '../src/pi/model.ts'
-import { type StepReport, timed } from '../src/mcp/connections/log.ts'
+import { type StepReport, reaching, timed } from '../src/mcp/connections/log.ts'
 import type { McpStep } from '../src/telemetry/report.ts'
 import { grantRequiredResult } from '../src/mcp/connections/extension.ts'
 import { NeedsAuthorization, NotFound, UpstreamMcp } from '../src/http/errors.ts'
@@ -747,7 +747,11 @@ describe('run telemetry outside Pi (unit)', () => {
 
   it('records each remote MCP step, and a failed one by its tag', async () => {
     const collected = new CollectedRuns()
-    const report = mcpReporter(new RunTelemetry([collected]))
+    const report = reaching(mcpReporter(new RunTelemetry([collected])), (connectionId) =>
+      connectionId === 'myplan'
+        ? { name: 'My Plan Server', version: '1.4.2', protocolVersion: '2025-11-25', toolsDigest: '1a2b3c4d-12' }
+        : undefined,
+    )
     await step({ step: 'call', connectionId: 'myplan', tool: 'notes_search' }, async () => 'ok', report)
     await expect(
       step(
@@ -764,13 +768,38 @@ describe('run telemetry outside Pi (unit)', () => {
           [RunAttribute.mcpStep]: 'call',
           [RunAttribute.mcpServer]: 'myplan',
           [RunAttribute.mcpTool]: 'notes_search',
+          [RunAttribute.mcpMethod]: 'tools/call',
+          // What the server says it is, its name as an alias; never its address (ADR 0107).
+          [RunAttribute.mcpServerName]: 'my_plan_server',
+          [RunAttribute.mcpServerVersion]: '1.4.2',
+          [RunAttribute.mcpProtocol]: '2025-11-25',
+          [RunAttribute.mcpToolsDigest]: '1a2b3c4d-12',
         },
       },
       {
         kind: 'mcp.request',
         status: 'error',
-        attributes: { [RunAttribute.mcpStep]: 'connect', [RunAttribute.errorType]: 'UpstreamMcp:timeout' },
+        attributes: {
+          [RunAttribute.mcpStep]: 'connect',
+          [RunAttribute.mcpMethod]: 'initialize',
+          [RunAttribute.errorType]: 'UpstreamMcp:timeout',
+        },
       },
     ])
+  })
+
+  it("drops a server's self-reported version that is not a plain token", async () => {
+    const collected = new CollectedRuns()
+    const report = reaching(mcpReporter(new RunTelemetry([collected])), () => ({
+      name: 'x',
+      version: 'v1 (beta) build',
+    }))
+    await step({ step: 'events', connectionId: 'feed', method: 'events/poll' }, async () => 'ok', report)
+    const [event] = collected.events()
+    expect(event?.attributes).toMatchObject({
+      [RunAttribute.mcpMethod]: 'events/poll',
+      [RunAttribute.mcpServerName]: 'x',
+    })
+    expect(Object.keys(event?.attributes ?? {})).not.toContain(RunAttribute.mcpServerVersion)
   })
 })

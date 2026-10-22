@@ -106,9 +106,19 @@ export const RunAttribute = {
   blockedReason: 'goblin.blocked_reason',
   mcpServer: 'goblin.mcp.server',
   mcpTool: 'goblin.mcp.tool',
-  /** `connect`, `call`, `skills` or `events`: one remote MCP step. */
+  /** `connect`, `call`, `tools`, `listen`, `skills` or `events`: one remote MCP step. */
   mcpStep: 'goblin.mcp.step',
-  mcpMethod: 'goblin.mcp.method',
+  /** The JSON-RPC method the step sent (`initialize`, `tools/call`, `tools/list`, an Events method). */
+  mcpMethod: 'mcp.method.name',
+  /** The protocol version the connection agreed on. */
+  mcpProtocol: 'mcp.protocol.version',
+  /**
+   * The server as it last connected (ADR 0107): the name and version its `initialize` reported, the name as an alias,
+   * and the digest of its tool list. Never its address.
+   */
+  mcpServerName: 'goblin.mcp.server.name',
+  mcpServerVersion: 'goblin.mcp.server.version',
+  mcpToolsDigest: 'goblin.mcp.tools_digest',
   /** Shared transport discovery belongs to the connection; caller waits carry their own explicit scope. */
   sharedConnection: 'goblin.mcp.shared_connection',
   source: 'goblin.source',

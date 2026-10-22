@@ -99,7 +99,10 @@ describe("a connection's tools, re-listed in place (unit, ADR 0042)", () => {
       const snapshot = Option.getOrThrow(await manager.connections.snapshot('roles'))
       expect(snapshot.tools.map(({ name }) => name)).toEqual(['whoami', 'create_task'])
       expect(reports.filter(({ step }) => step.step === 'tools')).toEqual([
-        { step: { step: 'tools', connectionId: 'roles' }, outcome: 'ok' },
+        {
+          step: { step: 'tools', connectionId: 'roles', reached: expect.objectContaining({ name: 'roles' }) },
+          outcome: 'ok',
+        },
       ])
       // A granted tool it still does not list after that one more list is refused.
       await expect(manager.connections.callTool('roles', 'retired', {})).rejects.toMatchObject({ _tag: 'NotFound' })

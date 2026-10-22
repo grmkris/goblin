@@ -1,5 +1,6 @@
-import { RunAttribute } from '@goblin/contracts/telemetry'
+import { RunAttribute, type RunAttributes } from '@goblin/contracts/telemetry'
 import { nowMillis } from '../clock.ts'
+import { aliasOf } from '../pi/native-tools.ts'
 import { type Answer, answerAttributes, failureAttributes, statusOfStop } from './attributes.ts'
 import type { RunTelemetry } from './events.ts'
 import { expectedFailure, safeFailureCode } from './safety.ts'
@@ -43,6 +44,14 @@ function recordAux(telemetry: RunTelemetry, purpose: AuxPurpose, call: AuxCall):
   })
 }
 
+/** The server a step reached, as it last connected (ADR 0107): what it says it is, and its tool list's digest. */
+export type McpReached = {
+  readonly name?: string | undefined
+  readonly version?: string | undefined
+  readonly protocolVersion?: string | undefined
+  readonly toolsDigest?: string | undefined
+}
+
 /** One remote MCP step (mcp/connections/log.ts): which, on which server, how it ended and when. */
 export type McpStep = {
   readonly step: 'connect' | 'call' | 'tools' | 'listen' | 'skills' | 'events'
@@ -51,6 +60,31 @@ export type McpStep = {
   readonly method?: string
   readonly scope?: { readonly conversationId: string; readonly taskId: string }
   readonly sharedConnection?: boolean
+  /** Filled by the manager when the step ends (`reaching`, mcp/connections/log.ts). */
+  readonly reached?: McpReached
+}
+
+/** The JSON-RPC method a step sends when the step names none (MCP semantic conventions' `mcp.method.name`). */
+const METHODS: Partial<Record<McpStep['step'], string>> = {
+  connect: 'initialize',
+  call: 'tools/call',
+  tools: 'tools/list',
+}
+
+/**
+ * What a step's attributes say of its server and method, for the run ledger and the log line alike: the method, and
+ * the server's own name (as an alias, `aliasOf`), version, protocol and tool list digest. Never its address.
+ */
+export function mcpStepAttributes(step: McpStep): RunAttributes {
+  const method = step.method ?? METHODS[step.step]
+  const reached = step.reached
+  return {
+    ...(method === undefined ? {} : { [RunAttribute.mcpMethod]: method }),
+    ...(reached?.protocolVersion === undefined ? {} : { [RunAttribute.mcpProtocol]: reached.protocolVersion }),
+    ...(reached?.name === undefined ? {} : { [RunAttribute.mcpServerName]: aliasOf(reached.name) }),
+    ...(reached?.version === undefined ? {} : { [RunAttribute.mcpServerVersion]: reached.version }),
+    ...(reached?.toolsDigest === undefined ? {} : { [RunAttribute.mcpToolsDigest]: reached.toolsDigest }),
+  }
 }
 
 /** Records each remote MCP step as one `mcp.request` event. */
@@ -70,7 +104,7 @@ export const mcpReporter =
         [RunAttribute.mcpServer]: step.connectionId,
         ...(step.sharedConnection === true ? { [RunAttribute.sharedConnection]: true } : {}),
         ...(step.tool === undefined ? {} : { [RunAttribute.mcpTool]: step.tool }),
-        ...(step.method === undefined ? {} : { [RunAttribute.mcpMethod]: step.method }),
+        ...mcpStepAttributes(step),
         ...(outcome === 'ok' ? {} : { [RunAttribute.errorType]: code }),
       },
     })

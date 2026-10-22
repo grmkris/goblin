@@ -10,7 +10,7 @@ import type { ArgumentChecks } from './arguments.ts'
 import { DispatchGuards } from './dispatch.ts'
 import { mapMcpError } from './errors.ts'
 import type { GrantCapability } from '../grants/grants.ts'
-import { logClientError, timed } from './log.ts'
+import { logClientError, logStep, reaching, timed } from './log.ts'
 import { ANSWERED, assertEndpoint, bounded, openRemote } from './remote.ts'
 import type { McpConnections } from '../service.ts'
 import { listenWhileUsed, refreshTools, stopListening, toolsListed, untilUnused, watchTools } from './tool-list.ts'
@@ -342,12 +342,26 @@ export const managerState = Effect.fnUntraced(function* (options: McpManagerOpti
     if (servers.size !== options.servers.length) throw new Internal({ reason: 'mcp_connection_id_duplicate' })
     for (const server of options.servers) assertEndpoint(server)
   })
+  const connections = new Map<string, Connection>()
+  const digests = new Map<string, string>()
+  // Every step says which server it reached, as that server last connected (ADR 0107).
+  const report = reaching(options.report ?? logStep, (connectionId) => {
+    const snapshot = connections.get(connectionId)?.snapshot
+    const toolsDigest = digests.get(connectionId)
+    if (snapshot === undefined && toolsDigest === undefined) return undefined
+    return {
+      name: snapshot?.serverInfo?.name,
+      version: snapshot?.serverInfo?.version,
+      protocolVersion: snapshot?.protocolVersion,
+      toolsDigest,
+    }
+  })
   const manager: Manager = {
-    options,
+    options: { ...options, report },
     flights: yield* SingleFlight,
     scope: yield* Effect.scope,
     servers,
-    connections: new Map(),
+    connections,
     dispatch: new DispatchGuards(),
     openTimeoutMs: options.timeoutMs ?? 10_000,
     requestTimeoutMs: options.timeoutMs ?? 30_000,
@@ -358,7 +372,7 @@ export const managerState = Effect.fnUntraced(function* (options: McpManagerOpti
     idleMs: options.idleMs ?? 300_000,
     listenIdleMs: options.listenIdleMs ?? 60_000,
     opened: 0,
-    digests: new Map(),
+    digests,
     argumentChecks: new WeakMap(),
   }
   yield* Effect.addFinalizer(() => closeAll(manager))
