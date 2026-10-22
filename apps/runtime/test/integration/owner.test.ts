@@ -98,7 +98,7 @@ harness.test(
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => threadHeadsCase(url)))),
 )
 harness.test(
-  'native: a key titles, renames, closes and reopens its own threads, and reads back its message to a Persona (ADR 0090)',
+  'native: a key titles, renames, closes and reopens its own threads, reads back its message to a Persona (ADR 0090), and keeps them rotated (ADR 0105)',
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => keyThreadsCase(url)))),
 )
 harness.test(

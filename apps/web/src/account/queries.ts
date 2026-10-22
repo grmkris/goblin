@@ -93,6 +93,15 @@ export const updateKeyMutation = mutationOptions({
   onSuccess: (_updated, _change, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),
 })
 
+/**
+ * A new secret for one key (ADR 0105): the same key, which keeps what it made; its answer holds the secret, which is
+ * never shown again, and the old one is refused from then on.
+ */
+export const rotateKeyMutation = mutationOptions({
+  ...workspaceAccount.apiMutation({ mutationFn: (api, keyId: string) => api.keys.rotate({ params: { keyId } }) }),
+  onSuccess: (_rotated, _keyId, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),
+})
+
 /** Ends one key at once. */
 export const revokeKeyMutation = mutationOptions({
   ...workspaceAccount.apiMutation({ mutationFn: (api, keyId: string) => api.keys.revoke({ params: { keyId } }) }),

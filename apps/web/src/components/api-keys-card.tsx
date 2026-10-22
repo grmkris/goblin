@@ -1,7 +1,7 @@
 // The Settings card for API keys (ADR 0081): what a server the owner runs uses instead of a browser session.
 import { Fragment, type SubmitEvent, useState } from 'react'
 import { useMutation, useQuery, useSuspenseQuery } from '@tanstack/react-query'
-import { type KeyOrigin, type KeyScope, keyOriginsOf } from '@goblin/contracts'
+import { type ApiKeyView, type KeyOrigin, type KeyScope, keyOriginsOf } from '@goblin/contracts'
 import {
   Alert,
   AlertDescription,
@@ -18,7 +18,13 @@ import {
   Skeleton,
   Switch,
 } from '@goblin/ui'
-import { createKeyMutation, keysQuery, revokeKeyMutation, updateKeyMutation } from '../account/queries.ts'
+import {
+  createKeyMutation,
+  keysQuery,
+  revokeKeyMutation,
+  rotateKeyMutation,
+  updateKeyMutation,
+} from '../account/queries.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { QueryBoundary } from '../lib/query/query-boundary.tsx'
 import { setupCatalogQuery } from '../setup/queries.ts'
@@ -48,7 +54,7 @@ function Toggle(props: {
 const toggled = <A,>(items: readonly A[], item: A, on: boolean): readonly A[] =>
   on ? [...new Set([...items, item])] : items.filter((each) => each !== item)
 
-/** A new key's secret, shown this once, to copy. */
+/** A new key's secret, or a rotated key's new one (ADR 0105), shown this once, to copy. */
 function ShownSecret(props: { readonly name: string; readonly secret: string; readonly onDone: () => void }) {
   return (
     <FieldGroup>
@@ -313,11 +319,58 @@ function KeyScopes(props: {
   )
 }
 
-/** The owner's keys, each revocable, and each one's scopes and MCP servers changeable. */
+/**
+ * A new secret for one key (ADR 0105), once the owner confirms that the old one stops working at once; then the new one,
+ * once. It stays the same key, and keeps what it made.
+ */
+function RotateSecret(props: { readonly keyId: string; readonly name: string; readonly onDone: () => void }) {
+  const rotate = useMutation(rotateKeyMutation)
+  const failure = rotate.error === null ? '' : messageOf(rotate.error, 'rotate that key')
+  if (rotate.data !== undefined)
+    return <ShownSecret name={rotate.data.key.name} secret={rotate.data.secret} onDone={props.onDone} />
+  return (
+    <FieldGroup>
+      {failure && (
+        <Alert variant="destructive">
+          <AlertDescription>{failure}</AlertDescription>
+        </Alert>
+      )}
+      <div className="inline-confirm" role="alertdialog" aria-label={`Rotate the secret of ${props.name}?`}>
+        <span>
+          Rotate its secret? The old one stops working at once, so anything using it needs the new one. The key keeps
+          its scopes, servers and what it made.
+        </span>
+        <Button size="sm" variant="destructive" pending={rotate.isPending} onClick={() => rotate.mutate(props.keyId)}>
+          Rotate secret
+        </Button>
+        <Button size="sm" variant="ghost" disabled={rotate.isPending} onClick={props.onDone}>
+          Cancel
+        </Button>
+      </div>
+    </FieldGroup>
+  )
+}
+
+/** What is open under one key: its scopes, its MCP servers or a new secret. */
+type Editing = { readonly id: string; readonly what: 'scopes' | 'servers' | 'secret' }
+
+/** The part open under one key, which closes with `onDone`. */
+function KeyEditor(props: {
+  readonly apiKey: ApiKeyView
+  readonly what: Editing['what']
+  readonly onDone: () => void
+}) {
+  const { apiKey, onDone } = props
+  if (props.what === 'scopes') return <KeyScopes keyId={apiKey.id} scopes={apiKey.scopes} onDone={onDone} />
+  if (props.what === 'servers') return <KeyServers keyId={apiKey.id} origins={apiKey.origins} onDone={onDone} />
+  return <RotateSecret keyId={apiKey.id} name={apiKey.name} onDone={onDone} />
+}
+
+/** The owner's keys, each revocable, each one's secret rotatable, and its scopes and MCP servers changeable. */
 function Keys() {
   const keys = useSuspenseQuery(keysQuery).data
   const revoke = useMutation(revokeKeyMutation)
-  const [editing, setEditing] = useState<{ readonly id: string; readonly what: 'scopes' | 'servers' }>()
+  const [editing, setEditing] = useState<Editing>()
   const revoking = revoke.isPending ? revoke.variables : ''
   const failure = revoke.error === null ? '' : messageOf(revoke.error, 'revoke that key')
   return (
@@ -363,6 +416,14 @@ function Keys() {
                 </Button>
                 <Button
                   size="sm"
+                  variant="ghost"
+                  disabled={editing?.id === key.id && editing.what === 'secret'}
+                  onClick={() => setEditing({ id: key.id, what: 'secret' })}
+                >
+                  Rotate secret
+                </Button>
+                <Button
+                  size="sm"
                   variant="outline"
                   pending={revoking === key.id}
                   disabled={revoking !== '' && revoking !== key.id}
@@ -373,11 +434,7 @@ function Keys() {
               </li>
               {editing?.id === key.id && (
                 <li>
-                  {editing.what === 'scopes' ? (
-                    <KeyScopes keyId={key.id} scopes={key.scopes} onDone={() => setEditing(undefined)} />
-                  ) : (
-                    <KeyServers keyId={key.id} origins={key.origins} onDone={() => setEditing(undefined)} />
-                  )}
+                  <KeyEditor apiKey={key} what={editing.what} onDone={() => setEditing(undefined)} />
                 </li>
               )}
             </Fragment>

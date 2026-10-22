@@ -8,12 +8,15 @@ import {
   type UpdateApiKey,
   keyOriginsOf,
 } from '@goblin/contracts'
+import { API_KEY_TABLE_NAME, defaultKeyHasher } from '@better-auth/api-key'
+import { generateRandomString } from 'better-auth/crypto'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type { RuntimeEnv } from '../env.ts'
 import { InvalidInput, NotFound, Unauthenticated } from '../http/errors.ts'
 import type { KeyGrant } from '../http/api/principal.ts'
 import { createAuth } from './options.ts'
+import { KEY_LENGTH, KEY_PREFIX, KEY_START_LENGTH } from './resources.ts'
 
 /**
  * Server API keys (ADR 0081), on Better Auth's apiKey() plugin in the auth D1, read and written through Better Auth's
@@ -24,7 +27,7 @@ import { createAuth } from './options.ts'
  */
 
 const DAY_SECONDS = 86_400
-const MODEL = 'apikey'
+const MODEL = API_KEY_TABLE_NAME
 
 /** A server the edge admitted by its key: the workspace the key belongs to, and what the key may reach. */
 export interface KeyPrincipal extends KeyGrant {
@@ -188,6 +191,38 @@ export const updateKey = async (
     },
   })
   return { before: viewOf(before), after: viewOf(after) }
+}
+
+/**
+ * A secret as the plugin makes one for a new key under our options: the prefix, then `KEY_LENGTH` letters from Better
+ * Auth's own generator. The plugin keeps its default generator to itself, so this is that one, alphabet and all; the
+ * tests hold a rotated secret to a made one's shape.
+ */
+const newSecret = (): string => `${KEY_PREFIX}${generateRandomString(KEY_LENGTH, 'a-z', 'A-Z')}`
+
+/**
+ * A new secret for one of the workspace's keys (ADR 0105), answered this once and stored only as the plugin stores
+ * one, its hash and first characters. It is the same key: its id, name, scopes, ceiling, expiry and so its reach stay,
+ * and the old secret admits nothing from now on, since the row holds one hash. A key of another workspace's, or one
+ * that is gone or expired, is `NotFound`.
+ */
+export const rotateKey = async (env: RuntimeEnv, workspaceId: string, keyId: string): Promise<CreatedApiKey> => {
+  const { adapter } = await createAuth(env, env.AUTH_DB).$context
+  const where = [
+    { field: 'id', value: keyId },
+    { field: 'referenceId', value: workspaceId },
+  ]
+  const current = await adapter.findOne<KeyRecord>({ model: MODEL, where })
+  if (current === null || (current.expiresAt !== null && new Date(current.expiresAt).getTime() <= Date.now()))
+    throw new NotFound({ what: 'key' })
+  const secret = newSecret()
+  const rotated = await adapter.update<KeyRecord>({
+    model: MODEL,
+    where,
+    update: { key: await defaultKeyHasher(secret), start: secret.slice(0, KEY_START_LENGTH), updatedAt: new Date() },
+  })
+  if (rotated === null) throw new NotFound({ what: 'key' })
+  return { key: viewOf(rotated), secret }
 }
 
 /** Ends one of the workspace's keys at once; a key of another workspace's, or one already gone, is left as it is. */

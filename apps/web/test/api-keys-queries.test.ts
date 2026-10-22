@@ -5,7 +5,7 @@ import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { keysQuery, updateKeyMutation } from '../src/account/queries.ts'
+import { keysQuery, rotateKeyMutation, updateKeyMutation } from '../src/account/queries.ts'
 import { workspaceAccount } from '../src/lib/api.ts'
 import { fakeHttpApi, testQueryClient } from './query/testing.ts'
 import { unusedHandlers } from './query/unused-handlers.ts'
@@ -17,7 +17,10 @@ const KEY: ApiKeyView = {
   servers: ['mycut'],
   origins: [],
   createdAt: '2026-10-20T00:00:00.000Z',
+  start: 'gbk_aaaaaa',
 }
+/** The secret the fake's rotation answers, made up for the test (ADR 0105). */
+const ROTATED = `gbk_${'b'.repeat(64)}`
 
 /**
  * The real keys group served in memory over one key, and the members group it never reaches, under a workspace's
@@ -37,6 +40,11 @@ const fakeAccount = () => {
           origins: payload.origins ?? state.key.origins,
         }
         return Effect.succeed(state.key)
+      },
+      rotate: ({ params }) => {
+        if (params.keyId !== state.key.id) return Effect.fail(new NotFound({ what: 'key' }))
+        state.key = { ...state.key, start: ROTATED.slice(0, 10) }
+        return Effect.succeed({ key: state.key, secret: ROTATED })
       },
     }),
   )
@@ -88,6 +96,27 @@ describe("a key's scopes (ADR 0084)", () => {
       // The page's own workspace is in every call's path: the edge strips it, as this fake does.
       expect(fake.calls.every((call) => new URL(call.url).pathname.startsWith('/api/keys'))).toBe(true)
       await expect(change.mutate({ keyId: 'key-9', scopes: ['inspect'] })).rejects.toBeInstanceOf(NotFound)
+    } finally {
+      unsubscribe()
+    }
+  })
+})
+
+describe("a key's secret (ADR 0105)", () => {
+  it('rotates in place: the answer holds the new secret once, and the list shows its new start, never the secret', async () => {
+    const client = testQueryClient()
+    const list = new QueryObserver(client, keysQuery)
+    const unsubscribe = list.subscribe(() => undefined)
+    try {
+      await vi.waitFor(() => expect(list.getCurrentResult().data?.[0]?.id).toBe('key-1'))
+      const rotate = new MutationObserver(client, rotateKeyMutation)
+      const rotated = await rotate.mutate('key-1')
+      expect(rotated).toMatchObject({ key: { id: 'key-1', name: 'swarm' }, secret: ROTATED })
+      expect(list.getCurrentResult().data?.[0]).toMatchObject({ id: 'key-1', start: ROTATED.slice(0, 10) })
+      expect(JSON.stringify(list.getCurrentResult().data)).not.toContain(ROTATED)
+      const post = fake.calls.find((call) => call.method === 'POST')
+      expect(new URL(post?.url ?? '').pathname).toBe('/api/keys/key-1/rotate')
+      await expect(rotate.mutate('key-9')).rejects.toBeInstanceOf(NotFound)
     } finally {
       unsubscribe()
     }

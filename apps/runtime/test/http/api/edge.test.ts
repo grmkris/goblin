@@ -40,6 +40,8 @@ const INVITATION = {
 } as const
 const SECRET = 'secret-words'
 const KEY = `gbk_${'k'.repeat(64)}`
+/** The secret a rotation of `key-1` answers (ADR 0105). */
+const ROTATED = `gbk_${'r'.repeat(64)}`
 
 const KEY_VIEW = {
   id: 'key-1',
@@ -82,6 +84,10 @@ const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
               origins: change.origins ?? [],
             },
           })
+        : Effect.fail(new NotFound({ what: 'key' })),
+    rotateKey: (_workspace, keyId) =>
+      keyId === 'key-1'
+        ? Effect.succeed({ key: { ...KEY_VIEW, start: ROTATED.slice(0, 10) }, secret: ROTATED })
         : Effect.fail(new NotFound({ what: 'key' })),
     revokeKey: () => Effect.void,
     crash: (report, userId) => {
@@ -453,12 +459,13 @@ describe("a server's API key (ADR 0081)", () => {
     expect(await response.json()).toMatchObject({ error: { reason: 'rate_limited', retryAfter: 17 } })
   })
 
-  it('never reaches the account APIs: a key cannot list, make or change keys, nor use a member path', async () => {
+  it('never reaches the account APIs: a key cannot list, make, change or rotate keys, nor use a member path', async () => {
     const { seen, edge } = deployment()
     for (const request of [
       server(`${BASE}/api/keys`, { method: 'GET' }),
       server(`${BASE}/api/keys`, { body: '{}' }),
       server(`${BASE}/api/keys/key-1`, { method: 'PATCH', body: JSON.stringify({ scopes: ['inspect'] }) }),
+      server(`${BASE}/api/keys/key-1/rotate`, {}),
       server(`${BASE}/api/topics`, { method: 'GET' }),
     ]) {
       const { response } = await through('workspace', request, edge)
@@ -476,6 +483,10 @@ const patchKey = (body: unknown) =>
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   })
+
+/** A manager's rotation of key `keyId`'s secret, as Settings sends it (ADR 0105). */
+const rotate = (keyId: string, headers: Record<string, string> = {}) =>
+  write(`${BASE}/api/keys/${keyId}/rotate`, { headers })
 
 describe('the account APIs in the Worker', () => {
   it("gives a workspace's key new scopes and audits who did it, never for a foreign Origin (ADR 0084)", async () => {
@@ -528,6 +539,25 @@ describe('the account APIs in the Worker', () => {
     expect(JSON.stringify(lines)).not.toContain('swarmm')
     expect(lines).not.toContainEqual(expect.objectContaining({ kind: 'scopes' }))
     expect((await through('workspace', patchKey({}), edge)).response.status).toBe(400)
+  })
+
+  it("rotates a key's secret and audits who did it, never the secret, never for a member (ADR 0105)", async () => {
+    const { edge } = deployment()
+    const { response, lines } = await through('workspace', rotate('key-1'), edge)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ key: { ...KEY_VIEW, start: ROTATED.slice(0, 10) }, secret: ROTATED })
+    expect(lines).toContainEqual(
+      expect.objectContaining({ event: 'api_key', kind: 'secret', id: 'key-1', agent: WS, by: OWNER }),
+    )
+    expect(JSON.stringify(lines)).not.toContain(ROTATED.slice(4))
+    expect((await through('workspace', rotate('key-9'), edge)).response.status).toBe(404)
+    expect((await through('workspace', rotate('key-1', { origin: 'https://evil.test' }), edge)).response.status).toBe(
+      403,
+    )
+    const member = deployment(undefined, accountRecords(), 'member')
+    const refused = (await through('workspace', rotate('key-1'), member.edge)).response
+    expect(refused.status).toBe(403)
+    expect(await refused.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
   })
 
   it("keeps a workspace's keys from a member who is not an owner or admin", async () => {

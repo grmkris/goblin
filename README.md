@@ -80,7 +80,8 @@ from the same tools a server's key gets. A server the owner runs gets a
 scoped `gbk_` API key from Settings and, with it, makes its own Topics and Personas, sends into their chats and reads
 the replies after a cursor, at `/api` or as the same operations on `/mcp`. It lists and reads back what it made, and
 with the `inspect` scope sees how its own chats ran, content-free, down to where each turn's time went (ADR 0084). A
-key never reaches the owner's own Topics or Personas and never keeps the agent active.
+key never reaches the owner's own Topics or Personas and never keeps the agent active. A secret that may have leaked
+is rotated in Settings: the same key, with all it made, and the old secret refused at once (ADR 0105).
 
 Every turn can be seen end to end (ADR 0024). Beside Pi's own record, each agent keeps a 30-day run ledger of how its
 turns ran: model attempts, tool calls, retries, MCP steps, Source replies, timings, tokens and errors, never content.

@@ -16,6 +16,9 @@ const KeyId = Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u))
  * - `create`: `POST /api/keys`, 201 with the key and its secret, which is never shown again.
  * - `update`: `PATCH /api/keys/:keyId` gives the key new scopes (ADR 0084); it keeps its id, secret and reach. A key
  *   of another user's, or one that is gone, is not found.
+ * - `rotate`: `POST /api/keys/:keyId/rotate` gives the key a new secret (ADR 0105), answered with the key as `create`
+ *   answers it and never shown again; it keeps its id, scopes, servers, origins, expiry and reach, and the old secret
+ *   admits nothing from then on. A key of another workspace's, or one that is gone, is not found.
  * - `revoke`: `DELETE /api/keys/:keyId` ends the key at once.
  */
 export class KeysGroup extends HttpApiGroup.make('keys').add(
@@ -29,6 +32,11 @@ export class KeysGroup extends HttpApiGroup.make('keys').add(
     params: { keyId: KeyId },
     payload: UpdateApiKey,
     success: ApiKeyView,
+    error: API_ERRORS,
+  }),
+  HttpApiEndpoint.post('rotate', '/keys/:keyId/rotate', {
+    params: { keyId: KeyId },
+    success: CreatedApiKey,
     error: API_ERRORS,
   }),
   HttpApiEndpoint.delete('revoke', '/keys/:keyId', {

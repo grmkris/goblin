@@ -37,7 +37,7 @@ export function Settings() {
           <>
             For servers this workspace runs: <code>Authorization: Bearer gbk_…</code> on{' '}
             <code>{`${window.location.origin}/api`}</code> or <code>/mcp</code>; a key reaches only this workspace.
-            Revoking one ends it at once.
+            Revoking one ends it at once; rotating its secret keeps the key, and the old secret stops working at once.
           </>
         }
       >

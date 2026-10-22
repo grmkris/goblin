@@ -181,7 +181,8 @@ until it runs, real provider and Telegram delivery remain unverified.
 ## Using it
 
 - **API keys.** Settings → API keys makes a key for a server you run (ADR 0081); copy the `gbk_…` secret then, it is
-  not shown again. A key's requests carry no cookie or `Origin`:
+  not shown again. Rotate secret gives the same key a new one when the old one may have leaked (ADR 0105): the old one
+  is refused at once, so give the server the new one. A key's requests carry no cookie or `Origin`:
 
   ```sh
   curl -sS -X POST "$GOBLIN_ORIGIN/api/topics" -H "authorization: Bearer $GOBLIN_KEY" \

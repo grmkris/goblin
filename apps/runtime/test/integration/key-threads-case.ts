@@ -8,15 +8,25 @@ import { ownerSnapshot } from './probe-reads.ts'
 const Snapshot = Schema.Struct({
   entries: Schema.optional(Schema.Array(Schema.Struct({ kind: Schema.String, data: Schema.optional(Schema.Unknown) }))),
 })
-const Secret = Schema.Struct({ secret: Schema.String })
+const Secret = Schema.Struct({ key: Schema.Struct({ id: Schema.String }), secret: Schema.String })
 const Made = Schema.Struct({ id: Schema.Int })
 const Refusal = Schema.Struct({ error: Schema.Struct({ reason: Schema.optional(Schema.String) }) })
 
-/** A key of `who` with `scopes` (ADR 0081), as the owner makes it in Settings: its secret. */
-async function keyOf(base: string, who: Person, scopes: readonly string[]): Promise<string> {
+/** A key of `who` with `scopes` (ADR 0081), as the owner makes it in Settings: its id and secret. */
+async function keyOf(base: string, who: Person, scopes: readonly string[]) {
   const made = await call(base, who, '/api/keys', { name: 'threads', scopes, servers: [], expiresInDays: 1 })
   expect(made.status, await made.clone().text()).toBe(201)
-  return Schema.decodeUnknownSync(Secret)(await made.json()).secret
+  const { key, secret } = Schema.decodeUnknownSync(Secret)(await made.json())
+  return { id: key.id, secret }
+}
+
+/** A new secret for `who`'s key `id` (ADR 0105), as the owner rotates it in Settings: the same key, its new secret. */
+async function rotated(base: string, who: Person, id: string): Promise<string> {
+  const answer = await call(base, who, `/api/keys/${id}/rotate`, {})
+  expect(answer.status, await answer.clone().text()).toBe(200)
+  const { key, secret } = Schema.decodeUnknownSync(Secret)(await answer.json())
+  expect(key.id).toBe(id)
+  return secret
 }
 
 /** One request of a server with `secret` to `path`: no cookie, no Origin, a JSON body when there is one. */
@@ -32,13 +42,14 @@ const reasonOf = async (response: Response) => Schema.decodeUnknownSync(Refusal)
 /**
  * ADR 0090 on the real Worker and agent: a key titles the empty threads it starts, which announce themselves in their
  * Topic's Conversation once; it renames, closes and reopens its own threads and no other chat; and the forward read
- * shows its message to a Persona as the owner's, with whom it went to.
+ * shows its message to a Persona as the owner's, with whom it went to. Rotated (ADR 0105), it keeps all of that.
  */
 export async function keyThreadsCase(url: string): Promise<void> {
   const owner = await person(url)
   const me = signedIn(url, owner)
-  const secret = await keyOf(url, owner, ['topics', 'conversations', 'personas'])
-  const other = await keyOf(url, owner, ['topics', 'conversations'])
+  const made = await keyOf(url, owner, ['topics', 'conversations', 'personas'])
+  const { secret } = made
+  const { secret: other } = await keyOf(url, owner, ['topics', 'conversations'])
   const topicOf = async (key: string, name: string, operationId: string) =>
     Schema.decodeUnknownSync(TopicView)(
       await (await asKey(url, key, 'POST', '/api/topics', { name, operationId })).json(),
@@ -126,4 +137,16 @@ export async function keyThreadsCase(url: string): Promise<void> {
       to: [{ id: persona.id, name: 'Scout' }],
     }),
   )
+
+  // A rotated key (ADR 0105) is the same key: its old secret is refused at once, and its new one reads back the thread
+  // the old one started and still reaches nothing else.
+  const renewed = await rotated(url, owner, made.id)
+  const stale = await asKey(url, secret, 'GET', `/api/conversations/${thread.id}/entries?after=0`)
+  expect(stale.status).toBe(401)
+  expect(await reasonOf(stale)).toBe('key')
+  const reread = Schema.decodeUnknownSync(ConversationEntries)(
+    await (await asKey(url, renewed, 'GET', `/api/conversations/${thread.id}/entries?after=0`)).json(),
+  )
+  expect(reread.entries).toContainEqual(expect.objectContaining({ kind: 'message', text: 'find the venue' }))
+  expect((await patch(renewed, otherTopic.conversation, { closed: true })).status).toBe(404)
 }

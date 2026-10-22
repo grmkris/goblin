@@ -18,7 +18,7 @@ import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
 import * as HttpServer from 'effect/http/HttpServer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
-import { type KeyChange, createKey, listKeys, revokeKey, updateKey } from '../../auth/api-keys.ts'
+import { type KeyChange, createKey, listKeys, revokeKey, rotateKey, updateKey } from '../../auth/api-keys.ts'
 import { listInboundClients, revokeInboundClient, setClientReach } from '../../auth/clients.ts'
 import { deleteAgentOf } from '../../auth/account.ts'
 import { type Person, createWorkspace, deleteWorkspace, updateWorkspace, workspacesOf } from '../../auth/workspaces.ts'
@@ -51,7 +51,7 @@ export interface AccountRecords {
     reach: ClientReach,
   ) => Effect.Effect<ClientReach, AppError>
   readonly revokeClient: (userId: string, clientId: string) => Effect.Effect<void, AppError>
-  /** A workspace's API keys (ADRs 0081, 0089), and making and ending one. */
+  /** A workspace's API keys (ADRs 0081, 0089), and making, rotating and ending one. */
   readonly keys: (workspaceId: string) => Effect.Effect<readonly ApiKeyView[], AppError>
   readonly createKey: (
     workspaceId: string,
@@ -65,6 +65,8 @@ export interface AccountRecords {
     keyId: string,
     change: UpdateApiKey,
   ) => Effect.Effect<KeyChange, AppError>
+  /** A new secret for one of the workspace's keys (ADR 0105): the same key, with its secret this once. */
+  readonly rotateKey: (workspaceId: string, keyId: string) => Effect.Effect<CreatedApiKey, AppError>
   readonly revokeKey: (workspaceId: string, keyId: string) => Effect.Effect<void, AppError>
   /**
    * A browser crash's `client_error` flow point (ADR 0037), under the hash of the person when the report came with a
@@ -128,6 +130,7 @@ export const accountRecords = (env: RuntimeEnv): AccountRecords => {
     createKey: (workspaceId, userId, input) => attempt(() => createKey(env, workspaceId, userId, input)),
     updateKey: (workspaceId, userId, keyId, change) =>
       attempt(() => updateKey(env, workspaceId, userId, keyId, change)),
+    rotateKey: (workspaceId, keyId) => attempt(() => rotateKey(env, workspaceId, keyId)),
     revokeKey: (workspaceId, keyId) => attempt(() => revokeKey(env, workspaceId, keyId)),
   }
 }
@@ -268,6 +271,18 @@ const changeKey = (keyId: string, change: UpdateApiKey) =>
     return after
   })
 
+/**
+ * A key's new secret (ADR 0105), as a manager's rotation of it is audited: one `api_key` line (`kind: secret`) with the
+ * key, the workspace, who rotated it and the request's reference. Never a secret, the old one or the new.
+ */
+const rotateSecret = (keyId: string) =>
+  Effect.gen(function* () {
+    const { records, person, workspace } = yield* manager
+    const rotated = yield* records.rotateKey(workspace.id, keyId)
+    yield* logEvent('info', 'api_key', { id: keyId, agent: workspace.id, by: person.id, kind: 'secret' })
+    return rotated
+  })
+
 const KeysHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'keys', (handlers) =>
   handlers
     .handle('list', () => quoted(Effect.flatMap(manager, ({ records, workspace }) => records.keys(workspace.id))))
@@ -279,6 +294,7 @@ const KeysHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'keys', (handlers
       ),
     )
     .handle('update', ({ params, payload }) => quoted(changeKey(params.keyId, payload)))
+    .handle('rotate', ({ params }) => quoted(rotateSecret(params.keyId)))
     .handle('revoke', ({ params }) =>
       quoted(
         Effect.flatMap(manager, ({ records, workspace }) =>

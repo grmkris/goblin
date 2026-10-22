@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createKey, listKeys, revokeKey, updateKey, verifyKey } from '../src/auth/api-keys.ts'
+import { createKey, listKeys, revokeKey, rotateKey, updateKey, verifyKey } from '../src/auth/api-keys.ts'
 import { handleInboundMcp } from '../src/inbound/route.ts'
 import { bearerKey } from '../src/http/api/principal.ts'
 import { handleAuth } from '../src/auth/service.ts'
@@ -105,6 +105,42 @@ describe('server API keys (ADR 0081)', () => {
     })
     await expect(updateKey(env, 'w2', 'u2', key.id, { scopes: ['personas'] })).rejects.toBeInstanceOf(NotFound)
     expect((await verifyKey(env, secret)).scopes).toEqual(['topics', 'inspect'])
+  })
+
+  it('rotates a key in place: a new secret admits as the same key, the old one no more, at once (ADR 0105)', async () => {
+    const { db, env } = fixture()
+    const origins = [{ origin: 'https://mcp.swarmm.app', tools: ['job_submit'] }]
+    const { key, secret } = await createKey(env, 'w1', 'u1', { ...KEY, origins })
+    const rotated = await rotateKey(env, 'w1', key.id)
+    expect(rotated.secret).toMatch(/^gbk_[A-Za-z]{64}$/u)
+    expect(rotated.secret).not.toBe(secret)
+    expect(rotated.key).toEqual({ ...key, start: rotated.secret.slice(0, 10) })
+    expect(await refusal(verifyKey(env, secret))).toBe('key')
+    expect(await verifyKey(env, rotated.secret)).toEqual({
+      workspaceId: 'w1',
+      keyId: key.id,
+      scopes: ['topics', 'conversations'],
+      servers: ['mycut'],
+      origins,
+    })
+    // One row, still its maker's, holding only the new secret's hash.
+    const rows = db.prepare('SELECT id, key, metadata FROM apikey').all()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.['id']).toBe(key.id)
+    expect(JSON.parse(String(rows[0]?.['metadata']))).toMatchObject({ createdBy: 'u1' })
+    expect(rows[0]?.['key']).not.toContain(rotated.secret.slice(4))
+  })
+
+  it("rotates no key of another workspace's, nor one revoked or expired", async () => {
+    const { db, env } = fixture()
+    const { key, secret } = await createKey(env, 'w1', 'u1', KEY)
+    await expect(rotateKey(env, 'w2', key.id)).rejects.toBeInstanceOf(NotFound)
+    expect((await verifyKey(env, secret)).keyId).toBe(key.id)
+    const expired = await createKey(env, 'w1', 'u1', KEY)
+    db.prepare('UPDATE apikey SET expiresAt = ? WHERE id = ?').run('2026-01-01T00:00:00.000Z', expired.key.id)
+    await expect(rotateKey(env, 'w1', expired.key.id)).rejects.toBeInstanceOf(NotFound)
+    await revokeKey(env, 'w1', key.id)
+    await expect(rotateKey(env, 'w1', key.id)).rejects.toBeInstanceOf(NotFound)
   })
 
   it('keeps the MCP origins the owner grants a key, normalized, beside its servers and maker (ADR 0091)', async () => {

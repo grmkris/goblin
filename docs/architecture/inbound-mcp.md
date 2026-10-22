@@ -79,9 +79,11 @@ A server the owner runs uses an API key instead of a session ([ADR 0081](../adr/
 The owner makes one in Settings: a name, its scopes (`topics`, `conversations`, `personas`, `inspect`), the connected
 MCP servers its setups may name, and a lifetime of at most a year. Change scopes on a key gives it other scopes later
 (`PATCH /api/keys/:keyId`, [ADR 0084](../adr/0084-a-key-reads-back-what-it-made-and-how-it-ran.md)): the same key, so it
-keeps what it made, and the change is logged as one `api_key` line. Better Auth's `apiKey()` plugin keeps it hashed in
-the auth D1 (`auth/api-keys.ts`); its own routes are not served. The owner may also grant it MCP server origins, each
-with exactly the tools its threads may call there (`origins`, Change servers in Settings,
+keeps what it made, and the change is logged as one `api_key` line. Rotate secret gives a key a new secret
+(`POST /api/keys/:keyId/rotate`, [ADR 0105](../adr/0105-a-keys-secret-rotates-in-place.md)), shown once: the same key,
+with its scopes, servers, origins, expiry and reach, and the old secret is refused at once. Better Auth's `apiKey()`
+plugin keeps it hashed in the auth D1 (`auth/api-keys.ts`); its own routes are not served. The owner may also grant it
+MCP server origins, each with exactly the tools its threads may call there (`origins`, Change servers in Settings,
 [ADR 0091](../adr/0091-a-key-names-the-mcp-servers-its-threads-may-use.md)): https origins of public hosts only, at
 most 8, each with 1 to 50 named tools. A thread's server is checked against them (`confineThreadServer`), so a key's
 threads reach no host the owner did not name. With `Authorization: Bearer gbk_…` a key is a caller
