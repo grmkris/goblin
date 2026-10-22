@@ -1,13 +1,15 @@
 import type { EntryRecord, SubmissionRecord } from '@earendil-works/pi-durable'
 import { authorOf } from '@goblin/contracts'
-import type {
-  FlowRecord,
-  InspectEntry,
-  RelatedOperation,
-  TurnSpent,
-  TurnStep,
-  TurnSummary,
-  TurnTimeline,
+import {
+  type FlowRecord,
+  type InspectEntry,
+  ModelEndpointKind,
+  type RelatedOperation,
+  type TurnRanWith,
+  type TurnSpent,
+  type TurnStep,
+  type TurnSummary,
+  type TurnTimeline,
 } from '@goblin/contracts/inspect'
 import { type FlowEvent, RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import * as Option from 'effect/Option'
@@ -177,6 +179,86 @@ export function summarize(turn: RunEvent, events: readonly RunEvent[]): TurnSumm
     inputTokens: attempts.reduce((sum, event) => sum + numberOf(event, RunAttribute.inputTokens), 0),
     outputTokens: attempts.reduce((sum, event) => sum + numberOf(event, RunAttribute.outputTokens), 0),
     errors: errors.length,
+    ...versionOf(turn),
+  }
+}
+
+/** The release an event ran on, as a field (ADR 0107). */
+const versionOf = (event: RunEvent): { readonly version?: string } => {
+  const version = stringOf(event, RunAttribute.agentVersion)
+  return version === undefined ? {} : { version }
+}
+
+/** A comma-separated name list as its names. */
+const namesAt = (event: RunEvent, key: string): readonly string[] | undefined => stringOf(event, key)?.split(',')
+
+const isEndpoint = Schema.is(ModelEndpointKind)
+
+/** What a model attempt ran with (ADR 0107): its endpoint, thinking level, and what changed in its prompt and tools. */
+function ranWithFields(event: RunEvent): Partial<TurnStep> {
+  const endpoint = stringOf(event, RunAttribute.modelEndpoint)
+  const thinking = stringOf(event, RunAttribute.reasoningLevel)
+  const sections = namesAt(event, RunAttribute.promptSections)
+  const added = numberAt(event, RunAttribute.toolsAdded)
+  const removed = numberAt(event, RunAttribute.toolsRemoved)
+  const changed = namesAt(event, RunAttribute.toolsChanged)
+  return {
+    ...(isEndpoint(endpoint) ? { endpoint } : {}),
+    ...(thinking === undefined ? {} : { thinking }),
+    ...(sections === undefined ? {} : { promptSections: sections }),
+    ...(event.attributes[RunAttribute.promptBaseline] === true ? { promptBaseline: true } : {}),
+    ...(added === undefined ? {} : { toolsAdded: added }),
+    ...(removed === undefined ? {} : { toolsRemoved: removed }),
+    ...(changed === undefined ? {} : { toolsChanged: changed }),
+  }
+}
+
+/** The server an MCP request reached, as it reported itself. */
+function serverFields(request: RunEvent | undefined): Partial<TurnStep> {
+  if (request === undefined) return {}
+  const name = stringOf(request, RunAttribute.mcpServerName)
+  const version = stringOf(request, RunAttribute.mcpServerVersion)
+  return {
+    ...(name === undefined ? {} : { serverName: name }),
+    ...(version === undefined ? {} : { serverVersion: version }),
+  }
+}
+
+/** Whether an attempt came after a change of its prompt or tools; a restatement after compaction is no change. */
+const changedBefore = (event: RunEvent): boolean =>
+  event.attributes[RunAttribute.promptBaseline] !== true &&
+  (event.attributes[RunAttribute.promptSections] !== undefined ||
+    event.attributes[RunAttribute.toolsAdded] !== undefined ||
+    event.attributes[RunAttribute.toolsRemoved] !== undefined)
+
+/** Each distinct value, in the order first seen. */
+const distinct = <A>(values: readonly (A | undefined)[]): A[] => [
+  ...new Set(values.filter((value): value is A => value !== undefined)),
+]
+
+/**
+ * What a turn ran with (ADR 0107): the releases of its events, its attempts' endpoints and thinking levels, how many
+ * attempts came after a prompt or tool change, and the MCP servers its requests reached as they report themselves.
+ */
+export function ranWithOf(events: readonly RunEvent[]): TurnRanWith {
+  const attempts = events.filter((event) => event.kind === 'model.attempt')
+  const servers = new Map<string, { server: string; name?: string; version?: string }>()
+  for (const event of events) {
+    const server = event.kind === 'mcp.request' ? stringOf(event, RunAttribute.mcpServer) : undefined
+    if (server === undefined) continue
+    const { serverName, serverVersion } = serverFields(event)
+    servers.set(server, {
+      server,
+      ...(serverName === undefined ? {} : { name: serverName }),
+      ...(serverVersion === undefined ? {} : { version: serverVersion }),
+    })
+  }
+  return {
+    versions: distinct(events.map((event) => stringOf(event, RunAttribute.agentVersion))),
+    endpoints: distinct(attempts.map((event) => stringOf(event, RunAttribute.modelEndpoint))).filter(isEndpoint),
+    thinking: distinct(attempts.map((event) => stringOf(event, RunAttribute.reasoningLevel))),
+    promptChanges: attempts.filter(changedBefore).length,
+    servers: [...servers.values()],
   }
 }
 
@@ -225,18 +307,24 @@ function callFields(event: RunEvent): Partial<TurnStep> {
  * scalars alone: content-free, as the events are.
  */
 export function stepsOf(turn: RunEvent, events: readonly RunEvent[]): TurnStep[] {
+  // A tool call's MCP request is the one its task made: it names the server as that server reports itself.
+  const requests = new Map<string, RunEvent>()
+  for (const event of events)
+    if (event.kind === 'mcp.request' && event.taskId !== undefined) requests.set(event.taskId, event)
   return events
     .filter((event) => STEP_KINDS.has(event.kind))
     .map((event) => {
       const errorType = stringOf(event, RunAttribute.errorType)
+      const request = event.taskId === undefined ? undefined : requests.get(event.taskId)
       return {
         kind: event.kind,
         status: event.status,
         offsetMs: between(turn.startedAt, event.startedAt),
         ...(event.endedAt === undefined ? {} : { ms: between(event.startedAt, event.endedAt) }),
-        ...(event.kind === 'model.attempt' ? attemptFields(event) : {}),
-        ...(event.kind === 'tool.call' ? callFields(event) : {}),
+        ...(event.kind === 'model.attempt' ? { ...attemptFields(event), ...ranWithFields(event) } : {}),
+        ...(event.kind === 'tool.call' ? { ...callFields(event), ...serverFields(request) } : {}),
         ...(errorType === undefined ? {} : { errorType }),
+        ...versionOf(event),
       }
     })
 }

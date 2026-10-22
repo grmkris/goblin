@@ -100,5 +100,6 @@ Personas as the owner's, with `to`.
 
 With `inspect` a key reads how its own chats ran, content-free (ADR 0084), seeing only the run events of chats within
 its reach (its Topics, their threads and Persona forks). `inspect_details` of an operation it sent lists its Personas'
-answers under `related` (`persona:<operation>:<persona id>`), and `inspect_turn` of one gives its `steps` in order and
-`spent`: where its time went, by model, tool and MCP server.
+answers under `related` (`persona:<operation>:<persona id>`), and `inspect_turn` of one gives its `steps` in order,
+`spent`: where its time went, by model, tool and MCP server, and `ranWith`: the releases, endpoint kinds, thinking
+levels and MCP servers it ran with (ADR 0107), never the deployment endpoint's address.

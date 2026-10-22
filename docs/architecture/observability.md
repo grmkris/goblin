@@ -141,7 +141,11 @@ without changing it or calling a model. The queries are in `contracts/src/inspec
   timeline cannot show: a restart mid-turn, events still open, a missing final answer, or a compaction's model call.
   `steps` lists its model attempts, tool calls, compactions and errors in order with their start offsets and durations
   (model, tokens, finish reason, time to first chunk; tool, MCP server and tool, failure class), and `spent` says where
-  its time went: wall, model and tool time, tool time by server, and the rest (ADR 0084).
+  its time went: wall, model and tool time, tool time by server, and the rest (ADR 0084). Each step also says what it
+  ran with (ADR 0107): its release; a model attempt its endpoint kind, thinking level and the prompt sections and tools
+  that changed before it; an MCP tool call the server's own name and version. `ranWith` sums that up for the turn: its
+  releases (two when the agent restarted into a new one mid-turn), endpoints, thinking levels, how many attempts came
+  after a prompt or tool change, and the servers it reached.
 - `problems`: events needing attention since a time (default the last day); expected authority waits and confirmed
   recovered model retries are filtered before applying the limit. Pass `all: true` for the full problem history.
   Cutoffs, empty answers and coverage gaps remain visible. Tool failures remain until reviewed; a successful turn

@@ -18,6 +18,7 @@ const turn = {
   failedToolCalls: 1,
   inputTokens: 120,
   outputTokens: 30,
+  version: '3f8f88b1c0ffee',
 }
 const event = (kind: string, status: string, attributes: Record<string, string | number>) => ({
   id: `${kind}-${status}`,
@@ -47,12 +48,20 @@ describe('goblin output (unit)', () => {
         servers: [{ server: 'mycut', calls: 1, ms: 30_000 }],
         otherMs: 30_500,
       },
+      ranWith: {
+        versions: ['3f8f88b1c0ffee', '5d6e7f8a9b0c1d'],
+        endpoints: ['deployment'],
+        thinking: ['medium'],
+        promptChanges: 1,
+        servers: [{ server: 'mycut', name: 'my_cut', version: '1.4.2' }],
+      },
       coverage: { complete: false, gaps: ['Some events have not ended.'] },
     })
     expect(text.split('\n')).toEqual([
-      '2026-10-06 10:00:00  error        source           2 calls (1 failed)  1 tools (1 failed)  120/30 tok  source-12  model_error',
+      '2026-10-06 10:00:00  error        source           2 calls (1 failed)  1 tools (1 failed)  120/30 tok  source-12  @3f8f88b  model_error',
       'Pi: unanswered (model_error)',
       'Time: 61.0s, model 0.3s, tools 30.3s (mycut 30.0s ×1), other 30.5s',
+      'Ran with: 3f8f88b → 5d6e7f8, deployment endpoint, thinking medium, prompt or tools changed before 1 attempt, mycut (my_cut) 1.4.2',
       '',
       '2026-10-06 10:00:00  model.attempt    error          250ms  gpt-test  rate limited',
       expect.stringMatching(/^2026-10-06 10:00:00 {2}tool\.call {8}blocked {8}250ms {2}mcp_call/u),

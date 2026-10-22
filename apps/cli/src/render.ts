@@ -49,6 +49,7 @@ const turnLine = (turn: TurnSummary) =>
     ...((turn.errors ?? 0) > 0 ? [`${turn.errors} errors`] : []),
     `${turn.inputTokens}/${turn.outputTokens} tok`,
     turn.operationId,
+    turn.version === undefined ? '' : `@${short(turn.version)}`,
     turn.reason ?? '',
   ].join('  ')
 
@@ -122,6 +123,29 @@ const spentLine = ({ totalMs, modelMs, toolMs, servers, otherMs }: TurnTimeline[
     `other ${seconds(otherMs)}`,
   ].join(', ')
 
+/** A release's commit as `git` abbreviates it. */
+const short = (version: string) => version.slice(0, 7)
+
+/**
+ * What a turn ran with in a line (ADR 0107): its releases (two when the agent restarted into a new one mid-turn), its
+ * endpoints and thinking levels, the attempts after a prompt or tool change, and the MCP servers as they report
+ * themselves.
+ */
+const ranWithLine = ({ versions, endpoints, thinking, promptChanges, servers }: TurnTimeline['ranWith']) =>
+  [
+    `Ran with: ${versions.length === 0 ? 'release unknown' : versions.map(short).join(' → ')}`,
+    ...(endpoints.length === 0 ? [] : [`${endpoints.join('/')} endpoint`]),
+    ...(thinking.length === 0 ? [] : [`thinking ${thinking.join('/')}`]),
+    ...(promptChanges === 0
+      ? []
+      : [`prompt or tools changed before ${promptChanges} attempt${promptChanges === 1 ? '' : 's'}`]),
+    ...servers.map((each) =>
+      [each.server, each.name === undefined || each.name === each.server ? '' : `(${each.name})`, each.version ?? '']
+        .filter((part) => part !== '')
+        .join(' '),
+    ),
+  ].join(', ')
+
 const gapLines = (coverage: TurnTimeline['coverage']) =>
   coverage.complete ? [] : ['', ...coverage.gaps.map((gap) => `! ${gap}`)]
 
@@ -154,6 +178,7 @@ const RENDERERS: Readonly<Record<string, (value: unknown) => string | undefined>
           turnLine(timeline.turn),
           piLine(timeline.submission),
           spentLine(timeline.spent),
+          ranWithLine(timeline.ranWith),
           '',
           ...timeline.events.map(eventLine),
           ...gapLines(timeline.coverage),
@@ -172,6 +197,7 @@ const RENDERERS: Readonly<Record<string, (value: unknown) => string | undefined>
         [
           ...(details.turn === undefined ? ['No turn: the steps of this operation'] : [turnLine(details.turn)]),
           ...(details.turn === undefined ? [] : [piLine(details.submission)]),
+          ...(details.ranWith === undefined ? [] : [ranWithLine(details.ranWith)]),
           '',
           ...details.events.map((event) => `${eventLine(event)}  ${event.operationId ?? ''}`),
           ...gapLines(details.coverage),

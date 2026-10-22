@@ -25,7 +25,16 @@ import { AgentInput } from '../runtime/input.ts'
 import { Db } from '../runtime/db.ts'
 import { RunLedger } from '../telemetry/ledger.ts'
 import { coverageGaps, operationGaps } from './coverage.ts'
-import { flowRecord, inspectEntry, relatedOf, settlementOf, spentOf, stepsOf, summarize } from './inspector.ts'
+import {
+  flowRecord,
+  inspectEntry,
+  ranWithOf,
+  relatedOf,
+  settlementOf,
+  spentOf,
+  stepsOf,
+  summarize,
+} from './inspector.ts'
 
 /** What a query of `kind` takes besides its kind. */
 type Input<K extends keyof typeof InspectInput> = (typeof InspectInput)[K]['Type']
@@ -160,6 +169,7 @@ const timelineWith = (settlement: InspectionSources['settlement']) =>
       events,
       steps: stepsOf(turn, events),
       spent: spentOf(turn, events, now),
+      ranWith: ranWithOf(events),
       coverage: { complete: gaps.length === 0, gaps },
     }
   })

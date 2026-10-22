@@ -165,6 +165,8 @@ export const TurnSummary = Schema.Struct({
   outputTokens: Schema.Number,
   /** Its `error` events; a reader older than the field sees none. */
   errors: Schema.optional(Schema.Number),
+  /** The release it was submitted on, its commit (ADR 0107). */
+  version: Schema.optional(Schema.String),
 })
 export type TurnSummary = typeof TurnSummary.Type
 
@@ -176,11 +178,17 @@ export const Coverage = Schema.Struct({ complete: Schema.Boolean, gaps: Schema.A
 
 const Ms = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
+/** Which endpoint a model call went to (ADR 0107): the deployment's, the owner's own (ADR 0059), or none. */
+export const ModelEndpointKind = Schema.Literals(['deployment', 'owner', 'none'])
+export type ModelEndpointKind = typeof ModelEndpointKind.Type
+
 /**
  * One step of a turn in order, content-free (ADR 0084): a model attempt, a tool call, a compaction or an error, when
  * it started after the turn did (`offsetMs`) and how long it took (`ms`, none while it runs). A model attempt names
  * its model, tokens, why it finished and how long until its first chunk; a tool call its tool, the MCP server and tool
- * it reached, and the class of its failure or block.
+ * it reached, and the class of its failure or block. Each says what it ran with (ADR 0107): the release; a model
+ * attempt its endpoint, thinking level and the prompt sections and tools that changed before it; an MCP tool call the
+ * server's own name and version.
  */
 export const TurnStep = Schema.Struct({
   kind: RunEventKind,
@@ -199,8 +207,42 @@ export const TurnStep = Schema.Struct({
   serverTool: Schema.optional(Schema.String),
   errorType: Schema.optional(Schema.String),
   blockedReason: Schema.optional(Schema.String),
+  version: Schema.optional(Schema.String),
+  endpoint: Schema.optional(ModelEndpointKind),
+  thinking: Schema.optional(Schema.String),
+  /** Keys of the prompt sections that changed before this attempt. */
+  promptSections: Schema.optional(Schema.Array(Schema.String)),
+  /** The prompt was restated after compaction, not changed. */
+  promptBaseline: Schema.optional(Schema.Boolean),
+  toolsAdded: Schema.optional(Schema.Int),
+  toolsRemoved: Schema.optional(Schema.Int),
+  /** The tools added or removed, for a change of at most eight. */
+  toolsChanged: Schema.optional(Schema.Array(Schema.String)),
+  serverName: Schema.optional(Schema.String),
+  serverVersion: Schema.optional(Schema.String),
 })
 export type TurnStep = typeof TurnStep.Type
+
+/**
+ * What a turn ran with, in one place (ADR 0107): the releases its events ran on (more than one when the agent restarted
+ * into a new one mid-turn), the endpoints and thinking levels of its model attempts, how many attempts came after a
+ * change of the prompt or tools (a restatement after compaction is none), and the MCP servers it reached as they
+ * report themselves.
+ */
+export const TurnRanWith = Schema.Struct({
+  versions: Schema.Array(Schema.String),
+  endpoints: Schema.Array(ModelEndpointKind),
+  thinking: Schema.Array(Schema.String),
+  promptChanges: Schema.Int,
+  servers: Schema.Array(
+    Schema.Struct({
+      server: Schema.String,
+      name: Schema.optional(Schema.String),
+      version: Schema.optional(Schema.String),
+    }),
+  ),
+})
+export type TurnRanWith = typeof TurnRanWith.Type
 
 /**
  * Where a turn's time went (ADR 0084): its wall time (to now while it runs), the summed time of its model attempts and
@@ -233,6 +275,7 @@ export const TurnTimeline = Schema.Struct({
   events: Schema.Array(RunEvent),
   steps: Schema.Array(TurnStep),
   spent: TurnSpent,
+  ranWith: TurnRanWith,
   coverage: Coverage,
 })
 export type TurnTimeline = typeof TurnTimeline.Type
@@ -267,6 +310,7 @@ export const InspectDetails = Schema.Struct({
   turn: Schema.optional(TurnSummary),
   steps: Schema.optional(TurnTimeline.fields.steps),
   spent: Schema.optional(TurnSpent),
+  ranWith: Schema.optional(TurnRanWith),
   related: Schema.Array(RelatedOperation),
 })
 export type InspectDetails = typeof InspectDetails.Type

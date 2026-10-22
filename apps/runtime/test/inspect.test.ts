@@ -3,7 +3,7 @@ import type { EntryRecord } from '@earendil-works/pi-durable'
 import { authorTag } from '@goblin/contracts'
 import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import { describe, expect, it } from 'vitest'
-import { inspectEntry, summarize } from '../src/inspect/inspector.ts'
+import { inspectEntry, ranWithOf, stepsOf, summarize } from '../src/inspect/inspector.ts'
 import { conversationId, entryId } from '../src/pi/context.ts'
 
 const usage = (input: number, output: number) => ({
@@ -162,6 +162,70 @@ describe('summarize', () => {
       inputTokens: 210,
       outputTokens: 12,
       errors: 1,
+    })
+  })
+})
+
+describe('what a turn ran with (ADR 0107)', () => {
+  const release = 'a'.repeat(40)
+  const next = 'b'.repeat(40)
+  const turn = event('turn.submitted', 'ok', { [RunAttribute.agentVersion]: release })
+  const first = {
+    ...event('model.attempt', 'ok', {
+      [RunAttribute.agentVersion]: release,
+      [RunAttribute.modelEndpoint]: 'deployment',
+      [RunAttribute.reasoningLevel]: 'medium',
+      [RunAttribute.promptSections]: 'persona,skills',
+      [RunAttribute.toolsAdded]: 2,
+      [RunAttribute.toolsChanged]: 'mycut__job_submit,mycut__job_status',
+    }),
+    taskId: 'g1',
+  }
+  const call = { ...event('tool.call', 'ok', { [RunAttribute.mcpServer]: 'mycut' }), taskId: 't1' }
+  const request = {
+    ...event('mcp.request', 'ok', {
+      [RunAttribute.mcpServer]: 'mycut',
+      [RunAttribute.mcpServerName]: 'my_cut',
+      [RunAttribute.mcpServerVersion]: '1.4.2',
+    }),
+    taskId: 't1',
+  }
+  // The agent restarted into a new release mid-turn, and the prompt was restated after compaction: no change.
+  const second = {
+    ...event('model.attempt', 'ok', {
+      [RunAttribute.agentVersion]: next,
+      [RunAttribute.modelEndpoint]: 'deployment',
+      [RunAttribute.reasoningLevel]: 'medium',
+      [RunAttribute.promptSections]: 'persona,skills',
+      [RunAttribute.promptBaseline]: true,
+      [RunAttribute.toolsAdded]: 2,
+    }),
+    taskId: 'g1',
+  }
+  const events = [turn, first, call, request, second]
+
+  it('says it on each step, the MCP call naming the server as its request found it', () => {
+    const [attempt, tool, restated] = stepsOf(turn, events)
+    expect(attempt).toMatchObject({
+      version: release,
+      endpoint: 'deployment',
+      thinking: 'medium',
+      promptSections: ['persona', 'skills'],
+      toolsAdded: 2,
+      toolsChanged: ['mycut__job_submit', 'mycut__job_status'],
+    })
+    expect(tool).toMatchObject({ server: 'mycut', serverName: 'my_cut', serverVersion: '1.4.2' })
+    expect(restated).toMatchObject({ version: next, promptBaseline: true })
+    expect(summarize(turn, events).version).toBe(release)
+  })
+
+  it('sums it up once for the turn', () => {
+    expect(ranWithOf(events)).toEqual({
+      versions: [release, next],
+      endpoints: ['deployment'],
+      thinking: ['medium'],
+      promptChanges: 1,
+      servers: [{ server: 'mycut', name: 'my_cut', version: '1.4.2' }],
     })
   })
 })
