@@ -114,6 +114,7 @@ export { Reasoning, ReasoningContent, ReasoningTrigger } from './components/reas
 export { Receipt } from './components/receipt.tsx'
 export { TopBar, TopBarTitle } from './components/top-bar.tsx'
 export { Textarea } from './components/textarea.tsx'
+export { TimelineBar } from './components/timeline-bar.tsx'
 export { ToolPayload, ToolPayloadText, type ToolPayloadView } from './components/tool-payload.tsx'
 export { UsageRing } from './components/usage-ring.tsx'
 export {

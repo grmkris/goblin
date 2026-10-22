@@ -87,6 +87,49 @@ const catalog = {
   ],
   apps: [],
 }
+/** What ran behind the assistant's answer (entry 11): two model calls around a Notes call that timed out. */
+const details = {
+  turn: {
+    operationId: 'owner:op-11',
+    conversationId: '30',
+    source: 'direct',
+    status: 'ok',
+    startedAt: 1792310000500,
+    endedAt: 1792310004500,
+    modelAttempts: 2,
+    failedAttempts: 0,
+    toolCalls: 1,
+    failedToolCalls: 1,
+    inputTokens: 28000,
+    outputTokens: 131,
+    version: '393c8952c962d36fa35db51e8f710d4cd73edd3f',
+  },
+  events: [],
+  steps: [
+    { kind: 'model.attempt', status: 'ok', offsetMs: 0, ms: 2000, model: 'deepseek-v4.1-flash', attempt: 1 },
+    {
+      kind: 'tool.call',
+      status: 'error',
+      offsetMs: 2000,
+      ms: 400,
+      tool: 'mcp_call',
+      server: 'notes',
+      serverTool: 'write',
+      error: 'Remote MCP request failed (timeout).',
+    },
+    { kind: 'model.attempt', status: 'ok', offsetMs: 2400, ms: 1600, model: 'deepseek-v4.1-flash', toolsAdded: 1 },
+  ],
+  spent: { totalMs: 4000, modelMs: 3600, toolMs: 400, servers: [], otherMs: 0 },
+  ranWith: {
+    versions: ['393c8952c962d36fa35db51e8f710d4cd73edd3f'],
+    endpoints: ['deployment'],
+    thinking: ['low'],
+    promptChanges: 1,
+    servers: [],
+  },
+  coverage: { complete: true, gaps: [] },
+  related: [{ operation: 'owner:op-12', kind: 'start', chat: '31', state: 'ok' }],
+}
 const server = await createServer({ configFile: path.join(import.meta.dirname, 'browser/vite.config.ts') })
 await server.listen()
 const origin = server.resolvedUrls?.local[0]
@@ -155,6 +198,15 @@ try {
           '/api/agent/usage': { used: 0, limit: null, resetsAt: 1_800_000_000 },
           '/api/routines': { routines: [] },
           '/api/sources': { sources: [] },
+          '/api/inspect/details': details,
+          '/api/workspaces': [
+            { id: 'ws_fixture', name: 'Travel planning', slug: 'fixture', role: 'owner', members: 1 },
+          ],
+          '/api/invitations': [],
+          '/api/auth/get-session': {
+            session: { id: 'session-fixture', userId: 'owner', expiresAt: '2099-01-01T00:00:00.000Z' },
+            user: { id: 'owner', name: 'Owner', email: 'owner@example.com', emailVerified: true },
+          },
         }
         if (at in responses) return json(responses[at])
         if (at.endsWith('/snapshot')) return json({ type: 'snapshot', entries, tools: [], inbox: [] })
@@ -207,6 +259,18 @@ try {
         .getByRole('button', { name: width === 390 ? 'Back to channel' : 'Close channel info', exact: true })
         .click()
       await page.getByPlaceholder('Reply…').waitFor()
+      // Details of the assistant's answer: the outcome, its steps on the timeline, where it led, what it ran with.
+      await page.goto(`${origin}channel.html`)
+      const action = page.getByRole('button', { name: 'Details', exact: true }).last()
+      await action.focus()
+      await action.click()
+      const sheet = page.getByRole('dialog', { name: 'Details' })
+      await sheet.getByText('Remote MCP request failed (timeout).', { exact: true }).waitFor()
+      await sheet.getByText(/^Answered in/u).waitFor()
+      await sheet.getByText('28.1K tokens on goblin’s model, thinking low, build 393c895.', { exact: true }).waitFor()
+      await page.screenshot({ path: path.join(out, `${label}-details.png`) })
+      await page.keyboard.press('Escape')
+      await sheet.waitFor({ state: 'detached' })
     }
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0)
     await page.close()

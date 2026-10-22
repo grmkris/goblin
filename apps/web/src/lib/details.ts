@@ -1,153 +1,213 @@
-import type { InspectDetails, RelatedOperation, TurnRanWith } from '@goblin/contracts/inspect'
-import { RunAttribute, type RunEvent, type RunEventStatus } from '@goblin/contracts/telemetry'
-import { durationText } from './format.ts'
+// A message's Details in the owner's words: how its turn ended, what goblin did, where it led and what it ran with,
+// from the content-free inspection read (ADR 0024; ADR 0107 for what it ran with). Internals (flow names, event kinds,
+// raw token pairs) stay with the CLI and /mcp inspection.
+import type { InspectDetails, RelatedOperation, TurnStep } from '@goblin/contracts/inspect'
+import type { ToolCallState } from '@goblin/ui'
+import { ownToolLine } from './parts.ts'
 
 /**
- * One step of what ran behind a message, in the owner's words: what it was, what it touched, how it ended, and where
- * it sits on the turn's timeline (`bar`: from its start to its end, as percents of the turn's wall time).
+ * The outcome as a sentence around a duration, `before` it and `after` it with its own punctuation: "Answered in 3.5s",
+ * "Failed after 4s: no answer came back", "Still working, 12s so far".
  */
+export type DetailOutcome = {
+  readonly before: string
+  readonly ms?: number
+  readonly running?: boolean
+  readonly after?: string
+}
+
+/** One step as a line like the chat's tool rows, and where it sits on the turn's timeline (percent of its time). */
 export type DetailStep = {
-  readonly id: string
-  readonly label: string
-  readonly detail: string | undefined
-  readonly status: RunEventStatus
-  readonly ms: number | undefined
-  readonly offsetMs?: number
+  readonly key: string
+  readonly state: ToolCallState
+  readonly lead: string
+  /** What the step reached, said in the foreground: a model, or an MCP connection by its id (named by the caller). */
+  readonly model?: string
+  readonly server?: string
+  readonly tool?: string
+  readonly ms?: number
+  readonly offsetMs: number
   readonly bar?: { readonly left: number; readonly width: number }
+  /** Why it failed or was held, in the ledger's fixed words. */
+  readonly problem?: string
+  /** What changed under it: a restart into another release, its tools or instructions. */
+  readonly note?: string
 }
 
-const attribute = (event: RunEvent, key: string): string | undefined => {
-  const value = event.attributes[key]
-  return value === undefined || value === '' ? undefined : String(value)
+export type DetailRelated = { readonly operation: string; readonly label: string; readonly chat?: string }
+
+export type DetailsView = {
+  readonly outcome: DetailOutcome
+  readonly steps: readonly DetailStep[]
+  readonly related: readonly DetailRelated[]
+  /** What the record cannot show, its sentences kept whole. */
+  readonly gaps?: string
+  /** Tokens, model endpoint, thinking level and release, as one quiet sentence. */
+  readonly footer?: string
 }
 
-const named = (what: string, ...names: readonly (string | undefined)[]): string => {
-  const name = names.filter((each) => each !== undefined).join(' · ')
-  return name === '' ? what : `${what} ${name}`
+/** Why a turn ended unanswered, for the few reasons an owner can act on or recognise. */
+const REASONS: Readonly<Record<string, string>> = {
+  model_error: 'the model did not answer',
+  unanswered: 'no answer came back',
+  faulted: 'something went wrong',
+  failed: 'something went wrong',
+  expired: 'it ran out of time',
+  inactive: 'goblin could not act for you',
 }
 
-/** What a step was: the model it asked, the tool it called, the flow it took. */
-function labelOf(event: RunEvent): string {
-  switch (event.kind) {
-    case 'turn.submitted':
-      return 'Message submitted'
-    case 'model.attempt':
-      return named('Model', attribute(event, RunAttribute.responseModel) ?? attribute(event, RunAttribute.requestModel))
-    case 'model.aux':
-      return named('Helper model', attribute(event, RunAttribute.purpose))
-    case 'tool.call':
-      return named('Tool', attribute(event, RunAttribute.toolName))
-    case 'compaction':
-      return 'Context compacted'
-    case 'source.received':
-      return named('Received from', attribute(event, RunAttribute.source))
-    case 'source.reply':
-      return named('Replied on', attribute(event, RunAttribute.source))
-    case 'recovery':
-      return 'Recovered'
-    case 'mcp.request':
-      return named('MCP', attribute(event, RunAttribute.mcpServer), attribute(event, RunAttribute.mcpTool))
+function outcomeOf(details: InspectDetails, now: number): DetailOutcome {
+  const { turn } = details
+  if (turn === undefined) return { before: 'Nothing ran for this message; it was written directly.' }
+  const ms = Math.max(0, (turn.endedAt ?? now) - turn.startedAt)
+  const reason = turn.reason === undefined ? undefined : REASONS[turn.reason]
+  switch (turn.status) {
+    case 'ok':
+      return { before: 'Answered in', ms }
+    case 'started':
+      return { before: 'Still working,', ms, running: true, after: ' so far' }
+    case 'blocked':
+      return { before: 'Waiting for you after', ms }
+    case 'interrupted':
+      return { before: 'Stopped after', ms }
     case 'error':
-      return 'Error'
-    case 'flow':
-      return named('Flow', attribute(event, RunAttribute.flow))
+      return reason === undefined
+        ? { before: 'Failed after', ms }
+        : { before: 'Failed after', ms, after: `: ${reason}` }
   }
 }
 
-/** Whether the prompt or the tools changed before a model attempt; a restatement after compaction is no change. */
-const changedBefore = (event: RunEvent): boolean =>
-  event.attributes[RunAttribute.promptBaseline] !== true &&
-  [RunAttribute.promptSections, RunAttribute.toolsAdded, RunAttribute.toolsRemoved].some(
-    (key) => event.attributes[key] !== undefined,
-  )
-
-/** What else is worth a line under a step: why it failed, its tokens, how a flow came in, what changed before it. */
-function detailOf(event: RunEvent): string | undefined {
-  const failure = attribute(event, RunAttribute.errorType) ?? attribute(event, RunAttribute.blockedReason)
-  if (failure !== undefined) return failure
-  if (event.kind === 'flow') return attribute(event, RunAttribute.flowVia)
-  const input = event.attributes[RunAttribute.inputTokens]
-  const output = event.attributes[RunAttribute.outputTokens]
-  const tokens =
-    typeof input === 'number' && typeof output === 'number' ? `${input} in · ${output} out tokens` : undefined
-  const changed =
-    event.kind === 'model.attempt' && changedBefore(event) ? 'prompt or tools changed before it' : undefined
-  const parts = [tokens, changed].filter((part) => part !== undefined)
-  return parts.length === 0 ? undefined : parts.join(' · ')
+const STATES: Readonly<Record<TurnStep['status'], ToolCallState>> = {
+  ok: 'done',
+  error: 'error',
+  started: 'running',
+  blocked: 'stopped',
+  interrupted: 'stopped',
 }
 
-/** Where a step sits on its turn's timeline, as percents of the turn's wall time; none without a turn. */
-function barOf(event: RunEvent, start: number, total: number, now: number) {
-  const left = Math.min(100, Math.max(0, ((event.startedAt - start) / total) * 100))
-  const end = event.endedAt ?? now
-  const width = Math.min(100 - left, Math.max(0.5, ((end - event.startedAt) / total) * 100))
-  return { left, width }
+/** A step's words: thought with a model, used a connection's tool or one of goblin's own, compacted, failed. */
+function wordsOf(step: TurnStep): Pick<DetailStep, 'lead' | 'model' | 'server' | 'tool'> {
+  switch (step.kind) {
+    case 'model.attempt':
+      return {
+        lead: (step.attempt ?? 1) > 1 ? 'Tried again' : 'Thought',
+        ...(step.model === undefined ? {} : { model: step.model }),
+      }
+    case 'tool.call':
+      return step.server === undefined
+        ? { lead: ownToolLine(step.tool ?? '') }
+        : { lead: 'Used', server: step.server, ...(step.serverTool === undefined ? {} : { tool: step.serverTool }) }
+    case 'compaction':
+      return { lead: 'Summarized older messages' }
+    case 'error':
+      return { lead: 'Something failed' }
+    // A turn's steps hold only its model attempts, tool calls, compactions and errors (`stepsOf`, inspect/inspector.ts).
+    case 'turn.submitted':
+    case 'model.aux':
+    case 'mcp.request':
+    case 'source.received':
+    case 'source.reply':
+    case 'recovery':
+    case 'flow':
+      return { lead: 'Recorded a step' }
+  }
 }
 
-/** The steps of a message's operation, in the order they ran, placed on its turn's timeline when it ran one. */
-export function detailSteps(details: InspectDetails, now: number = Date.now()): DetailStep[] {
-  const start = details.turn?.startedAt
+const count = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`
+
+/** What changed under a step, plainly: a restart into another release, then its tools, then its instructions. */
+function noteOf(step: TurnStep, previous: string | undefined): string | undefined {
+  if (step.version !== undefined && previous !== undefined && step.version !== previous)
+    return `goblin restarted into build ${step.version.slice(0, 7)} before this.`
+  if (step.promptBaseline === true) return undefined
+  const added = step.toolsAdded ?? 0
+  const removed = step.toolsRemoved ?? 0
+  if (added + removed > 0) {
+    const parts = [added > 0 ? `${count(added, 'tool')} added` : '', removed > 0 ? `${removed} removed` : '']
+    return `${parts.filter((part) => part !== '').join(', ')} before this.`
+  }
+  return (step.promptSections?.length ?? 0) > 0 ? 'Its instructions changed before this.' : undefined
+}
+
+function stepsOf(details: InspectDetails): DetailStep[] {
+  const steps = details.steps ?? []
   const total = details.spent?.totalMs ?? 0
-  return details.events
-    .toSorted((a, b) => a.startedAt - b.startedAt)
-    .map((event) => ({
-      id: event.id,
-      label: labelOf(event),
-      detail: detailOf(event),
-      status: event.status,
-      ms: event.endedAt === undefined ? undefined : event.endedAt - event.startedAt,
-      ...(start === undefined || total <= 0
-        ? {}
-        : { offsetMs: Math.max(0, event.startedAt - start), bar: barOf(event, start, total, now) }),
-    }))
+  // A single step's bar would only fill the width; bars say something once there are two to compare.
+  const scaled = steps.length > 1 && total > 0
+  let previous = details.turn?.version
+  return steps.map((step, index) => {
+    const note = noteOf(step, previous)
+    previous = step.version ?? previous
+    const problem = step.status === 'blocked' ? step.blockedReason : step.status === 'error' ? step.error : undefined
+    const left = Math.min(100, (step.offsetMs / total) * 100)
+    return {
+      key: `${index}:${step.kind}:${step.offsetMs}`,
+      state: STATES[step.status],
+      ...wordsOf(step),
+      ...(step.ms === undefined ? {} : { ms: step.ms }),
+      offsetMs: step.offsetMs,
+      ...(scaled
+        ? {
+            bar: {
+              left,
+              width: Math.min(100 - left, Math.max(0.5, ((step.ms ?? total - step.offsetMs) / total) * 100)),
+            },
+          }
+        : {}),
+      ...(problem === undefined ? {} : { problem }),
+      ...(note === undefined ? {} : { note }),
+    }
+  })
 }
 
-/** A release's commit as git abbreviates it. */
-const short = (version: string) => version.slice(0, 7)
+/** Related operations by what they are to this one. */
+const RELATED: Readonly<Record<string, string>> = {
+  start: 'Started a thread',
+  send: 'Started a thread',
+  subagent_spawn: 'Started a subagent',
+  persona_answer: 'A Persona answered',
+  persona_ask: 'Answered for an earlier message',
+  operation: 'Part of an earlier message',
+}
+
+const relatedOf = (related: RelatedOperation): DetailRelated => ({
+  operation: related.operation,
+  label: RELATED[related.kind] ?? 'Related',
+  ...(related.chat === undefined ? {} : { chat: related.chat }),
+})
 
 const ENDPOINTS: Readonly<Record<string, string>> = {
-  deployment: 'goblin’s model endpoint',
+  deployment: 'goblin’s model',
   owner: 'your own model endpoint',
   none: 'no model endpoint',
 }
+const TOKENS = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 
-/**
- * What a turn ran with in a line (ADR 0107): its release, endpoint, thinking level and MCP servers as they report
- * themselves, and what changed under it: a restart into a new release mid-turn, a prompt or tool change before an
- * attempt.
- */
-export function ranWithText(ranWith: TurnRanWith): string {
-  const [first, ...later] = ranWith.versions
+/** "28k tokens on goblin's model, thinking low, build 393c895." Only what is known, nothing when nothing ran. */
+function footerOf(details: InspectDetails): string | undefined {
+  const { turn, ranWith } = details
+  if (turn === undefined) return undefined
+  const tokens = turn.inputTokens + turn.outputTokens
+  const endpoint = ranWith?.endpoints[0]
+  const thinking = ranWith?.thinking[0]
+  const build = ranWith?.versions[0] ?? turn.version
   const parts = [
-    first === undefined ? undefined : `Build ${short(first)}`,
-    ...later.map((version) => `restarted into ${short(version)}`),
-    ...ranWith.endpoints.map((endpoint) => ENDPOINTS[endpoint] ?? endpoint),
-    ranWith.thinking.length === 0 ? undefined : `thinking ${ranWith.thinking.join(', ')}`,
-    ranWith.promptChanges === 0
-      ? undefined
-      : `prompt or tools changed before ${ranWith.promptChanges} attempt${ranWith.promptChanges === 1 ? '' : 's'}`,
-    ...ranWith.servers.map((server) => [server.name ?? server.server, server.version].filter(Boolean).join(' ')),
+    `${tokens === 0 ? 'No' : TOKENS.format(tokens)} tokens${endpoint === undefined ? '' : ` on ${ENDPOINTS[endpoint] ?? endpoint}`}`,
+    thinking === undefined ? '' : `thinking ${thinking}`,
+    build === undefined ? '' : `build ${build.slice(0, 7)}`,
   ]
-  return parts.filter((part) => part !== undefined && part !== '').join(' · ')
+  return `${parts.filter((part) => part !== '').join(', ')}.`
 }
 
-const counted = (count: number, one: string, failed = 0) =>
-  `${count} ${one}${count === 1 ? '' : 's'}${failed > 0 ? ` (${failed} failed)` : ''}`
-
-/** The operation in a few lines: where it came from and how it ended, what it took, what it cost. */
-export function detailSummary(details: InspectDetails): string[] {
-  const { turn } = details
-  if (turn === undefined) return ['A written note: no model ran for it.']
-  const ended = turn.endedAt === undefined ? 'still running' : durationText(turn.endedAt - turn.startedAt)
-  const ranWith = details.ranWith === undefined ? '' : ranWithText(details.ranWith)
-  return [
-    `From ${turn.source} · ${turn.status}${turn.reason === undefined ? '' : ` (${turn.reason})`} · ${ended}`,
-    `${counted(turn.modelAttempts, 'model attempt', turn.failedAttempts)} · ${counted(turn.toolCalls, 'tool call', turn.failedToolCalls)}`,
-    `${turn.inputTokens} in · ${turn.outputTokens} out tokens${(turn.errors ?? 0) > 0 ? ` · ${counted(turn.errors ?? 0, 'error')}` : ''}`,
-    ...(ranWith === '' ? [] : [`Ran with ${ranWith}`]),
-  ]
+/** A message's Details as the drawer shows them; `now` ends what still runs. */
+export function detailsView(details: InspectDetails, now: number): DetailsView {
+  const gaps = details.coverage.complete ? undefined : details.coverage.gaps.join(' ')
+  const footer = footerOf(details)
+  return {
+    outcome: outcomeOf(details, now),
+    steps: stepsOf(details),
+    related: details.related.map(relatedOf),
+    ...(gaps === undefined || gaps === '' ? {} : { gaps }),
+    ...(footer === undefined ? {} : { footer }),
+  }
 }
-
-/** A related operation in a line: what it was, and where it stands. */
-export const relatedText = (related: RelatedOperation): string =>
-  related.state === undefined ? related.kind : `${related.kind} · ${related.state}`

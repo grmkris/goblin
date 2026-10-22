@@ -118,11 +118,14 @@ composer, that branches the thread only when it is sent, because Pi cannot delet
 composer's draft into a new thread's draft the same way. A draft's (Reply's or "+"'s) first send is one call of the
 thread operation under the draft's one operation id: it makes the thread and sends that message as its first. A send
 meanwhile waits for the same thread and goes into it as a message of its own, and a retry asks for the same thread
-again (`lib/draft-thread.ts`, `components/shell/thread-start.ts`). Details opens a sheet of what ran behind the message
-(`GET /api/inspect/details?chat=&entry=`, the inspect group): its operation in a few lines with what it ran with
-(release, endpoint, thinking level, MCP servers, and a restart or prompt change under it, ADR 0107), its steps in
-order with their status and duration, each drawn to scale on the turn's timeline, the operations it led to, and what
-was not recorded; a message with nothing recorded says so. The channel and the panel follow conversations through one
+again (`lib/draft-thread.ts`, `components/shell/thread-start.ts`). Details opens a sheet of what goblin did behind the message, in
+the owner's words (`GET /api/inspect/details?chat=&entry=`, the inspect group; `lib/details.ts` `detailsView`): how its
+turn ended as a sentence ("Answered in 3.5s"), its steps as the chat's tool rows read ("Thought deepseek…", "Used Notes ·
+write"), each with its time, on the turn's timeline when there are two to compare (`TimelineBar`), why one failed or
+was held, and what changed before it (a restart into another release, tools added or removed, its instructions); then
+where it led, what was not recorded, and one quiet line of what it ran with (tokens, model endpoint, thinking level,
+release, ADR 0107). Flow names, event kinds and raw token pairs stay with the CLI and /mcp inspection; a message with
+nothing recorded says so. The channel and the panel follow conversations through one
 stream pool (`lib/stream-pool.ts`): one event stream per conversation however many show it, at most eight following
 beyond those on screen, and one off screen stops following after ten seconds, resuming from a fresh snapshot when it
 comes back. Start thread, a toggle in the composer (and `/new-thread`), posts the message as the head of a new thread whose

@@ -266,6 +266,9 @@ const OWN_TOOLS: Readonly<Record<string, string>> = {
   subagent_stop: 'Stopped a subagent',
 }
 
+/** One of goblin's own tools in words ("Looked up its tools"), or "Used <tool>" for the rest. */
+export const ownToolLine = (name: string): string => OWN_TOOLS[name] ?? `Used ${name || 'a tool'}`
+
 /** How a connection is named to the owner: its label (`useConnectionLabels`), or its id where none is known. */
 export type Named = (connectionId: string) => string
 const asIs: Named = (connectionId) => connectionId
@@ -282,7 +285,7 @@ export function toolLine(
   const { app, member } = part.call.arguments
   if (part.call.name === 'app_call' && isString(app) && isString(member))
     return { lead: 'Used', server: app, tool: member }
-  return { lead: OWN_TOOLS[part.call.name] ?? `Used ${part.call.name || 'a tool'}` }
+  return { lead: ownToolLine(part.call.name) }
 }
 
 /** How long a tool has run (to `now` while it runs) or ran; undefined when its start or end is unknown. */

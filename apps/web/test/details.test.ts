@@ -1,112 +1,135 @@
-import type { InspectDetails } from '@goblin/contracts/inspect'
+import type { InspectDetails, TurnStep } from '@goblin/contracts/inspect'
 import { describe, expect, it } from 'vitest'
-import { detailSteps, detailSummary, ranWithText, relatedText } from '../src/lib/details.ts'
+import { detailsView } from '../src/lib/details.ts'
 import { durationText } from '../src/lib/format.ts'
 
-const DETAILS: InspectDetails = {
-  turn: {
-    operationId: 'op-1',
-    conversationId: '7',
-    source: 'app',
-    status: 'error',
-    reason: 'tool_failed',
-    startedAt: 1_000,
-    endedAt: 5_200,
-    modelAttempts: 2,
-    failedAttempts: 1,
-    toolCalls: 1,
-    failedToolCalls: 1,
-    inputTokens: 1200,
-    outputTokens: 80,
-    errors: 1,
-  },
-  events: [
-    {
-      id: 'e3',
-      kind: 'tool.call',
-      status: 'error',
-      startedAt: 3_000,
-      endedAt: 3_400,
-      attributes: { 'gen_ai.tool.name': 'mcp_call', 'error.type': 'UpstreamMcp' },
-    },
-    {
-      id: 'e2',
-      kind: 'model.attempt',
-      status: 'ok',
-      startedAt: 1_100,
-      endedAt: 2_900,
-      attributes: {
-        'gen_ai.response.model': 'sonnet',
-        'gen_ai.usage.input_tokens': 600,
-        'gen_ai.usage.output_tokens': 40,
-      },
-    },
-    {
-      id: 'e4',
-      kind: 'flow',
-      status: 'ok',
-      startedAt: 5_000,
-      attributes: { 'goblin.flow': 'reply', 'goblin.flow.via': 'app' },
-    },
-  ],
-  coverage: { complete: true, gaps: [] },
-  related: [{ operation: 'op-2', kind: 'start', chat: '9', state: 'settled' }],
+const release = '393c8952c962d36fa35db51e8f710d4cd73edd3f'
+const next = '5d6e7f8a9b0c1d2e3f405162738495a6b7c8d9e0'
+
+const turn: NonNullable<InspectDetails['turn']> = {
+  operationId: 'op-1',
+  conversationId: '7',
+  source: 'direct',
+  status: 'ok',
+  startedAt: 1_000,
+  endedAt: 5_000,
+  modelAttempts: 2,
+  failedAttempts: 0,
+  toolCalls: 1,
+  failedToolCalls: 1,
+  inputTokens: 28_000,
+  outputTokens: 131,
+  version: release,
 }
 
-describe("a message's details, in the owner's words", () => {
-  it('lists the steps in the order they ran, each with what it touched and how it ended', () => {
-    expect(detailSteps(DETAILS)).toEqual([
-      { id: 'e2', label: 'Model sonnet', detail: '600 in · 40 out tokens', status: 'ok', ms: 1800 },
-      { id: 'e3', label: 'Tool mcp_call', detail: 'UpstreamMcp', status: 'error', ms: 400 },
-      { id: 'e4', label: 'Flow reply', detail: 'app', status: 'ok', ms: undefined },
-    ])
-  })
-  it('sums the operation up, and says when no model ran for it', () => {
-    expect(detailSummary(DETAILS)).toEqual([
-      'From app · error (tool_failed) · 4.2 s',
-      '2 model attempts (1 failed) · 1 tool call (1 failed)',
-      '1200 in · 80 out tokens · 1 error',
-    ])
-    expect(detailSummary({ ...DETAILS, turn: undefined })).toEqual(['A written note: no model ran for it.'])
-  })
-  it("places each step on the turn's timeline when the turn's wall time is known", () => {
-    const spent = { totalMs: 4_200, modelMs: 1_800, toolMs: 400, servers: [], otherMs: 2_000 }
-    const [attempt, tool, flow] = detailSteps({ ...DETAILS, spent }, 6_000)
-    expect(attempt).toMatchObject({ offsetMs: 100, bar: { left: (100 / 4_200) * 100, width: (1_800 / 4_200) * 100 } })
-    expect(tool?.bar?.left).toBeCloseTo((2_000 / 4_200) * 100)
-    // A step with no end runs to now, never past the end of the timeline; an instant still shows.
-    expect(flow?.bar).toEqual({ left: (4_000 / 4_200) * 100, width: 100 - (4_000 / 4_200) * 100 })
-    expect(detailSteps(DETAILS)[0]?.bar).toBeUndefined()
-  })
-  it('says what the turn ran with, and what changed under it (ADR 0107)', () => {
-    const ranWith = {
-      versions: ['3f8f88b1c0ffee', '5d6e7f8a9b0c1d'],
-      endpoints: ['deployment' as const],
-      thinking: ['medium'],
-      promptChanges: 2,
-      servers: [{ server: 'mycut', name: 'my_cut', version: '1.4.2' }],
-    }
-    expect(ranWithText(ranWith)).toBe(
-      'Build 3f8f88b · restarted into 5d6e7f8 · goblin’s model endpoint · thinking medium · prompt or tools changed before 2 attempts · my_cut 1.4.2',
-    )
-    expect(detailSummary({ ...DETAILS, ranWith }).at(-1)).toBe(`Ran with ${ranWithText(ranWith)}`)
-    const changed = detailSteps({
-      ...DETAILS,
-      events: [
-        {
-          id: 'e5',
-          kind: 'model.attempt',
-          status: 'ok',
-          startedAt: 1_100,
-          endedAt: 2_000,
-          attributes: { 'goblin.tools.added': 1, 'goblin.tools.changed': 'mycut__job_submit' },
-        },
-      ],
+const step = (fields: Partial<TurnStep> & Pick<TurnStep, 'kind'>): TurnStep => ({
+  status: 'ok',
+  offsetMs: 0,
+  ms: 100,
+  version: release,
+  ...fields,
+})
+
+/** A turn that thought, called mycut and failed there, then thought again after its tools changed and a restart. */
+const DETAILS: InspectDetails = {
+  turn,
+  events: [],
+  steps: [
+    step({ kind: 'model.attempt', offsetMs: 0, ms: 2_000, model: 'deepseek-v4.1-flash', attempt: 1 }),
+    step({
+      kind: 'tool.call',
+      status: 'error',
+      offsetMs: 2_000,
+      ms: 400,
+      tool: 'mcp_call',
+      server: 'mycut',
+      serverTool: 'job_submit',
+      error: 'Remote MCP request failed (timeout).',
+    }),
+    step({
+      kind: 'model.attempt',
+      offsetMs: 2_400,
+      ms: 1_600,
+      model: 'deepseek-v4.1-flash',
+      toolsAdded: 2,
+      version: next,
+    }),
+  ],
+  spent: { totalMs: 4_000, modelMs: 3_600, toolMs: 400, servers: [], otherMs: 0 },
+  ranWith: { versions: [release, next], endpoints: ['deployment'], thinking: ['low'], promptChanges: 1, servers: [] },
+  coverage: { complete: false, gaps: ['The agent restarted during this turn.', 'Some events have not ended.'] },
+  related: [
+    { operation: 'op-2', kind: 'start', chat: '9', state: 'ok' },
+    { operation: 'op-3', kind: 'thread_announce' },
+  ],
+}
+
+/** The note on a lone model attempt with `fields`. */
+const changed = (fields: Partial<TurnStep>) =>
+  detailsView({ ...DETAILS, steps: [step({ kind: 'model.attempt', ...fields })] }, 9_000).steps[0]?.note
+
+describe("a message's Details, in the owner's words", () => {
+  it('says how the turn ended in a sentence around its time', () => {
+    expect(detailsView(DETAILS, 9_000).outcome).toEqual({ before: 'Answered in', ms: 4_000 })
+    const failed = { ...DETAILS, turn: { ...turn, status: 'error' as const, reason: 'model_error' } }
+    expect(detailsView(failed, 9_000).outcome).toEqual({
+      before: 'Failed after',
+      ms: 4_000,
+      after: ': the model did not answer',
     })
-    expect(changed[0]?.detail).toBe('prompt or tools changed before it')
+    const { endedAt: _, ...open } = turn
+    expect(detailsView({ ...DETAILS, turn: { ...open, status: 'started' } }, 9_000).outcome).toEqual({
+      before: 'Still working,',
+      ms: 8_000,
+      running: true,
+      after: ' so far',
+    })
+    expect(detailsView({ ...DETAILS, turn: undefined }, 9_000)).toMatchObject({
+      outcome: { before: 'Nothing ran for this message; it was written directly.' },
+    })
   })
-  it('reads related operations and durations plainly', () => {
-    expect(relatedText({ operation: 'op-2', kind: 'start', state: 'settled' })).toBe('start · settled')
+
+  it("reads each step like the chat's tool rows, with why it failed and what changed under it", () => {
+    const [thought, used, again] = detailsView(DETAILS, 9_000).steps
+    expect(thought).toMatchObject({ state: 'done', lead: 'Thought', model: 'deepseek-v4.1-flash', ms: 2_000 })
+    expect(thought?.note).toBeUndefined()
+    expect(used).toMatchObject({
+      state: 'error',
+      lead: 'Used',
+      server: 'mycut',
+      tool: 'job_submit',
+      problem: 'Remote MCP request failed (timeout).',
+    })
+    // A restart into another release is the note that matters most; the tools that changed with it are in the footer's count.
+    expect(again?.note).toBe('goblin restarted into build 5d6e7f8 before this.')
+  })
+
+  it("places steps on the turn's timeline once there are two to compare", () => {
+    const [thought, used] = detailsView(DETAILS, 9_000).steps
+    expect(thought?.bar).toEqual({ left: 0, width: 50 })
+    expect(used?.bar).toEqual({ left: 50, width: 10 })
+    const one = detailsView({ ...DETAILS, steps: DETAILS.steps?.slice(0, 1) }, 9_000).steps
+    expect(one[0]?.bar).toBeUndefined()
+  })
+
+  it('names what changed before a step: tools by count, else its instructions, never a restatement', () => {
+    expect(changed({ toolsAdded: 1, toolsRemoved: 2 })).toBe('1 tool added, 2 removed before this.')
+    expect(changed({ promptSections: ['persona'] })).toBe('Its instructions changed before this.')
+    expect(changed({ promptSections: ['persona'], toolsAdded: 12, promptBaseline: true })).toBeUndefined()
+  })
+
+  it('says where it led, what was not recorded, and what it ran with', () => {
+    const view = detailsView(DETAILS, 9_000)
+    expect(view.related).toEqual([
+      { operation: 'op-2', label: 'Started a thread', chat: '9' },
+      { operation: 'op-3', label: 'Related' },
+    ])
+    expect(view.gaps).toBe('The agent restarted during this turn. Some events have not ended.')
+    expect(view.footer).toBe('28.1K tokens on goblin’s model, thinking low, build 393c895.')
+    expect(detailsView({ ...DETAILS, turn: undefined }, 9_000).footer).toBeUndefined()
+  })
+
+  it('reads durations plainly for a screen reader', () => {
     expect(durationText(250)).toBe('250 ms')
     expect(durationText(90_000)).toBe('1.5 min')
   })
