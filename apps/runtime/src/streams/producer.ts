@@ -300,8 +300,8 @@ export class Producer {
   }
 
   /**
-   * `step` over the cursor of each of the chat's streams (one waiting for a new epoch takes the step there): what it
-   * answers pending in the row's tier, appended at once at a boundary or armed for `FLUSH_MS`.
+   * `step` over the cursor of each of the chat's streams but one waiting for a new epoch (which starts the children
+   * working then): what it answers pending in the row's tier, appended at once at a boundary or armed for `FLUSH_MS`.
    */
   #step(chat: string, step: (cursor: StreamCursor) => Translation): Effect.Effect<void> {
     const rows = [...(this.#chats.get(chat)?.rows.values() ?? [])].filter(({ begin }) => begin === undefined)

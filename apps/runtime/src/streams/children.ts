@@ -25,9 +25,6 @@ export type ChildFrom = { readonly snapshot?: SnapshotEvent | undefined; readonl
 /** A child's batch as its parent's stream carries it, the cursor after it, and how a run of the child ended in it. */
 export type ChildTranslation = Translation & { readonly ended?: ChildEnd | undefined }
 
-/** The chats of the children whose work `cursor` carries now. */
-export const childrenOf = (cursor: StreamCursor): readonly string[] => Object.keys(cursor.children ?? {})
-
 /** The entry a child's run in flight began at: its newest input among its own entries (a fork's history is not). */
 const runInput = (chat: string, entries: readonly EntryRecord[]): EntryRecord | undefined =>
   entries.findLast((entry) => entry.kind === 'pi.user' && String(entry.conversationId) === chat)

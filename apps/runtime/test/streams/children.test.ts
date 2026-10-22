@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { type AguiEvent, EventType } from '@goblin/contracts'
 import { describe, expect, it } from 'vitest'
 import { type StreamCursor, open, startCursor, translate } from '../../src/streams/agui.ts'
-import { childBatch, childEnded, childStarted, childrenOf } from '../../src/streams/children.ts'
+import { childBatch, childEnded, childStarted } from '../../src/streams/children.ts'
 import { forTier } from '../../src/streams/tiers.ts'
 import { checked, forkChild, replayFamily, textOf } from './agui-check.ts'
 import type { Recording } from './scenarios.ts'
@@ -19,6 +19,9 @@ const kid = recording.child
 if (kid === undefined) throw new Error('the fork fixture has no child')
 const FORK = kid.chat
 const child = forkChild(FORK)
+
+/** The chats of the children whose work `cursor` carries now. */
+const childrenOf = (cursor: StreamCursor): readonly string[] => Object.keys(cursor.children ?? {})
 
 const ofType = <T extends EventType>(events: readonly AguiEvent[], type: T) =>
   events.filter((event): event is Extract<AguiEvent, { type: T }> => event.type === type)
@@ -181,6 +184,50 @@ describe("a Persona's fork in its parent's stream", () => {
     const answered = translate(late.cursor, recording.batches.at(-1) ?? [])
     expect(answered.events.at(-1)).toMatchObject({ type: EventType.SUBAGENT_FINISHED, subagentRunId: FORK })
     checked([...late.events, ...answered.events])
+  })
+
+  it('ends a fork whose answer waits for the owner as suspended, on what the answer raised', () => {
+    const held: Recording = JSON.parse(
+      readFileSync(fileURLToPath(new URL('fixtures/persona.json', import.meta.url).href), 'utf8'),
+    )
+    // The fixture's held answer (operation `op-persona-2`) names no fork: its Persona and operation find the child.
+    const persona = {
+      id: 4,
+      name: 'Squarewave',
+      revision: 2,
+      avatar: { glyph: 'S', hue: 210 },
+      operationId: 'op-persona-2',
+    }
+    const started = childStarted(startCursor(held.chat), { chat: '12', name: 'Squarewave', persona }, { after: 0 })
+    let at = started.cursor
+    const events: AguiEvent[] = [...started.events]
+    for (const batch of held.batches) {
+      const step = translate(at, batch)
+      events.push(...step.events)
+      at = step.cursor
+    }
+    checked(events)
+    const [finished] = ofType(events, EventType.SUBAGENT_FINISHED)
+    expect(finished).toEqual({
+      type: EventType.SUBAGENT_FINISHED,
+      subagentRunId: '12',
+      outcome: { type: 'suspended', interruptIds: ['1:i11'] },
+      metadata: {
+        goblin: {
+          entryId: 11,
+          persona: {
+            ...persona,
+            hold: { kind: 'grant', connectionId: 'calendar', name: 'events_list', fork: '12' },
+          },
+          invocation: { state: 'answered' },
+        },
+      },
+    })
+    // The answer to the other operation ended nothing.
+    expect(events.findIndex((event) => event === finished)).toBeGreaterThan(
+      events.findIndex((event) => event.type === EventType.TEXT_MESSAGE_START && event.messageId === '1:e11'),
+    )
+    expect(childrenOf(at)).toEqual([])
   })
 
   it('ends a failed or stopped fork with SUBAGENT_ERROR, what it left open closed first', () => {
