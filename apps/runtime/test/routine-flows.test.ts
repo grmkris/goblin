@@ -206,10 +206,10 @@ describe('routine flows', () => {
     const admitted = await run(admit(firing('routine:rt_1:5')))
     expect(admitted.state).toBe('admitted')
     expect(starts.at(-1)?.persona).toMatchObject({ name: 'Worker', revision: 1, model: 'model-p', role: 'Quotes jobs' })
-    runs.settle(admitted.id, 'completed', 'Quoted 40 USDC.', Date.now())
+    runs.settle(admitted.id, 'completed', 'Quoted 40 EUR.', Date.now())
     await run(reportRun(runs.get(admitted.id)))
     expect(reports.at(-1)).toMatchObject({
-      text: 'Quoted 40 USDC.',
+      text: 'Quoted 40 EUR.',
       persona: { name: 'Worker', revision: 1, avatar: { glyph: 'W', hue: 120 } },
     })
     expect(flows.at(-1)).toMatchObject({ flow: 'routine_report', status: 'ok' })

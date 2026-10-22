@@ -1,4 +1,4 @@
-/** Keep retired integrations out of shipped code without reserving ordinary product vocabulary. */
+/** Keep retired integrations out of shipped code and its tests without reserving ordinary product vocabulary. */
 const SOURCE_ROOTS = [
   'apps/runtime/src/',
   'apps/web/src/',
@@ -18,13 +18,25 @@ const IDENTIFIER = /[A-Za-z_][A-Za-z_0-9]*/gu
 
 export type TermViolation = { readonly line: number; readonly term: string }
 
-/** Source files only; colocated tests, historical evidence, operator scripts and shelf data have separate purposes. */
+const CODE = /\.(?:[cm]?[jt]sx?|css)$/u
+const COLOCATED_TEST = /\.(?:test|spec)\.[cm]?[jt]sx?$/u
+/** Each app's and package's own tests. */
+const TEST_ROOT = /^(?:apps|packages)\/[^/]+\/test\//u
+
+const inSourceRoot = (file: string): boolean => SOURCE_ROOTS.some((root) => file.startsWith(root))
+const colocatedTest = (file: string): boolean => COLOCATED_TEST.test(file) || file.includes('/__tests__/')
+
+/** Source files only; tests are guarded apart, and historical evidence, operator scripts and shelf data are not. */
 export const guardedSource = (file: string): boolean =>
-  SOURCE_ROOTS.some((root) => file.startsWith(root)) &&
-  /\.(?:[cm]?[jt]sx?|css)$/u.test(file) &&
-  !/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(file) &&
-  !file.includes('/__tests__/') &&
-  file !== SHELF
+  inSourceRoot(file) && CODE.test(file) && !colocatedTest(file) && file !== SHELF
+
+/**
+ * Tests: each app's and package's `test/` folder and the tests colocated in a source root. Their fixtures stay neutral
+ * too, so no retired name comes back through a test; a deployment's own hosts may appear there (a test pins the stage
+ * configuration or the shelf's real endpoints), so only the names are refused.
+ */
+export const guardedTest = (file: string): boolean =>
+  CODE.test(file) && (TEST_ROOT.test(file) || (inSourceRoot(file) && colocatedTest(file)))
 
 const retiredIdentifier = (identifier: string): string | undefined => {
   const joined = identifier.replaceAll('_', '').toLowerCase()
@@ -38,11 +50,15 @@ const retiredIdentifier = (identifier: string): string | undefined => {
   return words.find((word) => RETIRED.has(word))
 }
 
-/** Comments and strings count too: current source must describe current behavior. No source text enters the report. */
+/**
+ * Comments and strings count too: current source and its tests must describe current behavior. Hosts count in source
+ * only. No source text enters the report.
+ */
 export const termViolations = (file: string, source: string): readonly TermViolation[] => {
-  if (!guardedSource(file)) return []
+  const shipped = guardedSource(file)
+  if (!shipped && !guardedTest(file)) return []
   return source.split('\n').flatMap((line, index) => {
-    const terms = new Set<string>([...line.matchAll(HOST)].map(([host]) => host.toLowerCase()))
+    const terms = new Set<string>(shipped ? [...line.matchAll(HOST)].map(([host]) => host.toLowerCase()) : [])
     for (const [identifier] of line.matchAll(IDENTIFIER)) {
       const term = retiredIdentifier(identifier)
       if (term !== undefined) terms.add(term)

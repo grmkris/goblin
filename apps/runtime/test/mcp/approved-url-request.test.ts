@@ -43,7 +43,7 @@ const REQUEST = 'mcp-url:41:c1'
 
 /**
  * The owner approves a model's held call to an ask-first tool on the Sidequest-like server, whose dispatch it answers
- * with a URL request (ADR 0042, the F5 case of a wallet transfer to a new recipient): real approval and URL request
+ * with a URL request (ADR 0042, the F5 case of a transfer to a new recipient): real approval and URL request
  * stores and the agent's own held-call check (`heldCalls`), chat 41 acting and allowed everything.
  */
 const fixture = async () => {

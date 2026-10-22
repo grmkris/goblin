@@ -82,13 +82,13 @@ describe('Recent in Apps (ADR 0078)', () => {
 describe('Connected in Apps (ADR 0078)', () => {
   it('lists every connection with an App of its own, signed in or not, by its title, falling back to its label', () => {
     const listed = connectedApps([
-      server('wallet', { entrypoint: 'open', title: 'Wallet' }),
+      server('bank', { entrypoint: 'open', title: 'Bank' }),
       server('calendar-work', { entrypoint: 'home', label: 'Work', title: 'Calendar', status: 'needs_auth' }),
       server('calendar-home', { entrypoint: 'home', label: 'Home', title: 'Calendar', status: 'disconnected' }),
       server('notes', { entrypoint: 'home', label: 'My notes' }),
     ])
     expect(listed).toEqual([
-      { connectionId: 'wallet', title: 'Wallet', label: 'wallet', connected: true },
+      { connectionId: 'bank', title: 'Bank', label: 'bank', connected: true },
       { connectionId: 'calendar-work', title: 'Calendar', label: 'Work', connected: false },
       { connectionId: 'calendar-home', title: 'Calendar', label: 'Home', connected: false },
       { connectionId: 'notes', title: 'My notes', label: 'My notes', connected: true },

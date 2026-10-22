@@ -149,7 +149,7 @@ describe('first-run Start (ADR 0062)', () => {
     closes.push(close)
     const store = new OnboardingStore(durable(db))
     sqlite.exec(
-      `INSERT INTO app_onboarding (id, status, steps, updated_at) VALUES (1, 'open', '["welcome","wallet","mercator","goblin","goblin"]', 1000)`,
+      `INSERT INTO app_onboarding (id, status, steps, updated_at) VALUES (1, 'open', '["welcome","retired","unknown","goblin","goblin"]', 1000)`,
     )
     expect(store.get()).toEqual({ status: undefined, steps: ['welcome', 'goblin'], kickoff: undefined })
     sqlite.exec(`UPDATE app_onboarding SET steps = 'not json' WHERE id = 1`)
@@ -170,9 +170,9 @@ describe('first-run Start (ADR 0062)', () => {
     expect(store.takeConnect('mail', 1000 + 61 * 60)).toBeUndefined()
     // A note an older Start left for a step it no longer has comes back to Connections.
     sqlite.exec(
-      `INSERT INTO app_onboarding_connects (connection_id, step, recommend, created_at) VALUES ('wallet', 'wallet', 1, 1000)`,
+      `INSERT INTO app_onboarding_connects (connection_id, step, recommend, created_at) VALUES ('bank', 'retired', 1, 1000)`,
     )
-    expect(store.takeConnect('wallet', 1100)).toBeUndefined()
+    expect(store.takeConnect('bank', 1100)).toBeUndefined()
   })
 
   it.effect('begins a sign-in from its step and comes back there, allowing nothing on the way', () => {

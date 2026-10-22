@@ -33,13 +33,13 @@ describe('pending authorizations (unit, real SQLite)', () => {
     const { db, close } = chatDatabase()
     try {
       const store = new CredentialStore(durable(db), await CredentialCipher.fromBase64(key))
-      await store.savePending('fresh', 'wallet', 'verifier-1', 1000)
+      await store.savePending('fresh', 'bank', 'verifier-1', 1000)
       expect(await store.takePending('fresh', 1000 + 59 * 60)).toEqual({
-        connectionId: 'wallet',
+        connectionId: 'bank',
         codeVerifier: 'verifier-1',
       })
       expect(await store.takePending('fresh', 1000 + 59 * 60)).toBeUndefined()
-      await store.savePending('stale', 'wallet', 'verifier-2', 1000)
+      await store.savePending('stale', 'bank', 'verifier-2', 1000)
       expect(await store.takePending('stale', 1000 + 61 * 60)).toBeUndefined()
     } finally {
       close()

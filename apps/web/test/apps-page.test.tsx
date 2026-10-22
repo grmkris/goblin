@@ -76,7 +76,7 @@ const server = (connectionId: string, overrides: Partial<ServerView> = {}): Serv
   ...overrides,
 })
 const SERVERS = [
-  server('wallet', { title: 'Wallet', entrypoint: 'open' }),
+  server('bank', { title: 'Bank', entrypoint: 'open' }),
   server('calendar-work', { label: 'Work', title: 'Calendar', status: 'needs_auth', entrypoint: 'home' }),
   server('search', { title: 'Search' }),
 ]
@@ -212,7 +212,7 @@ describe('the Apps launcher (ADR 0078)', () => {
     expect(markup).toContain('From #Travel')
     expect(markup).toContain('href="/a/5"')
     // Connected: the connection's own App opens; a server with tools only is not listed.
-    expect(markup).toContain('href="/connections/wallet/app"')
+    expect(markup).toContain('href="/connections/bank/app"')
     expect(markup).not.toContain('/connections/search/app')
     // Built for you: Open beside Manage, Manage alone without a view, what it needs, and no version.
     expect(markup).toContain('aria-label="Open Trip tracker"')
@@ -232,7 +232,7 @@ describe('the Apps launcher (ADR 0078)', () => {
     await failed(client, agentAppsQuery.queryKey)
     const markup = await page(client)
     expect(headings(markup)).toEqual(['Connected', 'Built for you'])
-    expect(markup).toContain('href="/connections/wallet/app"')
+    expect(markup).toContain('href="/connections/bank/app"')
     expect(markup).toContain('Could not load the apps built for you.')
     expect(markup).toContain('Try again')
     expect(markup).not.toContain('No apps yet')

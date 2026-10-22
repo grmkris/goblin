@@ -176,15 +176,15 @@ describe('what the agent waits on the owner for', () => {
       kind: 'approval',
       callId: 'g2',
       approvalId: 'mcp:7:g2',
-      connectionId: 'wallet',
+      connectionId: 'bank',
       name: 'transfer',
     } as const
-    const other = { kind: 'approval', callId: 'g3', approvalId: 'mcp:7:g3', connectionId: 'wallet', name: 'x' } as const
+    const other = { kind: 'approval', callId: 'g3', approvalId: 'mcp:7:g3', connectionId: 'bank', name: 'x' } as const
     const open = [held, other]
     expect(followUrlRequests(open, new Map())).toBe(open)
     const followed = followUrlRequests(open, new Map([['mcp:7:g2', 'mcp-url:7:g2']]))
     expect(followed).toEqual([
-      { kind: 'url', callId: 'g2', requestId: 'mcp-url:7:g2', connectionId: 'wallet', name: 'transfer' },
+      { kind: 'url', callId: 'g2', requestId: 'mcp-url:7:g2', connectionId: 'bank', name: 'transfer' },
       other,
     ])
     // The followed card stays while the request waits, under the request's own state.
