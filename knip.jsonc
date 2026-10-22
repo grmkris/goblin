@@ -47,8 +47,10 @@
       "ignoreDependencies": ["@effect/tsgo"],
     },
     "apps/runtime": {
-      // A hand-run probe of a model provider, not part of the agent.
-      "entry": ["test/provider-probe.ts"],
+      // Hand-run: a probe of a model provider, and the recorder of the AG-UI stream fixtures; not part of the agent.
+      // The AG-UI stream translator (docs/architecture/streams.md) ships before its producer (ADR 0109's next step),
+      // which imports it; until then its tests are its only users, so it is its own production entry.
+      "entry": ["test/provider-probe.ts", "test/streams/record.ts", "src/streams/agui.ts!", "src/streams/tiers.ts!"],
       "project": ["src/**/*.ts!", "test/**/*.ts"],
     },
     "apps/cli": {

@@ -1,0 +1,502 @@
+{
+  "full": [
+    {
+      "type": "RUN_STARTED",
+      "threadId": "1",
+      "runId": "1:8",
+      "metadata": {
+        "goblin": {
+          "operations": [
+            "op-tool"
+          ]
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "messageId": "1:e7",
+      "role": "user",
+      "metadata": {
+        "goblin": {
+          "entryId": 7,
+          "at": 1760000000021
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "messageId": "1:e7",
+      "delta": "weather in Tallinn?"
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "messageId": "1:e7",
+      "metadata": {
+        "goblin": {
+          "entryId": 7
+        }
+      }
+    },
+    {
+      "type": "STEP_STARTED",
+      "stepName": "turn 1"
+    },
+    {
+      "type": "STATE_DELTA",
+      "delta": [
+        {
+          "op": "replace",
+          "path": "/generation",
+          "value": {
+            "attempt": 1
+          }
+        }
+      ]
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "messageId": "1:a1760000000047",
+      "role": "assistant",
+      "metadata": {
+        "goblin": {
+          "at": 1760000000047
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "messageId": "1:a1760000000047",
+      "delta": "Checking."
+    },
+    {
+      "type": "TOOL_CALL_START",
+      "toolCallId": "call-1",
+      "toolCallName": "forecast",
+      "parentMessageId": "1:a1760000000047"
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "messageId": "1:a1760000000047",
+      "metadata": {
+        "goblin": {
+          "entryId": 11
+        }
+      }
+    },
+    {
+      "type": "TOOL_CALL_ARGS",
+      "toolCallId": "call-1",
+      "delta": "{\"city\":\"Tallinn\"}"
+    },
+    {
+      "type": "TOOL_CALL_END",
+      "toolCallId": "call-1"
+    },
+    {
+      "type": "STATE_DELTA",
+      "delta": [
+        {
+          "op": "replace",
+          "path": "/generation",
+          "value": null
+        }
+      ]
+    },
+    {
+      "type": "STATE_DELTA",
+      "delta": [
+        {
+          "op": "replace",
+          "path": "/usage",
+          "value": {
+            "models": {
+              "fixture/lifecycle-fixture": {
+                "input": 10,
+                "output": 5,
+                "cacheRead": 2,
+                "cacheWrite": 0,
+                "totalTokens": 17
+              }
+            },
+            "tools": {}
+          }
+        }
+      ]
+    },
+    {
+      "type": "CUSTOM",
+      "name": "goblin.tool_progress",
+      "value": {
+        "toolCallId": "call-1",
+        "status": "running"
+      }
+    },
+    {
+      "type": "CUSTOM",
+      "name": "goblin.tool_progress",
+      "value": {
+        "toolCallId": "call-1",
+        "output": {
+          "set": "Looking up "
+        }
+      }
+    },
+    {
+      "type": "CUSTOM",
+      "name": "goblin.tool_progress",
+      "value": {
+        "toolCallId": "call-1",
+        "details": {
+          "kind": "forecast",
+          "step": 1
+        }
+      }
+    },
+    {
+      "type": "CUSTOM",
+      "name": "goblin.tool_progress",
+      "value": {
+        "toolCallId": "call-1",
+        "output": {
+          "append": "Tallinn"
+        }
+      }
+    },
+    {
+      "type": "TOOL_CALL_RESULT",
+      "messageId": "1:tcall-1",
+      "toolCallId": "call-1",
+      "content": "Tallinn: sunny",
+      "role": "tool",
+      "metadata": {
+        "goblin": {
+          "entryId": 13,
+          "at": 1760000000089,
+          "details": {
+            "kind": "forecast",
+            "structuredContent": {
+              "city": "Tallinn",
+              "sky": "sunny"
+            }
+          },
+          "isError": false
+        }
+      }
+    },
+    {
+      "type": "STEP_FINISHED",
+      "stepName": "turn 1"
+    },
+    {
+      "type": "STEP_STARTED",
+      "stepName": "turn 2"
+    },
+    {
+      "type": "STATE_DELTA",
+      "delta": [
+        {
+          "op": "replace",
+          "path": "/generation",
+          "value": {
+            "attempt": 1
+          }
+        }
+      ]
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "messageId": "1:a1760000000131",
+      "role": "assistant",
+      "metadata": {
+        "goblin": {
+          "at": 1760000000131
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "messageId": "1:a1760000000131",
+      "delta": "It is"
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "messageId": "1:a1760000000131",
+      "delta": " sunny."
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "messageId": "1:a1760000000131",
+      "metadata": {
+        "goblin": {
+          "entryId": 15
+        }
+      }
+    },
+    {
+      "type": "STATE_DELTA",
+      "delta": [
+        {
+          "op": "replace",
+          "path": "/generation",
+          "value": null
+        }
+      ]
+    },
+    {
+      "type": "STEP_FINISHED",
+      "stepName": "turn 2"
+    },
+    {
+      "type": "RUN_FINISHED",
+      "threadId": "1",
+      "runId": "1:8",
+      "usage": [
+        {
+          "provider": "fixture",
+          "model": "lifecycle-fixture",
+          "inputTokens": 24,
+          "outputTokens": 10,
+          "totalTokens": 34,
+          "cachedInputTokens": 4,
+          "cacheWriteInputTokens": 0
+        }
+      ],
+      "outcome": {
+        "type": "success"
+      }
+    },
+    {
+      "type": "STATE_DELTA",
+      "delta": [
+        {
+          "op": "replace",
+          "path": "/usage",
+          "value": {
+            "models": {
+              "fixture/lifecycle-fixture": {
+                "input": 20,
+                "output": 10,
+                "cacheRead": 4,
+                "cacheWrite": 0,
+                "totalTokens": 34
+              }
+            },
+            "tools": {}
+          }
+        }
+      ]
+    }
+  ],
+  "answers": [
+    {
+      "type": "RUN_STARTED",
+      "threadId": "1",
+      "runId": "1:8",
+      "metadata": {
+        "goblin": {
+          "operations": [
+            "op-tool"
+          ]
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "messageId": "1:e7",
+      "role": "user",
+      "metadata": {
+        "goblin": {
+          "entryId": 7,
+          "at": 1760000000021
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "messageId": "1:e7",
+      "delta": "weather in Tallinn?"
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "messageId": "1:e7",
+      "metadata": {
+        "goblin": {
+          "entryId": 7
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "messageId": "1:a1760000000047",
+      "role": "assistant",
+      "metadata": {
+        "goblin": {
+          "at": 1760000000047
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "messageId": "1:a1760000000047",
+      "delta": "Checking."
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "messageId": "1:a1760000000047",
+      "metadata": {
+        "goblin": {
+          "entryId": 11
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "messageId": "1:a1760000000131",
+      "role": "assistant",
+      "metadata": {
+        "goblin": {
+          "at": 1760000000131
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "messageId": "1:a1760000000131",
+      "delta": "It is"
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "messageId": "1:a1760000000131",
+      "delta": " sunny."
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "messageId": "1:a1760000000131",
+      "metadata": {
+        "goblin": {
+          "entryId": 15
+        }
+      }
+    },
+    {
+      "type": "RUN_FINISHED",
+      "threadId": "1",
+      "runId": "1:8",
+      "usage": [
+        {
+          "provider": "fixture",
+          "model": "lifecycle-fixture",
+          "inputTokens": 24,
+          "outputTokens": 10,
+          "totalTokens": 34,
+          "cachedInputTokens": 4,
+          "cacheWriteInputTokens": 0
+        }
+      ],
+      "outcome": {
+        "type": "success"
+      }
+    }
+  ],
+  "open": [
+    {
+      "type": "MESSAGES_SNAPSHOT",
+      "messages": [
+        {
+          "id": "1:e7",
+          "role": "user",
+          "content": "weather in Tallinn?",
+          "metadata": {
+            "goblin": {
+              "entryId": 7,
+              "at": 1760000000021
+            }
+          }
+        },
+        {
+          "id": "1:a1760000000047",
+          "role": "assistant",
+          "content": "Checking.",
+          "toolCalls": [
+            {
+              "id": "call-1",
+              "type": "function",
+              "function": {
+                "name": "forecast",
+                "arguments": "{\"city\":\"Tallinn\"}"
+              }
+            }
+          ],
+          "metadata": {
+            "goblin": {
+              "entryId": 11,
+              "at": 1760000000047
+            }
+          }
+        },
+        {
+          "id": "1:tcall-1",
+          "role": "tool",
+          "toolCallId": "call-1",
+          "content": "Tallinn: sunny",
+          "metadata": {
+            "goblin": {
+              "entryId": 13,
+              "at": 1760000000089,
+              "details": {
+                "kind": "forecast",
+                "structuredContent": {
+                  "city": "Tallinn",
+                  "sky": "sunny"
+                }
+              },
+              "isError": false
+            }
+          }
+        },
+        {
+          "id": "1:a1760000000131",
+          "role": "assistant",
+          "content": "It is sunny.",
+          "metadata": {
+            "goblin": {
+              "entryId": 15,
+              "at": 1760000000131
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "STATE_SNAPSHOT",
+      "snapshot": {
+        "queue": [],
+        "generation": null,
+        "compactions": {
+          "running": [],
+          "failure": null
+        },
+        "agent": {
+          "model": {
+            "provider": "fixture",
+            "modelId": "lifecycle-fixture"
+          },
+          "thinkingLevel": "off"
+        },
+        "usage": {
+          "models": {
+            "fixture/lifecycle-fixture": {
+              "input": 20,
+              "output": 10,
+              "cacheRead": 4,
+              "cacheWrite": 0,
+              "totalTokens": 34
+            }
+          },
+          "tools": {}
+        },
+        "attention": []
+      }
+    }
+  ]
+}

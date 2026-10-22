@@ -38,6 +38,7 @@ flowchart LR
 - [Sources](architecture/sources.md): any connection's events as the owner's own messages, routed to Topics and answered
   back.
 - [Run ledger](architecture/observability.md): run ledger, logs, failures and inspection.
+- [Chat streams](architecture/streams.md) (draft): a chat as AG-UI events in two tiers, the profile other apps read.
 - [Storage](architecture/storage.md): D1, Durable Object SQLite and migrations.
 - [Infrastructure and release](architecture/infrastructure.md): Alchemy stacks, stage origins, release and public source.
 - [Routines and notices](architecture/routines.md): routine definitions, runs and notices.

@@ -1,0 +1,348 @@
+{
+  "full": [
+    {
+      "type": "RUN_STARTED",
+      "threadId": "1",
+      "runId": "1:8",
+      "metadata": {
+        "goblin": {
+          "operations": [
+            "op-error"
+          ]
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "messageId": "1:e7",
+      "role": "user",
+      "metadata": {
+        "goblin": {
+          "entryId": 7,
+          "at": 1760000000021
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "messageId": "1:e7",
+      "delta": "are you there?"
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "messageId": "1:e7",
+      "metadata": {
+        "goblin": {
+          "entryId": 7
+        }
+      }
+    },
+    {
+      "type": "STEP_STARTED",
+      "stepName": "turn 1"
+    },
+    {
+      "type": "STATE_DELTA",
+      "delta": [
+        {
+          "op": "replace",
+          "path": "/generation",
+          "value": {
+            "attempt": 1,
+            "retry": {
+              "at": 1760000000068,
+              "error": "503 Service Unavailable: overloaded"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "messageId": "1:a1760000000047",
+      "role": "assistant",
+      "metadata": {
+        "goblin": {
+          "at": 1760000000047
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "messageId": "1:a1760000000047",
+      "metadata": {
+        "goblin": {
+          "entryId": 11,
+          "stop": {
+            "reason": "error",
+            "message": "503 Service Unavailable: overloaded"
+          }
+        }
+      }
+    },
+    {
+      "type": "STATE_DELTA",
+      "delta": [
+        {
+          "op": "replace",
+          "path": "/usage",
+          "value": {
+            "models": {
+              "fixture/lifecycle-fixture": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0
+              }
+            },
+            "tools": {}
+          }
+        }
+      ]
+    },
+    {
+      "type": "STATE_DELTA",
+      "delta": [
+        {
+          "op": "replace",
+          "path": "/generation",
+          "value": {
+            "attempt": 2
+          }
+        }
+      ]
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "messageId": "1:a1760000000085",
+      "role": "assistant",
+      "metadata": {
+        "goblin": {
+          "at": 1760000000085
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "messageId": "1:a1760000000085",
+      "metadata": {
+        "goblin": {
+          "entryId": 12,
+          "stop": {
+            "reason": "error",
+            "message": "503 Service Unavailable: overloaded"
+          }
+        }
+      }
+    },
+    {
+      "type": "STATE_DELTA",
+      "delta": [
+        {
+          "op": "replace",
+          "path": "/generation",
+          "value": null
+        }
+      ]
+    },
+    {
+      "type": "STEP_FINISHED",
+      "stepName": "turn 1"
+    },
+    {
+      "type": "RUN_ERROR",
+      "code": "model_error",
+      "message": "503 Service Unavailable: overloaded",
+      "usage": [
+        {
+          "provider": "fixture",
+          "model": "lifecycle-fixture",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "totalTokens": 0,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0
+        }
+      ]
+    }
+  ],
+  "answers": [
+    {
+      "type": "RUN_STARTED",
+      "threadId": "1",
+      "runId": "1:8",
+      "metadata": {
+        "goblin": {
+          "operations": [
+            "op-error"
+          ]
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "messageId": "1:e7",
+      "role": "user",
+      "metadata": {
+        "goblin": {
+          "entryId": 7,
+          "at": 1760000000021
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "messageId": "1:e7",
+      "delta": "are you there?"
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "messageId": "1:e7",
+      "metadata": {
+        "goblin": {
+          "entryId": 7
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "messageId": "1:a1760000000047",
+      "role": "assistant",
+      "metadata": {
+        "goblin": {
+          "at": 1760000000047
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "messageId": "1:a1760000000047",
+      "metadata": {
+        "goblin": {
+          "entryId": 11,
+          "stop": {
+            "reason": "error",
+            "message": "503 Service Unavailable: overloaded"
+          }
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "messageId": "1:a1760000000085",
+      "role": "assistant",
+      "metadata": {
+        "goblin": {
+          "at": 1760000000085
+        }
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "messageId": "1:a1760000000085",
+      "metadata": {
+        "goblin": {
+          "entryId": 12,
+          "stop": {
+            "reason": "error",
+            "message": "503 Service Unavailable: overloaded"
+          }
+        }
+      }
+    },
+    {
+      "type": "RUN_ERROR",
+      "code": "model_error",
+      "message": "503 Service Unavailable: overloaded",
+      "usage": [
+        {
+          "provider": "fixture",
+          "model": "lifecycle-fixture",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "totalTokens": 0,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0
+        }
+      ]
+    }
+  ],
+  "open": [
+    {
+      "type": "MESSAGES_SNAPSHOT",
+      "messages": [
+        {
+          "id": "1:e7",
+          "role": "user",
+          "content": "are you there?",
+          "metadata": {
+            "goblin": {
+              "entryId": 7,
+              "at": 1760000000021
+            }
+          }
+        },
+        {
+          "id": "1:a1760000000047",
+          "role": "assistant",
+          "metadata": {
+            "goblin": {
+              "entryId": 11,
+              "at": 1760000000047,
+              "stop": {
+                "reason": "error",
+                "message": "503 Service Unavailable: overloaded"
+              }
+            }
+          }
+        },
+        {
+          "id": "1:a1760000000085",
+          "role": "assistant",
+          "metadata": {
+            "goblin": {
+              "entryId": 12,
+              "at": 1760000000085,
+              "stop": {
+                "reason": "error",
+                "message": "503 Service Unavailable: overloaded"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "STATE_SNAPSHOT",
+      "snapshot": {
+        "queue": [],
+        "generation": null,
+        "compactions": {
+          "running": [],
+          "failure": null
+        },
+        "agent": {
+          "model": {
+            "provider": "fixture",
+            "modelId": "lifecycle-fixture"
+          },
+          "thinkingLevel": "off"
+        },
+        "usage": {
+          "models": {
+            "fixture/lifecycle-fixture": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0
+            }
+          },
+          "tools": {}
+        },
+        "attention": []
+      }
+    }
+  ]
+}

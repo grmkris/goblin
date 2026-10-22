@@ -1,0 +1,264 @@
+{
+  "pi": "1.3.0",
+  "chat": "1",
+  "batches": [
+    [
+      {
+        "type": "message_start",
+        "message": {
+          "role": "user",
+          "content": "Plan the trip",
+          "timestamp": 1760000000021
+        }
+      },
+      {
+        "type": "message_end",
+        "entry": {
+          "kind": "app.thread_head",
+          "data": {
+            "thread": "7",
+            "text": "Plan the trip",
+            "operationId": "op-head"
+          },
+          "model": [
+            {
+              "role": "user",
+              "content": "Plan the trip",
+              "timestamp": 1760000000021
+            }
+          ],
+          "id": 7,
+          "conversationId": 1
+        }
+      },
+      {
+        "type": "submission",
+        "record": {
+          "conversationId": 1,
+          "requestId": "thread-head:op-head",
+          "type": "write",
+          "status": "done",
+          "entry": 7,
+          "id": 8
+        }
+      }
+    ],
+    [
+      {
+        "type": "message_start",
+        "message": {
+          "role": "user",
+          "content": "Water the plants",
+          "timestamp": 1760000000027
+        }
+      },
+      {
+        "type": "message_end",
+        "entry": {
+          "kind": "app.notice",
+          "data": {
+            "notice": "n-1",
+            "routine": "r-1",
+            "source": "reminder",
+            "from": {
+              "label": "Daily check"
+            },
+            "title": "Water the plants"
+          },
+          "model": [
+            {
+              "role": "user",
+              "content": "Water the plants",
+              "timestamp": 1760000000027
+            }
+          ],
+          "id": 9,
+          "conversationId": 1
+        }
+      },
+      {
+        "type": "submission",
+        "record": {
+          "conversationId": 1,
+          "requestId": "notice-1",
+          "type": "write",
+          "status": "done",
+          "entry": 9,
+          "id": 10
+        }
+      }
+    ],
+    [
+      {
+        "type": "message_start",
+        "message": {
+          "role": "user",
+          "content": "Found three flights.",
+          "timestamp": 1760000000034
+        }
+      },
+      {
+        "type": "message_end",
+        "entry": {
+          "kind": "app.delegate_result",
+          "data": {
+            "delegate": "9",
+            "name": "Researcher",
+            "status": "done",
+            "text": "Found three flights."
+          },
+          "model": [
+            {
+              "role": "user",
+              "content": "Found three flights.",
+              "timestamp": 1760000000034
+            }
+          ],
+          "id": 11,
+          "conversationId": 1
+        }
+      },
+      {
+        "type": "submission",
+        "record": {
+          "conversationId": 1,
+          "requestId": "delegate-1",
+          "type": "write",
+          "status": "done",
+          "entry": 11,
+          "id": 12
+        }
+      }
+    ],
+    [
+      {
+        "type": "message_start",
+        "message": {
+          "role": "user",
+          "content": "Shared from the thread",
+          "timestamp": 1760000000041
+        }
+      },
+      {
+        "type": "message_end",
+        "entry": {
+          "kind": "app.shared",
+          "data": {
+            "thread": "7"
+          },
+          "model": [
+            {
+              "role": "user",
+              "content": "Shared from the thread",
+              "timestamp": 1760000000041
+            }
+          ],
+          "id": 13,
+          "conversationId": 1
+        }
+      },
+      {
+        "type": "submission",
+        "record": {
+          "conversationId": 1,
+          "requestId": "share-1",
+          "type": "write",
+          "status": "done",
+          "entry": 13,
+          "id": 14
+        }
+      }
+    ]
+  ],
+  "final": {
+    "type": "snapshot",
+    "entries": [
+      {
+        "kind": "app.thread_head",
+        "data": {
+          "thread": "7",
+          "text": "Plan the trip",
+          "operationId": "op-head"
+        },
+        "model": [
+          {
+            "role": "user",
+            "content": "Plan the trip",
+            "timestamp": 1760000000021
+          }
+        ],
+        "id": 7,
+        "conversationId": 1
+      },
+      {
+        "kind": "app.notice",
+        "data": {
+          "notice": "n-1",
+          "routine": "r-1",
+          "source": "reminder",
+          "from": {
+            "label": "Daily check"
+          },
+          "title": "Water the plants"
+        },
+        "model": [
+          {
+            "role": "user",
+            "content": "Water the plants",
+            "timestamp": 1760000000027
+          }
+        ],
+        "id": 9,
+        "conversationId": 1
+      },
+      {
+        "kind": "app.delegate_result",
+        "data": {
+          "delegate": "9",
+          "name": "Researcher",
+          "status": "done",
+          "text": "Found three flights."
+        },
+        "model": [
+          {
+            "role": "user",
+            "content": "Found three flights.",
+            "timestamp": 1760000000034
+          }
+        ],
+        "id": 11,
+        "conversationId": 1
+      },
+      {
+        "kind": "app.shared",
+        "data": {
+          "thread": "7"
+        },
+        "model": [
+          {
+            "role": "user",
+            "content": "Shared from the thread",
+            "timestamp": 1760000000041
+          }
+        ],
+        "id": 13,
+        "conversationId": 1
+      }
+    ],
+    "tools": [],
+    "nestedTools": [],
+    "compactions": [],
+    "inbox": [],
+    "agent": {
+      "model": {
+        "provider": "fixture",
+        "modelId": "lifecycle-fixture"
+      },
+      "thinkingLevel": "off"
+    },
+    "usage": {
+      "models": {},
+      "tools": {}
+    }
+  }
+}
