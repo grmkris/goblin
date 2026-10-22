@@ -94,12 +94,17 @@ function begin(message: MessageSent, out: AguiEvent[], index: number, block: Blo
   return (message.blocks[index] = { kind: 'thinking', sent: 0 })
 }
 
-/** Text appended to block `index`, as the content of its message. */
+/**
+ * Text appended to block `index`, as the content of its message. A thinking block's reasoning message is open only
+ * until a later block begins: what still arrives for it after that (a provider's late delta, or the rest of its text as
+ * the final message has it) is counted as sent but not streamed, since its message is closed, and the committed
+ * message carries all of it.
+ */
 function append(message: MessageSent, out: AguiEvent[], index: number, sent: BlockSent, delta: string): void {
   if (sent.kind === 'toolCall' || delta === '') return
   sent.sent += delta.length
   if (sent.kind === 'text') out.push({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: message.id, delta })
-  else if (sent.hidden !== true)
+  else if (sent.hidden !== true && message.thinking === index)
     out.push({ type: EventType.REASONING_MESSAGE_CONTENT, messageId: reasoningId(message.id, index), delta })
 }
 
