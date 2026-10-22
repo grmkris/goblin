@@ -13,7 +13,7 @@ import { generateRandomString } from 'better-auth/crypto'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type { RuntimeEnv } from '../env.ts'
-import { InvalidInput, NotFound, Unauthenticated } from '../http/errors.ts'
+import { Conflict, InvalidInput, NotFound, Unauthenticated } from '../http/errors.ts'
 import type { KeyGrant } from '../http/api/principal.ts'
 import { createAuth } from './options.ts'
 import { KEY_LENGTH, KEY_PREFIX, KEY_START_LENGTH } from './resources.ts'
@@ -204,7 +204,8 @@ const newSecret = (): string => `${KEY_PREFIX}${generateRandomString(KEY_LENGTH,
  * A new secret for one of the workspace's keys (ADR 0105), answered this once and stored only as the plugin stores
  * one, its hash and first characters. It is the same key: its id, name, scopes, ceiling, expiry and so its reach stay,
  * and the old secret admits nothing from now on, since the row holds one hash. A key of another workspace's, or one
- * that is gone or expired, is `NotFound`.
+ * that is gone or expired, is `NotFound`; of two rotations at once, the one that finds the hash already changed is
+ * `Conflict` (`rotated`), so no answer carries a secret that never worked.
  */
 export const rotateKey = async (env: RuntimeEnv, workspaceId: string, keyId: string): Promise<CreatedApiKey> => {
   const { adapter } = await createAuth(env, env.AUTH_DB).$context
@@ -212,16 +213,17 @@ export const rotateKey = async (env: RuntimeEnv, workspaceId: string, keyId: str
     { field: 'id', value: keyId },
     { field: 'referenceId', value: workspaceId },
   ]
-  const current = await adapter.findOne<KeyRecord>({ model: MODEL, where })
+  // With the secret's hash, which only a rotation reads: the update below matches it, or another rotation came first.
+  const current = await adapter.findOne<KeyRecord & { readonly key: string }>({ model: MODEL, where })
   if (current === null || (current.expiresAt !== null && new Date(current.expiresAt).getTime() <= Date.now()))
     throw new NotFound({ what: 'key' })
   const secret = newSecret()
   const rotated = await adapter.update<KeyRecord>({
     model: MODEL,
-    where,
+    where: [...where, { field: 'key', value: current.key }],
     update: { key: await defaultKeyHasher(secret), start: secret.slice(0, KEY_START_LENGTH), updatedAt: new Date() },
   })
-  if (rotated === null) throw new NotFound({ what: 'key' })
+  if (rotated === null) throw new Conflict({ reason: 'rotated' })
   return { key: viewOf(rotated), secret }
 }
 

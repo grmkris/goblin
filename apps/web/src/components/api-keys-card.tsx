@@ -371,6 +371,8 @@ function Keys() {
   const keys = useSuspenseQuery(keysQuery).data
   const revoke = useMutation(revokeKeyMutation)
   const [editing, setEditing] = useState<Editing>()
+  // While a key's new secret is open, nothing else may close it: the old one already stopped working (ADR 0105).
+  const rotating = editing?.what === 'secret' ? editing.id : undefined
   const revoking = revoke.isPending ? revoke.variables : ''
   const failure = revoke.error === null ? '' : messageOf(revoke.error, 'revoke that key')
   return (
@@ -401,7 +403,7 @@ function Keys() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  disabled={editing?.id === key.id && editing.what === 'scopes'}
+                  disabled={rotating !== undefined || (editing?.id === key.id && editing.what === 'scopes')}
                   onClick={() => setEditing({ id: key.id, what: 'scopes' })}
                 >
                   Change scopes
@@ -409,7 +411,7 @@ function Keys() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  disabled={editing?.id === key.id && editing.what === 'servers'}
+                  disabled={rotating !== undefined || (editing?.id === key.id && editing.what === 'servers')}
                   onClick={() => setEditing({ id: key.id, what: 'servers' })}
                 >
                   Change servers
@@ -417,7 +419,7 @@ function Keys() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  disabled={editing?.id === key.id && editing.what === 'secret'}
+                  disabled={rotating !== undefined}
                   onClick={() => setEditing({ id: key.id, what: 'secret' })}
                 >
                   Rotate secret
@@ -426,7 +428,7 @@ function Keys() {
                   size="sm"
                   variant="outline"
                   pending={revoking === key.id}
-                  disabled={revoking !== '' && revoking !== key.id}
+                  disabled={(revoking !== '' && revoking !== key.id) || rotating === key.id}
                   onClick={() => revoke.mutate(key.id)}
                 >
                   Revoke
