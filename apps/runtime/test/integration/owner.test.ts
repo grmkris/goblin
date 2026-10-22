@@ -30,6 +30,7 @@ import {
 } from './move-case.ts'
 import { call, lever, ownerFetch, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 import { clientErrorsCase, csrfCase, internalRefusalCase } from './edge-case.ts'
+import { streamChildrenCase } from './streams-children-case.ts'
 import { streamsCase } from './streams-case.ts'
 
 const harness = Test.make({
@@ -161,6 +162,11 @@ harness.test(
 harness.test(
   "native: a chat's AG-UI stream is joined in its tier, resumed from an offset, moves epochs at a run's end, refuses a bad token and keeps a lost acknowledgement's append once",
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => streamsCase(url)))),
+  { timeout: 240_000 },
+)
+harness.test(
+  "native: a Persona's fork and a subagent stream into their chat under their subagentRunId, a key's answers tier keeps their lifecycle and answer, and a new epoch opens with a child in flight",
+  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => streamChildrenCase(url)))),
   { timeout: 240_000 },
 )
 harness.test(

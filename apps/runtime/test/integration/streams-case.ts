@@ -16,7 +16,7 @@ const KEY = 'Z29ibGluLXRlc3QtZml4dHVyZS1rZXkhISEhISEhISE='
 /** How long a case waits for a run to show in a stream. */
 const WAIT_MS = 30_000
 
-const Secret = Schema.Struct({ secret: Schema.String })
+export const Secret = Schema.Struct({ secret: Schema.String })
 
 /** A stream URL as the test reaches it: the Worker at `base` stands where the deployment's origin does. */
 const local = (base: string, url: string) => `${base}${new URL(url).pathname}`
@@ -33,10 +33,10 @@ function valid(value: unknown): AguiEvent[] {
   return events as AguiEvent[]
 }
 
-type Read = { readonly events: AguiEvent[]; readonly offset: string; readonly closed: boolean }
+export type Read = { readonly events: AguiEvent[]; readonly offset: string; readonly closed: boolean }
 
 /** One read of `url` from `offset` (`-1`: the epoch's start), waiting for more with long-poll. */
-async function readOnce(base: string, url: string, offset: string): Promise<Read> {
+export async function readOnce(base: string, url: string, offset: string): Promise<Read> {
   const response = await ownerFetch(`${local(base, url)}?offset=${offset}&live=long-poll`)
   const next = response.headers.get('stream-next-offset') ?? offset
   const closed = response.headers.get('stream-closed') === 'true'
@@ -47,7 +47,7 @@ async function readOnce(base: string, url: string, offset: string): Promise<Read
 }
 
 /** Reads `url` from `offset` until `done` holds for what was read (or the stream closed); everything read, in order. */
-async function readUntil(
+export async function readUntil(
   base: string,
   url: string,
   offset: string,
@@ -65,7 +65,7 @@ async function readUntil(
   }
 }
 
-const ofType = <T extends EventType>(events: readonly AguiEvent[], type: T) =>
+export const ofType = <T extends EventType>(events: readonly AguiEvent[], type: T) =>
   events.filter((event): event is Extract<AguiEvent, { type: T }> => event.type === type)
 
 /** The text an assistant's content deltas add up to, message by message. */
@@ -83,11 +83,11 @@ const answers = (events: readonly AguiEvent[]): string[] => {
 
 const ended = (events: readonly AguiEvent[]) =>
   events.some(({ type }) => type === EventType.RUN_FINISHED || type === EventType.RUN_ERROR)
-const moved = (events: readonly AguiEvent[]) =>
+export const moved = (events: readonly AguiEvent[]) =>
   ofType(events, EventType.CUSTOM).some(({ name }) => name === 'goblin.stream.moved')
 
 /** `who`'s join of `chat`'s stream through the typed client. */
-const join = (base: string, who: Person, chat: string) =>
+export const join = (base: string, who: Person, chat: string) =>
   callOwner(signedIn(base, who), (api) => api.conversations.stream({ params: { id: chat } }))
 
 /** A message into `chat` from `who`'s browser. */
