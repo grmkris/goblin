@@ -70,4 +70,6 @@ export interface RuntimeEnv {
   /** 32 random bytes, base64: encrypts outbound OAuth credentials at rest. */
   readonly CREDENTIAL_KEY: string
   readonly STAGE?: 'local' | 'dev' | 'prod' | 'test'
+  /** The release's commit (`scripts/stage.ts`); every run event names it (ADR 0107). Unset on the local stack. */
+  readonly VITE_GOBLIN_BUILD?: string
 }

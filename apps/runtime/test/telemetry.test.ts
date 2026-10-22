@@ -9,9 +9,10 @@ import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
 import { describe, expect, it, vi } from 'vitest'
 import { BACKGROUND } from '../src/pi/context.ts'
-import { RunTelemetry, boundAttributes, type RunSink } from '../src/telemetry/events.ts'
+import { RunTelemetry, boundAttributes, type RunSink, type RunStamp } from '../src/telemetry/events.ts'
 import { RunLog } from '../src/telemetry/log.ts'
 import { PiRunRecorder, sourceOf } from '../src/telemetry/pi.ts'
+import { ranWith } from '../src/telemetry/ran-with.ts'
 import { auxReporter, mcpReporter } from '../src/telemetry/report.ts'
 import { CheapModel } from '../src/memory/model.ts'
 import { MODEL_PROVIDER } from '../src/pi/model.ts'
@@ -141,9 +142,15 @@ class Collected extends CollectedRuns {
 }
 
 /** One turn through real Pi (in memory) with the recorder attached; returns the run events it recorded. */
-async function turn(replies: Reply[], input = 'hello', operationId = 'op-1', extra: readonly RunSink[] = []) {
+async function turn(
+  replies: Reply[],
+  input = 'hello',
+  operationId = 'op-1',
+  extra: readonly RunSink[] = [],
+  stamp?: RunStamp,
+) {
   const collected = new Collected()
-  const telemetry = new RunTelemetry([...extra, collected], (id) => collected.read(id))
+  const telemetry = new RunTelemetry([...extra, collected], (id) => collected.read(id), stamp)
   const recorder = new PiRunRecorder(telemetry, collected)
   const models = createModels()
   models.setProvider(
@@ -216,11 +223,17 @@ describe('run telemetry from Pi commits (unit, in-memory Pi)', () => {
     ])
     expect(attempts.map((event) => event.attributes[RunAttribute.attempt])).toEqual([1, 2, 1])
     expect(attempts[0]?.attributes[RunAttribute.error]).toBe('Model provider failed.')
+    expect(attempts.map((event) => event.attributes[RunAttribute.responseModel])).toEqual([
+      model.id,
+      model.id,
+      model.id,
+    ])
     for (const attempt of attempts) {
       expect(attempt).toMatchObject({ operationId: 'op-1', conversationId: '1' })
       expect(attempt.attributes).toMatchObject({
+        [RunAttribute.provider]: 'openai',
         [RunAttribute.requestModel]: model.id,
-        [RunAttribute.provider]: model.provider,
+        [RunAttribute.reasoningLevel]: 'off',
         [RunAttribute.inputTokens]: 10,
         [RunAttribute.outputTokens]: 5,
         [RunAttribute.cacheReadTokens]: 2,
@@ -238,6 +251,55 @@ describe('run telemetry from Pi commits (unit, in-memory Pi)', () => {
     })
     // Telemetry never carries content: no prompt, answer or tool text in any attribute.
     expect(JSON.stringify(events)).not.toMatch(/hello|ping|done"/u)
+  })
+
+  it('says what each event ran with: the release everywhere, and the endpoint of each model call (ADR 0107)', async () => {
+    const release = 'a'.repeat(40)
+    const env = {
+      VITE_GOBLIN_BUILD: release,
+      MODEL_BASE_URL: 'https://gateway.example.com/v1',
+      MODEL_ID: model.id,
+      MODEL_KEY: 'k',
+    }
+    const shared = await turn(
+      [call('echo', { text: 'ping' })],
+      'hello',
+      'op-1',
+      [],
+      ranWith(env, () => false),
+    )
+    for (const event of shared.events) expect(event.attributes[RunAttribute.agentVersion]).toBe(release)
+    for (const attempt of ofKind(shared.events, 'model.attempt'))
+      expect(attempt.attributes).toMatchObject({
+        [RunAttribute.modelEndpoint]: 'deployment',
+        [RunAttribute.serverAddress]: 'gateway.example.com',
+        [RunAttribute.serverPort]: 443,
+      })
+    for (const event of [...ofKind(shared.events, 'turn.submitted'), ...ofKind(shared.events, 'tool.call')])
+      expect(Object.keys(event.attributes)).not.toContain(RunAttribute.modelEndpoint)
+
+    const own = await turn(
+      [],
+      'hello',
+      'op-1',
+      [],
+      ranWith(env, () => true),
+    )
+    const [attempt] = ofKind(own.events, 'model.attempt')
+    expect(attempt?.attributes[RunAttribute.modelEndpoint]).toBe('owner')
+    // The owner's endpoint is theirs: neither its address nor the deployment's is recorded for it.
+    expect(Object.keys(attempt?.attributes ?? {})).not.toContain(RunAttribute.serverAddress)
+
+    const none = await turn(
+      [],
+      'hello',
+      'op-1',
+      [],
+      ranWith({}, () => false),
+    )
+    const [unset] = ofKind(none.events, 'model.attempt')
+    expect(unset?.attributes[RunAttribute.modelEndpoint]).toBe('none')
+    expect(Object.keys(unset?.attributes ?? {})).not.toContain(RunAttribute.agentVersion)
   })
 
   it('names the MCP server and tool of an mcp_call, and records its failure', async () => {
@@ -389,6 +451,54 @@ describe('run telemetry (unit)', () => {
       startedAt: 1,
       endedAt: 3,
       attributes: { [RunAttribute.recovery]: 'resumed' },
+    })
+  })
+
+  it('names the release on a recorded event and on one ended from its fallback, and records one whose stamp threw', () => {
+    const collected = new Collected()
+    const telemetry = new RunTelemetry(
+      [collected],
+      (id) => collected.read(id),
+      ranWith({ VITE_GOBLIN_BUILD: 'b1' }, () => false),
+    )
+    telemetry.record({ id: 'restart:1', kind: 'recovery', status: 'ok', startedAt: 1, endedAt: 1, attributes: {} })
+    telemetry.finish(
+      'turn:9',
+      { status: 'ok', endedAt: 3 },
+      { id: 'turn:9', kind: 'turn.submitted', startedAt: 2, attributes: {} },
+    )
+    expect(collected.read('restart:1')?.attributes[RunAttribute.agentVersion]).toBe('b1')
+    expect(collected.read('turn:9')?.attributes[RunAttribute.agentVersion]).toBe('b1')
+
+    const broken = new Collected()
+    const throwing = new RunTelemetry([broken], undefined, () => {
+      throw new Error('storage reset')
+    })
+    throwing.record({ id: 'restart:2', kind: 'recovery', status: 'ok', startedAt: 1, endedAt: 1, attributes: {} })
+    expect(broken.read('restart:2')?.status).toBe('ok')
+  })
+
+  it('keeps only closed values for what a model call ran with', () => {
+    expect(
+      boundAttributes({
+        [RunAttribute.modelEndpoint]: 'elsewhere',
+        [RunAttribute.reasoningLevel]: 'ludicrous',
+        [RunAttribute.serverAddress]: 'https://gateway.example.com/v1',
+        [RunAttribute.serverPort]: 70_000,
+      }),
+    ).toEqual({})
+    expect(
+      boundAttributes({
+        [RunAttribute.modelEndpoint]: 'owner',
+        [RunAttribute.reasoningLevel]: 'xhigh',
+        [RunAttribute.serverAddress]: 'gateway.example.com',
+        [RunAttribute.serverPort]: 8443,
+      }),
+    ).toEqual({
+      [RunAttribute.modelEndpoint]: 'owner',
+      [RunAttribute.reasoningLevel]: 'xhigh',
+      [RunAttribute.serverAddress]: 'gateway.example.com',
+      [RunAttribute.serverPort]: 8443,
     })
   })
 })

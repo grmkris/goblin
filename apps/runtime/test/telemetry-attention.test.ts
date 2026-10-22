@@ -39,7 +39,6 @@ describe('safe telemetry and attention', () => {
     const zero = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
     const failed = sanitizeAttributes(
       answerAttributes({
-        provider: 'goblin-litellm',
         model: 'm',
         stopReason: 'error',
         errorMessage: '402 Payment Required: send funds to 0x76C7.',

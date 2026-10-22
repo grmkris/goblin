@@ -33,6 +33,15 @@ const eventOf = (row: Row): RunEvent | undefined =>
       }
     : undefined
 
+/**
+ * Attributes only the deployment's own logs and traces keep (ADR 0107): its model endpoint's host and port. The ledger
+ * drops them, so inspection, which reads only the ledger, never answers them to an owner or a key.
+ */
+const OPERATOR_ONLY: ReadonlySet<string> = new Set([RunAttribute.serverAddress, RunAttribute.serverPort])
+
+const ledgerAttributes = (attributes: RunEvent['attributes']): RunEvent['attributes'] =>
+  Object.fromEntries(Object.entries(attributes).filter(([key]) => !OPERATOR_ONLY.has(key)))
+
 const rowOf = (event: RunEvent): Row => ({
   id: event.id,
   kind: event.kind,
@@ -42,7 +51,7 @@ const rowOf = (event: RunEvent): Row => ({
   taskId: event.taskId ?? null,
   startedAt: event.startedAt,
   endedAt: event.endedAt ?? null,
-  attributes: JSON.stringify(event.attributes),
+  attributes: JSON.stringify(ledgerAttributes(event.attributes)),
 })
 
 /** An attribute equals `value`: its JSON path quotes the key, whose dots are part of the name. */

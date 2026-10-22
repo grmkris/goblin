@@ -5,7 +5,6 @@ import { failureSummary, safeFailureCode } from './safety.ts'
 
 /** The parts of a model response telemetry reads; pi-ai's `AssistantMessage` has them. */
 export type Answer = {
-  readonly provider: string
   readonly model: string
   readonly responseModel?: string | undefined
   readonly responseId?: string | undefined
@@ -22,18 +21,28 @@ export type Answer = {
   }
 }
 
+/**
+ * The GenAI provider every model call names (ADR 0107): the conventions' flavour of the API, and every endpoint goblin
+ * calls speaks OpenAI's chat completions (`pi/model.ts`), whichever system serves it. Pi's own provider id
+ * (`goblin-litellm`, a routine run's) is goblin's routing, not a provider.
+ */
+export const GEN_AI_PROVIDER = 'openai'
+
 /** Whether goblin's model streams marked `message` with diagnostic `type` (`pi/model.ts`, ADR 0083). */
 const noted = (message: Answer, type: string): boolean =>
   message.diagnostics?.some((diagnostic) => diagnostic.type === type) === true
 
-/** What a response tells about its model call: model, finish reason, tokens, error. Never its content. */
+/**
+ * What a response tells about its model call: the model that answered, finish reason, tokens, error. Never its
+ * content, and never the model asked for, which the call's start knew (an endpoint answers a model it does not serve
+ * with its own default).
+ */
 export function answerAttributes(message: Answer): RunAttributes {
   const failure = 'provider_error'
   const { usage } = message
   return {
-    [RunAttribute.provider]: message.provider,
-    [RunAttribute.requestModel]: message.model,
-    ...(message.responseModel === undefined ? {} : { [RunAttribute.responseModel]: message.responseModel }),
+    [RunAttribute.provider]: GEN_AI_PROVIDER,
+    [RunAttribute.responseModel]: message.responseModel ?? message.model,
     ...(message.responseId === undefined ? {} : { [RunAttribute.responseId]: message.responseId }),
     [RunAttribute.finishReason]: message.stopReason,
     [RunAttribute.inputTokens]: usage.input,

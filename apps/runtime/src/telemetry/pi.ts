@@ -2,7 +2,7 @@ import { type CommitPublication, type Harness, type Session } from '@earendil-wo
 import { RunAttribute, type RunAttributes, type RunEvent, type RunEventKind } from '@goblin/contracts/telemetry'
 import { nowMillis } from '../clock.ts'
 import { BACKGROUND, type PiContext } from '../pi/context.ts'
-import { answerAttributes, failureAttributes, statusOfStop } from './attributes.ts'
+import { GEN_AI_PROVIDER, answerAttributes, failureAttributes, statusOfStop } from './attributes.ts'
 import { expectedFailure, failureSummary, safeFailureCode } from './safety.ts'
 import { MAX_FAILURE_LINES, type RunTelemetry, reportTelemetryFailure } from './events.ts'
 import { rehydrateTelemetry } from './rehydrate.ts'
@@ -93,6 +93,8 @@ const familyOf = (tool: string): string =>
 const sizeOf = (value: unknown): number => JSON.stringify(value ?? null).length
 
 type Assistant = NonNullable<ReturnType<typeof decodeAssistant>>
+/** A generation's checkpoint: in `request`, the model it asks for and the thinking level it asks at. */
+type Checkpoint = NonNullable<NonNullable<ReturnType<typeof decodeTask>>['state']['checkpoint']>
 type Outcome = NonNullable<NonNullable<ReturnType<typeof decodeTask>>['state']['outcome']>
 /** Where an entry or task sits: its id, its conversation and the Pi task it belongs to. */
 type Place = { readonly id: string; readonly conversation: string; readonly taskId: string }
@@ -384,7 +386,7 @@ export class PiRunRecorder {
         ...this.#scope(place.conversation, place.taskId),
         // Pi stamps a response just before its request goes out.
         startedAt: message.timestamp,
-        attributes: { [RunAttribute.operation]: 'chat' },
+        attributes: { [RunAttribute.operation]: 'chat', [RunAttribute.requestModel]: message.model },
       },
     )
   }
@@ -439,7 +441,7 @@ export class PiRunRecorder {
     if (task.kind === 'pi.generation') {
       const checkpoint = state.checkpoint
       if (state.status !== 'running' || checkpoint?.phase !== 'request' || checkpoint.attempt === undefined) return
-      this.#attemptStarted({ id: String(seq), conversation, taskId }, checkpoint.attempt, checkpoint.model, now)
+      this.#attemptStarted({ id: String(seq), conversation, taskId }, checkpoint.attempt, checkpoint, now)
     } else if (task.kind === 'pi.tool') {
       this.#toolStarted(conversation, taskId, task.input, now)
     } else if (task.kind === 'pi.compaction') {
@@ -484,13 +486,12 @@ export class PiRunRecorder {
     })
   }
 
-  /** A generation entered `request`: an attempt starts. `place.id` is the commit sequence, unique per start. */
-  #attemptStarted(
-    place: Place,
-    attempt: number,
-    model: { readonly provider: string; readonly modelId: string } | undefined,
-    now: number,
-  ): void {
+  /**
+   * A generation entered `request`: an attempt starts, with the model it asks for and the thinking level Pi sends it
+   * at (ADR 0107). `place.id` is the commit sequence, unique per start.
+   */
+  #attemptStarted(place: Place, attempt: number, checkpoint: Checkpoint, now: number): void {
+    const { model, thinkingLevel } = checkpoint
     const { taskId, conversation } = place
     const open = this.#attempts.get(taskId)
     if (open?.attempt === attempt && this.#telemetry.isOpen(open.id)) return
@@ -510,9 +511,9 @@ export class PiRunRecorder {
       attributes: {
         [RunAttribute.operation]: 'chat',
         [RunAttribute.attempt]: attempt,
-        ...(model === undefined
-          ? {}
-          : { [RunAttribute.provider]: model.provider, [RunAttribute.requestModel]: model.modelId }),
+        [RunAttribute.provider]: GEN_AI_PROVIDER,
+        ...(model === undefined ? {} : { [RunAttribute.requestModel]: model.modelId }),
+        ...(thinkingLevel === undefined ? {} : { [RunAttribute.reasoningLevel]: thinkingLevel }),
       },
     })
   }

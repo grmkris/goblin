@@ -27,6 +27,26 @@ const turn: RunEvent = {
 }
 
 describe('run ledger reads', () => {
+  it("never keeps the deployment endpoint's host, so no inspection answers it (ADR 0107)", () => {
+    const { ledger } = fixture()
+    const attempt: RunEvent = {
+      id: 'model:t1:1:9',
+      kind: 'model.attempt',
+      status: 'ok',
+      operationId: 'op-1',
+      taskId: 't1',
+      startedAt: 100,
+      endedAt: 120,
+      attributes: {
+        [RunAttribute.modelEndpoint]: 'deployment',
+        [RunAttribute.serverAddress]: 'gateway.example.com',
+        [RunAttribute.serverPort]: 443,
+      },
+    }
+    ledger.ended(attempt)
+    expect(ledger.read(attempt.id)?.attributes).toEqual({ [RunAttribute.modelEndpoint]: 'deployment' })
+  })
+
   it('skips and counts a row whose kind this build does not know, and reads the rest', () => {
     const { db, ledger } = fixture()
     ledger.ended(turn)

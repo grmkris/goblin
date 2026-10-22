@@ -111,6 +111,25 @@ const FINISH_REASONS = new Set(['stop', 'toolUse', 'length', 'error', 'aborted']
 const finiteText = (value: unknown, values: ReadonlySet<string>, fallback: string): string =>
   typeof value === 'string' && values.has(value) ? value : fallback
 
+/** A value of a closed set, or nothing: what a model call ran with is never guessed (ADR 0107). */
+const oneOf =
+  (values: ReadonlySet<string>) =>
+  (value: unknown): boolean =>
+    typeof value === 'string' && values.has(value)
+const MODEL_ENDPOINTS = new Set(['deployment', 'owner', 'none'])
+/** Pi's thinking levels (pi-ai `MODEL_THINKING_LEVELS`) and goblin's `max` (`models.ts`). */
+const REASONING_LEVELS = new Set(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+/** A host as `URL` parses it, lowercase; an IPv6 literal is dropped. */
+const HOSTNAME = /^[a-z0-9][a-z0-9.-]{0,252}$/u
+const PORT = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 65_535 }))
+/** What a model call ran with keeps only a value of its closed set or shape (ADR 0107). */
+const RAN_WITH_VALUES: Readonly<Record<string, (value: unknown) => boolean>> = {
+  [RunAttribute.modelEndpoint]: oneOf(MODEL_ENDPOINTS),
+  [RunAttribute.reasoningLevel]: oneOf(REASONING_LEVELS),
+  [RunAttribute.serverAddress]: (value) => typeof value === 'string' && HOSTNAME.test(value),
+  [RunAttribute.serverPort]: Schema.is(PORT),
+}
+
 const ORIGINS = Schema.Literals(['owner', 'client', 'source', 'agent', 'routine', 'system'])
 const COUNT = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 /** Flow attributes keep only a value of their closed set or id shape; anything else is dropped, never coerced. */
@@ -136,7 +155,7 @@ const scalarMetadata = (value: RunAttributes[string]): RunAttributes[string] | u
 }
 
 function safeAttribute(key: string, value: RunAttributes[string], attributes: RunAttributes) {
-  const flowValue = FLOW_VALUES[key]
+  const flowValue = FLOW_VALUES[key] ?? RAN_WITH_VALUES[key]
   if (flowValue !== undefined) return flowValue(value) ? value : undefined
   switch (key) {
     case RunAttribute.errorType:

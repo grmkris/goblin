@@ -68,6 +68,7 @@ const Task = Schema.Struct({
         phase: Schema.optional(Schema.String),
         attempt: Schema.optional(Schema.Number),
         model: Schema.optional(Schema.Struct({ provider: Schema.String, modelId: Schema.String })),
+        thinkingLevel: Schema.optional(Schema.String),
       }),
     ),
     outcome: Schema.optional(Outcome),

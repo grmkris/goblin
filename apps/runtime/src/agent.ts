@@ -114,7 +114,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       ...appPorts(this.#bridge),
     })
     this.#apps = apps
-    this.#telemetry = agentTelemetry(ctx.storage, () => this.name, run)
+    this.#telemetry = agentTelemetry(ctx.storage, () => this.name, run, env)
     // Without Dynamic Workers (ADR 0064) the agent is given no app or `code_run` tools: nothing could run them.
     const appsRun = env.LOADER !== undefined
     const execution = [

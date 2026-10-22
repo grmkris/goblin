@@ -4,6 +4,7 @@ import {
   RunAttribute,
   type RunAttributes,
   type RunEvent,
+  type RunEventKind,
   type RunEventStatus,
 } from '@goblin/contracts/telemetry'
 import * as Option from 'effect/Option'
@@ -144,21 +145,30 @@ export function flowOf(event: RunEvent): FlowEvent | undefined {
   )
 }
 
+/** What every new event of a kind says it ran with (ADR 0107): the release, and a model call's endpoint. */
+export type RunStamp = (kind: RunEventKind) => RunAttributes
+
 /**
  * The run events of one agent, fanned out to its sinks. Recording never throws: a failing sink is logged and the
  * caller (a Pi commit listener, a submission, a log site) carries on. An event that started is ended by id, also
- * after a restart, when `recall` finds it in the ledger.
+ * after a restart, when `recall` finds it in the ledger. Each new event starts with what `stamp` says it ran with.
  */
 export class RunTelemetry {
   readonly #sinks: readonly RunSink[]
   readonly #recall: (id: string) => RunEvent | undefined
+  readonly #stamp: RunStamp
   readonly #open = new Map<string, RunEvent>()
   #failures = 0
   #sequence = 0
 
-  constructor(sinks: readonly RunSink[], recall: (id: string) => RunEvent | undefined = () => undefined) {
+  constructor(
+    sinks: readonly RunSink[],
+    recall: (id: string) => RunEvent | undefined = () => undefined,
+    stamp: RunStamp = () => ({}),
+  ) {
     this.#sinks = sinks
     this.#recall = recall
+    this.#stamp = stamp
   }
 
   /** A new id for an event that has none of its own (a model call outside a turn, an MCP step). */
@@ -177,7 +187,7 @@ export class RunTelemetry {
 
   /** Record that `event` started; its status is `started` whatever it says. */
   begin(event: Omit<RunEvent, 'status' | 'endedAt'>): void {
-    const started: RunEvent = { ...event, status: 'started', attributes: boundAttributes(event.attributes) }
+    const started: RunEvent = { ...this.#stamped(event), status: 'started' }
     this.#open.set(started.id, started)
     if (this.#open.size > MAX_OPEN) this.#open.delete(this.#open.keys().next().value ?? started.id)
     this.#each((sink) => sink.started(started))
@@ -203,7 +213,7 @@ export class RunTelemetry {
    */
   finish(id: string, end: RunEnd, fallback?: Omit<RunEvent, 'status' | 'endedAt'>): void {
     const known = this.#open.get(id) ?? this.#recallSafely(id)
-    const base = known ?? fallback
+    const base = known ?? (fallback === undefined ? undefined : this.#stamped(fallback))
     this.#open.delete(id)
     if (base === undefined) return
     const resumed = known?.status === 'interrupted' ? { [RunAttribute.recovery]: 'resumed' } : {}
@@ -218,8 +228,19 @@ export class RunTelemetry {
 
   /** Record an event that is already over, or that has no duration. */
   record(event: RunEvent): void {
-    const ended: RunEvent = { ...event, attributes: boundAttributes(event.attributes) }
+    const ended: RunEvent = this.#stamped(event)
     this.#each((sink) => sink.ended(ended))
+  }
+
+  /** A new event with what it ran with first, then its own attributes, bounded. */
+  #stamped<E extends Omit<RunEvent, 'status' | 'endedAt'>>(event: E): E {
+    let ranWith: RunAttributes = {}
+    try {
+      ranWith = this.#stamp(event.kind)
+    } catch (error) {
+      if (this.#reportable()) reportTelemetryFailure('stamp', error)
+    }
+    return { ...event, attributes: boundAttributes({ ...ranWith, ...event.attributes }) }
   }
 
   #recallSafely(id: string): RunEvent | undefined {

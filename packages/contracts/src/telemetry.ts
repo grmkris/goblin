@@ -45,20 +45,32 @@ export const RunEvent = Schema.Struct({
 export type RunEvent = typeof RunEvent.Type
 
 /**
- * Attribute names. `gen_ai.*` follow the OpenTelemetry GenAI semantic conventions, so a trace or log tool that knows
- * them reads goblin's too; `error.type` is OpenTelemetry's general one; `goblin.*` are goblin's own.
+ * Attribute names. `gen_ai.*` and `mcp.*` follow the OpenTelemetry GenAI and MCP semantic conventions, so a trace or
+ * log tool that knows them reads goblin's too; `error.type` and `server.*` are OpenTelemetry's general ones; `goblin.*`
+ * are goblin's own.
  */
 export const RunAttribute = {
   operation: 'gen_ai.operation.name',
+  /** `openai`: the API every endpoint goblin calls speaks, whichever system serves it (ADR 0107). */
   provider: 'gen_ai.provider.name',
+  /** The release every event ran on: its commit (ADR 0107). */
+  agentVersion: 'gen_ai.agent.version',
+  /** The model a call asked for; `responseModel` the one that answered it. */
   requestModel: 'gen_ai.request.model',
   responseModel: 'gen_ai.response.model',
+  /** The thinking level goblin asked Pi for (ADRs 0083, 0100), Pi's name for it. */
+  reasoningLevel: 'gen_ai.request.reasoning.level',
+  /** Which endpoint a model call went to: `deployment`, `owner` (ADR 0059) or `none`. */
+  modelEndpoint: 'goblin.model.endpoint',
+  /** The deployment endpoint's host and port, for its own logs: inspection never answers them (ADR 0107). */
+  serverAddress: 'server.address',
+  serverPort: 'server.port',
   responseId: 'gen_ai.response.id',
   finishReason: 'gen_ai.response.finish_reasons',
   inputTokens: 'gen_ai.usage.input_tokens',
   outputTokens: 'gen_ai.usage.output_tokens',
   cacheReadTokens: 'gen_ai.usage.cache_read.input_tokens',
-  cacheWriteTokens: 'gen_ai.usage.cache_creation.input_tokens',
+  cacheWriteTokens: 'gen_ai.usage.cache_write.input_tokens',
   reasoningTokens: 'gen_ai.usage.reasoning.output_tokens',
   toolName: 'gen_ai.tool.name',
   toolCallId: 'gen_ai.tool.call.id',

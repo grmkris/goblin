@@ -13,13 +13,20 @@ a run. The ledger supplies exact submission/task correlation when a cache entry 
   prefix (`source-`, `routine-input:`, `subagent:`, `persona:`, …; anything else is `direct`, the owner or an MCP
   client). An unanswered turn keeps Pi's reason.
 - **Model attempt:** a generation task entering `request`, ended by the assistant entry it appends (or the task's
-  fault): model, finish reason, input, output, cache and reasoning tokens, fixed error summaries, cutoff and
-  empty-answer markers. The first committed partial
+  fault): the model it asked for (`gen_ai.request.model`) and the one that answered (`gen_ai.response.model`), the
+  thinking level it asked at (`gen_ai.request.reasoning.level`), finish reason, input, output, cache and reasoning
+  tokens, fixed error summaries, cutoff and empty-answer markers. The first committed partial
   marks the first chunk; Pi commits partials at most every ~100 ms. A retried attempt is a new event.
 - **Tool call:** a tool task, ended by its result entry: name, family (`mcp`, `app`, `subagent`, `memory`,
   `builtin`), argument and result sizes, the MCP server and tool of an `mcp_call`, and `blocked`, `interrupted` or
   `error` with the first diagnostic. A call to a tool that is not there is one event, from the generation.
 - **Compaction** tasks, and any other task that faults or is orphaned (a subagent relay, an anchor).
+
+Every event also says what it ran with (ADR 0107, `telemetry/ran-with.ts`, stamped by `RunTelemetry`): the release's
+commit (`gen_ai.agent.version`, from `VITE_GOBLIN_BUILD`), and on a model call (`model.attempt`, `model.aux`) the
+endpoint it went to, `goblin.model.endpoint` `deployment`, `owner` or `none`, read as `Inference` chooses it. Only the
+deployment's endpoint names its host and port (`server.address`, `server.port`), and only in the logs and traces:
+the ledger drops them, so inspection never answers them. `gen_ai.provider.name` is `openai`, the API every endpoint speaks.
 
 Outside Pi, the agent's services report to the same telemetry (`telemetry/report.ts`):
 

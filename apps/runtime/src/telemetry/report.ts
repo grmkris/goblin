@@ -33,7 +33,13 @@ function recordAux(telemetry: RunTelemetry, purpose: AuxPurpose, call: AuxCall):
     status: outcome.status,
     startedAt: call.startedAt,
     endedAt,
-    attributes: { [RunAttribute.operation]: 'chat', [RunAttribute.purpose]: purpose, ...outcome.attributes },
+    attributes: {
+      [RunAttribute.operation]: 'chat',
+      [RunAttribute.purpose]: purpose,
+      // A call outside a turn has no start of its own: the model that answered is the best it knows of the one asked.
+      ...(call.message === undefined ? {} : { [RunAttribute.requestModel]: call.message.model }),
+      ...outcome.attributes,
+    },
   })
 }
 
