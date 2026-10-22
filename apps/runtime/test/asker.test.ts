@@ -28,6 +28,9 @@ const REQUESTS = new Map<number, string | undefined>([
   [6, undefined],
   [7, 'op-admin'],
   [8, 'op-key'],
+  [9, 'persona:z:1'],
+  [10, 'persona-resume:op-reply:12'],
+  [11, 'persona:persona:z:1:1'],
 ])
 
 /** Who admitted each operation, as the chat's receipts say. */
@@ -37,6 +40,11 @@ const RECEIPTS: readonly (readonly [string, ReceiptInput])[] = [
   ['op-member', { kind: 'send', origin: 'owner', role: 'member' }],
   ['op-key', { kind: 'send', origin: 'owner' }],
   ['op-tag', { kind: 'persona_ask', origin: 'owner', role: 'member' }],
+  // A member's own message whose client chose an id shaped like a Persona turn's.
+  ['persona:z:1', { kind: 'send', origin: 'owner', role: 'member' }],
+  ['persona:persona:z:1:1', { kind: 'send', origin: 'owner', role: 'member' }],
+  // A member's reply to a Persona's hold, which resumes its fork (`resumePersona`).
+  ['op-reply', { kind: 'persona_reply', origin: 'owner', role: 'member' }],
   ['source-src_1-m1', { kind: 'source', origin: 'source' }],
   ['routine-input:rr_1:1', { kind: 'routine_input', origin: 'routine' }],
 ]
@@ -105,6 +113,21 @@ describe("a member's turn (unit, ADR 0099)", () => {
       expect(yield* asked(4)).toBe(false)
       expect(yield* asked(8)).toBe(false)
       expect(yield* asked(3, 4, 8, 1)).toBe(false)
+    }),
+  )
+
+  it.effect("is one when a member's client chose an operation id shaped like a Persona turn's", () =>
+    Effect.gen(function* () {
+      expect(yield* asked(9)).toBe(true)
+      expect(yield* asked(1, 9)).toBe(true)
+      // Unwrapping takes one level only; the id as admitted is what finds a nested one.
+      expect(yield* asked(11)).toBe(true)
+    }),
+  )
+
+  it.effect("makes a resumed Persona's turn the turn of whoever replied to its hold", () =>
+    Effect.gen(function* () {
+      expect(yield* asked(10)).toBe(true)
     }),
   )
 

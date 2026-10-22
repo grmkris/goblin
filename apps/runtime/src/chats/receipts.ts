@@ -17,6 +17,7 @@ export const OPERATION_KINDS = [
   'ask_client',
   'source',
   'persona_ask',
+  'persona_reply',
   'start',
   'reply',
   'empty',

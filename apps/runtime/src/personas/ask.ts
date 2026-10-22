@@ -169,6 +169,8 @@ export const resumePersona = Effect.fn('personas.resume')(function* (fork: strin
   const found = Option.getOrUndefined(yield* chats.personaFork(fork))
   if (found === undefined) return yield* new NotFound({ what: 'persona fork' })
   yield* (yield* Conversations).requireActing(fork)
+  // The reply's receipt keeps who sent it, so the resumed fork's tools tell a member's reply (ADR 0099).
+  yield* (yield* ChatOperations).record(found.parent, operationId, { kind: 'persona_reply', origin: 'owner' })
   const persona = yield* frozenAt(found.persona, found.revision, yield* chats.topicOf(found.parent))
   const invocations = yield* Invocations
   const asked = { operationId, persona: persona.id, revision: persona.revision, chat: found.parent, order: 0 }

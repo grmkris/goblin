@@ -57,5 +57,10 @@ not the submission whose run it serves. The spike checks whether Pi's run for th
 - `requireAdminTurn` refuses with `Forbidden` (`role`) and `adminOnly` gives the model the words. `test/asker.test.ts`
   pins the tools, and the workerd members case refuses a member's `persona_create`, `app_build` and `app_rollback` and
   makes the owner's Persona.
-- Not covered: a member's reply to a Persona's hold (`POST /api/personas/reply`) admits no receipt, so the resumed fork,
-  which keeps `app_build` and `app_rollback`, does not see it as a member's turn.
+- A tool looks up both a run input's request id as admitted and the operation it names, so a member's client that
+  chooses an id shaped like a Persona turn's (`persona:<x>:<n>`) is still found by its own receipt. A member's reply to
+  a Persona's hold records a `persona_reply` receipt (`resumePersona`), so the resumed fork sees the replier's turn.
+- Not covered yet: input derived from a member's turn (a helper's synthesized report, an admin's approval of a
+  member's held call) carries no member mark of its own; the role is recorded, not an OAuth client's consented scopes,
+  so a client with only `goblin:agent` can still have the agent change a setup on an admin's turn; and a server key's
+  work counts as an admin's, so its Persona forks keep `app_build` and `app_rollback`.

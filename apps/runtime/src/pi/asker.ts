@@ -41,7 +41,11 @@ export const memberAmong = (inputs: readonly SubmissionId[], context: PiContext)
     const pi = yield* PiSessions.use((sessions) => fromPi(sessions.pi))
     const requests = yield* attempt(async () => {
       const records = await Promise.all(inputs.map(async (id) => (await pi.submission(id, context))?.status(context)))
-      return records.flatMap((record) => (record?.requestId === undefined ? [] : [inputOperation(record.requestId)]))
+      // The request id as admitted and the operation it names: a member's client may choose an id shaped like a
+      // Persona turn's, and its own receipt is the one that marks it.
+      return records.flatMap((record) =>
+        record?.requestId === undefined ? [] : [...new Set([record.requestId, inputOperation(record.requestId)])],
+      )
     })
     const db = yield* Db
     return yield* attemptSync(() => askedByMember(db, requests))

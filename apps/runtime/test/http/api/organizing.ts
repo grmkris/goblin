@@ -3,7 +3,7 @@ import type { FlowEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
-import { Chats, Conversations } from '../../../src/chats/service.ts'
+import { ChatOperations, Chats, Conversations } from '../../../src/chats/service.ts'
 import { RoutineControl, RoutineRuns } from '../../../src/routines/service.ts'
 import { AgentInput } from '../../../src/runtime/input.ts'
 import { PiSessions } from '../../../src/pi/sessions.ts'
@@ -119,6 +119,8 @@ export const organizing = () => {
             personaFork: () => Effect.succeed(Option.none()),
             topicOf: (chat) => Effect.succeed(topics.list().find((topic) => topic.conversation === chat)?.id ?? 1),
           }),
+          // A reply to a hold finds no fork here, so it records no receipt.
+          stub(ChatOperations),
           // What API keys made (ADR 0081), on the same SQLite.
           sqliteDb(db),
           stub(PiSessions),
