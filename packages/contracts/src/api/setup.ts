@@ -1,6 +1,7 @@
 import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { SetupCatalog } from '../setup.ts'
+import { EndpointScope } from './scope.ts'
 
 /**
  * What a Topic's or a Persona's setup can be chosen from (ADR 0040). Paths are relative to the API's `/api` prefix.
@@ -9,5 +10,5 @@ import { SetupCatalog } from '../setup.ts'
  *   on with the skills each lists now, and the agent's apps.
  */
 export class SetupGroup extends HttpApiGroup.make('setup').add(
-  HttpApiEndpoint.get('catalog', '/setup/catalog', { success: SetupCatalog }),
+  HttpApiEndpoint.get('catalog', '/setup/catalog', { success: SetupCatalog }).annotate(EndpointScope, 'setup'),
 ) {}

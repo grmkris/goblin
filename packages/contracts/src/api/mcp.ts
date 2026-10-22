@@ -36,6 +36,7 @@ import {
 import { ApiErrors } from './errors.ts'
 import { GrantsResident } from './resident.ts'
 import { EndpointRole } from './role.ts'
+import { EndpointScope } from './scope.ts'
 
 /** A connection's id in a path; anything else names no connection (404). */
 const ConnectionParam = Schema.String.check(Schema.isPattern(/^[\w-]{1,64}$/u))
@@ -65,7 +66,10 @@ const REMOTE = [ApiErrors.upstream, ApiErrors.upstreamTimeout, ApiErrors.conflic
  * authority.
  */
 export class McpGroup extends HttpApiGroup.make('mcp').add(
-  HttpApiEndpoint.get('servers', '/mcp/servers', { success: Schema.Array(ServerView) }),
+  HttpApiEndpoint.get('servers', '/mcp/servers', { success: Schema.Array(ServerView) }).annotate(
+    EndpointScope,
+    'setup',
+  ),
   HttpApiEndpoint.post('addServer', '/mcp/servers', {
     payload: AddServer,
     success: ServerView.pipe(HttpApiSchema.status(201)),

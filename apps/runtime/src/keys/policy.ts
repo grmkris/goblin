@@ -40,6 +40,20 @@ export const requestKey: Effect.Effect<KeyGrant | undefined> = Effect.map(reques
 )
 
 /**
+ * A change to what the agent works with (ADR 0098), here a Topic's guidance or setup: it takes an owner or an admin, so
+ * a member's request, from their browser or a client acting for them, is `Forbidden` `role`. A key's passes, its own
+ * policy bounding it, and so does anything else no member sent.
+ */
+export const requireAdminFor = (configures: boolean): Effect.Effect<void, Forbidden> =>
+  configures
+    ? Effect.flatMap(Effect.serviceOption(RequestContext), (context) =>
+        Option.getOrUndefined(context)?.member?.role === 'member'
+          ? Effect.fail(new Forbidden({ reason: 'role' }))
+          : Effect.void,
+      )
+    : Effect.void
+
+/**
  * Where a request's flow comes from (ADR 0037): a caller's (ADR 0086: an OAuth client or a server's key) is an MCP
  * client's, anyone else's the owner's in the app.
  */

@@ -29,6 +29,7 @@ import { saveRoutineMutation } from '../routines/queries.ts'
 import { EditorPart } from './editor-part.tsx'
 import { type HandKind, HandToFields, TellMeFields, WhereField } from './routine-hand.tsx'
 import { type EventChoice, type Kind, WhenFields, eventOf, triggerFrom } from './routine-when.tsx'
+import { useConfigures } from '../lib/current-workspace.ts'
 
 type Tool = { readonly connectionId: string; readonly name: string }
 
@@ -177,6 +178,7 @@ function useRoutineEditor({ timezone, routine, draft, topic, onSaved }: EditorPr
 
 /** Saving creates a proposed revision; the separate review is the only activation control. */
 export function RoutineEditor(props: EditorProps) {
+  const configures = useConfigures()
   const kit = useRoutineEditor(props)
   const { id, initial } = kit.when
   return (
@@ -206,8 +208,11 @@ export function RoutineEditor(props: EditorProps) {
               <AlertDescription>{kit.error}</AlertDescription>
             </Alert>
           )}
+          {!configures && (
+            <p className="text-sm text-muted-foreground">Only the workspace's owners and admins change routines.</p>
+          )}
           <div className="card-actions">
-            <Button type="submit" pending={kit.pending}>
+            <Button type="submit" pending={kit.pending} disabled={!configures}>
               Save for review
             </Button>
             {props.onCancel && (

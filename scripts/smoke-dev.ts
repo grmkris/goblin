@@ -94,7 +94,7 @@ class InboundClient {
       response_type: 'code',
       client_id: this.clientId,
       redirect_uri: REDIRECT_URI,
-      scope: 'openid offline_access goblin:inspect',
+      scope: 'openid offline_access goblin:agent goblin:inspect goblin:transcripts',
       state: base64url(randomBytes(16)),
       code_challenge: challenge,
       code_challenge_method: 'S256',
@@ -386,7 +386,8 @@ async function inboundChecks(dev: DevClient, client: InboundClient, servers: rea
   const names = objects(listed.result?.['tools'] ?? []).map((tool) => tool['name'])
   if (init.result === undefined || !names.includes('ask_agent') || !names.includes('get_recent_messages'))
     throw new Error('inbound_tools_missing')
-  // Consent granted `goblin:inspect`, so the same /mcp offers read-only inspection (ADR 0024). It reads without a model.
+  // Consent granted `goblin:inspect` and `goblin:transcripts`, so the same /mcp offers read-only inspection (ADRs 0024,
+  // 0098). It reads without a model.
   const inspection = names.filter((name) => typeof name === 'string' && name.startsWith('inspect_'))
   const problems = inspection.length === 7 ? await client.tool('inspect_problems', {}) : {}
   if (!Array.isArray(problems['problems'])) throw new Error('inbound_inspection_missing')

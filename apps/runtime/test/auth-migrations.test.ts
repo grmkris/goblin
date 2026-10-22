@@ -18,10 +18,14 @@ const SCOPES = [
   'profile',
   'email',
   'offline_access',
+  'goblin:agent',
   'goblin:topics',
   'goblin:conversations',
   'goblin:personas',
   'goblin:inspect',
+  'goblin:transcripts',
+  'goblin:setup',
+  'goblin:routines',
 ]
 const databases: DatabaseSync[] = []
 afterEach(() => {
@@ -137,7 +141,13 @@ const registration = (auth: ReturnType<typeof createAuth>, changes: Record<strin
 
 describe('auth D1 baseline', () => {
   it('contains exactly the configured Better Auth schema, including columns, indexes and foreign keys', async () => {
-    expect(migrations).toEqual(['0000_baseline.sql', '0001_api_keys.sql', '0002_workspaces.sql', '0003_mcp_reach.sql'])
+    expect(migrations).toEqual([
+      '0000_baseline.sql',
+      '0001_api_keys.sql',
+      '0002_workspaces.sql',
+      '0003_mcp_reach.sql',
+      '0004_mcp_powers.sql',
+    ])
     const { db, auth } = fixture()
     await auth.$context
     const schema = getSchema(auth.options)
@@ -264,6 +274,18 @@ describe('auth D1 baseline', () => {
     expect(db.prepare('SELECT COUNT(*) AS count FROM mcpReachWorkspace').get()).toEqual({ count: 0 })
     db.exec(`DELETE FROM oauthClient WHERE clientId = 'client-1'`)
     expect(db.prepare('SELECT COUNT(*) AS count FROM mcpReach').get()).toEqual({ count: 0 })
+  })
+
+  it('gives every client registered before the switches the whole scope list it may ask for (ADR 0098)', () => {
+    const db = new DatabaseSync(':memory:')
+    databases.push(db)
+    const powers = '0004_mcp_powers.sql'
+    for (const name of migrations.slice(0, migrations.indexOf(powers))) db.exec(readFileSync(join(DIR, name), 'utf8'))
+    db.exec(
+      `INSERT INTO oauthClient (id, clientId, redirectUris, scopes) VALUES ('c1', 'client-1', '[]', '["openid"]')`,
+    )
+    db.exec(readFileSync(join(DIR, powers), 'utf8'))
+    expect(JSON.parse(String(db.prepare('SELECT scopes FROM oauthClient').get()?.['scopes']))).toEqual(SCOPES)
   })
 
   it('registers current clients for one /mcp resource with inspection available and no pre-granted consent', async () => {

@@ -1,10 +1,22 @@
 /**
- * The scopes the owner turns on one by one on the consent page (ADRs 0024, 0086), in the order it offers them: what
- * the app may manage, then reading conversations and runs. Every other scope a client asks for (sign-in, a refresh
- * token) comes with Allow.
+ * The scopes the person turns on one by one on the consent page (ADRs 0024, 0086, 0098), in the order it offers them:
+ * asking the agent, what the app may manage, reading runs and conversations, then what setups use and routines. Every
+ * other scope a client asks for (sign-in, a refresh token) comes with Allow.
  */
-export const OPTIONAL_SCOPES = ['goblin:topics', 'goblin:conversations', 'goblin:personas', 'goblin:inspect'] as const
+export const OPTIONAL_SCOPES = [
+  'goblin:agent',
+  'goblin:topics',
+  'goblin:conversations',
+  'goblin:personas',
+  'goblin:inspect',
+  'goblin:transcripts',
+  'goblin:setup',
+  'goblin:routines',
+] as const
 export type OptionalScope = (typeof OPTIONAL_SCOPES)[number]
+
+/** The opt-in scopes that start on: asking the agent, which every client had before it was a switch. */
+export const STARTS_ON: readonly OptionalScope[] = ['goblin:agent']
 
 /** The scopes a client asked for, from the consent page's `scope` parameter. */
 export const requestedScopes = (scope: string | null): readonly string[] =>

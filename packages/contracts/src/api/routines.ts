@@ -15,6 +15,7 @@ import {
 } from '../routines.ts'
 import { ApiErrors } from './errors.ts'
 import { EndpointRole } from './role.ts'
+import { EndpointScope } from './scope.ts'
 
 /** A routine's id in a path: `rt_` and up to 100 word characters or dashes. */
 const RoutineParam = Schema.String.check(Schema.isPattern(/^rt_[\w-]{1,100}$/u))
@@ -37,12 +38,14 @@ const params = { id: RoutineParam }
  * - `runs`: `GET /api/routines/:id/runs`, its newest runs.
  */
 export class RoutinesGroup extends HttpApiGroup.make('routines').add(
-  HttpApiEndpoint.get('list', '/routines', { success: RoutinePage }),
+  HttpApiEndpoint.get('list', '/routines', { success: RoutinePage }).annotate(EndpointScope, 'routines'),
   HttpApiEndpoint.post('propose', '/routines', {
     payload: RoutineProposal,
     success: RoutineView.pipe(HttpApiSchema.status(201)),
     error: [ApiErrors.conflict, ApiErrors.invalidInput],
-  }),
+  })
+    .annotate(EndpointScope, 'routines')
+    .annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.get('settings', '/routines/settings', { success: RoutineSettings }),
   HttpApiEndpoint.put('updateSettings', '/routines/settings', {
     payload: RoutineSettings,
@@ -54,13 +57,17 @@ export class RoutinesGroup extends HttpApiGroup.make('routines').add(
     payload: RoutineEdit,
     success: RoutineView,
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput],
-  }),
+  })
+    .annotate(EndpointScope, 'routines')
+    .annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.delete('archive', '/routines/:id', {
     params,
     payload: RoutineRevision,
     success: RoutineView,
     error: [ApiErrors.notFound, ApiErrors.conflict],
-  }),
+  })
+    .annotate(EndpointScope, 'routines')
+    .annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.post('confirm', '/routines/:id/confirm', {
     params,
     payload: RoutineRevision,
@@ -78,16 +85,18 @@ export class RoutinesGroup extends HttpApiGroup.make('routines').add(
     payload: RoutineRevision,
     success: RoutineView,
     error: [ApiErrors.notFound, ApiErrors.conflict],
-  }),
+  })
+    .annotate(EndpointScope, 'routines')
+    .annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.post('run', '/routines/:id/run', {
     params,
     payload: RoutineManualRun,
     success: RoutineRunView.pipe(HttpApiSchema.status(202)),
     error: [ApiErrors.notFound, ApiErrors.conflict],
-  }),
+  }).annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.get('runs', '/routines/:id/runs', {
     params,
     success: RoutineRunPage,
     error: [ApiErrors.notFound],
-  }),
+  }).annotate(EndpointScope, 'routines'),
 ) {}

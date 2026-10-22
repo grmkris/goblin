@@ -15,6 +15,7 @@ import {
 import { type CallerScope, type WorkspaceView } from '@goblin/contracts'
 import { McpServer } from '@modelcontextprotocol/server'
 import * as Schema from 'effect/Schema'
+import { routineTools, setupTools } from './config-tools.ts'
 import { flowTools, runTools, transcriptTools } from './inspect-tools.ts'
 import {
   type Add,
@@ -428,5 +429,7 @@ export const mcpServer = (scopes: readonly CallerScope[], call: OwnerCaller, rea
   transcriptTools(server, add, reply)
   runTools(server, add, reply)
   flowTools(server, add, reply)
+  setupTools(server, add, reply)
+  routineTools(server, add, reply)
   return server
 }

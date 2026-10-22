@@ -9,7 +9,7 @@ const APP = 'https://goblin.test'
 const REDIRECT = 'http://127.0.0.1:9/callback'
 const RESOURCE = `${APP}/mcp`
 const SIGN_IN_SCOPES = 'openid profile email offline_access'
-const ALL_SCOPES = `${SIGN_IN_SCOPES} goblin:topics goblin:conversations goblin:personas goblin:inspect`
+const ALL_SCOPES = `${SIGN_IN_SCOPES} goblin:agent goblin:topics goblin:conversations goblin:personas goblin:inspect goblin:transcripts goblin:setup goblin:routines`
 const Registered = Schema.Struct({ client_id: Schema.String })
 const Tokens = Schema.Struct({ access_token: Schema.String, refresh_token: Schema.optional(Schema.String) })
 const Redirect = Schema.Struct({ url: Schema.optional(Schema.String), redirect_uri: Schema.optional(Schema.String) })
@@ -240,8 +240,8 @@ export async function inspectAuthCase(base: string) {
   const owner = await person(base)
   const clientId = await register(base, owner)
 
-  // Connected for sign-in scopes only, as every client was before inspection joined /mcp: ask, but not inspect.
-  const asking = await authorize(base, owner, clientId, { scope: SIGN_IN_SCOPES })
+  // Connected for sign-in scopes and asking the agent: ask, but not inspect (every power is its own switch, ADR 0098).
+  const asking = await authorize(base, owner, clientId, { scope: `${SIGN_IN_SCOPES} goblin:agent` })
   expect(asking.asked).toBe(true)
   expect([...(await toolsOf(base, asking.access))].toSorted()).toEqual([
     'ask_agent',
@@ -291,7 +291,7 @@ export async function inspectAuthCase(base: string) {
   const narrowed = await authorize(base, owner, clientId, {
     scope: ALL_SCOPES,
     prompt: 'consent',
-    grant: SIGN_IN_SCOPES,
+    grant: `${SIGN_IN_SCOPES} goblin:agent`,
   })
   expect(narrowed.asked).toBe(true)
   expect(inspection(await toolsOf(base, refreshed.access_token))).toEqual([])

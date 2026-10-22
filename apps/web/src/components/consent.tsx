@@ -6,7 +6,7 @@ import { Alert, AlertDescription, Button, Skeleton, Switch } from '@goblin/ui'
 import { clientReachMutation, workspacesQuery } from '../account/queries.ts'
 import { AuthRefused, consentClientQuery, consentMutation } from '../auth/queries.ts'
 import { ReachChooser, initialReach, reachesAny } from './client-reach.tsx'
-import { type OptionalScope, consentBody, offeredScopes, requestedScopes } from '../lib/consent-scope.ts'
+import { type OptionalScope, STARTS_ON, consentBody, offeredScopes, requestedScopes } from '../lib/consent-scope.ts'
 import { messageOf, withRef } from '../lib/query/app-error.ts'
 import { AuthShell } from './auth-shell.tsx'
 
@@ -20,20 +20,21 @@ type ClientLookup =
 const LOOKUP_FAILED = 'Could not look up the app asking for access. Reload the page to try again.'
 const UNKNOWN_CLIENT = 'goblin does not know this app. Start connecting from the app again.'
 
-/** What every MCP client may do once allowed. */
-const ASK = [
-  'ask your agent questions and give it tasks in your main conversation, where its messages show its name;',
-  'read the recent messages of your main conversation;',
-  "have your agent use the tools you allowed under Connections, while Work while you're away is on.",
-]
-
-/** What each opt-in scope adds (ADRs 0024, 0086), its switch's name first. Each starts off. */
+/** What each opt-in scope adds (ADRs 0024, 0086, 0098), its switch's name first. Asking starts on; the rest start off. */
 const SCOPE_COPY: Readonly<Record<OptionalScope, { readonly name: string; readonly lines: readonly string[] }>> = {
+  'goblin:agent': {
+    name: 'Let it ask your agent',
+    lines: [
+      'ask your agent questions and give it tasks in your main conversation, where its messages show its name;',
+      'read the recent messages of your main conversation;',
+      "have your agent use the tools you allowed under Connections, while Work while you're away is on.",
+    ],
+  },
   'goblin:topics': {
     name: 'Also let it manage your Topics',
     lines: [
       'list and read your Topics, including their guidance;',
-      'make, rename and archive Topics, and change what each works with.',
+      "make, rename and archive Topics; changing a Topic's guidance or what it works with needs an admin.",
     ],
   },
   'goblin:conversations': {
@@ -45,13 +46,31 @@ const SCOPE_COPY: Readonly<Record<OptionalScope, { readonly name: string; readon
   },
   'goblin:personas': {
     name: 'Also let it manage your Personas',
-    lines: ['list and read your Personas;', 'make and change Personas, and see the models they may use.'],
+    lines: [
+      'list and read your Personas, and see the models they may use;',
+      'make and change Personas, when you are an owner or admin of the workspace.',
+    ],
   },
   'goblin:inspect': {
-    name: 'Also let it read your conversations and runs',
+    name: 'Also let it read how your chats ran',
+    lines: ['read how each turn ran: model calls, tool calls, retries, errors and timings, never their words.'],
+  },
+  'goblin:transcripts': {
+    name: 'Also let it read your conversations in full',
+    lines: ['read every conversation in full, including tool calls and their results, without changing anything.'],
+  },
+  'goblin:setup': {
+    name: 'Also let it read what your setups use',
     lines: [
-      'read all your conversations in full, including tool calls and their results, without changing anything;',
-      'read how each turn ran: model calls, tool calls, retries, errors and timings.',
+      'list your MCP servers with their granted tools, your skills and apps, and your Sources with their routes;',
+      'it connects nothing and grants nothing.',
+    ],
+  },
+  'goblin:routines': {
+    name: 'Also let it read and draft routines',
+    lines: [
+      'list your routines and their runs;',
+      'draft, change, pause and archive them when you are an owner or admin; a draft runs only once confirmed here.',
     ],
   },
 }
@@ -72,12 +91,13 @@ function ScopeChoice(props: {
   readonly onChange: (on: boolean) => void
 }) {
   const { name, lines } = SCOPE_COPY[props.scope]
+  const starts = STARTS_ON.includes(props.scope) ? 'On unless you turn it off.' : 'Off unless you turn it on.'
   return (
     <div className="flex flex-col gap-2">
       <label className="switch-row">
         <span className="switch-name">
           <span>{name}</span>
-          <span className="switch-detail">Off unless you turn it on. With it, the app can:</span>
+          <span className="switch-detail">{starts} With it, the app can:</span>
         </span>
         <Switch checked={props.on} onCheckedChange={props.onChange} />
       </label>
@@ -158,7 +178,9 @@ export function Consent() {
   const requested = requestedScopes(query.get('scope'))
   const lookup = useClient(clientId)
   const client = lookup.kind === 'found' ? lookup.client : undefined
-  const [on, setOn] = useState<readonly string[]>([])
+  const [on, setOn] = useState<readonly string[]>(() =>
+    offeredScopes(requested).filter((scope) => STARTS_ON.includes(scope)),
+  )
   const workspaces = useQuery(workspacesQuery).data ?? []
   const [chosen, setChosen] = useState<ClientReach | undefined>(undefined)
   const reach = chosen ?? initialReach(workspaces)
@@ -176,12 +198,7 @@ export function Consent() {
       footer={<p>Revoke it any time in Settings.</p>}
     >
       <div className="auth-body">
-        <p>If you allow it, the app can:</p>
-        <ul className="plan-points">
-          {ASK.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
+        <p>If you allow it, the app can do what you turn on below.</p>
         <Workspaces reach={chosen} onChange={setChosen} />
         {offeredScopes(requested).map((scope) => (
           <ScopeChoice

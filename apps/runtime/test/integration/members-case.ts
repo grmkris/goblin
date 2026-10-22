@@ -85,6 +85,21 @@ export async function membersCase(url: string): Promise<void> {
   const refused = await call(url, member, '/api/agent/resident', { enabled: false })
   expect(refused.status).toBe(403)
   expect(await refused.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
+  // What the agent works with takes an admin too (ADR 0098): a Persona, and a Topic's guidance; a plain Topic does not.
+  const persona = await call(url, member, '/api/personas', {
+    name: 'Guestbot',
+    avatar: { glyph: 'G', hue: 30 },
+    role: 'A guest made it',
+    instructions: 'Be brief.',
+    operationId: crypto.randomUUID(),
+  })
+  expect(persona.status).toBe(403)
+  const guided = await call(url, member, '/api/topics', {
+    name: `Guided ${crypto.randomUUID().slice(0, 6)}`,
+    instructions: 'Answer in haiku.',
+    operationId: crypto.randomUUID(),
+  })
+  expect(await guided.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
 
   const removed = await ownerFetch(`${url}/w/${owner.slug}/api/members/${guest.userId}`, {
     method: 'DELETE',

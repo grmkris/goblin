@@ -76,6 +76,16 @@ export const TOOLS = {
   inspect_problems: 'inspect.problems',
   inspect_flows: 'inspect.flows',
   inspect_details: 'inspect.details',
+  setup_catalog: 'setup.catalog',
+  server_list: 'mcp.servers',
+  source_list: 'sources.list',
+  source_routes: 'sources.routes',
+  routine_list: 'routines.list',
+  routine_runs: 'routines.runs',
+  routine_propose: 'routines.propose',
+  routine_edit: 'routines.edit',
+  routine_archive: 'routines.archive',
+  routine_pause: 'routines.pause',
 } as const
 export type ToolName = keyof typeof TOOLS
 

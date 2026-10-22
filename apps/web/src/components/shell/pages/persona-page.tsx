@@ -14,6 +14,7 @@ import { PersonaAvatar } from '../../persona-avatar.tsx'
 import { useMinute } from '../../use-now.ts'
 import { BLANK, NAME, PersonaForm } from './persona-form.tsx'
 import { relativeTime } from '../../../lib/format.ts'
+import { useConfigures } from '../../../lib/current-workspace.ts'
 
 /** What the owner reads when a Persona could not be saved: a conflict in its own words, anything else as described. */
 function refusal(failure: Error | null, action: string): string {
@@ -48,6 +49,7 @@ function Editor({
   readonly error: string
   readonly children: ReactNode
 }) {
+  const configures = useConfigures()
   return (
     <>
       <PersonaForm draft={draft} onChange={onChange} />
@@ -56,7 +58,11 @@ function Editor({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      <div className="card-actions">{children}</div>
+      {configures ? (
+        <div className="card-actions">{children}</div>
+      ) : (
+        <p className="text-sm text-muted-foreground">Only the workspace's owners and admins change Personas.</p>
+      )}
     </>
   )
 }

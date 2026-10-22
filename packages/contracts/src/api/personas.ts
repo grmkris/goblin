@@ -5,6 +5,7 @@ import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
 import { NonEmptyString } from '../ids.ts'
 import { CreatePersona, PersonaDetail, PersonaPage, PersonaReply, PersonaView, UpdatePersona } from '../personas.ts'
 import { ApiErrors } from './errors.ts'
+import { EndpointRole } from './role.ts'
 import { EndpointScope } from './scope.ts'
 import { PageQuery } from './page.ts'
 
@@ -39,7 +40,9 @@ export class PersonasGroup extends HttpApiGroup.make('personas').add(
     payload: CreatePersona,
     success: PersonaView.pipe(HttpApiSchema.status(201)),
     error: [ApiErrors.conflict, ApiErrors.invalidInput],
-  }).annotate(EndpointScope, 'personas'),
+  })
+    .annotate(EndpointScope, 'personas')
+    .annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.get('detail', '/personas/:id', {
     params: { id: PersonaParam },
     success: PersonaDetail,
@@ -50,7 +53,9 @@ export class PersonasGroup extends HttpApiGroup.make('personas').add(
     payload: UpdatePersona,
     success: PersonaView,
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput],
-  }).annotate(EndpointScope, 'personas'),
+  })
+    .annotate(EndpointScope, 'personas')
+    .annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.post('reply', '/personas/reply', {
     payload: PersonaReply,
     success: Schema.Null.pipe(HttpApiSchema.status(202)),

@@ -7,15 +7,20 @@ import type { CallerScope } from '@goblin/contracts'
 const INSPECT_SCOPE = 'goblin:inspect'
 
 /**
- * What each `goblin:*` scope lets an OAuth client of the owner do, as the caller scopes owner admission checks. Every
- * consented client may ask the agent in main (`agent`); `goblin:inspect` reads how chats ran and the conversations in
- * full.
+ * What each `goblin:*` scope lets an OAuth client do, as the caller scopes owner admission checks (ADRs 0086, 0098).
+ * Every power is its own switch on the consent page: asking the agent in main (`goblin:agent`, on unless turned off),
+ * Topics, chats, Personas, how chats ran (`goblin:inspect`), the conversations in full (`goblin:transcripts`), what
+ * setups are chosen from and the Sources (`goblin:setup`), and reading and drafting routines (`goblin:routines`).
  */
 const GRANTS: Readonly<Record<string, readonly CallerScope[]>> = {
+  'goblin:agent': ['agent'],
   'goblin:topics': ['topics'],
   'goblin:conversations': ['conversations'],
   'goblin:personas': ['personas'],
-  [INSPECT_SCOPE]: ['inspect', 'transcripts'],
+  [INSPECT_SCOPE]: ['inspect'],
+  'goblin:transcripts': ['transcripts'],
+  'goblin:setup': ['setup'],
+  'goblin:routines': ['routines'],
 }
 
 /** What a client may ask for: `offline_access` earns a refresh token, each `goblin:*` scope what `GRANTS` says. */
@@ -23,7 +28,6 @@ export const MCP_SCOPES = ['openid', 'profile', 'email', 'offline_access', ...Ob
 
 /** The caller scopes a token's standing scopes give it (ADR 0086). */
 export const callerScopesOf = (scopes: readonly string[]): readonly CallerScope[] => [
-  'agent',
   ...new Set(scopes.flatMap((scope) => GRANTS[scope] ?? [])),
 ]
 

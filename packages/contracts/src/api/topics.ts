@@ -4,6 +4,7 @@ import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
 import { CreateTopic, TopicPage, TopicSetupEdit, TopicSetupSaved, TopicView, UpdateTopic } from '../topics.ts'
 import { ApiErrors } from './errors.ts'
+import { EndpointRole } from './role.ts'
 import { EndpointScope } from './scope.ts'
 import { PageQuery } from './page.ts'
 
@@ -49,6 +50,6 @@ export class TopicsGroup extends HttpApiGroup.make('topics')
       payload: TopicSetupEdit,
       success: TopicSetupSaved,
       error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput],
-    }),
+    }).annotate(EndpointRole, 'admin'),
   )
   .annotateEndpoints(EndpointScope, 'topics') {}

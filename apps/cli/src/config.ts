@@ -42,7 +42,7 @@ export async function settingsOf(args: Args, provider?: ConfigProvider.ConfigPro
     origin,
     endpoint: new URL('/mcp', origin),
     // Inspection on top of what every /mcp client may do; no identity scopes, which the CLI never reads.
-    scope: 'goblin:inspect offline_access',
+    scope: 'goblin:inspect goblin:transcripts offline_access',
     redirect: new URL(`http://127.0.0.1:${port}/callback`),
     store: join(environment.configHome, 'goblin', 'credentials.json'),
     json: args.flags.get('json') === true,

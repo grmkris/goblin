@@ -84,11 +84,22 @@ describe('/mcp for every caller (ADR 0086)', () => {
     expect(Object.values(TOOLS).toSorted()).toEqual([...endpointScopes(OwnerApi).keys()].toSorted())
   })
 
-  it('lists only what a consent grants: asking alone, then inspection, then everything', async () => {
-    expect(await listed(client([]))).toEqual(['ask_agent', 'get_recent_messages'])
-    expect(await listed(client(['goblin:inspect']))).toEqual(toolsFor(['agent', 'inspect', 'transcripts']))
-    expect(await listed(client(['goblin:inspect']))).toContain('inspect_conversation')
-    const all = client(['goblin:topics', 'goblin:conversations', 'goblin:personas', 'goblin:inspect'])
+  it('lists only what a consent grants: nothing, then asking, then runs apart from conversations, then everything', async () => {
+    expect(await listed(client([]))).toEqual([])
+    expect(await listed(client(['goblin:agent']))).toEqual(['ask_agent', 'get_recent_messages'])
+    expect(await listed(client(['goblin:inspect']))).toEqual(toolsFor(['inspect']))
+    expect(await listed(client(['goblin:inspect']))).not.toContain('inspect_conversation')
+    expect(await listed(client(['goblin:transcripts']))).toContain('inspect_conversation')
+    const all = client([
+      'goblin:agent',
+      'goblin:topics',
+      'goblin:conversations',
+      'goblin:personas',
+      'goblin:inspect',
+      'goblin:transcripts',
+      'goblin:setup',
+      'goblin:routines',
+    ])
     expect(await listed(all)).toEqual(Object.keys(TOOLS).toSorted())
   })
 
@@ -143,7 +154,7 @@ describe('/mcp for every caller (ADR 0086)', () => {
 
   it('asks the agent in main with a bounded wait, and reads main back', async () => {
     const answer = { status: 'done', operationId: 'op-1', text: 'pong' }
-    const { mcp, seen } = await connect(client([]), (request) =>
+    const { mcp, seen } = await connect(client(['goblin:agent']), (request) =>
       Response.json(
         new URL(request.url).pathname === '/api/agent/ask' ? answer : { messages: [{ role: 'assistant', text: 'hi' }] },
       ),
@@ -163,7 +174,7 @@ describe('/mcp for every caller (ADR 0086)', () => {
   })
 
   it('passes an inspection read the fields it was given, by operation or by a chat entry', async () => {
-    const { mcp, seen } = await connect(client(['goblin:inspect']), () =>
+    const { mcp, seen } = await connect(client(['goblin:inspect', 'goblin:transcripts']), () =>
       Response.json({ events: [], related: [], coverage: { complete: true, gaps: [] } }),
     )
     try {
@@ -184,7 +195,7 @@ describe('/mcp for every caller (ADR 0086)', () => {
 
   it("answers the agent's refusal as the tool's error result, its tag and safe fields only", async () => {
     const refusal = new BudgetExhausted({ limit: 2_000_000, resetsAt: 86_400 })
-    const { mcp } = await connect(client([]), () => Response.json(envelopeOf(refusal), { status: 429 }))
+    const { mcp } = await connect(client(['goblin:agent']), () => Response.json(envelopeOf(refusal), { status: 429 }))
     try {
       const refused = await mcp.callTool({ name: 'ask_agent', arguments: { input: 'ping' } })
       expect(refused.isError).toBe(true)

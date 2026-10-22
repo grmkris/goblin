@@ -23,10 +23,14 @@ describe('the /mcp resource (unit, ADRs 0024, 0086)', () => {
         'profile',
         'email',
         'offline_access',
+        'goblin:agent',
         'goblin:topics',
         'goblin:conversations',
         'goblin:personas',
         'goblin:inspect',
+        'goblin:transcripts',
+        'goblin:setup',
+        'goblin:routines',
       ],
       resource_name: 'goblin',
     })
@@ -40,11 +44,21 @@ describe('the /mcp resource (unit, ADRs 0024, 0086)', () => {
     )
   })
 
-  it('gives a token the caller scopes its consent maps to: asking always, the rest only as consented', () => {
-    expect(callerScopesOf(['openid', 'offline_access'])).toEqual(['agent'])
-    expect(callerScopesOf(['goblin:topics', 'goblin:personas'])).toEqual(['agent', 'topics', 'personas'])
-    expect(callerScopesOf(['goblin:inspect', 'goblin:inspect'])).toEqual(['agent', 'inspect', 'transcripts'])
-    expect(callerScopesOf(['goblin:everything'])).toEqual(['agent'])
+  it('gives a token the caller scopes its consent maps to, each only as consented', () => {
+    // Every power is its own switch (ADR 0098): asking the agent too, and the conversations in full apart from runs.
+    expect(callerScopesOf(['openid', 'offline_access'])).toEqual([])
+    expect(callerScopesOf(['goblin:agent', 'goblin:topics', 'goblin:personas'])).toEqual([
+      'agent',
+      'topics',
+      'personas',
+    ])
+    expect(callerScopesOf(['goblin:inspect', 'goblin:inspect'])).toEqual(['inspect'])
+    expect(callerScopesOf(['goblin:transcripts', 'goblin:setup', 'goblin:routines'])).toEqual([
+      'transcripts',
+      'setup',
+      'routines',
+    ])
+    expect(callerScopesOf(['goblin:everything'])).toEqual([])
   })
 
   it('reads the scopes a standing consent grants, and none from a malformed one', () => {

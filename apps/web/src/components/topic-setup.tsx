@@ -17,6 +17,7 @@ import { setupCatalogQuery } from '../setup/queries.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { setWorkspaceTopicSetupMutation } from '../lib/workspace/mutations.ts'
 import { SetupPicker } from './setup-picker.tsx'
+import { useConfigures } from '../lib/current-workspace.ts'
 
 const same = (one: TopicSetup, other: TopicSetup) => JSON.stringify(one) === JSON.stringify(other)
 
@@ -60,6 +61,7 @@ function TopicSetupEditor({ topic, onClose }: { readonly topic: TopicView; reado
   const [draft, setDraft] = useState<TopicSetup>(topic.setup)
   const [short, setShort] = useState<readonly RoutineOutsideSetup[]>()
   const save = useMutation(setWorkspaceTopicSetupMutation)
+  const configures = useConfigures()
   if (short !== undefined) return <RoutinesLeftShort routines={short} onDone={onClose} />
   const failure =
     (save.error !== null && messageOf(save.error, 'save the setup')) ||
@@ -79,9 +81,10 @@ function TopicSetupEditor({ topic, onClose }: { readonly topic: TopicView; reado
         <Button type="button" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
+        {!configures && <p className="setup-error">Only the workspace's owners and admins change a Topic's setup.</p>}
         <Button
           type="button"
-          disabled={save.isPending || same(draft, topic.setup)}
+          disabled={!configures || save.isPending || same(draft, topic.setup)}
           onClick={() =>
             save.mutate(
               { id: topic.id, edit: { set: draft, expectedRevision: revision } },

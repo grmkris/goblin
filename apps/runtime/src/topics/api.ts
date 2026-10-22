@@ -2,7 +2,15 @@ import type { CreateTopic } from '@goblin/contracts'
 import { OwnerApi } from '@goblin/contracts/api'
 import * as Effect from 'effect/Effect'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
-import { KEY_TOPIC_SETUP, claim, confineSetup, confineSetupEdit, confineTopic, requestKey } from '../keys/policy.ts'
+import {
+  KEY_TOPIC_SETUP,
+  claim,
+  confineSetup,
+  confineSetupEdit,
+  confineTopic,
+  requestKey,
+  requireAdminFor,
+} from '../keys/policy.ts'
 import { createTopic, editTopicSetup, madeTopic, updateTopic } from './program.ts'
 import { Topics } from './service.ts'
 
@@ -24,10 +32,11 @@ const list = (query: { readonly cursor?: string | undefined; readonly limit?: nu
 
 /**
  * A Topic a server's API key makes (ADR 0081): narrowed to nothing unless it names a setup under its ceiling, and its
- * own from then on. The owner's own create is unchanged.
+ * own from then on. A member's names neither guidance nor a setup, which take an admin (ADR 0098).
  */
 const create = (input: CreateTopic) =>
   Effect.gen(function* () {
+    yield* requireAdminFor(input.instructions !== undefined || input.setup !== undefined)
     if ((yield* requestKey) === undefined) return yield* createTopic(input, { actor: 'owner' })
     const keyed = { ...input, setup: input.setup ?? KEY_TOPIC_SETUP }
     yield* confineSetup(keyed.setup)
@@ -51,7 +60,12 @@ export const TopicsHandlers = HttpApiBuilder.group(OwnerApi, 'topics', (handlers
       ),
     )
     .handle('create', ({ payload }) => create(payload))
-    .handle('update', ({ params, payload }) => Effect.andThen(confineTopic(params.id), updateTopic(params.id, payload)))
+    .handle('update', ({ params, payload }) =>
+      Effect.andThen(
+        Effect.andThen(confineTopic(params.id), requireAdminFor(payload.instructions !== undefined)),
+        updateTopic(params.id, payload),
+      ),
+    )
     .handle('setSetup', ({ params, payload }) =>
       Effect.andThen(
         Effect.andThen(confineTopic(params.id), confineSetupEdit(payload)),

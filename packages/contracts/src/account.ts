@@ -30,11 +30,12 @@ export const KeyScope = Schema.Literals(['topics', 'conversations', 'personas', 
 export type KeyScope = typeof KeyScope.Type
 
 /**
- * What opens an owner endpoint to a caller other than the owner's session (ADR 0086): a server's API key holds some of
- * the key scopes; an OAuth client of the owner holds what its consent maps to, and only it can hold `transcripts` (the
- * conversations in full) and `agent` (asking the agent in main).
+ * What opens an owner endpoint to a caller other than the owner's session (ADRs 0086, 0098): a server's API key holds
+ * some of the key scopes; an OAuth client holds what its consent maps to, and only it can hold `transcripts` (the
+ * conversations in full), `agent` (asking the agent in main), `setup` (what setups are chosen from, and the Sources)
+ * and `routines` (reading and drafting routines; confirming one stays the web's).
  */
-export const CallerScope = Schema.Literals([...KeyScope.literals, 'transcripts', 'agent'])
+export const CallerScope = Schema.Literals([...KeyScope.literals, 'transcripts', 'agent', 'setup', 'routines'])
 export type CallerScope = typeof CallerScope.Type
 
 /** An MCP connection a key's setups may name: the key's server ceiling. */
