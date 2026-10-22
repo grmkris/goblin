@@ -85,6 +85,9 @@ is rotated in Settings: the same key, with all it made, and the old secret refus
 
 Every turn can be seen end to end (ADR 0024). Beside Pi's own record, each agent keeps a 30-day run ledger of how its
 turns ran: model attempts, tool calls, retries, MCP steps, Source replies, timings, tokens and errors, never content.
+Each event says what it ran with (ADR 0107): the release, the model endpoint and thinking level, the prompt sections
+and tools that changed before a model call, and each MCP server's own name and version, under OpenTelemetry's names.
+A turn also reads as an OpenTelemetry trace (`goblin turn <operation> --otlp`) that any trace viewer opens.
 Workers Logs and Traces carry the same ids. A coding agent reads the owner's conversations and any turn's timeline
 through the read-only inspection tools of goblin's one MCP endpoint, `/mcp` (when the owner grants `goblin:inspect`, and `goblin:transcripts` for conversations in full), or
 the `goblin` CLI (`apps/cli`), and the agent answers "why did that fail?" with its own `diagnose` tool.

@@ -61,11 +61,12 @@ Each event goes to `app_run_events` (kept 30 days) and to one Workers Log line w
 calls also become spans (`chat {model}`, `execute_tool {tool}`, `telemetry/trace.ts`), with the same attributes and
 the agent, conversation and operation ids. A call often starts in one invocation and ends in another, and a Workers
 span cannot outlive its invocation, so each is one span written whole where it ends, its real start and duration in
-`goblin.started_at` and `goblin.duration_ms`. Today only model calls outside a turn reach Traces: the spans of a
-turn's calls, recorded from Pi's commit listener, are created but never exported (seen on dev 2026-10-06, cause not
-yet found), so those calls are in the ledger and the log only. A span the runtime says it will not record
-(`isTraced` false) writes one capped `failure` line, `where: telemetry.trace.untraced`, its `kind`, and `code`
-`no_active_span` (made in an async context outside any request) or `unsampled`. Never content:
+`goblin.started_at` and `goblin.duration_ms`. A turn's calls, recorded from Pi's
+commit listener, reach Traces too: on dev on 2026-10-06 they were created but never exported, and by 2026-10-22 each
+turn's `chat {model}` spans were exported under its alarm invocation (seen for release 393c8952, and before it). A span
+the runtime says it will not record (`isTraced` false) writes one capped `failure` line,
+`where: telemetry.trace.untraced`, its `kind`, and `code` `no_active_span` (made in an async context outside any
+request) or `unsampled`, so a regression shows in the logs. Never content:
 ids, sizes, counts, timings, outcomes and fixed error summaries. Known fields are sanitized before fan-out and again
 when read back; arbitrary provider, schema and remote error text stays in Pi inspection. Expected authority waits use
 info log lines and an unset trace status. At start the agent marks whatever the last run left
