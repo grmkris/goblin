@@ -49,13 +49,15 @@ D1 (`organization`, `member`, `invitation`; `auth/workspaces.ts` reads and write
 served); a unique index keeps one membership per person and workspace. `GET /api/workspaces` lists the person's, oldest
 membership first, and gives a person with none a first one (named after them, its slug from their address) in one D1
 batch that runs only while they still have none. `POST /api/workspaces` makes another, `PATCH` renames it or moves its
-slug (an owner or admin), `DELETE` deletes it (an owner): its agent is erased first, then its keys, its members' OAuth
-consents to it and its memberships.
+slug (an owner or admin), `DELETE` deletes it (an owner): its agent is erased first, then its keys, its place in
+clients' reaches and its memberships.
 
 Which agent a request reaches comes from its credential: a browser session names the workspace's slug in its path
 (`/w/<slug>/api/…`), checked against the person's membership in one D1 read on every request; an API key belongs to
-one workspace; an OAuth client's consent names one (the consent page asks, `/consent/workspace`, when the person has
-more than one), and its token carries it in a `workspace` claim, honoured only while the person is still a member.
+one workspace; an OAuth client reaches the workspaces its reach names ([ADR
+0097](../adr/0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md): `mcpReach`, `mcpReachWorkspace`), read with
+the person's memberships on every call, and each call names the one it is for. A person's clients and their reach are
+theirs, at `/api/clients` (`auth/clients.ts`).
 
 ### Members and invitations
 
@@ -63,8 +65,8 @@ A workspace's people ([ADR 0093](../adr/0093-members-invitations-and-roles.md)) 
 `auth/members.ts` reads and writes them. `GET /w/<slug>/api/members` lists them for any member; owners change roles
 (`PATCH …/members/:userId`), owners and admins remove (`DELETE`), an admin only members and an owner anyone, and the
 last owner stays, as it does when its account is deleted (refused while others work in the workspace); anyone else may
-leave (`POST …/members/leave`). Removing someone deletes their OAuth consents and revokes
-their refresh tokens for the workspace in the same batch.
+leave (`POST …/members/leave`). Removing someone, or their leaving, takes the workspace out of their MCP clients'
+reaches in the same batch (ADR 0097).
 
 `POST /w/<slug>/api/members/invitations` invites addresses with a role (only an owner invites an admin): one
 `invitation` row each for seven days, replacing one still waiting for that address, mailed from the deployment's sender

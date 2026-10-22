@@ -36,6 +36,9 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   Record a result's content with `recordedContent` (links without query or fragment) wherever it reaches a transcript
   or an outcome.
 - Inbound tokens must verify locally, name `/mcp` as audience, come from an enabled client with live owner consent.
+  The workspaces a client reaches are its reach (ADR 0097), read with the person's memberships on every call: a tool
+  of a client that reaches more than one takes a required `workspace` (`inbound/mcp-server.ts` `naming`), and a new
+  tool needs nothing extra for it as long as its input is a Struct made by `standard`.
   An inbound client's messages go into main, labelled with its name.
 - Events (`mcp/events/engine.ts`, ADRs 0011 and 0073) require resident authority and an exact server/name/canonical-arguments owner
   grant through the originating endpoint-bound connection. A server offers Events by top-level `capabilities.events`

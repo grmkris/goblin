@@ -35,8 +35,13 @@ The agent's own standing permission to use the owner's MCP connections while the
 signed-in action grants it, and it lasts until the owner revokes it in Settings (ADR 0088).
 
 **Inbound client**:
-An MCP client (Claude Code, another agent) a member authorized to call goblin's `/mcp` for one workspace, which its
-consent names (ADR 0089). Settings lists them as Connected clients.
+An MCP client (Claude Code, another agent) a person authorized to call goblin's `/mcp`, reaching the workspaces its
+**reach** names (ADR 0097). Settings lists them as Connected clients.
+
+**Reach**:
+Which of a person's workspaces one of their inbound clients reaches (ADR 0097): all of them, ones they join later
+included, or those they chose, while they are a member of each. Set on the consent page, changed in Settings; a client
+that reaches more than one names the workspace on every call.
 _Avoid_: apps that use your agent
 
 **API key**:

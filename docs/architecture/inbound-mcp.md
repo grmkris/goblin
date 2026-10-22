@@ -19,12 +19,19 @@ server for every caller ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)): a
 Code, claude.ai, Cursor) or a server's API key.
 
 - **Signing in.** Clients register dynamically (open, and restricted to `/mcp`); a registration whose redirects are
-  all http loopback is marked native, which is how Claude Code registers. The person signs in, picks the workspace the
-  client is for when they have more than one (`/consent/workspace`, the provider's post-login step; [ADR
-  0089](../adr/0089-workspaces-own-agents.md)), and consents at `/consent`. The consent is stored for that workspace
-  and the token carries it (`workspace`). A Bearer token is accepted only if it verifies against the local JWKS, names
-  `/mcp` as audience, comes from an enabled client, and the person's consent for its workspace still exists while they
-  are its member; its scopes count only while that consent still grants them (`auth/service.ts`).
+  all http loopback is marked native, which is how Claude Code registers. The person signs in and consents at
+  `/consent`, which also asks which of their workspaces the client reaches (its **reach**, [ADR
+  0097](../adr/0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md)): those they choose, or all of them, ones they
+  join later included. Allow sets the reach (`PUT /api/clients/:clientId/reach`, `auth/clients.ts`) and then the
+  consent, which names no workspace. A Bearer token is accepted only if it verifies against the local JWKS, names
+  `/mcp` as audience, comes from an enabled client, and the person's consent still exists; its scopes count only while
+  that consent still grants them (`auth/service.ts`).
+- **Workspaces.** Every request reads the reach (`reachedBy`, `auth/workspaces.ts`): the person's memberships for
+  `all`, else the listed workspaces they are still a member of, with their role in each. A client given exactly one
+  never names it; any other has a required `workspace` argument (an id or slug) on every tool, added as each tool
+  registers (`inbound/mcp-server.ts`), and `workspace_list` plus the server's instructions name what it reaches. Each
+  call goes to that workspace's agent as the person, a member there with their role there (`inbound/route.ts`). Keys
+  are unchanged: a key's calls reach its own workspace.
 - **Scopes.** `/mcp` advertises `goblin:topics`, `goblin:conversations`, `goblin:personas` and `goblin:inspect` in
   its metadata, and an unauthenticated request gets a 401 naming the metadata and every scope. The consent page offers
   each `goblin:*` scope a client asks for as its own switch, off until the owner turns it on; Allow grants the rest

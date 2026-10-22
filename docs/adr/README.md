@@ -77,13 +77,14 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0083](0083-bounded-thinking-and-a-turn-that-answers.md) | Bounded thinking, and a turn that answers | Accepted |
 | [0084](0084-a-key-reads-back-what-it-made-and-how-it-ran.md) | A key reads back what it made, and how its chats ran | Accepted; amended by 0091 |
 | [0085](0085-a-keys-rate-limit-is-a-fixed-minute-counted-by-its-agent.md) | A key's rate limit is a fixed minute, counted by its agent | Accepted; amended by 0086 |
-| [0086](0086-one-mcp-for-every-caller.md) | One /mcp for every caller | Accepted; amended by 0089, 0090, 0094 |
+| [0086](0086-one-mcp-for-every-caller.md) | One /mcp for every caller | Accepted; amended by 0089, 0090, 0094, 0097 |
 | [0087](0087-the-owners-own-subscription-models.md) | The owner's own subscription models | Accepted; amended by 0089 |
 | [0088](0088-resident-authority-lasts-until-revoked.md) | Resident authority lasts until revoked | Accepted |
-| [0089](0089-workspaces-own-agents.md) | Workspaces own agents | Accepted; amended by 0093 |
+| [0089](0089-workspaces-own-agents.md) | Workspaces own agents | Accepted; amended by 0093; its consent naming one workspace superseded by 0097 |
 | [0090](0090-a-key-names-closes-and-reads-back-its-threads.md) | A key names, closes and reads back its threads | Accepted |
 | [0091](0091-a-key-names-the-mcp-servers-its-threads-may-use.md) | A key names the MCP servers its threads may use | Accepted |
 | [0092](0092-mcp-calls-are-checked-against-their-schema-and-keep-the-servers-message.md) | MCP calls are checked against their schema and keep the server's message | Accepted |
-| [0093](0093-members-invitations-and-roles.md) | Members, invitations and roles | Accepted; amended by 0095 |
+| [0093](0093-members-invitations-and-roles.md) | Members, invitations and roles | Accepted; amended by 0095, 0097 |
 | [0094](0094-a-members-message-names-who-wrote-it.md) | A member's message names who wrote it | Accepted |
 | [0095](0095-the-owners-subscription-workspace-takes-no-members.md) | The owner's subscription workspace takes no members | Accepted |
+| [0097](0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md) | One /mcp reaches the workspaces its consent chooses | Accepted |

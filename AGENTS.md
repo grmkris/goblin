@@ -54,8 +54,9 @@ infrastructure. Read
   its auth D1 into `.local` (`wrangler d1 export goblin-prod-auth --remote`), pause CI, then
   `GOBLIN_BREAK_GLASS=1 GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset`, re-create it with a
   break-glass `deploy:prod` of the same sha, and promote that sha once CI is back on. A workspace owns its agent, named
-  by the workspace's ID (ADR 0089): a request reaches it only through its credential's workspace (a key's, a consent's)
-  or, for a browser session, the slug in its path after a live membership check. Never add a route that takes an agent
+  by the workspace's ID (ADR 0089): a request reaches it only through its credential's workspace (a key's), a workspace
+  an OAuth client's call names among those its reach covers (ADR 0097), or for a browser session the slug in its path,
+  each after a live membership check. Never add a route that takes an agent
   name from the request.
   Telemetry never carries content ([ADR 0024](docs/adr/0024-observing-conversations.md)).
 
