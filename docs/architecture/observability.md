@@ -66,7 +66,8 @@ commit listener, reach Traces too: on dev on 2026-10-06 they were created but ne
 turn's `chat {model}` spans were exported under its alarm invocation (seen for release 393c8952, and before it). A span
 the runtime says it will not record (`isTraced` false) writes one capped `failure` line,
 `where: telemetry.trace.untraced`, its `kind`, and `code` `no_active_span` (made in an async context outside any
-request) or `unsampled`, so a regression shows in the logs. Never content:
+request) or `unsampled`, so a regression shows in the logs. Cloudflare's trace data lists each `chat` span twice,
+while the agent records the call once (one ledger row, one log line, one span created); the copy is Cloudflare's. Never content:
 ids, sizes, counts, timings, outcomes and fixed error summaries. Known fields are sanitized before fan-out and again
 when read back; arbitrary provider, schema and remote error text stays in Pi inspection. Expected authority waits use
 info log lines and an unset trace status. At start the agent marks whatever the last run left
