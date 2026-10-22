@@ -22,6 +22,7 @@ import type { RunProgram } from '../runtime/bridge.ts'
 import { keyWords } from '../sources/messages.ts'
 import { routeWords } from '../sources/program.ts'
 import { Sources } from '../sources/service.ts'
+import { describeError } from '../telemetry/attributes.ts'
 import { topicNamed } from '../topics/program.ts'
 import { byAgent } from './organize.ts'
 import { typedTool } from './typed-tool.ts'
@@ -94,6 +95,18 @@ const routeOfAsked = (asked: AskedRoute) =>
 
 const decodeSetup = Schema.decodeUnknownEffect(SourceSetup)
 
+/** How much of a refused proposal's problems the model reads. */
+const PROBLEMS = 2000
+
+/**
+ * What the model reads of a refused proposal: every problem the setup has, whole, so it fixes them all in one more
+ * call (a failure's one-line description cuts its reason short); anything else as any failure reads.
+ */
+const proposeFailure = (cause: unknown): string =>
+  cause instanceof InvalidInput
+    ? `The setup does not hold; fix it and propose again. ${cause.reason.slice(0, PROBLEMS)}`
+    : describeError(cause)
+
 /** `source_propose`: a Source for the owner to review; it ends the turn. */
 const proposeTool = (run: RunProgram) =>
   typedTool({
@@ -103,6 +116,7 @@ const proposeTool = (run: RunProgram) =>
     input: Asked,
     output: Proposed,
     replay: 'safe',
+    failure: proposeFailure,
     execute: async (asked, api) => {
       await run(requireResident)
       return run(
