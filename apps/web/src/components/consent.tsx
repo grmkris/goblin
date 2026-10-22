@@ -9,7 +9,6 @@ import { ReachChooser, initialReach, reachesAny } from './client-reach.tsx'
 import { type OptionalScope, STARTS_ON, consentBody, offeredScopes, requestedScopes } from '../lib/consent-scope.ts'
 import { messageOf, withRef } from '../lib/query/app-error.ts'
 import { AuthShell } from './auth-shell.tsx'
-import { SIGNED_QUERY } from '../lib/signed-query.ts'
 
 type ClientInfo = { readonly name: string; readonly uri?: string | undefined }
 /** The client asking, once looked up, or why it could not be: then the owner is not asked to allow it. */
@@ -161,11 +160,7 @@ function useDecision(clientId: string, requested: readonly string[], on: readonl
   function decide(accept: boolean): void {
     setChoice(accept ? 'allow' : 'deny')
     const consent = () =>
-      deciding.mutate(
-        // The query as the server signed it, never the router's rewrite of it (`signed-query.ts`).
-        { ...consentBody(requested, accept, on), ...(SIGNED_QUERY === '' ? {} : { oauth_query: SIGNED_QUERY }) },
-        { onSuccess: (next) => window.location.assign(next) },
-      )
+      deciding.mutate(consentBody(requested, accept, on), { onSuccess: (next) => window.location.assign(next) })
     if (accept) reaching.mutate({ clientId, ...reach }, { onSuccess: consent })
     else consent()
   }
