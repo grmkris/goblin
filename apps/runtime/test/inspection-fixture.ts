@@ -28,6 +28,8 @@ export function inspectionFixture(settled: Readonly<Record<string, SubmissionRec
     ledger,
     chats,
     settlement: (session, operationId) => Effect.succeed(settled[`${session}/${operationId}`]),
+    chatOf: (session) => Object.entries(SESSIONS).find(([, own]) => own === session)?.[0],
+    deployment: { workspace: 'ws_fixture', stage: 'test' },
   })
   return { db, ledger, inspection, layer: Layer.succeed(Inspection, inspection), close }
 }

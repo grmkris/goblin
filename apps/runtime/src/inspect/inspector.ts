@@ -377,11 +377,24 @@ function linksOf(ledger: LinkReads, operationId: string, events: readonly RunEve
   for (const event of events) add(flowOf(event)?.parentOperation, 'operation')
   add(PERSONA_ANSWER.exec(operationId)?.[1], 'persona_ask')
   add(FIRST_SEND.exec(operationId)?.[1], 'start')
-  for (const child of ledger.childFlows(operationId)) add(child.operationId, flowOf(child)?.flow ?? 'operation')
-  for (const answer of ledger.operationsStarting(`persona:${operationId}:`)) add(answer, 'persona_answer')
-  const first = `${operationId}:first`
-  if (ledger.operationsStarting(first).includes(first)) add(first, 'send')
+  for (const [child, kind] of childrenOf(ledger, operationId)) add(child, kind)
   return links
+}
+
+/**
+ * The operations `operationId` caused, each with its kind: by the flow graph (`goblin.operation.parent`), and by the
+ * ids derived from it (a Persona's answer, a Thread's first send).
+ */
+export function childrenOf(ledger: LinkReads, operationId: string): (readonly [string, string])[] {
+  const children: (readonly [string, string])[] = ledger
+    .childFlows(operationId)
+    .flatMap((child) =>
+      child.operationId === undefined ? [] : [[child.operationId, flowOf(child)?.flow ?? 'operation']],
+    )
+  for (const answer of ledger.operationsStarting(`persona:${operationId}:`)) children.push([answer, 'persona_answer'])
+  const first = `${operationId}:first`
+  if (ledger.operationsStarting(first).includes(first)) children.push([first, 'send'])
+  return children
 }
 
 /**

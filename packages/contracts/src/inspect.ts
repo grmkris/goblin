@@ -3,6 +3,8 @@ import { ChatId, EntryId, OperationId } from './ids.ts'
 import { ConversationView } from './conversations.ts'
 import { FlowEvent, FlowName, RunEvent, RunEventKind, RunEventStatus } from './telemetry.ts'
 
+export { OtlpTraceData } from './otlp.ts'
+
 /**
  * Read-only inspection of one agent (ADR 0024): its conversations, a conversation's entries, its turns and their
  * timelines, what went wrong, its conversation flows and the details behind a message. Full content for conversations,

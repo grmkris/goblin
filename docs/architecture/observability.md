@@ -145,7 +145,14 @@ without changing it or calling a model. The queries are in `contracts/src/inspec
   ran with (ADR 0107): its release; a model attempt its endpoint kind, thinking level and the prompt sections and tools
   that changed before it; an MCP tool call the server's own name and version. `ranWith` sums that up for the turn: its
   releases (two when the agent restarted into a new one mid-turn), endpoints, thinking levels, how many attempts came
-  after a prompt or tool change, and the servers it reached.
+  after a prompt or tool change, and the servers it reached. With `format=otlp` (the tool's `otlp`), the same turn
+  and the turns it started (a Persona's answer, a thread's first send, at most twenty) come back as OpenTelemetry
+  traces data, OTLP/JSON (`inspect/otlp.ts`, ADR 0107): a root `invoke_agent goblin` span, a `chat {model}` client
+  span per model attempt, an `execute_tool {tool}` span per tool call with the `{mcp.method.name} {tool}` client span
+  of its MCP request inside it, compactions as spans, and flow steps, errors and a Source's messages as events on the
+  root. Its resource is the `goblin` service at each release the spans ran on, in its stage. Ids derive from the
+  workspace and the operation, so a turn is the same trace on every read. Its attributes are the run events', so it is
+  content-free; the CLI adds the words on the reader's machine (`goblin turn <operation> --otlp`).
 - `problems`: events needing attention since a time (default the last day); expected authority waits and confirmed
   recovered model retries are filtered before applying the limit. Pass `all: true` for the full problem history.
   Cutoffs, empty answers and coverage gaps remain visible. Tool failures remain until reviewed; a successful turn

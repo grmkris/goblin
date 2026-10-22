@@ -26,6 +26,17 @@ const DetailsInput = Schema.Struct({
   ),
 })
 
+/** `inspect_turn`'s input: the operation, and whether to answer it as a trace (ADR 0107). */
+const TurnInput = Schema.Struct({
+  operation: Operation,
+  otlp: Schema.optional(
+    Schema.Boolean.annotate({
+      description:
+        'For a tracing tool, not for reading: the turn and the turns it started as OpenTelemetry traces data (OTLP/JSON) to post to a trace viewer. Large; content-free.',
+    }),
+  ),
+})
+
 /** `inspect_turns`, `inspect_turn` and `inspect_problems`: how the chats within reach ran, content-free (ADR 0084). */
 export const runTools = (server: McpServer, add: Add, reply: Reply) => {
   add('inspect_turns', () =>
@@ -62,11 +73,14 @@ export const runTools = (server: McpServer, add: Add, reply: Reply) => {
       {
         title: 'One turn end to end',
         description:
-          "One turn by its operation id: Pi's settlement of it, its steps in order (model attempts with model, tokens, finish reason and time to first chunk; tool calls with the MCP server and tool, outcome and failure class), each with its start offset and duration, and `spent`: wall time, model time, tool time by server and the rest (waiting).",
-        inputSchema: standard(Schema.Struct({ operation: Operation })),
+          "One turn by its operation id: Pi's settlement of it, its steps in order (model attempts with model, tokens, finish reason and time to first chunk; tool calls with the MCP server and tool, outcome and failure class), each with its start offset and duration, `spent`: wall time, model time, tool time by server and the rest (waiting), and `ranWith`: the releases, model endpoints, thinking levels and MCP servers it ran with.",
+        inputSchema: standard(TurnInput),
         annotations: reads,
       },
-      ({ operation }) => reply((api) => api.inspect.turn({ query: { operation } })),
+      ({ operation, otlp }) =>
+        reply((api) =>
+          api.inspect.turn({ query: { operation, ...(otlp === true ? { format: 'otlp' as const } : {}) } }),
+        ),
     ),
   )
   add('inspect_problems', () =>

@@ -1,6 +1,9 @@
 import { OwnerApi } from '@goblin/contracts/api'
+import type { TurnTimeline } from '@goblin/contracts/inspect'
 import * as Effect from 'effect/Effect'
+import type { TraceData } from 'effect/observability/OtlpTracer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
+import type { AppError } from '../http/errors.ts'
 import { inspectReach } from '../keys/policy.ts'
 import { Inspection, type Reach, detailsInput } from './service.ts'
 
@@ -20,7 +23,11 @@ export const InspectHandlers = HttpApiBuilder.group(OwnerApi, 'inspect', (handle
     .handle('conversations', () => Inspection.use((inspection) => inspection.conversations))
     .handle('conversation', ({ query }) => Inspection.use((inspection) => inspection.conversation(query)))
     .handle('turns', ({ query }) => within((inspection, reach) => inspection.turns(query, reach)))
-    .handle('turn', ({ query }) => within((inspection, reach) => inspection.turn(query.operation, reach)))
+    .handle('turn', ({ query }) =>
+      within((inspection, reach): Effect.Effect<TurnTimeline | TraceData, AppError> =>
+        query.format === 'otlp' ? inspection.trace(query.operation, reach) : inspection.turn(query.operation, reach),
+      ),
+    )
     .handle('problems', ({ query }) => within((inspection, reach) => inspection.problems(query, reach)))
     .handle('flows', ({ query }) => within((inspection, reach) => inspection.flows(query, reach)))
     .handle('details', ({ query }) =>

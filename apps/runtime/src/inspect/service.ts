@@ -15,9 +15,11 @@ import type {
 } from '@goblin/contracts/inspect'
 import type { RunEvent } from '@goblin/contracts/telemetry'
 import * as Clock from 'effect/Clock'
+import type { TraceData } from 'effect/observability/OtlpTracer'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
+import { chatOfSession } from '../chats/directory.ts'
 import { Conversations } from '../chats/service.ts'
 import { type AppError, InvalidInput, NotFound, attempt, attemptSync } from '../http/errors.ts'
 import { BACKGROUND, conversationId } from '../pi/context.ts'
@@ -26,6 +28,7 @@ import { Db } from '../runtime/db.ts'
 import { RunLedger } from '../telemetry/ledger.ts'
 import { coverageGaps, operationGaps } from './coverage.ts'
 import {
+  childrenOf,
   flowRecord,
   inspectEntry,
   ranWithOf,
@@ -35,6 +38,7 @@ import {
   stepsOf,
   summarize,
 } from './inspector.ts'
+import { traceOf } from './otlp.ts'
 
 /** What a query of `kind` takes besides its kind. */
 type Input<K extends keyof typeof InspectInput> = (typeof InspectInput)[K]['Type']
@@ -46,6 +50,8 @@ const NEWEST = 2 ** 31
 const TURNS = 20
 const PROBLEMS = 50
 const FLOWS = 50
+/** The most turns a trace nests under the one it is of. */
+const TRACED_CHILDREN = 20
 
 /** Where a run event belongs for a key: a chat within its reach, one outside it, or no chat at all. */
 export type Place = 'in' | 'out' | 'nowhere'
@@ -85,6 +91,11 @@ export class Inspection extends Context.Service<
      * the timeline cannot show.
      */
     readonly turn: (operationId: string, reach?: Reach) => Effect.Effect<TurnTimeline, AppError>
+    /**
+     * The same turn as OpenTelemetry traces data (ADR 0107), with the turns it started within `reach` nested under it:
+     * content-free, as its run events are.
+     */
+    readonly trace: (operationId: string, reach?: Reach) => Effect.Effect<TraceData, AppError>
     /** Events needing attention since `since`, newest first; `all` includes expected waits and recovered attempts. */
     readonly problems: (input: Input<'problems'>, reach?: Reach) => Effect.Effect<InspectProblems, AppError>
     /** Conversation flow steps since `since`, newest first, optionally of one chat or one flow. */
@@ -102,10 +113,12 @@ export class Inspection extends Context.Service<
     Effect.gen(function* () {
       const db = yield* Db
       const chats = yield* Conversations
-      const { harness } = yield* AgentInput
+      const { harness, env, workspaceId } = yield* AgentInput
       return makeInspection({
         ledger: new RunLedger(db),
         chats,
+        chatOf: (session) => chatOfSession(db, session),
+        deployment: { workspace: workspaceId, stage: env.STAGE },
         settlement: (session, operationId) =>
           attempt(async () =>
             (await harness.pi()).commit(
@@ -132,6 +145,10 @@ export interface InspectionSources {
     | 'operationsStarting'
   >
   readonly chats: Pick<(typeof Conversations)['Service'], 'list' | 'require' | 'history'>
+  /** The chat a Pi session belongs to, if it is registered; synchronous, like the ledger. */
+  readonly chatOf: (session: string) => string | undefined
+  /** The workspace whose agent this is and its stage, for a trace's id and resource (ADR 0107). */
+  readonly deployment: { readonly workspace: string; readonly stage?: string | undefined }
   /** The submission `operationId` names in Pi session `session`, if Pi has it. */
   readonly settlement: (session: string, operationId: string) => Effect.Effect<SubmissionRecord | undefined, AppError>
 }
@@ -228,7 +245,7 @@ const detailsWith = ({ ledger, chats, settlement }: InspectionSources): Reads['d
 
 /** The inspection reads over `sources`; the native layer's, and a test's over fakes. */
 export function makeInspection(sources: InspectionSources): Reads {
-  const { ledger, chats, settlement } = sources
+  const { ledger, chats, settlement, chatOf, deployment } = sources
   const timeline = timelineWith(settlement)
   const reads: Reads = {
     conversations: Effect.map(chats.list, (list) => ({ conversations: list })).pipe(
@@ -259,6 +276,34 @@ export function makeInspection(sources: InspectionSources): Reads {
       const submitted = events.find((event) => event.kind === 'turn.submitted')
       if (submitted === undefined || !reached(reach, events)) return yield* new NotFound({ what: 'turn' })
       return yield* timeline(submitted, events)
+    }),
+    trace: Effect.fn('Inspection.trace')(function* (operationId: string, reach?: Reach) {
+      const events = yield* attemptSync(() => ledger.forOperation(operationId))
+      const submitted = events.find((event) => event.kind === 'turn.submitted')
+      if (submitted === undefined || !reached(reach, events)) return yield* new NotFound({ what: 'turn' })
+      const submission =
+        submitted.conversationId === undefined
+          ? undefined
+          : settlementOf(yield* settlement(submitted.conversationId, operationId))
+      const children = yield* attemptSync(() => {
+        const ids = childrenOf(ledger, operationId)
+          .slice(0, TRACED_CHILDREN)
+          .map(([child]) => child)
+        const theirs = ledger.forOperations(ids)
+        return ids.flatMap((child) => {
+          const own = theirs.filter((event) => event.operationId === child)
+          const turn = own.find((event) => event.kind === 'turn.submitted')
+          return turn === undefined || !reached(reach, own) ? [] : [{ operationId: child, turn, events: own }]
+        })
+      })
+      return traceOf({
+        workspace: deployment.workspace,
+        stage: deployment.stage,
+        root: { operationId, turn: submitted, events, ...(submission === undefined ? {} : { submission }) },
+        children,
+        chatOf,
+        now: yield* Clock.currentTimeMillis,
+      })
     }),
     problems: Effect.fn('Inspection.problems')(function* (input: Input<'problems'>, reach?: Reach) {
       const since = yield* sinceOr(input.since)

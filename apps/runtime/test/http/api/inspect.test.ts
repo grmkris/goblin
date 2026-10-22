@@ -1,5 +1,5 @@
 import { InspectGroup } from '@goblin/contracts/api'
-import { InspectFlows, InspectProblems, InspectTurns, TurnTimeline } from '@goblin/contracts/inspect'
+import { InspectFlows, InspectProblems, InspectTurns, OtlpTraceData, TurnTimeline } from '@goblin/contracts/inspect'
 import type { RunEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
@@ -211,6 +211,25 @@ describe("the inspect group under a server's API key (ADR 0084)", () => {
     })
     // Nothing a key reads grants resident authority.
     expect(resident.grants).toHaveLength(0)
+  })
+
+  it("answers its turn as an OpenTelemetry trace too, and another's not at all (ADR 0107)", async () => {
+    const { read } = keyFixture()
+    const trace = await decoded(
+      OtlpTraceData,
+      read(`/api/inspect/turn?operation=${encodeURIComponent(FORK)}&format=otlp`),
+    )
+    const names = trace.resourceSpans.flatMap((resource) =>
+      resource.scopeSpans.flatMap((scope) => scope.spans.map((span) => span.name)),
+    )
+    expect(names).toEqual([
+      'invoke_agent goblin',
+      'chat qwen',
+      'execute_tool mycut__job_submit',
+      'chat qwen',
+      'execute_tool tool',
+    ])
+    expect((await read('/api/inspect/turn?operation=owner:op-1&format=otlp')).status).toBe(404)
   })
 
   it("lists and finds only what its own chats ran; the owner's and another Topic's are not there", async () => {

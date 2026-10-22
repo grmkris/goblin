@@ -11,6 +11,7 @@ import {
   InspectTurns,
   TurnTimeline,
 } from '../inspect.ts'
+import { OtlpTraceData } from '../otlp.ts'
 import { FlowName } from '../telemetry.ts'
 import { ApiErrors } from './errors.ts'
 import { EndpointScope } from './scope.ts'
@@ -48,7 +49,8 @@ const Limit = Schema.NumberFromString.check(
  * - `conversations`: `GET /api/inspect/conversations`, every conversation the agent keeps.
  * - `conversation`: `GET /api/inspect/conversation?conversation=&before=`, a page of one conversation's entries in full.
  * - `turns`: `GET /api/inspect/turns?conversation=&since=&limit=`, recent turns newest first, one line each.
- * - `turn`: `GET /api/inspect/turn?operation=…`, one turn end to end: its steps in order and where its time went.
+ * - `turn`: `GET /api/inspect/turn?operation=…`, one turn end to end: its steps in order and where its time went; with
+ *   `&format=otlp`, the same turn and the turns it started as an OpenTelemetry trace (OTLP/JSON, ADR 0107).
  * - `problems`: `GET /api/inspect/problems?since=&limit=&all=`, recent events needing attention, newest first.
  * - `flows`: `GET /api/inspect/flows?since=&limit=&chat=&flow=`, recent conversation flow steps, newest first.
  * - `details`: `GET /api/inspect/details?operation=…` or `?chat=&entry=`, what happened behind one message: its
@@ -73,8 +75,8 @@ export class InspectGroup extends HttpApiGroup.make('inspect').add(
     error: ApiErrors.notFound,
   }).annotate(EndpointScope, 'inspect'),
   HttpApiEndpoint.get('turn', '/inspect/turn', {
-    query: { operation: OperationId },
-    success: TurnTimeline,
+    query: { operation: OperationId, format: Schema.optional(Schema.Literal('otlp')) },
+    success: Schema.Union([TurnTimeline, OtlpTraceData]),
     error: ApiErrors.notFound,
   }).annotate(EndpointScope, 'inspect'),
   HttpApiEndpoint.get('problems', '/inspect/problems', {
