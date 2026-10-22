@@ -261,7 +261,8 @@
 }
 @media (pointer: coarse), (any-pointer: coarse) {
   .sidebar-row,
-  .sidebar-section-toggle {
+  .sidebar-section-toggle,
+  .sidebar-brand {
     min-height: 2.75rem;
   }
   .sidebar-collapse {
@@ -1603,6 +1604,11 @@ a.list-row:focus-visible {
   .list-fold {
     min-height: 2.75rem;
   }
+}
+.list-fold:focus-visible {
+  border-radius: 0.375rem;
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 .list-fold > svg {
   width: 0.875rem;

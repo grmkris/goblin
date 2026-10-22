@@ -308,6 +308,15 @@ try {
       'New workspace',
       'Workspace settings',
     ])
+    // At a mouse, No thanks and Join take a press 5px above what they draw (40px tall in all) without growing.
+    const reach = await menu.locator('[role="menuitem"]', { hasText: /^(No thanks|Join)$/u }).evaluateAll((items) =>
+      items.map((item) => {
+        const box = item.getBoundingClientRect()
+        const above = document.elementFromPoint(box.left + box.width / 2, box.top - 5)?.closest('[role="menuitem"]')
+        return above === item && box.height < 40
+      }),
+    )
+    assert.deepEqual(reach, [true, true, true, true])
     // Joining a workspace whose owner's own models take no members is refused in place, in words.
     await menu.getByRole('group', { name: 'Lab notes' }).getByRole('menuitem', { name: 'Join' }).click()
     await menu.getByRole('alert').filter({ hasText: "Lab notes offers its owner's own subscription models" }).waitFor()
@@ -362,8 +371,17 @@ try {
     await drawer.waitFor()
     await page.waitForTimeout(400)
     await page.screenshot({ path: path.join(out, `phone-${colorScheme}-drawer.png`) })
+    const brandHeight = await drawer
+      .locator('.sidebar-brand')
+      .evaluate((trigger) => (trigger instanceof HTMLElement ? trigger.offsetHeight : 0))
+    assert(brandHeight >= 44, `the workspace menu takes a finger (${String(brandHeight)})`)
     await drawer.locator('.sidebar-brand').tap()
     await page.getByRole('menu').waitFor()
+    const short = await page
+      .getByRole('menu')
+      .locator('[role="menuitem"]')
+      .evaluateAll((items) => items.filter((item) => item instanceof HTMLElement && item.offsetHeight < 44).length)
+    assert.equal(short, 0, 'every menu item takes a finger')
     await page.waitForTimeout(200)
     await page.screenshot({ path: path.join(out, `phone-${colorScheme}-workspace-menu.png`) })
     await page.keyboard.press('Escape')
