@@ -84,7 +84,7 @@ const textsOf = (content: unknown): string[] =>
     : []
 
 /** The owner's turns in a transcript, by goblin's mark: whether their author is `author`, their words, their files. */
-const markedTurns = (entries: readonly EntryRecord[], author: string) =>
+export const markedTurns = (entries: readonly EntryRecord[], author: string) =>
   entries
     .flatMap((each) => each.model ?? [])
     .flatMap((message) => {

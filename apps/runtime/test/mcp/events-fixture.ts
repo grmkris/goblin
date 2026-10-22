@@ -24,7 +24,9 @@ type InboxEntry = {
 /**
  * A producer of the draft Events profile. It declares Events as top-level `capabilities.events`, or with `spelling`
  * `extension` as the SEP-3415 `io.modelcontextprotocol/events` extension; `payloadSchema` may be left out. Its
- * `feed_read` lists the inbox after a cursor, and every tool call is kept with its arguments (`toolCalls`).
+ * `feed_read` lists the inbox after a cursor, and every tool call is kept with its arguments (`toolCalls`). A tool
+ * declares the output schema `outputSchemas` gives it, and with a `prefix` the server answers as a gateway does: its
+ * tools are listed `<prefix>_<tool>` and its post events `<prefix>.<event>`.
  */
 export class EventsFixture {
   readonly subscriptions = new Map<string, { secret: string; url: string }>()
@@ -40,6 +42,8 @@ export class EventsFixture {
   skills: readonly SkillEntry[] = []
   readonly files = new Map<string, string>()
   inputSchema: Record<string, unknown> = { type: 'object' }
+  outputSchemas: Readonly<Record<string, Record<string, unknown>>> = {}
+  prefix: string | undefined
   payloadSchema: Record<string, unknown> | undefined = { type: 'object' }
   spelling: 'top-level' | 'extension' = 'top-level'
   cursor = '0'
@@ -60,17 +64,22 @@ export class EventsFixture {
       ],
     }))
     server.setRequestHandler('tools/list', () => ({
-      tools: ['feed_read', 'post_reply', 'subscribe', 'unsubscribe'].map((name) => ({
-        name,
-        inputSchema: { type: 'object' as const },
-      })),
+      tools: ['feed_read', 'post_reply', 'subscribe', 'unsubscribe'].map((name) => {
+        const outputSchema = this.outputSchemas[name]
+        return {
+          name: this.#tool(name),
+          inputSchema: { type: 'object' as const },
+          ...(outputSchema === undefined ? {} : { outputSchema: { type: 'object' as const, ...outputSchema } }),
+        }
+      }),
     }))
     server.setRequestHandler('tools/call', (request) => {
       this.calls.push(request.params.name)
       this.toolCalls.push({ name: request.params.name, arguments: { ...request.params.arguments } })
-      if (request.params.name === 'post_reply') return this.replyResult({ ...request.params.arguments })
+      const tool = this.prefix === undefined ? request.params.name : request.params.name.slice(this.prefix.length + 1)
+      if (tool === 'post_reply') return this.replyResult({ ...request.params.arguments })
       const content =
-        request.params.name === 'feed_read'
+        tool === 'feed_read'
           ? { messages: request.params.arguments?.cursor === this.cursor ? [] : this.inbox, nextCursor: this.cursor }
           : { status: 'subscribed' }
       return { content: [], structuredContent: content }
@@ -78,7 +87,7 @@ export class EventsFixture {
     server.setRequestHandler('events/list', { params: Params }, () => ({
       resultType: 'complete',
       events: ['post.created', 'post.liked', 'skills.updated', 'skills.list_changed'].map((name) => ({
-        name,
+        name: name.startsWith('skills.') || this.prefix === undefined ? name : `${this.prefix}.${name}`,
         description: name,
         inputSchema: this.inputSchema,
         ...(this.payloadSchema === undefined ? {} : { payloadSchema: this.payloadSchema }),
@@ -158,6 +167,11 @@ export class EventsFixture {
       result: { ...result, capabilities: declared },
     })
   }
+  /** A tool's name as this server lists it: its own, or a gateway's `<prefix>_<tool>`. */
+  #tool(name: string): string {
+    return this.prefix === undefined ? name : `${this.prefix}_${name}`
+  }
+
   /**
    * A subscription's id, one per event name and webhook URL as a producer keyed by (name, arguments, URL) hands them
    * out: `sub_<name>` for the first URL, `sub_<name>~2`, `~3`… for the next ones (ADR 0041, two connections to one

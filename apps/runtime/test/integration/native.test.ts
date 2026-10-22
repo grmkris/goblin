@@ -17,6 +17,7 @@ import { cases as mcpCases } from './native-mcp.ts'
 import { cases as memoryCases } from './native-memory.ts'
 import { routineCases } from './native-routines.ts'
 import { cases as scopeCases } from './native-scopes.ts'
+import { cases as sourceProposeCases } from './source-propose-case.ts'
 import { cases as telemetryCases } from './native-telemetry.ts'
 import { cases as topicCases } from './native-topics.ts'
 import Stack from './stack.ts'
@@ -46,6 +47,7 @@ const CASES: readonly NativeCase[] = [
   ...appsCases,
   ...telemetryCases,
   ...mcpCases,
+  ...sourceProposeCases,
   ...agentCases(phase),
   ...conversationCases,
   ...scopeCases,

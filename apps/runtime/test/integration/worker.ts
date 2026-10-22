@@ -37,6 +37,7 @@ import { probes as routineSchedulingProbes } from './routines-scheduling.ts'
 import { probes as routineTellMeProbes } from './routines-tell-me.ts'
 import { probes as routineUsageProbes } from './routines-usage.ts'
 import { probes as skillsProbes } from './skills-probe.ts'
+import { probes as sourceProposeProbes } from './source-propose-probe.ts'
 import { probes as sourcesProbes } from './sources-probe.ts'
 import { probes as subagentProbes } from './subagent-probe.ts'
 import { probes as telemetryProbes } from './telemetry-probe.ts'
@@ -70,6 +71,7 @@ const PROBES = registry(
   routinesProbes,
   scopeProbes,
   skillsProbes,
+  sourceProposeProbes,
   sourcesProbes,
   subagentProbes,
   telemetryProbes,
