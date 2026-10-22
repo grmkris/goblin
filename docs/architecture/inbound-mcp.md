@@ -32,14 +32,17 @@ Code, claude.ai, Cursor) or a server's API key.
   registers (`inbound/mcp-server.ts`), and `workspace_list` plus the server's instructions name what it reaches. Each
   call goes to that workspace's agent as the person, a member there with their role there (`inbound/route.ts`). Keys
   are unchanged: a key's calls reach its own workspace.
-- **Scopes.** `/mcp` advertises `goblin:topics`, `goblin:conversations`, `goblin:personas` and `goblin:inspect` in
-  its metadata, and an unauthenticated request gets a 401 naming the metadata and every scope. The consent page offers
-  each `goblin:*` scope a client asks for as its own switch, off until the owner turns it on; Allow grants the rest
-  without the ones left off (`apps/web/src/lib/consent-scope.ts`). A token's standing scopes map to caller scopes
-  (`callerScopesOf`, `auth/resources.ts`): `agent` for any consent, `topics`, `conversations` and `personas` for their
-  `goblin:*` scope, and `inspect` with `transcripts` for `goblin:inspect`. `auth/options.ts` configures the one
-  resource and its allowed scopes, and gives a registering client all of them; a client registered before may need to
-  register again to ask for new ones.
+- **Scopes.** `/mcp` advertises `goblin:agent`, `goblin:topics`, `goblin:conversations`, `goblin:personas`,
+  `goblin:inspect`, `goblin:transcripts`, `goblin:setup` and `goblin:routines` in its metadata, and an unauthenticated
+  request gets a 401 naming the metadata and every scope. The consent page offers each `goblin:*` scope a client asks
+  for as its own switch ([ADR 0098](../adr/0098-admin-for-configuration-and-every-mcp-power-opt-in.md)): asking the
+  agent starts on, the rest off; Allow grants what was asked without the ones left off
+  (`apps/web/src/lib/consent-scope.ts`). A token's standing scopes map to caller scopes one for one (`callerScopesOf`,
+  `auth/resources.ts`): `agent`, `topics`, `conversations`, `personas`, `inspect` (how chats ran, content-free),
+  `transcripts` (conversations in full), `setup` (the setup catalog, the servers, the Sources and their routes) and
+  `routines` (routines and their runs; drafting, changing, pausing and archiving take an admin, confirming stays the
+  web's). `auth/options.ts` configures the one resource and its allowed scopes, and gives a registering client all of
+  them; `0004_mcp_powers.sql` gave clients registered before the whole list.
 - **Tools.** One registry (`inbound/tools.ts`, the tools in `inbound/mcp-server.ts` and `inbound/inspect-tools.ts`):
   each tool calls one owner endpoint as the caller (`ownerCall`, forwarding `x-goblin-caller`) and is listed only when
   the caller holds that endpoint's `EndpointScope`, so admission, scopes, the limit and reach are the owner API's own.

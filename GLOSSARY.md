@@ -14,8 +14,9 @@ _Avoid_: team, org, account (for this)
 
 **Member**:
 A person in a workspace, with a role: an `owner` (who may also delete it), an `admin` (who changes what its agent may do
-with the owners: connections, grants, Sources, the model, Start; ADR 0093) or a `member`, who works in every channel
-with the workspace's connections. One sign-in reaches every workspace its person is a member of. Once a workspace has
+with the owners: connections, grants, Sources, the model, Start, and what the agent works with: Personas, a Topic's
+guidance and setup, routines; ADRs 0093, 0098) or a `member`, who works in every channel with the workspace's
+connections. One sign-in reaches every workspace its person is a member of. Once a workspace has
 several, each one's messages name who wrote them (ADR 0094).
 
 **Owner**:

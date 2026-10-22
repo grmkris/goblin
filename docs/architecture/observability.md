@@ -141,7 +141,7 @@ without changing it or calling a model. The queries are in `contracts/src/inspec
 
 The agent answers them on the owner API's `inspect` group (`GET /api/inspect/…`, ADR 0086): the owner's app reads
 `details` for a message's Details sheet, and `/mcp`'s `inspect_*` tools call the same endpoints as their caller. The
-two conversation reads need `transcripts`, which only an OAuth client consented with `goblin:inspect` holds; the
+two conversation reads need `transcripts`, which only an OAuth client consented with `goblin:transcripts` holds; the
 content-free reads need `inspect`, which a key can hold too, seeing only the run events of chats within its reach
 (`inspectReach`, ADR 0084; see Inbound MCP).
 
