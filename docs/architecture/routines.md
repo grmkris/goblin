@@ -66,8 +66,10 @@ Pi acceptance does not establish external delivery.
 Event confirmation grants the exact connected server/name/canonical-arguments selector after authenticated review;
 its arguments must satisfy the producer descriptor schema. `routines/events.ts` binds `routine:<id>` and the current
 revision to ADR 0011's static dispatcher. Shared leases survive until their last consumer retires. Each admitted
-occurrence claims a losslessly escaped event ID, seals scrubbed bounded metadata, and labels it as untrusted data
-in the fresh run input. Replays remain no-ops across revised consumers, even after ingress receipts expire. At most
+occurrence claims a losslessly escaped event ID, seals the event's name, time and data, and labels them as untrusted
+data in the fresh run input. The data is the producer's JSON as sent, with no link or credential rewriting; data over
+16 KiB is left out whole with a note to read it through the server's tools, never cut (`routines/event-data.ts`, ADR
+0104). Replays remain no-ops across revised consumers, even after ingress receipts expire. At most
 one event run per minute is admitted across the agent; busy or spacing conflicts replace one sealed pending firing,
 whose durable handoff and consumer acknowledgment commit together. Gap controls show recovery health and use the
 originating authoritative poll; verification and termination create no model turn. Termination pauses the routine

@@ -567,14 +567,15 @@ and about 20 s. The React Compiler was measured and not adopted: both engines cu
 
 ## Routine definition checks
 
-From `apps/runtime`, run `heavy bun run test:unit test/routines-time.test.ts test/routines-summary.test.ts` for IANA
-zones, DST, cron spacing, explicit reminder offsets, strict write CSRF and summary scrubbing. Run
+From `apps/runtime`, run `heavy bun run test:unit test/routines-time.test.ts test/routines-event-data.test.ts
+test/routines-summary.test.ts` for IANA zones, DST, cron spacing, explicit reminder offsets, strict write CSRF, event
+data kept as sent (byte for byte, or left out whole past its limit) and summary scrubbing. Run
 `GOBLIN_HARNESS_PORT=18871 heavy bun run test:integration native.test.ts -t routine` for real local workerd SQLite,
 native dated alarms, Pi run/session/report dedupe, no copied capabilities, committed usage, revoked-authority skips,
 correlated questions, late answers, main Stop, two-running cap, burst collapse, archive and revision fencing. These
 keyless fixture tests establish local behavior. The signed routine Events case shares the native stack and official
 fixture producer: exact descriptor filters, raw signatures, shared leases, escaped run IDs, replay across revisions,
-sealed metadata, one event/minute, pending coalescing, gap/poll recovery and termination/reconfirmation. No live MCP
+sealed event data the run reads as the producer sent it, one event/minute, pending coalescing, gap/poll recovery and termination/reconfirmation. No live MCP
 producer or external message send is involved. To run just that case, use
 `GOBLIN_HARNESS_PORT=18871 heavy bun run test:integration native.test.ts -t 'signed routine Events'`.
 

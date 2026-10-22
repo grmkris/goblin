@@ -7,16 +7,15 @@ import { type AppError, Conflict, attempt, isAppError } from '../http/errors.ts'
 import { Cipher } from '../mcp/oauth/cipher.ts'
 import type { EventContext } from '../mcp/events/dispatcher.ts'
 import { type Consumer, canonicalArguments } from '../mcp/events/store.ts'
-import { redactSecretFields } from '../mcp/oauth/redaction.ts'
 import { Events, McpServers } from '../mcp/service.ts'
 import { writeLine } from '../observability/logger.ts'
 import { safeErrorType } from '../observability/report.ts'
+import { eventMetadata } from './event-data.ts'
 import { postEventNotice } from './notices.ts'
 import { admit, wakeIn } from './runner.ts'
 import type { Firing } from './runs.ts'
 import { Routines } from './service.ts'
 import { type RoutineRow, type RoutineStore, definitionOf } from './store.ts'
-import { routineSummary } from './summary.ts'
 
 // The shared Events dispatcher owns delivery (the 'routine-trigger' handler); these are only confirmed routine
 // admission and sealed pending metadata.
@@ -175,8 +174,9 @@ const replayed = (row: RoutineRow, occurredAt: number, at: number): boolean =>
 
 /**
  * One event occurrence: its notice first when the routine tells the owner (ADR 0041), then, when it hands the work
- * over, a firing with its selected metadata sealed for the run's prompt. A busy routine keeps the firing sealed as its
- * pending trigger, in one short transaction with this consumer's acknowledgement (`store`'s write).
+ * over, a firing with the event's data sealed for the run's prompt as the producer sent it (ADR 0104). A busy routine
+ * keeps the firing sealed as its pending trigger, in one short transaction with this consumer's acknowledgement
+ * (`store`'s write).
  */
 const occurrence = (store: RoutineStore, row: RoutineRow, context: EventContext) =>
   Effect.gen(function* () {
@@ -195,12 +195,9 @@ const occurrence = (store: RoutineStore, row: RoutineRow, context: EventContext)
         occurredAt,
       })
     if (handOverOf(definition) === undefined) return
-    const data = JSON.stringify(
-      redactSecretFields({ name: envelope.name, timestamp: envelope.timestamp, data: envelope.data }),
-    )
     const cipher = yield* Cipher
-    const selected = routineSummary(data).slice(0, 8000)
-    const dataSealed = yield* attempt(() => cipher.encrypt(selected, `routine-event:${operationId}:${row.revision}`))
+    const metadata = eventMetadata(envelope)
+    const dataSealed = yield* attempt(() => cipher.encrypt(metadata, `routine-event:${operationId}:${row.revision}`))
     const firing: Firing = {
       routineId: row.id,
       revision: row.revision,

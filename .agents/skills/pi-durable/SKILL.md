@@ -151,7 +151,7 @@ itself authorize model spend, external messages, deployment or production change
   entry with the routine's link. A Persona turn that stops on goblin's own approval or grant marker writes its hold
   into the answer; the owner's reply resumes the same `goblin.persona-turn` task kind with `resume: { fork, text }`.
 
-- Event routines consume the shared static Events handler at the confirmed revision. Seal scrubbed bounded metadata outside Pi commits, label it as untrusted data, preserve event run IDs across definition revisions and ingress retention, and commit a pending handoff with its consumer ACK. Admission is one event/minute per agent; controls never start model work.
+- Event routines consume the shared static Events handler at the confirmed revision. Seal the event's data outside Pi commits as the producer sent it (no link or credential rewriting; over 16 KiB it is left out with a note, never cut, ADR 0104), label it as untrusted data, preserve event run IDs across definition revisions and ingress retention, and commit a pending handoff with its consumer ACK. Admission is one event/minute per agent; controls never start model work.
 
 - The composer is a browser affordance over stable server-side selections. `/` chooses local commands or skills and `@`
   chooses connections, skills or helpers. Resolve each selection again before `useModel`; catalog labels never authorize

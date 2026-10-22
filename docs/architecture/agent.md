@@ -323,9 +323,10 @@ unfiltered listing with its `services` instead: each prefix, its tool count and 
 name or description). Both filters also narrow any listing, and naming tools in `tools` lists them in full as before. Refusals, held calls and the `skills` section name a connection the same way, `"<label>" (<connectionId>)`
 (`named` in `mcp/servers/labels.ts`); labels never enter telemetry. `mcp_call` takes its `arguments` as an object or the JSON string of one, and returns the server's result as
 Pi's MCP tools shape it (content blocks, `details.structuredContent`, `_meta` and the origin).
-Remote result details and signed routine event metadata share `mcp/oauth/redaction.ts`: it scrubs exact credential-shaped
-keys such as `accessToken`, `refresh_token` and `apiKey`, recursively. Public asset and usage fields such as
-`rewardToken`, `token`, `tokens` and `tokenAddress` remain readable.
+Remote result details and the arguments an approval shows go through `mcp/oauth/redaction.ts`: it scrubs exact
+credential-shaped keys such as `accessToken`, `refresh_token` and `apiKey`, recursively. Public asset and usage fields
+such as `rewardToken`, `token`, `tokens` and `tokenAddress` remain readable. A routine's event data skips it: its run
+reads the data as the producer sent it (ADR 0104).
 
 `ask_user` (`pi/ask-user.ts`) is how the agent asks the owner something. It takes one to five short questions:
 single choice, multiple choice or free text. The tool result is the questions as numbered plain text, with details

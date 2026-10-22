@@ -87,7 +87,7 @@ export const routineCases = (phase: Phase): readonly NativeCase[] => [
     }),
   ),
   matchCase(
-    'signed routine Events freeze metadata, dedupe and coalesce, recover gaps and retire revisions',
+    'signed routine Events seal the data as sent, dedupe and coalesce, recover gaps and retire revisions',
     'routine-events',
     (result) =>
       expect(result).toMatchObject({
@@ -99,8 +99,7 @@ export const routineCases = (phase: Phase): readonly NativeCase[] => [
         received: 204,
         replayOneRun: true,
         metadataSealed: true,
-        scrubbedMetadata: true,
-        publicTokensPreserved: true,
+        metadataAsSent: true,
         metadataLabelled: true,
         spacedOneRun: true,
         pendingLatest: true,

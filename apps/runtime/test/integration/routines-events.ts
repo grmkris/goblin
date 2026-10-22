@@ -12,8 +12,12 @@ import { type Probes, inAgent } from './probe.ts'
 import { waitFor } from './until.ts'
 import { withHandOver } from '../routine-definition.ts'
 
-const includesPublicTokens = (metadata: string, modelData: string) =>
-  ['0x123', '0x456'].every((token) => metadata.includes(token) && modelData.includes(token))
+/**
+ * The data the producer sends, in its compact JSON: a link whose query carries its access, fields after it, and fields
+ * that look like credentials. The run reads it as sent (ADR 0104).
+ */
+const PRODUCER_DATA =
+  '{"entryIds":["fixture-1"],"instructions":"untrusted fixture data","outputs":{"shareUrl":"https://media.test/f/a.mp4?t=fixture-share&dl=1","sha256":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","artifactId":"art_1"},"rewardToken":"0x123","token":"0x456","nested":[{"accessToken":"fixture-private","refresh_token":"fixture-private"}]}'
 const definition: RoutineDefinition = {
   title: 'Native event routine',
   timezone: 'UTC',
@@ -83,24 +87,17 @@ async function routineEventsProbe(
   const shared = lease?.subscriptionId === state.events.activeConsumer(`routine:${second.id}`)?.subscriptionId
   await changeRoutine(agent, second.id, { revision: 1, operationId: 'second-pause' }, 'pause')
   const leavingSharedKeptRemote = fixture.subscriptions.has('sub_post.created')
-  const deliver = (id: string, signature?: string) =>
-    fixture.deliver(
+  const sentAt = new Map<string, string>()
+  const deliver = (id: string, signature?: string) => {
+    const timestamp = new Date().toISOString()
+    if (!sentAt.has(id)) sentAt.set(id, timestamp)
+    return fixture.deliver(
       'sub_post.created',
-      {
-        eventId: id,
-        name: 'post.created',
-        timestamp: new Date().toISOString(),
-        data: {
-          entryIds: ['fixture-1'],
-          instructions: 'untrusted fixture data',
-          rewardToken: '0x123',
-          token: '0x456',
-          nested: [{ accessToken: 'fixture-private', refresh_token: 'fixture-private' }],
-        },
-      },
+      { eventId: id, name: 'post.created', timestamp, data: JSON.parse(PRODUCER_DATA) },
       id,
       signature === undefined ? {} : { signature },
     )
+  }
   const bad = await deliver('evt_bad', 'v1,bad')
   const received = await deliver('evt:one/%')
   await agent.mcpEventsWake()
@@ -202,9 +199,9 @@ async function routineEventsProbe(
     received: received.status,
     replayOneRun: raw?.operationId === `routine:${first.id}:evt%3Aone%2F%25`,
     metadataSealed: !!raw?.eventDataSealed && !raw.eventDataSealed.includes('fixture-private'),
-    scrubbedMetadata: !metadata.includes('fixture-private'),
-    publicTokensPreserved: includesPublicTokens(metadata, modelData),
-    metadataLabelled: modelData.includes('Untrusted event metadata') && !modelData.includes('fixture-private'),
+    metadataAsSent:
+      metadata === `{"name":"post.created","timestamp":"${sentAt.get('evt:one/%') ?? ''}","data":${PRODUCER_DATA}}`,
+    metadataLabelled: modelData.includes('Untrusted event metadata') && modelData.includes(PRODUCER_DATA),
     spacedOneRun,
     pendingLatest: pending.includes('evt_three'),
     pendingReplayNoop,
