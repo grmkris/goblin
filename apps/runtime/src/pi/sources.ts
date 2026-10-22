@@ -108,12 +108,8 @@ const proposeTool = (run: RunProgram) =>
           const setup = yield* decodeSetup({ ...facts, newKeys: route }).pipe(
             Effect.mapError((issue) => new InvalidInput({ reason: issue.message })),
           )
-          const by = yield* byAgent(api)
           const operationId = `source:${String(api.conversationId)}:${api.callId}`
-          const view = yield* (yield* Sources).propose(
-            { connectionId, title, setup, operationId },
-            { actor: 'agent', ...(by.chat === undefined ? {} : { chat: by.chat }) },
-          )
+          const view = yield* (yield* Sources).propose({ connectionId, title, setup, operationId }, yield* byAgent(api))
           return { sourceId: view.id, revision: view.revision, title: view.title }
         }),
       )

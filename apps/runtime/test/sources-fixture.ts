@@ -190,7 +190,6 @@ export const sourceWorld = (
             operationId: `op-${id}`,
             connectionId: 'chat',
             title: 'Chat',
-            proposedBy: 'owner',
             chatId: null,
             setup,
           },

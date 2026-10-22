@@ -70,7 +70,6 @@ const source = (fields: Partial<SourceView> = {}): SourceView => ({
   setup: SETUP,
   revision: 1,
   state: 'active',
-  proposedBy: 'owner',
   waiting: [],
   createdAt: 1,
   updatedAt: 1,

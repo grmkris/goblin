@@ -63,7 +63,6 @@ const sourceOf = (id: string, setup: unknown, state: string, fields: Json = {}):
   setup,
   revision: 1,
   state,
-  proposedBy: 'agent',
   waiting: [],
   createdAt: 1,
   updatedAt: 1,

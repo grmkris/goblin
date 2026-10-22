@@ -1,8 +1,8 @@
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 /**
- * The owner's Sources (ADR 0066): one row each, its setup (`SourceSetup` JSON) at `revision`, proposed by the owner or
- * the agent (`operation_id` makes a proposal idempotent). `state` is `proposed` until the owner confirms that revision
+ * The owner's Sources (ADR 0066): one row each, its setup (`SourceSetup` JSON) at `revision`, proposed by the agent in
+ * `chat_id` (`operation_id` makes a proposal idempotent). `state` is `proposed` until the owner confirms that revision
  * (or `refused`), `active` once its event is subscribed, `paused` by the owner or for their review (`paused`), with
  * `health` saying why. A confirmed Source is bound to the connection's endpoint and a digest of its tools' grants
  * (`endpoint`, `grant_version`), and its event is subscribed under consumer `source:<id>` at revision `binding`.
@@ -19,7 +19,6 @@ export const appSourceSetups = sqliteTable('app_source_setups', {
   state: text('state', { enum: ['proposed', 'active', 'paused', 'refused'] }).notNull(),
   paused: text('paused', { enum: ['owner', 'review'] }),
   health: text('health'),
-  proposedBy: text('proposed_by', { enum: ['owner', 'agent'] }).notNull(),
   chatId: text('chat_id'),
   endpoint: text('endpoint'),
   grantVersion: text('grant_version'),

@@ -310,7 +310,6 @@ export const SourceView = Schema.Struct({
   state: SourceState,
   paused: Schema.optional(Schema.Literals(['owner', 'review'])),
   health: Schema.optional(Schema.String),
-  proposedBy: Schema.Literals(['owner', 'agent']),
   bound: Schema.optional(SourceBound),
   waiting: Schema.Array(SourceWaiting),
   createdAt: Schema.Number,

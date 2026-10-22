@@ -122,7 +122,7 @@ async function confirmAndDeliver(
 ) {
   const { db } = await connectEventsServer(storage, api, fixture, { connectionId: CONNECTION, title: 'Chat' })
   const proposal = { id: SOURCE, operationId: 'source-canary', connectionId: CONNECTION, title: 'Chat messages' }
-  propose(db, { ...proposal, proposedBy: 'agent', chatId: null, setup }, Math.floor(Date.now() / 1000))
+  propose(db, { ...proposal, chatId: null, setup }, Math.floor(Date.now() / 1000))
   const confirmed = await callOwner(api, (owner) =>
     owner.sources.confirm({ params: { id: SOURCE }, payload: { revision: 1 } }),
   )

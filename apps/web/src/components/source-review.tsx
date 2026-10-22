@@ -118,9 +118,7 @@ export function SourceReview({ source }: { readonly source: SourceView }) {
           <span className="routine-title">{source.title}</span>
         </CardTitle>
         <CardDescription>
-          <span className="routine-title">
-            A Source on {source.label}, {source.proposedBy === 'agent' ? 'proposed by goblin' : 'proposed by you'}
-          </span>
+          <span className="routine-title">A Source on {source.label}, proposed by goblin</span>
         </CardDescription>
         <CardAction>
           <StatusLabel label={sourceStatus(source)} />

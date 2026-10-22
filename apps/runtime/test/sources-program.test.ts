@@ -165,7 +165,7 @@ describe('proposing and confirming a Source (ADR 0066)', () => {
             ? Effect.andThen(Deferred.succeed(entered, undefined), Deferred.await(release))
             : Effect.void,
       })
-      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-confirm-race' }, { actor: 'owner' }))
+      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-confirm-race' }, {}))
       const first = yield* Effect.forkChild(Effect.flip(run(confirmSource(engine, ports, proposed.id, 1))))
       yield* Deferred.await(entered)
       const result = { accepted: { pointer: '/ok', equals: true } }
@@ -186,7 +186,7 @@ describe('proposing and confirming a Source (ADR 0066)', () => {
   it.effect('editing reply rules retires the binding and requires confirmation of the new exact revision', () =>
     Effect.gen(function* () {
       const { db, engine, ports, calls, run } = yield* programWorld()
-      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-rules' }, { actor: 'owner' }))
+      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-rules' }, {}))
       yield* run(confirmSource(engine, ports, proposed.id, 1))
       const binding = sourceRow(db, proposed.id)?.binding
       const result = { accepted: { pointer: '/ok', equals: true } }
@@ -209,9 +209,7 @@ describe('proposing and confirming a Source (ADR 0066)', () => {
       const { run } = yield* programWorld()
       const { reply: _, ...noReply } = PROPOSAL.setup
       const setup = { ...noReply, key: [{ name: 'room', pointer: '/room' }] }
-      const refused = yield* Effect.flip(
-        run(proposeSource({ ...PROPOSAL, setup, operationId: 'op-1' }, { actor: 'agent' })),
-      )
+      const refused = yield* Effect.flip(run(proposeSource({ ...PROPOSAL, setup, operationId: 'op-1' }, {})))
       expect(refused).toMatchObject({
         _tag: 'InvalidInput',
         reason: expect.stringContaining('key.room points at /room'),
@@ -222,9 +220,9 @@ describe('proposing and confirming a Source (ADR 0066)', () => {
   it.effect('grants the event and tools, subscribes it and binds it to the endpoint and grants on Confirm', () =>
     Effect.gen(function* () {
       const { db, engine, ports, calls, run } = yield* programWorld()
-      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-1' }, { actor: 'owner' }))
+      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-1' }, {}))
       expect(proposed).toMatchObject({ state: 'proposed', revision: 1, label: 'Chat', waiting: [] })
-      expect(yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-1' }, { actor: 'owner' }))).toMatchObject({
+      expect(yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-1' }, {}))).toMatchObject({
         id: proposed.id,
       })
       expect(yield* Effect.flip(run(confirmSource(engine, ports, proposed.id, 2)))).toMatchObject({
@@ -256,7 +254,7 @@ describe('keeping a Source bound (ADR 0066)', () => {
             ? Effect.andThen(Deferred.succeed(entered, undefined), Deferred.await(release))
             : Effect.void,
       })
-      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-unbind-race' }, { actor: 'owner' }))
+      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-unbind-race' }, {}))
       yield* run(confirmSource(engine, ports, proposed.id, 1))
       const original = sourceRow(db, proposed.id)?.binding
       const pausing = yield* Effect.forkChild(run(pauseSource(proposed.id)))
@@ -282,7 +280,7 @@ describe('keeping a Source bound (ADR 0066)', () => {
             ? Effect.andThen(Deferred.succeed(entered, undefined), Deferred.await(release))
             : Effect.void,
       })
-      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-alarm-race' }, { actor: 'owner' }))
+      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-alarm-race' }, {}))
       yield* run(confirmSource(engine, ports, proposed.id, 1))
       const original = sourceRow(db, proposed.id)?.binding
       leases.set(`sub-${String(original)}`, 'terminated')
@@ -299,7 +297,7 @@ describe('keeping a Source bound (ADR 0066)', () => {
   it.effect('takes an owner message from an event, and subscribes again when the server ends the subscription', () =>
     Effect.gen(function* () {
       const { db, engine, ports, seen, calls, leases, run } = yield* programWorld()
-      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-1' }, { actor: 'owner' }))
+      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-1' }, {}))
       yield* run(confirmSource(engine, ports, proposed.id, 1))
       const binding = sourceRow(db, proposed.id)?.binding ?? 0
       yield* run(consumeSourceEvent(engine, ports, delivery(proposed.id, binding, OCCURRENCE)))
@@ -319,7 +317,7 @@ describe('keeping a Source bound (ADR 0066)', () => {
   it.effect('pauses for review, and ends its subscription, once a tool grant it was confirmed with changed', () =>
     Effect.gen(function* () {
       const { db, engine, ports, seen, calls, versions, run } = yield* programWorld()
-      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-1' }, { actor: 'owner' }))
+      const proposed = yield* run(proposeSource({ ...PROPOSAL, operationId: 'op-1' }, {}))
       yield* run(confirmSource(engine, ports, proposed.id, 1))
       const binding = sourceRow(db, proposed.id)?.binding ?? 0
       versions.set('message_send', 'v2')

@@ -42,17 +42,43 @@ const FTS = [
   'app_transcript_fts_idx',
 ]
 
+/** A database with the migrations before `key` applied, and a step that applies `key` and every one after it. */
+const before = (key: string) => {
+  const sqlite = new DatabaseSync(':memory:')
+  const at = MIGRATIONS.findIndex((migration) => migration.key === key)
+  const apply = (migrations: readonly (typeof MIGRATIONS)[number][]) => {
+    for (const migration of migrations) for (const statement of migration.sql.split(BREAK)) sqlite.exec(statement)
+  }
+  apply(MIGRATIONS.slice(0, at))
+  return { sqlite, rest: () => apply(MIGRATIONS.slice(at)) }
+}
+
 describe('resident authority until revoked (ADR 0088)', () => {
   it('keeps when it was granted and drops the expiry, so a lapsed one is active again', () => {
-    const sqlite = new DatabaseSync(':memory:')
-    const [last, ...before] = [...MIGRATIONS].toReversed()
-    for (const migration of before.toReversed())
-      for (const statement of migration.sql.split(BREAK)) sqlite.exec(statement)
+    const { sqlite, rest } = before('20261020200000_resident_until_revoked')
     // Authority as it was before: renewed at 100, lapsed at 200.
     sqlite.exec('INSERT INTO app_resident (id, renewed_at, expires_at, revoked_at) VALUES (1, 100, 200, NULL)')
-    for (const statement of last?.sql.split(BREAK) ?? []) sqlite.exec(statement)
+    rest()
     expect(sqlite.prepare('SELECT * FROM app_resident').all()).toEqual([{ id: 1, granted_at: 100, revoked_at: null }])
     expect(residentStatus(drizzle({ client: sqlite }))).toEqual({ state: 'active', grantedAt: 100 })
+    sqlite.close()
+  })
+})
+
+describe('a Source keeps no proposer (ADR 0068)', () => {
+  it('drops who proposed it and keeps the rest of the row', () => {
+    const { sqlite, rest } = before('20261022000000_source_proposer')
+    sqlite.exec(
+      "INSERT INTO app_source_setups (id, operation_id, connection_id, title, setup, revision, state, proposed_by, chat_id, created_at, updated_at) VALUES ('src_00000000000000a1', 'op', 'feed', 'Feed', '{}', 2, 'active', 'owner', '1', 1, 2)",
+    )
+    rest()
+    expect(
+      sqlite.prepare('SELECT id, operation_id, title, revision, state, chat_id FROM app_source_setups').all(),
+    ).toEqual([
+      { id: 'src_00000000000000a1', operation_id: 'op', title: 'Feed', revision: 2, state: 'active', chat_id: '1' },
+    ])
+    const columns = sqlite.prepare('PRAGMA table_info("app_source_setups")').all()
+    expect(columns.map((column) => column['name'])).not.toContain('proposed_by')
     sqlite.close()
   })
 })
@@ -71,6 +97,7 @@ describe('fresh application baseline', () => {
       '20261020000000_key_reach',
       '20261020120000_invocation_reason',
       '20261020200000_resident_until_revoked',
+      '20261022000000_source_proposer',
     ])
     // An additive migration that alters a table names it too, so a table may be named more than once.
     const owned = [...new Set(MIGRATIONS.flatMap((migration) => migration.tables))]

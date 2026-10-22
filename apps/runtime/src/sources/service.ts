@@ -24,11 +24,8 @@ export class Sources extends Context.Service<
     readonly list: Effect.Effect<SourcePage, AppError>
     /** A Source and every conversation it has seen. */
     readonly routes: (id: string) => Effect.Effect<SourceRoutes, AppError>
-    /** A proposal (the agent's `source_propose`, ADR 0068); the same operation finds the same one. */
-    readonly propose: (
-      proposal: SourceProposal,
-      by: { readonly actor: 'owner' | 'agent'; readonly chat?: string },
-    ) => Effect.Effect<SourceView, AppError>
+    /** The agent's proposal from `by.chat` (`source_propose`, ADR 0068); the same operation finds the same one. */
+    readonly propose: (proposal: SourceProposal, by: { readonly chat?: string }) => Effect.Effect<SourceView, AppError>
     /** The owner confirms the exact revision: its event and tools are granted, it is subscribed and bound. */
     readonly confirm: (id: string, revision: number) => Effect.Effect<SourceView, AppError>
     /** Owner edits reply-result rules at an exact revision; a new proposal must be confirmed. */

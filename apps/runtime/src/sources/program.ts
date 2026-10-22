@@ -91,7 +91,6 @@ const viewOf = (row: SourceRow, label: string, setup: SourceSetup, waiting: Sour
   state: row.state,
   ...(row.paused === null ? {} : { paused: row.paused }),
   ...(row.health === null ? {} : { health: row.health }),
-  proposedBy: row.proposedBy,
   ...(row.endpoint === null || row.grantVersion === null
     ? {}
     : { bound: { endpoint: row.endpoint, grantVersion: row.grantVersion } }),
@@ -224,12 +223,13 @@ const newId = Effect.map(Effect.all([Random.nextIntBetween(0, 2 ** 31), Random.n
 )
 
 /**
- * A proposal of a Source on `connectionId` (the agent's `source_propose`, ADR 0068): checked against what the connection
- * offers now, kept as revision 1 for the owner to confirm. The same operation finds the same one.
+ * A proposal of a Source on `connectionId`, by the agent's `source_propose` in `by.chat` (ADR 0068: only the agent
+ * proposes one): checked against what the connection offers now, kept as revision 1 for the owner to confirm. The same
+ * operation finds the same one.
  */
 export const proposeSource = Effect.fn('sources.propose')(function* (
   proposal: SourceProposal,
-  by: { readonly actor: 'owner' | 'agent'; readonly chat?: string },
+  by: { readonly chat?: string },
 ) {
   const db = yield* Db
   const existing = proposalOf(db, proposal.operationId)
@@ -245,7 +245,6 @@ export const proposeSource = Effect.fn('sources.propose')(function* (
         operationId: proposal.operationId,
         connectionId: proposal.connectionId,
         title: proposal.title,
-        proposedBy: by.actor,
         chatId: by.chat ?? null,
         setup: proposal.setup,
       },

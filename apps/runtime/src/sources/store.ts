@@ -67,7 +67,7 @@ export const proposalOf = (db: Db, operationId: string): SourceRow | undefined =
 /** A new proposal, as its revision 1; a repeat of the same operation changes nothing. The row it made. */
 export function propose(
   db: Db,
-  proposal: Pick<SourceRow, 'id' | 'operationId' | 'connectionId' | 'title' | 'proposedBy' | 'chatId'> & {
+  proposal: Pick<SourceRow, 'id' | 'operationId' | 'connectionId' | 'title' | 'chatId'> & {
     readonly setup: Setup
   },
   now: number,
