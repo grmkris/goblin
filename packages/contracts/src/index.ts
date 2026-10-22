@@ -1,6 +1,7 @@
 export * from './account.ts'
 export * from './agent.ts'
 export * from './agent-apps.ts'
+export * from './agui/index.ts'
 export * from './apps.ts'
 export * from './composer.ts'
 export * from './conversations.ts'
