@@ -71,10 +71,14 @@ export const setClientReach = async (
       )
       .bind(clientId, person.id, reach.all ? 1 : 0, new Date().toISOString()),
     db.prepare('DELETE FROM mcpReachWorkspace WHERE clientId = ? AND userId = ?').bind(clientId, person.id),
+    // Each only while the person is still its member: a removal between the check above and this batch adds none.
     ...listed.map((workspaceId) =>
       db
-        .prepare('INSERT INTO mcpReachWorkspace (clientId, userId, workspaceId) VALUES (?, ?, ?)')
-        .bind(clientId, person.id, workspaceId),
+        .prepare(
+          `INSERT INTO mcpReachWorkspace (clientId, userId, workspaceId)
+           SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM member WHERE organizationId = ? AND userId = ?)`,
+        )
+        .bind(clientId, person.id, workspaceId, workspaceId, person.id),
     ),
   ])
   return { all: reach.all, workspaces: listed }

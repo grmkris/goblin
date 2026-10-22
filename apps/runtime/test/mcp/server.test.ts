@@ -246,13 +246,18 @@ describe('one /mcp, the workspaces a consent reaches (ADR 0097)', () => {
     }
   })
 
-  it('takes no workspace from a client given exactly one', async () => {
+  it('needs no workspace from a client given exactly one, yet checks one it names after its reach shrank', async () => {
     const { mcp, calls } = await reaching({ all: false, workspaces: [A], named: false })
     try {
       const { tools } = await mcp.listTools()
-      expect(tools.find((tool) => tool.name === 'topic_list')?.inputSchema.properties).not.toHaveProperty('workspace')
+      const topics = tools.find((tool) => tool.name === 'topic_list')
+      expect(topics?.inputSchema.properties).toHaveProperty('workspace')
+      expect(topics?.inputSchema.required ?? []).not.toContain('workspace')
       await mcp.callTool({ name: 'topic_list', arguments: {} })
-      expect(calls).toEqual([undefined])
+      // A name from a tool list older than its reach reaches the resolver, which refuses one it no longer reaches.
+      await mcp.callTool({ name: 'topic_list', arguments: { workspace: 'sidequest' } })
+      expect(calls).toEqual([undefined, 'sidequest'])
+      expect(mcp.getInstructions()).not.toContain(A.name)
     } finally {
       await mcp.close()
     }
@@ -265,6 +270,10 @@ describe('one /mcp, the workspaces a consent reaches (ADR 0097)', () => {
     expect(() => workspaceFor(named, undefined)).toThrow(expect.objectContaining({ reason: 'workspace' }))
     expect(() => workspaceFor(named, 'elsewhere')).toThrow(expect.objectContaining({ what: 'workspace' }))
     expect(workspaceFor({ all: false, workspaces: [A], named: false }, undefined)).toBe(A)
+    expect(() => workspaceFor({ all: false, workspaces: [A], named: false }, 'sidequest')).toThrow()
+    // An id wins over a slug that looks like it.
+    const lookalike = { ...B, slug: A.id }
+    expect(workspaceFor({ all: false, workspaces: [lookalike, A], named: true }, A.id)).toBe(A)
     expect(() => workspaceFor({ all: false, workspaces: [], named: true }, undefined)).toThrow()
   })
 })

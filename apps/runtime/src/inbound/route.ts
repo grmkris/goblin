@@ -92,7 +92,10 @@ export const workspaceFor = (reach: CallerReach, named: string | undefined): Wor
     if (reach.named || only === undefined) throw new InvalidInput({ reason: 'workspace' })
     return only
   }
-  const chosen = reach.workspaces.find((workspace) => workspace.id === named || workspace.slug === named)
+  // An id first: a slug is its admins' to choose, so one may look like another workspace's id.
+  const chosen =
+    reach.workspaces.find((workspace) => workspace.id === named) ??
+    reach.workspaces.find((workspace) => workspace.slug === named)
   if (chosen === undefined) throw new NotFound({ what: 'workspace' })
   return chosen
 }

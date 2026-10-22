@@ -345,9 +345,10 @@ export interface CallerReach {
 
 /** What the guide adds for a client: the workspaces it reaches and how a call names one. */
 const reachGuide = (reach: CallerReach): string => {
-  const named = reach.workspaces.map(({ slug, name, role }) => `${slug} (${name}, ${role})`).join(', ')
+  // Slugs and roles only: a workspace's name is free text its admins write, and these instructions reach the model.
+  const named = reach.workspaces.map(({ slug, role }) => `${slug} (${role})`).join(', ')
   if (reach.workspaces.length === 0)
-    return ' This client reaches no workspace now: its person changes that in Settings → Account → Connected apps.'
+    return ' This client reaches no workspace now: its person changes that in Settings → Connected clients.'
   const which = reach.all ? `all of its person's workspaces, ones they join later included: ${named}` : named
   return reach.named
     ? ` This client reaches ${which}. Every tool takes \`workspace\`, a workspace's id or slug, naming the one the call is for; workspace_list lists them.`
@@ -355,14 +356,17 @@ const reachGuide = (reach: CallerReach): string => {
 }
 
 /**
- * Makes each tool registered on `server` from now on also take `workspace` (ADR 0097) when the caller must name one:
- * the argument is taken out of the tool's arguments and becomes the call's workspace (`target`) while the call starts.
+ * Makes each tool registered on `server` from now on also take `workspace` (ADR 0097), required when the caller must
+ * name one and optional when it reaches one: the argument is taken out of the tool's arguments and becomes the call's
+ * workspace (`target`) while the call starts. A client always has it, so a name it still sends after its reach shrank
+ * is checked, never dropped.
  */
 const naming = (server: McpServer, reach: CallerReach | undefined, target: CallTarget): void => {
-  if (reach === undefined || !reach.named) return
-  const workspace = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)).annotate({
+  if (reach === undefined) return
+  const argument = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)).annotate({
     description: `The workspace this call is for, by id or slug: ${reach.workspaces.map(({ slug }) => slug).join(', ') || 'none now'}.`,
   })
+  const workspace = reach.named ? argument : Schema.optional(argument)
   // oxlint-disable-next-line typescript/no-deprecated -- the SDK's overloads include a deprecated Zod raw-shape form; goblin registers Standard Schemas only
   const original = server.registerTool.bind(server)
   const register = (

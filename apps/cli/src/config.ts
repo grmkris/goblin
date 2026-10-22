@@ -16,12 +16,18 @@ export type Settings = {
   readonly redirect: URL
   readonly store: string
   readonly json: boolean
+  /** The workspace a sign-in that reaches several names in each call (ADR 0097): `--workspace` or `GOBLIN_WORKSPACE`. */
+  readonly workspace?: string
 }
 
 const Environment = Config.all({
   origin: Config.option(Config.String('GOBLIN_ORIGIN')),
+  workspace: Config.option(Config.String('GOBLIN_WORKSPACE')),
   configHome: Config.String('XDG_CONFIG_HOME').pipe(Config.withDefault(join(homedir(), '.config'))),
 })
+
+const workspaceOf = (named: string | undefined) =>
+  named === undefined || named.trim() === '' ? {} : { workspace: named.trim() }
 
 /**
  * Flags over environment (`provider`'s, else the process's) over defaults. The deployment has no default (ADR 0064):
@@ -41,10 +47,11 @@ export async function settingsOf(args: Args, provider?: ConfigProvider.ConfigPro
   return {
     origin,
     endpoint: new URL('/mcp', origin),
-    // Inspection on top of what every /mcp client may do; no identity scopes, which the CLI never reads.
+    // Inspection, runs and conversations in full; no identity scopes, which the CLI never reads.
     scope: 'goblin:inspect goblin:transcripts offline_access',
     redirect: new URL(`http://127.0.0.1:${port}/callback`),
     store: join(environment.configHome, 'goblin', 'credentials.json'),
     json: args.flags.get('json') === true,
+    ...workspaceOf(flagText(args, 'workspace') ?? Option.getOrUndefined(environment.workspace)),
   }
 }

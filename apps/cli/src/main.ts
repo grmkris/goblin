@@ -116,7 +116,12 @@ async function main(argv: readonly string[]): Promise<number> {
     case 'lookup':
       return withClient(settings, args, async (client) => {
         const details = async (operation: string): Promise<string> => {
-          const result: CallResult = await client.callTool({ name: 'inspect_details', arguments: { operation } })
+          // A sign-in that reaches several workspaces names the one to look in (ADR 0097).
+          const { workspace } = settings
+          const result: CallResult = await client.callTool({
+            name: 'inspect_details',
+            arguments: { operation, ...(workspace === undefined ? {} : { workspace }) },
+          })
           return result.isError === true ? failureText(errorText(result)) : render('details', result.structuredContent)
         }
         console.log(await lookup(args, settings.origin, Date.now(), details))
