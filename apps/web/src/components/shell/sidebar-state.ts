@@ -5,6 +5,7 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import { useRouterState } from '@tanstack/react-router'
 import { pinKey } from '@goblin/contracts'
+import { useMyInvitations } from '../../account/hooks.ts'
 import { type Highlight, highlightOf } from '../../lib/nav-highlight.ts'
 import { railCounts } from '../../lib/rail.ts'
 import { recentThreads } from '../../lib/recent-threads.ts'
@@ -87,7 +88,10 @@ export function useHighlight(): Highlight | undefined {
   )
 }
 
-/** The sidebar's counts (ADR 0078): what waits on the owner, the work under way, and the unread threads. */
+/**
+ * The sidebar's counts (ADR 0078): what waits on the owner (their invitations to other workspaces too), the work under
+ * way, and the unread threads.
+ */
 export function useNavCounts(): ReturnType<typeof railCounts> {
   return railCounts({
     views: useConversations(),
@@ -95,6 +99,7 @@ export function useNavCounts(): ReturnType<typeof railCounts> {
     activity: useActivities(),
     invocations: useInvocations(),
     notifications: useNotifications(),
+    invitations: useMyInvitations(),
   })
 }
 

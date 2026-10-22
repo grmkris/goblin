@@ -5,10 +5,12 @@ import type { InvitationPreview } from '@goblin/contracts'
 import { acceptInvitationMutation, declineInvitationMutation, invitationQuery } from '../account/queries.ts'
 import { useSession } from '../auth/hooks.ts'
 import { sessionPersonQuery, signOutMutation } from '../auth/queries.ts'
+import { ROLE_PHRASE } from '../lib/labels.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { inWorkspace } from '../lib/workspace-path.ts'
 import { AuthShell } from './auth-shell.tsx'
 import { Authentication } from './authentication.tsx'
+import { invitationRefusal } from './invitation-refusal.ts'
 
 const ENDED: Readonly<Record<Exclude<InvitationPreview['state'], 'pending'>, string>> = {
   accepted: 'This invitation was already taken.',
@@ -68,7 +70,7 @@ function Decide({ invitation }: { readonly invitation: InvitationPreview }) {
       </div>
       {failure !== null && (
         <Alert variant="destructive">
-          <AlertDescription>{messageOf(failure, 'answer the invitation')}</AlertDescription>
+          <AlertDescription>{invitationRefusal(failure, invitation)}</AlertDescription>
         </Alert>
       )}
     </div>
@@ -98,7 +100,7 @@ export function Invitation({ id }: { readonly id: string }) {
       </AuthShell>
     )
   if (invitation === undefined) return <Skeleton className="m-8 h-40" />
-  const role = invitation.role === 'admin' ? 'an admin' : 'a member'
+  const role = ROLE_PHRASE[invitation.role]
   return (
     <AuthShell
       title={`${invitation.invitedBy} invited you to ${invitation.workspace}`}

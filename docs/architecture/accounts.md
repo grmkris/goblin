@@ -75,6 +75,10 @@ workspace refuses invitations while it is offered their subscription models (`of
 `owner_models`, [ADR 0095](../adr/0095-the-owners-subscription-workspace-takes-no-members.md)). A person's invitations are
 `/api/invitations`: `GET` lists those waiting for their address, `GET /api/invitations/:id` previews one with or
 without a session (the link is all a visitor has), and `accept` or `decline` needs a session of the address it is for.
+They are the person's, not a workspace's, so the web shows the same ones in every workspace: a moss count on the
+workspace menu, which lists them first with Join and No thanks answered in place, and Activity's Needs you (they count
+in Activity's number). Joining opens the workspace joined; a refusal says why in the person's words (`owner_models`, an
+expired or withdrawn one).
 The email-code gate (`auth/email-code.ts`) lets an address with an invitation waiting sign up whatever the sign-up
 mode, and `workspacesOf` gives such a person no first workspace of their own.
 

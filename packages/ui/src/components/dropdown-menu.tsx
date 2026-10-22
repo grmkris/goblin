@@ -94,6 +94,10 @@ function DropdownMenuLabel({
   )
 }
 
+/**
+ * `moss`: the one action a row of the menu offers in place (Join an invitation), filled in the app's moss as Send is,
+ * and a little wider, so it reads as a button beside the row's plain items.
+ */
 function DropdownMenuItem({
   className,
   inset,
@@ -101,7 +105,7 @@ function DropdownMenuItem({
   ...props
 }: MenuPrimitive.Item.Props & {
   inset?: boolean
-  variant?: 'default' | 'destructive'
+  variant?: 'default' | 'destructive' | 'moss'
 }) {
   return (
     <MenuPrimitive.Item
@@ -109,7 +113,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:focus:text-destructive data-[variant=destructive]:data-highlighted:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive pointer-coarse:px-2.5 pointer-coarse:data-inset:pl-9 pointer-coarse:min-h-11 pointer-coarse:gap-2.5 pointer-coarse:text-base pointer-coarse:[&_svg:not([class*='size-'])]:size-[18px]",
+        "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:focus:text-destructive data-[variant=destructive]:data-highlighted:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive pointer-coarse:px-2.5 pointer-coarse:data-inset:pl-9 pointer-coarse:min-h-11 pointer-coarse:gap-2.5 pointer-coarse:text-base pointer-coarse:[&_svg:not([class*='size-'])]:size-[18px] data-[variant=moss]:bg-moss data-[variant=moss]:px-2.5 data-[variant=moss]:font-medium data-[variant=moss]:text-moss-foreground data-[variant=moss]:focus:bg-moss/85 data-[variant=moss]:focus:text-moss-foreground data-[variant=moss]:data-highlighted:bg-moss/85 data-[variant=moss]:data-highlighted:text-moss-foreground pointer-coarse:data-[variant=moss]:px-3.5",
         className,
       )}
       {...props}

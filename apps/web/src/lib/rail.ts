@@ -1,4 +1,11 @@
-import type { AppView, Attention, ConversationView, NotificationView, PersonaInvocationView } from '@goblin/contracts'
+import type {
+  AppView,
+  Attention,
+  ConversationView,
+  InvitationPreview,
+  NotificationView,
+  PersonaInvocationView,
+} from '@goblin/contracts'
 import { jobTrouble } from './app-jobs.ts'
 import { isClosed, isUnread } from './threads.ts'
 import { isChannel } from './topics.ts'
@@ -22,16 +29,24 @@ export function threadList(views: readonly ConversationView[]): {
   }
 }
 
-/** One thing that waits for the owner, as Activity lists it: in a chat (a question, an approval…) or an App. */
+/**
+ * One thing that waits for the owner, as Activity lists it: an invitation to another workspace (the person's own, so
+ * every workspace shows it), something in a chat (a question, an approval…) or an App.
+ */
 export type NeedsYou =
+  | { readonly kind: 'invitation'; readonly invitation: InvitationPreview }
   | { readonly kind: 'chat'; readonly chat: ConversationView; readonly attention: Attention }
   | { readonly kind: 'app'; readonly app: AppView }
 
 /**
- * What waits for the owner: every chat's attention (from a server that reports it), oldest first, then the agent apps
- * whose schedules are paused, failing or waiting for the owner.
+ * What waits for the owner: the invitations waiting for them, then every chat's attention (from a server that reports
+ * it), oldest first, then the agent apps whose schedules are paused, failing or waiting for the owner.
  */
-export function needsYou(views: readonly ConversationView[], apps: readonly AppView[]): readonly NeedsYou[] {
+export function needsYou(
+  views: readonly ConversationView[],
+  apps: readonly AppView[],
+  invitations: readonly InvitationPreview[],
+): readonly NeedsYou[] {
   const asks = views
     .filter((view) => !isClosed(view))
     .flatMap((chat) => (chat.attention ?? []).map((attention) => ({ kind: 'chat' as const, chat, attention })))
@@ -39,7 +54,7 @@ export function needsYou(views: readonly ConversationView[], apps: readonly AppV
   const troubled = apps
     .filter((app) => app.closedAt === undefined && app.source.kind === 'agent' && app.source.jobs.some(jobTrouble))
     .map((app) => ({ kind: 'app' as const, app }))
-  return [...asks, ...troubled]
+  return [...invitations.map((invitation) => ({ kind: 'invitation' as const, invitation })), ...asks, ...troubled]
 }
 
 /**
@@ -84,20 +99,21 @@ export const personaTasks = (invocations: readonly PersonaInvocationView[]): rea
   ...invocations.filter((each) => !answering(each)).toSorted((a, b) => b.createdAt - a.createdAt),
 ]
 
-/** What the rail counts from: the workspace feed's slices. */
+/** What the rail counts from: the workspace feed's slices, and the invitations waiting for the person. */
 export type RailSlices = {
   readonly views: readonly ConversationView[]
   readonly apps: readonly AppView[]
   readonly activity: Activity
   readonly invocations: readonly PersonaInvocationView[]
   readonly notifications: readonly NotificationView[]
+  readonly invitations: readonly InvitationPreview[]
 }
 
 /**
- * The rail's counts: unread threads; what needs the owner and the notifications they have not read; and the work going
- * on (Delegates and Personas).
+ * The rail's counts: unread threads; what needs the owner (their invitations included) and the notifications they have
+ * not read; and the work going on (Delegates and Personas).
  */
-export function railCounts({ views, apps, activity, invocations, notifications }: RailSlices): {
+export function railCounts({ views, apps, activity, invocations, notifications, invitations }: RailSlices): {
   readonly threads: number
   readonly activity: number
   readonly tasks: number
@@ -105,7 +121,7 @@ export function railCounts({ views, apps, activity, invocations, notifications }
   const working = views.filter((view) => view.kind === 'subagent' && activityOf(activity, view.id) !== undefined).length
   return {
     threads: threadList(views).unread.length,
-    activity: needsYou(views, apps).length + unreadNotifications(notifications, views).length,
+    activity: needsYou(views, apps, invitations).length + unreadNotifications(notifications, views).length,
     tasks: working + invocations.filter(answering).length,
   }
 }

@@ -10,6 +10,7 @@ import {
 } from '@tanstack/react-router'
 import { type AppView, type ConversationView, EVERYTHING, type WorkspaceSnapshot } from '@goblin/contracts'
 import { PageBar } from '../../src/components/page-bar.tsx'
+import { ActivityPage } from '../../src/components/shell/pages/activity-page.tsx'
 import { PersonasPage } from '../../src/components/shell/pages/personas-page.tsx'
 import { ShellNavigation } from '../../src/components/shell/navigation.tsx'
 import { ShellFrame } from '../../src/components/shell/shell.tsx'
@@ -231,7 +232,7 @@ const router = createRouter({
   routeTree: root.addChildren([
     channel,
     page('/threads', 'All threads'),
-    page('/activity', 'Activity'),
+    page('/activity', 'Activity', () => <ActivityPage />),
     page('/work', 'Work'),
     page('/apps', 'Apps'),
     page('/apps/$name', 'Manage app'),

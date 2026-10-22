@@ -1,13 +1,22 @@
 /**
  * The real sidebar (ADR 0078) over a populated workspace: one highlighted row per page, counts, every pin state, the
- * strip and its shortcut, the Topics popover, and the phone's drawer and dot. Screenshots land in .local.
+ * strip and its shortcut, the Topics popover, and the phone's drawer and dot. The page is in a workspace
+ * (`/w/swarmm-prod/…`, ADR 0089) where the person is an admin, with two more workspaces and two invitations waiting
+ * (ADR 0093): the workspace menu's count, roles and tooltip, and the invitations answered in place there and in
+ * Activity. Screenshots land in .local.
  */
 import assert from 'node:assert/strict'
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
-import { type Page, chromium } from 'playwright-core'
-import type { ServerView } from '@goblin/contracts'
+import { type Page, type Route, chromium } from 'playwright-core'
+import {
+  type InvitationPreview,
+  ONBOARDING_STEPS,
+  type OnboardingView,
+  type ServerView,
+  type WorkspaceView,
+} from '@goblin/contracts'
 
 const out = path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance', `navigation-${Date.now()}`)
 mkdirSync(out, { recursive: true, mode: 0o700 })
@@ -41,6 +50,107 @@ const SERVERS: ServerView[] = [
   },
 ]
 
+/** The person's workspaces: the page is in Swarmm, where they are an admin. */
+const WORKSPACES: WorkspaceView[] = [
+  { id: 'ws-home', name: "Ada's workspace", slug: 'ada-home', role: 'owner', members: 1 },
+  { id: 'ws-swarmm', name: 'Swarmm', slug: 'swarmm-prod', role: 'admin', members: 4 },
+  { id: 'ws-sidequest', name: 'Sidequest team', slug: 'sidequest', role: 'member', members: 6 },
+]
+const HERE = 'swarmm-prod'
+
+/** Two invitations waiting: one to join, one into a workspace whose owner's own models take no members (ADR 0095). */
+const LAB_NOTES = 'b'.repeat(32)
+const INVITATIONS: InvitationPreview[] = [
+  {
+    id: 'a'.repeat(32),
+    workspace: 'Aurora studio',
+    invitedBy: 'Grace',
+    email: 'ada@example.com',
+    role: 'member',
+    state: 'pending',
+  },
+  {
+    id: LAB_NOTES,
+    workspace: 'Lab notes',
+    invitedBy: 'Linus',
+    email: 'ada@example.com',
+    role: 'admin',
+    state: 'pending',
+  },
+]
+const JOINED: WorkspaceView = {
+  id: 'ws-aurora',
+  name: 'Aurora studio',
+  slug: 'aurora-studio',
+  role: 'member',
+  members: 3,
+}
+
+const ONBOARDING: OnboardingView = {
+  status: 'done',
+  steps: ONBOARDING_STEPS.map((id) => ({ id, done: true })),
+  model: { source: 'deployment', deployment: true, models: [] },
+  connected: 2,
+  kickoff: true,
+}
+
+const ANSWER = /^\/api\/invitations\/([a-f0-9]{32})\/(accept|decline)$/u
+
+/**
+ * The API as one browser context sees it: the workspace's (under `/w/<slug>/api/…`) and the person's (`/api/…`).
+ * Answering an invitation takes it off the list, except joining Lab notes, which is refused as its owner's own.
+ * Anything else is a test failure.
+ */
+function fakeApi(errors: string[]) {
+  let invitations = [...INVITATIONS]
+  const reads: Readonly<Record<string, () => unknown>> = {
+    '/api/mcp/servers': () => SERVERS,
+    '/api/health': () => ({ features: { agentApps: true } }),
+    '/api/workspaces': () => WORKSPACES,
+    '/api/invitations': () => invitations,
+    '/api/onboarding': () => ONBOARDING,
+    '/api/sources': () => ({ sources: [] }),
+  }
+  const answer = (id: string, how: string) => {
+    if (how === 'accept' && id === LAB_NOTES)
+      return {
+        status: 409,
+        json: { error: { code: 'conflict', message: 'Refused.', reason: 'owner_models', ref: '7f3a9c12e4b5a6d7' } },
+      }
+    invitations = invitations.filter((invitation) => invitation.id !== id)
+    return { json: how === 'accept' ? JOINED : { declined: true } }
+  }
+  return (route: Route) => {
+    const request = route.request()
+    const pathname = new URL(request.url()).pathname.replace(/^\/w\/[a-z0-9-]+(?=\/api\/)/u, '')
+    const [, id = '', how = ''] = ANSWER.exec(pathname) ?? []
+    if (request.method() === 'POST' && how !== '') return route.fulfill(answer(id, how))
+    const read = request.method() === 'GET' ? reads[pathname] : undefined
+    if (read !== undefined) return route.fulfill({ json: read() })
+    errors.push(`Unexpected API request: ${request.method()} ${pathname}`)
+    return route.fulfill({ status: 404, json: { error: { code: 'not_found', message: 'Not in fixture' } } })
+  }
+}
+
+/**
+ * Serves the fixture at a workspace's address (`/w/<slug>/navigation.html`), as the app is served, and a joined
+ * workspace's home as a page of its own.
+ */
+async function inWorkspaces(page: Page, origin: string, errors: string[]) {
+  await page.route(
+    (url) => /^\/w\/[a-z0-9-]+\/navigation\.html$/u.test(url.pathname),
+    (route) => route.continue({ url: `${origin}navigation.html${new URL(route.request().url()).search}` }),
+  )
+  await page.route(
+    (url) => /^\/w\/[a-z0-9-]+\/$/u.test(url.pathname),
+    (route) => route.fulfill({ contentType: 'text/html', body: '<p>Joined</p>' }),
+  )
+  await page.route((url) => /^(?:\/w\/[a-z0-9-]+)?\/api\//u.test(url.pathname), fakeApi(errors))
+}
+
+/** The workspace menu's trigger: the sidebar's head. */
+const brand = (page: Page) => page.locator('nav.shell-sidebar .sidebar-brand').first()
+
 /** The shown rows of the sidebar (or the drawer) that say they are where the page is (a hidden one is never read out). */
 async function current(page: Page): Promise<string[]> {
   return page.evaluate(() =>
@@ -62,20 +172,12 @@ try {
     const page = await context.newPage()
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
-    await page.route(
-      (url) => url.pathname.startsWith('/api/'),
-      (route) => {
-        const pathname = new URL(route.request().url()).pathname
-        if (pathname === '/api/mcp/servers') return route.fulfill({ json: SERVERS })
-        if (pathname === '/api/health') return route.fulfill({ json: { features: { agentApps: true } } })
-        errors.push(`Unexpected API request: ${route.request().method()} ${pathname}`)
-        return route.fulfill({ status: 404, json: { error: { code: 'not_found', message: 'Not in fixture' } } })
-      },
-    )
+    await inWorkspaces(page, origin, errors)
     const at = async (where: string) => {
-      await page.goto(`${origin}navigation.html?at=${encodeURIComponent(where)}`)
+      await page.goto(`${origin}w/${HERE}/navigation.html?at=${encodeURIComponent(where)}`)
       await page.locator('nav.shell-sidebar').first().waitFor()
       await page.getByText('Signed out').first().waitFor()
+      await page.locator('.sidebar-invites').first().waitFor()
     }
 
     await at('/c/30?thread=31')
@@ -95,7 +197,8 @@ try {
     assert.equal(await page.locator('.list-row').count(), 2, 'active Personas listed, the archived folded')
     await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-personas.png`) })
 
-    // Counts: Activity (an unread notification and a schedule in trouble), Work (a Delegate at work), All threads.
+    // Counts: Activity (two invitations, an unread notification and a schedule in trouble), Work (a Delegate at
+    // work), All threads.
     const counts = await page.evaluate(() =>
       Object.fromEntries(
         [...document.querySelectorAll('nav.shell-sidebar .sidebar-row')]
@@ -106,7 +209,7 @@ try {
           ]),
       ),
     )
-    assert.deepEqual(counts, { Activity: '2', Work: '1', 'All threads': '1' })
+    assert.deepEqual(counts, { Activity: '4', Work: '1', 'All threads': '1' })
     // Every pin keeps its place and says why it does not open.
     const pins = await page.locator('[data-section="pinned"] .sidebar-row').allTextContents()
     assert.deepEqual(pins, ['mysi', 'Trip tracker', 'Old boardClosed', 'Cloud consoleSigned out'])
@@ -132,6 +235,51 @@ try {
     await page.getByRole('button', { name: 'Expand sidebar' }).click()
     assert.equal(await page.evaluate(() => document.documentElement.dataset.sidebar), undefined)
 
+    // The workspace menu says what waits: a count of the invitations, which come first in the menu.
+    await at('/c/1')
+    assert.equal(await brand(page).getAttribute('aria-label'), 'Workspace: Swarmm, 2 invitations waiting')
+    assert.equal(await brand(page).locator('.sidebar-invites').textContent(), '2')
+    await brand(page).click()
+    const menu = page.getByRole('menu')
+    await menu.waitFor()
+    await page.waitForTimeout(200)
+    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-workspace-menu.png`) })
+    const rows = await menu.locator('[role="menuitem"]').allInnerTexts()
+    assert.deepEqual(
+      rows.map((row) => row.replace(/\s+/gu, ' ').trim()),
+      [
+        'Aurora studio From Grace, as a member',
+        'No thanks',
+        'Join',
+        'Lab notes From Linus, as an admin',
+        'No thanks',
+        'Join',
+        "Ada's workspace",
+        'Swarmm',
+        'Sidequest team',
+        'New workspace',
+        'Workspace settings',
+      ],
+    )
+    // Joining a workspace whose owner's own models take no members is refused in place, in words.
+    await menu.getByRole('group', { name: 'Lab notes' }).getByRole('menuitem', { name: 'Join' }).click()
+    await menu.getByRole('alert').filter({ hasText: "Lab notes offers its owner's own subscription models" }).waitFor()
+    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-workspace-refusal.png`) })
+    // No thanks answers in place: the menu stays open, the invitation goes and the count follows.
+    await menu.getByRole('group', { name: 'Lab notes' }).getByRole('menuitem', { name: 'No thanks' }).click()
+    await menu.getByRole('group', { name: 'Lab notes' }).waitFor({ state: 'detached' })
+    assert(await menu.isVisible(), 'the menu stays open')
+    assert.equal(await brand(page).locator('.sidebar-invites').textContent(), '1')
+    await page.keyboard.press('Escape')
+
+    // Activity's Needs you lists the invitation that waits, and Join opens the workspace joined.
+    await at('/activity')
+    const invitation = page.locator('.invitation-row')
+    assert.deepEqual(await invitation.locator('.list-row-title').allTextContents(), ['An invitation to Aurora studio'])
+    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-activity.png`) })
+    await invitation.getByRole('button', { name: 'Join' }).click()
+    await page.waitForURL((url) => url.pathname === '/w/aurora-studio/')
+
     assert.deepEqual(errors, [])
     results.push(`desktop ${colorScheme}: ok`)
     await context.close()
@@ -147,14 +295,15 @@ try {
     const page = await context.newPage()
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
-    await page.route(
-      (url) => url.pathname.startsWith('/api/'),
-      (route) => route.fulfill({ json: new URL(route.request().url()).pathname === '/api/mcp/servers' ? SERVERS : {} }),
-    )
-    await page.goto(`${origin}navigation.html?at=/apps`)
+    await inWorkspaces(page, origin, errors)
+    await page.goto(`${origin}w/${HERE}/navigation.html?at=/activity`)
+    await page.locator('.invitation-row').nth(1).waitFor()
+    await page.screenshot({ path: path.join(out, `phone-${colorScheme}-activity.png`), fullPage: true })
+    await page.goto(`${origin}w/${HERE}/navigation.html?at=/apps`)
     const menu = page.getByRole('button', { name: /^Open navigation/u })
     await menu.waitFor()
-    assert.equal(await menu.getAttribute('aria-label'), 'Open navigation, 2 waiting in Activity')
+    await page.waitForFunction(() => document.querySelector('.nav-button-dot') !== null)
+    assert.equal(await menu.getAttribute('aria-label'), 'Open navigation, 4 waiting in Activity')
     assert.equal(await page.locator('.nav-button-dot').count(), 1)
     assert.equal(await page.locator('.shell-nav').count(), 0)
     await page.screenshot({ path: path.join(out, `phone-${colorScheme}-page.png`) })
@@ -163,6 +312,12 @@ try {
     await drawer.waitFor()
     await page.waitForTimeout(400)
     await page.screenshot({ path: path.join(out, `phone-${colorScheme}-drawer.png`) })
+    await drawer.locator('.sidebar-brand').tap()
+    await page.getByRole('menu').waitFor()
+    await page.waitForTimeout(200)
+    await page.screenshot({ path: path.join(out, `phone-${colorScheme}-workspace-menu.png`) })
+    await page.keyboard.press('Escape')
+    await page.getByRole('menu').waitFor({ state: 'detached' })
     await drawer.getByRole('link', { name: 'Personas' }).tap()
     await drawer.waitFor({ state: 'detached' })
     await page.getByRole('heading', { name: 'Personas' }).first().waitFor()

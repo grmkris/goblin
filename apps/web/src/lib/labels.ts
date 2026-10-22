@@ -1,4 +1,4 @@
-import type { ResidentStatus, RoutineRunView, RoutineView, ServerView } from '@goblin/contracts'
+import type { ResidentStatus, RoutineRunView, RoutineView, ServerView, WorkspaceRole } from '@goblin/contracts'
 
 /**
  * A state in the owner's words, with the tone its dot takes: `good` (working as it should), `attention` (the owner can
@@ -92,4 +92,11 @@ export function runStatus(state: RoutineRunView['state']): Label {
     case 'stopped':
       return { text: 'Stopped', tone: 'quiet' }
   }
+}
+
+/** A person's role in a workspace inside a sentence: "as a member". */
+export const ROLE_PHRASE: Readonly<Record<WorkspaceRole, string>> = {
+  owner: 'an owner',
+  admin: 'an admin',
+  member: 'a member',
 }

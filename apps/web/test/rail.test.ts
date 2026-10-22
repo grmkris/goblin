@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { type AppView, type ConversationView, type NotificationView, PersonaInvocationView } from '@goblin/contracts'
+import {
+  type AppView,
+  type ConversationView,
+  type InvitationPreview,
+  type NotificationView,
+  PersonaInvocationView,
+} from '@goblin/contracts'
 import { Schema } from 'effect'
 import {
   delegates,
@@ -37,6 +43,14 @@ const notification = (id: string, chat: string, at: number, readAt: number | nul
   title: `Notice ${id}`,
   at,
   readAt,
+})
+const invitation = (id: string, workspace: string): InvitationPreview => ({
+  id,
+  workspace,
+  invitedBy: 'Aurora',
+  email: 'kris@example.com',
+  role: 'member',
+  state: 'pending',
 })
 const app = (id: string, trouble: boolean): AppView => ({
   id,
@@ -85,11 +99,20 @@ describe('the rail pages', () => {
     expect(list.closed.map(({ id }) => id)).toEqual(['7'])
   })
 
-  it('collects what needs the owner across chats, oldest first, then the agent apps in trouble', () => {
-    const needs = needsYou(VIEWS, [app('2', true), app('3', false)])
+  it('collects the invitations, then what needs the owner across chats, oldest first, then the agent apps in trouble', () => {
+    const needs = needsYou(VIEWS, [app('2', true), app('3', false)], [invitation('i1', 'Swarmm')])
     expect(
-      needs.map((need) => (need.kind === 'app' ? `app ${need.app.id}` : `${need.chat.id} ${need.attention.kind}`)),
-    ).toEqual(['10 approval', '6 question', 'app 2'])
+      needs.map((need) => {
+        switch (need.kind) {
+          case 'invitation':
+            return `invitation ${need.invitation.workspace}`
+          case 'app':
+            return `app ${need.app.id}`
+          case 'chat':
+            return `${need.chat.id} ${need.attention.kind}`
+        }
+      }),
+    ).toEqual(['invitation Swarmm', '10 approval', '6 question', 'app 2'])
   })
 
   it('lists the unread chats newest first, channels and threads, never a subagent or a closed chat', () => {
@@ -129,7 +152,16 @@ describe('the rail pages', () => {
       activity: { '8': { id: '8', state: 'working', since: 1 } },
       invocations: [invocation(1, 'running', 1), invocation(2, 'answered', 1)],
       notifications: [notification('unread', '1', 95), notification('read', '1', 5)],
+      invitations: [],
     })
     expect(counts).toEqual({ threads: 1, activity: 4, tasks: 2 })
+  })
+
+  it("counts the person's invitations among what waits in Activity, in every workspace alike", () => {
+    const slices = { views: VIEWS, apps: [], activity: {}, invocations: [], notifications: [] }
+    const without = railCounts({ ...slices, invitations: [] })
+    const invited = railCounts({ ...slices, invitations: [invitation('i1', 'Swarmm'), invitation('i2', 'Sidequest')] })
+    expect(invited.activity - without.activity).toBe(2)
+    expect({ ...invited, activity: without.activity }).toEqual(without)
   })
 })

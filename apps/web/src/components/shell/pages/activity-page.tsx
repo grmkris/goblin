@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import type { Attention, NotificationView, OrganizeReceipt, ServerView } from '@goblin/contracts'
+import type { Attention, InvitationPreview, NotificationView, OrganizeReceipt, ServerView } from '@goblin/contracts'
 import { Button } from '@goblin/ui'
 import {
   AlarmClockIcon,
@@ -11,6 +11,7 @@ import {
   ExternalLinkIcon,
   KeyRoundIcon,
   LayersIcon,
+  MailIcon,
   MessageCircleQuestionIcon,
   MessageSquareTextIcon,
   PlugIcon,
@@ -18,12 +19,15 @@ import {
   Settings2Icon,
   WandSparklesIcon,
 } from 'lucide-react'
+import { useAnswerInvitation, useMyInvitations } from '../../../account/hooks.ts'
+import { ROLE_PHRASE } from '../../../lib/labels.ts'
 import { type NeedsYou, needsYou, unreadChats, unreadNotifications } from '../../../lib/rail.ts'
 import { threadTitle } from '../../../lib/threads.ts'
 import { useApps, useConversations, useNotifications, useReceipts } from '../../../lib/workspace/hooks.ts'
 import { undoWorkspaceReceiptMutation } from '../../../lib/workspace/mutations.ts'
 import { dismissEventsMutation, serversQuery } from '../../../mcp/queries.ts'
 import { readNotificationsMutation } from '../../../notices/queries.ts'
+import { invitationRefusal } from '../../invitation-refusal.ts'
 import { connectionAnchor } from '../../server-card.tsx'
 import { PageSection } from '../../page-section.tsx'
 import { useMinute } from '../../use-now.ts'
@@ -45,8 +49,42 @@ const ASKS: Readonly<Record<Attention['kind'], { readonly icon: typeof KeyRoundI
   link: { icon: ExternalLinkIcon, label: 'A step to finish on a server’s site' },
 }
 
+/**
+ * An invitation to another workspace (ADR 0093), answered in place: No thanks drops it, Join opens the workspace. A
+ * refusal takes the place of its line, whole.
+ */
+function InvitationRow({ invitation }: { readonly invitation: InvitationPreview }) {
+  const answer = useAnswerInvitation(invitation.id)
+  return (
+    <li className="list-row invitation-row" data-static>
+      <RowContents
+        mark={<MailIcon aria-hidden />}
+        title={`An invitation to ${invitation.workspace}`}
+        meta={
+          answer.failure === null ? (
+            `From ${invitation.invitedBy}, as ${ROLE_PHRASE[invitation.role]}`
+          ) : (
+            <span className="row-refusal">{invitationRefusal(answer.failure, invitation)}</span>
+          )
+        }
+        end={
+          <span className="row-actions">
+            <Button variant="ghost" pending={answer.declining} disabled={answer.joining} onClick={answer.decline}>
+              No thanks
+            </Button>
+            <Button variant="outline" pending={answer.joining} disabled={answer.declining} onClick={answer.join}>
+              Join
+            </Button>
+          </span>
+        }
+      />
+    </li>
+  )
+}
+
 /** One thing that waits for the owner, linked to where it waits. */
 function NeedRow({ need, now }: { readonly need: NeedsYou; readonly now: number }) {
+  if (need.kind === 'invitation') return <InvitationRow invitation={need.invitation} />
   if (need.kind === 'app')
     return (
       <li>
@@ -224,15 +262,21 @@ function ReceiptRow({ receipt, now }: { readonly receipt: OrganizeReceipt; reado
   )
 }
 
-/** A need's key in its list: the App, or the chat and what it asks there. */
-const needKey = (need: NeedsYou): string =>
-  need.kind === 'app'
-    ? `app:${need.app.id}`
-    : `${need.chat.id}:${need.attention.kind}:${need.attention.since}:${String(need.attention.entry ?? '')}:${need.attention.label ?? ''}`
+/** A need's key in its list: the invitation, the App, or the chat and what it asks there. */
+function needKey(need: NeedsYou): string {
+  switch (need.kind) {
+    case 'invitation':
+      return `invitation:${need.invitation.id}`
+    case 'app':
+      return `app:${need.app.id}`
+    case 'chat':
+      return `${need.chat.id}:${need.attention.kind}:${need.attention.since}:${String(need.attention.entry ?? '')}:${need.attention.label ?? ''}`
+  }
+}
 
 /**
  * `/activity`: what needs the owner across every Topic (questions, approvals, grants, App schedules), linked to where
- * it waits; the Sources' conversations waiting for a route and Sources to review;
+ * it waits, and the invitations waiting for them in any workspace; the Sources' conversations waiting for a route and Sources to review;
  * Tell me's notifications; the chats with unread replies; and what organizing did, with Undo.
  */
 export function ActivityPage() {
@@ -240,7 +284,7 @@ export function ActivityPage() {
   const receipts = useReceipts()
   const notifications = useNotifications()
   const now = useMinute()
-  const needs = needsYou(conversations, useApps())
+  const needs = needsYou(conversations, useApps(), useMyInvitations())
   const unread = unreadChats(conversations)
   const offers = (useQuery(serversQuery).data ?? []).filter((server) => server.events === 'open')
   const setup = useQuery(onboardingQuery).data

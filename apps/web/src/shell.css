@@ -102,6 +102,62 @@
   height: 1rem;
   opacity: 0.6;
 }
+/* How many invitations wait for the person (ADR 0093): a moss count after the workspace's name, on its mark in the
+   strip. */
+.sidebar-invites {
+  flex: none;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding-inline: 0.3125rem;
+  border-radius: var(--radius-pill);
+  background: var(--moss);
+  color: var(--moss-foreground);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  line-height: 1.125rem;
+  text-align: center;
+}
+/*
+ * The workspace menu's parts (ADR 0089). An invitation's row: its words (which open its page), then No thanks and Join
+ * at the end, which move under the words where the menu cannot show the words whole beside them (a phone's larger
+ * type, a long name). Each
+ * answer reaches 40px tall at a mouse without growing (at a finger the menu's items are 44px themselves). A refusal
+ * reads whole under them, in line with the words.
+ */
+.workspace-invite {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+.workspace-invite > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.workspace-invite-answers {
+  display: flex;
+  gap: 0.25rem;
+  margin-inline-start: auto;
+}
+@media (pointer: fine) {
+  .workspace-invite-answers > [data-slot='dropdown-menu-item']::after {
+    position: absolute;
+    inset: -0.375rem 0;
+    content: '';
+  }
+}
+.workspace-invite-refusal {
+  flex: 1 1 100%;
+  padding: 0 0.375rem 0.25rem 1.75rem;
+  font-size: var(--text-xs);
+  text-wrap: pretty;
+}
+@media (pointer: coarse) {
+  .workspace-invite-refusal {
+    padding-inline: 2.375rem 0.625rem;
+  }
+}
 .sidebar-collapse {
   display: grid;
   flex: none;
@@ -339,6 +395,7 @@
     padding: max(0.5rem, var(--safe-top)) 0 0.5rem;
   }
   :root[data-sidebar='collapsed'] [data-place='column'] .sidebar-brand {
+    position: relative;
     padding: 0.3125rem;
   }
   :root[data-sidebar='collapsed'] [data-place='column'] .sidebar-collapse {
@@ -376,13 +433,13 @@
   }
   :root[data-sidebar='collapsed']
     [data-place='column']
-    :is(.sidebar-count, .sidebar-row-unread, .sidebar-row-alert, .sidebar-row-busy) {
+    :is(.sidebar-count, .sidebar-invites, .sidebar-row-unread, .sidebar-row-alert, .sidebar-row-busy) {
     position: absolute;
     top: 0.125rem;
     inset-inline-end: 0.125rem;
     box-shadow: 0 0 0 2px var(--shell);
   }
-  :root[data-sidebar='collapsed'] [data-place='column'] .sidebar-count {
+  :root[data-sidebar='collapsed'] [data-place='column'] :is(.sidebar-count, .sidebar-invites) {
     min-width: 1rem;
     height: 1rem;
     padding-inline: 0.1875rem;
@@ -1441,6 +1498,34 @@ a.list-row:focus-visible {
   display: flex;
   flex: none;
   gap: 0.25rem;
+}
+/*
+ * An invitation in Activity's Needs you (ADR 0093): its words keep at least 12rem, so on a narrow row No thanks and
+ * Join move under them, at the end. Each reaches 40px tall at a mouse without growing (at a finger a button is 44px
+ * itself). A refusal takes the place of its line and is read whole.
+ */
+.invitation-row {
+  flex-wrap: wrap;
+  row-gap: 0.25rem;
+}
+.invitation-row > .list-row-main {
+  flex: 1 1 12rem;
+}
+.invitation-row > .row-actions {
+  margin-inline-start: auto;
+}
+.invitation-row > .row-actions > [data-slot='button'] {
+  position: relative;
+}
+.invitation-row > .row-actions > [data-slot='button']::after {
+  position: absolute;
+  inset: -0.25rem 0;
+  content: '';
+}
+.list-row-meta:has(> .row-refusal) {
+  color: var(--foreground);
+  white-space: normal;
+  text-wrap: pretty;
 }
 .list-fold {
   display: inline-flex;

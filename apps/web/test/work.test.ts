@@ -52,6 +52,7 @@ describe('Work', () => {
       activity: ACTIVITY,
       invocations: INVOCATIONS,
       notifications: [],
+      invitations: [],
     })
     expect(running.delegates.length + running.answers.length).toBe(counts.tasks)
   })

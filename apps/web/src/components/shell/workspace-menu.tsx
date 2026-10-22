@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import type { WorkspaceView } from '@goblin/contracts'
+import type { InvitationPreview, WorkspaceView } from '@goblin/contracts'
 import { Conflict } from '@goblin/contracts/api'
 import {
   Button,
@@ -22,12 +22,16 @@ import {
   FieldLabel,
   GoblinMark,
   Input,
+  Spinner,
 } from '@goblin/ui'
 import { CheckIcon, ChevronsUpDownIcon, MailIcon, PlusIcon, SettingsIcon } from 'lucide-react'
-import { createWorkspaceMutation, myInvitationsQuery, workspacesQuery } from '../../account/queries.ts'
+import { useAnswerInvitation, useMyInvitations } from '../../account/hooks.ts'
+import { createWorkspaceMutation, workspacesQuery } from '../../account/queries.ts'
+import { ROLE_PHRASE } from '../../lib/labels.ts'
 import { rememberWorkspace } from '../../lib/last-workspace.ts'
 import { messageOf, withRef } from '../../lib/query/app-error.ts'
 import { currentSlug, inWorkspace } from '../../lib/workspace-path.ts'
+import { invitationRefusal } from '../invitation-refusal.ts'
 import { EXACT, Tip } from './sidebar-parts.tsx'
 
 /** A workspace's address from its name: lowercase letters and digits, single hyphens, at most 40 characters. */
@@ -125,37 +129,91 @@ function CreateWorkspace({
   )
 }
 
+/** How many invitations wait, in words. */
+const waiting = (count: number): string => `${String(count)} ${count === 1 ? 'invitation' : 'invitations'} waiting`
+
 /**
- * The sidebar's head (ADR 0089): the workspace this page is in, and a menu of the person's others, the invitations
- * waiting for them (ADR 0093), a new one and this one's settings. Choosing another opens it in this tab; each tab can
- * be in a different one.
+ * One invitation at the top of the menu (ADR 0093): its workspace and who invited, which opens the invitation's page,
+ * then No thanks and Join, which answer it in place and keep the menu open. A refusal shows under it, whole.
+ */
+function InvitationItem({ invitation }: { readonly invitation: InvitationPreview }) {
+  const answer = useAnswerInvitation(invitation.id)
+  const busy = answer.joining || answer.declining
+  return (
+    <DropdownMenuGroup aria-label={invitation.workspace}>
+      <div className="workspace-invite">
+        <DropdownMenuItem render={<Link to="/invite/$id" params={{ id: invitation.id }} />}>
+          <MailIcon aria-hidden />
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate">{invitation.workspace}</span>
+            <span className="truncate text-xs text-muted-foreground">
+              From {invitation.invitedBy}, as {ROLE_PHRASE[invitation.role]}
+            </span>
+          </span>
+        </DropdownMenuItem>
+        <span className="workspace-invite-answers">
+          <DropdownMenuItem closeOnClick={false} disabled={busy} onClick={answer.decline}>
+            {answer.declining && <Spinner aria-hidden role={undefined} />}
+            No thanks
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="moss" closeOnClick={false} disabled={busy} onClick={answer.join}>
+            {answer.joining && <Spinner aria-hidden role={undefined} />}
+            Join
+          </DropdownMenuItem>
+        </span>
+        {answer.failure !== null && (
+          <p className="workspace-invite-refusal" role="alert">
+            {invitationRefusal(answer.failure, invitation)}
+          </p>
+        )}
+      </div>
+    </DropdownMenuGroup>
+  )
+}
+
+/**
+ * The sidebar's head (ADR 0089): the workspace this page is in, with a moss count while invitations wait for the
+ * person (ADR 0093), and a menu of those invitations first, each answered in place, then the person's workspaces, a new
+ * one and this one's settings. Choosing another opens it in this tab; each tab can be in a different one.
  */
 export function WorkspaceMenu() {
   const workspaces = useQuery(workspacesQuery)
-  const invitations = useQuery(myInvitationsQuery).data ?? []
+  const invitations = useMyInvitations()
   const [creating, setCreating] = useState(false)
   const slug = currentSlug()
   const current = workspaces.data?.find((workspace) => workspace.slug === slug)
   useEffect(() => rememberWorkspace(window.location.pathname), [])
+  const label = [
+    `Workspace: ${current?.name ?? slug ?? ''}`,
+    ...(invitations.length > 0 ? [waiting(invitations.length)] : []),
+  ].join(', ')
   return (
     <>
       <DropdownMenu>
         <Tip label={current?.name ?? 'Workspace'}>
-          <DropdownMenuTrigger
-            render={
-              <button
-                type="button"
-                className="sidebar-brand"
-                aria-label={`Workspace: ${current?.name ?? slug ?? ''}`}
-              />
-            }
-          >
+          <DropdownMenuTrigger render={<button type="button" className="sidebar-brand" aria-label={label} />}>
             <GoblinMark />
             <span className="sidebar-title">{current?.name ?? 'goblin'}</span>
+            {invitations.length > 0 && (
+              <span className="sidebar-invites" aria-hidden>
+                {invitations.length > 9 ? '9+' : invitations.length}
+              </span>
+            )}
             <ChevronsUpDownIcon className="sidebar-title-chevron" aria-hidden />
           </DropdownMenuTrigger>
         </Tip>
         <DropdownMenuContent side="bottom" align="start">
+          {invitations.length > 0 && (
+            <>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Invitations</DropdownMenuLabel>
+                {invitations.map((invitation) => (
+                  <InvitationItem key={invitation.id} invitation={invitation} />
+                ))}
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+            </>
+          )}
           {(workspaces.data ?? []).map((workspace) => (
             <DropdownMenuItem key={workspace.id} onClick={() => workspace.slug !== slug && open(workspace)}>
               {workspace.slug === slug ? <CheckIcon aria-hidden /> : <span className="size-4" aria-hidden />}
@@ -163,23 +221,6 @@ export function WorkspaceMenu() {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          {invitations.length > 0 && (
-            <>
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>Invitations</DropdownMenuLabel>
-                {invitations.map((invitation) => (
-                  <DropdownMenuItem
-                    key={invitation.id}
-                    render={<Link to="/invite/$id" params={{ id: invitation.id }} />}
-                  >
-                    <MailIcon aria-hidden />
-                    {invitation.workspace}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-            </>
-          )}
           <DropdownMenuItem onClick={() => setCreating(true)}>
             <PlusIcon aria-hidden />
             New workspace
