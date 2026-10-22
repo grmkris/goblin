@@ -97,7 +97,8 @@ Each delivery is a `POST` of the exact JSON body to your URL, signed with
 | `content-type` | `application/json` |
 
 Verify the signature over the raw bytes and refuse a timestamp more than five minutes away; deduplicate on
-`webhook-id`. Answer with any `2xx` within five seconds; your answer's body is read up to 256 KiB and ignored.
+`webhook-id`. Answer with any `2xx` within five seconds; your answer's body is ignored, and one past 256 KiB counts
+as a `413`.
 
 A lease is owed at most one waiting wake per chat: when a chat changes again before its wake reached you, the waiting
 one is replaced by the newer, so you may see fewer wakes than changes, never a stale one last. A failed attempt
