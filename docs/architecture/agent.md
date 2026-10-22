@@ -126,9 +126,9 @@ was held, and what changed before it (a restart into another release, tools adde
 where it led, what was not recorded, and one quiet line of what it ran with (tokens, model endpoint, thinking level,
 release, ADR 0107). Flow names, event kinds and raw token pairs stay with the CLI and /mcp inspection; a message with
 nothing recorded says so. The channel and the panel follow conversations through one
-stream pool (`lib/stream-pool.ts`): one event stream per conversation however many show it, at most eight following
-beyond those on screen, and one off screen stops following after ten seconds, resuming from a fresh snapshot when it
-comes back. Start thread, a toggle in the composer (and `/new-thread`), posts the message as the head of a new thread whose
+stream pool (`lib/stream-pool.ts`): one reader of a chat's AG-UI stream ([chat streams](streams.md)) however many
+panes show it, at most eight following beyond those on screen, and one off screen stops following after ten seconds,
+reading on from the offset it stopped at when it comes back. Start thread, a toggle in the composer (and `/new-thread`), posts the message as the head of a new thread whose
 reply lands there (`POST /api/conversations/:id/threads` anchored at `latest`; the runtime writes the
 `app.thread_head` into the chat it started from), and the panel opens on it; turning it off keeps the draft, its
 files and references. Move to thread, in the toolbar of a channel's newest owner message (`POST …/move`,
@@ -214,9 +214,8 @@ The conversation-scoped routes of the owner API: the `conversations`, `inspect`,
 | `GET /api/files?dir=` | A directory of the owner's files (`FileListing`): `/uploads`, `/agent` or a folder under one, with the storage in use. |
 | `GET`, `PUT`, `DELETE /api/files/content?path=` | Download or write (raw: the body streams, `content-length` required) or delete one of the owner's files. Downloads are attachments, except PNG, JPEG, GIF and WebP, which open in place; all are sandboxed by CSP. No files endpoint renews resident authority. |
 | `POST /api/conversations/:id/stop` | Stop a conversation or one `operationId`, and the subagents it started (not its threads); answers `{ stopped }`, whether anything was running. |
-| `GET /api/conversations/:id/snapshot` | The chat's Pi snapshot as JSON. |
-| `GET /api/conversations/:id/events` | Raw. The chat's Pi events (SSE): a snapshot followed by committed batches. |
-| `GET /api/conversations/:id/history?before=<entry>` | Earlier entries, oldest first, with a `more` flag. |
+| `GET /api/conversations/:id/stream` | Joins the chat's AG-UI stream: where to read it (a signed URL for ten minutes), its epoch and its tier ([chat streams](streams.md)). |
+| `GET /api/conversations/:id/history?before=<entry>` | The page of entries before `before`, oldest first, as the AG-UI messages the stream maps them to, with the entry to read the next page before (`next`) and a `more` flag. |
 | `GET /api/conversations/:id/sources` | What the chat's answers retrieved from other chats (`SourceUse[]`, newest first, empty results left out): the source strips (ADR 0035). |
 | `GET /api/inspect/details?operation=` or `?chat=&entry=` | The `inspect` group: what happened behind one message, its operation's timeline (with its turn when it ran one) and the operations related to it (`InspectDetails`, ADR 0037). |
 
@@ -361,10 +360,11 @@ run, its `app.persona` answer carries `questions`, and the owner answers by tagg
 Readers that show only text use `personaAnswerText` (the words, then the numbered questions). A routine's Persona run
 has no `ask_user`.
 
-The browser URL, snapshot, history and queue use chat ids. Server-Sent Events resolve the current Pi session at
-connection: a snapshot of committed Pi entries, then batches, with a heartbeat. A chat keeps its Pi session, so its
-stream is that session's; a reconnect starts again from a fresh snapshot. The workspace feed maps Pi task activity back
-to current chat ownership. `ConversationView.primary` is an optional boolean; `WorkspaceSnapshot.primary` is an optional
+The browser URL, stream, history and queue use chat ids. A chat's stream is AG-UI events in a Durable Streams object
+per epoch ([chat streams](streams.md), [ADR 0109](../adr/0109-every-chat-streams-ag-ui-through-a-durable-stream.md)):
+an epoch opens with its newest entries as `MESSAGES_SNAPSHOT` and the STATE document, then carries what the chat's Pi
+session commits and streams. A reader that drops reads on from its last offset; one whose link expired, or whose epoch
+moved, joins again. The workspace feed maps Pi task activity back to current chat ownership. `ConversationView.primary` is an optional boolean; `WorkspaceSnapshot.primary` is an optional
 chat id for compatible readers.
 
 Every signed-in page sits beside the app's shell (`components/shell`, ADRs 0036 and 0078): one moss sidebar. At its

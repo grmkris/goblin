@@ -1,17 +1,17 @@
 # Chat streams
 
-> **Draft.** This is the profile third parties implement against. Built: the translator from Pi's events to AG-UI
-> (`apps/runtime/src/streams/agui.ts`), goblin's parts of it in the contracts (`packages/contracts/src/agui/`), the
-> producer that appends a joined chat's events to its streams, and the reader's way in (the join endpoint, its MCP
-> tool and the signed stream URL), proven in workerd against the real Worker, agent and stream objects. goblin's own
-> web app still follows its older private stream; it moves to this one next, with the ADR that decides it. Until then
-> names and shapes here may still change.
+The profile third parties implement against, and the only way goblin's own web app follows a chat
+([ADR 0109](../adr/0109-every-chat-streams-ag-ui-through-a-durable-stream.md)). Built: the translator from Pi's events
+to AG-UI (`apps/runtime/src/streams/agui.ts`), goblin's parts of it in the contracts (`packages/contracts/src/agui/`),
+the producer that appends a joined chat's events to its streams, the reader's way in (the join endpoint, its MCP tool
+and the signed stream URL), and the web's reader (`apps/web/src/lib/agui/`). The workspace feed is still its own
+stream.
 
 ## What a stream is
 
 Every chat has one stream of [AG-UI 1.0](https://docs.ag-ui.com/concepts/events) events (`@ag-ui/core` 1.0.3, protocol
 1.0), appended in order to a Durable Streams JSON stream, which gives readers offsets, resumption and live reads. The
-same stream will serve goblin's own web app and any other reader (a server's app such as Swarmm or Sidequest).
+same stream serves goblin's own web app and any other reader (a server's app such as Swarmm or Sidequest).
 
 It follows the chat, not one call: runs come and go, and some messages arrive between runs (a Persona's answer, a
 routine's notice, a note shared from a thread), so events outside a `RUN_STARTED`…`RUN_FINISHED` pair are normal.
@@ -53,6 +53,9 @@ message of its own). An assistant turn that only called tools is an empty messag
    (`Stream-Closed: true`): join again for the next epoch, which opens with its snapshots. A URL past `expiresAt`, or
    one whose token was changed, answers 401 `stream_link`: join again for a new one. A stream that expired after
    seven days without a read or write answers 404; joining makes the chat a new epoch.
+4. **Older history.** `GET /api/conversations/:id/history?before=<entry>` answers the page of entries before `before`
+   as the same AG-UI messages a snapshot holds (one mapping, `streams/messages.ts`), oldest first, with `next`, the
+   entry to read the page before, and `more`. Start at the snapshot's `before`.
 
 ## Ids
 
@@ -111,7 +114,8 @@ Pi's events are its experimental `watchEvents` (spec §9.4), one batch per commi
 - `MESSAGES_SNAPSHOT`: `before`, the entry older history is read before, a page at a time; absent when the snapshot
   starts at the chat's beginning;
 - `RUN_STARTED`: `operations`;
-- tool calls and results: `details` (Pi's details for UIs), `isError`, `parentToolCallId`.
+- tool calls and results: `details` (Pi's details for UIs), `isError`, `parentToolCallId`; a result names its tool
+  (`toolName`), for a reader that does not hold the call.
 
 **Activity types** (`ActivityType`), never CUSTOM events, since a reader that joins later sees only the snapshot:
 `goblin.thread_head`, `goblin.thread_started`, `goblin.notice`, `goblin.topic_seed`, `goblin.delegate_result`, each with
@@ -177,6 +181,23 @@ Pi's events do not carry everything; the producer supplies, or the stream leaves
 
 Persona forks and subagents will be carried in their parent's stream, attributed by `subagentRunId`, in a later step.
 
+## goblin's web app
+
+The web reads the `full` tier as any reader does (`apps/web/src/lib/`):
+
+- `agui/reader.ts` joins (`streamJoin`), reads what was written since its offset, then follows live over server-sent
+  events; a live read that drops reads on from the last offset it applied (events of a `data` frame count only once
+  its `control` frame names the offset after them). Two live reads in a row that fail before hearing anything turn it
+  to long polls. A 401, 403 or 404, a closed stream or `goblin.stream.moved` joins again at once, then with backoff;
+  a new epoch is read from its start. The transports themselves are in `event-streams.ts`.
+- `agui/reducer.ts` folds the events into the transcript's projection: the committed messages (an epoch's
+  `MESSAGES_SNAPSHOT` replaces them), the answer and thinking in flight, the tools running (with the times this browser
+  saw), the queue and the run's progress from STATE, and from the marks the entries a Thread may start at, those left
+  out and where older history starts. `agui/messages.ts` maps AG-UI messages to the transcript's, once per message, for
+  the projection and for older pages alike; the transcript keeps its ids (`<entry>:<index>`) from `entryId`.
+- `stream-pool.ts` shares one reader per chat among the panes that show it; one nobody sees for a while is suspended
+  and reads on from its offset when it is seen again.
+
 ## Where it is proven
 
 `apps/runtime/test/streams/`: Pi batches recorded on a real Pi 1.3.0 Harness (in memory, in the test process, with a
@@ -186,3 +207,10 @@ and a hold, activities, a queued follow-up and an overflow mid-answer. The golde
 events and an epoch opened on the idle chat; every event is checked against `@ag-ui/core`'s own schemas, goblin's parts
 against their contracts, and the sequence for well-formed runs, messages, spans and calls. The same cases also run
 against the installed Pi on every test run. `bun apps/runtime/test/streams/record.ts` records the fixtures again.
+
+The web holds its reducer to the same goldens (`apps/web/test/agui-reducer.test.ts`): for every case the transcript
+built from the live events, all at once or one event at a time, is the one the next epoch opens with, and the
+`answers` tier gives the same transcript without thinking and tools; the reader is tested against an in-memory stream
+(`agui-reader.test.ts`: resume from the offset, a moved epoch, a refused link, an expiring one, long polls). The
+browser fixtures `apps/web/test/ui-channel.ts` and `ui-queue.ts` serve the real components AG-UI events over the
+protocol's reads (`agui-route.ts`) and screenshot them at 1440 and 390 px, light and dark.

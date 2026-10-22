@@ -1,24 +1,27 @@
 ---
 name: pi-stream-and-mcp-apps
-description: Change how the browser follows the Pi conversation (SSE snapshot, batches, reconnect) or the sandboxed MCP Apps host.
+description: Change how the browser follows a chat (its AG-UI stream, the reader, the reducer, reconnect) or the sandboxed MCP Apps host.
 ---
 
 # Conversation stream and MCP Apps in goblin
 
-The browser follows committed Pi state over Server-Sent Events: `/api/conversations/:id/events` sends a snapshot of entries,
-then batches, with a heartbeat. The two event streams are owner endpoints served through raw handlers
-(`conversations.events`, `workspace.events`), behind the Worker's edge like the rest of the typed owner API (ADR 0038); the stream's own reads (the JSON snapshot, the queue) and every
-other server read go through the typed client's factories (`conversations/queries.ts`), and a stream event only
-invalidates the query keys it affects. `apps/web/src/lib/projection.ts` keeps the stream's snapshot and batches as a
-projection; `lib/entry-messages.ts` and `lib/chat-messages.ts` turn its entries into messages and tool calls, and
-`lib/conversation-parts.ts` folds them into render parts (the `Part` types are in `lib/parts.ts`): each tool result
-joins the call that asked for it, with a lifecycle state; the entries the app writes itself (thread heads, Persona asks and answers, Topic briefs, Delegate results) are
-decoded with their contract schemas, and entries a later entry's edits omit are hidden.
-`components/parts/registry.tsx` picks the renderer for each part. A thread opens in the thread panel beside its
-channel as the live thread itself (`components/shell/thread-panel.tsx`), never a copy: it starts at its fork entry and
-never shows inherited history. The channel and the panel follow through the shared stream pool
-(`lib/stream-pool.ts`, one stream per conversation, capped, suspended off screen); never open a second stream for a
-conversation outside it.
+A chat is one stream of AG-UI 1.0 events in a Durable Streams object per epoch, the same profile third parties read
+([chat streams](../../../docs/architecture/streams.md), ADR 0109). The browser joins it through the typed client
+(`streamJoin` in `conversations/queries.ts`, `GET /api/conversations/:id/stream`) and reads the `full` tier at the
+signed URL it answers: `lib/agui/reader.ts` reads what was written since its offset, then follows live
+(`lib/event-streams.ts` holds the `fetch` and `EventSource` transports, the only ones outside the typed client).
+`lib/agui/reducer.ts` folds the events into the `ConversationProjection` the transcript draws; `lib/agui/messages.ts`
+maps AG-UI messages to `ChatMessage`s (`lib/chat-messages.ts`) once per message, keeping the transcript's ids
+(`<entry>:<index>`) from `metadata.goblin.entryId`, and decodes goblin's marks and activities with their contract
+schemas. Older pages come from the history query, already AG-UI messages in the same mapping. `lib/conversation-parts.ts`
+folds the messages into render parts (the `Part` types are in `lib/parts.ts`): each tool result joins the call that
+asked for it, with a lifecycle state; the entries the app writes itself (thread heads, Persona asks and answers, Topic
+briefs, Delegate results, notices) arrive as activities and Persona-marked assistant messages, and entries a later
+entry omits (`omits`) are hidden. `components/parts/registry.tsx` picks the renderer for each part. A thread opens in
+the thread panel beside its channel as the live thread itself (`components/shell/thread-panel.tsx`), never a copy: it
+starts at its fork entry and never shows inherited history. The channel and the panel follow through the shared stream
+pool (`lib/stream-pool.ts`, one reader per conversation, capped, suspended off screen); never open a second reader for
+a conversation outside it.
 
 - Assistant figures use `MessageText` → `ChatMarkdown` (Streamdown) → `RichBlock` and lazy kit entries for Mermaid,
   chart and map fences. Keep open streaming fences, invalid specs and drawing failures as code; Streamdown says which
@@ -29,13 +32,13 @@ conversation outside it.
   `useConversation.send`; no hidden action, network provider or grant. Quoted and closed chats disable controls.
   Keep the runtime grammar (`pi/reply-ui.ts`) and browser library in step. Verify with `test/ui-openui.ts` and the
   public playground's built browser test. Preserve the inspector patch and `publishObservability={false}`.
-- Pi state is authoritative. Do not keep a second transcript or invent cursor replay.
-- Queue contents for Main and ordinary threads come from the owner queue API over `InboxDoc`; native snapshot/inbox
-  IDs remain authoritative membership. Keep one cancellable content read in the shared stream, reject stale reads,
-  retain contents on failure, and render the queue above both composers, outside the transcript and turn map. Normal
-  Send stays a follow-up; unchanged failed drafts reuse their operation IDs.
-  Row removal uses the owner DELETE queue API and disables only that row while pending. Keep failures visible,
-  refresh through the shared stream, and report an already-started outcome without invoking Stop.
+- The stream is authoritative. Do not keep a second transcript. Something the UI needs of an entry that the stream
+  does not carry is added to `metadata.goblin` or STATE on the server (`apps/runtime/src/streams/`), for every reader,
+  never read from Pi's entries in the browser.
+- Queued inputs and what they say come from STATE `/queue` (the producer reads `InboxDoc`). Render the queue above both
+  composers, outside the transcript and turn map. Normal Send stays a follow-up; unchanged failed drafts reuse their
+  operation IDs. Row removal uses the owner DELETE queue API and disables only that row while pending; the stream shows
+  the queue without it. Keep failures visible and report an already-started outcome without invoking Stop.
 - The conversation list and activity come from the workspace feed (`/api/workspace/events`, opened by
   `components/workspace-feed.tsx` and kept by `lib/workspace/`): one stream per tab, a fresh snapshot on every
   reconnect, written into the Query cache as one slice per kind (`['workspace', slice]`) that components read through
@@ -43,8 +46,11 @@ conversation outside it.
   its own and skips one it cannot read (`lib/workspace/decode.ts`), so a server newer than the tab never stops the
   feed; only a frame of another shape reconnects. Never refresh the list after a run, and never hold feed data in a
   second store.
-- Reconnect by opening a fresh stream and starting from its snapshot; dispose the previous stream. Back off between
-  attempts (`conversation-stream.ts`).
+- A dropped live read reads on from the last offset it applied; only a 401/403/404, a closed stream or
+  `goblin.stream.moved` joins again, and a new epoch (whose `MESSAGES_SNAPSHOT` resets the reducer) is read from its
+  start. Back off between failed attempts (`lib/reconnect.ts`). Verify with `test/agui-reader.test.ts`, the reducer
+  against the runtime's goldens (`test/agui-reducer.test.ts`), and the browser fixtures `test/ui-channel.ts` and
+  `test/ui-queue.ts`, which serve AG-UI over the protocol's reads (`test/agui-route.ts`).
 - MCP Apps are tool-associated `ui://` resources from the originating server. Render them in the sandboxed iframe
   with its CSP; validate message origin and source.
 - Apps are kept per call in the runtime registry (`apps/registry.ts`, ADR 0020) and listed by the workspace feed;
@@ -64,7 +70,7 @@ conversation outside it.
   MessageScroller (`patches/shadcn-react/README.md`; `bun run check:patches` proves the patch is installed). Only
   the owner's own turns are scroll anchors (`isOwnTurn` in `lib/parts.ts`); keep part ids stable across a reply's
   commit and give every row a `messageId`, because the scroller tells appends, prepends and new anchors apart by rows.
-  Rows render without `content-visibility`, so measurements are real heights. While the snapshot is loading the
+  Rows render without `content-visibility`, so measurements are real heights. Until the stream's opening is read the
   transcript shows nothing, so it opens at its end.
 - The turn map (`components/turn-map.tsx`, geometry in `lib/turn-map.ts`) sits in the transcript's right gutter with
   `data-app-cover`: a mark per own turn where it is, a band for what is on screen, a hover list that jumps with
