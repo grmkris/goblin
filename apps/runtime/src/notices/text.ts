@@ -1,10 +1,10 @@
 import { Predicate } from 'effect'
-import { redactSecretFields } from '../mcp/oauth/redaction.ts'
 import { routineSummary } from '../routines/summary.ts'
 
-/** How long a notice's title and body may be; with the link they stay within the 1600 characters a summary keeps. */
+/** How long a notice's title and body may be, and the longest link it keeps: whole, or not at all. */
 const TITLE = 200
 const BODY = 1200
+const LINK = 2048
 
 /** What a notice says: a title, perhaps a line more, perhaps one link. */
 export type NoticeText = { readonly title: string; readonly body?: string; readonly url?: string }
@@ -12,35 +12,29 @@ export type NoticeText = { readonly title: string; readonly body?: string; reado
 const record = (value: unknown): { readonly [key: PropertyKey]: unknown } =>
   Predicate.isReadonlyObject(value) && !Array.isArray(value) ? value : {}
 
-/** One line of the producer's text, scrubbed of credentials and controls and cut to `max`; empty when there is none. */
+/** One line of the producer's text, its controls stripped and cut to `max`; empty when there is none. */
 const line = (value: unknown, max: number): string =>
   typeof value === 'string' ? routineSummary(value.replaceAll(/\s+/gu, ' ')).slice(0, max) : ''
 
-/** The producer's link, kept only as a plain http(s) address with no credentials, query or fragment. */
+/**
+ * The producer's link, whole, query and all (ADR 0104): only an http(s) address of at most {@link LINK} characters. Any
+ * other value is left out, never cut or shown as a link.
+ */
 const link = (value: unknown): string | undefined => {
-  if (typeof value !== 'string') return undefined
-  try {
-    const url = new URL(value)
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') return undefined
-    url.username = ''
-    url.password = ''
-    url.search = ''
-    url.hash = ''
-    return url.toString().slice(0, 2048)
-  } catch {
-    // expected: a value that is no address is left out, never shown as a link.
+  const url = typeof value === 'string' ? URL.parse(value) : null
+  if (url === null || (url.protocol !== 'https:' && url.protocol !== 'http:') || url.href.length > LINK)
     return undefined
-  }
+  return url.href
 }
 
 /**
  * What a notice of event `name` from the connection labelled `label` says (ADR 0041). MCP Events has no summary field,
  * so it reads the producers' convention: `data.title` or `data.summary` as its title, the summary as a line more when
- * the title was the title, and `data.url` as its link. With none of them it says "<event> from <label>". The text is
- * the producer's: secrets are redacted and it is bounded, but it stays untrusted data.
+ * the title was the title, and `data.url` as its link. With none of them it says "<event> from <label>". The text and
+ * the link are the producer's as sent (ADR 0104), bounded and without controls; they stay untrusted data.
  */
 export function noticeOfEvent(name: string, data: unknown, label: string): NoticeText {
-  const fields = record(redactSecretFields(data))
+  const fields = record(data)
   const title = line(fields['title'], TITLE)
   const summary = line(fields['summary'], BODY)
   const url = link(fields['url'])

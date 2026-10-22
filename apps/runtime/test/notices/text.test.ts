@@ -9,7 +9,11 @@ describe("a notice's words (ADR 0041)", () => {
         { title: 'You were picked', summary: 'Job 12: Write docs', url: 'https://sidequest.test/jobs/12?token=x#a' },
         'Sidequest · Worker',
       ),
-    ).toEqual({ title: 'You were picked', body: 'Job 12: Write docs', url: 'https://sidequest.test/jobs/12' })
+    ).toEqual({
+      title: 'You were picked',
+      body: 'Job 12: Write docs',
+      url: 'https://sidequest.test/jobs/12?token=x#a',
+    })
   })
 
   it('takes the summary as the title when there is no title, and names the event otherwise', () => {
@@ -20,13 +24,21 @@ describe("a notice's words (ADR 0041)", () => {
     expect(noticeOfEvent('x', 'not an object', 'Hirer')).toEqual({ title: 'x from Hirer' })
   })
 
-  it('keeps only plain http(s) links, and strips secrets and controls from the words', () => {
+  it('keeps an http(s) link whole, query, fragment and credentials too, and leaves anything else out (ADR 0104)', () => {
+    const share = 'https://media.test/f/a.mp4?t=T0k3n&dl=1#t=3'
+    expect(noticeOfEvent('e', { title: 'a', url: share }, 'L').url).toBe(share)
+    expect(noticeOfEvent('e', { title: 'a', url: 'https://user:pw@x.test/p' }, 'L').url).toBe(
+      'https://user:pw@x.test/p',
+    )
     expect(noticeOfEvent('e', { title: 'a', url: 'javascript:alert(1)' }, 'L')).toEqual({ title: 'a' })
-    expect(noticeOfEvent('e', { title: 'a', url: 'https://user:pw@x.test/p' }, 'L').url).toBe('https://x.test/p')
-    const scrubbed = noticeOfEvent('e', { title: 'Bearer abc.def‮ evil', summary: 'token=sekrit' }, 'L')
-    expect(scrubbed.title).not.toContain('abc.def')
-    expect(scrubbed.title).not.toContain('‮')
-    expect(scrubbed.body).not.toContain('sekrit')
+    expect(noticeOfEvent('e', { title: 'a', url: 'not a link' }, 'L')).toEqual({ title: 'a' })
+    const long = `https://x.test/?q=${'x'.repeat(2048)}`
+    expect(noticeOfEvent('e', { title: 'a', url: long }, 'L')).toEqual({ title: 'a' })
+  })
+
+  it("keeps the producer's words, credential-shaped ones too, without controls", () => {
+    const said = noticeOfEvent('e', { title: 'Bearer abc.def\u202e evil', summary: 'token=sekrit\u0000 x' }, 'L')
+    expect(said).toEqual({ title: 'Bearer abc.def evil', body: 'token=sekrit x' })
   })
 
   it('frames a notice for the model as data from the connection, a reminder as from the routine', () => {

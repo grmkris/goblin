@@ -54,7 +54,8 @@ and abort owned conversations. Questions use sealed shared interaction receipts 
 
 Committed `pi.usage` counters, including compaction, project into app-only cumulative watermarks and UTC-day receipts:
 tokens for the routine's own caps and for the owner's daily usage. Replay does not charge twice; a model response
-already in flight may overshoot a cap. Settlement freezes a scrubbed summary and one `app.routine` parent write with a
+already in flight may overshoot a cap. Settlement freezes a bounded summary (1600 characters, terminal and bidi controls
+stripped, links and credential-shaped text kept as written, ADR 0104) and one `app.routine` parent write with a
 stable request ID. A routine belongs to a Topic (`app_routines.topic_id`, migration `20261026000500_routine_topics`, ADR
 0032): the Topic of the chat whose `routine_propose` drafted it, or the one the owner names when they propose or edit it
 (`RoutineProposal.topic`, `RoutineEdit.topic`; it must exist and be open). Its run conversation sits under that Topic's
@@ -81,7 +82,8 @@ retired receipt cannot become live again. Local signed-fixture proof is separate
 
 **Tell me** (ADR 0041) makes a routine's posts notifications. An event's **notice** comes first: `routines/notices.ts`
 derives its text from the producer's convention (`data.title` or `data.summary`, with `data.url`; else "<event> from
-<label>", `notices/text.ts`), redacted, scrubbed of controls and bounded, with only a plain http(s) link. It is posted as
+<label>", `notices/text.ts`), bounded and stripped of controls; its link is kept whole, query and all, when it is an
+http(s) address of at most 2048 characters, and left out otherwise (ADR 0104). It is posted as
 a passive `app.notice` entry in the routine's home chat (`Conversations.routineHome`: its Topic's Conversation, or
 Personal's while that Topic is archived) and attributed to the connection by its label. The model reads it framed as
 untrusted data from that connection; memory and retrieval leave it out. A schedule that hands nothing over posts a
