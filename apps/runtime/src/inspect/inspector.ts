@@ -306,6 +306,13 @@ function callFields(event: RunEvent): Partial<TurnStep> {
  * A turn's steps in order (ADR 0084), each when it started after the turn and how long it took, from its run event's
  * scalars alone: content-free, as the events are.
  */
+/**
+ * Steps in the order they ran: by start, and of two that started together (a tool call and the next model attempt
+ * start in one Pi commit) the one that ended first; one still running last.
+ */
+const inOrder = (a: RunEvent, b: RunEvent): number =>
+  a.startedAt - b.startedAt || (a.endedAt ?? Number.POSITIVE_INFINITY) - (b.endedAt ?? Number.POSITIVE_INFINITY)
+
 export function stepsOf(turn: RunEvent, events: readonly RunEvent[]): TurnStep[] {
   // A tool call's MCP request is the one its task made: it names the server as that server reports itself.
   const requests = new Map<string, RunEvent>()
@@ -313,6 +320,7 @@ export function stepsOf(turn: RunEvent, events: readonly RunEvent[]): TurnStep[]
     if (event.kind === 'mcp.request' && event.taskId !== undefined) requests.set(event.taskId, event)
   return events
     .filter((event) => STEP_KINDS.has(event.kind))
+    .toSorted(inOrder)
     .map((event) => {
       const errorType = stringOf(event, RunAttribute.errorType)
       const error = event.status === 'error' ? stringOf(event, RunAttribute.error) : undefined

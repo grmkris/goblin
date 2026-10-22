@@ -133,6 +133,14 @@ const event = (
   attributes,
 })
 
+/** A step event of `kind` from `startedAt` to `endedAt` (still running without one). */
+const at = (kind: RunEvent['kind'], startedAt: number, endedAt: number | undefined, id: string): RunEvent => ({
+  ...event(kind, 'ok'),
+  id,
+  startedAt,
+  ...(endedAt === undefined ? { endedAt: undefined, status: 'started' as const } : { endedAt }),
+})
+
 describe('summarize', () => {
   it('counts attempts, calls and failures, and sums tokens', () => {
     const turn = event('turn.submitted', 'error', {
@@ -235,6 +243,24 @@ describe('what a turn ran with (ADR 0107)', () => {
       error: 'Remote MCP request failed (timeout).',
     })
     expect(blockedStep?.error).toBeUndefined()
+  })
+
+  it('lists steps in the order they ran: of two that started together, the one that ended first', () => {
+    const ordered = stepsOf(turn, [
+      turn,
+      at('model.attempt', 10, 13, 'a1'),
+      at('model.attempt', 13, 20, 'a2'),
+      at('tool.call', 13, 13, 't1'),
+      at('model.attempt', 20, undefined, 'a3'),
+      at('tool.call', 20, 21, 't2'),
+    ])
+    expect(ordered.map((step) => [step.kind, step.offsetMs])).toEqual([
+      ['model.attempt', 0],
+      ['tool.call', 3],
+      ['model.attempt', 3],
+      ['tool.call', 10],
+      ['model.attempt', 10],
+    ])
   })
 
   it('sums it up once for the turn', () => {
