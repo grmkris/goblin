@@ -31,7 +31,7 @@ import {
   setUpOf,
   TELL_MAIN,
 } from '../lib/event-setup.ts'
-import { eventGroups, eventTitle } from '../lib/events.ts'
+import { eventTitle } from '../lib/events.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { usePersonas, useTopics } from '../lib/workspace/hooks.ts'
 import { routineSettingsQuery, setUpEventsMutation } from '../routines/queries.ts'
@@ -300,9 +300,9 @@ const LIMITS =
   'At most one run a minute. Past 20 notices an hour, the rest wait in Activity behind one line. Events from before you set one up are dropped.'
 
 /**
- * A connection's events to pick (ADR 0041, ADR 0068): grouped by the service a gateway names them by (flat otherwise),
- * none picked until the owner picks one, each routed in one select, Advanced folded away, and Set up for all of them at
- * once. Setting up proposes and confirms each event's own routine, so it grants exactly that event with those filters.
+ * A connection's events to pick (ADR 0041, ADR 0068): in the server's order, each by its own title, none picked until
+ * the owner picks one, each routed in one select, Advanced folded away, and Set up for all of them at once. Setting up
+ * proposes and confirms each event's own routine, so it grants exactly that event with those filters.
  */
 export function EventPicker({
   server,
@@ -314,28 +314,22 @@ export function EventPicker({
 }) {
   const places = usePlaces()
   const picks = useEventPicks(server, streams, places)
-  const groups = eventGroups(streams, server)
   const count = picks.choices.size
   if (streams.length === 0) return null
   return (
     <div className="event-picker">
-      {groups.map(({ group, streams: members }) => (
-        <div key={group} className="event-group">
-          {groups.length > 1 && <h4 className="event-group-title">{group}</h4>}
-          <ul className="event-picks">
-            {members.map((stream) => (
-              <PickRow
-                key={stream.name}
-                stream={stream}
-                choice={picks.choices.get(stream.name)}
-                places={places}
-                onPick={(picked) => picks.pick(stream, picked)}
-                onRoute={(route) => picks.update(stream.name, { route })}
-              />
-            ))}
-          </ul>
-        </div>
-      ))}
+      <ul className="event-picks">
+        {streams.map((stream) => (
+          <PickRow
+            key={stream.name}
+            stream={stream}
+            choice={picks.choices.get(stream.name)}
+            places={places}
+            onPick={(picked) => picks.pick(stream, picked)}
+            onRoute={(route) => picks.update(stream.name, { route })}
+          />
+        ))}
+      </ul>
       {count > 0 && <AdvancedSection server={server} streams={streams} picks={picks} />}
       {picks.error !== '' && (
         <Alert variant="destructive">

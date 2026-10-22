@@ -1,7 +1,7 @@
 /**
  * Local browser acceptance of a connection's Events (ADR 0041, amended by ADR 0068) against real source components, at
- * desktop and phone widths in light and dark: the open offer, the picker with the events' titles and descriptions
- * grouped by service, nothing picked until the owner picks it, an event with an existing subscription, a filter the server
+ * desktop and phone widths in light and dark: the open offer, the picker with the events' titles and descriptions in
+ * the server's order, nothing picked until the owner picks it, an event with an existing subscription, a filter the server
  * requires asked for in Advanced, a hand-over to a Persona, and both events set up in one step (each proposed, then
  * confirmed). No account or model call is made; the owner API is routed here.
  */

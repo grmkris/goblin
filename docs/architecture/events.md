@@ -62,9 +62,8 @@ Resume and Edit, which opens the routine editor and then its review), the **pick
 or streams without supported subscriptions show an explanation and Refresh event streams; read failures show their
 reference and Try again. Settings → Notify me via configures outgoing delivery and links back to Connections for
 incoming events. The picker
-lists the streams grouped by the service a gateway names them by (the part before the first dot of a name of three
-parts or more, mysi's `<service>.<event>`), else flat, each by its title (else its name in words, `message.received` →
-"Message received") with its description. Nothing is picked until the owner picks it; a picked stream goes to Tell me
+lists the streams in the server's order, each by its title (else every part of its name in words, `post.created` →
+"Post created"; no part is read as a gateway's service, ADR 0096) with its description. Nothing is picked until the owner picks it; a picked stream goes to Tell me
 in Personal until they choose otherwise. Each picked stream has one select for where it goes: Tell me in a Topic, or goblin acting on it in a Topic or a Persona acting on it (answering in Personal). A
 hand-over adds a line saying who answers where; a Tell me pick adds none, since its
 notice is the title and line its row already shows. **Advanced**

@@ -495,7 +495,7 @@ refreshed contents after toggling. It covers desktop and 390px, light and dark, 
 
 `heavy bun apps/web/test/ui-events.ts` renders a connection's Events (ADR 0041, ADR 0068) from source in local Chromium
 at desktop and phone widths, light and dark: loading, empty and unsupported catalogs, failures with a reference and retry,
-refresh recovery, the open offer, the picker with the events' titles and descriptions grouped by service, nothing picked until the owner picks it, an event with an existing subscription, a filter the server requires
+refresh recovery, the open offer, the picker with the events' titles and descriptions in the server's order, nothing picked until the owner picks it, an event with an existing subscription, a filter the server requires
 asked for in Advanced, a hand-over to a Persona, and both events set up in one step (each proposed, then confirmed), with the owner
 API routed in the page and the proposals it receives checked. Screenshots go under
 `.local/goblin-acceptance/events-*`; this is browser fixture evidence only.
