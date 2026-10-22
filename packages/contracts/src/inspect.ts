@@ -208,6 +208,8 @@ export const TurnStep = Schema.Struct({
   server: Schema.optional(Schema.String),
   serverTool: Schema.optional(Schema.String),
   errorType: Schema.optional(Schema.String),
+  /** A failed step's fixed summary in plain words (`goblin.error`), never the provider's or server's own text. */
+  error: Schema.optional(Schema.String),
   blockedReason: Schema.optional(Schema.String),
   version: Schema.optional(Schema.String),
   endpoint: Schema.optional(ModelEndpointKind),

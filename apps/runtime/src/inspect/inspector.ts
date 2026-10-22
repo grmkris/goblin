@@ -315,6 +315,7 @@ export function stepsOf(turn: RunEvent, events: readonly RunEvent[]): TurnStep[]
     .filter((event) => STEP_KINDS.has(event.kind))
     .map((event) => {
       const errorType = stringOf(event, RunAttribute.errorType)
+      const error = event.status === 'error' ? stringOf(event, RunAttribute.error) : undefined
       const request = event.taskId === undefined ? undefined : requests.get(event.taskId)
       return {
         kind: event.kind,
@@ -324,6 +325,7 @@ export function stepsOf(turn: RunEvent, events: readonly RunEvent[]): TurnStep[]
         ...(event.kind === 'model.attempt' ? { ...attemptFields(event), ...ranWithFields(event) } : {}),
         ...(event.kind === 'tool.call' ? { ...callFields(event), ...serverFields(request) } : {}),
         ...(errorType === undefined ? {} : { errorType }),
+        ...(error === undefined ? {} : { error }),
         ...versionOf(event),
       }
     })

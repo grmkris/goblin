@@ -219,6 +219,24 @@ describe('what a turn ran with (ADR 0107)', () => {
     expect(summarize(turn, events).version).toBe(release)
   })
 
+  it('gives a failed step its fixed summary, and a step that did not fail none', () => {
+    const failed = {
+      ...event('tool.call', 'error', {
+        [RunAttribute.toolName]: 'mcp_call',
+        [RunAttribute.errorType]: 'UpstreamMcp:timeout',
+        [RunAttribute.error]: 'Remote MCP request failed (timeout).',
+      }),
+      taskId: 't9',
+    }
+    const blocked = event('tool.call', 'blocked', { [RunAttribute.error]: 'Owner grant required.' })
+    const [failedStep, blockedStep] = stepsOf(turn, [turn, failed, blocked])
+    expect(failedStep).toMatchObject({
+      errorType: 'UpstreamMcp:timeout',
+      error: 'Remote MCP request failed (timeout).',
+    })
+    expect(blockedStep?.error).toBeUndefined()
+  })
+
   it('sums it up once for the turn', () => {
     expect(ranWithOf(events)).toEqual({
       versions: [release, next],
