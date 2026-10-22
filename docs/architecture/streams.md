@@ -5,8 +5,10 @@ The profile third parties implement against, and the only way goblin's own web a
 [ADR 0109](../adr/0109-every-chat-streams-ag-ui-through-a-durable-stream.md)'s). Built: the translator from Pi's events
 to AG-UI (`apps/runtime/src/streams/agui.ts`), goblin's parts of it in the contracts (`packages/contracts/src/agui/`),
 the producer that serves a chat's events to the readers connected to it, with its children's work (Personas' forks and
-subagents), the endpoint (`chats/api.ts` `stream`), and the web's reader (`apps/web/src/lib/agui/`). The workspace
-feed is still its own stream.
+subagents), the endpoint (`chats/api.ts` `stream`), and the web's reader (`apps/web/src/lib/agui/`). A chat is driven
+with AG-UI too: a send is AG-UI's `RunAgentInput`, answered with its receipt or with its own run's events
+([ADR 0111](../adr/0111-agui-run-input-is-the-send.md), "Driving a chat" below). The workspace feed is still its own
+stream.
 
 ## What a stream is
 
@@ -56,6 +58,57 @@ curl -N "$GOBLIN_ORIGIN/api/conversations/<chat>/stream" -H "authorization: Bear
 No string in any frame holds a secret goblin issues or keeps: one that holds something shaped like a server's key
 (`gbk_…`), a thread server's token (`swt_…`) or a webhook secret (`whsec_…`) is sent as `[redacted]`
 (`streams/redact.ts`). Credentials never enter the events; this pass is the backstop.
+
+## Driving a chat
+
+A send is AG-UI's `RunAgentInput` ([ADR 0111](../adr/0111-agui-run-input-is-the-send.md), `RunInput` in the
+contracts), posted to `POST /api/conversations/:id/messages` with the caller's credential (scope `conversations`):
+
+```json
+{
+  "threadId": "<chat>",
+  "runId": "<operation id, 1 to 200 characters: the same id is the same send>",
+  "messages": [{ "id": "<any>", "role": "user", "content": "Can you design my cover?" }],
+  "forwardedProps": { "goblin": { "selections": [{ "kind": "persona", "personaId": 7 }] } }
+}
+```
+
+- `threadId` is the chat in the path. Only the last of `messages` is read, and it must be the user's text (a string,
+  or text parts); a stock client's history before it is ignored. Files, composer tags (a Persona tag makes the send an
+  ask of that Persona instead of the agent), the Persona order and App context go in `forwardedProps.goblin`
+  (`attachments`, `selections`, `personaOrder`, `appContext`). `tools` and `state` must be empty; `context` is ignored.
+  A body may be up to 1 MiB.
+- `resume` answers the chat's questions by their interrupt ids (`/attention`, `<chat>:i<entry>`): `{ "interruptId",
+  "status": "resolved", "payload": "<the answer, as text>" }` makes the answer the send's words when its own say
+  nothing. A `cancelled` entry is nothing; other interrupts are answered by their own endpoints, and resolving one is
+  refused with its endpoint as the reason.
+- A refusal answers the error envelope before anything is admitted: 400 `InvalidInput` with a reason
+  (`thread_mismatch`, `last_message_not_user`, `non_text_content`, `client_tools`, `interrupt_not_open`, …), 404 for a
+  chat out of reach, 409 `stream_busy` past the agent's 32 run streams.
+
+Without `Accept: text/event-stream` it answers 202 with Pi's receipt (`{ operationId, session, accepted }`;
+`accepted: false` for a retry). With it, it answers that send's own run as server-sent events, framed as a chat's
+stream is, and ends after the run's end:
+
+1. nothing until the run that took the send's input starts (a send queued behind another run waits, and nothing of that
+   run is sent); then `RUN_STARTED` with the send's `runId` and `threadId` (`metadata.goblin.run` is the chat's own run
+   id), `STATE_SNAPSHOT`, and the run's events: steps, thinking, text, tool calls with their results, STATE changes;
+2. `RUN_FINISHED` with the send's ids (`outcome` `interrupt` holds only the run's open questions, which a `resume`
+   answers), or `RUN_ERROR`; then the connection ends.
+
+The send's own user message and the chat's children (a Persona's fork, a subagent) are left out; the chat's stream
+carries them. A send that tags Personas has no run of the chat's: its run carries each Persona's answer (an assistant
+message with `name`) and ends once they all answered (`interrupt` when an answer asked questions), were stopped
+(`cancelled`) or failed (`RUN_ERROR`). A retry of a send that ended answers `RUN_STARTED` and its end at once
+(`metadata.goblin.replayed`); one under way opens with what its run said so far. A run stream ends after fifteen
+minutes in `RUN_ERROR` `stream_lifetime`; the run goes on in the chat.
+
+A stock `@ag-ui/client` `HttpAgent` does all this: its URL is the endpoint, the key its `authorization` header, the chat
+its `threadId`; `scripts/agui-client-check.ts` runs one turn on a stage with it.
+
+`POST /api/conversations/:id/threads` (the thread operation) takes `{ anchor, title?, mcpServers?, message }`, `message`
+such a send for the chat in the path; its `runId` is the operation id, and it answers 201 with the Thread and the
+receipt, never events.
 
 ## Ids
 
@@ -276,6 +329,15 @@ matching the forward read's invocation and entry; a subagent's run streams the s
 while it works opens with it in flight. Not proven there: that the agent hears of a client that went away (local
 workerd never tells it, from outside the dev proxy or from inside the Worker), so a gone reader is freed by the
 fifteen-minute bound or a full sink.
+
+A send's run (`streams/run.ts` `RunFollow`, `layers/run-streams.ts`) is held by `run.test.ts` over the same
+recordings, every case's events through `@ag-ui/client`'s own `verifyEvents`: a plain run, thinking, a tool call, a
+failed and a stopped one, a send queued behind another run, a retry of a run under way (its answer so far) and one
+placed into a run in flight, a run that asks, finished retries, a withdrawn input, the stream's life, and an ask of
+Personas (its answer, its questions, a failure, a stop, a retry; never a fork's own work). In local workerd
+(`run-streams-case.ts`): a run with thinking and a tool call under the send's id, then its retry at once; a send queued
+behind a held run; a question answered by a `resume` alone; a Persona ask; a key sending as Swarmm does; a 300 KB
+history taken and a body past 1 MiB refused; and a stock `HttpAgent` running a turn with a key.
 
 The web holds its reducer to the same goldens (`apps/web/test/agui-reducer.test.ts`): for every case the transcript
 built from the live events, all at once or one event at a time, is the one a new connection opens with; a child's

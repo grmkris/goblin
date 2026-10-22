@@ -46,7 +46,10 @@ Code, claude.ai, Cursor) or a server's API key.
 - **Tools.** One registry (`inbound/tools.ts`, the tools in `inbound/mcp-server.ts` and `inbound/inspect-tools.ts`):
   each tool calls one owner endpoint as the caller (`ownerCall`, forwarding `x-goblin-caller`) and is listed only when
   the caller holds that endpoint's `EndpointScope`, so admission, scopes, the limit and reach are the owner API's own.
-  Each answers its endpoint's JSON as text, and as structured content when it is an object. Every scoped endpoint has
+  Each answers its endpoint's JSON as text, and as structured content when it is an object. `conversation_send` and
+  `thread_start` take plain fields (`PlainSend`, `PlainThreadStart`: the words, the operation id and goblin's parts),
+  which their adapters send as the AG-UI `RunAgentInput` the endpoints take (contracts' `runInput` and `threadStart`,
+  [ADR 0111](../adr/0111-agui-run-input-is-the-send.md)), and answer the receipt. Every scoped endpoint has
   its tool but a chat's stream (`STREAMED`, ADR 0110): server-sent events a key reads over HTTP itself
   (`GET /api/conversations/:id/stream`, [chat streams](streams.md)), which one tool answer cannot carry; the server's
   instructions name it.

@@ -73,7 +73,8 @@ Two more requests are drawn by the host, where the App cannot reach (`lib/app-co
 open (https only, no credentials) becomes an offer with a real anchor, so only the owner's click opens it. Context
 the App shares for the agent (`ui/update-model-context`, text or structured content rendered as JSON, at most 8192
 JavaScript string units) waits in a removable chip above its conversation's composer and travels once, with the
-owner's next message there, as `appContext` (`{ app: <App id>, text }`) on `POST /api/conversations/:id/messages`. The
+owner's next message there, as `appContext` (`{ app: <App id>, text }`, in the send's `forwardedProps.goblin`) on
+`POST /api/conversations/:id/messages`. The
 runtime reads where each open App comes from in its registry, never from the browser, and (`pi/content.ts`) appends the
 text after the owner's words as a separate block shaped `{ origin: { connectionId | app, trust: 'untrusted' }, appContext }`
 (an MCP App's server, or the agent app's name). An agent app's view shares through `share(text)` in its SDK. The persona

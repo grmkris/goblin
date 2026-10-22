@@ -16,6 +16,7 @@ Deployment scripts use Alchemy only. Secrets are read from mode-600 files under 
 | `bun run ui:acceptance [session-file]`                                               | Read-only UI checks and screenshots against dev (see UI acceptance below).                 |
 | `bun run icons`                                                                      | Redraw the app icons and favicon in `apps/web/public` from the shared goblin mark.         |
 | `heavy bun scripts/patch-shadcn-react.ts --test`                                     | Rebuild the MessageScroller patch from upstream source (`patches/shadcn-react/README.md`). |
+| `GOBLIN_ORIGIN=… GOBLIN_KEY=… bun scripts/agui-client-check.ts`                      | One turn on a stage with a stock AG-UI `HttpAgent` and a key; prints event types only.     |
 
 Stage configuration comes from `.local/<stage>.env` (see `.env.example`); `plan:dev`, `deploy:dev` and `destroy:dev`
 also read the Cloudflare credentials in `.local/cloud.env` (mode 600, only `CLOUDFLARE_API_TOKEN` and

@@ -24,7 +24,9 @@ agent is admitted in this order, then forwarded:
    request's caller in `x-goblin-caller` (ADR 0086), with its name (ADR 0108), which `/mcp` also sets for an OAuth
    client of the owner;
 3. every write needs the app's own `Origin` and `x-goblin-csrf: 1` (`http/csrf.ts`), which the web sends on every write;
-4. a body is capped at 64 KiB, except file bytes, which stream through to the agent's own limits;
+4. a body is capped at 64 KiB, except a send's and a thread operation's, at 1 MiB (an AG-UI `RunAgentInput`, which a
+   stock client sends with the whole conversation, [ADR 0111](../adr/0111-agui-run-input-is-the-send.md)), and file
+   bytes, which stream through to the agent's own limits;
 5. `AGENTS.getByName(workspaceId).fetch` gets the request with only `content-type`, `content-length`, `accept`,
    `last-event-id`, `x-goblin-request`, `x-goblin-operation` and `x-mcp-caller`, plus the edge's reference in
    `x-goblin-ref` (the request's cf-ray, or a random id where there is none), `x-goblin-forwarded: owner` and who it
@@ -62,7 +64,7 @@ messages carry `[from server <key name>]` (ADR 0108); an OAuth client reaches wh
 
 | Group | Paths under `/api` | Handlers |
 | --- | --- | --- |
-| `conversations` | `/conversations`, `/conversations/:id`, and under it `messages`, `threads`, `move`, `stop`, `queue`, `read`, `composer`, `history` (older pages, as AG-UI messages), `entries`, `sources`, `stream` (its AG-UI events as server-sent events, every one to every reader that reaches the chat, [chat streams](streams.md)) | `chats/api.ts` |
+| `conversations` | `/conversations`, `/conversations/:id`, and under it `messages` (a send as AG-UI's `RunAgentInput`, answered with Pi's receipt, or with its run's AG-UI events when asked for `text/event-stream`, ADR 0111, [driving a chat](streams.md#driving-a-chat)), `threads`, `move`, `stop`, `queue`, `read`, `composer`, `history` (older pages, as AG-UI messages), `entries`, `sources`, `stream` (its AG-UI events as server-sent events, every one to every reader that reaches the chat, [chat streams](streams.md)) | `chats/api.ts` |
 | `inspect` | `GET /inspect/conversations`, `/inspect/conversation`, `/inspect/turns`, `/inspect/turn`, `/inspect/problems`, `/inspect/flows`, `/inspect/details` | `inspect/api.ts` |
 | `events` | `GET /events`, `POST /events/subscribe`, `/events/unsubscribe`, `/events/poll` ([published events](published-events.md), scope `conversations`, ADR 0112) | `publish/api.ts` |
 | `topics` | `/topics`, `/topics/:id`, `/topics/:id/setup` | `topics/api.ts` |

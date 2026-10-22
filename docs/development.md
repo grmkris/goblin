@@ -188,6 +188,11 @@ until it runs, real provider and Telegram delivery remain unverified.
   ```sh
   curl -sS -X POST "$GOBLIN_ORIGIN/api/topics" -H "authorization: Bearer $GOBLIN_KEY" \
     -H 'content-type: application/json' -d '{"name":"Service test","operationId":"svc:topic:1"}'
+  # A message is AG-UI's RunAgentInput (ADR 0111): 202 and the receipt, or with -H 'accept: text/event-stream' and -N
+  # the run it starts as AG-UI events (docs/architecture/streams.md, "Driving a chat").
+  curl -sS -X POST "$GOBLIN_ORIGIN/api/conversations/<chat>/messages" -H "authorization: Bearer $GOBLIN_KEY" \
+    -H 'content-type: application/json' \
+    -d '{"threadId":"<chat>","runId":"svc:msg:1","messages":[{"id":"m1","role":"user","content":"Hello"}]}'
   curl -sS "$GOBLIN_ORIGIN/api/conversations/<chat>/entries?after=0" -H "authorization: Bearer $GOBLIN_KEY"
   # Follow the chat live instead (docs/architecture/streams.md): its AG-UI events as server-sent events, in full,
   # opening with the chat's snapshot; a reconnect opens with a fresh one.

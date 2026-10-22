@@ -32,6 +32,13 @@ a conversation outside it.
   `useConversation.send`; no hidden action, network provider or grant. Quoted and closed chats disable controls.
   Keep the runtime grammar (`pi/reply-ui.ts`) and browser library in step. Verify with `test/ui-openui.ts` and the
   public playground's built browser test. Preserve the inspector patch and `publishObservability={false}`.
+- A send is AG-UI's `RunAgentInput` (ADR 0111, "Driving a chat" in the profile): the web builds it with the contracts'
+  `runInput` and `threadStart` at the mutation (`conversations/queries.ts`), never by hand, and reads the 202 receipt;
+  the chat's stream shows the turn. `Accept: text/event-stream` makes the endpoint answer that send's own run instead
+  (`streams/run.ts` `RunFollow` over a watch of its own, `layers/run-streams.ts`): the run that took the input under
+  the send's `runId`, no children, its own user message left out, only questions as interrupts, and an ask of
+  Personas as a run of its answers. Hold it to `@ag-ui/client`'s `verifyEvents` (`test/streams/run.test.ts`,
+  `run-streams-case.ts`); the web does not use it.
 - The stream is authoritative. Do not keep a second transcript. Something the UI needs of an entry that the stream
   does not carry is added to `metadata.goblin` or STATE on the server (`apps/runtime/src/streams/`), for every reader,
   never read from Pi's entries in the browser.

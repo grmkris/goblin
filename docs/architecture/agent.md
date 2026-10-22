@@ -141,17 +141,18 @@ answer and a Delegate's result as attributed messages (a mark, a name, Persona o
 Personas still answering and subagents at work show after the transcript ("answering…", "working…", from the
 chat's stream, [chat streams](streams.md); a Persona waiting its turn in a sequence from the feed's invocations). With
 Personas on the server the composer offers them as `@` references (with their avatars), and with two or more tagged a
-Together or In turn choice that is sent as `personaOrder`. What an answer used from other chats shows as a strip under it: a
+Together or In turn choice that is sent as `forwardedProps.goblin.personaOrder`. What an answer used from other chats shows as a strip under it: a
 `search_chats` call's `SourcesDetails`, and automatic retrieval from `GET /api/conversations/:id/sources`
 (`lib/sources.ts`), each source opening its chat.
 A thread started with "+" tells its channel its name once it has one (ADR 0010): the channel gets one
 `app.thread_started` note, `[thread started: "<title>"]`, and its transcript shows that thread's summary.
 **The thread operation** ([ADR 0034](../adr/0034-move-to-thread.md), `chats/thread-heads.ts`) is one idempotent call for
-Reply, "+" and Start thread: `POST /api/conversations/:id/threads` with `StartThread` (`{ operationId, anchor, message,
-personaOrder? }`) makes the Thread at `anchor` (`{ entry }` forks there, `empty` starts one under the Conversation the
+Reply, "+" and Start thread: `POST /api/conversations/:id/threads` with `StartThread` (`{ anchor, title?, mcpServers?,
+message }`, `message` a send as AG-UI's `RunAgentInput` whose `runId` is the operation id, ADR 0111) makes the Thread at
+`anchor` (`{ entry }` forks there, `empty` starts one under the Conversation the
 chat sits under, `latest` forks at the chat's newest entry outside a running turn, or starts empty when it has none),
 in the same Topic, then submits `message` into the Thread through the ordinary owner path as `<operationId>:first`,
-with its Persona order. For `latest` (Start thread) it first writes an `app.thread_head` entry (`ThreadHeadData`,
+with its Persona order (`forwardedProps.goblin.personaOrder`). For `latest` (Start thread) it first writes an `app.thread_head` entry (`ThreadHeadData`,
 request id `thread-head:<op>`) into the chat as a passive write whose model text is a bounded `[the owner started a
 thread: "…"]`. `app_conversations.origin_op` (unique) makes one Thread per operation id, also for concurrent repeats,
 and `POST /api/conversations` with an `operationId` goes through the same path. A key's thread operation may declare up to four MCP
@@ -209,9 +210,9 @@ The conversation-scoped routes of the owner API: the `conversations`, `inspect`,
 | `GET /api/conversations/:id/composer` | Conversation-scoped connected servers, enabled skills by stable URI, existing helpers and unavailable libraries. |
 | `GET /api/conversations/:id/queue` | Ordered queued input IDs, modes and contents for Main and ordinary threads, from Pi InboxDoc. Passive writes, helpers and routine inputs are excluded. |
 | `DELETE /api/conversations/:id/queue` | Remove a queued input by positive safe-integer `submissionId`. Returns `removed`, `already_started`, `already_settled` or `not_found`; never stops a running input. |
-| `POST /api/conversations/:id/threads` | The thread operation (ADR 0034): `StartThread` makes a Thread of this chat at `anchor` (`{ entry }`, `empty` or `latest`, which also posts the message as its head here) and sends `message` there as `<operationId>:first`. Returns 201 `{ thread, receipt }`; the same `operationId` returns the same Thread (another chat's is 409). |
+| `POST /api/conversations/:id/threads` | The thread operation (ADR 0034): `StartThread` makes a Thread of this chat at `anchor` (`{ entry }`, `empty` or `latest`, which also posts the message as its head here) and sends `message` (a `RunAgentInput` for this chat, ADR 0111) there as `<runId>:first`. Returns 201 `{ thread, receipt }`; the same `runId` returns the same Thread (another chat's is 409). |
 | `POST /api/conversations/:id/move` | Move to thread (ADR 0034): `{ entry, operationId }` moves the newest finished turn the owner's message `entry` started into a new Thread. Returns the `MoveReceipt` (`state` `settled` with `thread`, or `refused` with `reason`); the same `operationId` returns the same receipt (another chat's is 409, a move already in flight in the chat is 409). |
-| `POST /api/conversations/:id/messages` | Submit `input`, a stable `operationId`, optional `appContext` (by App id), up to eight `attachments` (owner file paths that must exist) and up to sixteen stable composer `selections`; skill-only input is allowed. Returns 202 acceptance. |
+| `POST /api/conversations/:id/messages` | A send as AG-UI's `RunAgentInput` (ADR 0111): `threadId` this chat, `runId` a stable operation id, the last of `messages` the user's text, and in `forwardedProps.goblin` optional `appContext` (by App id), up to eight `attachments` (owner file paths that must exist), up to sixteen stable composer `selections` and `personaOrder`; skill-only input is allowed, and `resume` answers the chat's questions. Returns 202 acceptance, or with `Accept: text/event-stream` the send's run as AG-UI events ([driving a chat](streams.md#driving-a-chat)). |
 | `GET /api/files?dir=` | A directory of the owner's files (`FileListing`): `/uploads`, `/agent` or a folder under one, with the storage in use. |
 | `GET`, `PUT`, `DELETE /api/files/content?path=` | Download or write (raw: the body streams, `content-length` required) or delete one of the owner's files. Downloads are attachments, except PNG, JPEG, GIF and WebP, which open in place; all are sandboxed by CSP. No files endpoint renews resident authority. |
 | `POST /api/conversations/:id/stop` | Stop a conversation or one `operationId`, and the subagents it started (not its threads); answers `{ stopped }`, whether anything was running. |

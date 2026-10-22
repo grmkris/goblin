@@ -52,6 +52,10 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   (ADR 0110) is server-sent events a key reads over HTTP with its own credential, and the server's instructions say
   where. A key reads a chat's stream in full, so nothing a tool returns may carry a credential; the stream's frames
   redact goblin-shaped secrets as a backstop (`streams/redact.ts`), never the boundary.
+- A send is AG-UI's `RunAgentInput` (ADR 0111): `conversation_send` and `thread_start` keep plain fields a model writes
+  (`PlainSend`, `PlainThreadStart`) and build the body with the contracts' `runInput` and `threadStart`, so the tool
+  and the HTTP request are one handler and one reading (`chats/run-input.ts`). Never give a tool its own copy of the
+  body's rules.
 - Events (`mcp/events/engine.ts`, ADRs 0011 and 0073) require resident authority and an exact server/name/canonical-arguments owner
   grant through the originating endpoint-bound connection. A server offers Events by top-level `capabilities.events`
   (decoded at the authenticated SDK fetch seam, which strips it) or by the `io.modelcontextprotocol/events` extension,
