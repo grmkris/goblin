@@ -46,9 +46,10 @@ const answers = async (me: AgentFetch, chat = '1') =>
 const calls = async (url: string, owner: Person) =>
   decodeCalls(await (await lever(url, owner, 'approvals/calls')).json())
 
-/** A Persona that adds the apps fixture to its Topic's setup. */
-const persona = (name: string): PersonaDefinition => ({
+/** A Persona that adds the apps fixture to its Topic's setup, natively unless it says the gateway (ADR 0102). */
+const persona = (name: string, tools: 'native' | 'gateway' = 'native'): PersonaDefinition => ({
   name,
+  tools,
   avatar: { glyph: name.slice(0, 1), hue: 40 },
   role: `${name} on the board`,
   instructions: `Answer as ${name}.`,
@@ -104,6 +105,19 @@ async function approvalFromFork(url: string, owner: Person, me: AgentFetch, bidd
   expect(next?.hold).toBeUndefined()
   // The scripted fork echoes the decision's last line: the held call's result, as untrusted data.
   expect(next?.text).toContain('persona-held')
+}
+
+/** A Persona on the gateway answers as every Persona did before native tools: mcp_list and mcp_call, no native tool. */
+async function gatewayAsBefore(url: string, owner: Person, me: AgentFetch, plain: PersonaView) {
+  const before = (await answers(me)).length
+  await tag(me, plain, { operationKey: 'persona-plain' }, 'mcp_call')
+  await until(
+    () => answers(me),
+    (found) => found.length > before && found.some((answer) => answer.persona === plain.id),
+  )
+  const offered = await offeredTo(url, owner, plain.name)
+  expect(offered).toContain('mcp_call')
+  expect(offered).not.toContain(NATIVE)
 }
 
 /** A tagged Persona's call to a tool not granted asks the owner to allow it; Allow and a reply let the Persona go on. */
@@ -190,6 +204,7 @@ export async function personaHoldsCase(url: string): Promise<void> {
     callOwner(me, (api) => api.personas.create({ payload: { ...definition, operationId: crypto.randomUUID() } }))
   const bidder = await make(persona('Bidder'))
   await approvalFromFork(url, owner, me, bidder)
+  await gatewayAsBefore(url, owner, me, await make(persona('Plain', 'gateway')))
   await routineToPersona(url, owner, me, await make(persona('Runner')))
   await grantFromFork(me, bidder)
 }

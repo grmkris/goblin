@@ -16,6 +16,8 @@ export const appPersonas = sqliteTable('app_personas', {
   model: text('model'),
   /** How hard its model thinks (ADR 0100); none thinks at `medium`. */
   thinking: text('thinking', { enum: ['low', 'medium', 'high'] }),
+  /** How its answers reach its MCP tools (ADR 0102); none is `gateway`. */
+  toolMode: text('tool_mode', { enum: ['native', 'gateway'] }),
   /** The `PersonaSetup` JSON: what the Persona adds to its Topic's setup (ADR 0040). */
   setup: text('setup').notNull().default(NOTHING_JSON),
   revision: integer('revision').notNull(),
@@ -38,6 +40,7 @@ export const appPersonaRevisions = sqliteTable(
     instructions: text('instructions').notNull(),
     model: text('model'),
     thinking: text('thinking', { enum: ['low', 'medium', 'high'] }),
+    toolMode: text('tool_mode', { enum: ['native', 'gateway'] }),
     setup: text('setup').notNull().default(NOTHING_JSON),
     actor: text('actor', { enum: ['owner', 'agent'] }).notNull(),
     createdAt: integer('created_at').notNull(),

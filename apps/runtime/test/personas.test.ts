@@ -172,6 +172,14 @@ describe('Personas (ADR 0033)', () => {
     )
   })
 
+  it('keeps whether a Persona takes native tools in each revision, the gateway by default (ADR 0102)', () => {
+    const { personas } = fixture()
+    expect(personas.create({ ...scout, operationId: 'op-1' }, 'owner', 10).persona.tools).toBeUndefined()
+    expect(personas.update(1, { tools: 'native', expectedRevision: 1 }, 'owner', 11).tools).toBe('native')
+    expect(personas.revision(1, 2).tools).toBe('native')
+    expect(personas.update(1, { tools: null, expectedRevision: 2 }, 'owner', 12).tools).toBeUndefined()
+  })
+
   it('keeps how hard a Persona thinks in each revision, none by default, and lets an edit clear it (ADR 0100)', () => {
     const { personas } = fixture()
     const { persona } = personas.create({ ...scout, operationId: 'op-1' }, 'owner', 10)

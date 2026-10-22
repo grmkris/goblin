@@ -53,6 +53,7 @@ const definitionOf = (row: Row | RevisionRow): PersonaDefinition => ({
   instructions: row.instructions,
   ...(row.model === null ? {} : { model: row.model }),
   ...(row.thinking === null ? {} : { thinking: row.thinking }),
+  ...(row.toolMode === null ? {} : { tools: row.toolMode }),
   setup: personaSetupOf(row.setup),
 })
 
@@ -81,6 +82,7 @@ const stored = (definition: PersonaDefinition) => ({
   instructions: definition.instructions,
   model: definition.model ?? null,
   thinking: definition.thinking ?? null,
+  toolMode: definition.tools ?? null,
   setup: JSON.stringify(definition.setup),
 })
 
@@ -244,6 +246,7 @@ export class PersonaRegistry<RunResult = unknown> {
   #changed(current: PersonaDefinition, change: UpdatePersona): PersonaDefinition {
     const model = change.model === undefined ? current.model : (change.model ?? undefined)
     const thinking = change.thinking === undefined ? current.thinking : (change.thinking ?? undefined)
+    const tools = change.tools === undefined ? current.tools : (change.tools ?? undefined)
     return this.#normalize({
       name: change.name ?? current.name,
       avatar: change.avatar ?? current.avatar,
@@ -251,6 +254,7 @@ export class PersonaRegistry<RunResult = unknown> {
       instructions: change.instructions ?? current.instructions,
       ...(model === undefined ? {} : { model }),
       ...(thinking === undefined ? {} : { thinking }),
+      ...(tools === undefined ? {} : { tools }),
       setup: change.setup ?? current.setup,
     })
   }
@@ -295,6 +299,7 @@ const sameValues = (values: ReturnType<typeof stored>, row: Row): boolean =>
   values.instructions === row.instructions &&
   values.model === row.model &&
   values.thinking === row.thinking &&
+  values.toolMode === row.toolMode &&
   values.setup === row.setup
 
 /** A glyph and hue for a Persona made without an avatar: its first letter on a hue from its name. */

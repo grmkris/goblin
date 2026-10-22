@@ -14,37 +14,17 @@ type Context = Parameters<ToolRegistration['execute']>[2]
 /** A JSON Schema, as a model's tool parameters and a typed caller (codemode, `/mcp`) read it. */
 export type JsonSchema = { readonly [key: string]: JsonValue }
 
-/** The definition a local reference names (`#/$defs/<name>`, or the older `#/definitions/<name>`), by its name. */
-const definitionName = (ref: string): string | undefined =>
-  ref.startsWith('#/$defs/')
-    ? ref.slice('#/$defs/'.length)
-    : ref.startsWith('#/definitions/')
-      ? ref.slice('#/definitions/'.length)
-      : undefined
-
-/** `node` with every local definition reference replaced by its definition: providers differ on `$ref` in tools. */
+/** `node` with every `#/$defs/<name>` reference replaced by its definition: providers differ on `$ref` in tools. */
 function inline(node: JsonValue, definitions: Readonly<Record<string, JsonValue>>, depth = 0): JsonValue {
   if (depth > 32) return {}
   if (Array.isArray(node)) return node.map((item) => inline(item, definitions, depth + 1))
   if (typeof node !== 'object' || node === null) return node
-  const name = typeof node.$ref === 'string' ? definitionName(node.$ref) : undefined
-  if (name !== undefined) {
-    const target = definitions[name]
+  const ref = node.$ref
+  if (typeof ref === 'string' && ref.startsWith('#/$defs/')) {
+    const target = definitions[ref.slice('#/$defs/'.length)]
     return target === undefined ? {} : inline(target, definitions, depth + 1)
   }
   return Object.fromEntries(Object.entries(node).map(([key, value]) => [key, inline(value, definitions, depth + 1)]))
-}
-
-const recordOf = (value: JsonValue | undefined): Readonly<Record<string, JsonValue>> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value) ? value : {}
-
-/**
- * A JSON Schema from elsewhere (a remote MCP tool's, ADR 0101) with its local definitions inlined, as goblin's own tools
- * are: the definitions it names under `$defs` or `definitions`, which stay in place for the caller to drop.
- */
-export function selfContained(schema: JsonSchema): JsonSchema {
-  const inlined = inline(schema, { ...recordOf(schema['definitions']), ...recordOf(schema['$defs']) })
-  return typeof inlined === 'object' && inlined !== null && !Array.isArray(inlined) ? inlined : {}
 }
 
 /** An Effect schema as one self-contained JSON Schema (draft 2020-12, no `$ref`). */

@@ -105,6 +105,57 @@ describe('native tool names (ADR 0101)', () => {
   })
 })
 
+describe('a remote schema that would not end, or would not fit (ADR 0102)', () => {
+  it('refuses a reference inside itself at once, and one that multiplies past the bound', () => {
+    const started = Date.now()
+    const looped = {
+      type: 'object',
+      properties: { a: { $ref: '#/$defs/N' }, b: { $ref: '#/$defs/N' } },
+      $defs: { N: object({ x: { $ref: '#/$defs/N' }, y: { $ref: '#/$defs/N' }, z: { $ref: '#/$defs/N' } }) },
+    }
+    expect(nativeSchema(looped)).toBe('schema')
+    // Each level names the next twice: twenty levels would make a million nodes.
+    const defs = Object.fromEntries(
+      Array.from({ length: 20 }, (_, i) => [
+        `L${String(i)}`,
+        i === 19
+          ? { type: 'string' }
+          : object({ l: { $ref: `#/$defs/L${String(i + 1)}` }, r: { $ref: `#/$defs/L${String(i + 1)}` } }),
+      ]),
+    )
+    expect(nativeSchema({ ...object({ root: { $ref: '#/$defs/L0' } }), $defs: defs })).toMatch(/^schema/u)
+    expect(Date.now() - started).toBeLessThan(2000)
+  })
+
+  it('keeps a large schema whole up to 64 KiB once its words are cut', () => {
+    const wide = object(
+      Object.fromEntries(
+        Array.from({ length: 100 }, (_, i) => [`f${String(i)}`, { type: 'string', description: 'd'.repeat(2000) }]),
+      ),
+    )
+    const kept = nativeSchema(wide)
+    expect(typeof kept).toBe('object')
+    expect(JSON.stringify(kept).length).toBeLessThanOrEqual(65_536)
+  })
+
+  it('drops tag characters, variation selectors, separators and lone surrogates, and bounds values', () => {
+    expect(cleanText('a\u{E0041}b\uFE0Fc\u2028d\u061Ce\u00ADf\u180Eg\uD800h', 100)).toBe('abcdefgh')
+    // Cut by code points: an astral character is never split.
+    expect(cleanText('\u{1F600}\u{1F600}\u{1F600}', 2)).toBe('\u{1F600}\u2026')
+    const schema = nativeSchema(
+      object({
+        kind: { const: { format: 'png' } },
+        pick: { enum: ['a', 'b'] },
+        say: { type: 'string', examples: ['1', '2', '3', '4', '5'] },
+      }),
+    )
+    expect(schema).toMatchObject({
+      properties: { kind: { const: { format: 'png' } }, say: { examples: ['1', '2', '3'] } },
+    })
+    expect(nativeSchema(object({ pick: { enum: Array.from({ length: 300 }, (_, i) => String(i)) } }))).toBe('schema')
+  })
+})
+
 describe("a remote tool's words and schema, bounded and cleaned (ADR 0101)", () => {
   it('drops hidden characters and bounds a description', () => {
     expect(cleanText('Run\u0000 it‮ now​.\r', 100)).toBe('Run it now.')
@@ -140,7 +191,7 @@ describe("a remote tool's words and schema, bounded and cleaned (ADR 0101)", () 
     expect(nativeSchema(object({ next: { $ref: 'https://elsewhere.test/schema.json' } }))).toBe('schema')
     const huge = object(
       Object.fromEntries(
-        Array.from({ length: 400 }, (_, i) => [`field${String(i)}`, { type: 'string', description: 'x'.repeat(100) }]),
+        Array.from({ length: 800 }, (_, i) => [`field${String(i)}`, { type: 'string', description: 'x'.repeat(100) }]),
       ),
     )
     expect(nativeSchema(huge)).toBe('schema_too_large')
@@ -182,7 +233,29 @@ describe("a fork's selection with its set (ADR 0101)", () => {
     // A set that leaves something of the scope out keeps the way to it.
     expect(withForkTools({}, small, false)).toEqual({ extensions: { add: ['goblin.fork-tools:set2'], remove: [] } })
     expect(toolsText(frozen(2))).toContain('`notes__tool_0`, `notes__tool_1`')
-    expect(toolsText({ ...frozen(2), left: [{ connectionId: 'x', reason: 'unlisted' }] })).toContain('mcp_call')
+    expect(toolsText(frozen(2))).toContain('There is no `mcp_list` or `mcp_call` here')
+    expect(
+      toolsText({ ...frozen(2), left: [{ connectionId: 'cut', tool: 'job_submit', reason: 'schema' }] }),
+    ).toContain('Not offered natively, so reach them with `mcp_list` and `mcp_call`: `cut · job_submit`')
+  })
+
+  it("offers the Persona's own tools first and defers what its Topic adds past 20 (ADR 0102)", () => {
+    const sources = [
+      source(
+        'topic',
+        'extra',
+        Array.from({ length: 25 }, (_, i) => tool(`a${String(i).padStart(2, '0')}`)),
+      ),
+      source('cut', 'MyCut', [tool('job_submit'), tool('job_status')]),
+    ]
+    const built = composeSet(sources, new Set(), new Set(), (connectionId) => connectionId === 'cut')
+    expect(built.tools.slice(0, 2).map((each) => [each.name, each.deferred])).toEqual([
+      ['mycut__job_status', undefined],
+      ['mycut__job_submit', undefined],
+    ])
+    const deferred = built.tools.filter((each) => each.deferred === true)
+    expect(deferred).toHaveLength(7)
+    expect(deferred.every((each) => each.connectionId === 'topic')).toBe(true)
   })
 
   it('offers up to 20 tools at once, and above that loads them with tool_search', () => {
@@ -294,8 +367,11 @@ describe('a large set through tool_search, after a compaction (ADR 0101)', () =>
       const ask = async (content: string, requestId: string) =>
         (await root.submit({ type: 'input', content, requestId }, BACKGROUND)).wait(BACKGROUND)
       expect((await ask('find the zebra tool', 'find')).status).toBe('done')
-      // The first request offers tool_search alone; the one after it the zebra tool too, with its schema.
-      expect([...(requests[0]?.keys() ?? [])]).toEqual(['tool_search'])
+      // The first request offers the first 20 and tool_search, not the zebra tool; the one after it that too.
+      const first = requests[0]
+      expect(first?.has('tool_search')).toBe(true)
+      expect(first?.size).toBe(DIRECT_TOOLS + 1)
+      expect(first?.has('notes__tool_7')).toBe(false)
       const zebra = large.tools.find((each) => each.description === 'Archive a zebra.')
       expect(zebra?.name).toBe('notes__tool_7')
       expect(requests[1]?.get(zebra?.name ?? '')?.parameters).toEqual(zebra?.inputSchema)
@@ -304,7 +380,8 @@ describe('a large set through tool_search, after a compaction (ADR 0101)', () =>
       expect((await ask('and again', 'again')).status).toBe('done')
       const after = requests.at(-1)
       expect(after?.get(zebra?.name ?? '')?.parameters).toEqual(zebra?.inputSchema)
-      expect(after?.has('notes__tool_0')).toBe(false)
+      // A deferred tool that was not loaded stays unoffered.
+      expect(after?.has('notes__tool_9')).toBe(false)
     } finally {
       await harness.close(BACKGROUND)
     }
@@ -396,7 +473,7 @@ const run = <A>(program: Effect.Effect<A, AppError, AgentServices>): Promise<A> 
 
 /** Fork `fork`'s set, frozen and installed, and its native tool `name`. */
 const nativeIn = async (fork: string) => {
-  const made = await run(freezeForkTools(fork))
+  const made = await run(freezeForkTools(fork, { server: () => true, tool: () => true }))
   const registry = createRegistry()
   const kit = forkToolsKit(noStorage, run)
   kit.attach(registry)
@@ -477,8 +554,9 @@ describe("a Persona fork's native MCP tools (ADR 0101)", () => {
     await nativeIn('7')
     const naming = forkNaming(durable(database.db), '7', 'cut')
     expect(naming?.toolPrefix).toBe('mycut__')
+    // A tool the set does not hold keeps the server's own name: no native name that does not exist.
     expect(naming?.render('Call {{tool:job_submit}}, then {{tool:job_wait}}.')).toBe(
-      'Call mycut__job_submit, then mycut__job_wait.',
+      'Call mycut__job_submit, then job_wait.',
     )
     expect(forkNaming(durable(database.db), '99', 'cut')).toBeUndefined()
   })

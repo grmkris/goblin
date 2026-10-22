@@ -21,6 +21,13 @@ export const PersonaThinking = Schema.Literals(['low', 'medium', 'high'])
 export type PersonaThinking = typeof PersonaThinking.Type
 
 /**
+ * How a Persona's answers reach its setup's MCP tools (ADR 0102): `native`, each as a tool of its own
+ * (`<server>__<tool>`, ADR 0101), or `gateway`, through `mcp_list` and `mcp_call` as before. Without one it is `gateway`.
+ */
+export const PersonaTools = Schema.Literals(['native', 'gateway'])
+export type PersonaTools = typeof PersonaTools.Type
+
+/**
  * A Persona's definition (ADR 0033): a global name, its role in a line, its instructions, an optional model from the
  * offered list and how hard it thinks (ADR 0100), and its setup: the MCP servers, skills and apps it adds to the setup
  * of the Topic it answers in (ADR 0040). A setup only chooses among the owner's grants; a Persona never gains one.
@@ -32,6 +39,7 @@ export const PersonaDefinition = Schema.Struct({
   instructions: Schema.String.check(Schema.isMaxLength(8000)),
   model: Schema.optional(NonEmptyString(128)),
   thinking: Schema.optional(PersonaThinking),
+  tools: Schema.optional(PersonaTools),
   setup: PersonaSetup,
 })
 export type PersonaDefinition = typeof PersonaDefinition.Type
@@ -59,6 +67,7 @@ export const PersonaSummary = Schema.Struct({
   revision: Schema.Int,
   model: Schema.optional(Schema.String),
   thinking: Schema.optional(PersonaThinking),
+  tools: Schema.optional(PersonaTools),
   setup: SetupSummary,
   archivedAt: Schema.optional(Schema.Number),
   updatedAt: Schema.Number,
@@ -79,7 +88,8 @@ export type CreatePersona = typeof CreatePersona.Type
 
 /**
  * `PATCH /api/personas/:id`: a new revision. `expectedRevision` must be the current one, so two edits never silently
- * overwrite each other. `model: null` clears the preference, and `thinking: null` returns it to `medium`.
+ * overwrite each other. `model: null` clears the preference, `thinking: null` returns it to `medium` and `tools: null`
+ * to `gateway`.
  */
 export const UpdatePersona = Schema.Struct({
   name: Schema.optional(PersonaName),
@@ -88,6 +98,7 @@ export const UpdatePersona = Schema.Struct({
   instructions: Schema.optional(PersonaDefinition.fields.instructions),
   model: Schema.optional(Schema.NullOr(NonEmptyString(128))),
   thinking: Schema.optional(Schema.NullOr(PersonaThinking)),
+  tools: Schema.optional(Schema.NullOr(PersonaTools)),
   setup: Schema.optional(PersonaSetup),
   archived: Schema.optional(Schema.Boolean),
   expectedRevision: Schema.Int,
@@ -106,7 +117,8 @@ export type PersonaRevisionView = typeof PersonaRevisionView.Type
 /**
  * `GET /api/personas/:id`: the Persona with its revisions, newest first, and `exposedTools`, the names of the native MCP
  * tools its own setup gives its answers now (ADR 0101, `<server>__<tool>`): those its servers list that the model may
- * call and the owner granted. A Topic that adds servers adds tools to these; a server's thread adds its own.
+ * call and the owner granted, and none for a Persona that reaches its tools through the gateway (`tools`, ADR 0102). A
+ * Topic that adds servers adds tools to these; a server's thread adds its own.
  */
 export const PersonaDetail = Schema.Struct({
   persona: PersonaView,

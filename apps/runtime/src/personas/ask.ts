@@ -1,5 +1,5 @@
 import type { TextContent } from '@earendil-works/pi-ai'
-import { type PersonaAskData, authorOf } from '@goblin/contracts'
+import { type PersonaAskData, type PersonaRevisionView, type PersonaSetup, authorOf } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { epochSeconds } from '../clock.ts'
@@ -30,26 +30,34 @@ const addressedBlocks = (tag: string, blocks: readonly TextContent[]): TextConte
   return first === undefined ? [] : [{ ...first, text: `${tag}${first.text}` }, ...rest]
 }
 
+/** What freezing keeps of a Persona's definition at its revision, with its own model for the Topic (`own`). */
+const frozenOf = (
+  id: number,
+  revision: number,
+  definition: Pick<PersonaRevisionView, 'name' | 'avatar' | 'role' | 'instructions' | 'setup' | 'thinking' | 'tools'>,
+  own: string | undefined,
+): FrozenPersona & { readonly setup: PersonaSetup } => ({
+  id,
+  name: definition.name,
+  revision,
+  avatar: definition.avatar,
+  role: definition.role,
+  instructions: definition.instructions,
+  setup: definition.setup,
+  ...(own === undefined ? {} : { model: own }),
+  ...(definition.thinking === undefined ? {} : { thinking: definition.thinking }),
+  ...(definition.tools === undefined ? {} : { tools: definition.tools }),
+})
+
 /**
  * Persona `id` at `revision`, frozen for a turn in Topic `topic`: its words, its setup, its own model
- * (`Personas.ownModel`) and how hard it thinks (ADR 0100).
+ * (`Personas.ownModel`), how hard it thinks (ADR 0100) and how it reaches its tools (ADR 0102).
  */
 export const frozenAt = (id: number, revision: number, topic: number) =>
   Effect.gen(function* () {
     const personas = yield* Personas
-    const { name, avatar, role, instructions, setup, model, thinking } = yield* personas.revision(id, revision)
-    const own = yield* personas.ownModel(model, topic)
-    return {
-      id,
-      name,
-      revision,
-      avatar,
-      role,
-      instructions,
-      setup,
-      ...(own === undefined ? {} : { model: own }),
-      ...(thinking === undefined ? {} : { thinking }),
-    } satisfies FrozenPersona
+    const definition = yield* personas.revision(id, revision)
+    return frozenOf(id, revision, definition, yield* personas.ownModel(definition.model, topic))
   })
 
 /**
@@ -64,19 +72,7 @@ const freeze = (ids: readonly number[], topic: number) =>
       Effect.gen(function* () {
         const persona = active.find((each) => each.id === id)
         if (persona === undefined) return yield* new InvalidInput({ reason: `composer:persona:${String(id)}` })
-        const { name, revision, avatar, role, instructions, setup, model, thinking } = persona
-        const own = yield* personas.ownModel(model, topic)
-        return {
-          id,
-          name,
-          revision,
-          avatar,
-          role,
-          instructions,
-          ...(own === undefined ? {} : { model: own }),
-          ...(thinking === undefined ? {} : { thinking }),
-          setup,
-        } satisfies FrozenPersona
+        return frozenOf(id, persona.revision, persona, yield* personas.ownModel(persona.model, topic))
       }),
     )
   })

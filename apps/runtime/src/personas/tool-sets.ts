@@ -20,6 +20,8 @@ export const FrozenTool = Schema.Struct({
   tool: Schema.String,
   description: Schema.String,
   inputSchema: Schema.Record(Schema.String, Schema.Json),
+  /** Not offered until `tool_search` loads it: a tool beyond the first 20, the Persona's own first (ADR 0102). */
+  deferred: Schema.optionalKey(Schema.Literal(true)),
 })
 export type FrozenTool = typeof FrozenTool.Type
 

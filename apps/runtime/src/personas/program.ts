@@ -34,7 +34,14 @@ export const personaNamed = (name: string) =>
 export const personaDetail = (id: number) =>
   Effect.gen(function* () {
     const history = yield* (yield* Personas).detail(id)
-    const exposed = yield* exposedTools(history.persona.setup)
+    // A Persona on the gateway exposes no native tool (ADR 0102); one that takes them, what its own setup gives.
+    const exposed =
+      history.persona.tools === 'native'
+        ? yield* exposedTools(history.persona.setup).pipe(
+            // expected: what cannot be read now exposes nothing, which a server reads as not ready; the detail stands.
+            Effect.orElseSucceed(() => []),
+          )
+        : []
     return { ...history, exposedTools: exposed } satisfies PersonaDetail
   })
 
@@ -48,6 +55,7 @@ export const snapshotOf = (persona: PersonaView): PersonaSnapshot => ({
   instructions: persona.instructions,
   ...(persona.model === undefined ? {} : { model: persona.model }),
   ...(persona.thinking === undefined ? {} : { thinking: persona.thinking }),
+  ...(persona.tools === undefined ? {} : { tools: persona.tools }),
   setup: persona.setup,
   archived: persona.archivedAt !== undefined,
 })

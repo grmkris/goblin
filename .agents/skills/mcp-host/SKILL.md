@@ -26,7 +26,8 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 - A Topic's setup chooses the servers and tools its chats use (`setup/`, ADR 0040). `mcp_list` and `mcp_call`
   ask `Setups.scope(conversationId)` before the grant check; a setup only chooses and never grants, and a
   helper's exclusions are forgotten with a server's grants (`mcp/oauth/endpoints.ts`).
-- A Persona's fork gets its setup's tools natively as `<server>__<tool>` (ADR 0101, `pi/fork-tools.ts`): a frozen,
+- A Persona that chooses `tools: native` (ADR 0102; absent is the gateway) gets its setup's tools natively in its fork
+  as `<server>__<tool>` (ADR 0101, `pi/fork-tools.ts`): a frozen,
   cleaned set that only decides what is offered. Every native call goes through `callRemoteTool`
   (`pi/remote-call.ts`), `mcp_call`'s own body, so authority, scope, ask-first, grant and schema are checked again at
   each call; never give a native tool a path of its own.

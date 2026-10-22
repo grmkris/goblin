@@ -20,6 +20,7 @@ import {
   type PersonaHold,
   type PersonaSetup,
   type PersonaThinking,
+  type PersonaTools,
   type QuestionSpec,
   personaAnswerText,
 } from '@goblin/contracts'
@@ -44,6 +45,9 @@ import { NO_ANSWER, modelRef } from './model.ts'
 import { holdJson, readAnswer } from './persona-answer.ts'
 import { ConversationMissing } from './subagent-relay.ts'
 import { epochSeconds } from '../clock.ts'
+import { logEvent } from '../observability/logger.ts'
+import { setupAllows } from '../setup/scope.ts'
+import { safeErrorType } from '../observability/report.ts'
 
 /** The task kind of one Persona answering one owner message. */
 export const PERSONA_TURN = 'goblin.persona-turn'
@@ -92,6 +96,8 @@ export type FrozenPersona = {
   readonly model?: string
   /** How hard its model thinks (ADR 0100); none thinks at the host's `medium`. */
   readonly thinking?: PersonaThinking
+  /** How its fork reaches its MCP tools (ADR 0102): natively only when it says `native`. */
+  readonly tools?: PersonaTools
   /** What it adds to its Topic's setup (ADR 0040); a turn started before setups has none and adds nothing. */
   readonly setup?: PersonaSetup
 }
@@ -373,19 +379,35 @@ const forkPhase: Phase<'fork'> = async (task, runtime, context) => {
 }
 
 /**
- * Registers the fork with the setup it answers with, then freezes its native tools from that scope (ADR 0101) and, in
- * the commit that moves on, selects them: the set's extension, its tools by name, and the Persona's text with what it
- * says of them.
+ * The native set of a fork whose Persona takes native tools (ADR 0102), frozen from its scope (ADR 0101); none for one
+ * on the gateway, or when freezing fails, which then answers through `mcp_list` and `mcp_call` as before (a
+ * content-free `mcp` line says so).
+ */
+const frozenFor = (persona: FrozenPersona, fork: string) =>
+  persona.tools === 'native'
+    ? freezeForkTools(fork, setupAllows(persona.setup ?? NOTHING)).pipe(
+        Effect.tapError((error) =>
+          logEvent('warn', 'mcp', { where: 'fork_tools', kind: 'gateway', 'error.type': safeErrorType(error) }),
+        ),
+        // expected: a set that cannot be frozen leaves the fork on the gateway, the way every fork answered before.
+        Effect.orElseSucceed(() => undefined),
+      )
+    : Effect.succeed(undefined)
+
+/**
+ * Registers the fork with the setup it answers with, then, for a Persona that takes native tools (ADR 0102), freezes
+ * them from that scope (ADR 0101) and, in the commit that moves on, selects them: the set's extension, its tools by
+ * name, and the Persona's text with what it says of them.
  */
 const registerPhase =
   (run: RunProgram, tools: ForkToolsKit): Phase<'register'> =>
   async (task, runtime, context) => {
     const { fork } = task.state.checkpoint
     await run(registerFork(task.input, fork))
-    const frozen = await run(freezeForkTools(String(fork)))
-    tools.install(frozen.set)
+    const frozen = await run(frozenFor(task.input.persona, String(fork)))
+    if (frozen !== undefined) tools.install(frozen.set)
     await runtime.commit(async (tx) => {
-      if (frozen.set.tools.length > 0) {
+      if (frozen !== undefined && frozen.set.tools.length > 0) {
         const agent = await tx.doc(AgentDoc, fork)
         const selection = withForkTools(agent, frozen.set, frozen.left.length === 0)
         if (selection.extensions !== undefined) agent.extensions = selection.extensions
