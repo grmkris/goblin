@@ -3,7 +3,7 @@ import runtime from '@goblin/runtime/worker'
 import { canonicalRedirect } from '@goblin/runtime/canonical'
 import { robotsTxt } from './lib/robots.ts'
 export { PersonalAgent } from '@goblin/runtime/agent'
-// Each chat's AG-UI stream (docs/architecture/streams.md), one object per epoch, which the agent appends to.
+// Each chat's AG-UI stream (docs/architecture/streams.md): the agent appends to it, readers follow it at /streams/.
 export { StreamObject } from '@durable-streams/server-cloudflare'
 
 export default {
@@ -16,6 +16,7 @@ export default {
       /^\/w\/[^/]+\/api\//u.test(url.pathname) ||
       url.pathname.startsWith('/hooks/') ||
       url.pathname.startsWith('/files/link/') ||
+      url.pathname.startsWith('/streams/') ||
       url.pathname.startsWith('/.well-known/') ||
       url.pathname === '/health' ||
       url.pathname === '/mcp'

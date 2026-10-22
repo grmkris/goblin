@@ -1,10 +1,11 @@
 # Chat streams
 
-> **Draft.** This is the profile third parties will implement against. Built: the translator from Pi's events to
-> AG-UI (`apps/runtime/src/streams/agui.ts`), goblin's parts of it in the contracts (`packages/contracts/src/agui/`)
-> and the producer that appends a joined chat's events to its streams (below). The reader's way in (the join endpoint
-> and the signed stream URL) and the web's reader land next, with the ADR that decides them. Until then names and
-> shapes here may still change.
+> **Draft.** This is the profile third parties implement against. Built: the translator from Pi's events to AG-UI
+> (`apps/runtime/src/streams/agui.ts`), goblin's parts of it in the contracts (`packages/contracts/src/agui/`), the
+> producer that appends a joined chat's events to its streams, and the reader's way in (the join endpoint, its MCP
+> tool and the signed stream URL), proven in workerd against the real Worker, agent and stream objects. goblin's own
+> web app still follows its older private stream; it moves to this one next, with the ADR that decides it. Until then
+> names and shapes here may still change.
 
 ## What a stream is
 
@@ -27,12 +28,31 @@ An epoch ends with the CUSTOM event `goblin.stream.moved` `{ epoch }`, and the c
 
 | Tier | Carries | Who reads it |
 |---|---|---|
-| `full` | everything below | the owner's sessions, OAuth clients holding transcripts |
-| `answers` | `RUN_*`; `TEXT_MESSAGE_*` (people's and agents' messages, assistant and user); `ACTIVITY_*`; `SUBAGENT_*` lifecycle; `goblin.stream.moved`; `MESSAGES_SNAPSHOT` without reasoning and tool messages and without tool calls; STATE `/attention` only | servers' keys |
+| `full` | everything below | members' sessions, OAuth clients holding `transcripts` |
+| `answers` | `RUN_*`; `TEXT_MESSAGE_*` (people's and agents' messages, assistant and user); `ACTIVITY_*`; `SUBAGENT_*` lifecycle; `goblin.stream.moved`; `MESSAGES_SNAPSHOT` without reasoning and tool messages and without tool calls; STATE `/attention` only | servers' keys, OAuth clients without `transcripts` |
 
 `answers` drops `REASONING_*`, `TOOL_CALL_*` (with `TOOL_CALL_RESULT`), `STEP_*`, `RAW`, `goblin.tool_progress`, the
 other STATE members, and everything a subagent does but start, finish or fail (its answer reaches the parent as a
 message of its own). An assistant turn that only called tools is an empty message in `answers`.
+
+## Reading a stream
+
+1. **Join.** `GET /api/conversations/:id/stream` (a member's browser under `/w/<slug>/api/…`; a server's key or an
+   OAuth client on `/api/…`, scope `conversations`), or the MCP tool `conversation_stream` `{ chat }`, which calls it.
+   A key reaches only its own Topics' chats (any other is 404). Joining makes the chat's stream in the caller's tier
+   when it has none and answers once the stream exists: `{ url, epoch, tier, expiresAt }` (`ConversationStream`).
+   `Conflict` `stream_starting` means it could not be made in time; ask again.
+2. **Read.** `url` is `/streams/<token>` on the deployment's origin, the token signed for that workspace, chat, tier
+   and epoch and valid for ten minutes; no cookie or key goes with it, and reading never wakes the agent. It speaks
+   the [Durable Streams](https://github.com/durable-streams/durable-streams) protocol, GET and HEAD only, with
+   `offset`, `live` and `cursor` and nothing else: `GET url?offset=-1` answers the epoch from its start as one JSON
+   array of AG-UI events, with `Stream-Next-Offset`; the next read passes that offset and gets only what came after.
+   `live=long-poll` waits up to a couple of seconds for more (204 when nothing came), `live=sse` keeps the connection
+   open (recycled about every minute). Answers are never cached.
+3. **Go on.** `goblin.stream.moved` `{ epoch }` is the last event of an epoch, and the stream is then closed
+   (`Stream-Closed: true`): join again for the next epoch, which opens with its snapshots. A URL past `expiresAt`, or
+   one whose token was changed, answers 401 `stream_link`: join again for a new one. A stream that expired after
+   seven days without a read or write answers 404; joining makes the chat a new epoch.
 
 ## Ids
 

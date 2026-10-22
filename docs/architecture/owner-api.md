@@ -62,7 +62,7 @@ messages carry `[from server <key name>]` (ADR 0108); an OAuth client reaches wh
 
 | Group | Paths under `/api` | Handlers |
 | --- | --- | --- |
-| `conversations` | `/conversations`, `/conversations/:id`, and under it `messages`, `threads`, `move`, `stop`, `queue`, `read`, `composer`, `snapshot`, `history`, `sources`, `events` (SSE) | `chats/api.ts` |
+| `conversations` | `/conversations`, `/conversations/:id`, and under it `messages`, `threads`, `move`, `stop`, `queue`, `read`, `composer`, `snapshot`, `history`, `entries`, `sources`, `stream` (where to read its AG-UI stream, [chat streams](streams.md)), `events` (SSE) | `chats/api.ts` |
 | `inspect` | `GET /inspect/conversations`, `/inspect/conversation`, `/inspect/turns`, `/inspect/turn`, `/inspect/problems`, `/inspect/flows`, `/inspect/details` | `inspect/api.ts` |
 | `topics` | `/topics`, `/topics/:id`, `/topics/:id/setup` | `topics/api.ts` |
 | `setup` | `GET /setup/catalog` | `setup/api.ts` |

@@ -10,6 +10,7 @@ import type {
   UpdateConversation,
 } from '@goblin/contracts'
 import { OwnerApi } from '@goblin/contracts/api'
+import * as DateTime from 'effect/DateTime'
 import * as Effect from 'effect/Effect'
 import * as HttpServerResponse from 'effect/http/HttpServerResponse'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
@@ -22,7 +23,7 @@ import {
   updateOwnerConversation,
 } from '../agent-program.ts'
 import { composerOptions } from '../composer.ts'
-import { confineChat, confineMessage, confineUpdate } from '../keys/policy.ts'
+import { confineChat, confineMessage, confineUpdate, requestTier } from '../keys/policy.ts'
 import {
   applyServers,
   checkApply,
@@ -40,6 +41,9 @@ import { entryViews } from '../pi/entry-view.ts'
 import { piEventResponse, sessionSnapshot } from '../pi/events.ts'
 import { PiSessions } from '../pi/sessions.ts'
 import { Invocations } from '../personas/service.ts'
+import { epochSeconds } from '../clock.ts'
+import { STREAM_READ_SECONDS, streamReadToken, streamReadUrl } from '../streams/read-token.ts'
+import { Streams } from '../streams/service.ts'
 import { Conversations } from './service.ts'
 import { moveToThread } from './mover.ts'
 import { startThread } from './thread-heads.ts'
@@ -215,6 +219,25 @@ const sources = ({ params }: ChatRequest) =>
   )
 
 /**
+ * Joins a registered chat's AG-UI stream in the caller's tier and answers where to read it: a URL whose token, signed
+ * for that workspace, chat, tier and epoch, is valid for ten minutes (docs/architecture/streams.md). A key reaches only
+ * its own Topics' chats.
+ */
+const joinStream = ({ params }: ChatRequest) =>
+  Effect.gen(function* () {
+    yield* confineChat(params.id)
+    yield* registeredConversation(params.id)
+    const tier = yield* requestTier
+    const epoch = yield* Streams.use((streams) => streams.join(params.id, tier))
+    const { env, workspaceId } = yield* AgentInput
+    const expiresAt = (yield* epochSeconds) + STREAM_READ_SECONDS
+    const claims = { workspaceId, chat: params.id, tier, epoch, expiresAt }
+    const token = yield* attempt(() => streamReadToken(env.CREDENTIAL_KEY, claims))
+    const expires = DateTime.formatIso(DateTime.makeUnsafe(expiresAt * 1000))
+    return { url: streamReadUrl(env.APP_URL, token), epoch, tier, expiresAt: expires }
+  })
+
+/**
  * A registered chat's Pi event stream, server-sent. The stream is its own: it runs until the browser goes away, past
  * the request's scope, and stops Pi's stream then.
  */
@@ -247,5 +270,6 @@ export const ConversationsHandlers = HttpApiBuilder.group(OwnerApi, 'conversatio
     .handle('history', history)
     .handle('entries', entries)
     .handle('sources', sources)
+    .handle('stream', joinStream)
     .handleRaw('events', events),
 )

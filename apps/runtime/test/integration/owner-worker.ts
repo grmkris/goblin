@@ -21,6 +21,7 @@ import { moveState, readRounds } from './move-probe.ts'
 import { ownerSend } from './probe-reads.ts'
 import { addUsage, utcDay } from '../../src/budget.ts'
 import { BACKGROUND, conversationId } from '../../src/pi/context.ts'
+import type { StreamsFetch } from '../../src/streams/writer.ts'
 
 export { StreamObject } from '@durable-streams/server-cloudflare'
 
@@ -34,6 +35,8 @@ export class OwnerAgent extends PersonalAgent {
   /** The move boundary at which the next move waits for `/test/move/resume`, and the phase it waits at. */
   #pauseAt: MovePhase | undefined
   #paused: { readonly phase: MovePhase; readonly resume: () => void } | undefined
+  /** How many stream appends lose their acknowledgement next: the stream keeps them, the agent hears a failure. */
+  #loseAcks = 0
   protected override async moveBoundary(phase: MovePhase): Promise<void> {
     if (this.#pauseAt === phase) {
       this.#pauseAt = undefined
@@ -52,6 +55,18 @@ export class OwnerAgent extends PersonalAgent {
   override async onStart(): Promise<void> {
     await super.onStart()
     if (profileEnabled(this.env)) await permutePrimary(this.ctx.storage, this.harness)
+  }
+  /** The chat streams' writes, of which the next `#loseAcks` appends arrive but answer as if the network failed. */
+  protected override streamsFetch(): StreamsFetch | undefined {
+    const real = super.streamsFetch()
+    if (real === undefined) return undefined
+    return async (request) => {
+      const response = await real(request)
+      if (request.method !== 'POST' || this.#loseAcks === 0) return response
+      this.#loseAcks -= 1
+      await response.body?.cancel()
+      throw new Error('the acknowledgement was lost')
+    }
   }
   protected override modelStreams() {
     return queueModel(this).streams
@@ -97,6 +112,12 @@ export class OwnerAgent extends PersonalAgent {
     if (path === '/test/rooms/stale') return this.#staleFilter(request)
     // The object restarts: the next request reconstructs it, its in-memory state (what it applied, ADR 0108) gone.
     if (path === '/test/rooms/restart') this.ctx.abort('rooms restart')
+    if (path === '/test/streams/lose') {
+      const { appends } = Schema.decodeUnknownSync(Schema.Struct({ appends: Schema.Int }))(await request.json())
+      this.#loseAcks = appends
+      return Response.json({ losing: appends })
+    }
+    if (path === '/test/streams/losing') return Response.json({ losing: this.#loseAcks })
     if (path === '/test/approvals/calls') return Response.json(this.#mcp.calls)
     // Today's tokens spent past the deployment's cap (`spent`), and given back (`unspent`).
     if (path === '/test/approvals/spent') return this.#spend(SPENT_TOKENS)
@@ -204,6 +225,11 @@ export default {
             () => Response.json({ restarted: true }),
           )
         return agent.fetch(new Request(`https://agent/test/rooms/${name ?? ''}`, input))
+      }
+      if (url.pathname.startsWith('/__test/streams/')) {
+        return (await leverAgent(input, env)).fetch(
+          new Request(`https://agent/test/streams/${url.pathname.split('/').at(-1)}`, input),
+        )
       }
       if (url.pathname.startsWith('/__test/approvals/')) {
         return (await leverAgent(input, env)).fetch(`https://agent/test/approvals/${url.pathname.split('/').at(-1)}`)

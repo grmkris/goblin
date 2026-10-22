@@ -17,6 +17,7 @@ import { EVENT_BODY_BYTES } from '../mcp/events/webhook.ts'
 import { SIGN_IN_CALLBACK } from '../mcp/oauth/sign-in.ts'
 import { canonicalRedirect } from './canonical.ts'
 import { healthOf } from './health.ts'
+import { streamRoute } from './streams.ts'
 
 /**
  * A workspace's agent (ADR 0089): its name is the workspace's ID, which only a membership, a key, a consent or a signed
@@ -96,20 +97,21 @@ async function fileLinkRoute(request: Request, env: RuntimeEnv, path: string, re
 }
 
 /**
- * The Worker's own routes past the typed API: /mcp, the hooks and file links. Anything else, `/internal/*` included,
- * is a 404.
+ * The Worker's own routes past the typed API: /mcp, the hooks, file links and chat streams. Anything else,
+ * `/internal/*` included, is a 404.
  */
 async function workerRoute(request: Request, env: RuntimeEnv, ref: string): Promise<Response> {
   const path = new URL(request.url).pathname
   if (path === '/mcp') return handleInboundMcp(request, env)
   if (path.startsWith('/hooks/mcp-events/')) return mcpEventsRoute(request, env, path, ref)
   if (path.startsWith('/files/link/')) return fileLinkRoute(request, env, path, ref)
+  if (path.startsWith('/streams/')) return streamRoute(request, env, path)
   throw new NotFound({ what: 'route' })
 }
 
 /**
  * The deployed Worker's handler (`worker.ts` exports it with the agent's class): every request the web worker forwards
- * (`apps/web/src/worker.ts`): health, auth, the typed API's edge, /mcp, the hooks and file links.
+ * (`apps/web/src/worker.ts`): health, auth, the typed API's edge, /mcp, the hooks, file links and chat streams.
  */
 export const worker = {
   async fetch(request: Request, env: RuntimeEnv): Promise<Response> {

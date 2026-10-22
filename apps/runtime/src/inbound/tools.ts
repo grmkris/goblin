@@ -64,6 +64,7 @@ export const TOOLS = {
   thread_start: 'conversations.startThread',
   conversation_entries: 'conversations.entries',
   conversation_stop: 'conversations.stop',
+  conversation_stream: 'conversations.stream',
   persona_list: 'personas.list',
   models_list: 'agent.models',
   persona_create: 'personas.create',

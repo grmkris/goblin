@@ -30,6 +30,7 @@ import {
 } from './move-case.ts'
 import { call, lever, ownerFetch, person, signedIn, workspaceOf, type Person } from './owner-requests.ts'
 import { clientErrorsCase, conversationEventsCase, csrfCase, internalRefusalCase } from './edge-case.ts'
+import { streamsCase } from './streams-case.ts'
 
 const harness = Test.make({
   providers: Cloudflare.providers(),
@@ -160,6 +161,11 @@ harness.test(
 harness.test(
   "native: a chat's event stream through the Worker stays open and carries later commits",
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => conversationEventsCase(url)))),
+)
+harness.test(
+  "native: a chat's AG-UI stream is joined in its tier, resumed from an offset, moves epochs at a run's end, refuses a bad token and keeps a lost acknowledgement's append once",
+  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => streamsCase(url)))),
+  { timeout: 240_000 },
 )
 harness.test(
   'native: only the session user reaches their own Agent; request selectors cannot redirect it',

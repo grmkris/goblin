@@ -14,6 +14,7 @@ import {
   StopConversation,
   UpdateConversation,
 } from '../conversations.ts'
+import { ConversationStream } from '../agui/join.ts'
 import { ConversationEntries } from '../entries.ts'
 import { ConversationQueue, QueueRemoval, QueueRemovalResult } from '../queue.ts'
 import { SourceUse } from '../retrieval.ts'
@@ -76,9 +77,13 @@ const EntriesQuery = {
  * - `sources`: `GET …/:id/sources`: what retrieval gave the chat's answers (ADR 0035), newest first.
  * - `events`: `GET …/:id/events`, server-sent: Pi's `snapshot`, then a `batch` per commit, until the browser goes away.
  *   A chat keeps its Pi session, so this is its session's stream. It does not grant resident authority.
+ * - `stream`: `GET …/:id/stream`: joins the chat's AG-UI stream and answers where to read it (`ConversationStream`,
+ *   docs/architecture/streams.md): a session and an OAuth client holding `transcripts` read the `full` tier, a key and
+ *   any other client `answers`. `Conflict` `stream_starting` when its stream could not be made in time. It does not
+ *   grant resident authority.
  *
- * A caller with the `conversations` scope reaches `update`, `submit`, `startThread`, `stop` and `entries` (ADRs 0081,
- * 0086, 0090): a key only in its own Topics, and never `keepOpen`.
+ * A caller with the `conversations` scope reaches `update`, `submit`, `startThread`, `stop`, `entries` and `stream`
+ * (ADRs 0081, 0086, 0090): a key only in its own Topics, and never `keepOpen`.
  */
 export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
   HttpApiEndpoint.post('create', '/conversations', {
@@ -161,6 +166,13 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     success: Schema.Array(SourceUse),
     error: [ApiErrors.notFound],
   }),
+  HttpApiEndpoint.get('stream', '/conversations/:id/stream', {
+    params,
+    success: ConversationStream,
+    error: [ApiErrors.notFound, ApiErrors.conflict],
+  })
+    .annotate(EndpointScope, 'conversations')
+    .annotate(GrantsResident, false),
   HttpApiEndpoint.get('events', '/conversations/:id/events', {
     params,
     success: EventStream,

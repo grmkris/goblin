@@ -13,14 +13,6 @@ export type AguiMessage = Message
 /** What a run waits for when it finishes with the `interrupt` outcome; goblin's are `AttentionItem`s. */
 export type AguiInterrupt = Interrupt
 
-/**
- * Who reads what of a chat's stream: `full` carries everything (reasoning, tool calls, steps, the whole STATE
- * document); `answers` carries the run lifecycle, the messages people and agents wrote, activities, subagent lifecycle
- * and `/attention`.
- */
-export const StreamTier = Schema.Literals(['full', 'answers'])
-export type StreamTier = typeof StreamTier.Type
-
 /** The CUSTOM event names goblin sends; any other name is not goblin's. */
 export const CustomName = {
   /** A running tool's progress (`ToolProgress`), full tier only. */

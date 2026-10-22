@@ -52,7 +52,7 @@ Code, claude.ai, Cursor) or a server's API key.
   | --- | --- | --- |
   | `agent` | `ask_agent`, `get_recent_messages` | OAuth clients |
   | `topics` | `topic_list`, `topic_get`, `topic_create`, `topic_update`, `topic_set_setup` | both |
-  | `conversations` | `conversation_update`, `conversation_send`, `thread_start`, `conversation_entries`, `conversation_stop` | both |
+  | `conversations` | `conversation_update`, `conversation_send`, `thread_start`, `conversation_entries`, `conversation_stop`, `conversation_stream` | both |
   | `personas` | `persona_list`, `models_list`, `persona_create`, `persona_get`, `persona_update` | both |
   | `inspect` | `inspect_turns`, `inspect_turn`, `inspect_problems`, `inspect_flows`, `inspect_details` | both |
   | `transcripts` | `inspect_conversations`, `inspect_conversation` | OAuth clients |
