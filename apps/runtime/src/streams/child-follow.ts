@@ -153,7 +153,20 @@ export class ChildFollow {
       const known = new Set(live.map(({ info }) => info.chat))
       for (const [chat, child] of this.#parent.carried(parent))
         if (!known.has(chat)) yield* this.#gone(parent, chat, child)
+      yield* this.settled(parent)
     })
+  }
+
+  /**
+   * The parent's streams moved on (a batch of its, a new watch): a Persona's fork they no longer carry (its answer
+   * ended its work there) is done with, and its watch stops.
+   */
+  settled(parent: string): Effect.Effect<void> {
+    const carried = this.#parent.carried(parent)
+    const done = [...this.#children.values()].filter(
+      (child) => child.parent === parent && !child.runs && !carried.has(child.info.chat),
+    )
+    return Effect.forEach(done, (child) => this.#drop(child), { discard: true })
   }
 
   /** One message, in the producer's fiber. */
@@ -339,10 +352,9 @@ export class ChildFollow {
       }
       // An answer ends its fork's work where the stream carries the answer; a failed or stopped one ends it now.
       const end = settledEnd(view)
-      if (end === undefined || view.state === 'answered') return
-      yield* this.#parent.step(view.chat, (cursor) => childEnded(cursor, fork, end))
-      const child = this.#children.get(fork)
-      if (child !== undefined) yield* this.#drop(child)
+      if (end !== undefined && view.state !== 'answered')
+        yield* this.#parent.step(view.chat, (cursor) => childEnded(cursor, fork, end))
+      yield* this.settled(view.chat)
     })
   }
 

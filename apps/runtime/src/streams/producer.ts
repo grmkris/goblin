@@ -413,6 +413,7 @@ export class Producer {
           moves = true
         }
       yield* moves ? this.#attach(state) : this.#armIdle(state)
+      yield* this.#children.settled(state.chat)
     })
   }
 
