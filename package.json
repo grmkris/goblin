@@ -54,6 +54,7 @@
     "test:release": "python3 -B scripts/release_test.py && python3 -B scripts/promote_test.py && python3 -B scripts/ci_credentials_test.py"
   },
   "devDependencies": {
+    "@ag-ui/client": "1.0.3",
     "@shadcn/lint": "0.2.3",
     "@tanstack/eslint-plugin-query": "5.104.5",
     "@tanstack/eslint-plugin-router": "1.162.0",
