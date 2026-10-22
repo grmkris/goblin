@@ -43,7 +43,9 @@ is charged once: it is configured with the Persona's text in its context tail (`
 when offered, and the Persona turn's members without `ask_user`; `registerRoutine` binds the run's chat to the Persona
 in `app_persona_chats` first, so its scope is its allowed tools within its Topic's setup joined with the Persona's at
 the pinned revision. A completed run's answer is written as the Persona's own `app.persona` entry with the routine's
-link (`routine: { id, run }`) under the report's request id; any other ending reports as the routine.
+link (`routine: { id, run }`) under the report's request id; any other ending reports as the routine. The routines'
+sweep writes the report: a run that settles wakes it a second later (`settleRoutine`, as a stop does), so an answer
+never waits for the next minute's sweep.
 
 Pi background Anchor/Reporter tasks create and recover an empty task-owned run conversation, registered as a thread
 without copied capability rows or an ordinary main-start note. The confirmed MCP ceiling narrows `Setups.scope`.

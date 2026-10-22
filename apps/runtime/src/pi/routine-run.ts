@@ -17,6 +17,7 @@ import { Conversations } from '../chats/service.ts'
 import { type RoutineAnswer, RoutineRuns, RoutineUsage, Routines } from '../routines/service.ts'
 import type { RoutineRun } from '../routines/runs.ts'
 import { runBinding } from '../routines/persona.ts'
+import { wakeIn } from '../routines/runner.ts'
 import { definitionOf, runHandOver } from '../routines/store.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { BACKGROUND, conversationId } from './context.ts'
@@ -64,6 +65,8 @@ const settleRoutine = (runId: string, result: Extract<State, { phase: 'report' }
       capped ? 'Routine token budget exhausted; the in-flight response is retained in its run thread.' : result.summary,
       at,
     )
+    // The sweep reports a settled run; without this wake the report waits for the next one, up to a minute away.
+    yield* wakeIn(1000)
   })
 
 /** Creates the task once in main; Pi owns its wait/recovery and its empty child conversation. */
