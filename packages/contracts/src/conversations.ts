@@ -249,7 +249,7 @@ const plainName = (name: string): string =>
     .trim()
 
 /** The words that start the authors goblin writes itself; a name someone chose never starts with one. */
-const OWN_AUTHORS = /^(?:(?:member|persona|subagent|thread)\b[\s:]*)+/iu
+const OWN_AUTHORS = /^(?:(?:member|persona|server|subagent|thread)\b[\s:]*)+/iu
 
 /**
  * The author of a member's message in a workspace of several people (ADR 0094): `member <name> · <user id>`, which
@@ -261,13 +261,19 @@ export const memberAuthor = (name: string, userId: string): string =>
 
 /**
  * The author of an OAuth client's message (ADRs 0086, 0094): the name its registrant chose, never one that reads as an
- * author goblin writes (a member's, a Persona's, a subagent's, a thread's), and in a workspace of several people the
- * member it acts for.
+ * author goblin writes (a member's, a Persona's, a server's, a subagent's, a thread's), and in a workspace of several
+ * people the member it acts for.
  */
 export const clientAuthor = (client: string, member?: string): string => {
   const name = plainName(client).replace(OWN_AUTHORS, '').slice(0, 40) || 'client'
   return member === undefined ? name : `${name} for ${plainName(member).slice(0, 30)}`
 }
+
+/**
+ * The author of a message a server's API key sent (ADR 0108): `server <key name>`, which goblin writes in front of each,
+ * so the agent reads a request from a party the owner connected, never the owner's own words.
+ */
+export const serverAuthor = (key: string): string => `server ${plainName(key).slice(0, 64) || 'key'}`
 
 const MEMBER_AUTHOR = /^member (.{1,50}) · ([\w-]{1,200})$/u
 

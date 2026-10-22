@@ -24,7 +24,7 @@ import { AgentInput } from './runtime/input.ts'
 import { conversationId } from './pi/context.ts'
 import { PiSessions, fromPi } from './pi/sessions.ts'
 import type { HeldCallOutcome } from './mcp/connections/types.ts'
-import { requestAuthor, requestFlowOrigin } from './keys/policy.ts'
+import { requestAuthor, requestFlowOrigin, requestKey } from './keys/policy.ts'
 import { type SharedContext, outcomeContent, ownerContent, withAuthor } from './pi/content.ts'
 import { askPersonas } from './personas/ask.ts'
 
@@ -192,6 +192,19 @@ const routineAnswer = (operationId: string, text: string) => (admitted: SessionI
   RoutineControl.use((control) => control.answer(admitted, operationId, text))
 
 /**
+ * What a message's admission records and may answer: a server key's (`keyed`, ADR 0108) is recorded as the key's and
+ * never answers a routine's question, which is the owner's to answer.
+ */
+const admissionOf = (input: OwnerSubmit, keyed: boolean) => ({
+  receipt: {
+    kind: 'send',
+    origin: keyed ? 'key' : 'owner',
+    ...(input.parentOp === undefined ? {} : { parentOp: input.parentOp }),
+  } as const,
+  ...(keyed ? {} : { answer: routineAnswer(input.operationId, input.text) }),
+})
+
+/**
  * The owner's message into a chat, or an ask of the Personas it tags. Admission (the chat open, the operation recorded,
  * a routine's waiting question answered, the session on the owner's model, Pi's submit) runs under the chat's lock.
  */
@@ -216,6 +229,7 @@ export const submitOwner = (input: OwnerSubmit) =>
     const view = Option.getOrUndefined(yield* conversations.view(input.thread))
     const content = withAuthor(yield* requestAuthor, ownerContent(input.text, shared, attachments, selections))
     const origin = yield* requestFlowOrigin
+    const keyed = (yield* requestKey) !== undefined
     if (personaIds.length > 0) {
       if (view?.kind === 'subagent') return yield* new InvalidInput({ reason: 'persona_subagent' })
       return yield* askPersonas(input, personaIds, personaOrder, content)
@@ -227,10 +241,9 @@ export const submitOwner = (input: OwnerSubmit) =>
     return yield* (yield* ChatOperations).send<Conversations | RoutineControl | PiSessions | AgentInput>({
       chat: input.thread,
       operationId: input.operationId,
-      receipt: { kind: 'send', origin: 'owner', ...(input.parentOp === undefined ? {} : { parentOp: input.parentOp }) },
+      ...admissionOf(input, keyed),
       flow: { flow: 'send', ...origin },
       content,
-      answer: routineAnswer(input.operationId, input.text),
       ...(relay === undefined ? {} : { relay }),
     })
   })

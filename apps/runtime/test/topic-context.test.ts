@@ -9,8 +9,9 @@ import type { AgentServices } from '../src/layers/index.ts'
 import { topicContextExtension } from '../src/pi/topic-context.ts'
 import { BACKGROUND } from '../src/pi/context.ts'
 import { makeBridge } from '../src/runtime/bridge.ts'
-import { CLOSED } from '../src/setup/scope.ts'
+import { CLOSED, type ScopeTopic } from '../src/setup/scope.ts'
 import { Setups } from '../src/setup/service.ts'
+import { topicContext } from '../src/topics/context.ts'
 import { fake } from './fake.ts'
 import { model, scriptedStreams, type SeenRequest } from './integration/model.ts'
 
@@ -85,5 +86,34 @@ describe('channel guidance generation hook', () => {
       await harness.close(BACKGROUND)
       await runtime.dispose()
     }
+  })
+})
+
+/** The context a chat in `topic` reads, in room `room` when it is one. */
+const contextIn = (topic: ScopeTopic, room?: number) =>
+  Effect.runPromise(
+    topicContext('s').pipe(
+      Effect.provideService(
+        Setups,
+        fake<Setups['Service']>({
+          scope: () => Effect.succeed({ ...CLOSED, topic, ...(room === undefined ? {} : { room }) }),
+        }),
+      ),
+    ),
+  )
+
+describe("a room's context (ADR 0108)", () => {
+  const customer = { id: 7, name: 'Customer 7', description: '', instructions: 'Reply in German.', holds: () => false }
+
+  it("always says the chat reaches only the room, and that its guidance is the server's and grants nothing", async () => {
+    const room = await contextIn(customer, 7)
+    expect(room).toContain('Channel: #Customer 7, a room.')
+    expect(room).toContain('You reach only this room')
+    expect(room).toContain("server's operator guidance")
+    expect(room).toContain('Reply in German.')
+    expect(await contextIn({ ...customer, instructions: '' }, 7)).toContain('You reach only this room')
+    // Outside a room the owner's guidance reads as before, and none says nothing.
+    expect(await contextIn(customer)).toContain('The owner configured this channel guidance')
+    expect(await contextIn({ ...customer, instructions: '' })).toBeUndefined()
   })
 })

@@ -5,6 +5,7 @@ import {
   type WorkspaceRole,
   clientAuthor,
   memberAuthor,
+  serverAuthor,
   serverOriginOf,
 } from '@goblin/contracts'
 import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
@@ -72,9 +73,9 @@ export const requestFlowOrigin: Effect.Effect<{ readonly via: 'app' | 'mcp'; rea
   )
 
 /**
- * Who a request's message is by, which its content carries first: an OAuth client by the name it registered (ADR 0086,
- * and for whom in a workspace of several people), or in such a workspace a member by name and ID (ADR 0094); none for a
- * member alone in their workspace, or any other request.
+ * Who a request's message is by, which its content carries first: a server's key by its name (ADR 0108), an OAuth
+ * client by the name it registered (ADR 0086, and for whom in a workspace of several people), or in such a workspace a
+ * member by name and ID (ADR 0094); none for a member alone in their workspace, or any other request.
  */
 export const requestAuthor: Effect.Effect<string | undefined> = Effect.map(
   Effect.serviceOption(RequestContext),
@@ -82,6 +83,7 @@ export const requestAuthor: Effect.Effect<string | undefined> = Effect.map(
     const facts = Option.getOrUndefined(context)
     const member = facts?.member
     const caller = facts?.caller
+    if (caller?.kind === 'key') return serverAuthor(caller.name)
     if (caller?.kind === 'client') return clientAuthor(caller.name, member?.shared === true ? member.name : undefined)
     if (caller === undefined && member?.shared === true) return memberAuthor(member.name, member.user)
     return undefined

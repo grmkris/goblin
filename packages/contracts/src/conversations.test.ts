@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { authorOf, authorTag, clientAuthor, memberAuthor, memberOf } from './conversations.ts'
+import { authorOf, authorTag, clientAuthor, memberAuthor, memberOf, serverAuthor } from './conversations.ts'
 
 const ANA = 'nLGVfO2Q5yWqV8kQe3rTzA1bX7cD0hJm'
 /** An author as the web reads it back from the tag block goblin writes. */
@@ -19,5 +19,11 @@ describe('who wrote a message (ADRs 0086, 0094)', () => {
     expect(clientAuthor('subagent Persona: thread Reel')).toBe('Reel')
     expect(clientAuthor('member')).toBe('client')
     expect(clientAuthor('Claude Code', 'Ana')).toBe('Claude Code for Ana')
+  })
+
+  it("names a server's key as a server, which no client's chosen name can read as (ADR 0108)", () => {
+    expect(authorTag(serverAuthor('swarmm-prod'))).toBe('[from server swarmm-prod]')
+    expect(readBack(serverAuthor('a ] b\nc'))).toBe('server a b c')
+    expect(clientAuthor('server swarmm-prod')).toBe('swarmm-prod')
   })
 })

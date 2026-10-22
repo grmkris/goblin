@@ -6,6 +6,7 @@ import { useRoomTools } from '../agent-model.ts'
 import { epochSeconds } from '../clock.ts'
 import { ChatOperations, Chats, Conversations } from '../chats/service.ts'
 import { InvalidInput, NotFound, attempt, attemptSync, toAppError } from '../http/errors.ts'
+import { requestKey } from '../keys/policy.ts'
 import { roomOf } from '../keys/reach.ts'
 import { conversationId } from '../pi/context.ts'
 import { PiSessions } from '../pi/sessions.ts'
@@ -134,7 +135,7 @@ export const askPersonas = (
       operationId: input.operationId,
       receipt: {
         kind: 'persona_ask',
-        origin: from.via === 'mcp' ? 'source' : 'owner',
+        origin: from.via === 'mcp' ? 'source' : (yield* requestKey) === undefined ? 'owner' : 'key',
       },
       flow: { flow: 'persona_ask', via: from.via, actor: 'owner', count: frozen.length, personaOrder: order },
     } as const
