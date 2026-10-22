@@ -1,4 +1,4 @@
-import { PersonaPage, TopicPage } from '@goblin/contracts'
+import { EVERYTHING, PersonaPage, TopicPage } from '@goblin/contracts'
 import { sql } from 'drizzle-orm'
 import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
@@ -185,6 +185,27 @@ describe("an API key's reach (ADR 0081)", () => {
     expect(owners.topics.map((topic) => topic.room?.key ?? null)).toEqual([null, 'swarmm-prod', 'swarmm-prod', null])
     const own = await personaPage(fetch(get('/api/personas')))
     expect(own.personas.map((each) => each.madeBy?.key ?? null)).toEqual([null, 'swarmm-prod'])
+  })
+
+  it('keeps a room from holding everything, an app or subagents, whoever sets it, an Undo too (ADR 0108)', async () => {
+    const { fetch } = organizing()
+    await fetch(post('/api/topics', { name: 'Customer 1', operationId: 'svc:topic:1' }, KEY))
+    const setTo = (setup: object) => fetch(json('PATCH', '/api/topics/2/setup', { set: setup, expectedRevision: 1 }))
+    const none = { mcpServers: [], skills: [], apps: [], subagents: false }
+    for (const setup of [
+      { ...none, mcpServers: 'all' },
+      { ...none, mcpServers: [{ connectionId: 'mycut', tools: 'all' }] },
+      { ...none, skills: 'all' },
+      { ...none, apps: ['notes'] },
+      { ...none, subagents: true },
+    ])
+      await refusedFor(await setTo(setup), 'room_setup')
+    expect((await setTo({ ...none, mcpServers: [{ connectionId: 'mycut', tools: ['job_submit'] }] })).status).toBe(200)
+    // The owner's own Topic may still hold everything.
+    await fetch(post('/api/topics', { name: 'Trips', operationId: 'owner-topic' }))
+    expect((await fetch(json('PATCH', '/api/topics/3/setup', { set: EVERYTHING, expectedRevision: 1 }))).status).toBe(
+      200,
+    )
   })
 
   it("reads back one of its own Topics with its guidance and setup, and no other's", async () => {

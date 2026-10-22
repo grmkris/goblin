@@ -12,10 +12,10 @@ import { and, asc, desc, eq, getTableColumns, inArray, isNull, ne, sql } from 'd
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Effect from 'effect/Effect'
 import { type AppError, Conflict, InvalidInput, NotFound, attemptSync } from '../http/errors.ts'
-import { makerColumn, makerOf, reachedIds } from '../keys/reach.ts'
+import { makerColumn, makerOf, reachedIds, roomOf } from '../keys/reach.ts'
 import { after, pageOf } from '../storage/page.ts'
 import { appTopics } from '../storage/topics.ts'
-import { storedSetup, topicSetupOf } from './setup.ts'
+import { roomSetupWithin, storedSetup, topicSetupOf } from './setup.ts'
 
 type Row = typeof appTopics.$inferSelect
 
@@ -43,7 +43,7 @@ export type TopicPorts = {
 type Made = Row & { readonly maker: string | null | undefined }
 
 /** Who made a room: the key, by name (ADR 0108). */
-const roomOf = (maker: string | null | undefined) =>
+const roomView = (maker: string | null | undefined) =>
   maker === null || maker === undefined ? {} : { room: { key: maker } }
 
 const view = (row: Made): TopicView => ({
@@ -57,7 +57,7 @@ const view = (row: Made): TopicView => ({
   searchExcluded: row.searchExcluded,
   revision: row.revision,
   setup: topicSetupOf(row.setup),
-  ...roomOf(row.maker),
+  ...roomView(row.maker),
   createdBy: row.createdBy,
   createdAt: row.createdAt,
 })
@@ -70,7 +70,7 @@ const summary = (row: Made): TopicSummary => ({
   revision: row.revision,
   archived: row.archivedAt !== null,
   searchExcluded: row.searchExcluded,
-  ...roomOf(row.maker),
+  ...roomView(row.maker),
   updatedAt: row.updatedAt,
 })
 
@@ -284,11 +284,13 @@ export class TopicRegistry<RunResult = unknown> {
 
   /**
    * A new setup (ADR 0040) as one new revision, compare-and-set on `expectedRevision` when it is given (else `Conflict`
-   * `revision`). The same setup is no write.
+   * `revision`). The same setup is no write. A room's (ADR 0108) never holds everything of anything, an app or
+   * subagents, whoever sets it and an Undo too (`InvalidInput` `room_setup`).
    */
   setSetup(id: number, setup: TopicSetup, expectedRevision: number | undefined, now: number): TopicView {
     const row = this.#row(id)
     if (expectedRevision !== undefined && row.revision !== expectedRevision) throw new Conflict({ reason: 'revision' })
+    if (!roomSetupWithin(setup) && roomOf(this.#db, id)) throw new InvalidInput({ reason: 'room_setup' })
     const stored = storedSetup(setup)
     if (stored === row.setup) return this.#view(row)
     const [next] = this.#db

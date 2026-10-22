@@ -111,13 +111,22 @@ export const unallowed = (
   allowed: Allowed,
 ): readonly SetupItem[] => listedItems(next).filter((item) => !holds(before, item) && !allows(allowed, item))
 
+/** The categories a setup can hold whole (`'all'`). */
+const CATEGORIES = ['mcpServers', 'skills', 'apps'] as const
+
+/** Whether `next` holds whole a category `before` did not: everything the owner allows there, now and later. */
+const widensToAll = (before: TopicSetup | PersonaSetup, next: TopicSetup | PersonaSetup): boolean =>
+  CATEGORIES.some((category) => next[category] === 'all' && before[category] !== 'all')
+
 /**
- * Refuses (`InvalidInput` `setup_not_allowed`) a setup that lists something `before` did not hold and the owner does not
- * allow now: what the agent may not add to a Topic's or a Persona's setup (ADR 0040). The catalog is read only when the
- * setup lists something new.
+ * Refuses a setup that holds a category whole that `before` did not (`InvalidInput` `setup_all_owner_only`: only the
+ * owner gives everything, ADR 0108), or lists something `before` did not hold and the owner does not allow now
+ * (`setup_not_allowed`): what the agent may not add to a Topic's or a Persona's setup (ADR 0040). The catalog is read
+ * only when the setup lists something new.
  */
 export const refuseUnallowed = (before: TopicSetup | PersonaSetup, next: TopicSetup | PersonaSetup) =>
   Effect.gen(function* () {
+    if (widensToAll(before, next)) return yield* new InvalidInput({ reason: 'setup_all_owner_only' })
     if (listedItems(next).every((item) => holds(before, item))) return
     if (unallowed(before, next, yield* setupCatalog).length > 0)
       return yield* new InvalidInput({ reason: 'setup_not_allowed' })
