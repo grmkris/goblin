@@ -3,8 +3,24 @@
 A **Source** ([ADR 0066](../adr/0066-sources.md)) is an MCP connection whose events carry the owner's own messages into
 goblin, and goblin's answers back, by a setup the owner confirmed at an exact revision. Nothing in it names a server:
 the setup is JSON pointers and argument templates (`SourceSetup`, `packages/contracts/src/sources.ts`). All external
-message transport, including Mygram through MySI, uses this path (ADR 0069). There is no built-in channel or competing
-connection switch.
+message transport, a chat app's included, directly or through a gateway, uses this path (ADR 0069). There is no
+built-in channel or competing connection switch, and no code that knows a server: a Source configures itself from what
+its server says ([ADR 0096](../adr/0096-a-source-configures-itself-from-its-servers-guide.md)).
+
+## How a Source configures itself
+
+The owner asks for one ("set up my chat"); the agent sets it up from the server, not from goblin:
+
+1. **The server's guide.** `mcp_list` on the connection carries the server's own `instructions` (untrusted, cut to
+   2000 characters), which name its guide skills. With skills on for the connection (ADR 0008), the agent activates the
+   guide (`skill_activate`) and follows its recipe for a client; the skill grants nothing.
+2. **What the connection offers.** `mcp_list` with `events: true` and the read and reply tools named in `tools` gives the
+   event's `payloadSchema` and each tool's input and output schemas. The agent uses each name exactly as this connection
+   lists it: through a gateway an app's `post_reply` may be `notes_post_reply`.
+3. **The proposal.** `source_propose` sends the five facts. goblin checks them against the connection now (below); a
+   refusal reaches the agent whole (at most 2000 characters), so it fixes every problem in one more call.
+4. **The owner's one confirm.** The review card shows the facts, the exact setup, and a warning when the reply has no
+   result rules; only Confirm of that revision runs it.
 
 ## The setup
 
@@ -21,8 +37,9 @@ Five facts and a default (`SourceSetup`):
   cursor, `"{{cursor}}"` a whole argument value. `title` points at the conversation's name (a chat's title);
   `attachments` at a list of MCP content blocks (`resource_link`, `image`, `resource`, `audio`), shaped as a tool
   result's content is, that the message brought.
-- `reply` (optional): `{ tool, arguments, maxChars }`, its arguments using `"{{key.<name>}}"`, `"{{text}}"` (required) and
-  `"{{operationId}}"`.
+- `reply` (optional): `{ tool, arguments, maxChars, result }`, its arguments using `"{{key.<name>}}"`, `"{{text}}"`
+  (required) and `"{{operationId}}"`; `result` (ADR 0072) says which value of the tool's structured result means
+  accepted, retryable or rejected, and is required when the tool declares an output schema (ADR 0096).
 - `newKeys`: what a conversation seen for the first time gets (`held` unless the setup says otherwise): a route, or
   `{ to: 'topic-per-key' }`, a new Topic of its own answered by goblin.
 
@@ -32,15 +49,19 @@ decodes. `sources/setup.ts` checks a setup against what the connection offers no
 webhook), the read and reply tools, and every pointer against the event's `payloadSchema` or the read tool's
 `outputSchema` (`sources/pointer.ts`: properties, items, local `$ref`s and `allOf`/`anyOf`/`oneOf` branches; a schema
 that lists its properties without `additionalProperties` says a pointer to any other is absent; one that says nothing
-lets it be).
+lets it be). When the reply tool declares an `outputSchema`, `reply.result` is required (the refusal lists the schema's
+fields that name their values, `/status ("sent", "retryable", "rejected")`), each rule's pointer must be in that schema,
+and each `equals` one of the values its field's `enum` or `const` allows when it lists them. A reply tool that declares
+nothing may go without rules: its outcomes are unknown, and the owner hears of each one.
 
 No server suggests a setup (ADR 0068): goblin reads an event's standard fields only, never its `_meta`. The agent
-proposes one from the event's `payloadSchema`, the tools' schemas and the server's skill.
+proposes one from the event's `payloadSchema`, the tools' schemas and the server's guide skill.
 
 ## Proposing and confirming
 
 A proposal comes from the agent only (`source_propose`, `pi/sources.ts`, which ends its turn and leaves a review card
-in the chat; the card is also on the connection's card, `components/connection-sources.tsx`). `proposeSource`
+in the chat; the card is also on the connection's card, `components/connection-sources.tsx`), so a Source keeps no
+proposer. `proposeSource`
 (`sources/program.ts`) checks it and keeps it as revision 1 in `app_source_setups`; the same operation finds the same
 proposal. Only the owner's `confirm` of that exact revision binds it (`bind`): resident authority is checked, the wake
 selector is granted (`Events.grant`) and the read and reply tools (`McpGrants.setTool`), a tool read is started at the
@@ -168,8 +189,14 @@ template leaves, confirm granting and subscribing, an owner message as a turn in
 notice, a conversation named by its title and given a Topic of its own, attachments kept and held by reference, a held
 conversation routed and undone, an answer in pieces once, retries and the give-up notice, a terminated subscription
 made again and a changed grant pausing the Source. The workerd canary (`test/integration/sources-probe.ts`, in the
-native suite) runs a Source end to end on the real agent over the official Events producer: confirmed, a signed
+native suite) runs a Source end to end on the real agent over the official Events producer, with neutral fixture names
+(`post.created`, `feed_read`, `post_reply`, `/author/kind`): confirmed, a signed
 webhook, a tool read from its cursor, the owner's message (with a photo and UTF-8 text attachment kept under
 `/agent/received`) a marked turn in a Topic made for its chat, a same-title second chat in a separate Topic, someone
 else's an untrusted notice, and each answer sent once under its operation id. Another canary verifies that
-`others: drop` creates no foreign route or Topic and cannot retitle an existing route. The browser walk is `apps/web/test/ui-sources.ts`. None of it is deployed-stage evidence.
+`others: drop` creates no foreign route or Topic and cannot retitle an existing route. The `source-propose` canary
+(`test/integration/source-propose-probe.ts`, cases in `source-propose-case.ts`) has the scripted model set one up as
+the agent would: activate the server's guide skill, list the event and tools with their output schemas, be refused
+without result rules, propose with them; then the owner confirms it, a signed post is the owner's marked turn in its
+chat's own Topic, and the answer goes back accepted with no notice. Its second case does the same through a gateway's
+`notes_` names. A mail-shaped setup (read from the event's data, no cursor, no reply) is covered by the unit tests. The browser walk is `apps/web/test/ui-sources.ts`. None of it is deployed-stage evidence.

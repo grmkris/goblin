@@ -44,7 +44,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0041](0041-connections-tell-me-hand-to.md) | Connections, Tell me and Hand to | Accepted; amended by 0066, 0068, 0070 and 0073 |
 | [0042](0042-mcp-2026-client.md) | MCP 2026 client: live tool lists, URL requests and step-up | Accepted |
 | [0046](0046-production-promotion-and-public-source.md) | Daily development, deliberate production promotion and public source | Accepted; amended by 0077 |
-| [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted; amended by 0061, 0063 and 0075 |
+| [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted; amended by 0061, 0063, 0075 and 0096 |
 | [0053](0053-pinned-services-and-apps-with-a-chat-bar.md) | Pinned services and Apps with a chat bar | Accepted; amended by 0063; its pins by default superseded by 0078 |
 | [0055](archive/0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | Superseded by 0066 and 0069 |
 | [0056](0056-goblin-wallet-leaves-goblin.md) | Goblin Wallet leaves goblin | Accepted |
@@ -57,14 +57,14 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0063](0063-mcp-first-no-server-specific-code.md) | MCP-first: no server-specific code | Accepted |
 | [0064](0064-openid-connect-and-config-driven-deployment.md) | OpenID Connect sign-in and config-driven deployment | Accepted; amended by 0067 and 0078 |
 | [0065](0065-files-from-mcp-content.md) | Files from MCP content | Accepted |
-| [0066](0066-sources.md) | Sources: any MCP server's events carry the owner's own messages, by a setup the owner confirms | Accepted; amended by 0068 and 0072 |
+| [0066](0066-sources.md) | Sources: any MCP server's events carry the owner's own messages, by a setup the owner confirms | Accepted; amended by 0068, 0072 and 0096 |
 | [0067](0067-no-home-surface-and-no-typed-decisions.md) | No Home surface and no typed decisions | Accepted |
-| [0068](0068-events-use-their-standard-fields-only.md) | Events use their standard fields only | Accepted |
+| [0068](0068-events-use-their-standard-fields-only.md) | Events use their standard fields only | Accepted; amended by 0096 |
 | [0069](0069-external-messages-use-sources.md) | External messages use Sources; the built-in Telegram channel is removed | Accepted |
 | [0070](0070-notices-and-files-leave-through-the-owners-tools.md) | Notices and files leave through the owner's own tools: Notify me via and file links | Accepted; amended by 0071 |
 | [0071](0071-sink-delivery-rules-and-event-identity.md) | Sink delivery rules and exact event identity | Accepted |
-| [0072](0072-source-reply-result-outcomes.md) | Source reply result outcomes and durable piece progress | Accepted |
-| [0073](0073-event-lease-callback-generations.md) | Event lease callback generations | Accepted |
+| [0072](0072-source-reply-result-outcomes.md) | Source reply result outcomes and durable piece progress | Accepted; amended by 0096 |
+| [0073](0073-event-lease-callback-generations.md) | Event lease callback generations | Accepted; amended by 0096 |
 | [0074](0074-interactive-replies.md) | Interactive replies are ordinary owner follow-ups | Accepted |
 | [0075](0075-production-mysi-on-every-stage.md) | goblin uses production mysi on every stage | Accepted |
 | [0076](0076-batch-tool-grants.md) | Batch changes to exact tool grants | Accepted |
@@ -87,4 +87,5 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0093](0093-members-invitations-and-roles.md) | Members, invitations and roles | Accepted; amended by 0095, 0097 |
 | [0094](0094-a-members-message-names-who-wrote-it.md) | A member's message names who wrote it | Accepted |
 | [0095](0095-the-owners-subscription-workspace-takes-no-members.md) | The owner's subscription workspace takes no members | Accepted |
+| [0096](0096-a-source-configures-itself-from-its-servers-guide.md) | A Source configures itself from its server's guide | Accepted |
 | [0097](0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md) | One /mcp reaches the workspaces its consent chooses | Accepted |

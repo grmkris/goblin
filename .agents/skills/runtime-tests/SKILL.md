@@ -72,5 +72,6 @@ itself authorize model spend, external messages, deployment or production change
   Sidequest hiring and provider-side operation reconciliation remain separate acceptance.
 
 - Source native canaries cover signed ingress, cursor reads, own-turn marking, photo/text files, routing, replies and
-  replay. The Events suite covers transport and consumer recovery without a service-specific channel. MySI reconnect
+  replay, and the agent's own setup from a server's guide skill by an app's names and a gateway's (`source-propose`,
+  ADR 0096). Fixtures use neutral names (`post.created`, `feed_read`, `post_reply`); the retired-terms gate covers tests. The Events suite covers transport and consumer recovery without a service-specific channel. MySI reconnect
   and Telegram DM/group/photo receipts are a deferred live owner gate, not established by those fixtures (ADR 0069).

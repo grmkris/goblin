@@ -604,12 +604,16 @@ exercises frozen notice retries through the MCP host; `bun apps/web/test/ui-sour
 
 ### Deferred MySI and Mygram live acceptance
 
-Code completion and local fixtures do not close this gate. After the dev reset, schedule a 15–30 minute owner session:
+Code completion and local fixtures do not close this gate. The local proof of the agent setting a Source up from its
+server's guide is the native `source-propose` canary
+([ADR 0096](adr/0096-a-source-configures-itself-from-its-servers-guide.md)); this owner session proves it against the
+live servers:
 
 1. Sign in to Goblin dev, configure its model endpoint if needed, reconnect MySI and authorize Mygram with the intended
    DM/group/topic access. Keep credentials and personal identifiers out of committed evidence.
-2. Propose and review the Source against the live schemas, including owner identity, incoming direction, chat/thread
-   keys, cursor read, titles, attachments and reply arguments. Confirm the exact revision and desired routes.
+2. Turn skills on for the connection and ask the agent to set the Source up: it reads the server's guide skill and the
+   live schemas (owner identity, incoming direction, chat/thread keys, cursor read, titles, attachments, reply arguments
+   and result rules) and proposes it by the names the connection lists. Confirm the exact revision and desired routes.
 3. Send a DM, a group message and a photo; verify the routed Topic, the owner-turn mark, kept attachment and reply back
    to the same place. Include a non-owner message and replay to confirm their distinct behavior.
 4. Configure Notify me via with the live structured-result mapping and exact echo selector. Verify a routine copy,
