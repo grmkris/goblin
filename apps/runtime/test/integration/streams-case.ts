@@ -9,7 +9,7 @@ import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { streamReadToken } from '../../src/streams/read-token.ts'
 import { callOwner } from '../owner-client.ts'
-import { type Person, call, lever, ownerFetch, person, signedIn } from './owner-requests.ts'
+import { type Person, call, holding, lever, ownerFetch, person, signedIn } from './owner-requests.ts'
 
 /** The owner stack's credential key (`owner-stack.ts`), which signs its stream URLs. */
 const KEY = 'Z29ibGluLXRlc3QtZml4dHVyZS1rZXkhISEhISEhISE='
@@ -164,6 +164,34 @@ async function lostAcknowledgement(url: string, owner: Person, joined: Conversat
   expect(losing.losing).toBe(0)
 }
 
+/**
+ * The agent restarts mid-run (its object evicted while the model is held): the stream goes on in the same epoch from
+ * its stored cursor, and nothing it already carried is appended again.
+ */
+async function restartMidRun(url: string, owner: Person) {
+  const joined = await join(url, owner, '1')
+  const opening = await readOnce(url, joined.url, '-1')
+  const input = 'queue-hold:restart'
+  await send(url, owner, '1', input)
+  await holding(url, owner, input)
+  const begun = await readUntil(url, joined.url, opening.offset, (events) =>
+    events.some(({ type }) => type === EventType.RUN_STARTED),
+  )
+  // expected: the object stops while it answers, so the lever's answer may never arrive
+  await lever(url, owner, 'streams/evict').catch(() => undefined)
+  await holding(url, owner, input)
+  expect((await lever(url, owner, 'queue/release', { input })).status).toBe(200)
+  const run = await readUntil(url, joined.url, begun.offset, ended)
+  const all = [...begun.events, ...run.events]
+  expect(ofType(all, EventType.RUN_STARTED)).toHaveLength(1)
+  const said = ofType(all, EventType.TEXT_MESSAGE_START).filter(({ role }) => role === 'user')
+  expect(said).toHaveLength(1)
+  expect(answers(all)).toEqual([`echo: ${input}`])
+  // The same epoch carried the whole run: nothing moved it before the run's end.
+  const end = all.findIndex(({ type }) => type === EventType.RUN_FINISHED)
+  expect(moved(all.slice(0, end))).toBe(false)
+}
+
 /** A key reads its own Topic's chat in the answers tier, and no other chat. */
 async function keyReads(url: string, owner: Person) {
   const made = await call(url, owner, '/api/keys', {
@@ -235,5 +263,6 @@ export async function streamsCase(url: string): Promise<void> {
   const { next, offset } = await rotation(url, owner, joined, run)
   await refusedTokens(url, owner, next)
   await lostAcknowledgement(url, owner, next, offset)
+  await restartMidRun(url, owner)
   await keyReads(url, owner)
 }

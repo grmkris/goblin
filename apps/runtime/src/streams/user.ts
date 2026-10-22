@@ -9,8 +9,10 @@ import {
   authorOf,
   memberOf,
 } from '@goblin/contracts'
+import { Predicate } from 'effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
+import type { QueuedParts } from './state.ts'
 
 // A user message as a chat's stream carries it: the words alone, and what the runtime wrote around them
 // (`pi/content.ts`) as `metadata.goblin`. This is the server's reading of what the web read for itself before.
@@ -95,4 +97,23 @@ export function userParts(content: UserMessage['content']): UserParts {
   const added = decoded.map((block) => block.value)
   const composer = added.flatMap((block) => ('composer' in block ? [block.composer.text] : [])).at(0)
   return { text: composer ?? first, mark: { ...addedMarks(added), ...authorMarks(tag, added) } }
+}
+
+/** What a queued input says (`InboxDoc`'s JSON content), as a user message would carry it. */
+export function queuedParts(content: unknown): QueuedParts {
+  const blocks = Array.isArray(content)
+    ? content.flatMap((block: unknown) =>
+        Predicate.isReadonlyObject(block) && block.type === 'text' && Predicate.isString(block.text)
+          ? [{ type: 'text' as const, text: block.text }]
+          : [],
+      )
+    : undefined
+  const { text, mark } = userParts(Predicate.isString(content) ? content : (blocks ?? []))
+  return {
+    text,
+    ...(mark.author === undefined ? {} : { author: mark.author }),
+    ...(mark.attachments === undefined ? {} : { attachments: mark.attachments }),
+    ...(mark.selections === undefined ? {} : { selections: mark.selections }),
+    ...(mark.context === undefined ? {} : { context: mark.context }),
+  }
 }

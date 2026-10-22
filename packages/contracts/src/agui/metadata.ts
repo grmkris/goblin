@@ -5,6 +5,7 @@ import { ChatId, EntryId, OperationId, PersonaId } from '../ids.ts'
 import { McpOutcome } from '../mcp.ts'
 import { PersonaAskData, PersonaAvatar, PersonaHold } from '../personas.ts'
 import { QuestionSpec } from '../conversations.ts'
+import { TokenCounts } from './state.ts'
 
 /**
  * A Persona's attributed answer (ADR 0033) on its assistant message: who answered at which revision, for which
@@ -45,7 +46,13 @@ export type StopMark = typeof StopMark.Type
  *   (the composer's `@`/`/` choices), `outcome` (how a held call ended) and `kept` (an outcome kept for the next turn),
  *   `thread` (the thread a shared note or a routine report came from) and `ask` (the Personas it went to instead of
  *   the agent, ADR 0090).
- * - An assistant message: `persona` (a Persona's answer) and `stop` (why it has no whole answer).
+ * - An assistant message: `persona` (a Persona's answer), `stop` (why it has no whole answer) and `usage` (the tokens
+ *   its model call used, as Pi counts them).
+ * - `branchable`: a Thread may start at the message's entry (ADR 0034): the owner's own words and the agent's answers.
+ * - `omits`: the entries a later entry leaves out of the chat (a turn moved to a Thread, ADR 0034), on that entry's
+ *   message: a reader hides the messages of those entries, wherever it read them.
+ * - `MESSAGES_SNAPSHOT`: `before`, the entry older history is read before, a page at a time (the history endpoint);
+ *   absent when the snapshot starts at the chat's beginning.
  * - `RUN_STARTED`: `operations`, the operation ids of the inputs that started it, when the stream saw them admitted.
  * - A tool call or result: `details` (Pi's details for UIs), `isError`, `parentToolCallId` (a nested call's caller).
  */
@@ -64,6 +71,10 @@ export const GoblinMetadata = Schema.Struct({
   ask: Schema.optionalKey(PersonaAskData),
   persona: Schema.optionalKey(PersonaMark),
   stop: Schema.optionalKey(StopMark),
+  usage: Schema.optionalKey(TokenCounts),
+  branchable: Schema.optionalKey(Schema.Literal(true)),
+  omits: Schema.optionalKey(Schema.Array(EntryId)),
+  before: Schema.optionalKey(EntryId),
   operations: Schema.optionalKey(Schema.Array(OperationId)),
   details: Schema.optionalKey(Schema.Json),
   isError: Schema.optionalKey(Schema.Boolean),

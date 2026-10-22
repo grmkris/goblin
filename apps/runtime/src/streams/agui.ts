@@ -12,17 +12,28 @@ import {
 import { settleAttention } from './attention.ts'
 import { type MessageSent, applyChange, beginMessage, endMessage, syncBlock } from './live.ts'
 import {
+  entryMarks,
   entryMessages,
   firstLine,
   goblin,
   messageEvents,
+  omittedBy,
   outcomeOf,
   personaAnswer,
   runIdOf,
   stopOf,
   toolResultId,
 } from './messages.ts'
-import { addCounts, agentView, emptyState, queueView, stateOf, tokenCounts, usageView } from './state.ts'
+import {
+  type QueuedParts,
+  addCounts,
+  agentView,
+  emptyState,
+  queueView,
+  stateOf,
+  tokenCounts,
+  usageView,
+} from './state.ts'
 
 // A chat's Pi events as AG-UI 1.0 events (docs/architecture/streams.md): a pure translator, no services and no I/O.
 // The producer keeps its cursor between calls; `translate` follows Pi's committed batches, `reconcile` catches up from
@@ -62,8 +73,8 @@ export type StreamCursor = {
   state: GoblinState
 }
 
-/** What the producer knows that Pi's events do not say: the words of queued inputs (from `InboxDoc`), by id. */
-export type Hints = { readonly queueText?: ReadonlyMap<number, string> }
+/** What the producer knows that Pi's events do not say: what queued inputs say (from `InboxDoc`), by id. */
+export type Hints = { readonly queued?: ReadonlyMap<number, QueuedParts> }
 
 /** The events to append, and the cursor after them. */
 export type Translation = { readonly events: readonly AguiEvent[]; readonly cursor: StreamCursor }
@@ -160,11 +171,12 @@ function runEnded(w: Work, settled: ReadonlyMap<number, SubmissionRecord>): void
 }
 
 /** An assistant message committed: the one in flight ends with it, or it is written whole. */
-function assistantCommitted(w: Work, entryId: number, message: AssistantMessage): void {
+function assistantCommitted(w: Work, entry: EntryRecord, message: AssistantMessage): void {
+  const entryId = Number(entry.id)
   const { cursor } = w
   if (cursor.message !== undefined && cursor.message.at !== message.timestamp) endMessage(cursor.message, w.out)
   const sent = cursor.message?.at === message.timestamp ? cursor.message : beginMessage(cursor.chat, message.timestamp)
-  endMessage(sent, w.out, { message, entryId })
+  endMessage(sent, w.out, { message, entryId, marks: entryMarks(entry) })
   cursor.message = undefined
   // A failed attempt Pi retries is committed in the commit that starts its backoff, which the call still waits out.
   if (cursor.state.generation?.retry === undefined) setState(w, 'generation', null)
@@ -191,7 +203,7 @@ function entryCommitted(w: Work, entry: EntryRecord): void {
   if (id <= w.cursor.lastEntryId) return
   w.cursor.lastEntryId = id
   const first = entry.model?.[0]
-  if (first?.role === 'assistant' && entry.kind !== 'app.persona') assistantCommitted(w, id, first)
+  if (first?.role === 'assistant' && entry.kind !== 'app.persona') assistantCommitted(w, entry, first)
   else for (const message of entryMessages(w.cursor.chat, entry)) w.out.push(...messageEvents(message, id))
   if (entry.kind === 'pi.compaction') setState(w, 'compactions', { ...w.cursor.state.compactions, failure: null })
   attentionAfter(w, entry)
@@ -327,7 +339,7 @@ function apply(w: Work, event: AgentEvent, settled: ReadonlyMap<number, Submissi
     case 'tool_execution_end':
       return toolEnded(w, event)
     case 'inbox_update':
-      return setState(w, 'queue', queueView(event.items, w.hints.queueText))
+      return setState(w, 'queue', queueView(event.items, w.hints.queued))
     case 'auto_retry_start':
     case 'auto_retry_end':
     case 'deferred_poll':
@@ -442,7 +454,7 @@ function reconcileWith(w: Work, snapshot: SnapshotEvent): void {
   const entries = snapshot.entries.filter(({ id }) => Number(id) > cursor.lastEntryId)
   catchUpEntries(w, entries, snapshot.run?.inputs.map(Number))
   catchUpMessage(w, snapshot.generation?.message)
-  const fresh = stateOf(snapshot, cursor.state.attention, w.hints.queueText)
+  const fresh = stateOf(snapshot, cursor.state.attention, w.hints.queued)
   for (const key of ['queue', 'generation', 'compactions', 'agent', 'usage'] as const) setState(w, key, fresh[key])
 }
 
@@ -452,14 +464,6 @@ export function reconcile(cursor: StreamCursor, snapshot: SnapshotEvent, hints: 
   reconcileWith(w, snapshot)
   return { events: w.out, cursor: w.cursor }
 }
-
-/** The entries a later entry's edits omit (a turn moved to a thread): no transcript shows them. */
-const omittedBy = (entries: readonly EntryRecord[]): ReadonlySet<number> =>
-  new Set(
-    entries.flatMap(({ edits }) =>
-      (edits ?? []).flatMap(({ target, action }) => (action === 'omit' ? [Number(target)] : [])),
-    ),
-  )
 
 /**
  * An epoch's first events from `snapshot`: `MESSAGES_SNAPSHOT` with the messages of the newest `window` entries (older
@@ -471,14 +475,22 @@ export function open(
   options: { readonly window: number; readonly hints?: Hints },
 ): Translation {
   const w = work(startCursor(chat), options.hints ?? {})
-  const omitted = omittedBy(snapshot.entries)
+  const omitted = new Set(snapshot.entries.flatMap(omittedBy))
   const visible = snapshot.entries.filter(({ id }) => !omitted.has(Number(id)))
   let attention: readonly AttentionItem[] = []
   for (const entry of snapshot.entries)
     attention = settleAttention(chat, attention, entry, personaAnswer(entry), outcomeOf(entry))
-  const messages = visible.slice(-Math.max(0, options.window)).flatMap((entry) => entryMessages(chat, entry))
-  const state = stateOf(snapshot, [...attention], w.hints.queueText)
-  w.out.push({ type: EventType.MESSAGES_SNAPSHOT, messages }, { type: EventType.STATE_SNAPSHOT, snapshot: state })
+  const windowed = visible.slice(-Math.max(1, options.window))
+  const messages = windowed.flatMap((entry) => entryMessages(chat, entry))
+  const state = stateOf(snapshot, [...attention], w.hints.queued)
+  // Older history is read in pages before the window: one it cut, or what a head marker leaves out of the snapshot.
+  const [first] = windowed
+  const older = windowed.length < visible.length || snapshot.entries[0]?.head !== undefined
+  const before = first !== undefined && older ? { before: Number(first.id) } : {}
+  w.out.push(
+    { type: EventType.MESSAGES_SNAPSHOT, messages, ...goblin(before) },
+    { type: EventType.STATE_SNAPSHOT, snapshot: state },
+  )
   w.cursor.state = state
   w.cursor.lastEntryId = Math.max(0, ...snapshot.entries.map(({ id }) => Number(id)))
   if (snapshot.run !== undefined) runStarted(w, snapshot.run.inputs.map(Number))

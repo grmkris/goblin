@@ -1,7 +1,7 @@
 import type { SnapshotEvent } from '@earendil-works/pi-durable'
 import { type AguiEvent, CustomName, EventType, type StreamTier } from '@goblin/contracts'
 import { Predicate } from 'effect'
-import { type StreamCursor, type Translation, open } from './agui.ts'
+import { type Hints, type StreamCursor, type Translation, open } from './agui.ts'
 import { forTier } from './tiers.ts'
 
 // The bytes a chat's stream is written in: JSON arrays of AG-UI events, each one append. A stream object takes up to
@@ -65,9 +65,9 @@ export function bodiesOf(events: readonly AguiEvent[]): string[] {
 }
 
 /** The first events of an epoch in `tier`: `open`, with fewer of the newest entries until its snapshot fits a body. */
-export function opening(chat: string, snapshot: SnapshotEvent, tier: StreamTier): Translation {
+export function opening(chat: string, snapshot: SnapshotEvent, tier: StreamTier, hints: Hints = {}): Translation {
   for (let window = WINDOW; ; window = Math.floor(window / 2)) {
-    const opened = open(chat, snapshot, { window })
+    const opened = open(chat, snapshot, { window, hints })
     const events = forTier(opened.events, tier)
     const [messages] = events
     if (window <= 1 || messages === undefined || bytesOf(JSON.stringify(messages)) <= BODY_BYTES)

@@ -112,12 +112,7 @@ export class OwnerAgent extends PersonalAgent {
     if (path === '/test/rooms/stale') return this.#staleFilter(request)
     // The object restarts: the next request reconstructs it, its in-memory state (what it applied, ADR 0108) gone.
     if (path === '/test/rooms/restart') this.ctx.abort('rooms restart')
-    if (path === '/test/streams/lose') {
-      const { appends } = Schema.decodeUnknownSync(Schema.Struct({ appends: Schema.Int }))(await request.json())
-      this.#loseAcks = appends
-      return Response.json({ losing: appends })
-    }
-    if (path === '/test/streams/losing') return Response.json({ losing: this.#loseAcks })
+    if (path.startsWith('/test/streams/')) return this.#streamsProbe(path, request)
     if (path === '/test/approvals/calls') return Response.json(this.#mcp.calls)
     // Today's tokens spent past the deployment's cap (`spent`), and given back (`unspent`).
     if (path === '/test/approvals/spent') return this.#spend(SPENT_TOKENS)
@@ -136,6 +131,21 @@ export class OwnerAgent extends PersonalAgent {
     const conversation = await (await this.harness.pi()).conversation(conversationId(session), BACKGROUND)
     await conversation?.configure({ tools: null }, BACKGROUND)
     return Response.json({ stale: chat })
+  }
+  /** The chat streams' levers: lose the next appends' acknowledgements, how many are left, and evict the object. */
+  async #streamsProbe(path: string, request: Request): Promise<Response> {
+    if (path === '/test/streams/lose') {
+      const { appends } = Schema.decodeUnknownSync(Schema.Struct({ appends: Schema.Int }))(await request.json())
+      this.#loseAcks = appends
+      return Response.json({ losing: appends })
+    }
+    if (path === '/test/streams/losing') return Response.json({ losing: this.#loseAcks })
+    if (path === '/test/streams/evict') {
+      // The object stops here; the next request reconstructs it from storage, and Pi resumes the run in flight.
+      this.ctx.abort('streams restart')
+      return Response.json({ evicted: true })
+    }
+    return Response.json({ error: 'no such lever' }, { status: 404 })
   }
   /** Adds `tokens` to today's usage. */
   #spend(tokens: number): Response {

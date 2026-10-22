@@ -104,7 +104,12 @@ Pi's events are its experimental `watchEvents` (spec §9.4), one batch per commi
   choices; `outcome` and `kept`, how a held call ended; `thread`, where a shared note or report came from; `ask`, the
   Personas it went to instead of the agent. Its text is the words alone, without the tags and blocks the model reads;
 - an assistant message: `persona` (a Persona's answer: id, name, revision, avatar, operation, routine, hold,
-  questions) and `stop`;
+  questions), `stop` and `usage` (its model call's tokens, as Pi counts them);
+- `branchable` on the owner's own words and the agent's answers: a Thread may start at their entry (ADR 0034);
+- `omits` on the messages of an entry that leaves earlier entries out of the chat (a turn moved to a Thread): a reader
+  hides the messages of those entries, also ones it read in older history;
+- `MESSAGES_SNAPSHOT`: `before`, the entry older history is read before, a page at a time; absent when the snapshot
+  starts at the chat's beginning;
 - `RUN_STARTED`: `operations`;
 - tool calls and results: `details` (Pi's details for UIs), `isError`, `parentToolCallId`.
 
@@ -119,7 +124,7 @@ its entry's data as its contract says.
 
 | Path | Holds |
 |---|---|
-| `/queue` | inputs waiting for the next boundary: `id`, `mode` (`steer`, `followUp`), `text` when the producer read it |
+| `/queue` | inputs waiting for the next boundary: `id`, `mode` (`steer`, `followUp`), and what each says as a user message carries it (`text`, `author`, `attachments`, `selections`, `context`) |
 | `/generation` | the model call in flight (`attempt`, `retry { at, error }`, `deferred { pollAt }`), or null |
 | `/compactions` | `running` (reason, blocking, attempt, retry) and the newest `failure` |
 | `/agent` | the model (`provider`, `modelId`) and thinking level |
@@ -147,7 +152,9 @@ The producer (`streams/producer.ts`, one fiber per agent) follows only chats som
 `app_streams`). Pi's commits say which of them have activity (`subscribeCommits`, which only notes them); a watch
 (`watchEvents`) then follows that chat, and stops after 30 idle seconds with nothing running. Each batch is translated
 once per tier and appended at most every 250 ms, or at once at a boundary (`RUN_*`, `TEXT_MESSAGE_END`, a snapshot,
-a CUSTOM event); an overflow's snapshot, a new watch and a restart of the agent catch up from the stored cursor. An
+a CUSTOM event). When something waits in the chat's queue the producer reads what it says (`InboxDoc`) for `/queue`.
+An overflow's snapshot, a new watch and a restart of the agent catch up from the stored cursor: an agent evicted
+mid-run goes on in the same epoch and appends nothing twice. An
 append is first an outbox row (`app_stream_outbox`, written with the row's new cursor in one short transaction), sent
 outside any transaction by one drain per stream, and deleted once the stream answered 2xx; a write that may not have
 arrived goes again, the same bytes, after a backoff.
@@ -162,8 +169,6 @@ Erasing the agent erases every epoch of every stream it made.
 
 Pi's events do not carry everything; the producer supplies, or the stream leaves out:
 
-- a queued input's words (`/queue` `text`): the translator takes them as a hint, which the producer does not pass yet
-  (the owner queue read, `InboxDoc`, has them);
 - a run's `operations` when its inputs were admitted before the stream was attached (left out);
 - a held call decided outside the transcript before its outcome message arrives (it stays in `/attention` until then);
 - on a catch-up, tools already running (their progress resumes with the next update; a nested call started meanwhile

@@ -3,10 +3,13 @@
 // reviewed as the public profile's examples; the assertions name what each case is for.
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { type AguiEvent, EventType } from '@goblin/contracts'
+import { type AguiEvent, EventType, authorTag } from '@goblin/contracts'
 import { describe, expect, it } from 'vitest'
 import { open, reconcile, startCursor, translate } from '../../src/streams/agui.ts'
+import { submissionId } from '../../src/pi/context.ts'
+import { queueView } from '../../src/streams/state.ts'
 import { coalesce, forTier } from '../../src/streams/tiers.ts'
+import { queuedParts } from '../../src/streams/user.ts'
 import { checked, replay, textOf } from './agui-check.ts'
 import type { Recording, ScenarioName } from './scenarios.ts'
 
@@ -50,7 +53,13 @@ describe('a chat as AG-UI events', () => {
     expect(textOf(events, reply ?? '')).toBe('Hello there, friend.')
     expect(ofType(events, EventType.TEXT_MESSAGE_CONTENT).filter((event) => event.messageId === reply)).toHaveLength(3)
     const end = ofType(events, EventType.TEXT_MESSAGE_END).find((event) => event.messageId === reply)
-    expect(end?.metadata).toEqual({ goblin: { entryId: 11 } })
+    expect(end?.metadata).toEqual({
+      goblin: {
+        entryId: 11,
+        usage: { input: 10, output: 5, cacheRead: 2, cacheWrite: 0, totalTokens: 17 },
+        branchable: true,
+      },
+    })
     // The id the answer streamed under is the one an epoch's snapshot gives the committed message.
     const [snapshot] = ofType(open('1', recording.final, { window: 50 }).events, EventType.MESSAGES_SNAPSHOT)
     expect(snapshot?.messages.map(({ id }) => id)).toEqual(['1:e7', reply])
@@ -128,6 +137,7 @@ describe('a chat as AG-UI events', () => {
           at: 1760000000021,
           attachments: [{ path: '/uploads/plan.pdf', name: 'plan.pdf', size: 1024, mimeType: 'application/pdf' }],
           member: { name: 'Ada', userId: 'user-1' },
+          branchable: true,
         },
       },
     })
@@ -159,7 +169,7 @@ describe('a chat as AG-UI events', () => {
     const [reply] = assistantIds(events)
     expect(textOf(events, reply ?? '')).toBe('Starting')
     const end = ofType(events, EventType.TEXT_MESSAGE_END).find((event) => event.messageId === reply)
-    expect(end?.metadata).toEqual({ goblin: { entryId: 11, stop: { reason: 'aborted' } } })
+    expect(end?.metadata).toMatchObject({ goblin: { entryId: 11, stop: { reason: 'aborted' }, branchable: true } })
     expect(ofType(events, EventType.RUN_FINISHED)).toEqual([
       expect.objectContaining({ outcome: { type: 'cancelled' } }),
     ])
@@ -286,7 +296,12 @@ describe('catching up', () => {
     ])
     const [messages] = ofType(opened.events, EventType.MESSAGES_SNAPSHOT)
     expect(messages?.messages).toEqual([
-      { id: '1:e7', role: 'user', content: 'count', metadata: { goblin: { entryId: 7, at: 1760000000021 } } },
+      {
+        id: '1:e7',
+        role: 'user',
+        content: 'count',
+        metadata: { goblin: { entryId: 7, at: 1760000000021, branchable: true } },
+      },
     ])
     const rest = replay(opened.cursor, batches.slice(mid.after))
     const events = checked([...opened.events, ...rest.events])
@@ -305,6 +320,10 @@ describe('catching up', () => {
     const { chat, final } = fixture('tool')
     const [snapshot] = ofType(open(chat, final, { window: 2 }).events, EventType.MESSAGES_SNAPSHOT)
     expect(snapshot?.messages.map(({ role }) => role)).toEqual(['tool', 'assistant'])
+    // The window left older entries out: history is read before its first entry.
+    expect(snapshot?.metadata).toEqual({ goblin: { before: 13 } })
+    const [whole] = ofType(open(chat, final, { window: 50 }).events, EventType.MESSAGES_SNAPSHOT)
+    expect(whole?.metadata).toBeUndefined()
     // A turn moved to a thread: the head left in its place omits the turn's entries (hand-made from the recording).
     const moved = {
       id: 99,
@@ -317,12 +336,52 @@ describe('catching up', () => {
     const withMove: typeof final = JSON.parse(JSON.stringify({ ...final, entries: [...final.entries, moved] }))
     const [after] = ofType(open(chat, withMove, { window: 50 }).events, EventType.MESSAGES_SNAPSHOT)
     expect(after?.messages.map(({ id }) => id)).not.toContain('1:e7')
-    expect(after?.messages.at(-1)).toMatchObject({ id: '1:e99', role: 'activity', activityType: 'goblin.thread_head' })
+    expect(after?.messages.at(-1)).toMatchObject({
+      id: '1:e99',
+      role: 'activity',
+      activityType: 'goblin.thread_head',
+      metadata: { goblin: { entryId: 99, omits: [7] } },
+    })
     const [answers] = ofType(forTier(open(chat, final, { window: 50 }).events, 'answers'), EventType.MESSAGES_SNAPSHOT)
     expect(answers?.messages.map(({ role }) => role)).toEqual(['user', 'assistant', 'assistant'])
     expect(answers?.messages.some((message) => message.role === 'assistant' && message.toolCalls !== undefined)).toBe(
       false,
     )
+  })
+})
+
+describe('the queue', () => {
+  it('says what each queued input says, as a user message would, once the producer read it', () => {
+    const content = [
+      { type: 'text', text: authorTag('swarmm-prod') },
+      { type: 'text', text: 'and the totals' },
+      {
+        type: 'text',
+        text: JSON.stringify({
+          attachments: [{ path: '/uploads/a.csv', name: 'a.csv', size: 3, mimeType: 'text/csv' }],
+        }),
+      },
+    ]
+    const parts = new Map([[11, queuedParts(content)]])
+    expect(
+      queueView(
+        [
+          { id: submissionId(11), mode: 'followUp' },
+          { id: submissionId(12), mode: 'steer' },
+        ],
+        parts,
+      ),
+    ).toEqual([
+      {
+        id: 11,
+        mode: 'followUp',
+        text: 'and the totals',
+        author: 'swarmm-prod',
+        attachments: [{ path: '/uploads/a.csv', name: 'a.csv', size: 3, mimeType: 'text/csv' }],
+      },
+      { id: 12, mode: 'steer' },
+    ])
+    expect(queuedParts('plain words')).toEqual({ text: 'plain words' })
   })
 })
 

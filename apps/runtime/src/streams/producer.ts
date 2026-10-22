@@ -10,9 +10,10 @@ import { chatSession } from '../chats/directory.ts'
 import { type AppError, attempt, toAppError } from '../http/errors.ts'
 import { reportAndRecover } from '../observability/report.ts'
 import type { PiSessions } from '../pi/sessions.ts'
-import { type StreamCursor, reconcile, startCursor, translate } from './agui.ts'
+import { type Hints, type StreamCursor, reconcile, startCursor, translate } from './agui.ts'
 import { bodiesOf, bytesOf, cursorJson, isBoundary, isRunEnd, movedBody, opening, storedCursor } from './bodies.ts'
 import { type StoredStream, appendWrites, beginEpoch, streamKey, streamsOf } from './store.ts'
+import type { QueuedParts } from './state.ts'
 import { coalesce, forTier } from './tiers.ts'
 
 // The producer of a workspace's chat streams (docs/architecture/streams.md). One fiber takes every message in turn, so
@@ -85,6 +86,8 @@ export type ProducerPorts = {
   readonly drain: (key: string) => Effect.Effect<void>
   /** Bytes past which an epoch moves on; `ROTATE_BYTES` unless a fixture sets fewer. */
   readonly rotateBytes: number | undefined
+  /** What the session's queued inputs say now (`InboxDoc`), by submission id: the `/queue` of its streams. */
+  readonly queued: (session: string) => Effect.Effect<ReadonlyMap<number, QueuedParts>>
 }
 
 export type { Message as ProducerMessage }
@@ -116,6 +119,9 @@ const rowOf = (stored: StoredStream): Row => {
     begin: cursor === undefined ? 'unproven' : undefined,
   }
 }
+
+/** A batch that changed the queue to hold something. */
+const queues = (event: AgentEvent): boolean => event.type === 'inbox_update' && event.items.length > 0
 
 /** Whether anything runs in the chat as its streams saw last. */
 const busy = (state: ChatState): boolean =>
@@ -153,10 +159,10 @@ const sizeOf = (bodies: readonly string[]): number => bodies.reduce((sum, body) 
  * A new epoch's writes for `row`, which takes it from `snapshot` at `now`: its opening events (the first body creates
  * the stream, any other is appended), and unless its stream was lost the old epoch's `goblin.stream.moved` and close.
  */
-function nextEpoch(row: Row, snapshot: SnapshotEvent, now: number) {
+function nextEpoch(row: Row, snapshot: SnapshotEvent, now: number, hints: Hints) {
   const reason = row.begin ?? 'new'
   const epoch = row.epoch + 1
-  const opened = opening(row.chat, snapshot, row.tier)
+  const opened = opening(row.chat, snapshot, row.tier, hints)
   const bodies = bodiesOf(opened.events)
   const closing =
     row.epoch === 0 || reason === 'lost'
@@ -248,12 +254,12 @@ export class Producer {
   }
 
   /** A new epoch from `snapshot`; what the old one still had is appended to it first, unless its stream was lost. */
-  #begin(row: Row, snapshot: SnapshotEvent, now: number): Effect.Effect<void> {
+  #begin(row: Row, snapshot: SnapshotEvent, now: number, hints: Hints): Effect.Effect<void> {
     const flushed = row.begin === 'lost' ? Effect.void : this.#flush(row)
     return Effect.andThen(
       flushed,
       Effect.suspend(() => {
-        const { writes, closing } = nextEpoch(row, snapshot, now)
+        const { writes, closing } = nextEpoch(row, snapshot, now, hints)
         beginEpoch(this.#ports.db, storedOf(row), writes, closing)
         return this.#ports.drain(streamKey(row.chat, row.tier))
       }),
@@ -261,8 +267,8 @@ export class Producer {
   }
 
   /** Catches the row up from `snapshot`: what happened since its cursor, appended at once. */
-  #catchUp(row: Row, snapshot: SnapshotEvent): Effect.Effect<void> {
-    const caught = reconcile(row.cursor, snapshot)
+  #catchUp(row: Row, snapshot: SnapshotEvent, hints: Hints): Effect.Effect<void> {
+    const caught = reconcile(row.cursor, snapshot, hints)
     row.cursor = caught.cursor
     row.pending.push(...forTier(caught.events, row.tier))
     return this.#flush(row)
@@ -310,8 +316,11 @@ export class Producer {
         .events(state.session)
         .pipe(Effect.catchTag('PiFailure', (failure) => Effect.fail(toAppError(failure.cause))))
       const now = yield* Clock.currentTimeMillis
+      const hints = yield* this.#hints(state, stream.snapshot.inbox.length > 0)
       for (const row of state.rows.values())
-        yield* row.begin === undefined ? this.#catchUp(row, stream.snapshot) : this.#begin(row, stream.snapshot, now)
+        yield* row.begin === undefined
+          ? this.#catchUp(row, stream.snapshot, hints)
+          : this.#begin(row, stream.snapshot, now, hints)
       state.lastBatchAt = now
       this.#follow(state, stream)
       yield* this.#armIdle(state)
@@ -322,8 +331,8 @@ export class Producer {
    * One batch for one row: its events in the row's tier pending, appended at once at a boundary or armed for
    * `FLUSH_MS`. True when the batch ended a run with the epoch past its limits, so it moves on.
    */
-  #take(row: Row, events: readonly AgentEvent[], now: number): Effect.Effect<boolean> {
-    const translated = translate(row.cursor, events)
+  #take(row: Row, events: readonly AgentEvent[], now: number, hints: Hints): Effect.Effect<boolean> {
+    const translated = translate(row.cursor, events, hints)
     row.cursor = translated.cursor
     const mine = forTier(translated.events, row.tier)
     if (mine.length === 0) return Effect.succeed(false)
@@ -343,13 +352,19 @@ export class Producer {
       const now = yield* Clock.currentTimeMillis
       state.lastBatchAt = now
       let moves = false
+      const hints = yield* this.#hints(state, events.some(queues))
       for (const row of state.rows.values())
-        if (yield* this.#take(row, events, now)) {
+        if (yield* this.#take(row, events, now, hints)) {
           row.begin = 'limit'
           moves = true
         }
       yield* moves ? this.#attach(state) : this.#armIdle(state)
     })
+  }
+
+  /** What the chat's queued inputs say, read only when something waits in its queue. */
+  #hints(state: ChatState, waiting: boolean): Effect.Effect<Hints> {
+    return waiting ? Effect.map(this.#ports.queued(state.session), (queued) => ({ queued })) : Effect.succeed({})
   }
 
   /** A join: the row for its tier, begun with a new watch when it is new, and the epoch a reader reads. */

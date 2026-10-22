@@ -1,7 +1,8 @@
 import type { AssistantMessage } from '@earendil-works/pi-ai'
 import type { MessageChange } from '@earendil-works/pi-durable'
-import { type AguiEvent, EventType } from '@goblin/contracts'
+import { type AguiEvent, EventType, type GoblinMetadata } from '@goblin/contracts'
 import { assistantId, goblin, reasoningId, reasoningSpanId, stopOf } from './messages.ts'
+import { tokenCounts } from './state.ts'
 
 // The assistant message in flight, followed block by block: its text as TEXT_MESSAGE_CONTENT, each visible thinking
 // block as a reasoning message in a span of its own, each tool call opened when it starts and given its arguments,
@@ -83,7 +84,12 @@ function begin(message: MessageSent, out: AguiEvent[], index: number, block: Blo
   if (block.redacted === true) return (message.blocks[index] = { kind: 'thinking', sent: 0, hidden: true })
   out.push(
     { type: EventType.REASONING_START, messageId: reasoningSpanId(message.id, index) },
-    { type: EventType.REASONING_MESSAGE_START, messageId: reasoningId(message.id, index), role: 'reasoning' },
+    {
+      type: EventType.REASONING_MESSAGE_START,
+      messageId: reasoningId(message.id, index),
+      role: 'reasoning',
+      ...goblin({ at: message.at }),
+    },
   )
   return (message.blocks[index] = { kind: 'thinking', sent: 0 })
 }
@@ -138,13 +144,21 @@ export function applyChange(message: MessageSent, out: AguiEvent[], change: Mess
 export function endMessage(
   message: MessageSent,
   out: AguiEvent[],
-  final?: { readonly message: AssistantMessage; readonly entryId: number },
+  final?: { readonly message: AssistantMessage; readonly entryId: number; readonly marks: GoblinMetadata },
 ): void {
   for (const [index, block] of (final?.message.content ?? []).entries()) syncBlock(message, out, index, block)
   closeThinking(message, out)
   open(message, out)
   const stop = final === undefined ? undefined : stopOf(final.message)
-  const mark = final === undefined ? {} : { entryId: final.entryId, ...(stop === undefined ? {} : { stop }) }
+  const mark =
+    final === undefined
+      ? {}
+      : {
+          entryId: final.entryId,
+          ...(stop === undefined ? {} : { stop }),
+          usage: tokenCounts(final.message.usage),
+          ...final.marks,
+        }
   out.push({ type: EventType.TEXT_MESSAGE_END, messageId: message.id, ...goblin(mark) })
   for (const [index, sent] of message.blocks.entries()) {
     if (sent?.kind !== 'toolCall') continue

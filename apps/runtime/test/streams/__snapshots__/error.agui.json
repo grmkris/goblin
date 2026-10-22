@@ -19,7 +19,8 @@
       "metadata": {
         "goblin": {
           "entryId": 7,
-          "at": 1760000000021
+          "at": 1760000000021,
+          "branchable": true
         }
       }
     },
@@ -76,7 +77,15 @@
           "stop": {
             "reason": "error",
             "message": "503 Service Unavailable: overloaded"
-          }
+          },
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0
+          },
+          "branchable": true
         }
       }
     },
@@ -132,7 +141,15 @@
           "stop": {
             "reason": "error",
             "message": "503 Service Unavailable: overloaded"
-          }
+          },
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0
+          },
+          "branchable": true
         }
       }
     },
@@ -187,7 +204,8 @@
       "metadata": {
         "goblin": {
           "entryId": 7,
-          "at": 1760000000021
+          "at": 1760000000021,
+          "branchable": true
         }
       }
     },
@@ -224,7 +242,15 @@
           "stop": {
             "reason": "error",
             "message": "503 Service Unavailable: overloaded"
-          }
+          },
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0
+          },
+          "branchable": true
         }
       }
     },
@@ -247,7 +273,15 @@
           "stop": {
             "reason": "error",
             "message": "503 Service Unavailable: overloaded"
-          }
+          },
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0
+          },
+          "branchable": true
         }
       }
     },
@@ -279,7 +313,8 @@
           "metadata": {
             "goblin": {
               "entryId": 7,
-              "at": 1760000000021
+              "at": 1760000000021,
+              "branchable": true
             }
           }
         },
@@ -293,7 +328,15 @@
               "stop": {
                 "reason": "error",
                 "message": "503 Service Unavailable: overloaded"
-              }
+              },
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0
+              },
+              "branchable": true
             }
           }
         },
@@ -307,7 +350,15 @@
               "stop": {
                 "reason": "error",
                 "message": "503 Service Unavailable: overloaded"
-              }
+              },
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0
+              },
+              "branchable": true
             }
           }
         }

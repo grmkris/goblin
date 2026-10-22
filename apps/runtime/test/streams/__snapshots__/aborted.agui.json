@@ -19,7 +19,8 @@
       "metadata": {
         "goblin": {
           "entryId": 7,
-          "at": 1760000000021
+          "at": 1760000000021,
+          "branchable": true
         }
       }
     },
@@ -76,7 +77,15 @@
           "entryId": 11,
           "stop": {
             "reason": "aborted"
-          }
+          },
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0
+          },
+          "branchable": true
         }
       }
     },
@@ -155,7 +164,8 @@
       "metadata": {
         "goblin": {
           "entryId": 7,
-          "at": 1760000000021
+          "at": 1760000000021,
+          "branchable": true
         }
       }
     },
@@ -196,7 +206,15 @@
           "entryId": 11,
           "stop": {
             "reason": "aborted"
-          }
+          },
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0
+          },
+          "branchable": true
         }
       }
     },
@@ -231,7 +249,8 @@
           "metadata": {
             "goblin": {
               "entryId": 7,
-              "at": 1760000000021
+              "at": 1760000000021,
+              "branchable": true
             }
           }
         },
@@ -245,7 +264,15 @@
               "at": 1760000000047,
               "stop": {
                 "reason": "aborted"
-              }
+              },
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0
+              },
+              "branchable": true
             }
           }
         }

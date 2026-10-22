@@ -18,6 +18,7 @@ import {
 import { Predicate } from 'effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
+import { tokenCounts } from './state.ts'
 import { userParts } from './user.ts'
 
 // Committed Pi entries as AG-UI messages (a `MESSAGES_SNAPSHOT`'s), and a message as the events that write it, for an
@@ -75,7 +76,12 @@ export function stopOf(message: Pick<AssistantMessage, 'stopReason' | 'errorMess
 }
 
 /** An assistant message as the snapshot carries it: its visible thinking, then the message with its tool calls. */
-function assistantMessages(chat: string, entry: number, message: AssistantMessage): AguiMessage[] {
+function assistantMessages(
+  chat: string,
+  entry: number,
+  message: AssistantMessage,
+  marks: GoblinMetadata,
+): AguiMessage[] {
   const id = assistantId(chat, message.timestamp)
   const reasoning = message.content.flatMap((block, index): AguiMessage[] =>
     block.type === 'thinking' && block.redacted !== true && block.thinking !== ''
@@ -95,7 +101,13 @@ function assistantMessages(chat: string, entry: number, message: AssistantMessag
   )
   const text = textOf(message.content)
   const stop = stopOf(message)
-  const mark = { entryId: entry, at: message.timestamp, ...(stop === undefined ? {} : { stop }) }
+  const mark = {
+    entryId: entry,
+    at: message.timestamp,
+    ...(stop === undefined ? {} : { stop }),
+    usage: tokenCounts(message.usage),
+    ...marks,
+  }
   return [
     ...reasoning,
     {
@@ -109,7 +121,7 @@ function assistantMessages(chat: string, entry: number, message: AssistantMessag
 }
 
 /** A tool's result: its text, and Pi's details for UIs; an error result says so. */
-function toolMessage(chat: string, entry: number, message: ToolResultMessage): AguiMessage {
+function toolMessage(chat: string, entry: number, message: ToolResultMessage, marks: GoblinMetadata): AguiMessage {
   const content = textOf(message.content)
   const details = message.details === undefined ? {} : { details: message.details }
   return {
@@ -118,7 +130,7 @@ function toolMessage(chat: string, entry: number, message: ToolResultMessage): A
     toolCallId: message.toolCallId,
     content,
     ...(message.isError ? { error: content === '' ? 'The tool failed.' : content } : {}),
-    ...goblin({ entryId: entry, at: message.timestamp, ...details, isError: message.isError }),
+    ...goblin({ entryId: entry, at: message.timestamp, ...details, isError: message.isError, ...marks }),
   }
 }
 
@@ -134,32 +146,42 @@ function kindMarks(entry: EntryRecord): GoblinMetadata {
 }
 
 /** A user message: its words and marks, the kind's own marks over them. */
-function userMessage(entry: EntryRecord, id: string, message: UserMessage): AguiMessage {
+function userMessage(entry: EntryRecord, id: string, message: UserMessage, marks: GoblinMetadata): AguiMessage {
   const { text, mark } = userParts(message.content)
   const kind = kindMarks(entry)
   const words = kind.ask === undefined ? text : text.replace(ASKED, '')
-  const all: GoblinMetadata = { entryId: Number(entry.id), at: message.timestamp, ...mark, ...kind }
+  const all: GoblinMetadata = { entryId: Number(entry.id), at: message.timestamp, ...mark, ...kind, ...marks }
   const name = all.member?.name ?? all.author
   return { id, role: 'user', content: words, ...(name === undefined ? {} : { name }), ...goblin(all) }
 }
 
-/** The messages of one Pi model message in `entry`, the `index`th of the entry's. */
-function modelMessages(chat: string, entry: EntryRecord, message: Message, index: number): AguiMessage[] {
+/** The messages of one Pi model message in `entry`, the `index`th of the entry's, with the entry's own marks. */
+function modelMessages(
+  chat: string,
+  entry: EntryRecord,
+  [message, index]: readonly [Message, number],
+  marks: GoblinMetadata,
+): AguiMessage[] {
   const id = Number(entry.id)
   switch (message.role) {
     case 'assistant':
-      return assistantMessages(chat, id, message)
+      return assistantMessages(chat, id, message, marks)
     case 'toolResult':
-      return [toolMessage(chat, id, message)]
+      return [toolMessage(chat, id, message, marks)]
     case 'user':
-      return [userMessage(entry, entryMessageId(chat, id, index), message)]
+      return [userMessage(entry, entryMessageId(chat, id, index), message, marks)]
     case 'system':
       return []
   }
 }
 
 /** A Persona's attributed answer (`app.persona`, ADR 0033): an assistant message in its name. */
-const personaMessage = (chat: string, entry: EntryRecord, answer: PersonaAnswerData): AguiMessage => {
+const personaMessage = (
+  chat: string,
+  entry: EntryRecord,
+  answer: PersonaAnswerData,
+  marks: GoblinMetadata,
+): AguiMessage => {
   const { persona, name, revision, avatar, operationId, routine, hold, questions, text } = answer
   const mark = {
     id: persona,
@@ -177,17 +199,17 @@ const personaMessage = (chat: string, entry: EntryRecord, answer: PersonaAnswerD
     role: 'assistant',
     name,
     content: text,
-    ...goblin({ entryId: Number(entry.id), ...(at === undefined ? {} : { at }), persona: mark }),
+    ...goblin({ entryId: Number(entry.id), ...(at === undefined ? {} : { at }), persona: mark, ...marks }),
   }
 }
 
 /** An entry the app draws itself, as its activity message; none when its data is not its contract's. */
-function activityMessage(chat: string, entry: EntryRecord): AguiMessage[] | undefined {
+function activityMessage(chat: string, entry: EntryRecord, marks: GoblinMetadata): AguiMessage[] | undefined {
   const activity = Object.hasOwn(ACTIVITIES, entry.kind) ? ACTIVITIES[entry.kind] : undefined
   if (activity === undefined) return undefined
   if (!Schema.is(activity.data)(entry.data) || !Predicate.isReadonlyObject(entry.data)) return []
   const at = entry.model?.[0]?.timestamp
-  const mark = { entryId: Number(entry.id), ...(at === undefined ? {} : { at }) }
+  const mark = { entryId: Number(entry.id), ...(at === undefined ? {} : { at }), ...marks }
   return [
     {
       id: entryMessageId(chat, Number(entry.id)),
@@ -219,13 +241,30 @@ export const personaAnswer = (entry: EntryRecord): PersonaAnswerData | undefined
  */
 export function entryMessages(chat: string, entry: EntryRecord): AguiMessage[] {
   if (MARKERS.has(entry.kind)) return []
+  const marks = entryMarks(entry)
   const answer = personaAnswer(entry)
-  if (answer !== undefined) return [personaMessage(chat, entry, answer)]
+  if (answer !== undefined) return [personaMessage(chat, entry, answer, marks)]
   if (entry.kind === 'app.persona') return []
   return (
-    activityMessage(chat, entry) ??
-    (entry.model ?? []).flatMap((message, index) => modelMessages(chat, entry, message, index))
+    activityMessage(chat, entry, marks) ??
+    (entry.model ?? []).flatMap((message, index) => modelMessages(chat, entry, [message, index], marks))
   )
+}
+
+/** The entries a Thread may start at (ADR 0034): the owner's own words and the agent's answers. */
+const BRANCHABLE = new Set(['pi.user', 'pi.assistant'])
+
+/** The entries `entry`'s edits leave out of the chat (a turn moved to a Thread). */
+export const omittedBy = (entry: Pick<EntryRecord, 'edits'>): number[] =>
+  (entry.edits ?? []).flatMap(({ target, action }) => (action === 'omit' ? [Number(target)] : []))
+
+/** What an entry's every message says of the entry itself: a Thread may start there, and what it leaves out. */
+export function entryMarks(entry: EntryRecord): GoblinMetadata {
+  const omits = omittedBy(entry)
+  return {
+    ...(BRANCHABLE.has(entry.kind) ? { branchable: true } : {}),
+    ...(omits.length === 0 ? {} : { omits }),
+  }
 }
 
 /**

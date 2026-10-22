@@ -1,14 +1,23 @@
 import * as Schema from 'effect/Schema'
+import { ComposerOption } from '../composer.ts'
 import { QuestionSpec } from '../conversations.ts'
+import { Attachment } from '../files.ts'
 import { ChatId, EntryId, PersonaId } from '../ids.ts'
 import { SubmissionId } from '../queue.ts'
 
-/** An input waiting in the chat's queue for its next boundary: steered into the run, or a follow-up after it. */
+/**
+ * An input waiting in the chat's queue for its next boundary: steered into the run, or a follow-up after it, with its
+ * words and what came with them as a user message carries them (who wrote it when not the owner's composer, its
+ * files, its composer choices and what an open App shared), once the producer read them.
+ */
 export const QueueItem = Schema.Struct({
   id: SubmissionId,
   mode: Schema.Literals(['steer', 'followUp']),
-  /** Its words, when the producer read them (Pi's own events carry membership and mode only). */
   text: Schema.optionalKey(Schema.String),
+  author: Schema.optionalKey(Schema.String),
+  attachments: Schema.optionalKey(Schema.Array(Attachment)),
+  selections: Schema.optionalKey(Schema.Array(ComposerOption)),
+  context: Schema.optionalKey(Schema.Array(Schema.Struct({ from: Schema.String, text: Schema.String }))),
 })
 export type QueueItem = typeof QueueItem.Type
 

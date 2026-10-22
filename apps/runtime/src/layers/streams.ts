@@ -10,7 +10,10 @@ import { SingleFlight } from '../observability/single-flight.ts'
 import { PiSessions } from '../pi/sessions.ts'
 import { Db } from '../runtime/db.ts'
 import { AgentInput } from '../runtime/input.ts'
+import { queuedInputs } from '../conversation-queue.ts'
 import { storedCursor } from '../streams/bodies.ts'
+import type { QueuedParts } from '../streams/state.ts'
+import { queuedParts } from '../streams/user.ts'
 import { keyParts, outbox } from '../streams/outbox.ts'
 import { Producer, type ProducerMessage } from '../streams/producer.ts'
 import { Streams } from '../streams/service.ts'
@@ -57,6 +60,14 @@ export const StreamsLive = Layer.effect(
       scope,
       lost: (key, epoch) => Effect.asVoid(Queue.offer(queue, { kind: 'lost', ...keyParts(key), epoch })),
     })
+    const queued = (session: string) =>
+      Effect.gen(function* () {
+        const harness = yield* pi.pi.pipe(
+          Effect.catchTag('PiFailure', (failure) => Effect.fail(toAppError(failure.cause))),
+        )
+        const { inputs } = yield* attempt(() => queuedInputs(harness, session))
+        return new Map(inputs.map(({ id, content }) => [id, queuedParts(content)]))
+      }).pipe(reportAndRecover('streams.queue', new Map<number, QueuedParts>()))
     const produce = new Producer({
       db,
       pi,
@@ -64,6 +75,7 @@ export const StreamsLive = Layer.effect(
       queue,
       drain: out.request,
       rotateBytes: rotateBytesOf(env.STREAM_ROTATE_BYTES),
+      queued,
     })
     yield* Effect.forkScoped(produce.run)
     yield* start(produce, pi, queue).pipe(reportAndRecover('streams.start', undefined))

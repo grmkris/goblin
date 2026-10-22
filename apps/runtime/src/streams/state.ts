@@ -26,13 +26,14 @@ export const emptyState = (): GoblinState => ({
 
 type PiQueued = SnapshotEvent['inbox'][number]
 
-/** The queued inputs; passive writes wait in the same queue and are left out. `texts` are their words, when read. */
-export const queueView = (items: readonly PiQueued[], texts?: ReadonlyMap<number, string>): QueueItem[] =>
-  items.flatMap(({ id, mode }) => {
-    if (mode !== 'steer' && mode !== 'followUp') return []
-    const text = texts?.get(Number(id))
-    return [{ id: Number(id), mode, ...(text === undefined ? {} : { text }) }]
-  })
+/** What a queued input says, as a user message carries it. */
+export type QueuedParts = Omit<QueueItem, 'id' | 'mode'>
+
+/** The queued inputs; passive writes wait in the same queue and are left out. `parts` say what each says, when read. */
+export const queueView = (items: readonly PiQueued[], parts?: ReadonlyMap<number, QueuedParts>): QueueItem[] =>
+  items.flatMap(({ id, mode }) =>
+    mode === 'steer' || mode === 'followUp' ? [{ id: Number(id), mode, ...parts?.get(Number(id)) }] : [],
+  )
 
 /** The call in flight, without its partial (which the stream carries as the message itself). */
 export const generationView = (generation: SnapshotEvent['generation']): GenerationState =>
@@ -106,9 +107,9 @@ export function addCounts(total: TokenCounts | undefined, usage: TokenCounts): T
 export const stateOf = (
   snapshot: SnapshotEvent,
   attention: GoblinState['attention'],
-  texts?: ReadonlyMap<number, string>,
+  parts?: ReadonlyMap<number, QueuedParts>,
 ): GoblinState => ({
-  queue: queueView(snapshot.inbox, texts),
+  queue: queueView(snapshot.inbox, parts),
   generation: generationView(snapshot.generation),
   compactions: compactionsView(snapshot.compactions, snapshot.compactionFailure),
   agent: agentView(snapshot.agent),
