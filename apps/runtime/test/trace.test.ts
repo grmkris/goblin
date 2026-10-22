@@ -1,5 +1,5 @@
 import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { RunSink } from '../src/telemetry/events.ts'
 import { type TraceSpan, TraceSink, spanNameOf } from '../src/telemetry/trace.ts'
 
@@ -98,5 +98,25 @@ describe('run events as trace spans (unit, ADR 0024)', () => {
     sink.ended(event({ status: 'ok', endedAt: 30 }))
     sink.ended(event({ kind: 'turn.submitted', status: 'ok' }))
     expect(spans).toMatchObject([{ name: 'chat gpt-test', status: { code: 'ok' }, ended: true }])
+  })
+})
+
+describe('spans the runtime does not trace (unit)', () => {
+  it('says so in a capped failure line, naming whether any span was active', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const sink = new TraceSink(
+      {
+        startSpan: () => ({ isTraced: false, setAttributes: () => undefined, end: () => undefined }),
+        getActiveSpan: () => undefined,
+      },
+      () => 'agent-1',
+    )
+    for (let index = 0; index < 8; index += 1)
+      sink.ended(event({ id: `model:t${index}:1:0`, status: 'ok', endedAt: 20 }))
+    const lines = warn.mock.calls.map(([line]) => line)
+    warn.mockRestore()
+    const untraced = lines.map(String).filter((line) => line.includes('telemetry.trace.untraced'))
+    expect(untraced).toHaveLength(5)
+    expect(JSON.parse(untraced[0] ?? '{}')).toMatchObject({ kind: 'model.attempt', code: 'no_active_span' })
   })
 })

@@ -1,5 +1,6 @@
 import { RunAttribute, type RunAttributes, type RunEvent } from '@goblin/contracts/telemetry'
-import type { RunSink } from './events.ts'
+import { writeLine } from '../observability/logger.ts'
+import { MAX_FAILURE_LINES, type RunSink } from './events.ts'
 import { expectedFailure, sanitizeAttributes } from './safety.ts'
 
 /**
@@ -7,11 +8,13 @@ import { expectedFailure, sanitizeAttributes } from './safety.ts'
  * older local workerd's span has no `setStatus`; the status is in `goblin.status` either way.
  */
 export type TraceSpan = {
+  /** Whether the runtime records it: false outside a traced request, or when the request was not sampled. */
+  readonly isTraced?: boolean
   setAttributes(attributes: Record<string, string | number | boolean | undefined>): unknown
   setStatus?: (status: { readonly code: 'unset' | 'ok' | 'error'; readonly message?: string }) => unknown
   end(): void
 }
-export type Tracer = { startSpan(name: string): TraceSpan }
+export type Tracer = { startSpan(name: string): TraceSpan; getActiveSpan?: () => unknown }
 
 const AGENT_NAME = 'goblin'
 
@@ -39,6 +42,7 @@ export class TraceSink implements RunSink {
   readonly name = 'trace'
   readonly #tracer: Tracer
   readonly #agent: () => string
+  #untraced = 0
 
   constructor(tracer: Tracer, agent: () => string) {
     this.#tracer = tracer
@@ -52,6 +56,7 @@ export class TraceSink implements RunSink {
     if (name === undefined) return
     const attributes = sanitizeAttributes(event.attributes)
     const span = this.#tracer.startSpan(name)
+    if (span.isTraced === false) this.#reportUntraced(event)
     span.setAttributes({
       ...attributes,
       'gen_ai.agent.name': AGENT_NAME,
@@ -70,5 +75,22 @@ export class TraceSink implements RunSink {
         : { code: 'error', message },
     )
     span.end()
+  }
+
+  /**
+   * A span the runtime will not record, as one `failure` line, up to `MAX_FAILURE_LINES` per object: `no_active_span`
+   * when it was made in an async context outside any request (no span is active), `unsampled` when its request was not
+   * sampled. Why a turn's calls never reach Traces (docs/architecture/observability.md).
+   */
+  #reportUntraced(event: RunEvent): void {
+    this.#untraced += 1
+    if (this.#untraced > MAX_FAILURE_LINES) return
+    writeLine('warn', {
+      event: 'failure',
+      where: 'telemetry.trace.untraced',
+      kind: event.kind,
+      code: this.#tracer.getActiveSpan?.() === undefined ? 'no_active_span' : 'unsampled',
+      severity: 'Warn',
+    })
   }
 }
