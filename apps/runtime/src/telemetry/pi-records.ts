@@ -50,6 +50,19 @@ const Entry = Schema.Struct({
   model: Schema.optional(Schema.Array(Schema.Unknown)),
   data: Schema.optional(Schema.Unknown),
   byTaskId: Schema.optional(Id),
+  /** Earlier entries this one leaves out of the model's context: a `pi.system` baseline after compaction has some. */
+  edits: Schema.optional(Schema.Array(Schema.Unknown)),
+})
+const ToolName = Schema.Struct({ name: Schema.String })
+/**
+ * A `pi.system` entry's message: the prompt sections it sets (`null` removes one) and the tools it adds and removes.
+ * The recorder reads only the sections' keys and the tools' names, never a section's text or a tool's schema.
+ */
+const System = Schema.Struct({
+  role: Schema.Literal('system'),
+  sections: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+  toolsAdded: Schema.optional(Schema.Array(ToolName)),
+  toolsRemoved: Schema.optional(Schema.Array(ToolName)),
 })
 const Outcome = Schema.Struct({
   status: Schema.String,
@@ -99,6 +112,7 @@ const decode =
 export const decodeEntry = decode(Entry)
 export const decodeAssistant = decode(Assistant)
 export const decodeToolResult = decode(ToolResult)
+export const decodeSystem = decode(System)
 export const decodeDiagnostics = decode(Diagnostics)
 export const decodeTask = decode(Task)
 export const decodeToolInput = decode(ToolInput)

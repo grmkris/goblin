@@ -111,6 +111,8 @@ const FINISH_REASONS = new Set(['stop', 'toolUse', 'length', 'error', 'aborted']
 const finiteText = (value: unknown, values: ReadonlySet<string>, fallback: string): string =>
   typeof value === 'string' && values.has(value) ? value : fallback
 
+const COUNT = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
+
 /** A value of a closed set, or nothing: what a model call ran with is never guessed (ADR 0107). */
 const oneOf =
   (values: ReadonlySet<string>) =>
@@ -122,16 +124,23 @@ const REASONING_LEVELS = new Set(['off', 'minimal', 'low', 'medium', 'high', 'xh
 /** A host as `URL` parses it, lowercase; an IPv6 literal is dropped. */
 const HOSTNAME = /^[a-z0-9][a-z0-9.-]{0,252}$/u
 const PORT = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 65_535 }))
+/** Names, comma-separated: at most sixteen section keys or tool names, 300 characters in all. */
+const NAMES = /^[A-Za-z0-9_.:-]{1,64}(?:,[A-Za-z0-9_.:-]{1,64}){0,15}$/u
+const names = (value: unknown): boolean => typeof value === 'string' && value.length <= 300 && NAMES.test(value)
 /** What a model call ran with keeps only a value of its closed set or shape (ADR 0107). */
 const RAN_WITH_VALUES: Readonly<Record<string, (value: unknown) => boolean>> = {
   [RunAttribute.modelEndpoint]: oneOf(MODEL_ENDPOINTS),
   [RunAttribute.reasoningLevel]: oneOf(REASONING_LEVELS),
   [RunAttribute.serverAddress]: (value) => typeof value === 'string' && HOSTNAME.test(value),
   [RunAttribute.serverPort]: Schema.is(PORT),
+  [RunAttribute.promptSections]: names,
+  [RunAttribute.promptBaseline]: Schema.is(Schema.Boolean),
+  [RunAttribute.toolsAdded]: Schema.is(COUNT),
+  [RunAttribute.toolsRemoved]: Schema.is(COUNT),
+  [RunAttribute.toolsChanged]: names,
 }
 
 const ORIGINS = Schema.Literals(['owner', 'client', 'source', 'agent', 'routine', 'system'])
-const COUNT = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 /** Flow attributes keep only a value of their closed set or id shape; anything else is dropped, never coerced. */
 const FLOW_VALUES: Readonly<Record<string, (value: unknown) => boolean>> = {
   [RunAttribute.flow]: Schema.is(FlowName),

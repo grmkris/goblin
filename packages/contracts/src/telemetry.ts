@@ -65,6 +65,16 @@ export const RunAttribute = {
   /** The deployment endpoint's host and port, for its own logs: inspection never answers them (ADR 0107). */
   serverAddress: 'server.address',
   serverPort: 'server.port',
+  /**
+   * On a model attempt after its prompt or tools changed (Pi's `pi.system` entries, ADR 0107): the keys of the sections
+   * that changed, comma-separated; whether it was a restatement after compaction rather than a change; how many tools
+   * were added and removed; and, for a change of at most eight tools, their names. Never a section's text or a schema.
+   */
+  promptSections: 'goblin.prompt.sections',
+  promptBaseline: 'goblin.prompt.baseline',
+  toolsAdded: 'goblin.tools.added',
+  toolsRemoved: 'goblin.tools.removed',
+  toolsChanged: 'goblin.tools.changed',
   responseId: 'gen_ai.response.id',
   finishReason: 'gen_ai.response.finish_reasons',
   inputTokens: 'gen_ai.usage.input_tokens',

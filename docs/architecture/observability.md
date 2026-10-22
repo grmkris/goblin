@@ -16,7 +16,11 @@ a run. The ledger supplies exact submission/task correlation when a cache entry 
   fault): the model it asked for (`gen_ai.request.model`) and the one that answered (`gen_ai.response.model`), the
   thinking level it asked at (`gen_ai.request.reasoning.level`), finish reason, input, output, cache and reasoning
   tokens, fixed error summaries, cutoff and empty-answer markers. The first committed partial
-  marks the first chunk; Pi commits partials at most every ~100 ms. A retried attempt is a new event.
+  marks the first chunk; Pi commits partials at most every ~100 ms. A retried attempt is a new event. When the
+  prompt or the tools changed before it, Pi wrote `pi.system` entries in the commit that sent it; the attempt names
+  the section keys that changed (`goblin.prompt.sections`), the tools added and removed as counts, and for a change of
+  at most eight tools their names (`goblin.tools.changed`); a restatement after compaction is
+  `goblin.prompt.baseline`. Never a section's text or a tool's schema.
 - **Tool call:** a tool task, ended by its result entry: name, family (`mcp`, `app`, `subagent`, `memory`,
   `builtin`), argument and result sizes, the MCP server and tool of an `mcp_call`, and `blocked`, `interrupted` or
   `error` with the first diagnostic. A call to a tool that is not there is one event, from the generation.

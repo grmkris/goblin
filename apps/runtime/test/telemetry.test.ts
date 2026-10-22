@@ -3,7 +3,7 @@ import type { AssistantMessage, Message, Model, ProviderStreams } from '@earendi
 import { createModels, createProvider } from '@earendil-works/pi-ai/models'
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream'
 import { createRegistry, defineExtension, defineTool, hook, Harness, ToolTask } from '@earendil-works/pi-durable'
-import type { JsonObject } from '@earendil-works/pi-durable'
+import type { CommitPublication, Extension, JsonObject } from '@earendil-works/pi-durable'
 import { MemoryStorage } from '@earendil-works/pi-durable/storage/memory'
 import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
@@ -151,7 +151,16 @@ async function turn(
 ) {
   const collected = new Collected()
   const telemetry = new RunTelemetry([...extra, collected], (id) => collected.read(id), stamp)
-  const recorder = new PiRunRecorder(telemetry, collected)
+  const { pi, root } = await openPi(replies, new PiRunRecorder(telemetry, collected))
+  const settled = await (
+    await root.submit({ type: 'input', content: input, requestId: operationId }, BACKGROUND)
+  ).wait(BACKGROUND)
+  await pi.close(BACKGROUND)
+  return { settled, events: collected.events() }
+}
+
+/** Real Pi in memory, answering with `replies`, its root on `tools` (and able to add `more`), with `recorder` on. */
+async function openPi(replies: Reply[], recorder: PiRunRecorder, more: readonly Extension[] = []) {
   const models = createModels()
   models.setProvider(
     createProvider({
@@ -162,7 +171,7 @@ async function turn(
     }),
   )
   const registry = createRegistry()
-  registry.install(tools)
+  for (const extension of [tools, ...more]) registry.install(extension)
   const pi = await Harness.open(
     new MemoryStorage(),
     { models, registry, settings: { extensions: [tools], retry: { baseDelayMs: 1 } } },
@@ -172,12 +181,32 @@ async function turn(
   const root = await pi.root(BACKGROUND, {
     agent: { model: { provider: model.provider, modelId: model.id }, thinkingLevel: 'off' },
   })
-  const settled = await (
-    await root.submit({ type: 'input', content: input, requestId: operationId }, BACKGROUND)
-  ).wait(BACKGROUND)
-  await pi.close(BACKGROUND)
-  return { settled, events: collected.events() }
+  return { pi, root }
 }
+
+/** Two turns in one conversation, the second after `added` joins its extensions; the run events they recorded. */
+async function twoTurns(added: Extension) {
+  const collected = new Collected()
+  const { pi, root } = await openPi(
+    [],
+    new PiRunRecorder(new RunTelemetry([collected], (id) => collected.read(id)), collected),
+    [added],
+  )
+  await (await root.submit({ type: 'input', content: 'one', requestId: 'op-1' }, BACKGROUND)).wait(BACKGROUND)
+  await root.configure({ extensions: [tools, added] }, BACKGROUND)
+  await (await root.submit({ type: 'input', content: 'two', requestId: 'op-2' }, BACKGROUND)).wait(BACKGROUND)
+  await pi.close(BACKGROUND)
+  return collected.events()
+}
+
+/** One commit as Pi publishes it, made by hand. */
+const commit = (seq: number, changes: readonly unknown[]): CommitPublication =>
+  // SAFETY: a hand-made publication of entry and task records; the recorder decodes every record it reads.
+  ({ seq, changes }) as CommitPublication
+
+/** `count` comma-separated names of `length` characters each, numbered so each differs. */
+const nameList = (count: number, length: number) =>
+  Array.from({ length: count }, (_, index) => `${String(index).padStart(2, '0')}${'n'.repeat(length - 2)}`).join(',')
 
 const ofKind = (events: readonly RunEvent[], kind: RunEvent['kind']) => events.filter((event) => event.kind === kind)
 /** `work` as one remote MCP step, reported to `report` when it ends; its value, or its own rejection. */
@@ -300,6 +329,82 @@ describe('run telemetry from Pi commits (unit, in-memory Pi)', () => {
     const [unset] = ofKind(none.events, 'model.attempt')
     expect(unset?.attributes[RunAttribute.modelEndpoint]).toBe('none')
     expect(Object.keys(unset?.attributes ?? {})).not.toContain(RunAttribute.agentVersion)
+  })
+
+  it('says which tools an attempt started with and gained, by name, never what they or the prompt say (ADR 0107)', async () => {
+    const later = defineExtension({
+      name: 'telemetry-later',
+      tools: [
+        defineTool({
+          name: 'later',
+          description: 'PRIVATE_TOOL_DESCRIPTION',
+          parameters: Type.Object({}),
+          replay: 'safe',
+          execute: async () => ({ output: [{ type: 'text', text: 'ok' }] }),
+        }),
+      ],
+    })
+    const events = await twoTurns(later)
+    const [first, second] = ofKind(events, 'model.attempt')
+    expect(first?.attributes).toMatchObject({
+      [RunAttribute.toolsAdded]: 4,
+      [RunAttribute.toolsChanged]: 'echo,mcp_call,wait_grant,guarded',
+    })
+    expect(second?.attributes).toMatchObject({
+      [RunAttribute.toolsAdded]: 1,
+      [RunAttribute.toolsChanged]: 'later',
+    })
+    expect(Object.keys(second?.attributes ?? {})).not.toContain(RunAttribute.toolsRemoved)
+    expect(JSON.stringify(events)).not.toContain('PRIVATE_')
+  })
+
+  it('marks a restatement after compaction a baseline, counted and never named, and drops section text', () => {
+    const collected = new Collected()
+    const recorder = new PiRunRecorder(new RunTelemetry([collected], (id) => collected.read(id)), collected)
+    const system = {
+      role: 'system',
+      content: '',
+      sections: { persona: 'PRIVATE_SECTION_TEXT', memory: null },
+      toolsAdded: [{ name: 'echo', description: 'PRIVATE_DESCRIPTION', parameters: {} }],
+      toolsRemoved: [{ name: 'gone' }],
+      timestamp: 1,
+    }
+    recorder.observe(
+      commit(7, [
+        {
+          type: 'entry',
+          value: { id: 40, conversationId: 1, kind: 'pi.system', byTaskId: 9, edits: [{ target: 3 }], model: [system] },
+        },
+        {
+          type: 'task',
+          value: {
+            id: 9,
+            conversationId: 1,
+            kind: 'pi.generation',
+            input: {},
+            state: {
+              status: 'running',
+              checkpoint: {
+                phase: 'request',
+                attempt: 1,
+                model: { provider: 'p', modelId: 'm' },
+                thinkingLevel: 'low',
+              },
+            },
+          },
+        },
+      ]),
+    )
+    const [attempt] = ofKind(collected.events(), 'model.attempt')
+    expect(attempt?.attributes).toMatchObject({
+      [RunAttribute.promptSections]: 'persona,memory',
+      [RunAttribute.promptBaseline]: true,
+      [RunAttribute.toolsAdded]: 1,
+      [RunAttribute.toolsRemoved]: 1,
+      [RunAttribute.reasoningLevel]: 'low',
+    })
+    expect(Object.keys(attempt?.attributes ?? {})).not.toContain(RunAttribute.toolsChanged)
+    expect(JSON.stringify(collected.events())).not.toContain('PRIVATE_')
   })
 
   it('names the MCP server and tool of an mcp_call, and records its failure', async () => {
@@ -476,6 +581,48 @@ describe('run telemetry (unit)', () => {
     })
     throwing.record({ id: 'restart:2', kind: 'recovery', status: 'ok', startedAt: 1, endedAt: 1, attributes: {} })
     expect(broken.read('restart:2')?.status).toBe('ok')
+  })
+
+  it('keeps tokens and the finish reason when every drift attribute is at its bound (ADR 0107)', () => {
+    const started = boundAttributes({
+      [RunAttribute.agentVersion]: 'f'.repeat(40),
+      [RunAttribute.operation]: 'chat',
+      [RunAttribute.attempt]: 3,
+      [RunAttribute.provider]: 'openai',
+      [RunAttribute.requestModel]: 'm'.repeat(80),
+      [RunAttribute.reasoningLevel]: 'xhigh',
+      [RunAttribute.modelEndpoint]: 'deployment',
+      [RunAttribute.serverAddress]: `${'h'.repeat(60)}.example.com`,
+      [RunAttribute.serverPort]: 443,
+      [RunAttribute.promptSections]: nameList(16, 17),
+      [RunAttribute.promptBaseline]: true,
+      [RunAttribute.toolsAdded]: 120,
+      [RunAttribute.toolsRemoved]: 120,
+      [RunAttribute.toolsChanged]: nameList(8, 36),
+    })
+    const ended = boundAttributes({
+      ...started,
+      [RunAttribute.responseModel]: 'm'.repeat(80),
+      [RunAttribute.responseId]: 'r'.repeat(80),
+      [RunAttribute.finishReason]: 'toolUse',
+      [RunAttribute.inputTokens]: 123_456,
+      [RunAttribute.outputTokens]: 12_345,
+      [RunAttribute.cacheReadTokens]: 100_000,
+      [RunAttribute.cacheWriteTokens]: 20_000,
+      [RunAttribute.reasoningTokens]: 9_999,
+      [RunAttribute.entry]: 123_456,
+      [RunAttribute.firstPartialAt]: 1_760_000_000_000,
+      [RunAttribute.cutoff]: true,
+      [RunAttribute.recovered]: true,
+    })
+    expect(started[RunAttribute.promptSections]).toBe(nameList(16, 17))
+    expect(ended).toMatchObject({
+      [RunAttribute.finishReason]: 'toolUse',
+      [RunAttribute.inputTokens]: 123_456,
+      [RunAttribute.outputTokens]: 12_345,
+      [RunAttribute.reasoningTokens]: 9_999,
+    })
+    expect(ended[RunAttribute.truncated]).toBeUndefined()
   })
 
   it('keeps only closed values for what a model call ran with', () => {

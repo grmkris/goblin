@@ -10,6 +10,7 @@ import {
   decodeEntry,
   decodeAssistant,
   decodeToolResult,
+  decodeSystem,
   decodeDiagnostics,
   decodeTask,
   decodeToolInput,
@@ -106,6 +107,36 @@ const mcpOf = (ledger: RecorderLedger, place: Place, name: string, args: unknown
   return native === undefined ? undefined : { connectionId: native.connectionId, name: native.tool }
 }
 
+/** What `pi.system` entries changed before a generation's next request: section keys and tool names (ADR 0107). */
+type PromptChange = {
+  readonly sections: Set<string>
+  readonly added: Set<string>
+  readonly removed: Set<string>
+  baseline: boolean
+}
+
+/** The most section keys, and of tools changed by name, a model attempt lists. */
+const MAX_SECTIONS = 16
+const MAX_TOOL_NAMES = 8
+
+/**
+ * A prompt change as the attributes of the attempt it came before: the section keys, whether it restated the prompt
+ * after compaction, tool counts, and for a change of at most eight tools their names. Names, never text.
+ */
+function promptAttributes(change: PromptChange): RunAttributes {
+  const tools = [...new Set([...change.added, ...change.removed])]
+  const named = !change.baseline && tools.length > 0 && tools.length <= MAX_TOOL_NAMES
+  return {
+    ...(change.sections.size === 0
+      ? {}
+      : { [RunAttribute.promptSections]: [...change.sections].slice(0, MAX_SECTIONS).join(',') }),
+    ...(change.baseline ? { [RunAttribute.promptBaseline]: true } : {}),
+    ...(change.added.size === 0 ? {} : { [RunAttribute.toolsAdded]: change.added.size }),
+    ...(change.removed.size === 0 ? {} : { [RunAttribute.toolsRemoved]: change.removed.size }),
+    ...(named ? { [RunAttribute.toolsChanged]: tools.join(',') } : {}),
+  }
+}
+
 /** The calls an answer makes, keyed `entry:call`, with the attributes their tool call events start with. */
 function callsOf(ledger: RecorderLedger, place: Place, message: Assistant) {
   const entry = place.id
@@ -199,6 +230,8 @@ export class PiRunRecorder {
   readonly #calls = new Map<string, { readonly name: string; readonly attributes: RunAttributes }>()
   /** Per generation task, the attempt in progress. */
   readonly #attempts = new Map<string, { readonly id: string; readonly attempt: number; partial: boolean }>()
+  /** Per generation task, what its `pi.system` entries changed, for the attempt they come before. */
+  readonly #prompts = new Map<string, PromptChange>()
   #failures = 0
 
   constructor(telemetry: RunTelemetry, ledger: RecorderLedger, clock: () => number = nowMillis) {
@@ -362,6 +395,22 @@ export class PiRunRecorder {
     const place = { id: String(entry.id), conversation, taskId: String(entry.byTaskId) }
     if (entry.kind === 'pi.assistant') this.#answered(place, entry.model?.[0], now)
     else if (entry.kind === 'pi.tool-result') this.#toolResult(place, entry.model?.[0], entry.data, now)
+    else if (entry.kind === 'pi.system') this.#prompted(place.taskId, entry.model?.[0], (entry.edits?.length ?? 0) > 0)
+  }
+
+  /**
+   * A `pi.system` entry: Pi writes it in the commit that sends its generation's request, before the request, when the
+   * prompt or the tools changed. What it changed waits for that attempt (ADR 0107).
+   */
+  #prompted(taskId: string, raw: unknown, baseline: boolean): void {
+    const system = decodeSystem(raw)
+    if (system === undefined) return
+    const change = this.#prompts.get(taskId) ?? { sections: new Set(), added: new Set(), removed: new Set(), baseline }
+    for (const key of Object.keys(system.sections ?? {})) change.sections.add(key)
+    for (const tool of system.toolsAdded ?? []) change.added.add(tool.name)
+    for (const tool of system.toolsRemoved ?? []) change.removed.add(tool.name)
+    change.baseline ||= baseline
+    remember(this.#prompts, taskId, change)
   }
 
   /** An assistant entry ends the attempt that produced it, and names the tool calls it makes. */
@@ -503,6 +552,8 @@ export class PiRunRecorder {
       })
     const id = `model:${taskId}:${attempt}:${place.id}`
     this.#attempts.set(taskId, { id, attempt, partial: false })
+    const prompt = this.#prompts.get(taskId)
+    this.#prompts.delete(taskId)
     this.#telemetry.begin({
       id,
       kind: 'model.attempt',
@@ -514,6 +565,7 @@ export class PiRunRecorder {
         [RunAttribute.provider]: GEN_AI_PROVIDER,
         ...(model === undefined ? {} : { [RunAttribute.requestModel]: model.modelId }),
         ...(thinkingLevel === undefined ? {} : { [RunAttribute.reasoningLevel]: thinkingLevel }),
+        ...(prompt === undefined ? {} : promptAttributes(prompt)),
       },
     })
   }
@@ -525,6 +577,7 @@ export class PiRunRecorder {
     if (kind === 'pi.generation') {
       const open = this.#attempts.get(place.taskId)
       this.#attempts.delete(place.taskId)
+      this.#prompts.delete(place.taskId)
       if (open !== undefined && this.#telemetry.isOpen(open.id))
         this.#telemetry.finish(open.id, { status, endedAt: now, attributes })
     } else if (kind === 'pi.tool' || kind === 'pi.compaction') {
