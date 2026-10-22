@@ -33,7 +33,11 @@ replace its successor. Failed cleanup can lapse at the producer's finite TTL wit
 Lease generation checks also fence asynchronous subscribe, poll and verification responses at their durable write,
 including after encryption or alarm waits. Retirement finishes queued deliveries, and dispatch rechecks after
 decrypting and between handlers, so an old gap or termination cannot change the next lease. A terminated lease is only
-replaced by an explicit subscribe, with a fresh generation. No transaction spans a remote wait.
+replaced by an explicit subscribe, with a fresh generation. A renewal the producer answers with another subscription
+id (a gateway that now reaches the app through another of the owner's accounts) is a lease goblin no longer holds at
+that URL: it subscribes a fresh generation in its place, keeping the local id, consumers and cursor, then unsubscribes
+the old generation by its exact name, arguments and URL, best effort (`subscribeEvents`, ADR 0096); a second change of
+id in the same renewal is the producer's error. No transaction spans a remote wait.
 
 The dispatcher also binds myskills' `skills.updated` and `skills.list_changed`. Turning a server's skills on subscribes
 to them only where its Events offer them to this connection; a server without them, or one that refuses its Events

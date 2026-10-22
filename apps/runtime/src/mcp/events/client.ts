@@ -176,8 +176,78 @@ export const prepareEvents = (
 const leaseStatus = (result: EventsSubscribeResult): 'catching_up' | 'active' =>
   result.truncated === true || result.deliveryStatus?.active === false ? 'catching_up' : 'active'
 
-/** Subscribes (or renews) `row` remotely and records the lease, refreshed 10% early with bounded jitter. */
-export const subscribeEvents = (client: EventClient, row: Subscription, ttlMs: number = EVENT_LIMITS.ttlMs) =>
+/**
+ * A fresh generation of `row`'s lease, saved over it while it is still the current one: a new callback generation and
+ * secret, no remote id yet, its cursor kept, so a subscribe of it reaches whatever now answers the selector. Queued
+ * deliveries of the old generation are finished, as any replacement's are (ADR 0073).
+ */
+const freshGeneration = (client: EventClient, row: Subscription) =>
+  Effect.gen(function* () {
+    const current = client.store.get(row.id)
+    if (current?.secret !== row.secret || current.status === 'tombstone' || current.status === 'terminated')
+      return yield* new Conflict({ reason: 'event lease changed' })
+    const now = yield* Clock.currentTimeMillis
+    const callbackUrl = yield* attemptSync(() => generationOf(current.callbackUrl))
+    const secret = yield* attempt(() => client.cipher.encrypt(makeSecret(), secretAad(current)))
+    const fresh: Subscription = {
+      ...current,
+      callbackUrl,
+      secret,
+      previousSecret: null,
+      graceUntil: null,
+      remoteId: null,
+      refreshBefore: null,
+      nextRefreshAt: now,
+      status: 'pending',
+      lastError: null,
+      updatedAt: now,
+    }
+    // Arm a recovery wake before the durable intent, as a prepared lease does.
+    yield* client.wake(now + 60_000)
+    if (!(yield* Effect.sync(() => client.store.savePrepared(fresh, current))))
+      return yield* new Conflict({ reason: 'event lease changed' })
+    return fresh
+  })
+
+/**
+ * Subscribes (or renews) `row` remotely and records the lease, refreshed 10% early with bounded jitter. A renewal the
+ * server answers with another subscription id means the lease behind this callback URL is no longer the one goblin
+ * holds (a gateway that now reaches the app through another of the owner's accounts, ADR 0096): goblin subscribes a
+ * fresh generation, so its own callback URL tells it apart, then unsubscribes the old generation by its exact name,
+ * arguments and URL, best effort. Whatever that cannot reach lapses with its finite lease. A second change of id in the
+ * same renewal is the server's error.
+ */
+export const subscribeEvents = (
+  client: EventClient,
+  row: Subscription,
+  ttlMs: number = EVENT_LIMITS.ttlMs,
+): Effect.Effect<Subscription, AppError> => subscribeLease(client, row, ttlMs, false)
+
+/** Whether the server answered `row`'s subscribe with an id other than the one it already has. */
+const idChanged = (store: SqliteEventStore, row: Subscription, id: string): boolean => {
+  const known = store.get(row.id)?.remoteId
+  return known !== null && known !== undefined && known !== id
+}
+
+/**
+ * A fresh generation subscribed in place of `row`, then `row`'s own lease ended by its exact selector and URL; while
+ * `replacing` already, the server's error.
+ */
+const movedLease = (client: EventClient, row: Subscription, ttlMs: number, replacing: boolean) =>
+  Effect.gen(function* () {
+    if (replacing) return yield* new UpstreamMcp({ connectionId: row.connectionId, reason: 'remote-rpc' })
+    const renewed = yield* subscribeLease(client, yield* freshGeneration(client, row), ttlMs, true)
+    // expected: the old generation's lease may already be gone, or out of reach; it lapses at its finite expiry.
+    yield* Effect.ignore(unsubscribeEvents(client, row))
+    return renewed
+  })
+
+const subscribeLease = (
+  client: EventClient,
+  row: Subscription,
+  ttlMs: number,
+  replacing: boolean,
+): Effect.Effect<Subscription, AppError> =>
   Effect.gen(function* () {
     const { store, cipher } = client
     const now = yield* Clock.currentTimeMillis
@@ -203,9 +273,7 @@ export const subscribeEvents = (client: EventClient, row: Subscription, ttlMs: n
     const refreshBefore = Date.parse(result.refreshBefore)
     if (!Number.isFinite(refreshBefore) || refreshBefore <= now || refreshBefore > now + EVENT_LIMITS.maxTtlMs)
       return yield* new UpstreamMcp({ connectionId: row.connectionId, reason: 'remote-rpc' })
-    const provisional = store.get(row.id)?.remoteId
-    if (provisional !== null && provisional !== undefined && provisional !== result.id)
-      return yield* new UpstreamMcp({ connectionId: row.connectionId, reason: 'remote-rpc' })
+    if (idChanged(store, row, result.id)) return yield* movedLease(client, row, ttlMs, replacing)
     const margin = Math.min(300_000, Math.max(1000, (refreshBefore - now) / 10))
     const jitter = crypto.getRandomValues(new Uint16Array(1))[0] ?? 0
     const nextRefreshAt = Math.max(now + 1000, refreshBefore - margin - (jitter % 1000))
