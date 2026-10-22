@@ -2,9 +2,9 @@ import type { RpcResult } from './http/rpc.ts'
 import type { MailBinding } from './auth/mail.ts'
 
 /**
- * The Agent DO's RPC, what is left of it: account erasure. The owner reaches the agent through its typed API and the
- * Worker's other callers (an inbound MCP client, myagent's doorbell, MCP Events) through the internal one, both over
- * `fetch` (`onRequest`, `http/api/server.ts`).
+ * The Agent DO's RPC, what is left of it: account erasure. The owner and its callers (an inbound MCP client, a server's
+ * key, ADR 0086) reach the agent through its typed API, and the Worker's hooks (MCP Events webhooks, file links) through
+ * the internal one, both over `fetch` (`onRequest`, `http/api/server.ts`).
  */
 export interface AgentRpcMethods {
   readonly deleteAgentData: () => Promise<RpcResult<true>>
