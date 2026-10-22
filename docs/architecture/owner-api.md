@@ -62,7 +62,7 @@ messages carry `[from server <key name>]` (ADR 0108); an OAuth client reaches wh
 
 | Group | Paths under `/api` | Handlers |
 | --- | --- | --- |
-| `conversations` | `/conversations`, `/conversations/:id`, and under it `messages`, `threads`, `move`, `stop`, `queue`, `read`, `composer`, `history` (older pages, as AG-UI messages), `entries`, `sources`, `stream` (where to read its AG-UI stream, [chat streams](streams.md)) | `chats/api.ts` |
+| `conversations` | `/conversations`, `/conversations/:id`, and under it `messages`, `threads`, `move`, `stop`, `queue`, `read`, `composer`, `history` (older pages, as AG-UI messages), `entries`, `sources`, `stream` (its AG-UI events as server-sent events, every one to every reader that reaches the chat, [chat streams](streams.md)) | `chats/api.ts` |
 | `inspect` | `GET /inspect/conversations`, `/inspect/conversation`, `/inspect/turns`, `/inspect/turn`, `/inspect/problems`, `/inspect/flows`, `/inspect/details` | `inspect/api.ts` |
 | `topics` | `/topics`, `/topics/:id`, `/topics/:id/setup` | `topics/api.ts` |
 | `setup` | `GET /setup/catalog` | `setup/api.ts` |
@@ -80,7 +80,7 @@ messages carry `[from server <key name>]` (ADR 0108); an OAuth client reaches wh
 | account (Worker) | `clients`: `/clients`, `/clients/:clientId`; `keys`: `/keys`, `/keys/:keyId` (`PATCH` changes a key's scopes, ADR 0084), `/keys/:keyId/rotate` (a new secret, ADR 0105); `clientErrors`: `/client-errors` | `http/api/account.ts` |
 
 What is not JSON in and out is served through HttpApi's raw handlers, all annotated `GrantsResident: false`: the two
-event streams (SSE), the owner's file bytes (streamed both ways, never buffered), and `mcp.oauthCallback`, a redirect
+event streams (SSE: the workspace feed and a chat's AG-UI stream, which a key reads too), the owner's file bytes (streamed both ways, never buffered), and `mcp.oauthCallback`, a redirect
 to Connections that carries `ref` when it failed. A streamed answer owns its body, past the request's scope. Any path
 no endpoint names is a 404 in the envelope.
 
@@ -108,7 +108,7 @@ method remains, `deleteAgentData` (account deletion): Workers RPC drops custom e
 `@myapps/query` with its provenance in `lib/query/PROVENANCE.md`): `owner` (`OwnerApi`) and `account` (`AccountApi`).
 Every request carries a fresh `x-goblin-request` id, every write `x-goblin-csrf: 1`, and a write run with
 `withOperation` its `x-goblin-operation`. Besides them, only the file bytes (`lib/files.ts`), the two event streams
-and Better Auth's client (`/api/auth`) reach `/api`. Server data follows myapps ADR 0013, as
+(`lib/event-streams.ts`) and Better Auth's client (`/api/auth`) reach `/api`. Server data follows myapps ADR 0013, as
 [the web's instructions](../../apps/web/AGENTS.md#data-layer) spell out:
 
 - One `src/<feature>/queries.ts` per feature holds its `owner.apiQuery` and `owner.apiMutation` factories and its

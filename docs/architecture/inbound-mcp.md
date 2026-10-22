@@ -46,13 +46,16 @@ Code, claude.ai, Cursor) or a server's API key.
 - **Tools.** One registry (`inbound/tools.ts`, the tools in `inbound/mcp-server.ts` and `inbound/inspect-tools.ts`):
   each tool calls one owner endpoint as the caller (`ownerCall`, forwarding `x-goblin-caller`) and is listed only when
   the caller holds that endpoint's `EndpointScope`, so admission, scopes, the limit and reach are the owner API's own.
-  Each answers its endpoint's JSON as text, and as structured content when it is an object.
+  Each answers its endpoint's JSON as text, and as structured content when it is an object. Every scoped endpoint has
+  its tool but a chat's stream (`STREAMED`, ADR 0110): server-sent events a key reads over HTTP itself
+  (`GET /api/conversations/:id/stream`, [chat streams](streams.md)), which one tool answer cannot carry; the server's
+  instructions name it.
 
   | Scope | Tools | Who can hold it |
   | --- | --- | --- |
   | `agent` | `ask_agent`, `get_recent_messages` | OAuth clients |
   | `topics` | `topic_list`, `topic_get`, `topic_create`, `topic_update`, `topic_set_setup` | both |
-  | `conversations` | `conversation_update`, `conversation_send`, `thread_start`, `conversation_entries`, `conversation_stop`, `conversation_stream` | both |
+  | `conversations` | `conversation_update`, `conversation_send`, `thread_start`, `conversation_entries`, `conversation_stop` | both |
   | `personas` | `persona_list`, `models_list`, `persona_create`, `persona_get`, `persona_update` | both |
   | `inspect` | `inspect_turns`, `inspect_turn`, `inspect_problems`, `inspect_flows`, `inspect_details` | both |
   | `transcripts` | `inspect_conversations`, `inspect_conversation` | OAuth clients |

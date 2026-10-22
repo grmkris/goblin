@@ -92,7 +92,7 @@ provider's sign-in keeps it in the sign-in's state and the callback goes on to t
 The MCP Events hook and file links verify a token bound to the agent (the workspace's ID) before selecting it. Deleting
 an account requires a sign-in from the last 600 seconds, with an explicit Settings confirmation. It first deletes every
 workspace the account alone owns, each agent erased through `Agent.destroy()` (Pi, Agents and application tables, its
-alarm and isolate), its files in R2 and every epoch of its chats' streams first, before its records. Only then does Better Auth delete the user and D1 cascade sessions, other
+alarm and isolate), its files in R2 first, before its records. Only then does Better Auth delete the user and D1 cascade sessions, other
 memberships, consents and tokens. Agent-erasure failure leaves the account intact for retry. Outbound OAuth tokens are
 forgotten, not revoked remotely. Conversations, credentials, grants and resident authority belong to one workspace.
 

@@ -1,8 +1,9 @@
 # Web
 
-Read the root instructions first. Owns TanStack Start, the chat stream reader (AG-UI over Durable Streams,
-`lib/agui/`) and the MCP Apps host. No server secrets reach browser code. A dropped stream reads on from its last
-offset; an expired link or a moved epoch joins again. Sandbox Apps and validate message origin/source. Use the local shadcn UI package and keep all runtime calls behind the authenticated API.
+Read the root instructions first. Owns TanStack Start, the chat stream reader (AG-UI as server-sent events from the
+chat's own endpoint, `lib/agui/`) and the MCP Apps host. No server secrets reach browser code. Every connection opens
+with the chat's snapshot, so a dropped, ended or silent stream connects again and starts over; nothing is resumed.
+Sandbox Apps and validate message origin/source. Use the local shadcn UI package and keep all runtime calls behind the authenticated API.
 
 ## Data layer
 

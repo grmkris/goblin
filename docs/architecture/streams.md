@@ -1,64 +1,61 @@
 # Chat streams
 
 The profile third parties implement against, and the only way goblin's own web app follows a chat
-([ADR 0109](../adr/0109-every-chat-streams-ag-ui-through-a-durable-stream.md)). Built: the translator from Pi's events
+([ADR 0110](../adr/0110-the-agent-serves-every-chats-stream-to-every-reader.md); the mapping is
+[ADR 0109](../adr/0109-every-chat-streams-ag-ui-through-a-durable-stream.md)'s). Built: the translator from Pi's events
 to AG-UI (`apps/runtime/src/streams/agui.ts`), goblin's parts of it in the contracts (`packages/contracts/src/agui/`),
-the producer that appends a joined chat's events to its streams, with its children's work (Personas' forks and
-subagents), the reader's way in (the join endpoint, its MCP tool and the signed stream URL), and the web's reader
-(`apps/web/src/lib/agui/`). The workspace feed is still its own stream.
+the producer that serves a chat's events to the readers connected to it, with its children's work (Personas' forks and
+subagents), the endpoint (`chats/api.ts` `stream`), and the web's reader (`apps/web/src/lib/agui/`). The workspace
+feed is still its own stream.
 
 ## What a stream is
 
 Every chat has one stream of [AG-UI 1.0](https://docs.ag-ui.com/concepts/events) events (`@ag-ui/core` 1.0.3, protocol
-1.0), appended in order to a Durable Streams JSON stream, which gives readers offsets, resumption and live reads. The
-same stream serves goblin's own web app and any other reader (a server's app such as Swarmm or Sidequest).
+1.0), served by the chat's agent as server-sent events to each reader connected to it. The same stream serves goblin's
+own web app and any other reader (a server's app such as Swarmm or Sidequest), and every reader gets all of it: text,
+reasoning, tool calls with their results, steps, STATE, and a child's work.
 
 It follows the chat, not one call: runs come and go, and some messages arrive between runs (a Persona's answer, a
 routine's notice, a note shared from a thread), so events outside a `RUN_STARTED`…`RUN_FINISHED` pair are normal. So
 are a child's (below): a Persona answers without a run of the chat's, and a subagent goes on after the run that
 started it ended.
 
-A stream lives in **epochs**. An epoch begins with:
-
-1. `MESSAGES_SNAPSHOT`: the messages of the chat's newest entries (a window; older history is read in pages);
-2. `STATE_SNAPSHOT`: the whole STATE document;
-3. when a run is in flight, its `RUN_STARTED` and the answer so far (`TEXT_MESSAGE_START` and its content);
-4. for each child working now, its `SUBAGENT_STARTED` and, in `full`, what it did so far (below).
-
-An epoch ends with the CUSTOM event `goblin.stream.moved` `{ epoch }`, and the chat goes on in that epoch's stream.
-
-## Tiers
-
-| Tier | Carries | Who reads it |
-|---|---|---|
-| `full` | everything below | members' sessions, OAuth clients holding `transcripts` |
-| `answers` | `RUN_*`; `TEXT_MESSAGE_*` (people's and agents' messages, assistant and user); `ACTIVITY_*`; `SUBAGENT_*` lifecycle; `goblin.stream.moved`; `MESSAGES_SNAPSHOT` without reasoning and tool messages and without tool calls; STATE `/attention` only | servers' keys, OAuth clients without `transcripts` |
-
-`answers` drops `REASONING_*`, `TOOL_CALL_*` (with `TOOL_CALL_RESULT`), `STEP_*`, `RAW`, `goblin.tool_progress`, the
-other STATE members, and everything a child does but start, finish or fail (its answer reaches the parent as a
-message of its own). An assistant turn that only called tools is an empty message in `answers`.
-
 ## Reading a stream
 
-1. **Join.** `GET /api/conversations/:id/stream` (a member's browser under `/w/<slug>/api/…`; a server's key or an
-   OAuth client on `/api/…`, scope `conversations`), or the MCP tool `conversation_stream` `{ chat }`, which calls it.
-   A key reaches only its own Topics' chats (any other is 404). Joining makes the chat's stream in the caller's tier
-   when it has none and answers once the stream exists: `{ url, epoch, tier, expiresAt }` (`ConversationStream`).
-   `Conflict` `stream_starting` means it could not be made in time; ask again.
-2. **Read.** `url` is `/streams/<token>` on the deployment's origin, the token signed for that workspace, chat, tier
-   and epoch and valid for ten minutes; no cookie or key goes with it, and reading never wakes the agent. It speaks
-   the [Durable Streams](https://github.com/durable-streams/durable-streams) protocol, GET and HEAD only, with
-   `offset`, `live` and `cursor` and nothing else: `GET url?offset=-1` answers the epoch from its start as one JSON
-   array of AG-UI events, with `Stream-Next-Offset`; the next read passes that offset and gets only what came after.
-   `live=long-poll` waits up to a couple of seconds for more (204 when nothing came), `live=sse` keeps the connection
-   open (recycled about every minute). Answers are never cached.
-3. **Go on.** `goblin.stream.moved` `{ epoch }` is the last event of an epoch, and the stream is then closed
-   (`Stream-Closed: true`): join again for the next epoch, which opens with its snapshots. A URL past `expiresAt`, or
-   one whose token was changed, answers 401 `stream_link`: join again for a new one. A stream that expired after
-   seven days without a read or write answers 404; joining makes the chat a new epoch.
-4. **Older history.** `GET /api/conversations/:id/history?before=<entry>` answers the page of entries before `before`
+1. **Connect.** `GET /api/conversations/:id/stream`: a member's browser under `/w/<slug>/api/…` with its session
+   cookie, a server's key on `/api/…` with the key as its bearer (scope `conversations`). A key reaches only its own
+   room's chats; any other answers 404 in the error envelope, as does a chat that is not there. The answer is
+   `text/event-stream`, never cached.
+2. **Frames.** Each event is one `data:` frame, its JSON on one line, LF line ends: `data: {"type":"RUN_STARTED",…}`
+   and a blank line. Nothing else a reader must know of is sent: no `event:` names, ids or retry hints. A `: ping`
+   comment comes every fifteen seconds; a reader that hears nothing, not even a comment, for 45 seconds gives the
+   connection up and connects again.
+3. **The opening.** Each connection begins with:
+   1. `MESSAGES_SNAPSHOT`: the messages of the chat's newest entries (up to 50, fewer when they would not fit one
+      event of 512 KiB; older history is read in pages);
+   2. `STATE_SNAPSHOT`: the whole STATE document;
+   3. when a run is in flight, its `RUN_STARTED` (with the operations it answers) and the answer so far
+      (`TEXT_MESSAGE_START` and its content, its thinking);
+   4. for each child working now, its `SUBAGENT_STARTED` and what it did so far (below).
+
+   Then it carries the chat's events live, each batch as Pi commits it.
+4. **Reconnect.** A reconnect is a new connection, and opens afresh: its `MESSAGES_SNAPSHOT` replaces what the reader
+   built, so nothing is resumed, read twice or lost. There are no offsets and no `Last-Event-ID`. The server ends a
+   connection cleanly after fifteen minutes, or when the reader fell 512 batches behind; connect again then.
+5. **Refusals.** Before anything streams, a refusal answers in the error envelope: 404 for a chat out of reach, 401
+   for a session or key that is not valid, 403 for a key without `conversations`, and 409 `Conflict` `stream_busy`
+   when the chat already has 32 readers, or the workspace's agent 256 (try again later).
+6. **Older history.** `GET /api/conversations/:id/history?before=<entry>` answers the page of entries before `before`
    as the same AG-UI messages a snapshot holds (one mapping, `streams/messages.ts`), oldest first, with `next`, the
    entry to read the page before, and `more`. Start at the snapshot's `before`.
+
+```sh
+curl -N "$GOBLIN_ORIGIN/api/conversations/<chat>/stream" -H "authorization: Bearer $GOBLIN_KEY"
+```
+
+No string in any frame holds a secret goblin issues or keeps: one that holds something shaped like a server's key
+(`gbk_…`), a thread server's token (`swt_…`) or a webhook secret (`whsec_…`) is sent as `[redacted]`
+(`streams/redact.ts`). Credentials never enter the events; this pass is the backstop.
 
 ## Ids
 
@@ -81,24 +78,24 @@ message of its own). An assistant turn that only called tools is an empty messag
 
 Pi's events are its experimental `watchEvents` (spec §9.4), one batch per commit.
 
-| Pi | AG-UI | Tier |
-|---|---|---|
-| `run_start` | `RUN_STARTED`, `metadata.goblin.operations` = the operation ids of its inputs when the stream saw them admitted. The inputs it placed follow it, though Pi announces the run after them | both |
-| `run_end` | `RUN_ERROR` when its last answer's model call failed (`code: model_error`, the provider's first line), a generation faulted (`task_failed`) or Pi gave up an input; else `RUN_FINISHED` with outcome `cancelled` (stopped), `interrupt` (it raised attention items still open, carried as `interrupts`) or `success`. `usage` is its model calls' tokens. An answer or step still open closes first | both |
-| `turn_start`, `turn_end` | `STEP_STARTED`, `STEP_FINISHED`, named `turn <n>` | full |
-| `message_start`, `message_update` (assistant) | the answer streamed block by block: `TEXT_MESSAGE_START` (at its first text or tool call), `TEXT_MESSAGE_CONTENT`; each visible thinking block `REASONING_START`, `REASONING_MESSAGE_START`, `REASONING_MESSAGE_CONTENT`, closed when the next block begins; each tool call `TOOL_CALL_START` with `parentMessageId` | text both, the rest full |
-| `message_end` (assistant) | the rest of each block, `TEXT_MESSAGE_END` (`entryId`, and `stop` when it failed, was stopped or cut off), then each tool call's `TOOL_CALL_ARGS` (the whole JSON, once: Pi's argument deltas are paths, not JSON text) and `TOOL_CALL_END` | as above |
-| `message_end`, `entry_appended` (other entries) | the entry's messages, each written at once: user `TEXT_MESSAGE_*`; a Persona's answer an assistant `TEXT_MESSAGE_*` with `name` (then `SUBAGENT_FINISHED` for its fork, when the stream carries it); a tool result `TOOL_CALL_RESULT`; an entry the app draws `ACTIVITY_SNAPSHOT`. Markers (memory view, compaction summary, reset) and system messages make none | as their kind |
-| `tool_execution_start` | CUSTOM `goblin.tool_progress` `{ status: 'running' }`; a nested call (one a running tool made) is opened, given its arguments and closed here, with `metadata.goblin.parentToolCallId` | full |
-| `tool_execution_update` | CUSTOM `goblin.tool_progress` with its output, details and diagnostics | full |
-| `tool_execution_end` | a nested call's `TOOL_CALL_RESULT`; a model-issued call's result is its entry | full |
-| `inbox_update` | `STATE_DELTA` `/queue` | full |
-| `auto_retry_start`, `auto_retry_end`, `deferred_poll` | `STATE_DELTA` `/generation` | full |
-| `compaction_start`, `compaction_end` | `STATE_DELTA` `/compactions` | full |
-| `agent_changed`, `usage_changed` | `STATE_DELTA` `/agent`, `/usage` | full |
-| an entry that raises or settles attention | `STATE_DELTA` `/attention` | both |
-| `snapshot` (an overflow) | a catch-up: the entries past the last one carried, a run that ended or began meanwhile, the rest of the answer in flight, and each STATE member that changed; nothing is sent twice | as above |
-| `submission`, `task_failed` | nothing of their own: they decide the run's operations and outcome | — |
+| Pi | AG-UI |
+|---|---|
+| `run_start` | `RUN_STARTED`, `metadata.goblin.operations` = the operation ids of its inputs, as the stream saw them admitted or, for a run already under way when a watch began, as the producer read them. The inputs it placed follow it, though Pi announces the run after them |
+| `run_end` | `RUN_ERROR` when its last answer's model call failed (`code: model_error`, the provider's first line), a generation faulted (`task_failed`) or Pi gave up an input; else `RUN_FINISHED` with outcome `cancelled` (stopped), `interrupt` (it raised attention items still open, carried as `interrupts`) or `success`. `usage` is its model calls' tokens. An answer or step still open closes first |
+| `turn_start`, `turn_end` | `STEP_STARTED`, `STEP_FINISHED`, named `turn <n>` |
+| `message_start`, `message_update` (assistant) | the answer streamed block by block: `TEXT_MESSAGE_START` (at its first text or tool call), `TEXT_MESSAGE_CONTENT`; each visible thinking block `REASONING_START`, `REASONING_MESSAGE_START`, `REASONING_MESSAGE_CONTENT`, closed when the next block begins; each tool call `TOOL_CALL_START` with `parentMessageId` |
+| `message_end` (assistant) | the rest of each block, `TEXT_MESSAGE_END` (`entryId`, and `stop` when it failed, was stopped or cut off), then each tool call's `TOOL_CALL_ARGS` (the whole JSON, once: Pi's argument deltas are paths, not JSON text) and `TOOL_CALL_END` |
+| `message_end`, `entry_appended` (other entries) | the entry's messages, each written at once: user `TEXT_MESSAGE_*`; a Persona's answer an assistant `TEXT_MESSAGE_*` with `name` (then `SUBAGENT_FINISHED` for its fork, when the stream carries it); a tool result `TOOL_CALL_RESULT`; an entry the app draws `ACTIVITY_SNAPSHOT`. Markers (memory view, compaction summary, reset) and system messages make none |
+| `tool_execution_start` | CUSTOM `goblin.tool_progress` `{ status: 'running' }`; a nested call (one a running tool made) is opened, given its arguments and closed here, with `metadata.goblin.parentToolCallId` |
+| `tool_execution_update` | CUSTOM `goblin.tool_progress` with its output, details and diagnostics |
+| `tool_execution_end` | a nested call's `TOOL_CALL_RESULT`; a model-issued call's result is its entry |
+| `inbox_update` | `STATE_DELTA` `/queue` |
+| `auto_retry_start`, `auto_retry_end`, `deferred_poll` | `STATE_DELTA` `/generation` |
+| `compaction_start`, `compaction_end` | `STATE_DELTA` `/compactions` |
+| `agent_changed`, `usage_changed` | `STATE_DELTA` `/agent`, `/usage` |
+| an entry that raises or settles attention | `STATE_DELTA` `/attention` |
+| `snapshot` (an overflow) | a catch-up: the entries past the last one carried, a run that ended or began meanwhile, the rest of the answer in flight, and each STATE member that changed; nothing is sent twice |
+| `submission`, `task_failed` | nothing of their own: they decide the run's operations and outcome |
 
 ## goblin's parts
 
@@ -123,12 +120,12 @@ Pi's events are its experimental `watchEvents` (spec §9.4), one batch per commi
 - tool calls and results: `details` (Pi's details for UIs), `isError`, `parentToolCallId`; a result names its tool
   (`toolName`), for a reader that does not hold the call.
 
-**Activity types** (`ActivityType`), never CUSTOM events, since a reader that joins later sees only the snapshot:
+**Activity types** (`ActivityType`), never CUSTOM events, since a reader that connects later sees only the snapshot:
 `goblin.thread_head`, `goblin.thread_started`, `goblin.notice`, `goblin.topic_seed`, `goblin.delegate_result`, each with
 its entry's data as its contract says.
 
 **CUSTOM events**: `goblin.tool_progress` (`ToolProgress`: `toolCallId`, then `status: 'running'`, or `output` as
-`{ set }` or `{ trimStart?, append? }`, `details`, `diagnostics`) and `goblin.stream.moved` (`StreamMoved`: `epoch`).
+`{ set }` or `{ trimStart?, append? }`, `details`, `diagnostics`), the only one.
 
 **STATE** (`GoblinState`): every member always present, each changed by a `STATE_DELTA` that replaces it whole.
 
@@ -152,34 +149,34 @@ are answered through the app's own controls.
 
 ## How a stream is produced
 
-Each epoch of a chat's stream in a tier is its own Durable Streams object (`@durable-streams/server-cloudflare`'s
-`StreamObject`, pinned at 0.1.1, bound as `STREAMS`), keyed by its path `/s/<workspace>/<chat>/<tier>/<epoch>`. The
-agent writes it directly through the object's stub and never mounts the library's router: a JSON stream, created with
-a seven-day sliding TTL, each append a JSON array of events sent with the producer headers (`Producer-Id` `goblin`,
-`Producer-Epoch` 0, `Producer-Seq` from 0), so a retry of the same bytes is answered 204 and counted as sent.
+The producer (`streams/producer.ts`, one fiber per agent) follows a chat only while a reader is connected to it, and
+keeps nothing of it once the last one left. Each reader is a row: its own cursor of the translator, its own sink (512
+batches) and its connection. A reader joins with a message to the fiber, which answers once the reader's opening is in
+its sink, or refuses it (`stream_busy`, or Pi's failure) so the endpoint answers the error envelope instead of a
+stream.
 
-The producer (`streams/producer.ts`, one fiber per agent) follows only chats someone joined (a row in
-`app_streams`). Pi's commits say which of them have activity (`subscribeCommits`, which only notes them); a watch
-(`watchEvents`) then follows that chat, and stops after 30 idle seconds with nothing running. Each batch is translated
-once per tier and appended at most every 250 ms, or at once at a boundary (`RUN_*`, `TEXT_MESSAGE_END`, a snapshot,
-a CUSTOM event). When something waits in the chat's queue the producer reads what it says (`InboxDoc`) for `/queue`.
-An overflow's snapshot, a new watch and a restart of the agent catch up from the stored cursor: an agent evicted
-mid-run goes on in the same epoch and appends nothing twice. An
-append is first an outbox row (`app_stream_outbox`, written with the row's new cursor in one short transaction), sent
-outside any transaction by one drain per stream, and deleted once the stream answered 2xx; a write that may not have
-arrived goes again, the same bytes, after a backoff.
+A burst of joins shares one new watch of the chat (`watchEvents`): its snapshot opens each reader that joined and
+catches every other up from its own cursor, so nothing a reader read comes again. Then each batch Pi commits is
+translated over each reader's cursor and handed to its sink at once; the fiber never waits for a reader. A reader whose
+sink is full is let go, as is one connected for fifteen minutes: its connection ends, read or not, and it connects again
+for a fresh opening. The platform may never tell the agent that a client went away, so those two bounds are what free
+a gone reader's place; the last reader to leave stops the chat's watch and its children's.
 
-An epoch begins when a chat's stream is first joined, at the end of a run once the epoch passed 4 MiB or a day, when
-its stream is gone (expired or erased: 404 or 410) or out of step (409, 403), and when its stored cursor cannot be
-read. It begins from a new watch's snapshot (so nothing the old watch still delivered is sent twice), and the old
-epoch, unless its stream was lost, ends with `goblin.stream.moved` and is closed after what it still had to send.
-Erasing the agent erases every epoch of every stream it made.
+A watch with nothing running stops after 30 idle seconds, its readers still connected; Pi's commits say which chats
+have activity (`subscribeCommits`, which only notes them), and the next one watches the chat again, its snapshot
+catching every reader up. When something waits in the chat's queue the producer reads what it says (`InboxDoc`) for
+`/queue`; on a new watch it reads the operation ids of the run in flight's inputs and the queue's, which Pi's snapshot
+does not carry.
+
+The endpoint writes each reader's batches as frames (`streams/frames.ts`): an event bounded to 512 KiB (a tool result
+too large loses its details first, anything still larger is left out; the transcript keeps it), its secrets redacted
+(`streams/redact.ts`), and a comment every fifteen seconds.
 
 ## What the producer adds
 
 Pi's events do not carry everything; the producer supplies, or the stream leaves out:
 
-- a run's `operations` when its inputs were admitted before the stream was attached (left out);
+- a run's `operations`, from its inputs' submissions, when the watch began after they were admitted;
 - a held call decided outside the transcript before its outcome message arrives (it stays in `/attention` until then);
 - on a catch-up, tools already running (their progress resumes with the next update; a nested call started meanwhile
   is not opened);
@@ -203,7 +200,7 @@ parent as a message of its own.
 - **`subagentRunId`** is the child's chat id: the fork's (`PersonaInvocationView.fork`, `PersonaAnswerData.fork`) or
   the subagent's (`DelegateResultData.delegate`). A child given more work later starts again under the same id: a
   Persona going on after its hold (AG-UI's `suspended` outcome, continued), a subagent's next job.
-- **Its work** (`full` only): the child's own events as its own stream would have them, each carrying
+- **Its work**: the child's own events as its own stream would have them, each carrying
   `subagentRunId`: its input (a Persona's prompt, a subagent's job) and answers (`TEXT_MESSAGE_*`), `REASONING_*`,
   `TOOL_CALL_*` with its results, `STEP_*` and `goblin.tool_progress`; never its runs (its lifecycle stands for them),
   snapshots or STATE. Its message ids start with its chat, and its tool call ids are prefixed with it
@@ -214,31 +211,31 @@ parent as a message of its own.
   forward read's `invocations`), and on `SUBAGENT_FINISHED` `entryId`, the answer's entry (the `id` of its `persona`
   entry in `entries?after=`, the invocation's `answerEntry`). A subagent's lifecycle carries none.
 - **Pairing a child with its answer.** The answer is the parent's own message: an assistant message with `name` for
-  a Persona, the `goblin.delegate_result` activity for a subagent, without AG-UI's `subagentRunId` (so `answers`
-  keeps it) and with `metadata.goblin.subagentRunId`, the child it closes. A reader that persists answers once keys
+  a Persona, the `goblin.delegate_result` activity for a subagent, without AG-UI's `subagentRunId` (it is the chat's
+  own) and with `metadata.goblin.subagentRunId`, the child it closes. A reader that persists answers once keys
   them by `entryId`; `operationId` with the Persona's `id` names the invocation.
-- **Tiers.** `full` carries all of it. `answers` carries the lifecycle with its `metadata.goblin` and the answer, and
-  none of the child's work: nothing a key could not already read of the answer and the forward read. A room's
-  children are its Personas' forks (a room has no subagents), in the room's own stream only.
-- **Late joiners.** An epoch opens with each child working then: `SUBAGENT_STARTED`, then in `full` what it did so
-  far: a Persona's work from its invocation's prompt on, a subagent's run in flight with its answer so far.
+- **Rooms.** A room's children are its Personas' forks (a room has no subagents), carried in the room's own stream
+  only, in full to the key that reads it.
+- **Late readers.** A connection opens with each child working then: `SUBAGENT_STARTED`, then what it did so far: a
+  Persona's work from its invocation's prompt on, a subagent's run in flight with its answer so far.
 - **Producing them** (`streams/children.ts`, `streams/child-follow.ts`): the producer follows the children of each
-  chat with streams: Personas' forks from their invocation's start to its end (`invocations.changed`, each change
+  chat with readers: Personas' forks from their invocation's start to its end (`invocations.changed`, each change
   read as the write left it), and open subagents (`conversations.changed` and the chat registry), each with a watch of
-  its own over the same translator, its cursor kept in the parent's (`StreamCursor.children`) and its events appended
-  to every stream of the parent through the same outbox. A watch with nothing carried stops after 30 idle seconds,
-  and a child's commit starts it again. A subagent's own subagents are not carried yet.
+  its own over the same translator, its cursor kept in each reader's (`StreamCursor.children`) and its events sent to
+  each reader of the parent. A watch with nothing carried stops after 30 idle seconds, and a child's commit starts it
+  again; the parent's last reader leaving stops it. A subagent's own subagents are not carried yet.
 
 ## goblin's web app
 
-The web reads the `full` tier as any reader does (`apps/web/src/lib/`):
+The web reads the stream as any reader does (`apps/web/src/lib/`):
 
-- `agui/reader.ts` joins (`streamJoin`), reads what was written since its offset, then follows live over server-sent
-  events; a live read that drops reads on from the last offset it applied (events of a `data` frame count only once
-  its `control` frame names the offset after them). Two live reads in a row that fail before hearing anything turn it
-  to long polls. A 401, 403 or 404, a closed stream or `goblin.stream.moved` joins again at once, then with backoff;
-  a new epoch is read from its start. The transports themselves are in `event-streams.ts`.
-- `agui/reducer.ts` folds the events into the transcript's projection: the committed messages (an epoch's
+- `agui/reader.ts` connects (`event-streams.ts` `chatStream`: a `fetch` of the endpoint under the page's workspace,
+  same origin, with the session's cookie) and reads its frames (`readEvents`), each chunk's events handed on at once.
+  A connection the server ended after its events connects again at once; a dropped or unreachable one, or one silent
+  for 45 seconds, after a backoff (`lib/reconnect.ts`). A 404 or 403 stops (`stopped`, the chat out of reach), and a
+  401 goes to sign-in through the query client's handling (`failedOutside`). Every connection's opening starts the
+  reducer over.
+- `agui/reducer.ts` folds the events into the transcript's projection: the committed messages (a connection's
   `MESSAGES_SNAPSHOT` replaces them), the answer and thinking in flight, the tools running (with the times this browser
   saw), the queue and the run's progress from STATE, from the marks the entries a Thread may start at, those left
   out and where older history starts, and the children working (`children`: each one's name, a Persona's avatar and
@@ -247,7 +244,7 @@ The web reads the `full` tier as any reader does (`apps/web/src/lib/`):
   `agui/messages.ts` maps AG-UI messages to the transcript's, once per message, for
   the projection and for older pages alike; the transcript keeps its ids (`<entry>:<index>`) from `entryId`.
 - `stream-pool.ts` shares one reader per chat among the panes that show it; one nobody sees for a while is suspended
-  and reads on from its offset when it is seen again.
+  (its connection closed) and connects again, for a fresh opening, when it is seen again.
 
 ## Where it is proven
 
@@ -255,23 +252,35 @@ The web reads the `full` tier as any reader does (`apps/web/src/lib/`):
 scripted model that streams block by block; not workerd) for a plain reply, reasoning, a tool call with progress, a
 member's message with attachments, a run that asks, a stopped run, a failed model call after a retry, Persona answers
 and a hold, activities, a queued follow-up, an overflow mid-answer, and a Persona's fork (a tool call, then thinking
-and an answer) recorded beside its parent. The goldens keep each case's `full` and `answers` events and an epoch opened
-on the idle chat; every event is checked against `@ag-ui/core`'s own schemas, goblin's parts against their contracts,
+and an answer) recorded beside its parent. The goldens keep each case's live events and the opening of a connection
+to the idle chat; every event is checked against `@ag-ui/core`'s own schemas, goblin's parts against their contracts,
 and the sequence for well-formed runs, messages, spans and calls, a child's within its own lifecycle. The same cases
 also run against the installed Pi on every test run. `bun apps/runtime/test/streams/record.ts` records the fixtures
-again. `children.test.ts` holds the fork's work under its `subagentRunId` (its ids its own), its `answers` tier to the
-lifecycle and the answer, a late joiner's opening mid-answer and one taken after the fork worked, its failure and stop,
-and the same batches as a subagent's run.
+again. `children.test.ts` holds the fork's work under its `subagentRunId` (its ids its own), the Persona its lifecycle
+names, a late reader's opening mid-answer and one taken after the fork worked, its failure and stop, and the same
+batches as a subagent's run. `producer.test.ts` drives the producer over the recordings with Pi's watch scripted: a
+reader that joins mid-answer gets its own opening while the first reads on as if alone (a catch-up of STATE alone), a
+burst of joins opens one watch, the last reader to leave stops the chat's watch and its child's, a full sink lets only
+that reader go, a reader connected fifteen minutes is let go, a reader opening mid-run gets its run's operations, and
+the 33rd reader of a chat is `stream_busy`. `frames.test.ts` holds the frames: one `data:` frame per event, LF only,
+comments while idle, and a tool result echoing a key, a thread server's token and a webhook secret sent with each as
+`[redacted]`.
 
-In local workerd (`apps/runtime/test/integration/streams-children-case.ts`): the owner tags a Persona held at its model
-call and reads its start, its work, its end naming the answer and the answer; a server's key reads the same of its
-room in `answers`, lifecycle and answer alone, matching the forward read's invocation and entry; a subagent's run
-streams the same way, and the epoch after the run that spawned it opens with it in flight.
+In local workerd (`apps/runtime/test/integration/streams-case.ts`, `streams-children-case.ts`): a member reads their
+chat through `/w/<slug>/api` with their session, the opening then a turn's run, thinking, tool call and result and
+answer live; after the reader went away and the chat went on, a reconnect's opening holds what came meanwhile; a key
+reads its own room's chat in full (thinking and steps included) and gets 404 for another key's room and the owner's
+chat; a chat's 33rd reader is `stream_busy`. The owner tags a Persona held at its model call and reads its start, its
+work, its end naming the answer and the answer; a key reads the same of its room, the fork's own work included,
+matching the forward read's invocation and entry; a subagent's run streams the same way, and a reader that connects
+while it works opens with it in flight. Not proven there: that the agent hears of a client that went away (local
+workerd never tells it, from outside the dev proxy or from inside the Worker), so a gone reader is freed by the
+fifteen-minute bound or a full sink.
 
 The web holds its reducer to the same goldens (`apps/web/test/agui-reducer.test.ts`): for every case the transcript
-built from the live events, all at once or one event at a time, is the one the next epoch opens with, and the
-`answers` tier gives the same transcript without thinking and tools; a child's events stay with it
-(`ConversationProjection.children`), never in the transcript; the reader is tested against an in-memory stream
-(`agui-reader.test.ts`: resume from the offset, a moved epoch, a refused link, an expiring one, long polls). The
-browser fixtures `apps/web/test/ui-channel.ts` and `ui-queue.ts` serve the real components AG-UI events over the
-protocol's reads (`agui-route.ts`) and screenshot them at 1440 and 390 px, light and dark.
+built from the live events, all at once or one event at a time, is the one a new connection opens with; a child's
+events stay with it (`ConversationProjection.children`), never in the transcript. The reader is tested against an
+in-memory server (`agui-reader.test.ts`: the opening then live, a server-ended connection reconnecting at once, a
+drop backing off, a silent connection given up, a refusal stopping, frames across chunks). The browser fixtures
+`apps/web/test/ui-channel.ts` and `ui-queue.ts` serve the real components AG-UI events as server-sent events
+(`agui-route.ts`) and screenshot them at 1440 and 390 px, light and dark.

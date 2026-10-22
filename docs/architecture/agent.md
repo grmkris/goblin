@@ -215,7 +215,7 @@ The conversation-scoped routes of the owner API: the `conversations`, `inspect`,
 | `GET /api/files?dir=` | A directory of the owner's files (`FileListing`): `/uploads`, `/agent` or a folder under one, with the storage in use. |
 | `GET`, `PUT`, `DELETE /api/files/content?path=` | Download or write (raw: the body streams, `content-length` required) or delete one of the owner's files. Downloads are attachments, except PNG, JPEG, GIF and WebP, which open in place; all are sandboxed by CSP. No files endpoint renews resident authority. |
 | `POST /api/conversations/:id/stop` | Stop a conversation or one `operationId`, and the subagents it started (not its threads); answers `{ stopped }`, whether anything was running. |
-| `GET /api/conversations/:id/stream` | Joins the chat's AG-UI stream: where to read it (a signed URL for ten minutes), its epoch and its tier ([chat streams](streams.md)). |
+| `GET /api/conversations/:id/stream` | The chat's AG-UI events as server-sent events, every one in full: an opening (`MESSAGES_SNAPSHOT`, `STATE_SNAPSHOT`, the run in flight), then the chat live; a reconnect opens afresh. `Conflict` `stream_busy` past 32 readers of the chat ([chat streams](streams.md)). |
 | `GET /api/conversations/:id/history?before=<entry>` | The page of entries before `before`, oldest first, as the AG-UI messages the stream maps them to, with the entry to read the next page before (`next`) and a `more` flag. |
 | `GET /api/conversations/:id/sources` | What the chat's answers retrieved from other chats (`SourceUse[]`, newest first, empty results left out): the source strips (ADR 0035). |
 | `GET /api/inspect/details?operation=` or `?chat=&entry=` | The `inspect` group: what happened behind one message, its operation's timeline (with its turn when it ran one) and the operations related to it (`InspectDetails`, ADR 0037). |
@@ -361,11 +361,12 @@ run, its `app.persona` answer carries `questions`, and the owner answers by tagg
 Readers that show only text use `personaAnswerText` (the words, then the numbered questions). A routine's Persona run
 has no `ask_user`.
 
-The browser URL, stream, history and queue use chat ids. A chat's stream is AG-UI events in a Durable Streams object
-per epoch ([chat streams](streams.md), [ADR 0109](../adr/0109-every-chat-streams-ag-ui-through-a-durable-stream.md)):
-an epoch opens with its newest entries as `MESSAGES_SNAPSHOT` and the STATE document, then carries what the chat's Pi
-session commits and streams, and the work of its Personas' forks and subagents under their `subagentRunId`. A reader that drops reads on from its last offset; one whose link expired, or whose epoch
-moved, joins again. The workspace feed maps Pi task activity back to current chat ownership. `ConversationView.primary` is an optional boolean; `WorkspaceSnapshot.primary` is an optional
+The browser URL, stream, history and queue use chat ids. A chat's stream is AG-UI events the agent serves to each
+reader connected to it ([chat streams](streams.md),
+[ADR 0110](../adr/0110-the-agent-serves-every-chats-stream-to-every-reader.md)): a connection opens with the chat's
+newest entries as `MESSAGES_SNAPSHOT` and the STATE document, then carries what the chat's Pi session commits and
+streams, and the work of its Personas' forks and subagents under their `subagentRunId`. A reader that drops connects
+again and opens afresh; nothing is kept for a chat nobody reads. The workspace feed maps Pi task activity back to current chat ownership. `ConversationView.primary` is an optional boolean; `WorkspaceSnapshot.primary` is an optional
 chat id for compatible readers.
 
 Every signed-in page sits beside the app's shell (`components/shell`, ADRs 0036 and 0078): one moss sidebar. At its

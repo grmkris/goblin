@@ -85,10 +85,12 @@ feed.
 - **Other reads.** A workspace change that makes another feature's reads stale invalidates them through the module's
   one map (`staleAfter`, `lib/workspace/invalidations.ts`); no component bridges the feed and Query itself.
 
-A chat's stream ([chat streams](../architecture/streams.md)) is read beside the cache: `lib/agui/reader.ts` joins it
-(`streamJoin`, `conversations/queries.ts`) and reads its AG-UI events, `lib/agui/reducer.ts` folds them into the
-transcript's projection, and `lib/stream-pool.ts` shares one reader per chat among the panes that show it. It holds no
-owner data that a query also holds; older pages come from the history query, in the same message mapping.
+A chat's stream ([chat streams](../architecture/streams.md)) is read beside the cache: `lib/agui/reader.ts` connects
+to it (`chatStream`, `lib/event-streams.ts`, a `fetch` of `GET /api/conversations/:id/stream` under the page's
+workspace) and reads its AG-UI events, starting over at each connection's opening, `lib/agui/reducer.ts` folds them
+into the transcript's projection, and `lib/stream-pool.ts` shares one reader per chat among the panes that show it. It holds no
+owner data that a query also holds; older pages come from the history query, in the same message mapping. A stream
+refused for good (401) goes to sign-in through the query client (`failedOutside`, `lib/query/api-query.ts`).
 
 ## Failures
 

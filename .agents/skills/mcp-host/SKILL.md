@@ -48,6 +48,10 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   room (ADR 0108), labelled `[from server <key name>]`: a room's chats reach only the gateway within its setup and its
   thread's declared servers, skills and their own chats, refused past that at call time (`pi/room.ts`); never add a
   tool a room offers without adding it to `ROOM_TOOLS` on purpose.
+- Every `EndpointScope` endpoint has its tool in `inbound/tools.ts` but the streamed ones (`STREAMED`): a chat's stream
+  (ADR 0110) is server-sent events a key reads over HTTP with its own credential, and the server's instructions say
+  where. A key reads a chat's stream in full, so nothing a tool returns may carry a credential; the stream's frames
+  redact goblin-shaped secrets as a backstop (`streams/redact.ts`), never the boundary.
 - Events (`mcp/events/engine.ts`, ADRs 0011 and 0073) require resident authority and an exact server/name/canonical-arguments owner
   grant through the originating endpoint-bound connection. A server offers Events by top-level `capabilities.events`
   (decoded at the authenticated SDK fetch seam, which strips it) or by the `io.modelcontextprotocol/events` extension,

@@ -5,11 +5,11 @@ description: Change how the browser follows a chat (its AG-UI stream, the reader
 
 # Conversation stream and MCP Apps in goblin
 
-A chat is one stream of AG-UI 1.0 events in a Durable Streams object per epoch, the same profile third parties read
-([chat streams](../../../docs/architecture/streams.md), ADR 0109). The browser joins it through the typed client
-(`streamJoin` in `conversations/queries.ts`, `GET /api/conversations/:id/stream`) and reads the `full` tier at the
-signed URL it answers: `lib/agui/reader.ts` reads what was written since its offset, then follows live
-(`lib/event-streams.ts` holds the `fetch` and `EventSource` transports, the only ones outside the typed client).
+A chat is one stream of AG-UI 1.0 events the agent serves to every reader connected to it, the same profile third
+parties read ([chat streams](../../../docs/architecture/streams.md), ADRs 0109 and 0110): `GET
+/api/conversations/:id/stream`, server-sent events, each connection opening with the chat's snapshots. The browser
+connects with `fetch` (`chatStream` and `readEvents` in `lib/event-streams.ts`, which holds the transports outside the
+typed client) and `lib/agui/reader.ts` reads it live, connecting again for a fresh opening whenever it ends.
 `lib/agui/reducer.ts` folds the events into the `ConversationProjection` the transcript draws; `lib/agui/messages.ts`
 maps AG-UI messages to `ChatMessage`s (`lib/chat-messages.ts`) once per message, keeping the transcript's ids
 (`<entry>:<index>`) from `metadata.goblin.entryId`, and decodes goblin's marks and activities with their contract
@@ -38,11 +38,12 @@ a conversation outside it.
 - A chat's children (a Persona's fork, a subagent) stream into it under AG-UI's subagent attribution: `subagentRunId`
   is the child's chat, `SUBAGENT_STARTED` and `SUBAGENT_FINISHED`/`SUBAGENT_ERROR` bound its work, and its answer is the
   chat's own message naming it in `metadata.goblin.subagentRunId`. The runtime translates a child over its own cursor
-  (`streams/children.ts`, kept in the parent's) and follows it with a watch of its own (`streams/child-follow.ts`:
-  Personas by `invocations.changed`, subagents by `conversations.changed`); `answers` keeps its lifecycle alone. The
-  reducer keeps a child's events with it (`ConversationProjection.children`), never in the transcript; the rows after
-  the transcript (`components/shell/answering.tsx`) show who works from it, and a Persona waiting its turn from the
-  workspace feed. A new epoch starts the children working then; never infer a child from Pi's entries in the browser.
+  (`streams/children.ts`, kept in each reader's) and follows it with a watch of its own (`streams/child-follow.ts`:
+  Personas by `invocations.changed`, subagents by `conversations.changed`) while its parent has readers. Every reader,
+  a server's key included, gets the child's work in full. The reducer keeps a child's events with it
+  (`ConversationProjection.children`), never in the transcript; the rows after the transcript
+  (`components/shell/answering.tsx`) show who works from it, and a Persona waiting its turn from the workspace feed. A
+  connection's opening starts the children working then; never infer a child from Pi's entries in the browser.
 - Queued inputs and what they say come from STATE `/queue` (the producer reads `InboxDoc`). Render the queue above both
   composers, outside the transcript and turn map. Normal Send stays a follow-up; unchanged failed drafts reuse their
   operation IDs. Row removal uses the owner DELETE queue API and disables only that row while pending; the stream shows
@@ -54,12 +55,14 @@ a conversation outside it.
   its own and skips one it cannot read (`lib/workspace/decode.ts`), so a server newer than the tab never stops the
   feed; only a frame of another shape reconnects. Never refresh the list after a run, and never hold feed data in a
   second store.
-- A dropped live read reads on from the last offset it applied; only a 401/403/404, a closed stream or
-  `goblin.stream.moved` joins again, and a new epoch (whose `MESSAGES_SNAPSHOT` resets the reducer) is read from its
-  start. Back off between failed attempts (`lib/reconnect.ts`). Verify with `test/agui-reader.test.ts`, the reducer
-  against the runtime's goldens (`test/agui-reducer.test.ts`, the `fork` golden for a child), and the browser fixtures
-  `test/ui-channel.ts` and `test/ui-queue.ts`, which serve AG-UI over the protocol's reads (`test/agui-route.ts`). A
-  child's translation is held by `apps/runtime/test/streams/children.test.ts` and, in workerd, `streams-children-case.ts`.
+- Every connection opens afresh (its `MESSAGES_SNAPSHOT` resets the reducer): a connection the server ended after its
+  events connects again at once, a dropped or 45-seconds-silent one after a backoff (`lib/reconnect.ts`); a 404 or 403
+  stops, a 401 goes to sign-in (`failedOutside`). Never add offsets, `Last-Event-ID` or a second transcript to resume
+  with. Verify with `test/agui-reader.test.ts`, the reducer against the runtime's goldens (`test/agui-reducer.test.ts`,
+  the `fork` golden for a child), and the browser fixtures `test/ui-channel.ts` and `test/ui-queue.ts`, which serve
+  AG-UI as server-sent events (`test/agui-route.ts`). The producer is held by
+  `apps/runtime/test/streams/producer.test.ts`, a child's translation by `children.test.ts` and, in workerd,
+  `streams-case.ts` and `streams-children-case.ts`.
 - MCP Apps are tool-associated `ui://` resources from the originating server. Render them in the sandboxed iframe
   with its CSP; validate message origin and source.
 - Apps are kept per call in the runtime registry (`apps/registry.ts`, ADR 0020) and listed by the workspace feed;

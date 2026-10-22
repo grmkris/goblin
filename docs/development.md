@@ -189,9 +189,9 @@ until it runs, real provider and Telegram delivery remain unverified.
   curl -sS -X POST "$GOBLIN_ORIGIN/api/topics" -H "authorization: Bearer $GOBLIN_KEY" \
     -H 'content-type: application/json' -d '{"name":"Service test","operationId":"svc:topic:1"}'
   curl -sS "$GOBLIN_ORIGIN/api/conversations/<chat>/entries?after=0" -H "authorization: Bearer $GOBLIN_KEY"
-  # Follow the chat live instead (docs/architecture/streams.md): the answers tier, from its start, then waiting.
-  url=$(curl -sS "$GOBLIN_ORIGIN/api/conversations/<chat>/stream" -H "authorization: Bearer $GOBLIN_KEY" | jq -r .url)
-  curl -sS -D - "$url?offset=-1"
+  # Follow the chat live instead (docs/architecture/streams.md): its AG-UI events as server-sent events, in full,
+  # opening with the chat's snapshot; a reconnect opens with a fresh one.
+  curl -sS -N "$GOBLIN_ORIGIN/api/conversations/<chat>/stream" -H "authorization: Bearer $GOBLIN_KEY"
   ```
 
   The same key on `/mcp` lists `topic_create`, `conversation_send`, `conversation_entries` and the rest for its
@@ -570,7 +570,7 @@ includes other agents' edits) in scratch worktrees under `/tmp/goblin-perf-workt
   numbers from one run. The same revision on both sides gives the noise floor.
 - `heavy bun apps/web/test/ui-follow.ts` plays scripted owner turns against the same fixture (a streamed reply, a tool
   round after a slow provider, a storm of parallel calls, a reply already past the fold when its turn lands, a
-  new epoch opening mid-reply, the composer growing mid-stream) on the phone and desktop profiles and reports,
+  new connection opening mid-reply, the composer growing mid-stream) on the phone and desktop profiles and reports,
   frame by frame, how far the newest row sat under the composer, whether the jump-to-end arrow was offered while
   streaming, whether the view was pulled back up, how many rows the turn takes, and how often the gap between two rows
   that are both on screen changed (a visible jump; rows above the screen settling are not one, the scroller keeps the
