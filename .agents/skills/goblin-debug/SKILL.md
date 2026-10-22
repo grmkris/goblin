@@ -27,7 +27,12 @@ is read-only: no query changes the agent or calls a model.
    attempts, tool calls, failures, `error` events, tokens.
 3. `turn <operation id>`: Pi's settlement (`done`, or `unanswered` and why) and every event in order with timings.
    Read `coverage.gaps`: they say what the timeline cannot show (a restart mid-turn, open events, a missing final answer, a compaction's
-   model call). A gap is not evidence that nothing happened.
+   model call). A gap is not evidence that nothing happened. Its "Ran with" line (ADR 0107) says which release it ran
+   on (two when the agent restarted into a new one mid-turn: right after a deploy the agent can still answer from the
+   old code for minutes), which endpoint (`deployment` or the owner's own), the thinking level, whether the prompt or
+   tools changed before an attempt, and each MCP server's own name and version. "It worked yesterday" starts here.
+   `turn <operation id> --otlp` prints the same turn as an OpenTelemetry trace with its words, for a trace viewer
+   (`docs/development.md`).
 4. `conversation <id> --before <entry>`: the words, tool arguments and results around the turn, in full but bounded
    (`truncated` marks a cut).
 5. `flows --chat <id> --since 6h`: how conversations moved (ADR 0037), content-free, each step with its operation id
@@ -71,12 +76,17 @@ In the app, a message's Details (in its toolbar) shows what `details` shows, fro
   subagents `subagent:` and `subagent-report:`; a Persona's answer `persona:<operation>:<persona>`; the owner's
   browser and MCP clients use their own ids (`direct`).
 - `model.attempt`: one provider request. `error` with `gen_ai.response.finish_reasons` and a fixed `goblin.error` summary; a retried
-  attempt is a new event with a higher `goblin.attempt`.
+  attempt is a new event with a higher `goblin.attempt`. It names the model asked for and the one that answered, the
+  thinking level (`gen_ai.request.reasoning.level`), the endpoint (`goblin.model.endpoint`), and, when the prompt or
+  tools changed before it, the section keys and tools (`goblin.prompt.*`, `goblin.tools.*`). Every event names its
+  release (`gen_ai.agent.version`).
 - `tool.call`: `blocked` (`goblin.blocked_reason`: a missing grant, the budget, an inactive resident authority),
   `interrupted` (stopped or restarted), `error` (the tool failed). An `mcp_call` names `goblin.mcp.server` and
   `goblin.mcp.tool`.
 - `mcp.request`: the remote MCP step itself (connect, call, skills, Events) with an outcome tag such as
   `UpstreamMcp:timeout`; expected authorization waits are blocked. Shared connection discovery has no turn attribution.
+  It names the method (`mcp.method.name`) and the server as it last connected: its own name and version, the protocol
+  and its tool list's digest, so a server that changed under the agent shows.
 - `source.received` / `source.reply`: Source messages in and out; a reply is `sent` in pieces or `given_up` after a day.
 - `model.aux`: model calls outside a turn (naming, memory, skills, app `llm`).
   Successful completions, including a bounded memory call ending in `length`, stay out of both problem views;

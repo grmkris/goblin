@@ -338,7 +338,8 @@ until it runs, real provider and Telegram delivery remain unverified.
   bun run goblin problems --since 6h
   bun run goblin problems --all --since 6h # expected waits and recovered model attempts too
   bun run goblin turns
-  bun run goblin turn <operation-id>     # one turn end to end
+  bun run goblin turn <operation-id>     # one turn end to end, and what it ran with
+  bun run goblin turn <operation-id> --otlp > turn.json  # the same as an OpenTelemetry trace, with its words
   bun run goblin conversation 1         # main's entries, in full
   bun run goblin flows --chat 12        # how a chat's conversation moved, content-free
   bun run goblin details --operation <id> # what happened behind one message, and its related operations
@@ -361,6 +362,17 @@ until it runs, real provider and Telegram delivery remain unverified.
   `goblin stats` read Cloudflare with your own `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` and the stage
   Worker from `/health`; the Worker never sees them. `goblin stats` queries the stage's Analytics Engine dataset
   (`goblin-<stage>-flows`) and needs a token with Account Analytics read. `--json` prints a tool's structured result; `bun link` in `apps/cli` puts `goblin` on your path.
+
+  `goblin turn <operation-id> --otlp` prints the turn as OTLP/JSON traces data (ADR 0107), with its words added on
+  your machine from `inspect_conversation` when the sign-in may read conversations. Any OTLP viewer opens it; a
+  throwaway Jaeger on this machine, its ports on loopback only:
+
+  ```bash
+  docker run --rm -d --name goblin-jaeger -p 127.0.0.1:16686:16686 -p 127.0.0.1:4318:4318 jaegertracing/jaeger:2.21.0
+  bun run goblin turn <operation-id> --otlp > turn.json
+  curl -fsS -H 'content-type: application/json' --data-binary @turn.json http://127.0.0.1:4318/v1/traces
+  # open the address the CLI printed: http://127.0.0.1:16686/trace/<trace id>
+  ```
 
 ## Changing things
 

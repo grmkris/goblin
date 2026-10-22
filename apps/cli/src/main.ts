@@ -1,11 +1,15 @@
 #!/usr/bin/env bun
+import { InspectEntries, OtlpTraceData } from '@goblin/contracts/inspect'
 import type { Client } from '@modelcontextprotocol/client'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { type Args, UsageError, parseArgs } from './args.ts'
 import { type ToolInfo, argumentsFor, commandOf, usage } from './commands.ts'
 import { type Settings, settingsOf } from './config.ts'
 import { connect, logout } from './connect.ts'
 import { logs } from './logs.ts'
 import { lookup } from './lookup.ts'
+import { type ReadEntries, traceIdOf, withContent } from './otlp.ts'
 import { failureText, render } from './render.ts'
 import { stats } from './stats.ts'
 
@@ -16,6 +20,7 @@ const HELP = `goblin: your goblin agent from the terminal, as an MCP client of /
   goblin problems [--since …]  what failed, was blocked or cut short
   goblin turns                 recent turns, one line each
   goblin turn <operation id>   one turn end to end
+  goblin turn <id> --otlp      the same as an OpenTelemetry trace with its words, for a trace viewer
   goblin conversation <id>     a conversation's entries, in full
   goblin flows [--chat 12]     how conversations moved: sends, replies, threads, moves, Personas, Delegates
   goblin details --operation <id>   what happened behind one message
@@ -62,11 +67,49 @@ async function runTool(client: Client, args: Args, settings: Settings): Promise<
     console.error(failureText(errorText(result)))
     return 1
   }
+  if (tool.name === 'inspect_turn' && args.flags.get('otlp') === true)
+    return printTrace(client, tools, result.structuredContent, settings)
   console.log(
     settings.json
       ? JSON.stringify(result.structuredContent ?? null, null, 2)
       : render(args.command ?? '', result.structuredContent),
   )
+  return 0
+}
+
+/**
+ * A turn's trace as OTLP/JSON on stdout, with its words read on this machine when the sign-in may read conversations
+ * (ADR 0107), and where to see it on stderr: post it to any OTLP receiver's `/v1/traces`.
+ */
+async function printTrace(
+  client: Client,
+  tools: readonly ToolInfo[],
+  structured: unknown,
+  settings: Settings,
+): Promise<number> {
+  const trace = Schema.decodeUnknownSync(OtlpTraceData)(structured)
+  const { workspace } = settings
+  const read: ReadEntries = async (conversation, before) => {
+    const result: CallResult = await client.callTool({
+      name: 'inspect_conversation',
+      arguments: {
+        conversation,
+        ...(before === undefined ? {} : { before }),
+        ...(workspace === undefined ? {} : { workspace }),
+      },
+    })
+    return result.isError === true
+      ? undefined
+      : Option.getOrUndefined(Schema.decodeUnknownOption(InspectEntries)(result.structuredContent))
+  }
+  const words = tools.some((each) => each.name === 'inspect_conversation')
+  console.log(JSON.stringify(words ? await withContent(trace, read) : trace))
+  if (!words) console.error('No words: this sign-in cannot read conversations in full.')
+  const id = traceIdOf(trace)
+  if (id !== undefined)
+    console.error(
+      `trace ${id}: post it to an OTLP receiver's /v1/traces (local Jaeger: http://127.0.0.1:16686/trace/${id})`,
+    )
   return 0
 }
 
