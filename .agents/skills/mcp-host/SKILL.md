@@ -77,7 +77,8 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   `resident.ts`, handlers in `mcp/servers/api.ts` and `mcp/resident-api.ts`) over the services in `mcp/service.ts` (`McpServers`,
   `McpGrants`, `McpConnections`, `Approvals`, `Events`, `Resident`). An App's own calls carry `x-mcp-caller: app`,
   which the edge forwards and the contract reads, so they are held to the App's grants. The OAuth callback is the
-  `mcp` group's raw `oauthCallback` (`GET /api/mcp/oauth/callback`), a redirect to Connections, with `ref` when it
+  `mcp` group's raw `oauthCallback` (`GET /api/mcp/oauth/callback`; the edge sends a non-member of the state's
+  workspace to `/connect-elsewhere` instead, ADR 0096), a redirect to Connections, with `ref` when it
   failed.
 - Inbound `/mcp` is one server for every caller (ADR 0086): an OAuth client of the owner or a server's `gbk_` key
   (`inbound/route.ts`). Each tool in the registry (`inbound/tools.ts`, `mcp-server.ts`, `inspect-tools.ts`) calls one

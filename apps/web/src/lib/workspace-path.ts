@@ -11,7 +11,7 @@ import type { LocationRewrite } from '@tanstack/react-router'
 const PREFIX = /^\/w\/([a-z0-9-]{1,64})(?=\/|$)(.*)$/u
 
 /** The pages that belong to a person, not a workspace: never prefixed. */
-const PERSON_PAGES = ['/login', '/consent', '/invite', '/terms', '/privacy'] as const
+const PERSON_PAGES = ['/login', '/consent', '/invite', '/connect-elsewhere', '/terms', '/privacy'] as const
 
 const isPersonPage = (path: string): boolean =>
   PERSON_PAGES.some((page) => path === page || path.startsWith(`${page}/`))

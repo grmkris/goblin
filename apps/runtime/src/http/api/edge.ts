@@ -484,6 +484,9 @@ const workspaceOf =
     return Effect.provideContext(served, observed)
   }
 
+/** Where a sign-in goes back to when its person is not in the workspace its state names: a page that says so. */
+const SIGN_IN_ELSEWHERE = '/connect-elsewhere'
+
 const signInOf =
   ({ ownerRoute, observed }: Built): EdgeHttp['signIn'] =>
   (request, edge) => {
@@ -493,7 +496,17 @@ const signInOf =
       Effect.gen(function* () {
         const id = stateWorkspace(url.searchParams.get('state'))
         if (id === undefined) return yield* new NotFound({ what: 'workspace' })
-        const { person, workspace: member } = yield* admitMember(request, edge, { id })
+        const admitted = yield* admitMember(request, edge, { id }).pipe(
+          // expected: the person is no member of the sign-in's workspace. Its code goes to no agent (no login CSRF);
+          // the page says where to finish it, without naming the workspace (ADR 0096).
+          Effect.catchTag('NotFound', () => Effect.succeed(undefined)),
+        )
+        if (admitted === undefined)
+          return secured(
+            new Response(null, { status: 302, headers: { location: `${edge.origin}${SIGN_IN_ELSEWHERE}` } }),
+            facts.ref,
+          )
+        const { person, workspace: member } = admitted
         known(member.id)
         return yield* forwardMember({
           request,

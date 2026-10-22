@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ActivityRouteImport } from './routes/activity'
+import { Route as ConnectElsewhereRouteImport } from './routes/connect-elsewhere'
 import { Route as ConnectionsRouteImport } from './routes/connections'
 import { Route as ConsentRouteImport } from './routes/consent'
 import { Route as LoginRouteImport } from './routes/login'
@@ -38,6 +39,11 @@ const IndexRoute = IndexRouteImport.update({
 const ActivityRoute = ActivityRouteImport.update({
   id: '/activity',
   path: '/activity',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConnectElsewhereRoute = ConnectElsewhereRouteImport.update({
+  id: '/connect-elsewhere',
+  path: '/connect-elsewhere',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConnectionsRoute = ConnectionsRouteImport.update({
@@ -135,6 +141,7 @@ const ConnectionsConnectionIdAppRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/connect-elsewhere': typeof ConnectElsewhereRoute
   '/connections': typeof ConnectionsRoute
   '/consent': typeof ConsentRoute
   '/login': typeof LoginRoute
@@ -157,6 +164,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/connect-elsewhere': typeof ConnectElsewhereRoute
   '/connections': typeof ConnectionsRoute
   '/consent': typeof ConsentRoute
   '/login': typeof LoginRoute
@@ -180,6 +188,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/connect-elsewhere': typeof ConnectElsewhereRoute
   '/connections': typeof ConnectionsRoute
   '/consent': typeof ConsentRoute
   '/login': typeof LoginRoute
@@ -204,6 +213,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/activity'
+    | '/connect-elsewhere'
     | '/connections'
     | '/consent'
     | '/login'
@@ -226,6 +236,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/activity'
+    | '/connect-elsewhere'
     | '/connections'
     | '/consent'
     | '/login'
@@ -248,6 +259,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/activity'
+    | '/connect-elsewhere'
     | '/connections'
     | '/consent'
     | '/login'
@@ -271,6 +283,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivityRoute: typeof ActivityRoute
+  ConnectElsewhereRoute: typeof ConnectElsewhereRoute
   ConnectionsRoute: typeof ConnectionsRoute
   ConsentRoute: typeof ConsentRoute
   LoginRoute: typeof LoginRoute
@@ -305,6 +318,13 @@ declare module '@tanstack/react-router' {
       path: '/activity'
       fullPath: '/activity'
       preLoaderRoute: typeof ActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/connect-elsewhere': {
+      id: '/connect-elsewhere'
+      path: '/connect-elsewhere'
+      fullPath: '/connect-elsewhere'
+      preLoaderRoute: typeof ConnectElsewhereRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/connections': {
@@ -439,6 +459,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
+  ConnectElsewhereRoute: ConnectElsewhereRoute,
   ConnectionsRoute: ConnectionsRoute,
   ConsentRoute: ConsentRoute,
   LoginRoute: LoginRoute,

@@ -89,7 +89,10 @@ its registry, name and version. The owner connects each server from the Connecti
 2. The remote server redirects to `/api/mcp/oauth/callback`, one address for every workspace (`mcp/oauth/sign-in.ts`).
    The sign-in's `state` starts with the workspace's ID (`signInState`), and the Worker's edge forwards the callback to
    that workspace's agent once the person's session and membership of it admit (ADR 0089), then sends its redirect to
-   the workspace's pages (`/w/<slug>/connections`). The pending state is single-use and expires after an hour (a
+   the workspace's pages (`/w/<slug>/connections`). A signed-in person who is not a member of that workspace is sent to
+   `/connect-elsewhere`, which says to finish the sign-in as an admin of the workspace it belongs to and names none; the
+   code reaches no agent, so nobody can plant their own sign-in in someone else's workspace (ADR 0096). A `state` goblin
+   did not make is a 404, and no session a 401. The pending state is single-use and expires after an hour (a
    server's consent may have the owner set things up first); the code is exchanged and the tokens stored.
 3. Client registration and tokens are AES-GCM encrypted at rest (`GOBLIN_CREDENTIAL_KEY`, bound to server ID and
    purpose); discovery metadata is stored in plain JSON.

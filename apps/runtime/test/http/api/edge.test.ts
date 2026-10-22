@@ -259,13 +259,17 @@ describe("a member's forward (ADR 0089)", () => {
     expect(new URL(seen[0]?.url ?? '').pathname).toBe('/api/mcp/oauth/callback')
     expect(new URL(seen[0]?.url ?? '').searchParams.get('state')).toBe(state)
     expect(JSON.parse(seen[0]?.headers.get('x-goblin-member') ?? '{}')).toMatchObject({ user: OWNER, role: 'owner' })
-    // Another workspace's sign-in, a state goblin did not make and no session reach no agent.
+    // Another workspace's sign-in, a state goblin did not make and no session reach no agent. The person who is not
+    // in the sign-in's workspace is sent to a page that says so, which names no workspace (ADR 0096).
+    const elsewhere = `ws-other.${crypto.randomUUID()}`
     const refused = [
-      await back(`code=c&state=ws-other.${crypto.randomUUID()}`),
+      await back(`code=c&state=${elsewhere}`),
       await back('code=c&state=s'),
       await back(`code=c&state=${state}`, {}),
     ]
-    expect(refused.map(({ response: each }) => each.status)).toEqual([404, 404, 401])
+    expect(refused.map(({ response: each }) => each.status)).toEqual([302, 404, 401])
+    expect(refused[0]?.response.headers.get('location')).toBe(`${APP}/connect-elsewhere`)
+    expect(await refused[1]?.response.json()).toMatchObject({ error: { code: 'not_found', what: 'workspace' } })
     expect(agents).toEqual([WS])
   })
 
