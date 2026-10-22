@@ -78,7 +78,7 @@ without a session (the link is all a visitor has), and `accept` or `decline` nee
 They are the person's, not a workspace's, so the web shows the same ones in every workspace: a moss count on the
 workspace menu, which lists them first with Join and No thanks answered in place, and Activity's Needs you (they count
 in Activity's number). Joining opens the workspace joined; a refusal says why in the person's words (`owner_models`, an
-expired or withdrawn one).
+expired or withdrawn one). The menu also names the person's role in each workspace, and its tooltip the role here.
 The email-code gate (`auth/email-code.ts`) lets an address with an invitation waiting sign up whatever the sign-up
 mode, and `workspacesOf` gives such a person no first workspace of their own.
 

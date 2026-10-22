@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import type { InvitationPreview, WorkspaceView } from '@goblin/contracts'
@@ -23,16 +23,19 @@ import {
   GoblinMark,
   Input,
   Spinner,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@goblin/ui'
 import { CheckIcon, ChevronsUpDownIcon, MailIcon, PlusIcon, SettingsIcon } from 'lucide-react'
 import { useAnswerInvitation, useMyInvitations } from '../../account/hooks.ts'
 import { createWorkspaceMutation, workspacesQuery } from '../../account/queries.ts'
-import { ROLE_PHRASE } from '../../lib/labels.ts'
+import { ROLE_PHRASE, ROLE_WORDS } from '../../lib/labels.ts'
 import { rememberWorkspace } from '../../lib/last-workspace.ts'
 import { messageOf, withRef } from '../../lib/query/app-error.ts'
 import { currentSlug, inWorkspace } from '../../lib/workspace-path.ts'
 import { invitationRefusal } from '../invitation-refusal.ts'
-import { EXACT, Tip } from './sidebar-parts.tsx'
+import { EXACT, Strip } from './sidebar-parts.tsx'
 
 /** A workspace's address from its name: lowercase letters and digits, single hyphens, at most 40 characters. */
 const slugOf = (name: string): string =>
@@ -173,35 +176,47 @@ function InvitationItem({ invitation }: { readonly invitation: InvitationPreview
 
 /**
  * The sidebar's head (ADR 0089): the workspace this page is in, with a moss count while invitations wait for the
- * person (ADR 0093), and a menu of those invitations first, each answered in place, then the person's workspaces, a new
- * one and this one's settings. Choosing another opens it in this tab; each tab can be in a different one.
+ * person (ADR 0093), and a menu of those invitations first, each answered in place, then the person's workspaces with
+ * their role in each, a new one and this one's settings. Choosing another opens it in this tab; each tab can be in a
+ * different one. Its tooltip names the workspace and the person's role in it.
  */
 export function WorkspaceMenu() {
   const workspaces = useQuery(workspacesQuery)
   const invitations = useMyInvitations()
   const [creating, setCreating] = useState(false)
+  const strip = use(Strip)
   const slug = currentSlug()
   const current = workspaces.data?.find((workspace) => workspace.slug === slug)
   useEffect(() => rememberWorkspace(window.location.pathname), [])
+  const where = current === undefined ? undefined : `You are ${ROLE_PHRASE[current.role]} of ${current.name}`
   const label = [
     `Workspace: ${current?.name ?? slug ?? ''}`,
+    ...(current === undefined ? [] : [`you are ${ROLE_PHRASE[current.role]}`]),
     ...(invitations.length > 0 ? [waiting(invitations.length)] : []),
   ].join(', ')
   return (
     <>
       <DropdownMenu>
-        <Tip label={current?.name ?? 'Workspace'}>
-          <DropdownMenuTrigger render={<button type="button" className="sidebar-brand" aria-label={label} />}>
-            <GoblinMark />
-            <span className="sidebar-title">{current?.name ?? 'goblin'}</span>
-            {invitations.length > 0 && (
-              <span className="sidebar-invites" aria-hidden>
-                {invitations.length > 9 ? '9+' : invitations.length}
-              </span>
-            )}
-            <ChevronsUpDownIcon className="sidebar-title-chevron" aria-hidden />
-          </DropdownMenuTrigger>
-        </Tip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <DropdownMenuTrigger render={<button type="button" className="sidebar-brand" aria-label={label} />}>
+                <GoblinMark />
+                <span className="sidebar-title">{current?.name ?? 'goblin'}</span>
+                {invitations.length > 0 && (
+                  <span className="sidebar-invites" aria-hidden>
+                    {invitations.length > 9 ? '9+' : invitations.length}
+                  </span>
+                )}
+                <ChevronsUpDownIcon className="sidebar-title-chevron" aria-hidden />
+              </DropdownMenuTrigger>
+            }
+          />
+          <TooltipContent side={strip ? 'right' : 'bottom'} align={strip ? 'center' : 'start'}>
+            {where ?? current?.name ?? 'Workspace'}
+            {invitations.length > 0 && <span className="block opacity-75">{waiting(invitations.length)}</span>}
+          </TooltipContent>
+        </Tooltip>
         <DropdownMenuContent side="bottom" align="start">
           {invitations.length > 0 && (
             <>
@@ -216,8 +231,9 @@ export function WorkspaceMenu() {
           )}
           {(workspaces.data ?? []).map((workspace) => (
             <DropdownMenuItem key={workspace.id} onClick={() => workspace.slug !== slug && open(workspace)}>
-              {workspace.slug === slug ? <CheckIcon aria-hidden /> : <span className="size-4" aria-hidden />}
-              {workspace.name}
+              <CheckIcon aria-hidden className={workspace.slug === slug ? undefined : 'invisible'} />
+              <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
+              <span className="workspace-role">{ROLE_WORDS[workspace.role]}</span>
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />

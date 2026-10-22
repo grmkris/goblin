@@ -123,7 +123,7 @@
  * at the end, which move under the words where the menu cannot show the words whole beside them (a phone's larger
  * type, a long name). Each
  * answer reaches 40px tall at a mouse without growing (at a finger the menu's items are 44px themselves). A refusal
- * reads whole under them, in line with the words.
+ * reads whole under them, in line with the words. Each workspace's role is quiet at its end.
  */
 .workspace-invite {
   display: flex;
@@ -157,6 +157,12 @@
   .workspace-invite-refusal {
     padding-inline: 2.375rem 0.625rem;
   }
+}
+.workspace-role {
+  flex: none;
+  margin-inline-start: 0.75rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
 }
 .sidebar-collapse {
   display: grid;

@@ -94,7 +94,10 @@ export function runStatus(state: RoutineRunView['state']): Label {
   }
 }
 
-/** A person's role in a workspace inside a sentence: "as a member". */
+/** A person's role in a workspace, as its lists name it. */
+export const ROLE_WORDS: Readonly<Record<WorkspaceRole, string>> = { owner: 'Owner', admin: 'Admin', member: 'Member' }
+
+/** The same role inside a sentence: "you are an admin of Swarmm", "as a member". */
 export const ROLE_PHRASE: Readonly<Record<WorkspaceRole, string>> = {
   owner: 'an owner',
   admin: 'an admin',

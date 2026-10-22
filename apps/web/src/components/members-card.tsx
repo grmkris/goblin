@@ -33,9 +33,8 @@ import {
   updateMemberMutation,
 } from '../account/queries.ts'
 import { sessionPersonQuery } from '../auth/queries.ts'
+import { ROLE_WORDS } from '../lib/labels.ts'
 import { messageOf, withRef } from '../lib/query/app-error.ts'
-
-const ROLE_WORDS: Readonly<Record<WorkspaceRole, string>> = { owner: 'Owner', admin: 'Admin', member: 'Member' }
 
 /** An invitation's own link, which works for its address alone. */
 const linkOf = (id: string): string => `${window.location.origin}/invite/${id}`

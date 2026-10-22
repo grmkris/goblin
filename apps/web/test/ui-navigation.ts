@@ -235,10 +235,17 @@ try {
     await page.getByRole('button', { name: 'Expand sidebar' }).click()
     assert.equal(await page.evaluate(() => document.documentElement.dataset.sidebar), undefined)
 
-    // The workspace menu says what waits: a count of the invitations, which come first in the menu.
+    // The workspace menu says where the page is and what waits: the role in its name and tooltip, a count of the
+    // invitations, which come first in the menu, then each workspace with the person's role in it.
     await at('/c/1')
-    assert.equal(await brand(page).getAttribute('aria-label'), 'Workspace: Swarmm, 2 invitations waiting')
+    assert.equal(
+      await brand(page).getAttribute('aria-label'),
+      'Workspace: Swarmm, you are an admin, 2 invitations waiting',
+    )
     assert.equal(await brand(page).locator('.sidebar-invites').textContent(), '2')
+    await brand(page).hover()
+    await page.locator('[data-slot="tooltip-content"]', { hasText: 'You are an admin of Swarmm' }).waitFor()
+    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-workspace-tooltip.png`) })
     await brand(page).click()
     const menu = page.getByRole('menu')
     await menu.waitFor()
@@ -254,9 +261,9 @@ try {
         'Lab notes From Linus, as an admin',
         'No thanks',
         'Join',
-        "Ada's workspace",
-        'Swarmm',
-        'Sidequest team',
+        "Ada's workspace Owner",
+        'Swarmm Admin',
+        'Sidequest team Member',
         'New workspace',
         'Workspace settings',
       ],

@@ -497,8 +497,8 @@ Screenshots go under `.local/goblin-acceptance/setup-*`; this is browser fixture
 Chromium, desktop and phone, light and dark: one highlighted row per page (a thread, a pinned App, an unpinned App under
 Apps, a profile under Personas), the counts, every pin state, the strip with ⌘B/Ctrl+B, its tooltip, a reload that keeps
 it and the Topics list beside its `#`, and the phone's dot and drawer. The page is in a workspace with two invitations
-waiting: the workspace menu's count, its invitations first (a refused Join's words, No thanks in place), and
-Activity's Join opening the workspace joined.
+waiting: the workspace menu's count, its invitations first (a refused Join's words, No thanks in place), each
+workspace's role and its tooltip, and Activity's Join opening the workspace joined.
 `heavy bun apps/web/test/ui-apps.ts` renders Apps: the four sections in order, pins that do not open keeping their
 place, two accounts on one service, search by label, a closed view reopened in one step, a failed built-app read kept
 to its section and the ⋯ targets.
