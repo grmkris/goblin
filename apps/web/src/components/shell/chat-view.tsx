@@ -170,7 +170,7 @@ export function ChatView({
   const threads = useChatThreads(id, branchable, mover)
   const startThread = useThreadStart(id)
   const { lead, shown } = useLead(view, parts, earlier !== undefined, hideRoot)
-  const extras = useChatExtras(id, shown)
+  const extras = useChatExtras(id, shown, projection?.children)
   const rows = useFolded(id, shown)
   useHeads(parts, onHeads)
   return (
