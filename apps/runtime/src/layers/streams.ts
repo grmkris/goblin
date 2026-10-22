@@ -66,7 +66,7 @@ export const StreamsLive = Layer.effect(
 )
 
 /** What the session's queued inputs say now, by submission id; nothing when the inbox cannot be read. */
-const queued = (pi: PiSessions['Service'], session: string) =>
+export const queued = (pi: PiSessions['Service'], session: string) =>
   Effect.gen(function* () {
     const harness = yield* fromPi(pi.pi)
     const { inputs } = yield* attempt(() => queuedInputs(harness, session))
@@ -77,7 +77,7 @@ const queued = (pi: PiSessions['Service'], session: string) =>
  * The operation ids of `inputs` (a snapshot's run's and queue's), by submission id: Pi's snapshot names its inputs
  * without them, so a reader that opens mid-run still learns which operations its run answers.
  */
-const operations = (pi: PiSessions['Service'], inputs: readonly number[]) =>
+export const operations = (pi: PiSessions['Service'], inputs: readonly number[]) =>
   Effect.gen(function* () {
     const harness = yield* fromPi(pi.pi)
     const found = new Map<number, string>()

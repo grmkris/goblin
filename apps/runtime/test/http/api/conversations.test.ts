@@ -19,7 +19,7 @@ import { McpConnections, McpGrants, McpServers, Resident } from '../../../src/mc
 import { Models } from '../../../src/models.ts'
 import type { PersonaTurnKit } from '../../../src/organize/kit.ts'
 import { Invocations, Personas } from '../../../src/personas/service.ts'
-import { Streams } from '../../../src/streams/service.ts'
+import { RunStreams, Streams } from '../../../src/streams/service.ts'
 import type { PersonaView } from '@goblin/contracts'
 import { Retrieval } from '../../../src/retrieval/service.ts'
 import { RoutineControl, RoutineRuns } from '../../../src/routines/service.ts'
@@ -245,8 +245,9 @@ const services = (calls: Calls, personas: readonly PersonaView[]) =>
     // No message here carries files or App context, so neither is read.
     stub(Files),
     stub(Apps),
-    // No request here joins a chat's stream.
+    // No request here joins a chat's stream or asks for a send's run as events.
     stub(Streams),
+    stub(RunStreams),
     stub(Budget, { require: () => Effect.void }),
     stub(Models, { current: Effect.succeed('fixture-model') }),
     stub(RoutineRuns, { session: () => Effect.undefined }),

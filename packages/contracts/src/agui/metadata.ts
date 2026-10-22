@@ -69,6 +69,9 @@ export type StopMark = typeof StopMark.Type
  * - `MESSAGES_SNAPSHOT`: `before`, the entry older history is read before, a page at a time (the history endpoint);
  *   absent when the snapshot starts at the chat's beginning.
  * - `RUN_STARTED`: `operations`, the operation ids of the inputs that started it, when the stream saw them admitted.
+ * - A send's own run (ADR 0111, `POST …/messages` answered as events): `run` on its `RUN_STARTED`, the chat's run that
+ *   took the send (none for an ask of Personas, which has no run of the chat's); `replayed` on its end when the send's
+ *   operation had already ended: its input's entry and the entries of its answers.
  * - A tool call or result: `details` (Pi's details for UIs), `isError`, `parentToolCallId` (a nested call's caller);
  *   a result names its tool (`toolName`), for a reader that does not hold the call.
  */
@@ -94,6 +97,10 @@ export const GoblinMetadata = Schema.Struct({
   omits: Schema.optionalKey(Schema.Array(EntryId)),
   before: Schema.optionalKey(EntryId),
   operations: Schema.optionalKey(Schema.Array(OperationId)),
+  run: Schema.optionalKey(Schema.String),
+  replayed: Schema.optionalKey(
+    Schema.Struct({ entry: Schema.optionalKey(EntryId), answers: Schema.optionalKey(Schema.Array(EntryId)) }),
+  ),
   details: Schema.optionalKey(Schema.Json),
   isError: Schema.optionalKey(Schema.Boolean),
   toolName: Schema.optionalKey(Schema.String),

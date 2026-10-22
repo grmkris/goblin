@@ -1,4 +1,5 @@
 import type {
+  AguiEvent,
   ConversationView,
   CreateConversation,
   MoveToThread,
@@ -14,6 +15,7 @@ import { OwnerApi } from '@goblin/contracts/api'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Stream from 'effect/Stream'
+import type * as HttpServerRequest from 'effect/http/HttpServerRequest'
 import * as HttpServerResponse from 'effect/http/HttpServerResponse'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import {
@@ -44,7 +46,7 @@ import { entryMessages } from '../streams/messages.ts'
 import { PiSessions } from '../pi/sessions.ts'
 import { Invocations } from '../personas/service.ts'
 import { sseFrames } from '../streams/frames.ts'
-import { Streams } from '../streams/service.ts'
+import { RunStreams, Streams } from '../streams/service.ts'
 import { Conversations } from './service.ts'
 import { moveToThread } from './mover.ts'
 import { startThread } from './thread-heads.ts'
@@ -66,9 +68,43 @@ const confinedSend = (chat: string, input: RunInput) =>
     return send
   })
 
-/** The owner's message into a chat, or an ask of the Personas it tags. */
-const submit = ({ params, payload }: ChatWrite<RunInput>) =>
-  Effect.flatMap(confinedSend(params.id, payload), (send) => sendOwnerMessage(params.id, send))
+/** What a chat's stream and a send's run are answered with: server-sent events, never cached. */
+const SSE_HEADERS = { 'cache-control': 'no-store', 'content-type': 'text/event-stream' }
+
+/** `batches` as a server-sent events answer (`streams/frames.ts`); the body runs on its own past the request's scope. */
+const eventsAnswer = (batches: Stream.Stream<readonly AguiEvent[]>, signal?: AbortSignal) =>
+  HttpServerResponse.raw(
+    new Response(
+      Stream.toReadableStreamWith(sseFrames(batches), Context.empty(), signal === undefined ? {} : { signal }),
+      {
+        headers: SSE_HEADERS,
+      },
+    ),
+  )
+
+/** Whether a request asks to be answered with server-sent events. */
+const wantsEvents = (request: HttpServerRequest.HttpServerRequest): boolean =>
+  (request.headers['accept'] ?? '').includes('text/event-stream')
+
+/**
+ * The owner's message into a chat, or an ask of the Personas it tags (ADR 0111): Pi's receipt, or, asked for
+ * server-sent events, the run that took it as AG-UI events (`RunStreams`, docs/architecture/streams.md "Driving a
+ * chat"), its watch opened before the send is admitted.
+ */
+const submit = ({
+  params,
+  payload,
+  request,
+}: ChatWrite<RunInput> & { readonly request: HttpServerRequest.HttpServerRequest }) =>
+  Effect.gen(function* () {
+    const send = yield* confinedSend(params.id, payload)
+    const admit = sendOwnerMessage(params.id, send)
+    if (!wantsEvents(request)) return yield* admit
+    yield* registeredConversation(params.id)
+    const ask = send.context.selections.some(({ kind }) => kind === 'persona')
+    const target = { chat: params.id, runId: send.operationId, ask }
+    return eventsAnswer(yield* RunStreams.use((runs) => runs.follow(target, admit)))
+  })
 
 /** `view` with the thread's declared servers (ADR 0103), when it has any; never a token. */
 const withServers = (view: ConversationView) =>
@@ -214,9 +250,6 @@ const sources = ({ params }: ChatRequest) =>
     Retrieval.use((retrieval) => retrieval.uses(params.id)),
   )
 
-/** What a chat's stream is answered with: server-sent events, never cached. */
-const SSE_HEADERS = { 'cache-control': 'no-store', 'content-type': 'text/event-stream' }
-
 /**
  * A registered chat's AG-UI stream as server-sent events (docs/architecture/streams.md): its opening, then everything
  * that happens in it, until the reader goes away or the producer lets it go (then the connection ends, read or not);
@@ -228,8 +261,7 @@ const stream = ({ params }: ChatRequest) =>
     yield* confineChat(params.id)
     yield* registeredConversation(params.id)
     const { batches, released } = yield* Streams.use((streams) => streams.watch(params.id))
-    const body = Stream.toReadableStreamWith(sseFrames(batches), Context.empty(), { signal: released })
-    return HttpServerResponse.raw(new Response(body, { headers: SSE_HEADERS }))
+    return eventsAnswer(batches, released)
   })
 
 /**

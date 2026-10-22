@@ -32,6 +32,7 @@ import { call, lever, ownerFetch, person, signedIn, workspaceOf, type Person } f
 import { clientErrorsCase, csrfCase, internalRefusalCase } from './edge-case.ts'
 import { streamChildrenCase } from './streams-children-case.ts'
 import { streamsCase } from './streams-case.ts'
+import { runStreamsCase } from './run-streams-case.ts'
 import { publishCase } from './publish-case.ts'
 
 const harness = Test.make({
@@ -168,6 +169,11 @@ harness.test(
 harness.test(
   "native: a Persona's fork and a subagent stream into their chat under their subagentRunId, a key reads its room's fork in full, and a new reader opens with a child in flight",
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => streamChildrenCase(url)))),
+  { timeout: 240_000 },
+)
+harness.test(
+  'native: a send asked for events answers with the run that took it, a queued send waits for its own, a resume answers a question, a Persona ask is a run, a retry answers at once, a key sends as Swarmm does, a whole history fits, and a stock HttpAgent runs a turn (ADR 0111)',
+  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => runStreamsCase(url)))),
   { timeout: 240_000 },
 )
 harness.test(
