@@ -22,6 +22,7 @@ import { PersonasHandlers } from '../../../src/personas/api.ts'
 import { OrganizeReceipts } from '../../../src/organize/receipts.ts'
 import { PersonaRegistry } from '../../../src/personas/registry.ts'
 import { appConversations } from '../../../src/storage/schema.ts'
+import { KeyNames } from '../../../src/keys/names.ts'
 import { TopicsHandlers } from '../../../src/topics/api.ts'
 import { TopicRegistry } from '../../../src/topics/registry.ts'
 import { currentResident, database, serve, served, sqliteDb, stub } from './fixture.ts'
@@ -109,6 +110,7 @@ export const organizing = () => {
     served(
       [TopicsGroup, PersonasGroup, OrganizeGroup],
       Layer.mergeAll(TopicsHandlers, PersonasHandlers, OrganizeHandlers),
+      KeyNames.layer,
     ).pipe(
       Layer.provide(
         Layer.mergeAll(

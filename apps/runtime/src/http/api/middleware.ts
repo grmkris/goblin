@@ -17,6 +17,7 @@ import * as HttpServerRequest from 'effect/http/HttpServerRequest'
 import type * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { type AppError, NotFound, isAppError } from '../errors.ts'
+import { KeyNames } from '../../keys/names.ts'
 import { callerMinutes } from '../../keys/rate.ts'
 import { Resident } from '../../mcp/service.ts'
 import { RequestContext } from './context.ts'
@@ -60,21 +61,22 @@ const reaches = (role: Member['role'], needed: 'member' | 'admin'): boolean => n
  */
 /**
  * A caller's admission (ADR 0086): the endpoint's `EndpointScope` must be one it holds (else `scope`), and it must be
- * within its requests for the minute (else `rate_limited` with `retryAfter`, ADR 0085).
+ * within its requests for the minute (else `rate_limited` with `retryAfter`, ADR 0085). A key admitted is `learn`t: its
+ * first request in the object's lifetime names what it made (ADR 0108).
  */
 const admitCaller = (
   caller: Caller,
   annotations: Context.Context<never>,
   take: ReturnType<typeof callerMinutes>,
+  learn: KeyNames['Service']['learn'],
 ): Effect.Effect<void, AppError> => {
   const scope = Context.get(annotations, EndpointScope)
   if (scope === undefined || !caller.scopes.some((held) => held === scope))
     return Effect.fail(new Forbidden({ reason: 'scope' }))
   return Effect.flatMap(Clock.currentTimeMillis, (now) => {
     const retryAfter = take(callerId(caller), now)
-    return retryAfter === undefined
-      ? Effect.void
-      : Effect.fail(new Unauthenticated({ reason: 'rate_limited', retryAfter }))
+    if (retryAfter !== undefined) return Effect.fail(new Unauthenticated({ reason: 'rate_limited', retryAfter }))
+    return caller.kind === 'key' ? learn(caller) : Effect.void
   })
 }
 
@@ -82,6 +84,7 @@ export const OwnerAdmissionLive = Layer.effect(
   OwnerAdmission,
   Effect.gen(function* () {
     const resident = yield* Resident
+    const { learn } = yield* KeyNames
     const take = callerMinutes()
     const admit = (annotations: Context.Context<never>) =>
       Effect.flatMap(Effect.serviceOption(RequestContext), (context): Effect.Effect<void, AppError> => {
@@ -89,7 +92,7 @@ export const OwnerAdmissionLive = Layer.effect(
         const member = facts?.member
         if (member !== undefined && !reaches(member.role, Context.get(annotations, EndpointRole)))
           return Effect.fail(new Forbidden({ reason: 'role' }))
-        if (facts?.caller !== undefined) return admitCaller(facts.caller, annotations, take)
+        if (facts?.caller !== undefined) return admitCaller(facts.caller, annotations, take, learn)
         if (member === undefined) return Effect.fail(new Unauthenticated({ reason: 'principal' }))
         return Context.get(annotations, GrantsResident) ? resident.grant() : Effect.void
       })

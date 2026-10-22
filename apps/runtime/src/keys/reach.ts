@@ -23,13 +23,13 @@ export const madeByKey = (db: DrizzleSqliteDODatabase, kind: ReachKind, id: numb
     .where(and(eq(appKeyReach.kind, kind), eq(appKeyReach.resourceId, id)))
     .get() !== undefined
 
-/**
- * Records that key `keyId`, named `name`, made the `kind` with `id`; recording it again changes nothing. A key's name
- * never changes, so this also names what the key made before names were kept (ADR 0108).
- */
+/** A key as what it made records it: its id and its name (ADR 0108). */
+type Maker = { readonly keyId: string; readonly name: string }
+
+/** Records that key `key` made the `kind` with `id`, with the key's name; recording it again changes nothing. */
 export const recordReach = (
   db: DrizzleSqliteDODatabase,
-  key: { readonly keyId: string; readonly name: string },
+  key: Maker,
   kind: ReachKind,
   id: number,
   now: number,
@@ -38,11 +38,22 @@ export const recordReach = (
     .values({ keyId: key.keyId, kind, resourceId: id, createdAt: now, keyName: key.name })
     .onConflictDoNothing()
     .run()
-  db.update(appKeyReach)
+}
+
+/**
+ * Names what key `key` made before names were kept (ADR 0108), in one statement, and answers what it named. A key's
+ * name never changes, so a named row stays right.
+ */
+export const nameReach = (
+  db: DrizzleSqliteDODatabase,
+  key: Maker,
+): readonly { readonly kind: ReachKind; readonly id: number }[] =>
+  db
+    .update(appKeyReach)
     .set({ keyName: key.name })
     .where(and(eq(appKeyReach.keyId, key.keyId), isNull(appKeyReach.keyName)))
-    .run()
-}
+    .returning({ kind: appKeyReach.kind, id: appKeyReach.resourceId })
+    .all()
 
 /** The ids of every `kind` key `keyId` made, as a subquery: a list of a key's own reads it in one statement. */
 export const reachedIds = <RunResult>(db: SQLiteAsyncDatabase<'sync', RunResult>, keyId: string, kind: ReachKind) =>

@@ -46,7 +46,7 @@ export type PersonaDefinition = typeof PersonaDefinition.Type
 
 /**
  * A Persona a server's API key made (ADR 0108): `key` is the key's name, or its id while goblin has not learnt the name
- * yet (one made before names were kept, until the key makes something again).
+ * yet (one made before names were kept, until the key's next request).
  */
 const PersonaMaker = Schema.Struct({ key: Schema.String })
 

@@ -160,10 +160,13 @@ describe("an API key's reach (ADR 0081)", () => {
   it('names the key on what it made, to the key and the owner, and on nothing it did not (ADR 0108)', async () => {
     const { fetch, db, topics, personas } = organizing()
     const named = grant('key-1', ['topics', 'personas'], 'swarmm-prod')
-    // Made before names were kept: its key's id stands in until the key makes something again.
-    db.run(sql`INSERT INTO app_key_reach (key_id, kind, resource_id, created_at) VALUES ('key-1', 'topic', 9, 1)`)
+    // Made before names were kept: the key's id stands in until its first request names it.
+    await fetch(post('/api/topics', { name: 'Older', operationId: 'older' }))
+    db.run(sql`INSERT INTO app_key_reach (key_id, kind, resource_id, created_at) VALUES ('key-1', 'topic', 2, 1)`)
+    expect(topics.get(2).room).toEqual({ key: 'key-1' })
     const made = await fetch(post('/api/topics', { name: 'Customer 1', operationId: 'svc:topic:1' }, named))
-    expect(await made.json()).toMatchObject({ id: 2, room: { key: 'swarmm-prod' } })
+    expect(await made.json()).toMatchObject({ id: 3, room: { key: 'swarmm-prod' } })
+    expect(topics.get(2).room).toEqual({ key: 'swarmm-prod' })
     const persona = await fetch(post('/api/personas', { ...scout, operationId: 'svc:p:1' }, named))
     expect(await persona.json()).toMatchObject({ id: 1, madeBy: { key: 'swarmm-prod' } })
     await fetch(post('/api/topics', { name: 'Trips', operationId: 'owner-topic' }))
@@ -171,19 +174,17 @@ describe("an API key's reach (ADR 0081)", () => {
     expect(topics.list().map((topic) => [topic.id, topic.room?.key])).toEqual([
       [1, undefined],
       [2, 'swarmm-prod'],
-      [3, undefined],
+      [3, 'swarmm-prod'],
+      [4, undefined],
     ])
     expect(personas.list().map((each) => [each.id, each.madeBy?.key])).toEqual([
       [1, 'swarmm-prod'],
       [2, undefined],
     ])
-    expect(db.all(sql`SELECT resource_id, key_name FROM app_key_reach ORDER BY kind, resource_id`)).toEqual([
-      { resource_id: 1, key_name: 'swarmm-prod' },
-      { resource_id: 2, key_name: 'swarmm-prod' },
-      { resource_id: 9, key_name: 'swarmm-prod' },
-    ])
     const owners = await topicPage(fetch(get('/api/topics')))
-    expect(owners.topics.map((topic) => topic.room?.key ?? null)).toEqual([null, 'swarmm-prod', null])
+    expect(owners.topics.map((topic) => topic.room?.key ?? null)).toEqual([null, 'swarmm-prod', 'swarmm-prod', null])
+    const own = await personaPage(fetch(get('/api/personas')))
+    expect(own.personas.map((each) => each.madeBy?.key ?? null)).toEqual([null, 'swarmm-prod'])
   })
 
   it("reads back one of its own Topics with its guidance and setup, and no other's", async () => {

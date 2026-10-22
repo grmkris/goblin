@@ -8,7 +8,7 @@ const TopicInstructions = Schema.String.check(Schema.isMaxLength(8000))
 
 /**
  * A Topic a server's API key made is a room (ADR 0108): its chats reach only it. `key` is the key's name, or its id
- * while goblin has not learnt the name yet (a room made before names were kept, until the key makes something again).
+ * while goblin has not learnt the name yet (a room made before names were kept, until the key's next request).
  */
 const TopicRoom = Schema.Struct({ key: Schema.String })
 

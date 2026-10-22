@@ -1,6 +1,7 @@
 import { ownerApiOf } from '@goblin/contracts/api'
 import type { NonEmptyReadonlyArray } from 'effect/Array'
 import type * as Context from 'effect/Context'
+import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as ManagedRuntime from 'effect/ManagedRuntime'
 import * as Schema from 'effect/Schema'
@@ -9,6 +10,7 @@ import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { afterEach } from 'vitest'
 import { OwnerAdmissionLive } from '../../../src/http/api/middleware.ts'
+import { KeyNames } from '../../../src/keys/names.ts'
 import { routeNames } from '../../../src/http/api/context.ts'
 import { AgentHttp } from '../../../src/http/api/server.ts'
 import { chatDatabase } from '../../chats-sqlite.ts'
@@ -16,20 +18,25 @@ import { chatDatabase } from '../../chats-sqlite.ts'
 export { currentResident } from '../../fixed-services.ts'
 export { type ChatDatabase as Database, sqliteDb } from '../../chats-sqlite.ts'
 
+/** Key names learnt by nothing: what a test that does not look at them serves with. */
+const idleNames = Layer.succeed(KeyNames, KeyNames.of({ learn: () => Effect.void }))
+
 /**
  * `groups` and their `handlers` served the way the agent serves the owner API (`AgentHttp.serve`): behind owner
- * admission, its router and its failure rendering. Provide it the services the handlers read, then `serve` it.
+ * admission, its router and its failure rendering, with `names` learning keys' names (ADR 0108; none by default).
+ * Provide it the services the handlers read, then `serve` it.
  */
-export const served = <const Groups extends NonEmptyReadonlyArray<HttpApiGroup.Constraint>, Handlers, R>(
+export const served = <const Groups extends NonEmptyReadonlyArray<HttpApiGroup.Constraint>, Handlers, R, N = never>(
   groups: Groups,
   handlers: Layer.Layer<Handlers, never, R>,
+  names: Layer.Layer<KeyNames, never, N> = idleNames,
 ) => {
   const api = ownerApiOf(...groups)
   return AgentHttp.serve(
     [routeNames(api)],
     HttpApiBuilder.layer(api).pipe(
       Layer.provide(handlers),
-      Layer.provide(OwnerAdmissionLive),
+      Layer.provide(OwnerAdmissionLive.pipe(Layer.provide(names))),
       Layer.provide(HttpServer.layerServices),
     ),
   )
