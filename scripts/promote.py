@@ -34,7 +34,7 @@ class GitHub:
         # Best effort: the push run takes a few seconds to appear.
         for _ in range(10):
             matching = [item for item in runs_of(sha, 'prod', 20)
-                        if item.get('head_sha') == sha and item.get('event') == 'push']
+                        if item.get('head_sha') == sha and item.get('head_branch') == 'prod' and item.get('event') == 'push']
             if matching:
                 return matching[0]['html_url']
             time.sleep(3)
