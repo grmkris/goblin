@@ -42,8 +42,10 @@ Each group's handlers (`HttpApiBuilder.group`) live in their area (`<area>/api.t
 from context. Owner admission (the `OwnerAdmission` middleware, `http/api/middleware.ts`) admits every request
 before its handler, and before its body is decoded. A forward that names neither a member nor a caller, or names one in
 a header that does not decode, is `Unauthenticated` (`principal`), never taken for the owner. A member below the
-endpoint's `EndpointRole` (`admin` for what changes the agent's authority, ADR 0093) is `Forbidden` (`role`), and so is
-an OAuth client acting for one. A member's request gets a
+endpoint's `EndpointRole` (`admin` for what changes the agent's authority, ADR 0093, and what it works with: Personas,
+a Topic's setup, routine writes, ADR 0098) is `Forbidden` (`role`), and so is an OAuth client acting for one. Where one
+endpoint serves both, `requireAdminFor` (`keys/policy.ts`) refuses a member the admin's part: a Topic's description,
+guidance or setup on create and update, and Undo of a receipt whose change took an admin. A member's request gets a
 grant of resident authority, except where an endpoint is
 annotated `GrantsResident: false` (`POST /api/agent/resident`, the event streams, the entries read, the files group and the
 OAuth callback). A request from a caller (ADR 0086: a server's key, or an OAuth client of the owner on `/mcp`) never

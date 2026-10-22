@@ -81,7 +81,7 @@ async function withClient(settings: Settings, args: Args, work: (client: Client)
 
 /** Inspection is opt-in on the consent page (ADR 0024); without it the commands have nothing to read. */
 const NO_INSPECTION =
-  'This sign-in cannot inspect your agent. Run goblin logout, then goblin login, and turn on "Also let it read your conversations and runs" on the consent page.'
+  'This sign-in cannot inspect your agent. Run goblin logout, then goblin login, and turn on "Also let it read how your chats ran" and "Also let it read your conversations in full" on the consent page.'
 
 async function main(argv: readonly string[]): Promise<number> {
   const args = parseArgs(argv)

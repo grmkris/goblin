@@ -34,6 +34,25 @@ describe('the organize group', () => {
     expect(await again.json()).toMatchObject({ error: { code: 'conflict', reason: 'undone' } })
   })
 
+  it("refuses a member's Undo of what took an admin, and keeps a member's Undo of a rename (ADR 0098)", async () => {
+    const { fetch, personas, topics, receipts } = organizing()
+    const asMember = (request: Request) => {
+      request.headers.set('x-goblin-member', JSON.stringify({ user: 'ana', role: 'member', name: 'Ana', shared: true }))
+      return fetch(request)
+    }
+    await fetch(post('/api/personas', { ...scout, operationId: 'op-1' }))
+    const [made] = receipts.list()
+    const refused = await asMember(post(`/api/organize/${made?.id ?? ''}/undo`, {}))
+    expect(refused.status).toBe(403)
+    expect(await refused.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
+    expect(personas.get(1).archivedAt).toBeUndefined()
+    await fetch(post('/api/topics', { name: 'Garden', operationId: 'topic-1' }))
+    await fetch(json('PATCH', '/api/topics/2', { name: 'Garden shed' }))
+    const rename = receipts.list()[0]
+    expect((await asMember(post(`/api/organize/${rename?.id ?? ''}/undo`, {}))).status).toBe(200)
+    expect(topics.get(2)).toMatchObject({ name: 'Garden' })
+  })
+
   it('refuses Undo as touched once the target changed since, and answers 404 for a receipt that is not there', async () => {
     const { fetch, topics, receipts } = organizing()
     await fetch(post('/api/topics', { name: 'Garden', operationId: 'topic-1' }))

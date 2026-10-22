@@ -3,11 +3,14 @@ import { useMutation } from '@tanstack/react-query'
 import type { TopicView } from '@goblin/contracts'
 import { Button, Textarea } from '@goblin/ui'
 import { CheckIcon, PencilIcon, XIcon } from 'lucide-react'
+import { useConfigures } from '../../lib/current-workspace.ts'
 import { messageOf } from '../../lib/query/app-error.ts'
 import { updateWorkspaceTopicMutation } from '../../lib/workspace/mutations.ts'
 
+/** A Topic's description and guidance, which the agent reads as its purpose: an admin's to change (ADR 0098). */
 export function ChannelDetails({ topic }: { readonly topic: TopicView }) {
   const update = useMutation(updateWorkspaceTopicMutation)
+  const configures = useConfigures()
   const [editing, setEditing] = useState(false)
   const [revision, setRevision] = useState(topic.revision)
   const [description, setDescription] = useState(topic.description ?? '')
@@ -20,7 +23,7 @@ export function ChannelDetails({ topic }: { readonly topic: TopicView }) {
     setEditing(true)
     update.reset()
   }
-  if (!editing) return <DetailsSummary topic={topic} onEdit={edit} />
+  if (!editing) return <DetailsSummary topic={topic} onEdit={configures ? edit : undefined} />
   return (
     <form
       className="channel-info-editor"
@@ -75,7 +78,8 @@ export function ChannelDetails({ topic }: { readonly topic: TopicView }) {
   )
 }
 
-function DetailsSummary({ topic, onEdit }: { readonly topic: TopicView; readonly onEdit: () => void }) {
+/** The details as they are, with Edit for an admin (`onEdit`) and why there is none for a member. */
+function DetailsSummary({ topic, onEdit }: { readonly topic: TopicView; readonly onEdit: (() => void) | undefined }) {
   return (
     <div className="channel-info-details">
       <div className="channel-info-detail-row">
@@ -88,10 +92,14 @@ function DetailsSummary({ topic, onEdit }: { readonly topic: TopicView; readonly
           {topic.instructions || 'Add guidance for how goblin should work here.'}
         </span>
       </div>
-      <Button variant="outline" size="sm" onClick={onEdit}>
-        <PencilIcon data-icon="inline-start" />
-        Edit details
-      </Button>
+      {onEdit === undefined ? (
+        <p className="channel-info-value">Only the workspace's owners and admins change a channel's details.</p>
+      ) : (
+        <Button variant="outline" size="sm" onClick={onEdit}>
+          <PencilIcon data-icon="inline-start" />
+          Edit details
+        </Button>
+      )}
     </div>
   )
 }

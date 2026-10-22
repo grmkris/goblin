@@ -85,7 +85,8 @@ export async function membersCase(url: string): Promise<void> {
   const refused = await call(url, member, '/api/agent/resident', { enabled: false })
   expect(refused.status).toBe(403)
   expect(await refused.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
-  // What the agent works with takes an admin too (ADR 0098): a Persona, and a Topic's guidance; a plain Topic does not.
+  // What the agent works with takes an admin too (ADR 0098): a Persona, a Topic's guidance and its description, which
+  // the agent reads as the Topic's purpose; a plain Topic does not.
   const persona = await call(url, member, '/api/personas', {
     name: 'Guestbot',
     avatar: { glyph: 'G', hue: 30 },
@@ -100,6 +101,12 @@ export async function membersCase(url: string): Promise<void> {
     operationId: crypto.randomUUID(),
   })
   expect(await guided.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
+  const described = await call(url, member, '/api/topics', {
+    name: `Described ${crypto.randomUUID().slice(0, 6)}`,
+    description: 'Where the haiku go.',
+    operationId: crypto.randomUUID(),
+  })
+  expect(described.status).toBe(403)
 
   const removed = await ownerFetch(`${url}/w/${owner.slug}/api/members/${guest.userId}`, {
     method: 'DELETE',

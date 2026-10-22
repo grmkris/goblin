@@ -33,7 +33,7 @@ export const setupTools = (server: McpServer, add: Add, reply: Reply) => {
       {
         title: 'MCP servers',
         description:
-          "The workspace's MCP connections: each one's id, label, endpoint, status and tools. Connecting one or granting tools stays the web's.",
+          "The workspace's MCP connections: each one's id, label, endpoint and status, and whether it offers skills and events. Their granted tools are setup_catalog's. Connecting one or granting tools stays the web's.",
         inputSchema: standard(Schema.Struct({})),
         annotations: reads,
       },

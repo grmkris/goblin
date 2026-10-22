@@ -5,10 +5,9 @@ import {
   TopicSetup,
 } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
-import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { RequestContext } from '../http/api/context.ts'
-import { Conflict, Forbidden, InvalidInput } from '../http/errors.ts'
+import { Conflict, InvalidInput } from '../http/errors.ts'
+import { requireAdminFor } from '../keys/policy.ts'
 import { updatePersona } from '../personas/program.ts'
 import { Personas } from '../personas/service.ts'
 import { editTopicSetup, updateTopic } from '../topics/program.ts'
@@ -63,11 +62,19 @@ const applyPlan = (plan: Plan, revision: number) =>
     }
   })
 
+/** The receipts whose change took an admin, so undoing one does too. */
+const ADMIN_UNDO: ReadonlySet<OrganizeReceipt['kind']> = new Set([
+  'source.route',
+  'persona.create',
+  'persona.update',
+  'topic.setup',
+])
+
 /**
  * Undoes one receipt: the target goes back to what it was before the change. It is refused as `touched` (409) once
  * anything changed the target since (its revision is no longer the one the change left), and an Undo is itself not
- * undone. Undoing a creation archives the Topic or Persona; undoing an archive restores it. Routing a Source back takes
- * an admin, as routing it does (ADR 0093).
+ * undone. Undoing a creation archives the Topic or Persona; undoing an archive restores it. Undoing what took an
+ * admin takes one (`ADMIN_UNDO`).
  */
 export const undoReceipt = (id: string) => {
   const flow = { flow: 'organize_undo', via: 'app', actor: 'owner' } as const
@@ -77,9 +84,9 @@ export const undoReceipt = (id: string) => {
     const personas = yield* Personas
     const stored = yield* receipts.get(id)
     if (stored.undoneAt !== undefined) return yield* new Conflict({ reason: 'undone' })
+    // Undoing a change that takes an admin takes one too (ADRs 0093, 0098): a Source's route, a Persona, a setup.
+    yield* requireAdminFor(ADMIN_UNDO.has(stored.kind))
     if (stored.kind === 'source.route') {
-      const member = Option.getOrUndefined(yield* Effect.serviceOption(RequestContext))?.member
-      if (member?.role === 'member') return yield* new Forbidden({ reason: 'role' })
       yield* (yield* Sources).undo(stored)
       return yield* receipts.markUndone(id)
     }

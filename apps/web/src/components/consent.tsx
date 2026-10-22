@@ -35,7 +35,7 @@ const SCOPE_COPY: Readonly<Record<OptionalScope, { readonly name: string; readon
     name: 'Also let it manage your Topics',
     lines: [
       'list and read your Topics, including their guidance;',
-      "make, rename and archive Topics; changing a Topic's guidance or what it works with needs an admin.",
+      "make, rename and archive Topics; changing a Topic's description, guidance or what it works with needs an admin.",
     ],
   },
   'goblin:conversations': {
