@@ -68,9 +68,9 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   replaces or adds entries): one mysi connection (`mysi.lol/mcp?codemode=off`) instead of the separate my* servers,
   publishing (Cloudflare), then servers that need no sign-in in groups; re-probe one with an `initialize` before
   adding it. mysi names
-  tools `<service>_<tool>` and Events `<service>.<event>`: check an app's tool or Event name only through
-  `packages/contracts/src/service-names.ts`, never with a bare string. `mcp_list` lists a connection with many such
-  tools by service (`service`, `query`).
+  tools `<service>_<tool>` and Events `<service>.<event>`; no code checks an app's tool or Event name (ADR 0063): a
+  Source or a routine names exactly what its connection lists. `mcp_list` lists a connection with many such tools by
+  service (`service`, `query`).
 - Pinning an App adds no grant. Every owner write, `/api/mcp/` included, needs the app's Origin and the CSRF header at
   the Worker's edge (ADR 0038); the bridge remains bound to the originating server.
 - The owner's MCP endpoints are the owner API's `mcp` and `resident` groups (`packages/contracts/src/api/mcp.ts` and
