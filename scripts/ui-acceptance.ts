@@ -85,7 +85,9 @@ async function workspaceSlug(page: Page, origin: string): Promise<string> {
 /** Opens `route`, a page of the owner's workspace, under its prefix (`/w/<slug>/…`). */
 async function visit(page: Page, origin: string, route: string): Promise<void> {
   const prefixed = route.startsWith('/w/') ? route : `/w/${await workspaceSlug(page, origin)}${route}`
-  await page.goto(`${origin}${prefixed}`, { waitUntil: 'networkidle', timeout: 60_000 })
+  // `load`, not `networkidle`: a page holds its workspace feed and a chat its AG-UI stream open for as long as it is
+  // shown (ADR 0110), so the network is never idle; `SETTLE_MS` covers what the page draws after loading.
+  await page.goto(`${origin}${prefixed}`, { waitUntil: 'load', timeout: 60_000 })
   await page.waitForTimeout(SETTLE_MS)
 }
 
