@@ -3,6 +3,7 @@ import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
 import { type Person, call, lever, ownerFetch, person, signedIn, workspaceOf } from './owner-requests.ts'
+import { roomAllows } from '../../src/pi/room.ts'
 import { until } from './until.ts'
 
 const Secret = Schema.Struct({ secret: Schema.String })
@@ -159,6 +160,13 @@ export async function threadServersCase(url: string): Promise<void> {
   ).find((request) => request.context?.includes('You are Plain') === true)
   expect(plainRequest?.tools).toContain('mcp_call')
   expect(plainRequest?.tools).not.toContain('swarmm__board')
+
+  // The key's Topic is a room (ADR 0108): its Persona's fork keeps what a server's job needs, its native tools, skills
+  // and questions, its native call ran above, and it is offered nothing a room leaves out.
+  const maker = (await seen()).find((request) => request.context?.includes('You are Maker') === true)
+  expect(maker?.tools).toEqual(expect.arrayContaining(['swarmm__board', 'skill_activate', 'ask_user']))
+  expect(maker?.tools.filter((tool) => !roomAllows(tool))).toEqual([])
+  expect(maker?.context).toContain('You reach only this room')
 
   // Closing the thread drops its servers; reopening brings none back.
   const patch = (change: unknown) => asKey(url, secret, 'PATCH', `/api/conversations/${thread.id}`, change)

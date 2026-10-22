@@ -20,6 +20,7 @@ import type { MovePhase } from '../../src/chats/mover.ts'
 import { moveState, readRounds } from './move-probe.ts'
 import { ownerSend } from './probe-reads.ts'
 import { addUsage, utcDay } from '../../src/budget.ts'
+import { BACKGROUND, conversationId } from '../../src/pi/context.ts'
 
 /** Tokens the `approvals/spent` lever adds to today: more than the owner stack's daily cap (`owner-stack.ts`). */
 const SPENT_TOKENS = 1_000_000_000
@@ -91,6 +92,9 @@ export class OwnerAgent extends PersonalAgent {
       const { input } = Schema.decodeUnknownSync(Schema.Struct({ input: Schema.String }))(await request.json())
       return Response.json({ released: queueModel(this).release(input) })
     }
+    if (path === '/test/rooms/stale') return this.#staleFilter(request)
+    // The object restarts: the next request reconstructs it, its in-memory state (what it applied, ADR 0108) gone.
+    if (path === '/test/rooms/restart') this.ctx.abort('rooms restart')
     if (path === '/test/approvals/calls') return Response.json(this.#mcp.calls)
     // Today's tokens spent past the deployment's cap (`spent`), and given back (`unspent`).
     if (path === '/test/approvals/spent') return this.#spend(SPENT_TOKENS)
@@ -98,6 +102,17 @@ export class OwnerAgent extends PersonalAgent {
     if (path === '/test/approvals/recovery')
       return Response.json(await approvalsProbe(this.ctx.storage, this.env.CREDENTIAL_KEY))
     return super.onRequest(request)
+  }
+  /**
+   * Clears a chat's Pi tool filter in this lifetime, as a filter stored before rooms were (ADR 0108): what the room
+   * guard must refuse at call time, and the chat's first turn after a restart puts right.
+   */
+  async #staleFilter(request: Request): Promise<Response> {
+    const { chat } = Schema.decodeUnknownSync(Schema.Struct({ chat: Schema.String }))(await request.json())
+    const session = chatSession(drizzle(this.ctx.storage), chat)
+    const conversation = await (await this.harness.pi()).conversation(conversationId(session), BACKGROUND)
+    await conversation?.configure({ tools: null }, BACKGROUND)
+    return Response.json({ stale: chat })
   }
   /** Adds `tokens` to today's usage. */
   #spend(tokens: number): Response {
@@ -176,6 +191,17 @@ export default {
         return (await leverAgent(input, env)).fetch(
           new Request(`https://agent/test/queue/${url.pathname.split('/').at(-1)}`, input),
         )
+      }
+      if (url.pathname.startsWith('/__test/rooms/')) {
+        const name = url.pathname.split('/').at(-1)
+        const agent = await leverAgent(input, env)
+        // A restart ends the request it came in: the lever answers that it happened.
+        if (name === 'restart')
+          return await agent.fetch('https://agent/test/rooms/restart').then(
+            () => Response.json({ restarted: false }),
+            () => Response.json({ restarted: true }),
+          )
+        return agent.fetch(new Request(`https://agent/test/rooms/${name ?? ''}`, input))
       }
       if (url.pathname.startsWith('/__test/approvals/')) {
         return (await leverAgent(input, env)).fetch(`https://agent/test/approvals/${url.pathname.split('/').at(-1)}`)

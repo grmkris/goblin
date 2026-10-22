@@ -10,6 +10,9 @@ const textOf = (message: Message): string =>
     ? message.content
     : message.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('\n')
 
+/** A message's words without the author line one from someone else starts with (`[from server …]`, ADR 0108). */
+const wordsOf = (message: Message): string => textOf(message).replace(/^\[from [^\]\n]+\]\n/u, '')
+
 /** The prompt a Persona's fork is asked with (`pi/persona-turn.ts`): its name is who is answering. */
 const PERSONA_PROMPT = /^Answer the owner's message above as @(.+)\.$/u
 
@@ -23,8 +26,8 @@ function personaCall(messages: readonly Message[]): AssistantMessage['content'] 
   if (last === undefined) return undefined
   if (last.role === 'toolResult') return undefined
   if (!PERSONA_PROMPT.test(textOf(last).split('\n').at(-1) ?? '')) return undefined
-  const ask = messages.findLast((message) => message.role === 'user' && textOf(message).startsWith('[to @'))
-  const call = /persona-call ([\w-]+) (\{.*\})/u.exec(ask === undefined ? '' : textOf(ask))
+  const ask = messages.findLast((message) => message.role === 'user' && wordsOf(message).startsWith('[to @'))
+  const call = /persona-call ([\w-]+) (\{.*\})/u.exec(ask === undefined ? '' : wordsOf(ask))
   if (call === null) return undefined
   return [
     {
@@ -65,7 +68,7 @@ class QueueModel {
       // A Persona's fork is held by the `queue-hold:` token in the owner message it answers, keyed with its name.
       const answering = PERSONA_PROMPT.exec(text.split('\n').at(-1) ?? '')?.[1]
       // The token is read from the newest ask only: older asks stay in the chat the fork reads.
-      const ask = context.messages.findLast((message) => textOf(message).startsWith('[to @'))
+      const ask = context.messages.findLast((message) => wordsOf(message).startsWith('[to @'))
       const token = answering === undefined || ask === undefined ? undefined : /queue-hold:\S+/u.exec(textOf(ask))?.[0]
       const input = token === undefined ? text : `${token}@${answering ?? ''}`
       if (!input.startsWith('queue-hold:')) return this.#base.stream(target, context, options)
