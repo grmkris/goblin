@@ -292,9 +292,12 @@ allowed tools (an unknown or no-longer-owned session, a chat whose Topic is gone
 spawners, may use nothing). The scope also answers for agent apps (`app`) and names its Topic, so a refusal can say
 what held it back. What the scope leaves out is hidden from the model: `mcp_list` leaves it out, the `skills` section
 does not list or fetch that library, and Pi's per-conversation tool filter (`configure({ tools: { remove } })`) drops
-the subagent tools, whose section then hides too. A chat's filter is set when it is made or configured, and applied
-again to every chat of a Topic whose setup's subagents change (`retoolTopic`, which skips Persona forks and routine
-runs, whose filters are set when they are made). A call that still arrives runs nothing: `mcp_call`, `skill_activate`,
+the subagent tools, whose section then hides too. In a room, a Topic a server's key made and every chat under it (ADR
+0108), the scope names the room (`room`) and the filter drops every tool a room does not offer (`pi/room.ts`
+`ROOM_TOOLS`); the room guard refuses them at call time as well, deny by default. A chat's filter is set when it is
+made or configured, applied again to every chat of a Topic whose setup's subagents change (`retoolTopic`, which skips
+Persona forks and routine runs, whose filters are set when they are made), and, for a room's chats, again on each
+chat's first turn in the agent's lifetime (`useRoomTools`). A call that still arrives runs nothing: `mcp_call`, `skill_activate`,
 `skill_read`, `subagent_spawn` and `subagent_send` check the scope before anything else (before the grant check or any
 connection) and return an error result (`pi/setup.ts`, `outsideScopeResult`): when the Topic's setup does not hold the target,
 details `{ kind: 'not-in-topic', target, topic }` (`NotInTopic`) that ask the owner to add it to the Topic, and Goblin
