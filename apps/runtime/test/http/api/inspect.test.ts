@@ -106,7 +106,14 @@ describe('the inspect group served by the agent', () => {
 /** The grant the edge forwards for a key (ADR 0081) with `scopes`. */
 const keyed = (scopes: readonly string[] = ['inspect']) => ({
   'x-goblin-ref': 'ref-1',
-  'x-goblin-caller': JSON.stringify({ kind: 'key', keyId: 'key-1', scopes, servers: ['mycut'], origins: [] }),
+  'x-goblin-caller': JSON.stringify({
+    kind: 'key',
+    keyId: 'key-1',
+    name: 'swarmm',
+    scopes,
+    servers: ['mycut'],
+    origins: [],
+  }),
 })
 
 /** A run event of operation `operationId` in Pi session `session`, from `start` to `end` ms, `ok`. */
@@ -174,7 +181,7 @@ const keyFixture = () => {
       { chatId: '14', piSession: '42', kind: 'main', role: 'conversation', topicId: 3, createdAt: 1 },
     ])
     .run()
-  recordReach(durable(db), 'key-1', 'topic', 2, 1)
+  recordReach(durable(db), { keyId: 'key-1', name: 'swarmm' }, 'topic', 2, 1)
   for (const each of [...forkTurn, ask]) ledger.ended(each)
   ledger.ended(event('turn:main', 'turn.submitted', 'owner:op-1', ['1', 2_000, 3_000]))
   ledger.ended(event('turn:other', 'turn.submitted', 'owner:op-2', ['42', 2_000, 3_000]))

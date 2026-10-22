@@ -97,13 +97,14 @@ export const organizing = () => {
   const flows: FlowEvent[] = []
   const retooled: number[] = []
   const catalog = setupServices(retooled)
+  const changes = Layer.succeed(Changes, makeChanges())
   const lane = delegationServices({
     topics,
     personas,
     invocations: unread,
     receipts,
     fence: { ownerOnly: (id: string) => id === 'sub/opus', keyTopic: () => false },
-  }).pipe(Layer.provide(Layer.merge(KeyedLock.layer, Layer.succeed(Changes, makeChanges()))))
+  }).pipe(Layer.provide(Layer.merge(KeyedLock.layer, changes)))
   const { fetch } = serve(
     served(
       [TopicsGroup, PersonasGroup, OrganizeGroup],
@@ -131,6 +132,8 @@ export const organizing = () => {
           // Only a Source's route receipt reaches the Sources.
           stub(Sources),
           catalog,
+          // A key's create tells the views that it made what it made (ADR 0108).
+          changes,
           Layer.succeed(Resident, resident.service),
           FlowEvents.layerWith((event) => Effect.sync(() => void flows.push(event))),
         ),

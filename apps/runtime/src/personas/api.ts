@@ -17,6 +17,7 @@ const summaryOf = (persona: PersonaView): PersonaPage['personas'][number] => ({
   name: persona.name,
   role: persona.role,
   avatar: persona.avatar,
+  ...(persona.madeBy === undefined ? {} : { madeBy: persona.madeBy }),
   revision: persona.revision,
   ...(persona.model === undefined ? {} : { model: persona.model }),
   ...(persona.thinking === undefined ? {} : { thinking: persona.thinking }),
@@ -52,7 +53,10 @@ const confineModel = (model: string | null | undefined) =>
     if ((yield* Personas).ownerOnly(model)) return yield* new InvalidInput({ reason: 'persona_model' })
   })
 
-/** A Persona a server's API key makes (ADR 0081): its setup under the key's ceiling, and the key's own from then on. */
+/**
+ * A Persona a server's API key makes (ADR 0081): its setup under the key's ceiling, and the key's own from then on, as
+ * its answer says (`madeBy`, ADR 0108).
+ */
 const create = (input: CreatePersona) =>
   Effect.gen(function* () {
     if ((yield* requestKey) === undefined) return yield* createPersona(input, { actor: 'owner' })
@@ -60,7 +64,7 @@ const create = (input: CreatePersona) =>
     if (input.setup !== undefined) yield* confineSetup(input.setup)
     const made = yield* madePersona(input, { actor: 'owner' })
     yield* claim('persona', made.persona.id, made.created)
-    return made.persona
+    return yield* Personas.use((personas) => personas.get(made.persona.id))
   })
 
 /**

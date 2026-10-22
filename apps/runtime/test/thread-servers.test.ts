@@ -42,6 +42,7 @@ const TOOLS = ['plan_propose', 'progress_report', 'delivery_submit', 'file_impor
 const KEY: Caller = {
   kind: 'key',
   keyId: 'key-1',
+  name: 'swarmm',
   scopes: ['conversations'],
   servers: [],
   origins: [{ origin: ORIGIN, tools: TOOLS }],

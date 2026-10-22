@@ -8,11 +8,11 @@ import {
   type TopicView,
   type UpdateTopic,
 } from '@goblin/contracts'
-import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, getTableColumns, inArray, isNull, ne, sql } from 'drizzle-orm'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Effect from 'effect/Effect'
 import { type AppError, Conflict, InvalidInput, NotFound, attemptSync } from '../http/errors.ts'
-import { reachedIds } from '../keys/reach.ts'
+import { makerColumn, makerOf, reachedIds } from '../keys/reach.ts'
 import { after, pageOf } from '../storage/page.ts'
 import { appTopics } from '../storage/topics.ts'
 import { storedSetup, topicSetupOf } from './setup.ts'
@@ -39,7 +39,14 @@ export type TopicPorts = {
   readonly seed: (chat: string, operationId: string, seed: TopicSeedData) => Effect.Effect<void, AppError>
 }
 
-const view = (row: Row): TopicView => ({
+/** A Topic's row with the key that made it, when one did (ADR 0108). */
+type Made = Row & { readonly maker: string | null | undefined }
+
+/** Who made a room: the key, by name (ADR 0108). */
+const roomOf = (maker: string | null | undefined) =>
+  maker === null || maker === undefined ? {} : { room: { key: maker } }
+
+const view = (row: Made): TopicView => ({
   id: row.id,
   name: row.name,
   ...(row.description === '' ? {} : { description: row.description }),
@@ -50,11 +57,12 @@ const view = (row: Row): TopicView => ({
   searchExcluded: row.searchExcluded,
   revision: row.revision,
   setup: topicSetupOf(row.setup),
+  ...roomOf(row.maker),
   createdBy: row.createdBy,
   createdAt: row.createdAt,
 })
 
-const summary = (row: Row): TopicSummary => ({
+const summary = (row: Made): TopicSummary => ({
   id: row.id,
   name: row.name,
   conversation: row.chatId,
@@ -62,6 +70,7 @@ const summary = (row: Row): TopicSummary => ({
   revision: row.revision,
   archived: row.archivedAt !== null,
   searchExcluded: row.searchExcluded,
+  ...roomOf(row.maker),
   updatedAt: row.updatedAt,
 })
 
@@ -105,20 +114,28 @@ export class TopicRegistry<RunResult = unknown> {
     return row
   }
 
+  /** Topics with the key that made each, one statement for any number of them. */
+  #made() {
+    return this.#db.select({ ...getTableColumns(appTopics), maker: makerColumn('topic', appTopics.id) }).from(appTopics)
+  }
+
+  /** A row just read or written, with the key that made it. */
+  #view(row: Row): TopicView {
+    return view({ ...row, maker: makerOf(this.#db, 'topic', row.id) })
+  }
+
   /** Every Topic, archived ones included, in creation order (Personal first). */
   list(): readonly TopicView[] {
-    return this.#db.select().from(appTopics).orderBy(asc(appTopics.id)).all().map(view)
+    return this.#made().orderBy(asc(appTopics.id)).all().map(view)
   }
 
   get(id: number): TopicView {
-    return view(this.#row(id))
+    return this.#view(this.#row(id))
   }
 
   /** A page of Topics, newest change first; archived ones too. */
   page(query: TopicPageQuery): { readonly topics: readonly TopicSummary[]; readonly next?: string } {
-    const rows = this.#db
-      .select()
-      .from(appTopics)
+    const rows = this.#made()
       .where(
         and(
           query.key === undefined ? undefined : inArray(appTopics.id, reachedIds(this.#db, query.key, 'topic')),
@@ -169,6 +186,7 @@ export class TopicRegistry<RunResult = unknown> {
     const db = this.#db
     const ports = this.#ports
     const assertFree = (name: string) => this.#assertFree(name)
+    const viewOf = (row: Row) => this.#view(row)
     /** Turns the Conversation's memory on, then writes the seed it was made with, if any; both are idempotent. */
     const ready = (chat: string) =>
       Effect.andThen(ports.activate(chat), seed === undefined ? Effect.void : ports.seed(chat, input.operationId, seed))
@@ -177,7 +195,7 @@ export class TopicRegistry<RunResult = unknown> {
       if (existing !== undefined) {
         // A retry finishes what a failed first attempt began: the Conversation's memory and its seed.
         yield* ready(existing.chatId)
-        return { topic: view(existing), created: false }
+        return { topic: viewOf(existing), created: false }
       }
       const name = yield* attemptSync(() => {
         const clean = cleanName(input.name)
@@ -210,7 +228,7 @@ export class TopicRegistry<RunResult = unknown> {
       )
       yield* ports.touched([chat])
       yield* ready(chat)
-      return { topic: view(row), created: true }
+      return { topic: viewOf(row), created: true }
     })
   }
 
@@ -240,7 +258,7 @@ export class TopicRegistry<RunResult = unknown> {
       archivedAt === row.archivedAt &&
       searchExcluded === row.searchExcluded
     )
-      return view(row)
+      return this.#view(row)
     const updated = this.#db.transaction(() => {
       if (archivedAt === null) this.#assertFree(name, id)
       const [next] = this.#db
@@ -261,7 +279,7 @@ export class TopicRegistry<RunResult = unknown> {
       if (name !== row.name) this.#ports.retitle(row.chatId, name)
       return next
     })
-    return view(updated)
+    return this.#view(updated)
   }
 
   /**
@@ -272,7 +290,7 @@ export class TopicRegistry<RunResult = unknown> {
     const row = this.#row(id)
     if (expectedRevision !== undefined && row.revision !== expectedRevision) throw new Conflict({ reason: 'revision' })
     const stored = storedSetup(setup)
-    if (stored === row.setup) return view(row)
+    if (stored === row.setup) return this.#view(row)
     const [next] = this.#db
       .update(appTopics)
       .set({ setup: stored, revision: row.revision + 1, updatedAt: now })
@@ -280,6 +298,6 @@ export class TopicRegistry<RunResult = unknown> {
       .returning()
       .all()
     if (next === undefined) throw new Conflict({ reason: 'revision' })
-    return view(next)
+    return this.#view(next)
   }
 }

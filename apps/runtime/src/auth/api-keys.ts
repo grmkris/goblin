@@ -84,6 +84,7 @@ export const verifyKey = async (env: RuntimeEnv, key: string): Promise<KeyPrinci
   return {
     workspaceId,
     keyId: result.key.id,
+    name: result.key.name ?? '',
     scopes: scopesOf(result.key.permissions),
     ...ceilingOf(result.key.metadata),
   }

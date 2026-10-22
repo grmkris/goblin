@@ -7,11 +7,17 @@ const TopicDescription = Schema.String.check(Schema.isMaxLength(1000))
 const TopicInstructions = Schema.String.check(Schema.isMaxLength(8000))
 
 /**
+ * A Topic a server's API key made is a room (ADR 0108): its chats reach only it. `key` is the key's name, or its id
+ * while goblin has not learnt the name yet (a room made before names were kept, until the key makes something again).
+ */
+const TopicRoom = Schema.Struct({ key: Schema.String })
+
+/**
  * A Topic: a durable container with exactly one Conversation (`conversation`) and any number of Threads under it.
  * Personal (`personal`, id 1) holds today's Main as its Conversation and receives every inbound channel. An archived
  * Topic (`archivedAt`) is out of navigation and default search; `searchExcluded` keeps it out of automatic search while
  * active. `revision` counts changes, so an undo can tell whether something touched it since. `setup` is what its chats
- * work with (ADR 0040). Times are in seconds.
+ * work with (ADR 0040); `room` says which key made it, when one did (ADR 0108). Times are in seconds.
  */
 export const TopicView = Schema.Struct({
   id: TopicId,
@@ -24,14 +30,15 @@ export const TopicView = Schema.Struct({
   searchExcluded: Schema.Boolean,
   revision: Schema.Int,
   setup: TopicSetup,
+  room: Schema.optional(TopicRoom),
   createdBy: Schema.Literals(['owner', 'agent', 'system']),
   createdAt: Schema.Number,
 })
 export type TopicView = typeof TopicView.Type
 
 /**
- * A Topic in a list (`GET /api/topics`): who it is and how far it has changed, without its guidance or setup, which
- * `GET /api/topics/:id` answers. `updatedAt` is its last change, in seconds.
+ * A Topic in a list (`GET /api/topics`): who it is, which key made it (`room`, ADR 0108) and how far it has changed,
+ * without its guidance or setup, which `GET /api/topics/:id` answers. `updatedAt` is its last change, in seconds.
  */
 export const TopicSummary = Schema.Struct({
   id: TopicId,
@@ -41,6 +48,7 @@ export const TopicSummary = Schema.Struct({
   revision: Schema.Int,
   archived: Schema.Boolean,
   searchExcluded: Schema.Boolean,
+  room: Schema.optional(TopicRoom),
   updatedAt: Schema.Number,
 })
 export type TopicSummary = typeof TopicSummary.Type

@@ -18,6 +18,7 @@ import { RequestContext } from '../http/api/context.ts'
 import type { KeyGrant } from '../http/api/principal.ts'
 import { Conflict, Forbidden, NotFound } from '../http/errors.ts'
 import type { Place, Reach } from '../inspect/service.ts'
+import { Changes } from '../runtime/changes.ts'
 import { Db } from '../runtime/db.ts'
 import { type ReachKind, hasReach, madeByKey, recordReach } from './reach.ts'
 
@@ -120,8 +121,8 @@ export const confineChat = (chat: string) =>
   })
 
 /**
- * What a create made, recorded as the key's; one an operation id found that the key did not make is a `Conflict`, so a
- * key can never adopt the owner's own Topic or Persona.
+ * What a create made, recorded as the key's, and its views told that a key made it (ADR 0108); one an operation id found
+ * that the key did not make is a `Conflict`, so a key can never adopt the owner's own Topic or Persona.
  */
 export const claim = (kind: ReachKind, id: number, created: boolean) =>
   Effect.gen(function* () {
@@ -130,7 +131,8 @@ export const claim = (kind: ReachKind, id: number, created: boolean) =>
     if (created) {
       const now = yield* epochSeconds
       const db = yield* Db
-      return yield* Effect.sync(() => recordReach(db, key.keyId, kind, id, now))
+      yield* Effect.sync(() => recordReach(db, key, kind, id, now))
+      return yield* (yield* Changes).publish(kind === 'topic' ? 'topics.changed' : 'personas.changed', { ids: [id] })
     }
     if (!(yield* reached(key, kind, id))) return yield* new Conflict({ reason: 'key_reach' })
   })

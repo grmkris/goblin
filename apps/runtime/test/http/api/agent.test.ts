@@ -75,7 +75,7 @@ const ids = async (response: Response) =>
 
 /** The grant the edge forwards for a key with `scopes` (ADR 0081). */
 const keyHeaders = (scopes: readonly string[]) => ({
-  'x-goblin-caller': JSON.stringify({ kind: 'key', keyId: 'key-1', scopes, servers: [], origins: [] }),
+  'x-goblin-caller': JSON.stringify({ kind: 'key', keyId: 'key-1', name: 'swarmm', scopes, servers: [], origins: [] }),
 })
 
 describe('the agent group served by the agent', () => {

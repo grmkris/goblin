@@ -7,6 +7,7 @@ import { confineThreadServer } from '../src/keys/policy.ts'
 const KEY: Caller = {
   kind: 'key',
   keyId: 'key-1',
+  name: 'swarmm',
   scopes: ['conversations'],
   servers: [],
   origins: [{ origin: 'https://mcp.swarmm.app', tools: ['job_submit', 'job_status'] }],

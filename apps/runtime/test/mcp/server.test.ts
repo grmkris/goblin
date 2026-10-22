@@ -15,6 +15,7 @@ import { type OwnerCaller, TOOLS } from '../../src/inbound/tools.ts'
 const KEY: Caller = {
   kind: 'key',
   keyId: 'key-1',
+  name: 'swarmm',
   scopes: ['topics', 'conversations', 'personas'],
   servers: ['mycut'],
   origins: [],

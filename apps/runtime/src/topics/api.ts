@@ -32,8 +32,8 @@ const list = (query: { readonly cursor?: string | undefined; readonly limit?: nu
 
 /**
  * A Topic a server's API key makes (ADR 0081): narrowed to nothing unless it names a setup under its ceiling, and its
- * own from then on. A member's names no description, guidance or setup, which the agent reads as the Topic's purpose
- * and take an admin (ADR 0098).
+ * own from then on, a room (ADR 0108) as its answer says. A member's names no description, guidance or setup, which the
+ * agent reads as the Topic's purpose and take an admin (ADR 0098).
  */
 const create = (input: CreateTopic) =>
   Effect.gen(function* () {
@@ -45,7 +45,7 @@ const create = (input: CreateTopic) =>
     yield* confineSetup(keyed.setup)
     const made = yield* madeTopic(keyed, { actor: 'owner' })
     yield* claim('topic', made.topic.id, made.created)
-    return made.topic
+    return yield* Topics.use((topics) => topics.get(made.topic.id))
   })
 
 /**

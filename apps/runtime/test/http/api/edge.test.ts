@@ -122,6 +122,7 @@ const deployment = (
         ? Effect.succeed({
             workspaceId: WS,
             keyId: 'key-1',
+            name: 'swarmm',
             scopes: ['topics', 'conversations'],
             servers: ['mycut'],
             origins: [],
@@ -408,6 +409,7 @@ describe("a server's API key (ADR 0081)", () => {
     expect(JSON.parse(forwarded?.headers.get('x-goblin-caller') ?? '')).toEqual({
       kind: 'key',
       keyId: 'key-1',
+      name: 'swarmm',
       scopes: ['topics', 'conversations'],
       servers: ['mycut'],
       origins: [],

@@ -4,12 +4,14 @@ import * as Schema from 'effect/Schema'
 import { KEY_PREFIX } from '../../auth/resources.ts'
 
 /**
- * A server's API key as the agent sees it (ADR 0081): which key, its scopes and its ceiling, the connections its setups
- * may name and the MCP origins (with their tools) its threads may connect to (ADR 0091). The edge verifies the key and
- * forwards it as the request's caller; the agent never sees the secret.
+ * A server's API key as the agent sees it (ADR 0081): which key and its name, its scopes and its ceiling, the
+ * connections its setups may name and the MCP origins (with their tools) its threads may connect to (ADR 0091). The edge
+ * verifies the key and forwards it as the request's caller; the agent never sees the secret.
  */
 export interface KeyGrant {
   readonly keyId: string
+  /** The name the owner gave it, which its messages and what it made carry (ADR 0108). */
+  readonly name: string
   readonly scopes: readonly KeyScope[]
   readonly servers: readonly string[]
   readonly origins: readonly KeyOrigin[]
@@ -37,6 +39,7 @@ const ForwardedCaller = Schema.fromJsonString(
     Schema.Struct({
       kind: Schema.Literal('key'),
       keyId: Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u)),
+      name: Schema.String.check(Schema.isMaxLength(200)),
       scopes: Schema.Array(KeyScope),
       servers: Schema.Array(KeyServer),
       origins: Schema.Array(KeyOrigin),

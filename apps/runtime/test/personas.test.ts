@@ -299,7 +299,7 @@ describe("a Persona's own model in a server's work (ADR 0087)", () => {
     // Topic 9 is one a server's key made.
     const fence = { ownerOnly: (id: string) => id.startsWith('sub/'), keyTopic: (topic: number) => topic === 9 }
     const personas = Effect.runSync(Personas.make(store, fence).pipe(Effect.provideService(Changes, makeChanges())))
-    const key: KeyGrant = { keyId: 'key-1', scopes: ['personas'], servers: [], origins: [] }
+    const key: KeyGrant = { keyId: 'key-1', name: 'swarmm', scopes: ['personas'], servers: [], origins: [] }
     const facts = {
       ref: undefined,
       request: undefined,

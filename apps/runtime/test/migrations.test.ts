@@ -118,6 +118,22 @@ describe('a receipt keeps who asked, by role (ADR 0099)', () => {
   })
 })
 
+describe('a room knows its key (ADR 0108)', () => {
+  it('keeps what every key made, unnamed until the key makes something again, and finds it by resource', () => {
+    const { sqlite, rest } = before('20261022180000_rooms')
+    sqlite.exec("INSERT INTO app_key_reach (key_id, kind, resource_id, created_at) VALUES ('key-1', 'topic', 7, 1)")
+    rest()
+    expect(sqlite.prepare('SELECT key_id, kind, resource_id, key_name FROM app_key_reach').all()).toEqual([
+      { key_id: 'key-1', kind: 'topic', resource_id: 7, key_name: null },
+    ])
+    const plan = sqlite
+      .prepare("EXPLAIN QUERY PLAN SELECT key_id FROM app_key_reach WHERE kind = 'topic' AND resource_id = 7")
+      .all()
+    expect(plan.map((step) => String(step['detail'])).join('\n')).toContain('app_key_reach_resource')
+    sqlite.close()
+  })
+})
+
 describe('fresh application baseline', () => {
   it('creates exactly the live application tables and declares its complete ownership', async () => {
     const sqlite = database()
@@ -138,6 +154,7 @@ describe('fresh application baseline', () => {
       '20261022150000_persona_tool_mode',
       '20261022160000_asker_role',
       '20261022170000_thread_servers',
+      '20261022180000_rooms',
     ])
     // An additive migration that alters a table names it too, so a table may be named more than once.
     const owned = [...new Set(MIGRATIONS.flatMap((migration) => migration.tables))]

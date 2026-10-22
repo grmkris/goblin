@@ -9,12 +9,12 @@ import {
   type PersonaView,
   type UpdatePersona,
 } from '@goblin/contracts'
-import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, getTableColumns, inArray, isNull, ne, sql } from 'drizzle-orm'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { Conflict, InvalidInput, NotFound } from '../http/errors.ts'
-import { reachedIds } from '../keys/reach.ts'
+import { makerColumn, makerOf, reachedIds } from '../keys/reach.ts'
 import { after, pageOf } from '../storage/page.ts'
 import { appPersonaRevisions, appPersonas } from '../storage/personas.ts'
 
@@ -57,9 +57,13 @@ const definitionOf = (row: Row | RevisionRow): PersonaDefinition => ({
   setup: personaSetupOf(row.setup),
 })
 
-const view = (row: Row): PersonaView => ({
+/** A Persona's row with the key that made it, when one did (ADR 0108). */
+type Made = Row & { readonly maker: string | null | undefined }
+
+const view = (row: Made): PersonaView => ({
   ...definitionOf(row),
   id: row.id,
+  ...(row.maker === null || row.maker === undefined ? {} : { madeBy: { key: row.maker } }),
   revision: row.revision,
   ...(row.archivedAt === null ? {} : { archivedAt: row.archivedAt }),
   createdAt: row.createdAt,
@@ -111,9 +115,21 @@ export class PersonaRegistry<RunResult = unknown> {
     return row
   }
 
+  /** Personas with the key that made each, one statement for any number of them. */
+  #made() {
+    return this.#db
+      .select({ ...getTableColumns(appPersonas), maker: makerColumn('persona', appPersonas.id) })
+      .from(appPersonas)
+  }
+
+  /** A row just read or written, with the key that made it. */
+  #view(row: Row): PersonaView {
+    return view({ ...row, maker: makerOf(this.#db, 'persona', row.id) })
+  }
+
   /** Every Persona, archived ones included, in creation order. */
   list(): readonly PersonaView[] {
-    return this.#db.select().from(appPersonas).orderBy(asc(appPersonas.id)).all().map(view)
+    return this.#made().orderBy(asc(appPersonas.id)).all().map(view)
   }
 
   /** The Personas that can answer now. */
@@ -122,14 +138,12 @@ export class PersonaRegistry<RunResult = unknown> {
   }
 
   get(id: number): PersonaView {
-    return view(this.#row(id))
+    return this.#view(this.#row(id))
   }
 
   /** A page of Personas, newest change first; archived ones too. */
   page(query: PersonaPageQuery): { readonly personas: readonly PersonaView[]; readonly next?: string } {
-    const rows = this.#db
-      .select()
-      .from(appPersonas)
+    const rows = this.#made()
       .where(
         and(
           query.key === undefined ? undefined : inArray(appPersonas.id, reachedIds(this.#db, query.key, 'persona')),
@@ -150,9 +164,7 @@ export class PersonaRegistry<RunResult = unknown> {
 
   /** The active Persona named `name` (ignoring case), if any. */
   byName(name: string): PersonaView | undefined {
-    const row = this.#db
-      .select()
-      .from(appPersonas)
+    const row = this.#made()
       .where(and(sql`${appPersonas.name} = ${cleanName(name)} COLLATE NOCASE`, isNull(appPersonas.archivedAt)))
       .get()
     return row === undefined ? undefined : view(row)
@@ -167,7 +179,7 @@ export class PersonaRegistry<RunResult = unknown> {
       .where(eq(appPersonaRevisions.personaId, id))
       .orderBy(desc(appPersonaRevisions.revision))
       .all()
-    return { persona: view(row), revisions: revisions.map(revisionView) }
+    return { persona: this.#view(row), revisions: revisions.map(revisionView) }
   }
 
   /** One stored revision, as an invocation froze it. */
@@ -219,7 +231,7 @@ export class PersonaRegistry<RunResult = unknown> {
    */
   create(input: CreatePersona, actor: PersonaActor, now: number): { persona: PersonaView; created: boolean } {
     const existing = this.#db.select().from(appPersonas).where(eq(appPersonas.operationId, input.operationId)).get()
-    if (existing !== undefined) return { persona: view(existing), created: false }
+    if (existing !== undefined) return { persona: this.#view(existing), created: false }
     const { operationId, ...fields } = input
     const definition = this.#normalize({ ...fields, setup: fields.setup ?? NOTHING })
     const row = this.#db.transaction(() => {
@@ -236,7 +248,7 @@ export class PersonaRegistry<RunResult = unknown> {
         .run()
       return inserted
     })
-    return { persona: view(row), created: true }
+    return { persona: this.#view(row), created: true }
   }
 
   /**
@@ -270,7 +282,7 @@ export class PersonaRegistry<RunResult = unknown> {
     const next = this.#changed(definitionOf(row), change)
     const archivedAt = change.archived === undefined ? row.archivedAt : change.archived ? (row.archivedAt ?? now) : null
     const values = stored(next)
-    if (archivedAt === row.archivedAt && sameValues(values, row)) return view(row)
+    if (archivedAt === row.archivedAt && sameValues(values, row)) return this.#view(row)
     const updated = this.#db.transaction(() => {
       if (archivedAt === null) this.#assertName(next.name, id)
       const [changed] = this.#db
@@ -286,7 +298,7 @@ export class PersonaRegistry<RunResult = unknown> {
         .run()
       return changed
     })
-    return view(updated)
+    return this.#view(updated)
   }
 }
 

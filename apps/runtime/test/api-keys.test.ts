@@ -75,6 +75,7 @@ describe('server API keys (ADR 0081)', () => {
     expect(await verifyKey(env, secret)).toEqual({
       workspaceId: 'w1',
       keyId: key.id,
+      name: 'service-dev',
       scopes: ['topics', 'conversations'],
       servers: ['mycut'],
       origins: [],
@@ -99,6 +100,7 @@ describe('server API keys (ADR 0081)', () => {
     expect(await verifyKey(env, secret)).toEqual({
       workspaceId: 'w1',
       keyId: key.id,
+      name: 'service-dev',
       scopes: ['topics', 'inspect'],
       servers: ['mycut'],
       origins: [],
@@ -119,6 +121,7 @@ describe('server API keys (ADR 0081)', () => {
     expect(await verifyKey(env, rotated.secret)).toEqual({
       workspaceId: 'w1',
       keyId: key.id,
+      name: 'service-dev',
       scopes: ['topics', 'conversations'],
       servers: ['mycut'],
       origins,

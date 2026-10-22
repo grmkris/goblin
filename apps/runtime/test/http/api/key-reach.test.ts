@@ -9,8 +9,8 @@ import { organizing } from './organizing.ts'
 const scout = { name: 'Scout', avatar: { glyph: 'S', hue: 120 }, role: 'Finds things out', instructions: 'Be brief.' }
 
 /** The grant the edge forwards for a key (ADR 0081): every scope, and one server it may name in a setup. */
-const grant = (keyId = 'key-1', scopes = ['topics', 'conversations', 'personas']) => ({
-  'x-goblin-caller': JSON.stringify({ kind: 'key', keyId, scopes, servers: ['mycut'], origins: [] }),
+const grant = (keyId = 'key-1', scopes = ['topics', 'conversations', 'personas'], name = keyId) => ({
+  'x-goblin-caller': JSON.stringify({ kind: 'key', keyId, name, scopes, servers: ['mycut'], origins: [] }),
 })
 const KEY = grant()
 const OTHER = grant('key-2')
@@ -115,6 +115,7 @@ describe("an API key's reach (ADR 0081)", () => {
       revision: 2,
       archived: false,
       searchExcluded: false,
+      room: { key: 'key-1' },
       updatedAt: expect.any(Number),
     })
     expect(first.next).toMatch(/^\d+\.\d+$/u)
@@ -141,6 +142,7 @@ describe("an API key's reach (ADR 0081)", () => {
       name: 'Editor',
       role: scout.role,
       avatar: scout.avatar,
+      madeBy: { key: 'key-1' },
       revision: 1,
       model: 'model-a',
       setup: { servers: [{ connectionId: 'mycut', tools: 2 }], skills: 0, apps: 0 },
@@ -153,6 +155,35 @@ describe("an API key's reach (ADR 0081)", () => {
     expect((await personaPage(fetch(get('/api/personas')))).personas).toHaveLength(3)
     // A key with no personas scope lists none of them.
     expect((await fetch(get('/api/personas', grant('key-1', ['topics'])))).status).toBe(403)
+  })
+
+  it('names the key on what it made, to the key and the owner, and on nothing it did not (ADR 0108)', async () => {
+    const { fetch, db, topics, personas } = organizing()
+    const named = grant('key-1', ['topics', 'personas'], 'swarmm-prod')
+    // Made before names were kept: its key's id stands in until the key makes something again.
+    db.run(sql`INSERT INTO app_key_reach (key_id, kind, resource_id, created_at) VALUES ('key-1', 'topic', 9, 1)`)
+    const made = await fetch(post('/api/topics', { name: 'Customer 1', operationId: 'svc:topic:1' }, named))
+    expect(await made.json()).toMatchObject({ id: 2, room: { key: 'swarmm-prod' } })
+    const persona = await fetch(post('/api/personas', { ...scout, operationId: 'svc:p:1' }, named))
+    expect(await persona.json()).toMatchObject({ id: 1, madeBy: { key: 'swarmm-prod' } })
+    await fetch(post('/api/topics', { name: 'Trips', operationId: 'owner-topic' }))
+    await fetch(post('/api/personas', { ...scout, name: 'Owl', operationId: 'owner-p' }))
+    expect(topics.list().map((topic) => [topic.id, topic.room?.key])).toEqual([
+      [1, undefined],
+      [2, 'swarmm-prod'],
+      [3, undefined],
+    ])
+    expect(personas.list().map((each) => [each.id, each.madeBy?.key])).toEqual([
+      [1, 'swarmm-prod'],
+      [2, undefined],
+    ])
+    expect(db.all(sql`SELECT resource_id, key_name FROM app_key_reach ORDER BY kind, resource_id`)).toEqual([
+      { resource_id: 1, key_name: 'swarmm-prod' },
+      { resource_id: 2, key_name: 'swarmm-prod' },
+      { resource_id: 9, key_name: 'swarmm-prod' },
+    ])
+    const owners = await topicPage(fetch(get('/api/topics')))
+    expect(owners.topics.map((topic) => topic.room?.key ?? null)).toEqual([null, 'swarmm-prod', null])
   })
 
   it("reads back one of its own Topics with its guidance and setup, and no other's", async () => {

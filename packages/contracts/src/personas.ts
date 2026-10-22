@@ -44,10 +44,20 @@ export const PersonaDefinition = Schema.Struct({
 })
 export type PersonaDefinition = typeof PersonaDefinition.Type
 
-/** A Persona at its current revision. An archived one no longer answers but keeps its history. Times in seconds. */
+/**
+ * A Persona a server's API key made (ADR 0108): `key` is the key's name, or its id while goblin has not learnt the name
+ * yet (one made before names were kept, until the key makes something again).
+ */
+const PersonaMaker = Schema.Struct({ key: Schema.String })
+
+/**
+ * A Persona at its current revision; `madeBy` says which key made it, when one did (ADR 0108). An archived one no
+ * longer answers but keeps its history. Times in seconds.
+ */
 export const PersonaView = Schema.Struct({
   ...PersonaDefinition.fields,
   id: PersonaId,
+  madeBy: Schema.optional(PersonaMaker),
   revision: Schema.Int,
   archivedAt: Schema.optional(Schema.Number),
   createdAt: Schema.Number,
@@ -56,14 +66,16 @@ export const PersonaView = Schema.Struct({
 export type PersonaView = typeof PersonaView.Type
 
 /**
- * A Persona in a list (`GET /api/personas`): who it is, its revision and model, and its setup in a line; its
- * instructions and full setup are what `GET /api/personas/:id` answers. `updatedAt` is its last change, in seconds.
+ * A Persona in a list (`GET /api/personas`): who it is and which key made it (`madeBy`, ADR 0108), its revision and
+ * model, and its setup in a line; its instructions and full setup are what `GET /api/personas/:id` answers. `updatedAt`
+ * is its last change, in seconds.
  */
 export const PersonaSummary = Schema.Struct({
   id: PersonaId,
   name: Schema.String,
   role: Schema.String,
   avatar: PersonaAvatar,
+  madeBy: Schema.optional(PersonaMaker),
   revision: Schema.Int,
   model: Schema.optional(Schema.String),
   thinking: Schema.optional(PersonaThinking),

@@ -1,5 +1,6 @@
-import { and, eq } from 'drizzle-orm'
+import { type SQL, and, eq, isNull, sql } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
+import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import { appKeyReach } from '../storage/keys.ts'
 
@@ -22,15 +23,25 @@ export const madeByKey = (db: DrizzleSqliteDODatabase, kind: ReachKind, id: numb
     .where(and(eq(appKeyReach.kind, kind), eq(appKeyReach.resourceId, id)))
     .get() !== undefined
 
-/** Records that key `keyId` made the `kind` with `id`; recording it again changes nothing. */
+/**
+ * Records that key `keyId`, named `name`, made the `kind` with `id`; recording it again changes nothing. A key's name
+ * never changes, so this also names what the key made before names were kept (ADR 0108).
+ */
 export const recordReach = (
   db: DrizzleSqliteDODatabase,
-  keyId: string,
+  key: { readonly keyId: string; readonly name: string },
   kind: ReachKind,
   id: number,
   now: number,
 ): void => {
-  db.insert(appKeyReach).values({ keyId, kind, resourceId: id, createdAt: now }).onConflictDoNothing().run()
+  db.insert(appKeyReach)
+    .values({ keyId: key.keyId, kind, resourceId: id, createdAt: now, keyName: key.name })
+    .onConflictDoNothing()
+    .run()
+  db.update(appKeyReach)
+    .set({ keyName: key.name })
+    .where(and(eq(appKeyReach.keyId, key.keyId), isNull(appKeyReach.keyName)))
+    .run()
 }
 
 /** The ids of every `kind` key `keyId` made, as a subquery: a list of a key's own reads it in one statement. */
@@ -39,3 +50,24 @@ export const reachedIds = <RunResult>(db: SQLiteAsyncDatabase<'sync', RunResult>
     .select({ id: appKeyReach.resourceId })
     .from(appKeyReach)
     .where(and(eq(appKeyReach.keyId, keyId), eq(appKeyReach.kind, kind)))
+
+/**
+ * As a column of a query over `kind`'s rows, the key that made the row whose id is `id` (ADR 0108): its name, or its id
+ * while its name is not known yet; null when no key made it.
+ */
+export const makerColumn = (kind: ReachKind, id: SQLiteColumn): SQL<string | null> =>
+  sql<
+    string | null
+  >`(SELECT coalesce(${appKeyReach.keyName}, ${appKeyReach.keyId}) FROM ${appKeyReach} WHERE ${appKeyReach.kind} = ${kind} AND ${appKeyReach.resourceId} = ${id} LIMIT 1)`
+
+/** The key that made the `kind` with `id`, as `makerColumn` names it; none when no key did. */
+export const makerOf = <RunResult>(
+  db: SQLiteAsyncDatabase<'sync', RunResult>,
+  kind: ReachKind,
+  id: number,
+): string | undefined =>
+  db
+    .select({ key: sql<string>`coalesce(${appKeyReach.keyName}, ${appKeyReach.keyId})` })
+    .from(appKeyReach)
+    .where(and(eq(appKeyReach.kind, kind), eq(appKeyReach.resourceId, id)))
+    .get()?.key
