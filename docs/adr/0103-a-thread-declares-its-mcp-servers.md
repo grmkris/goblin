@@ -23,9 +23,11 @@ thread's servers (`set: []`). Each server's URL must be https with no credential
 a name, not an IP literal (`thread_server_url`), and passes `confineThreadServer`: its origin one the owner granted the key, its tools a subset of that origin's (`key_origin`,
 `key_origin_tool`). Every server is checked before the thread operation makes anything, so a refused one makes no thread,
 and a change's servers are checked before the change writes anything. The granted origin is the network fence (ADR 0091
-refuses IP literals, single-label and local names, now with a trailing dot too);
-the transport follows a redirect only within the origin, and every request is bounded in time (90 s) and its answer in
-size (1 MiB), like the owner's connections.
+refuses IP literals, single-label and local names, now with a trailing dot too). The transport sends every request with
+`redirect: manual` and follows a redirect only within the server's origin (a 307 or 308, or a GET; the MCP SDK's
+same-origin policy, set explicitly here and the default the owner's connections use too), so the bearer never leaves
+the origin and any other redirect fails the request. Every request is bounded in time (90 s) and its answer in size
+(1 MiB), like the owner's connections.
 
 **The token.** It is encrypted with the credential cipher, bound to the workspace, the thread, the server's name and
 its endpoint, in `app_thread_servers`. It
@@ -40,7 +42,10 @@ so the newest token is the live one. An older operation again, the same, answers
 late replay never undoes a later change or revives what an empty set or a close removed. An operation naming other
 servers than it first did is a `Conflict` (`thread_servers`). Tokens are sealed first; the check and the write are one
 synchronous step after. The servers are stored on the thread before its first message is sent, so the Personas it tags
-see them.
+see them, and only once the operation may start (the day's budget is not spent and its message says something), so a
+refused one leaves no servers. A replay onto a thread closed since answers as one without servers does. A set is
+written only while the thread is open and its Topic live, checked in the same step, so one in flight during a close or
+an archive never lands after the drop.
 
 **The key's grant, at every use.** Each server keeps the key that declared it. Freezing a fork's set and every call
 check that the key still exists, is unexpired and still grants that origin and tool (read from the auth store); a server

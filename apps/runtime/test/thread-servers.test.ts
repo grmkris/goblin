@@ -1,6 +1,7 @@
 import { createRegistry } from '@earendil-works/pi-durable'
 import { type KeyOrigin, ThreadServers } from '@goblin/contracts'
 import { ProtocolError, ProtocolErrorCode, createMcpHandler } from '@modelcontextprotocol/server'
+import { eq } from 'drizzle-orm'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as Schema from 'effect/Schema'
@@ -30,6 +31,7 @@ import { CLOSED } from '../src/setup/scope.ts'
 import { appKeyReach } from '../src/storage/keys.ts'
 import { appPersonaChats } from '../src/storage/personas.ts'
 import { appConversations } from '../src/storage/schema.ts'
+import { appTopics } from '../src/storage/topics.ts'
 import { appThreadServers } from '../src/storage/thread-servers.ts'
 import { chatDatabase, durable, sqliteDb } from './chats-sqlite.ts'
 import { stub } from './http/api/fixture.ts'
@@ -55,7 +57,7 @@ const keys = new Map<string, readonly KeyOrigin[]>([['key-1', [{ origin: ORIGIN,
 const received: { tool: string; args: unknown; authorization: string | null }[] = []
 let bearer: string | null = null
 /** How the fixture answers: as asked, with a JSON-RPC error, a 401, a dropped connection, or a huge tool list. */
-type Mode = 'ok' | 'rpc' | 'unauthorized' | 'down' | 'huge'
+type Mode = 'ok' | 'rpc' | 'unauthorized' | 'down' | 'huge' | 'redirect'
 const answer: { mode: Mode } = { mode: 'ok' }
 const DELIVER = {
   name: 'delivery_submit',
@@ -101,10 +103,16 @@ const swarmm = createMcpHandler(() => {
   })
   return server
 })
+/** Every host a request was sent to, with the bearer it carried. */
+const hosts: { host: string; authorization: string | null }[] = []
 const fetcher = async (input: RequestInfo | URL, init?: RequestInit) => {
   const request = new Request(input, init)
   bearer = request.headers.get('authorization')
+  hosts.push({ host: new URL(request.url).host, authorization: bearer })
   const calling = request.method === 'POST' && (await request.clone().text()).includes('tools/call')
+  // A server that sends its calls elsewhere: the redirect is not followed off its origin.
+  if (answer.mode === 'redirect' && calling)
+    return new Response(null, { status: 307, headers: { location: 'https://elsewhere.test/mcp' } })
   if (answer.mode === 'unauthorized' && calling) return new Response(null, { status: 401 })
   if (answer.mode === 'down' && calling) throw new TypeError('network down')
   return swarmm.fetch(request)
@@ -129,6 +137,9 @@ db.insert(appPersonaChats)
   ])
   .run()
 db.insert(appKeyReach).values({ keyId: 'key-1', kind: 'persona', resourceId: 5, createdAt: 1 }).run()
+db.insert(appTopics)
+  .values({ id: 2, name: 'Customer', chatId: '19', createdBy: 'owner', createdAt: 1, updatedAt: 1 })
+  .run()
 const cipher = await CredentialCipher.fromBase64(btoa(String.fromCharCode(...new Uint8Array(32).fill(7))))
 // SAFETY: these programs read nothing of the instance input but its MCP fetch, workspace and key origins.
 const instance = {
@@ -283,6 +294,13 @@ describe('a thread declares the MCP servers its Personas call (ADR 0103)', () =>
     expect(await refusal(KEY, threadEndpoint('20', 'swarmm'))).toBe('NotFound')
   })
 
+  it('never writes servers onto a thread closed while the change was in flight', async () => {
+    db.update(appConversations).set({ closedAt: 5 }).where(eq(appConversations.chatId, '20')).run()
+    expect(await setRefused('op-closed', [server()])).toBe('conversation_closed')
+    expect(threadServerViews(db, '20')).toEqual([])
+    db.update(appConversations).set({ closedAt: null }).where(eq(appConversations.chatId, '20')).run()
+  })
+
   it('stops a server its key no longer grants, at every use, and drops it: a revoked key, or changed origins', async () => {
     await set('op-6', [server({ token: 'live' })])
     keys.set('key-1', [{ origin: ORIGIN, tools: ['delivery_submit'] }])
@@ -390,6 +408,17 @@ describe("a thread's Persona fork calls its declared server natively (ADR 0101, 
     expect(said).toContain('the server says')
     expect(said.length).toBeLessThan(1500)
     answer.mode = 'ok'
+  })
+
+  it("follows no redirect off the server's origin, and the bearer goes nowhere else", async () => {
+    await set('op-13', [server({ token: 'stay-home' })])
+    const deliver = (await installedIn('21')).tool('swarmm__delivery_submit')
+    answer.mode = 'redirect'
+    const result = await executeTool(deliver, { items: [{ fileId: 'f' }] }, inConversation(21))
+    answer.mode = 'ok'
+    expect(result.isError).toBe(true)
+    expect(hosts.some((each) => each.host === 'elsewhere.test')).toBe(false)
+    expect(JSON.stringify(result)).not.toContain('stay-home')
   })
 
   it('offers nothing of a server whose tool list is over 1 MiB, and says it left it out', async () => {

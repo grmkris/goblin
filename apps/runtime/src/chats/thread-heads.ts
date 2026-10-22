@@ -55,6 +55,17 @@ export async function submitThreadHead(
  * selections and Persona order apply there. A retry with the same operation id repeats each step idempotently and
  * returns the same Thread and receipt.
  */
+/**
+ * What a thread operation checks before it makes anything: the day's budget is not spent, and its first message says
+ * something (or selects a skill). A key's declared servers (ADR 0103) are stored only after it.
+ */
+export const startable = (text: string, selections: OwnerSubmit['context']['selections']) =>
+  Effect.gen(function* () {
+    yield* requireBudget
+    const skill = (selections ?? []).some((selection) => selection.kind === 'skill')
+    if (text.trim() === '' && !skill) return yield* new InvalidInput({ reason: 'empty_message' })
+  })
+
 export const startThread = (
   input: Omit<OwnerSubmit, 'thread' | 'parentOp'> & {
     readonly parent: string
@@ -63,9 +74,7 @@ export const startThread = (
   },
 ) =>
   Effect.gen(function* () {
-    yield* requireBudget
-    const skill = (input.context.selections ?? []).some((selection) => selection.kind === 'skill')
-    if (input.text.trim() === '' && !skill) return yield* new InvalidInput({ reason: 'empty_message' })
+    yield* startable(input.text, input.context.selections)
     const conversations = yield* Conversations
     const { parent, anchor, operationId } = input
     const thread = yield* conversations.startThread(parent, operationId, anchor)

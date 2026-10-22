@@ -124,6 +124,10 @@ export async function threadServersCase(url: string): Promise<void> {
     mcpServers: [{ ...SERVER, url: 'https://evil.test/mcp', token: 't' }],
   }
   expect(await reasonOf(await asKey(url, secret, 'POST', threads, elsewhere))).toBe('key_origin')
+  // A message with nothing in it is refused before any thread or server is made, as without servers.
+  const empty = { ...start('t'), operationId: 'svc:job:9', title: 'Job 9', message: { input: '  ' } }
+  expect(await reasonOf(await asKey(url, secret, 'POST', threads, empty))).toBe('empty_message')
+  expect((await workspaceOf(url, owner)).conversations.some((view) => view.title === 'Job 9')).toBe(false)
   // Refused before anything was made: there is no thread of that operation.
   expect((await workspaceOf(url, owner)).conversations.some((view) => view.title === 'Job 8')).toBe(false)
   // Servers are a Thread's alone: not its Topic's Conversation's.
@@ -163,6 +167,12 @@ export async function threadServersCase(url: string): Promise<void> {
   // Closing the thread drops its servers; reopening brings none back.
   const patch = (change: unknown) => asKey(url, secret, 'PATCH', `/api/conversations/${thread.id}`, change)
   expect((await patch({ closed: true })).status).toBe(200)
+  // A replay of the operation onto the closed thread answers as one without servers does, and declares nothing again.
+  const { mcpServers: _servers, ...plainStart } = start('unused')
+  const without = await asKey(url, secret, 'POST', threads, plainStart)
+  const late = await asKey(url, secret, 'POST', threads, start('job-token-late'))
+  expect(late.status).toBe(without.status)
+  expect(await reasonOf(late)).toBe(await reasonOf(without))
   const reopened = await (await patch({ closed: false })).json()
   expect(reopened).not.toHaveProperty('mcpServers')
   // A key's change sets them again, as a whole.

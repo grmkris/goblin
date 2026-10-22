@@ -6,7 +6,7 @@ import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { chatRow } from '../chats/directory.ts'
+import { chatRow, openChatSession } from '../chats/directory.ts'
 import { epochSeconds } from '../clock.ts'
 import { Conflict, Forbidden, InvalidInput, NotFound, attempt, attemptSync } from '../http/errors.ts'
 import { confineThreadServer, requestKey } from '../keys/policy.ts'
@@ -172,6 +172,8 @@ const commit = (db: Database, write: Write): Outcome =>
       .orderBy(desc(appThreadServerOps.seq))
       .all()
     const mine = ops.find((op) => op.operationId === operationId)
+    // A set in flight while the thread closes or its Topic is archived never lands after the drop.
+    if (prepared.servers.length > 0) openChatSession(tx, chat)
     if (mine === undefined) {
       replaceAll(tx, write, ops[0]?.seq ?? 0)
       return 'set'
@@ -300,8 +302,8 @@ export const threadEndpoints = (chat: string) =>
 
 /**
  * One stateless session with `server`: a client opened over Streamable HTTP with its bearer token, the agent's own
- * fetch (redirects only within the origin, the transport's default), `use` run on it, and the client closed whatever
- * happens. A failure is the `UpstreamMcp` of the server's id, which never holds the token.
+ * fetch (a redirect followed only within the server's origin, never carrying the bearer elsewhere), `use` run on it,
+ * and the client closed whatever happens. A failure is the `UpstreamMcp` of the server's id, which never holds the token.
  */
 const session = <A>(server: ThreadEndpoint, use: (client: Client, signal: AbortSignal) => Promise<A>) =>
   Effect.gen(function* () {
@@ -317,6 +319,9 @@ const session = <A>(server: ThreadEndpoint, use: (client: Client, signal: AbortS
         const transport = new StreamableHTTPClientTransport(new URL(server.url), {
           requestInit: { headers: { authorization: `Bearer ${server.token}` } },
           fetch: mcpFetch,
+          // Each request is sent with `redirect: manual` and a redirect followed only within the server's origin (a
+          // 307 or 308, or a GET), so the bearer never leaves it; any other redirect fails the request.
+          redirectPolicy: 'same-origin',
         })
         try {
           await client.connect(transport, { timeout: TIMEOUT_MS, signal })

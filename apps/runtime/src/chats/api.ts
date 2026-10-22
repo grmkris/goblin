@@ -42,7 +42,7 @@ import { PiSessions } from '../pi/sessions.ts'
 import { Invocations } from '../personas/service.ts'
 import { Conversations } from './service.ts'
 import { moveToThread } from './mover.ts'
-import { startThread } from './thread-heads.ts'
+import { startThread, startable } from './thread-heads.ts'
 
 /** A request that names one chat (`/conversations/:id/…`), and one that also carries a body. */
 type ChatRequest = { readonly params: { readonly id: string } }
@@ -88,10 +88,13 @@ const withServers = (view: ConversationView) =>
  */
 const declareOn = (parent: string, payload: StartThread, servers: readonly ThreadServer[]) =>
   Effect.gen(function* () {
-    // Every server is checked against the key first: one refused makes no thread.
+    // Every server is checked against the key first, and the operation's own checks too: one refused makes no thread.
     const prepared = yield* prepareServers(servers)
+    yield* startable(payload.message.input, payload.message.selections)
     const conversations = yield* Conversations
     const thread = yield* conversations.startThread(parent, payload.operationId, payload.anchor)
+    // A replay onto a thread closed since answers as the operation did: its servers were dropped with the close.
+    if (thread.closedAt !== undefined) return
     yield* conversations.requireActing(thread.id)
     yield* applyServers(thread.id, payload.operationId, prepared)
   })
