@@ -19,6 +19,19 @@ const decodeEntries = Schema.decodeUnknownSync(
 )
 const decodeAnswer = Schema.decodeUnknownSync(PersonaAnswerData)
 const decodeCalls = Schema.decodeUnknownSync(Schema.Array(Schema.Struct({ name: Schema.String, args: Schema.Unknown })))
+const decodeSeen = Schema.decodeUnknownSync(
+  Schema.Struct({
+    requests: Schema.Array(
+      Schema.Struct({ tools: Schema.Array(Schema.String), context: Schema.optional(Schema.String) }),
+    ),
+  }),
+)
+
+/** The tools offered to `name`'s fork, in its first request. */
+const offeredTo = async (url: string, owner: Person, name: string) =>
+  decodeSeen(await (await lever(url, owner, 'queue/seen')).json()).requests.find(
+    (request) => request.context?.includes(`You are ${name}`) === true,
+  )?.tools
 
 /** As `until`, for up to 20 s: a Persona answers after its fork's turn, and again after the owner's reply. */
 const until = <A>(read: () => Promise<A>, done: (value: A) => boolean) => untilWithin(read, done, 20_000)
@@ -42,20 +55,32 @@ const persona = (name: string): PersonaDefinition => ({
   setup: { mcpServers: [{ connectionId: SERVER, tools: 'all' }], skills: [], apps: [] },
 })
 
-/** The owner's message into main tagging `tagged`, whose fork is scripted to call the board with `args`. */
-const tag = (me: AgentFetch, tagged: PersonaView, args: object) =>
+/** The board as a Persona fork's native tool (ADR 0101): the fixture's server is called `apps-fixture`. */
+const NATIVE = `${SERVER}__${TOOL}`
+
+/**
+ * The owner's message into main tagging `tagged`, whose fork is scripted to call the board with `args`: natively, as
+ * a fork whose set holds it does, or through `mcp_call`, as one whose set left it out (not granted when it froze).
+ */
+const tag = (me: AgentFetch, tagged: PersonaView, args: object, via: 'native' | 'mcp_call' = 'native') =>
   callOwner(me, (api) =>
     api.conversations.submit({
       params: { id: '1' },
       payload: {
-        input: `persona-call mcp_call ${JSON.stringify({ connectionId: SERVER, name: TOOL, arguments: args })}`,
+        input:
+          via === 'native'
+            ? `persona-call ${NATIVE} ${JSON.stringify(args)}`
+            : `persona-call mcp_call ${JSON.stringify({ connectionId: SERVER, name: TOOL, arguments: args })}`,
         operationId: crypto.randomUUID(),
         selections: [{ kind: 'persona', personaId: tagged.id }],
       },
     }),
   )
 
-/** A tagged Persona's ask-first call holds for the owner; their approval runs it once and the Persona answers again. */
+/**
+ * A tagged Persona's ask-first call of its native tool (ADR 0101) holds for the owner, as an `mcp_call` would; their
+ * approval runs it once and the Persona answers again.
+ */
 async function approvalFromFork(url: string, owner: Person, me: AgentFetch, bidder: PersonaView) {
   await tag(me, bidder, { operationKey: 'persona-held' })
   const held = await until(
@@ -64,6 +89,10 @@ async function approvalFromFork(url: string, owner: Person, me: AgentFetch, bidd
   )
   const hold = held.find((answer) => answer.hold?.kind === 'approval')?.hold
   expect(hold).toMatchObject({ kind: 'approval', connectionId: SERVER, name: TOOL })
+  // Its set holds everything its setup does, so the fork is offered the board by name and no mcp_list or mcp_call.
+  const offered = await offeredTo(url, owner, bidder.name)
+  expect(offered).toContain(NATIVE)
+  expect(offered).not.toContain('mcp_call')
   expect(await calls(url, owner)).not.toContainEqual({ name: TOOL, args: { operationKey: 'persona-held' } })
   expect((await decide(me, hold?.approvalId ?? '', true)).state).toBe('completed')
   expect(await calls(url, owner)).toContainEqual({ name: TOOL, args: { operationKey: 'persona-held' } })
@@ -81,7 +110,7 @@ async function approvalFromFork(url: string, owner: Person, me: AgentFetch, bidd
 async function grantFromFork(me: AgentFetch, bidder: PersonaView) {
   await callOwner(me, (api) => api.mcp.setToolGrant({ payload: { connectionId: SERVER, name: TOOL, allowed: false } }))
   const before = (await answers(me)).length
-  await tag(me, bidder, { operationKey: 'persona-grant' })
+  await tag(me, bidder, { operationKey: 'persona-grant' }, 'mcp_call')
   const asked = await until(
     () => answers(me),
     (found) => found.length > before && found.at(-1)?.hold?.kind === 'grant',

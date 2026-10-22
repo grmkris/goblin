@@ -1,6 +1,7 @@
 import { RunAttribute } from '@goblin/contracts/telemetry'
 import { drizzle } from 'drizzle-orm/durable-sqlite'
 import { receiptOf } from '../chats/receipts.ts'
+import { forkToolOf } from '../personas/tool-sets.ts'
 import { RunTelemetry, type RunSink, reportTelemetryFailure } from './events.ts'
 import { RunLedger } from './ledger.ts'
 import { RunLog } from './log.ts'
@@ -33,6 +34,7 @@ export function runTelemetry(
     read: (id) => ledger.read(id),
     forOperation: (operationId) => ledger.forOperation(operationId),
     receipt: (operationId) => receiptOf(db, operationId),
+    nativeTool: (conversation, name) => forkToolOf(db, conversation, name),
   })
   return {
     telemetry,

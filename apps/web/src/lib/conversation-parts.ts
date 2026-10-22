@@ -2,7 +2,15 @@
 // into the call that asked for it, the turn in flight after them, and each App build marked where its view shows.
 import type { ChatMessage, ToolCallView } from './chat-messages.ts'
 import { type Echo, delivered } from './echo.ts'
-import { type AppBuilt, type McpTarget, type Part, type ToolPart, type ToolState, partKey } from './parts.ts'
+import {
+  type AppBuilt,
+  type McpTarget,
+  type Part,
+  type ToolPart,
+  type ToolState,
+  isNativeTool,
+  partKey,
+} from './parts.ts'
 import type { ConversationProjection, LiveTool, ToolTimes } from './projection.ts'
 import { isString, record } from './values.ts'
 
@@ -20,12 +28,26 @@ function objectArgument(value: unknown): Record<string, unknown> | undefined {
   }
 }
 
-/** The MCP server, tool and arguments of an `mcp_call`, when the call has that shape. */
-function mcpTarget(call: ToolCallView): McpTarget | undefined {
-  if (call.name !== 'mcp_call') return undefined
-  const { connectionId, name } = call.arguments
-  if (!isString(connectionId) || !isString(name)) return undefined
-  return { connectionId, name, arguments: objectArgument(call.arguments.arguments) ?? {} }
+/**
+ * The MCP server, tool and arguments of a call: an `mcp_call`'s arguments name them; a Persona fork's native tool
+ * (`<server>__<tool>`, ADR 0101) is named by goblin's own words in its result, the `origin` of the server's result or
+ * the marker goblin wrote for that very tool, so a pending native call has none yet.
+ */
+function mcpTarget(call: ToolCallView, result: ToolResultMessage | undefined): McpTarget | undefined {
+  if (call.name === 'mcp_call') {
+    const { connectionId, name } = call.arguments
+    if (!isString(connectionId) || !isString(name)) return undefined
+    return { connectionId, name, arguments: objectArgument(call.arguments.arguments) ?? {} }
+  }
+  if (!isNativeTool(call.name)) return undefined
+  const details = record(result?.details)
+  const origin = record(details?.origin)
+  if (origin !== undefined)
+    return isString(origin.connectionId) && isString(origin.tool)
+      ? { connectionId: origin.connectionId, name: origin.tool, arguments: call.arguments }
+      : undefined
+  if (details?.tool !== call.name || !isString(details.connectionId) || !isString(details.name)) return undefined
+  return { connectionId: details.connectionId, name: details.name, arguments: call.arguments }
 }
 
 function toolState(result: ToolResultMessage | undefined, live: LiveTool | undefined, running: boolean): ToolState {
@@ -44,7 +66,7 @@ type Context = {
 function toolPart(call: ToolCallView, context: Context, askedAt: number | undefined): ToolPart {
   const result = context.results.get(call.id)
   const live = context.live.get(call.id)
-  const target = mcpTarget(call)
+  const target = mcpTarget(call, result)
   // What this browser saw when it saw it, for the whole life of the row; else the live start, else the asking message's.
   const times = context.times.get(call.id)
   const startedAt = times?.startedAt ?? live?.startedAt ?? askedAt

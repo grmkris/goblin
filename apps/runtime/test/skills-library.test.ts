@@ -16,6 +16,7 @@ import { makeSkills } from '../src/skills/library.ts'
 import { Skills } from '../src/skills/service.ts'
 import { SKILLS_EXTENSION, type SkillEntry } from '../src/skills/protocol.ts'
 import { digestOf } from '../src/skills/verify.ts'
+import { chatDatabase, sqliteDb } from './chats-sqlite.ts'
 import { fixedScopes, topicChatScope } from './fixed-services.ts'
 import { knowledgeOver } from './knowledge-layer.ts'
 import { MemoryCredentials, MemoryGrants, MemoryLabels, MemoryRegistries } from './mcp/memory.ts'
@@ -120,17 +121,26 @@ let library: Skills['Service']
 const later = (ms: number) => services.run(TestClock.adjust(ms))
 const run = <A, E>(program: Effect.Effect<A, E, McpConnections | McpServers>) => services.run(program)
 
+const closers: (() => void)[] = []
+afterEach(() => {
+  for (const close of closers.splice(0)) close()
+})
+
 /** `skill_activate` in conversation 4 of a Topic "Work" whose setup holds the skills `held`. */
 const activateIn = async (held: TopicSetup['skills'], handle: string) => {
   const setup = { ...EVERYTHING, skills: held }
   const scopeOfSession = fixedScopes({ '4': topicChatScope({ id: 2, name: 'Work', setup }) })
+  const { db, close } = chatDatabase()
+  closers.push(close)
   const layer = Layer.mergeAll(
     knowledgeOver({ skills: library }),
     Layer.mock(Resident)({ require: () => Effect.void }),
     Layer.mock(Setups)({ scope: (session: string) => Effect.sync(() => scopeOfSession(session)) }),
+    // Where a Persona fork's tool names would come from (ADR 0101): conversation 4 is not one.
+    sqliteDb(db),
   )
   const runProgram = <A>(program: Effect.Effect<A, AppError, AgentServices>): Promise<A> =>
-    // SAFETY: skill_activate needs only the Skills, Resident and Setups services provided here.
+    // SAFETY: skill_activate needs only the Skills, Resident, Setups and Db services provided here.
     Effect.runPromise(Effect.provide(program, layer) as Effect.Effect<A, AppError>)
   const activate = skillsExtension(runProgram).tools?.find((tool) => tool.name === 'skill_activate')
   if (activate === undefined) throw new Error('skill_activate is not registered')

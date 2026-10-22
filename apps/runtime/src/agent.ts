@@ -27,6 +27,7 @@ import { threadExtension } from './pi/thread.ts'
 import { type PersonaTurnKit, organizingKit } from './organize/kit.ts'
 import { type MemoryKit, memoryExtensions } from './pi/memory.ts'
 import { residentMcpExtension } from './pi/resident-mcp.ts'
+import { forkToolsKit } from './pi/fork-tools.ts'
 import { skillLearningExtension, skillsExtension } from './pi/skills.ts'
 import { AgentLive } from './layers/index.ts'
 import type { AgentServices } from './layers/index.ts'
@@ -99,7 +100,8 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     this.#thread = threadExtension(run)
     this.#memory = memoryExtensions(run)
     const { memory, recall } = this.#memory
-    const { personas, organize } = organizingKit(run)
+    const forkTools = forkToolsKit(ctx.storage, run)
+    const { personas, organize } = organizingKit(run, forkTools)
     this.#personas = personas
     const guidance = topicContextExtension(run, async (task, context) =>
       (await this.harness.pi()).abortTask(task, context),
@@ -140,7 +142,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     ]
     const own = [serversExtension(run), subagents, routinesExtension(run), this.#telemetry.diagnose]
     const extras = [this.#thread, memory, recall, this.#personas.extension, ...routineKit.extra]
-    this.harness = makePiHarness(this.#pi, [...base, ...own], extras, apps, this.#telemetry.recorder)
+    this.harness = makePiHarness(this.#pi, [...base, ...own], extras, [apps, forkTools], this.#telemetry.recorder)
     this.lifecycle.use(this.harness)
   }
   /** The native schedules that run the agent's apps' jobs (ADR 0021). */

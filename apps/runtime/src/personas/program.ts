@@ -2,6 +2,7 @@ import {
   type CreatePersona,
   NOTHING,
   type PersonaDefinition,
+  type PersonaDetail,
   type PersonaView,
   type UpdatePersona,
 } from '@goblin/contracts'
@@ -10,6 +11,7 @@ import * as Option from 'effect/Option'
 import { NotFound } from '../http/errors.ts'
 import type { NewReceipt } from '../organize/receipts.ts'
 import { Receipts } from '../organize/service.ts'
+import { exposedTools } from '../pi/fork-tools.ts'
 import { refuseUnallowed } from '../setup/catalog.ts'
 import type { PersonaActor } from './registry.ts'
 import { Personas } from './service.ts'
@@ -25,8 +27,16 @@ export const personaNamed = (name: string) =>
     ),
   )
 
-/** One Persona with its revisions. */
-export const personaDetail = (id: number) => Personas.use((personas) => personas.detail(id))
+/**
+ * One Persona with its revisions, and the native tools its own setup exposes now (ADR 0101): what a server checks before
+ * it hands the Persona work that needs them.
+ */
+export const personaDetail = (id: number) =>
+  Effect.gen(function* () {
+    const history = yield* (yield* Personas).detail(id)
+    const exposed = yield* exposedTools(history.persona.setup)
+    return { ...history, exposedTools: exposed } satisfies PersonaDetail
+  })
 
 /** What Undo restores: a Persona's definition and whether it was archived. */
 export type PersonaSnapshot = PersonaDefinition & { readonly archived: boolean }

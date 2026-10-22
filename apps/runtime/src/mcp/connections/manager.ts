@@ -275,8 +275,15 @@ const eventRequest = <S extends Schema.ConstraintDecoder<unknown>>(
     return answer
   })
 
+/** The `_meta` a skills request carries: the fork's tool prefix, when it has one (ADR 0101). */
+const prefixed = (toolPrefix: string | undefined) => (toolPrefix === undefined ? {} : { _meta: { toolPrefix } })
+
 /** Skills are read only from servers the owner turned them on for; nothing is opened otherwise. */
-const skillsConnection = (manager: Manager, connectionId: string, { authorize, ...request }: SkillRequestOptions) =>
+const skillsConnection = (
+  manager: Manager,
+  connectionId: string,
+  { authorize, toolPrefix: _prefix, ...request }: SkillRequestOptions,
+) =>
   Effect.gen(function* () {
     yield* serverOf(manager, connectionId)
     if (authorize !== undefined) yield* authorize(connectionId)
@@ -289,7 +296,7 @@ const skillsConnection = (manager: Manager, connectionId: string, { authorize, .
 const skillRequest = <A>(
   manager: Manager,
   live: Connection,
-  { authorize, ...request }: SkillRequestOptions,
+  { authorize, toolPrefix: _prefix, ...request }: SkillRequestOptions,
   send: (request: RequestOptions) => Promise<A>,
   max?: number,
 ) => {
@@ -312,7 +319,7 @@ const listSkills = (manager: Manager, connectionId: string, options: SkillReques
     let ttlMs: number | undefined
     let cursor: string | undefined
     for (let page = 0; page < manager.maxPages; page++) {
-      const params = cursor === undefined ? {} : { cursor }
+      const params = { ...(cursor === undefined ? {} : { cursor }), ...prefixed(options.toolPrefix) }
       const result = yield* skillRequest(manager, live, options, (guarded) =>
         live.client.request({ method: 'skills/list', params }, skillsListStandard, guarded),
       ).pipe(timed({ step: 'skills', connectionId }, manager.options.report))
@@ -334,7 +341,13 @@ const skillFile = (
     const live = yield* skillsConnection(manager, connectionId, options)
     if (!offersSkills(live.snapshot)) return yield* new UpstreamMcp({ connectionId, reason: 'unsupported' })
     const max = manager.options.maxSkillFileBytes ?? 4_194_304
-    return yield* skillRequest(manager, live, options, (guarded) => live.client.readResource({ uri }, guarded), max)
+    return yield* skillRequest(
+      manager,
+      live,
+      options,
+      (guarded) => live.client.readResource({ uri, ...prefixed(options.toolPrefix) }, guarded),
+      max,
+    )
   })
 
 /** The requests as the service answers them. */

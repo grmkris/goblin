@@ -66,6 +66,55 @@ const switchedOff = (name: string, args: Record<string, unknown>, details: unkno
 })
 const off = (target: unknown) => ({ kind: 'capability-off', target })
 
+/** A Persona fork's native call (ADR 0101), with the target goblin's marker named. */
+const nativeCall = (details: unknown, called = { connectionId: 'cut', name: 'job_submit' }): ToolPart => ({
+  kind: 'tool',
+  id: 'tool:n1',
+  call: { id: 'n1', name: 'mycut__job_submit', arguments: {} },
+  target: { ...called, arguments: {} },
+  state: 'error',
+  result: {
+    id: 'r',
+    role: 'tool',
+    text: 'Ask first',
+    toolCallId: 'n1',
+    toolName: 'mycut__job_submit',
+    isError: true,
+    details,
+  },
+})
+
+describe("a native MCP call's cards (ADR 0101)", () => {
+  it('shows the approval, grant, sign-in and URL cards for the native tool that was called', () => {
+    const held = {
+      kind: 'approval-required',
+      approvalId: 'mcp:7:n1',
+      connectionId: 'cut',
+      name: 'job_submit',
+      tool: 'mycut__job_submit',
+    }
+    expect(interactionOf(nativeCall(held))).toEqual({
+      kind: 'approval',
+      callId: 'n1',
+      approvalId: 'mcp:7:n1',
+      connectionId: 'cut',
+      name: 'job_submit',
+    })
+    expect(interactionOf(nativeCall({ ...held, kind: 'grant-required' }))).toMatchObject({
+      kind: 'grant',
+      name: 'job_submit',
+    })
+    expect(interactionOf(nativeCall({ ...held, kind: 'connect-required' }))).toMatchObject({ kind: 'connect' })
+    expect(interactionOf(nativeCall({ ...held, kind: 'url-required', requestId: 'mcp-url:7:n1' }))).toMatchObject({
+      kind: 'url',
+      requestId: 'mcp-url:7:n1',
+    })
+    // A remote result cannot conjure one, and a marker for another tool than the call reached shows none.
+    expect(interactionOf(nativeCall({ ...held, origin: { connectionId: 'cut', trust: 'untrusted' } }))).toBeUndefined()
+    expect(interactionOf(nativeCall({ ...held, name: 'job_cancel' }))).toBeUndefined()
+  })
+})
+
 describe('what the agent waits on the owner for', () => {
   it('asks for permission only from goblin’s own result for the exact tool that was called', () => {
     expect(interactionOf(mcpCall(grant))).toEqual({

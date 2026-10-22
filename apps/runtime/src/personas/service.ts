@@ -1,6 +1,5 @@
 import type {
   CreatePersona,
-  PersonaDetail,
   PersonaInvocationView,
   PersonaRevisionView,
   PersonaView,
@@ -14,7 +13,7 @@ import { requestKey } from '../keys/policy.ts'
 import { epochSeconds } from '../clock.ts'
 import { Changes } from '../runtime/changes.ts'
 import type { NewInvocation, PersonaInvocations, Settlement } from './invocations.ts'
-import type { PersonaActor, PersonaPageQuery, PersonaRegistry } from './registry.ts'
+import type { PersonaActor, PersonaHistory, PersonaPageQuery, PersonaRegistry } from './registry.ts'
 
 /** One invocation's key: the owner's send and the Persona tagged in it. */
 export type InvocationKey = { readonly operationId: string; readonly persona: number }
@@ -58,7 +57,7 @@ export class Personas extends Context.Service<
     /** The active Persona named `name`, ignoring case. */
     readonly byName: (name: string) => Effect.Effect<Option.Option<PersonaView>>
     /** A Persona with its revisions, newest first. */
-    readonly detail: (id: number) => Effect.Effect<PersonaDetail, AppError>
+    readonly detail: (id: number) => Effect.Effect<PersonaHistory, AppError>
     /** One stored revision, as an invocation froze it. */
     readonly revision: (id: number, revision: number) => Effect.Effect<PersonaRevisionView, AppError>
     /** Whether `model` is on offer now. */

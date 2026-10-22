@@ -88,8 +88,11 @@ const both = (one: Allow, other: Allow): Allow => ({
   app: (name) => one.app(name) && other.app(name),
 })
 
-/** What a setup lets a chat use: only what it holds. A Persona's setup never holds subagents. */
-const setupAllows = (setup: TopicSetup | PersonaSetup): Allow => ({
+/**
+ * What a setup lets a chat use: only what it holds. A Persona's setup never holds subagents. A Persona's own setup is
+ * also what decides the tools it exposes (ADR 0101).
+ */
+export const setupAllows = (setup: TopicSetup | PersonaSetup): Allow => ({
   server: (connectionId) => hasServer(setup, connectionId),
   tool: (connectionId, name) => hasTool(setup, connectionId, name),
   skills: (connectionId) => hasLibrary(setup, connectionId),

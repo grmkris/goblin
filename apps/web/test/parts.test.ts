@@ -30,6 +30,48 @@ const result = (id: number, toolCallId: string, isError = false) => ({
 const snapshot = (entries: readonly unknown[], extra: Record<string, unknown> = {}) =>
   projectSnapshot({ type: 'snapshot', entries, tools: [], inbox: [], ...extra })
 
+/** A Persona fork's native call of `name` (ADR 0101) and its result, whose details say what it reached. */
+const native = (name: string, args: Record<string, unknown>, details: unknown, isError = false) => [
+  {
+    id: 2,
+    model: [
+      {
+        role: 'assistant',
+        content: [{ type: 'toolCall', id: 'n1', name, arguments: args }],
+        stopReason: 'toolUse',
+        timestamp: 1_000,
+      },
+    ],
+  },
+  {
+    id: 3,
+    model: [
+      { role: 'toolResult', toolCallId: 'n1', toolName: name, isError, content: 'out', details, timestamp: 2_000 },
+    ],
+  },
+]
+
+describe("a Persona fork's native MCP calls (ADR 0101)", () => {
+  it("reads the server and tool from goblin's own words in the result: a remote result's origin, or its marker", () => {
+    const origin = { origin: { connectionId: 'cut', trust: 'untrusted', tool: 'job_submit' } }
+    const [done] = conversationParts(snapshot(native('mycut__job_submit', { a: 1 }, origin)))
+    expect(done).toMatchObject({ target: { connectionId: 'cut', name: 'job_submit', arguments: { a: 1 } } })
+    if (done?.kind !== 'tool') throw new Error('not a tool call')
+    expect(toolLine(done)).toEqual({ lead: 'Used', server: 'cut', tool: 'job_submit' })
+    const marker = { kind: 'grant-required', connectionId: 'cut', name: 'job_submit', tool: 'mycut__job_submit' }
+    const [asked] = conversationParts(snapshot(native('mycut__job_submit', {}, marker, true)))
+    expect(asked).toMatchObject({ target: { connectionId: 'cut', name: 'job_submit' } })
+    // A marker for another tool, or a call of none of goblin's MCP tools, names nothing.
+    const other = { ...marker, tool: 'mycut__job_cancel' }
+    expect(conversationParts(snapshot(native('mycut__job_submit', {}, other, true)))[0]).not.toHaveProperty('target')
+    expect(conversationParts(snapshot(native('share_back', {}, origin)))[0]).not.toHaveProperty('target')
+    // Still pending, the call names nothing yet.
+    expect(conversationParts(snapshot(native('mycut__job_submit', {}, origin).slice(0, 1)))[0]).not.toHaveProperty(
+      'target',
+    )
+  })
+})
+
 describe('the transcript as render parts', () => {
   it("reads an MCP call's arguments sent as the JSON string of an object", () => {
     const args = { connectionId: 'myplan', name: 'myplan_open', arguments: '{"note":"n1"}' }

@@ -165,4 +165,10 @@ export type SkillIdentity = { readonly name: string; readonly uri?: string }
  */
 export type SkillRequestOptions = RequestOptions & {
   readonly authorize?: (connectionId: string, skill?: SkillIdentity) => Effect.Effect<void, AppError>
+  /**
+   * Host metadata, stripped before the SDK sees the options: the prefix a Persona fork's native tools of this server
+   * carry (`<alias>__`, ADR 0101), sent as `_meta.toolPrefix` so a server that names its tools in its skills names them
+   * so. A listing and the files read against it are asked with the same prefix, since it changes their digests.
+   */
+  readonly toolPrefix?: string
 }

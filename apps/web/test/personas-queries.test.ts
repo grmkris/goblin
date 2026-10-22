@@ -37,6 +37,7 @@ const fakeOwner = () => {
   const detail = (): PersonaDetail => ({
     persona: state.persona,
     revisions: [{ ...state.persona, actor: 'owner', createdAt: state.persona.updatedAt }],
+    exposedTools: [],
   })
   const Personas = HttpApiBuilder.group(OwnerApi, 'personas', (handlers) =>
     handlers.handleAll({

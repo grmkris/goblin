@@ -21,6 +21,9 @@ import { appPersonaRevisions, appPersonas } from '../storage/personas.ts'
 type Row = typeof appPersonas.$inferSelect
 type RevisionRow = typeof appPersonaRevisions.$inferSelect
 
+/** A Persona with its revisions: its detail without what it exposes, which is read from its servers. */
+export type PersonaHistory = Omit<PersonaDetail, 'exposedTools'>
+
 /** Who changed a Persona: the owner (UI) or the agent (its organize tools, on a direct request). */
 export type PersonaActor = 'owner' | 'agent'
 
@@ -153,8 +156,8 @@ export class PersonaRegistry<RunResult = unknown> {
     return row === undefined ? undefined : view(row)
   }
 
-  /** A Persona with its revisions, newest first. */
-  detail(id: number): PersonaDetail {
+  /** A Persona with its revisions, newest first (what it exposes is read live, `personas/program.ts`). */
+  detail(id: number): PersonaHistory {
     const row = this.#row(id)
     const revisions = this.#db
       .select()

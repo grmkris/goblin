@@ -22,11 +22,18 @@ const onReport = (error: unknown) =>
     ...(error instanceof Error ? { frames: framesOf(error) } : {}),
   })
 
-/** The agent's apps as Pi sees them: extensions installed into its registry and selected by default (ADR 0021). */
-export interface AppTools {
+/**
+ * Extensions installed into the registry as they are made, not at construction: they are installed once Pi's registry
+ * exists and again before Pi opens, so a restarted agent offers them on its first request.
+ */
+export interface InstalledTools {
   attach(registry: Registry): void
-  /** Installs every app's tools; runs before Pi opens, so a restarted agent offers them on its first request. */
+  /** Installs what is already made; runs before Pi opens. */
   restore(): void
+}
+
+/** The agent's apps as Pi sees them: extensions installed into its registry and selected by default (ADR 0021). */
+export interface AppTools extends InstalledTools {
   extensions(): readonly Extension[]
 }
 
@@ -35,19 +42,21 @@ export interface AppTools {
  * `ask_user`, `base` and the apps' extensions; `extra` is installed for the conversations that add it by name (a
  * thread's own tools). The default selection is a getter, read at every use, so an app built or changed is offered
  * from the next model request. Subagents and routine runs set their own exact lists, so they get no app tools.
- * `recorder` follows Pi's commits from the moment it opens, before any of its work resumes (the run ledger, ADR 0024).
+ * `installed` (the apps, and the native tools Persona forks froze, ADR 0101) are installed as they are made and again
+ * before Pi opens. `recorder` follows Pi's commits from the moment it opens, before any of its work resumes (the run
+ * ledger, ADR 0024).
  */
 export function makePiHarness(
   pi: PiModels,
   base: readonly Extension[],
   extra: readonly Extension[],
-  apps: AppTools,
+  [apps, ...installed]: readonly [AppTools, ...InstalledTools[]],
   recorder: Pick<PiRunRecorder, 'attach' | 'restore'>,
 ): PiHarness {
   const registry = createRegistry()
   const defaults = [personaExtension, askUserExtension, ...base]
   for (const extension of [...defaults, ...extra]) registry.install(extension)
-  apps.attach(registry)
+  for (const each of [apps, ...installed]) each.attach(registry)
   const settings = {
     get extensions() {
       return [...defaults, ...apps.extensions()]
@@ -58,7 +67,7 @@ export function makePiHarness(
   }
   return new PiHarness({
     harness: async ({ storage, context }) => {
-      apps.restore()
+      for (const each of [apps, ...installed]) each.restore()
       const harness = await Harness.open(storage, { models: pi.models, registry, settings, onReport }, context)
       recorder.attach(harness)
       await recorder.restore(harness, context)

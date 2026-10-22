@@ -5,6 +5,7 @@ import type { AppEngine } from '../agent-apps/service.ts'
 import {
   type AgentAppsPort,
   type AppOrigin,
+  type NativeTarget,
   agentAppChanged,
   agentAppId,
   agentAppName,
@@ -26,6 +27,7 @@ import { FilesLive } from '../files/live.ts'
 import type { Files } from '../files/service.ts'
 import { attemptSync } from '../http/errors.ts'
 import type { KeyedLock } from '../observability/lock.ts'
+import { forkToolOf } from '../personas/tool-sets.ts'
 import { PiSessions } from '../pi/sessions.ts'
 import { Changes } from '../runtime/changes.ts'
 import { Db } from '../runtime/db.ts'
@@ -40,6 +42,11 @@ export const appsOver = (
   sessions: PiSessions['Service'],
 ) => {
   const changed = (id: string) => changes.publish('apps.changed', { ids: [id] })
+  // What a Persona fork's native tools call there (ADR 0101), so an App one of them renders launches like an mcp_call's.
+  const nativeIn =
+    (session: string): NativeTarget =>
+    (name) =>
+      forkToolOf(db, session, name)
   return Apps.of({
     list: attemptSync(() => appList(db, agents)).pipe(Effect.withSpan('Apps.list')),
     view: Effect.fn('Apps.view')(function* (id: string) {
@@ -66,7 +73,7 @@ export const appsOver = (
     launch: Effect.fn('Apps.launch')(function* (id: string) {
       const site = yield* attemptSync(() => launchSite(db, id))
       if (site.kind === 'agent') return yield* attemptSync(() => agents.launch(site.name))
-      const call = yield* findCall(sessions, site.session, site.callId, site.entry)
+      const call = yield* findCall(sessions, nativeIn(site.session), site.session, site.callId, site.entry)
       if (site.entry === undefined) yield* attemptSync(() => keepCallEntry(db, id, call.entry))
       return {
         kind: 'mcp' as const,
@@ -77,7 +84,7 @@ export const appsOver = (
       }
     }),
     call: Effect.fn('Apps.call')(function* (session: string, callId: string) {
-      return yield* findCall(sessions, session, callId)
+      return yield* findCall(sessions, nativeIn(session), session, callId)
     }),
     agentApp: Effect.fn('Apps.agentApp')(function* (id: string) {
       return yield* attemptSync(() => agentAppName(db, id))

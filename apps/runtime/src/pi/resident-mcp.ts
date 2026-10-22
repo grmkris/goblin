@@ -1,104 +1,20 @@
-import {
-  type ToolExecutionApi,
-  type ToolRegistration,
-  ToolTask,
-  defineExtension,
-  hook,
-} from '@earendil-works/pi-durable'
+import { ToolTask, defineExtension, hook } from '@earendil-works/pi-durable'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import type { Grant, ServerView } from '@goblin/contracts'
 import type { Tool } from '@modelcontextprotocol/client'
-import * as Option from 'effect/Option'
-import { Chats } from '../chats/service.ts'
-import { FlowEvents } from '../observability/flows.ts'
 import type { SetupScope } from '../setup/scope.ts'
 import { Setups } from '../setup/service.ts'
-import {
-  type GrantDenied,
-  InvalidArguments,
-  type NeedsAuthorization,
-  NotFound,
-  type ScopeRequired,
-  UpstreamMcp,
-  attempt,
-  attemptSync,
-} from '../http/errors.ts'
-import { AgentInput } from '../runtime/input.ts'
-import { describeError } from '../telemetry/attributes.ts'
-import { materialize } from '../mcp/content/materialize.ts'
+import { NotFound } from '../http/errors.ts'
 import { offersEvents, toolOffered } from '../mcp/connections/remote.ts'
-import {
-  connectRequiredResult,
-  grantRequiredResult,
-  mcpModelResult,
-  scopeRequiredResult,
-} from '../mcp/connections/extension.ts'
-import { named } from '../mcp/servers/labels.ts'
-import { Events, McpConnections, McpGrants, McpServers, requireResident } from '../mcp/service.ts'
-import type { McpConnectionSnapshot, McpRequestOptions } from '../mcp/connections/types.ts'
-import { requireRoutineSession } from '../routines/authority.ts'
-import { bound } from '../runtime/boundary.ts'
+import { Events, McpConnections, McpGrants, McpServers } from '../mcp/service.ts'
+import type { McpConnectionSnapshot } from '../mcp/connections/types.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
-import { outsideScopeResult, mcpOff } from './setup.ts'
-import { ReadyResult, typedTool } from './typed-tool.ts'
-import { McpCallInput, holdModelCall, approvalResult } from '../mcp/approvals/approval-request.ts'
-import { keepModelApp } from '../mcp/apps/kept-app.ts'
-import { holdUrlRequest } from '../mcp/url-requests/url-request.ts'
-
-/** The Pi context a tool's execution runs in. */
-type ToolContext = Parameters<ToolRegistration['execute']>[2]
-
-/** What a model's MCP tool checks before it runs: resident authority, then a routine run's own, when it is one. */
-const executionAuthority = (session: string) => Effect.andThen(requireResident, requireRoutineSession(session))
-
-/** What the manager checks again right before a model's call leaves: the call's execution authority and scope. */
-const dispatchAuthority = (session: string, input: { connectionId: string; name: string }) =>
-  Effect.gen(function* () {
-    yield* executionAuthority(session)
-    if (!(yield* (yield* Setups).scope(session)).tool(input.connectionId, input.name))
-      return yield* new NotFound({ what: 'tool scope' })
-  })
-
-/**
- * A call the owner has not granted becomes a request for their decision, but only for a tool that exists and the
- * model may call: anything else stays NotFound, so the owner is never asked about a tool that is not there. A tool the
- * connection does not list yet is listed once more first: the server may have just added it (ADR 0042).
- */
-const grantRequired = (denied: GrantDenied, options: McpRequestOptions) =>
-  Effect.gen(function* () {
-    const connections = yield* McpConnections
-    const known = yield* connections.connect(denied.connectionId, options)
-    const snapshot = known.tools.some(({ name }) => name === denied.name)
-      ? known
-      : yield* connections.refreshTools(denied.connectionId, options)
-    const tool = snapshot.tools.find((item) => item.name === denied.name)
-    if (tool === undefined || !toolOffered(tool, 'model')) return yield* new NotFound({ what: `tool ${denied.name}` })
-    const labels = yield* (yield* McpServers).labels()
-    return grantRequiredResult(denied.connectionId, denied.name, named(labels, denied.connectionId))
-  })
-
-/** A call to a connection the owner has not signed in to, as the model reads it: the owner connects it (ADR 0063). */
-const connectRequired = (needed: NeedsAuthorization, name: string) =>
-  Effect.map(
-    McpServers.use((servers) => servers.labels()),
-    (labels) => new ReadyResult(connectRequiredResult(needed.connectionId, name, named(labels, needed.connectionId))),
-  )
-
-/** A call beyond the connection's granted scope, as the model reads it: the owner signs in again (ADR 0042). */
-const scopeRequired = (required: ScopeRequired, name: string, session: string) =>
-  Effect.gen(function* () {
-    const connection = named(yield* (yield* McpServers).labels(), required.connectionId)
-    const chat = Option.getOrUndefined(yield* (yield* Chats).chatOf(session))
-    yield* FlowEvents.record({
-      flow: 'scope_required',
-      via: 'tool',
-      actor: 'agent',
-      ...(chat === undefined ? {} : { chat }),
-      status: 'ok',
-    })
-    return new ReadyResult(scopeRequiredResult(required.connectionId, name, required.scope, connection))
-  })
+import { typedTool } from './typed-tool.ts'
+import { McpCallInput, holdModelCall } from '../mcp/approvals/approval-request.ts'
+import { nativeCall } from './fork-tools.ts'
+import { SEPARATOR } from './native-tools.ts'
+import { callFailure, executionAuthority, remoteToolResult, requestFor } from './remote-call.ts'
 
 /** How many characters of a remote description `mcp_list` shows of a tool the model did not name. */
 const BRIEF = 160
@@ -396,49 +312,22 @@ const connectionListing = (snapshot: McpConnectionSnapshot, input: ListInput, co
   })
 
 /**
- * What the model reads of a failed call. Arguments that do not fit the tool's input schema were sent nowhere: it reads
- * every problem, one per line, to fix them in one more call (ADR 0092). A call that timed out or lost its connection
- * may still have reached the server, so it is told to look before calling again: in the showcase run it sent a slow
- * `create_agent` twice.
+ * The ask-first hold of a model's call, prepared before the call runs: an `mcp_call`, or a native tool of a Persona
+ * fork's frozen set (ADR 0101), which names its server and tool there.
  */
-const callFailure = (cause: unknown): string => {
-  if (cause instanceof InvalidArguments)
-    return `The arguments do not match ${cause.name}'s input schema; fix them and call again:\n${cause.problems.map((problem) => `- ${problem}`).join('\n')}`
-  return cause instanceof UpstreamMcp && (cause.reason === 'timeout' || cause.reason === 'transport')
-    ? `${describeError(cause)}. The call may have reached the server and taken effect: check its state with a read-only tool before calling it again, and never repeat a paid or one-time action blind.`
-    : describeError(cause)
-}
-
-/**
- * Whether the model answering this conversation sees images: its Pi model takes image input (`pi/model.ts`), as pi-ai
- * decides when it sends a tool result's images. Asked only when a kept file is a small image, which is then shown to it
- * beside the file's reference (ADR 0065).
- */
-const seesImages = (api: ToolExecutionApi, context: ToolContext) =>
-  Effect.gen(function* () {
-    const { pi } = yield* AgentInput
-    const chosen = (yield* attempt(() => api.agent(context))).model
-    const model = yield* attemptSync(() =>
-      chosen === undefined ? pi.model : pi.models.getModel(chosen.provider, chosen.modelId),
-    )
-    return model?.input.includes('image') === true
-  }).pipe(
-    // expected: a model goblin cannot tell sees images reads the file's reference alone, which is enough.
-    Effect.orElseSucceed(() => false),
-  )
-
-const requestFor = (api: ToolExecutionApi, signal: AbortSignal | undefined): McpRequestOptions => ({
-  runContext: { conversationId: String(api.conversationId), taskId: String(api.taskId) },
-  ...(signal === undefined ? {} : { signal }),
-})
-
 const approvalHooks = (run: RunProgram) => [
   hook(ToolTask, {
     // Pi's block path skips afterTool. Prepare here; execute emits the terminating approval card.
     beforeTool: async (call, api) => {
-      if (call.name !== 'mcp_call') return undefined
-      const input = Schema.decodeUnknownSync(McpCallInput)(call.arguments)
-      await run(holdModelCall(String(api.conversationId), call.id, String(api.taskId), input))
+      const session = String(api.conversationId)
+      const input =
+        call.name === 'mcp_call'
+          ? Schema.decodeUnknownSync(McpCallInput)(call.arguments)
+          : call.name.includes(SEPARATOR)
+            ? await run(nativeCall(session, call.name, call.arguments))
+            : undefined
+      if (input === undefined) return undefined
+      await run(holdModelCall(session, call.id, String(api.taskId), input))
       return undefined
     },
   }),
@@ -508,51 +397,8 @@ export function residentMcpExtension(run: RunProgram) {
         output: Schema.Json,
         replay: 'unsafe',
         failure: callFailure,
-        // Switched off in this conversation: nothing is called, not even the grant check or a connection.
-        execute: async (input, api, context) =>
-          run(
-            Effect.gen(function* () {
-              yield* executionAuthority(String(api.conversationId))
-              const scope = yield* (yield* Setups).scope(String(api.conversationId))
-              const off = mcpOff(scope, input.connectionId, input.name)
-              const session = String(api.conversationId)
-              if (off !== undefined) return new ReadyResult(outsideScopeResult(off, scope))
-              const held = yield* holdModelCall(session, api.callId, String(api.taskId), input)
-              if (held !== undefined) return new ReadyResult(yield* approvalResult(session, api.callId, held.id, input))
-              const connections = yield* McpConnections
-              const recheck = yield* bound(dispatchAuthority(session, input))
-              return yield* connections
-                .callModelTool(input.connectionId, input.name, input.arguments, {
-                  authorize: recheck,
-                  ...requestFor(api, context.abortSignal),
-                })
-                .pipe(
-                  Effect.flatMap((outcome) =>
-                    Effect.gen(function* () {
-                      if (outcome.kind === 'url')
-                        return new ReadyResult(
-                          yield* holdUrlRequest(session, api.callId, String(api.taskId), input, outcome.prompt),
-                        )
-                      yield* keepModelApp(session, api.callId, input)
-                      // The files the result hands over are kept in the owner's files (ADR 0065), after the call.
-                      const received = yield* materialize(input.connectionId, outcome.result, {
-                        images: seesImages(api, context),
-                        ...(context.abortSignal === undefined ? {} : { signal: context.abortSignal }),
-                      })
-                      return new ReadyResult(mcpModelResult(input.connectionId, outcome.result, received))
-                    }),
-                  ),
-                  Effect.catchTag('GrantDenied', (denied) =>
-                    Effect.map(
-                      grantRequired(denied, requestFor(api, context.abortSignal)),
-                      (result) => new ReadyResult(result),
-                    ),
-                  ),
-                  Effect.catchTag('ScopeRequired', (required) => scopeRequired(required, input.name, session)),
-                  Effect.catchTag('NeedsAuthorization', (needed) => connectRequired(needed, input.name)),
-                )
-            }),
-          ),
+        // Every check runs again at each call, in the call path native tools share (`pi/remote-call.ts`, ADR 0101).
+        execute: async (input, api, context) => run(remoteToolResult(input, api, context)),
       }),
     ],
   })

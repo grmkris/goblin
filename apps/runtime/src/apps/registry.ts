@@ -314,12 +314,25 @@ export function keepCallEntry(db: ChatDb, id: string, entry: number): void {
     .run()
 }
 
-/** The `mcp_call` with id `callId` among an assistant entry's tool calls, as server, tool and arguments. */
-function mcpCallIn(entry: EntryRecord, callId: string) {
+/**
+ * What a Persona fork's native tool calls, by its name (ADR 0101): its server and that server's name for the tool; none
+ * for a name that is not one there.
+ */
+export type NativeTarget = (name: string) => { readonly connectionId: string; readonly tool: string } | undefined
+
+/**
+ * The MCP call with id `callId` among an assistant entry's tool calls, as server, tool and arguments: an `mcp_call`, or
+ * a native tool `native` names.
+ */
+function mcpCallIn(entry: EntryRecord, callId: string, native: NativeTarget) {
   const message = entry.model?.[0]
   if (message?.role !== 'assistant') return undefined
   const call = message.content.find((block) => block.type === 'toolCall' && block.id === callId)
-  if (call?.type !== 'toolCall' || call.name !== 'mcp_call') return undefined
+  if (call?.type !== 'toolCall') return undefined
+  if (call.name !== 'mcp_call') {
+    const target = native(call.name)
+    return target === undefined ? undefined : { ...target, arguments: call.arguments }
+  }
   const { connectionId, name, arguments: args } = call.arguments
   if (typeof connectionId !== 'string' || typeof name !== 'string') return undefined
   return { connectionId, tool: name, arguments: isRecord(args) ? args : {} }
@@ -336,11 +349,13 @@ const SEARCH = 2000
 const AFTER = 200
 
 /**
- * The `mcp_call` with id `callId` in `session` and its committed result: from `at` when it is known, otherwise
- * searched back from the newest entry. `NotFound` when it is not there or has no result yet.
+ * The MCP call with id `callId` in `session` and its committed result: from `at` when it is known, otherwise searched
+ * back from the newest entry. `NotFound` when it is not there or has no result yet. `native` names what a Persona
+ * fork's native tools call there.
  */
 export const findCall = (
   sessions: PiSessions['Service'],
+  native: NativeTarget,
   session: string,
   callId: string,
   at?: number,
@@ -357,7 +372,7 @@ export const findCall = (
         let cursor: Parameters<typeof conversation.entries>[2]
         for (let seen = 0; seen < SEARCH;) {
           const page = await conversation.entries({}, 100, cursor, BACKGROUND)
-          const made = page.items.find((item) => mcpCallIn(item, callId) !== undefined)
+          const made = page.items.find((item) => mcpCallIn(item, callId, native) !== undefined)
           if (made !== undefined) return made.id
           seen += page.items.length
           if (page.next === undefined) break
@@ -374,7 +389,7 @@ export const findCall = (
       ),
     )
     const asked = page.items.find((item) => item.id === entry)
-    const made = asked === undefined ? undefined : mcpCallIn(asked, callId)
+    const made = asked === undefined ? undefined : mcpCallIn(asked, callId, native)
     const result = page.items.map((item) => resultIn(item, callId)).find((each) => each !== undefined)
     if (made === undefined || result === undefined) return yield* new NotFound({ what: 'app call' })
     return { entry, ...made, result: result.details }

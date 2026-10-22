@@ -323,6 +323,14 @@ unfiltered listing with its `services` instead: each prefix, its tool count and 
 name or description). Both filters also narrow any listing, and naming tools in `tools` lists them in full as before. Refusals, held calls and the `skills` section name a connection the same way, `"<label>" (<connectionId>)`
 (`named` in `mcp/servers/labels.ts`); labels never enter telemetry. `mcp_call` takes its `arguments` as an object or the JSON string of one, and returns the server's result as
 Pi's MCP tools shape it (content blocks, `details.structuredContent`, `_meta` and the origin).
+A Persona's fork is offered its setup's MCP tools natively ([ADR 0101](../adr/0101-a-persona-forks-mcp-tools-are-its-own.md),
+`pi/fork-tools.ts`): when it is registered, the tools its scope holds that the model may call and the owner granted are
+frozen as one set (`app_persona_tool_sets`, by the hash of its tools), each `<server>__<tool>` with its description and
+schema cleaned and bounded (`pi/native-tools.ts`), installed as an extension the fork selects and again before Pi
+opens; more than 20 are deferred behind Pi's `tool_search`. A set that holds everything the scope does takes
+`mcp_list` and `mcp_call` away. Every native call goes through `callRemoteTool` (`pi/remote-call.ts`), `mcp_call`'s own
+body, so each call is checked again at dispatch; its result names the server and tool in goblin's words (`origin.tool`,
+or `tool` on goblin's marker), which the web's cards read.
 Remote result details and the arguments an approval shows go through `mcp/oauth/redaction.ts`: it scrubs exact
 credential-shaped keys such as `accessToken`, `refresh_token` and `apiKey`, recursively. Public asset and usage fields
 such as `rewardToken`, `token`, `tokens` and `tokenAddress` remain readable. A routine's event data skips it: its run

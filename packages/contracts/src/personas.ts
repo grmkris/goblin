@@ -103,10 +103,15 @@ export const PersonaRevisionView = Schema.Struct({
 })
 export type PersonaRevisionView = typeof PersonaRevisionView.Type
 
-/** `GET /api/personas/:id`: the Persona with its revisions, newest first. */
+/**
+ * `GET /api/personas/:id`: the Persona with its revisions, newest first, and `exposedTools`, the names of the native MCP
+ * tools its own setup gives its answers now (ADR 0101, `<server>__<tool>`): those its servers list that the model may
+ * call and the owner granted. A Topic that adds servers adds tools to these; a server's thread adds its own.
+ */
 export const PersonaDetail = Schema.Struct({
   persona: PersonaView,
   revisions: Schema.Array(PersonaRevisionView),
+  exposedTools: Schema.Array(Schema.String),
 })
 export type PersonaDetail = typeof PersonaDetail.Type
 

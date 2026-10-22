@@ -85,6 +85,13 @@ type Library = {
 
 const generationOf = (library: Library, connectionId: string) => library.state.catalogState?.(connectionId).dirty ?? 0
 
+/**
+ * Where a server's listing is cached: by the server, and by the tool prefix it was asked with (ADR 0101), which changes
+ * the text it serves and so its digests.
+ */
+const listingKey = (connectionId: string, options: RequestOptions): string =>
+  options.toolPrefix === undefined ? connectionId : `${connectionId}\n${options.toolPrefix}`
+
 /** The servers the owner uses skills from and still has configured. */
 const sourcesOf = (library: Library) =>
   Effect.map(library.connections.servers(), (servers) => {
@@ -102,7 +109,7 @@ const load = (library: Library, connectionId: string, generation: number, option
     const entry = { generation, skills: listed(connectionId, skills), expiresAt: now + ttl }
     yield* Effect.sync(() => {
       library.state.refreshedCatalog?.(connectionId, generation, now)
-      library.cache.set(connectionId, entry)
+      library.cache.set(listingKey(connectionId, options), entry)
     })
     return entry.skills
   })
@@ -114,14 +121,12 @@ const listingOf = (
   options: RequestOptions,
 ): Effect.Effect<readonly ListedSkill[], AppError> =>
   Effect.gen(function* () {
-    const cached = library.cache.get(connectionId)
+    const key = listingKey(connectionId, options)
+    const cached = library.cache.get(key)
     const generation = generationOf(library, connectionId)
     const now = yield* Clock.currentTimeMillis
     if (cached !== undefined && cached.generation === generation && cached.expiresAt > now) return cached.skills
-    return yield* library.flights.run(
-      `skills.listing:${connectionId}`,
-      load(library, connectionId, generation, options),
-    )
+    return yield* library.flights.run(`skills.listing:${key}`, load(library, connectionId, generation, options))
   })
 
 /**
@@ -142,7 +147,7 @@ const catalogOf = (library: Library, options: RequestOptions, include: (connecti
           // expected: an unreachable server keeps its last listing while one is cached, else it is named unavailable
           Effect.catch(() =>
             Effect.sync(() => {
-              const candidate = library.cache.get(connectionId)
+              const candidate = library.cache.get(listingKey(connectionId, options))
               const current = candidate?.generation === generationOf(library, connectionId)
               return { connectionId, skills: current ? candidate?.skills : undefined }
             }),

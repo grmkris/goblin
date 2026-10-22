@@ -4,13 +4,14 @@ import { BASELINE } from './migrations/baseline.ts'
 import { INVOCATION_REASON } from './migrations/invocation-reason.ts'
 import { KEY_REACH } from './migrations/key-reach.ts'
 import { PERSONA_THINKING } from './migrations/persona-thinking.ts'
+import { PERSONA_TOOLS } from './migrations/persona-tools.ts'
 import { RESIDENT_UNTIL_REVOKED } from './migrations/resident-until-revoked.ts'
 import { SOURCE_PROPOSER } from './migrations/source-proposer.ts'
 import { assertApplicationTable } from './vendor.ts'
 
 /**
  * The fresh application baseline, then the forward migrations production needed without a reset (ADRs 0068, 0081, 0083,
- * 0088, 0100). An edit to the baseline ships only with a disposable dev reset.
+ * 0088, 0100, 0101). An edit to the baseline ships only with a disposable dev reset.
  *
  * @internal Unit tests apply these same statements to SQLite and compare them with the live Drizzle declarations.
  */
@@ -21,6 +22,7 @@ export const MIGRATIONS = [
   RESIDENT_UNTIL_REVOKED,
   SOURCE_PROPOSER,
   PERSONA_THINKING,
+  PERSONA_TOOLS,
 ] as const
 
 export function runApplicationMigrations(storage: DurableObjectStorage): void {

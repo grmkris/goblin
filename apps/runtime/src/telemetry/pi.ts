@@ -36,6 +36,14 @@ export type RecorderLedger = {
   readonly forOperation?: (operationId: string) => readonly RunEvent[]
   /** The receipt an operation was admitted with (chats/receipts.ts `receiptOf`), synchronously. */
   readonly receipt?: (operationId: string) => ReceiptSource | undefined
+  /**
+   * The server and tool a native tool of a Persona fork calls (ADR 0101), by the fork's conversation and the tool's name,
+   * synchronously; none for any other tool.
+   */
+  readonly nativeTool?: (
+    conversation: string,
+    name: string,
+  ) => { readonly connectionId: string; readonly tool: string } | undefined
 }
 
 /** What a turn's source is read from in its operation's receipt: its kind and who started it. */
@@ -70,9 +78,9 @@ export const sourceOf = (operationId: string, receipt?: ReceiptSource): string =
     ? (SOURCES.find(([prefix]) => operationId.startsWith(prefix))?.[1] ?? 'direct')
     : (RECEIPT_SOURCES[receipt.kind] ?? 'direct')
 
-/** The kind of tool a call is, by its name. */
+/** The kind of tool a call is, by its name: a Persona fork's native MCP tool is `<server>__<tool>` (ADR 0101). */
 const familyOf = (tool: string): string =>
-  tool === 'mcp_call' || tool === 'mcp_list'
+  tool === 'mcp_call' || tool === 'mcp_list' || tool.includes('__')
     ? 'mcp'
     : tool === 'subagent' || tool.startsWith('subagent_')
       ? 'subagent'
@@ -89,11 +97,19 @@ type Outcome = NonNullable<NonNullable<ReturnType<typeof decodeTask>>['state']['
 /** Where an entry or task sits: its id, its conversation and the Pi task it belongs to. */
 type Place = { readonly id: string; readonly conversation: string; readonly taskId: string }
 
+/** The server and tool a call reaches: an `mcp_call`'s arguments name them, a native tool's set does (ADR 0101). */
+const mcpOf = (ledger: RecorderLedger, place: Place, name: string, args: unknown) => {
+  if (name === 'mcp_call') return decodeMcpCall(args)
+  const native = name.includes('__') ? ledger.nativeTool?.(place.conversation, name) : undefined
+  return native === undefined ? undefined : { connectionId: native.connectionId, name: native.tool }
+}
+
 /** The calls an answer makes, keyed `entry:call`, with the attributes their tool call events start with. */
-function callsOf(entry: string, message: Assistant) {
+function callsOf(ledger: RecorderLedger, place: Place, message: Assistant) {
+  const entry = place.id
   return message.content.flatMap((block) => {
     if (block.type !== 'toolCall' || block.id === undefined || block.name === undefined) return []
-    const mcp = block.name === 'mcp_call' ? decodeMcpCall(block.arguments) : undefined
+    const mcp = mcpOf(ledger, place, block.name, block.arguments)
     const servers =
       mcp === undefined ? {} : { [RunAttribute.mcpServer]: mcp.connectionId, [RunAttribute.mcpTool]: mcp.name }
     const attributes = { [RunAttribute.argumentBytes]: sizeOf(block.arguments), ...servers }
@@ -350,7 +366,7 @@ export class PiRunRecorder {
   #answered(place: Place, raw: unknown, now: number): void {
     const message = decodeAssistant(raw)
     if (message === undefined) return
-    for (const [key, call] of callsOf(place.id, message)) remember(this.#calls, key, call)
+    for (const [key, call] of callsOf(this.#ledger, place, message)) remember(this.#calls, key, call)
     const id = this.#attemptFor(place)
     const emptyAnswer =
       message.stopReason === 'stop' &&

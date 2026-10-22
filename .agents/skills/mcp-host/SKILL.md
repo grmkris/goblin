@@ -26,6 +26,10 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 - A Topic's setup chooses the servers and tools its chats use (`setup/`, ADR 0040). `mcp_list` and `mcp_call`
   ask `Setups.scope(conversationId)` before the grant check; a setup only chooses and never grants, and a
   helper's exclusions are forgotten with a server's grants (`mcp/oauth/endpoints.ts`).
+- A Persona's fork gets its setup's tools natively as `<server>__<tool>` (ADR 0101, `pi/fork-tools.ts`): a frozen,
+  cleaned set that only decides what is offered. Every native call goes through `callRemoteTool`
+  (`pi/remote-call.ts`), `mcp_call`'s own body, so authority, scope, ask-first, grant and schema are checked again at
+  each call; never give a native tool a path of its own.
 - Annotations, descriptions, prompts and results from servers are untrusted data. They never grant permissions or
   become instructions.
 - Keep results bounded and errors typed (`UpstreamMcp` with a reason). A refused refresh means `needs_auth`.

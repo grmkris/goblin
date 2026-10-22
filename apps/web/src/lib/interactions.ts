@@ -1,7 +1,7 @@
 import { Option, Schema } from 'effect'
 import { NotInTopic, QuestionSpec, type SetupItem } from '@goblin/contracts'
 import { isString, record } from './values.ts'
-import type { Part, ToolPart } from './parts.ts'
+import { type Part, type ToolPart, isNativeTool } from './parts.ts'
 import { subagentAction } from './threads.ts'
 
 /**
@@ -56,7 +56,13 @@ export type Interaction =
 const decodeQuestions = Schema.decodeUnknownOption(Schema.Array(QuestionSpec))
 const decodeNotInTopic = Schema.decodeUnknownOption(NotInTopic)
 
-/** Whether a refused `mcp_call` asked for the server or tool the refusal names. */
+/**
+ * Whether a call is one of goblin's MCP calls: an `mcp_call`, or a Persona fork's native tool (ADR 0101), whose target
+ * only goblin's own words in its result name.
+ */
+const isMcpCall = (part: ToolPart): boolean => part.call.name === 'mcp_call' || isNativeTool(part.call.name)
+
+/** Whether a refused MCP call asked for the server or tool the refusal names. */
 function mcpAsked(part: ToolPart, target: SetupItem): boolean {
   const called = part.target
   if (called === undefined || (target.kind !== 'server' && target.kind !== 'tool')) return false
@@ -76,7 +82,7 @@ function skillAsked(handle: unknown, target: SetupItem): boolean {
  */
 function asksFor(part: ToolPart, target: SetupItem): boolean {
   const { name, arguments: args } = part.call
-  if (name === 'mcp_call') return mcpAsked(part, target)
+  if (isMcpCall(part)) return mcpAsked(part, target)
   if (name === 'skill_activate' || name === 'skill_read') return skillAsked(args.skill, target)
   return subagentAction(part) !== undefined && target.kind === 'subagents'
 }
@@ -101,8 +107,8 @@ const MARKERS = new Map<string, (part: ToolPart, details: Record<string, unknown
 ])
 
 /**
- * The interaction a tool result asks for, if any. A grant request is trusted only from goblin's own `mcp_call`
- * result: an error whose details carry `kind: 'grant-required'` for exactly the server and tool that were called, and
+ * The interaction a tool result asks for, if any. A grant request is trusted only from goblin's own MCP call's (an
+ * `mcp_call`, or a Persona fork's native tool, ADR 0101) result: an error whose details carry `kind: 'grant-required'` for exactly the server and tool that were called, and
  * no `origin` (remote results always have one), so a server's content cannot conjure an Allow card. A request for more
  * access (`scope-required`) is trusted the same way, for the connection that was called. An ask to add
  * something to the Topic's setup (`not-in-topic`) is trusted the same way, for exactly what the call asked for.
@@ -125,7 +131,7 @@ export function interactionOf(part: ToolPart): Interaction | undefined {
 /** Local approval markers must match the exact MCP target; the record is then fetched from the owner API. */
 function approvalOf(part: ToolPart, details: Record<string, unknown>): Interaction | undefined {
   const target = part.target
-  if (part.call.name !== 'mcp_call' || target === undefined || !isString(details.approvalId)) return undefined
+  if (!isMcpCall(part) || target === undefined || !isString(details.approvalId)) return undefined
   if (details.connectionId !== target.connectionId || details.name !== target.name) return undefined
   return {
     kind: 'approval',
@@ -139,7 +145,7 @@ function approvalOf(part: ToolPart, details: Record<string, unknown>): Interacti
 /** A grant request, only from `mcp_call` and only for exactly the server and tool that were called. */
 function grantOf(part: ToolPart, details: Record<string, unknown>): Interaction | undefined {
   const target = part.target
-  if (part.call.name !== 'mcp_call' || target === undefined) return undefined
+  if (!isMcpCall(part) || target === undefined) return undefined
   if (details.connectionId !== target.connectionId || details.name !== target.name) return undefined
   return { kind: 'grant', callId: part.call.id, connectionId: target.connectionId, name: target.name }
 }
@@ -147,7 +153,7 @@ function grantOf(part: ToolPart, details: Record<string, unknown>): Interaction 
 /** A sign-in the owner owes, only from `mcp_call` and only for the connection and tool that were called. */
 function connectOf(part: ToolPart, details: Record<string, unknown>): Interaction | undefined {
   const target = part.target
-  if (part.call.name !== 'mcp_call' || target === undefined) return undefined
+  if (!isMcpCall(part) || target === undefined) return undefined
   if (details.connectionId !== target.connectionId || details.name !== target.name) return undefined
   return { kind: 'connect', callId: part.call.id, connectionId: target.connectionId, name: target.name }
 }
@@ -155,8 +161,7 @@ function connectOf(part: ToolPart, details: Record<string, unknown>): Interactio
 /** A request for more access, only from `mcp_call` and only for the connection that was called. */
 function accessOf(part: ToolPart, details: Record<string, unknown>): Interaction | undefined {
   const target = part.target
-  if (part.call.name !== 'mcp_call' || target === undefined || details.connectionId !== target.connectionId)
-    return undefined
+  if (!isMcpCall(part) || target === undefined || details.connectionId !== target.connectionId) return undefined
   const scope = isString(details.scope) ? details.scope.slice(0, 512) : ''
   return { kind: 'access', callId: part.call.id, connectionId: target.connectionId, scope, name: target.name }
 }
@@ -164,7 +169,7 @@ function accessOf(part: ToolPart, details: Record<string, unknown>): Interaction
 /** A URL request, only from `mcp_call` and only for exactly the server and tool that were called. */
 function urlOf(part: ToolPart, details: Record<string, unknown>): Interaction | undefined {
   const target = part.target
-  if (part.call.name !== 'mcp_call' || target === undefined || !isString(details.requestId)) return undefined
+  if (!isMcpCall(part) || target === undefined || !isString(details.requestId)) return undefined
   if (details.connectionId !== target.connectionId || details.name !== target.name) return undefined
   return {
     kind: 'url',

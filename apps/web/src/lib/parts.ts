@@ -18,7 +18,13 @@ type ToolResultMessage = Extract<ChatMessage, { role: 'tool' }>
  * executing (or finished, with the result not committed yet). `stopped`: the turn ended before it ran.
  */
 export type ToolState = 'pending' | 'running' | 'done' | 'error' | 'stopped'
-/** The MCP server, tool and arguments behind an `mcp_call`. */
+/**
+ * Whether a tool is a Persona fork's native MCP tool (ADR 0101): its name is `<server>__<tool>`, which none of goblin's
+ * own tools has.
+ */
+export const isNativeTool = (name: string): boolean => name.includes('__')
+
+/** The MCP server, tool and arguments behind an `mcp_call` or a native MCP tool's call. */
 export type McpTarget = {
   readonly connectionId: string
   readonly name: string

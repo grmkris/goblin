@@ -28,12 +28,12 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0022](0022-owner-files-shell-and-r2.md) | The owner's files, in Shell's Workspace and R2 | Accepted; amended by 0065 |
 | [0023](0023-chat-blocks-and-one-kit.md) | Chat blocks, one kit | Accepted |
 | [0024](0024-observing-conversations.md) | Observing conversations | Accepted; amended by 0084, 0086 |
-| [0027](0027-typed-tools.md) | Typed tools and one `app_call` | Accepted; amended by 0067 |
+| [0027](0027-typed-tools.md) | Typed tools and one `app_call` | Accepted; amended by 0067 and 0101 |
 | [0028](0028-mcp-call-approvals.md) | Owner approval for an exact MCP call | Accepted |
 | [0029](0029-composer-commands-and-references.md) | Composer commands, references and helper execution | Accepted; amended by 0067 |
 | [0030](0030-logical-chats-over-pi-sessions.md) | Logical chats over Pi sessions | Accepted; amended by 0067 |
 | [0032](0032-topics-and-per-topic-memory.md) | Topics and per-Topic memory | Accepted |
-| [0033](0033-personas.md) | Personas, organize receipts and Delegate results | Accepted; amended by 0067 and 0100; its `ask_user` denial superseded by 0082 |
+| [0033](0033-personas.md) | Personas, organize receipts and Delegate results | Accepted; amended by 0067, 0100 and 0101; its `ask_user` denial superseded by 0082 |
 | [0034](0034-move-to-thread.md) | Start thread and Move to thread | Accepted; amended by 0067 |
 | [0035](0035-cross-topic-retrieval.md) | Cross-Topic retrieval | Accepted; amended by 0067 |
 | [0036](0036-slack-style-shell.md) | Slack-style shell | Accepted; amended by 0053; its rail and sidebar superseded by 0078 |
@@ -92,4 +92,5 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0098](0098-admin-for-configuration-and-every-mcp-power-opt-in.md) | Admin for configuration on every surface; every MCP power is opt-in | Accepted; its gap on the agent's own tools is 0099 |
 | [0099](0099-a-members-turn-gets-a-members-tools.md) | A member's turn gets a member's tools | Proposed (not built); would amend 0098 |
 | [0100](0100-a-persona-thinks-at-its-own-level.md) | A Persona thinks at its own level | Accepted |
+| [0101](0101-a-persona-forks-mcp-tools-are-its-own.md) | A Persona fork's MCP tools are its own | Accepted |
 | [0104](0104-routine-data-stays-as-its-producer-sent-it.md) | Routine data stays as its producer sent it | Accepted |

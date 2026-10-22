@@ -15,7 +15,7 @@ const PERSONA_PROMPT = /^Answer the owner's message above as @(.+)\.$/u
 
 /**
  * A Persona's fork scripted to call the tool its owner message asks for: `persona-call <tool> <json>` in the newest
- * message tagging it, once; the tool's result is then its answer. Older asks stay in the chat the fork reads, so a
+ * message tagging it (a native MCP tool's name may hold `-`, ADR 0101), once; the tool's result is then its answer. Older asks stay in the chat the fork reads, so a
  * later tag without the token is answered with the echo every other request gets.
  */
 function personaCall(messages: readonly Message[]): AssistantMessage['content'] | undefined {
@@ -24,7 +24,7 @@ function personaCall(messages: readonly Message[]): AssistantMessage['content'] 
   if (last.role === 'toolResult') return undefined
   if (!PERSONA_PROMPT.test(textOf(last).split('\n').at(-1) ?? '')) return undefined
   const ask = messages.findLast((message) => message.role === 'user' && textOf(message).startsWith('[to @'))
-  const call = /persona-call (\w+) (\{.*\})/u.exec(ask === undefined ? '' : textOf(ask))
+  const call = /persona-call ([\w-]+) (\{.*\})/u.exec(ask === undefined ? '' : textOf(ask))
   if (call === null) return undefined
   return [
     {

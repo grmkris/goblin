@@ -38,6 +38,7 @@ import type { RunProgram } from '../runtime/bridge.ts'
 import { withContext } from './context-tail.ts'
 import { authoredContent } from './content.ts'
 import { BACKGROUND, entryId } from './context.ts'
+import { type ForkToolsKit, freezeForkTools, toolsText, withForkTools } from './fork-tools.ts'
 import { questionJson } from './ask-user.ts'
 import { NO_ANSWER, modelRef } from './model.ts'
 import { holdJson, readAnswer } from './persona-answer.ts'
@@ -371,12 +372,28 @@ const forkPhase: Phase<'fork'> = async (task, runtime, context) => {
   }, context)
 }
 
+/**
+ * Registers the fork with the setup it answers with, then freezes its native tools from that scope (ADR 0101) and, in
+ * the commit that moves on, selects them: the set's extension, its tools by name, and the Persona's text with what it
+ * says of them.
+ */
 const registerPhase =
-  (run: RunProgram): Phase<'register'> =>
+  (run: RunProgram, tools: ForkToolsKit): Phase<'register'> =>
   async (task, runtime, context) => {
     const { fork } = task.state.checkpoint
     await run(registerFork(task.input, fork))
-    await runtime.commit(() => ({ status: 'running', checkpoint: { phase: 'ask', fork } }), context)
+    const frozen = await run(freezeForkTools(String(fork)))
+    tools.install(frozen.set)
+    await runtime.commit(async (tx) => {
+      if (frozen.set.tools.length > 0) {
+        const agent = await tx.doc(AgentDoc, fork)
+        const selection = withForkTools(agent, frozen.set, frozen.left.length === 0)
+        if (selection.extensions !== undefined) agent.extensions = selection.extensions
+        if (selection.tools !== undefined) agent.tools = selection.tools
+        await markPersona(tx, fork, [personaText(task.input.persona), toolsText(frozen)].join('\n\n'))
+      }
+      return { status: 'running', checkpoint: { phase: 'ask', fork } }
+    }, context)
   }
 
 /** What the fork is asked: to answer the owner's message, or to go on from the owner's reply to its hold. */
@@ -464,7 +481,7 @@ const writePhase =
  * The Persona turn: wait for the one before it, fork the chat, ask the fork, write the answer back attributed. A turn
  * that resumes a hold (ADR 0041) asks the Persona's fork again with the owner's reply and writes its next answer.
  */
-function turnTask(run: RunProgram) {
+function turnTask(run: RunProgram, tools: ForkToolsKit) {
   return defineTask<Input, State, null>({
     name: PERSONA_TURN,
     version: 1,
@@ -473,7 +490,7 @@ function turnTask(run: RunProgram) {
       wait: waitPhase,
       place: placePhase(run),
       fork: forkPhase,
-      register: registerPhase(run),
+      register: registerPhase(run, tools),
       ask: askPhase(run),
       write: writePhase(run),
     },
@@ -529,8 +546,8 @@ export type PersonaTurnKit = {
  * message, prompts the fork as that Persona, and writes the answer back as an attributed `app.persona` entry. Turns are
  * background tasks of the chat, so the chat's own run is neither held nor queued behind them.
  */
-export function personaTurnExtension(run: RunProgram): PersonaTurnKit {
-  const Turn = turnTask(run)
+export function personaTurnExtension(run: RunProgram, tools: ForkToolsKit): PersonaTurnKit {
+  const Turn = turnTask(run, tools)
   const extension = defineExtension({
     name: PERSONA_EXTENSION,
     tasks: [Turn],

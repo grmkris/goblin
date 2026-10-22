@@ -6,12 +6,14 @@ import { Setups } from '../setup/service.ts'
 import { named } from '../mcp/servers/labels.ts'
 import { McpServers, requireResident } from '../mcp/service.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
+import { Db } from '../runtime/db.ts'
 import { logLearnOutcome, type LearnOutcome } from '../skills/learner.ts'
 import type { Catalog } from '../skills/library.ts'
 import { skillScope } from '../skills/scope.ts'
 import { Learner, Skills } from '../skills/service.ts'
 import { outsideScopeResult, skillOutsideResult } from './setup.ts'
 import { withContext } from './context-tail.ts'
+import { forkNaming } from './fork-tools.ts'
 import { ReadyResult, typedTool } from './typed-tool.ts'
 
 /** How many skills the prompt lists, and how much of each description. */
@@ -137,6 +139,18 @@ const skillsOff = (session: string, handle: string) =>
     return skillOutsideResult({ connectionId, name }, scope)
   })
 
+/**
+ * How a Persona fork names the tools of the server a skill handle (`<server>:<name>`) is from, in that skill's text
+ * (ADR 0101); none in any other conversation, or for a server it has no native tool of.
+ */
+const namingOf = (session: string, handle: string) =>
+  Db.useSync((db) => {
+    const naming = forkNaming(db, session, handle.slice(0, Math.max(0, handle.indexOf(':'))))
+    return naming === undefined
+      ? { options: {}, render: (text: string) => text }
+      : { options: { toolPrefix: naming.toolPrefix }, render: naming.render }
+  })
+
 /** `skill_activate`: load one verified `SKILL.md` into the conversation. */
 const activateTool = (run: RunProgram) =>
   typedTool({
@@ -153,16 +167,18 @@ const activateTool = (run: RunProgram) =>
           const off = yield* skillsOff(String(api.conversationId), skill)
           if (off !== undefined) return new ReadyResult(off)
           const authorize = yield* skillScope(String(api.conversationId))
+          const naming = yield* namingOf(String(api.conversationId), skill)
           const loaded = yield* Skills.use((skills) =>
             skills.activate(String(api.conversationId), skill, {
               authorize,
+              ...naming.options,
               ...(context.abortSignal === undefined ? {} : { signal: context.abortSignal }),
             }),
           )
           return {
             handle: loaded.skill.handle,
             origin: loaded.skill.connectionId,
-            body: loaded.body,
+            body: naming.render(loaded.body),
             files: loaded.files.map(({ path, size }) => ({ path, size })),
           }
         }),
@@ -195,9 +211,11 @@ const readTool = (run: RunProgram) =>
           const off = yield* skillsOff(String(api.conversationId), skill)
           if (off !== undefined) return new ReadyResult(off)
           const authorize = yield* skillScope(String(api.conversationId))
+          const naming = yield* namingOf(String(api.conversationId), skill)
           const file = yield* Skills.use((skills) =>
             skills.read(String(api.conversationId), skill, path, {
               authorize,
+              ...naming.options,
               ...(context.abortSignal === undefined ? {} : { signal: context.abortSignal }),
             }),
           )
@@ -208,7 +226,7 @@ const readTool = (run: RunProgram) =>
                 { type: 'image', data: file.data, mimeType: file.mimeType },
               ],
             })
-          if (file.kind === 'text') return file
+          if (file.kind === 'text') return { ...file, text: naming.render(file.text) }
           return {
             kind: file.kind,
             path: file.path,
