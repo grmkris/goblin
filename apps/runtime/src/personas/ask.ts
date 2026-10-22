@@ -30,11 +30,14 @@ const addressedBlocks = (tag: string, blocks: readonly TextContent[]): TextConte
   return first === undefined ? [] : [{ ...first, text: `${tag}${first.text}` }, ...rest]
 }
 
-/** Persona `id` at `revision`, frozen for a turn in Topic `topic`: its words, its setup, and its own model (`Personas.ownModel`). */
+/**
+ * Persona `id` at `revision`, frozen for a turn in Topic `topic`: its words, its setup, its own model
+ * (`Personas.ownModel`) and how hard it thinks (ADR 0100).
+ */
 export const frozenAt = (id: number, revision: number, topic: number) =>
   Effect.gen(function* () {
     const personas = yield* Personas
-    const { name, avatar, role, instructions, setup, model } = yield* personas.revision(id, revision)
+    const { name, avatar, role, instructions, setup, model, thinking } = yield* personas.revision(id, revision)
     const own = yield* personas.ownModel(model, topic)
     return {
       id,
@@ -45,6 +48,7 @@ export const frozenAt = (id: number, revision: number, topic: number) =>
       instructions,
       setup,
       ...(own === undefined ? {} : { model: own }),
+      ...(thinking === undefined ? {} : { thinking }),
     } satisfies FrozenPersona
   })
 
@@ -60,7 +64,7 @@ const freeze = (ids: readonly number[], topic: number) =>
       Effect.gen(function* () {
         const persona = active.find((each) => each.id === id)
         if (persona === undefined) return yield* new InvalidInput({ reason: `composer:persona:${String(id)}` })
-        const { name, revision, avatar, role, instructions, setup, model } = persona
+        const { name, revision, avatar, role, instructions, setup, model, thinking } = persona
         const own = yield* personas.ownModel(model, topic)
         return {
           id,
@@ -70,6 +74,7 @@ const freeze = (ids: readonly number[], topic: number) =>
           role,
           instructions,
           ...(own === undefined ? {} : { model: own }),
+          ...(thinking === undefined ? {} : { thinking }),
           setup,
         } satisfies FrozenPersona
       }),

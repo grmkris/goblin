@@ -27,6 +27,8 @@ export type SeenRequest = {
   readonly tools: readonly string[]
   /** The trailing `<goblin-context>` block, kept apart from the messages (`pi/context-tail.ts`). */
   readonly context?: string
+  /** The thinking level the request was sent at, none when it was asked at no level. */
+  readonly reasoning?: string
 }
 
 const textOf = (message: Message): string =>
@@ -71,7 +73,7 @@ export function scriptedStreams(
   respond: (messages: readonly Message[]) => AssistantMessage['content'] = reply,
   delay: (messages: readonly Message[]) => number = () => 0,
 ): ProviderStreams {
-  const stream: ProviderStreams['stream'] = (target, context) => {
+  const stream: ProviderStreams['stream'] = (target, context, options) => {
     // The context block ends each request but is not a turn: the script answers, and records, the turns before it.
     const goblinContext = context.messages.find(isContextBlock)
     const messages = context.messages.filter((message) => !isContextBlock(message))
@@ -86,6 +88,10 @@ export function scriptedStreams(
       systemPrompt: getCurrentSystemPrompt(messages),
       tools: offeredTools(messages),
       ...(goblinContext === undefined ? {} : { context: textOf(goblinContext) }),
+      // Pi asks through `streamSimple`, whose options carry the thinking level; `stream` is the same function here.
+      ...(options !== undefined && 'reasoning' in options && typeof options.reasoning === 'string'
+        ? { reasoning: options.reasoning }
+        : {}),
     })
     const content = respond(messages)
     const message: AssistantMessage = {

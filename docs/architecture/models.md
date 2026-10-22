@@ -42,7 +42,8 @@ bounded and `pi/model.ts` (`thinkingFields`) sends it through pi-ai's `reasoning
 `thinking_budget` per level for Qwen (Model Studio answers once it is spent), a `reasoning_effort` per level for
 DeepSeek, GLM, Gemini and Muse. Asking at no level asks for the least: `enable_thinking: false` where the model can
 switch thinking off (DeepSeek, Qwen), its least effort where it cannot (GLM, Gemini low; Muse minimal). A model goblin
-does not know is sent no thinking control. Conversations think at medium (`pi/harness.ts`); housekeeping, which asks at
+does not know is sent no thinking control. Conversations think at medium (`pi/harness.ts`), and a Persona's fork at
+its own level when it names one (`thinking`, low, medium or high, ADR 0100); housekeeping, which asks at
 no level, thinks least. Each value was accepted by the deployment's endpoint (probed 2026-10-20).
 
 Every response may run to 32 768 tokens (`MAX_OUTPUT_TOKENS`), a ceiling: on Model Studio DeepSeek and GLM share it

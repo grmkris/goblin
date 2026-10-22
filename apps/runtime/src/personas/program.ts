@@ -37,6 +37,7 @@ export const snapshotOf = (persona: PersonaView): PersonaSnapshot => ({
   role: persona.role,
   instructions: persona.instructions,
   ...(persona.model === undefined ? {} : { model: persona.model }),
+  ...(persona.thinking === undefined ? {} : { thinking: persona.thinking }),
   setup: persona.setup,
   archived: persona.archivedAt !== undefined,
 })

@@ -54,6 +54,7 @@ const applyPlan = (plan: Plan, revision: number) =>
         {
           ...plan.definition,
           model: plan.definition?.model ?? null,
+          thinking: plan.definition?.thinking ?? null,
           archived: plan.archived,
           expectedRevision: revision,
         },

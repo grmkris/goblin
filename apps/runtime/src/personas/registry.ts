@@ -49,6 +49,7 @@ const definitionOf = (row: Row | RevisionRow): PersonaDefinition => ({
   role: row.role,
   instructions: row.instructions,
   ...(row.model === null ? {} : { model: row.model }),
+  ...(row.thinking === null ? {} : { thinking: row.thinking }),
   setup: personaSetupOf(row.setup),
 })
 
@@ -76,6 +77,7 @@ const stored = (definition: PersonaDefinition) => ({
   role: definition.role,
   instructions: definition.instructions,
   model: definition.model ?? null,
+  thinking: definition.thinking ?? null,
   setup: JSON.stringify(definition.setup),
 })
 
@@ -232,15 +234,20 @@ export class PersonaRegistry<RunResult = unknown> {
     return { persona: view(row), created: true }
   }
 
-  /** The definition `change` makes of `current`: a field not given stays, `model: null` clears the preference. */
+  /**
+   * The definition `change` makes of `current`: a field not given stays, `model: null` clears the preference and
+   * `thinking: null` returns it to the default.
+   */
   #changed(current: PersonaDefinition, change: UpdatePersona): PersonaDefinition {
     const model = change.model === undefined ? current.model : (change.model ?? undefined)
+    const thinking = change.thinking === undefined ? current.thinking : (change.thinking ?? undefined)
     return this.#normalize({
       name: change.name ?? current.name,
       avatar: change.avatar ?? current.avatar,
       role: change.role ?? current.role,
       instructions: change.instructions ?? current.instructions,
       ...(model === undefined ? {} : { model }),
+      ...(thinking === undefined ? {} : { thinking }),
       setup: change.setup ?? current.setup,
     })
   }
@@ -284,6 +291,7 @@ const sameValues = (values: ReturnType<typeof stored>, row: Row): boolean =>
   values.role === row.role &&
   values.instructions === row.instructions &&
   values.model === row.model &&
+  values.thinking === row.thinking &&
   values.setup === row.setup
 
 /** A glyph and hue for a Persona made without an avatar: its first letter on a hue from its name. */

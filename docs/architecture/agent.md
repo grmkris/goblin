@@ -360,7 +360,7 @@ Tell me's notifications (unread first, with Mark all read), the unread chats, an
 (`POST /api/organize/:id/undo`, offered while the receipt is undoable); Work lists what runs (the Delegates at work,
 the Personas answering), the routines with their controls, every agent app's schedules, and the recent results.
 `/personas` lists the Personas; a click opens the profile (`/p/<id>`), never a chat: its definition (a glyph on a hue,
-name, role, instructions, a model from the offered ones, and what it may use, which only narrows the owner's grants) saved as a new revision with the revision it was read at (`PATCH /api/personas/:id`, a conflict asks for a
+name, role, instructions, a model from the offered ones, how hard it thinks (set over the API and `/mcp`, ADR 0100), and what it may use, which only narrows the owner's grants) saved as a new revision with the revision it was read at (`PATCH /api/personas/:id`, a conflict asks for a
 reload), Archive or Restore, and its revisions. `/p/new` creates one (one operation id per visit). Connections and Settings are columns of titled sections (`PageSection`)
 whose states read in words (`lib/labels.ts`), never the raw value the runtime sends. The workspace fills the page beside it. The transcript scrolls in a `MessageScroller` (from `@shadcn/react`, patched with upstream fixes that are not
 released yet; `bun run check:patches` proves the patch is installed). Each of

@@ -19,6 +19,7 @@ import {
   type PersonaAvatar,
   type PersonaHold,
   type PersonaSetup,
+  type PersonaThinking,
   type QuestionSpec,
   personaAnswerText,
 } from '@goblin/contracts'
@@ -88,6 +89,8 @@ export type FrozenPersona = {
   readonly role: string
   readonly instructions: string
   readonly model?: string
+  /** How hard its model thinks (ADR 0100); none thinks at the host's `medium`. */
+  readonly thinking?: PersonaThinking
   /** What it adds to its Topic's setup (ADR 0040); a turn started before setups has none and adds nothing. */
   readonly setup?: PersonaSetup
 }
@@ -345,7 +348,10 @@ const placePhase =
     if (seen.outcome === 'waiting') await runtime.sleep(runtime.now() + Math.min(2000, 250 * (polls + 1)), context)
   }
 
-/** Forks the chat, owned by this task, as the Persona: its selection, model and frozen text, in one commit. */
+/**
+ * Forks the chat, owned by this task, as the Persona: its selection, model, thinking level (ADR 0100) and frozen text,
+ * in one commit.
+ */
 const forkPhase: Phase<'fork'> = async (task, runtime, context) => {
   const { parent, persona } = task.input
   const at = entryId(task.state.checkpoint.at)
@@ -359,6 +365,7 @@ const forkPhase: Phase<'fork'> = async (task, runtime, context) => {
       const ref = modelRef(persona.model)
       agent.model = { provider: ref.provider, modelId: ref.id }
     }
+    if (persona.thinking !== undefined) agent.thinkingLevel = persona.thinking
     await markPersona(tx, forked.id, personaText(persona))
     return { status: 'running', checkpoint: { phase: 'register', fork: forked.id } }
   }, context)

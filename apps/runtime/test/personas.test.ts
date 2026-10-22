@@ -172,6 +172,25 @@ describe('Personas (ADR 0033)', () => {
     )
   })
 
+  it('keeps how hard a Persona thinks in each revision, none by default, and lets an edit clear it (ADR 0100)', () => {
+    const { personas } = fixture()
+    const { persona } = personas.create({ ...scout, operationId: 'op-1' }, 'owner', 10)
+    expect(persona.thinking).toBeUndefined()
+    expect(personas.update(1, { thinking: 'high', expectedRevision: 1 }, 'owner', 11).thinking).toBe('high')
+    expect(personas.update(1, { thinking: 'high', expectedRevision: 2 }, 'owner', 12).revision).toBe(2)
+    expect(personas.update(1, { role: 'Digs', expectedRevision: 2 }, 'owner', 13).thinking).toBe('high')
+    expect(personas.update(1, { thinking: null, expectedRevision: 3 }, 'owner', 14).thinking).toBeUndefined()
+    expect(personas.detail(1).revisions.map((each) => [each.revision, each.thinking])).toEqual([
+      [4, undefined],
+      [3, 'high'],
+      [2, 'high'],
+      [1, undefined],
+    ])
+    expect(personas.revision(1, 2).thinking).toBe('high')
+    const low = personas.create({ ...scout, name: 'Low', thinking: 'low', operationId: 'op-2' }, 'owner', 15)
+    expect(low.persona.thinking).toBe('low')
+  })
+
   it('stores the setup a Persona adds, nothing by default, and keeps it in each revision (ADR 0040)', () => {
     const { personas } = fixture()
     const { setup: _setup, ...bare } = scout

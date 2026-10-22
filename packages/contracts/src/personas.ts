@@ -14,9 +14,16 @@ export const PersonaAvatar = Schema.Struct({
 export type PersonaAvatar = typeof PersonaAvatar.Type
 
 /**
+ * How hard a Persona's model thinks before it answers (ADR 0100), bounded by that model's own control (ADR 0083): a
+ * Qwen thinking budget of 2,048, 8,192 or 16,384 tokens, or a reasoning effort. Without one it thinks at `medium`.
+ */
+export const PersonaThinking = Schema.Literals(['low', 'medium', 'high'])
+export type PersonaThinking = typeof PersonaThinking.Type
+
+/**
  * A Persona's definition (ADR 0033): a global name, its role in a line, its instructions, an optional model from the
- * offered list, and its setup: the MCP servers, skills and apps it adds to the setup of the Topic it answers in
- * (ADR 0040). A setup only chooses among the owner's grants; a Persona never gains one.
+ * offered list and how hard it thinks (ADR 0100), and its setup: the MCP servers, skills and apps it adds to the setup
+ * of the Topic it answers in (ADR 0040). A setup only chooses among the owner's grants; a Persona never gains one.
  */
 export const PersonaDefinition = Schema.Struct({
   name: PersonaName,
@@ -24,6 +31,7 @@ export const PersonaDefinition = Schema.Struct({
   role: Schema.String.check(Schema.isMaxLength(120)),
   instructions: Schema.String.check(Schema.isMaxLength(8000)),
   model: Schema.optional(NonEmptyString(128)),
+  thinking: Schema.optional(PersonaThinking),
   setup: PersonaSetup,
 })
 export type PersonaDefinition = typeof PersonaDefinition.Type
@@ -50,6 +58,7 @@ export const PersonaSummary = Schema.Struct({
   avatar: PersonaAvatar,
   revision: Schema.Int,
   model: Schema.optional(Schema.String),
+  thinking: Schema.optional(PersonaThinking),
   setup: SetupSummary,
   archivedAt: Schema.optional(Schema.Number),
   updatedAt: Schema.Number,
@@ -70,7 +79,7 @@ export type CreatePersona = typeof CreatePersona.Type
 
 /**
  * `PATCH /api/personas/:id`: a new revision. `expectedRevision` must be the current one, so two edits never silently
- * overwrite each other. `model: null` clears the preference.
+ * overwrite each other. `model: null` clears the preference, and `thinking: null` returns it to `medium`.
  */
 export const UpdatePersona = Schema.Struct({
   name: Schema.optional(PersonaName),
@@ -78,6 +87,7 @@ export const UpdatePersona = Schema.Struct({
   role: Schema.optional(PersonaDefinition.fields.role),
   instructions: Schema.optional(PersonaDefinition.fields.instructions),
   model: Schema.optional(Schema.NullOr(NonEmptyString(128))),
+  thinking: Schema.optional(Schema.NullOr(PersonaThinking)),
   setup: Schema.optional(PersonaSetup),
   archived: Schema.optional(Schema.Boolean),
   expectedRevision: Schema.Int,

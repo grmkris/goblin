@@ -15,6 +15,7 @@ const decodeSeen = Schema.decodeUnknownSync(
         systemPrompt: Schema.String,
         tools: Schema.Array(Schema.String),
         context: Schema.optional(Schema.String),
+        reasoning: Schema.optional(Schema.String),
       }),
     ),
   }),
@@ -157,7 +158,8 @@ async function registry(url: string, owner: Person): Promise<PersonaView> {
  * each other; with "then" the second sees the first's answer. Their forks are hidden.
  */
 async function asking(url: string, owner: Person, scout: PersonaView): Promise<void> {
-  const critic = await makePersona(url, owner, definition('Critic'))
+  const critic = await makePersona(url, owner, definition('Critic', { thinking: 'high' }))
+  expect(critic.thinking).toBe('high')
   const before = (await seen(url, owner)).length
   const { answered, operationId } = await send(url, owner, 'weigh in on seeds', [scout, critic])
   expect(answered).toBe('ok')
@@ -172,6 +174,10 @@ async function asking(url: string, owner: Person, scout: PersonaView): Promise<v
   expect(forkRequests(requests)).toHaveLength(2)
   const scoutRequest = forkRequests(requests).find((request) => request.context?.includes('You are Scout') === true)
   expect(scoutRequest?.context).toContain('Scouts ahead')
+  // Each fork thinks at its Persona's level, and at medium when it names none (ADR 0100).
+  expect(scoutRequest?.reasoning).toBe('medium')
+  const criticRequest = forkRequests(requests).find((request) => request.context?.includes('You are Critic') === true)
+  expect(criticRequest?.reasoning).toBe('high')
   expect(scoutRequest?.messages.map((message) => message.text).join('\n')).not.toContain('[from persona Critic]')
   const all = await entries(url, owner)
   const ask = all.find((entry) => entry.kind === 'app.persona_ask')

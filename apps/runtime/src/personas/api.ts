@@ -19,6 +19,7 @@ const summaryOf = (persona: PersonaView): PersonaPage['personas'][number] => ({
   avatar: persona.avatar,
   revision: persona.revision,
   ...(persona.model === undefined ? {} : { model: persona.model }),
+  ...(persona.thinking === undefined ? {} : { thinking: persona.thinking }),
   setup: setupSummaryOf(persona.setup),
   ...(persona.archivedAt === undefined ? {} : { archivedAt: persona.archivedAt }),
   updatedAt: persona.updatedAt,

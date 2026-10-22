@@ -83,6 +83,25 @@ describe('a Source keeps no proposer (ADR 0068)', () => {
   })
 })
 
+describe('a Persona thinks at its own level (ADR 0100)', () => {
+  it('keeps every Persona and revision, which think at the default until they name a level', () => {
+    const { sqlite, rest } = before('20261022120000_persona_thinking')
+    sqlite.exec(
+      "INSERT INTO app_personas (name, glyph, hue, role, instructions, revision, created_at, updated_at) VALUES ('Scout', 'S', 1, '', '', 1, 1, 1)",
+    )
+    sqlite.exec(
+      "INSERT INTO app_persona_revisions (persona_id, revision, name, glyph, hue, role, instructions, actor, created_at) VALUES (1, 1, 'Scout', 'S', 1, '', '', 'owner', 1)",
+    )
+    rest()
+    expect(sqlite.prepare('SELECT name, thinking FROM app_personas').all()).toEqual([{ name: 'Scout', thinking: null }])
+    expect(sqlite.prepare('SELECT revision, thinking FROM app_persona_revisions').all()).toEqual([
+      { revision: 1, thinking: null },
+    ])
+    expect(() => sqlite.exec("UPDATE app_personas SET thinking = 'max'")).toThrow(/CHECK/u)
+    sqlite.close()
+  })
+})
+
 describe('fresh application baseline', () => {
   it('creates exactly the live application tables and declares its complete ownership', async () => {
     const sqlite = database()
@@ -98,6 +117,7 @@ describe('fresh application baseline', () => {
       '20261020120000_invocation_reason',
       '20261020200000_resident_until_revoked',
       '20261022000000_source_proposer',
+      '20261022120000_persona_thinking',
     ])
     // An additive migration that alters a table names it too, so a table may be named more than once.
     const owned = [...new Set(MIGRATIONS.flatMap((migration) => migration.tables))]

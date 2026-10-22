@@ -33,7 +33,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0029](0029-composer-commands-and-references.md) | Composer commands, references and helper execution | Accepted; amended by 0067 |
 | [0030](0030-logical-chats-over-pi-sessions.md) | Logical chats over Pi sessions | Accepted; amended by 0067 |
 | [0032](0032-topics-and-per-topic-memory.md) | Topics and per-Topic memory | Accepted |
-| [0033](0033-personas.md) | Personas, organize receipts and Delegate results | Accepted; amended by 0067; its `ask_user` denial superseded by 0082 |
+| [0033](0033-personas.md) | Personas, organize receipts and Delegate results | Accepted; amended by 0067 and 0100; its `ask_user` denial superseded by 0082 |
 | [0034](0034-move-to-thread.md) | Start thread and Move to thread | Accepted; amended by 0067 |
 | [0035](0035-cross-topic-retrieval.md) | Cross-Topic retrieval | Accepted; amended by 0067 |
 | [0036](0036-slack-style-shell.md) | Slack-style shell | Accepted; amended by 0053; its rail and sidebar superseded by 0078 |
@@ -74,7 +74,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0080](0080-server-owned-start-kickoff.md) | Server-owned Start kickoff | Accepted |
 | [0081](0081-api-keys-and-the-same-operations-over-mcp.md) | Scoped API keys for servers, and the same operations over /mcp | Accepted; amended by 0084, 0085, 0086, 0089, 0090, 0091 |
 | [0082](0082-personas-ask-with-ask-user.md) | A tagged Persona asks with ask_user | Accepted |
-| [0083](0083-bounded-thinking-and-a-turn-that-answers.md) | Bounded thinking, and a turn that answers | Accepted |
+| [0083](0083-bounded-thinking-and-a-turn-that-answers.md) | Bounded thinking, and a turn that answers | Accepted; amended by 0100 |
 | [0084](0084-a-key-reads-back-what-it-made-and-how-it-ran.md) | A key reads back what it made, and how its chats ran | Accepted; amended by 0091 |
 | [0085](0085-a-keys-rate-limit-is-a-fixed-minute-counted-by-its-agent.md) | A key's rate limit is a fixed minute, counted by its agent | Accepted; amended by 0086 |
 | [0086](0086-one-mcp-for-every-caller.md) | One /mcp for every caller | Accepted; amended by 0089, 0090, 0094, 0097, 0098 |
@@ -90,4 +90,5 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0096](0096-a-source-configures-itself-from-its-servers-guide.md) | A Source configures itself from its server's guide | Accepted |
 | [0097](0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md) | One /mcp reaches the workspaces its consent chooses | Accepted |
 | [0098](0098-admin-for-configuration-and-every-mcp-power-opt-in.md) | Admin for configuration on every surface; every MCP power is opt-in | Accepted |
+| [0100](0100-a-persona-thinks-at-its-own-level.md) | A Persona thinks at its own level | Accepted |
 | [0104](0104-routine-data-stays-as-its-producer-sent-it.md) | Routine data stays as its producer sent it | Accepted |

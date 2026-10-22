@@ -78,6 +78,9 @@ describe('how thinking is bounded (unit)', () => {
   // Each value is one the deployment's endpoint accepted for that model (probed 2026-10-20).
   it.each([
     ['qwen3.8-flash', 'medium', { enable_thinking: true, thinking_budget: 8192 }],
+    // A Persona's own thinking level (ADR 0100) reaches Qwen as pi-ai's budget for it.
+    ['qwen3.8-flash', 'low', { enable_thinking: true, thinking_budget: 2048 }],
+    ['qwen3.8-flash', 'high', { enable_thinking: true, thinking_budget: 16_384 }],
     ['qwen3.8-flash', undefined, { enable_thinking: false }],
     ['deepseek-v4.1-flash', 'medium', { enable_thinking: true, reasoning_effort: 'high' }],
     ['deepseek-v4.1-flash', undefined, { enable_thinking: false }],
