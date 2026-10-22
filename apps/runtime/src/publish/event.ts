@@ -1,19 +1,10 @@
-import type { EntryRecord } from '@earendil-works/pi-durable'
-import {
-  type AttentionItem,
-  CONVERSATION_UPDATED,
-  ConversationSelector,
-  type ConversationUpdated,
-  type PublishedEvents,
-} from '@goblin/contracts'
+import { CONVERSATION_UPDATED, ConversationSelector, type PublishedEvents } from '@goblin/contracts'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { InvalidInput, NotFound } from '../http/errors.ts'
-import { settleAttention } from '../streams/attention.ts'
-import { outcomeOf, personaAnswer } from '../streams/messages.ts'
 
-// `conversation.updated` (ADR 0112): its descriptor, its selector, the journal's cursors, how often a chat's wake goes
-// out, and the attention count, folded from the chat's entries as its stream folds `/attention`. Pure.
+// `conversation.updated` (ADR 0112): its descriptor, its selector, the journal's cursors and how often a chat's wake goes
+// out. Pure. What a wake says is `payload.ts`'s.
 
 /** The descriptor `events/list` answers: the profile's standard fields only. */
 export const DESCRIPTOR: PublishedEvents['events'][number] = {
@@ -25,7 +16,7 @@ export const DESCRIPTOR: PublishedEvents['events'][number] = {
     type: 'object',
     properties: {
       topic: { type: 'string', pattern: '^\\d{1,12}$', description: "Only this Topic's chats: its id." },
-      chat: { type: 'string', pattern: '^\\d{1,12}$', description: 'Only this chat: its id.' },
+      chat: { type: 'string', description: 'Only this chat: its id.' },
     },
     additionalProperties: false,
   },
@@ -84,33 +75,3 @@ export const EVERY_MS = 1000
 
 /** When a chat that changed at `now`, and last sent at `sentAt`, is looked at. */
 export const dueAt = (now: number, sentAt: number): number => Math.max(now + FIRST_MS, sentAt + EVERY_MS)
-
-/** What a chat's attention fold has read: past which entry, and the items open after it. */
-export type AttentionFold = { readonly last: number; readonly open: readonly AttentionItem[] }
-
-/**
- * `fold` advanced over `entries` (from nothing when there is none): each entry past its last once, in order, settled as
- * the chat's stream settles `/attention` (`streams/attention.ts`), so the count is its STATE's.
- */
-export function foldAttention(
-  chat: string,
-  fold: AttentionFold | undefined,
-  entries: readonly EntryRecord[],
-): AttentionFold {
-  let { last, open } = fold ?? { last: 0, open: [] }
-  for (const entry of entries) {
-    const id = Number(entry.id)
-    if (fold !== undefined && id <= fold.last) continue
-    open = settleAttention(chat, open, entry, personaAnswer(entry), outcomeOf(entry))
-    last = Math.max(last, id)
-  }
-  return { last, open }
-}
-
-/** Whether two wakes of a chat say the same: then none goes out. */
-export const sameWake = (left: ConversationUpdated, right: ConversationUpdated): boolean =>
-  left.chat === right.chat &&
-  left.topic === right.topic &&
-  left.entry === right.entry &&
-  left.activity === right.activity &&
-  left.attention === right.attention

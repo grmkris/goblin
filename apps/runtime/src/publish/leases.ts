@@ -269,10 +269,13 @@ export const pruneOrphans = <R>(db: Db<R>): void => {
 
 /** When the next delivery or claim falls due, or the next lease ends, if any does. */
 export function nextDue<R>(db: Db<R>): number | undefined {
+  // Drizzle's `min` of an expression answers text; the time is read as the number it is.
   const delivery = db
     .select({
-      at: min(
-        sql<number>`CASE WHEN ${appPublishDeliveries.claim} IS NULL THEN ${appPublishDeliveries.nextAt} ELSE max(${appPublishDeliveries.nextAt}, ${appPublishDeliveries.claimedUntil}) END`,
+      at: sql<
+        number | null
+      >`min(CASE WHEN ${appPublishDeliveries.claim} IS NULL THEN ${appPublishDeliveries.nextAt} ELSE max(${appPublishDeliveries.nextAt}, ${appPublishDeliveries.claimedUntil}) END)`.mapWith(
+        Number,
       ),
     })
     .from(appPublishDeliveries)

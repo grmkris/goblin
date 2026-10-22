@@ -126,13 +126,16 @@ export function retryDecision(input: {
   readonly nowMs: number
   /** In [0, 1]. */
   readonly jitter: number
+  /** The first retry's delay, 15 s unless a fixture sets less. */
+  readonly baseMs?: number | undefined
 }): RetryDecision {
   const { status, attempts, firstAttemptMs, nowMs } = input
   if (status !== undefined && status >= 200 && status < 300) return { state: 'accepted', atMs: nowMs }
   const reason = input.reason ?? (status !== undefined && status >= 500 ? 'http_5xx' : 'http_4xx')
   const deadline = firstAttemptMs + PUBLISH_LIMITS.retryWindowMs
   const delay =
-    Math.min(300_000, 15_000 * 2 ** Math.min(attempts - 1, 4)) * (0.75 + Math.max(0, Math.min(input.jitter, 1)) * 0.5)
+    Math.min(300_000, (input.baseMs ?? 15_000) * 2 ** Math.min(attempts - 1, 4)) *
+    (0.75 + Math.max(0, Math.min(input.jitter, 1)) * 0.5)
   const atMs = Math.ceil(nowMs + delay)
   if (
     status === 410 ||

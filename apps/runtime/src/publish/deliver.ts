@@ -121,6 +121,8 @@ export type DrainPorts = {
   readonly cipher: CredentialCipher
   readonly send: PublishFetch
   readonly newId: Effect.Effect<string, AppError>
+  /** The first retry's delay, when a fixture sets one (`PUBLISH_RETRY_MS`). */
+  readonly retryMs?: number | undefined
 }
 
 /** How many deliveries one round of a drain claims, and sends at once. */
@@ -147,6 +149,7 @@ const deliver = (ports: DrainPorts, row: Claimed, token: string) =>
       firstAttemptMs: row.firstAt,
       nowMs: now,
       jitter,
+      baseMs: ports.retryMs,
     })
     yield* Effect.sync(() => settle(ports.db, row, token, decision, now))
   }).pipe(reportAndRecover('publish.deliver', undefined))

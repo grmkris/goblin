@@ -8,8 +8,10 @@ import { chatOfSession, chatRow } from '../chats/directory.ts'
 import type { AppError } from '../http/errors.ts'
 import { reportAndRecover } from '../observability/report.ts'
 import { touchedSessions } from '../streams/producer.ts'
-import { type AttentionFold, dueAt } from './event.ts'
-import { type Wake, clearDirty, listened, markDirty, record } from './journal.ts'
+import type { ConversationUpdated } from '@goblin/contracts'
+import { dueAt } from './event.ts'
+import type { AttentionFold } from './payload.ts'
+import { clearDirty, listened, markDirty, record } from './journal.ts'
 
 // What notices that a chat changed (ADR 0112): Pi's commits and Persona invocations name chats, one fiber takes them
 // in turn, and each chat is looked at a little later (`dueAt`): at most once a second, never while nothing listens.
@@ -21,8 +23,8 @@ export type WatchMessage =
   | { readonly kind: 'chats'; readonly chats: readonly string[] }
   | { readonly kind: 'look'; readonly chat: string }
 
-/** A chat as it reads now: its wake (all but its id and time) and its attention fold after reading it. */
-export type ChatReading = { readonly wake: Omit<Wake, 'eventId' | 'at'>; readonly fold: AttentionFold }
+/** A chat as it reads now: the payload of its wake, and its attention fold after reading it. */
+export type ChatReading = { readonly data: ConversationUpdated; readonly fold: AttentionFold }
 
 export type WatchPorts = {
   readonly db: DrizzleSqliteDODatabase
@@ -122,7 +124,7 @@ export class Watch {
       known.fold = reading.fold
       const at = yield* Clock.currentTimeMillis
       const eventId = yield* newId
-      const recorded = yield* Effect.sync(() => record(db, { ...reading.wake, eventId, at }))
+      const recorded = yield* Effect.sync(() => record(db, { data: reading.data, eventId, at }))
       if (recorded === undefined) return
       known.sentAt = at
       if (recorded.queued > 0) yield* queued

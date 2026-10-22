@@ -25,6 +25,8 @@ export interface RuntimeEnv {
    * Optional (ADR 0064): without it the agent has no app or `code_run` tools.
    */
   readonly LOADER?: WorkerLoader
+  /** Fixtures only: a published Events delivery's first retry delay in ms, 15 s unless set (`publish/policy.ts`). */
+  readonly PUBLISH_RETRY_MS?: string
   readonly APP_URL: string
   readonly BETTER_AUTH_SECRET: string
   /** Cloudflare Email Sending; with `MAIL_SENDER` it turns on email verification (`auth/mail.ts`). */

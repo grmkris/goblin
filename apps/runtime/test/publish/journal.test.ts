@@ -64,7 +64,6 @@ const lease = (db: Db, id: string, principal: string, selector: { topic?: number
 let ids = 0
 const wake = (chat: string, topicId: number, change: Partial<ConversationUpdated> = {}, at = NOW) => ({
   data: { chat, topic: String(topicId), entry: 1, activity: 'working' as const, attention: 0, ...change },
-  topicId,
   eventId: `evt-${(ids += 1)}`,
   at,
 })
@@ -106,6 +105,11 @@ describe('the published journal (ADR 0112)', () => {
     settle(db, claimed, 'drain-1', { state: 'retry', atMs: NOW + 15_000, reason: 'http_5xx' }, NOW)
     expect(owed(sqlite, 'all-k1')).toEqual([expect.objectContaining({ seq: third?.seq, attempts: 1, claim: null })])
     expect(leaseOf(db, 'all-k1')?.lastError).toBe('http_5xx')
+    // The wake is armed for the retry, not only for the lease's end.
+    expect(nextDue(db)).toBe(NOW + 15_000)
+    expect(claimDue(db, NOW + 14_999, 'drain-2', 10)).toEqual([])
+    expect(claimDue(db, NOW + 15_000, 'drain-2', 10)).toHaveLength(1)
+    expect(nextDue(db)).toBe(NOW + 15_000 + 30_000)
   })
 
   it('pages a poll after a cursor; null answers where now is; a key reads only its rooms and selectors filter', () => {

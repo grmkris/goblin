@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { foldAttention } from '../../src/publish/event.ts'
+import { foldAttention, topicOfWake, wakeOf } from '../../src/publish/payload.ts'
 import { open, startCursor, translate } from '../../src/streams/agui.ts'
 import type { Recording } from '../streams/scenarios.ts'
 
@@ -36,5 +36,22 @@ describe("a chat's attention count", () => {
       recordings.map(([name, { chat, final }]) => [name, foldAttention(chat, undefined, final.entries).open.length]),
     )
     expect(waiting).toMatchObject({ question: 1, persona: 1, plain: 0 })
+  })
+})
+
+describe("a chat's wake", () => {
+  it('says its chat, its Topic (none in Personal), its newest entry, whether it works and what waits', () => {
+    const fold = { last: 12, open: [] }
+    expect(wakeOf({ chat: '7', topicId: 1 }, fold, true)).toEqual({
+      chat: '7',
+      topic: null,
+      entry: 12,
+      activity: 'working',
+      attention: 0,
+    })
+    const room = wakeOf({ chat: '40', topicId: 4 }, fold, false)
+    expect(room).toMatchObject({ topic: '4', activity: 'idle' })
+    expect(topicOfWake(room)).toBe(4)
+    expect(topicOfWake(wakeOf({ chat: '7', topicId: 1 }, fold, false))).toBe(1)
   })
 })

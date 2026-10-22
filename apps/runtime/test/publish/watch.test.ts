@@ -58,10 +58,7 @@ type Reading = { now: Omit<ConversationUpdated, 'chat'> }
 /** The watch over `db`, reading what `state` says, its fiber running in the test's scope. */
 const watching = (db: ReturnType<typeof setup>['db'], state: Reading) => {
   const read = (chat: string) =>
-    Effect.succeed<ChatReading>({
-      wake: { data: { chat, ...state.now }, topicId: 1 },
-      fold: { last: state.now.entry, open: [] },
-    })
+    Effect.succeed<ChatReading>({ data: { chat, ...state.now }, fold: { last: state.now.entry, open: [] } })
   let ids = 0
   return Effect.gen(function* () {
     const queue = yield* Queue.unbounded<WatchMessage>()

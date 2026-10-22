@@ -1,4 +1,3 @@
-import { PERSONAL_TOPIC } from '@goblin/contracts'
 import { and, eq, inArray, isNull } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import * as Clock from 'effect/Clock'
@@ -16,7 +15,7 @@ import { SingleFlight } from '../observability/single-flight.ts'
 import { Invocations } from '../personas/service.ts'
 import { PiSessions, fromPi } from '../pi/sessions.ts'
 import { drain } from '../publish/deliver.ts'
-import { type AttentionFold, foldAttention } from '../publish/event.ts'
+import { type AttentionFold, foldAttention, wakeOf } from '../publish/payload.ts'
 import { dirtyChats, nextPrune, pruneJournal } from '../publish/journal.ts'
 import { endExpired, nextDue, pruneOrphans } from '../publish/leases.ts'
 import { Published, leasesOf } from '../publish/service.ts'
@@ -25,6 +24,12 @@ import { Changes } from '../runtime/changes.ts'
 import { Db } from '../runtime/db.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { appConversations } from '../storage/schema.ts'
+
+/** A fixture's first retry delay, when it sets one (`PUBLISH_RETRY_MS`). */
+const retryMsOf = (value: string | undefined): number | undefined => {
+  const ms = Number(value)
+  return value === undefined || !Number.isSafeInteger(ms) || ms < 1 ? undefined : ms
+}
 
 /** How deep and how many subagents under a chat its activity looks at. */
 const HELPER_DEPTH = 3
@@ -53,7 +58,10 @@ function openHelpers(db: DrizzleSqliteDODatabase, chat: string): readonly string
   return sessions.slice(0, HELPERS)
 }
 
-/** How a chat reads now for its wake: its entries folded, and whether it or anything working for it is at work. */
+/**
+ * How a chat reads now for its wake, from Pi: its entries since the fold (or all of them, once), and whether it, a
+ * Persona answering in it or one of its subagents is at work; what that says is `publish/payload.ts`'s.
+ */
 const chatReader = Effect.gen(function* () {
   const db = yield* Db
   const pi = yield* PiSessions
@@ -81,10 +89,8 @@ const chatReader = Effect.gen(function* () {
       const row = chatRow(db, chat)
       if (row?.piSession === undefined || row.piSession === null) return undefined
       const next = yield* advance(chat, row.piSession, fold)
-      const activity = (yield* working(chat, row.piSession)) ? ('working' as const) : ('idle' as const)
-      const topic = row.topicId === PERSONAL_TOPIC ? null : String(row.topicId)
-      const data = { chat, topic, entry: next.last, activity, attention: next.open.length }
-      return { fold: next, wake: { data, topicId: row.topicId } } satisfies ChatReading
+      const busy = yield* working(chat, row.piSession)
+      return { fold: next, data: wakeOf({ chat, topicId: row.topicId }, next, busy) } satisfies ChatReading
     })
 })
 
@@ -96,7 +102,7 @@ const chatReader = Effect.gen(function* () {
 export const PublishLive = Layer.effect(
   Published,
   Effect.gen(function* () {
-    const { publishFetch, schedulePublish } = yield* AgentInput
+    const { publishFetch, schedulePublish, env } = yield* AgentInput
     const db = yield* Db
     const cipher = yield* Cipher
     const flights = yield* SingleFlight
@@ -109,7 +115,12 @@ export const PublishLive = Layer.effect(
       return times.length === 0 ? undefined : Math.min(...times)
     })
     const arm = Effect.flatMap(due, (at) => (at === undefined ? Effect.void : attempt(() => schedulePublish(at))))
-    const sendDue = Effect.asVoid(flights.skip('publish.drain', drain({ db, cipher, send: publishFetch, newId })))
+    const sendDue = Effect.asVoid(
+      flights.skip(
+        'publish.drain',
+        drain({ db, cipher, send: publishFetch, newId, retryMs: retryMsOf(env.PUBLISH_RETRY_MS) }),
+      ),
+    )
     const kick = Effect.asVoid(
       Effect.forkIn(Effect.andThen(sendDue, arm).pipe(reportAndRecover('publish.kick', undefined)), scope),
     )

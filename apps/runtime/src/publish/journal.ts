@@ -16,7 +16,8 @@ import {
   appPublishPosition,
   appPublishSubscriptions,
 } from '../storage/publish.ts'
-import { cursorOf, positionOf, sameWake } from './event.ts'
+import { cursorOf, positionOf } from './event.ts'
+import { sameWake, topicOfWake } from './payload.ts'
 import { PUBLISH_LIMITS } from './policy.ts'
 
 // The journal of the Events goblin publishes (ADR 0112) in the agent's SQLite: its position (mysi's `owner_seq`), the
@@ -97,10 +98,9 @@ export const clearDirty = <R>(db: Db<R>, chat: string): void => {
 
 const decodeWake = Schema.decodeUnknownOption(Schema.fromJsonString(ConversationUpdated))
 
-/** A chat's wake as it was looked at: what it says, its Topic, the occurrence's id and when (epoch ms). */
+/** A chat's wake as it was looked at: the ready payload, the occurrence's id and when (epoch ms). */
 export type Wake = {
   readonly data: ConversationUpdated
-  readonly topicId: number
   readonly eventId: string
   readonly at: number
 }
@@ -159,6 +159,7 @@ function queueWake<R>(db: Db<R>, lease: string, occurrence: PublishedOccurrence,
 
 /** Every active lease whose selector takes the wake and whose holder reaches its chat: a key only its own rooms. */
 function fanOut<R>(db: Db<R>, occurrence: PublishedOccurrence, wake: Wake): number {
+  const topicId = topicOfWake(wake.data)
   const leases = db
     .select()
     .from(appPublishSubscriptions)
@@ -172,10 +173,10 @@ function fanOut<R>(db: Db<R>, occurrence: PublishedOccurrence, wake: Wake): numb
     .all()
   let queued = 0
   for (const lease of leases) {
-    if (lease.topicId !== null && lease.topicId !== wake.topicId) continue
+    if (lease.topicId !== null && lease.topicId !== topicId) continue
     if (lease.chatId !== null && lease.chatId !== wake.data.chat) continue
     const key = keyOfHolder(lease.principal)
-    if (key !== undefined && !hasReach(db, key, 'topic', wake.topicId)) continue
+    if (key !== undefined && !hasReach(db, key, 'topic', topicId)) continue
     queueWake(db, lease.id, occurrence, wake.at)
     queued += 1
   }
@@ -218,7 +219,7 @@ export function record(
         eventId: wake.eventId,
         name: CONVERSATION_UPDATED,
         chatId: chat,
-        topicId: wake.topicId,
+        topicId: topicOfWake(wake.data),
         dataJson: JSON.stringify(wake.data),
         at: wake.at,
       })
