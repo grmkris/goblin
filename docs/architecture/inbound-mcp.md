@@ -92,11 +92,15 @@ that does not admit on `/mcp` gets the same envelope as on `/api`.
 
 A key reaches only the Topics, their chats and the Personas it made (`app_key_reach`); an operation id never adopts
 the owner's. Its Topics start with nothing in their setup, and any setup it writes names only its servers, tool by
-tool. Messages it sends are owner turns in those Topics: built-in tools are the owner's, and `searchExcluded` is not
-isolation. It names the threads it starts (`title`, which announces an empty one in its Topic's Conversation), and
+tool. Each Topic it makes is a room ([ADR 0108](../adr/0108-a-keys-topic-is-a-room.md), [Topics](topics.md#rooms)):
+every chat there, whoever writes in it, is offered only the gateway, skills, `ask_user`, its own search and memory,
+`share_back`, `tool_search` and a Persona fork's native tools, and searches only the room; no other chat's search or
+automatic retrieval reaches the room. Its messages start `[from server <key name>]`: a request from a party the owner
+connected, never the owner's instruction. The Topic and Persona views name the key that made them (`room`, `madeBy`),
+by the name the edge forwards with its grant. It names the threads it starts (`title`, which announces an empty one in its Topic's Conversation), and
 renames, closes and reopens its own threads, never a Topic's Conversation and never pinning one open
 ([ADR 0090](../adr/0090-a-key-names-closes-and-reads-back-its-threads.md)); its forward read shows its messages to
-Personas as the owner's, with `to`.
+Personas with `to` and `author`.
 
 With `inspect` a key reads how its own chats ran, content-free (ADR 0084), seeing only the run events of chats within
 its reach (its Topics, their threads and Persona forks). `inspect_details` of an operation it sent lists its Personas'

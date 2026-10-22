@@ -21,7 +21,8 @@ agent is admitted in this order, then forwarded:
    `Bearer gbk_…` key ([ADR 0081](../adr/0081-api-keys-and-the-same-operations-over-mcp.md)) is admitted instead of a
    session: verified in the auth D1, refused with a cookie or an `Origin`, and only for an endpoint annotated
    `EndpointScope` with a scope the key holds (`endpointScopes`); it needs no CSRF header, and it is forwarded as the
-   request's caller in `x-goblin-caller` (ADR 0086), which `/mcp` also sets for an OAuth client of the owner;
+   request's caller in `x-goblin-caller` (ADR 0086), with its name (ADR 0108), which `/mcp` also sets for an OAuth
+   client of the owner;
 3. every write needs the app's own `Origin` and `x-goblin-csrf: 1` (`http/csrf.ts`), which the web sends on every write;
 4. a body is capped at 64 KiB, except file bytes, which stream through to the agent's own limits;
 5. `AGENTS.getByName(workspaceId).fetch` gets the request with only `content-type`, `content-length`, `accept`,
@@ -53,9 +54,10 @@ annotated `GrantsResident: false` (`POST /api/agent/resident`, the event streams
 OAuth callback). A request from a caller (ADR 0086: a server's key, or an OAuth client of the owner on `/mcp`) never
 grants it; owner admission admits it only to an endpoint whose `EndpointScope` it holds (else `scope`) and counts its
 requests per minute (600, ADR 0085; past them `rate_limited` with `retryAfter`, which the edge answers with
-`Retry-After`). Past admission a key is confined to what it made (`keys/policy.ts`, `app_key_reach`): its lists hold
-only its own, and inspection sees only its own chats' run events (ADR 0084); an OAuth client reaches what the owner
-does. It annotates the request's logs with `goblin.rpc`
+`Retry-After`). A key's first admitted request in the object's lifetime names what it made before names were kept
+(`KeyNames`, ADR 0108). Past admission a key is confined to what it made (`keys/policy.ts`, `app_key_reach`): its lists
+hold only its own, and inspection sees only its own chats' run events (ADR 0084); its Topics are rooms, and its
+messages carry `[from server <key name>]` (ADR 0108); an OAuth client reaches what the owner does. It annotates the request's logs with `goblin.rpc`
 (`<group>.<endpoint>`), `goblin.operation` and `ref`, and stamps `ref` on every typed failure.
 
 | Group | Paths under `/api` | Handlers |

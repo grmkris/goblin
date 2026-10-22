@@ -16,8 +16,9 @@ each `all` or a list, and whether its chats may start subagents (`TopicSetup`, `
 Personal included, everything. A row that cannot be decoded reads as nothing chosen (`topics/setup.ts`), never as
 everything. `editTopicSetup` (`topics/program.ts`) changes it as one new revision: a whole setup compare-and-set, or
 items added or removed (`withItems`/`withoutItems`; removing from a category that holds everything lists what
-`setupCatalog`, `setup/catalog.ts`, says the owner allows now). The agent may add only what the owner allows now; the
-owner may keep or restore an item that is gone, which stays listed. A real change leaves a `topic.setup` receipt whose
+`setupCatalog`, `setup/catalog.ts`, says the owner allows now). The agent may add only what the owner allows now, item
+by item, and never makes a category hold everything it did not (`setup_all_owner_only`, ADR 0108); the owner may keep
+or restore an item that is gone, which stays listed. A real change leaves a `topic.setup` receipt whose
 Undo restores the setup before it, applies the Pi filter again to the Topic's chats when subagents changed
 (`retoolTopic`), and answers the routines it leaves without some of their allowed tools (`routinesOutside`). The
 `<apps>` context lists only the apps a chat's scope holds, and a new agent app built in a Topic that lists its apps
@@ -60,6 +61,33 @@ setup), its
 pending held MCP calls, and the unanswered powers of agent apps living there.
 Unit tests run the real migrations in `node:sqlite`; the local workerd owner case `topics-case.ts` runs in both
 native profiles. Neither is deployed-stage evidence.
+
+## Rooms
+
+A Topic a server's API key made is a **room** ([ADR 0108](../adr/0108-a-keys-topic-is-a-room.md)), and so is every chat
+under it: its Conversation, threads, subagents, Persona forks and routine runs, whoever writes there, the owner too.
+`roomOf` (`keys/reach.ts`) tells one by `app_key_reach` (indexed by `(kind, resource_id)`, since the scope asks on every
+tool call), and `chatScope` (`setup/scope.ts`) gives its chats `room` and turns subagents and apps off whatever the
+setup holds. In a room only `mcp_list`, `mcp_call` (the Topic's setup and the thread's declared servers), `skill_activate`,
+`skill_read`, `ask_user`, `search_chats`, `zoom`, `share_back`, `tool_search` and a Persona fork's native
+`<server>__<tool>` tools exist (`ROOM_TOOLS`, `pi/room.ts`):
+
+- Pi's filter removes every other tool of the agent's (`AgentInput.toolSets.room`, derived from the allowlist).
+  `piToolsFor` applies it, a key's create retools its Topic after the claim, and a chat's first turn in each object
+  lifetime applies its filter again (`useRoomTools`, `agent-model.ts`), in a send and in a Persona ask.
+- The room guard, a `beforeTool` hook every conversation, helper and routine run selects, refuses any other call at call
+  time, and each denied tool refuses in a room before it runs (`outsideRooms`, `Forbidden` `room`).
+- A Persona fork in a room leaves out the room's denied tools whatever it copied at the cut (`personaSelection`,
+  `pi/persona-selection.ts`) and is told it reaches only the room; its native tools, skills and `ask_user` stay.
+- The files, apps, code and routines guides are said only where their tools are offered, `<apps>` is left out, and the
+  skill learner skips a room's conversations.
+
+A room's chats read a room block in their context (`topics/context.ts`): they reach only the room, and its guidance is
+the server's operator guidance, which grants nothing. A key's message starts `[from server <key name>]` (ADR 0108), and
+its receipt's origin is `key`. A room's setup never holds everything of anything, an app or subagents, from any actor
+and through Undo too (`room_setup`, `TopicRegistry.setSetup`). `TopicView` and `TopicSummary` carry `room: { key }`,
+the key's name, from `app_key_reach.key_name`. Unit tests (`topic-setup-scope`, `room`, `retrieval`, `key-reach`) and the
+local workerd cases `rooms-case.ts` and `thread-servers-case.ts` prove it; neither is deployed-stage evidence.
 
 ## Personas, organize receipts
 
@@ -128,12 +156,14 @@ the agent's `KeyedLock` (`retrieval:<session>`), so two never read the same wind
 
 `search_chats { query, topic? }` turns the query into quoted literal terms joined with `OR`, ranks the top 20 hits,
 groups them into ±2-entry ranges per chat and returns at most five sources with excerpts of at most 1,200 characters,
-marked as quoted history. Without `topic` it searches active Topics that take part in search; a named Topic (name or
-id) is searched alone whatever its state. The asking chat is never searched. Each call records its sources under
+marked as quoted history. Without `topic` it searches active Topics that take part in search and are no room; a named
+Topic (name or id) is searched alone whatever its state. In a room it searches the room alone, and any other Topic
+named there is not found (ADR 0108). The asking chat is never searched. Each call records its sources under
 `tool:<session>:<call id>`, so a replay returns the same result; `details` is `SourcesDetails`.
 
 Automatic retrieval: on the first model request after an owner input in a Conversation or thread (never a persona
-fork), the `beforeRequest` hook searches the input's indexed text over the default Topics (never the asking chat), and
+fork), the `beforeRequest` hook searches the input's indexed text over the default Topics, or in a room the room alone
+(never the asking chat), and
 when a candidate passes the bm25 gate (-5 at 3,000 excerpts, scaled down by log size for smaller indexes) the cheap
 model reranks up to eight with constrained JSON and may abstain (`model.aux` purpose `retrieval`, metered into the
 daily budget; skipped once it is spent). At most three chosen sources go into the trailing `<goblin-context>` block as

@@ -44,7 +44,10 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   The workspaces a client reaches are its reach (ADR 0097), read with the person's memberships on every call: a tool
   of a client that reaches more than one takes a required `workspace` (`inbound/mcp-server.ts` `naming`), and a new
   tool needs nothing extra for it as long as its input is a Struct made by `standard`.
-  An inbound client's messages go into main, labelled with its name.
+  An inbound client's messages go into main, labelled with its name. A server key's go into its own Topics, each a
+  room (ADR 0108), labelled `[from server <key name>]`: a room's chats reach only the gateway within its setup and its
+  thread's declared servers, skills and their own chats, refused past that at call time (`pi/room.ts`); never add a
+  tool a room offers without adding it to `ROOM_TOOLS` on purpose.
 - Events (`mcp/events/engine.ts`, ADRs 0011 and 0073) require resident authority and an exact server/name/canonical-arguments owner
   grant through the originating endpoint-bound connection. A server offers Events by top-level `capabilities.events`
   (decoded at the authenticated SDK fetch seam, which strips it) or by the `io.modelcontextprotocol/events` extension,

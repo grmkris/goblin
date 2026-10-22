@@ -24,9 +24,13 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   it runs before `onStart`; the agent's constructor made the application tables. A generated tool pins its release with
   `api.memo('goblin.release', …)` and uses `c<conversation>:<call>` as its operation id.
 - `configure` changes only the fields it is given (`null` clears one). goblin uses the per-conversation `tools`
-  filter for one thing: `{ remove: subagentTools }` where a chat may not start subagents (its Topic's setup or its
-  spawner's exclusions; `setup/`, ADR 0040). A fork starts from its parent's agent at the fork entry, so a new thread sets its extensions (the host's plus
-  the thread's, `instructions: null` to drop a subagent's), and its filter, explicitly (ADR 0017).
+  filter for two things (`piToolsFor`, `AgentInput.toolSets`): `{ remove: subagents }` where a chat may not start
+  subagents (its Topic's setup or its spawner's exclusions; `setup/`, ADR 0040), and in a room every tool a room does not
+  offer (ADR 0108). A fork starts from its parent's agent at the fork entry, so a new thread sets its extensions (the host's plus
+  the thread's, `instructions: null` to drop a subagent's), and its filter, explicitly (ADR 0017). A filter is stored by
+  name and `tool_search` can load past it, so the room guard (`pi/room.ts`, a `beforeTool` in every conversation,
+  helper and routine run) refuses a room's denied tools at call time, and a chat's first turn in each object lifetime
+  applies its filter again (`useRoomTools`).
 - Observing Pi means its commit listener, not hooks: `subscribeCommits` sees every conversation's committed entries,
   tasks and submissions, and the run ledger (`telemetry/pi.ts`, ADR 0024) is attached in the harness factory as soon
   as `Harness.open` returns. A listener runs inside Pi's commit: if it throws, Pi faults the user's task, so guard it,

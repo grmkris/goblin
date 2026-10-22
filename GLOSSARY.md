@@ -46,7 +46,7 @@ that reaches more than one names the workspace on every call.
 _Avoid_: apps that use your agent
 
 **API key**:
-A `gbk_` key an owner makes in Settings for a server the workspace runs (ADR 0081). It belongs to that workspace (ADR 0089) and reaches only the Topics, chats and Personas it made, over `/api` or `/mcp`, and never keeps the agent active. Its scopes can change and it keeps what it
+A `gbk_` key an owner makes in Settings for a server the workspace runs (ADR 0081). It belongs to that workspace (ADR 0089) and reaches only the Topics, chats and Personas it made, over `/api` or `/mcp`, and never keeps the agent active. Each Topic it makes is a **room** (ADR 0108). Its scopes can change and it keeps what it
 made (ADR 0084). With an OAuth client of the owner it is one of `/mcp`'s two kinds of caller (ADR 0086).
 _Avoid_: token, service account
 
@@ -83,6 +83,13 @@ its current Pi session.
 **Topic**:
 A channel of the owner's work: exactly one Conversation and any number of threads under it (ADR 0032). Personal is
 the first Topic and holds Main.
+
+**Room**:
+A Topic a server's API key made, and every chat under it, whoever writes there (ADR 0108). It reaches only itself: the
+gateway within its setup, skills, questions, its own chats and memory, never the owner's files, other chats, apps,
+code or organizing. No other chat's search reaches it unless the owner names it. A key's messages there start
+`[from server <key name>]`, and its guidance is the server's, granting nothing.
+_Avoid_: customer topic, sandbox
 
 **Conversation**:
 A Topic's one long-lived chat. It never closes and keeps a memory instead of an ever-longer context.
