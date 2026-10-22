@@ -112,10 +112,13 @@ export class OwnerAgent extends PersonalAgent {
       const { input } = Schema.decodeUnknownSync(Schema.Struct({ input: Schema.String }))(await request.json())
       return Response.json({ released: queueModel(this).release(input) })
     }
-    if (path === '/test/rooms/stale') return this.#staleFilter(request)
-    // The object restarts: the next request reconstructs it, its in-memory state (what it applied, ADR 0108) gone.
-    if (path === '/test/rooms/restart') this.ctx.abort('rooms restart')
+    if (path.startsWith('/test/rooms/')) return this.#roomsProbe(path, request)
     if (path.startsWith('/test/streams/')) return this.#streamsProbe(path, request)
+    if (path.startsWith('/test/approvals/')) return this.#approvalsLever(path, request)
+    return super.onRequest(request)
+  }
+  /** The approvals' levers: the fixture's calls, today's spend past the cap and back, and the recovery read. */
+  async #approvalsLever(path: string, request: Request): Promise<Response> {
     if (path === '/test/approvals/calls') return Response.json(this.#mcp.calls)
     // Today's tokens spent past the deployment's cap (`spent`), and given back (`unspent`).
     if (path === '/test/approvals/spent') return this.#spend(SPENT_TOKENS)
@@ -123,6 +126,13 @@ export class OwnerAgent extends PersonalAgent {
     if (path === '/test/approvals/recovery')
       return Response.json(await approvalsProbe(this.ctx.storage, this.env.CREDENTIAL_KEY))
     return super.onRequest(request)
+  }
+  /** The rooms' levers (ADR 0108): a stale tool filter, and a restart that forgets what this lifetime applied. */
+  async #roomsProbe(path: string, request: Request): Promise<Response> {
+    if (path === '/test/rooms/stale') return this.#staleFilter(request)
+    // The object restarts: the next request reconstructs it, its in-memory state (what it applied, ADR 0108) gone.
+    if (path === '/test/rooms/restart') this.ctx.abort('rooms restart')
+    return Response.json({ error: 'no such lever' }, { status: 404 })
   }
   /**
    * Clears a chat's Pi tool filter in this lifetime, as a filter stored before rooms were (ADR 0108): what the room
