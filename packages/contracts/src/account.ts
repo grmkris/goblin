@@ -1,4 +1,5 @@
 import * as Schema from 'effect/Schema'
+import { GrantTerms } from './grants.ts'
 import { WorkspaceId } from './ids.ts'
 import { KeyOrigin } from './origins.ts'
 
@@ -42,12 +43,15 @@ export type CallerScope = typeof CallerScope.Type
 /** An MCP connection a key's setups may name: the key's server ceiling. */
 export const KeyServer = Schema.String.check(Schema.isPattern(/^[\w-]{1,64}$/u))
 
+/** A key's name: 1 to 64 letters, digits, spaces and `_.:-`. */
+const KeyName = Schema.String.check(Schema.isPattern(/^[\w .:-]{1,64}$/u))
+
 /**
  * `POST /api/keys`: a key for a server the owner runs, its scopes, the servers its setups may use, the MCP origins its
  * threads may connect to (ADR 0091) and its lifetime.
  */
 export const CreateApiKey = Schema.Struct({
-  name: Schema.String.check(Schema.isPattern(/^[\w .:-]{1,64}$/u)),
+  name: KeyName,
   scopes: Schema.Array(KeyScope).check(Schema.isMinLength(1), Schema.isMaxLength(4)),
   servers: Schema.Array(KeyServer).check(Schema.isMaxLength(32)),
   origins: Schema.optional(Schema.Array(KeyOrigin)),
@@ -66,7 +70,18 @@ export const UpdateApiKey = Schema.Struct({
 }).check(Schema.makeFilter((change) => change.scopes !== undefined || change.origins !== undefined))
 export type UpdateApiKey = typeof UpdateApiKey.Type
 
-/** A key as the owner sees it: its first characters, never its secret. */
+/** `POST /api/keys` with a grant: the key's name and the terms of its grant (`grants.ts`). */
+export const CreateApiKeyTerms = Schema.Struct({ name: KeyName, terms: GrantTerms })
+export type CreateApiKeyTerms = typeof CreateApiKeyTerms.Type
+
+/** `PATCH /api/keys/:keyId` with a grant: the terms of the key's grant from now on; its id and secret stay. */
+export const UpdateApiKeyTerms = Schema.Struct({ terms: GrantTerms })
+export type UpdateApiKeyTerms = typeof UpdateApiKeyTerms.Type
+
+/**
+ * A key as the owner sees it: its first characters, never its secret. `grantId` and `terms` are its grant, once the
+ * auth store keeps one for it.
+ */
 export const ApiKeyView = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
@@ -77,6 +92,8 @@ export const ApiKeyView = Schema.Struct({
   createdAt: Schema.String,
   expiresAt: Schema.optional(Schema.String),
   lastUsedAt: Schema.optional(Schema.String),
+  grantId: Schema.optionalKey(Schema.String),
+  terms: Schema.optionalKey(GrantTerms),
 })
 export type ApiKeyView = typeof ApiKeyView.Type
 
@@ -131,7 +148,8 @@ export type ReachedWorkspace = typeof ReachedWorkspace.Type
 
 /**
  * An MCP client a person authorized to use goblin's /mcp server (ADRs 0024, 0097): what it registered as, when they
- * consented, the `goblin:*` scopes their consent grants and the workspaces it reaches now.
+ * consented, the `goblin:*` scopes their consent grants and the workspaces it reaches now. `grantId` and `terms` are
+ * its grant, once the auth store keeps one for it.
  */
 export const InboundClient = Schema.Struct({
   clientId: Schema.String,
@@ -140,6 +158,8 @@ export const InboundClient = Schema.Struct({
   consentedAt: Schema.optional(Schema.String),
   scopes: Schema.Array(Schema.String),
   reach: Schema.Struct({ all: Schema.Boolean, workspaces: Schema.Array(ReachedWorkspace) }),
+  grantId: Schema.optionalKey(Schema.String),
+  terms: Schema.optionalKey(GrantTerms),
 })
 export type InboundClient = typeof InboundClient.Type
 
