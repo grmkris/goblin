@@ -14,6 +14,7 @@ export {
   AutocompleteList,
 } from './components/autocomplete.tsx'
 export { Badge } from './components/badge.tsx'
+export { Checkbox } from './components/checkbox.tsx'
 export { Button, buttonVariants } from './components/button.tsx'
 export {
   Card,
@@ -91,6 +92,7 @@ export { Separator } from './components/separator.tsx'
 export { Skeleton } from './components/skeleton.tsx'
 export { Spinner } from './components/spinner.tsx'
 export { PresenceBorder, PresenceOrb, type PresenceState } from './components/presence.tsx'
+export { RadioGroup, RadioGroupItem } from './components/radio-group.tsx'
 export { Switch } from './components/switch.tsx'
 export { Tabs, TabsContent, TabsList, TabsTrigger } from './components/tabs.tsx'
 export {
@@ -138,6 +140,10 @@ export {
 export { AuthPage } from './auth/auth-page.tsx'
 export { type AuthActionResult, failed, succeeded } from './auth/contract.ts'
 export { EmailSignInForm } from './auth/sign-in.tsx'
+export { GrantChoice, GrantTermsEditor, type GrantWords } from './auth/grant-terms.tsx'
+export { ReachListChoice, type ReachSelection } from './auth/grant-reach.tsx'
+export { ConsentSummary, GrantSummary, grantSummary } from './auth/consent-summary.tsx'
+export { WidenApproval } from './auth/widen-approval.tsx'
 export { ProviderSignIn, SignInDivider } from './auth/provider-sign-in.tsx'
 export { GoblinMark } from './components/goblin-mark.tsx'
 export { MossFrame, type MossFrameProps } from './marketing/moss-frame.tsx'
