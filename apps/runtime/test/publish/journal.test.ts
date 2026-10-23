@@ -30,8 +30,8 @@ const setup = () => {
   const insert = database.sqlite.prepare(
     "INSERT INTO app_topics (id, name, chat_id, created_by, created_at, updated_at) VALUES (?, ?, ?, 'owner', 1, 1)",
   )
-  insert.run(2, 'Room A', '20')
-  insert.run(3, 'Room B', '30')
+  insert.run(2, 'Customer A', '20')
+  insert.run(3, 'Customer B', '30')
   const synced = database.sqlite.prepare(
     "INSERT INTO app_grant_sync (grant_id, generation, topics, personas, connections, synced_at) VALUES (?, 1, 'list', 'all', 'all', 1)",
   )
@@ -88,13 +88,13 @@ describe('the published journal (ADR 0112)', () => {
   it('journals a wake once and owes it to each lease that takes it, a key only in the Topics its grant lists', () => {
     const { db, sqlite } = setup()
     lease(db, 'all-k1', 'key:k1')
-    lease(db, 'room-b-k1', 'key:k1', { topic: 3 })
+    lease(db, 'customer-b-k1', 'key:k1', { topic: 3 })
     lease(db, 'client', 'client:c1:u1')
     lease(db, 'chat-20', 'key:k1', { chat: '20' })
     expect(record(db, wake('20', 2))?.queued).toBe(3)
     expect(record(db, wake('30', 3))?.queued).toBe(1)
     expect(owed(sqlite, 'client')).toHaveLength(2)
-    expect(owed(sqlite, 'room-b-k1')).toEqual([])
+    expect(owed(sqlite, 'customer-b-k1')).toEqual([])
     // Nothing changed: nothing is journaled or owed.
     expect(record(db, wake('20', 2))).toBeUndefined()
     expect(record(db, wake('20', 2, { activity: 'idle' }))?.seq).toBe(3)

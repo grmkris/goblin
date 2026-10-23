@@ -21,7 +21,7 @@ describe('who wrote a message (ADRs 0086, 0094)', () => {
     expect(clientAuthor('Claude Code', 'Ana')).toBe('Claude Code for Ana')
   })
 
-  it("names a server's key as a server, which no client's chosen name can read as (ADR 0108)", () => {
+  it("names a server's key as a server, which no client's chosen name can read as (ADR 0115)", () => {
     expect(authorTag(serverAuthor('swarmm-prod'))).toBe('[from server swarmm-prod]')
     expect(readBack(serverAuthor('a ] b\nc'))).toBe('server a b c')
     expect(clientAuthor('server swarmm-prod')).toBe('swarmm-prod')

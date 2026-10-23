@@ -206,7 +206,7 @@ const fakeHarness = (record: PiRecord, calls: Calls): PiHarness => {
       record.writes.push({ conversation: id, requestId: write.requestId, kind: write.entry.kind })
       return { id: record.writes.length }
     },
-    // A chat's first turn in the object's lifetime puts its tool filter right (ADR 0108).
+    // A chat's turn puts its tool filter right for its sender's power (ADR 0115).
     configure: async () => void calls.push(`configure:${String(id)}`),
   })
   const inbox = {
@@ -503,7 +503,7 @@ describe('the conversations API served by the agent', () => {
     const body = threadStart('1', { operationId: 'op-p', anchor: 'latest', message, personaOrder: 'sequence' })
     const response = await fetch(post('/api/conversations/1/threads', body))
     expect(response.status).toBe(201)
-    // The Thread's tool filter is put right before the ask, so the forks copy it (ADR 0108).
+    // The Thread's tool filter is put right before the ask, so the forks copy it (ADR 0115).
     expect(calls).toEqual(['start:1:op-p:latest', 'asked:5', 'configure:9', 'personas:sequence'])
     expect(record.writes.map(({ conversation, kind }) => [conversation, kind])).toEqual([
       [1, 'app.thread_head'],

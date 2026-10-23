@@ -9,7 +9,7 @@ import { Db } from '../runtime/db.ts'
 import { nameMade } from './made-by.ts'
 
 /**
- * The names of the keys that made the agent's Topics and Personas (ADR 0108), learnt from each key's first request in
+ * The names of the keys that made the agent's Topics and Personas (ADR 0115), learnt from each key's first request in
  * the object's lifetime: whatever the key made before names were kept is named then, and the views of what that named
  * are told. A key's name never changes, so once is enough; a restart only names nothing again. The naming runs beside
  * the request, never in it: a key that made hundreds of Topics would otherwise wait for every view to be told.

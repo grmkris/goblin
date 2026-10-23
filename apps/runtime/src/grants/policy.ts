@@ -88,7 +88,7 @@ export const requestFlowOrigin: Effect.Effect<{ readonly via: 'app' | 'mcp'; rea
   )
 
 /**
- * Who a request's message is by, which its content carries first: a server's key by its name (ADR 0108), an OAuth
+ * Who a request's message is by, which its content carries first: a server's key by its name (ADR 0115), an OAuth
  * client by the name it registered (ADR 0086, and for whom in a workspace of several people), or in such a workspace a
  * member by name and ID (ADR 0094); none for a member alone in their workspace, or any other request.
  */
@@ -151,7 +151,7 @@ export const reachesChat = (chat: string) =>
 
 /**
  * What a credential's create made (ADR 0114): within its reach from then on, listed when its reach of that kind is a
- * list, and a key's recorded as made by it for its views (ADR 0108). A replay (`created` false) of a create must find
+ * list, and a key's recorded as made by it for its views (ADR 0115). A replay (`created` false) of a create must find
  * something it reaches: a grant that listed it on its first try, or one that reaches all; else `AccessInsufficient`,
  * so an operation id never adopts something outside its reach. A replay lists it again in the auth store, in case its
  * first try failed between the mirror and the store.

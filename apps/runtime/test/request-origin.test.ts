@@ -33,7 +33,7 @@ describe("where a request's flow comes from (ADR 0037)", () => {
   })
 })
 
-describe("who a request's message is by (ADR 0108)", () => {
+describe("who a request's message is by (ADR 0115)", () => {
   it("names a server's key as a server by its name, a client by its own, and the owner's session by none", async () => {
     expect(await inRequest(requestAuthor, KEY)).toBe('server swarmm-prod')
     expect(await inRequest(requestAuthor, CLIENT)).toBe('Claude Code')

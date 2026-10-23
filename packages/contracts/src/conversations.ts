@@ -266,7 +266,7 @@ export const clientAuthor = (client: string, member?: string): string => {
 }
 
 /**
- * The author of a message a server's API key sent (ADR 0108): `server <key name>`, which goblin writes in front of each,
+ * The author of a message a server's API key sent (ADR 0115): `server <key name>`, which goblin writes in front of each,
  * so the agent reads a request from a party the owner connected, never the owner's own words.
  */
 export const serverAuthor = (key: string): string => `server ${plainName(key).slice(0, 64) || 'key'}`

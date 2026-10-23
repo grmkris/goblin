@@ -76,7 +76,7 @@ const confinePersonaSetup = (setup: CreatePersona['setup']) =>
 
 /**
  * A Persona a credential makes (ADR 0114): its setup within its grant, and within its reach from then on (listed when
- * its Personas are a list); a key's is named as made by it (`madeBy`, ADR 0108).
+ * its Personas are a list); a key's is named as made by it (`madeBy`, for display, ADR 0115).
  */
 const create = (input: CreatePersona) =>
   Effect.gen(function* () {

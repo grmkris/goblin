@@ -45,7 +45,7 @@ const learning = () => {
   return { db: database.db, names, told }
 }
 
-describe("a key's name (ADR 0108)", () => {
+describe("a key's name, for display (ADR 0115)", () => {
   it('names what the key made before names were kept on its first request, tells the views, and asks once', async () => {
     const { db, names, told } = learning()
     db.run(

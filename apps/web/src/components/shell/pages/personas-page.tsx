@@ -46,7 +46,7 @@ function Archived({ personas }: { readonly personas: readonly PersonaView[] }) {
   )
 }
 
-/** The Personas one server's key made (ADR 0108), folded under the key's name until asked for. */
+/** The Personas one server's key made (for display, ADR 0115), folded under the key's name until asked for. */
 function MadeByKey({ group }: { readonly group: KeyPersonas }) {
   const [open, setOpen] = useState(false)
   return (
@@ -68,7 +68,7 @@ function MadeByKey({ group }: { readonly group: KeyPersonas }) {
 
 /**
  * `/personas` (ADR 0078): the specialists the owner calls into a conversation with `@name`, by name, each opening its
- * profile to edit; then those each server's key made, folded under the key (ADR 0108); the archived folded at the end.
+ * profile to edit; then those each server's key made, folded under the key (for display, ADR 0115); the archived folded at the end.
  */
 export function PersonasPage() {
   const personas = usePersonas()

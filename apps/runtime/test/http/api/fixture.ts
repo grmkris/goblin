@@ -25,7 +25,7 @@ const idleNames = Layer.succeed(KeyNames, KeyNames.of({ learn: () => Effect.void
 
 /**
  * `groups` and their `handlers` served the way the agent serves the owner API (`AgentHttp.serve`): behind owner
- * admission, its router and its failure rendering, with `names` learning keys' names (ADR 0108; none by default) and
+ * admission, its router and its failure rendering, with `names` learning keys' names (for display, ADR 0115; none by default) and
  * `grants` holding credentials' grants (ADR 0114; none listed by default). Provide it the services the handlers read,
  * then `serve` it.
  */

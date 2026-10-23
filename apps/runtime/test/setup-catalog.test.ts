@@ -37,7 +37,7 @@ describe('what the agent may add to a setup (ADR 0040)', () => {
     expect(outcome({ ...NOTHING, subagents: false }, { ...narrow, mcpServers: 'all' })).toBe('ok')
   })
 
-  it('never lets the agent make a category hold everything, which only the owner gives (ADR 0108)', async () => {
+  it('never lets the agent make a category hold everything, which only the owner gives', async () => {
     // The catalog is never read for it: these services answer nothing.
     const unread = Layer.mergeAll(
       stub(McpConnections),

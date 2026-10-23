@@ -1,7 +1,7 @@
 // A chat's AG-UI stream on the real Worker and agent (docs/architecture/streams.md, ADR 0110): a member reads it
 // through their workspace with their session, as server-sent events that open with the chat's snapshots and then carry
 // everything live (text, reasoning, tool calls and their results); a reconnect opens with a fresh snapshot that holds
-// what came meanwhile; a server's key reads its own room's chat in full and no other chat; and a chat past the readers
+// what came meanwhile; a server's key reads its own Topic's chat in full and no other chat; and a chat past the readers
 // it takes refuses one more as `stream_busy`.
 import { EventSchema } from '@ag-ui/core/schemas'
 import { type AguiEvent, ConversationEntries, EventType, TopicView, runInput } from '@goblin/contracts'
@@ -202,13 +202,13 @@ async function reconnect(url: string, owner: Person, gone: StreamRead) {
 }
 
 /**
- * A server's key reads its own room's chat in full: the opening with the whole STATE, then its thinking and its
- * answer; another key's room and the owner's own chat are out of its grant's reach (ADR 0114: `access_insufficient`).
+ * A server's key reads its own Topic's chat in full: the opening with the whole STATE, then its thinking and its
+ * answer; another key's Topic and the owner's own chat are out of its grant's reach (ADR 0114: `access_insufficient`).
  */
 async function keyReads(url: string, owner: Person) {
   const asKey = keyFetch(url, await newKey(url, owner, 'streams'))
   const topic = Schema.decodeUnknownSync(TopicView)(
-    await (await asKey('POST', '/api/topics', { name: 'Streamed room', operationId: 'streams:topic' })).json(),
+    await (await asKey('POST', '/api/topics', { name: 'Streamed customer', operationId: 'streams:topic' })).json(),
   )
   const chat = topic.conversation
   const stream = streamOf(await asKey('GET', `/api/conversations/${chat}/stream`))
@@ -229,7 +229,7 @@ async function keyReads(url: string, owner: Person) {
   await stream.close()
   const other = keyFetch(url, await newKey(url, owner, 'elsewhere'))
   const theirs = Schema.decodeUnknownSync(TopicView)(
-    await (await other('POST', '/api/topics', { name: 'Their room', operationId: 'streams:other' })).json(),
+    await (await other('POST', '/api/topics', { name: 'Their customer', operationId: 'streams:other' })).json(),
   )
   for (const outside of [theirs.conversation, '1']) {
     const refused = await asKey('GET', `/api/conversations/${outside}/stream`)

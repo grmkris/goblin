@@ -10,7 +10,7 @@ const textOf = (message: Message): string =>
     ? message.content
     : message.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('\n')
 
-/** A message's words without the author line one from someone else starts with (`[from server …]`, ADR 0108). */
+/** A message's words without the author line one from someone else starts with (`[from server …]`, ADR 0115). */
 const wordsOf = (message: Message): string => textOf(message).replace(/^\[from [^\]\n]+\]\n/u, '')
 
 /** The prompt a Persona's fork is asked with (`pi/persona-turn.ts`): its name is who is answering. */

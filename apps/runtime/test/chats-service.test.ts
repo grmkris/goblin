@@ -292,7 +292,8 @@ describe('the conversation services', () => {
       yield* operations.send(input)
       // A routine's question waiting in the chat takes `op-r` as its answer, so Pi never sees it.
       yield* operations.send({ ...input, operationId: 'op-r', answer: () => Effect.succeed(true) })
-      // The chat's first turn in this lifetime puts its tool filter right (ADR 0108); the next ones do not again.
+      // The chat's first turn in this lifetime puts its tool filter right for its sender (ADR 0115); the next ones of
+      // the same sender's power do not again.
       expect(calls).toEqual(['model:42:model-a', 'configure:42', 'submit:42:op-1', 'submit:42:op-1'])
       expect(yield* operations.receipt('2', 'op-1')).toMatchObject(Option.some({ kind: 'send', state: 'submitted' }))
       expect(yield* operations.receipt('2', 'op-r')).toMatchObject(Option.some({ state: 'submitted' }))

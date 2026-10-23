@@ -239,7 +239,7 @@ describe('a credential reaches what its grant reaches (ADR 0114)', () => {
     expect((await fetch(get('/api/topics/2', as(widened)))).status).toBe(200)
   })
 
-  it('names the key on what it made, to the key and the owner, and on nothing it did not (ADR 0108)', async () => {
+  it('names the key on what it made, to the key and the owner, and on nothing it did not, for display (ADR 0115)', async () => {
     const { fetch, db, topics, personas } = organizing()
     const named = credential({ id: 'key-1', name: 'swarmm-prod', level: 'manage' })
     // Made before names were kept: the key's id stands in until its first request names it.

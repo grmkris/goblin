@@ -58,7 +58,7 @@ const definitionOf = (row: Row | RevisionRow): PersonaDefinition => ({
   setup: personaSetupOf(row.setup),
 })
 
-/** A Persona's row with the key that made it, when one did (ADR 0108). */
+/** A Persona's row with the key that made it, when one did, for display (ADR 0115). */
 type Made = Row & { readonly maker: string | null | undefined }
 
 const view = (row: Made): PersonaView => ({

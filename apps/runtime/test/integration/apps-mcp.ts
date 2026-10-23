@@ -49,8 +49,8 @@ export class AppsMcpFixture {
       (request) => {
         this.calls.push({ name: request.name, args: request.arguments })
         const said = { type: 'text' as const, text: `fixture-${request.name}:${JSON.stringify(request.arguments)}` }
-        // Asked with `clip`, it also hands over a file embedded, which an owner's call keeps in their files (ADR 0065)
-        // and a room's never does (ADR 0113).
+        // Asked with `clip`, it also hands over a file embedded, which a call keeps in its Topic's folder (ADRs 0065,
+        // 0115).
         if (request.arguments?.['clip'] !== true) return { content: [said] }
         const clip = { uri: CLIP, mimeType: 'application/octet-stream', blob: btoa('fixture clip bytes') }
         return { content: [said, { type: 'resource' as const, resource: clip }] }

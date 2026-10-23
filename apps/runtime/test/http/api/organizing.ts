@@ -138,7 +138,7 @@ export const organizing = () => {
           // Only a Source's route receipt reaches the Sources.
           stub(Sources),
           catalog,
-          // A key's create tells the views that it made what it made (ADR 0108).
+          // A key's create tells the views that it made what it made (for display, ADR 0115).
           changes,
           Layer.succeed(Resident, resident.service),
           FlowEvents.layerWith((event) => Effect.sync(() => void flows.push(event))),

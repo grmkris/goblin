@@ -13,7 +13,7 @@ import { appMadeBy } from '../storage/made-by.ts'
 /** What a key can make: a Topic or a Persona. */
 export type MadeKind = 'topic' | 'persona'
 
-/** A key as what it made records it: its id and its name (ADR 0108). */
+/** A key as what it made records it: its id and its name (ADR 0115). */
 type Maker = { readonly keyId: string; readonly name: string }
 
 /** Records that key `key` made the `kind` with `id`, with the key's name; recording it again changes nothing. */
@@ -25,7 +25,7 @@ export const recordMaker = (db: DrizzleSqliteDODatabase, key: Maker, kind: MadeK
 }
 
 /**
- * Names what key `key` made before names were kept (ADR 0108), in one statement, and answers what it named. A key's
+ * Names what key `key` made before names were kept (ADR 0115), in one statement, and answers what it named. A key's
  * name stays its own, so a named row stays right.
  */
 export const nameMade = (
@@ -40,7 +40,7 @@ export const nameMade = (
     .all()
 
 /**
- * As a column of a query over `kind`'s rows, the key that made the row whose id is `id` (ADR 0108): its name, or its id
+ * As a column of a query over `kind`'s rows, the key that made the row whose id is `id` (ADR 0115): its name, or its id
  * while its name is not known yet; null when no key made it.
  */
 export const makerColumn = (kind: MadeKind, id: SQLiteColumn): SQL<string | null> =>

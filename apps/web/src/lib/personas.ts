@@ -6,7 +6,7 @@ export const activePersonas = (personas: readonly PersonaView[]): readonly Perso
     .filter((persona) => persona.archivedAt === undefined)
     .toSorted((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
 
-/** The Personas a server's API key made, under its name (ADR 0108). */
+/** The Personas a server's API key made, under its name, for display (ADR 0115). */
 export type KeyPersonas = { readonly key: string; readonly personas: readonly PersonaView[] }
 
 /**

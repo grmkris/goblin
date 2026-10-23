@@ -49,9 +49,9 @@ describe("a chat's wake", () => {
       activity: 'working',
       attention: 0,
     })
-    const room = wakeOf({ chat: '40', topicId: 4 }, fold, false)
-    expect(room).toMatchObject({ topic: '4', activity: 'idle' })
-    expect(topicOfWake(room)).toBe(4)
+    const customer = wakeOf({ chat: '40', topicId: 4 }, fold, false)
+    expect(customer).toMatchObject({ topic: '4', activity: 'idle' })
+    expect(topicOfWake(customer)).toBe(4)
     expect(topicOfWake(wakeOf({ chat: '7', topicId: 1 }, fold, false))).toBe(1)
   })
 })
