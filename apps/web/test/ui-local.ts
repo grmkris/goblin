@@ -126,8 +126,6 @@ async function styles(browser: Browser, origin: string, label: string, options: 
   await page.screenshot({ path: path.join(out, `styles-${label}.png`) })
   const card = page.locator('[data-sample="interactive-card"]')
   await card.hover()
-  await card.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
-  const hover = await card.evaluate((element) => getComputedStyle(element).backgroundColor)
   const fine = await page.evaluate(() => matchMedia('(hover: hover) and (pointer: fine)').matches)
   const expectedHover = await card.evaluate((element) => {
     const probe = document.createElement('span')
@@ -137,6 +135,17 @@ async function styles(browser: Browser, origin: string, label: string, options: 
     probe.remove()
     return color
   })
+  if (fine)
+    // Two animation frames can still sample the middle of the CSS transition, even under reduced motion.
+    await page.waitForFunction(
+      (expected) => {
+        const element = document.querySelector('[data-sample="interactive-card"]')
+        return element !== null && getComputedStyle(element).backgroundColor === expected
+      },
+      expectedHover,
+      { timeout: 3000 },
+    )
+  const hover = await card.evaluate((element) => getComputedStyle(element).backgroundColor)
   if (fine) assert.equal(hover, expectedHover, 'interactive card tints on hover')
   await page.getByRole('button', { name: 'Thoughts' }).click()
   const panel = page.locator('[data-slot="reasoning-content"]')
