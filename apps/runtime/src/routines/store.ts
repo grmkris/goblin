@@ -15,7 +15,6 @@ import { canonicalArguments } from '../mcp/events/store.ts'
 import { personaSetupOf } from '../personas/registry.ts'
 import { appPersonaRevisions, appPersonas } from '../storage/personas.ts'
 import { appRoutineOperations, appRoutines, appRoutineSettings } from '../storage/routines.ts'
-import { roomOf } from '../keys/made-by.ts'
 import { appTopics } from '../storage/topics.ts'
 import { topicSetupOf } from '../topics/setup.ts'
 import { nextFire, timezoneValid } from './time.ts'
@@ -211,8 +210,6 @@ export class RoutineStore {
       .get()
     if (row === undefined) throw new NotFound({ what: 'topic' })
     if (row.archivedAt !== null) throw new InvalidInput({ reason: 'topic_archived' })
-    // A room runs no routine (ADRs 0108, 0113): its chats are a server's customer's, and a routine is the owner's.
-    if (roomOf(this.#db, topic)) throw new InvalidInput({ reason: 'topic_room' })
   }
 
   propose(

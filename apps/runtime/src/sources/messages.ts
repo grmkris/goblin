@@ -17,7 +17,6 @@ import { RunAttribute } from '@goblin/contracts/telemetry'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import { type AppError, InvalidInput } from '../http/errors.ts'
-import { roomOf } from '../keys/made-by.ts'
 import { reportAndRecover } from '../observability/report.ts'
 import { routineSummary } from '../routines/summary.ts'
 import { isRecord, sha256Hex } from '../runtime/digest.ts'
@@ -257,12 +256,6 @@ const firstRoute = (source: Loaded, conversation: Conversation, ports: SourcePor
     )
   })
 
-/** Whether `route` sends a Source's messages into a room, which takes none (ADRs 0108, 0113). */
-const intoRoom = (context: EngineContext, route: SourceRoute): boolean => {
-  const topic = topicOf(route)
-  return topic !== undefined && roomOf(context.db, topic)
-}
-
 /** A conversation's route: the one it has (its title kept up to date), or the one it takes when goblin first sees it. */
 const routeFor = (context: EngineContext, source: Loaded, conversation: Conversation, ports: SourcePorts) =>
   Effect.gen(function* () {
@@ -270,9 +263,7 @@ const routeFor = (context: EngineContext, source: Loaded, conversation: Conversa
     const known = knownKey(context.db, seen)
     if (known !== undefined) return known
     const first = yield* firstRoute(source, conversation, ports)
-    // A room takes nothing from a Source (ADRs 0108, 0113): a setup that names one holds the conversation instead.
-    const placed: SourceRoute = intoRoom(context, first) ? { to: 'held' } : first
-    return addKey(context.db, seen, placed, Math.floor((yield* Clock.currentTimeMillis) / 1000))
+    return addKey(context.db, seen, first, Math.floor((yield* Clock.currentTimeMillis) / 1000))
   })
 
 /** The attachments at the setup's `read.attachments` pointer of `item`: a list of MCP content blocks, else none. */
@@ -416,7 +407,6 @@ export type RouteChange = { readonly key: string; readonly target: SourceRoute; 
 export const route = (context: EngineContext, source: Loaded, change: RouteChange, ports: SourcePorts) =>
   Effect.gen(function* () {
     const { key, target, by } = change
-    if (intoRoom(context, target)) return yield* new InvalidInput({ reason: 'topic_room' })
     const now = Math.floor((yield* Clock.currentTimeMillis) / 1000)
     const changed = setRoute(context.db, { sourceId: source.row.id, key }, target, by, now)
     if (changed === undefined) return undefined

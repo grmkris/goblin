@@ -24,6 +24,7 @@ import { discussionSeed } from '../topics/seed.ts'
 import { adminOnly, requireAdminTurn } from './asker.ts'
 import { PiSessions, fromPi } from './sessions.ts'
 import { typedTool } from './typed-tool.ts'
+import { requireWithin } from './within.ts'
 
 const GUIDE = [
   'Organize tools (`topic_create`, `topic_rename`, `topic_archive`, `topic_setup`, `persona_create`, `persona_update`)',
@@ -114,7 +115,7 @@ const topicTools = (run: RunProgram) => [
   typedTool({
     name: 'topic_rename',
     description:
-      "Rename the active Topic called `topic` to `name`, only on the owner's direct request. Personal's Conversation keeps its name.",
+      "Rename the active Topic called `topic` to `name`, only on the owner's direct request: this chat's own Topic, or from a hub any Topic. Personal's Conversation keeps its name.",
     input: Schema.Struct({ topic: TopicName, name: TopicName }),
     output: Done,
     replay: 'safe',
@@ -123,6 +124,7 @@ const topicTools = (run: RunProgram) => [
       const renamed = await run(
         Effect.gen(function* () {
           const found = yield* topicNamed(topic)
+          yield* requireWithin(String(api.conversationId), found.id)
           return yield* updateTopic(found.id, { name }, yield* byAgent(api))
         }),
       )
@@ -130,11 +132,12 @@ const topicTools = (run: RunProgram) => [
     },
     text: said,
     details: ({ id }) => ({ kind: 'organize', topic: id }),
+    failure: adminOnly('Topics'),
   }),
   typedTool({
     name: 'topic_archive',
     description:
-      "Archive the active Topic called `topic`, only on the owner's direct request: its chats stop working and take no new messages until the owner restores it. Personal cannot be archived.",
+      "Archive the active Topic called `topic`, only on the owner's direct request (this chat's own Topic, or from a hub any Topic): its chats stop working and take no new messages until the owner restores it. Personal cannot be archived.",
     input: Schema.Struct({ topic: TopicName }),
     output: Done,
     replay: 'safe',
@@ -143,6 +146,7 @@ const topicTools = (run: RunProgram) => [
       const archived = await run(
         Effect.gen(function* () {
           const found = yield* topicNamed(topic)
+          yield* requireWithin(String(api.conversationId), found.id)
           return yield* updateTopic(found.id, { archived: true }, yield* byAgent(api))
         }),
       )
@@ -150,6 +154,7 @@ const topicTools = (run: RunProgram) => [
     },
     text: said,
     details: ({ id }) => ({ kind: 'organize', topic: id }),
+    failure: adminOnly('Topics'),
   }),
 ]
 
@@ -158,7 +163,7 @@ const setupTools = (run: RunProgram) => [
   typedTool({
     name: 'topic_setup',
     description:
-      "Change what the active Topic called `topic` works with, only on the owner's direct request: `add` or `remove` items (an MCP server, one of its tools, a skills library, one skill by name, an app, or subagents), or `set` a whole setup. In a setup each of mcpServers, skills and apps is 'all' or a list: a server is {connectionId, tools: 'all' or [tool names]}, a skill {connectionId} (its whole library) or {connectionId, name}, an app its name. You can add only what the owner has granted or turned on. Never use it to get past something refused as not in the Topic: tell the owner instead.",
+      "Change what the active Topic called `topic` works with (this chat's own Topic, or from a hub any Topic), only on the owner's direct request: `add` or `remove` items (an MCP server, one of its tools, a skills library, one skill by name, an app, or subagents), or `set` a whole setup. In a setup each of mcpServers, skills and apps is 'all' or a list: a server is {connectionId, tools: 'all' or [tool names]}, a skill {connectionId} (its whole library) or {connectionId, name}, an app its name. You can add only what the owner has granted or turned on. Never use it to get past something refused as not in the Topic: tell the owner instead.",
     input: Schema.Struct({
       topic: TopicName,
       set: Schema.optionalKey(TopicSetup),
@@ -173,6 +178,7 @@ const setupTools = (run: RunProgram) => [
         Effect.gen(function* () {
           yield* requireAdminTurn(api, context)
           const found = yield* topicNamed(topic)
+          yield* requireWithin(String(api.conversationId), found.id)
           const edit = setupEdit(found, { set, add, remove })
           if (edit === undefined) return yield* new InvalidInput({ reason: 'setup_edit' })
           return yield* editTopicSetup(found.id, edit, yield* byAgent(api))

@@ -5,6 +5,7 @@ import { Forbidden, attempt, attemptSync } from '../http/errors.ts'
 import { Db } from '../runtime/db.ts'
 import { describeError } from '../telemetry/attributes.ts'
 import type { PiContext } from './context.ts'
+import { BOUNDARY_TEXT } from './within.ts'
 import { PiSessions, fromPi } from './sessions.ts'
 
 /** What a tool call's execution API is read through here: its conversation, and that conversation's live run. */
@@ -72,11 +73,14 @@ export const requireAdminTurn = (api: CallApi, context: PiContext) =>
 
 /**
  * What the model reads of a failure of a tool that changes `what`: refused on a member's turn, who may make the change
- * and what to tell the member, in words it can relay; any other failure as `otherwise` reads it.
+ * and what to tell the member, in words it can relay; refused past its chat's sealed Topic (ADR 0115), where it can be
+ * made; any other failure as `otherwise` reads it.
  */
 export const adminOnly =
   (what: string, otherwise: (cause: unknown) => string = describeError) =>
   (cause: unknown): string =>
     cause instanceof Forbidden && cause.reason === 'role'
       ? `Changing ${what} takes an admin of this workspace, and a member asked for it in this turn, so nothing changed. Tell them that an admin has to make this change and that they can ask one.`
-      : otherwise(cause)
+      : cause instanceof Forbidden && cause.reason === 'boundary'
+        ? BOUNDARY_TEXT
+        : otherwise(cause)

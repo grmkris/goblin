@@ -11,9 +11,13 @@ import {
   RoutineView,
 } from '@goblin/contracts'
 import { changeRoutine, proposeAsked, routinesList } from '../routines/program.ts'
+import { Routines } from '../routines/service.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
+import { topicNamed } from '../topics/program.ts'
+import { withinBoundary } from '../topics/boundary.ts'
 import { adminOnly, requireAdminTurn } from './asker.ts'
 import { typedTool } from './typed-tool.ts'
+import { requireWithin, sessionBoundary } from './within.ts'
 
 const operationOf = (api: { readonly conversationId: unknown; readonly callId: string }) =>
   `routine:${String(api.conversationId)}:${api.callId}`
@@ -52,11 +56,14 @@ const proposeTool = (run: RunProgram) =>
     output: Proposed,
     replay: 'safe',
     execute: async (asked, api, context) => {
+      const session = String(api.conversationId)
       const draft = await run(
-        Effect.andThen(
-          requireAdminTurn(api, context),
-          proposeAsked(asked, operationOf(api), String(api.conversationId)),
-        ),
+        Effect.gen(function* () {
+          yield* requireAdminTurn(api, context)
+          // Another Topic's routine is proposed from a hub only (ADR 0115); without `topic` it is this chat's Topic's.
+          if (asked.topic !== undefined) yield* requireWithin(session, (yield* topicNamed(asked.topic)).id)
+          return yield* proposeAsked(asked, operationOf(api), session)
+        }),
       )
       return { routineId: draft.id, revision: draft.revision, title: draft.definition.title }
     },
@@ -70,11 +77,21 @@ const proposeTool = (run: RunProgram) =>
 const listTool = (run: RunProgram) =>
   typedTool({
     name: 'routine_list',
-    description: "The owner's routines with their state, definition and schedule.",
+    description:
+      "The owner's routines with their state, definition and schedule: from a hub every Topic's, else this one's.",
     input: Schema.Struct({}),
     output: RoutinePage,
     replay: 'safe',
-    execute: async () => run(routinesList),
+    execute: async (_input, api) =>
+      run(
+        Effect.gen(function* () {
+          const boundary = yield* sessionBoundary(String(api.conversationId))
+          const { routines } = yield* routinesList
+          return {
+            routines: routines.filter((routine) => boundary !== undefined && withinBoundary(boundary, routine.topic)),
+          }
+        }),
+      ),
   })
 
 const pauseTool = (run: RunProgram) =>
@@ -86,10 +103,11 @@ const pauseTool = (run: RunProgram) =>
     replay: 'safe',
     execute: async ({ id, revision }, api, context) =>
       run(
-        Effect.andThen(
-          requireAdminTurn(api, context),
-          changeRoutine(id, { revision, operationId: operationOf(api) }, 'pause'),
-        ),
+        Effect.gen(function* () {
+          yield* requireAdminTurn(api, context)
+          yield* requireWithin(String(api.conversationId), (yield* (yield* Routines).view(id)).topic)
+          return yield* changeRoutine(id, { revision, operationId: operationOf(api) }, 'pause')
+        }),
       ),
     failure: adminOnly('routines'),
   })

@@ -15,7 +15,7 @@ import {
 import { defineExtension, section } from '@earendil-works/pi-durable'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
-import { InvalidInput } from '../http/errors.ts'
+import { Forbidden, InvalidInput } from '../http/errors.ts'
 import { requireResident } from '../mcp/service.ts'
 import { personaNamed } from '../personas/program.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
@@ -27,6 +27,7 @@ import { topicNamed } from '../topics/program.ts'
 import { adminOnly, requireAdminTurn } from './asker.ts'
 import { byAgent } from './organize.ts'
 import { typedTool } from './typed-tool.ts'
+import { BOUNDARY_TEXT, requireHub } from './within.ts'
 
 const GUIDE = [
   "Sources (`source_propose`, `source_routes`, `source_route`) carry the owner's own messages from an MCP server that",
@@ -106,7 +107,11 @@ const PROBLEMS = 2000
 const proposeFailure = (cause: unknown): string =>
   cause instanceof InvalidInput
     ? `The setup does not hold; fix it and propose again. ${cause.reason.slice(0, PROBLEMS)}`
-    : describeError(cause)
+    : outsideHub(cause)
+
+/** A Source tool's refusal from a sealed Topic (ADR 0115): Sources are the workspace's, set up from a hub. */
+const outsideHub = (cause: unknown): string =>
+  cause instanceof Forbidden && cause.reason === 'boundary' ? BOUNDARY_TEXT : describeError(cause)
 
 /** `source_propose`: a Source for the owner to review; it ends the turn. */
 const proposeTool = (run: RunProgram) =>
@@ -122,6 +127,7 @@ const proposeTool = (run: RunProgram) =>
       await run(requireResident)
       return run(
         Effect.gen(function* () {
+          yield* requireHub(String(api.conversationId))
           const { connectionId, title, newKeys, ...facts } = asked
           const route: SourceNewKeys =
             newKeys?.to === 'topic-per-key' ? newKeys : yield* routeOfAsked(newKeys ?? { to: 'held' })
@@ -167,10 +173,12 @@ const routesTool = (run: RunProgram) =>
     input: Schema.Struct({ source: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(64))) }),
     output: Listed,
     replay: 'safe',
-    execute: async (input) => {
+    failure: outsideHub,
+    execute: async (input, api) => {
       await run(requireResident)
       return run(
         Effect.gen(function* () {
+          yield* requireHub(String(api.conversationId))
           const sources = yield* Sources
           const listed = (yield* sources.list).sources.filter(
             (source) => input.source === undefined || source.id === input.source,
@@ -237,6 +245,7 @@ const routeTool = (run: RunProgram) =>
       return run(
         Effect.gen(function* () {
           yield* requireAdminTurn(api, context)
+          yield* requireHub(String(api.conversationId))
           if (input.to === 'persona' && input.persona === undefined)
             return yield* new InvalidInput({ reason: 'source_route_persona' })
           const route = yield* routeOfAsked(askedOf(input))
@@ -255,9 +264,10 @@ const routeTool = (run: RunProgram) =>
   })
 
 /**
- * goblin proposes Sources and shows and changes their routes on the owner's direct request (ADR 0066):
- * `source_propose` drafts a setup the owner confirms, `source_routes` lists each Source's conversations and where they
- * go, `source_route` sets one with an organizing receipt the owner can undo. A Persona's fork has none of them. A route
+ * goblin proposes Sources and shows and changes their routes on the owner's direct request (ADR 0066), from a hub only
+ * (ADR 0115): a Source's conversations go anywhere in the workspace. `source_propose` drafts a setup the owner
+ * confirms, `source_routes` lists each Source's conversations and where they go, `source_route` sets one with an
+ * organizing receipt the owner can undo. A Persona's fork has none of them. A route
  * takes an admin (ADR 0093), so `source_route` refuses on a member's turn (ADR 0099); proposing does not, since
  * confirming takes one.
  */
