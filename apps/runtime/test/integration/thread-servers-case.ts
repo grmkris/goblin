@@ -169,11 +169,14 @@ export async function threadServersCase(url: string): Promise<void> {
 
   // A key tagged it (ADR 0115): its Persona's fork keeps what a server's job needs, its native tools, skills and
   // questions, its native call ran above, and it is offered nothing its asker's power leaves out.
-  const maker = (await seen()).find((request) => request.context?.includes('You are Maker') === true)
-  expect(maker?.tools).toEqual(expect.arrayContaining(['swarmm__board', 'skill_activate', 'ask_user']))
+  const all = await seen()
+  const maker = all.find((request) => request.context?.includes('You are Maker') === true)
+  if (maker === undefined)
+    throw new Error(`no request of Maker among ${JSON.stringify(all.map((request) => request.context?.slice(0, 300)))}`)
+  expect(maker.tools).toEqual(expect.arrayContaining(['swarmm__board', 'skill_activate', 'ask_user']))
   for (const denied of ['routine_propose', 'app_call', 'source_route', 'topic_setup'])
-    expect(maker?.tools, denied).not.toContain(denied)
-  expect(maker?.context).toContain('A server the owner connected tagged @Maker')
+    expect(maker.tools, denied).not.toContain(denied)
+  expect(maker.context).toContain('A server the owner connected tagged @Maker')
 
   // Closing the thread drops its servers; reopening brings none back.
   const patch = (change: unknown) => asKey(url, secret, 'PATCH', `/api/conversations/${thread.id}`, change)

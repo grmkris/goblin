@@ -81,18 +81,19 @@ async function answered(url: string, owner: Person, who: Person, input: string, 
 const personaCall = (name: string) =>
   `call persona_create {"name":"${name}","role":"Asked for","instructions":"Be brief."}`
 
-/** The scripted model's answer to a tool's refusal on a member's turn (`pi/asker.ts`). */
-const refusal = (what: string) => `done: Changing ${what} takes an admin of this workspace`
+/** The scripted model's answer to a call of a tool its turn's power does not reach: it is not offered (ADR 0115). */
+const unavailable = (tool: string) => `Tool ${tool} is not available`
 
 /**
- * The agent's own tools take an admin as the owner API does (ADR 0099): on a member's turn the scripted model's
- * `persona_create`, `app_build` and `app_rollback` are refused in words it relays and change nothing, while a plain
+ * The agent's own tools take an admin as the owner API does (ADRs 0099, 0115): a member's turn is not offered
+ * `persona_create`, `app_build` or `app_rollback`, so the scripted model's calls of them change nothing, while a plain
  * Topic is made; on the owner's turn the Persona is made.
  */
 async function agentToolsTakeAnAdmin(url: string, owner: Person, member: Person): Promise<void> {
-  await answered(url, owner, member, personaCall('Askbot'), refusal('Personas'))
-  await answered(url, owner, member, 'call app_build {"name":"askers","files":{"app.ts":"export {}"}}', refusal('apps'))
-  await answered(url, owner, member, 'call app_rollback {"app":"askers","release":"r1"}', refusal('apps'))
+  await answered(url, owner, member, personaCall('Askbot'), unavailable('persona_create'))
+  const build = 'call app_build {"name":"askers","files":{"app.ts":"export {}"}}'
+  await answered(url, owner, member, build, unavailable('app_build'))
+  await answered(url, owner, member, 'call app_rollback {"app":"askers","release":"r1"}', unavailable('app_rollback'))
   // A plain Topic stays every member's to make (ADR 0098), on their turn too.
   const topic = `Asked topic ${crypto.randomUUID().slice(0, 8)}`
   await answered(url, owner, member, `call topic_create {"name":"${topic}"}`, 'done: Created topic')
