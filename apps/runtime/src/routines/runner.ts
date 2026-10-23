@@ -10,6 +10,7 @@ import { Conflict, InvalidInput, attempt, toAppError } from '../http/errors.ts'
 import { Cipher } from '../mcp/oauth/cipher.ts'
 import { requireResident } from '../mcp/service.ts'
 import { serverWorkIn } from '../keys/policy.ts'
+import { roomOf } from '../keys/reach.ts'
 import { Models } from '../models.ts'
 import { FlowEvents } from '../observability/flows.ts'
 import { reportFailure, safeErrorType } from '../observability/report.ts'
@@ -190,8 +191,11 @@ export const answerRun = Effect.fn('routines.answer')(function* (session: string
  * health, until the owner confirms it again (ADR 0041). Answers the run as stored after.
  */
 export const admit = Effect.fn('routines.admit')(function* (firing: Firing, forcedSkip?: string) {
-  const held = forcedSkip === undefined ? yield* personaHold(firing.routineId) : undefined
-  const claimed = yield* claimFiring(firing, forcedSkip ?? held)
+  // A routine whose Topic is a room runs nothing there (ADRs 0108, 0113), even one made before that was refused.
+  const inRoom = forcedSkip === undefined && roomOf(yield* Db, yield* (yield* Routines).topicOf(firing.routineId))
+  const room = inRoom ? 'topic_room' : undefined
+  const held = forcedSkip === undefined && room === undefined ? yield* personaHold(firing.routineId) : undefined
+  const claimed = yield* claimFiring(firing, forcedSkip ?? room ?? held)
   if (held !== undefined)
     yield* (yield* Routines).halt(firing.routineId, firing.revision, held, yield* Clock.currentTimeMillis)
   if (claimed.run.state === 'admitted' || claimed.run.state === 'running') yield* startRun(claimed.run)
