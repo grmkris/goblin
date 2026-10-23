@@ -4,6 +4,8 @@ import { lowLevelServer } from '../mcp/low-level-server.ts'
 
 /** The fixture's App: `board` renders it (ADR 0020). */
 export const BOARD = 'ui://apps-fixture/board.html'
+/** The file `board` hands over, embedded in its result, when asked with `clip`. */
+export const CLIP = 'https://apps-fixture.test/files/clip.bin'
 
 /** Official MCP transport; injected only at the native fixture's fetch boundary. */
 export class AppsMcpFixture {
@@ -46,9 +48,12 @@ export class AppsMcpFixture {
       },
       (request) => {
         this.calls.push({ name: request.name, args: request.arguments })
-        return {
-          content: [{ type: 'text', text: `fixture-${request.name}:${JSON.stringify(request.arguments)}` }],
-        }
+        const said = { type: 'text' as const, text: `fixture-${request.name}:${JSON.stringify(request.arguments)}` }
+        // Asked with `clip`, it also hands over a file embedded, which an owner's call keeps in their files (ADR 0065)
+        // and a room's never does (ADR 0113).
+        if (request.arguments?.['clip'] !== true) return { content: [said] }
+        const clip = { uri: CLIP, mimeType: 'application/octet-stream', blob: btoa('fixture clip bytes') }
+        return { content: [said, { type: 'resource' as const, resource: clip }] }
       },
     )
     return server

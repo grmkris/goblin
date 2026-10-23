@@ -113,7 +113,7 @@ harness.test(
   { timeout: 240_000 },
 )
 harness.test(
-  "native: a key's Topic is a room: only its own tools, the server's words marked, refused at call time, put right after a restart, and kept out of the owner's retrieval (ADR 0108)",
+  "native: a key's Topic is a room: only its own tools, the server's words marked, refused at call time, put right after a restart, kept out of the owner's retrieval (ADR 0108), and keeps no App or file of the owner's (ADR 0113)",
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => roomsCase(url)))),
   { timeout: 240_000 },
 )

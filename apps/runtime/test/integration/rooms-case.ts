@@ -3,7 +3,8 @@ import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { ROOM_TOOLS, roomAllows } from '../../src/pi/room.ts'
 import { callOwner } from '../owner-client.ts'
-import { type Person, call, lever, ownerFetch, person, showing, signedIn } from './owner-requests.ts'
+import { type Person, call, lever, ownerFetch, person, showing, signedIn, workspaceOf } from './owner-requests.ts'
+import { ownerResult } from './probe-reads.ts'
 import { waitFor } from './until.ts'
 
 const Secret = Schema.Struct({ secret: Schema.String })
@@ -18,6 +19,19 @@ const Seen = Schema.Struct({
 })
 type Request = (typeof Seen.Type)['requests'][number]
 
+/** The fixture server the owner connected, which the key may give its room (ADR 0081). */
+const FIXTURE = 'apps-fixture'
+
+/** A message that has the scripted model call `name` of the fixture with `args`. */
+const fixtureCall = (name: string, args: Record<string, unknown> = {}) =>
+  `call mcp_call ${JSON.stringify({ connectionId: FIXTURE, name, arguments: args })}`
+
+/** What the owner keeps under received files, as listed; empty while the folder is not there yet. */
+const received = async (me: ReturnType<typeof signedIn>) => {
+  const listed = await ownerResult(me, (api) => api.files.list({ query: { dir: '/agent/received' } }))
+  return listed.ok ? JSON.stringify(listed.value) : ''
+}
+
 /** Tools an owner's chat has that a room must never offer: one of each kind the room leaves out. */
 const DENIED = ['files_list', 'files_write', 'code_run', 'topic_create', 'persona_update', 'routine_propose']
 
@@ -26,7 +40,7 @@ async function keyOf(base: string, who: Person): Promise<string> {
   const made = await call(base, who, '/api/keys', {
     name: 'rooms',
     scopes: ['topics', 'conversations', 'personas'],
-    servers: [],
+    servers: [FIXTURE],
     expiresInDays: 1,
   })
   expect(made.status, await made.clone().text()).toBe(201)
@@ -92,8 +106,21 @@ export async function roomsCase(url: string): Promise<void> {
   const me = signedIn(url, owner)
   // The owner's own request gives the agent resident authority, which a key's turns still need.
   await callOwner(me, (api) => api.personas.list({ query: {} }))
+  await callOwner(me, (api) => api.mcp.connect({ params: { id: FIXTURE }, payload: {} }))
+  await callOwner(me, (api) =>
+    api.mcp.setToolGrant({ payload: { connectionId: FIXTURE, name: 'board', allowed: true } }),
+  )
   const secret = await keyOf(url, owner)
-  const made = await asKey(url, secret, 'POST', '/api/topics', { name: 'Customer 9', operationId: 'svc:topic:9' })
+  const made = await asKey(url, secret, 'POST', '/api/topics', {
+    name: 'Customer 9',
+    operationId: 'svc:topic:9',
+    setup: {
+      mcpServers: [{ connectionId: FIXTURE, tools: ['board'] }],
+      skills: [],
+      apps: [],
+      subagents: false,
+    },
+  })
   expect(made.status, await made.clone().text()).toBe(201)
   const room = Schema.decodeUnknownSync(TopicView)(await made.json())
   expect(room.room).toEqual({ key: 'rooms' })
@@ -152,4 +179,34 @@ export async function roomsCase(url: string): Promise<void> {
   await say('after the restart', 'svc:msg:4')
   const restarted = await requestFor(url, owner, 'after the restart')
   expect(restarted.tools.filter((tool) => !roomAllows(tool))).toEqual([])
+
+  // ADR 0113: a room's MCP call keeps nothing of the owner's, no App and no file, though the model reads its result.
+  await say(fixtureCall('board', { marker: 'room' }), 'svc:msg:5')
+  expect(await resultAfter(url, owner, fixtureCall('board', { marker: 'room' }))).toContain('fixture-board')
+  await say(fixtureCall('board', { clip: true }), 'svc:msg:6')
+  expect(await resultAfter(url, owner, fixtureCall('board', { clip: true }))).toContain('"clip":true')
+  const apps = (await workspaceOf(url, owner)).apps
+  expect(apps.filter((app) => app.conversation === room.conversation)).toEqual([])
+  expect(await received(me)).not.toContain(FIXTURE)
+  // The same calls from the owner's own chat keep the App and the file, as they always did (ADRs 0020, 0065).
+  const thread = await callOwner(me, (api) => api.conversations.create({ payload: {} }))
+  const ownCall = (input: string, operationId: string) =>
+    callOwner(me, (api) =>
+      api.conversations.submit({ params: { id: thread.id }, payload: runInput(thread.id, { input, operationId }) }),
+    )
+  await ownCall(fixtureCall('board', { marker: 'owner' }), 'own:fixture:1')
+  const kept = await waitFor(
+    () => workspaceOf(url, owner),
+    (workspace) => workspace.apps.some((app) => app.conversation === thread.id),
+    "the owner's App kept",
+    10_000,
+  )
+  expect(kept.apps.filter((app) => app.conversation === room.conversation)).toEqual([])
+  await ownCall(fixtureCall('board', { clip: true }), 'own:fixture:2')
+  await waitFor(
+    () => received(me),
+    (listed) => listed.includes(FIXTURE),
+    "the owner's file kept",
+    10_000,
+  )
 }
