@@ -2,7 +2,7 @@ import { Alert, AlertDescription, Button } from '@goblin/ui'
 import { QueryErrorResetBoundary, useQueryErrorResetBoundary } from '@tanstack/react-query'
 import { CatchBoundary, type ErrorComponentProps } from '@tanstack/react-router'
 import { Suspense, useCallback, type ReactNode } from 'react'
-import { messageOf } from './app-error.ts'
+import { describeError, messageOf } from './app-error.ts'
 
 export interface QueryBoundaryProps {
   readonly children: ReactNode
@@ -59,10 +59,26 @@ export function QueryError({
 }) {
   return (
     <Alert variant="destructive">
-      <AlertDescription>{messageOf(error, action)}</AlertDescription>
+      <AlertDescription>
+        {messageOf(error, action)} <WidenLink error={error} />
+      </AlertDescription>
       <Button variant="outline" onClick={onRetry}>
         Try again
       </Button>
     </Alert>
+  )
+}
+
+/**
+ * For a refusal that a grant lacks something (`access_insufficient`, ADR 0114), the link to widen it; nothing for any
+ * other failure. Shown beside the failure's copy wherever the web shows one.
+ */
+export function WidenLink({ error }: { readonly error: unknown }) {
+  const { widenPath } = describeError(error)
+  if (widenPath === undefined) return null
+  return (
+    <a className="font-medium underline underline-offset-4" href={widenPath}>
+      Widen access
+    </a>
   )
 }

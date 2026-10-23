@@ -1,4 +1,5 @@
 import {
+  AccessInsufficient,
   type ApiCode,
   Conflict,
   ERROR_COPY,
@@ -180,5 +181,30 @@ describe('the error kinds of goblin codes', () => {
   it.each(Object.entries(expected))('classifies %s as %s, from an envelope body', (code, kind) => {
     expect(ERROR_KINDS).toMatchObject({ [code]: kind })
     expect(describeError({ error: { code, message: 'x' } }).kind).toBe(kind)
+  })
+})
+
+describe('a refusal for want of access (ADR 0114)', () => {
+  const widenUrl = 'https://app.test/consent/widen?grant=key_1&extra=inspect'
+
+  it('carries its widening page as a path on this site, typed or as an envelope', () => {
+    const typed = new AccessInsufficient({ missing: { extra: 'inspect' }, widenUrl, ref: 'r1' })
+    expect(describeError(typed)).toMatchObject({
+      kind: 'forbidden',
+      code: 'access_insufficient',
+      widenPath: '/consent/widen?grant=key_1&extra=inspect',
+    })
+    expect(messageOf(typed, 'list the runs')).toBe('This credential needs more access. · ref r1')
+    const body = { error: { code: 'access_insufficient', message: 'x', missing: { extra: 'inspect' }, widenUrl } }
+    expect(describeError(body).widenPath).toBe('/consent/widen?grant=key_1&extra=inspect')
+  })
+
+  it('never links anywhere but the widening page', () => {
+    const elsewhere = { error: { code: 'access_insufficient', message: 'x', widenUrl: 'https://evil.test/login' } }
+    expect(describeError(elsewhere).widenPath).toBeUndefined()
+    const script = { error: { code: 'access_insufficient', message: 'x', widenUrl: 'javascript:alert(1)' } }
+    expect(describeError(script).widenPath).toBeUndefined()
+    const other = { error: { code: 'forbidden', message: 'x', widenUrl } }
+    expect(describeError(other).widenPath).toBeUndefined()
   })
 })

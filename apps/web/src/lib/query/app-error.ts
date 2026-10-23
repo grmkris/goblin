@@ -27,6 +27,27 @@ export interface AppErrorView {
   readonly retryable: boolean
   /** What the owner quotes to find this failure in the logs: the edge's reference, else the browser's request id. */
   readonly ref?: string | undefined
+  /**
+   * For a credential's grant that lacks what the call needed (`access_insufficient`, ADR 0114): the widening page that
+   * asks for it, as a path on this site; none for anything else.
+   */
+  readonly widenPath?: string | undefined
+}
+
+/**
+ * The widening link's path and query on this site, when it is the widening page (`/consent/widen`); none otherwise, so
+ * a link an answer carries never leads anywhere else.
+ */
+const widenPathOf = (widenUrl: string | undefined): string | undefined => {
+  if (widenUrl === undefined || !URL.canParse(widenUrl)) return undefined
+  const url = new URL(widenUrl)
+  return (url.protocol === 'https:' || url.protocol === 'http:') && url.pathname === '/consent/widen'
+    ? `${url.pathname}${url.search}`
+    : undefined
+}
+const widening = (widenUrl: string | undefined): { readonly widenPath?: string } => {
+  const widenPath = widenPathOf(widenUrl)
+  return widenPath === undefined ? {} : { widenPath }
 }
 
 export type ErrorKindTable<Code extends string> = Readonly<Record<Code, ErrorKind>>
@@ -79,6 +100,7 @@ const appView = (error: AppError): AppErrorView => {
     recovery: copy.recovery,
     retryable: gateway(status),
     ref: error.ref,
+    ...widening(Predicate.isTagged(error, 'AccessInsufficient') ? error.widenUrl : undefined),
   }
 }
 
@@ -118,6 +140,7 @@ const envelopeView = ({ error: detail }: ErrorEnvelope, status: number | undefin
   recovery: detail.recovery,
   retryable: gateway(status),
   ref: detail.ref,
+  ...widening(detail.code === 'access_insufficient' ? detail.widenUrl : undefined),
 })
 
 /** A refusal answered outside the typed API (Better Auth, `/health`): its status, and the reference it quotes. */

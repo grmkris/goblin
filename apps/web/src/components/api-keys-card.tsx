@@ -27,7 +27,7 @@ import {
   updateKeyMutation,
 } from '../account/queries.ts'
 import { messageOf } from '../lib/query/app-error.ts'
-import { QueryBoundary } from '../lib/query/query-boundary.tsx'
+import { QueryBoundary, WidenLink } from '../lib/query/query-boundary.tsx'
 import { GRANT_WORDS, type GrantHolder, GrantEditor, GrantLine, grantProblem, reachWords } from './grant-editor.tsx'
 
 /** A new key's secret, or a rotated key's new one (ADR 0105), shown this once, to copy. */
@@ -52,12 +52,17 @@ function ShownSecret(props: { readonly name: string; readonly secret: string; re
   )
 }
 
-/** A failure beside the control that failed, or what is wrong before anything is sent. */
-function Problem(props: { readonly text: string }) {
+/**
+ * A failure beside the control that failed (with its widening link, when it is one), or what is wrong before anything
+ * is sent.
+ */
+function Problem(props: { readonly text: string; readonly error?: unknown }) {
   if (props.text === '') return null
   return (
     <Alert variant="destructive">
-      <AlertDescription>{props.text}</AlertDescription>
+      <AlertDescription>
+        {props.text} <WidenLink error={props.error} />
+      </AlertDescription>
     </Alert>
   )
 }
@@ -92,7 +97,7 @@ function NewKey(props: { readonly workspace: WorkspaceView }) {
   return (
     <form onSubmit={submit}>
       <FieldGroup>
-        <Problem text={failure} />
+        <Problem text={failure} error={create.error} />
         <Field>
           <FieldLabel htmlFor="key-name">Name</FieldLabel>
           <Input id="key-name" value={name} maxLength={64} required onChange={(event) => setName(event.target.value)} />
@@ -133,7 +138,7 @@ function KeyGrant(props: { readonly apiKey: ApiKeyView; readonly holder: GrantHo
   return (
     <form onSubmit={submit} className="pb-4">
       <FieldGroup>
-        <Problem text={failure} />
+        <Problem text={failure} error={update.error} />
         <GrantEditor terms={terms} holder={props.holder} onChange={setTerms} disabled={update.isPending} />
         <Problem text={problem} />
         <Field orientation="horizontal">
