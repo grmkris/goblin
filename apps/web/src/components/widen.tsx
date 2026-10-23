@@ -3,11 +3,12 @@ import { type AccessSummary, GRANT_SPEC, type WorkspaceView } from '@goblin/cont
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Alert, AlertDescription, Skeleton, WidenApproval, failed, succeeded } from '@goblin/ui'
-import { grantTermsQuery, widenGrantMutation, workspacesQuery } from '../account/queries.ts'
+import { grantTermsQuery, reachItemsQuery, widenGrantMutation, workspacesQuery } from '../account/queries.ts'
+import { FIELD_OF } from '../lib/grant-reach.ts'
 import { describeError, messageOf } from '../lib/query/app-error.ts'
-import { type WidenSearch, askedWords, wideningOf } from '../lib/widen.ts'
+import { type AskedNames, type WidenSearch, askedWords, reachItemOf, wideningOf } from '../lib/widen.ts'
 import { AuthShell } from './auth-shell.tsx'
-import { GRANT_WORDS, type GrantHolder, GrantLine, reachWords } from './grant-editor.tsx'
+import { GRANT_WORDS, type GrantHolder, GrantLine, grantFailure, reachWords } from './grant-editor.tsx'
 
 /** Whose grant it is: a key's lives in the one workspace it reaches; anything else is a client's. */
 const holderOf = (summary: AccessSummary, workspaces: readonly WorkspaceView[]): GrantHolder => {
@@ -22,6 +23,33 @@ const endsOf = (expiresAt: string | null): string =>
   expiresAt === null
     ? 'until revoked'
     : new Date(expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+
+/**
+ * The names of the workspace and the Topic, Persona or connection a link asks for, read as the editor's pickers read
+ * them (that workspace's own lists, under the person's session), and whether they are still being read. One that cannot
+ * be read (gone, archived, or a workspace they left) stays unnamed, and the page says its id.
+ */
+function useAskedNames(
+  reachId: string | undefined,
+  workspaces: readonly WorkspaceView[] | undefined,
+): { readonly names: AskedNames; readonly reading: boolean } {
+  const item = reachId === undefined ? undefined : reachItemOf(reachId)
+  const workspace = workspaces?.find((each) => each.id === item?.workspace)
+  const kind = item?.kind
+  const picking = workspace !== undefined && kind !== undefined
+  const items = useQuery(
+    reachItemsQuery(workspace?.slug ?? '', kind === undefined ? 'topics' : FIELD_OF[kind], picking),
+  )
+  const named = item?.kind === undefined ? undefined : items.data?.find((each) => each.id === item.id)?.label
+  return { names: { workspace: workspace?.name, item: named }, reading: picking && items.isLoading }
+}
+
+/** Who asks, by the name its grant carries: an API key's, or the MCP client's as it registered. */
+const identityOf = (summary: AccessSummary, name: string) => (
+  <>
+    {summary.keyId === undefined ? 'The MCP client' : 'The API key'} <strong className="break-all">{name}</strong>
+  </>
+)
 
 /** The page's state once decided: what the grant holds now, or that nothing changed. */
 function Decided(props: { readonly children: React.ReactNode }) {
@@ -43,6 +71,7 @@ function Comparison(props: { readonly search: WidenSearch; readonly grantId: str
   const workspaces = useQuery(workspacesQuery).data
   const save = useMutation(widenGrantMutation)
   const [denied, setDenied] = useState(false)
+  const asked = useAskedNames(props.search.reach, workspaces)
   if (read.error !== null)
     return (
       <Alert variant="destructive">
@@ -53,7 +82,7 @@ function Comparison(props: { readonly search: WidenSearch; readonly grantId: str
         </AlertDescription>
       </Alert>
     )
-  if (read.data === undefined || workspaces === undefined) return <Skeleton className="h-40" />
+  if (read.data === undefined || workspaces === undefined || asked.reading) return <Skeleton className="h-40" />
   const widening = wideningOf(read.data, props.search)
   if (widening === null)
     return (
@@ -79,17 +108,12 @@ function Comparison(props: { readonly search: WidenSearch; readonly grantId: str
       spec={GRANT_SPEC}
       words={GRANT_WORDS}
       describeReach={reachWords(holder)}
-      asks={askedWords(props.search, widening.current, widening.requested, workspaces)}
-      identity={
-        <>
-          {widening.summary.keyId === undefined ? 'MCP client' : 'API key'}{' '}
-          <code className="break-all">{widening.summary.keyId ?? widening.summary.clientId ?? widening.grantId}</code>
-        </>
-      }
+      asks={askedWords(props.search, widening.current, widening.requested, asked.names)}
+      identity={identityOf(widening.summary, widening.current.name)}
       onApprove={() =>
         save.mutateAsync({ grantId: widening.grantId, terms: widening.requested }).then(
           () => succeeded,
-          (error: unknown) => failed(messageOf(error, 'approve this access')),
+          (error: unknown) => failed(grantFailure(error, 'approve this access')),
         )
       }
       onDeny={() => setDenied(true)}

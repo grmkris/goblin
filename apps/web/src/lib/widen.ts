@@ -107,21 +107,31 @@ const KIND_WORDS: Readonly<Record<ReachKind, string>> = {
 }
 
 /**
+ * The names the page could read for a reach id's workspace and its Topic, Persona or connection; one it could not read
+ * is said by its id instead.
+ */
+export interface AskedNames {
+  readonly workspace?: string | undefined
+  readonly item?: string | undefined
+}
+
+/**
  * What else the link asks for, in words, beside a level and extras: the reach item it was refused (when approving
- * adds it) and something it wants to make.
+ * adds it), by its name and its workspace's, and something it wants to make.
  */
 export const askedWords = (
   search: WidenSearch,
   current: GrantTerms,
   requested: GrantTerms,
-  workspaces: readonly { readonly id: string; readonly name: string }[],
+  names: AskedNames,
 ): readonly string[] => {
   const item = search.reach === undefined ? undefined : reachItemOf(search.reach)
-  const where = (id: string) => workspaces.find((workspace) => workspace.id === id)?.name ?? 'a workspace you left'
   const adds = item !== undefined && JSON.stringify(current.reach) !== JSON.stringify(requested.reach)
+  const where = names.workspace ?? item?.workspace ?? ''
+  const what = (id: string) => (names.item === undefined ? id : `“${names.item}”`)
   return [
-    ...(adds && item.kind === undefined ? [`The workspace ${where(item.workspace)}`] : []),
-    ...(adds && item.kind !== undefined ? [`${KIND_WORDS[item.kind]} ${item.id} in ${where(item.workspace)}`] : []),
+    ...(adds && item.kind === undefined ? [`The workspace ${where}`] : []),
+    ...(adds && item.kind !== undefined ? [`${KIND_WORDS[item.kind]} ${what(item.id)} in ${where}`] : []),
     ...(search.create === undefined ? [] : [`To make “${search.create}”`]),
   ]
 }

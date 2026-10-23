@@ -315,7 +315,9 @@ async function widen(page: Page, origin: string, label: string) {
   await page.goto(`${origin}grant.html?screen=widen&grant=key_crm&level=manage&reach=ws_acme/topic/3&extra=setup`)
   await page.getByRole('heading', { name: 'Approving adds' }).waitFor()
   await page.getByText('Manage instead of read').waitFor()
-  await page.getByText('Topic 3 in Acme').waitFor()
+  // Names, not ids: the key's from its grant, the Topic's from Acme's own list, the workspace's from the person's.
+  await page.getByText(/The API key crm was refused/u).waitFor()
+  await page.getByText('Topic “Support” in Acme').waitFor()
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   assert(wide <= 0, `${label} widen: scrolls sideways by ${String(wide)}px`)
   await page.screenshot({ path: path.join(out, `${label}-widen.png`), fullPage: true })

@@ -13,7 +13,6 @@ const LISTED: GrantTerms = {
     origins: [],
   },
 }
-const WORKSPACES = [{ id: 'ws_acme', name: 'Acme' }]
 
 describe("the widening link's terms", () => {
   it('keeps only what the grant contract knows', () => {
@@ -88,10 +87,23 @@ describe('the terms a widening asks for', () => {
     expect(wideningOf(withoutSummary, search)).toBeNull()
   })
 
-  it('says the reach it adds and what it wants to make', () => {
+  it('says the reach it adds by its names, and what it wants to make', () => {
     const search = { grant: 'key_1', reach: 'ws_acme/topic/12', create: 'Launch' }
     const requested = widened(LISTED, search)
-    expect(askedWords(search, LISTED, requested, WORKSPACES)).toEqual(['Topic 12 in Acme', 'To make “Launch”'])
-    expect(askedWords({ reach: 'ws_acme/topic/3' }, LISTED, LISTED, WORKSPACES)).toEqual([])
+    expect(askedWords(search, LISTED, requested, { workspace: 'Acme', item: 'Launch plan' })).toEqual([
+      'Topic “Launch plan” in Acme',
+      'To make “Launch”',
+    ])
+    expect(askedWords({ reach: 'ws_acme/topic/3' }, LISTED, LISTED, { workspace: 'Acme' })).toEqual([])
+    const none = { ...LISTED, reach: withWorkspaces(LISTED.reach, []) }
+    expect(askedWords({ reach: 'ws_acme' }, none, widened(none, { reach: 'ws_acme' }), { workspace: 'Acme' })).toEqual([
+      'The workspace Acme',
+    ])
+  })
+
+  it('says by its id what it could not read the name of', () => {
+    const search = { reach: 'ws_beta/persona/4' }
+    const requested = widened(LISTED, search)
+    expect(askedWords(search, LISTED, requested, {})).toEqual(['Persona 4 in ws_beta'])
   })
 })
