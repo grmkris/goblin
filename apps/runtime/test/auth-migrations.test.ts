@@ -76,8 +76,11 @@ const OWN_INDEXES: Readonly<Record<string, readonly { unique: boolean; columns: 
   member: [{ unique: true, columns: ['organizationId', 'userId'] }],
 }
 
-/** goblin's own tables in the auth D1, beside Better Auth's: what each OAuth client's consent reaches (ADR 0097). */
-const OWN_TABLES = ['mcpReach', 'mcpReachWorkspace'] as const
+/**
+ * goblin's own tables in the auth D1, beside Better Auth's: what each OAuth client's consent reaches (ADR 0097), and
+ * each credential's grant, its workspaces and its listed reach (0005).
+ */
+const OWN_TABLES = ['mcpReach', 'mcpReachWorkspace', 'grant', 'grantWorkspace', 'grantReach'] as const
 
 /** Compare the SQL to the installed Better Auth schema, not to a second manually maintained column list. */
 function checkTable(db: DatabaseSync, table: string, schema: ReturnType<typeof getSchema>[string]) {
@@ -147,6 +150,7 @@ describe('auth D1 baseline', () => {
       '0002_workspaces.sql',
       '0003_mcp_reach.sql',
       '0004_mcp_powers.sql',
+      '0005_grants.sql',
     ])
     const { db, auth } = fixture()
     await auth.$context
@@ -286,6 +290,72 @@ describe('auth D1 baseline', () => {
     )
     db.exec(readFileSync(join(DIR, powers), 'utf8'))
     expect(JSON.parse(String(db.prepare('SELECT scopes FROM oauthClient').get()?.['scopes']))).toEqual(SCOPES)
+  })
+
+  it("keeps one grant per key and per client and person, and cascades the key's, client's, person's and workspace's", () => {
+    const db = new DatabaseSync(':memory:')
+    databases.push(db)
+    for (const name of migrations) db.exec(readFileSync(join(DIR, name), 'utf8'))
+    db.exec('PRAGMA foreign_keys = ON')
+    db.exec(`
+      INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt)
+        VALUES ('u1', 'Kris', 'kris@example.test', 1, '${NOW}', '${NOW}');
+      INSERT INTO organization (id, name, slug, createdAt) VALUES ('w1', 'Mine', 'mine', '${NOW}');
+      INSERT INTO apikey (id, configId, referenceId, key, createdAt, updatedAt) VALUES ('k1', 'default', 'w1', 'hash', '${NOW}', '${NOW}');
+      INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]');
+      INSERT INTO "grant" (id, kind, keyId, name, level, createdAt, updatedAt)
+        VALUES ('k1', 'key', 'k1', 'swarmm', 'write', '${NOW}', '${NOW}');
+      INSERT INTO "grant" (id, kind, clientId, userId, name, level, workspacesAll, createdAt, updatedAt)
+        VALUES ('cg_1', 'client', 'client-1', 'u1', 'Claude Code', 'write', 1, '${NOW}', '${NOW}');
+      INSERT INTO grantWorkspace (grantId, workspaceId, topics) VALUES ('k1', 'w1', 'list'), ('cg_1', 'w1', 'list');
+      INSERT INTO grantReach (grantId, workspaceId, kind, resourceId)
+        VALUES ('k1', 'w1', 'topic', '7'), ('cg_1', 'w1', 'topic', '1');
+    `)
+    expect(db.prepare('SELECT extras, lifetime, origins, expiresAt FROM "grant" WHERE id = ?').get('k1')).toEqual({
+      extras: '[]',
+      lifetime: 'never',
+      origins: '[]',
+      expiresAt: null,
+    })
+    expect(
+      db.prepare('SELECT personas, connections, generation FROM grantWorkspace WHERE grantId = ?').get('k1'),
+    ).toEqual({
+      personas: 'all',
+      connections: 'all',
+      generation: 0,
+    })
+    const insert = (values: string) =>
+      db.exec(
+        `INSERT INTO "grant" (id, kind, keyId, clientId, userId, name, level, createdAt, updatedAt) VALUES ${values}`,
+      )
+    // A second grant for the same key, or for the same client and person, and a grant of either kind half made.
+    for (const values of [
+      `('k2', 'key', 'k1', null, null, 'again', 'read', '${NOW}', '${NOW}')`,
+      `('cg_2', 'client', null, 'client-1', 'u1', 'again', 'read', '${NOW}', '${NOW}')`,
+      `('k3', 'key', 'k1', 'client-1', null, 'both', 'read', '${NOW}', '${NOW}')`,
+      `('cg_3', 'client', null, 'client-1', null, 'nobody', 'read', '${NOW}', '${NOW}')`,
+      `('x', 'other', null, null, null, 'what', 'read', '${NOW}', '${NOW}')`,
+    ])
+      expect(() => insert(values), values).toThrow()
+    expect(() =>
+      db.exec(`INSERT INTO grantReach (grantId, workspaceId, kind, resourceId) VALUES ('k1', 'nowhere', 'topic', '1')`),
+    ).toThrow()
+    const count = (table: string) => db.prepare(`SELECT COUNT(*) AS count FROM "${table}"`).get()?.['count']
+    db.exec(`DELETE FROM apikey WHERE id = 'k1'`)
+    expect([count('grant'), count('grantWorkspace'), count('grantReach')]).toEqual([1, 1, 1])
+    db.exec(`DELETE FROM organization WHERE id = 'w1'`)
+    expect([count('grant'), count('grantWorkspace'), count('grantReach')]).toEqual([1, 0, 0])
+    db.exec(`DELETE FROM user WHERE id = 'u1'`)
+    expect(count('grant')).toBe(0)
+    db.exec(`
+      INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt)
+        VALUES ('u2', 'Ana', 'ana@example.test', 1, '${NOW}', '${NOW}');
+      INSERT INTO "grant" (id, kind, clientId, userId, name, level, createdAt, updatedAt)
+        VALUES ('cg_4', 'client', 'client-1', 'u2', 'Claude Code', 'read', '${NOW}', '${NOW}');
+    `)
+    db.exec(`DELETE FROM oauthClient WHERE clientId = 'client-1'`)
+    expect(count('grant')).toBe(0)
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([])
   })
 
   it('registers current clients for one /mcp resource with inspection available and no pre-granted consent', async () => {
