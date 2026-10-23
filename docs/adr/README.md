@@ -104,4 +104,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0110](0110-the-agent-serves-every-chats-stream-to-every-reader.md) | The agent serves every chat's stream to every reader | Accepted; built; supersedes 0109's transport; amends 0081, 0098 |
 | [0111](0111-agui-run-input-is-the-send.md) | AG-UI's run input is the send, answered with its receipt or its run's events | Accepted; built; supersedes 0081's message body, 0034's `StartThread` and 0033's `SendMessage.personaOrder` |
 | [0112](0112-goblin-publishes-mcp-events.md) | goblin publishes MCP Events: `conversation.updated` by signed webhook or poll | Accepted; built; amends 0081, 0086 |
-| [0113](0113-a-room-runs-in-its-own-object.md) | A room runs in its own object; the workspace object is the control plane | Proposed; slice 1 (rooms take no routine, Source or owner file) built |
+| [0113](0113-a-room-runs-in-its-own-object.md) | A room runs in its own object; the workspace object is the control plane | Accepted; slice 1 built (a room takes no routine, Source, owner App or file) |

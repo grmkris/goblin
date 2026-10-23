@@ -1,6 +1,6 @@
 # ADR 0113: A room runs in its own object
 
-Status: Proposed 2026-10-22 (draft by swarmm-d5, reviewed by goblin-dc; for Kris). Builds on ADR 0108; follows ADRs 0110–0112.
+Status: Accepted 2026-10-23 (owner); slice 1 built. Drafted by swarmm-d5, reviewed by goblin-dc. Builds on ADR 0108; follows ADRs 0110–0112.
 Amends ADR 0003 (the agent object owns everything) and ADR 0089 (one object per workspace).
 
 ## Context
