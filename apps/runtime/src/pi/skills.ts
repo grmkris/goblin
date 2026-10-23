@@ -156,7 +156,7 @@ const activateTool = (run: RunProgram) =>
   typedTool({
     name: 'skill_activate',
     description:
-      'Load a skill listed under <skills> in the goblin-context block by its handle (for example `library:code-review`). Returns its verified instructions and the files it may read. Activate before following a skill.',
+      'Load a skill listed under <skills> in the goblin-context block by its handle exactly as listed (`<server>:<name>`; its bare name also works when only one listed skill has it). Returns its verified instructions and the files it may read. Activate before following a skill.',
     input: Schema.Struct({ skill: Handle }),
     output: Loaded,
     replay: 'safe',
@@ -164,12 +164,18 @@ const activateTool = (run: RunProgram) =>
       run(
         Effect.gen(function* () {
           yield* requireResident
-          const off = yield* skillsOff(String(api.conversationId), skill)
+          const session = String(api.conversationId)
+          // A bare or guessed handle is resolved first, so the setup check and the fork's tool naming see its library.
+          const scope = yield* scopeFor(session)
+          const handle = yield* Skills.use((skills) =>
+            skills.resolve(skill, {}, (connectionId) => scope.skills(connectionId)),
+          ).pipe(Effect.catchTag('NotFound', () => Effect.succeed(skill)))
+          const off = yield* skillsOff(session, handle)
           if (off !== undefined) return new ReadyResult(off)
-          const authorize = yield* skillScope(String(api.conversationId))
-          const naming = yield* namingOf(String(api.conversationId), skill)
+          const authorize = yield* skillScope(session)
+          const naming = yield* namingOf(session, handle)
           const loaded = yield* Skills.use((skills) =>
-            skills.activate(String(api.conversationId), skill, {
+            skills.activate(session, handle, {
               authorize,
               ...naming.options,
               ...(context.abortSignal === undefined ? {} : { signal: context.abortSignal }),

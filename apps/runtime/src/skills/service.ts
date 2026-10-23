@@ -27,6 +27,16 @@ export class Skills extends Context.Service<
       include?: (connectionId: string) => boolean,
     ) => Effect.Effect<Catalog, AppError>
     /** Loads a skill by its handle into the conversation of `session`: its verified `SKILL.md` and its files. */
+    /**
+     * The listed handle a model's handle names, among the libraries `include` keeps: the handle itself when a library
+     * has its prefix, else the one listed skill with its bare name (a model writes `mycut-guide`, or guesses
+     * `library:mycut-guide`). Several namesakes are a `NotFound` that names their handles.
+     */
+    readonly resolve: (
+      handle: string,
+      options?: SkillRequestOptions,
+      include?: (connectionId: string) => boolean,
+    ) => Effect.Effect<string, AppError>
     readonly activate: (
       session: string,
       handle: string,

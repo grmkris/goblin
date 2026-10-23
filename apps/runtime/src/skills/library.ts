@@ -4,7 +4,7 @@
 // conversation; supporting files are read only from that retained manifest. Nothing is fetched at wake.
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
-import { type AppError, NotFound, UpstreamMcp, attempt, attemptSync } from '../http/errors.ts'
+import { type AppError, NotFound, UpstreamMcp, attempt, attemptSync, toAppError } from '../http/errors.ts'
 import { McpConnections } from '../mcp/service.ts'
 import type { SkillRequestOptions as RequestOptions } from '../mcp/connections/types.ts'
 import { SingleFlight } from '../observability/single-flight.ts'
@@ -171,6 +171,56 @@ const find = (library: Library, handle: string, options: RequestOptions) =>
     return skill
   })
 
+/** The bare name of a handle: what follows its prefix, without a namesake's `~N`. */
+const bareName = (handle: string): string => handle.slice(handle.indexOf(':') + 1).replace(/~\d+$/u, '')
+
+/**
+ * The listed skill `handle` names: by its exact handle when an enabled library has its prefix, else the one skill of
+ * the libraries `include` keeps with that bare name. None, or several namesakes, is a `NotFound`; several name their
+ * handles so the model can pick one.
+ */
+const resolveListed = (
+  library: Library,
+  handle: string,
+  options: RequestOptions,
+  include: (connectionId: string) => boolean,
+) =>
+  Effect.gen(function* () {
+    const prefix = handle.slice(0, Math.max(0, handle.indexOf(':')))
+    if ((yield* sourcesOf(library)).includes(prefix)) return yield* find(library, handle, options)
+    const name = bareName(handle)
+    const named = (yield* catalogOf(library, options, include)).skills.filter((skill) => skill.name === name)
+    const [only] = named
+    if (named.length === 1 && only !== undefined) return only
+    return yield* new NotFound({
+      what:
+        named.length === 0 ? `skill ${handle}` : `skill ${handle}: it is ${named.map((s) => s.handle).join(' or ')}`,
+    })
+  })
+
+/** At most this many of a skill's files are named when a path is not among them. */
+const NAMED_FILES = 40
+
+/**
+ * The manifest file at `path` of a skill a conversation activated. A path the skill does not have (a model's guess) is
+ * a `NotFound` that names the files it does have, not a failed check; any other refusal keeps its own failure.
+ */
+const manifestFile = (entry: SkillEntry, handle: string, path: string) =>
+  Effect.try({
+    try: () => fileAt(entry, path),
+    catch: (cause) => {
+      if (!(cause instanceof SkillVerifyError) || cause.failure !== 'not-in-manifest') return toAppError(cause)
+      const files = usableManifest(entry)
+        .filter((file) => file.uri !== entry.uri)
+        .map((file) => relativePath(entry, file.uri))
+      const shown = files.slice(0, NAMED_FILES).join(', ')
+      const more = files.length > NAMED_FILES ? ` and ${files.length - NAMED_FILES} more` : ''
+      return new NotFound({
+        what: `file ${path} in skill ${handle}; ${files.length === 0 ? 'it has no other files' : `its files: ${shown}${more}`}`,
+      })
+    },
+  })
+
 /** Verified bytes of one manifest file: from the cache when it still matches, else from the serving server. */
 const bytesOf = (library: Library, connectionId: string, entry: SkillEntry, path: string, options: RequestOptions) =>
   Effect.gen(function* () {
@@ -231,16 +281,18 @@ const selected = (library: Library, sessionId: string, connectionId: string, uri
     return yield* activateSkill(library, sessionId, skill, options)
   })
 
-/** The conversation's newest activation of a skill, by its handle's server and name. */
+/**
+ * The conversation's newest activation of a skill: by its handle's server and name, else, for a bare or guessed
+ * prefix, by its name when one library's skill of that name is activated here.
+ */
 const activationOf = (state: SkillState, sessionId: string, handle: string): Effect.Effect<Activation, AppError> =>
   Effect.suspend(() => {
-    const colon = handle.indexOf(':')
-    const connectionId = handle.slice(0, colon)
-    const name = handle.slice(colon + 1).replace(/~\d+$/u, '')
-    const found = state
-      .activations(sessionId)
-      .filter((item) => item.connectionId === connectionId && item.entry.frontmatter['name'] === name)
-      .toSorted((a, b) => b.activatedAt - a.activatedAt)[0]
+    const connectionId = handle.slice(0, Math.max(0, handle.indexOf(':')))
+    const name = bareName(handle)
+    const named = state.activations(sessionId).filter((item) => item.entry.frontmatter['name'] === name)
+    const exact = named.filter((item) => item.connectionId === connectionId)
+    const unique = new Set(named.map((item) => item.connectionId)).size === 1
+    const found = (exact.length > 0 ? exact : unique ? named : []).toSorted((a, b) => b.activatedAt - a.activatedAt)[0]
     return found === undefined
       ? Effect.fail(new NotFound({ what: `activated skill ${handle}` }))
       : Effect.succeed(found)
@@ -255,6 +307,7 @@ const readFile = (library: Library, sessionId: string, handle: string, path: str
     const name = found.entry.frontmatter['name']
     if (options.authorize !== undefined)
       yield* options.authorize(found.connectionId, { name: typeof name === 'string' ? name : '', uri: found.entry.uri })
+    yield* manifestFile(found.entry, handle, path)
     const { bytes, mimeType } = yield* bytesOf(library, found.connectionId, found.entry, path, options)
     if (isText(mimeType, path)) return { kind: 'text', path, text: new TextDecoder().decode(bytes) } satisfies SkillFile
     if (mimeType !== undefined && /^image\/(png|jpeg|gif|webp)$/u.test(mimeType))
@@ -309,8 +362,20 @@ export const makeSkills = Effect.fnUntraced(function* (state: SkillState) {
     ) {
       return yield* catalogOf(library, options, include)
     }),
+    resolve: Effect.fn('Skills.resolve')(function* (
+      handle: string,
+      options: RequestOptions = {},
+      include: (connectionId: string) => boolean = () => true,
+    ) {
+      return (yield* resolveListed(library, handle, options, include)).handle
+    }),
     activate: Effect.fn('Skills.activate')(function* (sessionId: string, handle: string, options: RequestOptions = {}) {
-      return yield* activateSkill(library, sessionId, yield* find(library, handle, options), options)
+      return yield* activateSkill(
+        library,
+        sessionId,
+        yield* resolveListed(library, handle, options, () => true),
+        options,
+      )
     }),
     activateSelection: Effect.fn('Skills.activateSelection')(function* (
       sessionId: string,

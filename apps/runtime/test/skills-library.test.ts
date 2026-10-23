@@ -186,10 +186,25 @@ describe('skills over MCP (unit)', () => {
       path: 'references/checklist.md',
       text: CHECKLIST,
     })
-    // A path outside the retained manifest fails its check, which the agent answers as Internal.
-    await expect(run(library.read('s1', 'lib:code-review', '../x/SKILL.md'))).rejects.toMatchObject({
-      _tag: 'Internal',
+    // A path the skill does not have (a model's guess) is NotFound naming the files it has, not a failed check.
+    await expect(run(library.read('s1', 'lib:code-review', 'recipes/promo.md'))).rejects.toMatchObject({
+      _tag: 'NotFound',
+      what: 'file recipes/promo.md in skill lib:code-review; its files: references/checklist.md',
     })
+    await expect(run(library.read('s1', 'lib:code-review', '../x/SKILL.md'))).rejects.toMatchObject({
+      _tag: 'NotFound',
+    })
+  })
+
+  it('resolves a bare or guessed handle to the one listed skill of that name, and reads by it', async () => {
+    expect(await run(library.resolve('code-review'))).toBe('lib:code-review')
+    expect(await run(library.resolve('library:code-review'))).toBe('lib:code-review')
+    await expect(run(library.resolve('library:missing'))).rejects.toMatchObject({ _tag: 'NotFound' })
+    const loaded = await run(library.activate('s5', 'library:code-review'))
+    expect(loaded.skill.handle).toBe('lib:code-review')
+    expect(await run(library.read('s5', 'code-review', 'references/checklist.md'))).toMatchObject({ kind: 'text' })
+    // A library the chat leaves out is not searched for a bare name.
+    await expect(run(library.resolve('code-review', {}, () => false))).rejects.toMatchObject({ _tag: 'NotFound' })
   })
 
   it('refuses bytes that do not match the manifest', async () => {
