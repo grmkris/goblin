@@ -13,16 +13,25 @@ export type PendingAttachment =
       readonly source: File
     }
 
-/** One portable draft: in-flight uploads continue when /new-thread moves its composer. */
+/**
+ * One portable draft: in-flight uploads continue when /new-thread moves its composer. Its files go to the Topic of the
+ * chat its composer writes in (`topic`, ADR 0115), so that Topic's agent reads them.
+ */
 export class AttachmentDraft {
   #pending: readonly PendingAttachment[] = []
   #next = 0
+  /** The Topic the composer this draft is in writes to; none while it is not known. */
+  #topic: number | undefined
   readonly #listeners = new Set<() => void>()
   readonly #uploadFile: typeof uploadAttachment
   constructor(upload = uploadAttachment) {
     this.#uploadFile = upload
   }
   readonly snapshot = () => this.#pending
+  /** Its next uploads go to Topic `topic`'s folder: the composer it is in now writes there. */
+  readonly writesTo = (topic: number | undefined) => {
+    this.#topic = topic
+  }
   readonly subscribe = (listener: () => void) => {
     this.#listeners.add(listener)
     return () => {
@@ -58,7 +67,7 @@ export class AttachmentDraft {
   }
   async #upload(id: number, file: File, taken = new Set<string>()): Promise<void> {
     try {
-      const uploaded = await this.#uploadFile(file, taken)
+      const uploaded = await this.#uploadFile(file, taken, this.#topic)
       this.#set(
         this.#pending.map((item) =>
           item.id === id ? { id, name: uploaded.name, state: 'ready', file: uploaded } : item,

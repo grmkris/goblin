@@ -4,13 +4,14 @@ import { expect } from 'vitest'
 import { BOUNDARY_TEXT, POWER_TEXT } from '../../src/pi/asker.ts'
 import { callOwner } from '../owner-client.ts'
 import { type Person, call, keyBody, lever, ownerFetch, person, showing, signedIn } from './owner-requests.ts'
-import { waitFor } from './until.ts'
+import { until, waitFor } from './until.ts'
 
 const Secret = Schema.Struct({ secret: Schema.String })
 const Seen = Schema.Struct({
   requests: Schema.Array(
     Schema.Struct({
       messages: Schema.Array(Schema.Struct({ role: Schema.String, text: Schema.String })),
+      systemPrompt: Schema.String,
       tools: Schema.Array(Schema.String),
       context: Schema.optional(Schema.String),
     }),
@@ -40,9 +41,14 @@ async function keyTopic(base: string, secret: string, name: string): Promise<Top
   return Schema.decodeUnknownSync(TopicView)(await made.json())
 }
 
-/** Every model request the agent made so far, oldest first. */
+/**
+ * Every model request of a turn the agent made so far, oldest first: a turn's requests are goblin's, the memory's and
+ * the rerank's (which quote the turn's words too) are not.
+ */
 const seen = async (base: string, owner: Person) =>
-  Schema.decodeUnknownSync(Seen)(await (await lever(base, owner, 'queue/seen')).json()).requests
+  Schema.decodeUnknownSync(Seen)(await (await lever(base, owner, 'queue/seen')).json()).requests.filter((request) =>
+    request.systemPrompt.includes('You are goblin'),
+  )
 
 /** The newest model request whose newest user message holds `words`, waited for. */
 const requestFor = async (base: string, owner: Person, words: string): Promise<Request> => {
@@ -59,30 +65,36 @@ const requestFor = async (base: string, owner: Person, words: string): Promise<R
   return found
 }
 
-/** The tool result the scripted model read back after the call `words` asked for. */
+/**
+ * The tool result the scripted model read back after the call `words` asked for: in the newest request that holds the
+ * message, the first tool result after it (a request holds the chat's earlier results too).
+ */
 const resultAfter = async (base: string, owner: Person, words: string): Promise<string> => {
   const after = (requests: readonly Request[]) => {
-    const at = requests.findLastIndex((request) =>
-      request.messages.some((message) => message.role === 'user' && message.text.includes(words)),
-    )
-    return requests
-      .slice(at)
-      .flatMap((request) => request.messages.filter((message) => message.role === 'toolResult'))
-      .at(-1)?.text
+    for (const request of requests.toReversed()) {
+      const asked = request.messages.findLastIndex((message) => message.role === 'user' && message.text.includes(words))
+      if (asked !== -1) return request.messages.slice(asked).find((message) => message.role === 'toolResult')?.text
+    }
+    return undefined
   }
-  const requests = await waitFor(
+  const requests = await until(
     () => seen(base, owner),
     (all) => after(all) !== undefined,
-    `the result of ${words}`,
     10_000,
   )
-  return after(requests) ?? ''
+  const found = after(requests)
+  if (found === undefined)
+    throw new Error(
+      `no result of ${words}; the last requests: ${JSON.stringify(requests.slice(-3).map((request) => request.messages.slice(-3)))}`,
+    )
+  return found
 }
 
 /**
  * ADR 0115 on the real Worker and agent: every Topic is sealed and Personal is the hub, and what a turn may do is its
  * sender's power. A server's key makes two customer Topics: each one's search and automatic retrieval never reach the
  * other's words while the hub's do, an owner's sealed Topic cannot see either, a key's message is marked as the
+ * server's, one customer's file is not found from the other, the Shared folder is the owner's turn's and never the
  * server's, and renaming the other customer from one is refused while the hub renames it. A `write` key is never
  * offered `routine_propose`, a call a stale filter still let through is refused at call time, and the next turn after
  * a restart has the filter again.
@@ -143,6 +155,28 @@ export async function sealedCase(url: string): Promise<void> {
   await ownerSays(garden.conversation, 'call search_chats {"query":"plum orchard"}', 'own:3')
   expect(await resultAfter(url, owner, 'call search_chats {"query":"plum orchard"}')).toContain(
     'No earlier messages matched',
+  )
+
+  // Files (ADR 0115): A's agent keeps a file in A's own folder, which B cannot read; the Shared folder is readable on
+  // the owner's turn in A, never on the server's.
+  const shared = await me.fetch(
+    new Request('https://agent/api/files/content?path=/uploads/shared-plan.txt', {
+      method: 'PUT',
+      headers: { 'content-type': 'text/plain' },
+      body: 'the shared plan is ready',
+    }),
+  )
+  expect(shared.status, await shared.clone().text()).toBe(201)
+  await keySays(a, 'call files_write {"path":"orders.md","content":"plum orders"}', 'svc:a:files:1')
+  const kept = `/topics/${String(a.id)}/agent/orders.md`
+  expect(await resultAfter(url, owner, '"path":"orders.md"')).toContain(kept)
+  await keySays(b, `call files_read {"path":"${kept}"}`, 'svc:b:files:1')
+  expect(await resultAfter(url, owner, `call files_read {"path":"${kept}"}`)).toContain('NotFound')
+  await keySays(a, 'call files_read {"path":"/uploads/shared-plan.txt"}', 'svc:a:files:2')
+  expect(await resultAfter(url, owner, 'call files_read {"path":"/uploads/shared-plan.txt"}')).toContain('NotFound')
+  await ownerSays(a.conversation, 'call files_read {"path":"/uploads/shared-plan.txt"}', 'own:files:1')
+  expect(await resultAfter(url, owner, 'call files_read {"path":"/uploads/shared-plan.txt"}')).toContain(
+    'the shared plan is ready',
   )
 
   // Renaming B from A is acting on another Topic: refused, and B keeps its name. From the hub it is renamed.

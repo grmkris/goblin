@@ -12,6 +12,7 @@ import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { Chats, type Conversations } from '../chats/service.ts'
 import { Files } from '../files/service.ts'
+import { OWNER_VIEW } from '../files/folders.ts'
 import type { CheapModel } from '../memory/model.ts'
 import { Notices } from '../notices/service.ts'
 import { writeLine } from '../observability/logger.ts'
@@ -150,7 +151,7 @@ const targetOf = (decision: Lesson, used: Used) => {
 
 /** Whether the owner's files hold `path` still: a draft there waits for them. */
 const waiting = (teacher: Teacher, path: string) =>
-  teacher.files.stat(path).pipe(
+  teacher.files.stat(OWNER_VIEW, path).pipe(
     Effect.as(true),
     // expected: no file there, so the draft is not waiting
     Effect.catchTag('NotFound', () => Effect.succeed(false)),
@@ -211,7 +212,8 @@ const draft = (teacher: Teacher, session: string, decision: Lesson, used: Used) 
     const now = yield* Clock.currentTimeMillis
     yield* Effect.sync(() => drafts.add({ contentHash, name, base }, now))
     const bytes = new TextEncoder().encode(text)
-    const written = yield* files.write('agent', path, text, 'text/markdown; charset=utf-8', bytes.byteLength).pipe(
+    // A draft is goblin's own keeping, in the Shared folder the owner reviews it from (ADR 0115).
+    const written = yield* files.write(OWNER_VIEW, path, text, 'text/markdown; charset=utf-8', bytes.byteLength).pipe(
       Effect.as(true),
       // expected: a draft that was not written is forgotten, so it does not block the next one; the outcome is `failed`
       Effect.catch(() => Effect.succeed(false)),

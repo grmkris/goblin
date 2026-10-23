@@ -7,10 +7,21 @@ const MIB = 1024 * 1024
 export const FILE_LIMITS = { fileBytes: 25 * MIB, totalBytes: 512 * MIB, files: 2000 } as const
 
 /**
- * A path in the owner's files (ADR 0022): under `/uploads` (what the owner uploaded) or `/agent` (what the agent wrote),
- * at most eight plain segments of letters, digits, spaces and `_ . ( ) -`, none of them only dots.
+ * A path in the workspace's files (ADRs 0022, 0115): under a Topic's folder (`/topics/<id>/uploads`, what people
+ * attached there, or `/topics/<id>/agent`, what the agent wrote there) or the Shared folder (`/uploads`, `/agent`), at
+ * most eight plain segments of letters, digits, spaces and `_ . ( ) -`, none of them only dots.
  */
-export const FILE_PATH = /^\/(?:uploads|agent)(?:\/(?!\.+(?:\/|$))[\p{L}\p{N}_ .()-]{1,80}){1,8}$/u
+export const FILE_PATH =
+  /^\/(?:topics\/[1-9]\d{0,8}\/)?(?:uploads|agent)(?:\/(?!\.+(?:\/|$))[\p{L}\p{N}_ .()-]{1,80}){1,8}$/u
+
+/**
+ * A folder a listing may start from that is no file path: an area of the Shared folder, `/topics` (every Topic's
+ * folder), one Topic's folder, or one of its areas.
+ */
+export const FILE_FOLDER = /^\/(?:uploads|agent|topics(?:\/[1-9]\d{0,8}(?:\/(?:uploads|agent))?)?)$/u
+
+/** Topic `topic`'s folder (ADR 0115): its `uploads` and `agent` areas are under it. */
+export const topicFolder = (topic: number): string => `/topics/${String(topic)}`
 
 export const FilePath = Schema.String.check(Schema.isMaxLength(512), Schema.isPattern(FILE_PATH))
 export type FilePath = typeof FilePath.Type
@@ -47,8 +58,8 @@ export function freeFileName(name: string, taken: ReadonlySet<string>): string {
   }
 }
 
-/** The directory a listing starts from: a file path, or one of the two areas itself. */
-export const FileDirectory = Schema.Union([Schema.Literals(['/uploads', '/agent']), FilePath])
+/** The directory a listing starts from: a file path, or a folder (`FILE_FOLDER`). */
+export const FileDirectory = Schema.Union([Schema.String.check(Schema.isPattern(FILE_FOLDER)), FilePath])
 
 export const FileEntry = Schema.Struct({
   path: Schema.String,
@@ -79,7 +90,7 @@ export type Attachment = typeof Attachment.Type
 
 /**
  * The files goblin kept in the owner's files from one MCP tool result (ADR 0065): its links, embedded resources and
- * audio, written under `/agent/received/`. A model call's result details carry them as `received`, which the web shows
+ * audio, written under its Topic's `/topics/<id>/agent/received/` (ADR 0115). A model call's result details carry them as `received`, which the web shows
  * as chips under the call.
  */
 export const ReceivedFiles = Schema.Array(Attachment)

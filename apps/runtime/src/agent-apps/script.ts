@@ -1,5 +1,6 @@
 import { RpcTarget } from 'cloudflare:workers'
 import * as Schema from 'effect/Schema'
+import { type FileView, pathIn } from '../files/folders.ts'
 import type { FileStore } from '../files/store.ts'
 import type { Isolates } from './isolates.ts'
 import { plainJson } from './json.ts'
@@ -10,18 +11,23 @@ import { sha256Hex } from '../runtime/digest.ts'
 const READ_BYTES = 1024 * 1024
 const SCRIPT_MS = 30_000
 
-/** The owner's files as a one-off script sees them: read `/uploads` and `/agent`, write `/agent`. */
+/**
+ * The files as a one-off script sees them: what its turn's view reads (ADR 0115), and writing only its Topic's `agent`
+ * folder, where a path without a leading `/` is.
+ */
 class ScriptFiles extends RpcTarget {
   readonly #files: FileStore
+  readonly #view: FileView
 
-  constructor(files: FileStore) {
+  constructor(files: FileStore, view: FileView) {
     super()
     this.#files = files
+    this.#view = view
   }
 
   async read(path: string): Promise<string> {
     try {
-      return (await this.#files.text(path, 0, READ_BYTES)).text
+      return (await this.#files.text(this.#view, pathIn(this.#view, path), 0, READ_BYTES)).text
     } catch (cause) {
       throw refusalOf(cause)
     }
@@ -29,7 +35,11 @@ class ScriptFiles extends RpcTarget {
 
   async list(dir: string): Promise<readonly { readonly path: string; readonly size: number; readonly kind: string }[]> {
     try {
-      return (await this.#files.list(dir)).entries.map(({ path, size, kind }) => ({ path, size, kind }))
+      return (await this.#files.list(this.#view, pathIn(this.#view, dir))).entries.map(({ path, size, kind }) => ({
+        path,
+        size,
+        kind,
+      }))
     } catch (cause) {
       throw refusalOf(cause)
     }
@@ -38,7 +48,8 @@ class ScriptFiles extends RpcTarget {
   async write(path: string, text: string): Promise<string> {
     try {
       const size = new TextEncoder().encode(text).byteLength
-      return (await this.#files.write('agent', path, text, 'text/plain; charset=utf-8', size)).path
+      const target = pathIn(this.#view, path)
+      return (await this.#files.write(this.#view, target, text, 'text/plain; charset=utf-8', size)).path
     } catch (cause) {
       throw refusalOf(cause)
     }
@@ -76,14 +87,20 @@ export const ScriptResult = Schema.Struct({
 export type ScriptResult = typeof ScriptResult.Type
 
 /**
- * Runs a one-off JavaScript snippet in its own isolate (`code_run`): no network, the owner's files through `files`,
- * `log(...)` for notes, and its return value back as JSON.
+ * Runs a one-off JavaScript snippet in its own isolate (`code_run`): no network, the files `view` reaches through
+ * `files`, `log(...)` for notes, and its return value back as JSON.
  */
-export async function runScript(isolates: Isolates, files: FileStore, code: string): Promise<ScriptResult> {
+export async function runScript(
+  isolates: Isolates,
+  files: { readonly store: FileStore; readonly view: FileView },
+  code: string,
+): Promise<ScriptResult> {
   const id = (await sha256Hex(code)).slice(0, 24)
   const script = isolates.script(id, moduleOf(code))
   try {
-    const result = await isolates.call(SCRIPT_MS, 'the script', () => script.run(new ScriptFiles(files)))
+    const result = await isolates.call(SCRIPT_MS, 'the script', () =>
+      script.run(new ScriptFiles(files.store, files.view)),
+    )
     // SAFETY: plainJson returns the value only once it is plain JSON within the limit.
     const value = plainJson(result.value ?? null, 256 * 1024, 'the result') as Schema.Json
     return { ok: result.ok, value, ...(result.error === undefined ? {} : { error: result.error }), logs: result.logs }

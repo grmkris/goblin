@@ -1,20 +1,25 @@
 import { PRIMARY_CHAT } from '@goblin/contracts'
 import { FileStore } from '../../src/files/store.ts'
+import { OWNER_VIEW } from '../../src/files/folders.ts'
 import { type Inside, type Probes, inAgent } from './probe.ts'
 import { ownerSend } from './probe-reads.ts'
 import { until } from './until.ts'
 
 const files = ({ storage, env, name }: Inside) => new FileStore(storage.sql, env.FILES, () => name)
 
+/** The file the interrupted script writes: in Personal's own folder. */
+const REPLAY = '/topics/1/agent/replay.txt'
+
 /** A real Dynamic Worker writes before eviction interrupts its Pi tool intent. */
 async function codeRecoveryWrite(inside: Inside) {
   const store = files(inside)
-  await store.write('agent', '/agent/replay.txt', '', 'text/plain', 0)
+  // Main is Personal's Conversation: its turn writes Personal's own folder (ADR 0115), where a relative path is.
+  await store.write(OWNER_VIEW, REPLAY, '', 'text/plain', 0)
   const code =
-    "await files.write('/agent/replay.txt', (await files.read('/agent/replay.txt')) + 'x'); await new Promise(resolve => setTimeout(resolve, 30000)); return null"
+    "await files.write('replay.txt', (await files.read('replay.txt')) + 'x'); await new Promise(resolve => setTimeout(resolve, 30000)); return null"
   await ownerSend(inside.api, PRIMARY_CHAT, `call code_run ${JSON.stringify({ code })}`, 'code-recovery')
   const written = await until(
-    () => store.text('/agent/replay.txt', 0, 100),
+    () => store.text(OWNER_VIEW, REPLAY, 0, 100),
     (file) => file.text === 'x',
   )
   return { instance: inside.agent.instance, text: written.text }
@@ -25,7 +30,7 @@ async function codeRecoveryRead(inside: Inside) {
   const result = await inside.agent.settle(PRIMARY_CHAT, 'code-recovery')
   return {
     instance: inside.agent.instance,
-    text: (await files(inside).text('/agent/replay.txt', 0, 100)).text,
+    text: (await files(inside).text(OWNER_VIEW, REPLAY, 0, 100)).text,
     result,
   }
 }

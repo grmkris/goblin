@@ -18,8 +18,8 @@ const entryOf = (path: string, { bytes, mimeType }: Stored): FileEntry => ({
 })
 
 /**
- * The owner's files in memory, held to the store's rules (a path `FILE_PATH` accepts, the agent writing only under
- * `/agent`): what each directory lists and what was written, by path. A store `full` refuses every write as over its
+ * The owner's files in memory, held to the store's rules (a path `FILE_PATH` accepts, a view's writes, ADR
+ * 0115): what each directory lists and what was written, by path. A store `full` refuses every write as over its
  * limit, and one with a `fileLimit` (a deployment without the files bucket) any larger file. Only listing and writing
  * are served.
  */
@@ -30,7 +30,7 @@ export function memoryFiles(held: Readonly<Record<string, string>> = {}) {
   )
   const state: { full: boolean; fileLimit?: number } = { full: false }
   const layer = stub(Files, {
-    list: (dir) =>
+    list: (_view, dir) =>
       Effect.sync(() => ({
         entries: [...written]
           .filter(([path]) => path.startsWith(`${dir}/`) && !path.slice(dir.length + 1).includes('/'))
@@ -38,9 +38,9 @@ export function memoryFiles(held: Readonly<Record<string, string>> = {}) {
         usedBytes: 0,
         limitBytes: FILE_LIMITS.totalBytes,
       })),
-    write: (caller, path, body, mimeType, size) =>
+    write: (view, path, body, mimeType, size) =>
       attemptSync(() => {
-        mayWrite(caller, filePath(path))
+        mayWrite(view, filePath(path))
         if (state.full) throw new PayloadTooLarge({ limit: FILE_LIMITS.totalBytes })
         if (state.fileLimit !== undefined && size > state.fileLimit)
           throw new PayloadTooLarge({ limit: state.fileLimit })

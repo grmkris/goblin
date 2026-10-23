@@ -1,4 +1,4 @@
-import { useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { Attachment } from '@goblin/contracts'
 import { Button, Spinner } from '@goblin/ui'
 import { AlertCircleIcon, FileIcon, ImageIcon, PaperclipIcon, RotateCcwIcon, XIcon } from 'lucide-react'
@@ -54,9 +54,13 @@ export function ReceivedFiles({ files }: { readonly files: readonly Attachment[]
   )
 }
 
-/** A portable attachment draft. Detaching leaves uploads running in the new pane. */
-export function useAttachments(initial?: AttachmentDraft) {
+/**
+ * A portable attachment draft, whose files go to Topic `topic`'s folder (ADR 0115). Detaching leaves uploads running in
+ * the new pane.
+ */
+export function useAttachments(initial?: AttachmentDraft, topic?: number) {
   const [draft, setDraft] = useState(() => initial ?? new AttachmentDraft())
+  useEffect(() => draft.writesTo(topic), [draft, topic])
   const pending = useSyncExternalStore(draft.subscribe, draft.snapshot, draft.snapshot)
   return {
     pending,

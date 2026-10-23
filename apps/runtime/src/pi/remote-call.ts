@@ -32,7 +32,7 @@ import { bound } from '../runtime/boundary.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { Setups } from '../setup/service.ts'
 import { describeError } from '../telemetry/attributes.ts'
-import { reachesConnection } from './power.ts'
+import { reachesConnection, turnFileView } from './power.ts'
 import { connectionOutsideResult, mcpOff, outsideScopeResult } from './setup.ts'
 import { ReadyResult } from './typed-tool.ts'
 
@@ -166,6 +166,7 @@ export const callRemoteTool = (input: McpCallInput, api: ToolExecutionApi, conte
             yield* keepModelApp(session, api.callId, input)
             // The files the result hands over are kept in its Topic's folder (ADRs 0065, 0115), after the call.
             const received = yield* materialize(input.connectionId, outcome.result, {
+              root: (yield* turnFileView(api, context)).home,
               images: seesImages(api, context),
               ...(context.abortSignal === undefined ? {} : { signal: context.abortSignal }),
             })

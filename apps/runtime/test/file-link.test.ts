@@ -8,6 +8,7 @@ import * as TestClock from 'effect/testing/TestClock'
 import { ChatOperations, Chats, Conversations } from '../src/chats/service.ts'
 import type { RuntimeEnv } from '../src/env.ts'
 import { fileLink } from '../src/files/link.ts'
+import { OWNER_VIEW } from '../src/files/folders.ts'
 import { FILE_LINK_SECONDS, fileLinkClaims, fileLinkToken } from '../src/files/link-token.ts'
 import { Files } from '../src/files/service.ts'
 import { NotFound, ResidentInactive } from '../src/http/errors.ts'
@@ -86,8 +87,10 @@ describe('file_link (ADR 0070)', () => {
     () =>
       Effect.gen(function* () {
         yield* TestClock.setTime(NOW * 1000)
-        const files = stub(Files, { stat: (path) => Effect.succeed({ ...PHOTO, path }) })
-        const answer = yield* fileLink(PHOTO.path).pipe(Effect.provide(Layer.mergeAll(files, inputs, resident(true))))
+        const files = stub(Files, { stat: (_view, path) => Effect.succeed({ ...PHOTO, path }) })
+        const answer = yield* fileLink(OWNER_VIEW, PHOTO.path).pipe(
+          Effect.provide(Layer.mergeAll(files, inputs, resident(true))),
+        )
         expect(answer).toMatchObject({
           expiresAt: new Date((NOW + FILE_LINK_SECONDS) * 1000).toISOString(),
           name: 'photo.png',
@@ -101,13 +104,13 @@ describe('file_link (ADR 0070)', () => {
 
   it.effect('needs current resident authority, and a file that is there', () =>
     Effect.gen(function* () {
-      const gone = stub(Files, { stat: (path) => Effect.fail(new NotFound({ what: path })) })
+      const gone = stub(Files, { stat: (_view, path) => Effect.fail(new NotFound({ what: path })) })
       const lapsed = yield* Effect.flip(
-        fileLink(PHOTO.path).pipe(Effect.provide(Layer.mergeAll(gone, inputs, resident(false)))),
+        fileLink(OWNER_VIEW, PHOTO.path).pipe(Effect.provide(Layer.mergeAll(gone, inputs, resident(false)))),
       )
       expect(lapsed).toBeInstanceOf(ResidentInactive)
       const missing = yield* Effect.flip(
-        fileLink(PHOTO.path).pipe(Effect.provide(Layer.mergeAll(gone, inputs, resident(true)))),
+        fileLink(OWNER_VIEW, PHOTO.path).pipe(Effect.provide(Layer.mergeAll(gone, inputs, resident(true)))),
       )
       expect(missing).toBeInstanceOf(NotFound)
     }),
@@ -124,7 +127,7 @@ const BYTES = new Uint8Array([137, 80, 78, 71])
 const agent = (current = true) => {
   const asked: string[] = []
   const files = stub(Files, {
-    read: (path) =>
+    read: (_view, path) =>
       Effect.sync(() => {
         asked.push(path)
         return { entry: { ...PHOTO, path }, body: new Response(BYTES).body ?? new ReadableStream() }

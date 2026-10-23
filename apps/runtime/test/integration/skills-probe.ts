@@ -236,9 +236,9 @@ export async function skillsLearnerDraftProbe(storage: DurableObjectStorage, har
         Layer.mergeAll(
           connectionsLayer(manager),
           Layer.mock(Files)({
-            stat: (path: string) =>
+            stat: (_view, path: string) =>
               written.has(path) ? Effect.succeed(fileEntry(path)) : Effect.fail(new NotFound({ what: 'file' })),
-            write: (_caller, path: string, text) =>
+            write: (_view, path: string, text) =>
               Effect.sync(() => {
                 // SAFETY: the learner writes its drafts as text.
                 written.set(path, text as string)

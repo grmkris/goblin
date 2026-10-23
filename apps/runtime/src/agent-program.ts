@@ -15,6 +15,7 @@ import type { SessionId } from './chats/directory.ts'
 import { epochSeconds } from './clock.ts'
 import { ChatOperations, Conversations } from './chats/service.ts'
 import { resolveSelections, type ResolvedSelections } from './composer.ts'
+import { OWNER_VIEW } from './files/folders.ts'
 import { Files } from './files/service.ts'
 import { FlowEvents, withFlow } from './observability/flows.ts'
 import { InvalidInput, attempt } from './http/errors.ts'
@@ -146,7 +147,7 @@ const attachedFiles = (paths: readonly string[]) =>
     paths,
     (path) =>
       Effect.map(
-        Files.use((files) => files.stat(path)),
+        Files.use((files) => files.stat(OWNER_VIEW, path)),
         ({ name, size, mimeType }): Attachment => ({ path, name, size, mimeType }),
       ),
     { concurrency: 'unbounded' },

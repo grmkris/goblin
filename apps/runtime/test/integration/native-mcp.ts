@@ -90,11 +90,11 @@ export const cases: readonly NativeCase[] = [
             words: 'Book the ferry for Friday',
             files: [
               {
-                path: expect.stringMatching(/^\/agent\/received\/[^/]+\/\d{4}-\d{2}-\d{2}\/image\.png$/u),
+                path: expect.stringMatching(/^\/topics\/\d+\/agent\/received\/[^/]+\/\d{4}-\d{2}-\d{2}\/image\.png$/u),
                 mimeType: 'image/png',
               },
               {
-                path: expect.stringMatching(/^\/agent\/received\/[^/]+\/\d{4}-\d{2}-\d{2}\/ferry\.md$/u),
+                path: expect.stringMatching(/^\/topics\/\d+\/agent\/received\/[^/]+\/\d{4}-\d{2}-\d{2}\/ferry\.md$/u),
                 mimeType: 'text/markdown',
               },
             ],

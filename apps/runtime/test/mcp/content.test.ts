@@ -78,12 +78,21 @@ const fixture = async (fetcher: typeof fetch, held: Readonly<Record<string, stri
     Layer.provideMerge(Layer.mergeAll(SingleFlight.layer, TestClock.layer())),
     Layer.merge(Layer.mergeAll(files.layer, Layer.succeed(AgentInput, input))),
   )
-  const keep = (content: CallToolResult['content'], images = false, text?: 'file'): Promise<Materialized> =>
+  const keep = (
+    content: CallToolResult['content'],
+    images = false,
+    text?: 'file',
+    root = '/agent',
+  ): Promise<Materialized> =>
     Effect.runPromise(
       Effect.provide(
         Effect.andThen(
           TestClock.setTime(NOON),
-          materialize('docs', { content }, { images: Effect.succeed(images), ...(text === undefined ? {} : { text }) }),
+          materialize(
+            'docs',
+            { content },
+            { root, images: Effect.succeed(images), ...(text === undefined ? {} : { text }) },
+          ),
         ),
         layer,
       ),
@@ -99,6 +108,15 @@ const link = (uri: string, name: string, mimeType?: string) => ({
 })
 
 describe('files from MCP content (unit)', () => {
+  it("keeps a result's file in the calling Topic's own folder (ADR 0115)", async () => {
+    const { fetcher } = web({ 'https://cdn.example.com/q3.csv': csv })
+    const { keep, files } = await fixture(fetcher)
+    const received = await keep([link('https://cdn.example.com/q3.csv', 'Q3')], false, undefined, '/topics/7/agent')
+    const path = '/topics/7/agent/received/docs-work/2026-10-15/Q3.csv'
+    expect(received.get(0)).toMatchObject({ kind: 'file', file: { path } })
+    expect(files.written.has(path)).toBe(true)
+  })
+
   it("keeps a public link's file, fetched without the connection's credentials", async () => {
     const signed = 'https://cdn.example.com/exports/q3%20report.csv?X-Amz-Signature=signed-secret#top'
     const { sent, fetcher } = web({

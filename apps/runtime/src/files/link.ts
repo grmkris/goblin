@@ -11,15 +11,17 @@ import { requireResident } from '../mcp/service.ts'
 import { logEvent } from '../observability/logger.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { FILE_LINK_SECONDS, fileLinkToken, fileLinkUrl } from './link-token.ts'
+import { type FileView, OWNER_VIEW } from './folders.ts'
 import { Files } from './service.ts'
 
 /**
- * `file_link`'s answer (ADR 0070): a link to the owner's file at `path` (`NotFound` for a directory or nothing), valid
- * for fifteen minutes, with the file's name, type and size. It needs current resident authority.
+ * `file_link`'s answer (ADR 0070): a link to the file at `path` within `view` (`NotFound` for a directory, nothing or a
+ * file outside it, ADR 0115), valid for fifteen minutes, with the file's name, type and size. It needs current resident
+ * authority.
  */
-export const fileLink = Effect.fn('files.link')(function* (path: string) {
+export const fileLink = Effect.fn('files.link')(function* (view: FileView, path: string) {
   yield* requireResident
-  const entry = yield* Files.use((files) => files.stat(path))
+  const entry = yield* Files.use((files) => files.stat(view, path))
   const { env, workspaceId } = yield* AgentInput
   const expiresAt = (yield* epochSeconds) + FILE_LINK_SECONDS
   const token = yield* attempt(() => fileLinkToken(env.CREDENTIAL_KEY, { workspaceId, path: entry.path, expiresAt }))
@@ -39,7 +41,8 @@ export const fileLink = Effect.fn('files.link')(function* (path: string) {
  */
 export const linkedFileDownload = Effect.fn('files.linkedDownload')(function* (path: string) {
   yield* requireResident
-  const { entry, body } = yield* Files.use((files) => files.read(path))
+  // The link was made within its turn's view; the token names that one file, which the owner reaches.
+  const { entry, body } = yield* Files.use((files) => files.read(OWNER_VIEW, path))
   yield* logEvent('info', 'file-link', { count: entry.size })
   return HttpServerResponse.raw(
     new Response(body, {

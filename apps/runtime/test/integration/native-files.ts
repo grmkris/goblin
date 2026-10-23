@@ -6,10 +6,11 @@ import { type NativeCase, freshName, probeOf } from './native-case.ts'
 async function filesChecks(base: string): Promise<void> {
   const store = await probeOf(base, 'files-store', Schema.Unknown)
   expect(store).toEqual({
-    written: '/agent/report.md',
+    written: '/topics/7/agent/report.md',
     paged: true,
     agentUpload: 'Forbidden',
     agentDelete: 'Forbidden',
+    otherTopic: 'NotFound',
     declaredTooLarge: 'PayloadTooLarge',
     longer: 'PayloadTooLarge',
     longerStored: false,

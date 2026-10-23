@@ -312,7 +312,8 @@ const take = (context: EngineContext, source: Loaded, item: unknown, itemId: str
     const target = routeOf(route)
     if (target.to === 'ignore') return
     if (owner) {
-      const kept = blocks.length === 0 ? undefined : yield* ports.receive(row.connectionId, blocks)
+      // Its attachments go to the Topic it goes to, or the Shared folder while it is held (ADR 0115).
+      const kept = blocks.length === 0 ? undefined : yield* ports.receive(row.connectionId, blocks, topicOf(target))
       const held = { sourceId: row.id, itemId, key: conversation.key, text, kept }
       return yield* send(context, source, route, { held, note: '' }, ports)
     }

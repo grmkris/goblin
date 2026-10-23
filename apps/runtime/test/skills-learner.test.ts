@@ -22,6 +22,7 @@ import type { RunProgram } from '../src/runtime/bridge.ts'
 import { Budget } from '../src/budget.ts'
 import { ChatId } from '../src/chats/directory.ts'
 import { Chats, Conversations } from '../src/chats/service.ts'
+import { OWNER_VIEW } from '../src/files/folders.ts'
 import { Files } from '../src/files/service.ts'
 import { Resident } from '../src/mcp/service.ts'
 import { type AppError, NotFound } from '../src/http/errors.ts'
@@ -48,11 +49,12 @@ import type { CheapModel } from '../src/memory/model.ts'
 /** The owner's files the learner wrote, by path, and the notices it claimed, in order. */
 const owner: { files: Map<string, string>; notices: NewNotice[] } = { files: new Map(), notices: [] }
 const ownerFiles = Layer.mock(Files)({
-  stat: (path: string) =>
+  stat: (_view, path: string) =>
     owner.files.has(path) ? Effect.succeed(fake<FileEntry>({ path })) : Effect.fail(new NotFound({ what: 'file' })),
-  write: (caller, path: string, body) =>
+  write: (view, path: string, body) =>
     Effect.sync(() => {
-      expect(caller).toBe('agent')
+      // A draft is goblin's own keeping, in the Shared folder (ADR 0115).
+      expect(view).toBe(OWNER_VIEW)
       // SAFETY: the learner writes its drafts as text.
       owner.files.set(path, body as string)
       return fake<FileEntry>({ path })

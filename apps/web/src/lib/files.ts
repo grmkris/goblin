@@ -1,8 +1,9 @@
-// The owner's files as the browser reaches them (ADR 0022): uploads for a message go to `/uploads/<day>/`, under a
-// name the runtime's path rule accepts and that replaces nothing already there. The listing goes through the typed
+// The workspace's files as the browser reaches them (ADR 0022): uploads for a message go to its chat's Topic's own
+// folder, `/topics/<id>/uploads/<day>/` (ADR 0115; the Shared `/uploads/<day>/` while the chat's Topic is not known
+// yet), under a name the runtime's path rule accepts and that replaces nothing already there. The listing goes through the typed
 // owner API; an upload sends the file's bytes as its body, so this module sends it itself, with the headers the typed
 // client sends.
-import { type Attachment, FILE_LIMITS, FileEntry, fileName, freeFileName } from '@goblin/contracts'
+import { type Attachment, FILE_LIMITS, FileEntry, fileName, freeFileName, topicFolder } from '@goblin/contracts'
 import { API_ERRORS, PayloadTooLarge } from '@goblin/contracts/api'
 import * as Data from 'effect/Data'
 import * as Option from 'effect/Option'
@@ -12,9 +13,10 @@ import { answerRef } from './query/app-error.ts'
 import { pad } from './format.ts'
 import { apiPath } from './workspace-path.ts'
 
-/** The day's upload folder, by the owner's local date. */
-export function uploadFolder(now: Date): string {
-  return `/uploads/${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+/** The day's upload folder of Topic `topic` (the Shared folder's without one), by the owner's local date. */
+export function uploadFolder(now: Date, topic?: number): string {
+  const root = topic === undefined ? '/uploads' : `${topicFolder(topic)}/uploads`
+  return `${root}/${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }
 
 /** Where a stored file downloads from (only plain images open in place). */
@@ -60,12 +62,17 @@ async function put(url: string, file: File, type: string): Promise<unknown> {
 }
 
 /**
- * Uploads `file` into today's folder under a name nobody holds there (`taken` adds the names this batch already
- * chose), and returns it as an attachment for the next message.
+ * Uploads `file` into Topic `topic`'s folder for today under a name nobody holds there (`taken` adds the names this
+ * batch already chose), and returns it as an attachment for the next message.
  */
-export async function uploadAttachment(file: File, taken: Set<string>, now = new Date()): Promise<Attachment> {
+export async function uploadAttachment(
+  file: File,
+  taken: Set<string>,
+  topic?: number,
+  now = new Date(),
+): Promise<Attachment> {
   if (file.size > FILE_LIMITS.fileBytes) throw new PayloadTooLarge({ limit: FILE_LIMITS.fileBytes })
-  const folder = uploadFolder(now)
+  const folder = uploadFolder(now, topic)
   const listing = await owner.run((api) => api.files.list({ query: { dir: folder } }))
   const held = new Set([...taken, ...listing.entries.map((entry) => entry.name)])
   const name = freeFileName(fileName(file.name), held)

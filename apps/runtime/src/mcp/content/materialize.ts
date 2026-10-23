@@ -1,6 +1,7 @@
 // Files from MCP content (ADR 0065). A tool result hands media over as links (`resource_link`), embedded resources and
-// audio. goblin keeps each one in the owner's files, under `/agent/received/<connection>/<day>/<name>`, and the model
-// reads a reference to the file in its place (and a small copy of an image, when it sees images). A public https link
+// audio. goblin keeps each one in the calling Topic's folder (ADR 0115), under
+// `/topics/<id>/agent/received/<connection>/<day>/<name>` (the Shared `/agent` for a Source's message no Topic holds
+// yet), and the model reads a reference to the file in its place (and a small copy of an image, when it sees images). A public https link
 // is fetched as anyone could, never with the connection's credentials; a link of any other scheme is read from its own
 // server with `resources/read`, as the owner's grant for that resource allows. A block that cannot be kept becomes a
 // short note; the call never fails for it. Nothing here holds a transaction or a lock across a fetch.
@@ -16,6 +17,7 @@ import * as Data from 'effect/Data'
 import * as DateTime from 'effect/DateTime'
 import * as Effect from 'effect/Effect'
 import * as Match from 'effect/Match'
+import { OWNER_VIEW } from '../../files/folders.ts'
 import { Files } from '../../files/service.ts'
 import { readBytes } from '../../http/body.ts'
 import { type AppError, PayloadTooLarge, type UpstreamMcp } from '../../http/errors.ts'
@@ -87,6 +89,11 @@ export type Materialized = ReadonlyMap<number, Received>
 export const NOTHING_RECEIVED: Materialized = new Map()
 
 type MaterializeOptions<R = never> = {
+  /**
+   * The folder whose `received/` keeps them (ADR 0115): the calling Topic's `agent` folder, or the Shared `/agent` for a
+   * Source's message no Topic holds yet.
+   */
+  readonly root: string
   /** Whether the model reading the result sees images, asked only when a kept file is a small image. */
   readonly images: Effect.Effect<boolean, never, R>
   /** Keep even short embedded text as a file when the caller carries file references rather than inline content. */
@@ -403,7 +410,9 @@ type Keeping<R> = {
 const takenIn = <R>(keeping: Keeping<R>) =>
   Effect.gen(function* () {
     if (keeping.taken !== undefined) return keeping.taken
-    const listing = yield* Files.use((files) => files.list(keeping.folder)).pipe(Effect.mapError(unwritable))
+    const listing = yield* Files.use((files) => files.list(OWNER_VIEW, keeping.folder)).pipe(
+      Effect.mapError(unwritable),
+    )
     keeping.taken = new Set(listing.entries.map((entry) => entry.name))
     return keeping.taken
   })
@@ -424,7 +433,7 @@ const keep = <R>(keeping: Keeping<R>, block: Keepable, named: string) =>
     const name = freeFileName(withExtension(named, type), taken)
     taken.add(name)
     const entry = yield* Files.use((files) =>
-      files.write('agent', `${keeping.folder}/${name}`, bytes, type, bytes.byteLength),
+      files.write(OWNER_VIEW, `${keeping.folder}/${name}`, bytes, type, bytes.byteLength),
     ).pipe(Effect.mapError(unwritable))
     const file = { path: entry.path, name: entry.name, size: entry.size, mimeType: entry.mimeType }
     const small = IMAGES.has(type) && bytes.byteLength <= INLINE_IMAGE_BYTES
@@ -434,7 +443,7 @@ const keep = <R>(keeping: Keeping<R>, block: Keepable, named: string) =>
   })
 
 /**
- * Keeps the files a tool result hands over (its links, embedded resources and audio) in the owner's files, and answers
+ * Keeps the files a tool result hands over (its links, embedded resources and audio) under `options.root`, and answers
  * what became of each such block, by its place in the result. It never fails: a block that cannot be kept is a note.
  * The model's `mcp_call` uses it, and any other reader of a server's content may.
  */
@@ -450,7 +459,7 @@ export const materialize = Effect.fn('mcp.materialize')(function* <R = never>(
   const day = DateTime.formatIsoDateUtc(yield* DateTime.now)
   const keeping: Keeping<R> = {
     connectionId,
-    folder: `/agent/received/${folderName(label)}/${day}`,
+    folder: `${options.root}/received/${folderName(label)}/${day}`,
     fetcher: (yield* AgentInput).mcpFetch,
     options,
     taken: undefined,

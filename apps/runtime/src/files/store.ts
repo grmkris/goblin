@@ -1,14 +1,10 @@
 import { Workspace } from '@cloudflare/shell'
-import { type FileEntry, type FileListing, FILE_LIMITS, FILE_PATH } from '@goblin/contracts'
+import { type FileEntry, type FileListing, FILE_FOLDER, FILE_LIMITS, FILE_PATH } from '@goblin/contracts'
 import { Forbidden, InvalidInput, NotFound, PayloadTooLarge } from '../http/errors.ts'
+import type { FileView } from './folders.ts'
 
 /** Files larger than this live in R2; smaller ones stay in the agent's SQLite. */
 const INLINE_BYTES = 128 * 1024
-
-/** Who acts on a file: the owner reads and writes everything, the agent reads uploads and writes only under /agent. */
-export type FileCaller = 'owner' | 'agent'
-
-const AREAS = new Set(['/uploads', '/agent'])
 
 /** `path` checked as a file path, or a refusal naming why. */
 export function filePath(path: string): string {
@@ -16,14 +12,19 @@ export function filePath(path: string): string {
   return path
 }
 
-/** `dir` checked as a listing root: an area itself or a path under one. */
+/** `dir` checked as a listing root: a folder (`FILE_FOLDER`) or a path under one. */
 export function fileDirectory(dir: string): string {
-  return AREAS.has(dir) ? dir : filePath(dir)
+  return FILE_FOLDER.test(dir) ? dir : filePath(dir)
 }
 
-/** Refuses a write by `caller` to `path`: the agent writes only what it owns, under /agent. */
-export function mayWrite(caller: FileCaller, path: string): void {
-  if (caller === 'agent' && !path.startsWith('/agent/')) throw new Forbidden({ reason: 'the agent writes only /agent' })
+/** Refuses a read of `path` outside `view` as not there, so a caller cannot tell a file it may not read exists. */
+function mayRead(view: FileView, path: string): void {
+  if (!view.reads(path)) throw new NotFound({ what: path })
+}
+
+/** Refuses a write to `path` outside `view`: a turn writes only its own Topic's `agent` folder (ADR 0115). */
+export function mayWrite(view: FileView, path: string): void {
+  if (!view.writes(path)) throw new Forbidden({ reason: 'file_folder' })
 }
 
 const entry = (info: {
@@ -57,9 +58,10 @@ function capped(stream: ReadableStream<Uint8Array>, limit: number): ReadableStre
 }
 
 /**
- * The owner's files: `@cloudflare/shell`'s Workspace over the agent's SQLite (its `cf_workspace_files` tables), with
+ * The workspace's files: `@cloudflare/shell`'s Workspace over the agent's SQLite (its `cf_workspace_files` tables), with
  * files over 128 KiB in the stage's R2 bucket under `agents/<user>/`. Without the bucket (ADR 0064) every file stays in
- * SQLite and none may be larger. Quotas are checked before every write.
+ * SQLite and none may be larger. Every read and write goes through a caller's view (`files/folders.ts`, ADR 0115):
+ * what it may not read is not found, and quotas are checked before every write.
  */
 export class FileStore {
   readonly #workspace: Workspace
@@ -78,10 +80,14 @@ export class FileStore {
     })
   }
 
-  /** A directory's entries, newest first, and the storage in use. */
-  async list(dir: string): Promise<FileListing> {
+  /** A directory's entries `view` reads, newest first, and the storage in use. */
+  async list(view: FileView, dir: string): Promise<FileListing> {
     const root = fileDirectory(dir)
-    const entries = (await this.#workspace.readDir(root)).map(entry).toSorted((a, b) => b.updatedAt - a.updatedAt)
+    mayRead(view, root)
+    const entries = (await this.#workspace.readDir(root))
+      .map(entry)
+      .filter((each) => view.reads(each.path))
+      .toSorted((a, b) => b.updatedAt - a.updatedAt)
     return {
       entries,
       usedBytes: (await this.#workspace.getWorkspaceInfo()).totalBytes,
@@ -89,15 +95,20 @@ export class FileStore {
     }
   }
 
-  async stat(path: string): Promise<FileEntry> {
-    const info = await this.#workspace.stat(filePath(path))
+  async stat(view: FileView, path: string): Promise<FileEntry> {
+    const target = filePath(path)
+    mayRead(view, target)
+    const info = await this.#workspace.stat(target)
     if (info === null || info.type !== 'file') throw new NotFound({ what: path })
     return entry(info)
   }
 
   /** A file's bytes as a stream, with its entry. */
-  async read(path: string): Promise<{ readonly entry: FileEntry; readonly body: ReadableStream<Uint8Array> }> {
-    const found = await this.stat(path)
+  async read(
+    view: FileView,
+    path: string,
+  ): Promise<{ readonly entry: FileEntry; readonly body: ReadableStream<Uint8Array> }> {
+    const found = await this.stat(view, path)
     const body = await this.#workspace.readFileStream(found.path)
     if (body === null) throw new NotFound({ what: path })
     return { entry: found, body }
@@ -105,11 +116,12 @@ export class FileStore {
 
   /** At most `maxBytes` of a file's text from byte `offset`, and where the next read would start (if there is more). */
   async text(
+    view: FileView,
     path: string,
     offset: number,
     maxBytes: number,
   ): Promise<{ readonly entry: FileEntry; readonly text: string; readonly next?: number }> {
-    const found = await this.stat(path)
+    const found = await this.stat(view, path)
     const bytes = await this.#workspace.readFileBytes(found.path)
     if (bytes === null) throw new NotFound({ what: path })
     const end = Math.min(bytes.byteLength, offset + maxBytes)
@@ -119,24 +131,24 @@ export class FileStore {
 
   /** Writes `body` (`size` bytes, as the request declared) to `path` once the quotas allow it. */
   async write(
-    caller: FileCaller,
+    view: FileView,
     path: string,
     body: string | Uint8Array | ReadableStream<Uint8Array>,
     mimeType: string,
     size: number,
   ): Promise<FileEntry> {
     const target = filePath(path)
-    mayWrite(caller, target)
+    mayWrite(view, target)
     await this.#admit(target, size)
     if (typeof body === 'string') await this.#workspace.writeFile(target, body, mimeType)
     else if (body instanceof Uint8Array) await this.#workspace.writeFileBytes(target, body, mimeType)
     else await this.#workspace.writeFileStream(target, capped(body, size), mimeType)
-    return this.stat(target)
+    return this.stat(view, target)
   }
 
-  async remove(caller: FileCaller, path: string): Promise<void> {
+  async remove(view: FileView, path: string): Promise<void> {
     const target = filePath(path)
-    mayWrite(caller, target)
+    mayWrite(view, target)
     if (!(await this.#workspace.deleteFile(target))) throw new NotFound({ what: path })
   }
 

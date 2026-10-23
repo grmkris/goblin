@@ -7,6 +7,7 @@ import type { Send } from '../../src/agent-apps/egress.ts'
 import { AppFiles } from '../../src/agent-apps/files.ts'
 import { problemText } from '../../src/agent-apps/queue.ts'
 import { runScript } from '../../src/agent-apps/script.ts'
+import { OWNER_VIEW } from '../../src/files/folders.ts'
 import { chatSession } from '../../src/chats/directory.ts'
 import type { RuntimeEnv } from '../../src/env.ts'
 import { callOwner } from '../owner-client.ts'
@@ -126,10 +127,14 @@ async function appsEngineProbe(storage: DurableObjectStorage, env: RuntimeEnv, o
   fresh.restore()
   const script = await runScript(
     apps.isolates,
-    apps.ownerFiles,
+    { store: apps.ownerFiles, view: OWNER_VIEW },
     "await files.write('/agent/answer.txt', 'forty-two'); log('wrote', 1); return { answer: 6 * 7, text: await files.read('/agent/answer.txt') }",
   )
-  const offline = await runScript(apps.isolates, apps.ownerFiles, "return (await fetch('https://example.com')).status")
+  const offline = await runScript(
+    apps.isolates,
+    { store: apps.ownerFiles, view: OWNER_VIEW },
+    "return (await fetch('https://example.com')).status",
+  )
   return {
     v1:
       v1.status === 'active'

@@ -10,6 +10,7 @@ import {
   type Trigger,
 } from '../lib/composer.ts'
 import { messageOf } from '../lib/query/app-error.ts'
+import { useConversation } from '../lib/workspace/hooks.ts'
 import { useAttachments } from './attachments.tsx'
 
 /**
@@ -110,7 +111,8 @@ export function useComposer(props: ComposerProps, form: RefObject<HTMLFormElemen
   const [error, setError] = useState('')
   const [failed, setFailed] = useState<string>()
   const { order, setOrder, thread, setThread, extras } = useSendModes(selected)
-  const attachments = useAttachments(props.draft?.attachments)
+  // A message's files go to its chat's Topic's own folder, which that Topic's agent reads (ADR 0115).
+  const attachments = useAttachments(props.draft?.attachments, useConversation(props.conversation)?.topic)
   useDraft(props.draft, setInput, setSelected, form)
   const clear = () => {
     setInput('')

@@ -8,7 +8,8 @@ import {
 } from '@earendil-works/pi-durable'
 import * as Effect from 'effect/Effect'
 import { mirrorReaches } from '../grants/mirror.ts'
-import { type Effective, type ToolNeed, allows, effectivePower } from '../grants/power.ts'
+import { CLOSED_VIEW, viewOf } from '../files/folders.ts'
+import { type Effective, type ToolNeed, allows, effectivePower, turnBoundary } from '../grants/power.ts'
 import { Forbidden } from '../http/errors.ts'
 import { writeLine } from '../observability/logger.ts'
 import { reportAndRecover, safeErrorType } from '../observability/report.ts'
@@ -39,6 +40,16 @@ export const effectiveOf = (api: CallApi, context: PiContext) =>
       mirrorReaches(db, grant, 'connection', connection),
     )
   })
+
+/**
+ * The files the call `api` serves reaches (ADR 0115): its Topic's folder (every Topic's from a hub its power reaches),
+ * the Shared folder on a person's turn, and its own Topic's `agent` folder to write. A session no chat owns reaches no
+ * file.
+ */
+export const turnFileView = (api: CallApi, context: PiContext) =>
+  Effect.map(effectiveOf(api, context), (effective) =>
+    effective === undefined ? CLOSED_VIEW : viewOf(turnBoundary(effective), effective.people),
+  )
 
 /**
  * Whether the call `api` serves may use MCP connection `connectionId` (ADR 0115): every credential whose connections

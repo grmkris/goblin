@@ -1,4 +1,5 @@
 import { FileStore } from '../../src/files/store.ts'
+import { OWNER_VIEW, viewOf } from '../../src/files/folders.ts'
 import { asOwner, callOwner } from '../owner-client.ts'
 import { type Probes, type ProbeStub, filesBucket, inAgent, inWorker } from './probe.ts'
 
@@ -26,28 +27,32 @@ function streamOf(size: number): ReadableStream<Uint8Array> {
 }
 
 /**
- * The real Shell Workspace and the stack's R2 bucket, as the agent's tools use them: the agent writes only under
- * `/agent`, text reads page, a declared size over the limit or a body longer than declared stores nothing.
+ * The real Shell Workspace and the stack's R2 bucket, as the agent's tools use them: a sealed Topic's turn writes only
+ * its own `agent` folder and reads nothing of another Topic's (ADR 0115), text reads page, a declared size over the
+ * limit or a body longer than declared stores nothing.
  */
 async function filesStoreProbe(sql: SqlStorage, bucket: R2Bucket, owner: string) {
   const store = new FileStore(sql, bucket, () => owner)
+  const turn = viewOf({ topic: 7, hub: false }, true)
   const report = `# Report\n${'line\n'.repeat(40)}`
-  const written = await store.write('agent', '/agent/report.md', report, 'text/markdown', report.length)
-  const first = await store.text('/agent/report.md', 0, 64)
-  const rest = await store.text('/agent/report.md', first.next ?? 0, 4 * KIB)
-  const longer = await outcome(store.write('owner', '/uploads/long.bin', streamOf(4 * KIB), 'x/y', 2 * KIB))
+  const written = await store.write(turn, '/topics/7/agent/report.md', report, 'text/markdown', report.length)
+  const first = await store.text(turn, '/topics/7/agent/report.md', 0, 64)
+  const rest = await store.text(turn, '/topics/7/agent/report.md', first.next ?? 0, 4 * KIB)
+  const longer = await outcome(store.write(OWNER_VIEW, '/uploads/long.bin', streamOf(4 * KIB), 'x/y', 2 * KIB))
+  await store.write(OWNER_VIEW, '/topics/8/agent/theirs.md', 'theirs', 'text/plain', 6)
   return {
     written: written.path,
     paged: first.text + rest.text === report && first.next === 64 && rest.next === undefined,
-    agentUpload: await outcome(store.write('agent', '/uploads/x.txt', 'no', 'text/plain', 2)),
-    agentDelete: await outcome(store.remove('agent', '/uploads/x.txt')),
-    declaredTooLarge: await outcome(store.write('owner', '/uploads/huge.bin', 'x', 'x/y', 26 * KIB * KIB)),
+    agentUpload: await outcome(store.write(turn, '/topics/7/uploads/x.txt', 'no', 'text/plain', 2)),
+    agentDelete: await outcome(store.remove(turn, '/uploads/x.txt')),
+    otherTopic: await outcome(store.text(turn, '/topics/8/agent/theirs.md', 0, 64)),
+    declaredTooLarge: await outcome(store.write(OWNER_VIEW, '/uploads/huge.bin', 'x', 'x/y', 26 * KIB * KIB)),
     longer,
-    longerStored: await store.stat('/uploads/long.bin').then(
+    longerStored: await store.stat(OWNER_VIEW, '/uploads/long.bin').then(
       () => true,
       () => false,
     ),
-    escape: await outcome(store.write('owner', '/uploads/../agent/x.txt', 'x', 'text/plain', 1)),
+    escape: await outcome(store.write(OWNER_VIEW, '/uploads/../agent/x.txt', 'x', 'text/plain', 1)),
     keys: await keysOf(bucket, owner),
   }
 }

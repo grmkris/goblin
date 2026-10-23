@@ -5,6 +5,7 @@ import type * as HttpServerRequest from 'effect/http/HttpServerRequest'
 import * as HttpServerResponse from 'effect/http/HttpServerResponse'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { InvalidInput, PayloadTooLarge } from '../http/errors.ts'
+import { OWNER_VIEW } from './folders.ts'
 import { Files } from './service.ts'
 
 /** Images the browser may show in place; anything else downloads, so an uploaded page never runs on the app's origin. */
@@ -36,26 +37,27 @@ const upload = (request: HttpServerRequest.HttpServerRequest, path: string) =>
     if (!Number.isSafeInteger(size) || body === null) return yield* new InvalidInput({ reason: 'file size' })
     if (size > FILE_LIMITS.fileBytes) return yield* new PayloadTooLarge({ limit: FILE_LIMITS.fileBytes })
     const mimeType = (request.headers['content-type'] ?? 'application/octet-stream').slice(0, 128)
-    return yield* Files.use((files) => files.write('owner', path, body, mimeType, size))
+    return yield* Files.use((files) => files.write(OWNER_VIEW, path, body, mimeType, size))
   })
 
 /**
- * The `files` group (ADR 0022). Owner admission has already admitted the request. The bytes go through unbuffered both
- * ways: an upload streams into the store, a download streams out of it.
+ * The `files` group (ADR 0022). Owner admission has already admitted the request; the owner's session reads and writes
+ * every folder, every Topic's and the Shared one (ADR 0115). The bytes go through unbuffered both ways: an upload
+ * streams into the store, a download streams out of it.
  */
 export const FilesHandlers = HttpApiBuilder.group(OwnerApi, 'files', (handlers) =>
   handlers
-    .handle('list', ({ query }) => Files.use((files) => files.list(query.dir ?? '/uploads')))
+    .handle('list', ({ query }) => Files.use((files) => files.list(OWNER_VIEW, query.dir ?? '/uploads')))
     .handleRaw('read', ({ query }) =>
       Effect.map(
-        Files.use((files) => files.read(query.path)),
+        Files.use((files) => files.read(OWNER_VIEW, query.path)),
         ({ entry, body }) => HttpServerResponse.raw(download(entry.name, entry.mimeType, body)),
       ),
     )
     .handleRaw('write', ({ request, query }) => upload(request, query.path))
     .handle('remove', ({ query }) =>
       Effect.as(
-        Files.use((files) => files.remove('owner', query.path)),
+        Files.use((files) => files.remove(OWNER_VIEW, query.path)),
         { deleted: true as const },
       ),
     ),

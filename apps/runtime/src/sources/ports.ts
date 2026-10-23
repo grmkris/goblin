@@ -3,7 +3,7 @@
 // ended, notices to the owner framed as untrusted data from the connection, a message's attachments kept in the owner's
 // files (ADR 0065), and a Topic made for a new conversation.
 import type { ContentBlock } from '@modelcontextprotocol/client'
-import { PERSONAL_TOPIC } from '@goblin/contracts'
+import { PERSONAL_TOPIC, topicFolder } from '@goblin/contracts'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
@@ -106,12 +106,13 @@ const ownerSeesImages = Effect.gen(function* () {
  * A message's attachments kept in the owner's files (ADR 0065): each block `materialize` keeps (a link fetched or read,
  * an image, audio or embedded bytes), a note for each one it could not keep, and one for blocks that are not MCP content.
  */
-const receive = (connectionId: string, blocks: readonly unknown[]) =>
+const receive = (connectionId: string, blocks: readonly unknown[], topic: number | undefined) =>
   Effect.gen(function* () {
     const read = blocks.map((block) => Option.getOrUndefined(decodeAttachment(block)))
     const content = read.flatMap((block) => (block === undefined ? [] : [keptBlock(block)]))
     const unread = read.length - content.length
-    const kept = yield* materialize(connectionId, { content }, { images: ownerSeesImages, text: 'file' })
+    const root = topic === undefined ? '/agent' : `${topicFolder(topic)}/agent`
+    const kept = yield* materialize(connectionId, { content }, { root, images: ownerSeesImages, text: 'file' })
     const received = [...kept.values()]
     const skipped = content.length - kept.size
     return {
@@ -206,7 +207,7 @@ export const sourcePorts = Effect.map(Effect.context<PortServices>(), (context):
   answer: (reply) => Effect.provideContext(answerOf(SOURCE, reply), context),
   notice: (notice) => Effect.provideContext(postNotice(notice), context),
   label: (connectionId) => Effect.provideContext(labelOf(connectionId), context),
-  receive: (connectionId, blocks) => Effect.provideContext(receive(connectionId, blocks), context),
+  receive: (connectionId, blocks, topic) => Effect.provideContext(receive(connectionId, blocks, topic), context),
   // goblin makes it for the setup the owner confirmed (`newKeys: topic-per-key`).
   topic: (name, fallback, operationId) => Effect.provideContext(sourceTopicFor(name, operationId, fallback), context),
 }))

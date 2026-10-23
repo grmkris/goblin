@@ -43,7 +43,7 @@ afterAll(async () => {
 describe('an upload', () => {
   it('takes a name nobody holds in the day folder and answers the stored file', async () => {
     const seen = filesRoutes(['notes.txt'], () => Response.json(entry('notes (2).txt'), { status: 201 }))
-    expect(await uploadAttachment(notes(), new Set(), DAY)).toEqual({
+    expect(await uploadAttachment(notes(), new Set(), undefined, DAY)).toEqual({
       path: '/uploads/2026-10-06/notes (2).txt',
       name: 'notes (2).txt',
       size: 7,
@@ -55,6 +55,15 @@ describe('an upload', () => {
     ])
   })
 
+  it("goes to its chat's Topic's own folder when the composer knows it (ADR 0115)", async () => {
+    const seen = filesRoutes([], () => Response.json(entry('notes.txt'), { status: 201 }))
+    await uploadAttachment(notes(), new Set(), 7, DAY)
+    expect(uploadFolder(DAY, 7)).toBe('/topics/7/uploads/2026-10-06')
+    expect(seen.find((sent) => sent.startsWith('PUT'))).toMatch(
+      /^PUT \/api\/files\/content\?path=%2Ftopics%2F7%2Fuploads%2F2026-10-06%2F/u,
+    )
+  })
+
   it('fails with the typed refusal its envelope names, quoting its reference', async () => {
     filesRoutes([], () =>
       Response.json(
@@ -64,7 +73,7 @@ describe('an upload', () => {
         },
       ),
     )
-    const missing = await uploadAttachment(notes(), new Set(), DAY).then(
+    const missing = await uploadAttachment(notes(), new Set(), undefined, DAY).then(
       () => undefined,
       (cause: unknown) => cause,
     )
@@ -76,7 +85,7 @@ describe('an upload', () => {
         { status: 413 },
       ),
     )
-    const envelope = await uploadAttachment(notes(), new Set(), DAY).then(
+    const envelope = await uploadAttachment(notes(), new Set(), undefined, DAY).then(
       () => undefined,
       (cause: unknown) => cause,
     )

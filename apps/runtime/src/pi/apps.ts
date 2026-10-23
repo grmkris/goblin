@@ -14,7 +14,7 @@ import type { PiContext } from './context.ts'
 import { allows } from '../grants/power.ts'
 import { reportAndRecover } from '../observability/report.ts'
 import { Setups } from '../setup/service.ts'
-import { effectiveOf } from './power.ts'
+import { effectiveOf, turnFileView } from './power.ts'
 import { APP_CALL } from './tool-needs.ts'
 import { newAppJoinsTopic } from '../topics/program.ts'
 import { typedTool } from './typed-tool.ts'
@@ -139,18 +139,19 @@ const rollbackTool = (apps: AgentApps, run: RunProgram) =>
     failure: adminOnly('apps', problemText),
   })
 
-/** `code_run`: one-off JavaScript over the owner's files. */
-const codeTool = (apps: AgentApps) =>
+/** `code_run`: one-off JavaScript over the files its turn reaches (ADR 0115). */
+const codeTool = (apps: AgentApps, run: RunProgram) =>
   typedTool({
     name: 'code_run',
     description:
-      "Run JavaScript once (the body of an async function; `return` a JSON value). `files.read(path)`, `files.list(dir)` and `files.write(path, text)` (under /agent) reach the owner's files; `log(...)` notes. No network; 30 s.",
+      "Run JavaScript once (the body of an async function; `return` a JSON value). `files.read(path)`, `files.list(dir)` and `files.write(path, text)` reach the files you reach (`files.write` into this Topic's `agent` folder, a path inside it like `out.csv`); `log(...)` notes. No network; 30 s.",
     input: Schema.Struct({ code: Schema.String.check(Schema.isMaxLength(100_000)) }),
     output: ScriptResult,
     // Scripts may write files before eviction interrupts the tool. Pi must surface that interruption,
     // rather than automatically executing the script and its writes again.
     replay: 'unsafe',
-    execute: async ({ code }) => runScript(apps.isolates, apps.ownerFiles, code),
+    execute: async ({ code }, api, context) =>
+      runScript(apps.isolates, { store: apps.ownerFiles, view: await run(turnFileView(api, context)) }, code),
   })
 
 /**
@@ -175,11 +176,11 @@ export function appExecutionExtension(apps: AgentApps, run: RunProgram) {
     sections: [
       section('code', (input) =>
         offers(input, 'code_run')
-          ? '`code_run` runs JavaScript over owner files. `app_call` executes approved app actions and views listed under <apps>; app powers still require owner approval.'
+          ? '`code_run` runs JavaScript over the files you reach. `app_call` executes approved app actions and views listed under <apps>; app powers still require owner approval.'
           : undefined,
       ),
     ],
-    tools: [codeTool(apps)],
+    tools: [codeTool(apps, run)],
     hooks: [
       hook(GenerationTask, {
         beforeRequest: async ({ messages }, api, context) => {
