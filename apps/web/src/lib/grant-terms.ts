@@ -103,6 +103,9 @@ export const withWorkspaces = (terms: GrantTerms, choice: ReachChoice): GrantTer
   },
 })
 
-/** A new client's terms on the consent page: the preset (`write`, everything, until revoked) over `choice`. */
+/**
+ * A new client's terms on the consent page: the preset (`write`, everything, until revoked) over `choice`, named as the
+ * client registered (a grant's name is 1 to 100 characters).
+ */
 export const clientTermsFrom = (name: string, choice: ReachChoice): GrantTerms =>
-  withWorkspaces(presetFor(name, 'all'), choice)
+  withWorkspaces(presetFor(name.trim().slice(0, 100) || 'MCP client', 'all'), choice)

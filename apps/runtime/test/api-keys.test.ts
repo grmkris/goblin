@@ -68,6 +68,23 @@ const invalidFor = (promise: Promise<unknown>) =>
     (error: unknown) => (error instanceof InvalidInput ? error.reason : error),
   )
 
+/** A key's terms over `w1` listing `ids` as its Topics and no Persona. */
+const listing = (ids: readonly string[]) =>
+  terms('w1', {
+    reach: {
+      workspaces: 'list',
+      each: [
+        {
+          workspace: 'w1',
+          topics: { kind: 'list', ids },
+          personas: { kind: 'list', ids: [] },
+          connections: { kind: 'all' },
+        },
+      ],
+      origins: [],
+    },
+  })
+
 describe('server API keys (ADRs 0081, 0114)', () => {
   it('makes a hashed gbk_ key and its grant, whose secret admits its workspace as its credential, once shown', async () => {
     const { db, env } = fixture()
@@ -137,6 +154,21 @@ describe('server API keys (ADRs 0081, 0114)', () => {
     expect(now.ws.generation).toBeGreaterThan(first)
     await expect(updateKey(env, 'w2', 'u2', key.id, { terms: KEY.terms })).rejects.toBeInstanceOf(NotFound)
     expect((await verifyKey(env, secret)).credential.level).toBe('manage')
+  })
+
+  it('keeps a list of hundreds of ids in a handful of statements, and replaces it whole', async () => {
+    const { db, env } = fixture()
+    const { key } = await createKey(env, 'w1', 'u1', KEY)
+    const many = Array.from({ length: 500 }, (_, index) => String(index + 1))
+    await updateKey(env, 'w1', 'u1', key.id, { terms: listing(many) })
+    const count = () => db.prepare('SELECT COUNT(*) AS count FROM grantReach WHERE grantId = ?').get(key.id)
+    expect(count()).toEqual({ count: 500 })
+    const { after } = await updateKey(env, 'w1', 'u1', key.id, { terms: listing(['7', '7', '9']) })
+    expect(count()).toEqual({ count: 2 })
+    expect(after.terms.reach.each[0]).toMatchObject({
+      topics: { kind: 'list', ids: ['7', '9'] },
+      personas: { kind: 'list', ids: [] },
+    })
   })
 
   it('ends a key when its grant does, and gives none of `keys` but by an owner', async () => {

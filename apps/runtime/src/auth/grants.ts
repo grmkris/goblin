@@ -272,15 +272,40 @@ const checkedOrigins = (origins: readonly KeyOrigin[]): readonly KeyOrigin[] => 
   return checked.origins
 }
 
-/** The statements that make `terms` grant `grantId`'s from now on: its row, its workspaces and its lists. */
+/** A grant's workspaces as one JSON value: each with its coverage of Topics, Personas and connections. */
+const workspacesJson = (terms: GrantTerms): string =>
+  JSON.stringify(
+    terms.reach.each.map((each) => ({
+      workspace: each.workspace,
+      topics: each.topics.kind,
+      personas: each.personas.kind,
+      connections: each.connections.kind,
+    })),
+  )
+
+/** A grant's listed ids as one JSON value: each with its workspace and kind. */
+const listedJson = (terms: GrantTerms): string =>
+  JSON.stringify(
+    terms.reach.each.flatMap((each) =>
+      KINDS.flatMap((kind) => {
+        const list = each[FIELD[kind]]
+        return list.kind === 'all' ? [] : [...new Set(list.ids)].map((id) => ({ workspace: each.workspace, kind, id }))
+      }),
+    ),
+  )
+
+/**
+ * The statements that make `terms` grant `grantId`'s from now on: its row, its workspaces and its lists. A grant's
+ * workspaces and ids travel as one JSON value each (`json_each`), so the statements stay five however many it names:
+ * D1 binds at most 100 values to a statement, and a list may hold thousands of ids.
+ */
 const termsStatements = (
   db: Database,
   grantId: string,
   terms: GrantTerms,
   now: number,
 ): readonly D1PreparedStatement[] => {
-  const named = terms.reach.each.map((each) => each.workspace)
-  const keep = named.length === 0 ? '' : ` AND "workspaceId" NOT IN (${named.map(() => '?').join(', ')})`
+  const workspaces = workspacesJson(terms)
   return [
     db
       .prepare(
@@ -299,31 +324,31 @@ const termsStatements = (
         grantId,
       ),
     db.prepare('DELETE FROM "grantReach" WHERE "grantId" = ?').bind(grantId),
-    db.prepare(`DELETE FROM "grantWorkspace" WHERE "grantId" = ?${keep}`).bind(grantId, ...named),
-    ...terms.reach.each.flatMap((each) => [
-      // The generation only ever moves on: one past the last, or now, whichever is later, so a workspace named again
-      // after it was dropped never repeats a generation an agent mirrored.
-      db
-        .prepare(
-          `INSERT INTO "grantWorkspace" ("grantId", "workspaceId", "topics", "personas", "connections", "generation")
-            VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT ("grantId", "workspaceId") DO UPDATE SET "topics" = excluded."topics",
+    db
+      .prepare(
+        `DELETE FROM "grantWorkspace" WHERE "grantId" = ?
+          AND "workspaceId" NOT IN (SELECT json_extract(value, '$.workspace') FROM json_each(?))`,
+      )
+      .bind(grantId, workspaces),
+    // The generation only ever moves on: one past the last, or now, whichever is later, so a workspace named again
+    // after it was dropped never repeats a generation an agent mirrored.
+    db
+      .prepare(
+        `INSERT INTO "grantWorkspace" ("grantId", "workspaceId", "topics", "personas", "connections", "generation")
+          SELECT ?, json_extract(value, '$.workspace'), json_extract(value, '$.topics'), json_extract(value, '$.personas'),
+            json_extract(value, '$.connections'), ? FROM json_each(?) WHERE true
+          ON CONFLICT ("grantId", "workspaceId") DO UPDATE SET "topics" = excluded."topics",
             "personas" = excluded."personas", "connections" = excluded."connections",
             "generation" = max("grantWorkspace"."generation" + 1, excluded."generation")`,
-        )
-        .bind(grantId, each.workspace, each.topics.kind, each.personas.kind, each.connections.kind, now),
-      ...KINDS.flatMap((kind) => {
-        const list = each[FIELD[kind]]
-        return list.kind === 'all'
-          ? []
-          : [...new Set(list.ids)].map((id) =>
-              db
-                .prepare(
-                  'INSERT INTO "grantReach" ("grantId", "workspaceId", "kind", "resourceId") VALUES (?, ?, ?, ?)',
-                )
-                .bind(grantId, each.workspace, kind, id),
-            )
-      }),
-    ]),
+      )
+      .bind(grantId, now, workspaces),
+    db
+      .prepare(
+        `INSERT INTO "grantReach" ("grantId", "workspaceId", "kind", "resourceId")
+          SELECT ?, json_extract(value, '$.workspace'), json_extract(value, '$.kind'), json_extract(value, '$.id')
+          FROM json_each(?)`,
+      )
+      .bind(grantId, listedJson(terms)),
   ]
 }
 
