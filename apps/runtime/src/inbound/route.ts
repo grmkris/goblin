@@ -1,13 +1,17 @@
 import { createMcpHandler } from 'agents/mcp/server'
 import type { WorkspaceView } from '@goblin/contracts'
 import { credentialOf, verifyKey } from '../auth/api-keys.ts'
+import { verifyServerBearer } from '../auth/workload-tokens.ts'
+import { workloadIssuer } from '../auth/workload-verifier.ts'
+import type { WorkloadVerifier } from '../auth/oidc-workloads.ts'
+import { authIssuer } from '../auth/options.ts'
 import { type GrantRecord, type WorkspaceCoverage, coveragesOf } from '../auth/grants.ts'
 import { challengeOf, clientName, verifyClientToken } from '../auth/index.ts'
 import { reachedBy } from '../auth/workspaces.ts'
 import type { RuntimeEnv } from '../env.ts'
 import { refOf, runAtEdge } from '../http/api/edge.ts'
-import { type Credential, bearerKey, memberName } from '../http/api/principal.ts'
-import { InvalidInput, NotFound } from '../http/errors.ts'
+import { type Credential, bearerKey, bearerWorkload, memberName } from '../http/api/principal.ts'
+import { Forbidden, InvalidInput, NotFound } from '../http/errors.ts'
 import { ownerCall } from './client.ts'
 import { type CallerReach, mcpServer } from './mcp-server.ts'
 import type { OwnerCaller } from './tools.ts'
@@ -42,7 +46,7 @@ type Admitted =
  * the Worker answers in the envelope `/api` uses: there is nothing to sign in to. An OAuth token that does not verify,
  * or no bearer at all, is answered with the sign-in challenge.
  */
-const admit = async (request: Request, env: RuntimeEnv): Promise<Admitted | undefined> => {
+const admit = async (request: Request, env: RuntimeEnv, verify?: WorkloadVerifier): Promise<Admitted | undefined> => {
   const key = bearerKey(request)
   if (key !== undefined) {
     const { workspaceId, credential } = await verifyKey(env, key)
@@ -51,6 +55,12 @@ const admit = async (request: Request, env: RuntimeEnv): Promise<Admitted | unde
   const header = request.headers.get('authorization') ?? ''
   if (!header.startsWith('Bearer ')) return undefined
   const token = header.slice('Bearer '.length)
+  // User OAuth tokens keep their established local verifier; every other JWT uses workload trust and fails closed.
+  if (bearerWorkload(request) !== undefined && workloadIssuer(token) !== authIssuer(env.APP_URL)) {
+    if (request.headers.has('cookie') || request.headers.has('origin')) throw new Forbidden({ reason: 'key_browser' })
+    const { workspaceId, credential } = await verifyServerBearer(env, token, verify)
+    return { kind: 'key', workspaceId, credential, token }
+  }
   let principal: Awaited<ReturnType<typeof verifyClientToken>>
   try {
     principal = await verifyClientToken(token, env)
@@ -133,8 +143,12 @@ const callerOf = (admitted: Admitted, env: RuntimeEnv, ref: string): OwnerCaller
  * an owner API call as that credential to an agent: a key's own workspace's (ADR 0089), or for an OAuth client the
  * workspace the call names among those its grant reaches (ADR 0097).
  */
-export const handleInboundMcp = async (request: Request, env: RuntimeEnv): Promise<Response> => {
-  const admitted = await admit(request, env)
+export const handleInboundMcp = async (
+  request: Request,
+  env: RuntimeEnv,
+  verify?: WorkloadVerifier,
+): Promise<Response> => {
+  const admitted = await admit(request, env, verify)
   if (admitted === undefined) return challengeOf(env.APP_URL)
   const { token } = admitted
   const power = admitted.kind === 'key' ? admitted.credential : admitted.grant

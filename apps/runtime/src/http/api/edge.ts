@@ -42,6 +42,7 @@ import {
   MEMBER_HEADER,
   type Member,
   bearerKey,
+  bearerWorkload,
   credentialHeader,
   memberHeader,
   memberName,
@@ -288,7 +289,7 @@ const ACCOUNT_PATHS = [
   '/api/client-errors',
 ] as const
 /** The workspace account API's paths, under `/w/<workspace slug>`: answered by the Worker, never the agent. */
-const WORKSPACE_ACCOUNT_PATHS = ['/api/keys', '/api/members'] as const
+const WORKSPACE_ACCOUNT_PATHS = ['/api/keys', '/api/members', '/api/trusted-workloads'] as const
 const under = (path: string, prefix: string): boolean => path === prefix || path.startsWith(`${prefix}/`)
 export const isAccountPath = (path: string): boolean => ACCOUNT_PATHS.some((prefix) => under(path, prefix))
 const isWorkspaceAccountPath = (path: string): boolean => WORKSPACE_ACCOUNT_PATHS.some((prefix) => under(path, prefix))
@@ -561,7 +562,7 @@ const ownerOf =
     const facts = { ...requestFacts(request, ownerRoute(request) ?? routeTemplate(url.pathname)), ref: refOf(request) }
     const served = settle(request, facts, (known) =>
       Effect.gen(function* () {
-        const token = bearerKey(request)
+        const token = bearerKey(request) ?? bearerWorkload(request)
         if (!url.pathname.startsWith(OWNER_PREFIX) || isAccountPath(url.pathname) || token === undefined)
           return yield* new NotFound({ what: 'route' })
         const { workspaceId, credential } = yield* admitKey(request, edge, token, ownerNeeds.get(facts.route))

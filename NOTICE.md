@@ -9,3 +9,9 @@ These grants do not replace third-party licenses. Keep the notices next to vendo
 React Leaflet 5 and @react-leaflet/core 3 use Hippocratic-2.1, which includes ethical use restrictions and is not an OSI-approved license. ELK uses EPL-2.0, Geist uses OFL-1.1, caniuse-lite data uses CC-BY-4.0, and libvips in the Sharp build toolchain uses LGPL-3.0-or-later. Review the installed packages' complete license texts before distributing bundles or binaries.
 
 The shelf's server marks (`apps/web/public/shelf`) take their glyphs from Simple Icons (CC0-1.0); the marks themselves are trademarks of their owners, used to identify their services, and are not covered by the MIT License.
+
+The proposed OIDC workload policy, provider forms and verifier adapt the public
+[OIDC UI registry](https://ui.shadcn.com/oidc) from [shadcn/ui](https://github.com/shadcn-ui/ui):
+`policy.json`, `verify.json`, `provider-github.json` and `provider-custom.json`. The MIT notice is retained in
+[oidc.LICENSE](packages/contracts/src/oidc.LICENSE). Goblin supplies its own schemas, grant integration, bounded
+network/cache behavior and local UI primitives.

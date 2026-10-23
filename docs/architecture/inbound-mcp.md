@@ -132,3 +132,17 @@ Personas' answers under `related` (`persona:<operation>:<persona id>`), and `ins
 order, `spent`: where its time went, by model, tool and MCP server, and `ranWith`: the releases, endpoint kinds,
 thinking levels and MCP servers it ran with (ADR 0107), never the deployment endpoint's address; with `otlp` the same
 turn comes back as OpenTelemetry traces data for a trace viewer, still content-free and within the grant's reach.
+
+
+## Trusted workloads (spike)
+
+[ADR 0116](../adr/0116-trusted-workloads.md) proposes machine OIDC trust beside user OAuth. Workspace managers save
+exact issuer/claim policies in Settings, attached to an existing server grant, optionally disabling its static secret.
+The runtime origin is the required audience; exactly one verified policy selects the workspace. Policy disable and
+live grant changes are checked on every request. Discovery/JWKS is bounded and cached; trust and grants are read live.
+Direct JWTs and opaque `gbw_` tokens from the RFC 7523 `/token` exchange reach `/api` and `/mcp` as the server, never as
+a member and never renewing resident authority. Exchange claims `iss`+`jti` once; direct Bearers remain reusable until
+expiry. Workloads cannot create published Events webhook leases (`workload_webhook`), because the existing lease
+model cannot bind them to policy revocation; polling is available. The MCP capability advertises
+`io.modelcontextprotocol/oauth-client-credentials`; platform assertions are exchanged explicitly, outside the SDK's
+built-in client-credentials flow. Local evidence and rollout gaps are in [the spike results](../../SPIKE_RESULTS.md).

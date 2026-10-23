@@ -1,5 +1,6 @@
 import { ClientsCard, DeleteAccountCard } from './account-cards.tsx'
 import { ApiKeysCard } from './api-keys-card.tsx'
+import { TrustedWorkloadsCard } from './trusted-workloads-card.tsx'
 import { MemoryCard, ResidentCard, UsageCard } from './agent-cards.tsx'
 import { ModelEndpointCard } from './model-endpoint-card.tsx'
 import { NotifySinkCard } from './notify-sink-card.tsx'
@@ -47,6 +48,11 @@ export function Settings() {
           <p className="text-sm text-muted-foreground">Only the workspace's owners and admins make keys.</p>
         )}
       </PageSection>
+      {managing && (
+        <PageSection id="trusted-workloads" title="Trusted workloads">
+          <TrustedWorkloadsCard />
+        </PageSection>
+      )}
       <PageSection id="workspace" title="Workspace">
         <WorkspaceCard />
         {workspace !== undefined && <MembersCard workspace={workspace} />}

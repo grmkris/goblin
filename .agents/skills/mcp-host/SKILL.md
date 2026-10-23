@@ -171,3 +171,9 @@ itself authorize model spend, external messages, deployment or production change
   is read from a resource's `text` or base64 `blob` (decoded and bounded in `mcp/apps/app-html.ts`, strict UTF-8). A call
   held for approval, or a finished URL request, keeps its App when it completes (`mcp/apps/kept-app.ts`), and the App
   launches with the real result, not the transcript's placeholder.
+
+- Trusted workloads (proposed spike, ADR 0116) use exact saved OIDC policies attached to server grants. Direct JWTs
+  and `/token`'s hashed opaque Bearers use the same principal and live grant on HTTP and MCP; policy disable is read
+  every request. Never treat a workload as a member or renew resident authority. `events/subscribe` refuses workload
+  principals until leases bind to policy and bearer lifetime; polling is supported. Keep user sign-in OIDC and inbound
+  user OAuth on their existing verifiers. Tests use ephemeral local keys and injected discovery/JWKS only.

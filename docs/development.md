@@ -6,6 +6,26 @@ the web app's reply renderer and does not enter the main app bundle. See its REA
 
 Requirements are Bun `1.4.2` and Node.js 22.
 
+## Trusted workloads (spike)
+
+Settings → Trusted workloads attaches a GitHub repository/branch or custom issuer/subject policy to a server's existing
+grant. Its audience is this runtime's origin. Swarmm uses its API origin as issuer and `swarmm:<stage>` as subject.
+Send its short-lived JWT as `Authorization: Bearer <assertion>` to `/api` or `/mcp`, or exchange it once with
+`POST /token` and the RFC 7523 JWT-bearer form. Never print or persist a real assertion. The saved grant bounds all
+access; workload tokens cannot call browser account routes, grant resident authority or create webhook leases.
+
+Local-only verification from the root, with ephemeral signing keys and injected discovery/JWKS:
+
+```sh
+heavy bun run --cwd apps/runtime test:unit test/workloads/principal.test.ts test/workloads/verifier.test.ts
+GOBLIN_HARNESS_PORT=22701 heavy bun run --cwd apps/runtime test:integration owner.test.ts -t 'trusted workloads'
+heavy bun apps/web/test/ui-workloads.ts
+```
+
+The browser fixture uses an ephemeral port and stores screenshots under `.local/goblin-acceptance`. The native harness
+uses only local workerd/D1 and a fixture model. See [ADR 0116](adr/0116-trusted-workloads.md) and
+[SPIKE_RESULTS.md](../SPIKE_RESULTS.md) for measured results and the proposed rollout; no workflow is changed.
+
 ## MCP Events
 
 The workerd fixture advertises Events (top-level `capabilities.events`, or the SEP-3415 extension), sends verification

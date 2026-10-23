@@ -117,6 +117,9 @@ const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
     widen: (_person, grantId, terms) =>
       grantId === 'cg_1' ? Effect.succeed(changed(grantId, terms)) : Effect.fail(new NotFound({ what: 'grant' })),
     keys: () => Effect.succeed([]),
+    trustedWorkloads: () => Effect.succeed([]),
+    createTrustedWorkload: () => Effect.die(new Error('no workload creation in this fixture')),
+    disableTrustedWorkload: () => Effect.void,
     createKey: () => Effect.die(new Error('no keys in this fixture')),
     updateKey: (_workspace, _user, keyId, change) =>
       keyId === 'key-1'
@@ -490,10 +493,10 @@ describe("a server's API key (ADR 0081)", () => {
     ['a file upload', server('/api/files/uploads/a.txt', { method: 'PUT', body: 'x' }), 403, 'credential'],
     ['a path that is no endpoint', server('/api/nothing/here', { method: 'GET' }), 403, 'credential'],
     [
-      'an inbound OAuth token',
+      'an unrecognized JWT bearer',
       server('/api/topics', { headers: { authorization: 'Bearer eyJhbGciOi.eyJzdWIiOi.c2ln' } }),
-      404,
-      'route',
+      401,
+      'key',
     ],
   ] as const)('refuses %s without waking the agent', async (_case, request, status, reason) => {
     const { seen, edge } = deployment()

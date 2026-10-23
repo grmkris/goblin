@@ -1,7 +1,8 @@
 import * as Effect from 'effect/Effect'
 import type { AgentRpc, RuntimeEnv } from '../env.ts'
 import { handleAuth, resourceMetadata, requireUserSession } from '../auth/index.ts'
-import { verifyKey } from '../auth/api-keys.ts'
+import { exchangeWorkloadToken, verifyServerBearer } from '../auth/workload-tokens.ts'
+import type { WorkloadVerifier } from '../auth/oidc-workloads.ts'
 import { readBytes } from './body.ts'
 import { NotFound, attempt } from './errors.ts'
 import { accountRecords } from './api/account.ts'
@@ -25,14 +26,14 @@ import { healthOf } from './health.ts'
 const agentOf = (env: RuntimeEnv, workspaceId: string): DurableObjectStub<AgentRpc> => env.AGENTS.getByName(workspaceId)
 
 /** The deployment as the typed API's edge sees it (`http/api/edge.ts`). */
-const edgeOf = (env: RuntimeEnv): Edge => ({
+const edgeOf = (env: RuntimeEnv, verify?: WorkloadVerifier): Edge => ({
   origin: new URL(env.APP_URL).origin,
   session: (request) =>
     Effect.map(
       attempt(() => requireUserSession(request, env)),
       (session) => session.person,
     ),
-  key: (key) => attempt(() => verifyKey(env, key)),
+  key: (key) => attempt(() => verifyServerBearer(env, key, verify)),
   membership: (userId, slug) => attempt(() => membershipAt(env.AUTH_DB, userId, slug)),
   membershipOf: (userId, workspaceId) => attempt(() => membershipOf(env.AUTH_DB, userId, workspaceId)),
   agent: (workspaceId) => agentOf(env, workspaceId),
@@ -99,9 +100,15 @@ async function fileLinkRoute(request: Request, env: RuntimeEnv, path: string, re
  * The Worker's own routes past the typed API: /mcp, the hooks and file links. Anything else, `/internal/*` included,
  * is a 404.
  */
-async function workerRoute(request: Request, env: RuntimeEnv, ref: string): Promise<Response> {
+async function workerRoute(
+  request: Request,
+  env: RuntimeEnv,
+  ref: string,
+  verify?: WorkloadVerifier,
+): Promise<Response> {
   const path = new URL(request.url).pathname
-  if (path === '/mcp') return handleInboundMcp(request, env)
+  if (path === '/token') return exchangeWorkloadToken(request, env, verify)
+  if (path === '/mcp') return handleInboundMcp(request, env, verify)
   if (path.startsWith('/hooks/mcp-events/')) return mcpEventsRoute(request, env, path, ref)
   if (path.startsWith('/files/link/')) return fileLinkRoute(request, env, path, ref)
   throw new NotFound({ what: 'route' })
@@ -112,24 +119,28 @@ async function workerRoute(request: Request, env: RuntimeEnv, ref: string): Prom
  * (`apps/web/src/worker.ts`): health, auth, the typed API's edge (a chat's stream among it), /mcp, the hooks and file
  * links.
  */
-export const worker = {
-  async fetch(request: Request, env: RuntimeEnv): Promise<Response> {
-    const redirect = canonicalRedirect(request, env.APP_URL)
-    if (redirect !== undefined) return redirect
-    const url = new URL(request.url)
-    if (url.pathname === '/health') return Response.json(healthOf(env))
-    if (url.pathname.startsWith('/.well-known/oauth-protected-resource'))
-      return secured(Response.json(resourceMetadata(env)), undefined)
-    if (url.pathname.startsWith('/.well-known/') || url.pathname.startsWith('/api/auth/'))
-      return handleAuth(request, env)
-    // The typed API (http/api/edge.ts): a person's account endpoints answered here; a member's requests, under their
-    // workspace's path, answered here or forwarded to its agent; and a key's `/api/*` requests forwarded to its own.
-    if (isAccountPath(url.pathname)) return runAtEdge((await edge()).account(request, edgeOf(env)))
-    if (isWorkspacePath(url.pathname)) return runAtEdge((await edge()).workspace(request, edgeOf(env)))
-    if (url.pathname === SIGN_IN_CALLBACK) return runAtEdge((await edge()).signIn(request, edgeOf(env)))
-    if (url.pathname.startsWith('/api/')) return runAtEdge((await edge()).owner(request, edgeOf(env)))
+const fetchWith = async (request: Request, env: RuntimeEnv, verify?: WorkloadVerifier): Promise<Response> => {
+  const redirect = canonicalRedirect(request, env.APP_URL)
+  if (redirect !== undefined) return redirect
+  const url = new URL(request.url)
+  if (url.pathname === '/health') return Response.json(healthOf(env))
+  if (url.pathname.startsWith('/.well-known/oauth-protected-resource'))
+    return secured(Response.json(resourceMetadata(env)), undefined)
+  if (url.pathname.startsWith('/.well-known/') || url.pathname.startsWith('/api/auth/')) return handleAuth(request, env)
+  // The typed API (http/api/edge.ts): a person's account endpoints answered here; a member's requests, under their
+  // workspace's path, answered here or forwarded to its agent; and a key's `/api/*` requests forwarded to its own.
+  if (isAccountPath(url.pathname)) return runAtEdge((await edge()).account(request, edgeOf(env, verify)))
+  if (isWorkspacePath(url.pathname)) return runAtEdge((await edge()).workspace(request, edgeOf(env, verify)))
+  if (url.pathname === SIGN_IN_CALLBACK) return runAtEdge((await edge()).signIn(request, edgeOf(env, verify)))
+  if (url.pathname.startsWith('/api/')) return runAtEdge((await edge()).owner(request, edgeOf(env, verify)))
 
-    // Every answer quotes the request's reference (its cf-ray), which its failure line carries too.
-    return runAtEdge((await edge()).route(request, (ref) => attempt(() => workerRoute(request, env, ref))))
-  },
+  // Every answer quotes the request's reference (its cf-ray), which its failure line carries too.
+  return runAtEdge((await edge()).route(request, (ref) => attempt(() => workerRoute(request, env, ref, verify))))
 }
+
+/** Tests inject only issuer verification; the production handler keeps its bounded HTTPS verifier. */
+export const workerWith = (verify?: WorkloadVerifier) => ({
+  fetch: (request: Request, env: RuntimeEnv): Promise<Response> => fetchWith(request, env, verify),
+})
+
+export const worker = workerWith()

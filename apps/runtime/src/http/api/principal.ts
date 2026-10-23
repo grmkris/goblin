@@ -32,6 +32,8 @@ export const Credential = Schema.Struct({
     generation: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   }),
   origins: Schema.Array(KeyOrigin),
+  // Workloads cannot establish webhook leases that outlive their policy or bearer (ADR 0116).
+  workload: Schema.optionalKey(Schema.Literal(true)),
 })
 export type Credential = typeof Credential.Type
 
@@ -113,4 +115,12 @@ export const bearerKey = (request: Request): string | undefined => {
   if (header === null || !header.startsWith(`Bearer ${KEY_PREFIX}`)) return undefined
   const key = header.slice('Bearer '.length)
   return /^gbk_[A-Za-z0-9]{32,128}$/u.test(key) ? key : undefined
+}
+
+/** A workload assertion (JWS shape) or exchanged workload bearer; validation belongs to the auth boundary. */
+export const bearerWorkload = (request: Request): string | undefined => {
+  const header = request.headers.get('authorization')
+  if (header === null || !header.startsWith('Bearer ')) return undefined
+  const token = header.slice('Bearer '.length)
+  return token.startsWith('gbw_') || token.split('.').length === 3 ? token : undefined
 }

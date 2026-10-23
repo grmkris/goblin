@@ -19,7 +19,8 @@ export default {
       url.pathname.startsWith('/files/link/') ||
       url.pathname.startsWith('/.well-known/') ||
       url.pathname === '/health' ||
-      url.pathname === '/mcp'
+      url.pathname === '/mcp' ||
+      url.pathname === '/token'
     )
       return runtime.fetch(request, env)
     if (url.pathname === '/robots.txt')
