@@ -559,9 +559,10 @@ owner API routed in the page and no screen scrolling sideways. It needs `@goblin
 Chromium at phone and desktop widths, light and dark: the hero's session playing, waiting on its question, answered by
 Allow and on its own, and the whole page; under reduced motion the session starts at its question and Allow still
 answers it. With `/health` and the session check routed in the page, it checks the way in (`/login?new=1`), Claude
-Code's command for the page's origin, that the Source link stays off, that a signed-in session leaves for its channel,
-and that nothing scrolls sideways. Screenshots go under `.local/goblin-acceptance/landing-*`; this is browser fixture
-evidence only.
+Code's command for the page's origin, that the Source link stays off, and that nothing scrolls sideways. The fixture
+mounts the public Landing component; signed-in navigation belongs to the real Home route and needs a route-level
+fixture. Its legacy signed-in assertion currently fails. Screenshots go under `.local/goblin-acceptance/landing-*`;
+this is browser fixture evidence only.
 
 `heavy bun apps/web/test/ui-markdown.ts` renders chat Markdown from source in local Chromium at desktop and phone
 widths: a reply that settles keeps its blocks (a table keeps its element and sideways scroll), with and without
