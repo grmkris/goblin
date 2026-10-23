@@ -304,7 +304,8 @@ describe('a credential reaches what its grant reaches (ADR 0114)', () => {
   })
 
   it('is refused past its requests for the minute, with how long to wait, and another grant is not (ADR 0085)', async () => {
-    const { fetch } = organizing()
+    // The clock stands still, so the 602 requests never straddle the start of a new minute.
+    const { fetch } = organizing({ frozen: true })
     const answers = await Promise.all(
       Array.from({ length: 601 }, () =>
         fetch(get('/api/personas?limit=1', as(KEY))).then((response) => response.status),
@@ -314,7 +315,8 @@ describe('a credential reaches what its grant reaches (ADR 0114)', () => {
     const refused = await fetch(get('/api/personas?limit=1', as(KEY)))
     expect(refused.status).toBe(401)
     expect(await refused.json()).toMatchObject({
-      error: { reason: 'rate_limited', retryAfter: expect.any(Number) },
+      // At the epoch, the next minute begins in a whole minute.
+      error: { reason: 'rate_limited', retryAfter: 60 },
     })
     expect((await fetch(get('/api/personas?limit=1', as(credential({ id: 'key-9' }))))).status).toBe(200)
   })

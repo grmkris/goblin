@@ -3,6 +3,7 @@ import type { FlowEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
+import * as TestClock from 'effect/testing/TestClock'
 import { ChatOperations, Chats, Conversations } from '../../../src/chats/service.ts'
 import { RoutineControl, RoutineRuns } from '../../../src/routines/service.ts'
 import { AgentInput } from '../../../src/runtime/input.ts'
@@ -60,9 +61,10 @@ const setupServices = (retooled: number[]) =>
 /**
  * The organizing groups (topics, personas, organize) as the agent serves them: lane D's services over real Topic,
  * Persona and receipt stores on SQLite. The gate's resident authority is the only fake. Nothing here
- * has an open chat to stop, an agent app or an MCP App, so Pi, Stop, the apps and the MCP host are never read.
+ * has an open chat to stop, an agent app or an MCP App, so Pi, Stop, the apps and the MCP host are never read. With
+ * `frozen`, the clock stands still at the epoch (`TestClock`), so every request falls in one fixed minute.
  */
-export const organizing = () => {
+export const organizing = (options: { readonly frozen?: boolean } = {}) => {
   const db = database()
   db.insert(appConversations).values({ chatId: '1', piSession: '1', kind: 'main', role: 'primary', createdAt: 1 }).run()
   let sessions = 100
@@ -142,6 +144,7 @@ export const organizing = () => {
           changes,
           Layer.succeed(Resident, resident.service),
           FlowEvents.layerWith((event) => Effect.sync(() => void flows.push(event))),
+          options.frozen === true ? TestClock.layer() : Layer.empty,
         ),
       ),
     ),
