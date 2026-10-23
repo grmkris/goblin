@@ -49,15 +49,31 @@ D1 (`organization`, `member`, `invitation`; `auth/workspaces.ts` reads and write
 served); a unique index keeps one membership per person and workspace. `GET /api/workspaces` lists the person's, oldest
 membership first, and gives a person with none a first one (named after them, its slug from their address) in one D1
 batch that runs only while they still have none. `POST /api/workspaces` makes another, `PATCH` renames it or moves its
-slug (an owner or admin), `DELETE` deletes it (an owner): its agent is erased first, then its keys, its place in
-clients' reaches and its memberships.
+slug (an owner or admin), `DELETE` deletes it (an owner): its agent is erased first, then its keys and their grants,
+its place in clients' grants and its memberships.
 
 Which agent a request reaches comes from its credential: a browser session names the workspace's slug in its path
 (`/w/<slug>/api/…`), checked against the person's membership in one D1 read on every request; an API key belongs to
-one workspace; an OAuth client reaches the workspaces its reach names ([ADR
-0097](../adr/0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md): `mcpReach`, `mcpReachWorkspace`), read with
-the person's memberships on every call, and each call names the one it is for. A person's clients and their reach are
+one workspace; an OAuth client reaches the workspaces its grant names ([ADRs
+0097](../adr/0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md), [0114](../adr/0114-one-grant-for-every-credential.md)),
+read with the person's memberships on every call, and each call names the one it is for. A person's clients are
 theirs, at `/api/clients` (`auth/clients.ts`).
+
+### Grants
+
+Every credential has one grant ([ADR 0114](../adr/0114-one-grant-for-every-credential.md),
+`packages/contracts/src/grants.ts`), in goblin's own auth D1 tables beside Better Auth's (`auth/grants.ts`): `grant`
+(its level, extras, lifetime and end, whether it reaches all of its person's workspaces, the MCP origins its threads
+may bring, revoked or not), `grantWorkspace` (per workspace, Topics, Personas and connections each `all` or `list`,
+and a generation that only moves on) and `grantReach` (the listed ids). A key's grant has the key's id and reaches its
+one workspace; a client's has its own id (`cg_…`), one per client and person. A change bumps the generation of every
+workspace it names, and a credential's create appends what it made to a list it has (`appendReach`).
+
+Approving is the person's who may: a key's grant an owner or admin of its workspace, a client's its own person; only
+an owner gives `keys`. A grant they may not approve is not found. `GET /api/grants/:id/terms` and `PUT /api/grants/:id`
+serve the widening page a refusal links to (`/consent/widen?grant=…`); `GET /api/clients/:clientId/terms` and
+`PUT /api/clients/:clientId/grant` the consent page (before the consent) and Settings (`auth/consent-terms.ts`). A change
+that narrows a grant's Topics ends its holder's published Events leases there first.
 
 ### Members and invitations
 
@@ -66,7 +82,7 @@ A workspace's people ([ADR 0093](../adr/0093-members-invitations-and-roles.md)) 
 (`PATCH …/members/:userId`), owners and admins remove (`DELETE`), an admin only members and an owner anyone, and the
 last owner stays, as it does when its account is deleted (refused while others work in the workspace); anyone else may
 leave (`POST …/members/leave`). Removing someone, or their leaving, takes the workspace out of their MCP clients'
-reaches in the same batch (ADR 0097).
+grants in the same batch (ADRs 0097, 0114).
 
 `POST /w/<slug>/api/members/invitations` invites addresses with a role (only an owner invites an admin): one
 `invitation` row each for seven days, replacing one still waiting for that address, mailed from the deployment's sender

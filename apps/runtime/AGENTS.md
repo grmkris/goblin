@@ -12,9 +12,11 @@ enter the workerd bundle.
   owner API as its caller, a key or an OAuth client of the owner (ADR 0086, `ownerCall` in `inbound/client.ts`); the
   Worker's other callers (the hooks, file links) use the internal API (`@goblin/contracts/internal`, behind
   `InternalGate`, `internalCall`); the one RPC method left, `deleteAgentData`, returns an encoded
-  result (`http/rpc.ts`), because Workers RPC drops error classes. Annotate an endpoint `EndpointScope` only on purpose
-  (ADRs 0081, 0086): it opens the endpoint to callers (servers' keys and OAuth clients of the owner) over HTTP and `/mcp`, so it needs a tool in `inbound/tools.ts`'s registry
-  and its handler must confine a key with `keys/policy.ts`. Never for grants, resident authority, files or keys.
+  result (`http/rpc.ts`), because Workers RPC drops error classes. Annotate an endpoint `EndpointAccess` (the level and
+  extra it needs of a credential's grant, ADR 0114) only on purpose: it opens the endpoint to credentials (servers'
+  keys and OAuth clients) over HTTP and `/mcp`, so it needs a tool in `inbound/tools.ts`'s registry and its handler
+  must check the reach of what it touches with `grants/policy.ts` (`reaches*`, `claim`, `confineSetup`). Never for
+  MCP tool grants, resident authority, files or keys.
 - **Composition.** Services are `Context.Service` tags in `<area>/service.ts`, built by their area's layer in
   `layers/` over the core layer (`layers/core.ts`). `layers/index.ts` orders the start's steps, which are the boot
   contract (keep their order and every await), then the area layers. A stateful object is made once, by its layer,

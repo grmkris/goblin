@@ -77,10 +77,11 @@ goblin is reachable by AI clients over MCP and by scripts over the API (ADRs 008
 claude.ai, Cursor) signs in to `/mcp` with OAuth, and the owner consents to each scope it asks for: managing Topics,
 sending in chats, managing Personas, reading conversations and runs; with them it manages the agent as the owner does,
 from the same tools a server's key gets. A server the owner runs gets a
-scoped `gbk_` API key from Settings and, with it, makes its own Topics and Personas, sends into their chats and reads
-the replies after a cursor, at `/api` or as the same operations on `/mcp`. It lists and reads back what it made, and
-with the `inspect` scope sees how its own chats ran, content-free, down to where each turn's time went (ADR 0084). A
-key never reaches the owner's own Topics or Personas and never keeps the agent active. Each Topic a key makes is a room
+`gbk_` API key from Settings with a grant (ADR 0114: a level, the Topics, Personas and connections it reaches, extras
+and a lifetime, the same shape an MCP client's consent gives) and, with it, makes Topics and Personas, sends into their
+chats and reads the replies after a cursor, at `/api` or as the same operations on `/mcp`. With the `inspect` extra it
+sees how chats within its reach ran, content-free, down to where each turn's time went (ADR 0084); a call its grant
+does not cover answers with a link where the owner can widen it. A key never keeps the agent active. Each Topic a key makes is a room
 (ADR 0108): its chats reach only that Topic's tools, skills and chats, whoever writes there, the server's messages are
 marked as its requests, and no other chat searches it. A secret that may have leaked is rotated in Settings: the same
 key, with all it made, and the old secret refused at once (ADR 0105).
@@ -91,7 +92,7 @@ Each event says what it ran with (ADR 0107): the release, the model endpoint and
 and tools that changed before a model call, and each MCP server's own name and version, under OpenTelemetry's names.
 A turn also reads as an OpenTelemetry trace (`goblin turn <operation> --otlp`) that any trace viewer opens.
 Workers Logs and Traces carry the same ids. A coding agent reads the owner's conversations and any turn's timeline
-through the read-only inspection tools of goblin's one MCP endpoint, `/mcp` (when the owner grants `goblin:inspect`, and `goblin:transcripts` for conversations in full), or
+through the read-only inspection tools of goblin's one MCP endpoint, `/mcp` (when its grant holds the `inspect` extra, ADR 0114), or
 the `goblin` CLI (`apps/cli`), and the agent answers "why did that fail?" with its own `diagnose` tool.
 Diagnostics focus on work needing attention; `problems --all` includes expected waits and recovered model attempts.
 Successful background model completions stay out of problems; their failures remain visible.

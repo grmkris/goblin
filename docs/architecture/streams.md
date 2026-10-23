@@ -25,8 +25,9 @@ started it ended.
 ## Reading a stream
 
 1. **Connect.** `GET /api/conversations/:id/stream`: a member's browser under `/w/<slug>/api/…` with its session
-   cookie, a server's key on `/api/…` with the key as its bearer (scope `conversations`). A key reaches only its own
-   room's chats; any other answers 404 in the error envelope, as does a chat that is not there. The answer is
+   cookie, a server's key on `/api/…` with the key as its bearer (its grant's `read`, ADR 0114). A key reaches only
+   the chats of the Topics its grant reaches; any other answers `access_insufficient` (403), and a chat that is not
+   there 404, in the error envelope. The answer is
    `text/event-stream`, never cached.
 2. **Frames.** Each event is one `data:` frame, its JSON on one line, LF line ends: `data: {"type":"RUN_STARTED",…}`
    and a blank line. Nothing else a reader must know of is sent: no `event:` names, ids or retry hints. A `: ping`
@@ -62,7 +63,7 @@ No string in any frame holds a secret goblin issues or keeps: one that holds som
 ## Driving a chat
 
 A send is AG-UI's `RunAgentInput` ([ADR 0111](../adr/0111-agui-run-input-is-the-send.md), `RunInput` in the
-contracts), posted to `POST /api/conversations/:id/messages` with the caller's credential (scope `conversations`):
+contracts), posted to `POST /api/conversations/:id/messages` with the caller's credential (its grant's `write`):
 
 ```json
 {

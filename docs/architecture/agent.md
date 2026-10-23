@@ -84,8 +84,8 @@ where the owner's browser and every inbound MCP client talk. The chat directory 
 from anyone but the owner's browser starts with an author tag block (`[from Claude Code]`, the `authorTag` contract),
 so the model and the web both know who wrote it. In a workspace of several people a member's message from the browser
 starts with one too, `[from member <name> · <user id>]` (`memberAuthor`, ADR 0094), and an OAuth client's names the
-member it acts for (`[from Claude Code for Ana]`); `requestAuthor` (`keys/policy.ts`) picks the block from the
-forwarded member and caller. Side
+member it acts for (`[from Claude Code for Ana]`); `requestAuthor` (`grants/policy.ts`) picks the block from the
+forwarded member and credential. Side
 **threads** are Pi conversations of their own: branched from a message of any open conversation (a Pi fork at that
 entry, so the thread sees its parent up to there and the parent never sees the thread), at any depth, or empty under
 main (ADR 0017). `app_conversations` registers each one as a chat tree (`parent_session`: its parent chat), with its

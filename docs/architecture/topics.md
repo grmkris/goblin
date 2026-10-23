@@ -66,8 +66,8 @@ native profiles. Neither is deployed-stage evidence.
 
 A Topic a server's API key made is a **room** ([ADR 0108](../adr/0108-a-keys-topic-is-a-room.md)), and so is every chat
 under it: its Conversation, threads, subagents, Persona forks and routine runs, whoever writes there, the owner too.
-`roomOf` (`keys/reach.ts`) tells one by `app_key_reach` (indexed by `(kind, resource_id)`, since the scope asks on every
-tool call), and `chatScope` (`setup/scope.ts`) gives its chats `room` and turns subagents and apps off whatever the
+`roomOf` (`keys/made-by.ts`) tells one by `app_key_reach` (indexed by `(kind, resource_id)`, since the scope asks on
+every tool call; who made a Topic is display and rooms only, never what a credential reaches, ADR 0114), and `chatScope` (`setup/scope.ts`) gives its chats `room` and turns subagents and apps off whatever the
 setup holds. In a room only `mcp_list`, `mcp_call` (the Topic's setup and the thread's declared servers), `skill_activate`,
 `skill_read`, `ask_user`, `search_chats`, `zoom`, `share_back`, `tool_search` and a Persona fork's native
 `<server>__<tool>` tools exist (`ROOM_TOOLS`, `pi/room.ts`):
@@ -86,7 +86,7 @@ A room's chats read a room block in their context (`topics/context.ts`): they re
 the server's operator guidance, which grants nothing. A key's message starts `[from server <key name>]` (ADR 0108), and
 its receipt's origin is `key`. A room's setup never holds everything of anything, an app or subagents, from any actor
 and through Undo too (`room_setup`, `TopicRegistry.setSetup`). `TopicView` and `TopicSummary` carry `room: { key }`,
-the key's name, from `app_key_reach.key_name`. Unit tests (`topic-setup-scope`, `room`, `retrieval`, `key-reach`) and the
+the key's name, from `app_key_reach.key_name`. Unit tests (`topic-setup-scope`, `room`, `retrieval`, `grant-reach`) and the
 local workerd cases `rooms-case.ts` and `thread-servers-case.ts` prove it; neither is deployed-stage evidence.
 
 ## Personas, organize receipts

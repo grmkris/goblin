@@ -11,7 +11,7 @@ is read-only: no query changes the agent or calls a model.
 ## Get access
 
 - MCP: `claude mcp add --transport http goblin https://dev.goblin.surf/mcp`, then the owner approves in the browser,
-  inspection included (`goblin:inspect`, and `goblin:transcripts` for the conversations in full). Tools: `inspect_problems`, `inspect_turns`, `inspect_turn`,
+  inspection included when its grant holds the `inspect` extra (ADR 0114; Settings → MCP clients changes it live). Tools: `inspect_problems`, `inspect_turns`, `inspect_turn`,
   `inspect_conversation`, `inspect_conversations`, `inspect_flows`, `inspect_details`, beside `ask_agent`. A connection that lists no `inspect_*` tools
   was approved before inspection joined `/mcp`: reconnect once (Claude Code: `/mcp` → goblin → Clear
   authentication).
@@ -104,7 +104,7 @@ found in it.
 The ledger lives in `apps/runtime/src/telemetry/` and follows Pi's commit listener (`telemetry/pi.ts`); inspection is
 `apps/runtime/src/inspect/` (the `Inspection` service, and the owner API's `inspect` group in `inspect/api.ts`); the
 MCP tools are `apps/runtime/src/inbound/inspect-tools.ts`, each calling the `inspect` group as its caller (ADR 0086):
-a token whose consent grants `goblin:inspect` gets the five content-free ones and `goblin:transcripts` the two conversation reads; a key with `inspect` the five content-free ones. Lines go only through `observability/logger.ts` (closed `LOG_EVENTS`, allowlisted keys),
+a credential whose grant holds `inspect` (ADR 0114) gets all seven, each reading only within its reach. Lines go only through `observability/logger.ts` (closed `LOG_EVENTS`, allowlisted keys),
 failures through `observability/report.ts`, and flow steps through `FlowEvents.record` (`observability/flows.ts`) to
 the ledger and, one point per operation, to Analytics Engine (`observability/ae.ts`). Their content-freedom is tested
 in `test/observability/`. A listener that throws faults

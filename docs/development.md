@@ -343,8 +343,9 @@ until it runs, real provider and Telegram delivery remain unverified.
   with an operation id (a Source message is `source-<source>-<message>`), then `inspect_conversation` for the words.
   `inspect_flows` shows how conversations moved (sends, replies, thread starts, moves, Personas, Delegates) and
   `inspect_details` the operation behind a message. Reading never calls a model; `ask_agent` does.
-- **The `goblin` CLI** (`apps/cli`) is the same from a terminal: an MCP client of `/mcp` that asks for
-  `goblin:inspect`, whose commands come from the server's tools (`goblin turn <operation id>` reads one turn).
+- **The `goblin` CLI** (`apps/cli`) is the same from a terminal: an MCP client of `/mcp` that asks for `goblin`, its
+  grant the one its person approves on the consent page (with `inspect` for these commands, ADR 0114), whose
+  commands come from the server's tools (`goblin turn <operation id>` reads one turn).
 
   ```sh
   export GOBLIN_ORIGIN=https://dev.goblin.surf   # which goblin: required, there is no default

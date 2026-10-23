@@ -170,8 +170,8 @@ without changing it or calling a model. The queries are in `contracts/src/inspec
 
 The agent answers them on the owner API's `inspect` group (`GET /api/inspect/…`, ADR 0086): the owner's app reads
 `details` for a message's Details sheet, and `/mcp`'s `inspect_*` tools call the same endpoints as their caller. The
-two conversation reads need `transcripts`, which only an OAuth client consented with `goblin:transcripts` holds; the
-content-free reads need `inspect`, which a key can hold too, seeing only the run events of chats within its reach
+reads need a credential's grant to hold `inspect` (ADR 0114), and a credential reads only within its reach: the two
+conversation reads the conversations of the Topics it reaches, the content-free reads the run events of their chats
 (`inspectReach`, ADR 0084; see Inbound MCP).
 
 The agent reads itself too: main has a `diagnose` tool (`pi/diagnose.ts`, wired by `telemetry/agent.ts`), so the

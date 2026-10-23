@@ -8,9 +8,9 @@ and its shapes in `packages/contracts/src/published-events.ts`).
 
 ## Who can use it
 
-Any caller holding the `conversations` scope: a server's API key (`Authorization: Bearer gbk_…`), an OAuth client of
-the owner with `goblin:conversations`, or a member's own session. A key sees only its own rooms' chats (its Topics,
-their threads, ADR 0108); a client or a member sees every chat of the workspace. Requests count toward the caller's
+Any credential (ADR 0114: a server's API key with `Authorization: Bearer gbk_…`, or an OAuth client), with `read`, or a
+member's own session. A credential sees only the chats of the Topics its grant reaches (a lease is made under its
+grant, and its fan-out checks the agent's mirror of it, `app_grant_reach`); a member sees every chat of the workspace. Requests count toward the caller's
 600 a minute, and never grant resident authority.
 
 ## The event
@@ -116,8 +116,8 @@ your own credential (`entries?after=`, or its stream).
 
 ## When access ends
 
-Revoking or rotating a key, a change of its scopes that drops `conversations`, and revoking an OAuth client end every
-lease they hold at once: each is sent `terminated` (`-32012`) before the access ends. A member removed from a workspace,
+Revoking or rotating a key, a change of a grant that narrows its Topics, and revoking an OAuth client end every lease
+they hold there at once: each is sent `terminated` (`-32012`) before the access ends. A member removed from a workspace,
 or a client whose reach no longer includes it, keeps its leases until they run out (a day at most); renewing is refused.
 
 ## Limits and assumptions

@@ -72,31 +72,31 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0078](0078-one-sidebar-and-one-apps-launcher.md) | One sidebar and one Apps launcher | Accepted |
 | [0079](0079-channel-info-and-goal-first-start.md) | Channel info and goal-first Start | Accepted; amended by 0080 |
 | [0080](0080-server-owned-start-kickoff.md) | Server-owned Start kickoff | Accepted |
-| [0081](0081-api-keys-and-the-same-operations-over-mcp.md) | Scoped API keys for servers, and the same operations over /mcp | Accepted; amended by 0084, 0085, 0086, 0089, 0090, 0091, 0105, 0108, 0109, 0110, 0112; its message body superseded by 0111 |
+| [0081](0081-api-keys-and-the-same-operations-over-mcp.md) | Scoped API keys for servers, and the same operations over /mcp | Accepted; amended by 0084, 0085, 0086, 0089, 0090, 0091, 0105, 0108, 0109, 0110, 0112, 0114; its message body superseded by 0111; its scopes superseded by 0114 |
 | [0082](0082-personas-ask-with-ask-user.md) | A tagged Persona asks with ask_user | Accepted |
 | [0083](0083-bounded-thinking-and-a-turn-that-answers.md) | Bounded thinking, and a turn that answers | Accepted; amended by 0100 |
-| [0084](0084-a-key-reads-back-what-it-made-and-how-it-ran.md) | A key reads back what it made, and how its chats ran | Accepted; amended by 0091, 0107 |
+| [0084](0084-a-key-reads-back-what-it-made-and-how-it-ran.md) | A key reads back what it made, and how its chats ran | Accepted; amended by 0091, 0107, 0114 |
 | [0085](0085-a-keys-rate-limit-is-a-fixed-minute-counted-by-its-agent.md) | A key's rate limit is a fixed minute, counted by its agent | Accepted; amended by 0086 |
-| [0086](0086-one-mcp-for-every-caller.md) | One /mcp for every caller | Accepted; amended by 0089, 0090, 0094, 0097, 0098, 0112 |
+| [0086](0086-one-mcp-for-every-caller.md) | One /mcp for every caller | Accepted; amended by 0089, 0090, 0094, 0097, 0098, 0112, 0114 |
 | [0087](0087-the-owners-own-subscription-models.md) | The owner's own subscription models | Accepted; amended by 0089 |
 | [0088](0088-resident-authority-lasts-until-revoked.md) | Resident authority lasts until revoked | Accepted |
 | [0089](0089-workspaces-own-agents.md) | Workspaces own agents | Accepted; amended by 0093; its consent naming one workspace superseded by 0097 |
 | [0090](0090-a-key-names-closes-and-reads-back-its-threads.md) | A key names, closes and reads back its threads | Accepted; amended by 0103 |
-| [0091](0091-a-key-names-the-mcp-servers-its-threads-may-use.md) | A key names the MCP servers its threads may use | Accepted |
+| [0091](0091-a-key-names-the-mcp-servers-its-threads-may-use.md) | A key names the MCP servers its threads may use | Accepted; amended by 0114 (origins are any credential's grant's) |
 | [0092](0092-mcp-calls-are-checked-against-their-schema-and-keep-the-servers-message.md) | MCP calls are checked against their schema and keep the server's message | Accepted |
 | [0093](0093-members-invitations-and-roles.md) | Members, invitations and roles | Accepted; amended by 0095, 0097, 0098 |
 | [0094](0094-a-members-message-names-who-wrote-it.md) | A member's message names who wrote it | Accepted |
 | [0095](0095-the-owners-subscription-workspace-takes-no-members.md) | The owner's subscription workspace takes no members | Accepted |
 | [0096](0096-a-source-configures-itself-from-its-servers-guide.md) | A Source configures itself from its server's guide | Accepted |
-| [0097](0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md) | One /mcp reaches the workspaces its consent chooses | Accepted |
-| [0098](0098-admin-for-configuration-and-every-mcp-power-opt-in.md) | Admin for configuration on every surface; every MCP power is opt-in | Accepted; amended by 0099 and 0110 |
+| [0097](0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md) | One /mcp reaches the workspaces its consent chooses | Accepted; amended by 0114 (the reach is the grant's) |
+| [0098](0098-admin-for-configuration-and-every-mcp-power-opt-in.md) | Admin for configuration on every surface; every MCP power is opt-in | Accepted; amended by 0099, 0110 and 0114 (its MCP powers are a grant's level and extras) |
 | [0099](0099-a-members-turn-gets-a-members-tools.md) | A member's turn gets a member's tools | Accepted; built; amends 0098; amended by 0108 |
 | [0100](0100-a-persona-thinks-at-its-own-level.md) | A Persona thinks at its own level | Accepted |
 | [0101](0101-a-persona-forks-mcp-tools-are-its-own.md) | A Persona fork's MCP tools are its own | Accepted; amended by 0102 |
 | [0102](0102-native-tools-are-a-personas-choice.md) | Native tools are a Persona's choice | Accepted |
 | [0103](0103-a-thread-declares-its-mcp-servers.md) | A thread declares the MCP servers its Personas call | Accepted |
 | [0104](0104-routine-data-stays-as-its-producer-sent-it.md) | Routine data stays as its producer sent it | Accepted |
-| [0105](0105-a-keys-secret-rotates-in-place.md) | A key's secret rotates in place | Accepted |
+| [0105](0105-a-keys-secret-rotates-in-place.md) | A key's secret rotates in place | Accepted; amended by 0114 (a key's end is its grant's) |
 | [0106](0106-the-deploy-smoke-makes-no-model-call.md) | The deploy smoke makes no model call | Accepted |
 | [0107](0107-a-turn-says-what-it-ran-with-and-reads-as-an-opentelemetry-trace.md) | A turn says what it ran with, and reads as an OpenTelemetry trace | Accepted; built |
 | [0108](0108-a-keys-topic-is-a-room.md) | A key's Topic is a room | Accepted; built; amends 0081, 0099 |
@@ -105,3 +105,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0111](0111-agui-run-input-is-the-send.md) | AG-UI's run input is the send, answered with its receipt or its run's events | Accepted; built; supersedes 0081's message body, 0034's `StartThread` and 0033's `SendMessage.personaOrder` |
 | [0112](0112-goblin-publishes-mcp-events.md) | goblin publishes MCP Events: `conversation.updated` by signed webhook or poll | Accepted; built; amends 0081, 0086 |
 | [0113](0113-a-room-runs-in-its-own-object.md) | A room runs in its own object; the workspace object is the control plane | Accepted; slice 1 built (a room takes no routine, Source, owner App or file) |
+| [0114](0114-one-grant-for-every-credential.md) | One grant for every credential: level, reach, extras and lifetime, for keys and OAuth clients alike | Accepted; release A built; amends 0081, 0084, 0086, 0091, 0097, 0098, 0105 |

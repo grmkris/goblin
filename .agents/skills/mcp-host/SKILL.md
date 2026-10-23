@@ -40,15 +40,18 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   `resources/read` under the owner's resource grant, and a block that cannot be kept is a note, never a failed call.
   Record a result's content with `recordedContent` (links without query or fragment) wherever it reaches a transcript
   or an outcome.
-- Inbound tokens must verify locally, name `/mcp` as audience, come from an enabled client with live owner consent.
-  The workspaces a client reaches are its reach (ADR 0097), read with the person's memberships on every call: a tool
+- Inbound tokens must verify locally, name `/mcp` as audience, come from an enabled client with live consent and a live
+  grant (ADR 0114); their scope claim (`goblin`) counts for nothing. Every credential, key or client, has one grant:
+  level × reach × extras × lifetime (`packages/contracts/src/grants.ts`, stored in `auth/grants.ts`, mirrored in the
+  agent by `grants/service.ts`). The workspaces a client reaches are its grant's (ADR 0097), read with the person's
+  memberships on every call: a tool
   of a client that reaches more than one takes a required `workspace` (`inbound/mcp-server.ts` `naming`), and a new
   tool needs nothing extra for it as long as its input is a Struct made by `standard`.
   An inbound client's messages go into main, labelled with its name. A server key's go into its own Topics, each a
   room (ADR 0108), labelled `[from server <key name>]`: a room's chats reach only the gateway within its setup and its
   thread's declared servers, skills and their own chats, refused past that at call time (`pi/room.ts`); never add a
   tool a room offers without adding it to `ROOM_TOOLS` on purpose.
-- Every `EndpointScope` endpoint has its tool in `inbound/tools.ts` but the streamed ones (`STREAMED`): a chat's stream
+- Every `EndpointAccess` endpoint has its tool in `inbound/tools.ts` but the streamed ones (`STREAMED`): a chat's stream
   (ADR 0110) is server-sent events a key reads over HTTP with its own credential, and the server's instructions say
   where. A key reads a chat's stream in full, so nothing a tool returns may carry a credential; the stream's frames
   redact goblin-shaped secrets as a backstop (`streams/redact.ts`), never the boundary.
@@ -65,8 +68,9 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
 - goblin also publishes Events (`publish/`, ADR 0112, [published events](../../../docs/architecture/published-events.md)):
   one thin `conversation.updated` wake (`{ chat, topic, entry, activity, attention }`, never content), served as the
   owner API's `events` group and on `/mcp` (`inbound/events-methods.ts`, which declares `capabilities.events` and the
-  extension to a caller holding `conversations`). What a wake says is pure (`publish/payload.ts`), apart from the
-  journal and fan-out that take it (`publish/journal.ts`); a key's leases reach only its rooms. Leases are verified by
+  extension to every credential). What a wake says is pure (`publish/payload.ts`), apart from the
+  journal and fan-out that take it (`publish/journal.ts`); a credential's lease reaches only the chats of Topics its
+  grant reaches, by the agent's mirror (`app_grant_reach`), with no request. Leases are verified by
   a signed challenge outside any transaction; deliveries are claimed, sent through `publishFetch` and settled under
   their claim, never inside a transaction. The account API ends a holder's leases (`/internal/publish/terminate`)
   before it revokes, rotates or narrows a key or revokes a client; keep that ahead of any new way access ends.
@@ -104,11 +108,15 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   `mcp` group's raw `oauthCallback` (`GET /api/mcp/oauth/callback`; the edge sends a non-member of the state's
   workspace to `/connect-elsewhere` instead, ADR 0096), a redirect to Connections, with `ref` when it
   failed.
-- Inbound `/mcp` is one server for every caller (ADR 0086): an OAuth client of the owner or a server's `gbk_` key
-  (`inbound/route.ts`). Each tool in the registry (`inbound/tools.ts`, `mcp-server.ts`, `inspect-tools.ts`) calls one
-  owner endpoint as the caller (`ownerCall` in `inbound/client.ts`, forwarding `x-goblin-caller`) and is listed only
-  when the caller holds the endpoint's `EndpointScope`; owner admission checks the scope, counts the caller per minute
-  and never grants resident authority. A new tool is a new annotated endpoint first.
+- Inbound `/mcp` is one server for every credential (ADRs 0086, 0114): an OAuth client acting for a person or a
+  server's `gbk_` key (`inbound/route.ts`). Each tool in the registry (`inbound/tools.ts`, `mcp-server.ts`,
+  `inspect-tools.ts`, `config-tools.ts`) calls one owner endpoint as the credential (`ownerCall` in
+  `inbound/client.ts`, forwarding `x-goblin-caller`) and is listed only when the grant's level and extras hold the
+  endpoint's `EndpointAccess` (`offers`); owner admission checks the same, a client's person's role too
+  (`ROLE_POWER`), counts the grant per minute, syncs the mirror and never grants resident authority. Handlers check
+  reach with `grants/policy.ts`. A refusal for want of access is `AccessInsufficient` with a `widenUrl`; `replyWith`
+  offers it as URL elicitation to a client that declares it (`inbound/access.ts`). `access_read` answers the grant
+  itself. A new tool is a new annotated endpoint first.
 - Fixture tests (`test/mcp/`) prove protocol behaviour; the real behaviour of mysi and its apps (myplan, mytab and the
   rest) is proven only on dev.
 

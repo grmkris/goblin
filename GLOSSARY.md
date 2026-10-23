@@ -36,22 +36,48 @@ The agent's own standing permission to use the owner's MCP connections while the
 signed-in action grants it, and it lasts until the owner revokes it in Settings (ADR 0088).
 
 **Inbound client**:
-An MCP client (Claude Code, another agent) a person authorized to call goblin's `/mcp`, reaching the workspaces its
-**reach** names (ADR 0097). Settings lists them as Connected clients.
-
-**Reach**:
-Which of a person's workspaces one of their inbound clients reaches (ADR 0097): all of them, ones they join later
-included, or those they chose, while they are a member of each. Set on the consent page, changed in Settings; a client
-that reaches more than one names the workspace on every call.
+An MCP client (Claude Code, another agent) a person authorized to call goblin's `/mcp`, acting for them with the
+**grant** they gave it and never more than their role (ADRs 0097, 0114). Settings lists them as MCP clients.
 _Avoid_: apps that use your agent
 
 **API key**:
-A `gbk_` key an owner makes in Settings for a server the workspace runs (ADR 0081). It belongs to that workspace (ADR 0089) and reaches only the Topics, chats and Personas it made, over `/api` or `/mcp`, and never keeps the agent active. Each Topic it makes is a **room** (ADR 0108). Its scopes can change and it keeps what it
-made (ADR 0084). With an OAuth client of the owner it is one of `/mcp`'s two kinds of caller (ADR 0086).
+A `gbk_` key an owner or admin makes in Settings for a server the workspace runs (ADR 0081). It belongs to that
+workspace (ADR 0089), does what its **grant** allows over `/api` or `/mcp`, and never keeps the agent active. Each Topic
+it makes is a **room** (ADR 0108).
 _Avoid_: token, service account
 
+**Credential**:
+An API key or an inbound client: what calls goblin for a server or a person's agent, each with its own grant (ADR 0114).
+_Avoid_: caller, principal
+
 **Grant**:
+What one credential may do (ADR 0114): its level, reach, extras and lifetime. A person's own power comes from their
+role, never a grant.
+_Avoid_: scope, permission
+
+**Level**:
+How much a grant may do within its reach: `read` sees, `write` also sends and makes Topics and threads, `manage` also
+makes and changes Personas and a Topic's settings.
+
+**Extra**:
+A named power beside a grant's level: `setup`, `routines` (both risky), `inspect`, and `keys`, which only an owner gives.
+
+**Reach**:
+What a grant reaches: all of its person's workspaces or those named, and in each its Topics, Personas and
+connections, each all or a list that grows with what the credential makes.
+
+**Lifetime**:
+How long a grant lasts: until revoked, or 1, 7, 30, 90 or 365 days from its last approval.
+_Avoid_: expiry (of a key)
+
+**Widening**:
+Approving more for a grant on the page a refusal links to, by the person who may approve it: an owner or admin for a
+key, its own person for an inbound client.
+_Avoid_: re-consent, upgrade
+
+**Tool grant**:
 The owner's permission for one tool of one connection. A tool grant also covers the App that tool declares.
+_Avoid_: grant (a credential's)
 
 **Suggested access**:
 goblin's suggestion for each tool from its annotations (ADR 0060): run when needed for one that says it only reads,
