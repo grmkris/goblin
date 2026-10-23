@@ -107,7 +107,7 @@ export const organizing = () => {
     personas,
     invocations: unread,
     receipts,
-    fence: { ownerOnly: (id: string) => id === 'sub/opus', keyTopic: () => false },
+    fence: { ownerOnly: (id: string) => id === 'sub/opus' },
   }).pipe(Layer.provide(Layer.merge(KeyedLock.layer, changes)))
   const { fetch } = serve(
     served(

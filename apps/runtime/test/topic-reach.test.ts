@@ -8,12 +8,15 @@ import { afterEach } from 'vitest'
 import { ChatId } from '../src/chats/directory.ts'
 import { Chats } from '../src/chats/service.ts'
 import { Forbidden } from '../src/http/errors.ts'
-import { adminOnly } from '../src/pi/asker.ts'
-import { BOUNDARY_TEXT, requireHub, requireWithin, sessionBoundary } from '../src/pi/within.ts'
+import { BOUNDARY_TEXT, adminOnly } from '../src/pi/asker.ts'
+import { BACKGROUND, conversationId } from '../src/pi/context.ts'
+import { PiSessions } from '../src/pi/sessions.ts'
+import { callBoundary, requireWithin, sessionBoundary } from '../src/pi/within.ts'
 import { RoutineStore } from '../src/routines/store.ts'
 import { routeRow } from '../src/sources/store.ts'
 import { appMadeBy } from '../src/storage/made-by.ts'
 import { chatDatabase, durable, sqliteDb } from './chats-sqlite.ts'
+import { fake } from './fake.ts'
 import { stub } from './http/api/fixture.ts'
 import { PAYLOAD_SETUP, message, sourceWorld } from './sources-fixture.ts'
 
@@ -73,23 +76,30 @@ const places = () => {
     stub(Chats, {
       chatOf: (session: string) => Effect.succeed(known.has(session) ? Option.some(ChatId(session)) : Option.none()),
     }),
+    // A call outside a live run is the agent's own work, which reads no submission.
+    Layer.succeed(PiSessions, fake<PiSessions['Service']>({})),
     Layer.effectDiscard(Effect.addFinalizer(() => Effect.sync(close))),
   )
 }
+
+/** A call in session `session` outside a live run: the agent's own work, an admin's. */
+const call = (session: string) => ({
+  conversationId: conversationId(session),
+  snapshot: async () => undefined,
+})
 
 describe("what the agent's tools act on from where they run (ADR 0115)", () => {
   it.effect('acts on its own Topic from a sealed one, and on any Topic from the hub', () =>
     Effect.gen(function* () {
       expect(yield* sessionBoundary('20')).toEqual({ topic: 2, hub: false })
-      yield* requireWithin('20', 2)
-      const refused = yield* Effect.flip(requireWithin('20', 3))
+      expect(yield* callBoundary(call('1'), BACKGROUND)).toEqual({ topic: 1, hub: true })
+      yield* requireWithin(call('20'), BACKGROUND, 2)
+      const refused = yield* Effect.flip(requireWithin(call('20'), BACKGROUND, 3))
       expect(refused).toMatchObject({ _tag: 'Forbidden', reason: 'boundary' })
-      yield* requireWithin('1', 3)
-      yield* requireHub('1')
-      expect(yield* Effect.flip(requireHub('30'))).toMatchObject({ _tag: 'Forbidden', reason: 'boundary' })
+      yield* requireWithin(call('1'), BACKGROUND, 3)
       // A session no chat owns reaches nothing.
       expect(yield* sessionBoundary('99')).toBeUndefined()
-      expect(yield* Effect.flip(requireWithin('99', 2))).toMatchObject({ reason: 'boundary' })
+      expect(yield* Effect.flip(requireWithin(call('99'), BACKGROUND, 2))).toMatchObject({ reason: 'boundary' })
     }).pipe(Effect.provide(places())),
   )
 

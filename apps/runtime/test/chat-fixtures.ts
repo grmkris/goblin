@@ -52,8 +52,8 @@ export const portServices = ({ db, harness, flows = FlowEvents.noop }: PortInsta
     fake<AgentInputs>({
       harness,
       applied: new Map(),
-      toolSets: { subagents: [], room: [] },
-      retooled: new Set(),
+      toolSets: { subagents: [], all: [] },
+      retooled: new Map(),
       env: fake<RuntimeEnv>(PROBE_MODEL),
       workspaceId: 'probe-owner',
     }),

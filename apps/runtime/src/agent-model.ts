@@ -7,16 +7,20 @@ import { Models } from './models.ts'
 import { BACKGROUND } from './pi/context.ts'
 import { modelRef } from './pi/model.ts'
 import { PiSessions, fromPi } from './pi/sessions.ts'
+import type { TurnPower } from './grants/power.ts'
 import type { Db } from './runtime/db.ts'
 import { AgentInput } from './runtime/input.ts'
 import { type ToolSets, filterFollowsScope, piToolsFor } from './setup/scope.ts'
 
 export type Applied = Map<string, string>
 
-/** The sessions whose Pi tool filter `useRoomTools` applied in this object's lifetime. */
-export type Retooled = Set<string>
+/**
+ * The Pi tool filter `useTools` applied to each session in this object's lifetime, by the names it removes; a change
+ * of the filter outside it (a setup's, a helper's switches) forgets the session, so its next turn applies its own.
+ */
+export type Retooled = Map<string, string>
 
-/** What `useRoomTools` reads: Pi, the agent's database, the tool sets a filter removes, and what it applied already. */
+/** What `useTools` reads: Pi, the agent's database, the tool sets a filter removes, and what it applied already. */
 export type Retooling = {
   readonly pi: PiSessions['Service']
   readonly db: Db['Service']
@@ -39,28 +43,33 @@ export const useModel = (pi: PiSessions['Service'], applied: Applied, session: s
     applied.set(session, id)
   })
 
+/** A filter as `Retooled` remembers it: the names it removes, in order. */
+const digestOf = (tools: ReturnType<typeof piToolsFor>): string =>
+  tools === null ? '' : tools.remove.map((tool) => tool.name).join('\n')
+
 /**
- * Applies chat `chat`'s Pi tool filter to `session` before its first turn in this object's lifetime (ADR 0108): a
- * filter stored before a deploy changed what a room offers, or one a failed retool left as it was, is put right before
- * the model is asked again. Only a chat whose filter follows its scope (not a Persona's fork or a routine's run, whose
- * filters are set when they are made). The room guard (`pi/room.ts`) refuses whatever a stale filter still offers.
+ * Offers `session` the tools a turn with `power` may use in chat `chat` (ADR 0115) before its sender's input reaches
+ * it: Pi's filter is set again when what it removes changed since this object last set it (another sender's turn, a
+ * filter stored before a deploy, one a failed retool left as it was). Only a chat whose filter follows its scope (not a
+ * Persona's fork or a routine's run, whose filters are set when they are made). The power guard (`pi/power.ts`) refuses
+ * whatever a filter still offers, so a run that takes several senders' inputs does no more than all of them may.
  */
-export const useRoomTools = (
+export const useTools = (
   { pi, db, toolSets, retooled }: Retooling,
   chat: string,
   session: string,
+  power: TurnPower,
 ): Effect.Effect<void, AppError> =>
   Effect.gen(function* () {
-    if (retooled.has(session)) return
     const tools = yield* attemptSync(() =>
-      filterFollowsScope(db, chat) ? { filter: piToolsFor(db, toolSets, chat) } : undefined,
+      filterFollowsScope(db, chat) ? piToolsFor(db, toolSets, chat, power) : undefined,
     )
-    if (tools !== undefined) {
-      const conversation = yield* fromPi(pi.conversation(session))
-      if (Option.isSome(conversation))
-        yield* attempt(() => conversation.value.configure({ tools: tools.filter }, BACKGROUND))
-    }
-    retooled.add(session)
+    if (tools === undefined) return
+    const digest = digestOf(tools)
+    if (retooled.get(session) === digest) return
+    const conversation = yield* fromPi(pi.conversation(session))
+    if (Option.isSome(conversation)) yield* attempt(() => conversation.value.configure({ tools }, BACKGROUND))
+    retooled.set(session, digest)
   })
 
 /** The owner picks a model: main is put on it at once, the others at their next turn. */

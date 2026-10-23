@@ -304,8 +304,8 @@ const instance = (harness: PiHarness, calls: Calls) => {
   return fake<AgentInputs>({
     harness,
     applied: new Map(),
-    toolSets: { subagents: [], room: [] },
-    retooled: new Set(),
+    toolSets: { subagents: [], all: [] },
+    retooled: new Map(),
     personas,
   })
 }

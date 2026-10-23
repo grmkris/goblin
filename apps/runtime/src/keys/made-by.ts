@@ -5,24 +5,13 @@ import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import { appMadeBy } from '../storage/made-by.ts'
 
 /**
- * Which server's key made a Topic or a Persona (ADR 0108), for display only: views name it, and a Topic a key made is a
- * room until rooms are removed (ADR 0114 leaves them to the next release). What a credential reaches is its grant's
- * (`grants/`), never this.
+ * Which server's key made a Topic or a Persona, for display only (ADRs 0114, 0115): views name it, and the sidebar
+ * groups by it. What a credential reaches is its grant's (`grants/`), and what a turn may do its senders' power
+ * (`grants/power.ts`), never this.
  */
 
 /** What a key can make: a Topic or a Persona. */
 export type MadeKind = 'topic' | 'persona'
-
-/**
- * Whether Topic `topic` is a room (ADR 0108): a server's key made it, so every chat under it reaches only it, and its
- * work is a server's (ADR 0087).
- */
-export const roomOf = <RunResult>(db: SQLiteAsyncDatabase<'sync', RunResult>, topic: number): boolean =>
-  db
-    .select({ keyId: appMadeBy.keyId })
-    .from(appMadeBy)
-    .where(and(eq(appMadeBy.kind, 'topic'), eq(appMadeBy.resourceId, topic)))
-    .get() !== undefined
 
 /** A key as what it made records it: its id and its name (ADR 0108). */
 type Maker = { readonly keyId: string; readonly name: string }

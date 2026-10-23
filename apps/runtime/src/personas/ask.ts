@@ -2,17 +2,18 @@ import type { TextContent } from '@earendil-works/pi-ai'
 import { type PersonaAskData, type PersonaRevisionView, type PersonaSetup, authorOf } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
-import { useRoomTools } from '../agent-model.ts'
+import { useTools } from '../agent-model.ts'
 import { epochSeconds } from '../clock.ts'
 import { ChatOperations, Chats, Conversations } from '../chats/service.ts'
 import { InvalidInput, NotFound, attempt, attemptSync, toAppError } from '../http/errors.ts'
-import { requestKey } from '../grants/policy.ts'
-import { roomOf } from '../keys/made-by.ts'
+import { requestPower } from '../grants/policy.ts'
+import { AUTOMATION } from '../grants/power.ts'
 import { conversationId } from '../pi/context.ts'
 import { PiSessions } from '../pi/sessions.ts'
 import type { FrozenPersona } from '../pi/persona-turn.ts'
 import { Db } from '../runtime/db.ts'
 import { AgentInput } from '../runtime/input.ts'
+import { piToolsFor } from '../setup/scope.ts'
 import { Invocations, Personas } from './service.ts'
 
 /**
@@ -54,21 +55,21 @@ const frozenOf = (
 })
 
 /**
- * Persona `id` at `revision`, frozen for a turn in Topic `topic`: its words, its setup, its own model
- * (`Personas.ownModel`), how hard it thinks (ADR 0100) and how it reaches its tools (ADR 0102).
+ * Persona `id` at `revision`, frozen for a turn: its words, its setup, its own model (`Personas.ownModel`), how hard it
+ * thinks (ADR 0100) and how it reaches its tools (ADR 0102).
  */
-export const frozenAt = (id: number, revision: number, topic: number) =>
+export const frozenAt = (id: number, revision: number) =>
   Effect.gen(function* () {
     const personas = yield* Personas
     const definition = yield* personas.revision(id, revision)
-    return frozenOf(id, revision, definition, yield* personas.ownModel(definition.model, topic))
+    return frozenOf(id, revision, definition, yield* personas.ownModel(definition.model))
   })
 
 /**
- * The tagged Personas as they are now, each at its current revision, for a turn in Topic `topic`; one that is gone or
- * archived refuses the send.
+ * The tagged Personas as they are now, each at its current revision, for a turn; one that is gone or archived refuses
+ * the send.
  */
-const freeze = (ids: readonly number[], topic: number) =>
+const freeze = (ids: readonly number[]) =>
   Effect.gen(function* () {
     const personas = yield* Personas
     const active = yield* personas.active
@@ -76,7 +77,7 @@ const freeze = (ids: readonly number[], topic: number) =>
       Effect.gen(function* () {
         const persona = active.find((each) => each.id === id)
         if (persona === undefined) return yield* new InvalidInput({ reason: `composer:persona:${String(id)}` })
-        return frozenOf(id, persona.revision, persona, yield* personas.ownModel(persona.model, topic))
+        return frozenOf(id, persona.revision, persona, yield* personas.ownModel(persona.model))
       }),
     )
   })
@@ -108,9 +109,9 @@ const askEntry = (
 /**
  * The owner tagged Personas (in the app, or through a Source route that a Persona answers, `from`): each
  * answers once, attributed, in this chat, and Goblin does not (ADR 0033). Admitted once per operation
- * (`ChatOperations.admit`, under the chat's lock): record who was asked, put the chat's tool filter right (its first
- * turn in this lifetime, ADR 0108; a fork copies it), write the ask into the chat as a passive `app.persona_ask` entry
- * (no run starts) and create one Persona turn per Persona, each told in a room which tools a room does not offer.
+ * (`ChatOperations.admit`, under the chat's lock): record who was asked, put the chat's tool filter right for its
+ * asker (`useTools`, ADR 0115; a fork copies it), write the ask into the chat as a passive `app.persona_ask` entry (no
+ * run starts) and create one Persona turn per Persona, each told which tools its asker's power does not reach there.
  * Nothing here waits for a model.
  */
 export const askPersonas = (
@@ -126,16 +127,17 @@ export const askPersonas = (
     const pi = yield* PiSessions
     const db = yield* Db
     const now = yield* epochSeconds
-    const topic = yield* (yield* Chats).topicOf(input.thread)
-    const frozen = yield* freeze(ids, topic)
-    const room = (yield* attemptSync(() => roomOf(db, topic))) ? toolSets.room.map((tool) => tool.name) : undefined
+    const frozen = yield* freeze(ids)
+    const power = (yield* requestPower) ?? AUTOMATION
+    const filter = yield* attemptSync(() => piToolsFor(db, toolSets, input.thread, power))
+    const denied = filter === null ? [] : filter.remove.map((tool) => tool.name)
     if (frozen.length > 8) return yield* new InvalidInput({ reason: 'persona_count' })
     const admission = {
       chat: input.thread,
       operationId: input.operationId,
       receipt: {
         kind: 'persona_ask',
-        origin: from.via === 'mcp' ? 'source' : (yield* requestKey) === undefined ? 'owner' : 'key',
+        origin: from.via === 'mcp' ? 'source' : power.server ? 'key' : 'owner',
       },
       flow: { flow: 'persona_ask', via: from.via, actor: 'owner', count: frozen.length, personaOrder: order },
     } as const
@@ -149,7 +151,7 @@ export const askPersonas = (
           order: index,
         }))
         yield* invocations.insert(asked, now)
-        yield* useRoomTools({ pi, db, toolSets, retooled }, input.thread, admitted.session)
+        yield* useTools({ pi, db, toolSets, retooled }, input.thread, admitted.session, power)
         const write = { requestId: input.operationId, entry: askEntry(frozen, order, content, now) }
         const harness = yield* Effect.andThen(pi.write(admitted.session, write), pi.pi).pipe(
           Effect.catchTag('PiFailure', (failure) => Effect.fail(toAppError(failure.cause))),
@@ -162,7 +164,8 @@ export const askPersonas = (
             parent,
             personas: frozen,
             order,
-            ...(room === undefined ? {} : { room }),
+            denied,
+            server: power.server,
           }),
         )
         return { session: admitted.session, operationId: input.operationId, accepted: true }
@@ -182,7 +185,7 @@ export const resumePersona = Effect.fn('personas.resume')(function* (fork: strin
   yield* (yield* Conversations).requireActing(fork)
   // The reply's receipt keeps who sent it, so the resumed fork's tools tell a member's reply (ADR 0099).
   yield* (yield* ChatOperations).record(found.parent, operationId, { kind: 'persona_reply', origin: 'owner' })
-  const persona = yield* frozenAt(found.persona, found.revision, yield* chats.topicOf(found.parent))
+  const persona = yield* frozenAt(found.persona, found.revision)
   const invocations = yield* Invocations
   const asked = { operationId, persona: persona.id, revision: persona.revision, chat: found.parent, order: 0 }
   yield* invocations.insert([asked], yield* epochSeconds)

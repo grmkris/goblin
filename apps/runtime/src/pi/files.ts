@@ -51,7 +51,7 @@ const FileLink = Schema.Struct({
 export function filesExtension(run: RunProgram) {
   return defineExtension({
     name: 'goblin.files',
-    // Only where the tools are offered: a room has them filtered out (ADR 0108).
+    // Only where the tools are offered: a turn whose power lacks them has them filtered out (ADR 0115).
     sections: [
       section('files', (input) =>
         input.agent.tools.some((offered) => FILE_TOOLS.includes(offered.name)) ? GUIDE : undefined,

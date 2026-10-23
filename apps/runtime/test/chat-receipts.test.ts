@@ -3,11 +3,12 @@ import {
   RECEIPT_RETENTION,
   admitReceipt,
   advanceReceipt,
-  askedByMember,
   receiptIn,
   receiptOf,
+  receiptPowers,
   relatedReceipts,
 } from '../src/chats/receipts.ts'
+import { powerOfAll, senderPower } from '../src/grants/power.ts'
 import { chatDatabase } from './chats-sqlite.ts'
 
 const cleanups: (() => void)[] = []
@@ -119,16 +120,32 @@ describe('chat operation receipts (unit)', () => {
     expect(receiptIn(db, '1', 'mine')).toMatchObject({ role: 'owner' })
     expect(receiptIn(db, '1', 'source')).not.toHaveProperty('role')
     expect(receiptOf(db, 'theirs')).toMatchObject({ chat: '7', role: 'member' })
-    expect(askedByMember(db, [])).toBe(false)
-    expect(askedByMember(db, ['mine', 'source', 'missing'])).toBe(false)
-    expect(askedByMember(db, ['mine', 'theirs'])).toBe(true)
+    // A receipt made before powers were reads as its role says, and work no person sent as an admin's (ADR 0115).
+    expect(receiptPowers(db, [])).toEqual([])
+    expect(powerOfAll(receiptPowers(db, ['mine', 'source', 'missing']))).toMatchObject({ level: 'manage' })
+    expect(powerOfAll(receiptPowers(db, ['mine', 'theirs']))).toMatchObject({ level: 'write', extras: ['inspect'] })
+  })
+
+  it('keeps the power of whoever admitted an operation, and narrows it when someone who may do less replays it', () => {
+    const { db } = database()
+    const key = senderPower({
+      kind: 'key',
+      grant: { grantId: 'key-1', level: 'write', extras: [], topics: 'list', connections: 'all' },
+    })
+    const owner = senderPower({ kind: 'person', role: 'owner' })
+    admitReceipt(db, { chat: '1', operationId: 'op', receipt: { ...send, power: owner }, session: () => '41', now: 1 })
+    expect(receiptIn(db, '1', 'op')?.power).toEqual(owner)
+    admitReceipt(db, { chat: '1', operationId: 'op', receipt: { ...send, power: key }, session: () => '41', now: 2 })
+    expect(receiptPowers(db, ['op'])).toEqual([
+      { level: 'write', extras: [], server: true, topicLists: ['key-1'], connectionLists: [] },
+    ])
   })
 
   it("marks an operation a member replays as theirs, and never unmarks a member's", () => {
     const { db, sqlite } = database()
     const member = { ...send, role: 'member' } as const
     admitReceipt(db, { chat: '1', operationId: 'reused', receipt: send, session: () => '41', now: 1 })
-    expect(askedByMember(db, ['reused'])).toBe(false)
+    expect(powerOfAll(receiptPowers(db, ['reused'])).level).toBe('manage')
     expect(
       admitReceipt(db, { chat: '1', operationId: 'reused', receipt: member, session: () => '43', now: 2 }),
     ).toEqual({
@@ -143,7 +160,7 @@ describe('chat operation receipts (unit)', () => {
       session: () => '41',
       now: 3,
     })
-    expect(askedByMember(db, ['reused'])).toBe(true)
+    expect(powerOfAll(receiptPowers(db, ['reused']))).toMatchObject({ level: 'write', extras: ['inspect'] })
     expect(() => sqlite.exec("UPDATE app_chat_operations SET role = 'guest'")).toThrow(/CHECK/u)
   })
 })

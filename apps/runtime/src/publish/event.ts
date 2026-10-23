@@ -11,7 +11,7 @@ export const DESCRIPTOR: PublishedEvents['events'][number] = {
   name: CONVERSATION_UPDATED,
   title: 'Conversation updated',
   description:
-    'A chat changed: a message or answer was committed, its work started or ended, or what waits for a person changed. A thin wake: read the chat with entries?after= from your cursor. At most one a second per chat, and always one when its work ends or its attention changes. A key sees only its own rooms; leave the arguments out for every chat in reach, or name one Topic or one chat.',
+    'A chat changed: a message or answer was committed, its work started or ended, or what waits for a person changed. A thin wake: read the chat with entries?after= from your cursor. At most one a second per chat, and always one when its work ends or its attention changes. A credential sees only the chats of the Topics its grant reaches; leave the arguments out for every chat in reach, or name one Topic or one chat.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -21,7 +21,7 @@ import { defaultAvatar } from '../personas/registry.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { createTopic, editTopicSetup, topicNamed, updateTopic } from '../topics/program.ts'
 import { discussionSeed } from '../topics/seed.ts'
-import { adminOnly, requireAdminTurn } from './asker.ts'
+import { adminOnly, requirePower } from './asker.ts'
 import { PiSessions, fromPi } from './sessions.ts'
 import { typedTool } from './typed-tool.ts'
 import { requireWithin } from './within.ts'
@@ -93,8 +93,8 @@ const topicTools = (run: RunProgram) => [
       await run(requireResident)
       const topic = await run(
         Effect.gen(function* () {
-          // A Topic is every member's to make; one with a setup takes an admin (ADR 0098), also on a member's turn.
-          if (setup !== undefined) yield* requireAdminTurn(api, context)
+          // A Topic is every writer's to make; one with a setup takes `setup` too (ADRs 0098, 0115), whoever sent the turn.
+          if (setup !== undefined) yield* requirePower(api, context, { extra: 'setup' })
           const found = yield* fromPi(PiSessions.use((pi) => pi.conversation(String(api.conversationId))))
           const conversation = Option.getOrUndefined(found)
           const { operationId, ...by } = yield* byAgent(api)
@@ -119,12 +119,12 @@ const topicTools = (run: RunProgram) => [
     input: Schema.Struct({ topic: TopicName, name: TopicName }),
     output: Done,
     replay: 'safe',
-    execute: async ({ topic, name }, api) => {
+    execute: async ({ topic, name }, api, context) => {
       await run(requireResident)
       const renamed = await run(
         Effect.gen(function* () {
           const found = yield* topicNamed(topic)
-          yield* requireWithin(String(api.conversationId), found.id)
+          yield* requireWithin(api, context, found.id)
           return yield* updateTopic(found.id, { name }, yield* byAgent(api))
         }),
       )
@@ -141,12 +141,12 @@ const topicTools = (run: RunProgram) => [
     input: Schema.Struct({ topic: TopicName }),
     output: Done,
     replay: 'safe',
-    execute: async ({ topic }, api) => {
+    execute: async ({ topic }, api, context) => {
       await run(requireResident)
       const archived = await run(
         Effect.gen(function* () {
           const found = yield* topicNamed(topic)
-          yield* requireWithin(String(api.conversationId), found.id)
+          yield* requireWithin(api, context, found.id)
           return yield* updateTopic(found.id, { archived: true }, yield* byAgent(api))
         }),
       )
@@ -176,9 +176,8 @@ const setupTools = (run: RunProgram) => [
       await run(requireResident)
       const saved = await run(
         Effect.gen(function* () {
-          yield* requireAdminTurn(api, context)
           const found = yield* topicNamed(topic)
-          yield* requireWithin(String(api.conversationId), found.id)
+          yield* requireWithin(api, context, found.id)
           const edit = setupEdit(found, { set, add, remove })
           if (edit === undefined) return yield* new InvalidInput({ reason: 'setup_edit' })
           return yield* editTopicSetup(found.id, edit, yield* byAgent(api))
@@ -236,7 +235,7 @@ const personaTools = (run: RunProgram) => [
       await run(requireResident)
       const persona = await run(
         Effect.gen(function* () {
-          yield* requireAdminTurn(api, context)
+          if (setup !== undefined) yield* requirePower(api, context, { extra: 'setup' })
           const { operationId, ...by } = yield* byAgent(api)
           const definition = {
             name,
@@ -274,7 +273,7 @@ const personaTools = (run: RunProgram) => [
       await run(requireResident)
       const updated = await run(
         Effect.gen(function* () {
-          yield* requireAdminTurn(api, context)
+          if (change.setup !== undefined) yield* requirePower(api, context, { extra: 'setup' })
           const found = yield* personaNamed(persona)
           return yield* updatePersona(found.id, { ...change, expectedRevision: found.revision }, yield* byAgent(api))
         }),
@@ -289,9 +288,10 @@ const personaTools = (run: RunProgram) => [
 
 /**
  * Goblin organizes the workspace on the owner's direct request (ADR 0033): create, rename and archive Topics, change a
- * Topic's setup (ADR 0040), create and update Personas. Every change writes an organize receipt (actor `agent`) the owner can undo from Activity. A tool
- * call that runs twice finds the receipt it made. A setup and a Persona take an admin (ADR 0098), so on a member's turn
- * those tools refuse (ADR 0099).
+ * Topic's setup (ADR 0040), create and update Personas. Every change writes an organize receipt (actor `agent`) the
+ * owner can undo from Activity. A tool call that runs twice finds the receipt it made. What each takes of its turn's
+ * power is `pi/tool-needs.ts`'s, and a setup it brings takes `setup` too (ADR 0115); a Topic other than its chat's is
+ * changed from a hub only.
  */
 export function organizeExtension(run: RunProgram) {
   return defineExtension({

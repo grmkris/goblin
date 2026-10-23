@@ -68,6 +68,23 @@ export function outsideScopeResult(target: ExclusionTarget, scope: SetupScope): 
 }
 
 /**
+ * What the model gets for an MCP connection its turn's power does not reach (ADR 0115): a credential that sent one of
+ * its inputs has a list of connections without it. Nothing ran, and it says so in its answer.
+ */
+export function connectionOutsideResult(connectionId: string): ToolExecutionResult {
+  return {
+    output: [
+      {
+        type: 'text',
+        text: `Whoever sent this turn may not use ${connectionId}: their access does not reach it. Nothing ran. Say in your answer that you could not use it.`,
+      },
+    ],
+    isError: true,
+    diagnostics: [{ severity: 'info', code: 'outside_power', message: 'Connection outside the turn’s power.' }],
+  }
+}
+
+/**
  * What the model gets for one skill it may not use: outside the Topic's setup, the refusal that names the Topic; else
  * words. Its library is held (the caller checked), so only a setup that leaves the skill out refuses it here.
  */

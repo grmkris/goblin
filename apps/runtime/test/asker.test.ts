@@ -7,13 +7,16 @@ import { type ReceiptInput, admitReceipt } from '../src/chats/receipts.ts'
 import { type AppError, Forbidden, NotFound, failureOf } from '../src/http/errors.ts'
 import type { AgentServices } from '../src/layers/index.ts'
 import { Resident } from '../src/mcp/service.ts'
-import { adminOnly, inputOperation, memberAmong, requireAdminTurn } from '../src/pi/asker.ts'
+import { POWER_TEXT, adminOnly, inputOperation, powerAmong, requirePower } from '../src/pi/asker.ts'
 import { BACKGROUND, conversationId, entryId, submissionId } from '../src/pi/context.ts'
 import { organizeExtension } from '../src/pi/organize.ts'
+import { outsidePower } from '../src/pi/power.ts'
 import { routinesExtension } from '../src/pi/routines.ts'
 import { PiSessions } from '../src/pi/sessions.ts'
 import { sourcesExtension } from '../src/pi/sources.ts'
 import type { RunProgram } from '../src/runtime/bridge.ts'
+import { CLOSED } from '../src/setup/scope.ts'
+import { Setups } from '../src/setup/service.ts'
 import { chatDatabase, sqliteDb } from './chats-sqlite.ts'
 import { fake } from './fake.ts'
 import { executeTool } from './pi-tool.ts'
@@ -81,7 +84,12 @@ const services = () => {
 }
 
 const ids = (...inputs: number[]): SubmissionId[] => inputs.map(submissionId)
-const asked = (...inputs: number[]) => memberAmong(ids(...inputs), BACKGROUND).pipe(Effect.provide(services()))
+/** Whether a member's role narrowed a run whose inputs are `inputs`: its power is a member's, `write` with `inspect`. */
+const asked = (...inputs: number[]) =>
+  powerAmong(ids(...inputs), BACKGROUND).pipe(
+    Effect.map((power) => power.level === 'write'),
+    Effect.provide(services()),
+  )
 
 /** A call in session 41 whose run took `inputs`; no run is live without them. */
 const callIn = (...inputs: number[]) => ({
@@ -91,7 +99,7 @@ const callIn = (...inputs: number[]) => ({
     inputs.length === 0 ? undefined : { run: { taskId: 9 as TaskId, inputs: ids(...inputs) } },
 })
 
-describe("a member's turn (unit, ADR 0099)", () => {
+describe("a member's turn is a member's power (unit, ADRs 0099, 0115)", () => {
   it.effect("is not one when the run took only an owner's or an admin's input", () =>
     Effect.gen(function* () {
       expect(yield* asked(1)).toBe(false)
@@ -107,7 +115,7 @@ describe("a member's turn (unit, ADR 0099)", () => {
     }),
   )
 
-  it.effect("counts a Source's, a routine's and a server key's input as an admin's: no member asked for them", () =>
+  it.effect("counts a Source's and a routine's input as an admin's, and a key's as its receipt says", () =>
     Effect.gen(function* () {
       expect(yield* asked(3)).toBe(false)
       expect(yield* asked(4)).toBe(false)
@@ -145,17 +153,19 @@ describe("a member's turn (unit, ADR 0099)", () => {
     Effect.gen(function* () {
       expect(yield* asked()).toBe(false)
       expect(yield* asked(6, 99)).toBe(false)
-      yield* requireAdminTurn(callIn(), BACKGROUND).pipe(Effect.provide(services()))
+      yield* requirePower(callIn(), BACKGROUND, { extra: 'setup' }).pipe(Effect.provide(services()))
     }),
   )
 
-  it.effect("refuses an admin's change through the call's live run, in words the model can relay", () =>
+  it.effect("refuses what a call asks beyond its tool's need through the call's live run, in words to relay", () =>
     Effect.gen(function* () {
-      const refused = yield* Effect.flip(requireAdminTurn(callIn(1, 2), BACKGROUND).pipe(Effect.provide(services())))
-      expect(refused).toMatchObject({ _tag: 'Forbidden', reason: 'role' })
-      yield* requireAdminTurn(callIn(1), BACKGROUND).pipe(Effect.provide(services()))
+      const refused = yield* Effect.flip(
+        requirePower(callIn(1, 2), BACKGROUND, { extra: 'setup' }).pipe(Effect.provide(services())),
+      )
+      expect(refused).toMatchObject({ _tag: 'Forbidden', reason: 'power' })
+      yield* requirePower(callIn(1), BACKGROUND, { extra: 'setup' }).pipe(Effect.provide(services()))
       const said = adminOnly('Personas')
-      expect(said(refused)).toMatch(/^Changing Personas takes an admin of this workspace.*ask one\.$/u)
+      expect(said(refused)).toBe(`Changing Personas: ${POWER_TEXT}`)
       expect(said(new NotFound({ what: 'persona' }))).toContain('NotFound (what: persona)')
       expect(adminOnly('apps', () => 'build failed')(new Forbidden({ reason: 'key_setup' }))).toBe('build failed')
     }),
@@ -163,23 +173,24 @@ describe("a member's turn (unit, ADR 0099)", () => {
 })
 
 /**
- * The agent's way into its programs (`runtime/bridge.ts`) over the fixture's services and current resident authority:
- * all a member's turn reaches, since each tool below refuses at its role check before its program reads anything else.
+ * The agent's way into its programs (`runtime/bridge.ts`) over the fixture's services, current resident authority and
+ * a chat in the hub: all a member's turn reaches, since each tool below refuses at its power check before it runs.
  */
 const run: RunProgram = async <A>(program: Effect.Effect<A, AppError, AgentServices>): Promise<A> => {
   const resident = Layer.succeed(Resident, fake<Resident['Service']>({ require: () => Effect.void }))
-  const provided = Effect.provide(program, Layer.merge(services(), resident))
-  // SAFETY: on a member's turn every program here fails at its role check, before it reads a service not provided.
+  const scope = { ...CLOSED, boundary: { topic: 1, hub: true }, subagents: () => true }
+  const setups = Layer.succeed(Setups, fake<Setups['Service']>({ scope: () => Effect.succeed(scope) }))
+  const provided = Effect.provide(program, Layer.mergeAll(services(), resident, setups))
+  // SAFETY: on a member's turn every program here fails at its power check, before it reads a service not provided.
   const exit = await Effect.runPromiseExit(provided as Effect.Effect<A, AppError>)
   if (Exit.isSuccess(exit)) return exit.value
   throw failureOf(exit.cause)
 }
 
-const TOOLS = [
-  ...(organizeExtension(run).tools ?? []),
-  ...(routinesExtension(run).tools ?? []),
-  ...(sourcesExtension(run).tools ?? []),
-]
+/** The tools as the agent selects them: each checks its turn's power before it runs (`outsidePower`). */
+const TOOLS = [organizeExtension(run), routinesExtension(run), sourcesExtension(run)].flatMap(
+  (extension) => outsidePower(run, extension).tools ?? [],
+)
 
 /**
  * Each tool that changes what the agent works with (ADR 0098), with arguments it accepts. `app_build` and `app_rollback`
@@ -201,14 +212,14 @@ const ADMINS_TOOLS: Readonly<Record<string, unknown>> = {
   source_route: { source: 'src_1', key: 'k1', to: 'ignore' },
 }
 
-describe("the agent's tools on a member's turn (unit, ADR 0099)", () => {
+describe("the agent's tools on a member's turn (unit, ADRs 0099, 0115)", () => {
   it('refuse every change an admin makes, in words the model relays, before it is made', async () => {
     for (const [name, args] of Object.entries(ADMINS_TOOLS)) {
       const tool = TOOLS.find((candidate) => candidate.name === name)
       if (tool === undefined) throw new Error(`${name} missing`)
       // The tools read only the call's conversation, its call id and its live run (Pi's LiveDoc).
       const result = await executeTool(tool, args, { ...callIn(1, 2), callId: 'c1' })
-      expect(result, name).toMatchObject({ isError: true, diagnostics: [{ code: 'Forbidden' }] })
+      expect(result, name).toMatchObject({ isError: true })
       expect(JSON.stringify(result.output), name).toContain('takes an admin of this workspace')
     }
   })

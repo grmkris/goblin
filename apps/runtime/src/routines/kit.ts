@@ -13,7 +13,7 @@ import { RoutineRuns } from './service.ts'
  * The routines' Pi kit, made before Pi opens: the run task, `ask_user` and the routine budget gate, and the start of a
  * run's Pi work (`RoutineControl` starts runs through it, as `AgentInput.startRoutine`). A run handed to a Persona
  * works with the Persona turn's extension (its text in the context tail) and without `ask_user` (ADR 0041). Every run
- * selects `every` too: the channel guidance (ADR 0079) and the room guard (ADR 0108). Its Pi callbacks run their
+ * selects `every` too: the channel guidance (ADR 0079) and the power guard (ADR 0115). Its Pi callbacks run their
  * programs through the bridge `agent.ts` gives it.
  */
 export function routineExtensions(

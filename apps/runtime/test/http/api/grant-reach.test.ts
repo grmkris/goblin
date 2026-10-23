@@ -266,25 +266,24 @@ describe('a credential reaches what its grant reaches (ADR 0114)', () => {
     ])
   })
 
-  it('keeps a room from holding everything, an app or subagents, whoever sets it, an Undo too (ADR 0108)', async () => {
-    const { fetch } = organizing()
+  it("lets the owner set a key's Topic up like any other: what a key's turn may use there is its own grant's (ADR 0115)", async () => {
+    const { fetch, topics } = organizing()
     await fetch(post('/api/topics', { name: 'Customer 1', operationId: 'svc:topic:1' }, as(KEY)))
-    const setTo = (setup: object) => fetch(json('PATCH', '/api/topics/2/setup', { set: setup, expectedRevision: 1 }))
-    const none = { mcpServers: [], skills: [], apps: [], subagents: false }
-    for (const setup of [
-      { ...none, mcpServers: 'all' },
-      { ...none, mcpServers: [{ connectionId: 'mycut', tools: 'all' }] },
-      { ...none, skills: 'all' },
-      { ...none, apps: ['notes'] },
-      { ...none, subagents: true },
-    ])
-      await refusedFor(await setTo(setup), 'room_setup')
-    expect((await setTo({ ...none, mcpServers: [{ connectionId: 'mycut', tools: ['job_submit'] }] })).status).toBe(200)
-    // The owner's own Topic may still hold everything.
-    await fetch(post('/api/topics', { name: 'Trips', operationId: 'owner-topic' }))
-    expect((await fetch(json('PATCH', '/api/topics/3/setup', { set: EVERYTHING, expectedRevision: 1 }))).status).toBe(
-      200,
-    )
+    const set = await fetch(json('PATCH', '/api/topics/2/setup', { set: EVERYTHING, expectedRevision: 1 }))
+    expect(set.status).toBe(200)
+    expect(topics.get(2).setup).toEqual(EVERYTHING)
+  })
+
+  it("keeps the name of the key that wrote a Topic's guidance, and none once a person writes it (ADR 0115)", async () => {
+    const { fetch, db } = organizing()
+    const guidanceBy = () =>
+      db.all<{ by: string | null }>(sql`SELECT guidance_by AS by FROM app_topics WHERE id = 2`)[0]?.by
+    await fetch(post('/api/topics', { name: 'Customer 1', instructions: 'Be brief.', operationId: 'k' }, as(KEY)))
+    expect(guidanceBy()).toBe('key-1')
+    await fetch(json('PATCH', '/api/topics/2', { name: 'Customer one' }))
+    expect(guidanceBy()).toBe('key-1')
+    await fetch(json('PATCH', '/api/topics/2', { instructions: 'Be kind.', expectedRevision: 2 }))
+    expect(guidanceBy()).toBeNull()
   })
 
   it('pages what it reaches, newest change first', async () => {

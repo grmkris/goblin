@@ -15,9 +15,9 @@ import { Routines } from '../routines/service.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { topicNamed } from '../topics/program.ts'
 import { withinBoundary } from '../topics/boundary.ts'
-import { adminOnly, requireAdminTurn } from './asker.ts'
+import { adminOnly } from './asker.ts'
 import { typedTool } from './typed-tool.ts'
-import { requireWithin, sessionBoundary } from './within.ts'
+import { callBoundary, requireWithin } from './within.ts'
 
 const operationOf = (api: { readonly conversationId: unknown; readonly callId: string }) =>
   `routine:${String(api.conversationId)}:${api.callId}`
@@ -56,13 +56,11 @@ const proposeTool = (run: RunProgram) =>
     output: Proposed,
     replay: 'safe',
     execute: async (asked, api, context) => {
-      const session = String(api.conversationId)
       const draft = await run(
         Effect.gen(function* () {
-          yield* requireAdminTurn(api, context)
           // Another Topic's routine is proposed from a hub only (ADR 0115); without `topic` it is this chat's Topic's.
-          if (asked.topic !== undefined) yield* requireWithin(session, (yield* topicNamed(asked.topic)).id)
-          return yield* proposeAsked(asked, operationOf(api), session)
+          if (asked.topic !== undefined) yield* requireWithin(api, context, (yield* topicNamed(asked.topic)).id)
+          return yield* proposeAsked(asked, operationOf(api), String(api.conversationId))
         }),
       )
       return { routineId: draft.id, revision: draft.revision, title: draft.definition.title }
@@ -82,10 +80,10 @@ const listTool = (run: RunProgram) =>
     input: Schema.Struct({}),
     output: RoutinePage,
     replay: 'safe',
-    execute: async (_input, api) =>
+    execute: async (_input, api, context) =>
       run(
         Effect.gen(function* () {
-          const boundary = yield* sessionBoundary(String(api.conversationId))
+          const boundary = yield* callBoundary(api, context)
           const { routines } = yield* routinesList
           return {
             routines: routines.filter((routine) => boundary !== undefined && withinBoundary(boundary, routine.topic)),
@@ -104,8 +102,7 @@ const pauseTool = (run: RunProgram) =>
     execute: async ({ id, revision }, api, context) =>
       run(
         Effect.gen(function* () {
-          yield* requireAdminTurn(api, context)
-          yield* requireWithin(String(api.conversationId), (yield* (yield* Routines).view(id)).topic)
+          yield* requireWithin(api, context, (yield* (yield* Routines).view(id)).topic)
           return yield* changeRoutine(id, { revision, operationId: operationOf(api) }, 'pause')
         }),
       ),
@@ -113,13 +110,14 @@ const pauseTool = (run: RunProgram) =>
   })
 
 /**
- * The model proposes a draft; only the authenticated owner's review may confirm it. Drafting and pausing take an admin
- * (ADR 0098), so on a member's turn they refuse (ADR 0099); listing does not.
+ * The model proposes a draft; only the authenticated owner's review may confirm it. Each takes the `routines` extra of
+ * its turn's power (`pi/tool-needs.ts`, ADR 0115), which a member's role does not hold, and another Topic's routine a
+ * hub.
  */
 export function routinesExtension(run: RunProgram) {
   return defineExtension({
     name: 'goblin.routines',
-    // Only where the tools are offered: a room has them filtered out (ADR 0108).
+    // Only where the tools are offered: a turn whose power lacks `routines` has them filtered out (ADR 0115).
     sections: [
       section('routines', (input) =>
         input.agent.tools.some((offered) => offered.name === 'routine_propose')

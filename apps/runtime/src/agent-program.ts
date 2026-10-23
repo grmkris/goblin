@@ -192,7 +192,7 @@ const routineAnswer = (operationId: string, text: string) => (admitted: SessionI
   RoutineControl.use((control) => control.answer(admitted, operationId, text))
 
 /**
- * What a message's admission records and may answer: a server key's (`keyed`, ADR 0108) is recorded as the key's and
+ * What a message's admission records and may answer: a server key's (`keyed`, ADR 0115) is recorded as the key's and
  * never answers a routine's question, which is the owner's to answer.
  */
 const admissionOf = (input: OwnerSubmit, keyed: boolean) => ({

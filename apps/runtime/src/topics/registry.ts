@@ -13,10 +13,10 @@ import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Effect from 'effect/Effect'
 import { type AppError, Conflict, InvalidInput, NotFound, attemptSync } from '../http/errors.ts'
 import { listedIds } from '../grants/mirror.ts'
-import { makerColumn, makerOf, roomOf } from '../keys/made-by.ts'
+import { makerColumn, makerOf } from '../keys/made-by.ts'
 import { after, pageOf } from '../storage/page.ts'
 import { appTopics } from '../storage/topics.ts'
-import { roomSetupWithin, storedSetup, topicSetupOf } from './setup.ts'
+import { storedSetup, topicSetupOf } from './setup.ts'
 
 type Row = typeof appTopics.$inferSelect
 
@@ -186,6 +186,7 @@ export class TopicRegistry<RunResult = unknown> {
     actor: TopicActor,
     now: number,
     seed?: TopicSeedData,
+    guidanceBy: string | null = null,
   ): Effect.Effect<{ readonly topic: TopicView; readonly created: boolean }, AppError> {
     const db = this.#db
     const ports = this.#ports
@@ -219,6 +220,7 @@ export class TopicRegistry<RunResult = unknown> {
               chatId: chat,
               operationId: input.operationId,
               setup: storedSetup(input.setup ?? EVERYTHING),
+              guidanceBy: input.description === undefined && input.instructions === undefined ? null : guidanceBy,
               createdBy: actor,
               createdAt: now,
               updatedAt: now,
@@ -244,9 +246,9 @@ export class TopicRegistry<RunResult = unknown> {
   /**
    * Rename, archive or restore, and seal or make a hub (ADR 0115), as one change with one new revision. Personal is
    * never archived; a rename or restore onto a name another active Topic has is a `Conflict`. Nothing changed is no
-   * write.
+   * write. Guidance written by a server's key keeps its name (`guidanceBy`), a person's none.
    */
-  update(id: number, change: UpdateTopic, now: number): TopicView {
+  update(id: number, change: UpdateTopic, now: number, guidanceBy: string | null = null): TopicView {
     const row = this.#row(id)
     checkGuidanceRevision(change, row.revision)
     if (change.archived === true && id === PERSONAL_TOPIC) throw new InvalidInput({ reason: 'personal_topic' })
@@ -273,6 +275,7 @@ export class TopicRegistry<RunResult = unknown> {
           instructions,
           archivedAt,
           reach,
+          ...(change.description === undefined && change.instructions === undefined ? {} : { guidanceBy }),
           revision: row.revision + 1,
           updatedAt: now,
         })
@@ -288,13 +291,11 @@ export class TopicRegistry<RunResult = unknown> {
 
   /**
    * A new setup (ADR 0040) as one new revision, compare-and-set on `expectedRevision` when it is given (else `Conflict`
-   * `revision`). The same setup is no write. A room's (ADR 0108) never holds everything of anything, an app or
-   * subagents, whoever sets it and an Undo too (`InvalidInput` `room_setup`).
+   * `revision`). The same setup is no write.
    */
   setSetup(id: number, setup: TopicSetup, expectedRevision: number | undefined, now: number): TopicView {
     const row = this.#row(id)
     if (expectedRevision !== undefined && row.revision !== expectedRevision) throw new Conflict({ reason: 'revision' })
-    if (!roomSetupWithin(setup) && roomOf(this.#db, id)) throw new InvalidInput({ reason: 'room_setup' })
     const stored = storedSetup(setup)
     if (stored === row.setup) return this.#view(row)
     const [next] = this.#db

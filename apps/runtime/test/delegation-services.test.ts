@@ -72,7 +72,7 @@ const services = () => {
     personas,
     invocations,
     receipts,
-    fence: { ownerOnly: () => false, keyTopic: () => false },
+    fence: { ownerOnly: () => false },
   }).pipe(Layer.provideMerge(Layer.merge(KeyedLock.layer, Layer.succeed(Changes, makeChanges()))))
   const sources = Layer.mergeAll(
     // SAFETY: Personal's chat id, as the chat directory brands it.

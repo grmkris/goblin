@@ -8,6 +8,7 @@ import { Retrieval, autoUseId } from '../retrieval/service.ts'
 import { sourcesText } from '../retrieval/text.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { type Boundary, withinBoundary } from '../topics/boundary.ts'
+import { type CallApi, turnPower } from './asker.ts'
 import type { PiContext } from './context.ts'
 import { withContext } from './context-tail.ts'
 import { typedTool } from './typed-tool.ts'
@@ -61,6 +62,18 @@ const searched = ({ query, topic: named }: typeof Input.Type, boundary: Boundary
   })
 
 /**
+ * Where the run `api` serves searches from its chat's place (ADR 0115): that boundary, and a hub's only when its
+ * turn's power reaches every Topic (no credential whose Topics are a list sent any of its inputs). None for a session
+ * no chat owns.
+ */
+const searchedFrom = (place: { readonly boundary: Boundary } | undefined, api: CallApi, context: PiContext) =>
+  Effect.gen(function* () {
+    if (place === undefined) return undefined
+    const power = yield* turnPower(api, context)
+    return { ...place.boundary, hub: place.boundary.hub && power.topicLists.length === 0 } satisfies Boundary
+  })
+
+/**
  * `search_chats`: reads only the owner's own index and records the use, so a rerun returns the same frozen result. It
  * searches its chat's boundary (ADR 0115): from a hub every Topic, from a sealed Topic itself alone.
  */
@@ -72,14 +85,15 @@ function searchTool(run: RunProgram) {
     input: Input,
     output: SourcesDetails,
     replay: 'safe',
-    execute: async (input, api) => {
+    execute: async (input, api, context) => {
       const session = String(api.conversationId)
       return run(
         Effect.gen(function* () {
           const retrieval = yield* Retrieval
           const place = yield* retrieval.chatFor(session)
           const chat = place?.chat
-          const sources = yield* retrieval.search(yield* searched(input, place?.boundary), {
+          const boundary = yield* searchedFrom(place, api, context)
+          const sources = yield* retrieval.search(yield* searched(input, boundary), {
             session,
             ...(chat === undefined ? {} : { chat }),
             useId: `tool:${session}:${api.callId}`,
@@ -112,7 +126,9 @@ function automatic(run: RunProgram, api: HookApi, context: PiContext): Promise<r
       const memo = yield* attempt(() => api.memo<string | null>(key, context))
       if (memo !== undefined) return memo === null ? undefined : (yield* retrieval.recorded(memo))?.sources
       const affordable = yield* requireBudget.pipe(Effect.match({ onFailure: () => false, onSuccess: () => true }))
-      const where = { session, chat: place.chat, boundary: place.boundary }
+      const boundary = yield* searchedFrom(place, api, context)
+      if (boundary === undefined) return undefined
+      const where = { session, chat: place.chat, boundary }
       const use = affordable ? yield* retrieval.automatic(where, input, context.abortSignal) : undefined
       yield* attempt(() =>
         api.memo<string | null>(key, use === undefined ? null : autoUseId(session, input.entry), context),

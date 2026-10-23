@@ -12,17 +12,17 @@ import {
 import { RunAttribute, type RunEvent } from '@goblin/contracts/telemetry'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
-import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import { chatOfSession, chatRow } from '../chats/directory.ts'
 import { epochSeconds } from '../clock.ts'
 import { RequestContext } from '../http/api/context.ts'
 import type { Credential } from '../http/api/principal.ts'
 import { Forbidden, NotFound, attemptSync } from '../http/errors.ts'
 import type { Place, Reach } from '../inspect/service.ts'
-import { recordMaker, roomOf } from '../keys/made-by.ts'
+import { recordMaker } from '../keys/made-by.ts'
 import { Changes } from '../runtime/changes.ts'
 import { Db } from '../runtime/db.ts'
 import { mirrorReaches } from './mirror.ts'
+import { type TurnPower, senderOf, senderPower } from './power.ts'
 import { Grants } from './service.ts'
 
 /**
@@ -107,11 +107,18 @@ export const requestAuthor: Effect.Effect<string | undefined> = Effect.map(
 )
 
 /**
- * Whether work in Topic `topic` is a server's (ADR 0087): it comes through a key, or the Topic is a room (a key made
- * it, ADR 0108), whoever works there. It never runs on the owner's own subscriptions.
+ * What the current request's sender may do in a turn its input starts or joins (ADR 0115): a person's role, an OAuth
+ * client's grant within its person's role, a server key's grant. None for work outside a request, which is an
+ * admin's (`AUTOMATION`).
  */
-export const serverWorkIn = (db: DrizzleSqliteDODatabase, topic: number): Effect.Effect<boolean> =>
-  Effect.map(requestKey, (key) => key !== undefined || roomOf(db, topic))
+export const requestPower: Effect.Effect<TurnPower | undefined> = Effect.map(
+  Effect.serviceOption(RequestContext),
+  (context) => {
+    const facts = Option.getOrUndefined(context)
+    const sender = facts === undefined ? undefined : senderOf(facts)
+    return sender === undefined ? undefined : senderPower(sender)
+  },
+)
 
 /** A Topic a key's create makes when its body names no setup: nothing but its own chats. */
 export const KEY_TOPIC_SETUP: TopicSetup = { mcpServers: [], skills: [], apps: [], subagents: false }

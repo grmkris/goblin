@@ -26,7 +26,7 @@ export const labelOf = (row: StoredChat): string =>
 
 /**
  * What every part of the registry works with, made once by its layer: the agent's database and Pi, the change bus,
- * the thread extensions and the tool sets a new thread's filter removes (ADR 0108), and each chat's reply tally, which
+ * the thread extensions and the tool sets a new thread's filter chooses from (ADR 0115), and each chat's reply tally, which
  * the registry keeps for as long as the agent is awake.
  */
 export type RegistryCore = {
@@ -114,7 +114,7 @@ export const describe = Effect.fn('Conversations.describe')(function* (core: Reg
   } satisfies ConversationView
 })
 
-/** Pi's tool filter for a new conversation that works like `chat` (its subagent switch, and whether it is a room). */
+/** Pi's tool filter for a new conversation that works like `chat` (its subagent switch, as an admin's turn's). */
 export const piTools = (core: RegistryCore, chat: string) => attemptSync(() => piToolsFor(core.db, core.toolSets, chat))
 
 /** A new top-level Pi session (not a fork) with `extensions` added and `like`'s tool filter, or `tools` given. */

@@ -138,8 +138,8 @@ describe('a room knows its key (ADR 0108)', () => {
 describe('every Topic is sealed (ADR 0115)', () => {
   it('makes Personal the hub and every other Topic sealed, drops the search opt-out, keeps receipts and makers', () => {
     const { sqlite, rest } = before('20261024000000_sealed')
-    sqlite.exec(`INSERT INTO app_topics (id, name, chat_id, search_excluded, created_by, created_at, updated_at) VALUES
-      (2, 'Customer', '20', 0, 'owner', 1, 1), (3, 'Quiet', '30', 1, 'agent', 1, 1)`)
+    sqlite.exec(`INSERT INTO app_topics (id, name, chat_id, instructions, search_excluded, created_by, created_at, updated_at)
+      VALUES (2, 'Customer', '20', 'Be brief.', 0, 'owner', 1, 1), (3, 'Quiet', '30', 'Mine.', 1, 'agent', 1, 1)`)
     sqlite.exec(
       "INSERT INTO app_chat_operations (chat_id, operation_id, session_id, admitted_at, kind, origin, role, state) VALUES ('20', 'op', '20', 1, 'send', 'key', NULL, 'settled')",
     )
@@ -147,10 +147,11 @@ describe('every Topic is sealed (ADR 0115)', () => {
       "INSERT INTO app_key_reach (key_id, kind, resource_id, created_at, key_name) VALUES ('key-1', 'topic', 2, 1, 'swarmm')",
     )
     rest()
-    expect(sqlite.prepare('SELECT id, name, reach FROM app_topics ORDER BY id').all()).toEqual([
-      { id: 1, name: 'Personal', reach: 'hub' },
-      { id: 2, name: 'Customer', reach: 'sealed' },
-      { id: 3, name: 'Quiet', reach: 'sealed' },
+    // The guidance a room had is its key's; the owner's own Topic's stays theirs.
+    expect(sqlite.prepare('SELECT id, name, reach, guidance_by FROM app_topics ORDER BY id').all()).toEqual([
+      { id: 1, name: 'Personal', reach: 'hub', guidance_by: null },
+      { id: 2, name: 'Customer', reach: 'sealed', guidance_by: 'swarmm' },
+      { id: 3, name: 'Quiet', reach: 'sealed', guidance_by: null },
     ])
     const columns = sqlite.prepare('PRAGMA table_info("app_topics")').all()
     expect(columns.map((column) => column['name'])).not.toContain('search_excluded')

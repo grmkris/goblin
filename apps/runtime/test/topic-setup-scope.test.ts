@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { openAsks } from '../src/attention.ts'
 import { type ToolSets, chatScope, piToolsFor, routinesOutside, sessionScope } from '../src/setup/scope.ts'
 import { recordMaker } from '../src/keys/made-by.ts'
+import { senderPower } from '../src/grants/power.ts'
 import { outsideScopeResult } from '../src/pi/setup.ts'
 import { appPersonaChats } from '../src/storage/personas.ts'
 import { appRoutineRuns, appRoutines } from '../src/storage/routines.ts'
@@ -225,8 +226,8 @@ describe("a chat's scope follows its Topic's setup (ADR 0040)", () => {
   it("removes the subagent tools from Pi where the Topic's setup does not allow subagents", () => {
     const { db } = fixture()
     const sets = toolSets()
-    expect(piToolsFor(db, sets, '1')).toBeNull()
-    expect(piToolsFor(db, sets, '21')).toEqual({ remove: sets.subagents })
+    expect(names(piToolsFor(db, sets, '1'))).toEqual(['later_tool'])
+    expect(names(piToolsFor(db, sets, '21'))).toEqual(['later_tool', 'source_route', 'subagent_spawn'])
   })
 })
 
@@ -234,14 +235,31 @@ describe("a chat's scope follows its Topic's setup (ADR 0040)", () => {
 const named = (name: string) =>
   defineTool({ name, description: '', parameters: Type.Object({}), execute: async () => ({ output: [] }) })
 
-/** The tool sets a filter removes. */
+/** The tool sets a filter chooses from: one tool `pi/tool-needs.ts` does not know among them. */
 const toolSets = (): ToolSets => ({
   subagents: [named('subagent_spawn')],
-  room: [named('subagent_spawn'), named('files_list'), named('topic_create')],
+  all: [
+    named('subagent_spawn'),
+    named('files_list'),
+    named('topic_create'),
+    named('routine_propose'),
+    named('source_route'),
+    named('app_call'),
+    named('later_tool'),
+  ],
+})
+
+/** The names a filter removes, sorted; none for no filter. */
+const names = (tools: ReturnType<typeof piToolsFor>) => (tools?.remove ?? []).map((tool) => tool.name).toSorted()
+
+/** A server key's power with a `write` grant over every Topic and connection. */
+const KEY = senderPower({
+  kind: 'key',
+  grant: { grantId: 'key-1', level: 'write', extras: [], topics: 'all', connections: 'all' },
 })
 
 /** The fixture with Topic 2 made by a key, and with subagents and an app in its setup all the same. */
-const room = () => {
+const keyMade = () => {
   const made = forks()
   made
     .update(appTopics)
@@ -252,32 +270,39 @@ const room = () => {
   return made
 }
 
-describe('a Topic a key made is a room (ADR 0108)', () => {
-  it('is the place of every chat under it: its Conversation, threads, subagents, Persona forks and routine runs', () => {
-    const db = room()
-    for (const chat of ['20', '21', '22', '23', '24', '25']) expect(chatScope(db, chat).room, chat).toBe(2)
-    expect(sessionScope(db, 's22').room).toBe(2)
-    expect(chatScope(db, '1').room).toBeUndefined()
+describe('a Topic a key made is sealed like any other, and its sender decides what a turn is offered (ADR 0115)', () => {
+  it("is every chat's boundary under it: its Conversation, threads, subagents, Persona forks and routine runs", () => {
+    const db = keyMade()
+    for (const chat of ['20', '21', '22', '23', '24', '25'])
+      expect(chatScope(db, chat).boundary, chat).toEqual({ topic: 2, hub: false })
+    expect(sessionScope(db, 's22').boundary).toEqual({ topic: 2, hub: false })
+    expect(chatScope(db, '1').boundary).toEqual({ topic: 1, hub: true })
   })
 
-  it('never starts subagents or uses apps there, whatever its setup holds, and keeps the rest of the setup', () => {
-    const db = room()
-    for (const chat of ['20', '21', '24']) {
-      expect(chatScope(db, chat).subagents(), chat).toBe(false)
-      expect(chatScope(db, chat).app('tracker'), chat).toBe(false)
+  it('keeps its setup whoever made it: subagents and apps where the setup holds them', () => {
+    const db = keyMade()
+    for (const chat of ['20', '21']) {
+      expect(chatScope(db, chat).subagents(), chat).toBe(true)
+      expect(chatScope(db, chat).app('tracker'), chat).toBe(true)
     }
     expect(chatScope(db, '20').tool('notes', 'read')).toBe(true)
-    expect(chatScope(db, '24').tool('mail', 'send')).toBe(true)
-    // A routine's run keeps its own allowed tools within the room's setup.
+    // A routine's run keeps its own allowed tools within the setup.
     expect(chatScope(db, '23').tool('notes', 'read')).toBe(true)
     expect(chatScope(db, '23').tool('mail', 'send')).toBe(false)
   })
 
-  it("removes from Pi every tool a room does not offer, subagents' among them; elsewhere only what it did", () => {
-    const db = room()
+  it("offers a server key's turn what its grant reaches, and the owner's turn in the same chat everything there", () => {
+    const db = keyMade()
     const sets = toolSets()
-    for (const chat of ['20', '21', '22']) expect(piToolsFor(db, sets, chat), chat).toEqual({ remove: sets.room })
-    expect(piToolsFor(db, sets, '1')).toBeNull()
+    // The hub's tools (a Source's route) are offered only in a hub, and no tool the table does not know anywhere.
+    expect(names(piToolsFor(db, sets, '20'))).toEqual(['later_tool', 'source_route'])
+    expect(names(piToolsFor(db, sets, '20', KEY))).toEqual([
+      'app_call',
+      'later_tool',
+      'routine_propose',
+      'source_route',
+    ])
+    expect(names(piToolsFor(db, sets, '1', KEY))).toEqual(['later_tool', 'routine_propose', 'source_route'])
   })
 })
 

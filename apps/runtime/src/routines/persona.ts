@@ -24,14 +24,13 @@ export const personaHold = Effect.fn('routines.personaHold')(function* (routineI
 })
 
 /**
- * The Persona run `record` is handed to, at the pinned revision, with its own model where it may answer in the
- * routine's Topic (`frozenAt`); none for Goblin's.
+ * The Persona run `record` is handed to, at the pinned revision, with its own model (`frozenAt`); none for Goblin's. A
+ * routine is the owner's, so it may answer on the owner's own models (ADRs 0087, 0115).
  */
 export const runPersona = Effect.fn('routines.runPersona')(function* (record: RoutineRun) {
   const { handTo } = definitionOf(record)
   if (handTo.kind !== 'persona') return undefined
-  const topic = yield* (yield* Routines).topicOf(record.routineId)
-  return yield* frozenAt(handTo.persona, handTo.revision, topic)
+  return yield* frozenAt(handTo.persona, handTo.revision)
 })
 
 /** The Persona a run's conversation is bound to, with the setup it adds there (ADR 0040); none for Goblin's run. */

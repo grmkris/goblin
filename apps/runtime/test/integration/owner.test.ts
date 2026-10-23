@@ -13,7 +13,7 @@ import { topicsCase } from './topics-case.ts'
 import { keyThreadsCase } from './key-threads-case.ts'
 import { threadServersCase } from './thread-servers-case.ts'
 import { membersCase } from './members-case.ts'
-import { roomsCase } from './rooms-case.ts'
+import { sealedCase } from './sealed-case.ts'
 import { threadHeadsCase } from './thread-heads-case.ts'
 import { organizeCase, personasCase } from './persona-case.ts'
 import { personaHoldsCase } from './persona-holds-case.ts'
@@ -113,8 +113,8 @@ harness.test(
   { timeout: 240_000 },
 )
 harness.test(
-  "native: a key's Topic is a room: only its own tools, the server's words marked, refused at call time, put right after a restart, kept out of the owner's retrieval (ADR 0108), and keeps no App or file of the owner's (ADR 0113)",
-  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => roomsCase(url)))),
+  "native: every Topic is sealed and Personal the hub: two key Topics never see each other while the hub sees both, the server's words marked, another Topic renamed only from the hub, a write key's routine_propose refused at call time and put right after a restart (ADR 0115)",
+  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => sealedCase(url)))),
   { timeout: 240_000 },
 )
 harness.test(

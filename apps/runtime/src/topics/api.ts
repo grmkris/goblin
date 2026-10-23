@@ -16,7 +16,6 @@ import {
   requireAdminFor,
 } from '../grants/policy.ts'
 import { Forbidden } from '../http/errors.ts'
-import { Setups } from '../setup/service.ts'
 import { createTopic, editTopicSetup, madeTopic, updateTopic } from './program.ts'
 import { Topics } from './service.ts'
 
@@ -42,7 +41,7 @@ const needOf = (input: CreateTopic): Partial<Need> => ({
   ...(namesAnything(input.setup) ? { extra: 'setup' } : {}),
 })
 
-/** The Topic a credential makes: a key's names nothing in its setup unless it says (ADR 0108). */
+/** The Topic a credential makes: a key's names nothing in its setup unless it says, so it starts with its chats alone. */
 const credentialTopic = (input: CreateTopic, keyed: boolean): CreateTopic =>
   input.setup !== undefined || !keyed ? input : { ...input, setup: KEY_TOPIC_SETUP }
 
@@ -72,9 +71,6 @@ const create = (input: CreateTopic) =>
     if (making.setup !== undefined) yield* confineSetup(making.setup)
     const made = yield* madeTopic(making, { actor: 'owner' })
     yield* claim('topic', made.topic.id, made.created)
-    // A key's Conversation was opened before the claim made it a room: it now leaves out what a room does not offer.
-    // A replay applies it again, so a create that failed here puts it right.
-    if (key !== undefined) yield* Setups.use((setups) => setups.retoolTopic(made.topic.id))
     return yield* Topics.use((topics) => topics.get(made.topic.id))
   })
 

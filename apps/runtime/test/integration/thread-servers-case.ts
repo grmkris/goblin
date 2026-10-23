@@ -3,7 +3,6 @@ import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
 import { type Person, call, keyBody, lever, ownerFetch, person, signedIn, workspaceOf } from './owner-requests.ts'
-import { roomAllows } from '../../src/pi/room.ts'
 import { until } from './until.ts'
 
 const Secret = Schema.Struct({ secret: Schema.String })
@@ -168,12 +167,13 @@ export async function threadServersCase(url: string): Promise<void> {
   expect(plainRequest?.tools).toContain('mcp_call')
   expect(plainRequest?.tools).not.toContain('swarmm__board')
 
-  // The key's Topic is a room (ADR 0108): its Persona's fork keeps what a server's job needs, its native tools, skills
-  // and questions, its native call ran above, and it is offered nothing a room leaves out.
+  // A key tagged it (ADR 0115): its Persona's fork keeps what a server's job needs, its native tools, skills and
+  // questions, its native call ran above, and it is offered nothing its asker's power leaves out.
   const maker = (await seen()).find((request) => request.context?.includes('You are Maker') === true)
   expect(maker?.tools).toEqual(expect.arrayContaining(['swarmm__board', 'skill_activate', 'ask_user']))
-  expect(maker?.tools.filter((tool) => !roomAllows(tool))).toEqual([])
-  expect(maker?.context).toContain('You reach only this room')
+  for (const denied of ['routine_propose', 'app_call', 'source_route', 'topic_setup'])
+    expect(maker?.tools, denied).not.toContain(denied)
+  expect(maker?.context).toContain('A server the owner connected tagged @Maker')
 
   // Closing the thread drops its servers; reopening brings none back.
   const patch = (change: unknown) => asKey(url, secret, 'PATCH', `/api/conversations/${thread.id}`, change)

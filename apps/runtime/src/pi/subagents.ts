@@ -25,6 +25,7 @@ import type { RunProgram } from '../runtime/bridge.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { outsideScopeResult } from './setup.ts'
 import { BACKGROUND, conversationId } from './context.ts'
+import { turnPower } from './asker.ts'
 import {
   ConversationMissing,
   type Relay,
@@ -460,6 +461,8 @@ export function subagentsExtension(run: RunProgram, members: (self: Extension) =
     const admitted = await admit(run, before)
     if (admitted === 'closed-by-owner') return done(name, admitted, before)
     const parentOperation = await run(callingOperation(api))
+    // What the turn that sends the job may do goes with it, so its subagent does no more (ADR 0115).
+    const power = await run(turnPower(api, context))
     const outcome = await api.commit(async (tx) => {
       const state = await tx.doc(Subagents, api.conversationId)
       const existing = known(state.agents, name)
@@ -475,6 +478,7 @@ export function subagentsExtension(run: RunProgram, members: (self: Extension) =
         exclusions,
         synthesize: state.agents[name]?.synthesize === true,
         ...(parentOperation === undefined ? {} : { parentOperation }),
+        power,
       } as const
       await tx.createTask(Relay, input, background)
       return delivered(action, admitted)

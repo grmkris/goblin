@@ -11,7 +11,9 @@ import { logLearnOutcome, type LearnOutcome } from '../skills/learner.ts'
 import type { Catalog } from '../skills/library.ts'
 import { skillScope } from '../skills/scope.ts'
 import { Learner, Skills } from '../skills/service.ts'
-import { outsideScopeResult, skillOutsideResult } from './setup.ts'
+import { turnPower } from './asker.ts'
+import { reachesConnection } from './power.ts'
+import { connectionOutsideResult, outsideScopeResult, skillOutsideResult } from './setup.ts'
 import { withContext } from './context-tail.ts'
 import { forkNaming } from './fork-tools.ts'
 import { ReadyResult, typedTool } from './typed-tool.ts'
@@ -172,6 +174,10 @@ const activateTool = (run: RunProgram) =>
           ).pipe(Effect.catchTag('NotFound', () => Effect.succeed(skill)))
           const off = yield* skillsOff(session, handle)
           if (off !== undefined) return new ReadyResult(off)
+          // A skill's server must be within the turn's power too: a credential's list of connections (ADR 0115).
+          const connectionId = handle.slice(0, Math.max(0, handle.indexOf(':'))) || handle
+          if (!(yield* reachesConnection(api, context, connectionId)))
+            return new ReadyResult(connectionOutsideResult(connectionId))
           const authorize = yield* skillScope(session)
           const naming = yield* namingOf(session, handle)
           const loaded = yield* Skills.use((skills) =>
@@ -278,8 +284,15 @@ export function skillLearningExtension(
     hooks: [
       hook(GenerationTask, {
         // Fire and forget after a final answer: the learner may write a skill draft for the owner to review. It never
-        // holds up the turn, and an attempt an eviction cuts short is simply not made.
-        onYield: (_answer, api) => {
+        // holds up the turn, and an attempt an eviction cuts short is simply not made. A turn a server's key sent any
+        // input to never drafts a skill of the owner's (ADR 0115): what its power says is read before the answer ends.
+        onYield: async (_answer, api, context) => {
+          // expected: a power that cannot be read drafts nothing, and the outcome line records it as failed
+          const power = await run(turnPower(api, context)).catch(() => undefined)
+          if (power === undefined || power.server) {
+            observe(api.conversationId, power === undefined ? 'failed' : 'skipped')
+            return undefined
+          }
           void run(
             Effect.gen(function* () {
               yield* requireResident

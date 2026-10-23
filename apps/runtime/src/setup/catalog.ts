@@ -120,7 +120,7 @@ const widensToAll = (before: TopicSetup | PersonaSetup, next: TopicSetup | Perso
 
 /**
  * Refuses a setup that holds a category whole that `before` did not (`InvalidInput` `setup_all_owner_only`: only the
- * owner gives everything, ADR 0108), or lists something `before` did not hold and the owner does not allow now
+ * owner gives everything), or lists something `before` did not hold and the owner does not allow now
  * (`setup_not_allowed`): what the agent may not add to a Topic's or a Persona's setup (ADR 0040). The catalog is read
  * only when the setup lists something new.
  */

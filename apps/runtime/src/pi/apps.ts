@@ -1,4 +1,5 @@
 import { GenerationTask, defineExtension, hook, section } from '@earendil-works/pi-durable'
+import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { BuildResult } from '../agent-apps/build.ts'
 import type { AgentApps } from '../agent-apps/engine.ts'
@@ -8,9 +9,13 @@ import { problemText } from '../agent-apps/queue.ts'
 import { ScriptResult, runScript } from '../agent-apps/script.ts'
 import { withContext } from './context-tail.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
-import { adminOnly, requireAdminTurn } from './asker.ts'
+import { type CallApi, adminOnly } from './asker.ts'
+import type { PiContext } from './context.ts'
+import { allows } from '../grants/power.ts'
 import { reportAndRecover } from '../observability/report.ts'
 import { Setups } from '../setup/service.ts'
+import { effectiveOf } from './power.ts'
+import { APP_CALL } from './tool-needs.ts'
 import { newAppJoinsTopic } from '../topics/program.ts'
 import { typedTool } from './typed-tool.ts'
 
@@ -34,13 +39,20 @@ const GUIDE = [
 
 /**
  * The apps this chat may call as they are now, for the trailing context block: they change with every build and the
- * Topic's setup (ADR 0040), the guide never does. A room (ADR 0108) lists none and says nothing of apps.
+ * Topic's setup (ADR 0040), the guide never does. Apps are the workspace's (ADR 0115): a turn that may not call them
+ * (a server key's, outside a hub) lists none and says nothing of apps.
  */
-const appsNow = (apps: AgentApps, run: RunProgram, session: string): Promise<string | undefined> =>
-  run(Setups.use((setups) => setups.scope(session))).then(
-    (scope) => (scope.room === undefined ? apps.summary((name) => scope.app(name)) || '(none here)' : undefined),
+const appsNow = (apps: AgentApps, run: RunProgram, api: CallApi, context: PiContext): Promise<string | undefined> =>
+  run(
+    Effect.gen(function* () {
+      const effective = yield* effectiveOf(api, context)
+      if (effective === undefined || !allows(effective, APP_CALL)) return undefined
+      const scope = yield* Setups.use((setups) => setups.scope(String(api.conversationId)))
+      return apps.summary((name) => scope.app(name)) || '(none here)'
+    }),
+  ).catch(
     // expected: the listing is optional context; run reported anything unexpected
-    () => '(none here)',
+    () => undefined,
   )
 
 /** Whether `input`'s agent is offered tool `name`: an extension's guide is said only where its tools are. */
@@ -87,8 +99,7 @@ const buildTool = (apps: AgentApps, run: RunProgram) =>
     }),
     output: BuildResult,
     replay: 'safe',
-    execute: async (request, api, context) => {
-      await run(requireAdminTurn(api, context))
+    execute: async (request, api) => {
       const session = String(api.conversationId)
       const built = await apps.build(request, { session, callId: api.callId })
       // A new app joins a Topic that lists its apps; failing that leaves the build as it is, and the owner can add it.
@@ -124,10 +135,7 @@ const rollbackTool = (apps: AgentApps, run: RunProgram) =>
     input: Schema.Struct({ app: AppName, release: Schema.String.check(Schema.isMaxLength(40)) }),
     output: RolledBack,
     replay: 'safe',
-    execute: async ({ app, release }, api, context) => {
-      await run(requireAdminTurn(api, context))
-      return apps.rollback(app, release)
-    },
+    execute: async ({ app, release }) => apps.rollback(app, release),
     failure: adminOnly('apps', problemText),
   })
 
@@ -147,13 +155,13 @@ const codeTool = (apps: AgentApps) =>
 
 /**
  * Owner app management, on main and threads (ADR 0021). Without Dynamic Workers (`buildable` false, ADR 0064) no app
- * can be built or run, so there is none. Changing an app takes an admin (ADR 0093), so building and rolling back refuse
- * on a member's turn (ADR 0099).
+ * can be built or run, so there is none. Changing an app takes the `setup` extra of its turn's power (ADR 0115), which
+ * an admin's role holds and a member's does not, and a person's turn or a hub.
  */
 export function appsExtension(apps: AgentApps, run: RunProgram, buildable = true) {
   const extension = defineExtension({
     name: 'goblin.apps',
-    // Only where the tools are offered: a room has them filtered out (ADR 0108).
+    // Only where the tools are offered: a turn whose power does not reach apps has them filtered out (ADR 0115).
     sections: [section('apps', (input) => (offers(input, 'app_build') ? GUIDE : undefined))],
     tools: [docsTool(apps), buildTool(apps, run), inspectTool(apps), rollbackTool(apps, run)],
   })
@@ -174,8 +182,8 @@ export function appExecutionExtension(apps: AgentApps, run: RunProgram) {
     tools: [codeTool(apps)],
     hooks: [
       hook(GenerationTask, {
-        beforeRequest: async ({ messages }, api) => {
-          const listed = await appsNow(apps, run, String(api.conversationId))
+        beforeRequest: async ({ messages }, api, context) => {
+          const listed = await appsNow(apps, run, api, context)
           return listed === undefined ? undefined : { messages: withContext(messages, 'apps', listed) }
         },
       }),

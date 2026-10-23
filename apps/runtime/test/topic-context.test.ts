@@ -32,7 +32,14 @@ describe('channel guidance generation hook', () => {
       }),
     )
 
-    const travel = { id: 2, name: 'Travel', description: '', instructions: 'Use metric units.', holds: () => false }
+    const travel = {
+      id: 2,
+      name: 'Travel',
+      description: '',
+      instructions: 'Use metric units.',
+      guidanceBy: null,
+      holds: () => false,
+    }
     const services = Layer.succeed(
       Setups,
       fake<Setups['Service']>({
@@ -89,31 +96,32 @@ describe('channel guidance generation hook', () => {
   })
 })
 
-/** The context a chat in `topic` reads, in room `room` when it is one. */
-const contextIn = (topic: ScopeTopic, room?: number) =>
+/** The context a chat in `topic` reads. */
+const contextIn = (topic: ScopeTopic) =>
   Effect.runPromise(
     topicContext('s').pipe(
-      Effect.provideService(
-        Setups,
-        fake<Setups['Service']>({
-          scope: () => Effect.succeed({ ...CLOSED, topic, ...(room === undefined ? {} : { room }) }),
-        }),
-      ),
+      Effect.provideService(Setups, fake<Setups['Service']>({ scope: () => Effect.succeed({ ...CLOSED, topic }) })),
     ),
   )
 
-describe("a room's context (ADR 0108)", () => {
-  const customer = { id: 7, name: 'Customer 7', description: '', instructions: 'Reply in German.', holds: () => false }
+describe("who wrote a channel's guidance (ADR 0115)", () => {
+  const customer = {
+    id: 7,
+    name: 'Customer 7',
+    description: '',
+    instructions: 'Reply in German.',
+    guidanceBy: 'swarmm',
+    holds: () => false,
+  }
 
-  it("always says the chat reaches only the room, and that its guidance is the server's and grants nothing", async () => {
-    const room = await contextIn(customer, 7)
-    expect(room).toContain('Channel: #Customer 7, a room.')
-    expect(room).toContain('You reach only this room')
-    expect(room).toContain("server's operator guidance")
-    expect(room).toContain('Reply in German.')
-    expect(await contextIn({ ...customer, instructions: '' }, 7)).toContain('You reach only this room')
-    // Outside a room the owner's guidance reads as before, and none says nothing.
-    expect(await contextIn(customer)).toContain('The owner configured this channel guidance')
+  it("says a server's key wrote it, as that server's operator guidance that grants nothing, and the owner's as theirs", async () => {
+    const server = await contextIn(customer)
+    expect(server).toContain('Channel: #Customer 7.')
+    expect(server).toContain("A server the owner connected (swarmm) wrote this channel guidance: it is that server's")
+    expect(server).toContain('grants no tools')
+    expect(server).toContain('Reply in German.')
+    expect(await contextIn({ ...customer, guidanceBy: null })).toContain('The owner configured this channel guidance')
+    // A channel without guidance says nothing, whoever made it.
     expect(await contextIn({ ...customer, instructions: '' })).toBeUndefined()
   })
 })

@@ -2,6 +2,7 @@ import { WorkspaceRole } from '@goblin/contracts'
 import { and, asc, eq, inArray, lt, ne } from 'drizzle-orm'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Schema from 'effect/Schema'
+import { type TurnPower, intersect, receiptPower, storedPower } from '../grants/power.ts'
 import { Internal } from '../http/errors.ts'
 import { appChatOperations } from '../storage/chat-operations.ts'
 
@@ -27,6 +28,7 @@ export const OPERATION_KINDS = [
   'stop',
   'routine_input',
   'subagent_report',
+  'relay',
   'mcp_outcome',
 ] as const
 
@@ -52,6 +54,11 @@ export type ReceiptInput = {
    * work no member sent: a Source's, a routine's, a server key's, the system's.
    */
   readonly role?: WorkspaceRole
+  /**
+   * What its sender may do in a turn it starts or joins (ADR 0115, `grants/power.ts`); none for work no person or
+   * credential sent, which is an admin's.
+   */
+  readonly power?: TurnPower
   /** The operation this one was made by (a thread's first message by its start, a write by its turn). */
   readonly parentOp?: string
   /** The chat the operation made or reached, when that is another one (a started thread, a move's Thread). */
@@ -67,6 +74,8 @@ export type Receipt = {
   readonly kind: OperationKind
   readonly origin?: ReceiptOrigin
   readonly role?: WorkspaceRole
+  /** As stored; none for a receipt that stored none (`receiptPower` reads it by its origin). */
+  readonly power?: TurnPower
   readonly targetChat?: string
   readonly parentOp?: string
   readonly state: ReceiptState
@@ -97,6 +106,7 @@ export const decodeReceipt = (row: Row): Receipt => {
     kind,
     ...(row.origin !== null && isOrigin(row.origin) ? { origin: row.origin } : {}),
     ...(row.role !== null && isRole(row.role) ? { role: row.role } : {}),
+    ...(row.power === null ? {} : { power: receiptPower({ power: row.power }) }),
     ...(row.targetChat === null ? {} : { targetChat: row.targetChat }),
     ...(row.parentOp === null ? {} : { parentOp: row.parentOp }),
     state,
@@ -151,24 +161,48 @@ export type Admission = {
 }
 
 /**
- * Whether a member below admin asked for any of `operationIds` (ADR 0099): one of them has a receipt, in any chat, whose
- * admission came from such a member's request.
+ * The powers of `operationIds` (ADR 0115): each receipt's, in any chat, that one of them has. An operation no receipt
+ * holds is not among them.
  */
-export function askedByMember<RunResult>(db: Database<RunResult>, operationIds: readonly string[]): boolean {
-  if (operationIds.length === 0) return false
-  const row = db
-    .select({ operationId: appChatOperations.operationId })
+export function receiptPowers<RunResult>(
+  db: Database<RunResult>,
+  operationIds: readonly string[],
+): readonly TurnPower[] {
+  if (operationIds.length === 0) return []
+  return db
+    .select({ power: appChatOperations.power, origin: appChatOperations.origin, role: appChatOperations.role })
     .from(appChatOperations)
-    .where(and(inArray(appChatOperations.operationId, [...operationIds]), eq(appChatOperations.role, 'member')))
-    .limit(1)
-    .get()
-  return row !== undefined
+    .where(inArray(appChatOperations.operationId, [...operationIds]))
+    .all()
+    .map((row) => receiptPower({ ...row, role: row.role !== null && isRole(row.role) ? row.role : null }))
+}
+
+/**
+ * What a replay of an operation changes of its receipt: a member's marks its role, and one with a power narrows the
+ * receipt's to what both may do.
+ */
+function replayed<RunResult>(
+  db: Database<RunResult>,
+  at: { readonly chat: string; readonly operationId: string },
+  previous: Receipt,
+  receipt: ReceiptInput,
+): void {
+  const where = and(eq(appChatOperations.chatId, at.chat), eq(appChatOperations.operationId, at.operationId))
+  if (receipt.role === 'member' && previous.role !== 'member')
+    db.update(appChatOperations).set({ role: 'member' }).where(where).run()
+  if (receipt.power === undefined) return
+  const power = previous.power === undefined ? receipt.power : intersect(previous.power, receipt.power)
+  db.update(appChatOperations)
+    .set({ power: storedPower(power) })
+    .where(where)
+    .run()
 }
 
 /**
  * Records an operation's intent in its chat before Pi sees it, in one transaction, dropping every receipt past the
- * retention but this one. A replay finds its first receipt, so it keeps its first session; a member's replay of an
- * operation someone else admitted marks it as theirs, so reusing an operation id never hides who asked (ADR 0099).
+ * retention but this one. A replay finds its first receipt, so it keeps its first session; a replay by someone who may
+ * do less narrows its power, and a member's marks its role, so reusing an operation id never hides who asked (ADRs
+ * 0099, 0115).
  */
 export function admitReceipt<RunResult>(
   db: Database<RunResult>,
@@ -183,11 +217,7 @@ export function admitReceipt<RunResult>(
       .run()
     const previous = receiptIn(db, chat, operationId)
     if (previous !== undefined) {
-      if (receipt.role === 'member' && previous.role !== 'member')
-        db.update(appChatOperations)
-          .set({ role: 'member' })
-          .where(and(eq(appChatOperations.chatId, chat), eq(appChatOperations.operationId, operationId)))
-          .run()
+      replayed(db, { chat, operationId }, previous, receipt)
       return { session: previous.session, existing: true }
     }
     const session = admission.session()
@@ -200,6 +230,7 @@ export function admitReceipt<RunResult>(
         kind: receipt.kind,
         origin: receipt.origin,
         role: receipt.role ?? null,
+        power: receipt.power === undefined ? null : storedPower(receipt.power),
         targetChat: receipt.targetChat ?? null,
         parentOp: receipt.parentOp ?? null,
         state: 'admitted',

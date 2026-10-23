@@ -33,8 +33,8 @@ type MadePersona = { readonly persona: PersonaView; readonly created: boolean }
 /** A Persona just before and just after one change, read in the step that made it. */
 export type PersonaChange = { readonly before: PersonaView; readonly after: PersonaView }
 
-/** Which models are the owner's own subscriptions, and which Topics a server's key made (ADR 0087). */
-export type ServerFence = { readonly ownerOnly: (id: string) => boolean; readonly keyTopic: (topic: number) => boolean }
+/** Which models are the owner's own subscriptions (ADR 0087). */
+export type ServerFence = { readonly ownerOnly: (id: string) => boolean }
 
 /**
  * The owner's Personas (ADR 0033): named, versioned agent definitions. Every change is a new revision of the one it
@@ -63,10 +63,10 @@ export class Personas extends Context.Service<
     /** Whether `model` is on offer now. */
     readonly offers: (model: string | undefined) => Effect.Effect<boolean>
     /**
-     * The Persona's own `model` a turn in Topic `topic` answers with: one on offer, never one of the owner's own
-     * subscriptions in a server's work (a key's request, or a Topic a key made; ADR 0087). None: the chat's model.
+     * The Persona's own `model` a turn answers with: one on offer, never one of the owner's own subscriptions in a
+     * server's work (a key's request, ADRs 0087, 0115: tenancy is the sender's). None: the chat's model.
      */
-    readonly ownModel: (model: string | undefined, topic: number) => Effect.Effect<string | undefined>
+    readonly ownModel: (model: string | undefined) => Effect.Effect<string | undefined>
     /** Whether `model` is one of the owner's own subscriptions, which a server's key never names (ADR 0087). */
     readonly ownerOnly: (model: string) => boolean
     /** A new Persona at revision 1, or the one `input.operationId` already made. A taken name is a `Conflict`. */
@@ -107,11 +107,10 @@ export class Personas extends Context.Service<
         offers: Effect.fn('Personas.offers')(function* (model: string | undefined) {
           return yield* Effect.sync(() => store.offers(model))
         }),
-        ownModel: Effect.fn('Personas.ownModel')(function* (model: string | undefined, topic: number) {
+        ownModel: Effect.fn('Personas.ownModel')(function* (model: string | undefined) {
           if (model === undefined || !store.offers(model)) return undefined
           if (!fence.ownerOnly(model)) return model
-          const server = (yield* requestKey) !== undefined || fence.keyTopic(topic)
-          return server ? undefined : model
+          return (yield* requestKey) === undefined ? model : undefined
         }),
         ownerOnly: fence.ownerOnly,
         create: Effect.fn('Personas.create')(function* (input: CreatePersona, actor: PersonaActor) {

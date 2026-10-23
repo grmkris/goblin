@@ -63,7 +63,7 @@ async function scopeProbe(storage: DurableObjectStorage) {
   const retooled: string[] = []
   const retooling: Retooling = {
     db,
-    toolSets: { subagents: [tool], room: [] },
+    toolSets: { subagents: [tool], all: [tool] },
     retool: async (session) => void retooled.push(session),
   }
   await configureHelper(

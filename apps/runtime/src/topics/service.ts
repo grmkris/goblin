@@ -5,6 +5,7 @@ import { type AppError, attemptSync } from '../http/errors.ts'
 import { KeyedLock } from '../observability/lock.ts'
 import { epochSeconds } from '../clock.ts'
 import { Changes } from '../runtime/changes.ts'
+import { requestKey } from '../grants/policy.ts'
 import type { TopicActor, TopicPageQuery, TopicRegistry } from './registry.ts'
 
 declare module '../runtime/changes.ts' {
@@ -76,15 +77,18 @@ export class Topics extends Context.Service<
         }),
         create: Effect.fn('Topics.create')(function* (input: CreateTopic, actor: TopicActor, seed?: TopicSeedData) {
           const now = yield* epochSeconds
-          const made = yield* lock.withLock('topics.create')(store.create(input, actor, now, seed))
+          // Guidance a server's key writes stays its own, never the owner's (ADR 0115).
+          const by = (yield* requestKey)?.name ?? null
+          const made = yield* lock.withLock('topics.create')(store.create(input, actor, now, seed, by))
           yield* changed(made.topic.id)
           return made
         }),
         update: Effect.fn('Topics.update')(function* (id: number, change: UpdateTopic) {
           const now = yield* epochSeconds
+          const by = (yield* requestKey)?.name ?? null
           const result = yield* attemptSync(() => {
             const before = store.get(id)
-            return { before, after: store.update(id, change, now) }
+            return { before, after: store.update(id, change, now, by) }
           })
           if (result.after.name !== result.before.name) yield* store.retitled(result.after.conversation)
           if (result.after.revision !== result.before.revision) yield* changed(id)

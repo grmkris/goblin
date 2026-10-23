@@ -1,9 +1,9 @@
 import { BREAK, type Migration } from './migration.ts'
 
 /**
- * Rooms (ADR 0108): the name of the key that made a Topic or Persona, and the lookup by resource that tells a room on
- * every tool call. Additive so production keeps its agents; it folds into the baseline at the next reset the owner
- * decides on.
+ * The name of the key that made a Topic or Persona, and the lookup by resource that views read (ADR 0108's, which ADR
+ * 0115 replaced; the table is `app_made_by` since `SEALED`). Additive so production keeps its agents; it folds into the
+ * baseline at the next reset the owner decides on.
  */
 export const ROOMS: Migration = {
   key: '20261022180000_rooms',

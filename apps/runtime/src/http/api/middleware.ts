@@ -65,7 +65,7 @@ interface CredentialGate {
  * never does more than its person may). A grant past its end is `Unauthenticated` (`grant_expired`). Then its requests
  * for the minute (else `rate_limited` with `retryAfter`, ADR 0085), and its grant's reach is mirrored afresh when its
  * generation moved (`Grants.sync`). A key admitted is `learn`t: its first request in the object's lifetime names what
- * it made (ADR 0108).
+ * it made, for display (ADR 0115).
  */
 /** A client never does more than its person may: their role's power must hold what the endpoint needs. */
 const personHolds = (credential: Credential, member: Member | undefined, need: Need): Effect.Effect<void, AppError> => {

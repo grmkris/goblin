@@ -5,7 +5,7 @@ import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
 import * as Option from 'effect/Option'
-import { type Applied, type Retooling, useModel, useRoomTools } from '../agent-model.ts'
+import { type Applied, type Retooling, useModel, useTools } from '../agent-model.ts'
 import { Budget } from '../budget.ts'
 import { type AppError, attemptSync, toAppError } from '../http/errors.ts'
 import { Models } from '../models.ts'
@@ -15,8 +15,9 @@ import { safeErrorType } from '../observability/report.ts'
 import { PiSessions, fromPi } from '../pi/sessions.ts'
 import { Db } from '../runtime/db.ts'
 import { AgentInput } from '../runtime/input.ts'
-import { SessionId, chatSession, openChatSession, topicOfChat } from './directory.ts'
-import { requestRole, serverWorkIn } from '../grants/policy.ts'
+import { SessionId, chatSession, openChatSession } from './directory.ts'
+import { requestPower, requestRole } from '../grants/policy.ts'
+import { AUTOMATION } from '../grants/power.ts'
 import { epochSeconds } from '../clock.ts'
 import {
   type ReceiptChange,
@@ -36,15 +37,17 @@ const chatLock =
 
 /**
  * The receipts in the agent's SQLite (chats/receipts.ts), each read or write with the Clock's time. Every admission
- * records the role of the member whose request it came in (ADR 0099), here for all of them rather than at each caller:
- * the agent's tools read it to tell a member's turn, whatever admitted it. Each role is kept, not only a member's, so a
- * receipt tells an owner's or an admin's request from work no member sent.
+ * records the role of the member whose request it came in (ADR 0099) and its sender's power (ADR 0115), here for all
+ * of them rather than at each caller: the agent's tools read it to tell what a turn may do, whatever admitted it. Each
+ * role is kept, not only a member's, so a receipt tells an owner's or an admin's request from work no member sent. A
+ * caller outside a request may name the power itself (a relay carries its spawner's).
  */
 const receiptsOf = (db: Db['Service']) => ({
   record: Effect.fn('ChatOperations.record')(function* (chat: string, operationId: string, input: ReceiptInput) {
     const now = yield* epochSeconds
     const role = yield* requestRole
-    const receipt = role === undefined ? input : { ...input, role }
+    const power = (yield* requestPower) ?? input.power
+    const receipt = { ...input, ...(role === undefined ? {} : { role }), ...(power === undefined ? {} : { power }) }
     const admitted = yield* attemptSync(() =>
       admitReceipt(db, { chat, operationId, receipt, session: () => chatSession(db, chat), now }),
     )
@@ -153,8 +156,8 @@ const admitWith =
   }
 
 /**
- * What an input's hand-on reads: the budget, Pi, the owner's model, whose work the chat's Topic holds, and the tool
- * filter its first turn in this lifetime applies (ADR 0108).
+ * What an input's hand-on reads: the budget, Pi, the owner's model, and the tool filter its sender's power applies
+ * (ADR 0115).
  */
 type Sending = {
   readonly admit: ReturnType<typeof admitWith>
@@ -162,13 +165,12 @@ type Sending = {
   readonly models: Models['Service']
   readonly pi: PiSessions['Service']
   readonly applied: Applied
-  readonly db: Db['Service']
   readonly retooling: Retooling
 }
 
 /** `ChatOperations.send`: the one admission sequence of an input (ADR 0030). */
 const sendWith =
-  ({ admit, budget, models, pi, applied, db, retooling }: Sending) =>
+  ({ admit, budget, models, pi, applied, retooling }: Sending) =>
   <R = never>(input: Submit<R>): Effect.Effect<PiReceipt, AppError, R> =>
     Effect.gen(function* () {
       yield* budget.require(yield* epochSeconds)
@@ -177,9 +179,10 @@ const sendWith =
         Effect.gen(function* () {
           if (answer !== undefined && (yield* answer(session)))
             return { session, operationId, accepted: true } satisfies PiReceipt
-          const server = yield* serverWorkIn(db, yield* attemptSync(() => topicOfChat(db, input.chat)))
-          yield* useModel(pi, applied, session, server).pipe(Effect.provideService(Models, models))
-          yield* useRoomTools(retooling, input.chat, session)
+          // A server key's work runs on the deployment's models (ADR 0087); its sender decides what the turn is offered.
+          const power = (yield* requestPower) ?? input.receipt.power ?? AUTOMATION
+          yield* useModel(pi, applied, session, power.server).pipe(Effect.provideService(Models, models))
+          yield* useTools(retooling, input.chat, session, power)
           if (relay !== undefined) return yield* relay(session)
           return yield* fromPi(pi.submit(session, content, { operationId }))
         }),
@@ -201,7 +204,7 @@ export const makeChatOperations = Effect.gen(function* () {
   const tracked = trackedWith(receipts)
   const admit = admitWith({ withChat, tracked, flows, requireOpen: (chat) => openChatSession(db, chat) })
   const retooling = { pi, db, toolSets, retooled }
-  const sending = { admit, budget: yield* Budget, models: yield* Models, pi, applied, db, retooling }
+  const sending = { admit, budget: yield* Budget, models: yield* Models, pi, applied, retooling }
   return ChatOperations.of({
     ...receipts,
     tracked,

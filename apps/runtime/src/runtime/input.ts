@@ -31,14 +31,14 @@ export interface AgentInputs {
   readonly pi: PiModels
   readonly thread: Extension
   readonly memory: MemoryKit
-  /** What Pi's tool filter removes: the subagent tools where subagents are off, and in a room (ADR 0108). */
+  /** What Pi's tool filter chooses from: the subagent tools, and every tool of the agent's (ADR 0115). */
   readonly toolSets: ToolSets
   readonly helperExtensions: readonly Extension[]
   readonly subagents: SubagentKit
   readonly personas: PersonaTurnKit
   /** The model each session was last put on (agent-model.ts). */
   readonly applied: Applied
-  /** The sessions whose tool filter this lifetime applied before a turn (agent-model.ts, ADR 0108). */
+  /** The tool filter this lifetime applied to each session before a turn, by its sender's power (agent-model.ts, ADR 0115). */
   readonly retooled: Retooled
   /** The native schedules the routines arm and cancel, and their sweep's alarm (routines/wake.ts). */
   readonly routineSchedules: RoutineSchedules

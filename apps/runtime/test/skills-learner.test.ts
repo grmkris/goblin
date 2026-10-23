@@ -1,5 +1,13 @@
 import { createMcpHandler } from '@modelcontextprotocol/server'
-import type { ConversationId, GenerationHooks, HookApi } from '@earendil-works/pi-durable'
+import type {
+  ConversationId,
+  GenerationHooks,
+  Harness,
+  HookApi,
+  LiveState,
+  Submission,
+  TaskId,
+} from '@earendil-works/pi-durable'
 import type { FileEntry } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
 import * as Effect from 'effect/Effect'
@@ -31,7 +39,10 @@ import { MemoryDraftLog, MemorySkillState } from './skills-memory.ts'
 import { lowLevelServer } from './mcp/low-level-server.ts'
 import { servicesOf } from './mcp/runtime.ts'
 import { fake, unread } from './fake.ts'
-import { BACKGROUND } from '../src/pi/context.ts'
+import { BACKGROUND, entryId, submissionId } from '../src/pi/context.ts'
+import { admitReceipt } from '../src/chats/receipts.ts'
+import { senderPower } from '../src/grants/power.ts'
+import { chatDatabase, sqliteDb } from './chats-sqlite.ts'
 import type { CheapModel } from '../src/memory/model.ts'
 
 /** The owner's files the learner wrote, by path, and the notices it claimed, in order. */
@@ -83,8 +94,6 @@ const piConversation = {
 }
 /** The cheap model's answer, and how many times it was asked. */
 const model = { answer: '{"action":"none"}', calls: 0 }
-/** The Pi sessions that work in a room (ADR 0108). */
-let rooms = new Set<string>()
 
 const state = new MemorySkillState()
 const credentials = new MemoryCredentials()
@@ -115,7 +124,6 @@ const learnerAt = () => {
           drafts,
           state,
           skills: skillsService,
-          room: (session) => rooms.has(session),
           // The learner only calls `complete`, which this fixture answers.
           model: fake<CheapModel>({
             complete: async () => {
@@ -175,7 +183,6 @@ beforeEach(() => {
   model.calls = 0
   model.answer = '{"action":"none"}'
   drafts = new MemoryDraftLog()
-  rooms = new Set()
   state.setEnabled('lib', true)
   exchange = [
     { role: 'user', text: 'Do the weekly review.' },
@@ -190,12 +197,52 @@ afterEach(async () => {
 })
 
 describe('the skill learner (unit)', () => {
-  it("never drafts from a room's conversation, and never asks the model there (ADR 0108)", async () => {
+  it("never drafts from a turn a server's key sent, and never asks the model for it (ADR 0115)", async () => {
     model.answer = NEW_SKILL
-    rooms.add(String(MAIN))
-    expect(await consider(MAIN)).toBe('skipped')
+    const { db, close } = chatDatabase()
+    const power = senderPower({
+      kind: 'key',
+      grant: { grantId: 'key-1', level: 'manage', extras: [], topics: 'all', connections: 'all' },
+    })
+    admitReceipt(db, {
+      chat: '1',
+      operationId: 'op-key',
+      receipt: { kind: 'send', origin: 'key', power },
+      session: () => '1',
+      now: 1,
+    })
+    const harness = fake<Harness>({
+      submission: async (id) =>
+        fake<Submission>({
+          status: async () => ({
+            id,
+            conversationId: MAIN,
+            type: 'input',
+            status: 'placed',
+            entry: entryId(1),
+            requestId: 'op-key',
+          }),
+        }),
+    })
+    const layer = Layer.mergeAll(
+      sqliteDb(db),
+      Layer.succeed(PiSessions, fake<PiSessions['Service']>({ pi: Effect.succeed(harness) })),
+    )
+    const run: RunProgram = <A>(program: Parameters<RunProgram>[0]) =>
+      // SAFETY: the hook reads only the run's power before it skips, over this test's layer.
+      Effect.runPromise(Effect.provide(program, layer) as Effect.Effect<A, AppError>)
+    const outcomes: LearnOutcome[] = []
+    const hooks = skillLearningExtension(run, (_conversation, outcome) => outcomes.push(outcome)).hooks?.[0]?.handlers
+    if (!hasYieldHook(hooks)) throw new Error('skills onYield hook missing')
+    // SAFETY: Pi's task ids are plain integers at runtime; the brand only types them.
+    const live: LiveState = { run: { taskId: 9 as TaskId, inputs: [submissionId(1)] } }
+    // SAFETY: the hook reads one document through `snapshot`, the conversation's LiveDoc, which is `live`.
+    const api = fake<HookApi>({ conversationId: MAIN, snapshot: async <T>() => live as T })
+    expect(await hooks.onYield(unread, api, BACKGROUND)).toBeUndefined()
+    expect(outcomes).toEqual(['skipped'])
     expect(model.calls).toBe(0)
     expect(owner.files.size).toBe(0)
+    close()
   })
 
   it('observes malformed model replies as failed without exposing the reply or holding up the answer', async () => {
@@ -212,8 +259,9 @@ describe('the skill learner (unit)', () => {
     const extension = skillLearningExtension(run, (_conversation, outcome) => outcomes.push(outcome))
     const hooks = extension.hooks?.[0]?.handlers
     if (!hasYieldHook(hooks)) throw new Error('skills onYield hook missing')
-    // The hook only reads conversationId; the answer is never read.
-    expect(hooks.onYield(unread, fake<HookApi>({ conversationId: MAIN }), BACKGROUND)).toBeUndefined()
+    // The hook reads only the conversation and its live run (none: the agent's own); the answer is never read.
+    const api = fake<HookApi>({ conversationId: MAIN, snapshot: async () => undefined })
+    expect(await hooks.onYield(unread, api, BACKGROUND)).toBeUndefined()
     await vi.waitFor(() => expect(outcomes).toEqual(['failed']))
     expect(model.calls).toBe(1)
   })
@@ -225,9 +273,9 @@ describe('the skill learner (unit)', () => {
     )
     const hooks = extension.hooks?.[0]?.handlers
     if (!hasYieldHook(hooks)) throw new Error('skills onYield hook missing')
-    // The hook only reads conversationId; the answer is never read.
-    const result = hooks.onYield(unread, fake<HookApi>({ conversationId: MAIN }), BACKGROUND)
-    expect(result).toBeUndefined()
+    // The hook reads only the conversation and its live run; the answer is never read.
+    const api = fake<HookApi>({ conversationId: MAIN, snapshot: async () => undefined })
+    expect(await hooks.onYield(unread, api, BACKGROUND)).toBeUndefined()
     await vi.waitFor(() => expect(outcomes).toEqual([{ conversation: MAIN, outcome: 'failed' }]))
     expect(JSON.stringify(outcomes)).not.toContain('private')
   })

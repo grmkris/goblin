@@ -4,10 +4,13 @@ import { Chats } from '../chats/service.ts'
 import { type AppError, Forbidden } from '../http/errors.ts'
 import { Db } from '../runtime/db.ts'
 import { type Boundary, boundaryOf, withinBoundary } from '../topics/boundary.ts'
+import { type CallApi, turnPower } from './asker.ts'
+import type { PiContext } from './context.ts'
 
 // What the agent's own tools may act on from where they run (ADR 0115). A tool acts on its own chat's Topic from
-// anywhere, and on another Topic only from a hub: renaming, archiving or setting it up, routing a Source into it,
-// proposing or pausing its routines. Making Topics and Personas is not acting on another Topic.
+// anywhere, and on another Topic only from a hub: renaming, archiving or setting it up, proposing or pausing its
+// routines. Making Topics and Personas is not acting on another Topic; Sources, which route anywhere, need a hub
+// whatever they name (`pi/tool-needs.ts`).
 
 /** The boundary of the chat Pi session `session` belongs to; none for a session no chat owns, which reaches nothing. */
 export const sessionBoundary = (session: string): Effect.Effect<Boundary | undefined, AppError, Chats | Db> =>
@@ -17,22 +20,22 @@ export const sessionBoundary = (session: string): Effect.Effect<Boundary | undef
     return yield* Db.useSync((db) => boundaryOf(db, chat))
   })
 
-/** Work in `session` acting on Topic `topic`: its own Topic, or any from a hub; else `Forbidden` `boundary`. */
-export const requireWithin = (session: string, topic: number) =>
+/**
+ * Where the call `api` serves may reach: its chat's boundary, and a hub's only when its turn's power reaches every
+ * Topic (no credential whose Topics are a list sent any of its inputs, `grants/power.ts`).
+ */
+export const callBoundary = (api: CallApi, context: PiContext) =>
   Effect.gen(function* () {
-    const boundary = yield* sessionBoundary(session)
+    const place = yield* sessionBoundary(String(api.conversationId))
+    if (place === undefined) return undefined
+    const power = yield* turnPower(api, context)
+    return { topic: place.topic, hub: place.hub && power.topicLists.length === 0 } satisfies Boundary
+  })
+
+/** The call `api` serves acting on Topic `topic`: its own Topic, or any from a hub; else `Forbidden` `boundary`. */
+export const requireWithin = (api: CallApi, context: PiContext, topic: number) =>
+  Effect.gen(function* () {
+    const boundary = yield* callBoundary(api, context)
     if (boundary === undefined || !withinBoundary(boundary, topic)) return yield* new Forbidden({ reason: 'boundary' })
     return boundary
   })
-
-/** Work in `session` acting on the whole workspace, as a Source's routes are: only from a hub. */
-export const requireHub = (session: string) =>
-  Effect.gen(function* () {
-    const boundary = yield* sessionBoundary(session)
-    if (boundary?.hub !== true) return yield* new Forbidden({ reason: 'boundary' })
-    return boundary
-  })
-
-/** What the model reads of a refusal for acting past its chat's Topic: why, and where the change can be made. */
-export const BOUNDARY_TEXT =
-  "This chat's Topic is sealed: its tools act only on itself, so nothing changed. Changing another Topic, or the whole workspace, is done from a hub (Personal, unless an admin made another): tell whoever asked."

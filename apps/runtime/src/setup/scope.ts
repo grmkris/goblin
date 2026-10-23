@@ -26,24 +26,27 @@ import { topicSetupOf } from '../topics/setup.ts'
 import { chatOfSession, chatSession } from '../chats/directory.ts'
 import { InvalidInput } from '../http/errors.ts'
 import { definitionOf } from '../routines/store.ts'
-import { roomOf } from '../keys/made-by.ts'
+import { AUTOMATION, type TurnPower, allows, effectivePower } from '../grants/power.ts'
+import { mirrorReaches } from '../grants/mirror.ts'
+import { type Boundary, topicBoundary } from '../topics/boundary.ts'
+import { needOf } from '../pi/tool-needs.ts'
 
 type Kind = ExclusionTarget['kind']
 type Db = DrizzleSqliteDODatabase
 
 /**
- * A conversation's Pi tool filter: the subagent tools removed, or every tool a room does not offer (ADR 0108), or none
- * (`null` clears an inherited one).
+ * A conversation's Pi tool filter: the tools its turn's power does not reach and the subagent tools where subagents are
+ * off (ADRs 0040, 0115), or none (`null` clears an inherited one).
  */
 export type PiTools = { readonly remove: readonly ToolRegistration[] } | null
 
 /**
- * The tools Pi's filter removes: the subagent tools where subagents are off, and in a room every tool it does not offer
- * (`pi/room.ts`, ADR 0108), the subagent tools among them. Pi stores a filter by name, so these are what it names.
+ * The tools Pi's filter may remove: the subagent tools, and every tool of the agent's (`all`), of which a turn is
+ * offered those its power reaches (`pi/tool-needs.ts`). Pi stores a filter by name, so these are what it names.
  */
 export type ToolSets = {
   readonly subagents: readonly ToolRegistration[]
-  readonly room: readonly ToolRegistration[]
+  readonly all: readonly ToolRegistration[]
 }
 
 /** One thing switched off in a conversation, as stored: `connectionId` empty for subagents, `name` set only for a tool. */
@@ -66,9 +69,11 @@ type Allow = {
 export type ScopeTopic = {
   readonly id: number
   readonly name: string
-  /** The channel guidance the owner wrote (ADR 0079); empty when there is none. */
+  /** The channel guidance (ADR 0079); empty when there is none. */
   readonly description: string
   readonly instructions: string
+  /** The server's key that wrote it, by name (ADR 0115); none when a person did. */
+  readonly guidanceBy: string | null
   readonly holds: (item: SetupItem) => boolean
 }
 
@@ -76,10 +81,14 @@ export type ScopeTopic = {
  * What a chat's agent may use: its Topic's setup, narrowed by its switches and those of every spawner above a subagent,
  * and by a routine's allowed tools. The one gate every tool and section asks. It only chooses among the owner's grants,
  * which the MCP manager still checks. `editable`: the owner can act on a refusal here (not in a subagent, which follows
- * the chats above it). `topic` is the Topic whose setup bounds it. `room` is that Topic's id when it is a room (ADR
- * 0108): the chat reaches only it, whoever writes there, and never starts subagents or uses apps.
+ * the chats above it). `topic` is the Topic whose setup bounds it, and `boundary` where its work may reach (ADR 0115):
+ * that Topic, and whether it is a hub. A chat the agent does not know has neither.
  */
-export type SetupScope = Allow & { readonly editable: boolean; readonly topic?: ScopeTopic; readonly room?: number }
+export type SetupScope = Allow & {
+  readonly editable: boolean
+  readonly topic?: ScopeTopic
+  readonly boundary?: Boundary
+}
 
 /** A conversation the agent does not know may use nothing. */
 export const CLOSED: SetupScope = {
@@ -251,7 +260,7 @@ const routineScope = (db: Db, scope: SetupScope, runId: string): SetupScope => {
   return {
     editable: false,
     ...(scope.topic === undefined ? {} : { topic: scope.topic }),
-    ...(scope.room === undefined ? {} : { room: scope.room }),
+    ...(scope.boundary === undefined ? {} : { boundary: scope.boundary }),
     server: (id) => scope.server(id) && allowedTools.some((tool) => tool.connectionId === id),
     tool: (id, name) =>
       scope.tool(id, name) && allowedTools.some((tool) => tool.connectionId === id && tool.name === name),
@@ -269,6 +278,7 @@ const topicOf = (db: Db, id: number): (ScopeTopic & { readonly setup: TopicSetup
       name: appTopics.name,
       description: appTopics.description,
       instructions: appTopics.instructions,
+      guidanceBy: appTopics.guidanceBy,
       setup: appTopics.setup,
     })
     .from(appTopics)
@@ -317,9 +327,8 @@ const appsOffIn = (db: Db, sessions: readonly string[]): ReadonlySet<string> =>
 /**
  * The scope of a registered chat (ADR 0040): its Topic's setup, read live (joined, in a Persona's fork, with the setup
  * the ask froze), narrowed by its own switches and, for a subagent, those of every spawner above it; a routine's thread
- * is narrowed to its allowed tools as well. A chat whose chain's root is in a room (ADR 0108) says so, by place and
- * never by who writes: its Conversation, threads, subagents, Persona forks and routine runs, with subagents and apps
- * off whatever the setup holds.
+ * is narrowed to its allowed tools as well. Its boundary is its chain root's Topic's (ADR 0115). What a turn may do
+ * there is its power's, which its senders decide (`grants/power.ts`), never the place.
  */
 export const chatScope = (db: Db, chat: string): SetupScope => {
   const chain = chainOf(db, chat)
@@ -338,10 +347,13 @@ export const chatScope = (db: Db, chat: string): SetupScope => {
       chain.map((link) => link.session),
     ),
   )
-  const bound: SetupScope = { ...both(allow, switches), editable, topic }
-  const scope: SetupScope = roomOf(db, root.topicId)
-    ? { ...bound, subagents: () => false, app: () => false, room: root.topicId }
-    : bound
+  const boundary = topicBoundary(db, root.topicId)
+  const scope: SetupScope = {
+    ...both(allow, switches),
+    editable,
+    topic,
+    ...(boundary === undefined ? {} : { boundary }),
+  }
   return root.routineRunId === null ? scope : routineScope(db, scope, root.routineRunId)
 }
 
@@ -355,13 +367,25 @@ export const sessionScope = (db: Db, session: string): SetupScope => {
 export const appAllowed = (db: Db, session: string, app: string): boolean => sessionScope(db, session).app(app)
 
 /**
- * Pi's tool filter for `chat`: in a room (ADR 0108) without every tool a room does not offer, else without the subagent
- * tools when subagents are off where it works, else none.
+ * Pi's tool filter for `chat` on a turn with `power` (ADR 0115): without each tool whose need that power does not reach
+ * there (`pi/tool-needs.ts`, so a tool the table does not know is never offered), and without the subagent tools when
+ * subagents are off where it works; none when nothing is left out. A chat the agent does not know is offered nothing.
+ * Work no one sent (a new thread before its first message, a setup's change) is filtered as an admin's: the first
+ * message of each sender applies theirs (`useTools`), and the call-time guard refuses whatever a filter still offers.
  */
-export const piToolsFor = (db: Db, toolSets: ToolSets, chat: string): PiTools => {
+export const piToolsFor = (db: Db, toolSets: ToolSets, chat: string, power: TurnPower = AUTOMATION): PiTools => {
   const scope = chatScope(db, chat)
-  if (scope.room !== undefined) return { remove: toolSets.room }
-  return scope.subagents() ? null : { remove: toolSets.subagents }
+  if (scope.boundary === undefined) return { remove: toolSets.all }
+  const effective = effectivePower(power, scope, scope.boundary, (grant, connection) =>
+    mirrorReaches(db, grant, 'connection', connection),
+  )
+  const removed = new Map<string, ToolRegistration>()
+  for (const tool of toolSets.all) {
+    const need = needOf(tool.name)
+    if (need === undefined || !allows(effective, need)) removed.set(tool.name, tool)
+  }
+  if (!scope.subagents()) for (const tool of toolSets.subagents) removed.set(tool.name, tool)
+  return removed.size === 0 ? null : { remove: [...removed.values()] }
 }
 
 /**
@@ -426,8 +450,8 @@ export const filterFollowsScope = (db: Db, chat: string): boolean => {
 
 /**
  * Applies the Pi filter again to every chat of `topic` whose filter follows its scope, after its setup's subagents
- * changed (ADR 0040) or it became a room (ADR 0108). One that fails to apply is left as it was; the next change, or
- * the chat's next turn after a restart (`useRoomTools`), applies it again.
+ * changed (ADR 0040), as an admin's (`piToolsFor`). One that fails to apply is left as it was; each chat's next turn
+ * applies its sender's (`useTools`).
  */
 export const retoolTopic = async (retooling: Retooling, topic: number): Promise<void> => {
   const { db, toolSets, retool } = retooling

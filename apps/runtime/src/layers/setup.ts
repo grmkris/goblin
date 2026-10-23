@@ -18,23 +18,26 @@ import { epochSeconds } from '../clock.ts'
 import { attempt } from '../http/errors.ts'
 import { BACKGROUND, conversationId } from '../pi/context.ts'
 import { Db } from '../runtime/db.ts'
+import type { Retooled } from '../agent-model.ts'
 import { AgentInput } from '../runtime/input.ts'
 
 // What each chat may use, as functions of the agent's database (setup/scope.ts), served by `SetupsLive`.
 
 /**
- * Sets a conversation's Pi tool filter (where subagents are switched off, and in a room), leaving its extensions as
- * they are.
+ * Sets a conversation's Pi tool filter (the tools its turn's power does not reach, and the subagent tools where they
+ * are switched off), leaving its extensions as they are. The session's next turn sets its own sender's again
+ * (`useTools`, which forgets what it applied here).
  */
-const retool = (harness: PiHarness) => async (session: string, tools: PiTools) => {
+const retool = (harness: PiHarness, retooled: Retooled) => async (session: string, tools: PiTools) => {
   const conversation = await (await harness.pi()).conversation(conversationId(session), BACKGROUND)
   await conversation?.configure({ tools }, BACKGROUND)
+  retooled.delete(session)
 }
 
 /** How the switches reach Pi: the agent's database, the tool sets its filters remove and its harness. */
 const retooling: Effect.Effect<Retooling, never, AgentInput | Db> = Effect.gen(function* () {
-  const { toolSets, harness } = yield* AgentInput
-  return { db: yield* Db, toolSets, retool: retool(harness) }
+  const { toolSets, harness, retooled } = yield* AgentInput
+  return { db: yield* Db, toolSets, retool: retool(harness, retooled) }
 })
 
 /** What each chat may use, over the agent's database, applied to Pi through its harness. */

@@ -109,8 +109,6 @@ export type LearnerDeps = {
   readonly state: SkillState
   readonly skills: Skills['Service']
   readonly model: CheapModel
-  /** Whether a Pi session works in a room (ADR 0108): what is said there never drafts a skill of the owner's. */
-  readonly room: (session: string) => boolean
 }
 
 /** What a notice of a draft is written with: the chat the lesson came from, and the notices (ADR 0041). */
@@ -256,14 +254,13 @@ const decide = (
   })
 
 /**
- * Considers the newest exchange of a conversation. Cheap checks first: not a room's (ADR 0108), skills on for some
- * server (the learner is part of using skills), today's cap, a signal in the owner's last message. Only then the model,
- * and only an actual procedure becomes a draft.
+ * Considers the newest exchange of a conversation (never a server key's, which its hook leaves out, ADR 0115). Cheap
+ * checks first: skills on for some server (the learner is part of using skills), today's cap, a signal in the owner's
+ * last message. Only then the model, and only an actual procedure becomes a draft.
  */
 const considered = (teacher: Teacher, id: ConversationId, signal: AbortSignal | undefined) =>
   Effect.gen(function* () {
     const sessionId = String(id)
-    if (yield* Effect.sync(() => teacher.room(sessionId))) return 'skipped'
     const now = yield* Clock.currentTimeMillis
     const capped = teacher.drafts.countSince(now - DAY_MS) >= DRAFTS_PER_DAY
     if (capped || (yield* teacher.skills.sources()).length === 0) return 'skipped'

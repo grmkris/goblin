@@ -15,6 +15,7 @@ import { moveEnd } from '../src/chats/mover.ts'
 import { ChatOperations, Chats, Conversations, Moves } from '../src/chats/service.ts'
 import { Conflict } from '../src/http/errors.ts'
 import { RequestContext } from '../src/http/api/context.ts'
+import { credential } from './grants-fixture.ts'
 import type { Member } from '../src/http/api/principal.ts'
 import type { FoundationServices } from '../src/layers/core.ts'
 import { ConversationLive } from '../src/layers/conversation.ts'
@@ -29,10 +30,8 @@ import { PiFailure, PiSessions } from '../src/pi/sessions.ts'
 import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
 import { appChatOperations } from '../src/storage/chat-operations.ts'
 import { appChatMoves, appConversations } from '../src/storage/schema.ts'
-import { appTopics } from '../src/storage/topics.ts'
 import { chatDatabase, sqliteDb } from './chats-sqlite.ts'
 import { fake } from './fake.ts'
-import { appMadeBy } from '../src/storage/made-by.ts'
 
 /** What Pi was asked, in order. */
 type Calls = string[]
@@ -130,8 +129,8 @@ const services = (calls: Calls, models = fake<Models['Service']>({ current: Effe
     fake<AgentInputs>({
       harness,
       applied: new Map(),
-      toolSets: { subagents: [], room: [] },
-      retooled: new Set(),
+      toolSets: { subagents: [], all: [] },
+      retooled: new Map(),
       thread: extension,
       memory: { memory: extension, recall: extension },
       moves: { handover: async () => [] },
@@ -167,35 +166,38 @@ const services = (calls: Calls, models = fake<Models['Service']>({ current: Effe
   }
 }
 
-describe("a server's work never runs on the owner's own subscriptions (ADR 0087)", () => {
-  it.effect('puts a send in a Topic a key made on the model for servers, and the owner elsewhere on their pick', () => {
+describe("a server's work never runs on the owner's own subscriptions (ADRs 0087, 0115)", () => {
+  it.effect("puts a key's send on the model for servers, and the owner's send in the same chat on their pick", () => {
     const calls: Calls = []
     const models = fake<Models['Service']>({
       current: Effect.succeed('sub/claude-opus-5-5'),
       forServers: Effect.succeed('model-a'),
     })
-    const { layer, db } = services(calls, models)
-    // Chat 5 sits in Topic 7, which a server's key made.
-    db.insert(appTopics)
-      .values({ id: 7, name: 'Customer', chatId: '7', createdBy: 'owner', createdAt: 1, updatedAt: 1 })
-      .run()
-    db.update(appConversations).set({ topicId: 7 }).where(eq(appConversations.chatId, '5')).run()
-    db.insert(appMadeBy).values({ keyId: 'key-1', kind: 'topic', resourceId: 7, createdAt: 1 }).run()
+    const { layer } = services(calls, models)
     return Effect.gen(function* () {
       const operations = yield* ChatOperations
-      const send = (chat: string, operationId: string) =>
+      const send = (operationId: string) =>
         operations.send({
-          chat,
+          chat: '5',
           operationId,
           receipt: { kind: 'send', origin: 'owner' },
           flow: { flow: 'send', via: 'app', actor: 'owner' },
           content: 'hello',
         })
-      yield* send('5', 'op-key-topic')
-      yield* send('2', 'op-own-topic')
+      // Tenancy is the sender's: the same chat runs a key's work on the servers' model and the owner's on theirs.
+      yield* send('op-key').pipe(
+        Effect.provideService(RequestContext, {
+          ref: undefined,
+          request: undefined,
+          operation: undefined,
+          route: 'r',
+          credential: credential({ id: 'key-1', name: 'swarmm', level: 'manage' }),
+        }),
+      )
+      yield* send('op-owner')
       expect(calls.filter((call) => call.startsWith('model:'))).toEqual([
         'model:45:model-a',
-        'model:42:sub/claude-opus-5-5',
+        'model:45:sub/claude-opus-5-5',
       ])
     }).pipe(Effect.provide(layer))
   })

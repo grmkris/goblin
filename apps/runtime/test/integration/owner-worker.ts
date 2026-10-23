@@ -103,7 +103,7 @@ export class OwnerAgent extends PersonalAgent {
       const { input } = Schema.decodeUnknownSync(Schema.Struct({ input: Schema.String }))(await request.json())
       return Response.json({ released: queueModel(this).release(input) })
     }
-    if (path.startsWith('/test/rooms/')) return this.#roomsProbe(path, request)
+    if (path.startsWith('/test/power/')) return this.#powerProbe(path, request)
     if (path === '/test/publish/received') return Response.json(this.#receiver.received)
     if (path.startsWith('/test/approvals/')) return this.#approvalsLever(path, request)
     return super.onRequest(request)
@@ -118,16 +118,16 @@ export class OwnerAgent extends PersonalAgent {
       return Response.json(await approvalsProbe(this.ctx.storage, this.env.CREDENTIAL_KEY))
     return super.onRequest(request)
   }
-  /** The rooms' levers (ADR 0108): a stale tool filter, and a restart that forgets what this lifetime applied. */
-  async #roomsProbe(path: string, request: Request): Promise<Response> {
-    if (path === '/test/rooms/stale') return this.#staleFilter(request)
-    // The object restarts: the next request reconstructs it, its in-memory state (what it applied, ADR 0108) gone.
-    if (path === '/test/rooms/restart') this.ctx.abort('rooms restart')
+  /** The power levers (ADR 0115): a stale tool filter, and a restart that forgets what this lifetime applied. */
+  async #powerProbe(path: string, request: Request): Promise<Response> {
+    if (path === '/test/power/stale') return this.#staleFilter(request)
+    // The object restarts: the next request reconstructs it, its in-memory state (what it applied, ADR 0115) gone.
+    if (path === '/test/power/restart') this.ctx.abort('power restart')
     return Response.json({ error: 'no such lever' }, { status: 404 })
   }
   /**
-   * Clears a chat's Pi tool filter in this lifetime, as a filter stored before rooms were (ADR 0108): what the room
-   * guard must refuse at call time, and the chat's first turn after a restart puts right.
+   * Clears a chat's Pi tool filter without this lifetime knowing, as a filter stored before a deploy (ADR 0115): what
+   * the power guard must refuse at call time, and the chat's first turn after a restart puts right.
    */
   async #staleFilter(request: Request): Promise<Response> {
     const { chat } = Schema.decodeUnknownSync(Schema.Struct({ chat: Schema.String }))(await request.json())
@@ -218,16 +218,16 @@ export default {
           new Request(`https://agent/test/queue/${url.pathname.split('/').at(-1)}`, input),
         )
       }
-      if (url.pathname.startsWith('/__test/rooms/')) {
+      if (url.pathname.startsWith('/__test/power/')) {
         const name = url.pathname.split('/').at(-1)
         const agent = await leverAgent(input, env)
         // A restart ends the request it came in: the lever answers that it happened.
         if (name === 'restart')
-          return await agent.fetch('https://agent/test/rooms/restart').then(
+          return await agent.fetch('https://agent/test/power/restart').then(
             () => Response.json({ restarted: false }),
             () => Response.json({ restarted: true }),
           )
-        return agent.fetch(new Request(`https://agent/test/rooms/${name ?? ''}`, input))
+        return agent.fetch(new Request(`https://agent/test/power/${name ?? ''}`, input))
       }
       if (url.pathname === '/__test/publish/received') {
         return (await leverAgent(input, env)).fetch('https://agent/test/publish/received')

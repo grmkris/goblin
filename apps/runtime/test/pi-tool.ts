@@ -4,9 +4,13 @@ import { BACKGROUND, conversationId } from '../src/pi/context.ts'
 /** The members of Pi's execution API a tool under test reads, given by name. */
 export type ToolApiParts = Partial<ToolExecutionApi>
 
-/** The execution API of a call in conversation `session`, with `parts` besides. */
+/**
+ * The execution API of a call in conversation `session`, with `parts` besides: by default outside a live run, the
+ * agent's own work (`turnPower`, ADR 0115).
+ */
 export const inConversation = (session: number, parts: ToolApiParts = {}): ToolApiParts => ({
   conversationId: conversationId(String(session)),
+  snapshot: async () => undefined,
   ...parts,
 })
 

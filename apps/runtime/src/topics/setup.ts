@@ -12,15 +12,3 @@ export const topicSetupOf = (stored: string): TopicSetup => Option.getOrElse(dec
 
 /** A Topic's setup as stored. */
 export const storedSetup = (setup: TopicSetup): string => JSON.stringify(setup)
-
-/**
- * What a room's setup may hold (ADR 0108), whoever sets it: its servers tool by tool, the skills it names, and never
- * everything of anything, an app or subagents.
- */
-export const roomSetupWithin = (setup: TopicSetup): boolean =>
-  setup.mcpServers !== 'all' &&
-  setup.mcpServers.every((server) => server.tools !== 'all') &&
-  setup.skills !== 'all' &&
-  setup.apps !== 'all' &&
-  setup.apps.length === 0 &&
-  !setup.subagents
