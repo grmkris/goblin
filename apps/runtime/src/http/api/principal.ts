@@ -1,4 +1,13 @@
-import { CallerScope, KeyOrigin, KeyScope, KeyServer, WorkspaceRole } from '@goblin/contracts'
+import {
+  CallerScope,
+  Extra,
+  KeyOrigin,
+  KeyScope,
+  KeyServer,
+  Level,
+  WorkspaceId,
+  WorkspaceRole,
+} from '@goblin/contracts'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { KEY_PREFIX } from '../../auth/resources.ts'
@@ -52,6 +61,36 @@ const ForwardedCaller = Schema.fromJsonString(
     }),
   ]),
 )
+
+const Coverage = Schema.Literals(['all', 'list'])
+
+/**
+ * A credential as the Worker forwards it once grants are kept: a server's key or an OAuth client acting for a person,
+ * its name, its grant's id, level and extras, when it ends (epoch milliseconds, `null` until revoked), and in the
+ * workspace the request reaches whether its Topics, Personas and connections are all or a list, with the reach's
+ * generation, so the agent knows when to read the lists again. The lists themselves never travel in the header; the
+ * MCP origins its threads may bring do (ADR 0091).
+ *
+ * @internal The forwarded caller is still `ForwardedCaller`; a test holds this shape until the edge forwards it.
+ */
+export const Credential = Schema.Struct({
+  kind: Schema.Literals(['key', 'client']),
+  id: Schema.String.check(Schema.isPattern(/^[\w.:-]{1,200}$/u)),
+  name: Schema.String.check(Schema.isMaxLength(200)),
+  grantId: Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u)),
+  level: Level,
+  extras: Schema.Array(Extra),
+  expiresAt: Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+  ws: Schema.Struct({
+    workspace: WorkspaceId,
+    topics: Coverage,
+    personas: Coverage,
+    connections: Coverage,
+    generation: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  }),
+  origins: Schema.Array(KeyOrigin),
+})
+export type Credential = typeof Credential.Type
 
 /** The header value that forwards `caller`. */
 export const callerHeader = (caller: Caller): string => JSON.stringify(caller)
