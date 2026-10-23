@@ -86,6 +86,11 @@ does not cover answers with a link where the owner can widen it. A key never kee
 marked as its requests, and no other chat searches it. A secret that may have leaked is rotated in Settings: the same
 key, with all it made, and the old secret refused at once (ADR 0105).
 
+The [trusted workloads spike](docs/adr/0116-trusted-workloads.md) adds workspace trust policies for GitHub Actions
+and custom issuers such as Swarmm. Short-lived OIDC Bearers, or tokens exchanged at `/token`, use the existing
+server grant on `/api` and `/mcp`; Settings can disable trust and retire the static secret. This is proposed spike
+behavior with local fixture evidence; see [SPIKE_RESULTS.md](SPIKE_RESULTS.md).
+
 Every turn can be seen end to end (ADR 0024). Beside Pi's own record, each agent keeps a 30-day run ledger of how its
 turns ran: model attempts, tool calls, retries, MCP steps, Source replies, timings, tokens and errors, never content.
 Each event says what it ran with (ADR 0107): the release, the model endpoint and thinking level, the prompt sections

@@ -5,6 +5,7 @@ import type {
   ConsentTerms,
   CreateApiKeyTerms,
   CreatedApiKey,
+  CreateTrustedWorkload,
   CreateWorkspace,
   GrantTerms,
   InboundClient,
@@ -12,6 +13,7 @@ import type {
   UpdateWorkspace,
   WidenResult,
   WorkspaceView,
+  TrustedWorkloadView,
 } from '@goblin/contracts'
 import type { FlowEvent } from '@goblin/contracts/telemetry'
 import * as Context from 'effect/Context'
@@ -22,6 +24,7 @@ import * as HttpServer from 'effect/http/HttpServer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { type KeyChange, createKey, listKeys, revokeKey, rotateKey, updateKey } from '../../auth/api-keys.ts'
 import { listInboundClients, revokeInboundClient } from '../../auth/clients.ts'
+import { createOidcPolicy, disableOidcPolicy, listOidcPolicies } from '../../auth/oidc-workloads.ts'
 import {
   type TermsChange,
   clientTerms,
@@ -91,6 +94,13 @@ export interface AccountRecords {
   /** A new secret for one of the workspace's keys (ADR 0105): the same key, with its secret this once. */
   readonly rotateKey: (workspaceId: string, keyId: string) => Effect.Effect<CreatedApiKey, AppError>
   readonly revokeKey: (workspaceId: string, keyId: string) => Effect.Effect<void, AppError>
+  readonly trustedWorkloads: (workspaceId: string) => Effect.Effect<readonly TrustedWorkloadView[], AppError>
+  readonly createTrustedWorkload: (
+    workspaceId: string,
+    userId: string,
+    input: CreateTrustedWorkload,
+  ) => Effect.Effect<TrustedWorkloadView, AppError>
+  readonly disableTrustedWorkload: (workspaceId: string, id: string) => Effect.Effect<void, AppError>
   /**
    * A browser crash's `client_error` flow point (ADR 0037), under the hash of the person when the report came with a
    * session; nothing without the `FLOWS` binding.
@@ -209,6 +219,10 @@ export const accountRecords = (env: RuntimeEnv): AccountRecords => {
         yield* attempt(() => revokeInboundClient(env, userId, clientId))
       }),
     keys: (workspaceId) => attempt(() => listKeys(env, workspaceId)),
+    trustedWorkloads: (workspaceId) => attempt(() => listOidcPolicies(env, workspaceId)),
+    createTrustedWorkload: (workspaceId, userId, input) =>
+      attempt(() => createOidcPolicy(env, workspaceId, userId, input)),
+    disableTrustedWorkload: (workspaceId, id) => attempt(() => disableOidcPolicy(env, workspaceId, id)),
     createKey: (workspaceId, userId, input) => attempt(() => createKey(env, workspaceId, userId, input)),
     updateKey: (workspaceId, userId, keyId, change) =>
       Effect.tap(
@@ -442,6 +456,27 @@ const KeysHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'keys', (handlers
     ),
 )
 
+const TrustedWorkloadsHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'trustedWorkloads', (handlers) =>
+  handlers
+    .handle('list', () =>
+      quoted(Effect.flatMap(manager, ({ records, workspace }) => records.trustedWorkloads(workspace.id))),
+    )
+    .handle('create', ({ payload }) =>
+      quoted(
+        Effect.flatMap(manager, ({ records, person, workspace }) =>
+          records.createTrustedWorkload(workspace.id, person.id, payload),
+        ),
+      ),
+    )
+    .handle('disable', ({ params }) =>
+      quoted(
+        Effect.flatMap(manager, ({ records, workspace }) =>
+          Effect.as(records.disableTrustedWorkload(workspace.id, params.id), { disabled: true as const }),
+        ),
+      ),
+    ),
+)
+
 /** The person's invitations (ADR 0093): one's preview needs no session, the rest the person it is for. */
 const InvitationsHandlers = HttpApiBuilder.group(AccountApi, 'invitations', (handlers) =>
   handlers
@@ -525,6 +560,6 @@ export const AccountApiLayer = HttpApiBuilder.layer(AccountApi).pipe(
 
 /** The workspace account API's routes, served by the Worker for a member (`edge.ts`). */
 export const WorkspaceAccountApiLayer = HttpApiBuilder.layer(WorkspaceAccountApi).pipe(
-  Layer.provide([KeysHandlers, MembersHandlers]),
+  Layer.provide([KeysHandlers, MembersHandlers, TrustedWorkloadsHandlers]),
   Layer.provide(HttpServer.layerServices),
 )

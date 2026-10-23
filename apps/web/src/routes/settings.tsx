@@ -3,6 +3,7 @@ import { OwnerGate } from '../components/owner-gate.tsx'
 import { PageBar } from '../components/page-bar.tsx'
 import { Settings } from '../components/settings.tsx'
 import { clientsQuery, keysQuery } from '../account/queries.ts'
+import { trustedWorkloadsQuery } from '../account/workloads.ts'
 import { memoryQuery, modelEndpointQuery, residentQuery, usageQuery } from '../agent/queries.ts'
 import { primeOwnerRead } from '../lib/prime.ts'
 
@@ -16,6 +17,7 @@ export const Route = createFileRoute('/settings')({
       primeOwnerRead(context.queryClient, memoryQuery()),
       primeOwnerRead(context.queryClient, clientsQuery),
       primeOwnerRead(context.queryClient, keysQuery),
+      primeOwnerRead(context.queryClient, trustedWorkloadsQuery),
     ])
   },
   component: SettingsPage,

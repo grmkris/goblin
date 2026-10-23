@@ -1,7 +1,9 @@
 import { authFixtureRoute, fixtureAuth } from './auth-fixture.ts'
 /** Native auth D1 + owner Agent fixture; test levers never enter the deployed Worker. */
 import { Schema } from 'effect'
-import runtime from '../../src/worker.ts'
+import { workerWith } from '../../src/http/worker.ts'
+import { makeOidcVerifier } from '../../src/auth/workload-verifier.ts'
+import { GITHUB, SWARMM, issuerFixture } from '../workloads/issuer.ts'
 import type { RuntimeEnv } from '../../src/env.ts'
 import { refusal } from '../../src/http/api/render.ts'
 import { toAppError } from '../../src/http/errors.ts'
@@ -27,6 +29,25 @@ import { PublishReceiver } from './publish-receiver.ts'
 
 /** Tokens the `approvals/spent` lever adds to today: more than the owner stack's daily cap (`owner-stack.ts`). */
 const SPENT_TOKENS = 1_000_000_000
+
+let workloadIssuers: Promise<readonly Awaited<ReturnType<typeof issuerFixture>>[]> | undefined
+const issuers = () => (workloadIssuers ??= Promise.all([issuerFixture(GITHUB), issuerFixture(SWARMM)]))
+const runtime = workerWith(
+  makeOidcVerifier(async (url, init) => {
+    const issuer = (await issuers()).find((candidate) => url.startsWith(`${candidate.issuer}/`))
+    return issuer === undefined ? new Response(null, { status: 404 }) : issuer.fetch(url, init)
+  }),
+)
+
+/** Mint fixture assertions only inside this test Worker. No real provider or network is involved. */
+const workloadToken = async (request: Request, env: RuntimeEnv) => {
+  await requireUserSession(request, env)
+  const issuer = (await issuers()).find(
+    (candidate) => candidate.issuer === new URL(request.url).searchParams.get('issuer'),
+  )
+  if (issuer === undefined) return new Response(null, { status: 404 })
+  return Response.json({ assertion: await issuer.token() })
+}
 
 export class OwnerAgent extends PersonalAgent {
   readonly #mcp = new AppsMcpFixture()
@@ -193,6 +214,7 @@ export default {
     try {
       const authProbe = await authFixtureRoute(input, env)
       if (authProbe !== undefined) return authProbe
+      if (url.pathname === '/__test/workload-token') return workloadToken(input, env)
       // A chat's Pi snapshot or raw history (`snapshot-lever.ts`), from the signed-in person's own agent.
       if (leverChat(url.pathname) !== undefined) {
         return (await leverAgent(input, env)).fetch(`https://agent${url.pathname}${url.search}`)

@@ -34,6 +34,7 @@ import { streamChildrenCase } from './streams-children-case.ts'
 import { streamsCase } from './streams-case.ts'
 import { runStreamsCase } from './run-streams-case.ts'
 import { publishCase } from './publish-case.ts'
+import { workloadsCase } from './workloads-case.ts'
 
 const harness = Test.make({
   providers: Cloudflare.providers(),
@@ -42,6 +43,10 @@ const harness = Test.make({
   dev: true,
 })
 const stack = harness.beforeAll(harness.deploy(Stack))
+harness.test(
+  'native: trusted workloads use GitHub and Swarmm assertions, exchange once, and follow live grants',
+  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => workloadsCase(url)))),
+)
 harness.test(
   'native: an invited address signs up while sign-up is closed, joins the workspace as a member and is removed (ADR 0093)',
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => membersCase(url)))),

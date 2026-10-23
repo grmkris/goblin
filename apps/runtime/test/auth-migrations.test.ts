@@ -79,8 +79,8 @@ const OWN_INDEXES: Readonly<Record<string, readonly { unique: boolean; columns: 
   member: [{ unique: true, columns: ['organizationId', 'userId'] }],
 }
 
-/** goblin's own tables in the auth D1, beside Better Auth's: each credential's grant, its workspaces and its lists. */
-const OWN_TABLES = ['grant', 'grantWorkspace', 'grantReach'] as const
+/** goblin's own auth D1 tables: grants and reach, workload policies and replay-protected exchanged tokens. */
+const OWN_TABLES = ['grant', 'grantWorkspace', 'grantReach', 'trustedWorkloadPolicy', 'workloadAccessToken'] as const
 
 /** Compare the SQL to the installed Better Auth schema, not to a second manually maintained column list. */
 function checkTable(db: DatabaseSync, table: string, schema: ReturnType<typeof getSchema>[string]) {
@@ -151,6 +151,7 @@ describe('auth D1 baseline', () => {
       '0003_mcp_reach.sql',
       '0004_mcp_powers.sql',
       '0005_grants.sql',
+      '0006_trusted_workloads.sql',
     ])
     const { db, auth } = fixture()
     await auth.$context

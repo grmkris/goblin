@@ -7,7 +7,7 @@ import * as Option from 'effect/Option'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { chatRow } from '../chats/directory.ts'
 import { RequestContext } from '../http/api/context.ts'
-import { NotFound, attemptSync } from '../http/errors.ts'
+import { Forbidden, NotFound, attemptSync } from '../http/errors.ts'
 import { listedBy, reachesChat, reachesTopic, requestCredential } from '../grants/policy.ts'
 import { Db } from '../runtime/db.ts'
 import { appTopics } from '../storage/topics.ts'
@@ -60,10 +60,12 @@ export const EventsHandlers = HttpApiBuilder.group(OwnerApi, 'events', (handlers
     .handle('list', () => Published.use((published) => published.list))
     .handle('subscribe', ({ payload }) =>
       Effect.gen(function* () {
+        const credential = yield* requestCredential
+        if (credential?.workload === true) return yield* new Forbidden({ reason: 'workload_webhook' })
         yield* attemptSync(() => requireEvent(payload.name))
         const selector = yield* selectorIn(payload.arguments)
         const holder = yield* requestHolder
-        const grant = (yield* requestCredential)?.grantId
+        const grant = credential?.grantId
         const { url, secret } = payload.delivery
         return yield* Published.use((published) =>
           published.subscribe({ holder, grant, selector, url, secret, ttlMs: payload.ttlMs, cursor: payload.cursor }),

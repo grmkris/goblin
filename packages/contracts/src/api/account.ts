@@ -4,6 +4,7 @@ import { ClientsGroup } from './clients.ts'
 import { GrantsGroup } from './grants.ts'
 import { InvitationsGroup } from './invitations.ts'
 import { KeysGroup } from './keys.ts'
+import { TrustedWorkloadsGroup } from './trusted-workloads.ts'
 import { MembersGroup } from './members.ts'
 import { WorkspacesGroup } from './workspaces.ts'
 
@@ -20,5 +21,5 @@ export class AccountApi extends HttpApi.make('goblin-account')
  * its agent: the workspace's API keys, and its members and invitations.
  */
 export class WorkspaceAccountApi extends HttpApi.make('goblin-workspace-account')
-  .add(KeysGroup, MembersGroup)
+  .add(KeysGroup, MembersGroup, TrustedWorkloadsGroup)
   .prefix('/api') {}

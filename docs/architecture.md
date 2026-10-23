@@ -18,6 +18,10 @@ flowchart LR
   Agent --> Model[Model gateway]
 ```
 
+The proposed [trusted workloads slice](adr/0116-trusted-workloads.md) adds workspace-scoped OIDC policies in auth D1.
+The Worker verifies platform JWTs or exchanges them at `/token`, then forwards the same server grant as an API key.
+See [inbound authentication](architecture/inbound-mcp.md#trusted-workloads-spike) for its boundaries.
+
 ## Areas
 
 - [Worker](architecture/worker.md): routes the Worker serves and how a request reaches the agent.

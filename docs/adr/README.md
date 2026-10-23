@@ -106,3 +106,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0112](0112-goblin-publishes-mcp-events.md) | goblin publishes MCP Events: `conversation.updated` by signed webhook or poll | Accepted; built; amends 0081, 0086 |
 | [0113](0113-a-room-runs-in-its-own-object.md) | A room runs in its own object; the workspace object is the control plane | Accepted; slice 1 built (a room takes no routine, Source, owner App or file) |
 | [0114](0114-one-grant-for-every-credential.md) | One grant for every credential: level, reach, extras and lifetime, for keys and OAuth clients alike | Accepted; release A built; amends 0081, 0084, 0086, 0091, 0097, 0098, 0105 |
+| [0116](0116-trusted-workloads.md) | Trusted workloads use platform OIDC assertions and the server's grant | proposed (spike) |

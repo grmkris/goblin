@@ -452,7 +452,13 @@ const workspaceList = (server: McpServer, reach: CallerReach) =>
  */
 export const mcpServer = (power: Power, call: OwnerCaller, reach?: CallerReach): McpServer => {
   const guide = `${reach === undefined ? GUIDE : `${GUIDE}${reachGuide(reach)}`}${EVENTS_GUIDE(power)}`
-  const server = new McpServer({ name: 'goblin', version: '0.1.0' }, { instructions: guide })
+  const server = new McpServer(
+    { name: 'goblin', version: '0.1.0' },
+    {
+      instructions: guide,
+      capabilities: { extensions: { 'io.modelcontextprotocol/oauth-client-credentials': {} } },
+    },
+  )
   eventMethods(server, power, call, reach)
   const target: CallTarget = { current: undefined, context: undefined }
   // `workspace_list` first: it names no workspace, and every tool after it does when the client must name one.

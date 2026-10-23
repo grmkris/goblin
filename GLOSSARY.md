@@ -46,8 +46,13 @@ workspace (ADR 0089), does what its **grant** allows over `/api` or `/mcp`, and 
 it makes is a **room** (ADR 0108).
 _Avoid_: token, service account
 
+**Trusted workload**:
+A server or job whose short-lived platform identity the workspace trusts to use a saved server grant. Its trust can
+be disabled independently of that grant (proposed spike, ADR 0116).
+
 **Credential**:
-An API key or an inbound client: what calls goblin for a server or a person's agent, each with its own grant (ADR 0114).
+An API key, trusted workload or inbound client: what calls goblin for a server or a person's agent under a grant
+(ADRs 0114, 0116).
 _Avoid_: caller, principal
 
 **Grant**:
