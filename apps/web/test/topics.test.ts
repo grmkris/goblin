@@ -5,8 +5,11 @@ import {
   channelOf,
   channels,
   isChannel,
-  matchingRooms,
-  roomGroups,
+  madeByGroups,
+  madeByKey,
+  matchingTopics,
+  reachChange,
+  reachNote,
   topicOfChannel,
   topicThreads,
   topicsOf,
@@ -116,18 +119,18 @@ describe("a Topic's threads in the sidebar", () => {
   })
 })
 
-/** A room a server's key made (ADR 0108). */
-const room = (id: number, name: string, key: string, extra: Partial<TopicView> = {}) =>
+/** A Topic a server's key made, for display (ADR 0115). */
+const made = (id: number, name: string, key: string, extra: Partial<TopicView> = {}) =>
   topic(id, name, String(id * 10), { madeBy: { key }, createdBy: 'agent', createdAt: id, ...extra })
 
-describe("a key's rooms in the sidebar", () => {
-  const ROOMS = [
+describe("the Topics a server's key made, in the sidebar (ADR 0115)", () => {
+  const MADE = [
     ...TOPICS,
-    room(5, 'deal-5', 'swarmm-prod'),
-    room(6, 'deal-6', 'swarmm-prod'),
-    room(7, 'Deal-7', 'swarmm-prod', { archivedAt: 99 }),
-    room(8, 'quest-8', 'sidequest'),
-    room(9, 'quest-9', 'sidequest'),
+    made(5, 'deal-5', 'swarmm-prod'),
+    made(6, 'deal-6', 'swarmm-prod'),
+    made(7, 'Deal-7', 'swarmm-prod', { archivedAt: 99 }),
+    made(8, 'quest-8', 'sidequest'),
+    made(9, 'quest-9', 'sidequest'),
   ]
   const views = [
     view('50', { kind: 'main', conversation: true, parent: undefined, topic: 5, lastReplyAt: 40 }),
@@ -136,30 +139,42 @@ describe("a key's rooms in the sidebar", () => {
     view('80', { kind: 'main', conversation: true, parent: undefined, topic: 8, lastReplyAt: 50 }),
   ]
 
-  it("keeps the owner's own channels as they were, without any room", () => {
-    expect(channels(ROOMS)).toEqual(channels(TOPICS))
+  it("keeps the owner's own channels as they were, with none a key made", () => {
+    expect(channels(MADE)).toEqual(channels(TOPICS))
+    expect(madeByKey(MADE[5] ?? PERSONAL)).toBe('swarmm-prod')
+    expect(madeByKey(PERSONAL)).toBeUndefined()
   })
 
-  it('groups the active rooms by key, the latest active first, a reply in a thread counting for its room', () => {
-    const groups = roomGroups(ROOMS, views)
-    expect(groups.map(({ key, rooms, latest }) => ({ key, rooms: rooms.map(({ name }) => name), latest }))).toEqual([
-      { key: 'swarmm-prod', rooms: ['deal-6', 'deal-5'], latest: 70 },
-      { key: 'sidequest', rooms: ['quest-8', 'quest-9'], latest: 50 },
+  it('groups the active ones by key, the latest active first, a reply in a thread counting for its Topic', () => {
+    const groups = madeByGroups(MADE, views)
+    expect(groups.map(({ key, topics, latest }) => ({ key, topics: topics.map(({ name }) => name), latest }))).toEqual([
+      { key: 'swarmm-prod', topics: ['deal-6', 'deal-5'], latest: 70 },
+      { key: 'sidequest', topics: ['quest-8', 'quest-9'], latest: 50 },
     ])
   })
 
-  it('counts a room with no chat yet from when it was made, and has no group without rooms', () => {
-    expect(roomGroups(ROOMS, []).map(({ key, rooms }) => [key, rooms.map(({ id }) => id)])).toEqual([
+  it('counts a Topic with no chat yet from when it was made, and has no group when no key made any', () => {
+    expect(madeByGroups(MADE, []).map(({ key, topics }) => [key, topics.map(({ id }) => id)])).toEqual([
       ['sidequest', [9, 8]],
       ['swarmm-prod', [6, 5]],
     ])
-    expect(roomGroups(TOPICS, views)).toEqual([])
+    expect(madeByGroups(TOPICS, views)).toEqual([])
   })
 
-  it('filters rooms by name whatever the case, and keeps them all while the filter is blank', () => {
-    const rooms = roomGroups(ROOMS, views)[0]?.rooms ?? []
-    expect(matchingRooms(rooms, ' DEAL-5 ').map(({ id }) => id)).toEqual([5])
-    expect(matchingRooms(rooms, '  ')).toBe(rooms)
-    expect(matchingRooms(rooms, 'nothing')).toEqual([])
+  it('filters them by name whatever the case, and keeps them all while the filter is blank', () => {
+    const topics = madeByGroups(MADE, views)[0]?.topics ?? []
+    expect(matchingTopics(topics, ' DEAL-5 ').map(({ id }) => id)).toEqual([5])
+    expect(matchingTopics(topics, '  ')).toBe(topics)
+    expect(matchingTopics(topics, 'nothing')).toEqual([])
+  })
+})
+
+describe("a Topic's reach in its channel info (ADR 0115)", () => {
+  it('says a sealed Topic sees only itself and a hub every Topic, and asks for exactly the reach the switch chose', () => {
+    expect(reachNote({ reach: 'sealed' })).toContain("only this Topic's chats and files")
+    expect(reachNote({ reach: 'hub' })).toContain('every Topic')
+    expect(reachChange(true)).toEqual({ reach: 'hub' })
+    expect(reachChange(false)).toEqual({ reach: 'sealed' })
+    expect(PERSONAL.reach).toBe('hub')
   })
 })

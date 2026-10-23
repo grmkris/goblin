@@ -43,7 +43,7 @@ function storedFold(key: string, foldedFirst: boolean): boolean {
 
 /**
  * The sections the owner folded or opened, remembered in this browser (a convenience: without storage each starts as
- * it does before anyone chose). A section starts open unless `foldedFirst` (a key's rooms, ADR 0108). The server, and
+ * it does before anyone chose). A section starts open unless `foldedFirst` (the Topics a server's key made, ADR 0115). The server, and
  * the first render in the browser, show it that way; the browser's choice follows.
  */
 export function useFolded(section: string, foldedFirst = false): readonly [boolean, () => void] {

@@ -3,8 +3,9 @@
  * strip and its shortcut, the Topics popover, and the phone's drawer and dot. The page is in a workspace
  * (`/w/swarmm-prod/…`, ADR 0089) where the person is an admin, with two more workspaces and two invitations waiting
  * (ADR 0093): the workspace menu's count, roles and tooltip, and the invitations answered in place there and in
- * Activity. Two server keys made rooms and Personas (ADR 0108): each key's rooms fold under the Topics, filter and page
- * once open, a room's info says what it is, and the Personas page folds each key's. Screenshots land in .local.
+ * Activity. Two server keys made Topics and Personas (ADR 0115): each key's Topics fold under the Topics, filter and
+ * page once open; a Topic's info says how far it reaches, an admin's hub switch asks for exactly that reach, and a
+ * member reads the line alone; the Personas page folds each key's. Screenshots land in .local.
  */
 import assert from 'node:assert/strict'
 import { mkdirSync } from 'node:fs'
@@ -102,6 +103,31 @@ const ANSWER = /^\/api\/invitations\/([a-f0-9]{32})\/(accept|decline)$/u
  * Answering an invitation takes it off the list, except joining Lab notes, which is refused as its owner's own.
  * Anything else is a test failure.
  */
+/** A Topic's change (`PATCH /api/topics/:id`). */
+const TOPIC = /^\/api\/topics\/(\d+)$/u
+
+/** Each Topic change the page asked for, its body as sent. */
+const changes: unknown[] = []
+
+/** The Topic a change answers: the fixture's Topic 107 or Personal, with the reach the change asked for. */
+function patched(id: string, request: ReturnType<Route['request']>): unknown {
+  const change: unknown = request.postDataJSON()
+  changes.push(change)
+  const reach = typeof change === 'object' && change !== null && 'reach' in change ? change.reach : 'sealed'
+  const personal = id === '1'
+  return {
+    id: Number(id),
+    name: personal ? 'Personal' : 'deal-08',
+    conversation: personal ? '1' : '1070',
+    ...(personal ? { personal: true } : { madeBy: { key: 'swarmm-prod' } }),
+    reach,
+    revision: 1,
+    setup: { mcpServers: 'all', skills: 'all', apps: 'all', subagents: true },
+    createdBy: personal ? 'system' : 'agent',
+    createdAt: 1,
+  }
+}
+
 function fakeApi(errors: string[]) {
   let invitations = [...INVITATIONS]
   const reads: Readonly<Record<string, () => unknown>> = {
@@ -126,6 +152,8 @@ function fakeApi(errors: string[]) {
     const pathname = new URL(request.url()).pathname.replace(/^\/w\/[a-z0-9-]+(?=\/api\/)/u, '')
     const [, id = '', how = ''] = ANSWER.exec(pathname) ?? []
     if (request.method() === 'POST' && how !== '') return route.fulfill(answer(id, how))
+    const topic = TOPIC.exec(pathname)?.[1]
+    if (request.method() === 'PATCH' && topic !== undefined) return route.fulfill({ json: patched(topic, request) })
     const read = request.method() === 'GET' ? reads[pathname] : undefined
     if (read !== undefined) return route.fulfill({ json: read() })
     errors.push(`Unexpected API request: ${request.method()} ${pathname}`)
@@ -221,44 +249,65 @@ try {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
     assert.equal(overflow, 0)
 
-    // A key's rooms: a folded section each under the Topics, the key active last first, with a dot while a room has
-    // unread replies; folded, the room the page shows keeps its row.
-    const rooms = page.locator('nav.shell-sidebar [data-section="rooms"]')
-    assert.deepEqual(await words(rooms.locator('.sidebar-section-toggle')), [
-      'swarmm-prod · 24 rooms , unread replies',
-      'sidequest-dev · 2 rooms',
+    // The Topics a key made: a folded section each under the Topics, the key active last first, with a dot while one
+    // has unread replies; folded, the Topic the page shows keeps its row.
+    const made = page.locator('nav.shell-sidebar [data-section="made-by"]')
+    assert.deepEqual(await words(made.locator('.sidebar-section-toggle')), [
+      'swarmm-prod · 24 topics , unread replies',
+      'sidequest-dev · 2 topics',
     ])
-    assert.equal(await rooms.locator('.sidebar-row').count(), 0)
+    assert.equal(await made.locator('.sidebar-row').count(), 0)
     await at('/c/1070')
     assert.deepEqual(await current(page), ['page deal-08'])
-    assert.equal(await rooms.first().locator('.sidebar-row').count(), 1)
-    // Open: a filter field, then the rooms active last first, twenty at a time.
-    await rooms.first().locator('.sidebar-section-toggle').click()
-    const names = rooms.first().locator('a.sidebar-row .sidebar-row-name')
+    assert.equal(await made.first().locator('.sidebar-row').count(), 1)
+    // Open: a filter field, then the Topics active last first, twenty at a time.
+    await made.first().locator('.sidebar-section-toggle').click()
+    const names = made.first().locator('a.sidebar-row .sidebar-row-name')
     assert.equal(await names.count(), 20)
     assert.deepEqual((await names.allTextContents()).slice(0, 3), ['deal-08', 'deal-24', 'deal-23'])
-    await rooms.first().evaluate((section) => section.scrollIntoView({ block: 'start' }))
-    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-rooms.png`) })
-    await rooms.first().getByRole('button', { name: 'Show 4 more' }).click()
+    await made.first().evaluate((section) => section.scrollIntoView({ block: 'start' }))
+    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-made-by.png`) })
+    await made.first().getByRole('button', { name: 'Show 4 more' }).click()
     assert.equal(await names.count(), 24)
-    const filter = rooms.first().getByRole('searchbox', { name: 'Filter the rooms of swarmm-prod' })
+    const filter = made.first().getByRole('searchbox', { name: 'Filter the topics swarmm-prod made' })
     await filter.fill('DEAL-1')
     assert.deepEqual(
       await names.allTextContents(),
       Array.from({ length: 10 }, (_, n) => `deal-${String(19 - n)}`),
     )
     await filter.fill('nothing')
-    await rooms.first().getByText('No rooms match.').waitFor()
-    await rooms.first().evaluate((section) => section.scrollIntoView({ block: 'start' }))
-    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-rooms-filtered.png`) })
-    await rooms.first().locator('.sidebar-section-toggle').click()
+    await made.first().getByText('No topics match.').waitFor()
+    await made.first().evaluate((section) => section.scrollIntoView({ block: 'start' }))
+    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-made-by-filtered.png`) })
+    await made.first().locator('.sidebar-section-toggle').click()
 
-    // A room's info: the Room chip beside its name and what goblin reaches there.
-    await at('/room-info')
+    // A Topic a key made is sealed like any other: its info says so, and an admin's switch makes it a hub, asking for
+    // exactly that reach; Personal is the hub, with Hub beside its name.
+    await at('/topic-info')
     const info = page.getByRole('dialog', { name: '#deal-08' })
-    await info.getByText('goblin here reaches only this Topic.').waitFor()
-    assert.equal(await info.locator('[data-slot="badge"]').textContent(), 'Room')
-    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-room-info.png`) })
+    await info.getByText("goblin here sees only this Topic's chats and files").waitFor()
+    assert.equal(await info.locator('[data-slot="badge"]').count(), 0)
+    const hub = info.getByRole('switch', { name: 'Hub' })
+    assert.equal(await hub.getAttribute('aria-checked'), 'false')
+    const row = await info.locator('.channel-info-reach-row').boundingBox()
+    assert(row !== null && row.height >= 40, 'the hub row is a 40px target')
+    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-topic-info.png`) })
+    changes.length = 0
+    await hub.click()
+    await info.getByText('goblin here reaches every Topic').waitFor()
+    assert.deepEqual(changes, [{ reach: 'hub' }])
+    assert.equal(await hub.getAttribute('aria-checked'), 'true')
+    await at('/hub-info')
+    const personal = page.getByRole('dialog', { name: '#Personal' })
+    await personal.getByText('goblin here reaches every Topic').waitFor()
+    assert.equal(await personal.locator('[data-slot="badge"]').textContent(), 'Hub')
+    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-hub-info.png`) })
+    // A member reads where it reaches, and has no switch.
+    await page.goto(`${origin}w/sidequest/navigation.html?at=/topic-info`)
+    const theirs = page.getByRole('dialog', { name: '#deal-08' })
+    await theirs.getByText("goblin here sees only this Topic's chats and files").waitFor()
+    assert.equal(await theirs.getByRole('switch').count(), 0)
+    await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-topic-info-member.png`) })
 
     // The strip: ⌘B or Ctrl+B, remembered across a reload, names in tooltips, the Topics behind one `#`.
     await at('/c/1')
@@ -355,9 +404,11 @@ try {
     await page.goto(`${origin}w/${HERE}/navigation.html?at=/activity`)
     await page.locator('.invitation-row').nth(1).waitFor()
     await page.screenshot({ path: path.join(out, `phone-${colorScheme}-activity.png`), fullPage: true })
-    await page.goto(`${origin}w/${HERE}/navigation.html?at=/room-info`)
-    await page.getByText('goblin here reaches only this Topic.').waitFor()
-    await page.screenshot({ path: path.join(out, `phone-${colorScheme}-room-info.png`) })
+    await page.goto(`${origin}w/${HERE}/navigation.html?at=/topic-info`)
+    await page.getByText("goblin here sees only this Topic's chats and files").waitFor()
+    const touch = await page.locator('.channel-info-reach-row').boundingBox()
+    assert(touch !== null && touch.height >= 44, 'the hub row is a 44px target at a finger')
+    await page.screenshot({ path: path.join(out, `phone-${colorScheme}-topic-info.png`) })
     await page.goto(`${origin}w/${HERE}/navigation.html?at=/apps`)
     const menu = page.getByRole('button', { name: /^Open navigation/u })
     await menu.waitFor()

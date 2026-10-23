@@ -45,7 +45,7 @@
   color: var(--muted-foreground);
   font-size: 0.75rem;
 }
-/* The channel's name, and for a key's room (ADR 0108) a quiet Room beside it; its one line opens the Overview. */
+/* The channel's name, and for a hub (ADR 0115) a quiet Hub beside it. */
 .channel-info-name {
   display: flex;
   align-items: center;
@@ -58,9 +58,23 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.channel-info-room {
+/*
+ * How far the Topic's chats reach (ADR 0115), first in the Overview: a quiet line for a member, a switch row for an
+ * owner or admin, its edge lined up with the text below it.
+ */
+.channel-info-reach {
   margin: 0 0 1rem;
   color: var(--muted-foreground);
+  text-wrap: pretty;
+}
+.channel-info-reach-name {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.channel-info-reach-row {
+  margin: 0 -0.625rem 1rem;
+}
+.channel-info-reach-row .switch-detail {
   text-wrap: pretty;
 }
 .channel-info-scroll {

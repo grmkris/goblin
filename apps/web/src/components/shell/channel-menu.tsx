@@ -16,8 +16,8 @@ import { updateWorkspaceTopicMutation } from '../../lib/workspace/mutations.ts'
 import { TopicDialog } from './topic-dialog.tsx'
 
 /**
- * A channel's actions, in its info panel's header: rename, keep the Topic out of automatic search or let it back in,
- * and archive it or restore it (never Personal). A failure shows in the panel and under the chat's bar.
+ * A channel's actions, in its info panel's header: rename, and archive it or restore it (never Personal). Whether it is
+ * sealed or a hub is the Overview's (`ChannelReach`). A failure shows in the panel and under the chat's bar.
  */
 export function ChannelMenu({
   topic,

@@ -374,17 +374,17 @@
   background: var(--live);
 }
 /*
- * A key's rooms (ADR 0108), under the Topics: the key's name, then how many rooms in figures that keep their width, and
- * once open a filter field on the sidebar's own surface (16px at a finger, so a phone does not zoom into it) and a
- * quiet line when nothing matches.
+ * The Topics a server's key made (ADR 0115), under the Topics: the key's name, then how many in figures that keep their
+ * width, and once open a filter field on the sidebar's own surface (16px at a finger, so a phone does not zoom into
+ * it) and a quiet line when nothing matches.
  */
-.sidebar-rooms-key {
+.sidebar-made-key {
   min-width: 0;
   overflow: clip;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sidebar-rooms-count {
+.sidebar-made-count {
   flex: none;
   font-variant-numeric: tabular-nums;
   font-weight: 500;
@@ -484,7 +484,7 @@
   }
   :root[data-sidebar='collapsed']
     [data-place='column']
-    :is(.sidebar-section-head, .sidebar-row-more, [data-section='topics'], [data-section='rooms']) {
+    :is(.sidebar-section-head, .sidebar-row-more, [data-section='topics'], [data-section='made-by']) {
     display: none;
   }
   :root[data-sidebar='collapsed'] [data-place='column'] .sidebar-strip-only {
@@ -746,7 +746,7 @@
   flex: none;
   color: var(--muted-foreground);
 }
-/* A key's room says so beside its name, quietly (ADR 0108). */
+/* A hub says so beside its name, quietly (ADR 0115). */
 .channel-title > [data-slot='badge'] {
   margin-inline-start: 0.25rem;
 }

@@ -1,4 +1,11 @@
-import { type ConversationView, EVERYTHING, PERSONAL_TOPIC, PRIMARY_CHAT, type TopicView } from '@goblin/contracts'
+import {
+  type ConversationView,
+  EVERYTHING,
+  PERSONAL_TOPIC,
+  PRIMARY_CHAT,
+  type TopicView,
+  type UpdateTopic,
+} from '@goblin/contracts'
 import { isClosed, isUnread } from './threads.ts'
 import { type Activity, activityOf } from './workspace/slices.ts'
 
@@ -29,25 +36,28 @@ const byName = (a: TopicView, b: TopicView) =>
   a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) ||
   a.id - b.id
 
-/** A Topic a server's API key made: a room, whose chats reach only it (ADR 0108). */
-export const isRoom = (topic: TopicView): boolean => topic.madeBy !== undefined
+/**
+ * The server's key that made a Topic, by its name, or none for the owner's own (ADR 0115). For display only: the
+ * sidebar keeps the many Topics a server makes for its customers apart, and nothing a Topic may do depends on it.
+ */
+export const madeByKey = (topic: TopicView): string | undefined => topic.madeBy?.key
 
 /**
  * The sidebar's channels: the owner's own active Topics, Personal first and then by name, and apart from them the
- * archived ones. A key's rooms are not among them: `roomGroups` lists those.
+ * archived ones. The Topics a server's key made are not among them: `madeByGroups` lists those.
  */
 export function channels(topics: readonly TopicView[]): {
   readonly active: readonly TopicView[]
   readonly archived: readonly TopicView[]
 } {
   const all = topicsOf(topics)
-    .filter((topic) => !isRoom(topic))
+    .filter((topic) => madeByKey(topic) === undefined)
     .toSorted(byName)
   return { active: all.filter((topic) => !isArchived(topic)), archived: all.filter(isArchived) }
 }
 
-/** One key's rooms (ADR 0108): the key's name, its active rooms with the latest active first, and when that was. */
-export type RoomGroup = { readonly key: string; readonly rooms: readonly TopicView[]; readonly latest: number }
+/** The Topics one key made: the key's name, its active Topics with the latest active first, and when that was. */
+export type MadeByGroup = { readonly key: string; readonly topics: readonly TopicView[]; readonly latest: number }
 
 /** When each channel was last active: its own last reply or start, or a later one in a thread right under it. */
 function lastActive(views: readonly ConversationView[]): ReadonlyMap<string, number> {
@@ -60,31 +70,41 @@ function lastActive(views: readonly ConversationView[]): ReadonlyMap<string, num
 }
 
 /**
- * The active rooms, one group per key that made them, the group with the latest activity first and in each the room
- * with the latest activity first (a room with no chat yet counts from when it was made). An archived room is in none.
+ * The active Topics servers' keys made, one group per key, the group with the latest activity first and in each the
+ * Topic with the latest activity first (one with no chat yet counts from when it was made). An archived one is in none.
  */
-export function roomGroups(topics: readonly TopicView[], views: readonly ConversationView[]): readonly RoomGroup[] {
+export function madeByGroups(topics: readonly TopicView[], views: readonly ConversationView[]): readonly MadeByGroup[] {
   const last = lastActive(views)
   const at = (topic: TopicView) => Math.max(last.get(topic.conversation) ?? 0, topic.createdAt)
   const byKey = new Map<string, TopicView[]>()
   for (const topic of topics) {
-    if (topic.madeBy === undefined || isArchived(topic)) continue
-    const group = byKey.get(topic.madeBy.key)
-    if (group === undefined) byKey.set(topic.madeBy.key, [topic])
+    const key = madeByKey(topic)
+    if (key === undefined || isArchived(topic)) continue
+    const group = byKey.get(key)
+    if (group === undefined) byKey.set(key, [topic])
     else group.push(topic)
   }
   return [...byKey]
-    .map(([key, rooms]) => {
-      const sorted = rooms.toSorted((a, b) => at(b) - at(a) || b.id - a.id)
-      return { key, rooms: sorted, latest: Math.max(...sorted.map(at)) }
+    .map(([key, made]) => {
+      const sorted = made.toSorted((a, b) => at(b) - at(a) || b.id - a.id)
+      return { key, topics: sorted, latest: Math.max(...sorted.map(at)) }
     })
     .toSorted((a, b) => b.latest - a.latest || a.key.localeCompare(b.key))
 }
 
-/** The rooms whose name holds `filter`, whatever the case; all of them while it is blank. */
-export function matchingRooms(rooms: readonly TopicView[], filter: string): readonly TopicView[] {
+/** How far a Topic's chats reach (ADR 0115), in the words its channel info says it. */
+export const reachNote = (topic: Pick<TopicView, 'reach'>): string =>
+  topic.reach === 'hub'
+    ? 'goblin here reaches every Topic of this workspace, its chats and files included.'
+    : "goblin here sees only this Topic's chats and files, and the Shared folder on a person's turn."
+
+/** The change that makes a Topic a hub (`true`) or seals it. */
+export const reachChange = (hub: boolean): UpdateTopic => ({ reach: hub ? 'hub' : 'sealed' })
+
+/** The Topics whose name holds `filter`, whatever the case; all of them while it is blank. */
+export function matchingTopics(topics: readonly TopicView[], filter: string): readonly TopicView[] {
   const wanted = filter.trim().toLocaleLowerCase()
-  return wanted === '' ? rooms : rooms.filter((room) => room.name.toLocaleLowerCase().includes(wanted))
+  return wanted === '' ? topics : topics.filter((topic) => topic.name.toLocaleLowerCase().includes(wanted))
 }
 
 /** Whether a chat is a Topic's one Conversation (its channel) rather than a thread or a subagent. */

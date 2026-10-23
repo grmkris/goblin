@@ -7,7 +7,7 @@ import { activePersonas } from './personas.ts'
 import type { ShownPin } from './pins.ts'
 import { threadList } from './rail.ts'
 import { threadTitle } from './threads.ts'
-import { channelOf, channels, roomGroups, topicOfChannel } from './topics.ts'
+import { channelOf, channels, madeByGroups, topicOfChannel } from './topics.ts'
 
 /** A page the switcher opens as a whole. */
 type PagePath = '/activity' | '/work' | '/apps' | '/connections' | '/personas' | '/settings' | '/threads'
@@ -39,7 +39,7 @@ export type JumpItem = {
   readonly detail: string
   readonly link: JumpLink
   readonly tile?: string
-  /** Listed only for a query that finds it, never before anything is typed: a key's room (ADR 0108). */
+  /** Listed only for a query that finds it, never before anything is typed: a Topic a server's key made (ADR 0115). */
   readonly asked?: true
 }
 
@@ -150,8 +150,9 @@ function apps({ pins, servers, built, agentApps }: JumpSources): JumpItem[] {
 }
 
 /**
- * Every place, in each kind's own order: the pages; the active Topics, then each key's rooms (ADR 0108); the open threads (unread first, then newest),
- * each in its Topic's channel; the Apps; the Personas; and the sections of Settings and Work.
+ * Every place, in each kind's own order: the pages; the active Topics, then those each server's key made (ADR 0115);
+ * the open threads (unread first, then newest), each in its Topic's channel; the Apps; the Personas; and the sections
+ * of Settings and Work.
  */
 export function jumpItems(sources: JumpSources): readonly JumpItem[] {
   const { topics, views } = sources
@@ -171,13 +172,13 @@ export function jumpItems(sources: JumpSources): readonly JumpItem[] {
     detail: 'Topic',
     link: { to: '/c/$chatId', params: { chatId: topic.conversation } },
   }))
-  const rooms = roomGroups(topics, views).flatMap((group) =>
-    group.rooms.map((room): JumpItem => ({
-      id: `topic:${String(room.id)}`,
+  const made = madeByGroups(topics, views).flatMap((group) =>
+    group.topics.map((topic): JumpItem => ({
+      id: `topic:${String(topic.id)}`,
       kind: 'topic',
-      label: room.name,
-      detail: `Room of ${group.key}`,
-      link: { to: '/c/$chatId', params: { chatId: room.conversation } },
+      label: topic.name,
+      detail: `Made by ${group.key}`,
+      link: { to: '/c/$chatId', params: { chatId: topic.conversation } },
       asked: true,
     })),
   )
@@ -207,7 +208,7 @@ export function jumpItems(sources: JumpSources): readonly JumpItem[] {
     detail: `Section in ${to === '/work' ? 'Work' : 'Settings'}`,
     link: { to, hash },
   }))
-  return [...pages, ...active, ...rooms, ...threads, ...apps(sources), ...personas, ...sections]
+  return [...pages, ...active, ...made, ...threads, ...apps(sources), ...personas, ...sections]
 }
 
 /**

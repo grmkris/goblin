@@ -1,12 +1,12 @@
 // The sidebar's Topics (ADR 0078): each channel with its live threads, the archived folded, Add topic and All threads;
-// in the strip, one `#` that lists them beside it. Under them, each key's rooms (ADR 0108), folded.
+// in the strip, one `#` that lists them beside it. Under them, the Topics each server's key made (ADR 0115), folded.
 import { use, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { ConversationView, TopicView } from '@goblin/contracts'
 import { Popover, PopoverContent, PopoverTrigger } from '@goblin/ui'
 import { ChevronDownIcon, ChevronRightIcon, HashIcon, MessagesSquareIcon, PlusIcon } from 'lucide-react'
 import { isUnread, threadTitle } from '../../lib/threads.ts'
-import { type RoomGroup, channelOf, channels, matchingRooms, roomGroups, topicThreads } from '../../lib/topics.ts'
+import { type MadeByGroup, channelOf, channels, madeByGroups, matchingTopics, topicThreads } from '../../lib/topics.ts'
 import { useActivities, useActivity, useConversation, useConversations, useTopics } from '../../lib/workspace/hooks.ts'
 import { Count, EXACT, Here, Section, Strip, Tip, useCurrent } from './sidebar-parts.tsx'
 import { useFolded, useRecentThreads } from './sidebar-state.ts'
@@ -126,8 +126,8 @@ function AllThreads({ unread }: { readonly unread: number }) {
   )
 }
 
-/** How many of a key's rooms show when its section opens; Show more adds as many again. */
-const ROOMS_SHOWN = 20
+/** How many of a key's Topics show when its section opens; Show more adds as many again. */
+const MADE_SHOWN = 20
 
 /** The channel of the page, when it shows a channel or a thread of one. */
 function useShowingChannel(): string | undefined {
@@ -140,11 +140,11 @@ function useShowingChannel(): string | undefined {
   return undefined
 }
 
-/** A key's open rooms: a filter field, then the rooms whose name holds it, a few at a time. */
-function RoomList({ group, recent }: { readonly group: RoomGroup; readonly recent: ReadonlySet<string> }) {
+/** A key's open Topics: a filter field, then the Topics whose name holds it, a few at a time. */
+function MadeList({ group, recent }: { readonly group: MadeByGroup; readonly recent: ReadonlySet<string> }) {
   const [filter, setFilter] = useState('')
-  const [shown, setShown] = useState(ROOMS_SHOWN)
-  const matching = matchingRooms(group.rooms, filter)
+  const [shown, setShown] = useState(MADE_SHOWN)
+  const matching = matchingTopics(group.topics, filter)
   return (
     <>
       <li>
@@ -152,22 +152,22 @@ function RoomList({ group, recent }: { readonly group: RoomGroup; readonly recen
           type="search"
           className="sidebar-filter"
           value={filter}
-          placeholder="Filter rooms"
-          aria-label={`Filter the rooms of ${group.key}`}
+          placeholder="Filter topics"
+          aria-label={`Filter the topics ${group.key} made`}
           autoComplete="off"
           spellCheck={false}
           onChange={(event) => setFilter(event.target.value)}
         />
       </li>
-      {matching.length === 0 && <li className="sidebar-rows-note">No rooms match.</li>}
-      {matching.slice(0, shown).map((room) => (
-        <ChannelWithThreads key={room.id} topic={room} recent={recent} />
+      {matching.length === 0 && <li className="sidebar-rows-note">No topics match.</li>}
+      {matching.slice(0, shown).map((topic) => (
+        <ChannelWithThreads key={topic.id} topic={topic} recent={recent} />
       ))}
       {matching.length > shown && (
         <li>
-          <button type="button" className="sidebar-row" onClick={() => setShown((count) => count + ROOMS_SHOWN)}>
+          <button type="button" className="sidebar-row" onClick={() => setShown((count) => count + MADE_SHOWN)}>
             <ChevronDownIcon className="sidebar-row-mark" aria-hidden />
-            <span className="sidebar-row-name">Show {Math.min(ROOMS_SHOWN, matching.length - shown)} more</span>
+            <span className="sidebar-row-name">Show {Math.min(MADE_SHOWN, matching.length - shown)} more</span>
           </button>
         </li>
       )}
@@ -176,27 +176,27 @@ function RoomList({ group, recent }: { readonly group: RoomGroup; readonly recen
 }
 
 /**
- * One key's rooms (ADR 0108), a section under the Topics that starts folded (the owner's choice is remembered in this
- * browser): the key's name and how many rooms, with a dot while any has replies the owner has not read. Open, a filter
- * field and the rooms, the latest active first; folded, the room the page shows keeps its row, so the page's place
- * still shows.
+ * The Topics one server's key made (ADR 0115), a section under the Topics that starts folded (the owner's choice is
+ * remembered in this browser): the key's name and how many Topics, with a dot while any has replies the owner has not
+ * read. Open, a filter field and the Topics, the latest active first; folded, the Topic the page shows keeps its row,
+ * so the page's place still shows. Grouping is for keeping many customers' Topics tidy: each is sealed like any other.
  */
-function Rooms({ group, recent }: { readonly group: RoomGroup; readonly recent: ReadonlySet<string> }) {
-  const [folded, toggle] = useFolded(`rooms:${group.key}`, true)
+function MadeBy({ group, recent }: { readonly group: MadeByGroup; readonly recent: ReadonlySet<string> }) {
+  const [folded, toggle] = useFolded(`made:${group.key}`, true)
   const views = useConversations()
   const showing = useShowingChannel()
   const unread = new Set(views.filter(isUnread).map((view) => view.id))
-  const anyUnread = group.rooms.some((room) => unread.has(room.conversation))
-  const here = group.rooms.find((room) => room.conversation === showing)
-  const count = group.rooms.length
+  const anyUnread = group.topics.some((topic) => unread.has(topic.conversation))
+  const here = group.topics.find((topic) => topic.conversation === showing)
+  const count = group.topics.length
   return (
-    <section className="sidebar-section" aria-label={`Rooms of ${group.key}`} data-section="rooms">
+    <section className="sidebar-section" aria-label={`Topics ${group.key} made`} data-section="made-by">
       <div className="sidebar-section-head">
         <button type="button" className="sidebar-section-toggle" aria-expanded={!folded} onClick={toggle}>
           <ChevronRightIcon aria-hidden />
-          <span className="sidebar-rooms-key">{group.key}</span>
-          <span className="sidebar-rooms-count">
-            · {count} {count === 1 ? 'room' : 'rooms'}
+          <span className="sidebar-made-key">{group.key}</span>
+          <span className="sidebar-made-count">
+            · {count} {count === 1 ? 'topic' : 'topics'}
           </span>
           {anyUnread && folded && (
             <>
@@ -210,7 +210,7 @@ function Rooms({ group, recent }: { readonly group: RoomGroup; readonly recent: 
         {folded ? (
           here !== undefined && <ChannelWithThreads topic={here} recent={recent} />
         ) : (
-          <RoomList group={group} recent={recent} />
+          <MadeList group={group} recent={recent} />
         )}
       </ul>
     </section>
@@ -219,13 +219,13 @@ function Rooms({ group, recent }: { readonly group: RoomGroup; readonly recent: 
 
 /**
  * The Topics as channels: Personal first, each with its live threads under it, the archived folded, then the rest;
- * under them each key's rooms, the key with the latest activity first.
+ * under them the Topics each server's key made, the key with the latest activity first.
  */
 export function Topics({ unread }: { readonly unread: number }) {
   const recent = useRecentThreads()
   const topics = useTopics()
   const { active, archived } = channels(topics)
-  const rooms = roomGroups(topics, useConversations())
+  const made = madeByGroups(topics, useConversations())
   return (
     <>
       <Section id="topics" label="Topics">
@@ -236,8 +236,8 @@ export function Topics({ unread }: { readonly unread: number }) {
         <AddTopic />
         <AllThreads unread={unread} />
       </Section>
-      {rooms.map((group) => (
-        <Rooms key={group.key} group={group} recent={recent} />
+      {made.map((group) => (
+        <MadeBy key={group.key} group={group} recent={recent} />
       ))}
     </>
   )

@@ -22,6 +22,7 @@ import { ActivityPage } from '../../src/components/shell/pages/activity-page.tsx
 import { PersonasPage } from '../../src/components/shell/pages/personas-page.tsx'
 import { ShellNavigation } from '../../src/components/shell/navigation.tsx'
 import { ShellFrame } from '../../src/components/shell/shell.tsx'
+import { useTopics } from '../../src/lib/workspace/hooks.ts'
 import { withQueryClient } from './with-query-client.tsx'
 import '../../src/styles.css'
 
@@ -45,8 +46,8 @@ const mcpView = (id: string, conversation: string, title: string, overrides: Par
   ...overrides,
 })
 
-/** A room a server's key made (ADR 0108): its Topic, made by the agent for the key. */
-const room = (id: number, name: string, key: string): TopicView => ({
+/** A Topic a server's key made (ADR 0115): sealed like any other, made by the agent for the key. */
+const made = (id: number, name: string, key: string): TopicView => ({
   id,
   name,
   conversation: String(id * 10),
@@ -57,14 +58,14 @@ const room = (id: number, name: string, key: string): TopicView => ({
   createdAt: NOW - 86_400 + id,
   madeBy: { key },
 })
-/** 24 rooms of one key (a few more than its section shows at once) and 2 of another, made a day ago. */
-const ROOMS: TopicView[] = [
-  ...Array.from({ length: 24 }, (_, n) => room(100 + n, `deal-${String(n + 1).padStart(2, '0')}`, 'swarmm-prod')),
-  room(200, 'quest-board', 'sidequest-dev'),
-  room(201, 'quest-review', 'sidequest-dev'),
+/** 24 Topics of one key (a few more than its section shows at once) and 2 of another, made a day ago. */
+const MADE: TopicView[] = [
+  ...Array.from({ length: 24 }, (_, n) => made(100 + n, `deal-${String(n + 1).padStart(2, '0')}`, 'swarmm-prod')),
+  made(200, 'quest-board', 'sidequest-dev'),
+  made(201, 'quest-review', 'sidequest-dev'),
 ]
 
-/** A Persona; `key` names the server's key that made it (ADR 0108). */
+/** A Persona; `key` names the server's key that made it, for display. */
 const persona = (id: number, name: string, role: string, key?: string): PersonaView => ({
   id,
   name,
@@ -80,8 +81,8 @@ const persona = (id: number, name: string, role: string, key?: string): PersonaV
 
 /**
  * An owner with three Topics (one archived), threads (one unread, one a Delegate at work), pins in every state, an agent
- * app, recent App views, two Personas and an unread notification: every row and count the sidebar draws. Two server
- * keys made rooms (one replied to a minute ago, unread) and two more Personas.
+ * app, recent App views, two Personas and an unread notification: every row and count the sidebar draws. Personal is
+ * the hub. Two server keys made Topics (one replied to a minute ago, unread) and two more Personas.
  */
 const WORKSPACE: WorkspaceSnapshot = {
   conversations: [
@@ -149,7 +150,7 @@ const WORKSPACE: WorkspaceSnapshot = {
       name: 'Personal',
       conversation: '1',
       personal: true,
-      reach: 'sealed',
+      reach: 'hub',
       revision: 0,
       setup: EVERYTHING,
       createdBy: 'system',
@@ -176,7 +177,7 @@ const WORKSPACE: WorkspaceSnapshot = {
       createdBy: 'owner',
       createdAt: 3,
     },
-    ...ROOMS,
+    ...MADE,
   ],
   personas: [
     {
@@ -213,7 +214,7 @@ const WORKSPACE: WorkspaceSnapshot = {
       updatedAt: 1,
       archivedAt: NOW - 100,
     },
-    persona(20, 'scout', 'Finds deals for the room', 'swarmm-prod'),
+    persona(20, 'scout', 'Finds deals for each customer', 'swarmm-prod'),
     persona(21, 'closer', 'Writes the offer', 'swarmm-prod'),
   ],
   invocations: [],
@@ -253,11 +254,14 @@ function Page({ title, children }: { readonly title: string; readonly children?:
   )
 }
 
-/** A room's channel info (ADR 0079), open beside an empty channel: the Room chip and its one line. */
-function RoomInfo() {
+/**
+ * A Topic's channel info (ADR 0079), open beside an empty channel, as the feed holds it now: how far its chats reach
+ * (ADR 0115), with the hub switch for an owner or admin.
+ */
+function TopicInfo({ id }: { readonly id: number }) {
   const [layout, setLayout] = useState<HTMLDivElement | null>(null)
   const trigger = useRef<HTMLButtonElement>(null)
-  const topic = ROOMS[7]
+  const topic = useTopics().find((each) => each.id === id)
   if (topic === undefined) return null
   return (
     <div ref={setLayout} className="channel-layout" data-info>
@@ -315,7 +319,8 @@ const router = createRouter({
     page('/personas', 'Personas', () => <PersonasPage />),
     page('/p/$id', 'Persona'),
     page('/settings', 'Settings'),
-    createRoute({ getParentRoute: () => root, path: '/room-info', component: RoomInfo }),
+    createRoute({ getParentRoute: () => root, path: '/topic-info', component: () => <TopicInfo id={107} /> }),
+    createRoute({ getParentRoute: () => root, path: '/hub-info', component: () => <TopicInfo id={1} /> }),
   ]),
   history: createMemoryHistory({ initialEntries: [new URLSearchParams(location.search).get('at') ?? '/c/1'] }),
 })

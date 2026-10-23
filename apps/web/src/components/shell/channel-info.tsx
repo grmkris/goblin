@@ -13,12 +13,12 @@ import {
   useIsMobile,
 } from '@goblin/ui'
 import { ArrowLeftIcon, XIcon } from 'lucide-react'
-import { isRoom } from '../../lib/topics.ts'
 import { TopicSetupDrawer } from '../topic-setup.tsx'
 import { ChannelDetails } from './channel-details.tsx'
 import { ChannelTools } from './channel-tools.tsx'
 import { ChannelWork } from './channel-work.tsx'
 import { ChannelMenu } from './channel-menu.tsx'
+import { ChannelReach } from './channel-reach.tsx'
 import { ChannelShared } from './channel-shared.tsx'
 
 /** Read-first channel details. The surrounding layout keeps chat and thread composers mounted. */
@@ -76,7 +76,7 @@ export function ChannelInfo({
             )}
             <TabsContent value="overview" keepMounted>
               <section className="channel-info-section">
-                {isRoom(topic) && <p className="channel-info-room">goblin here reaches only this Topic.</p>}
+                <ChannelReach topic={topic} onFailure={onFailure} />
                 <ChannelDetails topic={topic} />
               </section>
             </TabsContent>
@@ -119,7 +119,7 @@ function InfoHeader({
         <p className="channel-info-kicker">Channel info</p>
         <span className="channel-info-name">
           <DialogTitle>#{topic.name}</DialogTitle>
-          {isRoom(topic) && <Badge variant="secondary">Room</Badge>}
+          {topic.reach === 'hub' && <Badge variant="secondary">Hub</Badge>}
         </span>
       </div>
       <ChannelMenu topic={topic} onFailure={onFailure} />
