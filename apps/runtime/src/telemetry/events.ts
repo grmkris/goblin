@@ -185,6 +185,15 @@ export class RunTelemetry {
       : scope
   }
 
+  /**
+   * The request id an input submission was admitted with (its turn's operation, `turn:<submission>`), from this
+   * object's open turns or the ledger, with no read of Pi's; none for a submission the recorder never saw.
+   */
+  requestOf(submission: string): string | undefined {
+    const id = `turn:${submission}`
+    return (this.#open.get(id) ?? this.#recallSafely(id))?.operationId
+  }
+
   /** Record that `event` started; its status is `started` whatever it says. */
   begin(event: Omit<RunEvent, 'status' | 'endedAt'>): void {
     const started: RunEvent = { ...this.#stamped(event), status: 'started' }

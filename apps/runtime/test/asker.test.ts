@@ -13,6 +13,8 @@ import { organizeExtension } from '../src/pi/organize.ts'
 import { outsidePower } from '../src/pi/power.ts'
 import { routinesExtension } from '../src/pi/routines.ts'
 import { PiSessions } from '../src/pi/sessions.ts'
+import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
+import type { RunTelemetry } from '../src/telemetry/events.ts'
 import { sourcesExtension } from '../src/pi/sources.ts'
 import type { RunProgram } from '../src/runtime/bridge.ts'
 import { CLOSED } from '../src/setup/scope.ts'
@@ -72,13 +74,30 @@ const harness = fake<Harness>({
 })
 
 /** The receipts above in real SQLite, and Pi's harness. */
+/** The inputs the run recorder saw admitted, by submission id: the owner's and the member's; Pi answers the rest. */
+const RECORDED = new Map([
+  ['1', 'op-owner'],
+  ['2', 'op-member'],
+])
+
+/** Submissions Pi was asked for: a read the recorder already answers never reaches Pi's line. */
+const piReads: number[] = []
+
 const services = () => {
   const { db, close } = chatDatabase()
   for (const [operationId, receipt] of RECEIPTS)
     admitReceipt(db, { chat: '1', operationId, receipt, session: () => '41', now: 10 })
+  const recorder = fake<RunTelemetry>({ requestOf: (submission) => RECORDED.get(submission) })
+  const reading = fake<Harness>({
+    submission: async (id, context) => {
+      piReads.push(id)
+      return harness.submission(id, context)
+    },
+  })
   return Layer.mergeAll(
     sqliteDb(db),
-    Layer.succeed(PiSessions, fake<PiSessions['Service']>({ pi: Effect.succeed(harness) })),
+    Layer.succeed(PiSessions, fake<PiSessions['Service']>({ pi: Effect.succeed(reading) })),
+    Layer.succeed(AgentInput, fake<AgentInputs>({ telemetry: recorder })),
     Layer.effectDiscard(Effect.addFinalizer(() => Effect.sync(close))),
   )
 }
@@ -112,6 +131,16 @@ describe("a member's turn is a member's power (unit, ADRs 0099, 0115)", () => {
       expect(yield* asked(2)).toBe(true)
       expect(yield* asked(1, 2)).toBe(true)
       expect(yield* asked(7, 1, 2)).toBe(true)
+    }),
+  )
+
+  it.effect('reads the request ids the run recorder saw without asking Pi, and asks Pi only for the rest', () =>
+    Effect.gen(function* () {
+      piReads.length = 0
+      expect(yield* asked(1, 2)).toBe(true)
+      expect(piReads).toEqual([])
+      expect(yield* asked(1, 7)).toBe(false)
+      expect(piReads).toEqual([7])
     }),
   )
 

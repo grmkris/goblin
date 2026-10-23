@@ -5,6 +5,7 @@ import { GRANT_SPEC, levelAtLeast } from '@goblin/contracts'
 import { type ToolNeed, type TurnPower, powerOfAll } from '../grants/power.ts'
 import { Forbidden, attempt, attemptSync } from '../http/errors.ts'
 import { Db } from '../runtime/db.ts'
+import { AgentInput } from '../runtime/input.ts'
 import { describeError } from '../telemetry/attributes.ts'
 import type { PiContext } from './context.ts'
 import { PiSessions, fromPi } from './sessions.ts'
@@ -31,6 +32,27 @@ const PERSONA_TURN = /^persona(?:-resume)?:(.+):\d+$/u
 export const inputOperation = (requestId: string): string => PERSONA_TURN.exec(requestId)?.[1] ?? requestId
 
 /**
+ * The request ids `inputs` were admitted with: as the run recorder saw each admitted (`RunTelemetry.requestOf`, no
+ * read of Pi's), else from Pi's own record. A read of Pi's waits its turn on the session's line behind every commit,
+ * so the hooks that ask on every model request must not pay it for what the recorder already knows.
+ */
+const requestsOf = (inputs: readonly SubmissionId[], context: PiContext) =>
+  Effect.gen(function* () {
+    const { telemetry } = yield* AgentInput
+    const known = inputs.map((id) => ({ id, request: telemetry.requestOf(String(id)) }))
+    const missing = known.filter((each) => each.request === undefined).map((each) => each.id)
+    if (missing.length === 0) return known.flatMap((each) => (each.request === undefined ? [] : [each.request]))
+    const pi = yield* PiSessions.use((sessions) => fromPi(sessions.pi))
+    const read = yield* attempt(async () =>
+      Promise.all(missing.map(async (id) => (await pi.submission(id, context))?.status(context))),
+    )
+    return [
+      ...known.flatMap((each) => (each.request === undefined ? [] : [each.request])),
+      ...read.flatMap((record) => (record?.requestId === undefined ? [] : [record.requestId])),
+    ]
+  })
+
+/**
  * What a run whose inputs are `inputs` (its input submissions) may do (ADR 0115): the power each input's receipt
  * recorded at admission, intersected. An input no receipt holds is a Source's, a routine's, the system's or the
  * agent's own, and counts as an admin's: only a request's receipt narrows a run. A Persona's turn is its asker's, a
@@ -41,15 +63,11 @@ export const inputOperation = (requestId: string): string => PERSONA_TURN.exec(r
 export const powerAmong = (inputs: readonly SubmissionId[], context: PiContext) =>
   Effect.gen(function* () {
     if (inputs.length === 0) return powerOfAll([])
-    const pi = yield* PiSessions.use((sessions) => fromPi(sessions.pi))
-    const requests = yield* attempt(async () => {
-      const records = await Promise.all(inputs.map(async (id) => (await pi.submission(id, context))?.status(context)))
-      // The request id as admitted and the operation it names: a client may choose an id shaped like a Persona turn's,
-      // and its own receipt narrows it too.
-      return records.flatMap((record) =>
-        record?.requestId === undefined ? [] : [...new Set([record.requestId, inputOperation(record.requestId)])],
-      )
-    })
+    // The request id as admitted and the operation it names: a client may choose an id shaped like a Persona turn's,
+    // and its own receipt narrows it too.
+    const requests = (yield* requestsOf(inputs, context)).flatMap((request) => [
+      ...new Set([request, inputOperation(request)]),
+    ])
     const db = yield* Db
     return powerOfAll(yield* attemptSync(() => receiptPowers(db, requests)))
   })

@@ -85,7 +85,9 @@ thread, subagent, Persona fork and routine run is registered in the Topic it cam
 grant within its person's role; a key's grant; an admin's for work no one sent), recorded with each input's receipt at
 admission (`app_chat_operations.power`, `chats/operations.ts`) and intersected over a run's inputs (`turnPower`,
 `pi/asker.ts`; a Persona's turn is its asker's, a subagent's message its spawner's, carried in a `relay` receipt, and
-a synthesized report back again). `effectivePower` bounds it by where it runs: the setup's subagents, the boundary,
+a synthesized report back again). Each input's request id comes from the run recorder (`RunTelemetry.requestOf`,
+which saw it admitted), and from Pi's record only when the recorder never did: a read of Pi's waits on the session's
+line behind every commit, and the hooks ask on every model request. `effectivePower` bounds it by where it runs: the setup's subagents, the boundary,
 and a credential's list of connections. `pi/tool-needs.ts` (`TOOL_NEEDS`) says what each tool needs: a level, maybe an
 extra (`setup`, `routines`, `inspect`), a hub (the Source tools) or a person's turn or a hub (apps). Three layers read
 it:

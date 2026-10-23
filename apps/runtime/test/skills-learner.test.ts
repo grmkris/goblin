@@ -31,6 +31,8 @@ import type { NewNotice } from '../src/notices/store.ts'
 import { Changes, makeChanges } from '../src/runtime/changes.ts'
 import { SingleFlight } from '../src/observability/single-flight.ts'
 import { PiSessions } from '../src/pi/sessions.ts'
+import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
+import type { RunTelemetry } from '../src/telemetry/events.ts'
 import { knowledgeOver } from './knowledge-layer.ts'
 import { makeSkills } from '../src/skills/library.ts'
 import { Learner } from '../src/skills/service.ts'
@@ -229,6 +231,8 @@ describe('the skill learner (unit)', () => {
     const layer = Layer.mergeAll(
       sqliteDb(db),
       Layer.succeed(PiSessions, fake<PiSessions['Service']>({ pi: Effect.succeed(harness) })),
+      // The run recorder saw the key's message admitted, so its request id is known without asking Pi.
+      Layer.succeed(AgentInput, fake<AgentInputs>({ telemetry: fake<RunTelemetry>({ requestOf: () => 'op-key' }) })),
     )
     const run: RunProgram = <A>(program: Parameters<RunProgram>[0]) =>
       // SAFETY: the hook reads only the run's power before it skips, over this test's layer.

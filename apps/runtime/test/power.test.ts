@@ -35,6 +35,8 @@ import { PERSONA_DENIED_TOOLS, personaSelection } from '../src/pi/persona-select
 import { personaText } from '../src/pi/persona-turn.ts'
 import { outsidePower, powerGuardExtension, toolsOf } from '../src/pi/power.ts'
 import { PiSessions } from '../src/pi/sessions.ts'
+import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
+import type { RunTelemetry } from '../src/telemetry/events.ts'
 import { TOOL_NEEDS, anyTurn, needOf } from '../src/pi/tool-needs.ts'
 import type { RunProgram } from '../src/runtime/bridge.ts'
 import { CLOSED } from '../src/setup/scope.ts'
@@ -236,6 +238,8 @@ const services = () => {
   return Layer.mergeAll(
     sqliteDb(db),
     Layer.succeed(PiSessions, fake<PiSessions['Service']>({ pi: Effect.succeed(harness) })),
+    // The run recorder knows none of them here: each input's request id is Pi's.
+    Layer.succeed(AgentInput, fake<AgentInputs>({ telemetry: fake<RunTelemetry>({ requestOf: () => undefined }) })),
     Layer.succeed(
       Setups,
       fake<Setups['Service']>({

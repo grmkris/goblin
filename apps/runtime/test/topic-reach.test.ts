@@ -11,6 +11,7 @@ import { Forbidden } from '../src/http/errors.ts'
 import { BOUNDARY_TEXT, adminOnly } from '../src/pi/asker.ts'
 import { BACKGROUND, conversationId } from '../src/pi/context.ts'
 import { PiSessions } from '../src/pi/sessions.ts'
+import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
 import { callBoundary, requireWithin, sessionBoundary } from '../src/pi/within.ts'
 import { RoutineStore } from '../src/routines/store.ts'
 import { routeRow } from '../src/sources/store.ts'
@@ -78,6 +79,7 @@ const places = () => {
     }),
     // A call outside a live run is the agent's own work, which reads no submission.
     Layer.succeed(PiSessions, fake<PiSessions['Service']>({})),
+    Layer.succeed(AgentInput, fake<AgentInputs>({})),
     Layer.effectDiscard(Effect.addFinalizer(() => Effect.sync(close))),
   )
 }
