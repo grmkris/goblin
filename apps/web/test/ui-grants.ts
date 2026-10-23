@@ -4,6 +4,7 @@ import { mkdirSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { chromium } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 import { GrantBatchChange, type Grant, type ToolView } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
 
@@ -32,7 +33,8 @@ try {
     let reply = Promise.withResolvers<void>()
     let refuse = false
     page.on('pageerror', (error) => errors.push(error.message))
-    await page.route(
+    await mockRoute(
+      page,
       (url) => url.pathname.startsWith('/api/'),
       async (route) => {
         const request = route.request()

@@ -10,7 +10,8 @@ import assert from 'node:assert/strict'
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
-import { type Locator, type Page, type Route, chromium } from 'playwright-core'
+import { type Locator, type Page, chromium } from 'playwright-core'
+import { mockRoute, type MockRoute } from './mock-route.ts'
 import {
   type InvitationPreview,
   ONBOARDING_STEPS,
@@ -121,7 +122,7 @@ function fakeApi(errors: string[]) {
     invitations = invitations.filter((invitation) => invitation.id !== id)
     return { json: how === 'accept' ? JOINED : { declined: true } }
   }
-  return (route: Route) => {
+  return (route: MockRoute) => {
     const request = route.request()
     const pathname = new URL(request.url()).pathname.replace(/^\/w\/[a-z0-9-]+(?=\/api\/)/u, '')
     const [, id = '', how = ''] = ANSWER.exec(pathname) ?? []
@@ -138,15 +139,17 @@ function fakeApi(errors: string[]) {
  * workspace's home as a page of its own.
  */
 async function inWorkspaces(page: Page, origin: string, errors: string[]) {
+  // Browser document navigation needs a network-level rewrite/response.
   await page.route(
     (url) => /^\/w\/[a-z0-9-]+\/navigation\.html$/u.test(url.pathname),
     (route) => route.continue({ url: `${origin}navigation.html${new URL(route.request().url()).search}` }),
   )
+  // Browser document navigation needs a network-level rewrite/response.
   await page.route(
     (url) => /^\/w\/[a-z0-9-]+\/$/u.test(url.pathname),
     (route) => route.fulfill({ contentType: 'text/html', body: '<p>Joined</p>' }),
   )
-  await page.route((url) => /^(?:\/w\/[a-z0-9-]+)?\/api\//u.test(url.pathname), fakeApi(errors))
+  await mockRoute(page, (url) => /^(?:\/w\/[a-z0-9-]+)?\/api\//u.test(url.pathname), fakeApi(errors))
 }
 
 /** The text each of `rows` shows, its runs of white space as one space. */

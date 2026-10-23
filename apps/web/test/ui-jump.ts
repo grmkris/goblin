@@ -9,6 +9,7 @@ import { mkdirSync, writeFileSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { type Page, chromium } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 import type { AgentAppSummary, ServerView } from '@goblin/contracts'
 
 /** The file descriptor this script's result line goes to (@cloudflare/workers-types makes `process` `any`). */
@@ -94,7 +95,8 @@ async function matrix(origin: string, page: Page, label: string, phone: boolean)
   page.on('console', (message) => {
     if (message.type() === 'error' && !message.text().includes('Outdated Optimize Dep')) errors.push(message.text())
   })
-  await page.route(
+  await mockRoute(
+    page,
     (url) => url.pathname.startsWith('/api/') || url.pathname === '/health',
     (route) => {
       const request = route.request()

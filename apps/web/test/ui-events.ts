@@ -11,6 +11,7 @@ import path from 'node:path'
 import { createServer } from 'vite'
 import type { EventStream } from '@goblin/contracts'
 import { type Browser, type BrowserContextOptions, chromium } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 
 const STDOUT = 1
 const out = path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance', `events-${Date.now()}`)
@@ -90,11 +91,11 @@ async function drive(browser: Browser, origin: string, label: string, options: B
   const page = await browser.newPage(options)
   const routines = new Map<string, { readonly topic: number; readonly definition: unknown }>()
   page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`))
-  await page.route('**/api/mcp/servers', (route) => route.fulfill({ json: [WORKER] }))
+  await mockRoute(page, '**/api/mcp/servers', (route) => route.fulfill({ json: [WORKER] }))
   let streams = STREAMS
   let failCatalog = false
   let release = Promise.withResolvers<void>()
-  await page.route('**/api/mcp/sq-worker/events', async (route) => {
+  await mockRoute(page, '**/api/mcp/sq-worker/events', async (route) => {
     await release.promise
     if (failCatalog)
       return route.fulfill({
@@ -111,16 +112,16 @@ async function drive(browser: Browser, origin: string, label: string, options: B
       })
     return route.fulfill({ json: streams })
   })
-  await page.route('**/api/routines/settings', (route) =>
+  await mockRoute(page, '**/api/routines/settings', (route) =>
     route.fulfill({ json: { timezone: 'Europe/Tallinn', maxActive: 20, maxRunning: 2 } }),
   )
-  await page.route('**/api/routines/*/confirm', (route) => {
+  await mockRoute(page, '**/api/routines/*/confirm', (route) => {
     const id = new URL(route.request().url()).pathname.split('/').at(-2) ?? ''
     const body = routines.get(id)
     confirmed.push(id)
     return body === undefined ? route.fulfill({ status: 404 }) : route.fulfill({ json: routineOf(id, body, 'active') })
   })
-  await page.route('**/api/routines', (route) => {
+  await mockRoute(page, '**/api/routines', (route) => {
     if (route.request().method() !== 'POST')
       return route.fulfill({
         json: { routines: [...routines].map(([id, body]) => routineOf(id, body, 'active')) },

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, writeFileSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { chromium, type Page } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 import { createServer } from 'vite'
 
 // SAFETY: @cloudflare/workers-types declares the Buffer global `any` over @types/node's; this script runs under Bun.
@@ -20,7 +21,7 @@ const skill = {
 
 async function fixture(page: Page, origin: string, compact = false) {
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.route('**/api/conversations/1/composer', (route) =>
+  await mockRoute(page, '**/api/conversations/1/composer', (route) =>
     route.fulfill({
       json: {
         options: [
@@ -74,10 +75,10 @@ async function failureAndMove(page: Page) {
   await source.locator('[data-failed]').waitFor()
   assert.equal(await field.inputValue(), 'Keep the draft')
   await page.getByRole('button', { name: 'Toggle failure' }).click()
-  await page.route('**/api/files?*', (route) =>
+  await mockRoute(page, '**/api/files?*', (route) =>
     route.fulfill({ json: { entries: [], usedBytes: 0, limitBytes: 536870912 } }),
   )
-  await page.route('**/api/files/content?*', async (route) => {
+  await mockRoute(page, '**/api/files/content?*', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 400))
     await route.fulfill({
       json: {

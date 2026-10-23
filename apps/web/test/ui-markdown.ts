@@ -174,9 +174,11 @@ try {
     const page = await context.newPage()
     page.on('pageerror', (error) => errors.push(error.message))
     const fetched: { url: string; referer: string | undefined }[] = []
+    // This guards browser navigation to an external site, which a fetch mock cannot intercept.
     await page
       .context()
       .route('https://phish.example/**', (route) => route.fulfill({ body: 'phish', contentType: 'text/html' }))
+    // Binary images and their actual referrer headers require network interception.
     await page.route('https://images.example/**', async (route) => {
       fetched.push({ url: route.request().url(), referer: (await route.request().allHeaders())['referer'] })
       await route.fulfill({ body: PIXEL, contentType: 'image/png' })

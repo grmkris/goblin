@@ -1,0 +1,5252 @@
+{
+  "base": "81ee73f01281d70f36349e4d361e77439fc87610",
+  "candidate": "8357530b4dc846ecc59183fa4cbd0b46b97c359b",
+  "driver": "python3 .local/cache-spike/queue-matrix.py",
+  "complete": true,
+  "summaries": [
+    {
+      "phase": "base",
+      "mode": "serial",
+      "runs": 20,
+      "passed": 20,
+      "failed": 0
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "runs": 40,
+      "passed": 39,
+      "failed": 1
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "runs": 20,
+      "passed": 20,
+      "failed": 0
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "runs": 40,
+      "passed": 40,
+      "failed": 0
+    }
+  ],
+  "batches": [
+    {
+      "phase": "base",
+      "number": 1,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 72.88,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "base",
+      "number": 2,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 69.82,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "base",
+      "number": 3,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 60.68,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "base",
+      "number": 4,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 54.11,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "base",
+      "number": 5,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 59.95,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "base",
+      "number": 6,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 58.17,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "base",
+      "number": 7,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 42.71,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "base",
+      "number": 8,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 56.81,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "base",
+      "number": 9,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 58.69,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "base",
+      "number": 10,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 51.04,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "current",
+      "number": 1,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 89.7,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "current",
+      "number": 2,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 38.07,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "current",
+      "number": 3,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 40.65,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "current",
+      "number": 4,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 57.61,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "current",
+      "number": 5,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 40.4,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "current",
+      "number": 6,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 52.89,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "current",
+      "number": 7,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 56.18,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "current",
+      "number": 8,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 32.99,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "current",
+      "number": 9,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 31.91,
+      "distinctPorts": 4
+    },
+    {
+      "phase": "current",
+      "number": 10,
+      "workers": 4,
+      "allWorkersOverlapSeconds": 32.8,
+      "distinctPorts": 4
+    }
+  ],
+  "runs": [
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 1,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 34.31,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-1",
+      "ports": [
+        41549
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:41549/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41549/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41549/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41549/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 2,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 36.99,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-2",
+      "ports": [
+        45225
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45225/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45225/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45225/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45225/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 3,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 34.45,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-3",
+      "ports": [
+        37999
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:37999/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37999/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37999/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37999/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 4,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 32.77,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-4",
+      "ports": [
+        41041
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:41041/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41041/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41041/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41041/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 5,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 33.98,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-5",
+      "ports": [
+        35955
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:35955/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35955/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35955/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35955/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 6,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 34.96,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-6",
+      "ports": [
+        41985
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:41985/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41985/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41985/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41985/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 7,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 42.57,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-7",
+      "ports": [
+        35859
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:35859/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35859/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35859/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35859/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 8,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 44.58,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-8",
+      "ports": [
+        34027
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:34027/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34027/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34027/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34027/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 9,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 34.08,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-9",
+      "ports": [
+        46673
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:46673/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46673/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46673/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46673/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 10,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 31.19,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-10",
+      "ports": [
+        35349
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:35349/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35349/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35349/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35349/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 11,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 33.27,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-11",
+      "ports": [
+        44693
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:44693/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44693/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44693/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44693/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 12,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 32.61,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-12",
+      "ports": [
+        36283
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:36283/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36283/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36283/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36283/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 13,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 37.8,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-13",
+      "ports": [
+        45323
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45323/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45323/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45323/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45323/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 14,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 41.15,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-14",
+      "ports": [
+        37265
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:37265/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37265/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37265/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37265/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 15,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 42.53,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-15",
+      "ports": [
+        36343
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:36343/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36343/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36343/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36343/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 16,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 37.87,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-16",
+      "ports": [
+        46209
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:46209/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46209/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46209/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46209/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 17,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 59.84,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-17",
+      "ports": [
+        34823
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:34823/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34823/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34823/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34823/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 18,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 52.31,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-18",
+      "ports": [
+        33043
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:33043/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33043/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33043/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33043/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 19,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 35.77,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-19",
+      "ports": [
+        46595
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:46595/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46595/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46595/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46595/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "serial",
+      "number": 20,
+      "slot": null,
+      "port": 0,
+      "command": "heavy bun --preload <base>/.local/cache-spike/queue-stress-observe.ts <base>/apps/web/test/ui-queue.ts",
+      "seconds": 35.26,
+      "exit": 0,
+      "dir": "<repo>/.local/cache-spike/stress-v3/base/serial-base-20",
+      "ports": [
+        36477
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:36477/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36477/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36477/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36477/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 1,
+      "slot": 0,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:03:49.973781+00:00",
+      "end": "2026-10-23T23:05:11.318840+00:00",
+      "seconds": 81.35,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 1",
+      "ports": [
+        44633
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:44633/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44633/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44633/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44633/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 1,
+      "slot": 1,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:03:49.973153+00:00",
+      "end": "2026-10-23T23:05:11.674956+00:00",
+      "seconds": 81.7,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 1",
+      "ports": [
+        44615
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:44615/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44615/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44615/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44615/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 1,
+      "slot": 2,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:03:49.974456+00:00",
+      "end": "2026-10-23T23:05:11.422263+00:00",
+      "seconds": 81.45,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 1",
+      "ports": [
+        35023
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:35023/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35023/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35023/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35023/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 1,
+      "slot": 3,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:03:49.976631+00:00",
+      "end": "2026-10-23T23:05:02.859857+00:00",
+      "seconds": 72.88,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 1",
+      "ports": [
+        42815
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:42815/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42815/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42815/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42815/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 2,
+      "slot": 0,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:05:11.854926+00:00",
+      "end": "2026-10-23T23:06:23.187189+00:00",
+      "seconds": 71.33,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 2",
+      "ports": [
+        45239
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45239/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45239/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45239/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45239/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 2,
+      "slot": 1,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:05:11.857538+00:00",
+      "end": "2026-10-23T23:06:23.071247+00:00",
+      "seconds": 71.21,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 2",
+      "ports": [
+        35409
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:35409/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35409/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35409/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35409/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 2,
+      "slot": 2,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:05:11.860007+00:00",
+      "end": "2026-10-23T23:06:21.681818+00:00",
+      "seconds": 69.82,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 2",
+      "ports": [
+        45095
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45095/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45095/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45095/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45095/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 2,
+      "slot": 3,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:05:11.863894+00:00",
+      "end": "2026-10-23T23:06:23.645520+00:00",
+      "seconds": 71.78,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 2",
+      "ports": [
+        33889
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:33889/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33889/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33889/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33889/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 3,
+      "slot": 0,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:06:23.745960+00:00",
+      "end": "2026-10-23T23:07:24.436619+00:00",
+      "seconds": 60.69,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 3",
+      "ports": [
+        40579
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:40579/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40579/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40579/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40579/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 3,
+      "slot": 1,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:06:23.746614+00:00",
+      "end": "2026-10-23T23:07:24.798230+00:00",
+      "seconds": 61.05,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 3",
+      "ports": [
+        41795
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:41795/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41795/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41795/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41795/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 3,
+      "slot": 2,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:06:23.749042+00:00",
+      "end": "2026-10-23T23:07:24.427383+00:00",
+      "seconds": 60.68,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 3",
+      "ports": [
+        37803
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:37803/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37803/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37803/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37803/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 3,
+      "slot": 3,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:06:23.748728+00:00",
+      "end": "2026-10-23T23:07:24.922859+00:00",
+      "seconds": 61.17,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 3",
+      "ports": [
+        35871
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:35871/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35871/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35871/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35871/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 4,
+      "slot": 0,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:07:25.032491+00:00",
+      "end": "2026-10-23T23:08:19.833427+00:00",
+      "seconds": 54.8,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 4",
+      "ports": [
+        46813
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:46813/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46813/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46813/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46813/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 4,
+      "slot": 1,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:07:25.039186+00:00",
+      "end": "2026-10-23T23:08:43.714441+00:00",
+      "seconds": 78.68,
+      "exit": 1,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 4",
+      "ports": [
+        34775
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:34775/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34775/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34775/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34775/queue.html",
+          "resources": 250,
+          "streams": null,
+          "emptyBody": true
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 4,
+      "slot": 2,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:07:25.039753+00:00",
+      "end": "2026-10-23T23:08:19.149942+00:00",
+      "seconds": 54.11,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 4",
+      "ports": [
+        41955
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:41955/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41955/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41955/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41955/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 4,
+      "slot": 3,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:07:25.040460+00:00",
+      "end": "2026-10-23T23:08:19.490356+00:00",
+      "seconds": 54.45,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 4",
+      "ports": [
+        34911
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:34911/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34911/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34911/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34911/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 5,
+      "slot": 0,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:08:43.801591+00:00",
+      "end": "2026-10-23T23:09:47.720908+00:00",
+      "seconds": 63.92,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 5",
+      "ports": [
+        39789
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:39789/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39789/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39789/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39789/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 5,
+      "slot": 1,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:08:43.804540+00:00",
+      "end": "2026-10-23T23:09:43.758902+00:00",
+      "seconds": 59.95,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 5",
+      "ports": [
+        45631
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45631/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45631/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45631/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45631/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 5,
+      "slot": 2,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:08:43.805823+00:00",
+      "end": "2026-10-23T23:09:46.756141+00:00",
+      "seconds": 62.95,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 5",
+      "ports": [
+        37073
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:37073/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37073/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37073/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37073/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 5,
+      "slot": 3,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:08:43.805252+00:00",
+      "end": "2026-10-23T23:09:47.773628+00:00",
+      "seconds": 63.97,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 5",
+      "ports": [
+        40659
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:40659/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40659/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40659/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40659/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 6,
+      "slot": 0,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:09:47.874549+00:00",
+      "end": "2026-10-23T23:10:46.585471+00:00",
+      "seconds": 58.71,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 6",
+      "ports": [
+        35945
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:35945/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35945/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35945/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35945/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 6,
+      "slot": 1,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:09:47.881071+00:00",
+      "end": "2026-10-23T23:10:46.596487+00:00",
+      "seconds": 58.72,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 6",
+      "ports": [
+        38891
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:38891/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38891/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38891/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38891/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 6,
+      "slot": 2,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:09:47.877254+00:00",
+      "end": "2026-10-23T23:10:46.046636+00:00",
+      "seconds": 58.17,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 6",
+      "ports": [
+        43407
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:43407/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43407/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43407/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43407/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 6,
+      "slot": 3,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:09:47.876923+00:00",
+      "end": "2026-10-23T23:10:46.483746+00:00",
+      "seconds": 58.61,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 6",
+      "ports": [
+        42209
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:42209/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42209/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42209/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42209/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 7,
+      "slot": 0,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:10:46.715074+00:00",
+      "end": "2026-10-23T23:11:29.424180+00:00",
+      "seconds": 42.71,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 7",
+      "ports": [
+        42715
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:42715/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42715/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42715/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42715/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 7,
+      "slot": 1,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:10:46.716475+00:00",
+      "end": "2026-10-23T23:11:29.981383+00:00",
+      "seconds": 43.26,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 7",
+      "ports": [
+        45125
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45125/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45125/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45125/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45125/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 7,
+      "slot": 2,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:10:46.717026+00:00",
+      "end": "2026-10-23T23:11:30.222897+00:00",
+      "seconds": 43.51,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 7",
+      "ports": [
+        40045
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:40045/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40045/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40045/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40045/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 7,
+      "slot": 3,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:10:46.718634+00:00",
+      "end": "2026-10-23T23:11:29.610164+00:00",
+      "seconds": 42.89,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 7",
+      "ports": [
+        40779
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:40779/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40779/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40779/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40779/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 8,
+      "slot": 0,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:11:30.339613+00:00",
+      "end": "2026-10-23T23:12:27.954858+00:00",
+      "seconds": 57.62,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 8",
+      "ports": [
+        33087
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:33087/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33087/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33087/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33087/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 8,
+      "slot": 1,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:11:30.347979+00:00",
+      "end": "2026-10-23T23:12:27.965837+00:00",
+      "seconds": 57.62,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 8",
+      "ports": [
+        42159
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:42159/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42159/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42159/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42159/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 8,
+      "slot": 2,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:11:30.352318+00:00",
+      "end": "2026-10-23T23:12:27.167910+00:00",
+      "seconds": 56.82,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 8",
+      "ports": [
+        44057
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:44057/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44057/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44057/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44057/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 8,
+      "slot": 3,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:11:30.353312+00:00",
+      "end": "2026-10-23T23:12:27.647284+00:00",
+      "seconds": 57.29,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 8",
+      "ports": [
+        34689
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:34689/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34689/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34689/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34689/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 9,
+      "slot": 0,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:12:28.099069+00:00",
+      "end": "2026-10-23T23:13:26.790578+00:00",
+      "seconds": 58.69,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 9",
+      "ports": [
+        41535
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:41535/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41535/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41535/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:41535/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 9,
+      "slot": 1,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:12:28.103234+00:00",
+      "end": "2026-10-23T23:13:27.539513+00:00",
+      "seconds": 59.44,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 9",
+      "ports": [
+        37385
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:37385/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37385/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37385/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37385/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 9,
+      "slot": 2,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:12:28.103989+00:00",
+      "end": "2026-10-23T23:13:28.649596+00:00",
+      "seconds": 60.55,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 9",
+      "ports": [
+        43913
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:43913/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43913/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43913/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43913/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 9,
+      "slot": 3,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:12:28.104357+00:00",
+      "end": "2026-10-23T23:13:27.682488+00:00",
+      "seconds": 59.58,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 9",
+      "ports": [
+        36689
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:36689/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36689/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36689/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36689/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 10,
+      "slot": 0,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:13:28.753184+00:00",
+      "end": "2026-10-23T23:14:19.929375+00:00",
+      "seconds": 51.18,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 10",
+      "ports": [
+        46469
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:46469/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46469/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46469/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46469/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 10,
+      "slot": 1,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:13:28.754499+00:00",
+      "end": "2026-10-23T23:14:19.796051+00:00",
+      "seconds": 51.04,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 10",
+      "ports": [
+        35271
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:35271/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35271/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35271/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35271/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 10,
+      "slot": 2,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:13:28.756945+00:00",
+      "end": "2026-10-23T23:14:20.415884+00:00",
+      "seconds": 51.66,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 10",
+      "ports": [
+        33325
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:33325/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33325/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33325/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33325/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 10,
+      "slot": 3,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<base>",
+      "start": "2026-10-23T23:13:28.759153+00:00",
+      "end": "2026-10-23T23:14:20.018766+00:00",
+      "seconds": 51.26,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch base 10",
+      "ports": [
+        44461
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:44461/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44461/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44461/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44461/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 1,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:14:20.439805+00:00",
+      "end": "2026-10-23T23:15:04.239465+00:00",
+      "seconds": 43.8,
+      "exit": 0,
+      "ports": [
+        34883
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:34883/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34883/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34883/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34883/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 2,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:15:04.240325+00:00",
+      "end": "2026-10-23T23:15:34.520698+00:00",
+      "seconds": 30.28,
+      "exit": 0,
+      "ports": [
+        34915
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:34915/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34915/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34915/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34915/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 3,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:15:34.521433+00:00",
+      "end": "2026-10-23T23:16:06.001619+00:00",
+      "seconds": 31.48,
+      "exit": 0,
+      "ports": [
+        42689
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:42689/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42689/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42689/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:42689/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 4,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:16:06.002497+00:00",
+      "end": "2026-10-23T23:16:34.231650+00:00",
+      "seconds": 28.23,
+      "exit": 0,
+      "ports": [
+        38069
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:38069/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38069/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38069/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38069/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 5,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:16:34.234432+00:00",
+      "end": "2026-10-23T23:17:02.569280+00:00",
+      "seconds": 28.33,
+      "exit": 0,
+      "ports": [
+        44707
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:44707/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44707/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44707/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44707/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 6,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:17:02.570235+00:00",
+      "end": "2026-10-23T23:17:29.983039+00:00",
+      "seconds": 27.41,
+      "exit": 0,
+      "ports": [
+        45437
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45437/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45437/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45437/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45437/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 7,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:17:29.984112+00:00",
+      "end": "2026-10-23T23:18:01.358410+00:00",
+      "seconds": 31.37,
+      "exit": 0,
+      "ports": [
+        36879
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:36879/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36879/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36879/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36879/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 8,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:18:01.359274+00:00",
+      "end": "2026-10-23T23:18:31.705464+00:00",
+      "seconds": 30.35,
+      "exit": 0,
+      "ports": [
+        44499
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:44499/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44499/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44499/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44499/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 9,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:18:31.706265+00:00",
+      "end": "2026-10-23T23:18:58.127882+00:00",
+      "seconds": 26.42,
+      "exit": 0,
+      "ports": [
+        38231
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:38231/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38231/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38231/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38231/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 10,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:18:58.128901+00:00",
+      "end": "2026-10-23T23:19:26.212576+00:00",
+      "seconds": 28.08,
+      "exit": 0,
+      "ports": [
+        43847
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:43847/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43847/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43847/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43847/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 11,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:19:26.215246+00:00",
+      "end": "2026-10-23T23:19:50.796155+00:00",
+      "seconds": 24.58,
+      "exit": 0,
+      "ports": [
+        38909
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:38909/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38909/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38909/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38909/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 12,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:19:50.797151+00:00",
+      "end": "2026-10-23T23:20:15.622736+00:00",
+      "seconds": 24.83,
+      "exit": 0,
+      "ports": [
+        45581
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45581/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45581/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45581/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45581/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 13,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:20:15.623576+00:00",
+      "end": "2026-10-23T23:20:38.395843+00:00",
+      "seconds": 22.77,
+      "exit": 0,
+      "ports": [
+        44659
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:44659/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44659/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44659/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44659/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 14,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:20:38.399447+00:00",
+      "end": "2026-10-23T23:21:16.236162+00:00",
+      "seconds": 37.84,
+      "exit": 0,
+      "ports": [
+        36419
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:36419/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36419/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36419/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36419/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 15,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:21:16.238982+00:00",
+      "end": "2026-10-23T23:21:57.236147+00:00",
+      "seconds": 41.0,
+      "exit": 0,
+      "ports": [
+        34017
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:34017/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34017/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34017/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34017/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 16,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:21:57.237380+00:00",
+      "end": "2026-10-23T23:22:25.578780+00:00",
+      "seconds": 28.34,
+      "exit": 0,
+      "ports": [
+        39673
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:39673/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39673/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39673/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39673/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 17,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:22:25.579855+00:00",
+      "end": "2026-10-23T23:22:54.949763+00:00",
+      "seconds": 29.37,
+      "exit": 0,
+      "ports": [
+        45393
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45393/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45393/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45393/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45393/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 18,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:22:54.950602+00:00",
+      "end": "2026-10-23T23:23:24.359249+00:00",
+      "seconds": 29.41,
+      "exit": 0,
+      "ports": [
+        34575
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:34575/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34575/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34575/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34575/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 19,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:23:24.359970+00:00",
+      "end": "2026-10-23T23:23:52.871153+00:00",
+      "seconds": 28.51,
+      "exit": 0,
+      "ports": [
+        46857
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:46857/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46857/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46857/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46857/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "serial",
+      "number": 20,
+      "slot": null,
+      "command": "heavy bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:28:08.939613+00:00",
+      "end": "2026-10-23T23:28:56.657578+00:00",
+      "seconds": 47.72,
+      "exit": 0,
+      "ports": [
+        39215
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:39215/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39215/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39215/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39215/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 1,
+      "slot": 0,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:28:56.850625+00:00",
+      "end": "2026-10-23T23:30:27.954896+00:00",
+      "seconds": 91.1,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 1",
+      "ports": [
+        35975
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:35975/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35975/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35975/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35975/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 1,
+      "slot": 1,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:28:56.852480+00:00",
+      "end": "2026-10-23T23:30:27.770131+00:00",
+      "seconds": 90.92,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 1",
+      "ports": [
+        40009
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:40009/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40009/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40009/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40009/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 1,
+      "slot": 2,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:28:56.856814+00:00",
+      "end": "2026-10-23T23:30:26.553307+00:00",
+      "seconds": 89.7,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 1",
+      "ports": [
+        37963
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:37963/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37963/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37963/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37963/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 1,
+      "slot": 3,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:28:56.857193+00:00",
+      "end": "2026-10-23T23:30:27.449054+00:00",
+      "seconds": 90.59,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 1",
+      "ports": [
+        38811
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:38811/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38811/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38811/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38811/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 2,
+      "slot": 0,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:30:28.070549+00:00",
+      "end": "2026-10-23T23:31:07.274055+00:00",
+      "seconds": 39.2,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 2",
+      "ports": [
+        45769
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45769/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45769/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45769/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45769/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 2,
+      "slot": 1,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:30:28.072641+00:00",
+      "end": "2026-10-23T23:31:06.604895+00:00",
+      "seconds": 38.53,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 2",
+      "ports": [
+        40825
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:40825/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40825/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40825/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:40825/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 2,
+      "slot": 2,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:30:28.074672+00:00",
+      "end": "2026-10-23T23:31:06.143937+00:00",
+      "seconds": 38.07,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 2",
+      "ports": [
+        45643
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45643/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45643/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45643/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45643/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 2,
+      "slot": 3,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:30:28.077761+00:00",
+      "end": "2026-10-23T23:31:06.968571+00:00",
+      "seconds": 38.89,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 2",
+      "ports": [
+        44473
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:44473/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44473/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44473/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44473/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 3,
+      "slot": 0,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:31:07.348332+00:00",
+      "end": "2026-10-23T23:31:48.035760+00:00",
+      "seconds": 40.69,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 3",
+      "ports": [
+        39499
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:39499/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39499/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39499/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39499/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 3,
+      "slot": 1,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:31:07.349131+00:00",
+      "end": "2026-10-23T23:31:48.759802+00:00",
+      "seconds": 41.41,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 3",
+      "ports": [
+        45113
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45113/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45113/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45113/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45113/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 3,
+      "slot": 2,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:31:07.350634+00:00",
+      "end": "2026-10-23T23:31:48.607730+00:00",
+      "seconds": 41.26,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 3",
+      "ports": [
+        39761
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:39761/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39761/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39761/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39761/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 3,
+      "slot": 3,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:31:07.351472+00:00",
+      "end": "2026-10-23T23:31:48.005989+00:00",
+      "seconds": 40.65,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 3",
+      "ports": [
+        32901
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:32901/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:32901/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:32901/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:32901/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 4,
+      "slot": 0,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:31:48.877160+00:00",
+      "end": "2026-10-23T23:32:46.565161+00:00",
+      "seconds": 57.69,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 4",
+      "ports": [
+        43629
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:43629/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43629/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43629/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43629/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 4,
+      "slot": 1,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:31:48.881546+00:00",
+      "end": "2026-10-23T23:32:46.496655+00:00",
+      "seconds": 57.62,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 4",
+      "ports": [
+        45315
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45315/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45315/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45315/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45315/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 4,
+      "slot": 2,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:31:48.879277+00:00",
+      "end": "2026-10-23T23:32:46.757266+00:00",
+      "seconds": 57.88,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 4",
+      "ports": [
+        39583
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:39583/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39583/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39583/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:39583/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 4,
+      "slot": 3,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:31:48.889956+00:00",
+      "end": "2026-10-23T23:32:46.946156+00:00",
+      "seconds": 58.06,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 4",
+      "ports": [
+        35785
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:35785/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35785/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35785/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35785/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 5,
+      "slot": 0,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:32:47.088274+00:00",
+      "end": "2026-10-23T23:33:29.332836+00:00",
+      "seconds": 42.24,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 5",
+      "ports": [
+        45221
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45221/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45221/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45221/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45221/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 5,
+      "slot": 1,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:32:47.090616+00:00",
+      "end": "2026-10-23T23:33:27.495009+00:00",
+      "seconds": 40.4,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 5",
+      "ports": [
+        36313
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:36313/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36313/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36313/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36313/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 5,
+      "slot": 2,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:32:47.097977+00:00",
+      "end": "2026-10-23T23:33:29.076702+00:00",
+      "seconds": 41.98,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 5",
+      "ports": [
+        36095
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:36095/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36095/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36095/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36095/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 5,
+      "slot": 3,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:32:47.094895+00:00",
+      "end": "2026-10-23T23:33:28.586898+00:00",
+      "seconds": 41.49,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 5",
+      "ports": [
+        37591
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:37591/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37591/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37591/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37591/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 6,
+      "slot": 0,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:33:29.472372+00:00",
+      "end": "2026-10-23T23:34:22.485384+00:00",
+      "seconds": 53.01,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 6",
+      "ports": [
+        46729
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:46729/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46729/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46729/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46729/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 6,
+      "slot": 1,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:33:29.473034+00:00",
+      "end": "2026-10-23T23:34:23.387842+00:00",
+      "seconds": 53.91,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 6",
+      "ports": [
+        33693
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:33693/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33693/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33693/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33693/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 6,
+      "slot": 2,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:33:29.473639+00:00",
+      "end": "2026-10-23T23:34:22.363450+00:00",
+      "seconds": 52.89,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 6",
+      "ports": [
+        33631
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:33631/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33631/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33631/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33631/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 6,
+      "slot": 3,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:33:29.474759+00:00",
+      "end": "2026-10-23T23:34:23.983298+00:00",
+      "seconds": 54.51,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 6",
+      "ports": [
+        35149
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:35149/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35149/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35149/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35149/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 7,
+      "slot": 0,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:34:24.162675+00:00",
+      "end": "2026-10-23T23:35:22.097591+00:00",
+      "seconds": 57.93,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 7",
+      "ports": [
+        46643
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:46643/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46643/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46643/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46643/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 7,
+      "slot": 1,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:34:24.163572+00:00",
+      "end": "2026-10-23T23:35:21.996627+00:00",
+      "seconds": 57.83,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 7",
+      "ports": [
+        45141
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45141/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45141/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45141/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45141/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 7,
+      "slot": 2,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:34:24.164041+00:00",
+      "end": "2026-10-23T23:35:20.343909+00:00",
+      "seconds": 56.18,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 7",
+      "ports": [
+        33907
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:33907/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33907/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33907/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33907/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 7,
+      "slot": 3,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:34:24.165892+00:00",
+      "end": "2026-10-23T23:35:21.466378+00:00",
+      "seconds": 57.3,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 7",
+      "ports": [
+        44313
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:44313/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44313/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44313/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44313/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 8,
+      "slot": 0,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:35:22.177693+00:00",
+      "end": "2026-10-23T23:35:55.577819+00:00",
+      "seconds": 33.4,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 8",
+      "ports": [
+        43265
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:43265/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43265/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43265/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:43265/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 8,
+      "slot": 1,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:35:22.179038+00:00",
+      "end": "2026-10-23T23:35:56.006299+00:00",
+      "seconds": 33.83,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 8",
+      "ports": [
+        33735
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:33735/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33735/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33735/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33735/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 8,
+      "slot": 2,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:35:22.179239+00:00",
+      "end": "2026-10-23T23:35:56.127592+00:00",
+      "seconds": 33.95,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 8",
+      "ports": [
+        37715
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:37715/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37715/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37715/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:37715/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 8,
+      "slot": 3,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:35:22.179595+00:00",
+      "end": "2026-10-23T23:35:55.168107+00:00",
+      "seconds": 32.99,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 8",
+      "ports": [
+        46365
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:46365/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46365/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46365/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:46365/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 9,
+      "slot": 0,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:35:56.229027+00:00",
+      "end": "2026-10-23T23:36:30.015954+00:00",
+      "seconds": 33.79,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 9",
+      "ports": [
+        35627
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:35627/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35627/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35627/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:35627/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 9,
+      "slot": 1,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:35:56.229747+00:00",
+      "end": "2026-10-23T23:36:28.139787+00:00",
+      "seconds": 31.91,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 9",
+      "ports": [
+        36217
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:36217/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36217/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36217/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36217/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 9,
+      "slot": 2,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:35:56.231332+00:00",
+      "end": "2026-10-23T23:36:30.158140+00:00",
+      "seconds": 33.93,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 9",
+      "ports": [
+        44541
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:44541/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44541/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44541/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:44541/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 9,
+      "slot": 3,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:35:56.232941+00:00",
+      "end": "2026-10-23T23:36:30.098698+00:00",
+      "seconds": 33.87,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 9",
+      "ports": [
+        38659
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:38659/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38659/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38659/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:38659/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 10,
+      "slot": 0,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:36:30.259280+00:00",
+      "end": "2026-10-23T23:37:03.228601+00:00",
+      "seconds": 32.97,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 10",
+      "ports": [
+        34415
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:34415/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34415/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34415/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:34415/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 10,
+      "slot": 1,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:36:30.258968+00:00",
+      "end": "2026-10-23T23:37:03.060049+00:00",
+      "seconds": 32.8,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 10",
+      "ports": [
+        45913
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:45913/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45913/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45913/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:45913/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 10,
+      "slot": 2,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:36:30.260440+00:00",
+      "end": "2026-10-23T23:37:03.256843+00:00",
+      "seconds": 33.0,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 10",
+      "ports": [
+        33865
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:33865/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33865/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33865/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:33865/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    },
+    {
+      "phase": "current",
+      "mode": "parallel",
+      "number": 10,
+      "slot": 3,
+      "command": "bun --preload <repo>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "cwd": "<repo>",
+      "start": "2026-10-23T23:36:30.261684+00:00",
+      "end": "2026-10-23T23:37:03.125481+00:00",
+      "seconds": 32.86,
+      "exit": 0,
+      "gate": "heavy python3 .local/cache-spike/queue-matrix.py batch current 10",
+      "ports": [
+        36721
+      ],
+      "closes": [
+        {
+          "url": "http://127.0.0.1:36721/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36721/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36721/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        },
+        {
+          "url": "http://127.0.0.1:36721/queue.html",
+          "resources": 250,
+          "streams": "1",
+          "emptyBody": false
+        }
+      ]
+    }
+  ],
+  "failures": [
+    {
+      "phase": "base",
+      "mode": "parallel",
+      "number": 4,
+      "slot": 1,
+      "command": "bun --preload <base>/.local/cache-spike/queue-stress-observe.ts apps/web/test/ui-queue.ts",
+      "logExcerpt": "115 |   const fixture = await install(page)\n116 |   await page.goto(`${origin}queue.html`)\n117 |   if (dark) await page.evaluate(() => document.documentElement.classList.add('dark'))\n118 |   const full = page.getByRole('region', { name: 'Full conversation' })\n119 |   const inline = page.getByRole('region', { name: 'Inline thread' })\n120 |   await full.locator('[data-submission=\"5\"]').waitFor()\n                                                    ^\nTimeoutError: waitFor: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByRole('region', { name: 'Full conversation' }).locator('[data-submission=\"5\"]') to be visible\n\n  log: [ \"  - waiting for getByRole('region', { name: 'Full conversation' }).locator('[data-submission=\\\"5\\\"]') to be visible\" ],\n\n      at matrix (<base>/apps/web/test/ui-queue.ts:120:47)\n      at processTicksAndRejections (native:7:39)\n\nBun v1.4.2 (Linux x64)\n",
+      "requestFailureCounts": {
+        "net::ERR_FAILED": 3,
+        "net::ERR_NETWORK_CHANGED": 67
+      },
+      "pageErrors": [],
+      "consoleErrorCounts": {
+        "Failed to load resource: net::ERR_FAILED": 3,
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)": 3,
+        "Failed to load resource: net::ERR_NETWORK_CHANGED": 67
+      },
+      "lastClose": {
+        "url": "http://127.0.0.1:34775/queue.html",
+        "resources": 250,
+        "streams": null,
+        "emptyBody": true
+      },
+      "traceSha256": "062d3281d41652ed01ebf88ee6dd2e333b5be5ca5495f2f6dcb9d9a624a4b4f6",
+      "failingPageNetworkErrors": {
+        "net::ERR_NETWORK_CHANGED": 67
+      },
+      "failingPageScriptErrors": {
+        "net::ERR_NETWORK_CHANGED": 67
+      },
+      "failedRequestExamples": [
+        {
+          "url": "http://127.0.0.1:34775/@fs<base>/apps/web/node_modules/.vite/deps/SchemaTransformation-Dp-i-Gxw.js?v=7ab0d88d",
+          "resourceType": "script",
+          "status": -1,
+          "error": "net::ERR_NETWORK_CHANGED"
+        },
+        {
+          "url": "http://127.0.0.1:34775/@fs<base>/apps/web/node_modules/.vite/deps/SchemaIssue-BMHxccsP.js?v=7ab0d88d",
+          "resourceType": "script",
+          "status": -1,
+          "error": "net::ERR_NETWORK_CHANGED"
+        },
+        {
+          "url": "http://127.0.0.1:34775/@fs<base>/apps/web/node_modules/.vite/deps/SchemaParser-Cwmzfnyq.js?v=7ab0d88d",
+          "resourceType": "script",
+          "status": -1,
+          "error": "net::ERR_NETWORK_CHANGED"
+        }
+      ],
+      "openingRequestsOnFailingPage": 0,
+      "initScriptsCompletedBeforeGoto": true
+    }
+  ],
+  "gates": {
+    "hover-fixed-1": {
+      "command": "heavy bun apps/web/test/ui-local.ts",
+      "seconds": 52.91,
+      "exit": 1
+    },
+    "hover-fixed-2": {
+      "command": "heavy bun --preload ./.local/cache-spike/hover-observe.ts apps/web/test/ui-local.ts",
+      "seconds": 68.58,
+      "exit": 0
+    },
+    "hover-fixed-3": {
+      "command": "heavy bun --preload ./.local/cache-spike/hover-observe.ts apps/web/test/ui-local.ts",
+      "seconds": 36.14,
+      "exit": 0
+    },
+    "hover-fixed-4": {
+      "command": "heavy bun --preload ./.local/cache-spike/hover-observe.ts apps/web/test/ui-local.ts",
+      "seconds": 47.1,
+      "exit": 0
+    },
+    "followup-check": {
+      "command": "GOBLIN_HARNESS_PORT=28691 TURBO_CACHE=local:rw heavy bun run check",
+      "seconds": 491.1,
+      "exit": 0
+    },
+    "followup-fast": {
+      "command": "GOBLIN_HARNESS_PORT=28691 TURBO_CACHE=local:rw heavy bun run check:fast",
+      "seconds": 136.75,
+      "exit": 0
+    },
+    "followup-docs": {
+      "command": "bun run check:files SPIKE_RESULTS.md evidence/cache-goblin-20261023/queue-followup.json docs/development.md",
+      "seconds": 13.08,
+      "exit": 0
+    }
+  }
+}

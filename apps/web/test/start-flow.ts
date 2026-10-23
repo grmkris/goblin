@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import type { Browser, Page, Route } from 'playwright-core'
+import type { Browser, Page } from 'playwright-core'
+import { mockRoute, type MockRoute } from './mock-route.ts'
 import { EVERYTHING, type OnboardingKickoff } from '@goblin/contracts'
 
 const model = { source: 'deployment', deployment: true, models: ['house-model'] }
@@ -21,7 +22,7 @@ const draft = { goal: 'Plan a trip to Lisbon', channel: 'Travel plans', groups: 
  */
 function api(mode: Mode) {
   const kickoffs: OnboardingKickoff[] = []
-  const kickoff = (route: Route) => {
+  const kickoff = (route: MockRoute) => {
     const sent: OnboardingKickoff = route.request().postDataJSON()
     kickoffs.push(sent)
     if (kickoffs.length === 1) return route.fulfill(FAILURES[mode])
@@ -38,7 +39,7 @@ function api(mode: Mode) {
     }
     return route.fulfill({ json: { topic, view: { ...view, status: 'done', kickoff: true } } })
   }
-  const handle = (route: Route) => {
+  const handle = (route: MockRoute) => {
     const { pathname } = new URL(route.request().url())
     if (!pathname.startsWith('/api/')) return route.continue()
     if (pathname === '/api/agent/model-endpoint') return route.fulfill({ json: model })
@@ -56,7 +57,7 @@ async function runMode(browser: Browser, origin: string, mode: Mode): Promise<vo
   const fixture = api(mode)
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.route('**/api/**', fixture.handle)
+  await mockRoute(page, '**/api/**', fixture.handle)
   try {
     await page.goto(`${origin}start.html?at=/start/goblin`)
     await page.evaluate((value) => sessionStorage.setItem('goblin:start-draft', JSON.stringify(value)), draft)

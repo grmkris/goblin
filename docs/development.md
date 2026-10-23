@@ -559,9 +559,10 @@ owner API routed in the page and no screen scrolling sideways. It needs `@goblin
 Chromium at phone and desktop widths, light and dark: the hero's session playing, waiting on its question, answered by
 Allow and on its own, and the whole page; under reduced motion the session starts at its question and Allow still
 answers it. With `/health` and the session check routed in the page, it checks the way in (`/login?new=1`), Claude
-Code's command for the page's origin, that the Source link stays off, that a signed-in session leaves for its channel,
-and that nothing scrolls sideways. Screenshots go under `.local/goblin-acceptance/landing-*`; this is browser fixture
-evidence only.
+Code's command for the page's origin, that the Source link stays off, and that nothing scrolls sideways. The fixture
+mounts the public Landing component; signed-in navigation belongs to the real Home route and needs a route-level
+fixture. Its legacy signed-in assertion currently fails. Screenshots go under `.local/goblin-acceptance/landing-*`;
+this is browser fixture evidence only.
 
 `heavy bun apps/web/test/ui-markdown.ts` renders chat Markdown from source in local Chromium at desktop and phone
 widths: a reply that settles keeps its blocks (a table keeps its element and sideways scroll), with and without
@@ -569,6 +570,20 @@ motion (words fade in behind a caret only when motion is allowed), code highligh
 Shiki loads and Copy copies exactly the code, a table copies as CSV or Markdown and downloads as CSV, math sets in KaTeX while prices stay prices, a link asks
 before it
 opens and shows its address, and an image is fetched only when asked, once, without a referrer. Receipts go under `.local/goblin-acceptance/markdown-*`.
+
+## Browser API fixtures
+
+`heavy bun apps/web/test/ui-mock.ts` checks the in-page API fixture, including cancellation, AG-UI frames and native
+asset caching. Use `mockRoute(page, pattern, handler)` from `apps/web/test/mock-route.ts` for JSON/text API fetches.
+Its request/fulfill interface and last-matching-handler precedence follow the existing fixtures. Only same-origin
+API, health and synthetic stream-opening fetches cross a Playwright binding; asset requests stay in Chromium.
+`installLiveReads` retains the live AG-UI stream simulator and composes with this fixture in either init-script order.
+
+Keep network routing for document rewrites, external navigation guards, binary images and real network failures.
+Those pages still have caching disabled. This helper does not intercept XHR, WebSocket or EventSource: the current
+component fixtures inject the workspace feed into their query cache and chat streams use fetch. A test of the native
+workspace-feed transport needs its own server fixture. Synthetic fetch responses do not emit Playwright network
+request/response events; assert the fixture's calls and the page's resulting state instead.
 
 ## Client performance
 
@@ -582,6 +597,12 @@ includes other agents' edits) in scratch worktrees under `/tmp/goblin-perf-workt
   reply at pi-durable's 100 ms batches while typing, wheel-scrolling 1,000 parts, and idle work after a reply. A win
   or a regression needs the medians to differ by more than either side's spread; this box is shared, so only compare
   numbers from one run. The same revision on both sides gives the noise floor.
+- `heavy bun apps/web/test/ui-cache.ts --assert` measures a cold load, second navigation and reload of the same
+  transcript in each fresh context. It records resource-timing cache hits, transferred asset bytes, CDP cache events
+  and time to the rendered transcript. The static server mirrors `apps/web/public/_headers` for built `/assets/*`
+  and makes HTML revalidate. `--dist <path>` reuses a build; `--out <receipt.json>` names its receipt.
+  `--route-control` deliberately adds an inert network route; `--no-cache-headers` removes the server's cache policy.
+  Both controls assert zero cached assets. This tests fixture cache behavior, separate from deployed CDN behavior.
 - `heavy bun apps/web/test/ui-follow.ts` plays scripted owner turns against the same fixture (a streamed reply, a tool
   round after a slow provider, a storm of parallel calls, a reply already past the fold when its turn lands, a
   new connection opening mid-reply, the composer growing mid-stream) on the phone and desktop profiles and reports,

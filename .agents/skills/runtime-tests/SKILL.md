@@ -75,3 +75,8 @@ itself authorize model spend, external messages, deployment or production change
   replay, and the agent's own setup from a server's guide skill by an app's names and a gateway's (`source-propose`,
   ADR 0096). Fixtures use neutral names (`post.created`, `feed_read`, `post_reply`); the retired-terms gate covers tests. The Events suite covers transport and consumer recovery without a service-specific channel. MySI reconnect
   and Telegram DM/group/photo receipts are a deferred live owner gate, not established by those fixtures (ADR 0069).
+
+- Browser component fixtures use `apps/web/test/mock-route.ts` for same-origin JSON/text API fetches so Chromium keeps
+  its HTTP cache. `ui-mock.ts` covers the adapter and AG-UI composition; `ui-cache.ts --assert` checks second navigation
+  and reload against the built transcript. Keep documented network routes for document navigation, binary data,
+  external guards and genuine network failures. Native EventSource transport remains outside these component fixtures.

@@ -6,13 +6,15 @@
 import { RunInput } from '@goblin/contracts'
 import * as Predicate from 'effect/Predicate'
 import * as Schema from 'effect/Schema'
-import type { Page, Route } from 'playwright-core'
+import type { Page } from 'playwright-core'
+import type { MockRoute } from './mock-route.ts'
 
 /** Where the page's stand-in reads a chat's opening; route it to the chat's `FixtureStream.opening`. */
 export const OPENINGS = '**/__fixture/streams/**'
 
 /** The chat an opening request is for. */
-export const openingChat = (route: Route): string => new URL(route.request().url()).pathname.split('/').at(-1) ?? ''
+export const openingChat = (route: Pick<MockRoute, 'request'>): string =>
+  new URL(route.request().url()).pathname.split('/').at(-1) ?? ''
 
 /**
  * The page's `fetch` stand-in, installed before the page loads: a chat's stream is a body of `data:` frames, its
@@ -70,14 +72,15 @@ export async function installLiveReads(page: Page): Promise<void> {
     }
     const STREAM = /\/conversations\/([^/]+)\/stream$/u
     const standIn = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      const url = new URL(input instanceof Request ? input.url : String(input), window.location.href)
+      const request = new Request(input instanceof Request ? input : new URL(String(input), window.location.href), init)
+      const url = new URL(request.url)
       const chat = STREAM.exec(url.pathname)?.[1]
-      if (chat === undefined) return native(input, init)
-      const answered = await native(`/__fixture/streams/${chat}`)
+      if (chat === undefined) return native(request)
+      const answered = await window.fetch(`/__fixture/streams/${chat}`, { signal: request.signal })
       if (!answered.ok) return answered
       const opening: unknown = await answered.json()
       document.documentElement.dataset['streams'] = String(++opened)
-      const body = stream(chat, Array.isArray(opening) ? opening : [], init?.signal)
+      const body = stream(chat, Array.isArray(opening) ? opening : [], request.signal)
       return new Response(body, { headers: { 'content-type': 'text/event-stream' } })
     }
     Object.defineProperty(window, 'fetch', { value: standIn, configurable: true, writable: true })
@@ -101,7 +104,7 @@ export class FixtureStream {
    * A new connection's opening: the chat's events so far, which the page's reducer folds into what a fresh snapshot
    * of the chat would give it.
    */
-  async opening(route: Route): Promise<void> {
+  async opening(route: Pick<MockRoute, 'fulfill'>): Promise<void> {
     this.reads += 1
     await route.fulfill({ json: this.#events })
   }
