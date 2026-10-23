@@ -33,10 +33,10 @@ interface RouterContext {
 }
 
 /** Pages that are part of signing in: no app navigation there. */
-const AUTH_PAGES = new Set(['/login', '/consent', '/terms', '/privacy'])
+const AUTH_PAGES = new Set(['/login', '/consent', '/consent/widen', '/terms', '/privacy'])
 /**
- * Whether `path` is a person's own page, outside any workspace: signing in, consenting, an invitation (ADR 0093), a
- * sign-in that belongs to another workspace (ADR 0096).
+ * Whether `path` is a person's own page, outside any workspace: signing in, consenting and widening a grant (ADR 0114),
+ * an invitation (ADR 0093), a sign-in that belongs to another workspace (ADR 0096).
  */
 const isAuthPage = (path: string): boolean =>
   AUTH_PAGES.has(path) || path.startsWith('/invite/') || path === '/connect-elsewhere'

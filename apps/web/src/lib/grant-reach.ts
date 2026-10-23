@@ -3,7 +3,7 @@
  * Personas and connections as all or a list, plus the MCP servers it may bring. Pure: the editor's controls call these,
  * and the summary line says the reach in words with `describeReach`.
  */
-import type { GoblinReach, ReachList, WorkspaceReach } from '@goblin/contracts'
+import type { GoblinReach, ReachKind, ReachList, WorkspaceReach } from '@goblin/contracts'
 
 /** Where a workspace's id comes with its name. */
 type Named = { readonly id: string; readonly name: string }
@@ -11,6 +11,13 @@ type Named = { readonly id: string; readonly name: string }
 /** The three kinds one workspace's reach lists, in the order the editor shows them. */
 export const REACH_KINDS = ['topics', 'personas', 'connections'] as const satisfies readonly (keyof WorkspaceReach)[]
 export type ReachField = (typeof REACH_KINDS)[number]
+
+/** Each kind's field in a workspace's reach, by the kind a reach id names. */
+export const FIELD_OF: Readonly<Record<ReachKind, ReachField>> = {
+  topic: 'topics',
+  persona: 'personas',
+  connection: 'connections',
+}
 
 const NOUNS: Readonly<Record<ReachField, readonly [one: string, many: string]>> = {
   topics: ['Topic', 'Topics'],

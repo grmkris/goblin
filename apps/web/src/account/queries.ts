@@ -6,7 +6,7 @@ import type {
   UpdateWorkspace,
   WorkspaceRole,
 } from '@goblin/contracts'
-import { mutationOptions, queryOptions, skipToken } from '@tanstack/react-query'
+import { type QueryClient, mutationOptions, queryOptions, skipToken } from '@tanstack/react-query'
 import * as Effect from 'effect/Effect'
 import { account, inWorkspaceOf, owner, workspaceAccount } from '../lib/api.ts'
 import { grantsAccount, keyTerms } from '../lib/api-grants.ts'
@@ -24,6 +24,7 @@ const accountKeys = {
   clients: ['account', 'clients'] as const,
   keys: ['account', 'keys'] as const,
   clientTerms: (clientId: string) => ['account', 'clients', clientId, 'terms'] as const,
+  grantTerms: (grantId: string) => ['account', 'grants', grantId, 'terms'] as const,
   reach: (slug: string, kind: 'topics' | 'personas' | 'connections') => ['account', 'reach', slug, kind] as const,
 }
 
@@ -86,6 +87,30 @@ export const clientGrantMutation = mutationOptions({
       client.invalidateQueries({ queryKey: accountKeys.clientTerms(clientId) }),
     ]),
 })
+
+/** What the widening page shows for a live grant the person may approve: its terms now, and its summary. */
+export const grantTermsQuery = (grantId: string) =>
+  grantsAccount.apiQuery({
+    queryKey: accountKeys.grantTerms(grantId),
+    queryFn: (api) => api.grants.terms({ params: { id: grantId } }),
+  })
+
+/** Saves the terms the person approved for a grant: a key's or an MCP client's, whichever it is. */
+export const widenGrantMutation = mutationOptions({
+  ...grantsAccount.apiMutation({
+    mutationFn: (api, { grantId, terms }: { readonly grantId: string; readonly terms: GrantTerms }) =>
+      api.grants.widen({ params: { id: grantId }, payload: { grantId, terms } }),
+  }),
+  onSuccess: (_saved, { grantId }, _result, { client }) => grantsChanged(client, grantId),
+})
+
+/** Every read a grant's new terms change: its own, and the keys and clients that show them. */
+const grantsChanged = (client: QueryClient, grantId: string) =>
+  Promise.all([
+    client.invalidateQueries({ queryKey: accountKeys.grantTerms(grantId) }),
+    client.invalidateQueries({ queryKey: accountKeys.keys }),
+    client.invalidateQueries({ queryKey: accountKeys.clients }),
+  ])
 
 /** Ends one client's access at once. */
 export const revokeClientMutation = mutationOptions({

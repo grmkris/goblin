@@ -22,7 +22,14 @@ import * as Layer from 'effect/Layer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GrantsAccountApi, grantsAccount } from '../src/lib/api-grants.ts'
-import { clientGrantMutation, clientTermsQuery, clientsQuery, reachItemsQuery } from '../src/account/queries.ts'
+import {
+  clientGrantMutation,
+  clientTermsQuery,
+  clientsQuery,
+  grantTermsQuery,
+  reachItemsQuery,
+  widenGrantMutation,
+} from '../src/account/queries.ts'
 import { account, owner } from '../src/lib/api.ts'
 import { fakeHttpApi, testQueryClient } from './query/testing.ts'
 import { unusedHandlers } from './query/unused-handlers.ts'
@@ -210,6 +217,21 @@ describe("an MCP client's grant (ADR 0114)", () => {
     } finally {
       unsubscribe()
     }
+  })
+})
+
+describe('widening a grant', () => {
+  it('reads its terms and saves exactly the approved ones under its id', async () => {
+    const client = testQueryClient()
+    const read = await client.query(grantTermsQuery('key_1'))
+    expect(read).toMatchObject({ grantId: 'key_1', current: { level: 'read' } })
+    const widen = new MutationObserver(client, widenGrantMutation)
+    const terms: GrantTerms = { ...KEY_TERMS, level: 'write' }
+    expect(await widen.mutate({ grantId: 'key_1', terms })).toEqual({ grantId: 'key_1', terms, expiresAt: null })
+    expect(fake.state.key).toEqual(terms)
+    expect(client.getQueryState(grantTermsQuery('key_1').queryKey)?.isInvalidated).toBe(true)
+    const put = fake.calls().find((call) => call.method === 'PUT')
+    expect(new URL(put?.url ?? '').pathname).toBe('/api/grants/key_1')
   })
 })
 
