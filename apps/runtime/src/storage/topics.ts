@@ -6,6 +6,7 @@ import { EVERYTHING_JSON } from './migrations/setup.ts'
  * Conversation (`chat_id`, an `app_conversations` row with role `primary` or `conversation`); its threads carry the
  * Topic in `app_conversations.topic_id`. An active name is unique, ignoring case (a partial index in the migration);
  * `revision` counts changes. `operation_id` makes a create idempotent. `setup` is the Topic's setup as JSON (ADR 0040).
+ * `reach` is how far its chats see (ADR 0115): `sealed`, or `hub` (Personal's, until an admin says otherwise).
  */
 export const appTopics = sqliteTable('app_topics', {
   id: integer('id').primaryKey().notNull(),
@@ -14,9 +15,11 @@ export const appTopics = sqliteTable('app_topics', {
   instructions: text('instructions').notNull().default(''),
   chatId: text('chat_id').notNull().unique(),
   archivedAt: integer('archived_at'),
-  searchExcluded: integer('search_excluded', { mode: 'boolean' }).notNull().default(false),
   revision: integer('revision').notNull().default(1),
   setup: text('setup').notNull().default(EVERYTHING_JSON),
+  reach: text('reach', { enum: ['sealed', 'hub'] })
+    .notNull()
+    .default('sealed'),
   operationId: text('operation_id').unique(),
   createdBy: text('created_by', { enum: ['owner', 'agent', 'system'] }).notNull(),
   createdAt: integer('created_at').notNull(),

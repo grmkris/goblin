@@ -11,7 +11,7 @@ const WORK: TopicView = {
   id: 2,
   name: 'Work',
   conversation: '20',
-  searchExcluded: false,
+  reach: 'sealed',
   revision: 3,
   setup: EVERYTHING,
   createdBy: 'owner',

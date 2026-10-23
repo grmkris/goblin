@@ -8,7 +8,7 @@ export const PERSONAL: TopicView = {
   name: 'Personal',
   conversation: PRIMARY_CHAT,
   personal: true,
-  searchExcluded: false,
+  reach: 'hub',
   revision: 0,
   setup: EVERYTHING,
   createdBy: 'system',
@@ -30,7 +30,7 @@ const byName = (a: TopicView, b: TopicView) =>
   a.id - b.id
 
 /** A Topic a server's API key made: a room, whose chats reach only it (ADR 0108). */
-export const isRoom = (topic: TopicView): boolean => topic.room !== undefined
+export const isRoom = (topic: TopicView): boolean => topic.madeBy !== undefined
 
 /**
  * The sidebar's channels: the owner's own active Topics, Personal first and then by name, and apart from them the
@@ -68,9 +68,9 @@ export function roomGroups(topics: readonly TopicView[], views: readonly Convers
   const at = (topic: TopicView) => Math.max(last.get(topic.conversation) ?? 0, topic.createdAt)
   const byKey = new Map<string, TopicView[]>()
   for (const topic of topics) {
-    if (topic.room === undefined || isArchived(topic)) continue
-    const group = byKey.get(topic.room.key)
-    if (group === undefined) byKey.set(topic.room.key, [topic])
+    if (topic.madeBy === undefined || isArchived(topic)) continue
+    const group = byKey.get(topic.madeBy.key)
+    if (group === undefined) byKey.set(topic.madeBy.key, [topic])
     else group.push(topic)
   }
   return [...byKey]

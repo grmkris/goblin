@@ -40,7 +40,7 @@ describe('topics, personas and threads', () => {
     id: 2,
     name: 'Japan trip',
     conversation: '17',
-    searchExcluded: false,
+    reach: 'sealed',
     revision: 1,
     setup: { mcpServers: [{ connectionId: 'notes', tools: ['read'] }], skills: 'all', apps: [], subagents: false },
     createdBy: 'agent',

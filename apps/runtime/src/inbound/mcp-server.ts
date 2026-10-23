@@ -90,7 +90,7 @@ const topicTools = (server: McpServer, add: Add, reply: Reply) => {
       {
         title: 'List Topics',
         description:
-          'A page of the Topics within reach, newest change first: id, name, conversation (its chat), revision, archived, searchExcluded and updatedAt. Pass `next` back as `cursor` for the page after.',
+          'A page of the Topics within reach, newest change first: id, name, conversation (its chat), revision, archived, reach (sealed or hub), madeBy and updatedAt. Pass `next` back as `cursor` for the page after.',
         inputSchema: standard(Schema.Struct(Page)),
         annotations: reads,
       },
@@ -128,7 +128,7 @@ const topicTools = (server: McpServer, add: Add, reply: Reply) => {
       {
         title: 'Change a Topic',
         description:
-          'Rename, archive or change the search opt-out, description or guidance of a Topic within reach. Needs manage (and an admin person for a client, for the description and guidance).',
+          'Rename or archive a Topic within reach, change its description or guidance, or seal it (reach: sealed). Needs manage (and an admin person for a client, for the description, guidance and reach); only a person makes a Topic the hub.',
         inputSchema: standard(Schema.Struct({ id: Id, change: UpdateTopic })),
         annotations: writes,
       },

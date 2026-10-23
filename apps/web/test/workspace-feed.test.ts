@@ -50,7 +50,7 @@ const TOPIC = {
   id: 1,
   name: 'Personal',
   conversation: '1',
-  searchExcluded: false,
+  reach: 'hub' as const,
   revision: 0,
   setup: EVERYTHING,
   createdBy: 'system' as const,

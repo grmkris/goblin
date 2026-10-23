@@ -32,7 +32,7 @@ import { appChatMoves, appConversations } from '../src/storage/schema.ts'
 import { appTopics } from '../src/storage/topics.ts'
 import { chatDatabase, sqliteDb } from './chats-sqlite.ts'
 import { fake } from './fake.ts'
-import { appKeyReach } from '../src/storage/keys.ts'
+import { appMadeBy } from '../src/storage/made-by.ts'
 
 /** What Pi was asked, in order. */
 type Calls = string[]
@@ -180,7 +180,7 @@ describe("a server's work never runs on the owner's own subscriptions (ADR 0087)
       .values({ id: 7, name: 'Customer', chatId: '7', createdBy: 'owner', createdAt: 1, updatedAt: 1 })
       .run()
     db.update(appConversations).set({ topicId: 7 }).where(eq(appConversations.chatId, '5')).run()
-    db.insert(appKeyReach).values({ keyId: 'key-1', kind: 'topic', resourceId: 7, createdAt: 1 }).run()
+    db.insert(appMadeBy).values({ keyId: 'key-1', kind: 'topic', resourceId: 7, createdAt: 1 }).run()
     return Effect.gen(function* () {
       const operations = yield* ChatOperations
       const send = (chat: string, operationId: string) =>

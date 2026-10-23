@@ -4,12 +4,12 @@ import type { PiHarness } from 'agents/harness/pi'
 import { and, count, desc, eq, gte, ne, sql } from 'drizzle-orm'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Schema from 'effect/Schema'
-import { roomOf } from '../keys/made-by.ts'
 import { BACKGROUND, conversationId, entryId } from '../pi/context.ts'
+import { type Boundary, topicBoundary } from '../topics/boundary.ts'
 import { appConversations } from '../storage/schema.ts'
 import { appRetrievalUses, appTranscriptExcerpts, appTranscriptIndex } from '../storage/retrieval.ts'
 import { type Range, excerptOf, ftsQuery, indexable, mergeRanges } from './text.ts'
-import { searchHits, rangeEdge, sourceRows, type Hit } from './sql.ts'
+import { type Hit, type HitScope, rangeEdge, searchHits, sourceRows } from './sql.ts'
 
 /** Where the index reads Pi from, injected so the index is tested without Pi. */
 export type TranscriptSource = {
@@ -59,17 +59,11 @@ const WINDOWS = 40
 const HITS = 20
 const NEIGHBOURS = 2
 
-/** Where a search looks: every chat but `exclude` in the default Topics, or only in `topic` when one is named. */
 /**
- * What a search covers: never the chat `exclude`; Topic `topic` alone when one is named; and in a room (ADR 0108) the
- * room alone, which no search from outside it covers unless it names the room.
+ * What a search covers (ADR 0115): never the chat `exclude`; within `boundary` (a hub's every active Topic, a sealed
+ * Topic itself); and Topic `topic` alone when one is named, which the boundary must reach. At most `limit` sources.
  */
-export type SearchScope = {
-  readonly exclude?: string
-  readonly topic?: number
-  readonly room?: number
-  readonly limit: number
-}
+export type SearchScope = HitScope & { readonly limit: number }
 
 /** A use as recorded: its stable id, where it happened and what it found. */
 export type UseRecord = Omit<SourceUse, 'chat'> & { readonly chat: string; readonly session: string }
@@ -90,19 +84,23 @@ type IndexDb = SQLiteAsyncDatabase<'sync', unknown>
 // nothing is held across Pi reads. A session's catch-ups must not overlap: the Retrieval service runs each under that
 // session's turn of the agent's KeyedLock (`retrieval/service.ts`). Times are epoch seconds.
 
-/** The chat a session is registered as and whether it may retrieve automatically (never a persona fork). */
-export const chatForSession = (
-  db: IndexDb,
-  session: string,
-): { readonly chat: string; readonly persona: boolean; readonly room?: number } | undefined => {
+/** Where a session's searches run: the chat it is registered as, whether it is a persona fork, and its boundary. */
+export type SessionPlace = { readonly chat: string; readonly persona: boolean; readonly boundary: Boundary }
+
+/**
+ * The chat a session is registered as, whether it may retrieve automatically (never a persona fork) and its boundary
+ * (ADR 0115): every chat under a Topic is registered in it, so a chat's Topic is its chain root's. None for a session
+ * no chat owns, or one whose Topic is gone.
+ */
+export const chatForSession = (db: IndexDb, session: string): SessionPlace | undefined => {
   const row = db
     .select({ chat: appConversations.chatId, role: appConversations.role, topic: appConversations.topicId })
     .from(appConversations)
     .where(eq(appConversations.piSession, session))
     .get()
-  if (row === undefined) return undefined
-  // Every chat under a Topic is registered in it, so a chat's Topic is its chain root's: the room it works in.
-  return { chat: row.chat, persona: row.role === 'persona', ...(roomOf(db, row.topic) ? { room: row.topic } : {}) }
+  const boundary = row === undefined ? undefined : topicBoundary(db, row.topic)
+  if (row === undefined || boundary === undefined) return undefined
+  return { chat: row.chat, persona: row.role === 'persona', boundary }
 }
 
 const indexedThrough = (db: IndexDb, session: string): number | undefined =>

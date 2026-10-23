@@ -35,7 +35,7 @@ const TOPICS = ['Personal', 'Launch', 'Support', 'Customer interviews for the Oc
     conversation: String(index + 1),
     revision: 1,
     archived: false,
-    searchExcluded: false,
+    reach: 'sealed',
     updatedAt: 1,
   }),
 )

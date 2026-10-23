@@ -1,4 +1,4 @@
-import type { CreateTopic, Need } from '@goblin/contracts'
+import type { CreateTopic, Need, UpdateTopic } from '@goblin/contracts'
 import { OwnerApi } from '@goblin/contracts/api'
 import * as Effect from 'effect/Effect'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
@@ -15,6 +15,7 @@ import {
   requireAccessFor,
   requireAdminFor,
 } from '../grants/policy.ts'
+import { Forbidden } from '../http/errors.ts'
 import { Setups } from '../setup/service.ts'
 import { createTopic, editTopicSetup, madeTopic, updateTopic } from './program.ts'
 import { Topics } from './service.ts'
@@ -44,6 +45,20 @@ const needOf = (input: CreateTopic): Partial<Need> => ({
 /** The Topic a credential makes: a key's names nothing in its setup unless it says (ADR 0108). */
 const credentialTopic = (input: CreateTopic, keyed: boolean): CreateTopic =>
   input.setup !== undefined || !keyed ? input : { ...input, setup: KEY_TOPIC_SETUP }
+
+/**
+ * What changing a Topic takes beyond reaching it: its guidance or reach an admin, or a credential's `manage` (ADR 0115);
+ * making it a hub a person, never a credential, so what a credential's content steers can never be read from
+ * everywhere.
+ */
+const updating = (change: UpdateTopic) =>
+  Effect.gen(function* () {
+    const guidance = change.description !== undefined || change.instructions !== undefined
+    yield* requireAdminFor(guidance || change.reach !== undefined)
+    if ((yield* requestCredential) === undefined || change.reach === undefined) return
+    if (change.reach === 'hub') return yield* new Forbidden({ reason: 'hub_person' })
+    yield* requireAccessFor({ level: 'manage' }, false)
+  })
 
 const create = (input: CreateTopic) =>
   Effect.gen(function* () {
@@ -79,13 +94,7 @@ export const TopicsHandlers = HttpApiBuilder.group(OwnerApi, 'topics', (handlers
     )
     .handle('create', ({ payload }) => create(payload))
     .handle('update', ({ params, payload }) =>
-      Effect.andThen(
-        Effect.andThen(
-          reachesTopic(params.id),
-          requireAdminFor(payload.description !== undefined || payload.instructions !== undefined),
-        ),
-        updateTopic(params.id, payload),
-      ),
+      Effect.andThen(Effect.andThen(reachesTopic(params.id), updating(payload)), updateTopic(params.id, payload)),
     )
     .handle('setSetup', ({ params, payload }) =>
       Effect.andThen(

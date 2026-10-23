@@ -110,7 +110,7 @@ describe('Topics (ADR 0032)', () => {
   it('seeds Personal with Main as its Conversation', () => {
     const { topics } = fixture()
     expect(topics.list()).toEqual([
-      expect.objectContaining({ id: 1, name: 'Personal', conversation: '1', personal: true, searchExcluded: false }),
+      expect.objectContaining({ id: 1, name: 'Personal', conversation: '1', personal: true, reach: 'hub' }),
     ])
     expect(topics.archived(1)).toBe(false)
   })
@@ -187,15 +187,16 @@ describe('Topics (ADR 0032)', () => {
     expect(topics.get(topic.id).archivedAt).toBe(12)
   })
 
-  it('renames, archives, restores and opts out of search with one revision per change', async () => {
+  it('renames, archives, restores and seals or makes a hub with one revision per change (ADR 0115)', async () => {
     const { topics, create, retitled } = fixture()
     const { topic } = await create({ name: 'Trips', operationId: 'op' }, 'owner', 10)
     const renamed = topics.update(topic.id, { name: 'Travel' }, 11)
     expect(renamed).toMatchObject({ name: 'Travel', revision: 2 })
     expect(retitled).toEqual([`${topic.conversation}:Travel`])
-    expect(topics.update(topic.id, { name: 'Travel', searchExcluded: false }, 12)).toEqual(renamed)
-    const archived = topics.update(topic.id, { archived: true, searchExcluded: true }, 13)
-    expect(archived).toMatchObject({ archivedAt: 13, searchExcluded: true, revision: 3 })
+    expect(renamed.reach).toBe('sealed')
+    expect(topics.update(topic.id, { name: 'Travel', reach: 'sealed' }, 12)).toEqual(renamed)
+    const archived = topics.update(topic.id, { archived: true, reach: 'hub' }, 13)
+    expect(archived).toMatchObject({ archivedAt: 13, reach: 'hub', revision: 3 })
     expect(topics.archived(topic.id)).toBe(true)
     expect(topics.update(topic.id, { archived: true }, 14).archivedAt).toBe(13)
     const restored = topics.update(topic.id, { archived: false }, 15)
@@ -221,15 +222,16 @@ describe('Topics (ADR 0032)', () => {
     expect(touched).toEqual([topic.conversation, topic.conversation])
   })
 
-  it('never archives Personal, but renames it and changes its search opt-out', () => {
+  it('never archives Personal, the hub, but renames it and seals it', () => {
     const { topics } = fixture()
     expect(() => topics.update(1, { archived: true }, 10)).toThrow(
       expect.objectContaining({ _tag: 'InvalidInput', reason: 'personal_topic' }),
     )
-    expect(topics.update(1, { name: 'Home', searchExcluded: true }, 11)).toMatchObject({
+    expect(topics.get(1).reach).toBe('hub')
+    expect(topics.update(1, { name: 'Home', reach: 'sealed' }, 11)).toMatchObject({
       name: 'Home',
       personal: true,
-      searchExcluded: true,
+      reach: 'sealed',
       revision: 2,
     })
     expect(() => topics.get(9)).toThrow(expect.objectContaining({ _tag: 'NotFound' }))

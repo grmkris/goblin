@@ -15,7 +15,7 @@ const topic = (id: number, name: string, conversation: string, extra: Partial<To
   id,
   name,
   conversation,
-  searchExcluded: false,
+  reach: 'sealed',
   revision: 1,
   setup: EVERYTHING,
   createdBy: 'owner',
@@ -158,8 +158,8 @@ describe('the places Jump to lists', () => {
 
   it("lists a key's rooms after the Topics, by key, found by a query but not before one is typed", () => {
     const rooms = [
-      topic(4, 'deal-4', '40', { room: { key: 'swarmm-prod' } }),
-      topic(5, 'deal-5', '50', { room: { key: 'swarmm-prod' }, archivedAt: 9 }),
+      topic(4, 'deal-4', '40', { madeBy: { key: 'swarmm-prod' } }),
+      topic(5, 'deal-5', '50', { madeBy: { key: 'swarmm-prod' }, archivedAt: 9 }),
     ]
     const items = jumpItems(sources({ topics: [...TOPICS, ...rooms] }))
     expect(rows(of(items, 'topic'))).toEqual(['Personal — Topic', 'Travel — Topic', 'deal-4 — Room of swarmm-prod'])

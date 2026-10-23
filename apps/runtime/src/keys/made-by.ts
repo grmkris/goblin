@@ -2,7 +2,7 @@ import { type SQL, and, eq, isNull, sql } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
-import { appKeyReach } from '../storage/keys.ts'
+import { appMadeBy } from '../storage/made-by.ts'
 
 /**
  * Which server's key made a Topic or a Persona (ADR 0108), for display only: views name it, and a Topic a key made is a
@@ -19,9 +19,9 @@ export type MadeKind = 'topic' | 'persona'
  */
 export const roomOf = <RunResult>(db: SQLiteAsyncDatabase<'sync', RunResult>, topic: number): boolean =>
   db
-    .select({ keyId: appKeyReach.keyId })
-    .from(appKeyReach)
-    .where(and(eq(appKeyReach.kind, 'topic'), eq(appKeyReach.resourceId, topic)))
+    .select({ keyId: appMadeBy.keyId })
+    .from(appMadeBy)
+    .where(and(eq(appMadeBy.kind, 'topic'), eq(appMadeBy.resourceId, topic)))
     .get() !== undefined
 
 /** A key as what it made records it: its id and its name (ADR 0108). */
@@ -29,7 +29,7 @@ type Maker = { readonly keyId: string; readonly name: string }
 
 /** Records that key `key` made the `kind` with `id`, with the key's name; recording it again changes nothing. */
 export const recordMaker = (db: DrizzleSqliteDODatabase, key: Maker, kind: MadeKind, id: number, now: number): void => {
-  db.insert(appKeyReach)
+  db.insert(appMadeBy)
     .values({ keyId: key.keyId, kind, resourceId: id, createdAt: now, keyName: key.name })
     .onConflictDoNothing()
     .run()
@@ -44,10 +44,10 @@ export const nameMade = (
   key: Maker,
 ): readonly { readonly kind: MadeKind; readonly id: number }[] =>
   db
-    .update(appKeyReach)
+    .update(appMadeBy)
     .set({ keyName: key.name })
-    .where(and(eq(appKeyReach.keyId, key.keyId), isNull(appKeyReach.keyName)))
-    .returning({ kind: appKeyReach.kind, id: appKeyReach.resourceId })
+    .where(and(eq(appMadeBy.keyId, key.keyId), isNull(appMadeBy.keyName)))
+    .returning({ kind: appMadeBy.kind, id: appMadeBy.resourceId })
     .all()
 
 /**
@@ -57,7 +57,7 @@ export const nameMade = (
 export const makerColumn = (kind: MadeKind, id: SQLiteColumn): SQL<string | null> =>
   sql<
     string | null
-  >`(SELECT coalesce(${appKeyReach.keyName}, ${appKeyReach.keyId}) FROM ${appKeyReach} WHERE ${appKeyReach.kind} = ${kind} AND ${appKeyReach.resourceId} = ${id} LIMIT 1)`
+  >`(SELECT coalesce(${appMadeBy.keyName}, ${appMadeBy.keyId}) FROM ${appMadeBy} WHERE ${appMadeBy.kind} = ${kind} AND ${appMadeBy.resourceId} = ${id} LIMIT 1)`
 
 /** The key that made the `kind` with `id`, as `makerColumn` names it; none when no key did. */
 export const makerOf = <RunResult>(
@@ -66,7 +66,7 @@ export const makerOf = <RunResult>(
   id: number,
 ): string | undefined =>
   db
-    .select({ key: sql<string>`coalesce(${appKeyReach.keyName}, ${appKeyReach.keyId})` })
-    .from(appKeyReach)
-    .where(and(eq(appKeyReach.kind, kind), eq(appKeyReach.resourceId, id)))
+    .select({ key: sql<string>`coalesce(${appMadeBy.keyName}, ${appMadeBy.keyId})` })
+    .from(appMadeBy)
+    .where(and(eq(appMadeBy.kind, kind), eq(appMadeBy.resourceId, id)))
     .get()?.key

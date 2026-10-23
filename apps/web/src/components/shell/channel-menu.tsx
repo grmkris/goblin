@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@goblin/ui'
-import { ArchiveIcon, ArchiveRestoreIcon, EllipsisIcon, EyeOffIcon, PencilIcon, SearchIcon } from 'lucide-react'
+import { ArchiveIcon, ArchiveRestoreIcon, EllipsisIcon, PencilIcon } from 'lucide-react'
 import { messageOf } from '../../lib/query/app-error.ts'
 import { isArchived } from '../../lib/topics.ts'
 import { updateWorkspaceTopicMutation } from '../../lib/workspace/mutations.ts'
@@ -44,10 +44,6 @@ export function ChannelMenu({
           <DropdownMenuItem onClick={() => setRenaming(true)}>
             <PencilIcon aria-hidden />
             Rename
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => change({ searchExcluded: !topic.searchExcluded })}>
-            {topic.searchExcluded ? <SearchIcon aria-hidden /> : <EyeOffIcon aria-hidden />}
-            {topic.searchExcluded ? 'Include in search' : 'Exclude from search'}
           </DropdownMenuItem>
           {topic.personal !== true && (
             <>

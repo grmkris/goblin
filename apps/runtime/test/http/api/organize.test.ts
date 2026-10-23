@@ -58,7 +58,7 @@ describe('the organize group', () => {
     await fetch(post('/api/topics', { name: 'Garden', operationId: 'topic-1' }))
     await fetch(json('PATCH', '/api/topics/2', { name: 'Garden shed' }))
     const rename = receipts.list()[0]
-    await fetch(json('PATCH', '/api/topics/2', { searchExcluded: true }))
+    await fetch(json('PATCH', '/api/topics/2', { reach: 'hub' }))
     const touched = await fetch(post(`/api/organize/${rename?.id ?? ''}/undo`, {}))
     expect(touched.status).toBe(409)
     expect(await touched.json()).toMatchObject({ error: { code: 'conflict', reason: 'touched' } })

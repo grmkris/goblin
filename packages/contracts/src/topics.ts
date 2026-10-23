@@ -7,17 +7,26 @@ const TopicDescription = Schema.String.check(Schema.isMaxLength(1000))
 const TopicInstructions = Schema.String.check(Schema.isMaxLength(8000))
 
 /**
- * A Topic a server's API key made is a room (ADR 0108): its chats reach only it. `key` is the key's name, or its id
- * while goblin has not learnt the name yet (a room made before names were kept, until the key's next request).
+ * How far a Topic's chats reach (ADR 0115): a `sealed` Topic's chats see only it (its own chats and files, and the
+ * Shared folder on people's turns); a `hub`'s see every Topic of the workspace. Personal is the hub until an admin
+ * says otherwise; every other Topic is sealed when it is made.
  */
-const TopicRoom = Schema.Struct({ key: Schema.String })
+export const TopicReach = Schema.Literals(['sealed', 'hub'])
+export type TopicReach = typeof TopicReach.Type
+
+/**
+ * Which server's key made a Topic, for display only (ADR 0115): `key` is the key's name, or its id while goblin has not
+ * learnt the name yet (one made before names were kept, until the key's next request). What anything may do never
+ * depends on it.
+ */
+const TopicMaker = Schema.Struct({ key: Schema.String })
 
 /**
  * A Topic: a durable container with exactly one Conversation (`conversation`) and any number of Threads under it.
  * Personal (`personal`, id 1) holds today's Main as its Conversation and receives every inbound channel. An archived
- * Topic (`archivedAt`) is out of navigation and default search; `searchExcluded` keeps it out of automatic search while
- * active. `revision` counts changes, so an undo can tell whether something touched it since. `setup` is what its chats
- * work with (ADR 0040); `room` says which key made it, when one did (ADR 0108). Times are in seconds.
+ * Topic (`archivedAt`) is out of navigation and of the hub's search. `reach` is how far its chats see (ADR 0115).
+ * `revision` counts changes, so an undo can tell whether something touched it since. `setup` is what its chats work
+ * with (ADR 0040); `madeBy` says which key made it, when one did, for display only. Times are in seconds.
  */
 export const TopicView = Schema.Struct({
   id: TopicId,
@@ -27,18 +36,19 @@ export const TopicView = Schema.Struct({
   conversation: ChatId,
   personal: Schema.optional(Schema.Boolean),
   archivedAt: Schema.optional(Schema.Number),
-  searchExcluded: Schema.Boolean,
+  reach: TopicReach,
   revision: Schema.Int,
   setup: TopicSetup,
-  room: Schema.optional(TopicRoom),
+  madeBy: Schema.optional(TopicMaker),
   createdBy: Schema.Literals(['owner', 'agent', 'system']),
   createdAt: Schema.Number,
 })
 export type TopicView = typeof TopicView.Type
 
 /**
- * A Topic in a list (`GET /api/topics`): who it is, which key made it (`room`, ADR 0108) and how far it has changed,
- * without its guidance or setup, which `GET /api/topics/:id` answers. `updatedAt` is its last change, in seconds.
+ * A Topic in a list (`GET /api/topics`): who it is, how far its chats see (`reach`), which key made it (`madeBy`, for
+ * display) and how far it has changed, without its guidance or setup, which `GET /api/topics/:id` answers. `updatedAt`
+ * is its last change, in seconds.
  */
 export const TopicSummary = Schema.Struct({
   id: TopicId,
@@ -47,8 +57,8 @@ export const TopicSummary = Schema.Struct({
   personal: Schema.optional(Schema.Boolean),
   revision: Schema.Int,
   archived: Schema.Boolean,
-  searchExcluded: Schema.Boolean,
-  room: Schema.optional(TopicRoom),
+  reach: TopicReach,
+  madeBy: Schema.optional(TopicMaker),
   updatedAt: Schema.Number,
 })
 export type TopicSummary = typeof TopicSummary.Type
@@ -70,7 +80,10 @@ export const CreateTopic = Schema.Struct({
 })
 export type CreateTopic = typeof CreateTopic.Type
 
-/** `PATCH /api/topics/:id`. Personal cannot be archived. */
+/**
+ * `PATCH /api/topics/:id`. Personal cannot be archived. `reach` takes an admin, or a credential's `manage`; only a
+ * person makes a Topic the hub (ADR 0115).
+ */
 export const UpdateTopic = Schema.Struct({
   name: Schema.optional(TopicName),
   description: Schema.optional(TopicDescription),
@@ -78,7 +91,7 @@ export const UpdateTopic = Schema.Struct({
   /** Required when editing description or instructions; a stale revision is a conflict. */
   expectedRevision: Schema.optional(Schema.Int),
   archived: Schema.optional(Schema.Boolean),
-  searchExcluded: Schema.optional(Schema.Boolean),
+  reach: Schema.optional(TopicReach),
 })
 export type UpdateTopic = typeof UpdateTopic.Type
 

@@ -111,7 +111,7 @@ const resultAfter = async (base: string, owner: Person, words: string): Promise<
  * ADR 0108 on the real Worker and agent: a key's Topic is a room. A key makes one and writes in it: the model is offered
  * only the room's tools and reads the message as the server's, with the room's block in its context; a tool a stale
  * filter still offers is refused at call time, and the next turn after a restart has the filter again; `search_chats`
- * reaches no other Topic from it, and the owner's automatic retrieval never brings its words into their chats. Every
+ * reaches no other Topic from it, and only the hub's automatic retrieval brings its words into the owner's chats. Every
  * tool an owner's chat is offered is one a room offers or one it never does.
  */
 export async function roomsCase(url: string): Promise<void> {
@@ -136,7 +136,8 @@ export async function roomsCase(url: string): Promise<void> {
   })
   expect(made.status, await made.clone().text()).toBe(201)
   const room = Schema.decodeUnknownSync(TopicView)(await made.json())
-  expect(room.room).toEqual({ key: 'rooms' })
+  expect(room.madeBy).toEqual({ key: 'rooms' })
+  expect(room.reach).toBe('sealed')
   const say = async (input: string, operationId: string) => {
     const sent = await asKey(
       url,
@@ -173,8 +174,8 @@ export async function roomsCase(url: string): Promise<void> {
   expect(owners.tools.filter((tool) => ROOM_TOOLS.has(tool))).toEqual(
     expect.arrayContaining(['mcp_list', 'mcp_call', 'skill_activate', 'ask_user']),
   )
-  // Its automatic retrieval never brings a room's words: no candidate from the room reached the rerank or the context.
-  expect(owners.context ?? '').not.toContain('orchard is due')
+  // Personal is the hub (ADR 0115): its automatic retrieval reaches every Topic, the key's too.
+  expect(owners.context ?? '').toContain('orchard is due')
 
   // From the room, search_chats reaches no other Topic.
   await say('call search_chats {"query":"plum","topic":"Personal"}', 'svc:msg:2')

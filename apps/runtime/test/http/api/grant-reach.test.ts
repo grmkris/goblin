@@ -67,7 +67,27 @@ describe('a credential reaches what its grant reaches (ADR 0114)', () => {
     expect(made.status).toBe(201)
     expect(topics.get(2).setup).toEqual({ mcpServers: [], skills: [], apps: [], subagents: false })
     expect((await topicPage(fetch(get('/api/topics', as(KEY))))).topics.map((topic) => topic.id)).toEqual([2, 1])
-    expect((await fetch(json('PATCH', '/api/topics/1', { searchExcluded: true }, as(KEY)))).status).toBe(200)
+    expect((await fetch(json('PATCH', '/api/topics/1', { name: 'Home' }, as(KEY)))).status).toBe(200)
+  })
+
+  it('seals a Topic with manage, and leaves making a hub to a person (ADR 0115)', async () => {
+    const { fetch, topics } = organizing()
+    await fetch(post('/api/topics', { name: 'Trips', operationId: 'owner-topic' }))
+    const writer = credential({ id: 'key-w', level: 'write' })
+    await lacking(await fetch(json('PATCH', '/api/topics/1', { reach: 'sealed' }, as(writer))), { level: 'manage' })
+    expect(topics.get(1).reach).toBe('hub')
+    expect((await fetch(json('PATCH', '/api/topics/1', { reach: 'sealed' }, as(KEY)))).status).toBe(200)
+    expect(topics.get(1).reach).toBe('sealed')
+    const hub = await fetch(json('PATCH', '/api/topics/2', { reach: 'hub' }, as(KEY)))
+    expect(hub.status).toBe(403)
+    await refusedFor(hub, 'hub_person')
+    // A client acting for a member is refused for the member's role; the owner's session makes a hub.
+    const client = credential({ kind: 'client', id: 'client-1', level: 'manage' })
+    const member = await fetch(json('PATCH', '/api/topics/2', { reach: 'sealed' }, as(client, 'member')))
+    expect(member.status).toBe(403)
+    await refusedFor(member, 'role')
+    expect((await fetch(json('PATCH', '/api/topics/2', { reach: 'hub' }))).status).toBe(200)
+    expect(topics.get(2).reach).toBe('hub')
   })
 
   it('appends what a list-reach key makes to its list, and reaches nothing else of that kind', async () => {
@@ -224,17 +244,17 @@ describe('a credential reaches what its grant reaches (ADR 0114)', () => {
     const named = credential({ id: 'key-1', name: 'swarmm-prod', level: 'manage' })
     // Made before names were kept: the key's id stands in until its first request names it.
     await fetch(post('/api/topics', { name: 'Older', operationId: 'older' }))
-    db.run(sql`INSERT INTO app_key_reach (key_id, kind, resource_id, created_at) VALUES ('key-1', 'topic', 2, 1)`)
-    expect(topics.get(2).room).toEqual({ key: 'key-1' })
+    db.run(sql`INSERT INTO app_made_by (key_id, kind, resource_id, created_at) VALUES ('key-1', 'topic', 2, 1)`)
+    expect(topics.get(2).madeBy).toEqual({ key: 'key-1' })
     const made = await fetch(post('/api/topics', { name: 'Customer 1', operationId: 'svc:topic:1' }, as(named)))
-    expect(await made.json()).toMatchObject({ id: 3, room: { key: 'swarmm-prod' } })
+    expect(await made.json()).toMatchObject({ id: 3, madeBy: { key: 'swarmm-prod' } })
     // The naming of what came before runs beside the request, never in it.
-    await expect.poll(() => topics.get(2).room, { timeout: 1000 }).toEqual({ key: 'swarmm-prod' })
+    await expect.poll(() => topics.get(2).madeBy, { timeout: 1000 }).toEqual({ key: 'swarmm-prod' })
     const persona = await fetch(post('/api/personas', { ...scout, operationId: 'svc:p:1' }, as(named)))
     expect(await persona.json()).toMatchObject({ id: 1, madeBy: { key: 'swarmm-prod' } })
     await fetch(post('/api/topics', { name: 'Trips', operationId: 'owner-topic' }))
     await fetch(post('/api/personas', { ...scout, name: 'Owl', operationId: 'owner-p' }))
-    expect(topics.list().map((topic) => [topic.id, topic.room?.key])).toEqual([
+    expect(topics.list().map((topic) => [topic.id, topic.madeBy?.key])).toEqual([
       [1, undefined],
       [2, 'swarmm-prod'],
       [3, 'swarmm-prod'],

@@ -47,7 +47,7 @@ const workspace: WorkspaceSnapshot = {
       description: 'Plan a thoughtful week in Lisbon. Keep bookings, places and ideas together.',
       instructions:
         'Prefer walkable neighborhoods and locally owned places. Check dates and prices before recommending a booking.',
-      searchExcluded: false,
+      reach: 'sealed',
       revision: 1,
       // One skill the library lists and one it no longer does.
       setup: {

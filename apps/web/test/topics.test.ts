@@ -16,7 +16,7 @@ const topic = (id: number, name: string, conversation: string, extra: Partial<To
   id,
   name,
   conversation,
-  searchExcluded: false,
+  reach: 'sealed',
   revision: 1,
   setup: EVERYTHING,
   createdBy: 'owner',
@@ -118,7 +118,7 @@ describe("a Topic's threads in the sidebar", () => {
 
 /** A room a server's key made (ADR 0108). */
 const room = (id: number, name: string, key: string, extra: Partial<TopicView> = {}) =>
-  topic(id, name, String(id * 10), { room: { key }, createdBy: 'agent', createdAt: id, ...extra })
+  topic(id, name, String(id * 10), { madeBy: { key }, createdBy: 'agent', createdAt: id, ...extra })
 
 describe("a key's rooms in the sidebar", () => {
   const ROOMS = [

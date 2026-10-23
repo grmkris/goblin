@@ -30,7 +30,7 @@ function api(mode: Mode) {
       name: sent.channel,
       description: sent.goal,
       conversation: '42',
-      searchExcluded: false,
+      reach: 'sealed',
       setup: EVERYTHING,
       revision: 1,
       createdBy: 'owner',

@@ -80,7 +80,7 @@ export const createTopic = (input: CreateTopic, provenance: Provenance | TopicAc
   Effect.map(madeTopic(input, provenance, seed), (made) => made.topic)
 
 /**
- * Rename, archive, restore or change a Topic's search opt-out. Archiving (v1, ADR 0032) hides it and then stops the
+ * Rename, archive, restore, or seal a Topic or make it a hub (ADR 0115). Archiving (v1, ADR 0032) hides it and then stops the
  * work of its chats through the owner's own Stop: each open chat's run and queued inputs, the subagents it started and
  * a routine run in it. Every chat is stopped even when one fails, and an archive asked again stops them again, so a
  * failed request is retried by repeating it. Schedules are left as they are. Restoring starts nothing again.
@@ -127,7 +127,7 @@ export const updateTopic = (id: number, change: UpdateTopic, provenance: Provena
 const snapshot = (topic: TopicView) => ({
   name: topic.name,
   archived: topic.archivedAt !== undefined,
-  searchExcluded: topic.searchExcluded,
+  reach: topic.reach,
 })
 
 /** The receipt of one change to a Topic: archive and restore win over a rename made in the same change. */

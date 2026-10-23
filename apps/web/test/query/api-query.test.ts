@@ -28,7 +28,7 @@ const PERSONAL: TopicView = {
   name: 'Personal',
   conversation: '1',
   personal: true,
-  searchExcluded: false,
+  reach: 'sealed',
   revision: 1,
   setup: EVERYTHING,
   createdBy: 'system',

@@ -140,7 +140,7 @@ const topic = (id: number, name: string, conversation: string): TopicView => ({
   id,
   name,
   conversation,
-  searchExcluded: false,
+  reach: 'sealed',
   revision: 1,
   setup: EVERYTHING,
   createdBy: 'owner',

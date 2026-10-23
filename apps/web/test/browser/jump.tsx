@@ -17,7 +17,7 @@ const topic = (id: number, name: string, conversation: string, extra: Partial<To
   id,
   name,
   conversation,
-  searchExcluded: false,
+  reach: 'sealed',
   revision: 1,
   setup: EVERYTHING,
   createdBy: 'owner',

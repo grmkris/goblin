@@ -151,7 +151,7 @@ const TOPICS: readonly TopicView[] = [
     id: 2,
     name: 'Travel',
     conversation: '20',
-    searchExcluded: false,
+    reach: 'sealed',
     revision: 1,
     setup: EVERYTHING,
     createdBy: 'owner',

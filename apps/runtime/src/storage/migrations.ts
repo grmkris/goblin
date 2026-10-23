@@ -12,6 +12,7 @@ import { PERSONA_TOOLS } from './migrations/persona-tools.ts'
 import { PUBLISH } from './migrations/publish.ts'
 import { RESIDENT_UNTIL_REVOKED } from './migrations/resident-until-revoked.ts'
 import { ROOMS } from './migrations/rooms.ts'
+import { SEALED } from './migrations/sealed.ts'
 import { SOURCE_PROPOSER } from './migrations/source-proposer.ts'
 import { STREAMS_DROPPED } from './migrations/streams-dropped.ts'
 import { THREAD_SERVERS } from './migrations/thread-servers.ts'
@@ -19,7 +20,7 @@ import { assertApplicationTable } from './vendor.ts'
 
 /**
  * The fresh application baseline, then the forward migrations production needed without a reset (ADRs 0068, 0081, 0083,
- * 0088, 0099, 0100, 0101, 0102, 0103, 0108, 0112, 0114), the fork a Persona's work streams from, and the chat streams'
+ * 0088, 0099, 0100, 0101, 0102, 0103, 0108, 0112, 0114, 0115), the fork a Persona's work streams from, and the chat streams'
  * tables dropped (ADR 0110; the migration that made them is gone, and an agent that applied it keeps its record). An edit to
  * the baseline ships only with a disposable dev reset.
  *
@@ -41,6 +42,7 @@ export const MIGRATIONS = [
   STREAMS_DROPPED,
   PUBLISH,
   GRANTS,
+  SEALED,
 ] as const
 
 export function runApplicationMigrations(storage: DurableObjectStorage): void {

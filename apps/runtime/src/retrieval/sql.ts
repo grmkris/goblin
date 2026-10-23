@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Schema from 'effect/Schema'
+import type { Boundary } from '../topics/boundary.ts'
 import type { ExcerptRow, Range } from './text.ts'
 
 /** The raw SQL of the transcript index (ADR 0035): FTS5 MATCH and bm25 have no Drizzle builder. */
@@ -23,27 +24,24 @@ const Place = Schema.Struct({ topic: Schema.Number, topicName: Schema.String, ti
 const Ids = Schema.Array(Schema.Struct({ id: Schema.Number }))
 const Sessions = Schema.Array(Schema.Struct({ session: Schema.String }))
 
+/** Where a search looks: never the chat `exclude`; within `boundary`; and only Topic `topic` when one is named. */
+export type HitScope = { readonly exclude?: string; readonly topic?: number; readonly boundary: Boundary }
+
 /**
- * The Topics a search covers: in a room (ADR 0108) the room alone; else a named Topic alone, whatever its state (a
- * deliberate request overrides archive and opt-out); else the active Topics that take part in search, and no room.
+ * The Topics a search covers (ADR 0115): a named Topic alone, whatever its state (a deliberate request overrides
+ * archive), when the boundary reaches it; else in a hub every active Topic of the workspace, and in a sealed Topic
+ * itself alone. A named Topic the boundary does not reach covers nothing.
  */
-const topicsOf = (scope: { readonly topic?: number; readonly room?: number }) => {
-  if (scope.room !== undefined) return sql`t.id = ${scope.room}`
-  if (scope.topic !== undefined) return sql`t.id = ${scope.topic}`
-  return sql`t.archived_at IS NULL AND t.search_excluded = 0
-      AND NOT EXISTS (SELECT 1 FROM app_key_reach r WHERE r.kind = 'topic' AND r.resource_id = t.id)`
+const topicsOf = ({ topic, boundary }: HitScope) => {
+  if (topic !== undefined) return boundary.hub || topic === boundary.topic ? sql`t.id = ${topic}` : sql`0`
+  return boundary.hub ? sql`t.archived_at IS NULL` : sql`t.id = ${boundary.topic}`
 }
 
 /**
  * The best `limit` hits for an FTS5 `match` (built by `ftsQuery`, so it is literal terms only), never in a persona
  * fork or the excluded chat, in the Topics `topicsOf` says.
  */
-export function searchHits<R>(
-  db: Db<R>,
-  match: string,
-  scope: { readonly exclude?: string; readonly topic?: number; readonly room?: number },
-  limit: number,
-): readonly Hit[] {
+export function searchHits<R>(db: Db<R>, match: string, scope: HitScope, limit: number): readonly Hit[] {
   const topics = topicsOf(scope)
   const rows = db.all(sql`
     SELECT e.entry_id AS entryId, e.chat_id AS chat, bm25(app_transcript_fts) AS score

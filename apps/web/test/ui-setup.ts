@@ -58,7 +58,7 @@ async function drive(browser: Browser, origin: string, label: string, options: B
           id: 2,
           name: 'Work',
           conversation: '20',
-          searchExcluded: false,
+          reach: 'sealed',
           revision: 4,
           setup: body.set,
           createdBy: 'owner',

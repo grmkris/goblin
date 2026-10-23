@@ -16,6 +16,7 @@ import {
 import { AUTO_THRESHOLD, chooseSources, gateFor, parseSelection } from '../src/retrieval/auto.ts'
 import { type RetrievalDeps, autoUseId, catchUpChats, catchUpSession, retrievalOver } from '../src/retrieval/service.ts'
 import { topicByName } from '../src/retrieval/sql.ts'
+import type { Boundary } from '../src/topics/boundary.ts'
 import { EXCERPT_CHARS, excerptOf, ftsQuery, mergeRanges, sourcesText } from '../src/retrieval/text.ts'
 import { conversationId, entryId } from '../src/pi/context.ts'
 import { chatDatabase } from './chats-sqlite.ts'
@@ -87,13 +88,13 @@ const indexAll = (index: Index) => Effect.runPromise(catchUpChats(index, lock))
 /** The Retrieval service over `index` and the cheap model `model`. */
 const serviceOf = (index: Index, model: RetrievalDeps['model']) => retrievalOver({ ...index, model }, lock)
 
-/** Topics: Personal (1), Garden (2), Old (3, archived), Quiet (4, opted out of search); their chats and a persona fork. */
+/** Topics: Personal (1, the hub), Garden (2), Old (3, archived), Quiet (4); their chats and a persona fork. */
 function fixture() {
   const database = chatDatabase()
   open.push(database.close)
   const { sqlite } = database
-  sqlite.exec(`INSERT INTO app_topics (id, name, chat_id, archived_at, search_excluded, created_by, created_at, updated_at) VALUES
-    (2, 'Garden', '10', NULL, 0, 'owner', 1, 1), (3, 'Old', '20', 5, 0, 'owner', 1, 1), (4, 'Quiet', '30', NULL, 1, 'owner', 1, 1)`)
+  sqlite.exec(`INSERT INTO app_topics (id, name, chat_id, archived_at, created_by, created_at, updated_at) VALUES
+    (2, 'Garden', '10', NULL, 'owner', 1, 1), (3, 'Old', '20', 5, 'owner', 1, 1), (4, 'Quiet', '30', NULL, 'owner', 1, 1)`)
   sqlite.exec(`INSERT INTO app_conversations (session_id, pi_session, role, kind, title, parent_session, created_at, topic_id) VALUES
     ('1', '1', 'primary', 'main', NULL, NULL, 1, 1),
     ('10', '10', 'conversation', 'main', 'Garden', NULL, 1, 2),
@@ -126,6 +127,10 @@ function fixture() {
   const index: Index = { db: database.db, source: pi }
   return { ...database, pi, index }
 }
+
+/** Personal's boundary, the hub's, and Garden's, a sealed Topic's (ADR 0115). */
+const HUB: Boundary = { topic: 1, hub: true }
+const GARDEN: Boundary = { topic: 2, hub: false }
 
 const Excerpts = Schema.Array(Schema.Struct({ entry: Schema.Number, chat: Schema.String, text: Schema.String }))
 const excerpts = (sqlite: ReturnType<typeof chatDatabase>['sqlite']) =>
@@ -207,24 +212,29 @@ describe('transcript index', () => {
     expect(stored?.text).not.toContain('hunter2')
     expect(stored?.text).not.toContain('abc.def.ghi')
     expect(stored?.text).toContain('api_key=[redacted]')
-    const sources = searchTranscripts(db, 'tomatoes shop login', { limit: 5 }, 1)
+    const sources = searchTranscripts(db, 'tomatoes shop login', { limit: 5, boundary: HUB }, 1)
     expect(JSON.stringify(sources)).not.toContain('hunter2')
   })
 
-  it('searches active Topics that take part, unless a Topic is named, and never the asking chat', async () => {
+  it('searches every active Topic from the hub, unless a Topic is named, and never the asking chat', async () => {
     const { db, index } = fixture()
     await indexAll(index)
     const chats = (topic?: number, exclude?: string) =>
       searchTranscripts(
         db,
         'tomatoes',
-        { limit: 5, ...(topic === undefined ? {} : { topic }), ...(exclude === undefined ? {} : { exclude }) },
+        {
+          limit: 5,
+          boundary: HUB,
+          ...(topic === undefined ? {} : { topic }),
+          ...(exclude === undefined ? {} : { exclude }),
+        },
         1,
       )
         .map((found) => found.chat)
         .toSorted()
-    expect(chats()).toEqual(['10', '13', '50'])
-    expect(chats(undefined, '13')).toEqual(['10', '50'])
+    expect(chats()).toEqual(['10', '13', '30', '50'])
+    expect(chats(undefined, '13')).toEqual(['10', '30', '50'])
     expect(chats(3)).toEqual(['20'])
     expect(chats(4)).toEqual(['30'])
     expect(topicByName(db, 'old')).toBe(3)
@@ -236,20 +246,20 @@ describe('transcript index', () => {
   it('returns sources in the frozen contract shape, grouped by chat and bounded', async () => {
     const { db, index } = fixture()
     await indexAll(index)
-    const sources = searchTranscripts(db, 'raised beds tomatoes "OR" NEAR(*)', { limit: 5 }, 1)
+    const sources = searchTranscripts(db, 'raised beds tomatoes "OR" NEAR(*)', { limit: 5, boundary: HUB }, 1)
     const details = Schema.decodeUnknownSync(SourcesDetails)({ kind: 'sources', mode: 'tool', sources })
     const garden = details.sources.find((found) => found.chat === '10')
     expect(garden).toMatchObject({ topic: 2, topicName: 'Garden', chatTitle: 'Garden', entryStart: 11, entryEnd: 12 })
     expect(garden?.excerpt).toContain('user: We plan tomatoes')
     expect(garden?.score).toBeLessThan(0)
-    expect(searchTranscripts(db, '', { limit: 5 }, 1)).toEqual([])
+    expect(searchTranscripts(db, '', { limit: 5, boundary: HUB }, 1)).toEqual([])
     expect(sourcesText(details.sources)).toMatch(/^Quoted history/u)
   })
 
   it('records a use once, so a replay returns the first frozen sources, and lists a chat newest first', async () => {
     const { db, index } = fixture()
     await indexAll(index)
-    const sources = searchTranscripts(db, 'tomatoes', { limit: 1 }, 1)
+    const sources = searchTranscripts(db, 'tomatoes', { limit: 1, boundary: HUB }, 1)
     const first = recordUse(db, { id: 'tool:1:a', chat: '1', session: '1', mode: 'tool', sources, retrievedAt: 5 })
     const again = recordUse(db, { id: 'tool:1:a', chat: '1', session: '1', mode: 'tool', sources: [], retrievedAt: 6 })
     expect(again).toEqual(first)
@@ -351,7 +361,10 @@ describe('automatic retrieval', () => {
     const model = scripted('{"ids":[1],"none":false}')
     const retrieval = serviceOf(index, model)
     const use = await Effect.runPromise(
-      retrieval.automatic({ session: '1', chat: '1' }, { entry: 2, text: 'What about the tomatoes in raised beds?' }),
+      retrieval.automatic(
+        { session: '1', chat: '1', boundary: HUB },
+        { entry: 2, text: 'What about the tomatoes in raised beds?' },
+      ),
     )
     expect(use).toMatchObject({ id: autoUseId('1', 2), mode: 'auto', inputEntry: 2, chat: '1' })
     expect(use?.sources).toHaveLength(1)
@@ -364,7 +377,7 @@ describe('automatic retrieval', () => {
       const retrieval = serviceOf(index, scripted(answer))
       expect(
         await Effect.runPromise(
-          retrieval.automatic({ session: '1', chat: '1' }, { entry: 2, text: 'tomatoes raised beds' }),
+          retrieval.automatic({ session: '1', chat: '1', boundary: HUB }, { entry: 2, text: 'tomatoes raised beds' }),
         ),
       ).toBeUndefined()
       expect(recordedUses(db, '1')).toEqual([])
@@ -374,56 +387,56 @@ describe('automatic retrieval', () => {
     const { db, index } = fixture()
     await indexAll(index)
     const model = scripted('{"ids":[1],"none":false}')
-    const weak = searchTranscripts(db, 'tomatoes', { limit: 8 }, 1).map((found) => ({ ...found, score: 0 }))
+    const weak = searchTranscripts(db, 'tomatoes', { limit: 8, boundary: HUB }, 1).map((found) => ({
+      ...found,
+      score: 0,
+    }))
     expect(await chooseSources('tomatoes', weak, -1, model)).toEqual([])
     expect(model.calls).toEqual([])
   })
 })
 
-/** The fixture with Garden (2) a room: a key made it (ADR 0108). */
-function withRoom() {
-  const made = fixture()
-  made.sqlite.exec(
-    "INSERT INTO app_key_reach (key_id, kind, resource_id, created_at, key_name) VALUES ('key-1', 'topic', 2, 1, 'swarmm')",
-  )
-  return made
-}
-
-describe('a room in search (ADR 0108)', () => {
-  it('keeps a room out of every other chat’s search unless it is named, and searches only the room from inside', async () => {
-    const { db, index } = withRoom()
+describe('a sealed Topic in search (ADR 0115)', () => {
+  it('searches only itself from inside, whatever it names, and every Topic only from the hub', async () => {
+    const { db, index, sqlite } = fixture()
     await indexAll(index)
-    const chats = (scope: { readonly topic?: number; readonly room?: number; readonly exclude?: string }) =>
-      searchTranscripts(db, 'tomatoes', { limit: 5, ...scope }, 1)
+    const chats = (scope: { readonly topic?: number; readonly exclude?: string }, boundary = GARDEN) =>
+      searchTranscripts(db, 'tomatoes', { limit: 5, boundary, ...scope }, 1)
         .map((found) => found.chat)
         .toSorted()
-    expect(chats({})).toEqual(['50'])
-    expect(chats({ topic: 2 })).toEqual(['10', '13'])
-    expect(chats({ room: 2, exclude: '13' })).toEqual(['10'])
-    // A room's own search never leaves it, whatever else it names.
-    expect(chats({ room: 2, topic: 3 })).toEqual(['10', '13'])
+    expect(chats({})).toEqual(['10', '13'])
+    expect(chats({ exclude: '13' })).toEqual(['10'])
+    // A Topic a sealed one names is not searched: the search never leaves it.
+    expect(chats({ topic: 4 })).toEqual([])
+    expect(chats({ topic: 2 }, HUB)).toEqual(['10', '13'])
+    // Personal sealed by an admin is a Topic like any other: its own chats alone.
+    sqlite.exec("UPDATE app_topics SET reach = 'sealed' WHERE id = 1")
+    expect(chats({}, { topic: 1, hub: false })).toEqual(['50'])
   })
 
-  it('tells a chat the room it works in, a persona fork too, and no room elsewhere', () => {
-    const { index } = withRoom()
+  it('tells a chat its boundary, a persona fork too, from the Topic its chain is in', () => {
+    const { index } = fixture()
     const retrieval = serviceOf(index, scripted('{"ids":[],"none":true}'))
     const place = (session: string) => Effect.runSync(retrieval.chatFor(session))
-    expect(place('13')).toEqual({ chat: '13', persona: false, room: 2 })
-    expect(place('40')).toEqual({ chat: '40', persona: true, room: 2 })
-    expect(place('1')).toEqual({ chat: '1', persona: false })
+    expect(place('13')).toEqual({ chat: '13', persona: false, boundary: GARDEN })
+    expect(place('40')).toEqual({ chat: '40', persona: true, boundary: GARDEN })
+    expect(place('1')).toEqual({ chat: '1', persona: false, boundary: HUB })
+    expect(place('99')).toBeUndefined()
   })
 
-  it('takes no room excerpt into an owner chat’s automatic retrieval, and only the room’s into the room’s', async () => {
-    const { index } = withRoom()
+  it('takes only its own Topic into a sealed chat’s automatic retrieval, and asks no model when that has none', async () => {
+    const { index } = fixture()
     const model = scripted('{"ids":[1],"none":false}')
     const retrieval = serviceOf(index, model)
     const input = { entry: 2, text: 'What about the tomatoes in raised beds?' }
-    const room = await Effect.runPromise(retrieval.automatic({ session: '13', chat: '13', room: 2 }, input))
-    expect(room?.sources.map((source) => source.chat)).toEqual(['10'])
+    const garden = await Effect.runPromise(retrieval.automatic({ session: '13', chat: '13', boundary: GARDEN }, input))
+    expect(garden?.sources.map((source) => source.chat)).toEqual(['10'])
     const asked = model.calls.length
-    const owner = await Effect.runPromise(retrieval.automatic({ session: '1', chat: '1' }, input))
-    expect(owner?.sources ?? []).not.toContainEqual(expect.objectContaining({ topic: 2 }))
-    expect(model.calls.slice(asked).join('\n')).not.toMatch(/raised beds|Compost/u)
+    const quiet = { topic: 4, hub: false }
+    expect(await Effect.runPromise(retrieval.automatic({ session: '30', chat: '30', boundary: quiet }, input))).toBe(
+      undefined,
+    )
+    expect(model.calls.slice(asked)).toEqual([])
   })
 })
 
@@ -433,10 +446,13 @@ describe('search_chats', () => {
     const retrieval = serviceOf(index, scripted('{"ids":[],"none":true}'))
     const search = (query: string, useId: string, topic?: number) =>
       Effect.runPromise(
-        retrieval.search({ query, ...(topic === undefined ? {} : { topic }) }, { session: '1', chat: '1', useId }),
+        retrieval.search(
+          { query, boundary: HUB, ...(topic === undefined ? {} : { topic }) },
+          { session: '1', chat: '1', useId },
+        ),
       )
     const first = await search('tomatoes', 'tool:1:c1')
-    expect(first.map((found) => found.chat).toSorted()).toEqual(['10', '13', '50'])
+    expect(first.map((found) => found.chat).toSorted()).toEqual(['10', '13', '30', '50'])
     expect(await search('japan', 'tool:1:c1')).toEqual(first)
     expect(await search('tomatoes', 'tool:1:c2', 3)).toMatchObject([{ chat: '20', topicName: 'Old' }])
   })

@@ -29,7 +29,7 @@ import type { RoutineSchedules } from '../src/routines/scheduler.ts'
 import { RoutineRuns, RoutineUsage, Routines } from '../src/routines/service.ts'
 import { RoutineStore } from '../src/routines/store.ts'
 import { AgentInput } from '../src/runtime/input.ts'
-import { appKeyReach } from '../src/storage/keys.ts'
+import { appMadeBy } from '../src/storage/made-by.ts'
 import { Topics } from '../src/topics/service.ts'
 import { chatDatabase, durable } from './chats-sqlite.ts'
 import { stub } from './http/api/fixture.ts'
@@ -127,7 +127,7 @@ const fixture = (gate: { budget?: Effect.Effect<void, AppError> } = {}, persona 
           name: 'Personal',
           conversation: ChatId('1'),
           personal: true,
-          searchExcluded: false,
+          reach: 'hub' as const,
           revision: 0,
           setup: EVERYTHING,
           createdBy: 'system' as const,
@@ -178,7 +178,7 @@ describe('routine flows', () => {
 
   it('skips a firing whose Topic is a room, even of a routine made before that was refused (ADRs 0108, 0113)', async () => {
     const { run, sqlite, flows, firing, starts } = fixture()
-    sqlite.insert(appKeyReach).values({ keyId: 'key-1', kind: 'topic', resourceId: PERSONAL_TOPIC, createdAt: 1 }).run()
+    sqlite.insert(appMadeBy).values({ keyId: 'key-1', kind: 'topic', resourceId: PERSONAL_TOPIC, createdAt: 1 }).run()
     const skipped = await run(admit(firing('routine:rt_1:9')))
     expect(skipped).toMatchObject({ state: 'skipped', outcome: 'topic_room' })
     expect(starts).toEqual([])

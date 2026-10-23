@@ -40,12 +40,12 @@ export type TopicPorts = {
   readonly seed: (chat: string, operationId: string, seed: TopicSeedData) => Effect.Effect<void, AppError>
 }
 
-/** A Topic's row with the key that made it, when one did (ADR 0108). */
+/** A Topic's row with the key that made it, when one did, for display (ADR 0115). */
 type Made = Row & { readonly maker: string | null | undefined }
 
-/** Who made a room: the key, by name (ADR 0108). */
-const roomView = (maker: string | null | undefined) =>
-  maker === null || maker === undefined ? {} : { room: { key: maker } }
+/** Which key made a Topic, by name, when one did. */
+const madeByView = (maker: string | null | undefined) =>
+  maker === null || maker === undefined ? {} : { madeBy: { key: maker } }
 
 const view = (row: Made): TopicView => ({
   id: row.id,
@@ -55,10 +55,10 @@ const view = (row: Made): TopicView => ({
   conversation: row.chatId,
   ...(row.id === PERSONAL_TOPIC ? { personal: true } : {}),
   ...(row.archivedAt === null ? {} : { archivedAt: row.archivedAt }),
-  searchExcluded: row.searchExcluded,
+  reach: row.reach,
   revision: row.revision,
   setup: topicSetupOf(row.setup),
-  ...roomView(row.maker),
+  ...madeByView(row.maker),
   createdBy: row.createdBy,
   createdAt: row.createdAt,
 })
@@ -70,8 +70,8 @@ const summary = (row: Made): TopicSummary => ({
   ...(row.id === PERSONAL_TOPIC ? { personal: true } : {}),
   revision: row.revision,
   archived: row.archivedAt !== null,
-  searchExcluded: row.searchExcluded,
-  ...roomView(row.maker),
+  reach: row.reach,
+  ...madeByView(row.maker),
   updatedAt: row.updatedAt,
 })
 
@@ -242,7 +242,7 @@ export class TopicRegistry<RunResult = unknown> {
   }
 
   /**
-   * Rename, archive or restore, and opt in or out of automatic search, as one change with one new revision. Personal is
+   * Rename, archive or restore, and seal or make a hub (ADR 0115), as one change with one new revision. Personal is
    * never archived; a rename or restore onto a name another active Topic has is a `Conflict`. Nothing changed is no
    * write.
    */
@@ -254,13 +254,13 @@ export class TopicRegistry<RunResult = unknown> {
     const description = change.description?.trim() ?? row.description
     const instructions = change.instructions?.trim() ?? row.instructions
     const archivedAt = change.archived === undefined ? row.archivedAt : change.archived ? (row.archivedAt ?? now) : null
-    const searchExcluded = change.searchExcluded ?? row.searchExcluded
+    const reach = change.reach ?? row.reach
     if (
       name === row.name &&
       description === row.description &&
       instructions === row.instructions &&
       archivedAt === row.archivedAt &&
-      searchExcluded === row.searchExcluded
+      reach === row.reach
     )
       return this.#view(row)
     const updated = this.#db.transaction(() => {
@@ -272,7 +272,7 @@ export class TopicRegistry<RunResult = unknown> {
           description,
           instructions,
           archivedAt,
-          searchExcluded,
+          reach,
           revision: row.revision + 1,
           updatedAt: now,
         })

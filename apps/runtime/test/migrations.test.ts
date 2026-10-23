@@ -123,13 +123,45 @@ describe('a room knows its key (ADR 0108)', () => {
     const { sqlite, rest } = before('20261022180000_rooms')
     sqlite.exec("INSERT INTO app_key_reach (key_id, kind, resource_id, created_at) VALUES ('key-1', 'topic', 7, 1)")
     rest()
-    expect(sqlite.prepare('SELECT key_id, kind, resource_id, key_name FROM app_key_reach').all()).toEqual([
+    // Kept for display only since ADR 0115, as app_made_by.
+    expect(sqlite.prepare('SELECT key_id, kind, resource_id, key_name FROM app_made_by').all()).toEqual([
       { key_id: 'key-1', kind: 'topic', resource_id: 7, key_name: null },
     ])
     const plan = sqlite
-      .prepare("EXPLAIN QUERY PLAN SELECT key_id FROM app_key_reach WHERE kind = 'topic' AND resource_id = 7")
+      .prepare("EXPLAIN QUERY PLAN SELECT key_id FROM app_made_by WHERE kind = 'topic' AND resource_id = 7")
       .all()
-    expect(plan.map((step) => String(step['detail'])).join('\n')).toContain('app_key_reach_resource')
+    expect(plan.map((step) => String(step['detail'])).join('\n')).toContain('app_made_by_resource')
+    sqlite.close()
+  })
+})
+
+describe('every Topic is sealed (ADR 0115)', () => {
+  it('makes Personal the hub and every other Topic sealed, drops the search opt-out, keeps receipts and makers', () => {
+    const { sqlite, rest } = before('20261024000000_sealed')
+    sqlite.exec(`INSERT INTO app_topics (id, name, chat_id, search_excluded, created_by, created_at, updated_at) VALUES
+      (2, 'Customer', '20', 0, 'owner', 1, 1), (3, 'Quiet', '30', 1, 'agent', 1, 1)`)
+    sqlite.exec(
+      "INSERT INTO app_chat_operations (chat_id, operation_id, session_id, admitted_at, kind, origin, role, state) VALUES ('20', 'op', '20', 1, 'send', 'key', NULL, 'settled')",
+    )
+    sqlite.exec(
+      "INSERT INTO app_key_reach (key_id, kind, resource_id, created_at, key_name) VALUES ('key-1', 'topic', 2, 1, 'swarmm')",
+    )
+    rest()
+    expect(sqlite.prepare('SELECT id, name, reach FROM app_topics ORDER BY id').all()).toEqual([
+      { id: 1, name: 'Personal', reach: 'hub' },
+      { id: 2, name: 'Customer', reach: 'sealed' },
+      { id: 3, name: 'Quiet', reach: 'sealed' },
+    ])
+    const columns = sqlite.prepare('PRAGMA table_info("app_topics")').all()
+    expect(columns.map((column) => column['name'])).not.toContain('search_excluded')
+    expect(() => sqlite.exec("UPDATE app_topics SET reach = 'open' WHERE id = 2")).toThrow(/CHECK/u)
+    expect(sqlite.prepare('SELECT operation_id, origin, power FROM app_chat_operations').all()).toEqual([
+      { operation_id: 'op', origin: 'key', power: null },
+    ])
+    expect(sqlite.prepare('SELECT key_id, resource_id, key_name FROM app_made_by').all()).toEqual([
+      { key_id: 'key-1', resource_id: 2, key_name: 'swarmm' },
+    ])
+    expect(sqlite.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'app_key_reach%'").all()).toEqual([])
     sqlite.close()
   })
 })
@@ -173,10 +205,11 @@ describe('fresh application baseline', () => {
       '20261023000000_streams_dropped',
       '20261023010000_publish',
       '20261023200000_grants',
+      '20261024000000_sealed',
     ])
     // An additive migration that alters a table names it too, so a table may be named more than once; one that drops
-    // a table names it, and it is no live table (ADR 0110's chat streams).
-    const dropped = ['app_streams', 'app_stream_outbox']
+    // or renames a table names it, and it is no live table (ADR 0110's chat streams, ADR 0115's key reach).
+    const dropped = ['app_streams', 'app_stream_outbox', 'app_key_reach']
     const owned = [...new Set(MIGRATIONS.flatMap((migration) => migration.tables))]
     expect(owned.filter((name) => !dropped.includes(name)).toSorted()).toEqual(
       [...tables.keys(), 'app_transcript_fts'].toSorted(),

@@ -43,7 +43,7 @@ const topic = (me: AgentFetch, name: string): Promise<TopicView> =>
 const uses = (me: AgentFetch, chat: string) =>
   callOwner(me, (api) => api.conversations.sources({ params: { id: chat } }))
 
-/** Garden holds the answer; Old (archived later) and Quiet (opted out later) hold words only they have. */
+/** Garden holds the answer; Old (archived later) and Quiet hold words only they have. Each is sealed (ADR 0115). */
 async function seed(me: AgentFetch) {
   const garden = await topic(me, 'Garden')
   const old = await topic(me, 'Old')
@@ -53,7 +53,6 @@ async function seed(me: AgentFetch) {
   await say(me, old.conversation, 'the greenhouse budget was 400 euros')
   await say(me, quiet.conversation, 'quiet marigold notes')
   await callOwner(me, (api) => api.topics.update({ params: { id: old.id }, payload: { archived: true } }))
-  await callOwner(me, (api) => api.topics.update({ params: { id: quiet.id }, payload: { searchExcluded: true } }))
   const snapshot = decodeEntries(await ownerSnapshot(me, garden.conversation))
   const entry = (snapshot.entries ?? []).findLast(({ kind }) => kind === 'pi.assistant')?.id
   if (entry === undefined) throw new Error('no answer in the Garden')
@@ -72,7 +71,10 @@ const sourced = (me: AgentFetch, needle: string) =>
     `${needle} among the sources`,
   )
 
-/** `search_chats` from Personal: default Topics only, a named one whatever its state, every result recorded. */
+/**
+ * `search_chats` from Personal, the hub: every active Topic, a named one whatever its state, every result recorded.
+ * From Garden, a sealed Topic: itself alone, and another Topic named there is not found (ADR 0115).
+ */
 async function searches(me: AgentFetch, garden: TopicView): Promise<void> {
   await say(me, '1', 'call search_chats {"query":"heirloom tomatoes"}', 'done: Quoted history')
   const [found] = await uses(me, '1')
@@ -80,13 +82,17 @@ async function searches(me: AgentFetch, garden: TopicView): Promise<void> {
   const details = Schema.decodeUnknownSync(SourcesDetails)({ kind: 'sources', mode: 'tool', sources: found?.sources })
   expect(details.sources[0]).toMatchObject({ topic: garden.id, topicName: 'Garden', chat: garden.conversation })
   expect(details.sources[0]?.excerpt).toContain('heirloom tomatoes')
-  await say(me, '1', 'call search_chats {"query":"greenhouse marigold"}', 'done: No earlier messages matched')
+  await say(me, '1', 'call search_chats {"query":"greenhouse budget"}', 'done: No earlier messages matched')
   await say(me, '1', 'call search_chats {"query":"greenhouse budget","topic":"Old"}', 'done: Quoted history')
   await sourced(me, '"topicName":"Old"')
-  await say(me, '1', 'call search_chats {"query":"marigold","topic":"quiet"}', 'done: Quoted history')
+  await say(me, '1', 'call search_chats {"query":"marigold"}', 'done: Quoted history')
   await sourced(me, '"topicName":"Quiet"')
   const named = (await uses(me, '1')).slice(0, 2).map((use) => use.sources.map((source) => source.topicName))
   expect(named).toEqual([['Quiet'], ['Old']])
+  const sealed = garden.conversation
+  await say(me, sealed, 'call search_chats {"query":"marigold"}', 'done: No earlier messages matched')
+  await say(me, sealed, 'call search_chats {"query":"marigold","topic":"Quiet"}', 'done: That Topic was not found')
+  await say(me, sealed, 'call search_chats {"query":"compost farm"}', 'done: Quoted history')
 }
 
 /** The context block of the newest model request that answered `input` (the scripted model records each request). */

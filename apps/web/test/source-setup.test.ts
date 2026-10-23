@@ -21,7 +21,7 @@ const topic = (id: number, name: string, archivedAt?: number): TopicView => ({
   conversation: String(id * 10),
   ...(id === 1 && { personal: true }),
   ...(archivedAt !== undefined && { archivedAt }),
-  searchExcluded: false,
+  reach: 'sealed',
   revision: 0,
   setup: EVERYTHING,
   createdBy: 'owner',
