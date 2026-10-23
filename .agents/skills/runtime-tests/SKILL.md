@@ -5,6 +5,11 @@ description: Run or design goblin unit, workerd integration and dev-stage tests 
 
 # goblin runtime tests
 
+The default-off dquickts spike's unit tests are `test/durable-code.test.ts`; its local workerd suite is
+`test/integration/durable-code.test.ts`. The latter exercises the flagged Pi tool, explicit object eviction, the
+per-call journal, build/integrity guards, cumulative limits and eight suspended runs admitting a ninth sandbox job.
+Tests write synthetic measurement JSON under `.local/durable-code`. Those timings are neither billing nor deployed CPU.
+
 Choose the test that proves the claim: unit tests, local workerd integration, reconstruction, and the deployed dev
 smoke are different evidence.
 

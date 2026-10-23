@@ -1,0 +1,141 @@
+diff --git a/tests/snapshot/test_suspend.c b/tests/snapshot/test_suspend.c
+index 8b41804..b28f911 100644
+--- a/tests/snapshot/test_suspend.c
++++ b/tests/snapshot/test_suspend.c
+@@ -22,6 +22,7 @@
+ #include <string.h>
+ #include <inttypes.h>
+ #include <stdarg.h>
++#include <stddef.h>
+ #if defined(__APPLE__)
+ #include <malloc/malloc.h>
+ #elif defined(__linux__) || defined(__GLIBC__)
+@@ -54,12 +55,23 @@ static long live_large_blocks;
+ static int fail_armed;
+ static size_t fail_min_size;
+
++#if defined(__wasi__)
++/* WASI has no malloc_usable_size(). Track requested sizes in an aligned
++   test-only header so the existing allocation/leak assertions still run. */
++typedef union {
++    size_t size;
++    max_align_t alignment;
++} TestAllocHeader;
++#endif
++
+ static size_t t_usable_size(const void *ptr)
+ {
+ #if defined(__APPLE__)
+     return malloc_size(ptr);
+ #elif defined(__linux__) || defined(__GLIBC__)
+     return malloc_usable_size((void *)ptr);
++#elif defined(__wasi__)
++    return ((const TestAllocHeader *)ptr)[-1].size;
+ #else
+     return 0;
+ #endif
+@@ -72,7 +84,15 @@ static void *t_malloc(JSMallocState *s, size_t size)
+         fail_armed = FALSE;
+         return NULL;
+     }
++#if defined(__wasi__)
++    TestAllocHeader *header = malloc(sizeof(*header) + size);
++    if (!header)
++        return NULL;
++    header->size = size;
++    ptr = header + 1;
++#else
+     ptr = malloc(size);
++#endif
+     if (!ptr)
+         return NULL;
+     live_blocks++;
+@@ -100,7 +120,11 @@ static void t_free(JSMallocState *s, void *ptr)
+         live_large_blocks--;
+     s->malloc_count--;
+     s->malloc_size -= t_usable_size(ptr);
++#if defined(__wasi__)
++    free((TestAllocHeader *)ptr - 1);
++#else
+     free(ptr);
++#endif
+ }
+
+ static void *t_realloc(JSMallocState *s, void *ptr, size_t size)
+@@ -113,7 +137,15 @@ static void *t_realloc(JSMallocState *s, void *ptr, size_t size)
+         return NULL;
+     }
+     old_size = t_usable_size(ptr);
++#if defined(__wasi__)
++    TestAllocHeader *header = realloc((TestAllocHeader *)ptr - 1, sizeof(*header) + size);
++    if (!header)
++        return NULL;
++    header->size = size;
++    ptr = header + 1;
++#else
+     ptr = realloc(ptr, size);
++#endif
+     if (!ptr)
+         return NULL;
+     live_large_blocks += (t_usable_size(ptr) >= LARGE_BLOCK_SIZE) -
+@@ -1166,6 +1198,9 @@ static void buf_printf(char **pp, char *end, const char *fmt, ...)
+
+ static void test_suspend_oom(int nested)
+ {
++    /* Keep the frame > 4200 bytes with both 8-byte (wasm32) and 16-byte
++       (native 64-bit) JSValues, so it reaches the host fault injector. */
++    enum { FRAME_LOCALS = 4800 / sizeof(JSValue) };
+     JSRuntime *rt;
+     JSContext *ctx;
+     JSValue ret, exc;
+@@ -1183,13 +1218,13 @@ static void test_suspend_oom(int nested)
+     end = src + 16384;
+     buf_printf(&p, end, "function small(n) { var s = 0; for (var i = 0; i < n; i++) s += i; return s; }\n");
+     buf_printf(&p, end, "function big(n) {\n  var v0 = n");
+-    for(i = 1; i < 300; i++)
++    for(i = 1; i < FRAME_LOCALS; i++)
+         buf_printf(&p, end, ", v%d = v%d + 1", i, i - 1);
+     buf_printf(&p, end, ";\n");
+     if (nested)
+-        buf_printf(&p, end, "  return v299 + small(n);\n}\n");
++        buf_printf(&p, end, "  return v%d + small(n);\n}\n", FRAME_LOCALS - 1);
+     else
+-        buf_printf(&p, end, "  for (var i = 0; i < n; i++) v0 += i;\n  return v0 + v299;\n}\n");
++        buf_printf(&p, end, "  for (var i = 0; i < n; i++) v0 += i;\n  return v0 + v%d;\n}\n", FRAME_LOCALS - 1);
+     buf_printf(&p, end, "try { print(big(1000000)); } catch (e) { print('caught', e); }\n"
+                "finally { print('finally'); }\n");
+
+@@ -1251,6 +1286,8 @@ typedef enum {
+
+ static void test_resume_failure(ResumeFailEnum mode)
+ {
++    /* As above: the saved frame must exceed the allocator arena size. */
++    enum { FRAME_LOCALS = 6400 / sizeof(JSValue) };
+     JSRuntime *rt;
+     JSContext *ctx;
+     JSValue ret, global, v;
+@@ -1270,13 +1307,13 @@ static void test_resume_failure(ResumeFailEnum mode)
+     end = src + 32768;
+     buf_printf(&p, end, "var keep, keepOuter, ready = false;\n");
+     buf_printf(&p, end, "function inner(n) {\n  var local = { v: 1 }, v0 = n");
+-    for(i = 1; i < 400; i++)
++    for(i = 1; i < FRAME_LOCALS; i++)
+         buf_printf(&p, end, ", v%d = v%d + 1", i, i - 1);
+     buf_printf(&p, end, ";\n"
+                "  keep = function () { return local.v++ + n; };\n"
+                "  var s = 0;\n"
+                "  for (var i = 0; i < 2000000; i++) { s += i; ready = true; }\n"
+-               "  return s + v399;\n"
++               "  return s + v%d;\n"
+                "}\n"
+                "function outer() {\n"
+                "  var o = 10;\n"
+@@ -1289,7 +1326,7 @@ static void test_resume_failure(ResumeFailEnum mode)
+                "    print('finally must not run');\n"
+                "  }\n"
+                "}\n"
+-               "outer();\n");
++               "outer();\n", FRAME_LOCALS - 1);
+
+     rt = JS_NewRuntime2(&t_mf, NULL);
+     ctx = new_context(rt);

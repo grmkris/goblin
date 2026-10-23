@@ -309,6 +309,19 @@ export class AgentApps {
     remove: (app: string): Promise<void> => this.#remove(app),
   }
 
+  /** Durable code's MCP calls retain the existing live authority, session scope and exact grant checks. */
+  codeTool(
+    input: { readonly connectionId: string; readonly name: string; readonly arguments: Record<string, unknown> },
+    session: string,
+  ): Promise<unknown> {
+    return this.#deps.services.tool({
+      connectionId: input.connectionId,
+      name: input.name,
+      args: input.arguments,
+      session,
+    })
+  }
+
   /** An app's own files. */
   files(app: string): AppFiles {
     const known = this.#files.get(app)

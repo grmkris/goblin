@@ -173,6 +173,7 @@ describe('fresh application baseline', () => {
       '20261023000000_streams_dropped',
       '20261023010000_publish',
       '20261023200000_grants',
+      '20261024000000_durable_code',
     ])
     // An additive migration that alters a table names it too, so a table may be named more than once; one that drops
     // a table names it, and it is no live table (ADR 0110's chat streams).

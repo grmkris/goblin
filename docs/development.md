@@ -1,5 +1,10 @@
 # Development
 
+For the default-off local/test durable `code_run` spike, see [SPIKE_RESULTS.md](../SPIKE_RESULTS.md) and
+[ADR 0115](adr/0115-durable-code-run-with-dquickts.md). The native test harness enables `DQUICKTS_CODE_RUN=spike`
+through its `GOBLIN_DQUICKTS` fixture setting. It uses synchronous TypeScript, fake tools and a fake model, and creates
+no cloud resources. The runtime ignores that opt-in on dev and prod; no deployment configuration enables it.
+
 The isolated [OpenUI playground](../apps/openui-spike/README.md) previews the production interactive-reply renderer with synthetic data.
 It has its own Alchemy stack and public Worker preview; it has no model or account bindings. The playground imports
 the web app's reply renderer and does not enter the main app bundle. See its README for local checks and deployment.

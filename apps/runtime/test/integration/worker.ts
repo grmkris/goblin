@@ -11,6 +11,8 @@ import { probes as agentProbes, listTables, startupCheck } from './agent-probe.t
 import { probes as appsJobsProbes } from './apps-jobs-probe.ts'
 import { probes as appsProbes } from './apps-probe.ts'
 import { probes as codeRecoveryProbes } from './code-recovery-probe.ts'
+import { probes as durableCodeBaseline } from './durable-code-baseline.ts'
+import { probes as durableCodeProbes } from './durable-code-probe.ts'
 import { probes as composerProbes } from './composer-probe.ts'
 import { probes as conversationProbes } from './conversation-probe.ts'
 import { probes as ingressProbes } from './events-ingress-case.ts'
@@ -51,6 +53,8 @@ const PROBES = registry(
   appsJobsProbes,
   appsProbes,
   codeRecoveryProbes,
+  durableCodeBaseline,
+  durableCodeProbes,
   composerProbes,
   conversationOpsProbes,
   conversationProbes,

@@ -3,6 +3,7 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator'
 import { ASKER_ROLE } from './migrations/asker-role.ts'
 import { BASELINE } from './migrations/baseline.ts'
 import { GRANTS } from './migrations/grants.ts'
+import { DURABLE_CODE } from './migrations/durable-code.ts'
 import { INVOCATION_FORK } from './migrations/invocation-fork.ts'
 import { INVOCATION_REASON } from './migrations/invocation-reason.ts'
 import { KEY_REACH } from './migrations/key-reach.ts'
@@ -41,6 +42,7 @@ export const MIGRATIONS = [
   STREAMS_DROPPED,
   PUBLISH,
   GRANTS,
+  DURABLE_CODE,
 ] as const
 
 export function runApplicationMigrations(storage: DurableObjectStorage): void {

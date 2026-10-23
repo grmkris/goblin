@@ -6,6 +6,7 @@ import { AppInspection, InspectPart } from '../agent-apps/inspect.ts'
 import { RolledBack } from '../agent-apps/rollback.ts'
 import { problemText } from '../agent-apps/queue.ts'
 import { ScriptResult, runScript } from '../agent-apps/script.ts'
+import type { DurableScripts } from '../agent-apps/dquickts/runner.ts'
 import { withContext } from './context-tail.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { adminOnly, requireAdminTurn } from './asker.ts'
@@ -132,17 +133,25 @@ const rollbackTool = (apps: AgentApps, run: RunProgram) =>
   })
 
 /** `code_run`: one-off JavaScript over the owner's files. */
-const codeTool = (apps: AgentApps) =>
+const codeTool = (apps: AgentApps, durable?: DurableScripts) =>
   typedTool({
     name: 'code_run',
     description:
-      "Run JavaScript once (the body of an async function; `return` a JSON value). `files.read(path)`, `files.list(dir)` and `files.write(path, text)` (under /agent) reach the owner's files; `log(...)` notes. No network; 30 s.",
+      durable !== undefined
+        ? 'SPIKE: Run a synchronous TypeScript function body; return JSON. files.read(path), files.list(dir), files.write(path,text), tools.call(connectionId,name,arguments), log(...). No async/await, timers or network. Host calls suspend durably; cumulative 30 s. Unrecorded writes become indeterminate after recovery.'
+        : "Run JavaScript once (the body of an async function; `return` a JSON value). `files.read(path)`, `files.list(dir)` and `files.write(path, text)` (under /agent) reach the owner's files; `log(...)` notes. No network; 30 s.",
     input: Schema.Struct({ code: Schema.String.check(Schema.isMaxLength(100_000)) }),
     output: ScriptResult,
     // Scripts may write files before eviction interrupts the tool. Pi must surface that interruption,
     // rather than automatically executing the script and its writes again.
-    replay: 'unsafe',
-    execute: async ({ code }) => runScript(apps.isolates, apps.ownerFiles, code),
+    replay: durable === undefined ? 'unsafe' : 'safe',
+    execute: async ({ code }, api) =>
+      durable === undefined
+        ? runScript(apps.isolates, apps.ownerFiles, code)
+        : durable.run(`c${String(api.conversationId)}:${api.callId}`, code, {
+            files: apps.ownerFiles,
+            tool: (input) => apps.codeTool(input, String(api.conversationId)),
+          }),
   })
 
 /**
@@ -161,7 +170,7 @@ export function appsExtension(apps: AgentApps, run: RunProgram, buildable = true
 }
 
 /** Execution shared with helpers, without app management. */
-export function appExecutionExtension(apps: AgentApps, run: RunProgram) {
+export function appExecutionExtension(apps: AgentApps, run: RunProgram, durable?: DurableScripts) {
   return defineExtension({
     name: 'goblin.app-execution',
     sections: [
@@ -171,7 +180,7 @@ export function appExecutionExtension(apps: AgentApps, run: RunProgram) {
           : undefined,
       ),
     ],
-    tools: [codeTool(apps)],
+    tools: [codeTool(apps, durable)],
     hooks: [
       hook(GenerationTask, {
         beforeRequest: async ({ messages }, api) => {
