@@ -11,6 +11,7 @@ import { mkdirSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { type Browser, type BrowserContextOptions, type Page, chromium } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 
 const STDOUT = 1
 const out = path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance', `sources-${Date.now()}`)
@@ -110,22 +111,23 @@ async function serve(page: Page, label: string, sources: Map<string, Json>) {
   const routeRows = new Map<string, Json>(ROUTES.map((row) => [row.key, row]))
   page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`))
   // Only the owner API: the fixture's own modules live under paths with `/api/` in them too.
-  await page.route(
+  await mockRoute(
+    page,
     ({ pathname }) => pathname.startsWith('/api/'),
     (route) => route.fulfill({ status: 404, json: { error: { code: 'not_found', message: 'not here' } } }),
   )
-  await page.route('**/api/mcp/servers', (route) => route.fulfill({ json: [CHAT] }))
-  await page.route('**/api/mcp/chat/events', (route) => route.fulfill({ json: STREAMS }))
-  await page.route('**/api/mcp/chat/tools*', (route) => route.fulfill({ json: TOOLS }))
-  await page.route('**/api/notify-sink', (route) => {
+  await mockRoute(page, '**/api/mcp/servers', (route) => route.fulfill({ json: [CHAT] }))
+  await mockRoute(page, '**/api/mcp/chat/events', (route) => route.fulfill({ json: STREAMS }))
+  await mockRoute(page, '**/api/mcp/chat/tools*', (route) => route.fulfill({ json: TOOLS }))
+  await mockRoute(page, '**/api/notify-sink', (route) => {
     if (route.request().method() === 'GET') return route.fulfill({ json: null })
     // SAFETY: Save sends the owner API's NotifySink.
     const body = route.request().postDataJSON() as Json
     sinks.push(body)
     return route.fulfill({ json: { ...body, label: 'Chat', updatedAt: 2 } })
   })
-  await page.route('**/api/sources', (route) => route.fulfill({ json: { sources: [...sources.values()] } }))
-  await page.route('**/api/sources/*/reply-result', (route) => {
+  await mockRoute(page, '**/api/sources', (route) => route.fulfill({ json: { sources: [...sources.values()] } }))
+  await mockRoute(page, '**/api/sources/*/reply-result', (route) => {
     const id = new URL(route.request().url()).pathname.split('/').at(-2) ?? ''
     // SAFETY: this fixture receives the typed owner API mutation from the reply rules editor.
     const body = route.request().postDataJSON() as { readonly revision: number; readonly result: unknown }
@@ -135,7 +137,7 @@ async function serve(page: Page, label: string, sources: Map<string, Json>) {
     sources.set(id, updated)
     return route.fulfill({ json: updated })
   })
-  await page.route('**/api/sources/*/confirm', (route) => {
+  await mockRoute(page, '**/api/sources/*/confirm', (route) => {
     const id = new URL(route.request().url()).pathname.split('/').at(-2) ?? ''
     confirms.push(route.request().postDataJSON())
     // A stale review is refused; the owner reads the current setup and confirms its revision.
@@ -148,7 +150,7 @@ async function serve(page: Page, label: string, sources: Map<string, Json>) {
     sources.set(id, confirmed)
     return route.fulfill({ json: confirmed })
   })
-  await page.route('**/api/sources/*/routes', (route) => {
+  await mockRoute(page, '**/api/sources/*/routes', (route) => {
     const id = new URL(route.request().url()).pathname.split('/').at(-2) ?? ''
     if (route.request().method() === 'GET')
       return route.fulfill({ json: { source: sources.get(id), routes: [...routeRows.values()] } })

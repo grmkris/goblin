@@ -9,6 +9,7 @@ import { mkdirSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { type Browser, type BrowserContextOptions, chromium } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 
 const STDOUT = 1
 const out = path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance', `holds-${Date.now()}`)
@@ -61,8 +62,8 @@ async function drive(browser: Browser, origin: string, label: string, options: B
   const page = await browser.newPage(options)
   page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`))
   const answers: string[] = []
-  await page.route('**/api/mcp/servers', (route) => route.fulfill({ json: [WORKER] }))
-  await page.route('**/api/mcp/url-requests/*', (route) => {
+  await mockRoute(page, '**/api/mcp/servers', (route) => route.fulfill({ json: [WORKER] }))
+  await mockRoute(page, '**/api/mcp/url-requests/*', (route) => {
     const id = decodeURIComponent(new URL(route.request().url()).pathname.split('/').at(-1) ?? '')
     if (route.request().method() !== 'POST') return route.fulfill({ json: view(id, 'pending') })
     // SAFETY: the card sends the owner API's UrlRequestAnswer.
@@ -72,10 +73,12 @@ async function drive(browser: Browser, origin: string, label: string, options: B
     const state = action === 'decline' ? 'declined' : answers.length === 1 ? 'pending' : 'completed'
     return route.fulfill({ json: view(id, state) })
   })
-  await page.route('**/api/mcp/sq-worker/step-up', (route) => route.fulfill({ json: { authorizationUrl: AUTHORIZE } }))
+  await mockRoute(page, '**/api/mcp/sq-worker/step-up', (route) =>
+    route.fulfill({ json: { authorizationUrl: AUTHORIZE } }),
+  )
   // A call held for the owner: the card reads its exact arguments, and Approve once sends the decision.
   const decisions: unknown[] = []
-  await page.route('**/api/mcp/approvals/*', (route) => {
+  await mockRoute(page, '**/api/mcp/approvals/*', (route) => {
     if (route.request().method() === 'POST') {
       decisions.push(route.request().postDataJSON())
       return route.fulfill({ json: { ...HELD, state: 'approved' } })
@@ -103,6 +106,7 @@ async function drive(browser: Browser, origin: string, label: string, options: B
   const width = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   assert(width <= 0, `${label}: scrolls sideways by ${String(width)}px`)
   // Open leads until the owner has opened the link; then Done does. The tab it opens goes nowhere here.
+  // Network interception blocks the external authorization popup before it loads.
   await page.context().route('https://dev.sidequest.exchange/**', (route) => route.abort())
   const leads = async () => (await open.getAttribute('class'))?.includes('bg-primary') === true
   assert(await leads(), `${label}: Open does not lead before the link is opened`)

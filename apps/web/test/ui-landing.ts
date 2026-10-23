@@ -13,6 +13,7 @@ import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { createServer } from 'vite'
 import { type Browser, type BrowserContextOptions, type Page, chromium } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 
 const STDOUT = 1
 const { values: options } = parseArgs({ options: { out: { type: 'string' } } })
@@ -30,8 +31,13 @@ async function open(browser: Browser, origin: string, label: string, context: Br
   page.on('response', (response) => {
     if (response.status() >= 400) errors.push(`${label}: ${String(response.status())} ${response.url()}`)
   })
-  await page.route('**/health', (route) => route.fulfill({ json: HEALTH }))
-  await page.route('**/api/auth/get-session', (route) =>
+  // Synthetic replies do not emit Playwright response events; retain the fixture's unexpected-API guard.
+  await mockRoute(page, '**/api/**', (route) => {
+    errors.push(`${label}: unexpected API request ${route.request().url()}`)
+    return route.fulfill({ status: 404 })
+  })
+  await mockRoute(page, '**/health', (route) => route.fulfill({ json: HEALTH }))
+  await mockRoute(page, '**/api/auth/get-session', (route) =>
     route.fulfill({
       json: signedIn ? { session: { id: 's', userId: 'u' }, user: { id: 'u', email: 'owner@example.com' } } : null,
     }),

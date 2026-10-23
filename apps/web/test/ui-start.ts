@@ -10,6 +10,7 @@ import path from 'node:path'
 import { createServer } from 'vite'
 import { SHELF } from './browser/services-fixture.ts'
 import { type Browser, type BrowserContextOptions, type Page, chromium } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 import { startFlowChecks } from './start-flow.ts'
 
 const STDOUT = 1
@@ -153,12 +154,13 @@ async function drive(browser: Browser, origin: string, label: string, options: B
       if (response.status() >= 400)
         errors.push(`${label} ${screen.name}: ${String(response.status())} ${response.url()}`)
     })
-    await page.route('**/api/**', (route) => {
+    await mockRoute(page, '**/api/**', (route) => {
       const { pathname } = new URL(route.request().url())
       // Only the owner API is answered here; the fixture's own modules (`/@fs/…/src/api/…`) load as they are.
       if (!pathname.startsWith('/api/')) return route.continue()
       const body = ownerAnswer(screen, pathname)
       if (body !== undefined) return route.fulfill({ json: body })
+      errors.push(`${label} ${screen.name}: unexpected API request ${pathname}`)
       return route.fulfill({ status: 404, json: { error: { code: 'not_found', message: 'not here' } } })
     })
     await page.addInitScript(() =>

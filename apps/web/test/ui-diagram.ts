@@ -214,6 +214,7 @@ async function main() {
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] })
   try {
     const context = await browser.newContext()
+    // Guard real network traffic to prove unsafe diagrams never fetch external resources.
     await context.route('**/*', (route) => {
       if (!route.request().url().startsWith(origin)) {
         requests.push(route.request().url())
@@ -237,6 +238,7 @@ async function main() {
     touch.setDefaultTimeout(10000)
     touch.setDefaultNavigationTimeout(30000)
     touch.on('pageerror', (error) => errors.push(error.message))
+    // Keep the same external-network guard for the touch context.
     await touch.route('**/*', (route) => {
       if (route.request().url().startsWith(origin)) return route.continue()
       requests.push(route.request().url())

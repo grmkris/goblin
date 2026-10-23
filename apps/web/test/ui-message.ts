@@ -4,6 +4,7 @@ import { writeSync } from 'node:fs'
 import path from 'node:path'
 import { build, createServer } from 'vite'
 import { chromium } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 import { record, records } from '../src/lib/values.ts'
 import { sentOf } from './agui-route.ts'
 
@@ -55,19 +56,19 @@ let saved = false
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.route('**/api/mcp/myplan/resources/read', (route) =>
+  await mockRoute(page, '**/api/mcp/myplan/resources/read', (route) =>
     route.fulfill({
       json: { contents: [{ uri: 'ui://myplan/question.html', mimeType: 'text/html;profile=mcp-app', text: html }] },
     }),
   )
-  await page.route('**/api/mcp/myplan/tools/call', (route) => {
+  await mockRoute(page, '**/api/mcp/myplan/tools/call', (route) => {
     assert.equal(route.request().headers()['x-mcp-caller'], 'app')
     const body = record(route.request().postDataJSON())
     assert(['myplan_question_read', 'question_answer'].includes(String(body?.name)), 'calls use the exposed name')
     if (body?.name === 'question_answer') saved = true
     return route.fulfill({ json: { content: [], structuredContent: saved ? { continuation: receipt } : {} } })
   })
-  await page.route('**/api/conversations/*/messages', (route) => {
+  await mockRoute(page, '**/api/conversations/*/messages', (route) => {
     assert.equal(new URL(route.request().url()).pathname, '/api/conversations/7/messages')
     const body = sentOf(route.request().postDataJSON())
     submissions.push(body)

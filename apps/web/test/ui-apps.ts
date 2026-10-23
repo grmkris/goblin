@@ -8,6 +8,7 @@ import { mkdirSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { chromium, type Page } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 import type { AgentAppSummary, AppView, ServerView } from '@goblin/contracts'
 
 const out = path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance', `apps-${Date.now()}`)
@@ -81,7 +82,8 @@ type Answers = { readonly servers: ServerView[]; readonly built: AgentAppSummary
 
 /** Answers the owner API as `answers` says, and records every write. */
 async function serve(page: Page, answers: Answers, writes: string[], errors: string[]) {
-  await page.route(
+  await mockRoute(
+    page,
     (url) => url.pathname === '/health' || url.pathname.startsWith('/api/'),
     async (route) => {
       const request = route.request()

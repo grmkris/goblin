@@ -46,6 +46,7 @@ async function install(page: Page) {
   const changed = () =>
     stream.write(page, { type: 'STATE_DELTA', delta: [{ op: 'replace', path: '/queue', value: inputs }] })
   await installLiveReads(page)
+  // This page intentionally uses routing: its send handler below exercises a real network abort.
   await page.route(OPENINGS, (route) => stream.opening(route))
   const remove = async (route: Route) => {
     const { submissionId } = Schema.decodeUnknownSync(Schema.Struct({ submissionId: Schema.Int }))(
@@ -74,6 +75,7 @@ async function install(page: Page) {
     await route.fulfill({ status: 202, json: { accepted: true, session: '1', operationId: message.operationId } })
     await changed()
   }
+  // Keep route.abort for the failed-send and retry assertions.
   await page.route('**/api/conversations/1/**', async (route: Route) => {
     const request = route.request()
     const action = new URL(request.url()).pathname.split('/').at(-1)

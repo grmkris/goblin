@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { type Page, chromium } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 import { marksOf } from '../src/lib/agui/messages.ts'
 import { activity, answer, asking, opening, result, said } from './agui-fixtures.ts'
 import { FixtureStream, OPENINGS, installLiveReads, openingChat } from './agui-route.ts'
@@ -282,8 +283,9 @@ try {
       return known
     }
     await installLiveReads(page)
-    await page.route(OPENINGS, (route) => streamOf(openingChat(route)).opening(route))
-    await page.route(
+    await mockRoute(page, OPENINGS, (route) => streamOf(openingChat(route)).opening(route))
+    await mockRoute(
+      page,
       (url) => url.pathname.startsWith('/api/'),
       (route) => {
         const url = new URL(route.request().url())
