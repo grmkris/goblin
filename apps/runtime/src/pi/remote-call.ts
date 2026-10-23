@@ -137,7 +137,8 @@ export const requestFor = (api: ToolExecutionApi, signal: AbortSignal | undefine
  * Topic's setup, a Persona's frozen one), the ask-first hold and its approval card, then the manager's own: the exact
  * owner grant and dispatch authority again right before each HTTP dispatch, and the arguments against the tool's
  * schema as listed now (ADR 0092). A URL request is held for the owner, an App the result renders is kept, the files it
- * hands over are kept in the owner's files (ADR 0065), and a missing grant, sign-in or scope becomes the owner's card.
+ * hands over are kept in the owner's files (ADR 0065), except in a room, which keeps neither (ADR 0113), and a missing
+ * grant, sign-in or scope becomes the owner's card.
  */
 export const callRemoteTool = (input: McpCallInput, api: ToolExecutionApi, context: ToolContext) =>
   Effect.gen(function* () {
@@ -159,6 +160,8 @@ export const callRemoteTool = (input: McpCallInput, api: ToolExecutionApi, conte
           Effect.gen(function* () {
             if (outcome.kind === 'url')
               return yield* holdUrlRequest(session, api.callId, String(api.taskId), input, outcome.prompt)
+            // A room keeps nothing in the owner's Apps or files (ADRs 0108, 0113): its results stay in its chat.
+            if (scope.room !== undefined) return mcpModelResult(input.connectionId, outcome.result, new Map())
             yield* keepModelApp(session, api.callId, input)
             // The files the result hands over are kept in the owner's files (ADR 0065), after the call.
             const received = yield* materialize(input.connectionId, outcome.result, {
