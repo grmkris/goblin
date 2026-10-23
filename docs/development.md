@@ -570,6 +570,20 @@ Shiki loads and Copy copies exactly the code, a table copies as CSV or Markdown 
 before it
 opens and shows its address, and an image is fetched only when asked, once, without a referrer. Receipts go under `.local/goblin-acceptance/markdown-*`.
 
+## Browser API fixtures
+
+`heavy bun apps/web/test/ui-mock.ts` checks the in-page API fixture, including cancellation, AG-UI frames and native
+asset caching. Use `mockRoute(page, pattern, handler)` from `apps/web/test/mock-route.ts` for JSON/text API fetches.
+Its request/fulfill interface and last-matching-handler precedence follow the existing fixtures. Only same-origin
+API, health and synthetic stream-opening fetches cross a Playwright binding; asset requests stay in Chromium.
+`installLiveReads` retains the live AG-UI stream simulator and composes with this fixture in either init-script order.
+
+Keep network routing for document rewrites, external navigation guards, binary images and real network failures.
+Those pages still have caching disabled. This helper does not intercept XHR, WebSocket or EventSource: the current
+component fixtures inject the workspace feed into their query cache and chat streams use fetch. A test of the native
+workspace-feed transport needs its own server fixture. Synthetic fetch responses do not emit Playwright network
+request/response events; assert the fixture's calls and the page's resulting state instead.
+
 ## Client performance
 
 A change made for speed is measured against the revision before it; nothing is inferred from bundle size or transform
@@ -582,6 +596,12 @@ includes other agents' edits) in scratch worktrees under `/tmp/goblin-perf-workt
   reply at pi-durable's 100 ms batches while typing, wheel-scrolling 1,000 parts, and idle work after a reply. A win
   or a regression needs the medians to differ by more than either side's spread; this box is shared, so only compare
   numbers from one run. The same revision on both sides gives the noise floor.
+- `heavy bun apps/web/test/ui-cache.ts --assert` measures a cold load, second navigation and reload of the same
+  transcript in each fresh context. It records resource-timing cache hits, transferred asset bytes, CDP cache events
+  and time to the rendered transcript. The static server mirrors `apps/web/public/_headers` for built `/assets/*`
+  and makes HTML revalidate. `--dist <path>` reuses a build; `--out <receipt.json>` names its receipt.
+  `--route-control` deliberately adds an inert network route; `--no-cache-headers` removes the server's cache policy.
+  Both controls assert zero cached assets. This tests fixture cache behavior, separate from deployed CDN behavior.
 - `heavy bun apps/web/test/ui-follow.ts` plays scripted owner turns against the same fixture (a streamed reply, a tool
   round after a slow provider, a storm of parallel calls, a reply already past the fold when its turn lands, a
   new connection opening mid-reply, the composer growing mid-stream) on the phone and desktop profiles and reports,
