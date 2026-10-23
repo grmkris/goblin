@@ -18,7 +18,7 @@ export const requestId = (): string => crypto.randomUUID().replaceAll('-', '').s
  * What every API request carries: a fresh `x-goblin-request` id, the CSRF header on every write, and the operation a
  * write runs as (`withOperation`).
  */
-export const apiHeaders = (
+const apiHeaders = (
   request: HttpClientRequest.HttpClientRequest,
   operation: string | undefined,
 ): Readonly<Record<string, string>> => ({
@@ -45,7 +45,7 @@ export const inWorkspaceOf =
  * Every call under a workspace (`/w/<slug>/api/…`, ADR 0089): the address says which workspace it is, this page's
  * unless the call names another (`inWorkspaceOf`).
  */
-export const inThisWorkspace = HttpClient.mapRequestEffect((request) =>
+const inThisWorkspace = HttpClient.mapRequestEffect((request) =>
   Effect.gen(function* () {
     const slug = yield* CallWorkspace
     return HttpClientRequest.setUrl(request, slug === undefined ? apiPath(request.url) : `/w/${slug}${request.url}`)

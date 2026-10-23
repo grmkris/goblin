@@ -6,13 +6,13 @@ transport boundary.
 
 ## Clients
 
-`lib/api.ts` has the clients: `owner` (the agent's `OwnerApi`), `workspaceAccount` (the Worker's
-`WorkspaceAccountApi`: a workspace's keys and members) and `account` (the Worker's `AccountApi`: workspaces, inbound
-clients, crash reports). `lib/api-grants.ts` holds two more for release A's grant endpoints (ADR 0114) until the Worker's
-own APIs carry them: `grantsAccount` (`GrantsGroup`: the consent and widening pages' terms, and saving them) and
-`keyTerms` (a key made and changed by its grant's terms). Each request carries `x-goblin-request`, the CSRF header on
-every write and, with `withOperation`, the operation id. A call under a workspace goes to the page's own unless it is
-wrapped in `inWorkspaceOf(slug)`: a person's own page (the consent page) reads each of their workspaces that way. Nothing else calls the server, except four transports: the owner's file bytes
+`lib/api.ts` has three clients: `owner` (the agent's `OwnerApi`), `workspaceAccount` (the Worker's
+`WorkspaceAccountApi`: a workspace's keys, made and changed by their grant's terms, and its members) and `account` (the
+Worker's `AccountApi`: workspaces, inbound clients, the grants a person approves (ADR 0114: the consent and widening
+pages' terms, and saving them), crash reports). Each request carries `x-goblin-request`, the CSRF header on every write
+and, with `withOperation`, the operation id. A call under a workspace goes to the page's own unless it is wrapped in
+`inWorkspaceOf(slug)`: a person's own page (the consent page) reads each of their workspaces that way. Nothing else
+calls the server, except four transports: the owner's file bytes
 (`lib/files.ts`), the live reads in `lib/event-streams.ts` (a chat's AG-UI stream at the URL its join answered, read by
 `lib/agui/reader.ts`, and the workspace stream, opened by `WorkspaceFeedProvider`, `components/workspace-feed.tsx`, over
 `BrowserFeedSource` and kept by `lib/workspace/`) and Better Auth's client. Untyped values (stream frames, App messages, tool payloads) are read with `lib/values.ts`, never

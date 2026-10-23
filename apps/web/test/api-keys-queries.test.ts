@@ -5,7 +5,6 @@ import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { KeyTermsApi, keyTerms } from '../src/lib/api-grants.ts'
 import { createKeyMutation, keysQuery, rotateKeyMutation, updateKeyMutation } from '../src/account/queries.ts'
 import { workspaceAccount } from '../src/lib/api.ts'
 import { fakeHttpApi, testQueryClient } from './query/testing.ts'
@@ -24,13 +23,15 @@ const ROTATED = `gbk_${'b'.repeat(64)}`
 
 /**
  * The real keys group served in memory over one key, and the members group it never reaches, under a workspace's
- * prefix as the edge serves them (ADR 0089): a call that is not under `/w/kris` is no route. Making and changing a key
- * by its grant's terms (ADR 0114) answers from the same key.
+ * prefix as the edge serves them (ADR 0089): a call that is not under `/w/kris` is no route. A key is made and changed
+ * by its grant's terms (ADR 0114).
  */
 const fakeAccount = () => {
   const state = { key: KEY }
-  const KeyTerms = HttpApiBuilder.group(KeyTermsApi, 'keys', (handlers) =>
+  const Keys = HttpApiBuilder.group(WorkspaceAccountApi, 'keys', (handlers) =>
     handlers.handleAll({
+      ...unusedHandlers(WorkspaceAccountApi.groups.keys),
+      list: () => Effect.succeed([state.key]),
       create: ({ payload }) =>
         Effect.succeed({
           key: { ...KEY, id: 'key-2', name: payload.name, grantId: 'key-2', terms: payload.terms },
@@ -41,12 +42,6 @@ const fakeAccount = () => {
         state.key = { ...state.key, terms: payload.terms }
         return Effect.succeed(state.key)
       },
-    }),
-  )
-  const Keys = HttpApiBuilder.group(WorkspaceAccountApi, 'keys', (handlers) =>
-    handlers.handleAll({
-      ...unusedHandlers(WorkspaceAccountApi.groups.keys),
-      list: () => Effect.succeed([state.key]),
       rotate: ({ params }) => {
         if (params.keyId !== state.key.id) return Effect.fail(new NotFound({ what: 'key' }))
         state.key = { ...state.key, start: ROTATED.slice(0, 10) }
@@ -58,25 +53,17 @@ const fakeAccount = () => {
     handlers.handleAll(unusedHandlers(WorkspaceAccountApi.groups.members)),
   )
   const served = fakeHttpApi(WorkspaceAccountApi, Layer.mergeAll(Keys, Members))
-  const terms = fakeHttpApi(KeyTermsApi, KeyTerms)
   const fetch: typeof globalThis.fetch = Object.assign(
     (input: RequestInfo | URL, init?: RequestInit) => {
       const request = new Request(input instanceof Request ? input : new URL(String(input), 'http://app.test'), init)
       const url = new URL(request.url)
       if (!url.pathname.startsWith('/w/kris/api/')) return Promise.resolve(new Response(null, { status: 404 }))
       url.pathname = url.pathname.slice('/w/kris'.length)
-      const byTerms = request.method === 'PATCH' || (request.method === 'POST' && url.pathname === '/api/keys')
-      return (byTerms ? terms : served).fetch(new Request(url, request))
+      return served.fetch(new Request(url, request))
     },
     { preconnect: () => undefined },
   )
-  return {
-    calls: served.calls,
-    termCalls: terms.calls,
-    fetch,
-    state,
-    dispose: () => Promise.all([served.dispose(), terms.dispose()]),
-  }
+  return { calls: served.calls, fetch, state, dispose: served.dispose }
 }
 
 const fake = fakeAccount()
@@ -88,7 +75,7 @@ beforeAll(() => {
 })
 afterAll(async () => {
   vi.unstubAllGlobals()
-  await Promise.all([workspaceAccount.runtime.dispose(), keyTerms.runtime.dispose()])
+  await workspaceAccount.runtime.dispose()
   await fake.dispose()
 })
 
@@ -98,12 +85,12 @@ describe("a key's grant (ADR 0114)", () => {
     const list = new QueryObserver(client, keysQuery)
     const unsubscribe = list.subscribe(() => undefined)
     try {
-      await vi.waitFor(() => expect(list.getCurrentResult().data?.[0]?.terms?.level).toBe('write'))
+      await vi.waitFor(() => expect(list.getCurrentResult().data?.[0]?.terms.level).toBe('write'))
       const change = new MutationObserver(client, updateKeyMutation)
       const terms: GrantTerms = { ...presetFor('swarm', ['ws_kris']), level: 'manage', extras: ['inspect'] }
       await change.mutate({ keyId: 'key-1', terms })
       expect(list.getCurrentResult().data?.[0]).toMatchObject({ id: 'key-1', terms })
-      const patch = fake.termCalls.find((call) => call.method === 'PATCH')
+      const patch = fake.calls.find((call) => call.method === 'PATCH')
       expect(new URL(patch?.url ?? '').pathname).toBe('/api/keys/key-1')
       expect(await patch?.json()).toEqual({ terms })
       // The page's own workspace is in every call's path: the edge strips it, as this fake does.
@@ -119,7 +106,7 @@ describe("a key's grant (ADR 0114)", () => {
     const make = new MutationObserver(client, createKeyMutation)
     const terms = presetFor('crm', ['ws_kris'])
     expect(await make.mutate({ name: 'crm', terms })).toMatchObject({ key: { name: 'crm', terms } })
-    const post = fake.termCalls.find((call) => call.method === 'POST')
+    const post = fake.calls.find((call) => call.method === 'POST' && new URL(call.url).pathname === '/api/keys')
     expect(await post?.json()).toEqual({ name: 'crm', terms })
     expect(post?.headers.get('x-goblin-csrf')).toBe('1')
   })
@@ -137,7 +124,7 @@ describe("a key's secret (ADR 0105)", () => {
       expect(rotated).toMatchObject({ key: { id: 'key-1', name: 'swarm' }, secret: ROTATED })
       expect(list.getCurrentResult().data?.[0]).toMatchObject({ id: 'key-1', start: ROTATED.slice(0, 10) })
       expect(JSON.stringify(list.getCurrentResult().data)).not.toContain(ROTATED)
-      const post = fake.calls.find((call) => call.method === 'POST')
+      const post = fake.calls.find((call) => call.method === 'POST' && call.url.endsWith('/rotate'))
       expect(new URL(post?.url ?? '').pathname).toBe('/api/keys/key-1/rotate')
       await expect(rotate.mutate('key-9')).rejects.toBeInstanceOf(NotFound)
     } finally {

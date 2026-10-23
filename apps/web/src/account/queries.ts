@@ -9,12 +9,11 @@ import type {
 import { type QueryClient, mutationOptions, queryOptions, skipToken } from '@tanstack/react-query'
 import * as Effect from 'effect/Effect'
 import { account, inWorkspaceOf, owner, workspaceAccount } from '../lib/api.ts'
-import { grantsAccount, keyTerms } from '../lib/api-grants.ts'
 
 /**
- * The person's workspaces and MCP clients (`AccountApi`), and this workspace's API keys and members
- * (`WorkspaceAccountApi`), answered by the Worker: keys are `['account', kind]`, and each change refreshes what it
- * changed before it settles. One page is one workspace's (ADR 0089), so its keys need no workspace in their keys.
+ * The person's workspaces, MCP clients and the grants they approve (`AccountApi`), and this workspace's API keys and
+ * members (`WorkspaceAccountApi`), answered by the Worker: keys are `['account', kind]`, and each change refreshes what
+ * it changed before it settles. One page is one workspace's (ADR 0089), so its keys need no workspace in their keys.
  */
 const accountKeys = {
   workspaces: ['account', 'workspaces'] as const,
@@ -67,7 +66,7 @@ export const clientsQuery = account.apiQuery({
  * current terms.
  */
 export const clientTermsQuery = (clientId: string) =>
-  grantsAccount.apiQuery({
+  account.apiQuery({
     queryKey: accountKeys.clientTerms(clientId),
     queryFn: (api) => api.grants.clientTerms({ params: { clientId } }),
   })
@@ -77,7 +76,7 @@ export const clientTermsQuery = (clientId: string) =>
  * follows them at once.
  */
 export const clientGrantMutation = mutationOptions({
-  ...grantsAccount.apiMutation({
+  ...account.apiMutation({
     mutationFn: (api, { clientId, terms }: { readonly clientId: string; readonly terms: GrantTerms }) =>
       api.grants.clientGrant({ params: { clientId }, payload: { terms } }),
   }),
@@ -90,14 +89,14 @@ export const clientGrantMutation = mutationOptions({
 
 /** What the widening page shows for a live grant the person may approve: its terms now, and its summary. */
 export const grantTermsQuery = (grantId: string) =>
-  grantsAccount.apiQuery({
+  account.apiQuery({
     queryKey: accountKeys.grantTerms(grantId),
     queryFn: (api) => api.grants.terms({ params: { id: grantId } }),
   })
 
 /** Saves the terms the person approved for a grant: a key's or an MCP client's, whichever it is. */
 export const widenGrantMutation = mutationOptions({
-  ...grantsAccount.apiMutation({
+  ...account.apiMutation({
     mutationFn: (api, { grantId, terms }: { readonly grantId: string; readonly terms: GrantTerms }) =>
       api.grants.widen({ params: { id: grantId }, payload: { grantId, terms } }),
   }),
@@ -125,13 +124,13 @@ export const keysQuery = workspaceAccount.apiQuery({ queryKey: accountKeys.keys,
 
 /** A new key and its grant's terms (ADR 0114); its answer holds the secret, which is never shown again. */
 export const createKeyMutation = mutationOptions({
-  ...keyTerms.apiMutation({ mutationFn: (api, payload: CreateApiKeyTerms) => api.keys.create({ payload }) }),
+  ...workspaceAccount.apiMutation({ mutationFn: (api, payload: CreateApiKeyTerms) => api.keys.create({ payload }) }),
   onSuccess: (_created, _payload, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),
 })
 
 /** New terms for one key's grant (ADR 0114): the same key, with its id and secret. */
 export const updateKeyMutation = mutationOptions({
-  ...keyTerms.apiMutation({
+  ...workspaceAccount.apiMutation({
     mutationFn: (api, { keyId, terms }: { readonly keyId: string; readonly terms: GrantTerms }) =>
       api.keys.update({ params: { keyId }, payload: { terms } }),
   }),

@@ -21,7 +21,6 @@ import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { GrantsAccountApi, grantsAccount } from '../src/lib/api-grants.ts'
 import {
   clientGrantMutation,
   clientTermsQuery,
@@ -45,12 +44,12 @@ const SPEC = { levels: GRANT_SPEC.levels, extras: GRANT_SPEC.extras, reachOption
 const KEY_TERMS: GrantTerms = { ...presetFor('swarm', ['ws_acme']), level: 'read' }
 
 /**
- * The grants group and the person's clients served in memory, as the Worker serves them outside any workspace, and one
- * workspace's Topics, Personas and connections under `/w/acme`, as its agent answers them there.
+ * The person's account API served in memory (its grants and clients), as the Worker serves it outside any workspace,
+ * and one workspace's Topics, Personas and connections under `/w/acme`, as its agent answers them there.
  */
 const fakeWorker = () => {
   const state = { client: CLIENT, key: KEY_TERMS }
-  const Grants = HttpApiBuilder.group(GrantsAccountApi, 'grants', (handlers) =>
+  const Grants = HttpApiBuilder.group(AccountApi, 'grants', (handlers) =>
     handlers.handleAll({
       clientTerms: ({ params }): Effect.Effect<ConsentTerms, NotFound> =>
         params.clientId === state.client.clientId
@@ -86,7 +85,6 @@ const fakeWorker = () => {
       },
     }),
   )
-  const grants = fakeHttpApi(GrantsAccountApi, Grants)
   const Clients = HttpApiBuilder.group(AccountApi, 'clients', (handlers) =>
     handlers.handleAll({ ...unusedHandlers(AccountApi.groups.clients), list: () => Effect.succeed([state.client]) }),
   )
@@ -99,10 +97,7 @@ const fakeWorker = () => {
   const ClientErrors = HttpApiBuilder.group(AccountApi, 'clientErrors', (handlers) =>
     handlers.handleAll(unusedHandlers(AccountApi.groups.clientErrors)),
   )
-  const Unused = HttpApiBuilder.group(AccountApi, 'grants', (handlers) =>
-    handlers.handleAll(unusedHandlers(AccountApi.groups.grants)),
-  )
-  const clients = fakeHttpApi(AccountApi, Layer.mergeAll(Clients, Workspaces, Invitations, ClientErrors, Unused))
+  const worker = fakeHttpApi(AccountApi, Layer.mergeAll(Grants, Clients, Workspaces, Invitations, ClientErrors))
   const gate = Layer.succeed(
     OwnerAdmission,
     OwnerAdmission.of((handler) => handler),
@@ -161,9 +156,7 @@ const fakeWorker = () => {
         url.pathname = url.pathname.slice('/w/acme'.length)
         return agent.fetch(new Request(url, request))
       }
-      if (url.pathname === '/api/clients') return clients.fetch(request)
-      if (url.pathname.startsWith('/api/grants/') || url.pathname.startsWith('/api/clients/'))
-        return grants.fetch(request)
+      if (url.pathname.startsWith('/api/')) return worker.fetch(request)
       return Promise.resolve(new Response(null, { status: 404 }))
     },
     { preconnect: () => undefined },
@@ -171,15 +164,15 @@ const fakeWorker = () => {
   return {
     fetch,
     state,
-    calls: () => [...grants.calls, ...clients.calls, ...agent.calls],
+    calls: () => [...worker.calls, ...agent.calls],
     seen,
     reset: () => {
       seen.length = 0
       state.client = CLIENT
       state.key = KEY_TERMS
-      for (const served of [grants, clients, agent]) served.calls.length = 0
+      for (const served of [worker, agent]) served.calls.length = 0
     },
-    dispose: () => Promise.all([grants.dispose(), clients.dispose(), agent.dispose()]),
+    dispose: () => Promise.all([worker.dispose(), agent.dispose()]),
   }
 }
 
@@ -193,7 +186,7 @@ beforeAll(() => {
 beforeEach(() => fake.reset())
 afterAll(async () => {
   vi.unstubAllGlobals()
-  await Promise.all([grantsAccount.runtime.dispose(), account.runtime.dispose(), owner.runtime.dispose()])
+  await Promise.all([account.runtime.dispose(), owner.runtime.dispose()])
   await fake.dispose()
 })
 
