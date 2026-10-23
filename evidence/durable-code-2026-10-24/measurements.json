@@ -1,0 +1,308 @@
+{
+  "summary": {
+    "baselineRevision": "e06aae340b9b942343ebc7c36b7e024a401a1897",
+    "baselineWallMedianMs": 159,
+    "baselineOccupiedMedianMs": 159,
+    "dquicktsWallMedianMs": 187,
+    "dquicktsOccupiedMedianMs": 22,
+    "checkpointRecoveryMedianMs": 58,
+    "readOnlyReplayMedianMs": 163,
+    "baseBytes": [
+      13063
+    ],
+    "deltaBytes": [
+      3945
+    ],
+    "restoreResumeMedianMs": 0.9566030000005412,
+    "restoreResumeMinMs": 0.7339150000007066,
+    "restoreResumeMaxMs": 5.116242000000057,
+    "evictionRecoveryMs": 6,
+    "artifactBytes": 754236,
+    "artifactSha256": "e3abf1cd294d57a26e23ee232ccfeed6b2f4b00535b75be2d840b9e1f61bad71"
+  },
+  "raw": {
+    "baseline-control": {
+      "samples": [
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 174,
+          "occupiedMs": 174
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 250,
+          "occupiedMs": 250
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 156,
+          "occupiedMs": 155
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 158,
+          "occupiedMs": 158
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 159,
+          "occupiedMs": 159
+        }
+      ]
+    },
+    "baseline": {
+      "samples": [
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 162,
+          "occupiedMs": 161
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 158,
+          "occupiedMs": 158
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 157,
+          "occupiedMs": 157
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 157,
+          "occupiedMs": 157
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 204,
+          "occupiedMs": 204
+        }
+      ]
+    },
+    "after": {
+      "samples": [
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 234,
+          "occupiedMs": 55
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 187,
+          "occupiedMs": 24
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 181,
+          "occupiedMs": 19
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 243,
+          "occupiedMs": 21
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 180,
+          "occupiedMs": 22
+        }
+      ]
+    },
+    "snapshot": {
+      "samples": [
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "restoreResumeMs": 0.7721740000015416
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "restoreResumeMs": 5.116242000000057
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "restoreResumeMs": 0.7579529999984516
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "restoreResumeMs": 0.7339150000007066
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "restoreResumeMs": 0.8778789999996661
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "restoreResumeMs": 1.013409999999567
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "restoreResumeMs": 3.8854230000015377
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "restoreResumeMs": 1.0317489999997633
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "restoreResumeMs": 0.9566030000005412
+        }
+      ]
+    },
+    "replay": {
+      "samples": [
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 56,
+          "replayMs": 173
+        },
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 59,
+          "replayMs": 168
+        },
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 56,
+          "replayMs": 162
+        },
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 60,
+          "replayMs": 163
+        },
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 58,
+          "replayMs": 163
+        }
+      ]
+    },
+    "recovery": {
+      "effects": "x",
+      "result": {
+        "ok": true,
+        "value": {
+          "count": 42,
+          "label": "kept",
+          "text": "restored"
+        },
+        "logs": []
+      },
+      "recoveryMs": 6
+    }
+  }
+}

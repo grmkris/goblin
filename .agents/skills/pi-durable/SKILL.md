@@ -166,3 +166,8 @@ itself authorize model spend, external messages, deployment or production change
   the current execution extension selection after reconstruction.
 
 - `code_run` may write owner files and is `replay: unsafe`; after an interrupted invocation, Pi reports the interruption and never automatically runs the script again. The native recovery regression writes, evicts, and reads the unchanged file through the reconstructed agent.
+
+- ADR 0115 is a local/test-only spike: `DQUICKTS_CODE_RUN=spike` selects synchronous TypeScript with heap checkpoints
+  and an app-owned per-call journal. Only that backend is safe for Pi to reenter with the same conversation/call id;
+  it restores the heap and never replays completed host calls. An unfinished write or MCP call becomes indeterminate.
+  The flag is ignored on dev and prod. Keep the default-path recovery regression alongside the flagged Pi eviction test.

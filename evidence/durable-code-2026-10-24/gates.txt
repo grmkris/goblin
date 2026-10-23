@@ -1,0 +1,37 @@
+Durable code spike gate receipts (2026-10-24)
+
+All commands ran from the repository root. `heavy` exit 75 was shared-slot contention; commands were retried unchanged.
+
+Final normalized artifact receipts: typecheck, full unit and targeted integration were rerun after the artifact build identity was pinned.
+
+PASS exit 0: heavy bun run --cwd apps/runtime typecheck
+PASS exit 0: heavy bun run --cwd apps/runtime effect:check
+  apps/runtime/tsconfig.json: 0 findings in 766 files
+PASS exit 0: heavy bun run --cwd apps/runtime test:unit
+  Test Files 184 passed (184); Tests 1217 passed (1217)
+PASS exit 0: bun --cwd apps/runtime test:unit test/durable-code.test.ts
+  Test Files 1 passed (1); Tests 17 passed (17)
+PASS exit 0: heavy bash vendor/dquickts/measure-baseline.sh e06aae34
+  Test Files 1 passed (1); Tests 1 passed (1)
+PASS exit 0: heavy env GOBLIN_HARNESS_PORT=22861 bun --cwd apps/runtime test:integration test/integration/durable-code.test.ts test/integration/code-recovery.test.ts
+  Test Files 2 passed (2); Tests 9 passed (9)
+PASS exit 0: heavy bash vendor/dquickts/build.sh .local/durable-code/source .local/durable-code/wasi-sdk
+PASS exit 0: sha256sum -c vendor/dquickts/SHA256SUMS
+  apps/runtime/src/agent-apps/dquickts/engine.wasm: OK
+PASS exit 0: cmp .local/durable-code/engine-normalized-1.wasm apps/runtime/src/agent-apps/dquickts/engine.wasm
+  repeated normalized build was byte-identical
+PASS exit 0: python3 vendor/dquickts/summarize.py e06aae340b9b942343ebc7c36b7e024a401a1897
+
+PASS exit 0: bun run check:files --lint-only apps/runtime/src/agent-apps/dquickts apps/runtime/src/agent-apps/script-result.ts apps/runtime/src/agent-apps/script.ts apps/runtime/src/agent-apps/engine.ts apps/runtime/src/agent.ts apps/runtime/src/env.ts apps/runtime/src/pi/apps.ts apps/runtime/src/storage/durable-code.ts apps/runtime/src/storage/migrations.ts apps/runtime/src/storage/migrations/durable-code.ts apps/runtime/test/durable-code.test.ts apps/runtime/test/migrations.test.ts apps/runtime/test/integration/durable-code.test.ts apps/runtime/test/integration/durable-code-baseline.ts apps/runtime/test/integration/durable-code-probe.ts apps/runtime/test/integration/stack.ts apps/runtime/test/integration/worker.ts
+  format pass (23 files, 1 ignored); oxlint pass (23 files)
+
+BLOCKED BY EXISTING REPO FINDINGS: heavy bun run check
+  exit 1 at tsc: scripts/fixtures/mcp-app/server.ts cannot resolve @modelcontextprotocol/server and has two implicit-any errors.
+  Earlier stages passed: release, format, repoagents, patches, chat-id, terms, graph.
+BLOCKED BY EXISTING REPO FINDINGS: heavy bun run lint:gate
+  exit 1; lint:gate reports scripts/fixtures/mcp-app/server.ts:26 oxlint(unused-disable-directive) and scripts/fixtures/mcp-app/package.json:11 knip(production:dependencies); 0 collection failures.
+
+PASS exit 0: bun run agents:check
+  repoagents: ok; agents:check passed
+PASS exit 0: bun run fmt:check
+  All matched files use the correct format.

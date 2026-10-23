@@ -12,6 +12,9 @@ import { type RpcResult, encodeExit } from './http/rpc.ts'
 import { filesExtension } from './pi/files.ts'
 import { type AgentApps, agentApps } from './agent-apps/engine.ts'
 import { appPorts } from './agent-apps/ports.ts'
+import { DurableScripts } from './agent-apps/dquickts/runner.ts'
+import { CodeStore } from './agent-apps/dquickts/store.ts'
+import { drizzle } from 'drizzle-orm/durable-sqlite'
 import { JOB_CALLBACK, type JobSchedules, type JobSlot } from './agent-apps/jobs.ts'
 import { reconcileAppJobs, runAppJob } from './agent-apps/wake.ts'
 import { mcpEventsWake } from './mcp/events/wake.ts'
@@ -130,12 +133,16 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     this.#telemetry = agentTelemetry(ctx.storage, () => this.name, run, env)
     // Without Dynamic Workers (ADR 0064) the agent is given no app or `code_run` tools: nothing could run them.
     const appsRun = env.LOADER !== undefined
+    const durableCode =
+      env.DQUICKTS_CODE_RUN === 'spike' && (env.STAGE === 'local' || env.STAGE === 'test')
+        ? new DurableScripts(new CodeStore(drizzle(ctx.storage)), apps.isolates)
+        : undefined
     const execution = [
       ...tools,
       guidance,
       skillsExtension(run),
       filesExtension(run),
-      ...(appsRun ? [appExecutionExtension(apps, run)] : []),
+      ...(appsRun ? [appExecutionExtension(apps, run, durableCode)] : []),
     ].map(outside)
     this.#subagents = subagentsExtension(run, (self) => [
       personaExtension,

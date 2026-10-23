@@ -5,6 +5,10 @@ description: Change goblin application-owned Durable Object schemas, SQLite migr
 
 # Drizzle Do in goblin
 
+ADR 0115's local/test dquickts spike adds `app_code_runs` and `app_code_calls` through a forward additive migration.
+Heap snapshots remain trusted server-only data; integrity binds their build, source, run id and counters. The journal
+records intent before dispatch and response before advancing the heap. Never hold a transaction across that host wait.
+
 Drizzle owns only goblin application tables and migrations; Pi/vendor storage stays outside this schema.
 
 - Verify the current Durable Object SQLite driver and runtime-safe migration entrypoints from installed source.

@@ -13,6 +13,7 @@ export default Alchemy.Stack(
   Effect.gen(function* () {
     const profile = yield* Config.String('GOBLIN_PRIMARY_PROFILE').pipe(Config.withDefault('root'))
     const port = yield* Config.Port('GOBLIN_HARNESS_PORT')
+    const durable = yield* Config.String('GOBLIN_DQUICKTS').pipe(Config.withDefault(''))
     const files = yield* Cloudflare.R2.Bucket('NativeFiles')
     const auth = yield* Cloudflare.D1.Database('NativeAccountUsage', {
       migrations: fileURLToPath(new URL('../../migrations', import.meta.url).href),
@@ -26,6 +27,8 @@ export default Alchemy.Stack(
         AUTH_DB: auth,
         FILES: files,
         LOADER: Cloudflare.WorkerLoader(),
+        DQUICKTS_CODE_RUN: durable,
+        STAGE: 'test',
         LIFECYCLE: Cloudflare.DurableObject('NativeLifecycleProbe'),
         MODEL_BASE_URL: 'https://no-model-calls.invalid/v1',
         MODEL_ID: 'storage-only',

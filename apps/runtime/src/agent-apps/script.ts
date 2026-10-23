@@ -5,6 +5,8 @@ import type { Isolates } from './isolates.ts'
 import { plainJson } from './json.ts'
 import { problemText, refusalOf } from './queue.ts'
 import { sha256Hex } from '../runtime/digest.ts'
+import type { ScriptResult } from './script-result.ts'
+export { ScriptResult } from './script-result.ts'
 
 /** How much of a file a script reads at once, and how long a script may take. */
 const READ_BYTES = 1024 * 1024
@@ -65,15 +67,6 @@ ${code}
 }
 export default {}
 `
-
-/** What `code_run` returns: whether the script finished, its value as JSON or its error, and what it logged. */
-export const ScriptResult = Schema.Struct({
-  ok: Schema.Boolean,
-  value: Schema.optionalKey(Schema.Json),
-  error: Schema.optionalKey(Schema.String),
-  logs: Schema.Array(Schema.String),
-})
-export type ScriptResult = typeof ScriptResult.Type
 
 /**
  * Runs a one-off JavaScript snippet in its own isolate (`code_run`): no network, the owner's files through `files`,
