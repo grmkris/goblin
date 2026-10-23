@@ -10,7 +10,6 @@ import * as Effect from 'effect/Effect'
 import { mirrorReaches } from '../grants/mirror.ts'
 import { CLOSED_VIEW, viewOf } from '../files/folders.ts'
 import { type Effective, type ToolNeed, allows, effectivePower, turnBoundary } from '../grants/power.ts'
-import { Forbidden } from '../http/errors.ts'
 import { writeLine } from '../observability/logger.ts'
 import { reportAndRecover, safeErrorType } from '../observability/report.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
@@ -153,13 +152,6 @@ export function outsidePower(run: RunProgram, extension: Extension): Extension {
   if (tools.every(open)) return extension
   return { ...extension, tools: tools.map((tool) => (open(tool) ? tool : checked(run, tool))) }
 }
-
-/** `Forbidden` `power` or `boundary` for the call `api` serves, when its power does not reach `need` where it runs. */
-export const requireNeed = (api: CallApi, context: PiContext, need: ToolNeed) =>
-  Effect.gen(function* () {
-    const found = verdictOf(yield* effectiveOf(api, context), need)
-    if (found !== 'open') return yield* new Forbidden({ reason: found === 'boundary' ? 'boundary' : 'power' })
-  })
 
 /** Every tool of `extensions`, each name once: what Pi's filter chooses from (`ToolSets.all`). */
 export const toolsOf = (extensions: readonly Extension[]): readonly ToolRegistration[] => {
