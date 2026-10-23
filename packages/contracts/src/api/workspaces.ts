@@ -2,7 +2,8 @@ import * as Schema from 'effect/Schema'
 import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
-import { CreateWorkspace, UpdateWorkspace, WorkspaceId, WorkspaceView } from '../account.ts'
+import { CreateWorkspace, UpdateWorkspace, WorkspaceView } from '../account.ts'
+import { WorkspaceId } from '../ids.ts'
 import { API_ERRORS } from './errors.ts'
 
 /**

@@ -33,3 +33,7 @@ export const EntryId = Schema.Int.check(Schema.isGreaterThan(0))
  */
 export const PageCursor = Schema.String.check(Schema.isPattern(/^\d{1,15}\.\d{1,12}$/u))
 export type PageCursor = typeof PageCursor.Type
+
+/** A workspace's ID, which also names its agent. */
+export const WorkspaceId = Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u))
+export type WorkspaceId = typeof WorkspaceId.Type

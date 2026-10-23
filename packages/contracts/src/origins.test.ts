@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { keyOriginsOf, serverOriginOf } from './account.ts'
+import { keyOriginsOf, serverOriginOf } from './origins.ts'
 
 const job = (origin: string, tools: readonly string[] = ['job_submit']) => ({ origin, tools })
 
