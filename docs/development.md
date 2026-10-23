@@ -201,9 +201,9 @@ until it runs, real provider and Telegram delivery remain unverified.
 
   The same key on `/mcp` lists `topic_create`, `conversation_send`, `conversation_entries` and the rest for its
   scopes. For your own MCP client use OAuth instead: an `.mcp.json` entry with only the URL
-  (`{"type": "http", "url": "$GOBLIN_ORIGIN/mcp"}`, no `headers`) signs in at the consent page, where you turn on what
-  it may manage (ADR 0086). With the
-  `inspect` scope (Change scopes on the key in Settings), see where a Persona's answer spent its time:
+  (`{"type": "http", "url": "$GOBLIN_ORIGIN/mcp"}`, no `headers`) signs in at the consent page, where Change sets its
+  grant's level, reach, extras and lifetime (ADR 0114). With the
+  `inspect` extra (Change access on the key in Settings), see where a Persona's answer spent its time:
 
   ```sh
   curl -sS "$GOBLIN_ORIGIN/api/inspect/turn?operation=persona:svc:job:1:first:<persona>" -H "authorization: Bearer $GOBLIN_KEY"
@@ -508,6 +508,14 @@ evidence, separate from signed-in deployed acceptance and real-device checks.
 right on a desktop and from the bottom on a phone, in light and dark: Everything to Only these, a tool switched off,
 touch rows of 44px, no sideways scroll, and Save as the owner API's compare-and-set answered with a routine left short.
 Screenshots go under `.local/goblin-acceptance/setup-*`; this is browser fixture evidence only.
+
+`heavy bun apps/web/test/ui-grant.ts` renders the grant editor (ADR 0114) from source in local Chromium at 1440 and
+390px, light and dark, with the Worker's and the agents' answers routed in: a key made from the preset narrowed to a
+picked Topic with `inspect` for 30 days and another key's access changed in Settings, an MCP client's consent changed
+to one workspace and approved (the grant saved before Better Auth's consent), a client's grant changed from Settings,
+and a widening link approved with exactly what it asked for added. Every choice row is 40px to point at and 44px to
+touch, and nothing scrolls sideways. Screenshots go under `.local/goblin-acceptance/grant-*`; this is browser fixture
+evidence only.
 
 `heavy bun apps/web/test/ui-navigation.ts` renders the real sidebar (ADR 0078) over a populated workspace in local
 Chromium, desktop and phone, light and dark: one highlighted row per page (a thread, a pinned App, an unpinned App under
