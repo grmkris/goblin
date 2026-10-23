@@ -5,6 +5,12 @@
     },
     "cloudflare": {
       "url": "https://mcp.cloudflare.com/mcp"
+    },
+    "goblin-prod": {
+      "url": "https://goblin.surf/mcp"
+    },
+    "goblin-dev": {
+      "url": "https://dev.goblin.surf/mcp"
     }
   }
 }

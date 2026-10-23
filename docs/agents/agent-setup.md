@@ -18,4 +18,6 @@ recorded adaptations) and verified by `bunx repoagents check`, which `agents:che
 `tools/agents.ts` keeps only the repo-authored checks. The shared design, review and grilling skills come from
 grmkris/personal (emil-design-eng, improve-animations and prototype retired for overlap); Cloudflare skills from
 cloudflare/skills, see `cloudflare-provenance.md`. `.mcp.json` lists mysi (one OAuth for the my* apps: myplan,
-myinbox, mytab, mytmux, mygram, myskills) and cloudflare (OAuth). Change skills with `bunx repoagents skills add`, `skills rehash` and `skills update`.
+myinbox, mytab, mytmux, mygram, myskills), cloudflare (OAuth), and goblin's own `/mcp` on each stage, `goblin-prod` and
+`goblin-dev` (OAuth as you; tick the workspaces and scopes the session may use, `inspect` and `transcripts` to debug a
+turn with the goblin-debug skill's inspect tools). Change skills with `bunx repoagents skills add`, `skills rehash` and `skills update`.

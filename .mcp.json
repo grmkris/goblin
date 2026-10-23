@@ -1,6 +1,8 @@
 {
   "mcpServers": {
     "mysi": { "type": "http", "url": "https://mysi.lol/mcp" },
-    "cloudflare": { "type": "http", "url": "https://mcp.cloudflare.com/mcp" }
+    "cloudflare": { "type": "http", "url": "https://mcp.cloudflare.com/mcp" },
+    "goblin-prod": { "type": "http", "url": "https://goblin.surf/mcp" },
+    "goblin-dev": { "type": "http", "url": "https://dev.goblin.surf/mcp" }
   }
 }
