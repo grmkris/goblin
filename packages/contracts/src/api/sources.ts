@@ -15,7 +15,6 @@ import {
 } from '../sources.ts'
 import { ApiErrors } from './errors.ts'
 import { EndpointRole } from './role.ts'
-import { EndpointScope } from './scope.ts'
 import { EndpointAccess } from './access.ts'
 
 const params = { id: SourceId }
@@ -35,9 +34,10 @@ const params = { id: SourceId }
  * - `remove`: `DELETE /api/sources/:id` ends its subscription and forgets it, its routes and what it held.
  */
 export class SourcesGroup extends HttpApiGroup.make('sources').add(
-  HttpApiEndpoint.get('list', '/sources', { success: SourcePage })
-    .annotate(EndpointScope, 'setup')
-    .annotate(EndpointAccess, { level: 'read', extra: 'setup' }),
+  HttpApiEndpoint.get('list', '/sources', { success: SourcePage }).annotate(EndpointAccess, {
+    level: 'read',
+    extra: 'setup',
+  }),
   HttpApiEndpoint.post('confirm', '/sources/:id/confirm', {
     params,
     payload: SourceRevision,
@@ -60,9 +60,7 @@ export class SourcesGroup extends HttpApiGroup.make('sources').add(
     params,
     success: SourceRoutes,
     error: [ApiErrors.notFound],
-  })
-    .annotate(EndpointScope, 'setup')
-    .annotate(EndpointAccess, { level: 'read', extra: 'setup' }),
+  }).annotate(EndpointAccess, { level: 'read', extra: 'setup' }),
   HttpApiEndpoint.put('route', '/sources/:id/routes', {
     params,
     payload: SourceRoutePick,

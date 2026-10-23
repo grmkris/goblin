@@ -14,7 +14,6 @@ import {
 import { NonEmptyString } from '../ids.ts'
 import { ApiErrors } from './errors.ts'
 import { EndpointAccess } from './access.ts'
-import { EndpointScope } from './scope.ts'
 import { EndpointRole } from './role.ts'
 
 /** `?limit=`: how many of the newest messages, 1 to 50. */
@@ -36,14 +35,15 @@ const ModelPick = Schema.Struct({ model: NonEmptyString(128) })
  *   owner's own model endpoint (ADR 0059). Setting one lists its models with the key first: a URL that is not public
  *   https, a refused key or an answer that is not a model list is invalid input. Clearing goes back to the
  *   deployment's.
- * - `models`: `GET /api/models`, the models a Persona may name now. A caller with the `personas` scope reaches it
- *   (ADR 0084), so a server can check a model before it writes a Persona.
+ * - `models`: `GET /api/models`, the models a Persona may name now. A credential reaches it with `read` (ADR 0084), so
+ *   a server can check a model before it writes a Persona.
  * - `ask`: `POST /api/agent/ask`, a question for the agent in main, labelled with the caller's name, answered when it
  *   settles within `waitMs` (else `running`, to ask again with the same operation id). It needs current resident
  *   authority and never grants it.
  * - `recent`: `GET /api/agent/recent?limit=`, the newest messages of main.
  *
- * `ask` and `recent` need the `agent` scope, which only an OAuth client of the owner holds (ADR 0086).
+ * A credential reaches `ask` with `write` and `recent` with `read` (ADRs 0086, 0114); both are main's, Personal's
+ * Conversation, so its grant must reach Personal (Topic 1).
  */
 export class AgentGroup extends HttpApiGroup.make('agent').add(
   HttpApiEndpoint.get('usage', '/agent/usage', { success: UsageToday }),
@@ -66,20 +66,14 @@ export class AgentGroup extends HttpApiGroup.make('agent').add(
     EndpointRole,
     'admin',
   ),
-  HttpApiEndpoint.get('models', '/models', { success: ModelOffer })
-    .annotate(EndpointScope, 'personas')
-    .annotate(EndpointAccess, { level: 'read' }),
+  HttpApiEndpoint.get('models', '/models', { success: ModelOffer }).annotate(EndpointAccess, { level: 'read' }),
   HttpApiEndpoint.post('ask', '/agent/ask', {
     payload: AgentAsk,
     success: AskResult,
     error: [ApiErrors.conflict, ApiErrors.budgetExhausted],
-  })
-    .annotate(EndpointScope, 'agent')
-    .annotate(EndpointAccess, { level: 'write' }),
+  }).annotate(EndpointAccess, { level: 'write' }),
   HttpApiEndpoint.get('recent', '/agent/recent', {
     query: RecentQuery,
     success: Schema.Struct({ messages: Schema.Array(TranscriptMessage) }),
-  })
-    .annotate(EndpointScope, 'agent')
-    .annotate(EndpointAccess, { level: 'read' }),
+  }).annotate(EndpointAccess, { level: 'read' }),
 ) {}

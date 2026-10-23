@@ -53,10 +53,10 @@ export interface AgentInputs {
   readonly scheduleSources: (seconds: number) => void
   readonly mcpFetch: typeof fetch
   /**
-   * The origins key `keyId` of this workspace grants now (ADR 0091), none once it is gone or expired: what a thread's
-   * declared servers are checked against at every use (ADR 0103).
+   * The origins grant `grantId` gives its threads in this workspace now (ADRs 0091, 0114), none once it is gone or
+   * ended: what a thread's declared servers are checked against at every use (ADR 0103).
    */
-  readonly keyOrigins: (keyId: string) => Promise<readonly KeyOrigin[] | undefined>
+  readonly grantOrigins: (grantId: string) => Promise<readonly KeyOrigin[] | undefined>
   /** The agent's apps, made before Pi opened (their tools are Pi's). */
   readonly agentApps: AgentApps
   /** The run ledger and log lines the agent's services report to (ADR 0024). */

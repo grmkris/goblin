@@ -2,7 +2,7 @@ import { ConversationEntries, StartedThread, TopicView } from '@goblin/contracts
 import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
-import { type Person, call, ownerFetch, person, signedIn } from './owner-requests.ts'
+import { type Person, call, keyBody, ownerFetch, person, signedIn } from './owner-requests.ts'
 import { ownerSnapshot } from './probe-reads.ts'
 
 const Snapshot = Schema.Struct({
@@ -12,9 +12,12 @@ const Secret = Schema.Struct({ key: Schema.Struct({ id: Schema.String }), secret
 const Made = Schema.Struct({ id: Schema.Int })
 const Refusal = Schema.Struct({ error: Schema.Struct({ reason: Schema.optional(Schema.String) }) })
 
-/** A key of `who` with `scopes` (ADR 0081), as the owner makes it in Settings: its id and secret. */
-async function keyOf(base: string, who: Person, scopes: readonly string[]) {
-  const made = await call(base, who, '/api/keys', { name: 'threads', scopes, servers: [], expiresInDays: 1 })
+/**
+ * A key of `who` (ADR 0081), as the owner makes it in Settings: its grant `level` over only what it makes (ADR 0114),
+ * its id and secret.
+ */
+async function keyOf(base: string, who: Person, level: 'write' | 'manage') {
+  const made = await call(base, who, '/api/keys', keyBody(who, 'threads', { level, lists: true }))
   expect(made.status, await made.clone().text()).toBe(201)
   const { key, secret } = Schema.decodeUnknownSync(Secret)(await made.json())
   return { id: key.id, secret }
@@ -47,9 +50,9 @@ const reasonOf = async (response: Response) => Schema.decodeUnknownSync(Refusal)
 export async function keyThreadsCase(url: string): Promise<void> {
   const owner = await person(url)
   const me = signedIn(url, owner)
-  const made = await keyOf(url, owner, ['topics', 'conversations', 'personas'])
+  const made = await keyOf(url, owner, 'manage')
   const { secret } = made
-  const { secret: other } = await keyOf(url, owner, ['topics', 'conversations'])
+  const { secret: other } = await keyOf(url, owner, 'write')
   const topicOf = async (key: string, name: string, operationId: string) =>
     Schema.decodeUnknownSync(TopicView)(
       await (await asKey(url, key, 'POST', '/api/topics', { name, operationId })).json(),
@@ -106,14 +109,14 @@ export async function keyThreadsCase(url: string): Promise<void> {
   expect((await asKey(url, secret, 'GET', `/api/conversations/${thread.id}/entries?after=0`)).status).toBe(200)
   expect((await patch(secret, thread.id, { closed: false })).status).toBe(200)
 
-  // Nothing else: another key's chat, its Topic's Conversation, or pinning a chat open.
-  expect((await patch(other, thread.id, { title: 'Mine now' })).status).toBe(404)
-  expect((await patch(secret, otherTopic.conversation, { closed: true })).status).toBe(404)
+  // Nothing else: another key's chat (outside its grant's reach), its Topic's Conversation, or pinning a chat open.
+  expect((await patch(other, thread.id, { title: 'Mine now' })).status).toBe(403)
+  expect((await patch(secret, otherTopic.conversation, { closed: true })).status).toBe(403)
   const conversation = await patch(secret, channel, { title: 'Renamed channel' })
   expect(await reasonOf(conversation)).toBe('topic_conversation')
   const pinned = await patch(secret, thread.id, { keepOpen: true })
   expect(pinned.status).toBe(403)
-  expect(await reasonOf(pinned)).toBe('key_keep_open')
+  expect(await reasonOf(pinned)).toBe('credential_keep_open')
 
   // The forward read shows the key's message to a Persona as the owner's, with whom it went to.
   const persona = Schema.decodeUnknownSync(Made)(
@@ -156,5 +159,5 @@ export async function keyThreadsCase(url: string): Promise<void> {
     await (await asKey(url, renewed, 'GET', `/api/conversations/${thread.id}/entries?after=0`)).json(),
   )
   expect(reread.entries).toContainEqual(expect.objectContaining({ kind: 'message', text: 'find the venue' }))
-  expect((await patch(renewed, otherTopic.conversation, { closed: true })).status).toBe(404)
+  expect((await patch(renewed, otherTopic.conversation, { closed: true })).status).toBe(403)
 }

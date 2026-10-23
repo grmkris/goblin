@@ -1,15 +1,23 @@
 import type { InspectQuery } from '@goblin/contracts/inspect'
 import * as Effect from 'effect/Effect'
-import type { Caller } from '../src/http/api/principal.ts'
+import type { Credential } from '../src/http/api/principal.ts'
 import { type AgentFetch, type OwnerClient, ownerCall } from '../src/inbound/client.ts'
 import { type RpcResult, encodeExit } from '../src/http/rpc.ts'
 
-/** The OAuth client the probes act as (ADR 0086), named `name`, with every scope a client's consent can give. */
-export const fixtureClient = (name = 'fixture-client'): Caller => ({
+/**
+ * The OAuth client the probes act as (ADRs 0086, 0114), named `name`, its grant `manage` over every Topic, Persona and
+ * connection with `inspect`.
+ */
+export const fixtureClient = (name = 'fixture-client'): Credential => ({
   kind: 'client',
-  clientId: 'fixture-client',
+  id: 'fixture-client',
   name,
-  scopes: ['agent', 'topics', 'conversations', 'personas', 'inspect', 'transcripts'],
+  grantId: 'cg_fixture',
+  level: 'manage',
+  extras: ['inspect'],
+  expiresAt: null,
+  ws: { workspace: 'probe', topics: 'all', personas: 'all', connections: 'all', generation: 1 },
+  origins: [],
 })
 
 /** The person an OAuth client of the probes acts for (ADR 0089). */
@@ -21,7 +29,7 @@ const PROBE_MEMBER = { user: 'probe-owner', role: 'owner', name: 'Owner', shared
  */
 const callerResult = async <A, E>(
   agent: AgentFetch,
-  caller: Caller,
+  caller: Credential,
   call: (api: OwnerClient) => Effect.Effect<A, E>,
 ): Promise<RpcResult<A>> =>
   encodeExit(

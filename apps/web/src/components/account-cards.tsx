@@ -1,7 +1,7 @@
 // The Settings cards about the account: the MCP clients connected to it and the workspaces each reaches, and deleting
 // the account.
 import { type SubmitEvent, useState } from 'react'
-import type { ClientReach, InboundClient } from '@goblin/contracts'
+import { type InboundClient, presetFor } from '@goblin/contracts'
 import { useMutation, useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import {
   Alert,
@@ -16,7 +16,8 @@ import {
   FieldGroup,
   Skeleton,
 } from '@goblin/ui'
-import { clientReachMutation, clientsQuery, revokeClientMutation, workspacesQuery } from '../account/queries.ts'
+import { clientGrantMutation, clientsQuery, revokeClientMutation, workspacesQuery } from '../account/queries.ts'
+import { type ReachChoice, withWorkspaces } from '../lib/grant-terms.ts'
 import { AuthRefused, deleteAccountMutation } from '../auth/queries.ts'
 import { messageOf, withRef } from '../lib/query/app-error.ts'
 import { QueryBoundary } from '../lib/query/query-boundary.tsx'
@@ -34,11 +35,13 @@ const reachWords = ({ reach }: InboundClient): string =>
 function ChangeReach(props: { readonly client: InboundClient; readonly onDone: () => void }) {
   const workspaces = useQuery(workspacesQuery).data ?? []
   const { reach } = props.client
-  const [value, setValue] = useState<ClientReach>({
+  const [value, setValue] = useState<ReachChoice>({
     all: reach.all,
     workspaces: reach.workspaces.map((workspace) => workspace.id),
   })
-  const change = useMutation(clientReachMutation)
+  const change = useMutation(clientGrantMutation)
+  // Its grant's terms with the workspaces chosen here; a client listed without one starts from the preset.
+  const terms = withWorkspaces(props.client.terms ?? presetFor(props.client.name ?? 'MCP client', 'all'), value)
   const failure = change.error === null ? '' : messageOf(change.error, 'change the workspaces it reaches')
   return (
     <div className="flex flex-col gap-2">
@@ -53,7 +56,7 @@ function ChangeReach(props: { readonly client: InboundClient; readonly onDone: (
           size="sm"
           pending={change.isPending}
           disabled={!reachesAny(value)}
-          onClick={() => change.mutate({ clientId: props.client.clientId, ...value }, { onSuccess: props.onDone })}
+          onClick={() => change.mutate({ clientId: props.client.clientId, terms }, { onSuccess: props.onDone })}
         >
           Save
         </Button>

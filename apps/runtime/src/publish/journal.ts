@@ -8,7 +8,7 @@ import { type SQL, and, asc, desc, eq, gt, gte, inArray, lt, lte, max, min, sql 
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { hasReach, reachedIds } from '../keys/reach.ts'
+import { listedIds, mirrorReaches } from '../grants/mirror.ts'
 import {
   appPublishDeliveries,
   appPublishDirty,
@@ -105,10 +105,6 @@ export type Wake = {
   readonly at: number
 }
 
-/** The key a lease's holder is (`key:<id>`), when a key holds it. */
-export const keyOfHolder = (holder: string): string | undefined =>
-  holder.startsWith('key:') ? holder.slice('key:'.length) : undefined
-
 /** The occurrence a journal row is. */
 const occurrenceOf = (row: typeof appPublishJournal.$inferSelect): PublishedOccurrence => ({
   eventId: row.eventId,
@@ -157,7 +153,10 @@ function queueWake<R>(db: Db<R>, lease: string, occurrence: PublishedOccurrence,
     .run()
 }
 
-/** Every active lease whose selector takes the wake and whose holder reaches its chat: a key only its own rooms. */
+/**
+ * Every active lease whose selector takes the wake and whose holder reaches its chat: a credential's only while its
+ * grant reaches the chat's Topic, as the agent's mirror holds it (ADR 0114).
+ */
 function fanOut<R>(db: Db<R>, occurrence: PublishedOccurrence, wake: Wake): number {
   const topicId = topicOfWake(wake.data)
   const leases = db
@@ -175,8 +174,7 @@ function fanOut<R>(db: Db<R>, occurrence: PublishedOccurrence, wake: Wake): numb
   for (const lease of leases) {
     if (lease.topicId !== null && lease.topicId !== topicId) continue
     if (lease.chatId !== null && lease.chatId !== wake.data.chat) continue
-    const key = keyOfHolder(lease.principal)
-    if (key !== undefined && !hasReach(db, key, 'topic', topicId)) continue
+    if (lease.grantId !== null && !mirrorReaches(db, lease.grantId, 'topic', String(topicId))) continue
     queueWake(db, lease.id, occurrence, wake.at)
     queued += 1
   }
@@ -230,9 +228,12 @@ export function record(
   })
 }
 
-/** A poll as the journal reads it: its holder's key (none reaches every chat), its selector, cursor and bounds. */
+/**
+ * A poll as the journal reads it: the grant whose Topic list it keeps to (none reaches every chat), its selector, cursor
+ * and bounds.
+ */
 export type PageQuery = {
-  readonly key: string | undefined
+  readonly grant: string | undefined
   readonly name: string
   readonly topicId?: number | undefined
   readonly chat?: string | undefined
@@ -257,7 +258,8 @@ export function page(db: Db, query: PageQuery): EventsPolled {
   ]
   if (query.topicId !== undefined) conditions.push(eq(appPublishJournal.topicId, query.topicId))
   if (query.chat !== undefined) conditions.push(eq(appPublishJournal.chatId, query.chat))
-  if (query.key !== undefined) conditions.push(inArray(appPublishJournal.topicId, reachedIds(db, query.key, 'topic')))
+  if (query.grant !== undefined)
+    conditions.push(inArray(appPublishJournal.topicId, listedIds(db, query.grant, 'topic')))
   const rows = db
     .select()
     .from(appPublishJournal)

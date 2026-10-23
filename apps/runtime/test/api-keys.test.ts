@@ -1,3 +1,4 @@
+import { type GrantTerms, presetFor } from '@goblin/contracts'
 import { InvalidInput, NotFound, Unauthenticated } from '@goblin/contracts/api'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -9,6 +10,7 @@ import { handleInboundMcp } from '../src/inbound/route.ts'
 import { bearerKey } from '../src/http/api/principal.ts'
 import { handleAuth } from '../src/auth/service.ts'
 import type { RuntimeEnv } from '../src/env.ts'
+import { d1Of } from './d1-sqlite.ts'
 
 const DIR = fileURLToPath(new URL('../migrations', import.meta.url).href)
 const APP = 'https://goblin.test'
@@ -20,7 +22,7 @@ afterEach(() => {
 
 /**
  * The real auth store (every migration) with two people, each the owner of their own workspace (ADR 0089), under the
- * deployed Better Auth options.
+ * deployed Better Auth options, reached as D1 is (`d1Of`).
  */
 const fixture = () => {
   const db = new DatabaseSync(':memory:')
@@ -41,12 +43,18 @@ const fixture = () => {
   const env: RuntimeEnv = Object.assign(Object.create(null), {
     APP_URL: APP,
     BETTER_AUTH_SECRET: 'api-key-fixture-secret-at-least-32-characters',
-    AUTH_DB: db,
+    AUTH_DB: d1Of(db),
   })
   return { db, env }
 }
 
-const KEY = { name: 'service-dev', scopes: ['topics', 'conversations'], servers: ['mycut'], expiresInDays: 30 } as const
+/** A grant's terms for workspace `workspace`: `write` over everything, `inspect`, until revoked, unless `changes` say. */
+const terms = (workspace: string, changes: Partial<GrantTerms> = {}): GrantTerms => ({
+  ...presetFor('service-dev', [workspace]),
+  extras: ['inspect'],
+  ...changes,
+})
+const KEY = { name: 'service-dev', terms: terms('w1') }
 const refusal = (promise: Promise<unknown>) =>
   promise.then(
     () => undefined,
@@ -60,72 +68,102 @@ const invalidFor = (promise: Promise<unknown>) =>
     (error: unknown) => (error instanceof InvalidInput ? error.reason : error),
   )
 
-describe('server API keys (ADR 0081)', () => {
-  it('makes a hashed gbk_ key whose secret admits its workspace with its scopes and servers, once shown', async () => {
+describe('server API keys (ADRs 0081, 0114)', () => {
+  it('makes a hashed gbk_ key and its grant, whose secret admits its workspace as its credential, once shown', async () => {
     const { db, env } = fixture()
     const { key, secret } = await createKey(env, 'w1', 'u1', KEY)
     expect(secret).toMatch(/^gbk_[A-Za-z]{64}$/u)
-    expect(key).toMatchObject({ name: 'service-dev', scopes: ['topics', 'conversations'], servers: ['mycut'] })
+    expect(key).toMatchObject({ name: 'service-dev', grantId: key.id, terms: KEY.terms })
     expect(key.start).toBe(secret.slice(0, 10))
-    expect(Date.parse(key.expiresAt ?? '') - Date.now()).toBeGreaterThan(29 * 86_400_000)
-    const stored = db.prepare('SELECT key, referenceId, metadata FROM apikey').get()
+    expect(key.expiresAt).toBeUndefined()
+    const stored = db.prepare('SELECT key, referenceId, metadata, permissions, expiresAt FROM apikey').get()
     expect(stored?.['referenceId']).toBe('w1')
-    expect(JSON.parse(String(stored?.['metadata']))).toEqual({ servers: ['mycut'], origins: [], createdBy: 'u1' })
+    expect(JSON.parse(String(stored?.['metadata']))).toEqual({ createdBy: 'u1' })
+    expect([stored?.['permissions'], stored?.['expiresAt']]).toEqual([null, null])
     expect(stored?.['key']).not.toContain(secret.slice(4))
     expect(await verifyKey(env, secret)).toEqual({
       workspaceId: 'w1',
-      keyId: key.id,
-      name: 'service-dev',
-      scopes: ['topics', 'conversations'],
-      servers: ['mycut'],
-      origins: [],
+      credential: {
+        kind: 'key',
+        id: key.id,
+        name: 'service-dev',
+        grantId: key.id,
+        level: 'write',
+        extras: ['inspect'],
+        expiresAt: null,
+        ws: { workspace: 'w1', topics: 'all', personas: 'all', connections: 'all', generation: expect.any(Number) },
+        origins: [],
+      },
     })
     expect(await listKeys(env, 'w1')).toEqual([expect.objectContaining({ id: key.id, name: 'service-dev' })])
     expect(JSON.stringify(await listKeys(env, 'w1'))).not.toContain(secret)
     expect(await listKeys(env, 'w2')).toEqual([])
   })
 
-  it('makes no key for a workspace the person is not a member of', async () => {
+  it('makes no key for a workspace the person is not a member of, and its grant reaches only its own', async () => {
     const { db, env } = fixture()
     await expect(createKey(env, 'w2', 'u1', KEY)).rejects.toThrow()
     expect(db.prepare('SELECT COUNT(*) AS count FROM apikey').get()).toEqual({ count: 0 })
+    const elsewhere = { name: 'x', terms: terms('w2', { reach: { workspaces: 'all', each: [], origins: [] } }) }
+    const { key } = await createKey(env, 'w1', 'u1', elsewhere)
+    expect(key.terms.reach.workspaces).toBe('list')
+    expect(key.terms.reach.each.map((each) => each.workspace)).toEqual(['w1'])
   })
 
-  it('gives a key new scopes in place: the same id and secret, and only in its own workspace (ADR 0084)', async () => {
+  it('gives a key new terms in place: the same id and secret, a new generation, and only in its own workspace', async () => {
     const { env } = fixture()
     const { key, secret } = await createKey(env, 'w1', 'u1', KEY)
-    const { before, after } = await updateKey(env, 'w1', 'u1', key.id, { scopes: ['topics', 'inspect', 'inspect'] })
-    expect(before.scopes).toEqual(['topics', 'conversations'])
-    expect(after).toMatchObject({ id: key.id, name: 'service-dev', scopes: ['topics', 'inspect'], servers: ['mycut'] })
-    expect(await verifyKey(env, secret)).toEqual({
-      workspaceId: 'w1',
-      keyId: key.id,
-      name: 'service-dev',
-      scopes: ['topics', 'inspect'],
-      servers: ['mycut'],
-      origins: [],
+    const first = (await verifyKey(env, secret)).credential.ws.generation
+    const listed = terms('w1', {
+      level: 'manage',
+      reach: {
+        workspaces: 'list',
+        each: [
+          {
+            workspace: 'w1',
+            topics: { kind: 'list', ids: ['2'] },
+            personas: { kind: 'all' },
+            connections: { kind: 'all' },
+          },
+        ],
+        origins: [],
+      },
     })
-    await expect(updateKey(env, 'w2', 'u2', key.id, { scopes: ['personas'] })).rejects.toBeInstanceOf(NotFound)
-    expect((await verifyKey(env, secret)).scopes).toEqual(['topics', 'inspect'])
+    const { before, after } = await updateKey(env, 'w1', 'u1', key.id, { terms: listed })
+    expect(before.terms.level).toBe('write')
+    expect(after).toMatchObject({ id: key.id, name: 'service-dev', terms: { level: 'manage' } })
+    const now = (await verifyKey(env, secret)).credential
+    expect(now).toMatchObject({ id: key.id, level: 'manage', ws: { topics: 'list' } })
+    expect(now.ws.generation).toBeGreaterThan(first)
+    await expect(updateKey(env, 'w2', 'u2', key.id, { terms: KEY.terms })).rejects.toBeInstanceOf(NotFound)
+    expect((await verifyKey(env, secret)).credential.level).toBe('manage')
+  })
+
+  it('ends a key when its grant does, and gives none of `keys` but by an owner', async () => {
+    const { db, env } = fixture()
+    const { key, secret } = await createKey(env, 'w1', 'u1', { ...KEY, terms: terms('w1', { lifetime: '1d' }) })
+    expect(Date.parse(key.expiresAt ?? '') - Date.now()).toBeGreaterThan(23 * 3_600_000)
+    db.prepare('UPDATE "grant" SET expiresAt = ? WHERE id = ?').run('2026-01-01T00:00:00.000Z', key.id)
+    expect(await refusal(verifyKey(env, secret))).toBe('grant_expired')
+    db.exec(
+      `INSERT INTO member (id, organizationId, userId, role, createdAt) VALUES ('m-a', 'w1', 'u2', 'admin', '${NOW}')`,
+    )
+    const keys = { ...KEY, terms: terms('w1', { extras: ['keys'] }) }
+    await expect(createKey(env, 'w1', 'u2', keys)).rejects.toMatchObject({ _tag: 'Forbidden', reason: 'role' })
+    expect((await createKey(env, 'w1', 'u1', keys)).key.terms.extras).toEqual(['keys'])
   })
 
   it('rotates a key in place: a new secret admits as the same key, the old one no more, at once (ADR 0105)', async () => {
     const { db, env } = fixture()
     const origins = [{ origin: 'https://mcp.swarmm.app', tools: ['job_submit'] }]
-    const { key, secret } = await createKey(env, 'w1', 'u1', { ...KEY, origins })
+    const withOrigins = terms('w1', { reach: { ...KEY.terms.reach, origins } })
+    const { key, secret } = await createKey(env, 'w1', 'u1', { ...KEY, terms: withOrigins })
     const rotated = await rotateKey(env, 'w1', key.id)
     expect(rotated.secret).toMatch(/^gbk_[A-Za-z]{64}$/u)
     expect(rotated.secret).not.toBe(secret)
     expect(rotated.key).toEqual({ ...key, start: rotated.secret.slice(0, 10) })
     expect(await refusal(verifyKey(env, secret))).toBe('key')
-    expect(await verifyKey(env, rotated.secret)).toEqual({
-      workspaceId: 'w1',
-      keyId: key.id,
-      name: 'service-dev',
-      scopes: ['topics', 'conversations'],
-      servers: ['mycut'],
-      origins,
-    })
+    expect((await verifyKey(env, rotated.secret)).credential).toMatchObject({ id: key.id, origins })
     // One row, still its maker's, holding only the new secret's hash.
     const rows = db.prepare('SELECT id, key, metadata FROM apikey').all()
     expect(rows).toHaveLength(1)
@@ -134,43 +172,36 @@ describe('server API keys (ADR 0081)', () => {
     expect(rows[0]?.['key']).not.toContain(rotated.secret.slice(4))
   })
 
-  it("rotates no key of another workspace's, nor one revoked or expired", async () => {
+  it("rotates no key of another workspace's, nor one revoked or whose grant ended", async () => {
     const { db, env } = fixture()
     const { key, secret } = await createKey(env, 'w1', 'u1', KEY)
     await expect(rotateKey(env, 'w2', key.id)).rejects.toBeInstanceOf(NotFound)
-    expect((await verifyKey(env, secret)).keyId).toBe(key.id)
+    expect((await verifyKey(env, secret)).credential.id).toBe(key.id)
     const expired = await createKey(env, 'w1', 'u1', KEY)
-    db.prepare('UPDATE apikey SET expiresAt = ? WHERE id = ?').run('2026-01-01T00:00:00.000Z', expired.key.id)
+    db.prepare('UPDATE "grant" SET expiresAt = ? WHERE id = ?').run('2026-01-01T00:00:00.000Z', expired.key.id)
     await expect(rotateKey(env, 'w1', expired.key.id)).rejects.toBeInstanceOf(NotFound)
     await revokeKey(env, 'w1', key.id)
     await expect(rotateKey(env, 'w1', key.id)).rejects.toBeInstanceOf(NotFound)
+    expect(db.prepare('SELECT COUNT(*) AS count FROM "grant" WHERE id = ?').get(key.id)).toEqual({ count: 0 })
   })
 
-  it('keeps the MCP origins the owner grants a key, normalized, beside its servers and maker (ADR 0091)', async () => {
-    const { db, env } = fixture()
-    const origins = [{ origin: 'https://MCP.swarmm.app/', tools: ['job_submit', 'job_status'] }]
-    const { key, secret } = await createKey(env, 'w1', 'u1', { ...KEY, origins })
-    const granted = [{ origin: 'https://mcp.swarmm.app', tools: ['job_submit', 'job_status'] }]
-    expect(key.origins).toEqual(granted)
-    expect((await verifyKey(env, secret)).origins).toEqual(granted)
-    // Changing the scopes keeps the origins; changing the origins keeps the scopes, servers and maker.
-    await updateKey(env, 'w1', 'u1', key.id, { scopes: ['personas'] })
-    const moved = [{ origin: 'https://dev.swarmm.app', tools: ['job_submit'] }]
-    const { before, after } = await updateKey(env, 'w1', 'u1', key.id, { origins: moved })
-    expect([before.origins, after.origins]).toEqual([granted, moved])
-    expect(await verifyKey(env, secret)).toMatchObject({ scopes: ['personas'], servers: ['mycut'], origins: moved })
-    const stored = db.prepare('SELECT metadata FROM apikey').get()
-    expect(JSON.parse(String(stored?.['metadata']))).toEqual({ servers: ['mycut'], origins: moved, createdBy: 'u1' })
-  })
-
-  it('refuses origins no key may hold, and leaves the key as it was', async () => {
+  it('keeps the MCP origins its grant names, normalized, and refuses origins no key may hold', async () => {
     const { env } = fixture()
+    const origins = [{ origin: 'https://MCP.swarmm.app/', tools: ['job_submit', 'job_status'] }]
+    const { key, secret } = await createKey(env, 'w1', 'u1', {
+      ...KEY,
+      terms: terms('w1', { reach: { ...KEY.terms.reach, origins } }),
+    })
+    const granted = [{ origin: 'https://mcp.swarmm.app', tools: ['job_submit', 'job_status'] }]
+    expect(key.terms.reach.origins).toEqual(granted)
+    expect((await verifyKey(env, secret)).credential.origins).toEqual(granted)
     const local = [{ origin: 'https://10.0.0.2', tools: ['job_submit'] }]
-    expect(await invalidFor(createKey(env, 'w1', 'u1', { ...KEY, origins: local }))).toBe('key_origin')
-    const { key, secret } = await createKey(env, 'w1', 'u1', KEY)
+    const refused = { ...KEY, terms: terms('w1', { reach: { ...KEY.terms.reach, origins: local } }) }
+    expect(await invalidFor(createKey(env, 'w1', 'u1', refused))).toBe('key_origin')
     const everything = [{ origin: 'https://mcp.swarmm.app', tools: ['all'] }]
-    expect(await invalidFor(updateKey(env, 'w1', 'u1', key.id, { origins: everything }))).toBe('key_origin_tools')
-    expect((await verifyKey(env, secret)).origins).toEqual([])
+    const widened = terms('w1', { reach: { ...KEY.terms.reach, origins: everything } })
+    expect(await invalidFor(updateKey(env, 'w1', 'u1', key.id, { terms: widened }))).toBe('key_origin_tools')
+    expect((await verifyKey(env, secret)).credential.origins).toEqual(granted)
   })
 
   it("keeps admitting a key whose plugin counter is full: its rate limit is its agent's (ADR 0085)", async () => {
@@ -179,7 +210,7 @@ describe('server API keys (ADR 0081)', () => {
     db.prepare(
       'UPDATE apikey SET rateLimitEnabled = 1, rateLimitTimeWindow = 60000, rateLimitMax = 600, requestCount = 600, lastRequest = ? WHERE id = ?',
     ).run(new Date().toISOString(), key.id)
-    expect((await verifyKey(env, secret)).keyId).toBe(key.id)
+    expect((await verifyKey(env, secret)).credential.id).toBe(key.id)
   })
 
   it('answers /mcp for a key that does not admit with its typed refusal, which the Worker renders', async () => {
@@ -192,7 +223,7 @@ describe('server API keys (ADR 0081)', () => {
     await expect(handleInboundMcp(request, env)).rejects.toMatchObject({ _tag: 'Unauthenticated', reason: 'key' })
   })
 
-  it('refuses an unknown, revoked or expired key, and one whose workspace is gone', async () => {
+  it('refuses an unknown or revoked key, and one whose workspace is gone', async () => {
     const { db, env } = fixture()
     expect(await refusal(verifyKey(env, `gbk_${'x'.repeat(64)}`))).toBe('key')
     const revoked = await createKey(env, 'w1', 'u1', KEY)
@@ -200,10 +231,7 @@ describe('server API keys (ADR 0081)', () => {
     expect((await verifyKey(env, revoked.secret)).workspaceId).toBe('w1')
     await revokeKey(env, 'w1', revoked.key.id)
     expect(await refusal(verifyKey(env, revoked.secret))).toBe('key')
-    const expired = await createKey(env, 'w1', 'u1', KEY)
-    db.prepare('UPDATE apikey SET expiresAt = ? WHERE id = ?').run('2026-01-01T00:00:00.000Z', expired.key.id)
-    expect(await refusal(verifyKey(env, expired.secret))).toBe('key')
-    const orphan = await createKey(env, 'w2', 'u2', KEY)
+    const orphan = await createKey(env, 'w2', 'u2', { ...KEY, terms: terms('w2') })
     db.exec("PRAGMA foreign_keys = ON; DELETE FROM organization WHERE id = 'w2'")
     expect(await refusal(verifyKey(env, orphan.secret))).toBe('key')
   })

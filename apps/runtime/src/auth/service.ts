@@ -4,13 +4,8 @@ import { nowSeconds } from '../clock.ts'
 import { Unauthenticated } from '../http/errors.ts'
 import { isOidcPath } from './oidc.ts'
 import { AUTH_BASE_PATH, authIssuer, createAuth } from './options.ts'
-import {
-  type ConsentRow,
-  clientFromClaims,
-  type ClientPrincipal,
-  grantedScopes,
-  type TokenClaims,
-} from './principal.ts'
+import { type GrantRecord, grantOfClient, isLive, revokeClientGrant } from './grants.ts'
+import { clientFromClaims, type ClientPrincipal, type TokenClaims } from './principal.ts'
 import { mcpResource, protectedResourceMetadata } from './resources.ts'
 import type { Person } from './workspaces.ts'
 
@@ -39,11 +34,16 @@ export const requireUserSession = async (request: Request, env: RuntimeEnv): Pro
 
 /**
  * An inbound MCP client's access token: a signature from our own JWKS (read locally, no self-fetch), our issuer and
- * /mcp audience, an enabled client, and the person's standing consent to it (ADR 0097: a consent names no workspace).
- * Its scopes count only while that consent still grants them, so revoking the client or consenting again more narrowly
- * ends its access at once; which workspaces it reaches is its reach, read on every call.
+ * /mcp audience, an enabled client, the person's standing consent to it (ADR 0097: a consent names no workspace) and
+ * the live grant they gave it (ADR 0114). The token's scopes count for nothing: what it may do is that grant, read on
+ * every call, so changing it in Settings applies to the live token at once and revoking the client ends it. A grant
+ * past its end ends the consent and the client's refresh tokens with it (`grant_expired`), so the next sign-in asks
+ * again, pre-filled with the same terms.
  */
-export const verifyClientToken = async (token: string, env: RuntimeEnv): Promise<ClientPrincipal> => {
+export const verifyClientToken = async (
+  token: string,
+  env: RuntimeEnv,
+): Promise<ClientPrincipal & { readonly grant: GrantRecord }> => {
   const auth = createAuth(env, env.AUTH_DB)
   const resource = mcpResource(env.APP_URL)
   let claims: TokenClaims
@@ -62,13 +62,19 @@ export const verifyClientToken = async (token: string, env: RuntimeEnv): Promise
     .first<{ disabled: number | null }>()
   if (client === null || client.disabled === 1) throw new Unauthenticated({ reason: 'client revoked' })
   const consent = await env.AUTH_DB.prepare(
-    'SELECT scopes FROM oauthConsent WHERE clientId = ? AND userId = ? AND referenceId IS NULL',
+    'SELECT 1 AS present FROM oauthConsent WHERE clientId = ? AND userId = ? AND referenceId IS NULL',
   )
     .bind(principal.clientId, principal.subject)
-    .first<ConsentRow>()
+    .first<{ present: number }>()
   if (consent === null) throw new Unauthenticated({ reason: 'consent revoked' })
-  const granted = grantedScopes(consent)
-  return { ...principal, scopes: principal.scopes.filter((scope) => granted.includes(scope)) }
+  const grant = await grantOfClient(env.AUTH_DB, principal.clientId, principal.subject)
+  if (grant === undefined || grant.revokedAt !== null) throw new Unauthenticated({ reason: 'consent revoked' })
+  const now = Date.now()
+  if (!isLive(grant, now)) {
+    await revokeClientGrant(env.AUTH_DB, principal.subject, principal.clientId, now)
+    throw new Unauthenticated({ reason: 'grant_expired' })
+  }
+  return { ...principal, grant }
 }
 
 /**

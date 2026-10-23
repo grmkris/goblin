@@ -5,7 +5,7 @@ import * as HttpApi from 'effect/http-api/HttpApi'
 import { describe, expect, it } from 'vitest'
 import { RequestContext } from '../../../src/http/api/context.ts'
 import type { Member } from '../../../src/http/api/principal.ts'
-import { requireAdminFor } from '../../../src/keys/policy.ts'
+import { requireAdminFor } from '../../../src/grants/policy.ts'
 
 /** Every owner endpoint that takes an admin, as `<group>.<endpoint>`, from the contract alone. */
 const adminEndpoints = (): readonly string[] => {

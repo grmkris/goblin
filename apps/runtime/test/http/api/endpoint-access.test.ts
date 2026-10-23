@@ -1,6 +1,6 @@
 import { AccessGroup, OwnerApi, ownerApiOf } from '@goblin/contracts/api'
 import { describe, expect, it } from 'vitest'
-import { endpointAccess, endpointScopes } from '../../../src/http/api/context.ts'
+import { endpointAccess } from '../../../src/http/api/context.ts'
 
 /** What each owner endpoint a credential may call needs of its grant; a handler checks the reach of what it touches. */
 const NEEDS = {
@@ -43,12 +43,13 @@ const NEEDS = {
   'events.subscribe': { level: 'read' },
   'events.unsubscribe': { level: 'read' },
   'events.poll': { level: 'read' },
+  'access.read': { level: 'read' },
 }
 
 describe("what a credential's grant must hold for each owner endpoint", () => {
-  it('names a need for every endpoint a scope opens today, and for no other', () => {
-    expect([...endpointAccess(OwnerApi).keys()].toSorted()).toEqual([...endpointScopes(OwnerApi).keys()].toSorted())
-    expect(endpointAccess(OwnerApi).size).toBe(39)
+  it('names a need for exactly the 40 endpoints a credential reaches, and every other refuses one', () => {
+    expect([...endpointAccess(OwnerApi).keys()].toSorted()).toEqual(Object.keys(NEEDS).toSorted())
+    expect(endpointAccess(OwnerApi).size).toBe(40)
   })
 
   it('needs a level of each, and an extra of setup, routine and inspection endpoints', () => {

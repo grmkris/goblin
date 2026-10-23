@@ -27,7 +27,7 @@ import {
   updateOwnerConversation,
 } from '../agent-program.ts'
 import { composerOptions } from '../composer.ts'
-import { confineChat, confineMessage, confineUpdate } from '../keys/policy.ts'
+import { reachesChat, confineMessage, confineUpdate } from '../grants/policy.ts'
 import { sendOf } from './run-input.ts'
 import {
   applyServers,
@@ -62,7 +62,7 @@ type ChatWrite<Payload> = ChatRequest & { readonly payload: Payload }
  */
 const confinedSend = (chat: string, input: RunInput) =>
   Effect.gen(function* () {
-    yield* confineChat(chat)
+    yield* reachesChat(chat)
     const send = yield* sendOf(chat, input)
     yield* confineMessage(send.context)
     return send
@@ -172,7 +172,7 @@ const preparedFor = (chat: string, change: NonNullable<UpdateConversation['mcpSe
 const update = ({ params, payload }: ChatWrite<UpdateConversation>) =>
   Effect.gen(function* () {
     const { mcpServers, ...change } = payload
-    yield* confineChat(params.id)
+    yield* reachesChat(params.id)
     yield* confineUpdate(change)
     const prepared =
       mcpServers === undefined ? undefined : yield* preparedFor(params.id, mcpServers, change.closed === true)
@@ -186,7 +186,7 @@ const update = ({ params, payload }: ChatWrite<UpdateConversation>) =>
 const move = ({ params, payload }: ChatWrite<MoveToThread>) => moveToThread(params.id, payload)
 const stop = ({ params, payload }: ChatWrite<StopConversation>) =>
   Effect.andThen(
-    confineChat(params.id),
+    reachesChat(params.id),
     Effect.map(stopChat(params.id, payload.operationId), (stopped) => ({ stopped })),
   )
 const queue = ({ params }: ChatRequest) => ownerQueue(params.id)
@@ -225,7 +225,7 @@ const entries = ({
   query,
 }: ChatRequest & { readonly query: { readonly after: number; readonly limit?: number | undefined } }) =>
   Effect.gen(function* () {
-    yield* confineChat(params.id)
+    yield* reachesChat(params.id)
     const session = yield* registeredConversation(params.id)
     const records = yield* Conversations.use((conversations) => conversations.after(params.id, query.after))
     const page = records.slice(0, query.limit ?? ENTRIES)
@@ -258,7 +258,7 @@ const sources = ({ params }: ChatRequest) =>
  */
 const stream = ({ params }: ChatRequest) =>
   Effect.gen(function* () {
-    yield* confineChat(params.id)
+    yield* reachesChat(params.id)
     yield* registeredConversation(params.id)
     const { batches, released } = yield* Streams.use((streams) => streams.watch(params.id))
     return eventsAnswer(batches, released)

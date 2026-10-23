@@ -1,9 +1,9 @@
 import type {
-  ClientReach,
-  CreateApiKey,
+  ClientGrantTerms,
+  CreateApiKeyTerms,
   CreateWorkspace,
   InviteMembers,
-  UpdateApiKey,
+  UpdateApiKeyTerms,
   UpdateWorkspace,
   WorkspaceRole,
 } from '@goblin/contracts'
@@ -58,11 +58,11 @@ export const clientsQuery = account.apiQuery({
   queryFn: (api) => api.clients.list(),
 })
 
-/** Which of the person's workspaces a client reaches: the consent page's choice first, Settings' change later. */
-export const clientReachMutation = mutationOptions({
+/** The grant a person gives a client (ADR 0114): the consent page's terms first, Settings' change later. */
+export const clientGrantMutation = mutationOptions({
   ...account.apiMutation({
-    mutationFn: (api, { clientId, ...payload }: ClientReach & { readonly clientId: string }) =>
-      api.clients.reach({ params: { clientId }, payload }),
+    mutationFn: (api, { clientId, ...payload }: ClientGrantTerms & { readonly clientId: string }) =>
+      api.grants.clientGrant({ params: { clientId }, payload }),
   }),
   onSuccess: (_reach, _change, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.clients }),
 })
@@ -80,14 +80,14 @@ export const keysQuery = workspaceAccount.apiQuery({ queryKey: accountKeys.keys,
 
 /** A new key; its answer holds the secret, which is never shown again. */
 export const createKeyMutation = mutationOptions({
-  ...workspaceAccount.apiMutation({ mutationFn: (api, payload: CreateApiKey) => api.keys.create({ payload }) }),
+  ...workspaceAccount.apiMutation({ mutationFn: (api, payload: CreateApiKeyTerms) => api.keys.create({ payload }) }),
   onSuccess: (_created, _payload, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),
 })
 
-/** New scopes for one key (ADR 0084): the same key, which keeps what it made. */
+/** New terms for one key's grant (ADRs 0084, 0114): the same key, its id and secret kept. */
 export const updateKeyMutation = mutationOptions({
   ...workspaceAccount.apiMutation({
-    mutationFn: (api, { keyId, ...payload }: UpdateApiKey & { readonly keyId: string }) =>
+    mutationFn: (api, { keyId, ...payload }: UpdateApiKeyTerms & { readonly keyId: string }) =>
       api.keys.update({ params: { keyId }, payload }),
   }),
   onSuccess: (_updated, _change, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),

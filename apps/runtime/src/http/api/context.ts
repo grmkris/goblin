@@ -1,10 +1,10 @@
-import type { CallerScope, Need } from '@goblin/contracts'
-import { EndpointAccess, EndpointScope } from '@goblin/contracts/api'
+import type { Need } from '@goblin/contracts'
+import { EndpointAccess } from '@goblin/contracts/api'
 import * as Context from 'effect/Context'
 import * as FindMyWay from 'effect/http/FindMyWay'
 import * as HttpApi from 'effect/http-api/HttpApi'
 import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
-import type { Caller, Member } from './principal.ts'
+import type { Credential, Member } from './principal.ts'
 
 /** What one owner API request says about itself, for logs and error references. Never content. */
 export interface RequestFacts {
@@ -16,8 +16,11 @@ export interface RequestFacts {
   readonly operation: string | undefined
   /** The endpoint the request reached, as `<group>.<endpoint>` (`topics.update`). */
   readonly route: string
-  /** The caller the Worker admitted the request for, a key or an OAuth client (ADR 0086); none for a member's session. */
-  readonly caller?: Caller | undefined
+  /**
+   * The credential the Worker admitted the request for, a key or an OAuth client (ADRs 0086, 0114); none for a member's
+   * session.
+   */
+  readonly credential?: Credential | undefined
   /** The member the request acts for (ADR 0089): a session's person, or the person an OAuth client acts for. */
   readonly member?: Member | undefined
 }
@@ -62,29 +65,8 @@ export const routeTemplate = (path: string): string => {
 }
 
 /**
- * The scope each of `api`'s endpoints accepts a caller for (ADR 0086), by its name (`topics.update`): an endpoint
- * without `EndpointScope` is absent, and refuses every caller.
- */
-export const endpointScopes = <Id extends string, Groups extends HttpApiGroup.Constraint>(
-  api: HttpApi.HttpApi<Id, Groups>,
-): ReadonlyMap<string, CallerScope> => {
-  const scopes = new Map<string, CallerScope>()
-  HttpApi.reflect(api, {
-    onGroup: () => undefined,
-    onEndpoint: ({ group, endpoint }) => {
-      const scope = Context.get(endpoint.annotations, EndpointScope)
-      if (scope !== undefined) scopes.set(`${group.identifier}.${endpoint.identifier}`, scope)
-    },
-  })
-  return scopes
-}
-
-/**
- * What each of `api`'s endpoints needs of a credential's grant, by its name (`topics.update`): an endpoint without
- * `EndpointAccess` is absent, and no credential reaches it.
- *
- * @internal Admission still reads `endpointScopes`; until the grant replaces scopes, a test holds every scoped endpoint
- * to a need here.
+ * What each of `api`'s endpoints needs of a credential's grant (ADR 0114), by its name (`topics.update`): an endpoint
+ * without `EndpointAccess` is absent, and no credential reaches it.
  */
 export const endpointAccess = <Id extends string, Groups extends HttpApiGroup.Constraint>(
   api: HttpApi.HttpApi<Id, Groups>,

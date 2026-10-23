@@ -2,7 +2,7 @@ import { ConversationEntries, StartedThread, TopicView, runInput, threadStart } 
 import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
-import { type Person, call, lever, ownerFetch, person, signedIn, workspaceOf } from './owner-requests.ts'
+import { type Person, call, keyBody, lever, ownerFetch, person, signedIn, workspaceOf } from './owner-requests.ts'
 import { roomAllows } from '../../src/pi/room.ts'
 import { until } from './until.ts'
 
@@ -24,15 +24,17 @@ const Seen = Schema.Struct({
 const ORIGIN = 'https://apps-fixture.test'
 const SERVER = { name: 'swarmm', url: `${ORIGIN}/mcp`, tools: ['board'] }
 
-/** A key of `who` with `origins` granted, as the owner makes it in Settings: its secret. */
+/**
+ * A key of `who` whose grant gives `origins` (ADRs 0091, 0114) and reaches only what it makes, as the owner makes it in
+ * Settings: its secret.
+ */
 async function keyOf(base: string, who: Person): Promise<{ readonly secret: string; readonly id: string }> {
-  const made = await call(base, who, '/api/keys', {
-    name: 'jobs',
-    scopes: ['topics', 'conversations', 'personas'],
-    servers: [],
-    origins: [{ origin: ORIGIN, tools: ['board'] }],
-    expiresInDays: 1,
-  })
+  const made = await call(
+    base,
+    who,
+    '/api/keys',
+    keyBody(who, 'jobs', { lists: true, origins: [{ origin: ORIGIN, tools: ['board'] }] }),
+  )
   expect(made.status, await made.clone().text()).toBe(201)
   const created = Schema.decodeUnknownSync(
     Schema.Struct({ ...Secret.fields, key: Schema.Struct({ id: Schema.String }) }),
@@ -118,7 +120,7 @@ export async function threadServersCase(url: string): Promise<void> {
   // The owner's own session declares none, and an origin the key was not granted is refused.
   const mine = await call(url, owner, '/api/conversations/1/threads', start('t', '1', 'own:job:1'))
   expect(mine.status).toBe(403)
-  expect(await reasonOf(mine)).toBe('key_only')
+  expect(await reasonOf(mine)).toBe('credential_only')
   const elsewhere = {
     ...start('t', topic.conversation, 'svc:job:8', 'Job 8'),
     mcpServers: [{ ...SERVER, url: 'https://evil.test/mcp', token: 't' }],

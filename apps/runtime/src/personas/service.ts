@@ -9,7 +9,7 @@ import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { type AppError, attemptSync } from '../http/errors.ts'
-import { requestKey } from '../keys/policy.ts'
+import { requestKey } from '../grants/policy.ts'
 import { epochSeconds } from '../clock.ts'
 import { Changes } from '../runtime/changes.ts'
 import type { NewInvocation, PersonaInvocations, Settlement } from './invocations.ts'
@@ -50,7 +50,7 @@ export class Personas extends Context.Service<
     readonly active: Effect.Effect<readonly PersonaView[]>
     /** One Persona; `NotFound` when there is none with `id`. */
     readonly get: (id: number) => Effect.Effect<PersonaView, AppError>
-    /** A page of Personas, newest change first, archived ones too; only a key's own for a key (ADR 0084). */
+    /** A page of Personas, newest change first, archived ones too; only a grant's listed ones for it (ADR 0114). */
     readonly page: (
       query: PersonaPageQuery,
     ) => Effect.Effect<{ readonly personas: readonly PersonaView[]; readonly next?: string }>

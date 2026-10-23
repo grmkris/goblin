@@ -16,9 +16,7 @@ export const EndpointAccess = Context.Reference<Need | undefined>('goblin/api/En
  * The calling credential's own grant. Paths are relative to the API's `/api` prefix.
  *
  * - `read`: `GET /api/access`, the credential's grant as `AccessSummary`: its terms, when it ends and its widening link,
- *   which `/mcp` answers as `access_read`.
- *
- * Not yet part of `OwnerApi`: the agent serves it once it keeps a credential's grant.
+ *   which `/mcp` answers as `access_read`. A member's session has no grant and is refused (`credential`).
  */
 export class AccessGroup extends HttpApiGroup.make('access').add(
   HttpApiEndpoint.get('read', '/access', { success: AccessSummary }).annotate(EndpointAccess, { level: 'read' }),

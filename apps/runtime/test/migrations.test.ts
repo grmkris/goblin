@@ -172,6 +172,7 @@ describe('fresh application baseline', () => {
       '20261022200000_invocation_fork',
       '20261023000000_streams_dropped',
       '20261023010000_publish',
+      '20261023200000_grants',
     ])
     // An additive migration that alters a table names it too, so a table may be named more than once; one that drops
     // a table names it, and it is no live table (ADR 0110's chat streams).

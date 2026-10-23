@@ -47,8 +47,9 @@ export async function settingsOf(args: Args, provider?: ConfigProvider.ConfigPro
   return {
     origin,
     endpoint: new URL('/mcp', origin),
-    // Asking the agent, runs and conversations in full (ADR 0098); no identity scopes, which the CLI never reads.
-    scope: 'goblin:agent goblin:inspect goblin:transcripts offline_access',
+    // goblin's one scope (ADR 0114): what the CLI may do is the grant its person approves on the consent page. No
+    // identity scopes, which the CLI never reads.
+    scope: 'goblin offline_access',
     redirect: new URL(`http://127.0.0.1:${port}/callback`),
     store: join(environment.configHome, 'goblin', 'credentials.json'),
     json: args.flags.get('json') === true,

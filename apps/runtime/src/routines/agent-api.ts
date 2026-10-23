@@ -1,9 +1,10 @@
+import { PERSONAL_TOPIC } from '@goblin/contracts'
 import { OwnerApi } from '@goblin/contracts/api'
 import * as Effect from 'effect/Effect'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { chooseOwnerModel } from '../agent-model.ts'
 import { Budget } from '../budget.ts'
-import { requestKey } from '../keys/policy.ts'
+import { reachesTopic, requestKey } from '../grants/policy.ts'
 import { Models } from '../models.ts'
 import { Inference } from '../inference/service.ts'
 import { epochSeconds } from '../clock.ts'
@@ -29,8 +30,14 @@ export const AgentHandlers = HttpApiBuilder.group(OwnerApi, 'agent', (handlers) 
       Effect.flatMap(epochSeconds, (now) => Inference.use((inference) => inference.setOwner(payload, now))),
     )
     .handle('clearModelEndpoint', () => Inference.use((inference) => inference.clearOwner))
-    .handle('ask', ({ payload }) => askAgent(payload))
-    .handle('recent', ({ query }) => Effect.map(recentOwnerMessages(query.limit), (messages) => ({ messages })))
+    // Main is Personal's Conversation: a credential asks or reads it only when its grant reaches Personal (ADR 0114).
+    .handle('ask', ({ payload }) => Effect.andThen(reachesTopic(PERSONAL_TOPIC), askAgent(payload)))
+    .handle('recent', ({ query }) =>
+      Effect.andThen(
+        reachesTopic(PERSONAL_TOPIC),
+        Effect.map(recentOwnerMessages(query.limit), (messages) => ({ messages })),
+      ),
+    )
     .handle('models', () =>
       Effect.map(choiceFor, (choice) => ({
         ...(choice.default === undefined ? {} : { default: choice.default }),

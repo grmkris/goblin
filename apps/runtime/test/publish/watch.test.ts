@@ -20,6 +20,7 @@ const setup = () => {
   registerChat(db, { chatId: '26', kind: 'subagent', parentSession: '20', createdAt: 1 })
   renewLease(db, {
     id: 'lease',
+    grantId: null,
     principal: 'client:c1:u1',
     name: 'conversation.updated',
     argumentsJson: '{}',

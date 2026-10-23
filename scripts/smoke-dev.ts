@@ -294,8 +294,8 @@ async function inboundOpen(client: InboundClient): Promise<void> {
   const names = objects(listed.result?.['tools'] ?? []).map((tool) => tool['name'])
   if (init.result === undefined || !names.includes('ask_agent') || !names.includes('get_recent_messages'))
     throw new Error('inbound_tools_missing')
-  // Consent granted `goblin:inspect` and `goblin:transcripts`, so the same /mcp offers read-only inspection (ADRs 0024,
-  // 0098). It reads without a model.
+  // Its grant holds `inspect`, so the same /mcp offers read-only inspection (ADRs 0024, 0114). It reads without a
+  // model.
   const inspection = names.filter((name) => typeof name === 'string' && name.startsWith('inspect_'))
   const problems = inspection.length === 7 ? await client.tool('inspect_problems', {}) : {}
   if (!Array.isArray(problems['problems'])) throw new Error('inbound_inspection_missing')

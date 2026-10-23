@@ -30,7 +30,7 @@ describe('goblin credentials (unit)', () => {
 
   it('gives the SDK only a client registered for this redirect, and well-formed tokens', async () => {
     const store = await fresh()
-    const provider = new CliAuthProvider(store, KEY, REDIRECT, 'goblin:inspect offline_access', () => undefined)
+    const provider = new CliAuthProvider(store, KEY, REDIRECT, 'goblin offline_access', () => undefined)
     expect(await provider.clientInformation()).toBeUndefined()
     await provider.saveClientInformation({ client_id: 'cli-1', redirect_uris: [REDIRECT] })
     expect(await provider.clientInformation()).toEqual({ client_id: 'cli-1' })
@@ -45,7 +45,7 @@ describe('goblin credentials (unit)', () => {
     expect(provider.clientMetadata).toMatchObject({
       redirect_uris: [REDIRECT],
       token_endpoint_auth_method: 'none',
-      scope: 'goblin:inspect offline_access',
+      scope: 'goblin offline_access',
     })
   })
 })

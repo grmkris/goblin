@@ -19,6 +19,7 @@ import { AgentInput } from '../../../src/runtime/input.ts'
 import { callOwner } from '../../owner-client.ts'
 import { durable } from '../../chats-sqlite.ts'
 import { currentResident, database, json, serve, served, stub } from './fixture.ts'
+import { credential, credentialHeaders } from '../../grants-fixture.ts'
 
 const fixture = (owner: { readonly OWNER_WORKSPACE_ID?: string; readonly OWNER_MODELS?: string } = {}) => {
   const db = database()
@@ -74,9 +75,8 @@ const ids = async (response: Response) =>
   Schema.decodeUnknownSync(ModelChoice)(await response.json()).options.map((option) => option.id)
 
 /** The grant the edge forwards for a key with `scopes` (ADR 0081). */
-const keyHeaders = (scopes: readonly string[]) => ({
-  'x-goblin-caller': JSON.stringify({ kind: 'key', keyId: 'key-1', name: 'swarmm', scopes, servers: [], origins: [] }),
-})
+/** A key's credential as the edge forwards it (ADR 0114), its grant `read`. */
+const keyHeaders = () => credentialHeaders(credential({ id: 'key-1', name: 'swarmm', level: 'read' }))
 
 describe('the agent group served by the agent', () => {
   it("answers today's usage in tokens against the deployment's cap", async () => {
@@ -129,19 +129,20 @@ describe('the agent group served by the agent', () => {
     expect(cleared).toEqual({ source: 'deployment', deployment: true, models: ['model-a', 'model-b'] })
   })
 
-  it("answers the models a Persona may name, also to a server's key with the personas scope (ADR 0084)", async () => {
+  it("answers the models a Persona may name, also to a server's key that reads (ADRs 0084, 0114)", async () => {
     const { fetch } = fixture()
     const offer = {
       default: 'model-a',
       models: [expect.objectContaining({ id: 'model-a' }), expect.objectContaining({ id: 'model-b' })],
     }
     expect(await callOwner({ fetch }, (api) => api.agent.models())).toEqual(offer)
-    const answered = await fetch(json('GET', '/api/models', undefined, keyHeaders(['personas'])))
+    const answered = await fetch(json('GET', '/api/models', undefined, keyHeaders()))
     expect(answered.status).toBe(200)
     expect(await answered.json()).toEqual(offer)
-    expect((await fetch(json('GET', '/api/models', undefined, keyHeaders(['topics'])))).status).toBe(403)
     // The owner's own pick is not a key's to read.
-    expect((await fetch(json('GET', '/api/agent/model', undefined, keyHeaders(['personas'])))).status).toBe(403)
+    const pick = await fetch(json('GET', '/api/agent/model', undefined, keyHeaders()))
+    expect(pick.status).toBe(403)
+    expect(await pick.json()).toMatchObject({ error: { code: 'forbidden', reason: 'credential' } })
   })
 
   it("offers the owner's own subscriptions to the owner alone, never to a server's key (ADR 0087)", async () => {
@@ -159,7 +160,7 @@ describe('the agent group served by the agent', () => {
       route: 'Your subscription',
       images: true,
     })
-    const keyed = await fetch(json('GET', '/api/models', undefined, keyHeaders(['personas'])))
+    const keyed = await fetch(json('GET', '/api/models', undefined, keyHeaders()))
     expect(await keyed.json()).toEqual({
       default: 'model-a',
       models: [expect.objectContaining({ id: 'model-a' }), expect.objectContaining({ id: 'model-b' })],

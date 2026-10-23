@@ -1,18 +1,18 @@
 import * as HttpApi from 'effect/http-api/HttpApi'
 import { ClientErrorsGroup } from './client-errors.ts'
 import { ClientsGroup } from './clients.ts'
+import { GrantsGroup } from './grants.ts'
 import { InvitationsGroup } from './invitations.ts'
 import { KeysGroup } from './keys.ts'
 import { MembersGroup } from './members.ts'
 import { WorkspacesGroup } from './workspaces.ts'
 
 /**
- * What the Worker answers for a person, without waking an agent (ADRs 0089, 0093, 0097): their workspaces, the
- * invitations waiting for them, the MCP clients they connected and the workspaces each reaches, and client crash
- * reports.
+ * What the Worker answers for a person, without waking an agent (ADRs 0089, 0093, 0097, 0114): their workspaces, the
+ * invitations waiting for them, the MCP clients they connected, the grants they approve, and client crash reports.
  */
 export class AccountApi extends HttpApi.make('goblin-account')
-  .add(WorkspacesGroup, InvitationsGroup, ClientsGroup, ClientErrorsGroup)
+  .add(WorkspacesGroup, InvitationsGroup, ClientsGroup, GrantsGroup, ClientErrorsGroup)
   .prefix('/api') {}
 
 /**

@@ -16,7 +16,7 @@ import { PiSessions, fromPi } from '../pi/sessions.ts'
 import { Db } from '../runtime/db.ts'
 import { AgentInput } from '../runtime/input.ts'
 import { SessionId, chatSession, openChatSession, topicOfChat } from './directory.ts'
-import { requestRole, serverWorkIn } from '../keys/policy.ts'
+import { requestRole, serverWorkIn } from '../grants/policy.ts'
 import { epochSeconds } from '../clock.ts'
 import {
   type ReceiptChange,

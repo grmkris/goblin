@@ -1,35 +1,10 @@
-import type { CallerScope } from '@goblin/contracts'
-
 /**
- * goblin's one protected resource (ADRs 0024, 0086): `/mcp`. A client asks for the sign-in scopes and the `goblin:*`
- * scopes it wants; the owner's consent decides each one, and a token holds only what the consent still grants.
+ * goblin's one protected resource (ADRs 0024, 0086): `/mcp`. A client asks for the sign-in scopes, `offline_access` for
+ * a refresh token, and `goblin`, the one scope that reaches goblin at all. What it may do there is its grant (ADR 0114),
+ * which its person approves on the consent page and edits in Settings, never a scope: a change applies to its live
+ * tokens at once.
  */
-const INSPECT_SCOPE = 'goblin:inspect'
-
-/**
- * What each `goblin:*` scope lets an OAuth client do, as the caller scopes owner admission checks (ADRs 0086, 0098).
- * Every power is its own switch on the consent page: asking the agent in main (`goblin:agent`, on unless turned off),
- * Topics, chats, Personas, how chats ran (`goblin:inspect`), the conversations in full (`goblin:transcripts`), what
- * setups are chosen from and the Sources (`goblin:setup`), and reading and drafting routines (`goblin:routines`).
- */
-const GRANTS: Readonly<Record<string, readonly CallerScope[]>> = {
-  'goblin:agent': ['agent'],
-  'goblin:topics': ['topics'],
-  'goblin:conversations': ['conversations'],
-  'goblin:personas': ['personas'],
-  [INSPECT_SCOPE]: ['inspect'],
-  'goblin:transcripts': ['transcripts'],
-  'goblin:setup': ['setup'],
-  'goblin:routines': ['routines'],
-}
-
-/** What a client may ask for: `offline_access` earns a refresh token, each `goblin:*` scope what `GRANTS` says. */
-export const MCP_SCOPES = ['openid', 'profile', 'email', 'offline_access', ...Object.keys(GRANTS)] as const
-
-/** The caller scopes a token's standing scopes give it (ADR 0086). */
-export const callerScopesOf = (scopes: readonly string[]): readonly CallerScope[] => [
-  ...new Set(scopes.flatMap((scope) => GRANTS[scope] ?? [])),
-]
+export const MCP_SCOPES = ['openid', 'profile', 'email', 'offline_access', 'goblin'] as const
 
 /**
  * Every server API key's prefix (ADR 0081). An inbound OAuth access token is a JWS, so a bearer with this prefix is
@@ -57,7 +32,7 @@ export const protectedResourceMetadata = (appUrl: string, issuer: string) => ({
 
 /**
  * The 401 an unauthenticated request gets: where the metadata is, and the scopes to ask for, so a client's first
- * authorization already asks for every `goblin:*` scope and the consent page offers each one.
+ * authorization asks for `goblin` and the consent page shows the grant it is to have.
  */
 export const challengeOf = (appUrl: string): Response =>
   new Response(JSON.stringify({ error: 'Unauthenticated' }), {

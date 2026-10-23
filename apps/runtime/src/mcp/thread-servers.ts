@@ -9,7 +9,7 @@ import * as Schema from 'effect/Schema'
 import { chatRow } from '../chats/directory.ts'
 import { epochSeconds } from '../clock.ts'
 import { Conflict, Forbidden, InvalidInput, NotFound, attempt, attemptSync } from '../http/errors.ts'
-import { confineThreadServer, requestKey } from '../keys/policy.ts'
+import { confineThreadServer, requestCredential } from '../grants/policy.ts'
 import { Db } from '../runtime/db.ts'
 import { sha256Hex } from '../runtime/digest.ts'
 import { AgentInput } from '../runtime/input.ts'
@@ -19,8 +19,8 @@ import { mapMcpError } from './connections/errors.ts'
 import { bounded, toolOffered } from './connections/remote.ts'
 import { Cipher } from './oauth/cipher.ts'
 
-// The MCP servers a server's key declares on one of its threads (ADR 0103): checked against the key's granted origins
-// (ADR 0091) when declared and again at every use, kept with their tokens encrypted, changed only by the newest
+// The MCP servers a credential declares on one of its threads (ADR 0103): checked against its grant's origins (ADRs
+// 0091, 0114) when declared and again at every use, kept with their tokens encrypted, changed only by the newest
 // operation, dropped when the thread closes or its Topic is archived, and called statelessly over Streamable HTTP by
 // the thread's native Persona forks (ADR 0101, 0102).
 
@@ -54,7 +54,7 @@ const ipLiteral = (host: string): boolean => host.startsWith('[') || /^\d{1,3}(?
 
 /**
  * A declared server's endpoint, checked: https, no credentials, query or fragment, a host that is a name. Its origin is
- * then checked against the key's (`confineThreadServer`), which is the network fence: an origin the owner grants is
+ * then checked against the grant's (`confineThreadServer`), which is the network fence: an origin the owner grants is
  * never an IP literal or a local name (ADR 0091).
  */
 const endpointOf = (url: string) =>
@@ -66,15 +66,16 @@ const endpointOf = (url: string) =>
     return parsed.href
   })
 
-/** A declared server checked against the request's key: its endpoint, granted origin and the tools it may call. */
+/** A declared server checked against the request's grant: its endpoint, granted origin and the tools it may call. */
 type Checked = { readonly name: string; readonly url: string; readonly origin: string; readonly tools: string[] }
 
 /**
- * A change of a thread's servers, checked before anything is written: the key it is the request of (none for the
- * owner clearing them), each server against that key's origins, and the digest of what it declares, without tokens.
+ * A change of a thread's servers, checked before anything is written: the grant of the credential it is the request of
+ * (none for a member clearing them), each server against that grant's origins, and the digest of what it declares,
+ * without tokens.
  */
 export type Prepared = {
-  readonly keyId: string | undefined
+  readonly grantId: string | undefined
   readonly servers: readonly (Checked & { readonly token: string })[]
   readonly digest: string
 }
@@ -92,13 +93,13 @@ const digestOf = (servers: readonly Checked[]) =>
   )
 
 /**
- * `servers` checked against the request's key, before any thread is made or changed: a key's alone (`key_only`), save
- * that the owner may clear a thread's servers with none; each endpoint https to a named host (`thread_server_url`); each
- * origin and tool within the key's grant (`key_origin`, `key_origin_tool`).
+ * `servers` checked against the request's credential, before any thread is made or changed: a credential's alone
+ * (`credential_only`), save that a member may clear a thread's servers with none; each endpoint https to a named host
+ * (`thread_server_url`); each origin and tool within its grant (`key_origin`, `key_origin_tool`).
  */
 export const prepareServers = Effect.fn('ThreadServers.prepare')(function* (servers: readonly ThreadServer[]) {
-  const key = yield* requestKey
-  if (key === undefined && servers.length > 0) return yield* new Forbidden({ reason: 'key_only' })
+  const credential = yield* requestCredential
+  if (credential === undefined && servers.length > 0) return yield* new Forbidden({ reason: 'credential_only' })
   const checked = yield* Effect.forEach(servers, (server) =>
     Effect.gen(function* () {
       const url = yield* endpointOf(server.url)
@@ -106,7 +107,7 @@ export const prepareServers = Effect.fn('ThreadServers.prepare')(function* (serv
       return { name: server.name, url, origin, tools: [...tools], token: server.token }
     }),
   )
-  return { keyId: key?.keyId, servers: checked, digest: yield* digestOf(checked) } satisfies Prepared
+  return { grantId: credential?.grantId, servers: checked, digest: yield* digestOf(checked) } satisfies Prepared
 })
 
 /**
@@ -148,7 +149,7 @@ const replaceAll = (tx: Database, { chat, operationId, prepared, sealed, now }: 
         origin: server.origin,
         tools: JSON.stringify(server.tools),
         token: sealed[index] ?? '',
-        keyId: prepared.keyId ?? '',
+        grantId: prepared.grantId ?? '',
         createdAt: now,
       })
       .run()
@@ -239,37 +240,40 @@ export const dropTopicServers = (topic: number) =>
         db.delete(appThreadServers).where(eq(appThreadServers.chatId, chatId)).run()
   })
 
-/** One declared server, as a fork calls it: its endpoint, the tools it may call now, its token, opened, and its key. */
+/**
+ * One declared server, as a fork calls it: its endpoint, the tools it may call now, its token, opened, and the grant
+ * that declared it.
+ */
 export type ThreadEndpoint = {
   readonly name: string
   readonly url: string
   readonly tools: readonly string[]
   readonly token: string
-  readonly keyId: string
+  readonly grantId: string
 }
 
 /**
- * The tools of `row` its key still grants (ADR 0091), checked live: none once the key is gone or expired, or no longer
- * grants its origin, and then every server that key declared on that origin (or on any, for a key that is gone) is
- * dropped, wherever it is.
+ * The tools of `row` its grant still gives (ADRs 0091, 0114), checked live: none once the grant is gone, ended or no
+ * longer reaches this workspace, or no longer names its origin, and then every server that grant declared on that
+ * origin (or on any, for a grant that is gone) is dropped, wherever it is.
  */
 const stillGranted = (row: Row) =>
   Effect.gen(function* () {
-    const { keyOrigins } = yield* AgentInput
-    const origins: readonly KeyOrigin[] | undefined = yield* attempt(() => keyOrigins(row.keyId))
+    const { grantOrigins } = yield* AgentInput
+    const origins: readonly KeyOrigin[] | undefined = yield* attempt(() => grantOrigins(row.grantId))
     const granted = origins?.find((each) => each.origin === row.origin)
     if (granted !== undefined) return toolsOf(row.tools).filter((tool) => granted.tools.includes(tool))
     const dropped =
       origins === undefined
-        ? eq(appThreadServers.keyId, row.keyId)
-        : and(eq(appThreadServers.keyId, row.keyId), eq(appThreadServers.origin, row.origin))
+        ? eq(appThreadServers.grantId, row.grantId)
+        : and(eq(appThreadServers.grantId, row.grantId), eq(appThreadServers.origin, row.origin))
     yield* Db.useSync((db) => db.delete(appThreadServers).where(dropped).run())
     return yield* new Forbidden({ reason: 'key_origin' })
   })
 
 /**
- * Server `name` of thread `chat`, its token opened and its tools narrowed to what its key still grants; `NotFound` once
- * it is dropped or replaced without that name, `Forbidden` once its key no longer grants it.
+ * Server `name` of thread `chat`, its token opened and its tools narrowed to what its grant still gives; `NotFound` once
+ * it is dropped or replaced without that name, `Forbidden` once its grant no longer gives it.
  */
 export const threadEndpoint = Effect.fn('ThreadServers.endpoint')(function* (chat: string, name: string) {
   const row = yield* Db.useSync((db) => rowsOf(db, chat).find((each) => each.name === name))
@@ -278,10 +282,10 @@ export const threadEndpoint = Effect.fn('ThreadServers.endpoint')(function* (cha
   const cipher = yield* Cipher
   const { workspaceId } = yield* AgentInput
   const token = yield* attempt(() => cipher.decrypt(row.token, aadOf(workspaceId, chat, name, row.url)))
-  return { name, url: row.url, tools, token, keyId: row.keyId } satisfies ThreadEndpoint
+  return { name, url: row.url, tools, token, grantId: row.grantId } satisfies ThreadEndpoint
 })
 
-/** Every server of thread `chat` its key still grants, their tokens opened, for a fork's set. */
+/** Every server of thread `chat` its grant still gives, their tokens opened, for a fork's set. */
 export const threadEndpoints = (chat: string) =>
   Effect.flatMap(
     Db.useSync((db) => rowsOf(db, chat)),
@@ -290,7 +294,7 @@ export const threadEndpoints = (chat: string) =>
         Effect.forEach(rows, (row) =>
           threadEndpoint(chat, row.name).pipe(
             Effect.map(Option.some),
-            // expected: a server its key no longer grants is dropped (`stillGranted`) and offers nothing.
+            // expected: a server its grant no longer gives is dropped (`stillGranted`) and offers nothing.
             Effect.catchTag('Forbidden', () => Effect.succeed(Option.none())),
           ),
         ),

@@ -2,13 +2,13 @@ import { Predicate } from 'effect'
 import { Unauthenticated } from '../http/errors.ts'
 
 /**
- * An inbound MCP client acting for a person with a Better Auth access token. Never a session. The workspaces it reaches
- * are its consent's reach, read on every call (ADR 0097), never a claim.
+ * An inbound MCP client acting for a person with a Better Auth access token. Never a session. What it may do and which
+ * workspaces it reaches are its grant's (ADR 0114), read on every call, never a claim: the token's `scope` counts for
+ * nothing.
  */
 export type ClientPrincipal = {
   readonly clientId: string
   readonly subject: string
-  readonly scopes: readonly string[]
   readonly expiresAt: number
 }
 export interface TokenClaims {
@@ -17,7 +17,6 @@ export interface TokenClaims {
   readonly aud?: unknown
   readonly azp?: unknown
   readonly client_id?: unknown
-  readonly scope?: unknown
   readonly exp?: unknown
   readonly cnf?: unknown
 }
@@ -38,25 +37,5 @@ export const clientFromClaims = (
   if (!text(claims.sub)) throw new Unauthenticated({ reason: 'subject' })
   if (!text(clientId)) throw new Unauthenticated({ reason: 'client' })
   if (claims.cnf !== undefined) throw new Unauthenticated({ reason: 'sender-constrained tokens are not supported' })
-  return {
-    clientId,
-    subject: claims.sub,
-    scopes: Predicate.isString(claims.scope) ? claims.scope.split(/\s+/u).filter(Boolean) : [],
-    expiresAt: claims.exp,
-  }
-}
-
-/** A user's consent to one client, as the provider stores it: its scopes as JSON text. */
-export type ConsentRow = { readonly scopes: string | null }
-
-/** The scopes a standing consent grants; anything unreadable grants none. */
-export const grantedScopes = (consent: ConsentRow): readonly string[] => {
-  if (consent.scopes === null) return []
-  try {
-    const parsed: unknown = JSON.parse(consent.scopes)
-    return Array.isArray(parsed) ? parsed.filter(text) : []
-  } catch {
-    // expected: stored scopes that do not parse grant nothing, which is the safe reading.
-    return []
-  }
+  return { clientId, subject: claims.sub, expiresAt: claims.exp }
 }

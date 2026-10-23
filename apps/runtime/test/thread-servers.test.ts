@@ -7,7 +7,7 @@ import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import { Conversations } from '../src/chats/service.ts'
 import { RequestContext } from '../src/http/api/context.ts'
-import type { Caller } from '../src/http/api/principal.ts'
+import type { Credential } from '../src/http/api/principal.ts'
 import type { AppError } from '../src/http/errors.ts'
 import type { AgentServices } from '../src/layers/index.ts'
 import { CredentialCipher, Cipher } from '../src/mcp/oauth/cipher.ts'
@@ -27,7 +27,8 @@ import { RoutineRuns } from '../src/routines/service.ts'
 import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
 import { Setups } from '../src/setup/service.ts'
 import { CLOSED } from '../src/setup/scope.ts'
-import { appKeyReach } from '../src/storage/keys.ts'
+import { appGrantReach, appGrantSync } from '../src/storage/grants.ts'
+import { credential } from './grants-fixture.ts'
 import { appPersonaChats } from '../src/storage/personas.ts'
 import { appConversations } from '../src/storage/schema.ts'
 import { appThreadServers } from '../src/storage/thread-servers.ts'
@@ -38,18 +39,12 @@ import { executeTool, inConversation } from './pi-tool.ts'
 
 const ORIGIN = 'https://dev.swarmm.test'
 const TOOLS = ['plan_propose', 'progress_report', 'delivery_submit', 'file_import']
-/** A key the owner granted Swarmm's dev origin, with its four tools (ADR 0091). */
-const KEY: Caller = {
-  kind: 'key',
-  keyId: 'key-1',
-  name: 'swarmm',
-  scopes: ['conversations'],
-  servers: [],
-  origins: [{ origin: ORIGIN, tools: TOOLS }],
-}
-const CLIENT: Caller = { kind: 'client', clientId: 'claude', name: 'Claude Code', scopes: ['agent', 'conversations'] }
+/** A key whose grant gives Swarmm's dev origin, with its four tools (ADRs 0091, 0114), and lists its Personas. */
+const KEY = credential({ id: 'key-1', name: 'swarmm', personas: 'list', origins: [{ origin: ORIGIN, tools: TOOLS }] })
+/** An OAuth client whose grant names no origin. */
+const CLIENT = credential({ kind: 'client', id: 'claude', name: 'Claude Code', grantId: 'cg_1' })
 
-/** What each key grants now, as the auth store would answer it; a key not here is gone. */
+/** What each grant gives now, as the auth store would answer it; a grant not here is gone. */
 const keys = new Map<string, readonly KeyOrigin[]>([['key-1', [{ origin: ORIGIN, tools: TOOLS }]]])
 
 /** What the fixture server was called with: each call's tool, arguments and bearer. */
@@ -129,13 +124,17 @@ db.insert(appPersonaChats)
     { chatId: '22', personaId: 6, revision: 1, setup: '{}', createdAt: 2 },
   ])
   .run()
-db.insert(appKeyReach).values({ keyId: 'key-1', kind: 'persona', resourceId: 5, createdAt: 1 }).run()
+// The key's grant lists Persona 5 alone, as the agent's mirror holds it.
+db.insert(appGrantSync)
+  .values({ grantId: 'key-1', generation: 1, topics: 'all', personas: 'list', connections: 'all', syncedAt: 1 })
+  .run()
+db.insert(appGrantReach).values({ grantId: 'key-1', kind: 'persona', resourceId: '5' }).run()
 const cipher = await CredentialCipher.fromBase64(btoa(String.fromCharCode(...new Uint8Array(32).fill(7))))
-// SAFETY: these programs read nothing of the instance input but its MCP fetch, workspace and key origins.
+// SAFETY: these programs read nothing of the instance input but its MCP fetch, workspace and grant origins.
 const instance = {
   mcpFetch: fetcher,
   workspaceId: 'ws-1',
-  keyOrigins: async (keyId: string) => keys.get(keyId),
+  grantOrigins: async (grantId: string) => keys.get(grantId),
 } as AgentInputs
 const base = Layer.mergeAll(
   sqliteDb(database.db),
@@ -151,19 +150,19 @@ const base = Layer.mergeAll(
   stub(McpConnections),
 )
 /** `program` in a request `caller` sent (none: the owner's own), over the services above. */
-const as = <A, E>(caller: Caller | undefined, program: Effect.Effect<A, E, AgentServices | RequestContext>) => {
+const as = <A, E>(caller: Credential | undefined, program: Effect.Effect<A, E, AgentServices | RequestContext>) => {
   const context = Layer.succeed(RequestContext, {
     ref: undefined,
     request: undefined,
     operation: undefined,
     route: 'conversations.update',
-    ...(caller === undefined ? {} : { caller }),
+    ...(caller === undefined ? {} : { credential: caller }),
   })
   // SAFETY: the thread servers' programs need only the services provided here.
   return Effect.runPromise(Effect.provide(program, Layer.merge(base, context)) as Effect.Effect<A, E>)
 }
 const refusal = (
-  caller: Caller | undefined,
+  caller: Credential | undefined,
   program: Effect.Effect<unknown, AppError, AgentServices | RequestContext>,
 ) =>
   as(
@@ -180,7 +179,7 @@ const server = (extra: Partial<Declared> = {}): Declared => ({
   ...extra,
 })
 /** Operation `op` of `caller` setting thread 20's servers to `servers`, as a change and a thread operation do. */
-const set = (op: string, servers: readonly Declared[], caller: Caller | undefined = KEY) =>
+const set = (op: string, servers: readonly Declared[], caller: Credential | undefined = KEY) =>
   as(
     caller,
     Effect.gen(function* () {
@@ -203,9 +202,9 @@ const token = async () => (await as(KEY, threadEndpoint('20', 'swarmm'))).token
 const grantAll = () => keys.set('key-1', [{ origin: ORIGIN, tools: TOOLS }])
 
 describe('a thread declares the MCP servers its Personas call (ADR 0103)', () => {
-  it('refuses anyone but a key, an origin or tool the key was not granted, and an endpoint that is no https name', async () => {
-    expect(await refusal(undefined, prepareServers([server()]))).toBe('key_only')
-    expect(await refusal(CLIENT, prepareServers([server()]))).toBe('key_only')
+  it('refuses a member, an origin or tool the grant does not give, and an endpoint that is no https name', async () => {
+    expect(await refusal(undefined, prepareServers([server()]))).toBe('credential_only')
+    expect(await refusal(CLIENT, prepareServers([server()]))).toBe('key_origin')
     expect(await refusal(KEY, prepareServers([server({ url: 'https://evil.test/mcp' })]))).toBe('key_origin')
     expect(await refusal(KEY, prepareServers([server({ tools: ['admin_reset'] })]))).toBe('key_origin_tool')
     for (const url of [
@@ -241,7 +240,7 @@ describe('a thread declares the MCP servers its Personas call (ADR 0103)', () =>
     expect(views).toEqual([{ name: 'swarmm', url: `${ORIGIN}/api/mcp`, tools: ['delivery_submit', 'progress_report'] }])
     const [row] = db.select().from(appThreadServers).all()
     expect(JSON.stringify(row)).not.toContain('secret-token-1')
-    expect(row?.keyId).toBe('key-1')
+    expect(row?.grantId).toBe('key-1')
     expect(await token()).toBe('secret-token-1')
     // Copied to another thread, or pointed at another endpoint, it does not open.
     if (row !== undefined)

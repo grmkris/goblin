@@ -7,7 +7,7 @@ import { expect } from 'vitest'
 import Stack from './auth-stack.ts'
 import { call, person, signedIn } from './owner-requests.ts'
 import { answerOf } from './probe-reads.ts'
-import { inspectAuthCase, reachCase } from './auth-inspect.ts'
+import { inspectAuthCase, keyWideningCase, reachCase } from './auth-inspect.ts'
 
 const harness = Test.make({
   providers: Cloudflare.providers(),
@@ -216,10 +216,11 @@ harness.test(
   }),
 )
 harness.test(
-  'one /mcp: inspection and management only while consent grants their scopes (ADRs 0024, 0086)',
+  'one /mcp: tools by the grant its person approves and changes live, and a refusal that widens (ADRs 0024, 0086, 0114)',
   Effect.gen(function* () {
     const { url } = yield* stack
     yield* Effect.promise(() => inspectAuthCase(url))
     yield* Effect.promise(() => reachCase(url))
+    yield* Effect.promise(() => keyWideningCase(url))
   }),
 )

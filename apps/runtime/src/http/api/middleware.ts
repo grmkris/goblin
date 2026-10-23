@@ -1,6 +1,7 @@
+import { GRANT_SPEC, type Need, ROLE_POWER, missingFor } from '@goblin/contracts'
 import {
+  EndpointAccess,
   EndpointRole,
-  EndpointScope,
   Forbidden,
   OwnerAdmission,
   GrantsResident,
@@ -17,11 +18,12 @@ import * as HttpServerRequest from 'effect/http/HttpServerRequest'
 import type * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { type AppError, NotFound, isAppError } from '../errors.ts'
+import { Grants } from '../../grants/service.ts'
 import { KeyNames } from '../../keys/names.ts'
 import { callerMinutes } from '../../keys/rate.ts'
 import { Resident } from '../../mcp/service.ts'
 import { RequestContext } from './context.ts'
-import { type Caller, type Member, callerId } from './principal.ts'
+import { type Credential, type Member, credentialId } from './principal.ts'
 
 /**
  * `handler` behind `admit`, as every API of the agent runs it: its logs carry the endpoint, the operation and the
@@ -49,50 +51,73 @@ const admitted = <A, E, R, E1, R1>(
 /** Whether `role` reaches an endpoint that needs `needed` (ADR 0093): an owner counts as an admin. */
 const reaches = (role: Member['role'], needed: 'member' | 'admin'): boolean => needed === 'member' || role !== 'member'
 
+/** What admitting a credential takes from the agent: its count per minute, its key names and its grants. */
+interface CredentialGate {
+  readonly take: ReturnType<typeof callerMinutes>
+  readonly learn: KeyNames['Service']['learn']
+  readonly grants: Grants['Service']
+}
+
+/**
+ * A credential's admission (ADRs 0086, 0114): the endpoint must take credentials at all (`EndpointAccess`, else
+ * `Forbidden` `credential`), and its grant must hold the endpoint's level and extra (else `AccessInsufficient` with
+ * the widening link); a client's person's role must hold them too (`ROLE_POWER`, else `Forbidden` `role`: a client
+ * never does more than its person may). A grant past its end is `Unauthenticated` (`grant_expired`). Then its requests
+ * for the minute (else `rate_limited` with `retryAfter`, ADR 0085), and its grant's reach is mirrored afresh when its
+ * generation moved (`Grants.sync`). A key admitted is `learn`t: its first request in the object's lifetime names what
+ * it made (ADR 0108).
+ */
+/** A client never does more than its person may: their role's power must hold what the endpoint needs. */
+const personHolds = (credential: Credential, member: Member | undefined, need: Need): Effect.Effect<void, AppError> => {
+  if (credential.kind !== 'client') return Effect.void
+  if (member === undefined) return Effect.fail(new Unauthenticated({ reason: 'principal' }))
+  return missingFor(GRANT_SPEC, ROLE_POWER[member.role], need) === null
+    ? Effect.void
+    : Effect.fail(new Forbidden({ reason: 'role' }))
+}
+
+const admitCredential = (
+  credential: Credential,
+  member: Member | undefined,
+  annotations: Context.Context<never>,
+  gate: CredentialGate,
+): Effect.Effect<void, AppError> =>
+  Effect.gen(function* () {
+    const need = Context.get(annotations, EndpointAccess)
+    if (need === undefined) return yield* new Forbidden({ reason: 'credential' })
+    yield* gate.grants.require(credential, need)
+    yield* personHolds(credential, member, need)
+    const now = yield* Clock.currentTimeMillis
+    if (credential.expiresAt !== null && credential.expiresAt <= now)
+      return yield* new Unauthenticated({ reason: 'grant_expired' })
+    const retryAfter = gate.take(credentialId(credential), now)
+    if (retryAfter !== undefined) return yield* new Unauthenticated({ reason: 'rate_limited', retryAfter })
+    yield* gate.grants.sync(credential)
+    if (credential.kind === 'key') yield* gate.learn(credential)
+  })
+
 /**
  * Owner admission (`OwnerAdmission` in the contract): a request says who it comes from (ADR 0089), else it is
  * `Unauthenticated` (`principal`). A member reaches an endpoint only with the role it needs (`EndpointRole`, ADR 0093;
  * else `Forbidden`, `role`), and so does an OAuth client acting for them. A member's session grants resident authority
  * unless the endpoint says otherwise (`GrantsResident`: changing it must not grant first), then the handler runs. A
- * request from a caller (ADR 0086: a server's key or an OAuth client) is admitted only to an endpoint whose
- * `EndpointScope` the caller holds (else `scope`), within its requests for the minute (else `rate_limited` with
- * `retryAfter`, ADR 0085), and never grants it: a caller is not a member's presence. What it reaches past admission is
- * its kind's (`keys/policy.ts`).
+ * request from a credential (a server's key or an OAuth client, ADRs 0086, 0114) is admitted by its grant
+ * (`admitCredential`) and never grants it: a credential is not a member's presence. What it reaches past admission is
+ * its grant's (`grants/policy.ts`).
  */
-/**
- * A caller's admission (ADR 0086): the endpoint's `EndpointScope` must be one it holds (else `scope`), and it must be
- * within its requests for the minute (else `rate_limited` with `retryAfter`, ADR 0085). A key admitted is `learn`t: its
- * first request in the object's lifetime names what it made (ADR 0108).
- */
-const admitCaller = (
-  caller: Caller,
-  annotations: Context.Context<never>,
-  take: ReturnType<typeof callerMinutes>,
-  learn: KeyNames['Service']['learn'],
-): Effect.Effect<void, AppError> => {
-  const scope = Context.get(annotations, EndpointScope)
-  if (scope === undefined || !caller.scopes.some((held) => held === scope))
-    return Effect.fail(new Forbidden({ reason: 'scope' }))
-  return Effect.flatMap(Clock.currentTimeMillis, (now) => {
-    const retryAfter = take(callerId(caller), now)
-    if (retryAfter !== undefined) return Effect.fail(new Unauthenticated({ reason: 'rate_limited', retryAfter }))
-    return caller.kind === 'key' ? learn(caller) : Effect.void
-  })
-}
-
 export const OwnerAdmissionLive = Layer.effect(
   OwnerAdmission,
   Effect.gen(function* () {
     const resident = yield* Resident
     const { learn } = yield* KeyNames
-    const take = callerMinutes()
+    const gate: CredentialGate = { take: callerMinutes(), learn, grants: yield* Grants }
     const admit = (annotations: Context.Context<never>) =>
       Effect.flatMap(Effect.serviceOption(RequestContext), (context): Effect.Effect<void, AppError> => {
         const facts = Option.getOrUndefined(context)
         const member = facts?.member
         if (member !== undefined && !reaches(member.role, Context.get(annotations, EndpointRole)))
           return Effect.fail(new Forbidden({ reason: 'role' }))
-        if (facts?.caller !== undefined) return admitCaller(facts.caller, annotations, take, learn)
+        if (facts?.credential !== undefined) return admitCredential(facts.credential, member, annotations, gate)
         if (member === undefined) return Effect.fail(new Unauthenticated({ reason: 'principal' }))
         return Context.get(annotations, GrantsResident) ? resident.grant() : Effect.void
       })

@@ -1,7 +1,6 @@
 import * as Schema from 'effect/Schema'
 import { GrantTerms } from './grants.ts'
 import { WorkspaceId } from './ids.ts'
-import { KeyOrigin } from './origins.ts'
 
 /** A `path:line:col` stack location, never a message. */
 const StackFrame = Schema.String.check(Schema.isMaxLength(300), Schema.isPattern(/^\S+:\d{1,7}:\d{1,7}$/u))
@@ -24,76 +23,33 @@ export const ClientErrorReport = Schema.Struct({
 )
 export type ClientErrorReport = typeof ClientErrorReport.Type
 
-/**
- * What a server's API key may reach (ADR 0081): each scope opens its area's annotated owner endpoints. `inspect` reads
- * how the key's own chats ran, content-free (ADR 0084).
- */
-export const KeyScope = Schema.Literals(['topics', 'conversations', 'personas', 'inspect'])
-export type KeyScope = typeof KeyScope.Type
-
-/**
- * What opens an owner endpoint to a caller other than the owner's session (ADRs 0086, 0098): a server's API key holds
- * some of the key scopes; an OAuth client holds what its consent maps to, and only it can hold `transcripts` (the
- * conversations in full), `agent` (asking the agent in main), `setup` (what setups are chosen from, and the Sources)
- * and `routines` (reading and drafting routines; confirming one stays the web's).
- */
-export const CallerScope = Schema.Literals([...KeyScope.literals, 'transcripts', 'agent', 'setup', 'routines'])
-export type CallerScope = typeof CallerScope.Type
-
-/** An MCP connection a key's setups may name: the key's server ceiling. */
-export const KeyServer = Schema.String.check(Schema.isPattern(/^[\w-]{1,64}$/u))
-
 /** A key's name: 1 to 64 letters, digits, spaces and `_.:-`. */
 const KeyName = Schema.String.check(Schema.isPattern(/^[\w .:-]{1,64}$/u))
 
-/**
- * `POST /api/keys`: a key for a server the owner runs, its scopes, the servers its setups may use, the MCP origins its
- * threads may connect to (ADR 0091) and its lifetime.
- */
-export const CreateApiKey = Schema.Struct({
-  name: KeyName,
-  scopes: Schema.Array(KeyScope).check(Schema.isMinLength(1), Schema.isMaxLength(4)),
-  servers: Schema.Array(KeyServer).check(Schema.isMaxLength(32)),
-  origins: Schema.optional(Schema.Array(KeyOrigin)),
-  expiresInDays: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 365 })),
-})
-export type CreateApiKey = typeof CreateApiKey.Type
-
-/**
- * `PATCH /api/keys/:keyId`: the key's scopes (ADR 0084) or its MCP origins (ADR 0091) from now on, whichever it names,
- * and at least one. It stays the same key, so what it made stays within its reach; its secret, servers and expiry do
- * not change.
- */
-export const UpdateApiKey = Schema.Struct({
-  scopes: Schema.optional(CreateApiKey.fields.scopes),
-  origins: Schema.optional(Schema.Array(KeyOrigin)),
-}).check(Schema.makeFilter((change) => change.scopes !== undefined || change.origins !== undefined))
-export type UpdateApiKey = typeof UpdateApiKey.Type
-
-/** `POST /api/keys` with a grant: the key's name and the terms of its grant (`grants.ts`). */
+/** `POST /api/keys`: a key for a server the owner runs, its name and the terms of its grant (`grants.ts`, ADR 0114). */
 export const CreateApiKeyTerms = Schema.Struct({ name: KeyName, terms: GrantTerms })
 export type CreateApiKeyTerms = typeof CreateApiKeyTerms.Type
 
-/** `PATCH /api/keys/:keyId` with a grant: the terms of the key's grant from now on; its id and secret stay. */
+/**
+ * `PATCH /api/keys/:keyId`: the terms of the key's grant from now on (ADR 0114), its name among them; its id and secret
+ * stay.
+ */
 export const UpdateApiKeyTerms = Schema.Struct({ terms: GrantTerms })
 export type UpdateApiKeyTerms = typeof UpdateApiKeyTerms.Type
 
 /**
- * A key as the owner sees it: its first characters, never its secret. `grantId` and `terms` are its grant, once the
- * auth store keeps one for it.
+ * A key as the owner sees it: its first characters, never its secret, and its grant (ADR 0114): its id, which is the
+ * key's, and its terms. `expiresAt` is when its grant ends; none until revoked.
  */
 export const ApiKeyView = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   start: Schema.optional(Schema.String),
-  scopes: Schema.Array(KeyScope),
-  servers: Schema.Array(KeyServer),
-  origins: Schema.Array(KeyOrigin),
   createdAt: Schema.String,
   expiresAt: Schema.optional(Schema.String),
   lastUsedAt: Schema.optional(Schema.String),
-  grantId: Schema.optionalKey(Schema.String),
-  terms: Schema.optionalKey(GrantTerms),
+  grantId: Schema.String,
+  terms: GrantTerms,
 })
 export type ApiKeyView = typeof ApiKeyView.Type
 
@@ -132,31 +88,20 @@ export const WorkspaceView = Schema.Struct({
 })
 export type WorkspaceView = typeof WorkspaceView.Type
 
-/**
- * The workspaces an MCP client's consent reaches (ADR 0097): `all` of the person's, ones they join later included, or
- * those listed, while they are still a member of each. A reach of none reaches nothing until it is changed.
- */
-export const ClientReach = Schema.Struct({
-  all: Schema.Boolean,
-  workspaces: Schema.Array(WorkspaceId).check(Schema.isMaxLength(200)),
-})
-export type ClientReach = typeof ClientReach.Type
-
 /** A workspace a client reaches, as its person's list shows it. */
 export const ReachedWorkspace = Schema.Struct({ id: WorkspaceId, slug: Schema.String, name: Schema.String })
 export type ReachedWorkspace = typeof ReachedWorkspace.Type
 
 /**
- * An MCP client a person authorized to use goblin's /mcp server (ADRs 0024, 0097): what it registered as, when they
- * consented, the `goblin:*` scopes their consent grants and the workspaces it reaches now. `grantId` and `terms` are
- * its grant, once the auth store keeps one for it.
+ * An MCP client a person authorized to use goblin's /mcp server (ADRs 0024, 0097, 0114): what it registered as, when
+ * they consented, the workspaces it reaches now, and the grant they gave it (`grantId`, `terms`; absent only for a
+ * consent its grant was revoked under, which admits nothing).
  */
 export const InboundClient = Schema.Struct({
   clientId: Schema.String,
   name: Schema.optional(Schema.String),
   uri: Schema.optional(Schema.String),
   consentedAt: Schema.optional(Schema.String),
-  scopes: Schema.Array(Schema.String),
   reach: Schema.Struct({ all: Schema.Boolean, workspaces: Schema.Array(ReachedWorkspace) }),
   grantId: Schema.optionalKey(Schema.String),
   terms: Schema.optionalKey(GrantTerms),

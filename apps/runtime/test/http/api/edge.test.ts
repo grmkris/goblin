@@ -1,3 +1,4 @@
+import { type GrantTerms, presetFor } from '@goblin/contracts'
 import { NotFound, Unauthenticated, envelopeOf } from '@goblin/contracts/api'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
@@ -8,6 +9,7 @@ import { attempt } from '../../../src/http/errors.ts'
 import { FlowPointFailure } from '../../../src/observability/ae.ts'
 import { withLines } from '../../observability/lines.ts'
 import { fake } from '../../fake.ts'
+import { credential } from '../../grants-fixture.ts'
 
 const APP = 'https://goblin.test'
 const OWNER = 'user-owner'
@@ -16,12 +18,15 @@ const WS = 'ws-owner'
 const BASE = '/w/owner'
 const PERSON = { id: OWNER, name: 'Owner', email: 'owner@goblin.test' }
 const MEMBERSHIP = { id: WS, name: "Owner's workspace", slug: 'owner', role: 'owner', members: 1 } as const
-/** One MCP client the owner connected, reaching their workspace (ADR 0097). */
+/** A grant's terms over the owner's workspace: `write`, everything, no extras, unless `changes` say. */
+const TERMS = (changes: Partial<GrantTerms> = {}): GrantTerms => ({ ...presetFor('svc', [WS]), ...changes })
+/** One MCP client the owner connected, reaching their workspace (ADRs 0097, 0114). */
 const CLIENT_VIEW = {
   clientId: 'client.1',
   name: 'Claude',
-  scopes: ['goblin:topics'],
   reach: { all: false, workspaces: [{ id: WS, slug: 'owner', name: "Owner's workspace" }] },
+  grantId: 'cg_1',
+  terms: TERMS({ name: 'Claude' }),
 }
 const MEMBER_VIEW = {
   userId: OWNER,
@@ -46,11 +51,33 @@ const ROTATED = `gbk_${'r'.repeat(64)}`
 const KEY_VIEW = {
   id: 'key-1',
   name: 'svc',
-  scopes: [],
-  servers: ['mycut'],
-  origins: [],
   createdAt: '2026-10-20T00:00:00.000Z',
+  grantId: 'key-1',
+  terms: TERMS(),
 }
+/** The credential the key admits (ADR 0114): `write` over everything of its workspace. */
+const KEY_CREDENTIAL = credential({ id: 'key-1', name: 'swarmm', level: 'write', generation: 3 })
+/** A grant change's answer, as the account records give it. */
+const changed = (grantId: string, terms: GrantTerms) => ({
+  grant: {
+    id: grantId,
+    kind: 'client' as const,
+    keyId: undefined,
+    clientId: 'client.1',
+    userId: OWNER,
+    name: terms.name,
+    level: terms.level,
+    extras: terms.extras,
+    lifetime: terms.lifetime,
+    expiresAt: null,
+    workspacesAll: false,
+    origins: [],
+    revokedAt: null,
+  },
+  before: TERMS({ name: terms.name }),
+  after: terms,
+  expiresAt: null,
+})
 
 /** The account's records, keeping the crash points asked for: each one's user, if the report came with a session. */
 const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
@@ -70,20 +97,30 @@ const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
     updateWorkspace: () => Effect.die(new Error('no updates in this fixture')),
     deleteWorkspace: () => Effect.void,
     clients: () => Effect.succeed([CLIENT_VIEW]),
-    setClientReach: (_person, _clientId, reach) => Effect.succeed(reach),
     revokeClient: () => Effect.void,
+    clientTerms: () =>
+      Effect.succeed({
+        spec: { levels: ['read', 'write', 'manage'], extras: [], reachOptions: [] },
+        defaults: CLIENT_VIEW.terms,
+        current: null,
+      }),
+    setClientGrant: (_person, _clientId, terms) => Effect.succeed(changed('cg_1', terms)),
+    grantTerms: (_person, grantId) =>
+      grantId === 'cg_1'
+        ? Effect.succeed({
+            spec: { levels: ['read', 'write', 'manage'], extras: [], reachOptions: [] },
+            defaults: CLIENT_VIEW.terms,
+            current: CLIENT_VIEW.terms,
+            grantId,
+          })
+        : Effect.fail(new NotFound({ what: 'grant' })),
+    widen: (_person, grantId, terms) =>
+      grantId === 'cg_1' ? Effect.succeed(changed(grantId, terms)) : Effect.fail(new NotFound({ what: 'grant' })),
     keys: () => Effect.succeed([]),
     createKey: () => Effect.die(new Error('no keys in this fixture')),
     updateKey: (_workspace, _user, keyId, change) =>
       keyId === 'key-1'
-        ? Effect.succeed({
-            before: { ...KEY_VIEW, scopes: ['topics', 'personas'] },
-            after: {
-              ...KEY_VIEW,
-              scopes: change.scopes ?? ['topics', 'personas'],
-              origins: change.origins ?? [],
-            },
-          })
+        ? Effect.succeed({ before: KEY_VIEW, after: { ...KEY_VIEW, terms: change.terms } })
         : Effect.fail(new NotFound({ what: 'key' })),
     rotateKey: (_workspace, keyId) =>
       keyId === 'key-1'
@@ -121,11 +158,7 @@ const deployment = (
       key === KEY
         ? Effect.succeed({
             workspaceId: WS,
-            keyId: 'key-1',
-            name: 'swarmm',
-            scopes: ['topics', 'conversations'],
-            servers: ['mycut'],
-            origins: [],
+            credential: { ...KEY_CREDENTIAL, ws: { ...KEY_CREDENTIAL.ws, workspace: WS } },
           })
         : Effect.fail(new Unauthenticated({ reason: 'key' })),
     membership: (userId, slug) =>
@@ -404,7 +437,7 @@ describe("a server's API key (ADR 0081)", () => {
       ...(init.body === undefined ? {} : { body: init.body }),
     })
 
-  it("reaches its workspace's agent without a CSRF header, forwarding its grant and never the key, a member or an App mark", async () => {
+  it("reaches its workspace's agent without a CSRF header, forwarding its credential and never the key, a member or an App mark", async () => {
     const { seen, agents, edge } = deployment()
     const request = server('/api/topics', {
       headers: {
@@ -423,12 +456,8 @@ describe("a server's API key (ADR 0081)", () => {
     expect(forwarded?.headers.get('x-goblin-member')).toBeNull()
     expect(forwarded?.headers.get('x-goblin-forwarded')).toBe('owner')
     expect(JSON.parse(forwarded?.headers.get('x-goblin-caller') ?? '')).toEqual({
-      kind: 'key',
-      keyId: 'key-1',
-      name: 'swarmm',
-      scopes: ['topics', 'conversations'],
-      servers: ['mycut'],
-      origins: [],
+      ...KEY_CREDENTIAL,
+      ws: { ...KEY_CREDENTIAL.ws, workspace: WS },
     })
   })
 
@@ -450,10 +479,16 @@ describe("a server's API key (ADR 0081)", () => {
     ],
     ['a key with a cookie', server('/api/topics', { headers: { cookie: 'session=owner' } }), 403, 'key_browser'],
     ['a key with an Origin', server('/api/topics', { headers: { origin: APP } }), 403, 'key_browser'],
-    ['an endpoint no key reaches', server('/api/agent/resident', { method: 'GET' }), 403, 'scope'],
-    ['a scope the key lacks', server('/api/personas', { body: '{}' }), 403, 'scope'],
-    ['a file upload', server('/api/files/uploads/a.txt', { method: 'PUT', body: 'x' }), 403, 'scope'],
-    ['a path that is no endpoint', server('/api/nothing/here', { method: 'GET' }), 403, 'scope'],
+    ['an endpoint no credential reaches', server('/api/agent/resident', { method: 'GET' }), 403, 'credential'],
+    [
+      'a level its grant lacks',
+      server('/api/personas', { body: '{}' }),
+      403,
+      'https://goblin.test/consent/widen?grant=key-1&level=manage',
+    ],
+    ['an extra its grant lacks', server('/api/inspect/turns', { method: 'GET' }), 403, '"extra":"inspect"'],
+    ['a file upload', server('/api/files/uploads/a.txt', { method: 'PUT', body: 'x' }), 403, 'credential'],
+    ['a path that is no endpoint', server('/api/nothing/here', { method: 'GET' }), 403, 'credential'],
     [
       'an inbound OAuth token',
       server('/api/topics', { headers: { authorization: 'Bearer eyJhbGciOi.eyJzdWIiOi.c2ln' } }),
@@ -482,7 +517,7 @@ describe("a server's API key (ADR 0081)", () => {
     for (const request of [
       server(`${BASE}/api/keys`, { method: 'GET' }),
       server(`${BASE}/api/keys`, { body: '{}' }),
-      server(`${BASE}/api/keys/key-1`, { method: 'PATCH', body: JSON.stringify({ scopes: ['inspect'] }) }),
+      server(`${BASE}/api/keys/key-1`, { method: 'PATCH', body: JSON.stringify({ terms: KEY_VIEW.terms }) }),
       server(`${BASE}/api/keys/key-1/rotate`, {}),
       server(`${BASE}/api/topics`, { method: 'GET' }),
     ]) {
@@ -506,57 +541,56 @@ const patchKey = (body: unknown) =>
 const rotate = (keyId: string, headers: Record<string, string> = {}) =>
   write(`${BASE}/api/keys/${keyId}/rotate`, { headers })
 
+/** The widening page's read of grant `id`'s terms, with the owner's session. */
+const grantTerms = (id: string) =>
+  new Request(`${APP}/api/grants/${id}/terms`, { headers: { cookie: 'session=owner' } })
+/** The widening page's approval of `body` for grant `id`. */
+const widen = (id: string, body: unknown) =>
+  write(`/api/grants/${id}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
 describe('the account APIs in the Worker', () => {
-  it("gives a workspace's key new scopes and audits who did it, never for a foreign Origin (ADR 0084)", async () => {
+  it("gives a workspace's key new terms and audits who did it, never for a foreign Origin (ADRs 0084, 0114)", async () => {
     const { edge } = deployment()
-    const change = JSON.stringify({ scopes: ['topics', 'personas', 'inspect'] })
-    const patch = (headers: Record<string, string> = {}) =>
-      write(`${BASE}/api/keys/key-1`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json', ...headers },
-        body: change,
-      })
-    const { response, lines } = await through('workspace', patch(), edge)
+    const origins = [{ origin: 'https://mcp.swarmm.app', tools: ['job_submit'] }]
+    const terms = TERMS({ level: 'manage', extras: ['inspect'], reach: { ...TERMS().reach, origins } })
+    const { response, lines } = await through('workspace', patchKey({ terms }), edge)
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ id: 'key-1', scopes: ['topics', 'personas', 'inspect'] })
+    expect(await response.json()).toMatchObject({ id: 'key-1', terms: { level: 'manage', extras: ['inspect'] } })
     expect(lines).toContainEqual(
       expect.objectContaining({
         event: 'api_key',
-        kind: 'scopes',
+        kind: 'grant',
         id: 'key-1',
         agent: WS,
         by: OWNER,
-        scopes: ['topics', 'personas', 'inspect'],
-        'scopes.before': ['topics', 'personas'],
+        scopes: ['manage', 'inspect'],
+        'scopes.before': ['write'],
+        count: 1,
       }),
     )
+    // How many origins, never naming one.
+    expect(JSON.stringify(lines)).not.toContain('swarmm.app')
+    const patch = (headers: Record<string, string>) =>
+      write(`${BASE}/api/keys/key-1`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: JSON.stringify({ terms }),
+      })
     expect((await through('workspace', patch({ origin: 'https://evil.test' }), edge)).response.status).toBe(403)
     const gone = write(`${BASE}/api/keys/key-9`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: change,
+      body: JSON.stringify({ terms }),
     })
     expect((await through('workspace', gone, edge)).response.status).toBe(404)
-    const empty = write(`${BASE}/api/keys/key-1`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ scopes: [] }),
-    })
-    expect((await through('workspace', empty, edge)).response.status).toBe(400)
-  })
-
-  it('gives a key MCP origins and audits only how many, never naming one; a change naming nothing is refused (ADR 0091)', async () => {
-    const { edge } = deployment()
-    const origins = [{ origin: 'https://mcp.swarmm.app', tools: ['job_submit'] }]
-    const { response, lines } = await through('workspace', patchKey({ origins }), edge)
-    expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ id: 'key-1', origins })
-    expect(lines).toContainEqual(
-      expect.objectContaining({ event: 'api_key', kind: 'origins', id: 'key-1', agent: WS, by: OWNER, count: 1 }),
+    expect((await through('workspace', patchKey({ scopes: ['topics'] }), edge)).response.status).toBe(400)
+    expect((await through('workspace', patchKey({ terms: { ...terms, level: 'admin' } }), edge)).response.status).toBe(
+      400,
     )
-    expect(JSON.stringify(lines)).not.toContain('swarmm')
-    expect(lines).not.toContainEqual(expect.objectContaining({ kind: 'scopes' }))
-    expect((await through('workspace', patchKey({}), edge)).response.status).toBe(400)
   })
 
   it("rotates a key's secret and audits who did it, never the secret, never for a member (ADR 0105)", async () => {
@@ -731,16 +765,23 @@ describe('the account APIs in the Worker', () => {
     expect((await through('account', big, edge)).response.status).toBe(413)
   })
 
-  it("answers a person's clients and their reach, changes one's reach and revokes one, without waking an agent", async () => {
+  it("answers a person's clients and their grants, changes one's grant and revokes one, without waking an agent", async () => {
     const { seen, edge } = deployment()
     const list = new Request(`${APP}/api/clients`, { headers: { cookie: 'session=owner' } })
     expect(await (await through('account', list, edge)).response.json()).toEqual([CLIENT_VIEW])
-    const reach = write('/api/clients/client.1/reach', {
+    const terms = new Request(`${APP}/api/clients/client.1/terms`, { headers: { cookie: 'session=owner' } })
+    expect(await (await through('account', terms, edge)).response.json()).toMatchObject({ current: null })
+    const read = TERMS({ name: 'Claude', level: 'read' })
+    const grant = write('/api/clients/client.1/grant', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ all: false, workspaces: [WS] }),
+      body: JSON.stringify({ terms: read }),
     })
-    expect(await (await through('account', reach, edge)).response.json()).toEqual({ all: false, workspaces: [WS] })
+    const granted = await through('account', grant, edge)
+    expect(await granted.response.json()).toEqual({ grantId: 'cg_1', terms: read, expiresAt: null })
+    expect(granted.lines).toContainEqual(
+      expect.objectContaining({ event: 'grant', id: 'cg_1', by: OWNER, kind: 'client', scopes: ['read'] }),
+    )
     const revoke = write('/api/clients/client.1', { method: 'DELETE' })
     expect(await (await through('account', revoke, edge)).response.json()).toEqual({ revoked: true })
     const forged = write('/api/clients/client.1', { method: 'DELETE', headers: { 'x-goblin-csrf': '' } })
@@ -748,10 +789,25 @@ describe('the account APIs in the Worker', () => {
     expect(seen).toHaveLength(0)
   })
 
+  it('widens a grant its person may approve at the page a refusal links to, the body naming the same grant', async () => {
+    const { seen, edge } = deployment()
+    expect(await (await through('account', grantTerms('cg_1'), edge)).response.json()).toMatchObject({
+      grantId: 'cg_1',
+    })
+    expect((await through('account', grantTerms('cg_9'), edge)).response.status).toBe(404)
+    const wider = TERMS({ name: 'Claude', extras: ['inspect'] })
+    const widened = await through('account', widen('cg_1', { grantId: 'cg_1', terms: wider }), edge)
+    expect(await widened.response.json()).toEqual({ grantId: 'cg_1', terms: wider, expiresAt: null })
+    expect((await through('account', widen('cg_1', { grantId: 'cg_2', terms: wider }), edge)).response.status).toBe(400)
+    expect(seen).toHaveLength(0)
+  })
+
   it('owns its paths: anything else under them is a 404 in the envelope', async () => {
-    expect(['/api/workspaces', '/api/workspaces/x', '/api/clients', '/api/client-errors'].every(isAccountPath)).toBe(
-      true,
-    )
+    expect(
+      ['/api/workspaces', '/api/workspaces/x', '/api/clients', '/api/grants/x', '/api/client-errors'].every(
+        isAccountPath,
+      ),
+    ).toBe(true)
     expect(['/api/clientsx', '/api/keys', '/api/topics', '/api/workspacesx'].some(isAccountPath)).toBe(false)
     const { edge } = deployment()
     const { response } = await through('account', new Request(`${APP}/api/workspaces/x/y/z`), edge)

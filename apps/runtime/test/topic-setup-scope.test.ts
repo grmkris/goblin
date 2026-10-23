@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it } from 'vitest'
 import { openAsks } from '../src/attention.ts'
 import { type ToolSets, chatScope, piToolsFor, routinesOutside, sessionScope } from '../src/setup/scope.ts'
-import { recordReach } from '../src/keys/reach.ts'
+import { recordMaker } from '../src/keys/made-by.ts'
 import { outsideScopeResult } from '../src/pi/setup.ts'
 import { appPersonaChats } from '../src/storage/personas.ts'
 import { appRoutineRuns, appRoutines } from '../src/storage/routines.ts'
@@ -248,7 +248,7 @@ const room = () => {
     .set({ setup: storedSetup({ ...WORK, subagents: true }) })
     .where(eq(appTopics.id, 2))
     .run()
-  recordReach(made, { keyId: 'key-1', name: 'swarmm' }, 'topic', 2, 1)
+  recordMaker(made, { keyId: 'key-1', name: 'swarmm' }, 'topic', 2, 1)
   return made
 }
 

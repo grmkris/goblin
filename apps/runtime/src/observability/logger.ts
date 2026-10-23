@@ -23,6 +23,7 @@ const LOG_EVENTS = [
   'failure',
   'file-link',
   'flow',
+  'grant',
   'http.failure',
   'job',
   'mcp',

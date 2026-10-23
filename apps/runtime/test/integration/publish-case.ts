@@ -12,7 +12,7 @@ import { decodeEnvelope, verifyWebhook } from '../../src/mcp/events/webhook.ts'
 import { CredentialCipher } from '../../src/mcp/oauth/cipher.ts'
 import { fake } from '../fake.ts'
 import { callOwner } from '../owner-client.ts'
-import { type Person, call, holding, lever, ownerFetch, person, showing, signedIn } from './owner-requests.ts'
+import { type Person, call, holding, keyBody, lever, ownerFetch, person, showing, signedIn } from './owner-requests.ts'
 import type { Received } from './publish-receiver.ts'
 import { waitFor } from './until.ts'
 
@@ -29,14 +29,12 @@ const Polled = Schema.Struct({
   hasMore: Schema.Boolean,
 })
 
-/** A key of `who` for a server, named `name`, with the scopes a server needs to make rooms and follow them. */
+/**
+ * A key of `who` for a server, named `name`, whose grant writes in only the rooms it makes (ADR 0114: its Topics a
+ * list), as a server that makes rooms and follows them needs.
+ */
 async function keyOf(base: string, who: Person, name: string) {
-  const made = await call(base, who, '/api/keys', {
-    name,
-    scopes: ['topics', 'conversations'],
-    servers: [],
-    expiresInDays: 1,
-  })
+  const made = await call(base, who, '/api/keys', keyBody(who, name, { level: 'write', lists: true }))
   expect(made.status, await made.clone().text()).toBe(201)
   const created = Schema.decodeUnknownSync(Made)(await made.json())
   return { id: created.key.id, secret: created.secret }

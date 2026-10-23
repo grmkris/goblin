@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
+import { presetFor } from '../packages/contracts/src/grants.ts'
 import { Schema } from 'effect'
 import type { DevClient } from './smoke-client.ts'
 
@@ -54,7 +55,7 @@ class InboundClient {
       response_type: 'code',
       client_id: this.clientId,
       redirect_uri: REDIRECT_URI,
-      scope: 'openid offline_access goblin:agent goblin:inspect goblin:transcripts',
+      scope: 'openid offline_access goblin',
       state: base64url(randomBytes(16)),
       code_challenge: challenge,
       code_challenge_method: 'S256',
@@ -63,13 +64,10 @@ class InboundClient {
     const authorize = await this.#dev.send(`/api/auth/oauth2/authorize?${query.toString()}`)
     const location = authorize.headers.get('location') ?? ''
     if (!location.startsWith('/consent?')) throw new Error('consent_redirect_missing')
-    // As the consent page does (ADR 0097): the client reaches the owner's one workspace, so its calls name none.
-    await this.#dev.person((api) =>
-      api.clients.reach({
-        params: { clientId: this.clientId },
-        payload: { all: false, workspaces: [this.#dev.workspaceId] },
-      }),
-    )
+    // As the consent page does (ADRs 0097, 0114): its grant writes and inspects in the owner's one workspace, so its
+    // calls name none.
+    const terms = { ...presetFor(SMOKE_CLIENT_NAME, [this.#dev.workspaceId]), extras: ['inspect' as const] }
+    await this.#dev.person((api) => api.grants.clientGrant({ params: { clientId: this.clientId }, payload: { terms } }))
     const consent = await this.#dev.json('/api/auth/oauth2/consent', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

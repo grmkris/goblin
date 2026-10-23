@@ -8,7 +8,7 @@ import { type AguiEvent, ConversationEntries, EventType, TopicView, runInput } f
 import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
-import { type Person, call, ownerFetch, person, signedIn } from './owner-requests.ts'
+import { type Person, call, keyBody, ownerFetch, person, signedIn } from './owner-requests.ts'
 import { waitFor } from './until.ts'
 
 /** How long a case waits for something to show in a stream. */
@@ -101,9 +101,9 @@ export const keyFetch =
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })
 
-/** A new key of `owner` with `scopes`, as its secret. */
-export async function newKey(base: string, owner: Person, name: string, scopes: readonly string[]): Promise<string> {
-  const made = await call(base, owner, '/api/keys', { name, scopes, servers: [], expiresInDays: 1 })
+/** A new key of `owner` whose grant manages only what it makes (ADR 0114: its Topics and Personas a list), as its secret. */
+export async function newKey(base: string, owner: Person, name: string): Promise<string> {
+  const made = await call(base, owner, '/api/keys', keyBody(owner, name, { lists: true }))
   expect(made.status, await made.clone().text()).toBe(201)
   return Schema.decodeUnknownSync(Secret)(await made.json()).secret
 }
@@ -203,10 +203,10 @@ async function reconnect(url: string, owner: Person, gone: StreamRead) {
 
 /**
  * A server's key reads its own room's chat in full: the opening with the whole STATE, then its thinking and its
- * answer; another key's room and the owner's own chat answer 404, as any chat out of its reach.
+ * answer; another key's room and the owner's own chat are out of its grant's reach (ADR 0114: `access_insufficient`).
  */
 async function keyReads(url: string, owner: Person) {
-  const asKey = keyFetch(url, await newKey(url, owner, 'streams', ['topics', 'conversations']))
+  const asKey = keyFetch(url, await newKey(url, owner, 'streams'))
   const topic = Schema.decodeUnknownSync(TopicView)(
     await (await asKey('POST', '/api/topics', { name: 'Streamed room', operationId: 'streams:topic' })).json(),
   )
@@ -227,14 +227,15 @@ async function keyReads(url: string, owner: Person) {
   ])
   expect(run.some(({ type }) => type === EventType.STEP_STARTED)).toBe(true)
   await stream.close()
-  const other = keyFetch(url, await newKey(url, owner, 'elsewhere', ['topics', 'conversations']))
+  const other = keyFetch(url, await newKey(url, owner, 'elsewhere'))
   const theirs = Schema.decodeUnknownSync(TopicView)(
     await (await other('POST', '/api/topics', { name: 'Their room', operationId: 'streams:other' })).json(),
   )
   for (const outside of [theirs.conversation, '1']) {
     const refused = await asKey('GET', `/api/conversations/${outside}/stream`)
-    expect(refused.status).toBe(404)
+    expect(refused.status).toBe(403)
     expect(refused.headers.get('content-type')).toContain('application/json')
+    expect(await refused.json()).toMatchObject({ error: { code: 'access_insufficient' } })
   }
 }
 

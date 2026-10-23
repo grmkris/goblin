@@ -112,14 +112,16 @@ describe('workspaces (ADR 0089)', () => {
     )
   })
 
-  it("deletes a workspace for its owner: its agent first, then its keys, clients' reach of it and memberships", async () => {
+  it("deletes a workspace for its owner: its agent first, then its keys and their grants, clients' reach of it and memberships", async () => {
     const { db, sqlite } = fixture()
     const made = await createWorkspace(db, KRIS.id, { name: 'Swarmm', slug: 'swarmm' }, NOW)
     sqlite.exec(`
       INSERT INTO apikey (id, configId, referenceId, key, createdAt, updatedAt) VALUES ('k1', 'default', '${made.id}', 'h', 'x', 'x');
       INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]');
-      INSERT INTO mcpReach (clientId, userId, "all", updatedAt) VALUES ('client-1', 'u-kris', 0, 'x');
-      INSERT INTO mcpReachWorkspace (clientId, userId, workspaceId) VALUES ('client-1', 'u-kris', '${made.id}');
+      INSERT INTO "grant" (id, kind, keyId, name, level, createdAt, updatedAt) VALUES ('k1', 'key', 'k1', 'k', 'write', 'x', 'x');
+      INSERT INTO "grant" (id, kind, clientId, userId, name, level, createdAt, updatedAt)
+        VALUES ('cg_1', 'client', 'client-1', 'u-kris', 'c', 'write', 'x', 'x');
+      INSERT INTO grantWorkspace (grantId, workspaceId) VALUES ('k1', '${made.id}'), ('cg_1', '${made.id}');
     `)
     const failing = agents(made.id)
     await expect(deleteWorkspace({ db, eraseAgent: failing.eraseAgent }, KRIS.id, made.id)).rejects.toThrow()
@@ -131,8 +133,10 @@ describe('workspaces (ADR 0089)', () => {
     )
     await deleteWorkspace({ db, eraseAgent: working.eraseAgent }, KRIS.id, made.id)
     expect(working.erased).toEqual([made.id])
-    for (const table of ['organization', 'member', 'apikey', 'mcpReachWorkspace'])
+    for (const table of ['organization', 'member', 'apikey', 'grantWorkspace'])
       expect(count(sqlite, table), table).toBe(0)
+    // The client's grant is its person's, for whatever else it reaches; the key's went with the key.
+    expect(sqlite.prepare('SELECT id FROM "grant"').all()).toEqual([{ id: 'cg_1' }])
   })
 
   it('deletes, before an account goes, only the workspaces it alone owns', async () => {
@@ -160,7 +164,7 @@ describe('workspaces (ADR 0089)', () => {
     expect(erased).toEqual([])
   })
 
-  it("reaches, for an MCP client, all of a person's workspaces live, or those listed while they are a member (ADR 0097)", async () => {
+  it("reaches, for an MCP client, all of a person's workspaces live, or those its grant names while they are a member (ADRs 0097, 0114)", async () => {
     const { db, sqlite } = fixture()
     const [first] = await workspacesOf(db, KRIS, NOW)
     const second = await createWorkspace(db, KRIS.id, { name: 'Swarmm', slug: 'swarmm' }, NOW)
@@ -168,21 +172,23 @@ describe('workspaces (ADR 0089)', () => {
     sqlite.exec(`INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]')`)
     expect(await reachedBy(db, KRIS.id, 'client-1')).toBeUndefined()
     sqlite.exec(`
-      INSERT INTO mcpReach (clientId, userId, "all", updatedAt) VALUES ('client-1', 'u-kris', 0, 'x');
-      INSERT INTO mcpReachWorkspace (clientId, userId, workspaceId) VALUES ('client-1', 'u-kris', '${second.id}');
-      INSERT INTO mcpReachWorkspace (clientId, userId, workspaceId) VALUES ('client-1', 'u-kris', '${foreign.id}');
+      INSERT INTO "grant" (id, kind, clientId, userId, name, level, createdAt, updatedAt)
+        VALUES ('cg_1', 'client', 'client-1', 'u-kris', 'c', 'write', 'x', 'x');
+      INSERT INTO grantWorkspace (grantId, workspaceId) VALUES ('cg_1', '${second.id}'), ('cg_1', '${foreign.id}');
     `)
     // A listed workspace the person is no member of is never reached.
     expect((await reachedBy(db, KRIS.id, 'client-1'))?.workspaces.map((workspace) => workspace.slug)).toEqual([
       'swarmm',
     ])
-    sqlite.exec(`UPDATE mcpReach SET "all" = 1`)
+    sqlite.exec(`UPDATE "grant" SET "workspacesAll" = 1`)
     const later = await createWorkspace(db, KRIS.id, { name: 'Later', slug: 'later' }, NOW)
     const all = await reachedBy(db, KRIS.id, 'client-1')
     expect(all?.all).toBe(true)
     expect(all?.workspaces.map((workspace) => workspace.id).toSorted(byId)).toEqual(
       [first?.id ?? '', second.id, later.id].toSorted(byId),
     )
+    sqlite.exec(`UPDATE "grant" SET "revokedAt" = 'x'`)
+    expect(await reachedBy(db, KRIS.id, 'client-1')).toBeUndefined()
   })
 
   it('makes a slug of lowercase letters, digits and single hyphens, three characters at least', () => {

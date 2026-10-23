@@ -16,7 +16,7 @@ import * as Effect from 'effect/Effect'
 import type * as Schema from 'effect/Schema'
 import { epochSeconds, nowSeconds } from '../clock.ts'
 import { chatRow } from '../chats/directory.ts'
-import { hasReach } from '../keys/reach.ts'
+import { mirrorReaches } from '../grants/mirror.ts'
 import { Conversations } from '../chats/service.ts'
 import { NotFound } from '../http/errors.ts'
 import { mcpModelResult } from '../mcp/connections/extension.ts'
@@ -250,9 +250,11 @@ const sourcesFor = (allow: Allow) =>
 const threadSourcesFor = (chat: string | undefined, persona: number | undefined) =>
   Effect.gen(function* () {
     if (chat === undefined || persona === undefined) return { sources: [], left: [] }
-    // Only a Persona the declaring key reaches gets its servers' tools (ADR 0103).
-    const reached = yield* Db.useSync((db) => (keyId: string) => hasReach(db, keyId, 'persona', persona))
-    const endpoints = (yield* threadEndpoints(chat)).filter((endpoint) => reached(endpoint.keyId))
+    // Only a Persona the declaring grant reaches gets its servers' tools (ADRs 0103, 0114), as the mirror holds it.
+    const reached = yield* Db.useSync(
+      (db) => (grantId: string) => mirrorReaches(db, grantId, 'persona', String(persona)),
+    )
+    const endpoints = (yield* threadEndpoints(chat)).filter((endpoint) => reached(endpoint.grantId))
     const listed = yield* Effect.forEach(
       endpoints,
       (endpoint) =>

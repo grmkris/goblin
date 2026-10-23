@@ -16,7 +16,6 @@ import {
 import { ApiErrors } from './errors.ts'
 import { EndpointRole } from './role.ts'
 import { EndpointAccess } from './access.ts'
-import { EndpointScope } from './scope.ts'
 
 /** A routine's id in a path: `rt_` and up to 100 word characters or dashes. */
 const RoutineParam = Schema.String.check(Schema.isPattern(/^rt_[\w-]{1,100}$/u))
@@ -39,15 +38,15 @@ const params = { id: RoutineParam }
  * - `runs`: `GET /api/routines/:id/runs`, its newest runs.
  */
 export class RoutinesGroup extends HttpApiGroup.make('routines').add(
-  HttpApiEndpoint.get('list', '/routines', { success: RoutinePage })
-    .annotate(EndpointScope, 'routines')
-    .annotate(EndpointAccess, { level: 'read', extra: 'routines' }),
+  HttpApiEndpoint.get('list', '/routines', { success: RoutinePage }).annotate(EndpointAccess, {
+    level: 'read',
+    extra: 'routines',
+  }),
   HttpApiEndpoint.post('propose', '/routines', {
     payload: RoutineProposal,
     success: RoutineView.pipe(HttpApiSchema.status(201)),
     error: [ApiErrors.conflict, ApiErrors.invalidInput],
   })
-    .annotate(EndpointScope, 'routines')
     .annotate(EndpointAccess, { level: 'write', extra: 'routines' })
     .annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.get('settings', '/routines/settings', { success: RoutineSettings }),
@@ -62,7 +61,6 @@ export class RoutinesGroup extends HttpApiGroup.make('routines').add(
     success: RoutineView,
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput],
   })
-    .annotate(EndpointScope, 'routines')
     .annotate(EndpointAccess, { level: 'write', extra: 'routines' })
     .annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.delete('archive', '/routines/:id', {
@@ -71,7 +69,6 @@ export class RoutinesGroup extends HttpApiGroup.make('routines').add(
     success: RoutineView,
     error: [ApiErrors.notFound, ApiErrors.conflict],
   })
-    .annotate(EndpointScope, 'routines')
     .annotate(EndpointAccess, { level: 'write', extra: 'routines' })
     .annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.post('confirm', '/routines/:id/confirm', {
@@ -92,7 +89,6 @@ export class RoutinesGroup extends HttpApiGroup.make('routines').add(
     success: RoutineView,
     error: [ApiErrors.notFound, ApiErrors.conflict],
   })
-    .annotate(EndpointScope, 'routines')
     .annotate(EndpointAccess, { level: 'write', extra: 'routines' })
     .annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.post('run', '/routines/:id/run', {
@@ -105,7 +101,5 @@ export class RoutinesGroup extends HttpApiGroup.make('routines').add(
     params,
     success: RoutineRunPage,
     error: [ApiErrors.notFound],
-  })
-    .annotate(EndpointScope, 'routines')
-    .annotate(EndpointAccess, { level: 'read', extra: 'routines' }),
+  }).annotate(EndpointAccess, { level: 'read', extra: 'routines' }),
 ) {}

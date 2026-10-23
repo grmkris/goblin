@@ -6,11 +6,11 @@ import * as Layer from 'effect/Layer'
 import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import { InspectHandlers } from '../../../src/inspect/api.ts'
-import { recordReach } from '../../../src/keys/reach.ts'
 import { Resident } from '../../../src/mcp/service.ts'
 import { appConversations } from '../../../src/storage/schema.ts'
 import { flowRunEvent } from '../../../src/telemetry/events.ts'
-import { durable, sqliteDb } from '../../chats-sqlite.ts'
+import { sqliteDb } from '../../chats-sqlite.ts'
+import { credential, credentialHeaders, memoryGrants } from '../../grants-fixture.ts'
 import { inspectionFixture } from '../../inspection-fixture.ts'
 import { callOwner } from '../../owner-client.ts'
 import { cleanup, currentResident, get as request, serve, served } from './fixture.ts'
@@ -23,14 +23,15 @@ const fixture = () => {
   const resident = currentResident()
   const inspection = inspectionFixture()
   cleanup(inspection.close)
+  const grants = memoryGrants()
   const { fetch } = serve(
-    served([InspectGroup], InspectHandlers).pipe(
+    served([InspectGroup], InspectHandlers, undefined, grants.layer).pipe(
       Layer.provide(
         Layer.mergeAll(inspection.layer, Layer.succeed(Resident, resident.service), sqliteDb(inspection.db)),
       ),
     ),
   )
-  return { fetch, resident, ledger: inspection.ledger, db: inspection.db }
+  return { fetch, resident, ledger: inspection.ledger, db: inspection.db, grants }
 }
 
 /** A move from chat 12 into a new thread, recorded as its one flow step, and the answer of a turn there. */
@@ -103,17 +104,11 @@ describe('the inspect group served by the agent', () => {
   })
 })
 
-/** The grant the edge forwards for a key (ADR 0081) with `scopes`. */
-const keyed = (scopes: readonly string[] = ['inspect']) => ({
+/** The key the edge forwards (ADRs 0081, 0114): its grant reads with `extras`, and lists its Topics. */
+const KEY = credential({ id: 'key-1', name: 'swarmm', level: 'read', extras: ['inspect'], topics: 'list' })
+const keyed = (extras: readonly ('inspect' | 'setup')[] = ['inspect']) => ({
   'x-goblin-ref': 'ref-1',
-  'x-goblin-caller': JSON.stringify({
-    kind: 'key',
-    keyId: 'key-1',
-    name: 'swarmm',
-    scopes,
-    servers: ['mycut'],
-    origins: [],
-  }),
+  ...credentialHeaders({ ...KEY, extras }),
 })
 
 /** A run event of operation `operationId` in Pi session `session`, from `start` to `end` ms, `ok`. */
@@ -173,7 +168,7 @@ const ask = flowRunEvent(
  * (`1`) is Personal's and `14` (session `42`) another Topic's; the owner ran a turn in each.
  */
 const keyFixture = () => {
-  const { fetch, ledger, db, resident } = fixture()
+  const { fetch, ledger, db, resident, grants } = fixture()
   db.insert(appConversations)
     .values([
       { chatId: '12', piSession: '40', kind: 'thread', topicId: 2, createdAt: 1 },
@@ -181,7 +176,7 @@ const keyFixture = () => {
       { chatId: '14', piSession: '42', kind: 'main', role: 'conversation', topicId: 3, createdAt: 1 },
     ])
     .run()
-  recordReach(durable(db), { keyId: 'key-1', name: 'swarmm' }, 'topic', 2, 1)
+  grants.set(KEY, [{ kind: 'topic', id: '2' }])
   for (const each of [...forkTurn, ask]) ledger.ended(each)
   ledger.ended(event('turn:main', 'turn.submitted', 'owner:op-1', ['1', 2_000, 3_000]))
   ledger.ended(event('turn:other', 'turn.submitted', 'owner:op-2', ['42', 2_000, 3_000]))
@@ -190,11 +185,11 @@ const keyFixture = () => {
     ...event('tool:fork:bad', 'tool.call', FORK, ['41', 52_000, 53_000], { 'error.type': 'tool_error' }),
     status: 'error',
   })
-  const read = (path: string, scopes?: readonly string[]) => fetch(request(path, keyed(scopes)))
+  const read = (path: string, extras?: readonly ('inspect' | 'setup')[]) => fetch(request(path, keyed(extras)))
   return { fetch, read, resident }
 }
 
-describe("the inspect group under a server's API key (ADR 0084)", () => {
+describe("the inspect group under a server's API key whose grant lists its Topics (ADRs 0084, 0114)", () => {
   it("answers a Persona fork's turn by its operation: its steps in order and where its 60 seconds went", async () => {
     const { read, resident } = keyFixture()
     const answered = await read(`/api/inspect/turn?operation=${encodeURIComponent(FORK)}`)
@@ -270,20 +265,28 @@ describe("the inspect group under a server's API key (ADR 0084)", () => {
     expect((await read('/api/inspect/details?chat=14&entry=1')).status).toBe(404)
   })
 
-  it('never reads conversations in full, whatever its scopes: no key holds transcripts (ADR 0086)', async () => {
+  it('reads in full only the conversations of the Topics it reaches', async () => {
     const { read } = keyFixture()
-    for (const path of ['/api/inspect/conversations', '/api/inspect/conversation?conversation=12']) {
-      const refused = await read(path, ['topics', 'conversations', 'personas', 'inspect'])
-      expect(refused.status).toBe(403)
-      expect(await refused.json()).toMatchObject({ error: { reason: 'scope' } })
-    }
+    expect((await read('/api/inspect/conversations')).status).toBe(200)
+    expect((await read('/api/inspect/conversation?conversation=12')).status).toBe(200)
+    const refused = await read('/api/inspect/conversation?conversation=14')
+    expect(refused.status).toBe(403)
+    expect(await refused.json()).toMatchObject({
+      error: { code: 'access_insufficient', missing: { reachId: 'w1/topic/3' } },
+    })
   })
 
-  it('is refused without the inspect scope, before anything is read', async () => {
+  it('is refused without the inspect extra before anything is read, with a link to widen it', async () => {
     const { read } = keyFixture()
-    const refused = await read(`/api/inspect/turn?operation=${encodeURIComponent(FORK)}`, ['topics', 'personas'])
+    const refused = await read(`/api/inspect/turn?operation=${encodeURIComponent(FORK)}`, [])
     expect(refused.status).toBe(403)
-    expect(await refused.json()).toMatchObject({ error: { reason: 'scope' } })
-    expect((await read('/api/inspect/details?operation=svc%3Ajob%3A1%3Afirst', ['conversations'])).status).toBe(403)
+    expect(await refused.json()).toMatchObject({
+      error: {
+        code: 'access_insufficient',
+        missing: { extra: 'inspect' },
+        widenUrl: 'https://goblin.test/consent/widen?grant=key-1&extra=inspect',
+      },
+    })
+    expect((await read('/api/inspect/details?operation=svc%3Ajob%3A1%3Afirst', ['setup'])).status).toBe(403)
   })
 })

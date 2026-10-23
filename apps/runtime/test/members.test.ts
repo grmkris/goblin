@@ -158,20 +158,21 @@ describe('members and their roles (ADR 0093)', () => {
     expect((await updateMemberRole(db, workspace, KRIS.id, 'member')).role).toBe('member')
   })
 
-  it("removes a member and takes the workspace out of their clients' reaches, never oneself or the last owner", async () => {
+  it("removes a member and takes the workspace out of their clients' grants, never oneself or the last owner", async () => {
     const { db, sqlite, workspace } = await withAna()
     sqlite.exec(`
       INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]');
       INSERT INTO oauthConsent (id, clientId, userId, scopes, createdAt, updatedAt)
         VALUES ('consent-1', 'client-1', 'u-ana', '[]', 'x', 'x');
-      INSERT INTO mcpReach (clientId, userId, "all", updatedAt) VALUES ('client-1', 'u-ana', 0, 'x');
-      INSERT INTO mcpReachWorkspace (clientId, userId, workspaceId) VALUES ('client-1', 'u-ana', '${workspace.id}');
+      INSERT INTO "grant" (id, kind, clientId, userId, name, level, createdAt, updatedAt)
+        VALUES ('cg_1', 'client', 'client-1', 'u-ana', 'c', 'write', 'x', 'x');
+      INSERT INTO grantWorkspace (grantId, workspaceId) VALUES ('cg_1', '${workspace.id}');
     `)
     await expect(removeMember(db, workspace, KRIS.id, KRIS.id)).rejects.toEqual(new Conflict({ reason: 'leave' }))
     await removeMember(db, workspace, KRIS.id, ANA.id)
     expect(await membershipOf(db, ANA.id, workspace.id)).toBeUndefined()
-    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM mcpReachWorkspace').get()).toEqual({ count: 0 })
-    // The consent is the person's, for whatever else its reach names.
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM grantWorkspace').get()).toEqual({ count: 0 })
+    // The consent and the grant are the person's, for whatever else the grant names.
     expect(sqlite.prepare('SELECT COUNT(*) AS count FROM oauthConsent').get()).toEqual({ count: 1 })
     await expect(leaveWorkspace(db, workspace, KRIS.id)).rejects.toEqual(new Conflict({ reason: 'last_owner' }))
   })

@@ -1,14 +1,15 @@
-import type { ClientReach, WorkspaceView } from '@goblin/contracts'
+import type { WorkspaceView } from '@goblin/contracts'
 import { Switch } from '@goblin/ui'
+import type { ReachChoice } from '../lib/grant-terms.ts'
 
 /** The reach a person starts from: their only workspace when they have one, else nothing chosen yet. */
-export const initialReach = (workspaces: readonly WorkspaceView[]): ClientReach => {
+export const initialReach = (workspaces: readonly WorkspaceView[]): ReachChoice => {
   const [only, ...others] = workspaces
   return { all: false, workspaces: only !== undefined && others.length === 0 ? [only.id] : [] }
 }
 
 /** Whether a reach names any workspace: all of them, or at least one. */
-export const reachesAny = (reach: ClientReach): boolean => reach.all || reach.workspaces.length > 0
+export const reachesAny = (reach: ReachChoice): boolean => reach.all || reach.workspaces.length > 0
 
 /**
  * Which of the person's workspaces an MCP client reaches (ADR 0097): all of them, ones they join later included, or
@@ -16,8 +17,8 @@ export const reachesAny = (reach: ClientReach): boolean => reach.all || reach.wo
  */
 export function ReachChooser(props: {
   readonly workspaces: readonly WorkspaceView[]
-  readonly value: ClientReach
-  readonly onChange: (reach: ClientReach) => void
+  readonly value: ReachChoice
+  readonly onChange: (reach: ReachChoice) => void
   readonly disabled?: boolean
 }) {
   const { workspaces, value, onChange, disabled = false } = props

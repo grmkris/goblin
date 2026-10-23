@@ -13,7 +13,8 @@ const migrations = readdirSync(DIR)
   .toSorted()
 const APP = 'https://goblin.test'
 const NOW = '2026-10-15T00:00:00.000Z'
-const SCOPES = [
+/** Every scope a client could ask for under ADR 0098 (0004). */
+const SCOPES_0004 = [
   'openid',
   'profile',
   'email',
@@ -27,6 +28,8 @@ const SCOPES = [
   'goblin:setup',
   'goblin:routines',
 ]
+/** The scopes a client asks for since ADR 0114 (0005): the sign-in ones and `goblin`. */
+const SCOPES = ['openid', 'profile', 'email', 'offline_access', 'goblin']
 const databases: DatabaseSync[] = []
 afterEach(() => {
   for (const db of databases.splice(0)) db.close()
@@ -76,11 +79,8 @@ const OWN_INDEXES: Readonly<Record<string, readonly { unique: boolean; columns: 
   member: [{ unique: true, columns: ['organizationId', 'userId'] }],
 }
 
-/**
- * goblin's own tables in the auth D1, beside Better Auth's: what each OAuth client's consent reaches (ADR 0097), and
- * each credential's grant, its workspaces and its listed reach (0005).
- */
-const OWN_TABLES = ['mcpReach', 'mcpReachWorkspace', 'grant', 'grantWorkspace', 'grantReach'] as const
+/** goblin's own tables in the auth D1, beside Better Auth's: each credential's grant, its workspaces and its lists. */
+const OWN_TABLES = ['grant', 'grantWorkspace', 'grantReach'] as const
 
 /** Compare the SQL to the installed Better Auth schema, not to a second manually maintained column list. */
 function checkTable(db: DatabaseSync, table: string, schema: ReturnType<typeof getSchema>[string]) {
@@ -289,7 +289,7 @@ describe('auth D1 baseline', () => {
       `INSERT INTO oauthClient (id, clientId, redirectUris, scopes) VALUES ('c1', 'client-1', '[]', '["openid"]')`,
     )
     db.exec(readFileSync(join(DIR, powers), 'utf8'))
-    expect(JSON.parse(String(db.prepare('SELECT scopes FROM oauthClient').get()?.['scopes']))).toEqual(SCOPES)
+    expect(JSON.parse(String(db.prepare('SELECT scopes FROM oauthClient').get()?.['scopes']))).toEqual(SCOPES_0004)
   })
 
   it("keeps one grant per key and per client and person, and cascades the key's, client's, person's and workspace's", () => {
@@ -355,6 +355,262 @@ describe('auth D1 baseline', () => {
     `)
     db.exec(`DELETE FROM oauthClient WHERE clientId = 'client-1'`)
     expect(count('grant')).toBe(0)
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+  })
+
+  it("turns a seeded 0004 database's keys and consents into grants, row for row of the mapping (0005, ADR 0114)", () => {
+    const db = new DatabaseSync(':memory:')
+    databases.push(db)
+    const grants = '0005_grants.sql'
+    for (const name of migrations.slice(0, migrations.indexOf(grants))) db.exec(readFileSync(join(DIR, name), 'utf8'))
+    const key = (id: string, permissions: string | null, metadata: string | null, expiresAt: string | null) =>
+      db
+        .prepare(
+          'INSERT INTO apikey (id, configId, name, referenceId, key, createdAt, updatedAt, permissions, metadata, expiresAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        )
+        .run(id, 'default', `key ${id}`, 'w1', `hash-${id}`, NOW, NOW, permissions, metadata, expiresAt)
+    const consent = (id: string, client: string, user: string, scopes: readonly string[]) =>
+      db
+        .prepare(
+          'INSERT INTO oauthConsent (id, clientId, userId, scopes, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+        )
+        .run(id, client, user, JSON.stringify(scopes), NOW, NOW)
+    db.exec(`
+      INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt)
+        VALUES ('u1', 'Kris', 'kris@example.test', 1, '${NOW}', '${NOW}'), ('u2', 'Ana', 'ana@example.test', 1, '${NOW}', '${NOW}');
+      INSERT INTO organization (id, name, slug, createdAt) VALUES ('w1', 'Mine', 'mine', '${NOW}'), ('w2', 'Team', 'team', '${NOW}');
+      INSERT INTO member (id, organizationId, userId, role, createdAt)
+        VALUES ('m1', 'w1', 'u1', 'owner', '${NOW}'), ('m2', 'w2', 'u1', 'member', '${NOW}'), ('m3', 'w2', 'u2', 'owner', '${NOW}');
+      INSERT INTO oauthClient (id, clientId, name, redirectUris, scopes) VALUES
+        ('c1', 'claude', 'Claude Code', '[]', '${JSON.stringify(SCOPES_0004)}'),
+        ('c2', 'mysi', NULL, '[]', '${JSON.stringify(SCOPES_0004)}'),
+        ('c3', 'probe', 'Probe', '[]', '${JSON.stringify(SCOPES_0004)}');
+    `)
+    // Keys: topics and personas manage, conversations write, inspect alone read; servers, origins and expiry.
+    const origins = [{ origin: 'https://mcp.swarmm.app', tools: ['job_submit'] }]
+    key(
+      'k-manage',
+      '{"goblin":["topics","conversations","personas"]}',
+      JSON.stringify({ servers: ['mycut', 'myplan'], origins, createdBy: 'u1' }),
+      '2026-11-14T00:00:00.000Z',
+    )
+    key(
+      'k-write',
+      '{"goblin":["conversations","inspect"]}',
+      '{"servers":[],"createdBy":"u1"}',
+      '2026-10-22T00:00:00.000Z',
+    )
+    key('k-read', '{"goblin":["inspect"]}', '{"servers":["mycut"]}', '2027-10-15T00:00:00.000Z')
+    key('k-none', null, null, null)
+    key('k-odd', 'not json', '{"servers":"mycut"}', '2026-10-22T12:00:00.000Z')
+    // Consents: every scope over all workspaces; asking alone over a listed one; reading and runs with no reach.
+    consent('o1', 'claude', 'u1', [...SCOPES_0004])
+    consent('o2', 'mysi', 'u1', ['openid', 'offline_access', 'goblin:agent'])
+    consent('o3', 'probe', 'u2', ['openid', 'goblin:inspect', 'goblin:conversations'])
+    consent('o4', 'probe', 'u1', ['openid', 'goblin:transcripts', 'goblin:routines'])
+    db.exec(`
+      INSERT INTO mcpReach (clientId, userId, "all", updatedAt) VALUES ('claude', 'u1', 1, '${NOW}'), ('mysi', 'u1', 0, '${NOW}'), ('probe', 'u1', 0, '${NOW}');
+      INSERT INTO mcpReachWorkspace (clientId, userId, workspaceId) VALUES ('mysi', 'u1', 'w2'), ('probe', 'u1', 'w1');
+      INSERT INTO session (id, expiresAt, token, createdAt, updatedAt, userId) VALUES ('s1', '${NOW}', 't1', '${NOW}', '${NOW}', 'u1');
+      INSERT INTO oauthRefreshToken (id, token, clientId, sessionId, userId, expiresAt, createdAt, scopes)
+        VALUES ('r1', 'rt-1', 'claude', 's1', 'u1', '${NOW}', '${NOW}', '["openid","offline_access","goblin:agent","goblin:inspect"]');
+      INSERT INTO oauthAccessToken (id, token, clientId, userId, expiresAt, createdAt, scopes)
+        VALUES ('a1', 'at-1', 'claude', 'u1', '${NOW}', '${NOW}', '["openid"]');
+      INSERT INTO oauthResource (id, identifier, name, allowedScopes) VALUES ('res', '${APP}/mcp', 'goblin', '${JSON.stringify(SCOPES_0004)}');
+    `)
+    db.exec(readFileSync(join(DIR, grants), 'utf8'))
+    db.exec('PRAGMA foreign_keys = ON')
+    const rows = (sql: string, ...values: string[]) => db.prepare(sql).all(...values)
+    expect(
+      rows(
+        'SELECT id, kind, keyId, name, level, extras, lifetime, expiresAt, workspacesAll, origins, createdBy FROM "grant" WHERE kind = \'key\' ORDER BY id',
+      ),
+    ).toEqual([
+      {
+        id: 'k-manage',
+        kind: 'key',
+        keyId: 'k-manage',
+        name: 'key k-manage',
+        level: 'manage',
+        extras: '["setup"]',
+        lifetime: '30d',
+        expiresAt: '2026-11-14T00:00:00.000Z',
+        workspacesAll: 0,
+        origins: JSON.stringify(origins),
+        createdBy: 'u1',
+      },
+      {
+        id: 'k-none',
+        kind: 'key',
+        keyId: 'k-none',
+        name: 'key k-none',
+        level: 'read',
+        extras: '[]',
+        lifetime: 'never',
+        expiresAt: null,
+        workspacesAll: 0,
+        origins: '[]',
+        createdBy: null,
+      },
+      {
+        id: 'k-odd',
+        kind: 'key',
+        keyId: 'k-odd',
+        name: 'key k-odd',
+        level: 'read',
+        extras: '[]',
+        lifetime: '30d',
+        expiresAt: '2026-10-22T12:00:00.000Z',
+        workspacesAll: 0,
+        origins: '[]',
+        createdBy: null,
+      },
+      {
+        id: 'k-read',
+        kind: 'key',
+        keyId: 'k-read',
+        name: 'key k-read',
+        level: 'read',
+        extras: '["inspect"]',
+        lifetime: '365d',
+        expiresAt: '2027-10-15T00:00:00.000Z',
+        workspacesAll: 0,
+        origins: '[]',
+        createdBy: null,
+      },
+      {
+        id: 'k-write',
+        kind: 'key',
+        keyId: 'k-write',
+        name: 'key k-write',
+        level: 'write',
+        extras: '["inspect"]',
+        lifetime: '7d',
+        expiresAt: '2026-10-22T00:00:00.000Z',
+        workspacesAll: 0,
+        origins: '[]',
+        createdBy: 'u1',
+      },
+    ])
+    // Every key reaches every Topic and Persona of its workspace, and the connections it named.
+    expect(
+      rows(
+        "SELECT grantId, workspaceId, topics, personas, connections FROM grantWorkspace WHERE grantId LIKE 'k-%' ORDER BY grantId",
+      ),
+    ).toEqual(
+      ['k-manage', 'k-none', 'k-odd', 'k-read', 'k-write'].map((grantId) => ({
+        grantId,
+        workspaceId: 'w1',
+        topics: 'all',
+        personas: 'all',
+        connections: 'list',
+      })),
+    )
+    expect(
+      rows("SELECT grantId, kind, resourceId FROM grantReach WHERE grantId LIKE 'k-%' ORDER BY grantId, resourceId"),
+    ).toEqual([
+      { grantId: 'k-manage', kind: 'connection', resourceId: 'mycut' },
+      { grantId: 'k-manage', kind: 'connection', resourceId: 'myplan' },
+      { grantId: 'k-read', kind: 'connection', resourceId: 'mycut' },
+    ])
+    // The key keeps its secret and who made it; what it may do is its grant's alone.
+    expect(rows('SELECT id, permissions, metadata, expiresAt FROM apikey ORDER BY id')).toEqual([
+      { id: 'k-manage', permissions: null, metadata: '{"createdBy":"u1"}', expiresAt: null },
+      { id: 'k-none', permissions: null, metadata: null, expiresAt: null },
+      { id: 'k-odd', permissions: null, metadata: null, expiresAt: null },
+      { id: 'k-read', permissions: null, metadata: null, expiresAt: null },
+      { id: 'k-write', permissions: null, metadata: '{"createdBy":"u1"}', expiresAt: null },
+    ])
+    const clients = rows(
+      'SELECT id, clientId, userId, name, level, extras, lifetime, workspacesAll, createdBy FROM "grant" WHERE kind = \'client\' ORDER BY clientId, userId',
+    )
+    expect(clients).toEqual([
+      {
+        id: expect.stringMatching(/^cg_[0-9a-f]{32}$/u),
+        clientId: 'claude',
+        userId: 'u1',
+        name: 'Claude Code',
+        level: 'manage',
+        extras: '["setup","routines","inspect"]',
+        lifetime: 'never',
+        workspacesAll: 1,
+        createdBy: 'u1',
+      },
+      {
+        id: expect.stringMatching(/^cg_/u),
+        clientId: 'mysi',
+        userId: 'u1',
+        name: 'MCP client',
+        level: 'write',
+        extras: '[]',
+        lifetime: 'never',
+        workspacesAll: 0,
+        createdBy: 'u1',
+      },
+      {
+        id: expect.stringMatching(/^cg_/u),
+        clientId: 'probe',
+        userId: 'u1',
+        name: 'Probe',
+        level: 'read',
+        extras: '["routines","inspect"]',
+        lifetime: 'never',
+        workspacesAll: 0,
+        createdBy: 'u1',
+      },
+      {
+        id: expect.stringMatching(/^cg_/u),
+        clientId: 'probe',
+        userId: 'u2',
+        name: 'Probe',
+        level: 'write',
+        extras: '["inspect"]',
+        lifetime: 'never',
+        workspacesAll: 0,
+        createdBy: 'u2',
+      },
+    ])
+    const idOf = (client: string, user: string) =>
+      String(rows('SELECT id FROM "grant" WHERE clientId = ? AND userId = ?', client, user)[0]?.['id'])
+    const reachOf = (grantId: string) => ({
+      workspaces: rows(
+        'SELECT workspaceId, topics, personas, connections FROM grantWorkspace WHERE grantId = ? ORDER BY workspaceId',
+        grantId,
+      ),
+      listed: rows(
+        'SELECT workspaceId, kind, resourceId FROM grantReach WHERE grantId = ? ORDER BY workspaceId',
+        grantId,
+      ),
+    })
+    // All of its person's workspaces: no row, everything in each.
+    expect(reachOf(idOf('claude', 'u1'))).toEqual({ workspaces: [], listed: [] })
+    // Asking the agent alone reaches Personal of each workspace it reached, and nothing else of Topics or Personas.
+    expect(reachOf(idOf('mysi', 'u1'))).toEqual({
+      workspaces: [{ workspaceId: 'w2', topics: 'list', personas: 'list', connections: 'all' }],
+      listed: [{ workspaceId: 'w2', kind: 'topic', resourceId: '1' }],
+    })
+    // A listed reach is its workspaces in full; no reach at all is no workspace, as before.
+    expect(reachOf(idOf('probe', 'u1'))).toEqual({
+      workspaces: [{ workspaceId: 'w1', topics: 'all', personas: 'all', connections: 'all' }],
+      listed: [],
+    })
+    expect(reachOf(idOf('probe', 'u2'))).toEqual({ workspaces: [], listed: [] })
+    // One scope, `goblin`, from now on, for every consent, token, client and the resource.
+    const scopes = (table: string) =>
+      rows(`SELECT scopes FROM ${table} ORDER BY id`).map((row) => JSON.parse(String(row['scopes'])))
+    expect(scopes('oauthConsent')).toEqual([
+      ['openid', 'profile', 'email', 'offline_access', 'goblin'],
+      ['openid', 'offline_access', 'goblin'],
+      ['openid', 'goblin'],
+      ['openid', 'goblin'],
+    ])
+    expect(scopes('oauthRefreshToken')).toEqual([['openid', 'offline_access', 'goblin']])
+    expect(scopes('oauthAccessToken')).toEqual([['openid']])
+    expect(scopes('oauthClient')).toEqual([SCOPES, SCOPES, SCOPES])
+    expect(rows('SELECT allowedScopes FROM oauthResource')).toEqual([{ allowedScopes: JSON.stringify(SCOPES) }])
+    expect(
+      rows("SELECT name FROM sqlite_master WHERE name IN ('mcpReach', 'mcpReachWorkspace', 'grantConsent')"),
+    ).toEqual([])
     expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([])
   })
 

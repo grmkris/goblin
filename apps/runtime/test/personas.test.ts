@@ -32,11 +32,11 @@ import { appConversations } from '../src/storage/schema.ts'
 import { appThreadServers } from '../src/storage/thread-servers.ts'
 import type { Db } from '../src/runtime/db.ts'
 import { RequestContext } from '../src/http/api/context.ts'
-import type { KeyGrant } from '../src/http/api/principal.ts'
 import { updateTopic } from '../src/topics/program.ts'
 import { TopicRegistry } from '../src/topics/registry.ts'
 import { chatDatabase, sqliteDb } from './chats-sqlite.ts'
 import { unread } from './fake.ts'
+import { credential } from './grants-fixture.ts'
 
 const cleanups: (() => void)[] = []
 afterEach(() => {
@@ -310,13 +310,12 @@ describe("a Persona's own model in a server's work (ADR 0087)", () => {
     // Topic 9 is one a server's key made.
     const fence = { ownerOnly: (id: string) => id.startsWith('sub/'), keyTopic: (topic: number) => topic === 9 }
     const personas = Effect.runSync(Personas.make(store, fence).pipe(Effect.provideService(Changes, makeChanges())))
-    const key: KeyGrant = { keyId: 'key-1', name: 'swarmm', scopes: ['personas'], servers: [], origins: [] }
     const facts = {
       ref: undefined,
       request: undefined,
       operation: undefined,
       route: 'conversations.submit',
-      caller: { kind: 'key' as const, ...key },
+      credential: credential({ id: 'key-1', name: 'swarmm', level: 'manage' }),
     }
     const own = (model: string, topic: number) => Effect.runSync(personas.ownModel(model, topic))
     expect([own('sub/claude-opus-5-5', 1), own('sub/claude-opus-5-5', 9), own('model-a', 9)]).toEqual([
@@ -582,7 +581,7 @@ describe('organize receipts and Undo', () => {
       origin: 'https://dev.swarmm.test',
       tools: '[]',
       token: 'sealed',
-      keyId: 'key-1',
+      grantId: 'key-1',
       createdAt: 6,
     }
     db.insert(appThreadServers)

@@ -9,11 +9,13 @@ import * as HttpServer from 'effect/http/HttpServer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { afterEach } from 'vitest'
+import type { Grants } from '../../../src/grants/service.ts'
 import { OwnerAdmissionLive } from '../../../src/http/api/middleware.ts'
 import { KeyNames } from '../../../src/keys/names.ts'
 import { routeNames } from '../../../src/http/api/context.ts'
 import { AgentHttp } from '../../../src/http/api/server.ts'
 import { chatDatabase } from '../../chats-sqlite.ts'
+import { idleGrants } from '../../grants-fixture.ts'
 
 export { currentResident } from '../../fixed-services.ts'
 export { type ChatDatabase as Database, sqliteDb } from '../../chats-sqlite.ts'
@@ -23,13 +25,21 @@ const idleNames = Layer.succeed(KeyNames, KeyNames.of({ learn: () => Effect.void
 
 /**
  * `groups` and their `handlers` served the way the agent serves the owner API (`AgentHttp.serve`): behind owner
- * admission, its router and its failure rendering, with `names` learning keys' names (ADR 0108; none by default).
- * Provide it the services the handlers read, then `serve` it.
+ * admission, its router and its failure rendering, with `names` learning keys' names (ADR 0108; none by default) and
+ * `grants` holding credentials' grants (ADR 0114; none listed by default). Provide it the services the handlers read,
+ * then `serve` it.
  */
-export const served = <const Groups extends NonEmptyReadonlyArray<HttpApiGroup.Constraint>, Handlers, R, N = never>(
+export const served = <
+  const Groups extends NonEmptyReadonlyArray<HttpApiGroup.Constraint>,
+  Handlers,
+  R,
+  N = never,
+  G = never,
+>(
   groups: Groups,
   handlers: Layer.Layer<Handlers, never, R>,
   names: Layer.Layer<KeyNames, never, N> = idleNames,
+  grants: Layer.Layer<Grants, never, G> = idleGrants,
 ) => {
   const api = ownerApiOf(...groups)
   return AgentHttp.serve(
@@ -39,7 +49,7 @@ export const served = <const Groups extends NonEmptyReadonlyArray<HttpApiGroup.C
       Layer.provide(OwnerAdmissionLive.pipe(Layer.provide(names))),
       Layer.provide(HttpServer.layerServices),
     ),
-  )
+  ).pipe(Layer.provideMerge(grants))
 }
 
 const disposals: (() => unknown)[] = []

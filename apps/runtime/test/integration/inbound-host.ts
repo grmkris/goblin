@@ -9,7 +9,7 @@ export function inboundHostProbe(request: Request): Promise<Response> {
   headers.set('host', url.host)
   const handler = createMcpHandler(
     () =>
-      mcpServer(['agent'], async () => {
+      mcpServer({ level: 'write', extras: [] }, async () => {
         throw new Error('no agent behind the host probe')
       }),
     { route: '/mcp', ...inboundHosts(url.origin) },

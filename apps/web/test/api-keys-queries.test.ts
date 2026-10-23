@@ -1,4 +1,4 @@
-import type { ApiKeyView } from '@goblin/contracts'
+import { type ApiKeyView, presetFor } from '@goblin/contracts'
 import { NotFound, WorkspaceAccountApi } from '@goblin/contracts/api'
 import { MutationObserver, QueryObserver } from '@tanstack/react-query'
 import * as Effect from 'effect/Effect'
@@ -13,11 +13,10 @@ import { unusedHandlers } from './query/unused-handlers.ts'
 const KEY: ApiKeyView = {
   id: 'key-1',
   name: 'swarm',
-  scopes: ['topics', 'conversations', 'personas'],
-  servers: ['mycut'],
-  origins: [],
   createdAt: '2026-10-20T00:00:00.000Z',
   start: 'gbk_aaaaaa',
+  grantId: 'key-1',
+  terms: presetFor('swarm', ['ws-kris']),
 }
 /** The secret the fake's rotation answers, made up for the test (ADR 0105). */
 const ROTATED = `gbk_${'b'.repeat(64)}`
@@ -34,11 +33,7 @@ const fakeAccount = () => {
       list: () => Effect.succeed([state.key]),
       update: ({ params, payload }) => {
         if (params.keyId !== state.key.id) return Effect.fail(new NotFound({ what: 'key' }))
-        state.key = {
-          ...state.key,
-          scopes: payload.scopes ?? state.key.scopes,
-          origins: payload.origins ?? state.key.origins,
-        }
+        state.key = { ...state.key, terms: payload.terms }
         return Effect.succeed(state.key)
       },
       rotate: ({ params }) => {
@@ -78,24 +73,24 @@ afterAll(async () => {
   await fake.dispose()
 })
 
-describe("a key's scopes (ADR 0084)", () => {
+describe("a key's grant (ADRs 0084, 0114)", () => {
   it('change in place and the list is fresh once the change settles', async () => {
     const client = testQueryClient()
     const list = new QueryObserver(client, keysQuery)
     const unsubscribe = list.subscribe(() => undefined)
     try {
-      await vi.waitFor(() => expect(list.getCurrentResult().data?.[0]?.scopes).toHaveLength(3))
+      await vi.waitFor(() => expect(list.getCurrentResult().data?.[0]?.terms.level).toBe('write'))
       const change = new MutationObserver(client, updateKeyMutation)
-      await change.mutate({ keyId: 'key-1', scopes: ['topics', 'conversations', 'personas', 'inspect'] })
+      await change.mutate({ keyId: 'key-1', terms: { ...KEY.terms, level: 'manage', extras: ['inspect'] } })
       expect(list.getCurrentResult().data?.[0]).toMatchObject({
         id: 'key-1',
-        scopes: expect.arrayContaining(['inspect']),
+        terms: { level: 'manage', extras: ['inspect'] },
       })
       const patch = fake.calls.find((call) => call.method === 'PATCH')
       expect(new URL(patch?.url ?? '').pathname).toBe('/api/keys/key-1')
       // The page's own workspace is in every call's path: the edge strips it, as this fake does.
       expect(fake.calls.every((call) => new URL(call.url).pathname.startsWith('/api/keys'))).toBe(true)
-      await expect(change.mutate({ keyId: 'key-9', scopes: ['inspect'] })).rejects.toBeInstanceOf(NotFound)
+      await expect(change.mutate({ keyId: 'key-9', terms: KEY.terms })).rejects.toBeInstanceOf(NotFound)
     } finally {
       unsubscribe()
     }

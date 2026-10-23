@@ -1,7 +1,7 @@
 // The Settings card for API keys (ADR 0081): what a server the owner runs uses instead of a browser session.
 import { Fragment, type SubmitEvent, useState } from 'react'
 import { useMutation, useQuery, useSuspenseQuery } from '@tanstack/react-query'
-import { type ApiKeyView, type KeyOrigin, type KeyScope, keyOriginsOf } from '@goblin/contracts'
+import { type ApiKeyView, type GrantTerms, type KeyOrigin, keyOriginsOf } from '@goblin/contracts'
 import {
   Alert,
   AlertDescription,
@@ -25,11 +25,13 @@ import {
   rotateKeyMutation,
   updateKeyMutation,
 } from '../account/queries.ts'
+import { useCurrentWorkspace } from '../lib/current-workspace.ts'
+import { type KeyPower, keyTermsFrom, powersOf, withOrigins, withPowers } from '../lib/grant-terms.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { QueryBoundary } from '../lib/query/query-boundary.tsx'
 import { setupCatalogQuery } from '../setup/queries.ts'
 
-const SCOPES: readonly { readonly scope: KeyScope; readonly label: string }[] = [
+const SCOPES: readonly { readonly scope: KeyPower; readonly label: string }[] = [
   { scope: 'topics', label: 'Make and change its own Topics' },
   { scope: 'conversations', label: 'Send to and read its own chats' },
   { scope: 'personas', label: 'Make and change its own Personas' },
@@ -53,6 +55,23 @@ function Toggle(props: {
 
 const toggled = <A,>(items: readonly A[], item: A, on: boolean): readonly A[] =>
   on ? [...new Set([...items, item])] : items.filter((each) => each !== item)
+
+/** The powers a key's grant holds, one switch each, as `id`'s rows. */
+function KeyPowers(props: {
+  readonly id: string
+  readonly powers: readonly KeyPower[]
+  readonly onChange: (powers: readonly KeyPower[]) => void
+}) {
+  return SCOPES.map(({ scope, label }) => (
+    <Toggle
+      key={scope}
+      id={`${props.id}-scope-${scope}`}
+      label={label}
+      on={props.powers.includes(scope)}
+      onChange={(on) => props.onChange(toggled(props.powers, scope, on))}
+    />
+  ))
+}
 
 /** A new key's secret, or a rotated key's new one (ADR 0105), shown this once, to copy. */
 function ShownSecret(props: { readonly name: string; readonly secret: string; readonly onDone: () => void }) {
@@ -158,19 +177,15 @@ function OriginFields(props: {
   )
 }
 
-/** One key's MCP servers, changed in place (ADR 0091): the same key, which keeps what it made. */
-function KeyServers(props: {
-  readonly keyId: string
-  readonly origins: readonly KeyOrigin[]
-  readonly onDone: () => void
-}) {
+/** One key's MCP servers, changed in place (ADR 0091): the same key, its grant's other terms kept. */
+function KeyServers(props: { readonly keyId: string; readonly terms: GrantTerms; readonly onDone: () => void }) {
   const update = useMutation(updateKeyMutation)
-  const [rows, setRows] = useState(rowsOf(props.origins))
+  const [rows, setRows] = useState(rowsOf(props.terms.reach.origins))
   const problem = originProblem(rows)
   const failure = update.error === null ? '' : messageOf(update.error, 'change that key')
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault()
-    update.mutate({ keyId: props.keyId, origins: [...originsOf(rows)] }, { onSuccess: props.onDone })
+    update.mutate({ keyId: props.keyId, terms: withOrigins(props.terms, originsOf(rows)) }, { onSuccess: props.onDone })
   }
   return (
     <form onSubmit={submit}>
@@ -201,7 +216,8 @@ function NewKey() {
   const create = useMutation(createKeyMutation)
   const servers = useQuery(setupCatalogQuery).data?.servers ?? []
   const [name, setName] = useState('')
-  const [scopes, setScopes] = useState<readonly KeyScope[]>(['topics', 'conversations', 'personas'])
+  const workspace = useCurrentWorkspace()
+  const [scopes, setScopes] = useState<readonly KeyPower[]>(['conversations'])
   const [chosen, setChosen] = useState<readonly string[]>([])
   const [origins, setOrigins] = useState<readonly OriginRow[]>([])
   const [days, setDays] = useState('90')
@@ -209,12 +225,18 @@ function NewKey() {
   const failure = create.error === null ? '' : messageOf(create.error, 'make that key')
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault()
+    if (workspace === undefined) return
+    const named = name.trim()
     create.mutate({
-      name: name.trim(),
-      scopes: [...scopes],
-      servers: [...chosen],
-      origins: [...originsOf(origins)],
-      expiresInDays: Number(days),
+      name: named,
+      terms: keyTermsFrom({
+        name: named,
+        workspace: workspace.id,
+        powers: scopes,
+        servers: chosen,
+        origins: originsOf(origins),
+        days: Number(days),
+      }),
     })
   }
   if (create.data !== undefined)
@@ -231,15 +253,7 @@ function NewKey() {
           <FieldLabel htmlFor="key-name">Name</FieldLabel>
           <Input id="key-name" value={name} maxLength={64} required onChange={(event) => setName(event.target.value)} />
         </Field>
-        {SCOPES.map(({ scope, label }) => (
-          <Toggle
-            key={scope}
-            id={`key-scope-${scope}`}
-            label={label}
-            on={scopes.includes(scope)}
-            onChange={(on) => setScopes(toggled(scopes, scope, on))}
-          />
-        ))}
+        <KeyPowers id="key" powers={scopes} onChange={setScopes} />
         {servers.length > 0 && <p className="text-sm text-muted-foreground">Servers its Topics and Personas may use</p>}
         {servers.map((server) => (
           <Toggle
@@ -266,7 +280,7 @@ function NewKey() {
           <Button
             type="submit"
             pending={create.isPending}
-            disabled={name.trim() === '' || scopes.length === 0 || problem !== ''}
+            disabled={name.trim() === '' || problem !== '' || workspace === undefined}
           >
             Make key
           </Button>
@@ -276,18 +290,14 @@ function NewKey() {
   )
 }
 
-/** One key's scopes, changed in place (ADR 0084): it stays the same key, and keeps what it made. */
-function KeyScopes(props: {
-  readonly keyId: string
-  readonly scopes: readonly KeyScope[]
-  readonly onDone: () => void
-}) {
+/** One key's level and inspection, changed in place (ADRs 0084, 0114): the same key, its grant's other terms kept. */
+function KeyScopes(props: { readonly keyId: string; readonly terms: GrantTerms; readonly onDone: () => void }) {
   const update = useMutation(updateKeyMutation)
-  const [scopes, setScopes] = useState(props.scopes)
+  const [scopes, setScopes] = useState(powersOf(props.terms))
   const failure = update.error === null ? '' : messageOf(update.error, 'change that key')
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault()
-    update.mutate({ keyId: props.keyId, scopes: [...scopes] }, { onSuccess: props.onDone })
+    update.mutate({ keyId: props.keyId, terms: withPowers(props.terms, scopes) }, { onSuccess: props.onDone })
   }
   return (
     <form onSubmit={submit}>
@@ -297,17 +307,9 @@ function KeyScopes(props: {
             <AlertDescription>{failure}</AlertDescription>
           </Alert>
         )}
-        {SCOPES.map(({ scope, label }) => (
-          <Toggle
-            key={scope}
-            id={`key-${props.keyId}-scope-${scope}`}
-            label={label}
-            on={scopes.includes(scope)}
-            onChange={(on) => setScopes(toggled(scopes, scope, on))}
-          />
-        ))}
+        <KeyPowers id={`key-${props.keyId}`} powers={scopes} onChange={setScopes} />
         <Field orientation="horizontal">
-          <Button type="submit" size="sm" pending={update.isPending} disabled={scopes.length === 0}>
+          <Button type="submit" size="sm" pending={update.isPending}>
             Save scopes
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={props.onDone}>
@@ -361,8 +363,8 @@ function KeyEditor(props: {
   readonly onDone: () => void
 }) {
   const { apiKey, onDone } = props
-  if (props.what === 'scopes') return <KeyScopes keyId={apiKey.id} scopes={apiKey.scopes} onDone={onDone} />
-  if (props.what === 'servers') return <KeyServers keyId={apiKey.id} origins={apiKey.origins} onDone={onDone} />
+  if (props.what === 'scopes') return <KeyScopes keyId={apiKey.id} terms={apiKey.terms} onDone={onDone} />
+  if (props.what === 'servers') return <KeyServers keyId={apiKey.id} terms={apiKey.terms} onDone={onDone} />
   return <RotateSecret keyId={apiKey.id} name={apiKey.name} onDone={onDone} />
 }
 
@@ -393,9 +395,9 @@ function Keys() {
                     {key.name} {key.start && <code>{key.start}…</code>}
                   </span>
                   <span className="grant-about">
-                    {key.scopes.join(', ')}
-                    {key.servers.length > 0 && ` · ${key.servers.join(', ')}`}
-                    {key.origins.length > 0 && ` · ${key.origins.map(({ origin }) => new URL(origin).host).join(', ')}`}
+                    {[key.terms.level, ...key.terms.extras].join(', ')}
+                    {key.terms.reach.origins.length > 0 &&
+                      ` · ${key.terms.reach.origins.map(({ origin }) => new URL(origin).host).join(', ')}`}
                     {key.expiresAt && ` · expires ${new Date(key.expiresAt).toLocaleDateString()}`}
                     {key.lastUsedAt && ` · used ${new Date(key.lastUsedAt).toLocaleDateString()}`}
                   </span>

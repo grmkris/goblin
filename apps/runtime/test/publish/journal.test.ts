@@ -23,7 +23,7 @@ afterEach(() => {
 
 const NOW = 1_800_000_000_000
 
-/** An agent's database with two keys' rooms: key k1 made Topic 2, key k2 Topic 3. */
+/** An agent's database with two keys whose grants list one Topic each (ADR 0114): k1 Topic 2, k2 Topic 3. */
 const setup = () => {
   const database = chatDatabase()
   databases.push(database)
@@ -32,11 +32,19 @@ const setup = () => {
   )
   insert.run(2, 'Room A', '20')
   insert.run(3, 'Room B', '30')
-  const reach = database.sqlite.prepare(
-    "INSERT INTO app_key_reach (key_id, kind, resource_id, created_at) VALUES (?, 'topic', ?, 1)",
+  const synced = database.sqlite.prepare(
+    "INSERT INTO app_grant_sync (grant_id, generation, topics, personas, connections, synced_at) VALUES (?, 1, 'list', 'all', 'all', 1)",
   )
-  reach.run('k1', 2)
-  reach.run('k2', 3)
+  const reach = database.sqlite.prepare(
+    "INSERT INTO app_grant_reach (grant_id, kind, resource_id) VALUES (?, 'topic', ?)",
+  )
+  for (const [grant, topic] of [
+    ['k1', '2'],
+    ['k2', '3'],
+  ] as const) {
+    synced.run(grant)
+    reach.run(grant, topic)
+  }
   return { db: durable(database.db), sqlite: database.sqlite }
 }
 type Db = ReturnType<typeof setup>['db']
@@ -45,6 +53,7 @@ const lease = (db: Db, id: string, principal: string, selector: { topic?: number
   const row: Lease = {
     id,
     principal,
+    grantId: principal.startsWith('key:') ? principal.slice('key:'.length) : null,
     name: 'conversation.updated',
     argumentsJson: '{}',
     topicId: selector.topic ?? null,
@@ -76,7 +85,7 @@ const owed = (sqlite: ReturnType<typeof setup>['sqlite'], id: string) =>
     .all(id)
 
 describe('the published journal (ADR 0112)', () => {
-  it('journals a wake once and owes it to each lease that takes it, a key only in its own rooms', () => {
+  it('journals a wake once and owes it to each lease that takes it, a key only in the Topics its grant lists', () => {
     const { db, sqlite } = setup()
     lease(db, 'all-k1', 'key:k1')
     lease(db, 'room-b-k1', 'key:k1', { topic: 3 })
@@ -112,7 +121,7 @@ describe('the published journal (ADR 0112)', () => {
     expect(nextDue(db)).toBe(NOW + 15_000 + 30_000)
   })
 
-  it('pages a poll after a cursor; null answers where now is; a key reads only its rooms and selectors filter', () => {
+  it('pages a poll after a cursor; null answers where now is; a key reads only the Topics its grant lists and selectors filter', () => {
     const { db } = setup()
     for (const [chat, topic] of [
       ['20', 2],
@@ -122,19 +131,19 @@ describe('the published journal (ADR 0112)', () => {
     ] as const)
       record(db, wake(chat, topic, { entry: (ids += 1) }))
     const query = { name: 'conversation.updated', maxEvents: 2, cutoff: 0 }
-    const now = page(db, { ...query, key: 'k1', cursor: null })
+    const now = page(db, { ...query, grant: 'k1', cursor: null })
     expect(now).toMatchObject({ events: [], cursor: cursorOf(4), truncated: false, hasMore: false })
-    const first = page(db, { ...query, key: 'k1', cursor: cursorOf(0) })
+    const first = page(db, { ...query, grant: 'k1', cursor: cursorOf(0) })
     expect(first.events.map(({ data }) => data.chat)).toEqual(['20', '21'])
     expect(first).toMatchObject({ hasMore: true, cursor: cursorOf(2) })
-    const rest = page(db, { ...query, key: 'k1', cursor: first.cursor })
+    const rest = page(db, { ...query, grant: 'k1', cursor: first.cursor })
     expect(rest.events.map(({ data }) => data.chat)).toEqual(['20'])
     expect(rest).toMatchObject({ hasMore: false, cursor: cursorOf(4) })
-    expect(page(db, { ...query, key: 'k2', cursor: cursorOf(0) }).events.map(({ data }) => data.chat)).toEqual(['30'])
-    const everyone = page(db, { ...query, maxEvents: 100, key: undefined, cursor: cursorOf(0), chat: '20' })
+    expect(page(db, { ...query, grant: 'k2', cursor: cursorOf(0) }).events.map(({ data }) => data.chat)).toEqual(['30'])
+    const everyone = page(db, { ...query, maxEvents: 100, grant: undefined, cursor: cursorOf(0), chat: '20' })
     expect(everyone.events.map(({ cursor }) => cursor)).toEqual([cursorOf(1), cursorOf(4)])
     expect(first.events[0]).toMatchObject({ name: 'conversation.updated', data: { chat: '20', topic: '2' } })
-    expect(() => page(db, { ...query, key: 'k1', cursor: cursorOf(9) })).toThrow(
+    expect(() => page(db, { ...query, grant: 'k1', cursor: cursorOf(9) })).toThrow(
       expect.objectContaining({ reason: 'event_cursor' }),
     )
   })
@@ -144,7 +153,13 @@ describe('the published journal (ADR 0112)', () => {
     record(db, wake('20', 2, { entry: 1 }, NOW - PUBLISH_LIMITS.retentionMs - 1))
     record(db, wake('20', 2, { entry: 2 }))
     pruneJournal(db, NOW)
-    const polled = page(db, { key: 'k1', name: 'conversation.updated', cursor: cursorOf(0), maxEvents: 10, cutoff: 0 })
+    const polled = page(db, {
+      grant: 'k1',
+      name: 'conversation.updated',
+      cursor: cursorOf(0),
+      maxEvents: 10,
+      cutoff: 0,
+    })
     expect(polled).toMatchObject({ truncated: true, events: [expect.objectContaining({ cursor: cursorOf(2) })] })
     expect(behind(db, cursorOf(0))).toBe(true)
     expect(behind(db, cursorOf(1))).toBe(false)

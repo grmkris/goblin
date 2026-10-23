@@ -12,7 +12,8 @@ import { and, asc, desc, eq, getTableColumns, inArray, isNull, ne, sql } from 'd
 import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Effect from 'effect/Effect'
 import { type AppError, Conflict, InvalidInput, NotFound, attemptSync } from '../http/errors.ts'
-import { makerColumn, makerOf, reachedIds, roomOf } from '../keys/reach.ts'
+import { listedIds } from '../grants/mirror.ts'
+import { makerColumn, makerOf, roomOf } from '../keys/made-by.ts'
 import { after, pageOf } from '../storage/page.ts'
 import { appTopics } from '../storage/topics.ts'
 import { roomSetupWithin, storedSetup, topicSetupOf } from './setup.ts'
@@ -74,8 +75,11 @@ const summary = (row: Made): TopicSummary => ({
   updatedAt: row.updatedAt,
 })
 
-/** Which page of Topics: after `cursor`, at most `limit`, and only key `key`'s own when it names one (ADR 0084). */
-export type TopicPageQuery = { readonly key?: string; readonly cursor?: string; readonly limit: number }
+/**
+ * Which page of Topics: after `cursor`, at most `limit`, and only those grant `grant` lists when it names one (ADR 0114:
+ * a credential whose Topics are a list).
+ */
+export type TopicPageQuery = { readonly grant?: string; readonly cursor?: string; readonly limit: number }
 
 /** A name as stored: runs of whitespace become one space, ends trimmed; nothing left is refused. */
 const cleanName = (name: string): string => {
@@ -138,7 +142,7 @@ export class TopicRegistry<RunResult = unknown> {
     const rows = this.#made()
       .where(
         and(
-          query.key === undefined ? undefined : inArray(appTopics.id, reachedIds(this.#db, query.key, 'topic')),
+          query.grant === undefined ? undefined : inArray(appTopics.id, listedIds(this.#db, query.grant, 'topic')),
           after(appTopics, query.cursor),
         ),
       )

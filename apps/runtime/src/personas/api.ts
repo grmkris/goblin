@@ -2,7 +2,16 @@ import { type CreatePersona, type PersonaPage, type PersonaView, setupSummaryOf 
 import { OwnerApi } from '@goblin/contracts/api'
 import * as Effect from 'effect/Effect'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
-import { claim, confinePersona, confineSetup, requestKey } from '../keys/policy.ts'
+import {
+  claim,
+  confineSetup,
+  listedBy,
+  namesAnything,
+  reachesPersona,
+  requestCredential,
+  requestKey,
+  requireAccessFor,
+} from '../grants/policy.ts'
 import { InvalidInput } from '../http/errors.ts'
 import { Resident } from '../mcp/service.ts'
 import { resumePersona } from './ask.ts'
@@ -27,17 +36,17 @@ const summaryOf = (persona: PersonaView): PersonaPage['personas'][number] => ({
   updatedAt: persona.updatedAt,
 })
 
-/** A page of Personas: every one for the owner, only its own for a server's API key (ADR 0084). */
+/** A page of Personas: every one for a member, those its grant reaches for a credential (ADR 0114). */
 const list = (query: {
   readonly name?: string | undefined
   readonly cursor?: string | undefined
   readonly limit?: number | undefined
 }) =>
   Effect.gen(function* () {
-    const key = yield* requestKey
+    const grant = yield* listedBy('personas')
     const page = yield* Personas.use((personas) =>
       personas.page({
-        ...(key === undefined ? {} : { key: key.keyId }),
+        ...(grant === undefined ? {} : { grant }),
         ...(query.name === undefined ? {} : { name: query.name }),
         ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
         limit: query.limit ?? PAGE,
@@ -54,14 +63,26 @@ const confineModel = (model: string | null | undefined) =>
   })
 
 /**
- * A Persona a server's API key makes (ADR 0081): its setup under the key's ceiling, and the key's own from then on, as
- * its answer says (`madeBy`, ADR 0108).
+ * A credential's setup for a Persona (ADR 0114): one that gives anything takes the `setup` extra, and it names only
+ * connections in reach.
+ */
+const confinePersonaSetup = (setup: CreatePersona['setup']) =>
+  setup === undefined
+    ? Effect.void
+    : Effect.andThen(
+        namesAnything(setup) ? requireAccessFor({ extra: 'setup' }, false) : Effect.void,
+        confineSetup(setup),
+      )
+
+/**
+ * A Persona a credential makes (ADR 0114): its setup within its grant, and within its reach from then on (listed when
+ * its Personas are a list); a key's is named as made by it (`madeBy`, ADR 0108).
  */
 const create = (input: CreatePersona) =>
   Effect.gen(function* () {
-    if ((yield* requestKey) === undefined) return yield* createPersona(input, { actor: 'owner' })
+    if ((yield* requestCredential) === undefined) return yield* createPersona(input, { actor: 'owner' })
     yield* confineModel(input.model)
-    if (input.setup !== undefined) yield* confineSetup(input.setup)
+    yield* confinePersonaSetup(input.setup)
     const made = yield* madePersona(input, { actor: 'owner' })
     yield* claim('persona', made.persona.id, made.created)
     return yield* Personas.use((personas) => personas.get(made.persona.id))
@@ -69,19 +90,19 @@ const create = (input: CreatePersona) =>
 
 /**
  * The `personas` group (ADR 0033): each handler runs its program as the owner. Owner admission has already admitted
- * the request; a reply to a Persona's hold (ADR 0041) is admitted again as an owner message is. A request an API key
- * sent reaches only the key's own Personas (ADR 0081).
+ * the request; a reply to a Persona's hold (ADR 0041) is admitted again as an owner message is. A request a credential
+ * sent reaches only the Personas its grant reaches (ADR 0114).
  */
 export const PersonasHandlers = HttpApiBuilder.group(OwnerApi, 'personas', (handlers) =>
   handlers
     .handle('list', ({ query }) => list(query))
     .handle('create', ({ payload }) => create(payload))
-    .handle('detail', ({ params }) => Effect.andThen(confinePersona(params.id), personaDetail(params.id)))
+    .handle('detail', ({ params }) => Effect.andThen(reachesPersona(params.id), personaDetail(params.id)))
     .handle('update', ({ params, payload }) =>
       Effect.andThen(
         Effect.andThen(
-          Effect.andThen(confinePersona(params.id), confineModel(payload.model)),
-          payload.setup === undefined ? Effect.void : confineSetup(payload.setup),
+          Effect.andThen(reachesPersona(params.id), confineModel(payload.model)),
+          confinePersonaSetup(payload.setup),
         ),
         updatePersona(params.id, payload, { actor: 'owner' }),
       ),

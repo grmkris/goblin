@@ -21,7 +21,6 @@ import { MoveReceipt, MoveToThread } from '../threads.ts'
 import { ApiErrors } from './errors.ts'
 import { EventStream } from './stream.ts'
 import { EndpointAccess } from './access.ts'
-import { EndpointScope } from './scope.ts'
 import { GrantsResident } from './resident.ts'
 
 /** The chat a path names: a logical chat id of 1 to 12 digits. */
@@ -87,8 +86,8 @@ const EntriesQuery = {
  *   flight, then follows the chat until the reader goes away (at most fifteen minutes; a reconnect opens afresh).
  *   `Conflict` `stream_busy` past the readers a chat or the workspace takes. It does not grant resident authority.
  *
- * A caller with the `conversations` scope reaches `update`, `submit`, `startThread`, `stop`, `entries` and `stream`
- * (ADRs 0081, 0086, 0090): a key only in its own Topics, and never `keepOpen`.
+ * A credential reaches `update`, `submit`, `startThread` and `stop` with `write`, and `entries` and `stream` with
+ * `read` (ADRs 0081, 0086, 0090, 0114): only in the Topics its grant reaches, and never `keepOpen`.
  */
 export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
   HttpApiEndpoint.post('create', '/conversations', {
@@ -101,25 +100,19 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     payload: UpdateConversation,
     success: ConversationView,
     error: [ApiErrors.notFound, ApiErrors.invalidInput],
-  })
-    .annotate(EndpointScope, 'conversations')
-    .annotate(EndpointAccess, { level: 'write' }),
+  }).annotate(EndpointAccess, { level: 'write' }),
   HttpApiEndpoint.post('submit', '/conversations/:id/messages', {
     params,
     payload: RunInput,
     success: MessageReceipt.pipe(HttpApiSchema.status(202)),
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput, ApiErrors.budgetExhausted],
-  })
-    .annotate(EndpointScope, 'conversations')
-    .annotate(EndpointAccess, { level: 'write' }),
+  }).annotate(EndpointAccess, { level: 'write' }),
   HttpApiEndpoint.post('startThread', '/conversations/:id/threads', {
     params,
     payload: StartThread,
     success: StartedThread.pipe(HttpApiSchema.status(201)),
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput, ApiErrors.budgetExhausted],
-  })
-    .annotate(EndpointScope, 'conversations')
-    .annotate(EndpointAccess, { level: 'write' }),
+  }).annotate(EndpointAccess, { level: 'write' }),
   HttpApiEndpoint.post('move', '/conversations/:id/move', {
     params,
     payload: MoveToThread,
@@ -131,9 +124,7 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     payload: StopConversation,
     success: Schema.Struct({ stopped: Schema.Boolean }),
     error: [ApiErrors.notFound],
-  })
-    .annotate(EndpointScope, 'conversations')
-    .annotate(EndpointAccess, { level: 'write' }),
+  }).annotate(EndpointAccess, { level: 'write' }),
   HttpApiEndpoint.get('queue', '/conversations/:id/queue', {
     params,
     success: ConversationQueue,
@@ -167,7 +158,6 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     success: ConversationEntries,
     error: [ApiErrors.notFound, ApiErrors.conflict],
   })
-    .annotate(EndpointScope, 'conversations')
     .annotate(EndpointAccess, { level: 'read' })
     .annotate(GrantsResident, false),
   HttpApiEndpoint.get('sources', '/conversations/:id/sources', {
@@ -180,7 +170,6 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     success: EventStream,
     error: [ApiErrors.notFound, ApiErrors.conflict],
   })
-    .annotate(EndpointScope, 'conversations')
     .annotate(EndpointAccess, { level: 'read' })
     .annotate(GrantsResident, false),
 ) {}

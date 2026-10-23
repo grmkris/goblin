@@ -42,7 +42,8 @@ export const appPublishDirty = sqliteTable('app_publish_dirty', {
 
 /**
  * A lease on webhook deliveries (ADR 0112). Its id is the hash of its holder (`key:<id>`, `client:<id>:<user>` or
- * `member:<user>`), selector and exact URL, so subscribing again finds it. The selector's arguments as canonical JSON,
+ * `member:<user>`), selector and exact URL, so subscribing again finds it. `grantId` is the grant a credential's lease
+ * was made under (ADR 0114), whose reach its fan-out checks; none for a member's. The selector's arguments as canonical JSON,
  * and the Topic or chat they name; the secret sealed with the credential cipher; `refreshBefore` when it ends unless
  * renewed (epoch ms). `failing` once a delivery was given up on (a gap went out), `terminated` once it ended.
  */
@@ -62,6 +63,7 @@ export const appPublishSubscriptions = sqliteTable(
     lastError: text('last_error'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
+    grantId: text('grant_id'),
   },
   (table) => [index('app_publish_subscriptions_principal').on(table.principal)],
 )

@@ -19,7 +19,55 @@ export interface Person {
 }
 
 /** The paths a person's browser sends as they are; every other `/api/` path is a member's, under their workspace. */
-const PERSON_PATHS = ['/api/auth/', '/api/workspaces', '/api/invitations', '/api/clients', '/api/client-errors']
+const PERSON_PATHS = [
+  '/api/auth/',
+  '/api/workspaces',
+  '/api/invitations',
+  '/api/clients',
+  '/api/grants',
+  '/api/client-errors',
+]
+
+/**
+ * A new key's body as Settings sends it (ADR 0114): its name and its grant's terms over `who`'s workspace, `manage`
+ * unless `terms` say, for a day. `lists` makes its Topics and Personas lists, growing with what it makes, so it reaches
+ * nothing of anyone else's; `connections` lists the connections its setups may name.
+ */
+export const keyBody = (
+  who: Person,
+  name: string,
+  terms: {
+    readonly level?: 'read' | 'write' | 'manage'
+    readonly extras?: readonly ('setup' | 'routines' | 'inspect')[]
+    readonly lists?: boolean
+    readonly connections?: readonly string[]
+    readonly origins?: readonly { readonly origin: string; readonly tools: readonly string[] }[]
+  } = {},
+) => {
+  const list = terms.lists === true ? { kind: 'list', ids: [] } : { kind: 'all' }
+  return {
+    name,
+    terms: {
+      name,
+      level: terms.level ?? 'manage',
+      extras: terms.extras ?? [],
+      lifetime: '1d',
+      reach: {
+        workspaces: 'list',
+        each: [
+          {
+            workspace: who.workspace,
+            topics: list,
+            personas: list,
+            connections:
+              terms.connections === undefined ? { kind: 'all' } : { kind: 'list', ids: [...terms.connections] },
+          },
+        ],
+        origins: terms.origins ?? [],
+      },
+    },
+  }
+}
 
 /** `path` as `who`'s browser sends it: a member's `/api/…` path under `/w/<their workspace's slug>` (ADR 0089). */
 export const inWorkspace = (who: Person, path: string): string =>

@@ -26,7 +26,6 @@ describe('inbound client claims (unit)', () => {
     expect(clientFromClaims(valid, expected)).toEqual({
       clientId: 'cli',
       subject: 'owner',
-      scopes: ['openid'],
       expiresAt: 101,
     })
   })

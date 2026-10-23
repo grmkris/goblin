@@ -3,19 +3,12 @@ import { createMcpHandler } from '@modelcontextprotocol/server'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
-import { callerScopesOf } from '../../src/auth/resources.ts'
-import type { Caller } from '../../src/http/api/principal.ts'
+import type { Credential } from '../../src/http/api/principal.ts'
 import { ownerCall } from '../../src/inbound/client.ts'
 import { type CallerReach, mcpServer } from '../../src/inbound/mcp-server.ts'
+import { credential } from '../grants-fixture.ts'
 
-const KEY: Caller = {
-  kind: 'key',
-  keyId: 'key-1',
-  name: 'swarmm',
-  scopes: ['conversations'],
-  servers: [],
-  origins: [],
-}
+const KEY = credential({ id: 'key-1', name: 'swarmm', level: 'read' })
 const SUBSCRIBED = {
   id: 'sub_1',
   refreshBefore: '2026-10-22T12:00:00.000Z',
@@ -25,7 +18,7 @@ const SUBSCRIBED = {
 }
 
 /** /mcp for `caller` over an agent that records each request and answers `reply`. */
-const handlerFor = (caller: Caller, reply: (request: Request) => Response, reach?: CallerReach) => {
+const handlerFor = (caller: Credential, reply: (request: Request) => Response, reach?: CallerReach) => {
   const seen: Request[] = []
   const agent = {
     fetch: async (request: Request) => {
@@ -36,7 +29,7 @@ const handlerFor = (caller: Caller, reply: (request: Request) => Response, reach
   const member =
     caller.kind === 'client' ? { user: 'u1', role: 'owner' as const, name: 'Owner', shared: false } : undefined
   const handler = createMcpHandler(() =>
-    mcpServer(caller.scopes, (call) => Effect.runPromise(ownerCall(agent, caller, member, call)), reach),
+    mcpServer(caller, (call) => Effect.runPromise(ownerCall(agent, caller, member, call)), reach),
   )
   return { handler, seen }
 }
@@ -89,13 +82,6 @@ describe('/mcp publishes Events (ADR 0112)', () => {
       }),
     )
     expect(await legacy.text()).toContain('"events":{}')
-    const other = handlerFor({ ...KEY, scopes: ['topics'] }, () => Response.json({}))
-    const { client: topics, raw: topicsRaw } = await connected(other.handler)
-    expect(topicsRaw[0]).not.toContain('"events"')
-    await expect(topics.request({ method: 'events/list', params: {} }, Anything)).rejects.toMatchObject({
-      code: -32601,
-    })
-    await topics.close()
   })
 
   it('calls the events endpoints as the caller, with a client’s workspace taken out of the arguments', async () => {
@@ -107,12 +93,7 @@ describe('/mcp publishes Events (ADR 0112)', () => {
         { id: 'ws-b', slug: 'side', name: 'Side', role: 'owner', members: 1 },
       ],
     }
-    const client = {
-      kind: 'client' as const,
-      clientId: 'cc',
-      name: 'Claude Code',
-      scopes: callerScopesOf(['goblin:conversations']),
-    }
+    const client = credential({ kind: 'client', id: 'cc', name: 'Claude Code', grantId: 'cg_1', level: 'read' })
     const { handler, seen } = handlerFor(client, () => Response.json(SUBSCRIBED), reach)
     const { client: mcp } = await connected(handler)
     const delivery = { mode: 'webhook', url: 'https://hooks.example.com/a', secret: 'whsec_x' }
@@ -127,10 +108,7 @@ describe('/mcp publishes Events (ADR 0112)', () => {
     const [request] = seen
     expect(new URL(request?.url ?? '').pathname).toBe('/api/events/subscribe')
     expect(await request?.json()).toEqual({ name: 'conversation.updated', arguments: { topic: '2' }, delivery })
-    expect(JSON.parse(request?.headers.get('x-goblin-caller') ?? '{}')).toMatchObject({
-      kind: 'client',
-      clientId: 'cc',
-    })
+    expect(JSON.parse(request?.headers.get('x-goblin-caller') ?? '{}')).toMatchObject({ kind: 'client', id: 'cc' })
     await mcp.close()
   })
 

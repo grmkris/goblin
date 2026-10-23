@@ -14,7 +14,8 @@ import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { Conflict, InvalidInput, NotFound } from '../http/errors.ts'
-import { makerColumn, makerOf, reachedIds } from '../keys/reach.ts'
+import { listedIds } from '../grants/mirror.ts'
+import { makerColumn, makerOf } from '../keys/made-by.ts'
 import { after, pageOf } from '../storage/page.ts'
 import { appPersonaRevisions, appPersonas } from '../storage/personas.ts'
 
@@ -34,10 +35,10 @@ export const personaSetupOf = (stored: string): PersonaSetup => Option.getOrElse
 
 /**
  * Which page of Personas: after `cursor`, at most `limit`, only those whose name holds `name` (ignoring case) when it
- * is given, and only key `key`'s own when it names one (ADR 0084).
+ * is given, and only those grant `grant` lists when it names one (ADR 0114: a credential whose Personas are a list).
  */
 export type PersonaPageQuery = {
-  readonly key?: string
+  readonly grant?: string
   readonly name?: string
   readonly cursor?: string
   readonly limit: number
@@ -146,7 +147,7 @@ export class PersonaRegistry<RunResult = unknown> {
     const rows = this.#made()
       .where(
         and(
-          query.key === undefined ? undefined : inArray(appPersonas.id, reachedIds(this.#db, query.key, 'persona')),
+          query.grant === undefined ? undefined : inArray(appPersonas.id, listedIds(this.#db, query.grant, 'persona')),
           query.name === undefined
             ? undefined
             : // Cloudflare's SQLite refuses a LIKE pattern over 50 bytes; `instr` has no such bound. ASCII case folds

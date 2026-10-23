@@ -24,7 +24,7 @@ import { AgentInput } from './runtime/input.ts'
 import { conversationId } from './pi/context.ts'
 import { PiSessions, fromPi } from './pi/sessions.ts'
 import type { HeldCallOutcome } from './mcp/connections/types.ts'
-import { requestAuthor, requestFlowOrigin, requestKey } from './keys/policy.ts'
+import { requestAuthor, requestFlowOrigin, requestKey } from './grants/policy.ts'
 import { type SharedContext, outcomeContent, ownerContent, withAuthor } from './pi/content.ts'
 import { askPersonas } from './personas/ask.ts'
 

@@ -4,10 +4,14 @@ import { fake } from './fake.ts'
 /** A statement's SQL and its bound values, as `prepare` and `bind` made it. */
 type Bound = { readonly sql: string; readonly params: readonly SQLInputValue[] }
 
+/** Whether `sql` reads rows: a select, or a write that answers rows (`returning`). */
+const readsRows = (sql: string): boolean => /^\s*(?:select|with|pragma)\b/iu.test(sql) || /\breturning\b/iu.test(sql)
+
 /**
- * A D1 database over node:sqlite, for the code that calls D1's own API (`prepare`, `bind`, `first`, `all`, `run` and
- * `batch`) against the real auth migrations. A batch runs in one transaction, as D1 runs one. The code under test
- * reaches only these members of the database and its statements.
+ * A D1 database over node:sqlite, for the code that calls D1's own API (`prepare`, `bind`, `first`, `all`, `run`,
+ * `batch` and `exec`) against the real auth migrations, Better Auth's own D1 dialect included (which reads `all`'s
+ * `meta`). A batch runs in one transaction, as D1 runs one. The code under test reaches only these members of the
+ * database and its statements.
  */
 export const d1Of = (db: DatabaseSync): D1Database => {
   const bound = new WeakMap<D1PreparedStatement, Bound>()
@@ -20,9 +24,16 @@ export const d1Of = (db: DatabaseSync): D1Database => {
         return Promise.resolve(row === undefined ? null : column === undefined ? row : row[column]) as Promise<T>
       },
       all: <T>() => {
+        const prepared = db.prepare(sql)
+        if (!readsRows(sql)) {
+          const { changes, lastInsertRowid } = prepared.run(...params)
+          const meta = { changes: Number(changes), last_row_id: Number(lastInsertRowid) }
+          return Promise.resolve(fake<D1Result<T>>({ results: [], success: true, meta: fake<D1Result['meta']>(meta) }))
+        }
         // SAFETY: as for `first`, the caller names the rows' shape.
-        const results = db.prepare(sql).all(...params) as T[]
-        return Promise.resolve(fake<D1Result<T>>({ results, success: true }))
+        const results = prepared.all(...params) as T[]
+        const meta = fake<D1Result['meta']>({ changes: results.length, last_row_id: 0 })
+        return Promise.resolve(fake<D1Result<T>>({ results, success: true, meta }))
       },
       run: <T>() => {
         db.prepare(sql).run(...params)
@@ -53,7 +64,11 @@ export const d1Of = (db: DatabaseSync): D1Database => {
       return Promise.reject(cause)
     }
   }
-  return fake<D1Database>({ prepare: (sql: string) => statement(sql), batch })
+  const exec = (sql: string) => {
+    db.exec(sql)
+    return Promise.resolve(fake<D1ExecResult>({ count: 1, duration: 0 }))
+  }
+  return fake<D1Database>({ prepare: (sql: string) => statement(sql), batch, exec })
 }
 
 /** A bound value as node:sqlite takes it: D1 binds strings, numbers and nulls here. */

@@ -1,77 +1,20 @@
-import {
-  CallerScope,
-  Extra,
-  KeyOrigin,
-  KeyScope,
-  KeyServer,
-  Level,
-  WorkspaceId,
-  WorkspaceRole,
-} from '@goblin/contracts'
+import { Extra, KeyOrigin, Level, WorkspaceId, WorkspaceRole } from '@goblin/contracts'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { KEY_PREFIX } from '../../auth/resources.ts'
 
-/**
- * A server's API key as the agent sees it (ADR 0081): which key and its name, its scopes and its ceiling, the
- * connections its setups may name and the MCP origins (with their tools) its threads may connect to (ADR 0091). The edge
- * verifies the key and forwards it as the request's caller; the agent never sees the secret.
- */
-export interface KeyGrant {
-  readonly keyId: string
-  /** The name the owner gave it, which its messages and what it made carry (ADR 0108). */
-  readonly name: string
-  readonly scopes: readonly KeyScope[]
-  readonly servers: readonly string[]
-  readonly origins: readonly KeyOrigin[]
-}
-
-/** An OAuth client of the owner on /mcp (ADR 0086): which client, the name it registered and what its consent grants. */
-export interface ClientGrant {
-  readonly clientId: string
-  readonly name: string
-  readonly scopes: readonly CallerScope[]
-}
-
-/**
- * Who an owner request comes from when it is not the owner's session (ADR 0086): a server's key, which reaches only what
- * it made, or an OAuth client, which reaches what the owner does. Either holds scopes, never renews resident authority
- * and is counted per minute. Only the Worker sets it: the edge for a key on `/api`, `/mcp` for either.
- */
-export type Caller = ({ readonly kind: 'key' } & KeyGrant) | ({ readonly kind: 'client' } & ClientGrant)
-
-/** The header the Worker forwards a caller in. */
+/** The header the Worker forwards a credential in. */
 export const CALLER_HEADER = 'x-goblin-caller'
-
-const ForwardedCaller = Schema.fromJsonString(
-  Schema.Union([
-    Schema.Struct({
-      kind: Schema.Literal('key'),
-      keyId: Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u)),
-      name: Schema.String.check(Schema.isMaxLength(200)),
-      scopes: Schema.Array(KeyScope),
-      servers: Schema.Array(KeyServer),
-      origins: Schema.Array(KeyOrigin),
-    }),
-    Schema.Struct({
-      kind: Schema.Literal('client'),
-      clientId: Schema.String.check(Schema.isPattern(/^[\w.:-]{1,200}$/u)),
-      name: Schema.String.check(Schema.isMaxLength(200)),
-      scopes: Schema.Array(CallerScope),
-    }),
-  ]),
-)
 
 const Coverage = Schema.Literals(['all', 'list'])
 
 /**
- * A credential as the Worker forwards it once grants are kept: a server's key or an OAuth client acting for a person,
- * its name, its grant's id, level and extras, when it ends (epoch milliseconds, `null` until revoked), and in the
- * workspace the request reaches whether its Topics, Personas and connections are all or a list, with the reach's
- * generation, so the agent knows when to read the lists again. The lists themselves never travel in the header; the
- * MCP origins its threads may bring do (ADR 0091).
- *
- * @internal The forwarded caller is still `ForwardedCaller`; a test holds this shape until the edge forwards it.
+ * A credential as the Worker forwards it (ADR 0114): a server's API key or an OAuth client acting for a person, its
+ * name, its grant's id, level and extras, when it ends (epoch milliseconds, `null` until revoked), and in the workspace
+ * the request reaches whether its Topics, Personas and connections are all or a list, with the reach's generation, so
+ * the agent knows when to read the lists again (`Grants.sync`). The lists themselves never travel in the header; the
+ * MCP origins its threads may bring do (ADR 0091). It holds what its grant holds, never renews resident authority and
+ * is counted per minute. Only the Worker sets it: the edge for a key on `/api`, `/mcp` for either.
  */
 export const Credential = Schema.Struct({
   kind: Schema.Literals(['key', 'client']),
@@ -92,8 +35,7 @@ export const Credential = Schema.Struct({
 })
 export type Credential = typeof Credential.Type
 
-/** The header value that forwards `caller`. */
-export const callerHeader = (caller: Caller): string => JSON.stringify(caller)
+const ForwardedCredential = Schema.fromJsonString(Credential)
 
 /**
  * The person a request acts for in its workspace (ADR 0089): their user ID and role. The edge forwards it for a
@@ -133,32 +75,37 @@ const asciiJson = (value: unknown): string => {
 export const memberHeader = (member: Member): string =>
   asciiJson({ user: member.user, role: member.role, name: member.name, shared: member.shared })
 
+/** The header value that forwards `credential`: ASCII whatever a client registered as its name. */
+export const credentialHeader = (credential: Credential): string => asciiJson(credential)
+
 /** A person's name as a member's messages carry it: theirs, or their address's local part. */
 export const memberName = (person: { readonly name: string; readonly email: string }): string =>
   (person.name.trim() === '' ? (person.email.split('@')[0] ?? '') : person.name.trim()).slice(0, 80)
 
 /**
- * Who a forwarded request comes from, as its headers say (ADR 0089): a member (a session), a caller (a key), or a
- * caller and the member it acts for (an OAuth client). `undefined` for a request that says neither, or whose header
- * does not decode: it is refused, never taken for the owner.
+ * Who a forwarded request comes from, as its headers say (ADRs 0089, 0114): a member (a session), a credential (a key),
+ * or a credential and the member it acts for (an OAuth client). `undefined` for a request that says neither, or whose
+ * header does not decode: it is refused, never taken for the owner.
  */
 export const forwardedPrincipal = (
   request: Request,
-): { readonly caller?: Caller; readonly member?: Member } | undefined => {
-  const callerValue = request.headers.get(CALLER_HEADER)
+): { readonly credential?: Credential; readonly member?: Member } | undefined => {
+  const credentialValue = request.headers.get(CALLER_HEADER)
   const memberValue = request.headers.get(MEMBER_HEADER)
-  const caller =
-    callerValue === null ? undefined : Option.getOrUndefined(Schema.decodeUnknownOption(ForwardedCaller)(callerValue))
+  const credential =
+    credentialValue === null
+      ? undefined
+      : Option.getOrUndefined(Schema.decodeUnknownOption(ForwardedCredential)(credentialValue))
   const member =
     memberValue === null ? undefined : Option.getOrUndefined(Schema.decodeUnknownOption(ForwardedMember)(memberValue))
-  if ((callerValue !== null && caller === undefined) || (memberValue !== null && member === undefined)) return undefined
-  if (caller === undefined && member === undefined) return undefined
-  return { ...(caller === undefined ? {} : { caller }), ...(member === undefined ? {} : { member }) }
+  if ((credentialValue !== null && credential === undefined) || (memberValue !== null && member === undefined))
+    return undefined
+  if (credential === undefined && member === undefined) return undefined
+  return { ...(credential === undefined ? {} : { credential }), ...(member === undefined ? {} : { member }) }
 }
 
-/** One name for a caller across both kinds, for its per-minute count. */
-export const callerId = (caller: Caller): string =>
-  caller.kind === 'key' ? `key:${caller.keyId}` : `client:${caller.clientId}`
+/** One name for a credential, for its per-minute count (ADR 0085): its grant's. */
+export const credentialId = (credential: Credential): string => `grant:${credential.grantId}`
 
 /** The key a request carries, when its `Authorization` header is a `gbk_` bearer: never an inbound OAuth token. */
 export const bearerKey = (request: Request): string | undefined => {

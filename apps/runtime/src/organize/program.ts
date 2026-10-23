@@ -7,7 +7,7 @@ import {
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { Conflict, InvalidInput } from '../http/errors.ts'
-import { requireAdminFor } from '../keys/policy.ts'
+import { requireAdminFor } from '../grants/policy.ts'
 import { updatePersona } from '../personas/program.ts'
 import { Personas } from '../personas/service.ts'
 import { editTopicSetup, updateTopic } from '../topics/program.ts'

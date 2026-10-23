@@ -65,31 +65,35 @@ export const membershipOf = async (
   return row === null ? undefined : viewOf(row)
 }
 
-/** The workspaces an MCP client reaches for its person now (ADR 0097), and whether its reach is all of theirs. */
+/** The workspaces an MCP client reaches for its person now (ADRs 0097, 0114), and whether its grant reaches all. */
 export interface Reached {
   readonly all: boolean
   readonly workspaces: readonly WorkspaceView[]
 }
 
 /**
- * What `userId`'s consent to MCP client `clientId` reaches now (ADR 0097): every workspace they are a member of when its
- * reach is `all` (ones joined since included), else those it lists that they still are; none without a reach. One D1
- * round trip, read on every call.
+ * What `userId`'s grant to MCP client `clientId` reaches now (ADRs 0097, 0114): every workspace they are a member of
+ * when it reaches all of theirs (ones joined since included), else those it names that they still are; none without a
+ * grant, or with a revoked one. Its end is the token's check (`verifyClientToken`). One D1 round trip, read on every
+ * call.
  */
 export const reachedBy = async (db: Database, userId: string, clientId: string): Promise<Reached | undefined> => {
-  const [reach, listed] = await db.batch<Row & { readonly everything?: number }>([
-    db.prepare('SELECT "all" AS everything FROM mcpReach WHERE clientId = ? AND userId = ?').bind(clientId, userId),
+  const [grant, listed] = await db.batch<Row & { readonly everything?: number }>([
     db
       .prepare(
-        `${SELECT} WHERE m.userId = ? AND (
-          EXISTS (SELECT 1 FROM mcpReach r WHERE r.clientId = ? AND r.userId = m.userId AND r."all" = 1)
-          OR EXISTS (SELECT 1 FROM mcpReachWorkspace w
-            WHERE w.clientId = ? AND w.userId = m.userId AND w.workspaceId = o.id))
+        'SELECT "workspacesAll" AS everything FROM "grant" WHERE "clientId" = ? AND "userId" = ? AND "revokedAt" IS NULL',
+      )
+      .bind(clientId, userId),
+    db
+      .prepare(
+        `${SELECT} WHERE m.userId = ? AND EXISTS (SELECT 1 FROM "grant" g
+          WHERE g."clientId" = ? AND g."userId" = m.userId AND g."revokedAt" IS NULL AND (g."workspacesAll" = 1
+            OR EXISTS (SELECT 1 FROM "grantWorkspace" w WHERE w."grantId" = g."id" AND w."workspaceId" = o.id)))
         ORDER BY m.createdAt, o.id`,
       )
-      .bind(userId, clientId, clientId),
+      .bind(userId, clientId),
   ])
-  const [row] = reach?.results ?? []
+  const [row] = grant?.results ?? []
   if (row === undefined) return undefined
   return { all: row.everything === 1, workspaces: (listed?.results ?? []).map(viewOf) }
 }
@@ -216,13 +220,14 @@ export const updateWorkspace = async (
 }
 
 /**
- * Removes a workspace's records once its agent is gone: its keys, its place in MCP clients' reaches (ADR 0097), and
- * the workspace, whose memberships and invitations go with it.
+ * Removes a workspace's records once its agent is gone: its keys with their grants, its place in MCP clients' grants
+ * (ADRs 0097, 0114), and the workspace, whose memberships and invitations go with it.
  */
 const removeRecords = (db: Database, workspaceId: string) =>
   db.batch([
+    db.prepare('DELETE FROM "grant" WHERE "keyId" IN (SELECT id FROM apikey WHERE referenceId = ?)').bind(workspaceId),
     db.prepare('DELETE FROM apikey WHERE referenceId = ?').bind(workspaceId),
-    db.prepare('DELETE FROM mcpReachWorkspace WHERE workspaceId = ?').bind(workspaceId),
+    db.prepare('DELETE FROM "grantWorkspace" WHERE "workspaceId" = ?').bind(workspaceId),
     db.prepare('DELETE FROM organization WHERE id = ?').bind(workspaceId),
   ])
 

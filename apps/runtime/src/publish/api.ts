@@ -8,7 +8,7 @@ import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { chatRow } from '../chats/directory.ts'
 import { RequestContext } from '../http/api/context.ts'
 import { NotFound, attemptSync } from '../http/errors.ts'
-import { confineChat, confineTopic, requestKey } from '../keys/policy.ts'
+import { listedBy, reachesChat, reachesTopic, requestCredential } from '../grants/policy.ts'
 import { Db } from '../runtime/db.ts'
 import { appTopics } from '../storage/topics.ts'
 import { requireEvent, selectorOf } from './event.ts'
@@ -20,10 +20,10 @@ import { Published } from './service.ts'
  */
 const requestHolder: Effect.Effect<string> = Effect.map(Effect.serviceOption(RequestContext), (context) => {
   const facts = Option.getOrUndefined(context)
-  const caller = facts?.caller
-  if (caller?.kind === 'key') return `key:${caller.keyId}`
+  const credential = facts?.credential
+  if (credential?.kind === 'key') return `key:${credential.id}`
   const user = facts?.member?.user ?? 'owner'
-  return caller?.kind === 'client' ? `client:${caller.clientId}:${user}` : `member:${user}`
+  return credential?.kind === 'client' ? `client:${credential.id}:${user}` : `member:${user}`
 })
 
 /** A holder as the Worker names it ending (`/internal/publish/terminate`), as its leases name it. */
@@ -32,7 +32,8 @@ export const holderOf = (holder: LeaseHolder): string =>
 
 /**
  * A request's selector, within the caller's reach: its Topic or chat must be there (a chat a Conversation or a thread,
- * never a Persona's fork or a subagent, whose work counts for the chat they work for), and a key's within its rooms.
+ * never a Persona's fork or a subagent, whose work counts for the chat they work for), and a credential's within its
+ * grant (ADR 0114).
  */
 const selectorIn = (args: Readonly<Record<string, unknown>> | undefined) =>
   Effect.gen(function* () {
@@ -42,13 +43,13 @@ const selectorIn = (args: Readonly<Record<string, unknown>> | undefined) =>
       const id = Number(topic)
       const found = yield* Db.useSync((db) => db.select().from(appTopics).where(eq(appTopics.id, id)).get())
       if (found === undefined) return yield* new NotFound({ what: 'topic' })
-      yield* confineTopic(id)
+      yield* reachesTopic(id)
     }
     if (chat !== undefined) {
       const row = yield* Db.useSync((db) => chatRow(db, chat))
       if (row === undefined || row.role === 'persona' || row.kind === 'subagent')
         return yield* new NotFound({ what: 'conversation' })
-      yield* confineChat(chat)
+      yield* reachesChat(chat)
     }
     return selector
   })
@@ -62,9 +63,10 @@ export const EventsHandlers = HttpApiBuilder.group(OwnerApi, 'events', (handlers
         yield* attemptSync(() => requireEvent(payload.name))
         const selector = yield* selectorIn(payload.arguments)
         const holder = yield* requestHolder
+        const grant = (yield* requestCredential)?.grantId
         const { url, secret } = payload.delivery
         return yield* Published.use((published) =>
-          published.subscribe({ holder, selector, url, secret, ttlMs: payload.ttlMs, cursor: payload.cursor }),
+          published.subscribe({ holder, grant, selector, url, secret, ttlMs: payload.ttlMs, cursor: payload.cursor }),
         )
       }),
     )
@@ -81,10 +83,10 @@ export const EventsHandlers = HttpApiBuilder.group(OwnerApi, 'events', (handlers
       Effect.gen(function* () {
         yield* attemptSync(() => requireEvent(payload.name))
         const selector = yield* selectorIn(payload.arguments)
-        const key = (yield* requestKey)?.keyId
+        const grant = yield* listedBy('topics')
         return yield* Published.use((published) =>
           published.poll({
-            key,
+            grant,
             selector,
             cursor: payload.cursor ?? null,
             maxEvents: payload.maxEvents,

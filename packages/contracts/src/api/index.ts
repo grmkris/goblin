@@ -25,8 +25,7 @@ export { WorkspaceGroup } from './workspace.ts'
 export { GrantsResident } from './resident.ts'
 export { KeysGroup } from './keys.ts'
 export { WorkspacesGroup } from './workspaces.ts'
-export { EndpointScope } from './scope.ts'
-// The grant's contract (`grants.ts`): each owner endpoint's need, and the groups served once grants are kept.
+// The grant's contract (`grants.ts`, ADR 0114): each owner endpoint's need, a credential's own grant, and the grants.
 export { AccessGroup, EndpointAccess } from './access.ts'
 export { GrantsGroup } from './grants.ts'
 export { EndpointRole } from './role.ts'

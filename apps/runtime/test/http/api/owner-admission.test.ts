@@ -6,6 +6,7 @@ import { ResidentLive } from '../../../src/layers/core.ts'
 import { ResidentHandlers } from '../../../src/mcp/resident-api.ts'
 import { Events, Resident } from '../../../src/mcp/service.ts'
 import { type Database, database, get, post, serve, served, sqliteDb, stub } from './fixture.ts'
+import { credential, credentialHeaders } from '../../grants-fixture.ts'
 
 /** Resident authority on SQLite (lane M's layer), counting the grants asked of it from outside. */
 const countingResident = (db: Database, grants: number[]) =>
@@ -85,9 +86,13 @@ describe('owner admission', () => {
     expect(refused.status).toBe(403)
     expect(await refused.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
     expect((await fetch(post('/api/agent/resident', { enabled: false }, as('admin')))).status).toBe(200)
-    const client = as('member', {
-      'x-goblin-caller': JSON.stringify({ kind: 'client', clientId: 'c', name: 'Claude', scopes: ['agent'] }),
-    })
-    expect((await fetch(post('/api/agent/resident', { enabled: true }, client))).status).toBe(403)
+    // A credential reaches no endpoint without `EndpointAccess`, whatever its grant or its person's role.
+    const client = as(
+      'admin',
+      credentialHeaders(credential({ kind: 'client', id: 'c', grantId: 'cg_1', level: 'manage' })),
+    )
+    const refusedClient = await fetch(post('/api/agent/resident', { enabled: true }, client))
+    expect(refusedClient.status).toBe(403)
+    expect(await refusedClient.json()).toMatchObject({ error: { code: 'forbidden', reason: 'credential' } })
   })
 })

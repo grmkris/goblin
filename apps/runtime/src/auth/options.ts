@@ -99,11 +99,10 @@ const codePlugin = (env: AuthEnvironment, delivery: MailDelivery) =>
     },
   })
 
-const DAY_SECONDS = 86_400
-
 /**
- * Server API keys (ADR 0081): hashed at rest, named, `gbk_`-prefixed and expiring (90 days unless the owner says, a
- * year at most). A key is never turned into a session. Keys are made, listed, rotated and ended only through
+ * Server API keys (ADR 0081): hashed at rest, named and `gbk_`-prefixed. A key's lifetime is its grant's (ADR 0114),
+ * so the plugin keeps no expiry of its own: with no default it leaves a key's `expiresAt` empty (any default would be
+ * written for every key made without one). A key is never turned into a session. Keys are made, listed, rotated and ended only through
  * `auth/api-keys.ts`; the plugin's own routes are not served (`handleAuth`). The plugin's per-key limiter is off, for
  * keys made before too (its global switch is read first): it resets only after a quiet window, so a steady client
  * piled up to the limit and was cut off. A key's agent counts its requests per fixed minute instead (ADR 0085).
@@ -120,7 +119,7 @@ const keyPlugin = () =>
     enableMetadata: true,
     enableSessionForAPIKeys: false,
     startingCharactersConfig: { shouldStore: true, charactersLength: KEY_START_LENGTH },
-    keyExpiration: { defaultExpiresIn: 90 * DAY_SECONDS, minExpiresIn: 1, maxExpiresIn: 365 },
+    keyExpiration: { defaultExpiresIn: null, minExpiresIn: 1, maxExpiresIn: 365 },
     rateLimit: { enabled: false },
   })
 
@@ -229,14 +228,15 @@ const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeed
     loginPage: '/login',
     consentPage: '/consent',
     // MCP clients (Claude Code and others) register themselves before the owner signs in. Registration grants
-    // nothing: every client needs the owner's consent to the scopes it asks for, and the consent page says what
-    // `goblin:inspect` adds. Only the /mcp resource can be requested.
+    // nothing: every client needs its person's consent and a grant they approve (ADR 0114). Only the /mcp resource can
+    // be requested.
     allowDynamicClientRegistration: true,
     allowUnauthenticatedClientRegistration: true,
     clientRegistrationAllowedResources: [resource],
     clientRegistrationDefaultScopes: [...MCP_SCOPES],
-    // A consent names no workspace (ADR 0097): which of the person's workspaces a client reaches is its reach, which
-    // the consent page sets first and every /mcp call reads, so the standard consent and its re-authorization apply.
+    // A consent names no workspace (ADR 0097): which of the person's workspaces a client reaches is its grant's reach,
+    // which the consent page sets first and every /mcp call reads, so the standard consent and its re-authorization
+    // apply.
   })
   return {
     appName: 'goblin',

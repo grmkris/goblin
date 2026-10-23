@@ -3,8 +3,8 @@ import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlit
 /**
  * The MCP servers a server's key declared on one of its threads (ADR 0103): by thread and the name its tools take
  * there, the endpoint and its granted origin, the tools it may call (JSON), its bearer token encrypted with the
- * credential cipher (bound to the workspace, thread, name and endpoint), and the key that declared it, whose grant is
- * checked again at every use.
+ * credential cipher (bound to the workspace, thread, name and endpoint), and the grant of the credential that declared
+ * it (ADR 0114), checked again at every use.
  */
 export const appThreadServers = sqliteTable(
   'app_thread_servers',
@@ -15,10 +15,10 @@ export const appThreadServers = sqliteTable(
     origin: text('origin').notNull(),
     tools: text('tools').notNull(),
     token: text('token').notNull(),
-    keyId: text('key_id').notNull(),
+    grantId: text('grant_id').notNull(),
     createdAt: integer('created_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.chatId, table.name] }), index('app_thread_servers_key').on(table.keyId)],
+  (table) => [primaryKey({ columns: [table.chatId, table.name] }), index('app_thread_servers_grant').on(table.grantId)],
 )
 
 /**

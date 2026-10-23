@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import type { ClientReach } from '@goblin/contracts'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Alert, AlertDescription, Button, Skeleton, Switch } from '@goblin/ui'
-import { clientReachMutation, workspacesQuery } from '../account/queries.ts'
+import { clientGrantMutation, workspacesQuery } from '../account/queries.ts'
+import { type ReachChoice, clientTermsFrom } from '../lib/grant-terms.ts'
 import { AuthRefused, consentClientQuery, consentMutation } from '../auth/queries.ts'
 import { ReachChooser, initialReach, reachesAny } from './client-reach.tsx'
 import { type OptionalScope, STARTS_ON, consentBody, offeredScopes, requestedScopes } from '../lib/consent-scope.ts'
@@ -115,8 +115,8 @@ function ScopeChoice(props: {
  * none yet (an invitation waiting) is pointed to it instead.
  */
 function Workspaces(props: {
-  readonly reach: ClientReach | undefined
-  readonly onChange: (reach: ClientReach) => void
+  readonly reach: ReachChoice | undefined
+  readonly onChange: (reach: ReachChoice) => void
 }) {
   const workspaces = useQuery(workspacesQuery)
   if (workspaces.data === undefined) return <Skeleton className="h-16" />
@@ -145,8 +145,13 @@ function Workspaces(props: {
  * The person's answer: on Allow the reach first (a consent without one reaches nothing, and one without a consent is
  * harmless), then the consent; on Deny the refusal alone. Which button is busy, and why it failed.
  */
-function useDecision(clientId: string, requested: readonly string[], on: readonly string[], reach: ClientReach) {
-  const reaching = useMutation(clientReachMutation)
+function useDecision(
+  client: { readonly id: string; readonly name: string },
+  requested: readonly string[],
+  on: readonly string[],
+  reach: ReachChoice,
+) {
+  const reaching = useMutation(clientGrantMutation)
   const deciding = useMutation(consentMutation)
   const [choice, setChoice] = useState<'allow' | 'deny'>()
   // A decision that succeeded is leaving for the client, so its button stays busy.
@@ -161,7 +166,9 @@ function useDecision(clientId: string, requested: readonly string[], on: readonl
     setChoice(accept ? 'allow' : 'deny')
     const consent = () =>
       deciding.mutate(consentBody(requested, accept, on), { onSuccess: (next) => window.location.assign(next) })
-    if (accept) reaching.mutate({ clientId, ...reach }, { onSuccess: consent })
+    // Its grant first (ADR 0114): the preset over the workspaces chosen, which the grant editor will let them change.
+    if (accept)
+      reaching.mutate({ clientId: client.id, terms: clientTermsFrom(client.name, reach) }, { onSuccess: consent })
     else consent()
   }
   return { decide, pending, error }
@@ -182,9 +189,14 @@ export function Consent() {
     offeredScopes(requested).filter((scope) => STARTS_ON.includes(scope)),
   )
   const workspaces = useQuery(workspacesQuery).data ?? []
-  const [chosen, setChosen] = useState<ClientReach | undefined>(undefined)
+  const [chosen, setChosen] = useState<ReachChoice | undefined>(undefined)
   const reach = chosen ?? initialReach(workspaces)
-  const { decide, pending, error } = useDecision(clientId, requested, on, reach)
+  const { decide, pending, error } = useDecision(
+    { id: clientId, name: client?.name ?? 'MCP client' },
+    requested,
+    on,
+    reach,
+  )
   return (
     <AuthShell
       size="lg"

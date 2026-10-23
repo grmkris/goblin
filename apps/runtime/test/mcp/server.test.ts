@@ -1,36 +1,26 @@
-import type { CallerScope } from '@goblin/contracts'
-import { BudgetExhausted, OwnerApi, envelopeOf } from '@goblin/contracts/api'
+import { type Extra, GRANT_SPEC, type Level, missingFor } from '@goblin/contracts'
+import { AccessInsufficient, BudgetExhausted, OwnerApi, envelopeOf, accessInsufficient } from '@goblin/contracts/api'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { createMcpHandler } from '@modelcontextprotocol/server'
 import * as Effect from 'effect/Effect'
 import { describe, expect, it } from 'vitest'
-import { callerScopesOf } from '../../src/auth/resources.ts'
-import { endpointScopes } from '../../src/http/api/context.ts'
-import type { Caller } from '../../src/http/api/principal.ts'
+import { endpointAccess } from '../../src/http/api/context.ts'
+import type { Credential } from '../../src/http/api/principal.ts'
+import { accessElicitation } from '../../src/inbound/access.ts'
 import { ownerCall } from '../../src/inbound/client.ts'
 import { type CallerReach, mcpServer } from '../../src/inbound/mcp-server.ts'
 import { workspaceFor } from '../../src/inbound/route.ts'
 import { type OwnerCaller, STREAMED, TOOLS } from '../../src/inbound/tools.ts'
 import { EVENT_METHODS } from '../../src/inbound/events-methods.ts'
+import { credential } from '../grants-fixture.ts'
 
-const KEY: Caller = {
-  kind: 'key',
-  keyId: 'key-1',
-  name: 'swarmm',
-  scopes: ['topics', 'conversations', 'personas'],
-  servers: ['mycut'],
-  origins: [],
-}
-/** An OAuth client the owner consented to with `scopes` (ADR 0086). */
-const client = (scopes: readonly string[]): Caller => ({
-  kind: 'client',
-  clientId: 'claude-code',
-  name: 'Claude Code',
-  scopes: callerScopesOf(scopes),
-})
+const KEY = credential({ id: 'key-1', name: 'swarmm', level: 'manage' })
+/** An OAuth client a person approved with a grant of `level` and `extras` (ADR 0114). */
+const client = (level: Level = 'write', extras: readonly Extra[] = []): Credential =>
+  credential({ kind: 'client', id: 'claude-code', name: 'Claude Code', grantId: 'cg_1', level, extras })
 
 /** /mcp for `caller` over an agent that records what reached it and answers `reply`. */
-const connect = async (caller: Caller, reply: (request: Request) => Response = () => Response.json({})) => {
+const connect = async (caller: Credential, reply: (request: Request) => Response = () => Response.json({})) => {
   const seen: Request[] = []
   const agent = {
     fetch: async (request: Request) => {
@@ -39,7 +29,7 @@ const connect = async (caller: Caller, reply: (request: Request) => Response = (
     },
   }
   const handler = createMcpHandler(() =>
-    mcpServer(caller.scopes, (call) =>
+    mcpServer(caller, (call) =>
       Effect.runPromise(
         ownerCall(
           agent,
@@ -60,7 +50,7 @@ const connect = async (caller: Caller, reply: (request: Request) => Response = (
   return { mcp, seen }
 }
 
-const listed = async (caller: Caller) => {
+const listed = async (caller: Credential) => {
   const { mcp } = await connect(caller)
   try {
     return (await mcp.listTools()).tools.map((tool) => tool.name).toSorted()
@@ -69,11 +59,14 @@ const listed = async (caller: Caller) => {
   }
 }
 
-/** The tools whose endpoints a caller holding `scopes` reaches. */
-const toolsFor = (scopes: readonly CallerScope[]) => {
-  const scopeOf = endpointScopes(OwnerApi)
+/** The tools whose endpoints a grant of `level` with `extras` holds, from the contract alone. */
+const toolsFor = (level: Level, extras: readonly Extra[] = []) => {
+  const needs = endpointAccess(OwnerApi)
   return Object.entries(TOOLS)
-    .filter(([, endpoint]) => scopes.some((scope) => scope === scopeOf.get(endpoint)))
+    .filter(([, endpoint]) => {
+      const need = needs.get(endpoint)
+      return need !== undefined && missingFor(GRANT_SPEC, { level, extras }, need) === null
+    })
     .map(([name]) => name)
     .toSorted()
 }
@@ -81,47 +74,47 @@ const textOf = (result: { readonly content?: unknown }): unknown =>
   // SAFETY: every goblin tool answers one text block (`text` and `failed` in inbound/tools.ts).
   JSON.parse((result.content as readonly { readonly text: string }[])[0]?.text ?? 'null')
 
-describe('/mcp for every caller (ADR 0086)', () => {
-  it('has exactly one tool or Events method for each owner endpoint a caller reaches, but the streams it reads over HTTP', () => {
-    const scoped = [...endpointScopes(OwnerApi).keys()]
+describe('/mcp for every credential (ADRs 0086, 0114)', () => {
+  it('has exactly one tool or Events method for each owner endpoint a credential reaches, but the streams it reads over HTTP', () => {
+    const reached = [...endpointAccess(OwnerApi).keys()]
     expect([...Object.values(TOOLS), ...Object.values(EVENT_METHODS)].toSorted()).toEqual(
-      scoped.filter((endpoint) => !STREAMED.has(endpoint)).toSorted(),
+      reached.filter((endpoint) => !STREAMED.has(endpoint)).toSorted(),
     )
-    expect(scoped).toEqual(expect.arrayContaining([...STREAMED]))
+    expect(reached).toEqual(expect.arrayContaining([...STREAMED]))
   })
 
-  it('lists only what a consent grants: nothing, then asking, then runs apart from conversations, then everything', async () => {
-    expect(await listed(client([]))).toEqual([])
-    expect(await listed(client(['goblin:agent']))).toEqual(['ask_agent', 'get_recent_messages'])
-    expect(await listed(client(['goblin:inspect']))).toEqual(toolsFor(['inspect']))
-    expect(await listed(client(['goblin:inspect']))).not.toContain('inspect_conversation')
-    expect(await listed(client(['goblin:transcripts']))).toContain('inspect_conversation')
-    const all = client([
-      'goblin:agent',
-      'goblin:topics',
-      'goblin:conversations',
-      'goblin:personas',
-      'goblin:inspect',
-      'goblin:transcripts',
-      'goblin:setup',
-      'goblin:routines',
-    ])
-    expect(await listed(all)).toEqual(Object.keys(TOOLS).toSorted())
+  it("lists only what a grant's level and extras hold: reads, then writes, then settings, then each extra", async () => {
+    const reads = await listed(client('read'))
+    expect(reads).toEqual(toolsFor('read'))
+    expect(reads).toEqual(expect.arrayContaining(['access_read', 'topic_list', 'persona_get', 'conversation_entries']))
+    expect(reads).not.toContain('conversation_send')
+    const writes = await listed(client('write'))
+    expect(writes).toEqual(toolsFor('write'))
+    expect(writes).toEqual(expect.arrayContaining(['conversation_send', 'topic_create', 'ask_agent']))
+    expect(writes).not.toContain('persona_create')
+    expect(writes.filter((tool) => tool.startsWith('inspect_') || tool.startsWith('routine_'))).toEqual([])
+    expect(await listed(client('manage'))).toEqual(expect.arrayContaining(['persona_create', 'topic_update']))
+    expect(await listed(client('manage'))).not.toContain('topic_set_setup')
+    expect(await listed(client('read', ['inspect']))).toEqual(toolsFor('read', ['inspect']))
+    expect(await listed(client('read', ['inspect']))).toContain('inspect_conversation')
+    expect(await listed(client('manage', ['setup', 'routines', 'inspect']))).toEqual(Object.keys(TOOLS).toSorted())
   })
 
-  it("lists a key's tools by its scopes, never asking the agent or reading conversations in full", async () => {
-    const tools = await listed(KEY)
-    expect(tools).toEqual(toolsFor(KEY.scopes))
-    expect(tools).not.toContain('ask_agent')
-    const inspecting = await listed({ ...KEY, scopes: [...KEY.scopes, 'inspect'] })
-    expect(inspecting).toContain('inspect_turn')
-    expect(inspecting).not.toContain('inspect_conversation')
-    expect(inspecting).not.toContain('inspect_conversations')
+  it('lists the same tools for a key and an OAuth client with the same grant', async () => {
+    for (const [level, extras] of [
+      ['read', []],
+      ['write', ['inspect']],
+      ['manage', ['setup', 'routines']],
+    ] as const) {
+      const keyed = await listed(credential({ level, extras }))
+      expect(keyed).toEqual(await listed(client(level, extras)))
+      expect(keyed).toEqual(toolsFor(level, extras))
+    }
   })
 
-  it('calls the owner API as the caller: an owner forward carrying it, never a credential', async () => {
+  it('calls the owner API as the credential: an owner forward carrying it, never a secret', async () => {
     const page = { personas: [] }
-    for (const caller of [KEY, client(['goblin:personas'])]) {
+    for (const caller of [KEY, client('read')]) {
       const { mcp, seen } = await connect(caller, () => Response.json(page))
       try {
         const result = await mcp.callTool({ name: 'persona_list', arguments: { name: 'edit', limit: 10 } })
@@ -142,8 +135,8 @@ describe('/mcp for every caller (ADR 0086)', () => {
     }
   })
 
-  it('renames or closes a chat as the caller, a key and an OAuth client with goblin:conversations alike (ADR 0090)', async () => {
-    for (const caller of [KEY, client(['goblin:conversations'])]) {
+  it('renames or closes a chat as the credential, a key and an OAuth client that write alike (ADR 0090)', async () => {
+    for (const caller of [KEY, client('write')]) {
       const { mcp, seen } = await connect(caller, () => Response.json({ id: '12', title: 'Job 1, done' }))
       try {
         expect(await listed(caller)).toContain('conversation_update')
@@ -155,7 +148,7 @@ describe('/mcp for every caller (ADR 0086)', () => {
         await mcp.close()
       }
     }
-    expect(await listed(client([]))).not.toContain('conversation_update')
+    expect(await listed(client('read'))).not.toContain('conversation_update')
   })
 
   it('sends and starts threads with plain fields, as the AG-UI input the endpoints take (ADR 0111)', async () => {
@@ -188,7 +181,7 @@ describe('/mcp for every caller (ADR 0086)', () => {
 
   it('asks the agent in main with a bounded wait, and reads main back', async () => {
     const answer = { status: 'done', operationId: 'op-1', text: 'pong' }
-    const { mcp, seen } = await connect(client(['goblin:agent']), (request) =>
+    const { mcp, seen } = await connect(client('write'), (request) =>
       Response.json(
         new URL(request.url).pathname === '/api/agent/ask' ? answer : { messages: [{ role: 'assistant', text: 'hi' }] },
       ),
@@ -208,7 +201,7 @@ describe('/mcp for every caller (ADR 0086)', () => {
   })
 
   it('passes an inspection read the fields it was given, by operation or by a chat entry', async () => {
-    const { mcp, seen } = await connect(client(['goblin:inspect', 'goblin:transcripts']), () =>
+    const { mcp, seen } = await connect(client('read', ['inspect']), () =>
       Response.json({ events: [], related: [], coverage: { complete: true, gaps: [] } }),
     )
     try {
@@ -229,7 +222,7 @@ describe('/mcp for every caller (ADR 0086)', () => {
 
   it("answers the agent's refusal as the tool's error result, its tag and safe fields only", async () => {
     const refusal = new BudgetExhausted({ limit: 2_000_000, resetsAt: 86_400 })
-    const { mcp } = await connect(client(['goblin:agent']), () => Response.json(envelopeOf(refusal), { status: 429 }))
+    const { mcp } = await connect(client('write'), () => Response.json(envelopeOf(refusal), { status: 429 }))
     try {
       const refused = await mcp.callTool({ name: 'ask_agent', arguments: { input: 'ping' } })
       expect(refused.isError).toBe(true)
@@ -237,6 +230,53 @@ describe('/mcp for every caller (ADR 0086)', () => {
     } finally {
       await mcp.close()
     }
+  })
+
+  it('answers a refusal for want of access with what is missing and the link to widen it', async () => {
+    const refusal = accessInsufficient('https://goblin.test', 'cg_1', { reachId: 'w1/topic/1' })
+    const { mcp } = await connect(client('write'), () => Response.json(envelopeOf(refusal), { status: 403 }))
+    try {
+      const refused = await mcp.callTool({ name: 'ask_agent', arguments: { input: 'ping' } })
+      expect(refused.isError).toBe(true)
+      expect(textOf(refused)).toEqual({
+        _tag: 'AccessInsufficient',
+        missing: { reachId: 'w1/topic/1' },
+        widenUrl: 'https://goblin.test/consent/widen?grant=cg_1&reach=w1%2Ftopic%2F1',
+      })
+    } finally {
+      await mcp.close()
+    }
+  })
+})
+
+const widenUrl = new AccessInsufficient({ missing: { extra: 'inspect' }, widenUrl: 'https://goblin.test/w' }).widenUrl
+/** A call's context as a client's request carries it: its capabilities, its answers so far and the dropped ones. */
+const context = (capabilities: object | undefined, responses?: Record<string, unknown>, dropped: string[] = []) => ({
+  capabilities,
+  inputResponses: responses,
+  dropped,
+})
+
+describe('the widening asked for by URL elicitation (ADR 0114)', () => {
+  it('asks a client that declares URL elicitation to open the widening page, once per call', () => {
+    expect(accessElicitation(context({ elicitation: { url: {} } }), widenUrl)).toEqual({
+      resultType: 'input_required',
+      inputRequests: {
+        access: {
+          method: 'elicitation/create',
+          params: expect.objectContaining({ mode: 'url', url: widenUrl }),
+        },
+      },
+    })
+  })
+
+  it('keeps the plain refusal for a client that cannot, or once the ask was answered or dropped', () => {
+    expect(accessElicitation(undefined, widenUrl)).toBeNull()
+    expect(accessElicitation(context({ elicitation: { form: {} } }), widenUrl)).toBeNull()
+    expect(
+      accessElicitation(context({ elicitation: { url: {} } }, { access: { action: 'accept' } }), widenUrl),
+    ).toBeNull()
+    expect(accessElicitation(context({ elicitation: { url: {} } }, {}, ['access']), widenUrl)).toBeNull()
   })
 })
 
@@ -251,7 +291,7 @@ const reaching = async (reach: CallerReach) => {
     // SAFETY: the tools under test only pass the answer on as their result.
     return {} as never
   }
-  const handler = createMcpHandler(() => mcpServer(['agent', 'topics'], call, reach))
+  const handler = createMcpHandler(() => mcpServer({ level: 'write', extras: [] }, call, reach))
   const mcp = new Client({ name: 'probe', version: '1.0.0' })
   await mcp.connect(
     new StreamableHTTPClientTransport(new URL('https://goblin.test/mcp'), {

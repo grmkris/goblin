@@ -3,6 +3,7 @@ import { InternalApi } from '@goblin/contracts/internal'
 import * as Layer from 'effect/Layer'
 import * as HttpServer from 'effect/http/HttpServer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
+import { AccessHandlers } from '../../access/api.ts'
 import { AgentAppsHandlers } from '../../agent-apps/api.ts'
 import { AppsHandlers } from '../../apps/api.ts'
 import { ConversationsHandlers } from '../../chats/api.ts'
@@ -51,6 +52,7 @@ const OwnerApiLayer = HttpApiBuilder.layer(OwnerApi).pipe(
     SourcesHandlers,
     NotifyHandlers,
     EventsHandlers,
+    AccessHandlers,
   ]),
   Layer.provide(OwnerAdmissionLive.pipe(Layer.provide(KeyNames.layer))),
 )

@@ -104,7 +104,7 @@ async function personaInOwnersChat(url: string, owner: Person) {
  * fork.
  */
 async function personaInKeysRoom(url: string, owner: Person) {
-  const asKey = keyFetch(url, await newKey(url, owner, 'children', ['topics', 'conversations', 'personas']))
+  const asKey = keyFetch(url, await newKey(url, owner, 'children'))
   const json = async (method: string, path: string, body?: unknown) => {
     const response = await asKey(method, path, body)
     expect(response.status, await response.clone().text()).toBeLessThan(300)

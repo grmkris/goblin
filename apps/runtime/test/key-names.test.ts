@@ -5,10 +5,11 @@ import * as Exit from 'effect/Exit'
 import * as Layer from 'effect/Layer'
 import * as Scope from 'effect/Scope'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { KeyGrant } from '../src/http/api/principal.ts'
+import type { Credential } from '../src/http/api/principal.ts'
 import { KeyNames } from '../src/keys/names.ts'
 import { Changes, makeChanges } from '../src/runtime/changes.ts'
 import { chatDatabase, sqliteDb } from './chats-sqlite.ts'
+import { credential } from './grants-fixture.ts'
 
 const databases: ReturnType<typeof chatDatabase>[] = []
 const scopes: Scope.Closeable[] = []
@@ -20,7 +21,7 @@ afterEach(() => {
 /** Lets the naming the request started beside it run (it never holds the request). */
 const settled = () => new Promise((resolve) => setTimeout(resolve, 10))
 
-const key = (keyId: string, name: string): KeyGrant => ({ keyId, name, scopes: ['topics'], servers: [], origins: [] })
+const key = (keyId: string, name: string): Credential => credential({ id: keyId, name })
 
 /** The key names over a fresh database, with what each topic of the change bus was told. */
 const learning = () => {

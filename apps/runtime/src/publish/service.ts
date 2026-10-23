@@ -18,9 +18,13 @@ import { behind, headOf, notePoll, page } from './journal.ts'
 import { dropLease, endHolder, leaseCounts, leaseOf, renewLease } from './leases.ts'
 import { PUBLISH_LIMITS, callbackUrl, canonicalJson, leaseMs, subscriptionId, webhookSecret } from './policy.ts'
 
-/** A subscribe, as the handler has checked it: who holds the lease, its selector, the URL, the secret and the ask. */
+/**
+ * A subscribe, as the handler has checked it: who holds the lease and the grant it is made under (a credential's, ADR
+ * 0114; none for a member's), its selector, the URL, the secret and the ask.
+ */
 export type LeaseRequest = {
   readonly holder: string
+  readonly grant?: string | undefined
   readonly selector: ConversationSelector
   readonly url: string
   readonly secret: string
@@ -28,9 +32,12 @@ export type LeaseRequest = {
   readonly cursor?: string | null | undefined
 }
 
-/** A poll, as the handler has checked it: whose key filters it (none reaches every chat), its selector and bounds. */
+/**
+ * A poll, as the handler has checked it: the grant whose Topic list filters it (none reaches every chat), its selector
+ * and bounds.
+ */
 export type PollRequest = {
-  readonly key: string | undefined
+  readonly grant: string | undefined
   readonly selector: ConversationSelector
   readonly cursor: string | null
   readonly maxEvents?: number | undefined
@@ -120,6 +127,7 @@ const subscribeWith = (ports: LeasePorts) =>
       renewLease(db, {
         id,
         principal: request.holder,
+        grantId: request.grant ?? null,
         name: CONVERSATION_UPDATED,
         ...selectorRow(request.selector),
         url,
@@ -159,7 +167,7 @@ export const leasesOf = (ports: LeasePorts) => ({
     const retention = PUBLISH_LIMITS.retentionMs
     return yield* attemptSync(() =>
       page(ports.db, {
-        key: request.key,
+        grant: request.grant,
         name: CONVERSATION_UPDATED,
         topicId: request.selector.topic === undefined ? undefined : Number(request.selector.topic),
         chat: request.selector.chat,

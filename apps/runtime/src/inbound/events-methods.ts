@@ -1,27 +1,26 @@
-import { type CallerScope, PollEvents, SubscribeEvents, UnsubscribeEvents } from '@goblin/contracts'
-import { AppError, OwnerApi } from '@goblin/contracts/api'
+import { PollEvents, SubscribeEvents, UnsubscribeEvents } from '@goblin/contracts'
+import { AppError } from '@goblin/contracts/api'
 import { type McpServer, ProtocolError } from '@modelcontextprotocol/server'
 import type * as Effect from 'effect/Effect'
 import * as Match from 'effect/Match'
 import * as Option from 'effect/Option'
 import * as Predicate from 'effect/Predicate'
 import * as Schema from 'effect/Schema'
-import { endpointScopes } from '../http/api/context.ts'
 import { toAppError } from '../http/errors.ts'
 import { EVENTS_EXTENSION } from '../mcp/events/protocol.ts'
 import type { OwnerClient } from './client.ts'
 import type { CallerReach } from './mcp-server.ts'
-import type { OwnerCaller } from './tools.ts'
+import { type Power, type OwnerCaller, offers } from './tools.ts'
 
 // The MCP Events goblin publishes, on /mcp (ADR 0112): `events/list`, `subscribe`, `unsubscribe` and `poll`, each a call
-// of its `events` endpoint as the caller (`ownerCall`), so admission, the `conversations` scope, the minute's limit and
-// a key's reach are the owner API's own; `events/stream` is unsupported. An OAuth client that names its workspace on
+// of its `events` endpoint as the caller (`ownerCall`), so admission, the grant's level, the minute's limit and the
+// credential's reach are the owner API's own; `events/stream` is unsupported. An OAuth client that names its workspace on
 // every call names it inside `arguments` (in `params` for `events/list`), as its tools take `workspace`.
 
 /**
  * Each method, by the endpoint it calls (`<group>.<endpoint>`).
  *
- * @internal The parity test holds the tools and these to the endpoints annotated `EndpointScope`, one to one.
+ * @internal The parity test holds the tools and these to the endpoints annotated `EndpointAccess`, one to one.
  */
 export const EVENT_METHODS = {
   'events/list': 'events.list',
@@ -113,30 +112,22 @@ const withWorkspace = (
   }),
 })
 
-/** Whether a caller holding `scopes` reaches the published Events: the `conversations` scope. */
-const reaches = (scopes: readonly CallerScope[]): boolean => {
-  const scope = endpointScopes(OwnerApi).get(EVENT_METHODS['events/subscribe'])
-  return scope !== undefined && scopes.includes(scope)
-}
+/** Whether a credential with `power` reaches the published Events: what subscribing needs of its grant. */
+const reaches = (power: Power): boolean => offers(power, EVENT_METHODS['events/subscribe'])
 
 /** What the server's instructions add for a caller that reaches the published Events. */
-export const EVENTS_GUIDE = (scopes: readonly CallerScope[]): string =>
-  reaches(scopes)
+export const EVENTS_GUIDE = (power: Power): string =>
+  reaches(power)
     ? ' Instead of polling conversation_entries, subscribe to conversation.updated with events/subscribe for a signed webhook wake (at most one a second per chat, always one when its work ends), or poll it with events/poll; then read the chat with conversation_entries from your cursor.'
     : ''
 
 /**
- * Declares the Events extension and serves its methods on `server` when the caller holds `conversations`: the
+ * Declares the Events extension and serves its methods on `server` when the credential's grant reaches them: the
  * top-level `capabilities.events` (which the pinned SDK keeps on the wire, for `initialize` and `server/discover`)
  * and `extensions["io.modelcontextprotocol/events"]`.
  */
-export function eventMethods(
-  server: McpServer,
-  scopes: readonly CallerScope[],
-  call: OwnerCaller,
-  reach: CallerReach | undefined,
-): void {
-  if (!reaches(scopes)) return
+export function eventMethods(server: McpServer, power: Power, call: OwnerCaller, reach: CallerReach | undefined): void {
+  if (!reaches(power)) return
   // SAFETY: the SDK's ServerCapabilities type has no draft `events`; registerCapabilities merges it as given.
   server.server.registerCapabilities({ events: {}, extensions: { [EVENTS_EXTENSION]: {} } } as never)
   const answer = async <A>(run: (api: OwnerClient) => Effect.Effect<A, unknown>, workspace?: string) => {

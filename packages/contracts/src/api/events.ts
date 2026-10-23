@@ -12,13 +12,13 @@ import {
 import { ApiErrors } from './errors.ts'
 import { GrantsResident } from './resident.ts'
 import { EndpointAccess } from './access.ts'
-import { EndpointScope } from './scope.ts'
 
 /**
  * The MCP Events goblin publishes (ADR 0112, docs/architecture/published-events.md): one event, `conversation.updated`,
  * as signed webhook wake-ups or a poll. Paths are relative to the API's `/api` prefix; `/mcp` serves the same as
  * `events/list`, `events/subscribe`, `events/unsubscribe` and `events/poll`, each calling its endpoint here. Every one
- * takes the `conversations` scope and never grants resident authority; a key sees only its own rooms' chats.
+ * needs `read` of a credential's grant and never grants resident authority; a credential sees only the chats of the
+ * Topics its grant reaches (ADR 0114).
  *
  * - `list`: `GET /api/events`, the events offered.
  * - `subscribe`: `POST /api/events/subscribe`, a lease on webhook deliveries to an https URL, verified by a signed
@@ -45,6 +45,5 @@ export class EventsGroup extends HttpApiGroup.make('events')
       error: [ApiErrors.notFound, ApiErrors.invalidInput],
     }),
   )
-  .annotateEndpoints(EndpointScope, 'conversations')
   .annotateEndpoints(EndpointAccess, { level: 'read' })
   .annotateEndpoints(GrantsResident, false) {}

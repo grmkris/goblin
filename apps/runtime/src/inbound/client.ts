@@ -10,10 +10,10 @@ import { type AppError, NotFound, isAppError, toAppError } from '../http/errors.
 import type { EventWebhook } from '../mcp/events/engine.ts'
 import {
   CALLER_HEADER,
-  type Caller,
+  type Credential,
   MEMBER_HEADER,
   type Member,
-  callerHeader,
+  credentialHeader,
   memberHeader,
 } from '../http/api/principal.ts'
 
@@ -55,15 +55,15 @@ export const internalCall = <A, E>(
 export type OwnerClient = HttpApiClient.ForApi<typeof OwnerApi>
 
 /**
- * One call of the owner API over `agent`'s own `fetch` for a caller on /mcp (ADR 0086): an owner forward carrying the
- * caller, and for an OAuth client the member it acts for (ADR 0089), as the edge forwards a request, so owner
- * admission, the caller's scopes and its reach apply as they do over HTTP. It quotes the request's reference (`ref`,
+ * One call of the owner API over `agent`'s own `fetch` for a credential on /mcp (ADRs 0086, 0114): an owner forward
+ * carrying the credential, and for an OAuth client the member it acts for (ADR 0089), as the edge forwards a request,
+ * so owner admission, the credential's grant and its reach apply as they do over HTTP. It quotes the request's reference (`ref`,
  * as the edge's forward does) and the call's operation, so the agent's logs and refusals join them. Its value, or the
  * `AppError` the agent answered; anything else is reported, and `Internal`.
  */
 export const ownerCall = <A, E>(
   agent: AgentFetch,
-  caller: Caller,
+  credential: Credential,
   member: Member | undefined,
   call: (api: OwnerClient) => Effect.Effect<A, E>,
   quoted: { readonly ref?: string; readonly operation?: string } = {},
@@ -73,7 +73,7 @@ export const ownerCall = <A, E>(
     transformClient: HttpClient.mapRequest(
       HttpClientRequest.setHeaders({
         [FORWARDED_HEADER]: 'owner',
-        [CALLER_HEADER]: callerHeader(caller),
+        [CALLER_HEADER]: credentialHeader(credential),
         ...(member === undefined ? {} : { [MEMBER_HEADER]: memberHeader(member) }),
         ...(quoted.ref === undefined ? {} : { 'x-goblin-ref': quoted.ref }),
         ...(quoted.operation === undefined ? {} : { 'x-goblin-operation': quoted.operation }),

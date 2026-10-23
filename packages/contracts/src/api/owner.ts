@@ -2,6 +2,7 @@ import type { NonEmptyReadonlyArray } from 'effect/Array'
 import * as HttpApi from 'effect/http-api/HttpApi'
 import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import * as HttpApiMiddleware from 'effect/http-api/HttpApiMiddleware'
+import { AccessGroup } from './access.ts'
 import { AgentGroup } from './agent.ts'
 import { AgentAppsGroup } from './agent-apps.ts'
 import { AppsGroup } from './apps.ts'
@@ -59,6 +60,7 @@ export class OwnerApi extends HttpApi.make('goblin-owner')
     SourcesGroup,
     NotifyGroup,
     EventsGroup,
+    AccessGroup,
   )
   .prefix('/api')
   .middleware(OwnerAdmission) {}

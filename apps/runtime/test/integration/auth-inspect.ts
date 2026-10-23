@@ -3,13 +3,14 @@ import { InspectConversations } from '@goblin/contracts/inspect'
 import { Schema } from 'effect'
 import { createHash } from 'node:crypto'
 import { expect } from 'vitest'
-import { type Person, call, person } from './owner-requests.ts'
+import { type Person, call, keyBody, person } from './owner-requests.ts'
 
 const APP = 'https://goblin.test'
 const REDIRECT = 'http://127.0.0.1:9/callback'
 const RESOURCE = `${APP}/mcp`
 const SIGN_IN_SCOPES = 'openid profile email offline_access'
-const ALL_SCOPES = `${SIGN_IN_SCOPES} goblin:agent goblin:topics goblin:conversations goblin:personas goblin:inspect goblin:transcripts goblin:setup goblin:routines`
+/** What a client asks for since ADR 0114: the sign-in scopes and `goblin`; what it may do is its grant. */
+const ALL_SCOPES = `${SIGN_IN_SCOPES} goblin`
 const Registered = Schema.Struct({ client_id: Schema.String })
 const Tokens = Schema.Struct({ access_token: Schema.String, refresh_token: Schema.optional(Schema.String) })
 const Redirect = Schema.Struct({ url: Schema.optional(Schema.String), redirect_uri: Schema.optional(Schema.String) })
@@ -50,30 +51,62 @@ async function register(base: string, who: Person): Promise<string> {
   return Schema.decodeUnknownSync(Registered)(await registered.json()).client_id
 }
 
+/** A grant's terms as the consent page and Settings send them (ADR 0114). */
+type Terms = {
+  readonly level: 'read' | 'write' | 'manage'
+  readonly extras?: readonly ('setup' | 'routines' | 'inspect')[]
+  /** The workspaces it reaches: all of the person's, or these, each with every Topic unless `topics` lists some. */
+  readonly workspaces?: 'all' | readonly string[]
+  readonly topics?: readonly string[]
+}
+
+/** `terms` for `who`, as the grant editor writes them: every Persona and connection, until revoked. */
+const termsOf = (who: Person, terms: Terms) => ({
+  name: 'inspect-fixture',
+  level: terms.level,
+  extras: terms.extras ?? [],
+  lifetime: 'never',
+  reach: {
+    workspaces: terms.workspaces === 'all' ? 'all' : 'list',
+    each: (terms.workspaces === 'all' ? [] : (terms.workspaces ?? [who.workspace])).map((workspace) => ({
+      workspace,
+      topics: terms.topics === undefined ? { kind: 'all' } : { kind: 'list', ids: terms.topics },
+      personas: { kind: 'all' },
+      connections: { kind: 'all' },
+    })),
+    origins: [],
+  },
+})
+
+const browserOf = (who: Person) => ({
+  cookie: who.cookie,
+  origin: APP,
+  'x-goblin-csrf': '1',
+  'cf-connecting-ip': who.ip,
+  'content-type': 'application/json',
+})
+const GrantSaved = Schema.Struct({ grantId: Schema.String })
+
+/**
+ * What the consent page does before the consent itself, and Settings does later (ADR 0114): the grant the person gives
+ * the client, which a live token follows at once. Its id.
+ */
+async function grantOf(base: string, who: Person, clientId: string, terms: Terms): Promise<string> {
+  const set = await fetch(`${base}/api/clients/${clientId}/grant`, {
+    method: 'PUT',
+    headers: browserOf(who),
+    body: JSON.stringify({ terms: termsOf(who, terms) }),
+  })
+  expect(set.status, await set.clone().text()).toBe(200)
+  return Schema.decodeUnknownSync(GrantSaved)(await set.json()).grantId
+}
+
 type Authorization = {
   readonly scope: string
   /** Force the consent page (`prompt=consent`) even when the standing consent covers the request. */
   readonly prompt?: 'consent'
-  /** The scopes the owner grants on the consent page, when narrower than requested. */
-  readonly grant?: string
-  /** The workspaces the consent page lets it reach (ADR 0097); the person's own one by default. */
-  readonly reach?: { readonly all: boolean; readonly workspaces: readonly string[] }
-}
-
-/** What the consent page does before the consent itself (ADR 0097): the workspaces the client will reach. */
-async function reachOf(base: string, who: Person, clientId: string, reach: Authorization['reach']) {
-  const set = await fetch(`${base}/api/clients/${clientId}/reach`, {
-    method: 'PUT',
-    headers: {
-      cookie: who.cookie,
-      origin: APP,
-      'x-goblin-csrf': '1',
-      'cf-connecting-ip': who.ip,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(reach ?? { all: false, workspaces: [who.workspace] }),
-  })
-  expect(set.status, await set.clone().text()).toBe(200)
+  /** The grant the consent page gives it (ADR 0114); `write` over the person's own workspace by default. */
+  readonly terms?: Terms
 }
 
 /** One sign-in of a registered client to /mcp: authorize, the consent page when the owner must answer, token. */
@@ -100,15 +133,11 @@ async function authorize(base: string, who: Person, clientId: string, request: A
     // What the consent page reads to say what the client asks for.
     expect(landing.searchParams.get('scope')).toBe(request.scope)
     expect(landing.searchParams.getAll('resource')).toEqual([RESOURCE])
-    await reachOf(base, who, clientId, request.reach)
+    await grantOf(base, who, clientId, request.terms ?? { level: 'write' })
     const consented = await auth(base, who, '/oauth2/consent', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        accept: true,
-        oauth_query: landing.search.slice(1),
-        ...(request.grant === undefined ? {} : { scope: request.grant }),
-      }),
+      body: JSON.stringify({ accept: true, oauth_query: landing.search.slice(1) }),
     })
     expect(consented.status, await consented.clone().text()).toBe(200)
     landing = await next(consented)
@@ -180,16 +209,22 @@ const MANAGEMENT = [
 ]
 const management = (tools: readonly string[]) => tools.filter((name) => MANAGEMENT.includes(name)).toSorted()
 
-/** A Persona one of the owner's own API keys made (ADR 0081), by its name. */
-async function keyMadePersona(base: string, who: Person): Promise<string> {
-  const browser = { cookie: who.cookie, origin: APP, 'x-goblin-csrf': '1', 'cf-connecting-ip': who.ip }
+/** A key of the owner's (ADR 0081) whose grant is `level` with `extras` over everything, as its id and secret. */
+async function ownerKey(base: string, who: Person, level: 'read' | 'manage', extras: readonly 'inspect'[] = []) {
   const made = await fetch(`${base}/w/${who.slug}/api/keys`, {
     method: 'POST',
-    headers: { ...browser, 'content-type': 'application/json' },
-    body: JSON.stringify({ name: 'service', scopes: ['personas'], servers: [], expiresInDays: 1 }),
+    headers: browserOf(who),
+    body: JSON.stringify(keyBody(who, `service-${level}`, { level, extras })),
   })
   expect(made.status, await made.clone().text()).toBe(201)
-  const { secret } = Schema.decodeUnknownSync(Schema.Struct({ secret: Schema.String }))(await made.json())
+  return Schema.decodeUnknownSync(Schema.Struct({ key: Schema.Struct({ id: Schema.String }), secret: Schema.String }))(
+    await made.json(),
+  )
+}
+
+/** A Persona one of the owner's own API keys made (ADR 0081), by its name. */
+async function keyMadePersona(base: string, who: Person): Promise<string> {
+  const { secret } = await ownerKey(base, who, 'manage')
   const persona = await fetch(`${base}/api/personas`, {
     method: 'POST',
     headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
@@ -214,7 +249,7 @@ const INSPECTION = [
   'inspect_details',
 ]
 
-/** One resource: every metadata path names /mcp and offers inspection; the 401 asks for every scope. */
+/** One resource: every metadata path names /mcp and offers `goblin`; the 401 asks for it. */
 async function discoveryCase(base: string) {
   for (const path of ['', '/mcp', '/mcp/inspect'])
     expect(await (await fetch(`${base}/.well-known/oauth-protected-resource${path}`)).json(), path).toMatchObject({
@@ -231,36 +266,40 @@ async function discoveryCase(base: string) {
   expect((await fetch(`${base}/mcp/operator`, { method: 'POST' })).status).toBe(404)
 }
 
+/** The access summary `access_read` answers: its grant, level and widening link. */
+const Summary = Schema.Struct({ grantId: Schema.String, level: Schema.String, widenUrl: Schema.String })
+const Refused = Schema.Struct({ _tag: Schema.Literal('AccessInsufficient'), widenUrl: Schema.String })
+
 /**
- * ADRs 0024 and 0086 end to end on the real Worker, D1 auth store and agents: one /mcp, whose inspection and management
- * tools a client gets only while the owner's consent grants their `goblin:*` scopes, with the owner's reach.
+ * ADRs 0024, 0086 and 0114 end to end on the real Worker, D1 auth store and agents: one /mcp, whose tools a client
+ * gets by its grant's level and extras, which its person changes in Settings and its live token follows at once; a
+ * call its grant does not cover answers `access_insufficient` with a widening link that works.
  */
 export async function inspectAuthCase(base: string) {
   await discoveryCase(base)
   const owner = await person(base)
   const clientId = await register(base, owner)
 
-  // Connected for sign-in scopes and asking the agent: ask, but not inspect (every power is its own switch, ADR 0098).
-  const asking = await authorize(base, owner, clientId, { scope: `${SIGN_IN_SCOPES} goblin:agent` })
-  expect(asking.asked).toBe(true)
-  expect([...(await toolsOf(base, asking.access))].toSorted()).toEqual([
-    'ask_agent',
-    'get_recent_messages',
-    'workspace_list',
-  ])
+  // A grant that only reads: no sends, no inspection; but its own access to read.
+  const reading = await authorize(base, owner, clientId, { scope: ALL_SCOPES, terms: { level: 'read' } })
+  expect(reading.asked).toBe(true)
+  expect(reading.refresh).toBeDefined()
+  const readTools = await toolsOf(base, reading.access)
+  expect(readTools).toEqual(expect.arrayContaining(['access_read', 'topic_list', 'persona_get', 'workspace_list']))
+  expect(inspection(readTools)).toEqual([])
+  expect(readTools).not.toContain('ask_agent')
+  expect(readTools).not.toContain('conversation_send')
 
-  expect(management(await toolsOf(base, asking.access))).toEqual([])
-
-  // Reconnecting with every scope asks the owner again, and the same /mcp then offers inspection and management.
-  const inspecting = await authorize(base, owner, clientId, { scope: ALL_SCOPES })
-  expect(inspecting.asked).toBe(true)
-  expect(inspecting.refresh).toBeDefined()
-  const client = await connect(base, inspecting.access)
+  // Settings widens it: the same live token now lists inspection and management, without signing in again.
+  const grantId = await grantOf(base, owner, clientId, { level: 'manage', extras: ['setup', 'routines', 'inspect'] })
+  const client = await connect(base, reading.access)
   try {
     const names = (await client.listTools()).tools.map((tool) => tool.name)
     expect(inspection(names)).toEqual(INSPECTION)
     expect(management(names)).toEqual(MANAGEMENT)
-    // The owner's reach (ADR 0086): a Persona one of the owner's keys made is the client's to read too.
+    const access = await client.callTool({ name: 'access_read', arguments: {} })
+    expect(Schema.decodeUnknownSync(Summary)(access.structuredContent)).toMatchObject({ grantId, level: 'manage' })
+    // Every Persona of the workspace: one of the owner's keys made is the client's to read too.
     const keyMade = await keyMadePersona(base, owner)
     const personas = await client.callTool({ name: 'persona_list', arguments: {} })
     expect(personas.isError, JSON.stringify(personas)).toBeFalsy()
@@ -278,39 +317,42 @@ export async function inspectAuthCase(base: string) {
   } finally {
     await client.close()
   }
-  // A refreshed token keeps inspection while the consent grants it.
+
+  // Narrowed to Topics it lists, none yet: Personal is refused with a link to widen it, which its person follows.
+  await grantOf(base, owner, clientId, { level: 'write', topics: [] })
   const refreshed = await token(base, owner, {
     grant_type: 'refresh_token',
-    refresh_token: inspecting.refresh ?? '',
+    refresh_token: reading.refresh ?? '',
     client_id: clientId,
     resource: RESOURCE,
   })
-  expect(inspection(await toolsOf(base, refreshed.access_token))).toEqual(INSPECTION)
-
-  // The owner consents again without inspection: tokens already issued lose it at once.
-  const narrowed = await authorize(base, owner, clientId, {
-    scope: ALL_SCOPES,
-    prompt: 'consent',
-    grant: `${SIGN_IN_SCOPES} goblin:agent`,
-  })
-  expect(narrowed.asked).toBe(true)
-  expect(inspection(await toolsOf(base, refreshed.access_token))).toEqual([])
-  expect(inspection(await toolsOf(base, narrowed.access))).toEqual([])
-  expect(management(await toolsOf(base, narrowed.access))).toEqual([])
-
-  // Reading main's newest messages works; revoking the client in Settings then ends every token.
-  const reading = await connect(base, narrowed.access)
+  const narrowed = await connect(base, refreshed.access_token)
   try {
-    const recent = await reading.callTool({ name: 'get_recent_messages', arguments: { limit: 5 } })
-    expect(recent.isError, JSON.stringify(recent)).toBeFalsy()
-    expect(JSON.stringify(recent.content)).toContain('messages')
+    expect(inspection((await narrowed.listTools()).tools.map((tool) => tool.name))).toEqual([])
+    const outside = await narrowed.callTool({ name: 'topic_get', arguments: { id: 1 } })
+    expect(outside.isError).toBe(true)
+    const [text] = Schema.decodeUnknownSync(Schema.Array(Schema.Struct({ text: Schema.String })))(outside.content)
+    const { widenUrl } = Schema.decodeUnknownSync(Refused)(JSON.parse(text?.text ?? '{}'))
+    const link = new URL(widenUrl)
+    expect([link.origin, link.pathname, link.searchParams.get('grant')]).toEqual([APP, '/consent/widen', grantId])
+    expect(link.searchParams.get('reach')).toBe(`${owner.workspace}/topic/1`)
+    // The widening page reads the grant's terms, and its approval lists Personal.
+    const page = await fetch(`${base}/api/grants/${grantId}/terms`, { headers: browserOf(owner) })
+    expect(page.status, await page.clone().text()).toBe(200)
+    const widened = await fetch(`${base}/api/grants/${grantId}`, {
+      method: 'PUT',
+      headers: browserOf(owner),
+      body: JSON.stringify({ grantId, terms: termsOf(owner, { level: 'write', topics: ['1'] }) }),
+    })
+    expect(widened.status, await widened.clone().text()).toBe(200)
+    const inside = await narrowed.callTool({ name: 'topic_get', arguments: { id: 1 } })
+    expect(inside.isError, JSON.stringify(inside)).toBeFalsy()
   } finally {
-    await reading.close()
+    await narrowed.close()
   }
-  const revoked = await fetch(`${base}/api/clients/${clientId}`, {
-    method: 'DELETE',
-    headers: { cookie: owner.cookie, origin: APP, 'x-goblin-csrf': '1', 'cf-connecting-ip': owner.ip },
-  })
+
+  // Revoking the client in Settings ends every token.
+  const revoked = await fetch(`${base}/api/clients/${clientId}`, { method: 'DELETE', headers: browserOf(owner) })
   expect(revoked.status).toBe(200)
   const after = await fetch(`${base}/mcp`, {
     method: 'POST',
@@ -324,6 +366,42 @@ export async function inspectAuthCase(base: string) {
   expect(after.status).toBe(401)
 }
 
+/**
+ * A server's key over HTTP (ADR 0114): a call its grant does not cover answers `access_insufficient` with a widening
+ * link; its workspace's owner approves there, and the same key then passes.
+ */
+export async function keyWideningCase(base: string) {
+  const owner = await person(base)
+  const { key, secret } = await ownerKey(base, owner, 'read')
+  const turns = () => fetch(`${base}/api/inspect/turns`, { headers: { authorization: `Bearer ${secret}` } })
+  const refused = await turns()
+  expect(refused.status).toBe(403)
+  const body = Schema.decodeUnknownSync(
+    Schema.Struct({ error: Schema.Struct({ code: Schema.String, widenUrl: Schema.String }) }),
+  )(await refused.json())
+  expect(body.error.code).toBe('access_insufficient')
+  const link = new URL(body.error.widenUrl)
+  expect([link.pathname, link.searchParams.get('grant'), link.searchParams.get('extra')]).toEqual([
+    '/consent/widen',
+    key.id,
+    'inspect',
+  ])
+  const widened = await fetch(`${base}/api/grants/${key.id}`, {
+    method: 'PUT',
+    headers: browserOf(owner),
+    body: JSON.stringify({
+      grantId: key.id,
+      terms: keyBody(owner, 'ignored', { level: 'read', extras: ['inspect'] }).terms,
+    }),
+  })
+  expect(widened.status, await widened.clone().text()).toBe(200)
+  expect((await turns()).status).toBe(200)
+  // Another person may not approve it: the grant is not there for them.
+  const stranger = await person(base)
+  const theirs = await fetch(`${base}/api/grants/${key.id}/terms`, { headers: browserOf(stranger) })
+  expect(theirs.status).toBe(404)
+}
+
 /** A tool call's structured answer, or its error result's text. */
 const answerOf = async (client: Client, name: string, args: Record<string, unknown>) => {
   const result = await client.callTool({ name, arguments: args })
@@ -331,8 +409,8 @@ const answerOf = async (client: Client, name: string, args: Record<string, unkno
 }
 
 /**
- * One /mcp for several workspaces (ADR 0097): a client given two of the person's reaches each by the workspace a call
- * names, and nothing else; given all, it reaches one made after it signed in; revoked, nothing.
+ * One /mcp for several workspaces (ADRs 0097, 0114): a client whose grant names two of the person's reaches each by the
+ * workspace a call names, and nothing else; given all, it reaches one made after it signed in; revoked, nothing.
  */
 export async function reachCase(base: string) {
   const owner = await person(base)
@@ -347,8 +425,8 @@ export async function reachCase(base: string) {
   const team = await madeAt('Team')
   const clientId = await register(base, owner)
   const granted = await authorize(base, owner, clientId, {
-    scope: `${SIGN_IN_SCOPES} goblin:topics`,
-    reach: { all: false, workspaces: [owner.workspace, team.id] },
+    scope: ALL_SCOPES,
+    terms: { level: 'write', workspaces: [owner.workspace, team.id] },
   })
   const client = await connect(base, granted.access)
   try {
@@ -366,7 +444,7 @@ export async function reachCase(base: string) {
     await client.close()
   }
   // All of the person's workspaces, a later one included, without signing in again.
-  await reachOf(base, owner, clientId, { all: true, workspaces: [] })
+  await grantOf(base, owner, clientId, { level: 'write', workspaces: 'all' })
   const later = await madeAt('Later')
   const again = await connect(base, granted.access)
   try {

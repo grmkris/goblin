@@ -26,7 +26,7 @@ import { topicSetupOf } from '../topics/setup.ts'
 import { chatOfSession, chatSession } from '../chats/directory.ts'
 import { InvalidInput } from '../http/errors.ts'
 import { definitionOf } from '../routines/store.ts'
-import { roomOf } from '../keys/reach.ts'
+import { roomOf } from '../keys/made-by.ts'
 
 type Kind = ExclusionTarget['kind']
 type Db = DrizzleSqliteDODatabase

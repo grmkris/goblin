@@ -125,7 +125,7 @@ async function personaAsk(url: string, owner: Person): Promise<void> {
 
 /** A server's key sends as Swarmm does: AG-UI bodies written by hand, a Persona tag in `forwardedProps.goblin`. */
 async function keySends(url: string, owner: Person): Promise<void> {
-  const asKey = keyFetch(url, await newKey(url, owner, 'drive', ['topics', 'conversations', 'personas']))
+  const asKey = keyFetch(url, await newKey(url, owner, 'drive'))
   const topic = Schema.decodeUnknownSync(TopicView)(
     await (await asKey('POST', '/api/topics', { name: 'Driven room', operationId: 'drive:topic' })).json(),
   )
@@ -180,7 +180,7 @@ async function wholeHistory(url: string, owner: Person): Promise<void> {
 
 /** A stock `HttpAgent` drives its key's room with the key: one turn, its events verified by the client itself. */
 async function stockAgent(url: string, owner: Person): Promise<void> {
-  const secret = await newKey(url, owner, 'stock', ['topics', 'conversations'])
+  const secret = await newKey(url, owner, 'stock')
   const topic = Schema.decodeUnknownSync(TopicView)(
     await (
       await keyFetch(url, secret)('POST', '/api/topics', { name: 'Stock room', operationId: 'stock:topic' })

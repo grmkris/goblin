@@ -83,13 +83,18 @@ const governs = (actor: WorkspaceView, target: WorkspaceRole): boolean =>
   actor.role === 'owner' || (actor.role === 'admin' && target === 'member')
 
 /**
- * Ends `userId`'s membership, and takes the workspace out of the reaches they gave MCP clients (ADR 0097): a reach of
- * all of theirs drops it with the membership, and joining again never brings back one that listed it.
+ * Ends `userId`'s membership, and takes the workspace out of the grants they gave MCP clients (ADRs 0097, 0114): a grant
+ * of all of theirs drops it with the membership, and joining again never brings back one that named it.
  */
 const endMembership = (db: Database, workspaceId: string, userId: string) =>
   db.batch([
     db.prepare('DELETE FROM member WHERE organizationId = ? AND userId = ?').bind(workspaceId, userId),
-    db.prepare('DELETE FROM mcpReachWorkspace WHERE workspaceId = ? AND userId = ?').bind(workspaceId, userId),
+    db
+      .prepare(
+        `DELETE FROM "grantWorkspace" WHERE "workspaceId" = ?
+          AND "grantId" IN (SELECT "id" FROM "grant" WHERE "kind" = 'client' AND "userId" = ?)`,
+      )
+      .bind(workspaceId, userId),
   ])
 
 /**

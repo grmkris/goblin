@@ -1,4 +1,5 @@
 import * as Layer from 'effect/Layer'
+import { Grants } from '../grants/service.ts'
 import { AgentHttp } from '../http/api/server.ts'
 import { Inspection } from '../inspect/service.ts'
 import type { AgentInputs } from '../runtime/input.ts'
@@ -59,8 +60,9 @@ const start = (input: AgentInputs) =>
   )
 
 /**
- * Every service of one agent, built once per Durable Object (agent.ts): the start (above), the model budget and model
- * picker (a send's admission reads them), then each area's layer in turn, each built
+ * Every service of one agent, built once per Durable Object (agent.ts): the start (above), the credentials' grants
+ * (ADR 0114: every Topic, Persona, chat, inspection and owner-API check of a credential reads them), the model budget
+ * and model picker (a send's admission reads them), then each area's layer in turn, each built
  * after and over everything before it: the skill learner after the owner's files and the routines' notices it writes,
  * and the Sources after the routines' notices they post and the owner's files they keep attachments in (their Events
  * handler is registered there, before the agent runs anything). The chat streams and the sends' run streams come last
@@ -68,6 +70,7 @@ const start = (input: AgentInputs) =>
  */
 export const AgentLive = (input: AgentInputs) =>
   start(input).pipe(
+    then(Grants.layer),
     then(ModelBudgetLive),
     then(ConversationLive),
     then(SetupsLive),

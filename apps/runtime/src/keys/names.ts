@@ -2,11 +2,11 @@ import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import { attemptSync } from '../http/errors.ts'
-import type { KeyGrant } from '../http/api/principal.ts'
+import type { Credential } from '../http/api/principal.ts'
 import { reportAndRecover } from '../observability/report.ts'
 import { Changes } from '../runtime/changes.ts'
 import { Db } from '../runtime/db.ts'
-import { nameReach } from './reach.ts'
+import { nameMade } from './made-by.ts'
 
 /**
  * The names of the keys that made the agent's Topics and Personas (ADR 0108), learnt from each key's first request in
@@ -18,7 +18,7 @@ export class KeyNames extends Context.Service<
   KeyNames,
   {
     /** Names what `key` made without a name, the first time it asks in this lifetime; never fails or holds its request. */
-    readonly learn: (key: KeyGrant) => Effect.Effect<void>
+    readonly learn: (key: Credential) => Effect.Effect<void>
   }
 >()('goblin/keys/KeyNames') {
   static readonly layer = Layer.effect(
@@ -30,16 +30,16 @@ export class KeyNames extends Context.Service<
       const learnt = new Set<string>()
       return KeyNames.of({
         learn: (key) => {
-          if (learnt.has(key.keyId)) return Effect.void
-          learnt.add(key.keyId)
+          if (learnt.has(key.id)) return Effect.void
+          learnt.add(key.id)
           const naming = Effect.gen(function* () {
-            const named = yield* attemptSync(() => nameReach(db, key))
+            const named = yield* attemptSync(() => nameMade(db, { keyId: key.id, name: key.name }))
             const ids = (kind: 'topic' | 'persona') => named.filter((row) => row.kind === kind).map((row) => row.id)
             if (ids('topic').length > 0) yield* changes.publish('topics.changed', { ids: ids('topic') })
             if (ids('persona').length > 0) yield* changes.publish('personas.changed', { ids: ids('persona') })
           }).pipe(
             // A failed naming is tried again by the key's next request in this lifetime.
-            Effect.tapError(() => Effect.sync(() => learnt.delete(key.keyId))),
+            Effect.tapError(() => Effect.sync(() => learnt.delete(key.id))),
             reportAndRecover('keys.learn', undefined),
           )
           return Effect.asVoid(Effect.forkIn(naming, scope))

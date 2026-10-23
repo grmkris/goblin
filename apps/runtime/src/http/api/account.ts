@@ -2,13 +2,15 @@ import { AccountApi, type AppError, WorkspaceAccountApi, withRef } from '@goblin
 import type {
   ApiKeyView,
   ClientErrorReport,
-  ClientReach,
-  CreateApiKey,
+  ConsentTerms,
+  CreateApiKeyTerms,
   CreatedApiKey,
   CreateWorkspace,
+  GrantTerms,
   InboundClient,
-  UpdateApiKey,
+  UpdateApiKeyTerms,
   UpdateWorkspace,
+  WidenResult,
   WorkspaceView,
 } from '@goblin/contracts'
 import type { FlowEvent } from '@goblin/contracts/telemetry'
@@ -19,7 +21,15 @@ import * as Option from 'effect/Option'
 import * as HttpServer from 'effect/http/HttpServer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { type KeyChange, createKey, listKeys, revokeKey, rotateKey, updateKey } from '../../auth/api-keys.ts'
-import { listInboundClients, revokeInboundClient, setClientReach } from '../../auth/clients.ts'
+import { listInboundClients, revokeInboundClient } from '../../auth/clients.ts'
+import {
+  type TermsChange,
+  clientTerms,
+  grantTerms,
+  narrowedTopics,
+  setClientGrant,
+  widenGrant,
+} from '../../auth/consent-terms.ts'
 import { deleteAgentOf } from '../../auth/account.ts'
 import {
   type Person,
@@ -35,7 +45,7 @@ import type { RuntimeEnv } from '../../env.ts'
 import { logEvent } from '../../observability/logger.ts'
 import { reportAndRecover } from '../../observability/report.ts'
 import { FlowPointFailure, agentHash, flowPoint } from '../../observability/ae.ts'
-import { Forbidden, Unauthenticated, attempt } from '../errors.ts'
+import { Forbidden, InvalidInput, Unauthenticated, attempt } from '../errors.ts'
 import { RequestContext } from './context.ts'
 import { type MemberRecords, memberRecords } from './member-records.ts'
 
@@ -52,27 +62,31 @@ export interface AccountRecords {
     change: UpdateWorkspace,
   ) => Effect.Effect<WorkspaceView, AppError>
   readonly deleteWorkspace: (userId: string, workspaceId: string) => Effect.Effect<void, AppError>
-  /** The MCP clients a person connected, the workspaces each reaches, and changing or ending that (ADR 0097). */
+  /** The MCP clients a person connected, with their grants and the workspaces each reaches, and ending one (ADR 0097). */
   readonly clients: (userId: string) => Effect.Effect<readonly InboundClient[], AppError>
-  readonly setClientReach: (
-    person: Person,
-    clientId: string,
-    reach: ClientReach,
-  ) => Effect.Effect<ClientReach, AppError>
   readonly revokeClient: (userId: string, clientId: string) => Effect.Effect<void, AppError>
+  /**
+   * Grants as the person approving them reads and changes them (ADR 0114): an MCP client's (the consent page, Settings)
+   * and any grant they may approve (the widening page). A change that narrows a grant's Topics first ends its holder's
+   * published Events leases where it narrowed.
+   */
+  readonly clientTerms: (person: Person, clientId: string) => Effect.Effect<ConsentTerms, AppError>
+  readonly setClientGrant: (person: Person, clientId: string, terms: GrantTerms) => Effect.Effect<TermsChange, AppError>
+  readonly grantTerms: (person: Person, grantId: string) => Effect.Effect<ConsentTerms, AppError>
+  readonly widen: (person: Person, grantId: string, terms: GrantTerms) => Effect.Effect<TermsChange, AppError>
   /** A workspace's API keys (ADRs 0081, 0089), and making, rotating and ending one. */
   readonly keys: (workspaceId: string) => Effect.Effect<readonly ApiKeyView[], AppError>
   readonly createKey: (
     workspaceId: string,
     userId: string,
-    input: CreateApiKey,
+    input: CreateApiKeyTerms,
   ) => Effect.Effect<CreatedApiKey, AppError>
-  /** New scopes for one of the workspace's keys (ADR 0084), before and after. */
+  /** New terms for one of the workspace's keys' grant (ADRs 0084, 0114), before and after. */
   readonly updateKey: (
     workspaceId: string,
     userId: string,
     keyId: string,
-    change: UpdateApiKey,
+    change: UpdateApiKeyTerms,
   ) => Effect.Effect<KeyChange, AppError>
   /** A new secret for one of the workspace's keys (ADR 0105): the same key, with its secret this once. */
   readonly rotateKey: (workspaceId: string, keyId: string) => Effect.Effect<CreatedApiKey, AppError>
@@ -130,6 +144,27 @@ const clientWorkspaces = (env: RuntimeEnv, userId: string, clientId: string) =>
     reportAndRecover('publish.reach', []),
   )
 
+/** The lease holder a grant's credential is (ADR 0112): its key, or its client for its person. */
+const holderOfGrant = (change: TermsChange): LeaseHolder | undefined =>
+  change.grant.keyId !== undefined
+    ? key(change.grant.keyId)
+    : change.grant.clientId !== undefined && change.grant.userId !== undefined
+      ? { kind: 'client', clientId: change.grant.clientId, user: change.grant.userId }
+      : undefined
+
+/**
+ * `change` made, after the holder's leases in every workspace whose Topics it narrowed were ended: a lease never
+ * outlives the reach it was made under. The terms are saved first, so a refused change ends nothing.
+ */
+const endNarrowed = (env: RuntimeEnv, change: TermsChange) =>
+  Effect.gen(function* () {
+    const holder = holderOfGrant(change)
+    if (holder === undefined) return change
+    for (const workspace of narrowedTopics(change.before?.reach, change.after.reach))
+      yield* endLeases(env, workspace, holder)
+    return change
+  })
+
 /** The records as the deployment keeps them. */
 export const accountRecords = (env: RuntimeEnv): AccountRecords => {
   const flows = env.FLOWS
@@ -154,7 +189,18 @@ export const accountRecords = (env: RuntimeEnv): AccountRecords => {
         deleteWorkspace({ db: env.AUTH_DB, eraseAgent: (id) => deleteAgentOf(env, id) }, userId, workspaceId),
       ),
     clients: (userId) => attempt(() => listInboundClients(env, userId)),
-    setClientReach: (person, clientId, reach) => attempt(() => setClientReach(env, person, clientId, reach)),
+    clientTerms: (person, clientId) => attempt(() => clientTerms(env, person, clientId)),
+    setClientGrant: (person, clientId, terms) =>
+      Effect.flatMap(
+        attempt(() => setClientGrant(env, person, clientId, terms)),
+        (change) => endNarrowed(env, change),
+      ),
+    grantTerms: (person, grantId) => attempt(() => grantTerms(env, person, grantId)),
+    widen: (person, grantId, terms) =>
+      Effect.flatMap(
+        attempt(() => widenGrant(env, person, grantId, terms)),
+        (change) => endNarrowed(env, change),
+      ),
     revokeClient: (userId, clientId) =>
       Effect.gen(function* () {
         const holder = { kind: 'client' as const, clientId, user: userId }
@@ -165,11 +211,12 @@ export const accountRecords = (env: RuntimeEnv): AccountRecords => {
     keys: (workspaceId) => attempt(() => listKeys(env, workspaceId)),
     createKey: (workspaceId, userId, input) => attempt(() => createKey(env, workspaceId, userId, input)),
     updateKey: (workspaceId, userId, keyId, change) =>
-      Effect.andThen(
-        change.scopes === undefined || change.scopes.includes('conversations')
-          ? Effect.void
-          : endLeases(env, workspaceId, key(keyId)),
+      Effect.tap(
         attempt(() => updateKey(env, workspaceId, userId, keyId, change)),
+        ({ before, after }) =>
+          narrowedTopics(before.terms.reach, after.terms.reach).length === 0
+            ? Effect.void
+            : endLeases(env, workspaceId, key(keyId)),
       ),
     rotateKey: (workspaceId, keyId) =>
       Effect.andThen(
@@ -284,11 +331,6 @@ const WorkspacesHandlers = HttpApiBuilder.group(AccountApi, 'workspaces', (handl
 const ClientsHandlers = HttpApiBuilder.group(AccountApi, 'clients', (handlers) =>
   handlers
     .handle('list', () => quoted(Effect.flatMap(signedIn, ({ records, person }) => records.clients(person.id))))
-    .handle('reach', ({ params, payload }) =>
-      quoted(
-        Effect.flatMap(signedIn, ({ records, person }) => records.setClientReach(person, params.clientId, payload)),
-      ),
-    )
     .handle('revoke', ({ params }) =>
       quoted(
         Effect.flatMap(signedIn, ({ records, person }) =>
@@ -298,27 +340,74 @@ const ClientsHandlers = HttpApiBuilder.group(AccountApi, 'clients', (handlers) =
     ),
 )
 
+/** A grant's level and extras as an audit line carries them: a few short tokens, never a name or an id it reaches. */
+const powerOf = (terms: GrantTerms): readonly string[] => [terms.level, ...terms.extras]
+
 /**
- * A key's new scopes (ADR 0084) or MCP origins (ADR 0091), as a manager's change of it is audited: one `api_key` line
- * for each it changed, with the key, the workspace, who changed it and the request's reference; for scopes they before
- * and after, for origins how many there were and are. Never its secret, and no origin or tool name.
+ * A key's grant's new terms (ADRs 0084, 0114), as a manager's change of it is audited: one `api_key` line with the key,
+ * the workspace, who changed it and the request's reference, its level and extras before and after, and how many MCP
+ * origins it holds now. Never its secret, and no origin, tool or reach id.
  */
-const changeKey = (keyId: string, change: UpdateApiKey) =>
+const changeKey = (keyId: string, change: UpdateApiKeyTerms) =>
   Effect.gen(function* () {
     const { records, person, workspace } = yield* manager
     const { before, after } = yield* records.updateKey(workspace.id, person.id, keyId, change)
-    const line = { id: keyId, agent: workspace.id, by: person.id }
-    if (change.scopes !== undefined)
-      yield* logEvent('info', 'api_key', {
-        ...line,
-        kind: 'scopes',
-        scopes: after.scopes,
-        'scopes.before': before.scopes,
-      })
-    if (change.origins !== undefined)
-      yield* logEvent('info', 'api_key', { ...line, kind: 'origins', count: after.origins.length })
+    yield* logEvent('info', 'api_key', {
+      id: keyId,
+      agent: workspace.id,
+      by: person.id,
+      kind: 'grant',
+      scopes: powerOf(after.terms),
+      'scopes.before': powerOf(before.terms),
+      count: after.terms.reach.origins.length,
+    })
     return after
   })
+
+/** A grant change as its answer says it, after one `grant` audit line like a key's (`changeKey`). */
+const audited = (change: TermsChange, by: string): Effect.Effect<WidenResult> =>
+  Effect.as(
+    logEvent('info', 'grant', {
+      id: change.grant.id,
+      by,
+      kind: change.grant.kind,
+      scopes: powerOf(change.after),
+      ...(change.before === undefined ? {} : { 'scopes.before': powerOf(change.before) }),
+    }),
+    { grantId: change.grant.id, terms: change.after, expiresAt: change.expiresAt },
+  )
+
+/**
+ * Grants as the person approving them sees them (ADR 0114): what the consent and widening pages show, and their
+ * approval, widened or narrowed. Theirs alone: a grant they may not approve is not found.
+ */
+const GrantsHandlers = HttpApiBuilder.group(AccountApi, 'grants', (handlers) =>
+  handlers
+    .handle('terms', ({ params }) =>
+      quoted(Effect.flatMap(signedIn, ({ records, person }) => records.grantTerms(person, params.id))),
+    )
+    .handle('widen', ({ params, payload }) =>
+      quoted(
+        Effect.flatMap(signedIn, ({ records, person }) =>
+          payload.grantId === params.id
+            ? Effect.flatMap(records.widen(person, params.id, payload.terms), (change) => audited(change, person.id))
+            : Effect.fail(new InvalidInput({ reason: 'grant' })),
+        ),
+      ),
+    )
+    .handle('clientTerms', ({ params }) =>
+      quoted(Effect.flatMap(signedIn, ({ records, person }) => records.clientTerms(person, params.clientId))),
+    )
+    .handle('clientGrant', ({ params, payload }) =>
+      quoted(
+        Effect.flatMap(signedIn, ({ records, person }) =>
+          Effect.flatMap(records.setClientGrant(person, params.clientId, payload.terms), (change) =>
+            audited(change, person.id),
+          ),
+        ),
+      ),
+    ),
+)
 
 /**
  * A key's new secret (ADR 0105), as a manager's rotation of it is audited: one `api_key` line (`kind: secret`) with the
@@ -430,7 +519,7 @@ const ClientErrorsHandlers = HttpApiBuilder.group(AccountApi, 'clientErrors', (h
 
 /** The account API's routes, served by the Worker (`edge.ts`). */
 export const AccountApiLayer = HttpApiBuilder.layer(AccountApi).pipe(
-  Layer.provide([WorkspacesHandlers, InvitationsHandlers, ClientsHandlers, ClientErrorsHandlers]),
+  Layer.provide([WorkspacesHandlers, InvitationsHandlers, ClientsHandlers, GrantsHandlers, ClientErrorsHandlers]),
   Layer.provide(HttpServer.layerServices),
 )
 

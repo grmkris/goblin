@@ -33,7 +33,7 @@ export class Topics extends Context.Service<
     readonly list: Effect.Effect<readonly TopicView[]>
     /** One Topic; `NotFound` when there is none with `id`. */
     readonly get: (id: number) => Effect.Effect<TopicView, AppError>
-    /** A page of Topics, newest change first, archived ones too; only a key's own for a key (ADR 0084). */
+    /** A page of Topics, newest change first, archived ones too; only a grant's listed ones for it (ADR 0114). */
     readonly page: (query: TopicPageQuery) => Effect.Effect<TopicPage>
     /**
      * A new Topic named `input.name` with a new Conversation, or the one `input.operationId` already made. A name

@@ -1,9 +1,10 @@
-import type { CallerScope, WorkspaceView } from '@goblin/contracts'
+import { GRANT_SPEC, type Need, type WorkspaceView, missingFor } from '@goblin/contracts'
 import {
   AccountApi,
   AppError,
   ErrorEnvelope,
   Forbidden,
+  accessInsufficient,
   NotFound,
   OwnerApi,
   WorkspaceAccountApi,
@@ -30,19 +31,18 @@ import {
   RequestContext,
   type RequestFacts,
   type RouteNames,
-  endpointScopes,
+  endpointAccess,
   requestFacts,
   routeNames,
   routeTemplate,
 } from './context.ts'
 import {
   CALLER_HEADER,
-  type Caller,
-  type KeyGrant,
+  type Credential,
   MEMBER_HEADER,
   type Member,
   bearerKey,
-  callerHeader,
+  credentialHeader,
   memberHeader,
   memberName,
 } from './principal.ts'
@@ -73,10 +73,12 @@ export interface Edge {
   /** The signed-in person of a request, from its session cookie alone: any `Authorization` header is refused. */
   readonly session: (request: Request) => Effect.Effect<Person, AppError>
   /**
-   * The workspace a server's API key belongs to, and what it may reach; `Unauthenticated` for any key that does not
-   * admit.
+   * The workspace a server's API key belongs to, and the credential its grant makes there (ADR 0114);
+   * `Unauthenticated` for any key that does not admit.
    */
-  readonly key: (key: string) => Effect.Effect<KeyGrant & { readonly workspaceId: string }, AppError>
+  readonly key: (
+    key: string,
+  ) => Effect.Effect<{ readonly workspaceId: string; readonly credential: Credential }, AppError>
   /** A person's membership of the workspace at a slug, read now: the workspace and their role, or none. */
   readonly membership: (userId: string, slug: string) => Effect.Effect<WorkspaceView | undefined, AppError>
   /** A person's membership of the workspace with an ID, read now: the workspace and their role, or none. */
@@ -117,21 +119,21 @@ const OWNER_PREFIX = '/api/'
 /** A member's path: a workspace's slug, then the API path its agent or the workspace account API answers. */
 const WORKSPACE_PATH = /^\/w\/([\w-]{1,200})(\/api\/.*)$/u
 
-/** Who a forwarded request comes from: a member (a session) or a caller (a key). */
-type Principal = { readonly member: Member } | { readonly caller: Caller }
+/** Who a forwarded request comes from: a member (a session) or a credential (a key). */
+type Principal = { readonly member: Member } | { readonly credential: Credential }
 
 /**
  * The headers an owner request carries to its agent: the edge's reference, the owner-forward mark and `FORWARDED`;
- * then its member, or a key's grant and never an App's caller mark.
+ * then its member, or a key's credential and never an App's caller mark.
  */
 const forwardedHeaders = (request: Request, ref: string, principal: Principal): Headers => {
   const headers = new Headers({ 'x-goblin-ref': ref, [FORWARDED_HEADER]: 'owner' })
-  const keyed = 'caller' in principal
+  const keyed = 'credential' in principal
   for (const name of FORWARDED) {
     const value = request.headers.get(name)
     if (value !== null && !(keyed && name === 'x-mcp-caller')) headers.set(name, value)
   }
-  if (keyed) headers.set(CALLER_HEADER, callerHeader(principal.caller))
+  if (keyed) headers.set(CALLER_HEADER, credentialHeader(principal.credential))
   else headers.set(MEMBER_HEADER, memberHeader(principal.member))
   return headers
 }
@@ -178,22 +180,24 @@ const admitMember = (
 
 /**
  * Admission of a server by its API key (ADR 0081): a key is a server's, so a browser's cookie or Origin with it is
- * refused; the key must admit, and hold the scope of the endpoint the request names (`scope`, none for an endpoint no
- * key reaches). The workspace the key belongs to, and the key as the request's caller (ADR 0086).
+ * refused; the key must admit, and its grant must hold what the endpoint the request names needs (ADR 0114: `need`,
+ * none for an endpoint no credential reaches, `Forbidden` `credential`), else `AccessInsufficient` with what it lacks
+ * and the link to widen it. The workspace the key belongs to, and its credential (ADR 0086).
  */
 const admitKey = (
   request: Request,
   edge: Edge,
   key: string,
-  scope: CallerScope | undefined,
-): Effect.Effect<{ readonly workspaceId: string; readonly caller: Caller }, AppError> =>
+  need: Need | undefined,
+): Effect.Effect<{ readonly workspaceId: string; readonly credential: Credential }, AppError> =>
   Effect.gen(function* () {
     if (request.headers.has('cookie') || request.headers.has('origin'))
       return yield* new Forbidden({ reason: 'key_browser' })
-    const { workspaceId, ...grant } = yield* edge.key(key)
-    if (scope === undefined || !grant.scopes.some((held) => held === scope))
-      return yield* new Forbidden({ reason: 'scope' })
-    return { workspaceId, caller: { kind: 'key', ...grant } }
+    const admitted = yield* edge.key(key)
+    if (need === undefined) return yield* new Forbidden({ reason: 'credential' })
+    const missing = missingFor(GRANT_SPEC, admitted.credential, need)
+    if (missing !== null) return yield* accessInsufficient(edge.origin, admitted.credential.grantId, missing)
+    return admitted
   })
 
 /** A body read up to `limit` bytes; past it, `PayloadTooLarge` (`readBytes`). */
@@ -276,7 +280,13 @@ const settle = (
   })
 
 /** The account API's paths, a person's; anything else under them is a 404 in the envelope. */
-const ACCOUNT_PATHS = ['/api/workspaces', '/api/invitations', '/api/clients', '/api/client-errors'] as const
+const ACCOUNT_PATHS = [
+  '/api/workspaces',
+  '/api/invitations',
+  '/api/clients',
+  '/api/grants',
+  '/api/client-errors',
+] as const
 /** The workspace account API's paths, under `/w/<workspace slug>`: answered by the Worker, never the agent. */
 const WORKSPACE_ACCOUNT_PATHS = ['/api/keys', '/api/members'] as const
 const under = (path: string, prefix: string): boolean => path === prefix || path.startsWith(`${prefix}/`)
@@ -424,7 +434,7 @@ interface Built {
   readonly accountRoute: RouteNames
   readonly workspaceAccountRoute: RouteNames
   readonly ownerRoute: RouteNames
-  readonly ownerScopes: ReadonlyMap<string, CallerScope>
+  readonly ownerNeeds: ReadonlyMap<string, Need>
 }
 
 const accountOf =
@@ -545,7 +555,7 @@ const signInOf =
   }
 
 const ownerOf =
-  ({ ownerRoute, ownerScopes, observed }: Built): EdgeHttp['owner'] =>
+  ({ ownerRoute, ownerNeeds, observed }: Built): EdgeHttp['owner'] =>
   (request, edge) => {
     const url = new URL(request.url)
     const facts = { ...requestFacts(request, ownerRoute(request) ?? routeTemplate(url.pathname)), ref: refOf(request) }
@@ -554,7 +564,7 @@ const ownerOf =
         const token = bearerKey(request)
         if (!url.pathname.startsWith(OWNER_PREFIX) || isAccountPath(url.pathname) || token === undefined)
           return yield* new NotFound({ what: 'route' })
-        const { workspaceId, caller } = yield* admitKey(request, edge, token, ownerScopes.get(facts.route))
+        const { workspaceId, credential } = yield* admitKey(request, edge, token, ownerNeeds.get(facts.route))
         known(workspaceId)
         return yield* forward({
           request,
@@ -562,7 +572,7 @@ const ownerOf =
           route: facts.route,
           path: url.pathname,
           search: url.search,
-          principal: { caller },
+          principal: { credential },
           agent: edge.agent(workspaceId),
         })
       }),
@@ -593,7 +603,7 @@ export const makeEdgeHttp: Effect.Effect<EdgeHttp> = Effect.gen(function* () {
     accountRoute: routeNames(AccountApi),
     workspaceAccountRoute: routeNames(WorkspaceAccountApi),
     ownerRoute: routeNames(OwnerApi),
-    ownerScopes: endpointScopes(OwnerApi),
+    ownerNeeds: endpointAccess(OwnerApi),
   }
   return {
     account: accountOf(built),

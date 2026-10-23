@@ -27,6 +27,7 @@ import { TopicsHandlers } from '../../../src/topics/api.ts'
 import { TopicRegistry } from '../../../src/topics/registry.ts'
 import { currentResident, database, serve, served, sqliteDb, stub } from './fixture.ts'
 import { unread } from '../../fake.ts'
+import { memoryGrants } from '../../grants-fixture.ts'
 
 /**
  * What a Topic's setup is chosen from here: one server `notes` with its granted tool `read`, no skills and no apps. A
@@ -99,6 +100,8 @@ export const organizing = () => {
   const retooled: number[] = []
   const catalog = setupServices(retooled)
   const changes = Layer.succeed(Changes, makeChanges())
+  // The credentials' grants (ADR 0114), mirrored on the same SQLite from an auth store held in memory.
+  const grants = memoryGrants()
   const lane = delegationServices({
     topics,
     personas,
@@ -111,6 +114,7 @@ export const organizing = () => {
       [TopicsGroup, PersonasGroup, OrganizeGroup],
       Layer.mergeAll(TopicsHandlers, PersonasHandlers, OrganizeHandlers),
       KeyNames.layer,
+      grants.layer,
     ).pipe(
       Layer.provide(
         Layer.mergeAll(
@@ -142,5 +146,5 @@ export const organizing = () => {
       ),
     ),
   )
-  return { fetch, db, resident, topics, personas, receipts, flows, retooled }
+  return { fetch, db, resident, topics, personas, receipts, flows, retooled, grants }
 }

@@ -3,7 +3,17 @@ import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { ROOM_TOOLS, roomAllows } from '../../src/pi/room.ts'
 import { callOwner } from '../owner-client.ts'
-import { type Person, call, lever, ownerFetch, person, showing, signedIn, workspaceOf } from './owner-requests.ts'
+import {
+  type Person,
+  call,
+  keyBody,
+  lever,
+  ownerFetch,
+  person,
+  showing,
+  signedIn,
+  workspaceOf,
+} from './owner-requests.ts'
 import { ownerResult } from './probe-reads.ts'
 import { waitFor } from './until.ts'
 
@@ -35,14 +45,17 @@ const received = async (me: ReturnType<typeof signedIn>) => {
 /** Tools an owner's chat has that a room must never offer: one of each kind the room leaves out. */
 const DENIED = ['files_list', 'files_write', 'code_run', 'topic_create', 'persona_update', 'routine_propose']
 
-/** A key of `who` for a server (ADR 0081), named `rooms`, as the owner makes it in Settings: its secret. */
+/**
+ * A key of `who` for a server (ADR 0081), named `rooms`, as the owner makes it in Settings: its grant manages only
+ * what it makes and sets up the fixture's connection (ADR 0114). Its secret.
+ */
 async function keyOf(base: string, who: Person): Promise<string> {
-  const made = await call(base, who, '/api/keys', {
-    name: 'rooms',
-    scopes: ['topics', 'conversations', 'personas'],
-    servers: [FIXTURE],
-    expiresInDays: 1,
-  })
+  const made = await call(
+    base,
+    who,
+    '/api/keys',
+    keyBody(who, 'rooms', { extras: ['setup'], lists: true, connections: [FIXTURE] }),
+  )
   expect(made.status, await made.clone().text()).toBe(201)
   return Schema.decodeUnknownSync(Secret)(await made.json()).secret
 }

@@ -7,7 +7,6 @@ import { CreatePersona, PersonaDetail, PersonaPage, PersonaReply, PersonaView, U
 import { ApiErrors } from './errors.ts'
 import { EndpointAccess } from './access.ts'
 import { EndpointRole } from './role.ts'
-import { EndpointScope } from './scope.ts'
 import { PageQuery } from './page.ts'
 
 /** A Persona's id in a path: 1 to 999999999. */
@@ -20,7 +19,7 @@ const PersonaQuery = { ...PageQuery, name: Schema.optional(NonEmptyString(32)) }
  * The owner's Personas (ADR 0033): named, versioned agent definitions. Paths are relative to the API's `/api` prefix.
  *
  * - `list`: `GET /api/personas?name=&cursor=&limit=`, a page of Personas, newest change first, each with its setup in
- *   a line: every one for the owner, a key's own for a key.
+ *   a line: every one for a member, those its grant reaches for a credential.
  * - `create`: `POST /api/personas`, 201 with the Persona as it is now. The same operation id finds the same Persona. A
  *   name another active Persona has is a conflict; a model the deployment does not offer is invalid input.
  * - `detail`: `GET /api/personas/:id`, one Persona with its revisions, newest first.
@@ -29,35 +28,32 @@ const PersonaQuery = { ...PageQuery, name: Schema.optional(NonEmptyString(32)) }
  * - `reply`: `POST /api/personas/reply`, 202: the owner's reply to a Persona's hold (ADR 0041) goes to its fork, and the
  *   Persona answers again in the chat it was asked in. A fork that is not a Persona's, or whose chat is closed, refuses.
  *
- * An API key with the `personas` scope reaches `list`, `create`, `detail` and `update` for its own Personas, never
- * `reply` (ADRs 0081, 0084).
+ * A credential reaches `list` and `detail` with `read`, `create` and `update` with `manage` (and `setup` for a setup),
+ * each within its grant's reach, never `reply` (ADRs 0081, 0084, 0114). A Persona a credential with a list makes is
+ * added to it.
  */
 export class PersonasGroup extends HttpApiGroup.make('personas').add(
-  HttpApiEndpoint.get('list', '/personas', { query: PersonaQuery, success: PersonaPage })
-    .annotate(EndpointScope, 'personas')
-    .annotate(EndpointAccess, { level: 'read' }),
+  HttpApiEndpoint.get('list', '/personas', { query: PersonaQuery, success: PersonaPage }).annotate(EndpointAccess, {
+    level: 'read',
+  }),
   HttpApiEndpoint.post('create', '/personas', {
     payload: CreatePersona,
     success: PersonaView.pipe(HttpApiSchema.status(201)),
     error: [ApiErrors.conflict, ApiErrors.invalidInput],
   })
-    .annotate(EndpointScope, 'personas')
     .annotate(EndpointAccess, { level: 'manage' })
     .annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.get('detail', '/personas/:id', {
     params: { id: PersonaParam },
     success: PersonaDetail,
     error: ApiErrors.notFound,
-  })
-    .annotate(EndpointScope, 'personas')
-    .annotate(EndpointAccess, { level: 'read' }),
+  }).annotate(EndpointAccess, { level: 'read' }),
   HttpApiEndpoint.patch('update', '/personas/:id', {
     params: { id: PersonaParam },
     payload: UpdatePersona,
     success: PersonaView,
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput],
   })
-    .annotate(EndpointScope, 'personas')
     .annotate(EndpointAccess, { level: 'manage' })
     .annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.post('reply', '/personas/reply', {

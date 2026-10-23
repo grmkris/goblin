@@ -1,93 +1,75 @@
-import {
-  type ApiKeyView,
-  type CreateApiKey,
-  type CreatedApiKey,
-  KeyOrigin,
-  KeyScope,
-  KeyServer,
-  type UpdateApiKey,
-  keyOriginsOf,
-} from '@goblin/contracts'
+import type { ApiKeyView, CreateApiKeyTerms, CreatedApiKey, UpdateApiKeyTerms } from '@goblin/contracts'
 import { API_KEY_TABLE_NAME, defaultKeyHasher } from '@better-auth/api-key'
 import { generateRandomString } from 'better-auth/crypto'
-import * as Option from 'effect/Option'
-import * as Schema from 'effect/Schema'
 import type { RuntimeEnv } from '../env.ts'
-import { Conflict, InvalidInput, NotFound, Unauthenticated } from '../http/errors.ts'
-import type { KeyGrant } from '../http/api/principal.ts'
+import { Conflict, NotFound, Unauthenticated } from '../http/errors.ts'
+import type { Credential } from '../http/api/principal.ts'
+import {
+  type GrantRecord,
+  coverageIn,
+  createKeyGrant,
+  grantOfKey,
+  isLive,
+  newKeyTerms,
+  setTerms,
+  termsOf,
+} from './grants.ts'
 import { createAuth } from './options.ts'
 import { KEY_LENGTH, KEY_PREFIX, KEY_START_LENGTH } from './resources.ts'
 
 /**
  * Server API keys (ADR 0081), on Better Auth's apiKey() plugin in the auth D1, read and written through Better Auth's
- * own adapter. A key belongs to a workspace (ADR 0089): its `referenceId` is the workspace's ID. Its permissions are
- * its scopes (`{ goblin: [...] }`) and its metadata its ceiling and who made it (`{ servers: [...], origins: [...],
- * createdBy }`: the MCP connections its setups may name, and the MCP origins with their tools its threads may connect
- * to, ADR 0091); none of it is ever taken from a request but the owner's.
+ * own adapter. A key belongs to a workspace (ADR 0089): its `referenceId` is the workspace's ID. What it may do is its
+ * grant (ADR 0114, `grants.ts`), whose id is the key's own; the plugin keeps only its secret's hash, its name and who
+ * made it (`metadata.createdBy`). None of it is ever taken from a request but a manager's.
  */
 
-const DAY_SECONDS = 86_400
 const MODEL = API_KEY_TABLE_NAME
 
-/** A server the edge admitted by its key: the workspace the key belongs to, and what the key may reach. */
-export interface KeyPrincipal extends KeyGrant {
+/** A server the edge admitted by its key: the workspace the key belongs to, and the credential its grant makes. */
+export interface KeyPrincipal {
   readonly workspaceId: string
+  readonly credential: Credential
 }
 
-const Permissions = Schema.Struct({ goblin: Schema.Array(KeyScope) })
-const Metadata = Schema.Struct({
-  servers: Schema.Array(KeyServer),
-  origins: Schema.optional(Schema.Array(KeyOrigin)),
+/** The credential `grant` makes in `workspaceId`, for a key or a client named `name` (`id` the key's or client's). */
+export const credentialOf = (
+  grant: GrantRecord,
+  identity: { readonly id: string; readonly name: string },
+  ws: Credential['ws'],
+): Credential => ({
+  kind: grant.kind,
+  id: identity.id,
+  name: identity.name.slice(0, 200),
+  grantId: grant.id,
+  level: grant.level,
+  extras: grant.extras,
+  expiresAt: grant.expiresAt,
+  ws,
+  origins: grant.origins,
 })
-/** The plugin hands permissions back parsed from some calls and as their JSON text from the adapter. */
-const json = (value: unknown): unknown => {
-  if (typeof value !== 'string') return value
-  try {
-    return JSON.parse(value)
-  } catch {
-    // expected: a column that is not JSON decodes to no scopes or servers.
-    return null
-  }
-}
-const scopesOf = (permissions: unknown): readonly KeyScope[] =>
-  Option.match(Schema.decodeUnknownOption(Permissions)(json(permissions)), {
-    onNone: () => [],
-    onSome: (decoded) => decoded.goblin,
-  })
-const ceilingOf = (
-  metadata: unknown,
-): { readonly servers: readonly string[]; readonly origins: readonly KeyOrigin[] } =>
-  Option.match(Schema.decodeUnknownOption(Metadata)(json(metadata)), {
-    onNone: () => ({ servers: [], origins: [] }),
-    onSome: (decoded) => ({ servers: decoded.servers, origins: decoded.origins ?? [] }),
-  })
-
-/** Origins as a key stores them (ADR 0091), or the owner's input refused for its first problem. */
-const checkedOrigins = (origins: readonly KeyOrigin[]): readonly KeyOrigin[] => {
-  const checked = keyOriginsOf(origins)
-  if ('problem' in checked) throw new InvalidInput({ reason: checked.problem })
-  return checked.origins
-}
 
 /**
- * The principal a key admits: valid, unexpired, and of a workspace that still exists. Anything else is
- * `Unauthenticated` (`key`), saying nothing more. Its rate limit is its agent's to count (ADR 0085).
+ * The principal a key admits: valid, of a workspace that still exists, with a grant that has not ended. A key that does
+ * not verify, or whose workspace is gone, is `Unauthenticated` (`key`), saying nothing more; one whose grant ended is
+ * `grant_expired`. Its rate limit is its agent's to count (ADR 0085).
  */
 export const verifyKey = async (env: RuntimeEnv, key: string): Promise<KeyPrincipal> => {
   const auth = createAuth(env, env.AUTH_DB)
   const result = await auth.api.verifyApiKey({ body: { key } })
   if (!result.valid || result.key === null) throw new Unauthenticated({ reason: 'key' })
   const workspaceId = result.key.referenceId
+  const grant = await grantOfKey(env.AUTH_DB, result.key.id)
+  if (grant === undefined) throw new Unauthenticated({ reason: 'key' })
+  if (!isLive(grant, Date.now())) throw new Unauthenticated({ reason: 'grant_expired' })
+  const ws = await coverageIn(env.AUTH_DB, grant, workspaceId)
   const { adapter } = await auth.$context
-  if ((await adapter.findOne({ model: 'organization', where: [{ field: 'id', value: workspaceId }] })) === null)
+  if (
+    ws === undefined ||
+    (await adapter.findOne({ model: 'organization', where: [{ field: 'id', value: workspaceId }] })) === null
+  )
     throw new Unauthenticated({ reason: 'key' })
-  return {
-    workspaceId,
-    keyId: result.key.id,
-    name: result.key.name ?? '',
-    scopes: scopesOf(result.key.permissions),
-    ...ceilingOf(result.key.metadata),
-  }
+  return { workspaceId, credential: credentialOf(grant, { id: result.key.id, name: result.key.name ?? '' }, ws) }
 }
 
 /** A key as the plugin stores it, the columns the owner's view shows. */
@@ -95,23 +77,25 @@ interface KeyRecord {
   readonly id: string
   readonly name: string | null
   readonly start: string | null
-  readonly permissions?: unknown
-  readonly metadata?: unknown
   readonly createdAt: Date
-  readonly expiresAt: Date | null
   readonly lastRequest: Date | null
 }
 
-const viewOf = (key: KeyRecord): ApiKeyView => ({
-  id: key.id,
-  name: key.name ?? '',
-  ...(key.start === null ? {} : { start: key.start }),
-  scopes: scopesOf(key.permissions),
-  ...ceilingOf(key.metadata),
-  createdAt: new Date(key.createdAt).toISOString(),
-  ...(key.expiresAt === null ? {} : { expiresAt: new Date(key.expiresAt).toISOString() }),
-  ...(key.lastRequest === null ? {} : { lastUsedAt: new Date(key.lastRequest).toISOString() }),
-})
+/** A key with its grant as the owner's view shows it; its end is its grant's. */
+const viewOf = async (env: RuntimeEnv, key: KeyRecord): Promise<ApiKeyView> => {
+  const grant = await grantOfKey(env.AUTH_DB, key.id)
+  if (grant === undefined) throw new NotFound({ what: 'key' })
+  return {
+    id: key.id,
+    name: key.name ?? '',
+    ...(key.start === null ? {} : { start: key.start }),
+    createdAt: new Date(key.createdAt).toISOString(),
+    ...(grant.expiresAt === null ? {} : { expiresAt: new Date(grant.expiresAt).toISOString() }),
+    ...(key.lastRequest === null ? {} : { lastUsedAt: new Date(key.lastRequest).toISOString() }),
+    grantId: grant.id,
+    terms: await termsOf(env.AUTH_DB, grant),
+  }
+}
 
 /** The workspace's keys, newest first, without secrets. */
 export const listKeys = async (env: RuntimeEnv, workspaceId: string): Promise<readonly ApiKeyView[]> => {
@@ -121,34 +105,50 @@ export const listKeys = async (env: RuntimeEnv, workspaceId: string): Promise<re
     where: [{ field: 'referenceId', value: workspaceId }],
     sortBy: { field: 'createdAt', direction: 'desc' },
   })
-  return keys.map(viewOf)
+  return Promise.all(keys.map((key) => viewOf(env, key)))
+}
+
+/** The workspace's key `keyId` and its grant; `NotFound` for a key of another workspace's, or one that is gone. */
+const keyOf = async (env: RuntimeEnv, workspaceId: string, keyId: string) => {
+  const { adapter } = await createAuth(env, env.AUTH_DB).$context
+  const key = await adapter.findOne<KeyRecord & { readonly key: string }>({
+    model: MODEL,
+    where: [
+      { field: 'id', value: keyId },
+      { field: 'referenceId', value: workspaceId },
+    ],
+  })
+  const grant = key === null ? undefined : await grantOfKey(env.AUTH_DB, keyId)
+  if (key === null || grant === undefined) throw new NotFound({ what: 'key' })
+  return { adapter, key, grant }
 }
 
 /**
- * A new key for the workspace, made by `userId`, with its secret, which is answered this once and never stored in the
- * clear. The plugin checks that they are a member allowed to make one.
+ * A new key for the workspace, made by `userId` (an owner or admin there) with its grant's terms, and its secret, which
+ * is answered this once and never stored in the clear. The plugin checks that they may make one; the grant is written
+ * with the key, and a key whose grant could not be written is deleted again, so no key ever stands without one.
  */
 export const createKey = async (
   env: RuntimeEnv,
   workspaceId: string,
   userId: string,
-  input: CreateApiKey,
+  input: CreateApiKeyTerms,
 ): Promise<CreatedApiKey> => {
-  const created = await createAuth(env, env.AUTH_DB).api.createApiKey({
-    body: {
-      organizationId: workspaceId,
-      userId,
-      name: input.name,
-      expiresIn: input.expiresInDays * DAY_SECONDS,
-      permissions: { goblin: [...new Set(input.scopes)] },
-      metadata: {
-        servers: [...new Set(input.servers)],
-        origins: checkedOrigins(input.origins ?? []),
-        createdBy: userId,
-      },
-    },
+  const now = Date.now()
+  // The terms are checked as the grant they will be before the key exists: only an owner gives `keys`, origins clean.
+  const terms = await newKeyTerms(env.AUTH_DB, userId, workspaceId, { ...input.terms, name: input.name })
+  const auth = createAuth(env, env.AUTH_DB)
+  const created = await auth.api.createApiKey({
+    body: { organizationId: workspaceId, userId, name: input.name, metadata: { createdBy: userId } },
   })
-  return { key: viewOf(created), secret: created.key }
+  try {
+    await createKeyGrant(env.AUTH_DB, { keyId: created.id, workspaceId, userId }, terms, now)
+  } catch (cause) {
+    const { adapter } = await auth.$context
+    await adapter.deleteMany({ model: MODEL, where: [{ field: 'id', value: created.id }] })
+    throw cause
+  }
+  return { key: await viewOf(env, created), secret: created.key }
 }
 
 /** One of the workspace's keys before and after a change. */
@@ -158,40 +158,26 @@ export interface KeyChange {
 }
 
 /**
- * New scopes (ADR 0084) or MCP origins (ADR 0091) for one of the workspace's keys, by `userId`: the same key, so what
- * it made stays within its reach, and the rest of its metadata (servers, who made it) is kept. A key of another
- * workspace's, or one that is gone, is `NotFound`; origins with a problem are `InvalidInput`.
+ * New terms for one of the workspace's keys' grant, by `userId` (an owner or admin there): the same key, its id and
+ * secret kept, its name the terms' (ADR 0114). A key of another workspace's, or one that is gone, is `NotFound`; origins
+ * with a problem are `InvalidInput`.
  */
 export const updateKey = async (
   env: RuntimeEnv,
   workspaceId: string,
   userId: string,
   keyId: string,
-  change: UpdateApiKey,
+  change: UpdateApiKeyTerms,
 ): Promise<KeyChange> => {
-  const auth = createAuth(env, env.AUTH_DB)
-  const { adapter } = await auth.$context
-  const before = await adapter.findOne<KeyRecord>({
+  const { adapter, key, grant } = await keyOf(env, workspaceId, keyId)
+  const before = await viewOf(env, key)
+  const saved = await setTerms(env.AUTH_DB, userId, grant, change.terms, Date.now())
+  const named = await adapter.update<KeyRecord>({
     model: MODEL,
-    where: [
-      { field: 'id', value: keyId },
-      { field: 'referenceId', value: workspaceId },
-    ],
+    where: [{ field: 'id', value: keyId }],
+    update: { name: saved.name.slice(0, 64), updatedAt: new Date() },
   })
-  if (before === null) throw new NotFound({ what: 'key' })
-  const origins = change.origins === undefined ? undefined : checkedOrigins(change.origins)
-  const metadata = json(before.metadata)
-  const after = await auth.api.updateApiKey({
-    body: {
-      keyId,
-      userId,
-      ...(change.scopes === undefined ? {} : { permissions: { goblin: [...new Set(change.scopes)] } }),
-      ...(origins === undefined
-        ? {}
-        : { metadata: { ...(typeof metadata === 'object' && metadata !== null ? metadata : {}), origins } }),
-    },
-  })
-  return { before: viewOf(before), after: viewOf(after) }
+  return { before, after: await viewOf(env, named ?? key) }
 }
 
 /**
@@ -203,34 +189,37 @@ const newSecret = (): string => `${KEY_PREFIX}${generateRandomString(KEY_LENGTH,
 
 /**
  * A new secret for one of the workspace's keys (ADR 0105), answered this once and stored only as the plugin stores
- * one, its hash and first characters. It is the same key: its id, name, scopes, ceiling, expiry and so its reach stay,
- * and the old secret admits nothing from now on, since the row holds one hash. A key of another workspace's, or one
- * that is gone or expired, is `NotFound`; of two rotations at once, the one that finds the hash already changed is
- * `Conflict` (`rotated`), so no answer carries a secret that never worked.
+ * one, its hash and first characters. It is the same key: its id, name and grant stay, and the old secret admits
+ * nothing from now on, since the row holds one hash. A key of another workspace's, or one that is gone or whose grant
+ * ended, is `NotFound`; of two rotations at once, the one that finds the hash already changed is `Conflict` (`rotated`),
+ * so no answer carries a secret that never worked.
  */
 export const rotateKey = async (env: RuntimeEnv, workspaceId: string, keyId: string): Promise<CreatedApiKey> => {
-  const { adapter } = await createAuth(env, env.AUTH_DB).$context
-  const where = [
-    { field: 'id', value: keyId },
-    { field: 'referenceId', value: workspaceId },
-  ]
-  // With the secret's hash, which only a rotation reads: the update below matches it, or another rotation came first.
-  const current = await adapter.findOne<KeyRecord & { readonly key: string }>({ model: MODEL, where })
-  if (current === null || (current.expiresAt !== null && new Date(current.expiresAt).getTime() <= Date.now()))
-    throw new NotFound({ what: 'key' })
+  const { adapter, key, grant } = await keyOf(env, workspaceId, keyId)
+  if (!isLive(grant, Date.now())) throw new NotFound({ what: 'key' })
   const secret = newSecret()
+  // With the secret's hash, which only a rotation reads: the update matches it, or another rotation came first.
   const rotated = await adapter.update<KeyRecord>({
     model: MODEL,
-    where: [...where, { field: 'key', value: current.key }],
+    where: [
+      { field: 'id', value: keyId },
+      { field: 'referenceId', value: workspaceId },
+      { field: 'key', value: key.key },
+    ],
     update: { key: await defaultKeyHasher(secret), start: secret.slice(0, KEY_START_LENGTH), updatedAt: new Date() },
   })
   if (rotated === null) throw new Conflict({ reason: 'rotated' })
-  return { key: viewOf(rotated), secret }
+  return { key: await viewOf(env, rotated), secret }
 }
 
-/** Ends one of the workspace's keys at once; a key of another workspace's, or one already gone, is left as it is. */
+/** Ends one of the workspace's keys at once, its grant with it; a key of another workspace's, or one gone, is left. */
 export const revokeKey = async (env: RuntimeEnv, workspaceId: string, keyId: string): Promise<void> => {
   const { adapter } = await createAuth(env, env.AUTH_DB).$context
+  await env.AUTH_DB.prepare(
+    'DELETE FROM "grant" WHERE "keyId" = ? AND EXISTS (SELECT 1 FROM apikey WHERE id = ? AND referenceId = ?)',
+  )
+    .bind(keyId, keyId, workspaceId)
+    .run()
   await adapter.deleteMany({
     model: MODEL,
     where: [
