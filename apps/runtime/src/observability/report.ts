@@ -70,6 +70,7 @@ const LEVELS: Readonly<Record<Severity, LineLevel>> = {
 export const EXPECTED_ERROR_TAGS: ReadonlySet<string> = new Set([
   'Unauthenticated',
   'Forbidden',
+  'AccessInsufficient',
   'GrantDenied',
   'NotFound',
   'Conflict',

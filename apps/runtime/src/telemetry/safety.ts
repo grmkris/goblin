@@ -21,6 +21,7 @@ const FAILURES: Readonly<Record<string, string>> = {
   AbortError: 'Operation cancelled.',
   Unauthenticated: 'Sign-in required.',
   Forbidden: 'Operation refused.',
+  AccessInsufficient: 'Credential needs more access.',
   GrantDenied: 'Owner grant required.',
   NotFound: 'Requested item unavailable.',
   Conflict: 'State changed; refresh before retrying.',
@@ -74,6 +75,7 @@ export const expectedFailure = (code: unknown): boolean => {
   return [
     'NeedsAuthorization',
     'ScopeRequired',
+    'AccessInsufficient',
     'GrantDenied',
     'ResidentInactive',
     'BudgetExhausted',

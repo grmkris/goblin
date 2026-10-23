@@ -161,6 +161,7 @@ describe('the error kinds of goblin codes', () => {
   const expected = {
     unauthenticated: 'unauthenticated',
     forbidden: 'forbidden',
+    access_insufficient: 'forbidden',
     grant_denied: 'forbidden',
     not_found: 'not_found',
     conflict: 'conflict',

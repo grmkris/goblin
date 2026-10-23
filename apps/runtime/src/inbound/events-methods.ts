@@ -49,6 +49,7 @@ const codeOf = (error: AppError): keyof typeof CODES =>
       InvalidArguments: () => 'invalid' as const,
       NotFound: () => 'notFound' as const,
       Forbidden: () => 'forbidden' as const,
+      AccessInsufficient: () => 'forbidden' as const,
       GrantDenied: () => 'forbidden' as const,
       ResidentInactive: () => 'forbidden' as const,
       Unauthenticated: ({ reason }) => (reason === 'rate_limited' ? ('quota' as const) : ('forbidden' as const)),

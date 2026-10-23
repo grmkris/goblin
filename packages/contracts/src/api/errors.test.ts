@@ -13,6 +13,7 @@ import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
   API_ERRORS,
+  AccessInsufficient,
   ApiErrors,
   type ApiCode,
   type AppError,
@@ -31,6 +32,7 @@ import {
   ScopeRequired,
   Unauthenticated,
   UpstreamMcp,
+  accessInsufficient,
   codeOf,
   envelopeOf,
   failureCopy,
@@ -41,6 +43,14 @@ import {
 const CASES: readonly (readonly [AppError, number])[] = [
   [new Unauthenticated({ reason: 'session' }), 401],
   [new Forbidden({ reason: 'csrf' }), 403],
+  [
+    new AccessInsufficient({
+      missing: { level: 'write', reachId: 'w1/topic/7', extra: 'inspect' },
+      widenUrl: 'https://goblin.test/consent/widen?grant=k1&level=write&reach=w1%2Ftopic%2F7&extra=inspect',
+      ref: '7f3a9c12',
+    }),
+    403,
+  ],
   [new GrantDenied({ connectionId: 'myplan', name: 'search' }), 403],
   [new NotFound({ what: 'topic' }), 404],
   [new Conflict({ reason: 'topic_name_taken', ref: '7f3a9c12' }), 409],
@@ -177,6 +187,31 @@ describe('the API error envelope', () => {
     expect(envelopeOf(new UpstreamMcp({ connectionId: 'kiwi', reason: 'cancelled' })).error.message).toBe(
       'The MCP server did not respond as expected.',
     )
+  })
+
+  it("answers a grant's refusal with fixed copy, what is missing and the widening link", () => {
+    const refusal = accessInsufficient('https://goblin.test/', 'k1', { level: 'manage', reachId: 'w1/persona/45' })
+    expect(refusal).toEqual(
+      new AccessInsufficient({
+        missing: { level: 'manage', reachId: 'w1/persona/45' },
+        widenUrl: 'https://goblin.test/consent/widen?grant=k1&level=manage&reach=w1%2Fpersona%2F45',
+      }),
+    )
+    const quoted = new AccessInsufficient({ missing: refusal.missing, widenUrl: refusal.widenUrl, ref: 'r1' })
+    expect(envelopeOf(quoted)).toEqual({
+      error: {
+        code: 'access_insufficient',
+        message: 'This credential needs more access.',
+        recovery: 'The owner can allow it at the widening link.',
+        missing: { level: 'manage', reachId: 'w1/persona/45' },
+        widenUrl: refusal.widenUrl,
+        ref: 'r1',
+      },
+    })
+    expect(statusOf(refusal)).toBe(403)
+    const forbidden = envelopeOf(new Forbidden({ reason: 'role' }))
+    expect(Schema.decodeUnknownSync(ApiErrors.forbidden)(envelopeOf(refusal))).toEqual(refusal)
+    expect(Schema.decodeUnknownSync(ApiErrors.forbidden)(forbidden)).toEqual(new Forbidden({ reason: 'role' }))
   })
 
   it('refuses a body whose code another status answers', () => {

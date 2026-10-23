@@ -35,6 +35,7 @@ export type ErrorKindTable<Code extends string> = Readonly<Record<Code, ErrorKin
 export const ERROR_KINDS: ErrorKindTable<ApiCode> = {
   unauthenticated: 'unauthenticated',
   forbidden: 'forbidden',
+  access_insufficient: 'forbidden',
   grant_denied: 'forbidden',
   not_found: 'not_found',
   conflict: 'conflict',

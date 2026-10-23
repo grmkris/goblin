@@ -6,6 +6,7 @@ import * as SchemaIssue from 'effect/SchemaIssue'
 import * as SchemaParser from 'effect/SchemaParser'
 import * as SchemaTransformation from 'effect/SchemaTransformation'
 import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
+import { Missing, widenUrl } from '../grants.ts'
 
 /**
  * The reference a typed API answer quotes for its failure (the request's cf-ray), so the owner can name it and an
@@ -25,6 +26,17 @@ export class Unauthenticated extends Schema.TaggedError<Unauthenticated>()('Unau
   ref,
 }) {}
 export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', { reason: Schema.String, ref }) {}
+/**
+ * A credential's grant does not cover the call (myapps ADR 0015): `missing` is what it lacks (a level, an extra, a
+ * reach item as `<workspace>/<kind>/<id>`, or creating something) and `widenUrl` the page where the owner can allow
+ * it. Its copy is fixed; what is missing travels only in these fields. `Forbidden` stays for a person's role, a
+ * boundary and a credential that may never call.
+ */
+export class AccessInsufficient extends Schema.TaggedError<AccessInsufficient>()('AccessInsufficient', {
+  missing: Missing,
+  widenUrl: Schema.String,
+  ref,
+}) {}
 export class GrantDenied extends Schema.TaggedError<GrantDenied>()('GrantDenied', {
   connectionId: Schema.String,
   name: Schema.String,
@@ -99,6 +111,7 @@ export class Internal extends Schema.TaggedError<Internal>()('Internal', { reaso
 export const AppError = Schema.Union([
   Unauthenticated,
   Forbidden,
+  AccessInsufficient,
   GrantDenied,
   NotFound,
   Conflict,
@@ -123,6 +136,10 @@ export type AppErrorTag = AppError['_tag']
 export const ERROR_COPY = {
   Unauthenticated: { message: 'Your session has ended.', recovery: 'Sign in again.' },
   Forbidden: { message: 'This request is not allowed.' },
+  AccessInsufficient: {
+    message: 'This credential needs more access.',
+    recovery: 'The owner can allow it at the widening link.',
+  },
   GrantDenied: { message: 'That tool is not enabled.', recovery: 'Turn it on under Connections.' },
   NotFound: { message: 'That does not exist.' },
   Conflict: { message: 'That clashes with something that is already there.', recovery: 'Refresh and try again.' },
@@ -171,6 +188,7 @@ export const statusOf = (error: AppError | typeof AppError.Encoded): number =>
     Match.tagsExhaustive({
       Unauthenticated: () => 401,
       Forbidden: () => 403,
+      AccessInsufficient: () => 403,
       GrantDenied: () => 403,
       NotFound: () => 404,
       Conflict: () => 409,
@@ -191,7 +209,7 @@ export const statusOf = (error: AppError | typeof AppError.Encoded): number =>
  * The safe detail fields the classes carry, as they cross the wire. UpstreamMcp's numeric `code` (the remote server's
  * JSON-RPC code) crosses as `rpcCode`, because `code` is the envelope's own; its `serverMessage` stays behind (`toWire`),
  * so a caller never reads a remote server's words, while `problems` (InvalidArguments) are goblin's account of the
- * caller's own arguments.
+ * caller's own arguments, and `missing` and `widenUrl` (AccessInsufficient) what the caller's own grant lacks.
  */
 const DETAIL_FIELDS = {
   recovery: Schema.optionalKey(Schema.String),
@@ -206,6 +224,8 @@ const DETAIL_FIELDS = {
   rpcCode: Schema.optionalKey(Schema.Number),
   scope: Schema.optionalKey(Schema.String),
   problems: Schema.optionalKey(Schema.Array(Schema.String)),
+  missing: Schema.optionalKey(Missing),
+  widenUrl: Schema.optionalKey(Schema.String),
   ref,
 }
 
@@ -302,7 +322,7 @@ const envelope = <const Members extends readonly [AppErrorClass, ...AppErrorClas
 export const ApiErrors = {
   invalidInput: envelope(400, [InvalidInput, InvalidArguments]),
   unauthenticated: envelope(401, [Unauthenticated]),
-  forbidden: envelope(403, [Forbidden, GrantDenied, ScopeRequired]),
+  forbidden: envelope(403, [Forbidden, AccessInsufficient, GrantDenied, ScopeRequired]),
   notFound: envelope(404, [NotFound]),
   conflict: envelope(409, [Conflict, ResidentInactive, NeedsAuthorization, NoModelEndpoint]),
   payloadTooLarge: envelope(413, [PayloadTooLarge]),
@@ -325,6 +345,13 @@ export const API_ERRORS = [
   ApiErrors.upstream,
   ApiErrors.upstreamTimeout,
 ] as const
+
+/**
+ * The refusal of a call that grant `grantId` does not cover, linking to the widening page under `appUrl` (trusted
+ * configuration) that asks for `missing`.
+ */
+export const accessInsufficient = (appUrl: string, grantId: string, missing: Missing): AccessInsufficient =>
+  new AccessInsufficient({ missing, widenUrl: widenUrl(appUrl, grantId, missing) })
 
 /** The envelope body of `error`, for a failure answered outside HttpApi's own encoding. */
 export const envelopeOf = (error: AppError): ErrorEnvelope => toWire(Schema.encodeSync(AppError)(error))
