@@ -1,7 +1,7 @@
-// The Settings cards about the account: the MCP clients connected to it and the workspaces each reaches, and deleting
+// The Settings cards about the account: the MCP clients connected to it, each with its grant (ADR 0114), and deleting
 // the account.
 import { type SubmitEvent, useState } from 'react'
-import { type InboundClient, presetFor } from '@goblin/contracts'
+import { type GrantTerms, type InboundClient, type WorkspaceView, presetFor } from '@goblin/contracts'
 import { useMutation, useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import {
   Alert,
@@ -17,50 +17,40 @@ import {
   Skeleton,
 } from '@goblin/ui'
 import { clientGrantMutation, clientsQuery, revokeClientMutation, workspacesQuery } from '../account/queries.ts'
-import { type ReachChoice, withWorkspaces } from '../lib/grant-terms.ts'
 import { AuthRefused, deleteAccountMutation } from '../auth/queries.ts'
 import { messageOf, withRef } from '../lib/query/app-error.ts'
 import { QueryBoundary } from '../lib/query/query-boundary.tsx'
-import { ReachChooser, reachesAny } from './client-reach.tsx'
+import { type GrantHolder, GrantEditor, GrantLine, grantProblem } from './grant-editor.tsx'
 
-/** What a client reaches, in words: all the person's workspaces, those listed, or none. */
-const reachWords = ({ reach }: InboundClient): string =>
-  reach.all
-    ? 'All your workspaces'
-    : reach.workspaces.length === 0
-      ? 'No workspace'
-      : reach.workspaces.map((workspace) => workspace.name).join(', ')
-
-/** Changing which workspaces one client reaches, from what it reaches now (ADR 0097). */
-function ChangeReach(props: { readonly client: InboundClient; readonly onDone: () => void }) {
-  const workspaces = useQuery(workspacesQuery).data ?? []
-  const { reach } = props.client
-  const [value, setValue] = useState<ReachChoice>({
-    all: reach.all,
-    workspaces: reach.workspaces.map((workspace) => workspace.id),
-  })
+/** Changing one client's grant (ADR 0114), from what it holds now: a live token follows the change at once. */
+function ChangeGrant(props: {
+  readonly client: InboundClient
+  readonly workspaces: readonly WorkspaceView[]
+  readonly onDone: () => void
+}) {
+  const { client } = props
+  const holder: GrantHolder = { kind: 'client', workspaces: props.workspaces }
+  const [terms, setTerms] = useState<GrantTerms>(() => client.terms ?? presetFor(nameOf(client), 'all'))
   const change = useMutation(clientGrantMutation)
-  // Its grant's terms with the workspaces chosen here; a client listed without one starts from the preset.
-  const terms = withWorkspaces(props.client.terms ?? presetFor(props.client.name ?? 'MCP client', 'all'), value)
-  const failure = change.error === null ? '' : messageOf(change.error, 'change the workspaces it reaches')
+  const problem = grantProblem(terms)
+  const failure = change.error === null ? '' : messageOf(change.error, 'change what it may do')
   return (
-    <div className="flex flex-col gap-2">
-      <ReachChooser workspaces={workspaces} value={value} onChange={setValue} disabled={change.isPending} />
-      {failure && (
+    <div className="flex flex-col gap-4 pb-4">
+      <GrantEditor terms={terms} holder={holder} onChange={setTerms} disabled={change.isPending} />
+      {(failure || problem) && (
         <Alert variant="destructive">
-          <AlertDescription>{failure}</AlertDescription>
+          <AlertDescription>{failure || problem}</AlertDescription>
         </Alert>
       )}
       <div className="card-actions">
         <Button
-          size="sm"
           pending={change.isPending}
-          disabled={!reachesAny(value)}
-          onClick={() => change.mutate({ clientId: props.client.clientId, terms }, { onSuccess: props.onDone })}
+          disabled={problem !== ''}
+          onClick={() => change.mutate({ clientId: client.clientId, terms }, { onSuccess: props.onDone })}
         >
-          Save
+          Save access
         </Button>
-        <Button size="sm" variant="ghost" disabled={change.isPending} onClick={props.onDone}>
+        <Button variant="ghost" disabled={change.isPending} onClick={props.onDone}>
           Cancel
         </Button>
       </div>
@@ -68,8 +58,13 @@ function ChangeReach(props: { readonly client: InboundClient; readonly onDone: (
   )
 }
 
+/** A client's name as it registered, else its id. */
+const nameOf = (client: InboundClient): string => client.name ?? client.clientId
+
 function Clients() {
   const clients = useSuspenseQuery(clientsQuery).data
+  const workspaces = useQuery(workspacesQuery).data ?? []
+  const holder: GrantHolder = { kind: 'client', workspaces }
   const revoke = useMutation(revokeClientMutation)
   const revoking = revoke.isPending ? revoke.variables : ''
   const [changing, setChanging] = useState('')
@@ -86,31 +81,39 @@ function Clients() {
         <ul className="pick-list">
           {clients.map((client) => (
             <li className="flex flex-col gap-2" key={client.clientId}>
-              <div className="pick-row">
-                <span className="grant-text">
-                  <span className="grant-name">{client.name ?? client.clientId}</span>
-                  <span className="grant-about">{reachWords(client)}</span>
+              <div className="pick-row flex-wrap">
+                <span className="grant-text basis-64">
+                  <span className="grant-name">{nameOf(client)}</span>
                   {client.uri && <span className="grant-about">{client.uri}</span>}
+                  <span className="text-sm text-pretty text-muted-foreground">
+                    {client.terms === undefined ? (
+                      'No grant yet: it reaches nothing until you set one.'
+                    ) : (
+                      <GrantLine name="It" terms={client.terms} holder={holder} />
+                    )}
+                  </span>
                 </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={changing === client.clientId}
-                  onClick={() => setChanging(client.clientId)}
-                >
-                  Change
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  pending={revoking === client.clientId}
-                  disabled={revoking !== '' && revoking !== client.clientId}
-                  onClick={() => revoke.mutate(client.clientId)}
-                >
-                  Revoke
-                </Button>
+                <span className="flex flex-wrap gap-1">
+                  <Button
+                    variant="ghost"
+                    disabled={changing === client.clientId}
+                    onClick={() => setChanging(client.clientId)}
+                  >
+                    Change
+                  </Button>
+                  <Button
+                    variant="outline"
+                    pending={revoking === client.clientId}
+                    disabled={revoking !== '' && revoking !== client.clientId}
+                    onClick={() => revoke.mutate(client.clientId)}
+                  >
+                    Revoke
+                  </Button>
+                </span>
               </div>
-              {changing === client.clientId && <ChangeReach client={client} onDone={() => setChanging('')} />}
+              {changing === client.clientId && (
+                <ChangeGrant client={client} workspaces={workspaces} onDone={() => setChanging('')} />
+              )}
             </li>
           ))}
         </ul>
@@ -119,7 +122,7 @@ function Clients() {
   )
 }
 
-/** The MCP clients the person let use goblin, each with the workspaces it reaches, changeable and revocable. */
+/** The MCP clients the person let use goblin, each with its grant in a line, changeable and revocable. */
 export function ClientsCard() {
   return (
     <Card>

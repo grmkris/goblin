@@ -1,7 +1,8 @@
-// The Settings card for API keys (ADR 0081): what a server the owner runs uses instead of a browser session.
+// The Settings card for API keys (ADRs 0081, 0114): what a server the workspace runs uses instead of a browser session,
+// each with its grant.
 import { Fragment, type SubmitEvent, useState } from 'react'
-import { useMutation, useQuery, useSuspenseQuery } from '@tanstack/react-query'
-import { type ApiKeyView, type GrantTerms, type KeyOrigin, keyOriginsOf } from '@goblin/contracts'
+import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
+import { type ApiKeyView, GRANT_SPEC, type GrantTerms, type WorkspaceView, presetFor } from '@goblin/contracts'
 import {
   Alert,
   AlertDescription,
@@ -11,12 +12,12 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  ConsentSummary,
   Field,
   FieldGroup,
   FieldLabel,
   Input,
   Skeleton,
-  Switch,
 } from '@goblin/ui'
 import {
   createKeyMutation,
@@ -25,53 +26,9 @@ import {
   rotateKeyMutation,
   updateKeyMutation,
 } from '../account/queries.ts'
-import { useCurrentWorkspace } from '../lib/current-workspace.ts'
-import { type KeyPower, keyTermsFrom, powersOf, withOrigins, withPowers } from '../lib/grant-terms.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { QueryBoundary } from '../lib/query/query-boundary.tsx'
-import { setupCatalogQuery } from '../setup/queries.ts'
-
-const SCOPES: readonly { readonly scope: KeyPower; readonly label: string }[] = [
-  { scope: 'topics', label: 'Make and change its own Topics' },
-  { scope: 'conversations', label: 'Send to and read its own chats' },
-  { scope: 'personas', label: 'Make and change its own Personas' },
-  { scope: 'inspect', label: 'See how its own chats ran, without their words' },
-]
-
-/** One switch of a set, as a labelled row. */
-function Toggle(props: {
-  readonly id: string
-  readonly label: string
-  readonly on: boolean
-  readonly onChange: (on: boolean) => void
-}) {
-  return (
-    <Field orientation="horizontal">
-      <Switch id={props.id} checked={props.on} onCheckedChange={props.onChange} />
-      <FieldLabel htmlFor={props.id}>{props.label}</FieldLabel>
-    </Field>
-  )
-}
-
-const toggled = <A,>(items: readonly A[], item: A, on: boolean): readonly A[] =>
-  on ? [...new Set([...items, item])] : items.filter((each) => each !== item)
-
-/** The powers a key's grant holds, one switch each, as `id`'s rows. */
-function KeyPowers(props: {
-  readonly id: string
-  readonly powers: readonly KeyPower[]
-  readonly onChange: (powers: readonly KeyPower[]) => void
-}) {
-  return SCOPES.map(({ scope, label }) => (
-    <Toggle
-      key={scope}
-      id={`${props.id}-scope-${scope}`}
-      label={label}
-      on={props.powers.includes(scope)}
-      onChange={(on) => props.onChange(toggled(props.powers, scope, on))}
-    />
-  ))
-}
+import { GRANT_WORDS, type GrantHolder, GrantEditor, GrantLine, grantProblem, reachWords } from './grant-editor.tsx'
 
 /** A new key's secret, or a rotated key's new one (ADR 0105), shown this once, to copy. */
 function ShownSecret(props: { readonly name: string; readonly secret: string; readonly onDone: () => void }) {
@@ -95,193 +52,63 @@ function ShownSecret(props: { readonly name: string; readonly secret: string; re
   )
 }
 
-/** One origin being edited: its address and its tools as typed, comma-separated. */
-type OriginRow = { readonly origin: string; readonly tools: string }
-
-const rowsOf = (origins: readonly KeyOrigin[]): readonly OriginRow[] =>
-  origins.map(({ origin, tools }) => ({ origin, tools: tools.join(', ') }))
-const originsOf = (rows: readonly OriginRow[]): readonly KeyOrigin[] =>
-  rows
-    .filter((row) => row.origin.trim() !== '' || row.tools.trim() !== '')
-    .map((row) => ({
-      origin: row.origin.trim(),
-      tools: row.tools
-        .split(',')
-        .map((tool) => tool.trim())
-        .filter((tool) => tool !== ''),
-    }))
-
-/** What is wrong with `rows` as a key's origins, in words, before anything is sent (`keyOriginsOf`). */
-const ORIGIN_PROBLEMS = {
-  key_origin: 'Each server needs its own https address of a public host, like https://mcp.example.com, at most 8.',
-  key_origin_tools: 'Each server needs 1 to 50 tool names, separated by commas.',
-} as const
-const originProblem = (rows: readonly OriginRow[]): string => {
-  const checked = keyOriginsOf(originsOf(rows))
-  return 'problem' in checked ? ORIGIN_PROBLEMS[checked.problem] : ''
+/** A failure beside the control that failed, or what is wrong before anything is sent. */
+function Problem(props: { readonly text: string }) {
+  if (props.text === '') return null
+  return (
+    <Alert variant="destructive">
+      <AlertDescription>{props.text}</AlertDescription>
+    </Alert>
+  )
 }
 
 /**
- * The MCP servers a key's threads may connect to (ADR 0091): each an https origin with exactly the tools they may call
- * there, as rows to edit.
+ * A new key: its name and its grant (ADR 0114), which starts as the preset (write, every Topic, Persona and
+ * connection, no extras, until revoked); then its secret, once.
  */
-function OriginFields(props: {
-  readonly id: string
-  readonly rows: readonly OriginRow[]
-  readonly onChange: (rows: readonly OriginRow[]) => void
-}) {
-  const set = (index: number, row: OriginRow) =>
-    props.onChange(props.rows.map((each, at) => (at === index ? row : each)))
-  return (
-    <>
-      <p className="text-sm text-muted-foreground">
-        MCP servers its threads may connect to, and the tools they may call
-      </p>
-      {props.rows.map((row, index) => (
-        // The rows have no ids of their own; their order is their identity while editing.
-        <Field key={index} orientation="horizontal">
-          <Input
-            aria-label="Server address"
-            placeholder="https://mcp.example.com"
-            value={row.origin}
-            onChange={(event) => set(index, { ...row, origin: event.target.value })}
-          />
-          <Input
-            aria-label="Tools"
-            placeholder="job_submit, job_status"
-            value={row.tools}
-            onChange={(event) => set(index, { ...row, tools: event.target.value })}
-          />
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => props.onChange(props.rows.filter((_, at) => at !== index))}
-          >
-            Remove
-          </Button>
-        </Field>
-      ))}
-      <Field orientation="horizontal">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          id={`${props.id}-add-origin`}
-          onClick={() => props.onChange([...props.rows, { origin: '', tools: '' }])}
-        >
-          Add a server
-        </Button>
-      </Field>
-    </>
-  )
-}
-
-/** One key's MCP servers, changed in place (ADR 0091): the same key, its grant's other terms kept. */
-function KeyServers(props: { readonly keyId: string; readonly terms: GrantTerms; readonly onDone: () => void }) {
-  const update = useMutation(updateKeyMutation)
-  const [rows, setRows] = useState(rowsOf(props.terms.reach.origins))
-  const problem = originProblem(rows)
-  const failure = update.error === null ? '' : messageOf(update.error, 'change that key')
-  function submit(event: SubmitEvent<HTMLFormElement>): void {
-    event.preventDefault()
-    update.mutate({ keyId: props.keyId, terms: withOrigins(props.terms, originsOf(rows)) }, { onSuccess: props.onDone })
-  }
-  return (
-    <form onSubmit={submit}>
-      <FieldGroup>
-        {(failure || problem) && (
-          <Alert variant="destructive">
-            <AlertDescription>{failure || problem}</AlertDescription>
-          </Alert>
-        )}
-        <OriginFields id={`key-${props.keyId}`} rows={rows} onChange={setRows} />
-        <Field orientation="horizontal">
-          <Button type="submit" size="sm" pending={update.isPending} disabled={problem !== ''}>
-            Save servers
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={props.onDone}>
-            Cancel
-          </Button>
-        </Field>
-      </FieldGroup>
-    </form>
-  )
-}
-
-/**
- * A new key: its name, scopes, the servers its setups may use and the MCP servers its threads may connect to (ADR 0091)
- * and its lifetime; then its secret, once. */
-function NewKey() {
+function NewKey(props: { readonly workspace: WorkspaceView }) {
   const create = useMutation(createKeyMutation)
-  const servers = useQuery(setupCatalogQuery).data?.servers ?? []
+  const holder: GrantHolder = { kind: 'key', workspace: props.workspace }
   const [name, setName] = useState('')
-  const workspace = useCurrentWorkspace()
-  const [scopes, setScopes] = useState<readonly KeyPower[]>(['conversations'])
-  const [chosen, setChosen] = useState<readonly string[]>([])
-  const [origins, setOrigins] = useState<readonly OriginRow[]>([])
-  const [days, setDays] = useState('90')
-  const problem = originProblem(origins)
+  const [terms, setTerms] = useState<GrantTerms>(() => presetFor('key', [props.workspace.id]))
+  const problem = grantProblem(terms)
   const failure = create.error === null ? '' : messageOf(create.error, 'make that key')
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault()
-    if (workspace === undefined) return
-    const named = name.trim()
-    create.mutate({
-      name: named,
-      terms: keyTermsFrom({
-        name: named,
-        workspace: workspace.id,
-        powers: scopes,
-        servers: chosen,
-        origins: originsOf(origins),
-        days: Number(days),
-      }),
-    })
+    create.mutate({ name: name.trim(), terms: { ...terms, name: name.trim() } })
   }
   if (create.data !== undefined)
-    return <ShownSecret name={create.data.key.name} secret={create.data.secret} onDone={() => create.reset()} />
+    return (
+      <ShownSecret
+        name={create.data.key.name}
+        secret={create.data.secret}
+        onDone={() => {
+          create.reset()
+          setName('')
+          setTerms(presetFor('key', [props.workspace.id]))
+        }}
+      />
+    )
   return (
     <form onSubmit={submit}>
       <FieldGroup>
-        {(failure || problem) && (
-          <Alert variant="destructive">
-            <AlertDescription>{failure || problem}</AlertDescription>
-          </Alert>
-        )}
+        <Problem text={failure} />
         <Field>
           <FieldLabel htmlFor="key-name">Name</FieldLabel>
           <Input id="key-name" value={name} maxLength={64} required onChange={(event) => setName(event.target.value)} />
         </Field>
-        <KeyPowers id="key" powers={scopes} onChange={setScopes} />
-        {servers.length > 0 && <p className="text-sm text-muted-foreground">Servers its Topics and Personas may use</p>}
-        {servers.map((server) => (
-          <Toggle
-            key={server.connectionId}
-            id={`key-server-${server.connectionId}`}
-            label={server.label}
-            on={chosen.includes(server.connectionId)}
-            onChange={(on) => setChosen(toggled(chosen, server.connectionId, on))}
-          />
-        ))}
-        <OriginFields id="key-new" rows={origins} onChange={setOrigins} />
-        <Field>
-          <FieldLabel htmlFor="key-days">Expires after (days)</FieldLabel>
-          <Input
-            id="key-days"
-            type="number"
-            min={1}
-            max={365}
-            value={days}
-            onChange={(event) => setDays(event.target.value)}
-          />
-        </Field>
+        <ConsentSummary
+          clientName={name.trim() || 'The key'}
+          terms={terms}
+          spec={GRANT_SPEC}
+          words={GRANT_WORDS}
+          describeReach={reachWords(holder)}
+        >
+          <GrantEditor terms={terms} holder={holder} onChange={setTerms} disabled={create.isPending} />
+        </ConsentSummary>
+        <Problem text={problem} />
         <Field orientation="horizontal">
-          <Button
-            type="submit"
-            pending={create.isPending}
-            disabled={name.trim() === '' || problem !== '' || workspace === undefined}
-          >
+          <Button type="submit" pending={create.isPending} disabled={name.trim() === '' || problem !== ''}>
             Make key
           </Button>
         </Field>
@@ -290,29 +117,30 @@ function NewKey() {
   )
 }
 
-/** One key's level and inspection, changed in place (ADRs 0084, 0114): the same key, its grant's other terms kept. */
-function KeyScopes(props: { readonly keyId: string; readonly terms: GrantTerms; readonly onDone: () => void }) {
+/** One key's grant, changed in place (ADR 0114): it stays the same key, with its id and secret. */
+function KeyGrant(props: { readonly apiKey: ApiKeyView; readonly holder: GrantHolder; readonly onDone: () => void }) {
   const update = useMutation(updateKeyMutation)
-  const [scopes, setScopes] = useState(powersOf(props.terms))
+  const { apiKey } = props
+  const [terms, setTerms] = useState<GrantTerms>(
+    () => apiKey.terms ?? presetFor(apiKey.name, [props.holder.kind === 'key' ? props.holder.workspace.id : '']),
+  )
+  const problem = grantProblem(terms)
   const failure = update.error === null ? '' : messageOf(update.error, 'change that key')
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault()
-    update.mutate({ keyId: props.keyId, terms: withPowers(props.terms, scopes) }, { onSuccess: props.onDone })
+    update.mutate({ keyId: apiKey.id, terms }, { onSuccess: props.onDone })
   }
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={submit} className="pb-4">
       <FieldGroup>
-        {failure && (
-          <Alert variant="destructive">
-            <AlertDescription>{failure}</AlertDescription>
-          </Alert>
-        )}
-        <KeyPowers id={`key-${props.keyId}`} powers={scopes} onChange={setScopes} />
+        <Problem text={failure} />
+        <GrantEditor terms={terms} holder={props.holder} onChange={setTerms} disabled={update.isPending} />
+        <Problem text={problem} />
         <Field orientation="horizontal">
-          <Button type="submit" size="sm" pending={update.isPending}>
-            Save scopes
+          <Button type="submit" pending={update.isPending} disabled={problem !== ''}>
+            Save access
           </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={props.onDone}>
+          <Button type="button" variant="ghost" disabled={update.isPending} onClick={props.onDone}>
             Cancel
           </Button>
         </Field>
@@ -340,7 +168,7 @@ function RotateSecret(props: { readonly keyId: string; readonly name: string; re
       <div className="inline-confirm" role="alertdialog" aria-label={`Rotate the secret of ${props.name}?`}>
         <span>
           Rotate its secret? The old one stops working at once, so anything using it needs the new one. The key keeps
-          its scopes, servers and what it made.
+          its access.
         </span>
         <Button size="sm" variant="destructive" pending={rotate.isPending} onClick={() => rotate.mutate(props.keyId)}>
           Rotate secret
@@ -353,24 +181,34 @@ function RotateSecret(props: { readonly keyId: string; readonly name: string; re
   )
 }
 
-/** What is open under one key: its scopes, its MCP servers or a new secret. */
-type Editing = { readonly id: string; readonly what: 'scopes' | 'servers' | 'secret' }
+/** What is open under one key: its grant, or a new secret. */
+type Editing = { readonly id: string; readonly what: 'access' | 'secret' }
 
 /** The part open under one key, which closes with `onDone`. */
 function KeyEditor(props: {
   readonly apiKey: ApiKeyView
+  readonly holder: GrantHolder
   readonly what: Editing['what']
   readonly onDone: () => void
 }) {
   const { apiKey, onDone } = props
-  if (props.what === 'scopes') return <KeyScopes keyId={apiKey.id} terms={apiKey.terms} onDone={onDone} />
-  if (props.what === 'servers') return <KeyServers keyId={apiKey.id} terms={apiKey.terms} onDone={onDone} />
+  if (props.what === 'access') return <KeyGrant apiKey={apiKey} holder={props.holder} onDone={onDone} />
   return <RotateSecret keyId={apiKey.id} name={apiKey.name} onDone={onDone} />
 }
 
-/** The owner's keys, each revocable, each one's secret rotatable, and its scopes and MCP servers changeable. */
-function Keys() {
+/** When a key was last used and when it ends, as dates. */
+const datesOf = (key: ApiKeyView): string =>
+  [
+    key.expiresAt === undefined ? undefined : `ends ${new Date(key.expiresAt).toLocaleDateString()}`,
+    key.lastUsedAt === undefined ? undefined : `used ${new Date(key.lastUsedAt).toLocaleDateString()}`,
+  ]
+    .filter((part) => part !== undefined)
+    .join(' · ')
+
+/** The owner's keys, each with its grant in a line, changeable, its secret rotatable, and revocable. */
+function Keys(props: { readonly workspace: WorkspaceView }) {
   const keys = useSuspenseQuery(keysQuery).data
+  const holder: GrantHolder = { kind: 'key', workspace: props.workspace }
   const revoke = useMutation(revokeKeyMutation)
   const [editing, setEditing] = useState<Editing>()
   // While a key's new secret is open, nothing else may close it: the old one already stopped working (ADR 0105).
@@ -389,56 +227,50 @@ function Keys() {
         <ul className="pick-list">
           {keys.map((key) => (
             <Fragment key={key.id}>
-              <li className="pick-row">
-                <span className="grant-text">
+              <li className="pick-row flex-wrap">
+                <span className="grant-text basis-64">
                   <span className="grant-name">
                     {key.name} {key.start && <code>{key.start}…</code>}
                   </span>
-                  <span className="grant-about">
-                    {[key.terms.level, ...key.terms.extras].join(', ')}
-                    {key.terms.reach.origins.length > 0 &&
-                      ` · ${key.terms.reach.origins.map(({ origin }) => new URL(origin).host).join(', ')}`}
-                    {key.expiresAt && ` · expires ${new Date(key.expiresAt).toLocaleDateString()}`}
-                    {key.lastUsedAt && ` · used ${new Date(key.lastUsedAt).toLocaleDateString()}`}
+                  <span className="text-sm text-pretty text-muted-foreground">
+                    {key.terms === undefined ? (
+                      'No grant yet.'
+                    ) : (
+                      <GrantLine name="It" terms={key.terms} holder={holder} />
+                    )}
                   </span>
+                  {datesOf(key) !== '' && (
+                    <span className="text-xs text-muted-foreground tabular-nums">{datesOf(key)}</span>
+                  )}
                 </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={rotating !== undefined || (editing?.id === key.id && editing.what === 'scopes')}
-                  onClick={() => setEditing({ id: key.id, what: 'scopes' })}
-                >
-                  Change scopes
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={rotating !== undefined || (editing?.id === key.id && editing.what === 'servers')}
-                  onClick={() => setEditing({ id: key.id, what: 'servers' })}
-                >
-                  Change servers
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={rotating !== undefined}
-                  onClick={() => setEditing({ id: key.id, what: 'secret' })}
-                >
-                  Rotate secret
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  pending={revoking === key.id}
-                  disabled={(revoking !== '' && revoking !== key.id) || rotating === key.id}
-                  onClick={() => revoke.mutate(key.id)}
-                >
-                  Revoke
-                </Button>
+                <span className="flex flex-wrap gap-1">
+                  <Button
+                    variant="ghost"
+                    disabled={rotating !== undefined || (editing?.id === key.id && editing.what === 'access')}
+                    onClick={() => setEditing({ id: key.id, what: 'access' })}
+                  >
+                    Change access
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    disabled={rotating !== undefined}
+                    onClick={() => setEditing({ id: key.id, what: 'secret' })}
+                  >
+                    Rotate secret
+                  </Button>
+                  <Button
+                    variant="outline"
+                    pending={revoking === key.id}
+                    disabled={(revoking !== '' && revoking !== key.id) || rotating === key.id}
+                    onClick={() => revoke.mutate(key.id)}
+                  >
+                    Revoke
+                  </Button>
+                </span>
               </li>
               {editing?.id === key.id && (
                 <li>
-                  <KeyEditor apiKey={key} what={editing.what} onDone={() => setEditing(undefined)} />
+                  <KeyEditor apiKey={key} holder={holder} what={editing.what} onDone={() => setEditing(undefined)} />
                 </li>
               )}
             </Fragment>
@@ -449,22 +281,24 @@ function Keys() {
   )
 }
 
-/** Keys for servers the owner runs: a new one, and the list. */
-export function ApiKeysCard() {
+/** Keys for servers the workspace runs: a new one, and the list. */
+export function ApiKeysCard(props: { readonly workspace: WorkspaceView }) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>New key</CardTitle>
         <CardDescription>
-          A key reaches only the Topics, chats and Personas it makes itself, never yours, and does not keep your agent
-          active. Messages it sends run as yours in its Topics.
+          A key reaches what its access allows in this workspace, and anything it makes is added to what it reaches. It
+          does not keep your agent active.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <NewKey />
-        <QueryBoundary action="list your API keys" pending={<Skeleton className="h-6 w-full" />}>
-          <Keys />
-        </QueryBoundary>
+        <div className="flex flex-col gap-6">
+          <NewKey workspace={props.workspace} />
+          <QueryBoundary action="list your API keys" pending={<Skeleton className="h-6 w-full" />}>
+            <Keys workspace={props.workspace} />
+          </QueryBoundary>
+        </div>
       </CardContent>
     </Card>
   )

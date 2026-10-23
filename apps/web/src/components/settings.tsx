@@ -12,7 +12,7 @@ import { useCurrentWorkspace } from '../lib/current-workspace.ts'
 /**
  * The workspace's settings, most used first: today's usage, Start and the model, its agent (and where its notices go),
  * the API keys of servers it runs, the workspace itself (ADR 0089), then the person's own: the MCP clients they
- * connected and the workspaces each reaches (ADR 0097), and their account. Routines are on Work.
+ * connected and each one's grant (ADR 0114), and their account. Routines are on Work.
  */
 export function Settings() {
   const workspace = useCurrentWorkspace()
@@ -42,7 +42,7 @@ export function Settings() {
         }
       >
         {managing ? (
-          <ApiKeysCard />
+          <ApiKeysCard workspace={workspace} />
         ) : (
           <p className="text-sm text-muted-foreground">Only the workspace's owners and admins make keys.</p>
         )}
@@ -56,9 +56,9 @@ export function Settings() {
         title="Connected clients"
         note={
           <>
-            External MCP clients you allowed to use goblin at <code>{`${window.location.origin}/mcp`}</code>, each
-            reaching the workspaces you chose, or all of yours. They are yours, whichever workspace you are in; revoking
-            one ends its access at once.
+            External MCP clients you allowed to use goblin at <code>{`${window.location.origin}/mcp`}</code>, each with
+            the access you gave it: a level, the workspaces and what in each it reaches, and its extras. They are yours,
+            whichever workspace you are in; a change applies at once, and revoking one ends its access.
           </>
         }
       >

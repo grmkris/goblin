@@ -1,14 +1,13 @@
 import { useState } from 'react'
+import { GRANT_SPEC, type GrantTerms, type WorkspaceView } from '@goblin/contracts'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Alert, AlertDescription, Button, Skeleton, Switch } from '@goblin/ui'
-import { clientGrantMutation, workspacesQuery } from '../account/queries.ts'
-import { type ReachChoice, clientTermsFrom } from '../lib/grant-terms.ts'
-import { AuthRefused, consentClientQuery, consentMutation } from '../auth/queries.ts'
-import { ReachChooser, initialReach, reachesAny } from './client-reach.tsx'
-import { type OptionalScope, STARTS_ON, consentBody, offeredScopes, requestedScopes } from '../lib/consent-scope.ts'
+import { Alert, AlertDescription, Button, Card, CardContent, ConsentSummary, Skeleton } from '@goblin/ui'
+import { clientGrantMutation, clientTermsQuery, workspacesQuery } from '../account/queries.ts'
+import { AuthRefused, consentClientQuery, consentMutation, sessionPersonQuery } from '../auth/queries.ts'
 import { messageOf, withRef } from '../lib/query/app-error.ts'
 import { AuthShell } from './auth-shell.tsx'
+import { GRANT_WORDS, type GrantHolder, GrantEditor, grantProblem, reachWords } from './grant-editor.tsx'
 
 type ClientInfo = { readonly name: string; readonly uri?: string | undefined }
 /** The client asking, once looked up, or why it could not be: then the owner is not asked to allow it. */
@@ -20,61 +19,6 @@ type ClientLookup =
 const LOOKUP_FAILED = 'Could not look up the app asking for access. Reload the page to try again.'
 const UNKNOWN_CLIENT = 'goblin does not know this app. Start connecting from the app again.'
 
-/** What each opt-in scope adds (ADRs 0024, 0086, 0098), its switch's name first. Asking starts on; the rest start off. */
-const SCOPE_COPY: Readonly<Record<OptionalScope, { readonly name: string; readonly lines: readonly string[] }>> = {
-  'goblin:agent': {
-    name: 'Let it ask your agent',
-    lines: [
-      'ask your agent questions and give it tasks in your main conversation, where its messages show its name;',
-      'read the recent messages of your main conversation;',
-      "have your agent use the tools you allowed under Connections, while Work while you're away is on.",
-    ],
-  },
-  'goblin:topics': {
-    name: 'Also let it manage your Topics',
-    lines: [
-      'list and read your Topics, including their guidance;',
-      "make, rename and archive Topics; changing a Topic's description, guidance or what it works with needs an admin.",
-    ],
-  },
-  'goblin:conversations': {
-    name: 'Also let it send in your chats',
-    lines: [
-      "send messages and start threads in any of your Topics' chats, shown with its name;",
-      'read their replies, and stop what a chat is doing.',
-    ],
-  },
-  'goblin:personas': {
-    name: 'Also let it manage your Personas',
-    lines: [
-      'list and read your Personas, and see the models they may use;',
-      'make and change Personas, when you are an owner or admin of the workspace.',
-    ],
-  },
-  'goblin:inspect': {
-    name: 'Also let it read how your chats ran',
-    lines: ['read how each turn ran: model calls, tool calls, retries, errors and timings, never their words.'],
-  },
-  'goblin:transcripts': {
-    name: 'Also let it read your conversations in full',
-    lines: ['read every conversation in full, including tool calls and their results, without changing anything.'],
-  },
-  'goblin:setup': {
-    name: 'Also let it read what your setups use',
-    lines: [
-      'list your MCP servers with their granted tools, your skills and apps, and your Sources with their routes;',
-      'it connects nothing and grants nothing.',
-    ],
-  },
-  'goblin:routines': {
-    name: 'Also let it read and draft routines',
-    lines: [
-      'list your routines and their runs;',
-      'draft, change, pause and archive them when you are an owner or admin; a draft runs only once confirmed here.',
-    ],
-  },
-}
-
 /** The client's registered name and address: untrusted, shown as the client's own claim. */
 function useClient(clientId: string): ClientLookup {
   const read = useQuery(consentClientQuery(clientId))
@@ -84,162 +28,171 @@ function useClient(clientId: string): ClientLookup {
   return { kind: 'failed', reason: withRef(unknown ? UNKNOWN_CLIENT : LOOKUP_FAILED, read.error) }
 }
 
-/** One opt-in scope's switch, with what it adds; off until the owner turns it on. */
-function ScopeChoice(props: {
-  readonly scope: OptionalScope
-  readonly on: boolean
-  readonly onChange: (on: boolean) => void
-}) {
-  const { name, lines } = SCOPE_COPY[props.scope]
-  const starts = STARTS_ON.includes(props.scope) ? 'On unless you turn it off.' : 'Off unless you turn it on.'
+/**
+ * Who asks: the name and address the client registered (its own claim, not verified), its exact id, and the account
+ * it would act for.
+ */
+function ClientIdentity(props: { readonly clientId: string; readonly client: ClientInfo | undefined }) {
+  const person = useQuery(sessionPersonQuery).data
   return (
-    <div className="flex flex-col gap-2">
-      <label className="switch-row">
-        <span className="switch-name">
-          <span>{name}</span>
-          <span className="switch-detail">{starts} With it, the app can:</span>
-        </span>
-        <Switch checked={props.on} onCheckedChange={props.onChange} />
-      </label>
-      <ul className="plan-points" data-off={props.on ? undefined : true}>
-        {lines.map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ul>
-    </div>
+    <Card size="sm">
+      <CardContent>
+        <div className="flex flex-col gap-2 text-sm">
+          {props.client === undefined ? (
+            <Skeleton className="h-5 w-40" />
+          ) : (
+            <p className="m-0 font-medium text-balance">{props.client.name}</p>
+          )}
+          {props.client?.uri && (
+            <p className="m-0 text-pretty text-muted-foreground">
+              Says it is <span className="break-all">{props.client.uri}</span>
+            </p>
+          )}
+          <p className="m-0 text-xs text-muted-foreground">
+            Client ID <code className="break-all text-foreground">{props.clientId}</code>
+          </p>
+          {person && <p className="m-0 text-xs text-muted-foreground">For {person.email}</p>}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** A person in no workspace yet (an invitation waiting) is pointed to it: a grant would reach nothing. */
+function NoWorkspace() {
+  return (
+    <Alert>
+      <AlertDescription>
+        You are in no workspace yet. <Link to="/">Join the one you were invited to</Link>, or start your own, then
+        connect this app again.
+      </AlertDescription>
+    </Alert>
   )
 }
 
 /**
- * Which workspaces the client will reach (ADR 0097): the person's choice among theirs, or all of them. A person with
- * none yet (an invitation waiting) is pointed to it instead.
+ * The client's grant as the consent page offers it: its current terms when it has a grant, else the default chain's
+ * (ADR 0114), until the person changes them.
  */
-function Workspaces(props: {
-  readonly reach: ReachChoice | undefined
-  readonly onChange: (reach: ReachChoice) => void
-}) {
-  const workspaces = useQuery(workspacesQuery)
-  if (workspaces.data === undefined) return <Skeleton className="h-16" />
-  if (workspaces.data.length === 0)
-    return (
-      <Alert>
-        <AlertDescription>
-          You are in no workspace yet. <Link to="/">Join the one you were invited to</Link>, or start your own, then
-          connect this app again.
-        </AlertDescription>
-      </Alert>
-    )
-  return (
-    <div className="flex flex-col gap-2">
-      <p>It reaches the workspaces you choose:</p>
-      <ReachChooser
-        workspaces={workspaces.data}
-        value={props.reach ?? initialReach(workspaces.data)}
-        onChange={props.onChange}
-      />
-    </div>
-  )
+function useOffer(clientId: string) {
+  const offered = useQuery(clientTermsQuery(clientId))
+  const [chosen, setChosen] = useState<GrantTerms>()
+  const terms = chosen ?? offered.data?.current ?? offered.data?.defaults
+  return {
+    terms,
+    setTerms: setChosen,
+    failure: offered.error === null ? '' : messageOf(offered.error, 'read what it may do'),
+  }
 }
 
 /**
- * The person's answer: on Allow the reach first (a consent without one reaches nothing, and one without a consent is
- * harmless), then the consent; on Deny the refusal alone. Which button is busy, and why it failed.
+ * The person's answer: on Approve the grant first (a consent without one reaches nothing, and a grant without a consent
+ * is harmless), then Better Auth's consent; on Deny the refusal alone. Which button is busy, and why it failed.
  */
-function useDecision(
-  client: { readonly id: string; readonly name: string },
-  requested: readonly string[],
-  on: readonly string[],
-  reach: ReachChoice,
-) {
-  const reaching = useMutation(clientGrantMutation)
+function useDecision(clientId: string) {
+  const granting = useMutation(clientGrantMutation)
   const deciding = useMutation(consentMutation)
-  const [choice, setChoice] = useState<'allow' | 'deny'>()
+  const [choice, setChoice] = useState<'approve' | 'deny'>()
   // A decision that succeeded is leaving for the client, so its button stays busy.
-  const pending = reaching.isPending || deciding.isPending || deciding.isSuccess ? choice : undefined
+  const pending = granting.isPending || deciding.isPending || deciding.isSuccess ? choice : undefined
   const error =
-    reaching.error !== null
-      ? messageOf(reaching.error, 'set the workspaces it reaches')
+    granting.error !== null
+      ? messageOf(granting.error, 'save what it may do')
       : deciding.error === null
         ? ''
         : messageOf(deciding.error, 'complete the authorization')
-  function decide(accept: boolean): void {
-    setChoice(accept ? 'allow' : 'deny')
-    const consent = () =>
-      deciding.mutate(consentBody(requested, accept, on), { onSuccess: (next) => window.location.assign(next) })
-    // Its grant first (ADR 0114): the preset over the workspaces chosen, which the grant editor will let them change.
-    if (accept)
-      reaching.mutate({ clientId: client.id, terms: clientTermsFrom(client.name, reach) }, { onSuccess: consent })
-    else consent()
+  const consent = (accept: boolean) =>
+    deciding.mutate({ accept }, { onSuccess: (next) => window.location.assign(next) })
+  function approve(terms: GrantTerms): void {
+    setChoice('approve')
+    granting.mutate({ clientId, terms }, { onSuccess: () => consent(true) })
   }
-  return { decide, pending, error }
+  function deny(): void {
+    setChoice('deny')
+    consent(false)
+  }
+  return { approve, deny, pending, error }
+}
+
+/** What the client may do, in a line, and Change to edit it before approving. */
+function Offer(props: {
+  readonly name: string
+  readonly terms: GrantTerms
+  readonly workspaces: readonly WorkspaceView[]
+  readonly onChange: (terms: GrantTerms) => void
+  readonly disabled: boolean
+}) {
+  const holder: GrantHolder = { kind: 'client', workspaces: props.workspaces }
+  return (
+    <ConsentSummary
+      clientName={props.name}
+      terms={props.terms}
+      spec={GRANT_SPEC}
+      words={GRANT_WORDS}
+      describeReach={reachWords(holder)}
+      disabled={props.disabled}
+    >
+      <GrantEditor terms={props.terms} holder={holder} onChange={props.onChange} disabled={props.disabled} />
+    </ConsentSummary>
+  )
 }
 
 /**
- * Ask the person whether an MCP client may use goblin, saying what the requested scopes grant and which of their
- * workspaces it reaches (ADR 0097). Each `goblin:*` scope it asks for is a separate opt-in (ADR 0086). Client-supplied
- * names and URLs are shown as untrusted.
+ * Ask the person whether an MCP client may use goblin, and with what grant (ADR 0114): one line says what it may do,
+ * Change opens the editor, Approve saves the grant and then consents. Client-supplied names and URLs are shown as
+ * untrusted.
  */
 export function Consent() {
-  const query = new URLSearchParams(window.location.search)
-  const clientId = query.get('client_id') ?? ''
-  const requested = requestedScopes(query.get('scope'))
+  const clientId = new URLSearchParams(window.location.search).get('client_id') ?? ''
   const lookup = useClient(clientId)
   const client = lookup.kind === 'found' ? lookup.client : undefined
-  const [on, setOn] = useState<readonly string[]>(() =>
-    offeredScopes(requested).filter((scope) => STARTS_ON.includes(scope)),
-  )
-  const workspaces = useQuery(workspacesQuery).data ?? []
-  const [chosen, setChosen] = useState<ReachChoice | undefined>(undefined)
-  const reach = chosen ?? initialReach(workspaces)
-  const { decide, pending, error } = useDecision(
-    { id: clientId, name: client?.name ?? 'MCP client' },
-    requested,
-    on,
-    reach,
-  )
+  const workspaces = useQuery(workspacesQuery).data
+  const offer = useOffer(clientId)
+  const { approve, deny, pending, error } = useDecision(clientId)
+  const problem = offer.terms === undefined ? '' : grantProblem(offer.terms)
+  const failure = error || (lookup.kind === 'failed' ? lookup.reason : '') || offer.failure
   return (
     <AuthShell
       size="lg"
       title={`Allow “${client?.name ?? '…'}” to use goblin?`}
-      description={
-        <>
-          {client?.uri ? `It says it is ${client.uri}. ` : ''}The app supplies its own name and address; they are not
-          verified.
-        </>
-      }
-      footer={<p>Revoke it any time in Settings.</p>}
+      description="The app supplies its own name and address; they are not verified."
+      footer={<p>Change or revoke it any time in Settings.</p>}
     >
       <div className="auth-body">
-        <p>If you allow it, the app can do what you turn on below.</p>
-        <Workspaces reach={chosen} onChange={setChosen} />
-        {offeredScopes(requested).map((scope) => (
-          <ScopeChoice
-            key={scope}
-            scope={scope}
-            on={on.includes(scope)}
-            onChange={(turned) => setOn(turned ? [...on, scope] : on.filter((each) => each !== scope))}
+        <ClientIdentity clientId={clientId} client={client} />
+        {workspaces?.length === 0 ? (
+          <NoWorkspace />
+        ) : offer.terms === undefined || workspaces === undefined || client === undefined ? (
+          offer.failure === '' && lookup.kind !== 'failed' && <Skeleton className="h-16" />
+        ) : (
+          <Offer
+            name={client.name}
+            terms={offer.terms}
+            workspaces={workspaces}
+            onChange={offer.setTerms}
+            disabled={pending !== undefined}
           />
-        ))}
-        {(error || lookup.kind === 'failed') && (
+        )}
+        {(failure || problem) && (
           <Alert variant="destructive">
-            <AlertDescription>{error || (lookup.kind === 'failed' && lookup.reason)}</AlertDescription>
+            <AlertDescription>{failure || problem}</AlertDescription>
           </Alert>
         )}
-        <div className="card-actions">
+        <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-start">
           <Button
             size="lg"
-            pending={pending === 'allow'}
-            disabled={pending !== undefined || client === undefined || !reachesAny(reach)}
-            onClick={() => decide(true)}
+            pending={pending === 'approve'}
+            disabled={pending !== undefined || client === undefined || offer.terms === undefined || problem !== ''}
+            onClick={() => offer.terms !== undefined && approve(offer.terms)}
           >
-            Allow
+            Approve
           </Button>
           <Button
             size="lg"
             variant="outline"
             pending={pending === 'deny'}
             disabled={pending !== undefined}
-            onClick={() => decide(false)}
+            onClick={deny}
           >
             Deny
           </Button>

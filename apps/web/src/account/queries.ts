@@ -1,14 +1,15 @@
 import type {
-  ClientGrantTerms,
   CreateApiKeyTerms,
   CreateWorkspace,
+  GrantTerms,
   InviteMembers,
-  UpdateApiKeyTerms,
   UpdateWorkspace,
   WorkspaceRole,
 } from '@goblin/contracts'
-import { mutationOptions } from '@tanstack/react-query'
-import { account, workspaceAccount } from '../lib/api.ts'
+import { mutationOptions, queryOptions, skipToken } from '@tanstack/react-query'
+import * as Effect from 'effect/Effect'
+import { account, inWorkspaceOf, owner, workspaceAccount } from '../lib/api.ts'
+import { grantsAccount, keyTerms } from '../lib/api-grants.ts'
 
 /**
  * The person's workspaces and MCP clients (`AccountApi`), and this workspace's API keys and members
@@ -22,6 +23,8 @@ const accountKeys = {
   mine: ['account', 'invitations', 'mine'] as const,
   clients: ['account', 'clients'] as const,
   keys: ['account', 'keys'] as const,
+  clientTerms: (clientId: string) => ['account', 'clients', clientId, 'terms'] as const,
+  reach: (slug: string, kind: 'topics' | 'personas' | 'connections') => ['account', 'reach', slug, kind] as const,
 }
 
 /** Every workspace the person belongs to, oldest first; a person with none is given one first. */
@@ -58,13 +61,30 @@ export const clientsQuery = account.apiQuery({
   queryFn: (api) => api.clients.list(),
 })
 
-/** The grant a person gives a client (ADR 0114): the consent page's terms first, Settings' change later. */
+/**
+ * What the consent page shows for an MCP client (ADR 0114): the default chain's terms and, once it has a grant, its
+ * current terms.
+ */
+export const clientTermsQuery = (clientId: string) =>
+  grantsAccount.apiQuery({
+    queryKey: accountKeys.clientTerms(clientId),
+    queryFn: (api) => api.grants.clientTerms({ params: { clientId } }),
+  })
+
+/**
+ * The person's terms for an MCP client: on the consent page before its consent, from Settings later. A live token
+ * follows them at once.
+ */
 export const clientGrantMutation = mutationOptions({
-  ...account.apiMutation({
-    mutationFn: (api, { clientId, ...payload }: ClientGrantTerms & { readonly clientId: string }) =>
-      api.grants.clientGrant({ params: { clientId }, payload }),
+  ...grantsAccount.apiMutation({
+    mutationFn: (api, { clientId, terms }: { readonly clientId: string; readonly terms: GrantTerms }) =>
+      api.grants.clientGrant({ params: { clientId }, payload: { terms } }),
   }),
-  onSuccess: (_reach, _change, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.clients }),
+  onSuccess: (_saved, { clientId }, _result, { client }) =>
+    Promise.all([
+      client.invalidateQueries({ queryKey: accountKeys.clients }),
+      client.invalidateQueries({ queryKey: accountKeys.clientTerms(clientId) }),
+    ]),
 })
 
 /** Ends one client's access at once. */
@@ -78,17 +98,17 @@ export const revokeClientMutation = mutationOptions({
 /** The workspace's API keys, for servers it runs (ADR 0081), without secrets. */
 export const keysQuery = workspaceAccount.apiQuery({ queryKey: accountKeys.keys, queryFn: (api) => api.keys.list() })
 
-/** A new key; its answer holds the secret, which is never shown again. */
+/** A new key and its grant's terms (ADR 0114); its answer holds the secret, which is never shown again. */
 export const createKeyMutation = mutationOptions({
-  ...workspaceAccount.apiMutation({ mutationFn: (api, payload: CreateApiKeyTerms) => api.keys.create({ payload }) }),
+  ...keyTerms.apiMutation({ mutationFn: (api, payload: CreateApiKeyTerms) => api.keys.create({ payload }) }),
   onSuccess: (_created, _payload, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),
 })
 
-/** New terms for one key's grant (ADRs 0084, 0114): the same key, its id and secret kept. */
+/** New terms for one key's grant (ADR 0114): the same key, with its id and secret. */
 export const updateKeyMutation = mutationOptions({
-  ...workspaceAccount.apiMutation({
-    mutationFn: (api, { keyId, ...payload }: UpdateApiKeyTerms & { readonly keyId: string }) =>
-      api.keys.update({ params: { keyId }, payload }),
+  ...keyTerms.apiMutation({
+    mutationFn: (api, { keyId, terms }: { readonly keyId: string; readonly terms: GrantTerms }) =>
+      api.keys.update({ params: { keyId }, payload: { terms } }),
   }),
   onSuccess: (_updated, _change, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),
 })
@@ -183,3 +203,45 @@ export const declineInvitationMutation = mutationOptions({
   ...account.apiMutation({ mutationFn: (api, id: string) => api.invitations.decline({ params: { id } }) }),
   onSuccess: (_declined, _id, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.mine }),
 })
+
+/** One thing a grant's editor offers to pick: its reach id within its kind, its name and a line about it. */
+export type ReachItemView = { readonly id: string; readonly label: string; readonly description?: string }
+
+/** The owner API's client, as a reader of one workspace's lists takes it. */
+type OwnerClient = Parameters<Parameters<typeof owner.run>[0]>[0]
+
+/** Each kind's list in one workspace, as the editor picks from it: its reach id, name and a line. */
+const READERS: Readonly<
+  Record<'topics' | 'personas' | 'connections', (api: OwnerClient) => Effect.Effect<readonly ReachItemView[], Error>>
+> = {
+  // The latest hundred still open; the editor searches them.
+  topics: (api) =>
+    Effect.map(api.topics.list({ query: { limit: 100 } }), ({ topics }) =>
+      topics.filter((topic) => !topic.archived).map((topic) => ({ id: String(topic.id), label: topic.name })),
+    ),
+  // The latest hundred still answering, with their roles.
+  personas: (api) =>
+    Effect.map(api.personas.list({ query: { limit: 100 } }), ({ personas }) =>
+      personas
+        .filter((persona) => persona.archivedAt === undefined)
+        .map((persona) => ({ id: String(persona.id), label: persona.name, description: persona.role })),
+    ),
+  // By the owner's names for them.
+  connections: (api) =>
+    Effect.map(api.mcp.servers(), (servers) =>
+      servers.map((server) => ({ id: server.connectionId, label: server.label })),
+    ),
+}
+
+/**
+ * What a grant may reach of one kind in the workspace at `slug` (ADR 0114), for its editor to pick from: its Topics,
+ * Personas or MCP connections, read from that workspace's agent whichever page asks, and only once `open` (the
+ * editor is picking).
+ */
+export const reachItemsQuery = (slug: string, kind: 'topics' | 'personas' | 'connections', open: boolean) =>
+  queryOptions({
+    queryKey: accountKeys.reach(slug, kind),
+    queryFn: open
+      ? ({ signal }) => owner.run((api) => READERS[kind](api).pipe(inWorkspaceOf(slug)), signal)
+      : skipToken,
+  })

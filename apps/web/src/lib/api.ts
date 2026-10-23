@@ -1,4 +1,6 @@
 import { AccountApi, OwnerApi, WorkspaceAccountApi } from '@goblin/contracts/api'
+import * as Context from 'effect/Context'
+import * as Effect from 'effect/Effect'
 import * as HttpClient from 'effect/http/HttpClient'
 import * as HttpClientRequest from 'effect/http/HttpClientRequest'
 import * as HttpApiClient from 'effect/http-api/HttpApiClient'
@@ -16,7 +18,7 @@ export const requestId = (): string => crypto.randomUUID().replaceAll('-', '').s
  * What every API request carries: a fresh `x-goblin-request` id, the CSRF header on every write, and the operation a
  * write runs as (`withOperation`).
  */
-const apiHeaders = (
+export const apiHeaders = (
   request: HttpClientRequest.HttpClientRequest,
   operation: string | undefined,
 ): Readonly<Record<string, string>> => ({
@@ -25,8 +27,30 @@ const apiHeaders = (
   ...(operation === undefined ? {} : { 'x-goblin-operation': operation }),
 })
 
-/** Every call under this page's workspace (`/w/<slug>/api/…`, ADR 0089): the address says which workspace it is. */
-const inThisWorkspace = HttpClient.mapRequest((request) => HttpClientRequest.setUrl(request, apiPath(request.url)))
+/**
+ * The workspace one call is for when it is not this page's (`inWorkspaceOf`): a person's own page (the consent page,
+ * Settings' MCP clients) reads what each of their workspaces holds to choose a grant's reach in it.
+ */
+const CallWorkspace = Context.Reference<string | undefined>('goblin/api/CallWorkspace', {
+  defaultValue: () => undefined,
+})
+
+/** Run `call` in the workspace at `slug` rather than this page's. */
+export const inWorkspaceOf =
+  (slug: string) =>
+  <A, E, R>(call: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+    Effect.provideService(call, CallWorkspace, slug)
+
+/**
+ * Every call under a workspace (`/w/<slug>/api/…`, ADR 0089): the address says which workspace it is, this page's
+ * unless the call names another (`inWorkspaceOf`).
+ */
+export const inThisWorkspace = HttpClient.mapRequestEffect((request) =>
+  Effect.gen(function* () {
+    const slug = yield* CallWorkspace
+    return HttpClientRequest.setUrl(request, slug === undefined ? apiPath(request.url) : `/w/${slug}${request.url}`)
+  }),
+)
 
 /** The workspace's API, served by its agent: same-origin, with the session cookie, under the page's workspace. */
 export const owner = makeApiQuery({
