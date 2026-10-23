@@ -32,6 +32,7 @@ import {
   type ReachSelection,
 } from '@goblin/ui'
 import { ChevronRightIcon, XIcon } from 'lucide-react'
+import { Forbidden, InvalidInput } from '@goblin/contracts/api'
 import { reachItemsQuery } from '../account/queries.ts'
 import {
   type ReachField,
@@ -43,7 +44,7 @@ import {
   withEntry,
   withWorkspaces,
 } from '../lib/grant-reach.ts'
-import { messageOf } from '../lib/query/app-error.ts'
+import { messageOf, withRef } from '../lib/query/app-error.ts'
 
 /** goblin's words for each level and extra, each in one line. */
 export const GRANT_WORDS: GrantWords<Level, Extra> = {
@@ -101,6 +102,20 @@ const ORIGIN_PROBLEMS = {
   key_origin: 'Each server needs its own https address of a public host, like https://mcp.example.com, at most 8.',
   key_origin_tools: 'Each server needs 1 to 50 tool names, separated by commas.',
 } as const
+
+/**
+ * Why saving a grant's terms failed, in words: the grant endpoints' refusals of terms that cannot be given (`keys` from
+ * anyone but an owner, servers the contract refuses, terms for another grant), else `messageOf`'s copy for `action`.
+ */
+export const grantFailure = (error: unknown, action: string): string => {
+  if (error instanceof Forbidden && error.reason === 'role')
+    return withRef('Only an owner of the workspace may give Keys: turn it off, or ask an owner.', error)
+  if (error instanceof InvalidInput && (error.reason === 'key_origin' || error.reason === 'key_origin_tools'))
+    return withRef(ORIGIN_PROBLEMS[error.reason], error)
+  if (error instanceof InvalidInput && error.reason === 'grant')
+    return withRef('That access changed meanwhile. Reload the page and try again.', error)
+  return messageOf(error, action)
+}
 
 /** Why `terms` cannot be saved yet, in words; empty when they can. */
 export const grantProblem = (terms: GrantTerms): string => {

@@ -20,7 +20,7 @@ import { clientGrantMutation, clientsQuery, revokeClientMutation, workspacesQuer
 import { AuthRefused, deleteAccountMutation } from '../auth/queries.ts'
 import { messageOf, withRef } from '../lib/query/app-error.ts'
 import { QueryBoundary } from '../lib/query/query-boundary.tsx'
-import { type GrantHolder, GrantEditor, GrantLine, grantProblem } from './grant-editor.tsx'
+import { type GrantHolder, GrantEditor, GrantLine, grantFailure, grantProblem } from './grant-editor.tsx'
 
 /** Changing one client's grant (ADR 0114), from what it holds now: a live token follows the change at once. */
 function ChangeGrant(props: {
@@ -33,7 +33,7 @@ function ChangeGrant(props: {
   const [terms, setTerms] = useState<GrantTerms>(() => client.terms ?? presetFor(nameOf(client), 'all'))
   const change = useMutation(clientGrantMutation)
   const problem = grantProblem(terms)
-  const failure = change.error === null ? '' : messageOf(change.error, 'change what it may do')
+  const failure = change.error === null ? '' : grantFailure(change.error, 'change what it may do')
   return (
     <div className="flex flex-col gap-4 pb-4">
       <GrantEditor terms={terms} holder={holder} onChange={setTerms} disabled={change.isPending} />
@@ -87,7 +87,7 @@ function Clients() {
                   {client.uri && <span className="grant-about">{client.uri}</span>}
                   <span className="text-sm text-pretty text-muted-foreground">
                     {client.terms === undefined ? (
-                      'No grant yet: it reaches nothing until you set one.'
+                      'Its access was revoked: it reaches nothing until you change it.'
                     ) : (
                       <GrantLine name="It" terms={client.terms} holder={holder} />
                     )}

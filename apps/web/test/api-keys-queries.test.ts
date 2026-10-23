@@ -1,12 +1,14 @@
 import { type ApiKeyView, type GrantTerms, presetFor } from '@goblin/contracts'
-import { NotFound, WorkspaceAccountApi } from '@goblin/contracts/api'
+import { AccessInsufficient, Forbidden, InvalidInput, NotFound, WorkspaceAccountApi } from '@goblin/contracts/api'
 import { MutationObserver, QueryObserver } from '@tanstack/react-query'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createKeyMutation, keysQuery, rotateKeyMutation, updateKeyMutation } from '../src/account/queries.ts'
+import { grantFailure } from '../src/components/grant-editor.tsx'
 import { workspaceAccount } from '../src/lib/api.ts'
+import { describeError } from '../src/lib/query/app-error.ts'
 import { fakeHttpApi, testQueryClient } from './query/testing.ts'
 import { unusedHandlers } from './query/unused-handlers.ts'
 
@@ -32,12 +34,26 @@ const fakeAccount = () => {
     handlers.handleAll({
       ...unusedHandlers(WorkspaceAccountApi.groups.keys),
       list: () => Effect.succeed([state.key]),
-      create: ({ payload }) =>
-        Effect.succeed({
+      // As the Worker refuses them: `keys` from anyone but an owner, and a server address that is no public https one.
+      create: ({ payload }) => {
+        if (payload.terms.extras.includes('keys')) return Effect.fail(new Forbidden({ reason: 'role', ref: 'r-role' }))
+        if (payload.terms.reach.origins.some(({ origin }) => !origin.startsWith('https://')))
+          return Effect.fail(new InvalidInput({ reason: 'key_origin', ref: 'r-origin' }))
+        return Effect.succeed({
           key: { ...KEY, id: 'key-2', name: payload.name, grantId: 'key-2', terms: payload.terms },
           secret: `gbk_${'c'.repeat(64)}`,
-        }),
+        })
+      },
       update: ({ params, payload }) => {
+        // A call made with a key whose own grant lacks `keys` is refused with its widening link (ADR 0114).
+        if (params.keyId === 'key-narrow')
+          return Effect.fail(
+            new AccessInsufficient({
+              missing: { extra: 'keys' },
+              widenUrl: 'https://app.test/consent/widen?grant=key-narrow&extra=keys',
+              ref: 'r-widen',
+            }),
+          )
         if (params.keyId !== state.key.id) return Effect.fail(new NotFound({ what: 'key' }))
         state.key = { ...state.key, terms: payload.terms }
         return Effect.succeed(state.key)
@@ -109,6 +125,42 @@ describe("a key's grant (ADR 0114)", () => {
     const post = fake.calls.find((call) => call.method === 'POST' && new URL(call.url).pathname === '/api/keys')
     expect(await post?.json()).toEqual({ name: 'crm', terms })
     expect(post?.headers.get('x-goblin-csrf')).toBe('1')
+  })
+})
+
+describe("a key's refused terms (ADR 0114)", () => {
+  it('say why in words: keys only from an owner, servers only at public https addresses', async () => {
+    const make = new MutationObserver(testQueryClient(), createKeyMutation)
+    const owners: unknown = await make
+      .mutate({ name: 'ops', terms: { ...presetFor('ops', ['ws_kris']), extras: ['keys'] } })
+      // expected: the test asserts on the failure it captures
+      .catch((error: unknown) => error)
+    expect(grantFailure(owners, 'make that key')).toBe(
+      'Only an owner of the workspace may give Keys: turn it off, or ask an owner. · ref r-role',
+    )
+    const preset = presetFor('ops', ['ws_kris'])
+    const local: unknown = await make
+      .mutate({
+        name: 'ops',
+        terms: { ...preset, reach: { ...preset.reach, origins: [{ origin: 'http://localhost', tools: ['a'] }] } },
+      })
+      // expected: the test asserts on the failure it captures
+      .catch((error: unknown) => error)
+    expect(grantFailure(local, 'make that key')).toMatch(/^Each server needs its own https address.* · ref r-origin$/u)
+  })
+
+  it('link to widening when the call lacked access, as a path on this site', async () => {
+    const change = new MutationObserver(testQueryClient(), updateKeyMutation)
+    const refused: unknown = await change
+      .mutate({ keyId: 'key-narrow', terms: KEY.terms })
+      // expected: the test asserts on the failure it captures
+      .catch((error: unknown) => error)
+    expect(describeError(refused)).toMatchObject({
+      code: 'access_insufficient',
+      widenPath: '/consent/widen?grant=key-narrow&extra=keys',
+      ref: 'r-widen',
+    })
+    expect(grantFailure(refused, 'change that key')).toBe('This credential needs more access. · ref r-widen')
   })
 })
 

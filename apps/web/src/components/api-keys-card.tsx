@@ -28,7 +28,15 @@ import {
 } from '../account/queries.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { QueryBoundary, WidenLink } from '../lib/query/query-boundary.tsx'
-import { GRANT_WORDS, type GrantHolder, GrantEditor, GrantLine, grantProblem, reachWords } from './grant-editor.tsx'
+import {
+  GRANT_WORDS,
+  type GrantHolder,
+  GrantEditor,
+  GrantLine,
+  grantFailure,
+  grantProblem,
+  reachWords,
+} from './grant-editor.tsx'
 
 /** A new key's secret, or a rotated key's new one (ADR 0105), shown this once, to copy. */
 function ShownSecret(props: { readonly name: string; readonly secret: string; readonly onDone: () => void }) {
@@ -77,7 +85,7 @@ function NewKey(props: { readonly workspace: WorkspaceView }) {
   const [name, setName] = useState('')
   const [terms, setTerms] = useState<GrantTerms>(() => presetFor('key', [props.workspace.id]))
   const problem = grantProblem(terms)
-  const failure = create.error === null ? '' : messageOf(create.error, 'make that key')
+  const failure = create.error === null ? '' : grantFailure(create.error, 'make that key')
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault()
     create.mutate({ name: name.trim(), terms: { ...terms, name: name.trim() } })
@@ -126,11 +134,9 @@ function NewKey(props: { readonly workspace: WorkspaceView }) {
 function KeyGrant(props: { readonly apiKey: ApiKeyView; readonly holder: GrantHolder; readonly onDone: () => void }) {
   const update = useMutation(updateKeyMutation)
   const { apiKey } = props
-  const [terms, setTerms] = useState<GrantTerms>(
-    () => apiKey.terms ?? presetFor(apiKey.name, [props.holder.kind === 'key' ? props.holder.workspace.id : '']),
-  )
+  const [terms, setTerms] = useState<GrantTerms>(apiKey.terms)
   const problem = grantProblem(terms)
-  const failure = update.error === null ? '' : messageOf(update.error, 'change that key')
+  const failure = update.error === null ? '' : grantFailure(update.error, 'change that key')
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault()
     update.mutate({ keyId: apiKey.id, terms }, { onSuccess: props.onDone })
@@ -238,11 +244,7 @@ function Keys(props: { readonly workspace: WorkspaceView }) {
                     {key.name} {key.start && <code>{key.start}…</code>}
                   </span>
                   <span className="text-sm text-pretty text-muted-foreground">
-                    {key.terms === undefined ? (
-                      'No grant yet.'
-                    ) : (
-                      <GrantLine name="It" terms={key.terms} holder={holder} />
-                    )}
+                    <GrantLine name="It" terms={key.terms} holder={holder} />
                   </span>
                   {datesOf(key) !== '' && (
                     <span className="text-xs text-muted-foreground tabular-nums">{datesOf(key)}</span>

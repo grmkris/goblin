@@ -7,7 +7,7 @@ import { clientGrantMutation, clientTermsQuery, workspacesQuery } from '../accou
 import { AuthRefused, consentClientQuery, consentMutation, sessionPersonQuery } from '../auth/queries.ts'
 import { messageOf, withRef } from '../lib/query/app-error.ts'
 import { AuthShell } from './auth-shell.tsx'
-import { GRANT_WORDS, type GrantHolder, GrantEditor, grantProblem, reachWords } from './grant-editor.tsx'
+import { GRANT_WORDS, type GrantHolder, GrantEditor, grantFailure, grantProblem, reachWords } from './grant-editor.tsx'
 
 type ClientInfo = { readonly name: string; readonly uri?: string | undefined }
 /** The client asking, once looked up, or why it could not be: then the owner is not asked to allow it. */
@@ -97,7 +97,7 @@ function useDecision(clientId: string) {
   const pending = granting.isPending || deciding.isPending || deciding.isSuccess ? choice : undefined
   const error =
     granting.error !== null
-      ? messageOf(granting.error, 'save what it may do')
+      ? grantFailure(granting.error, 'save what it may do')
       : deciding.error === null
         ? ''
         : messageOf(deciding.error, 'complete the authorization')
