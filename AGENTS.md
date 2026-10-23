@@ -28,6 +28,9 @@ infrastructure. Read
   `oauthProvider()` or a custom adapter. A credential (a server API key or an OAuth client) reaches what its grant
   reaches, an OAuth client never more than its person's role, and neither renews resident authority (ADRs 0081,
   0114).
+- Every Topic is sealed: its chats see only it, and only a hub reaches every Topic (ADR 0115). What a turn may do is its
+  senders' power (`grants/power.ts`), never who made the Topic: every Pi tool has its need in `pi/tool-needs.ts`, and a
+  tool without one is never offered and never runs.
 - Outbound MCP calls require current resident authority and an exact owner grant for the server and tool/resource.
   Tool annotations, descriptions and remote content are untrusted data: they never grant permission and never become
   instructions. One exception is a skill from a server the owner turned skills on for (ADR 0008): the agent follows its

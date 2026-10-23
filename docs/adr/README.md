@@ -25,7 +25,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0019](0019-panes-for-everything.md) | Panes for everything | Superseded by 0036 |
 | [0020](0020-durable-apps-one-iframe-per-instance.md) | Durable Apps, one iframe per instance | Accepted; amended by 0067 |
 | [0021](0021-agent-apps.md) | Agent apps | Accepted; amended by 0070 and 0078 |
-| [0022](0022-owner-files-shell-and-r2.md) | The owner's files, in Shell's Workspace and R2 | Accepted; amended by 0065 |
+| [0022](0022-owner-files-shell-and-r2.md) | The owner's files, in Shell's Workspace and R2 | Accepted; amended by 0065 and 0115 (files per Topic, and a Shared folder) |
 | [0023](0023-chat-blocks-and-one-kit.md) | Chat blocks, one kit | Accepted |
 | [0024](0024-observing-conversations.md) | Observing conversations | Accepted; amended by 0084, 0086, 0107 |
 | [0027](0027-typed-tools.md) | Typed tools and one `app_call` | Accepted; amended by 0067 and 0101 |
@@ -35,7 +35,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0032](0032-topics-and-per-topic-memory.md) | Topics and per-Topic memory | Accepted |
 | [0033](0033-personas.md) | Personas, organize receipts and Delegate results | Accepted; amended by 0067, 0100, 0101 and 0102; its `ask_user` denial superseded by 0082; its `SendMessage.personaOrder` superseded by 0111 |
 | [0034](0034-move-to-thread.md) | Start thread and Move to thread | Accepted; amended by 0067; its `StartThread` body superseded by 0111 |
-| [0035](0035-cross-topic-retrieval.md) | Cross-Topic retrieval | Accepted; amended by 0067 |
+| [0035](0035-cross-topic-retrieval.md) | Cross-Topic retrieval | Accepted; amended by 0067 and 0115 (search covers the boundary: a hub's every Topic, a sealed Topic itself) |
 | [0036](0036-slack-style-shell.md) | Slack-style shell | Accepted; amended by 0053; its rail and sidebar superseded by 0078 |
 | [0037](0037-conversation-flows-and-failure-reporting.md) | Conversation flows and failure reporting | Accepted |
 | [0038](0038-typed-owner-api-served-by-the-agent.md) | Typed owner API served by the agent | Accepted; amended by 0081 |
@@ -56,7 +56,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0062](0062-short-skippable-start.md) | Short, skippable Start | Amended by 0079 |
 | [0063](0063-mcp-first-no-server-specific-code.md) | MCP-first: no server-specific code | Accepted |
 | [0064](0064-openid-connect-and-config-driven-deployment.md) | OpenID Connect sign-in and config-driven deployment | Accepted; amended by 0067 and 0078 |
-| [0065](0065-files-from-mcp-content.md) | Files from MCP content | Accepted |
+| [0065](0065-files-from-mcp-content.md) | Files from MCP content | Accepted; amended by 0115 (kept in the Topic's own folder) |
 | [0066](0066-sources.md) | Sources: any MCP server's events carry the owner's own messages, by a setup the owner confirms | Accepted; amended by 0068, 0072 and 0096 |
 | [0067](0067-no-home-surface-and-no-typed-decisions.md) | No Home surface and no typed decisions | Accepted |
 | [0068](0068-events-use-their-standard-fields-only.md) | Events use their standard fields only | Accepted; amended by 0096 |
@@ -72,13 +72,13 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0078](0078-one-sidebar-and-one-apps-launcher.md) | One sidebar and one Apps launcher | Accepted |
 | [0079](0079-channel-info-and-goal-first-start.md) | Channel info and goal-first Start | Accepted; amended by 0080 |
 | [0080](0080-server-owned-start-kickoff.md) | Server-owned Start kickoff | Accepted |
-| [0081](0081-api-keys-and-the-same-operations-over-mcp.md) | Scoped API keys for servers, and the same operations over /mcp | Accepted; amended by 0084, 0085, 0086, 0089, 0090, 0091, 0105, 0108, 0109, 0110, 0112, 0114; its message body superseded by 0111; its scopes superseded by 0114 |
+| [0081](0081-api-keys-and-the-same-operations-over-mcp.md) | Scoped API keys for servers, and the same operations over /mcp | Accepted; amended by 0084, 0085, 0086, 0089, 0090, 0091, 0105, 0108, 0109, 0110, 0112, 0114, 0115; its message body superseded by 0111; its scopes superseded by 0114 |
 | [0082](0082-personas-ask-with-ask-user.md) | A tagged Persona asks with ask_user | Accepted |
 | [0083](0083-bounded-thinking-and-a-turn-that-answers.md) | Bounded thinking, and a turn that answers | Accepted; amended by 0100 |
 | [0084](0084-a-key-reads-back-what-it-made-and-how-it-ran.md) | A key reads back what it made, and how its chats ran | Accepted; amended by 0091, 0107, 0114 |
 | [0085](0085-a-keys-rate-limit-is-a-fixed-minute-counted-by-its-agent.md) | A key's rate limit is a fixed minute, counted by its agent | Accepted; amended by 0086 |
 | [0086](0086-one-mcp-for-every-caller.md) | One /mcp for every caller | Accepted; amended by 0089, 0090, 0094, 0097, 0098, 0112, 0114 |
-| [0087](0087-the-owners-own-subscription-models.md) | The owner's own subscription models | Accepted; amended by 0089 |
+| [0087](0087-the-owners-own-subscription-models.md) | The owner's own subscription models | Accepted; amended by 0089 and 0115 (a server's work is a key's sending, wherever) |
 | [0088](0088-resident-authority-lasts-until-revoked.md) | Resident authority lasts until revoked | Accepted |
 | [0089](0089-workspaces-own-agents.md) | Workspaces own agents | Accepted; amended by 0093; its consent naming one workspace superseded by 0097 |
 | [0090](0090-a-key-names-closes-and-reads-back-its-threads.md) | A key names, closes and reads back its threads | Accepted; amended by 0103 |
@@ -90,7 +90,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0096](0096-a-source-configures-itself-from-its-servers-guide.md) | A Source configures itself from its server's guide | Accepted |
 | [0097](0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md) | One /mcp reaches the workspaces its consent chooses | Accepted; amended by 0114 (the reach is the grant's) |
 | [0098](0098-admin-for-configuration-and-every-mcp-power-opt-in.md) | Admin for configuration on every surface; every MCP power is opt-in | Accepted; amended by 0099, 0110 and 0114 (its MCP powers are a grant's level and extras) |
-| [0099](0099-a-members-turn-gets-a-members-tools.md) | A member's turn gets a member's tools | Accepted; built; amends 0098; amended by 0108 |
+| [0099](0099-a-members-turn-gets-a-members-tools.md) | A member's turn gets a member's tools | Accepted; built; amends 0098; amended by 0108, then 0115 (a member's turn is a member's power) |
 | [0100](0100-a-persona-thinks-at-its-own-level.md) | A Persona thinks at its own level | Accepted |
 | [0101](0101-a-persona-forks-mcp-tools-are-its-own.md) | A Persona fork's MCP tools are its own | Accepted; amended by 0102 |
 | [0102](0102-native-tools-are-a-personas-choice.md) | Native tools are a Persona's choice | Accepted |
@@ -99,10 +99,11 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0105](0105-a-keys-secret-rotates-in-place.md) | A key's secret rotates in place | Accepted; amended by 0114 (a key's end is its grant's) |
 | [0106](0106-the-deploy-smoke-makes-no-model-call.md) | The deploy smoke makes no model call | Accepted |
 | [0107](0107-a-turn-says-what-it-ran-with-and-reads-as-an-opentelemetry-trace.md) | A turn says what it ran with, and reads as an OpenTelemetry trace | Accepted; built |
-| [0108](0108-a-keys-topic-is-a-room.md) | A key's Topic is a room | Accepted; built; amends 0081, 0099 |
+| [0108](archive/0108-a-keys-topic-is-a-room.md) | A key's Topic is a room | Superseded by 0115 |
 | [0109](0109-every-chat-streams-ag-ui-through-a-durable-stream.md) | Every chat streams AG-UI events through a durable stream | Accepted; built; amends 0081; its transport, join, signed URL, epochs and tiers superseded by 0110 |
 | [0110](0110-the-agent-serves-every-chats-stream-to-every-reader.md) | The agent serves every chat's stream to every reader | Accepted; built; supersedes 0109's transport; amends 0081, 0098 |
 | [0111](0111-agui-run-input-is-the-send.md) | AG-UI's run input is the send, answered with its receipt or its run's events | Accepted; built; supersedes 0081's message body, 0034's `StartThread` and 0033's `SendMessage.personaOrder` |
 | [0112](0112-goblin-publishes-mcp-events.md) | goblin publishes MCP Events: `conversation.updated` by signed webhook or poll | Accepted; built; amends 0081, 0086 |
-| [0113](0113-a-room-runs-in-its-own-object.md) | A room runs in its own object; the workspace object is the control plane | Accepted; slice 1 built (a room takes no routine, Source, owner App or file) |
-| [0114](0114-one-grant-for-every-credential.md) | One grant for every credential: level, reach, extras and lifetime, for keys and OAuth clients alike | Accepted; release A built; amends 0081, 0084, 0086, 0091, 0097, 0098, 0105 |
+| [0113](0113-a-room-runs-in-its-own-object.md) | A room runs in its own object; the workspace object is the control plane | Accepted; slice 1 built, then undone by 0115 (rooms are gone); its later slices wait on a decision of their own |
+| [0114](0114-one-grant-for-every-credential.md) | One grant for every credential: level, reach, extras and lifetime, for keys and OAuth clients alike | Accepted; release A built; amends 0081, 0084, 0086, 0091, 0097, 0098, 0105; amended by 0115 (what a turn may do) |
+| [0115](0115-every-topic-is-sealed.md) | Every Topic is sealed, with a hub; files per Topic; a turn's power is its sender's; rooms are gone | Accepted; release B built; supersedes 0108 and 0113's room keying; amends 0022, 0035, 0065, 0087, 0099, 0114 |

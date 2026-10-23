@@ -7,11 +7,12 @@
 | Agent DO SQLite | `pi_*`, `cf_agents_*` and the other vendor tables | Pi, Agents SDK. Never touched. |
 | Agent DO SQLite | `app_mcp_connections`, `app_mcp_registries`, `app_mcp_endpoints`, `app_mcp_credentials`, `app_mcp_oauth_pending`, `app_mcp_grants` | Drizzle: MCP metadata and authorization. |
 | Agent DO SQLite | `app_resident`, `app_conversations`, `app_model_choice`, `app_usage_daily` | Drizzle: agent metadata and logical chat bindings (ADR 0030). `app_usage_daily` counts model tokens per UTC day (ADR 0058). |
-| Agent DO SQLite | `app_chat_operations` | Drizzle: operation receipts per chat, pinned to their original Pi session, with kind, origin, the asking member's role (ADR 0099), target chat, parent operation, state and reason, pruned opportunistically after 30 days (ADR 0030). |
+| Agent DO SQLite | `app_chat_operations` | Drizzle: operation receipts per chat, pinned to their original Pi session, with kind, origin, the asking member's role (ADR 0099), its sender's power (`power`, ADR 0115), target chat, parent operation, state and reason, pruned opportunistically after 30 days (ADR 0030). |
 | Agent DO SQLite | `app_conversation_capabilities`, `app_execution_exclusions` | Drizzle: a helper's exclusions, set by its spawner (ADRs 0018, 0029); the owner's per-conversation switches were deleted (ADR 0040). |
 | Agent DO SQLite | `app_persona_chats` | Drizzle: the setup a Persona answers with in a chat: its fork, frozen at the ask (ADR 0040), or a routine's run at the pinned revision (ADR 0041). |
 | Agent DO SQLite | `app_chat_memory_log`, `app_chat_memory_nodes`, `app_chat_memory_state` | Drizzle: each Topic Conversation's memory, keyed by chat id (ADR 0032). |
-| Agent DO SQLite | `app_topics` | Drizzle: the owner's Topics, each with its Conversation's chat id (ADR 0032) and its setup (ADR 0040). |
+| Agent DO SQLite | `app_topics` | Drizzle: the owner's Topics, each with its Conversation's chat id (ADR 0032), its setup (ADR 0040), its reach (`sealed` or `hub`) and the key that wrote its guidance, if one did (`guidance_by`, ADR 0115). |
+| Agent DO SQLite | `app_made_by` | Drizzle (`storage/made-by.ts`): which server's key made a Topic or a Persona, with its name, for display only (ADR 0115). |
 | Agent DO SQLite | `app_transcript_excerpts`, `app_transcript_fts` (FTS5, shadow tables `app_transcript_fts_*`), `app_transcript_index`, `app_retrieval_uses` | Drizzle and raw FTS5 SQL: the cross-Topic transcript index and the frozen sources each run used (ADR 0035). |
 | Agent DO SQLite | `app_skill_sources`, `app_skill_activations`, `app_skill_files`, `app_skill_drafts` | Drizzle: skills, and the learner's log of the drafts it wrote to the owner's files. |
 | Agent DO SQLite | `app_source_setups`, `app_source_routes`, `app_source_held`, `app_source_replies`, `app_notify_sink` | Drizzle: Sources' confirmed setups and bindings, each conversation's route and title, what waits for a route (with the files it brought, by reference), the answers owed, and Notify me via (ADRs 0066, 0071). |
@@ -40,6 +41,10 @@ columns are absent. Notice outbox fields use `copy_*`; each copy binds the sink 
 This is a fresh schema, with no upgrade path for the previous application or auth migrations. A release that changes
 either baseline must reset disposable dev before recreating it, following the reset/setup checklist in
 [development](../development.md). Existing deployments must not receive these migrations without that reset.
+
+Production keeps its agents through forward migrations after the baseline (`MIGRATIONS`); the last, `SEALED` (ADR
+0115), adds each Topic's reach (Personal the hub) and `guidance_by`, drops the search opt-out, adds receipts' `power`
+and renames `app_key_reach` to `app_made_by`; its unit test runs it on a seeded database from before it.
 
 Unit tests compare the baseline's complete table and column inventory with the current Drizzle declarations,
 including types, defaults and nullability; they exercise partial uniqueness and FTS insert/update/delete triggers.

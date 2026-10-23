@@ -25,12 +25,14 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   `api.memo('goblin.release', …)` and uses `c<conversation>:<call>` as its operation id.
 - `configure` changes only the fields it is given (`null` clears one). goblin uses the per-conversation `tools`
   filter for two things (`piToolsFor`, `AgentInput.toolSets`): `{ remove: subagents }` where a chat may not start
-  subagents (its Topic's setup or its spawner's exclusions; `setup/`, ADR 0040), and in a room every tool a room does not
-  offer (ADR 0108). A fork starts from its parent's agent at the fork entry, so a new thread sets its extensions (the host's plus
+  subagents (its Topic's setup or its spawner's exclusions; `setup/`, ADR 0040), and every tool its turn's power does
+  not reach (`pi/tool-needs.ts`, ADR 0115). A fork starts from its parent's agent at the fork entry, so a new thread sets its extensions (the host's plus
   the thread's, `instructions: null` to drop a subagent's), and its filter, explicitly (ADR 0017). A filter is stored by
-  name and `tool_search` can load past it, so the room guard (`pi/room.ts`, a `beforeTool` in every conversation,
-  helper and routine run) refuses a room's denied tools at call time, and a chat's first turn in each object lifetime
-  applies its filter again (`useRoomTools`).
+  name and `tool_search` can load past it, so the power guard (`pi/power.ts`, a `beforeTool` in every conversation,
+  helper and routine run) refuses at call time whatever a turn's power does not reach, deny by default, and each
+  sender's input applies its own filter at admission when what it removes changed (`useTools`). A run's power is the
+  intersection of its inputs' receipts' (`turnPower`, `pi/asker.ts`): an input that reaches a run some other way than
+  `ChatOperations.send` (a relay into a subagent, a synthesized report) records a receipt with the power it carries.
 - Observing Pi means its commit listener, not hooks: `subscribeCommits` sees every conversation's committed entries,
   tasks and submissions, and the run ledger (`telemetry/pi.ts`, ADR 0024) is attached in the harness factory as soon
   as `Harness.open` returns. A listener runs inside Pi's commit: if it throws, Pi faults the user's task, so guard it,
@@ -117,7 +119,7 @@ Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native
   asking tools. A task's passive writes go through `Conversations.writeEntry`, because a task's conversation
   handle submits inputs only. Delegate reports are passive `app.delegate_result` writes unless the spawn set
   `synthesize: true`. Organize tools write `app_organize_receipts` in the same synchronous step as the change.
-- Cross-Topic retrieval (ADR 0035): `goblin.retrieval` is in the default extension list (Conversations and threads,
+- Cross-Topic retrieval (ADR 0035, covering the chat's boundary since ADR 0115): `goblin.retrieval` is in the default extension list (Conversations and threads,
   not subagents or routine runs). The transcript index reads `Conversation.entries` in entry-id windows and indexes only
   entries whose `conversationId` is the session (never forked history, never `role = 'persona'` forks), redacted and
   bounded, into `app_transcript_*`; its `afterResponse` catch-up is fire and forget. `search_chats` records its frozen
@@ -165,4 +167,4 @@ itself authorize model spend, external messages, deployment or production change
   routines, memory and skill learning stay absent. `subagent_config` adds exclusions only, and retained helpers receive
   the current execution extension selection after reconstruction.
 
-- `code_run` may write owner files and is `replay: unsafe`; after an interrupted invocation, Pi reports the interruption and never automatically runs the script again. The native recovery regression writes, evicts, and reads the unchanged file through the reconstructed agent.
+- `code_run` may write its Topic's own folder (its turn's view, ADR 0115) and is `replay: unsafe`; after an interrupted invocation, Pi reports the interruption and never automatically runs the script again. The native recovery regression writes, evicts, and reads the unchanged file through the reconstructed agent.

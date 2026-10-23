@@ -131,8 +131,9 @@ carries `serverMessage`.
 
 **Files from results** ([ADR 0065](../adr/0065-files-from-mcp-content.md), `mcp/content/materialize.ts`). After a model's `mcp_call`
 completes, `materialize` keeps each `resource_link`, embedded blob, embedded text over 16 K characters and `audio` block
-of its result (never an App's own `ui://` resource) in the owner's files, at most eight, one at a time, under
-`/agent/received/<connection label, slugged>/<YYYY-MM-DD>/` with a name that replaces nothing there. A public https link
+of its result (never an App's own `ui://` resource) in the calling Topic's folder (ADR 0115), at most eight, one at a
+time, under `/topics/<id>/agent/received/<connection label, slugged>/<YYYY-MM-DD>/` with a name that replaces nothing
+there. A public https link
 is fetched with no credentials (never the connection's token): the link and each of at most three redirects must pass
 `isPublicHttps` (`mcp/servers/endpoint.ts`, the rule for added servers), the body is counted as it arrives and abandoned past
 25 MiB, and all of it has thirty seconds. A link of another scheme is read with `resources/read` on the same connection,

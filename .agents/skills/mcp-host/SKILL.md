@@ -47,10 +47,11 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   memberships on every call: a tool
   of a client that reaches more than one takes a required `workspace` (`inbound/mcp-server.ts` `naming`), and a new
   tool needs nothing extra for it as long as its input is a Struct made by `standard`.
-  An inbound client's messages go into main, labelled with its name. A server key's go into its own Topics, each a
-  room (ADR 0108), labelled `[from server <key name>]`: a room's chats reach only the gateway within its setup and its
-  thread's declared servers, skills and their own chats, refused past that at call time (`pi/room.ts`); never add a
-  tool a room offers without adding it to `ROOM_TOOLS` on purpose.
+  An inbound client's messages go into main, labelled with its name. A server key's go into the Topics it reaches,
+  labelled `[from server <key name>]`; every Topic is sealed (ADR 0115), and what a turn may do is its senders' power
+  (`grants/power.ts`): every tool has its need in `pi/tool-needs.ts` (`TOOL_NEEDS`), read by the filter, the call-time
+  guard (`pi/power.ts`, deny by default) and the tool itself; never add a tool without giving it its need on purpose,
+  and check what depends on a call's arguments (a connection, another Topic, a setup) in the tool.
 - Every `EndpointAccess` endpoint has its tool in `inbound/tools.ts` but the streamed ones (`STREAMED`): a chat's stream
   (ADR 0110) is server-sent events a key reads over HTTP with its own credential, and the server's instructions say
   where. A key reads a chat's stream in full, so nothing a tool returns may carry a credential; the stream's frames

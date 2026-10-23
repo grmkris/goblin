@@ -268,8 +268,8 @@ parent as a message of its own.
   a Persona, the `goblin.delegate_result` activity for a subagent, without AG-UI's `subagentRunId` (it is the chat's
   own) and with `metadata.goblin.subagentRunId`, the child it closes. A reader that persists answers once keys
   them by `entryId`; `operationId` with the Persona's `id` names the invocation.
-- **Rooms.** A room's children are its Personas' forks (a room has no subagents), carried in the room's own stream
-  only, in full to the key that reads it.
+- **A key's chats.** Their children are their Personas' forks and helpers, carried in that chat's own stream only, in
+  full to the key that reads it.
 - **Late readers.** A connection opens with each child working then: `SUBAGENT_STARTED`, then what it did so far: a
   Persona's work from its invocation's prompt on, a subagent's run in flight with its answer so far.
 - **Producing them** (`streams/children.ts`, `streams/child-follow.ts`): the producer follows the children of each
@@ -323,9 +323,9 @@ comments while idle, and a tool result echoing a key, a thread server's token an
 In local workerd (`apps/runtime/test/integration/streams-case.ts`, `streams-children-case.ts`): a member reads their
 chat through `/w/<slug>/api` with their session, the opening then a turn's run, thinking, tool call and result and
 answer live; after the reader went away and the chat went on, a reconnect's opening holds what came meanwhile; a key
-reads its own room's chat in full (thinking and steps included) and gets 404 for another key's room and the owner's
+reads its own Topic's chat in full (thinking and steps included) and gets 404 for another key's Topic and the owner's
 chat; a chat's 33rd reader is `stream_busy`. The owner tags a Persona held at its model call and reads its start, its
-work, its end naming the answer and the answer; a key reads the same of its room, the fork's own work included,
+work, its end naming the answer and the answer; a key reads the same of its own Topic's chat, the fork's own work included,
 matching the forward read's invocation and entry; a subagent's run streams the same way, and a reader that connects
 while it works opens with it in flight. Not proven there: that the agent hears of a client that went away (local
 workerd never tells it, from outside the dev proxy or from inside the Worker), so a gone reader is freed by the

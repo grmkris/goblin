@@ -102,8 +102,9 @@ Personal first, then by name, the archived folded at the end, each bold with a d
 pulse while its agent works, with one flat level under it of its threads at work, unread, recently opened in this
 browser or showing now (`topicThreads`); the open agent apps follow. A server without Topics implies Personal alone,
 holding Main, and shows no Topic controls. With Topics, Add topic names a new one (`POST /api/topics`, one operation id
-per opening of the dialog) and opens its channel; the channel's `#name` opens its menu: Rename, Exclude from search or
-Include in search, and Archive or Restore (never Personal), all `PATCH /api/topics/:id`. An archived Topic's channel
+per opening of the dialog) and opens its channel; the channel's `#name` opens its menu: Rename, and Archive or Restore
+(never Personal), both `PATCH /api/topics/:id`; channel info says whether it is sealed or the hub, and an admin turns
+the hub on or off there (`reach`, ADR 0115). An archived Topic's channel
 shows a banner with Restore in place of its composer.
 Unread is the server's: `read_at` on
 `app_conversations` is the owner's read mark, set when a chat has been shown for a moment (half in view, the page in
@@ -293,12 +294,12 @@ allowed tools (an unknown or no-longer-owned session, a chat whose Topic is gone
 spawners, may use nothing). The scope also answers for agent apps (`app`) and names its Topic, so a refusal can say
 what held it back. What the scope leaves out is hidden from the model: `mcp_list` leaves it out, the `skills` section
 does not list or fetch that library, and Pi's per-conversation tool filter (`configure({ tools: { remove } })`) drops
-the subagent tools, whose section then hides too. In a room, a Topic a server's key made and every chat under it (ADR
-0108), the scope names the room (`room`) and the filter drops every tool a room does not offer (`pi/room.ts`
-`ROOM_TOOLS`); the room guard refuses them at call time as well, deny by default. A chat's filter is set when it is
+the subagent tools, whose section then hides too. The scope also names the chat's boundary (its Topic, and whether that
+is a hub, ADR 0115), and the filter drops every tool its turn's power does not reach there (`pi/tool-needs.ts`); the
+power guard (`pi/power.ts`) refuses them at call time as well, deny by default. A chat's filter is set when it is
 made or configured, applied again to every chat of a Topic whose setup's subagents change (`retoolTopic`, which skips
-Persona forks and routine runs, whose filters are set when they are made), and, for a room's chats, again on each
-chat's first turn in the agent's lifetime (`useRoomTools`). A call that still arrives runs nothing: `mcp_call`, `skill_activate`,
+Persona forks and routine runs, whose filters are set when they are made), and for each sender's input at its
+admission when what it removes changed (`useTools`). A call that still arrives runs nothing: `mcp_call`, `skill_activate`,
 `skill_read`, `subagent_spawn` and `subagent_send` check the scope before anything else (before the grant check or any
 connection) and return an error result (`pi/setup.ts`, `outsideScopeResult`): when the Topic's setup does not hold the target,
 details `{ kind: 'not-in-topic', target, topic }` (`NotInTopic`) that ask the owner to add it to the Topic, and Goblin

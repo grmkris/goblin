@@ -20,3 +20,4 @@ replaced it. Living docs never cite an archived ADR as current behaviour.
 | [0031](0031-typed-decisions-through-workers-ai.md) | Typed decisions through Workers AI | [0067](../0067-no-home-surface-and-no-typed-decisions.md) |
 | [0009](0009-telegram-through-myagent.md) | Telegram through myagent | [0066](../0066-sources.md), [0069](../0069-external-messages-use-sources.md) |
 | [0055](0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | [0066](../0066-sources.md), [0069](../0069-external-messages-use-sources.md) |
+| [0108](0108-a-keys-topic-is-a-room.md) | A key's Topic is a room | [0115](../0115-every-topic-is-sealed.md) |

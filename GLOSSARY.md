@@ -42,8 +42,8 @@ _Avoid_: apps that use your agent
 
 **API key**:
 A `gbk_` key an owner or admin makes in Settings for a server the workspace runs (ADR 0081). It belongs to that
-workspace (ADR 0089), does what its **grant** allows over `/api` or `/mcp`, and never keeps the agent active. Each Topic
-it makes is a **room** (ADR 0108).
+workspace (ADR 0089), does what its **grant** allows over `/api` or `/mcp`, and never keeps the agent active. The Topics
+it makes are sealed like any other, and named as made by it for display only (ADR 0115).
 _Avoid_: token, service account
 
 **Credential**:
@@ -110,12 +110,21 @@ its current Pi session.
 A channel of the owner's work: exactly one Conversation and any number of threads under it (ADR 0032). Personal is
 the first Topic and holds Main.
 
-**Room**:
-A Topic a server's API key made, and every chat under it, whoever writes there (ADR 0108). It reaches only itself: the
-gateway within its setup, skills, questions, its own chats and memory, never the owner's files, other chats, apps,
-code or organizing. No other chat's search reaches it unless the owner names it. A key's messages there start
-`[from server <key name>]`, and its guidance is the server's, granting nothing.
-_Avoid_: customer topic, sandbox
+**Sealed Topic**:
+Every Topic unless it is a hub (ADR 0115): its chats see only it, its own chats and its own files (and the **Shared
+folder** on a person's turn), and act only on it. Whoever made it, the owner or a server's key.
+_Avoid_: room, private topic
+
+**Hub**:
+A Topic whose chats reach every Topic of the workspace: their search, their files, and changing another Topic, its
+routines and the Sources (ADR 0115). Personal is the hub until an admin says otherwise; only a person makes a hub.
+_Avoid_: admin topic, main (for this)
+
+**Turn power**:
+What one turn of the agent may do (ADR 0115): what everyone who sent its inputs may do, together. A person's role, an
+inbound client's grant within its person's role, a server key's grant; work no one sent is an admin's. Where the turn
+works bounds it further: the Topic's or the Persona's setup, the Topic's reach, a credential's connections.
+_Avoid_: permissions (for this), room
 
 **Conversation**:
 A Topic's one long-lived chat. It never closes and keeps a memory instead of an ever-longer context.
@@ -347,15 +356,21 @@ A fenced `mermaid`, `chart` or `map` block in the agent's reply, drawn in place 
 `@goblin/kit`, the one implementation of the drawn blocks, for the chat and agent apps.
 
 **Files**:
-The owner's files (ADR 0022): `/uploads`, what they uploaded or attached, and `/agent`, what the agent wrote. The
-agent writes only `/agent`.
+The workspace's files (ADRs 0022, 0115): each Topic's folder (`/topics/<id>/uploads`, what people attached there, and
+`/topics/<id>/agent`, what the agent wrote there), and the **Shared folder**. The agent writes only its Topic's
+`agent` folder; the owner reads and writes everything.
+
+**Shared folder**:
+`/uploads` and `/agent`, outside every Topic (ADR 0115): what the workspace kept before Topics had folders. A person's
+turn reads it in any Topic; a turn a server's key sent never does.
+_Avoid_: public folder
 
 **Attachment**:
 A file the owner sent with a message: its path rides with the words, and the message shows it.
 
 **Received file**:
-A file goblin kept from an MCP tool result (ADR 0065): a link, an embedded resource or audio, written under
-`/agent/received/<connection>/<day>/`. The model reads its path in the block's place, and the call shows it as a chip.
+A file goblin kept from an MCP tool result (ADR 0065): a link, an embedded resource or audio, written under the Topic's
+`/topics/<id>/agent/received/<connection>/<day>/` (ADR 0115). The model reads its path in the block's place, and the call shows it as a chip.
 
 **File link**:
 A short-lived https URL on goblin's own origin to one of the owner's files (`file_link`, ADR 0070), for a tool that

@@ -116,12 +116,12 @@ holds; the edge refuses the rest before an agent wakes) and on `/mcp` (the tools
 A key reaches what its grant reaches; one whose Topics or Personas are a list has what it makes added to its list, and
 an operation id never adopts something outside it. Its Topics start with nothing in their setup, and a setup a
 credential writes names only connections it reaches (with a list of connections, never `all`, apps or subagents).
-Each Topic a key makes is still a room ([ADR 0108](../adr/0108-a-keys-topic-is-a-room.md), [Topics](topics.md#rooms)),
-until sealed Topics replace rooms: every chat there, whoever writes in it, is offered only the gateway, skills,
-`ask_user`, its own search and memory, `share_back`, `tool_search` and a Persona fork's native tools, and searches only
-the room; no other chat's search or automatic retrieval reaches the room. Its messages start `[from server <key
-name>]`: a request from a party the owner connected, never the owner's instruction. The Topic and Persona views name
-the key that made them (`room`, `madeBy`, display only). It names the threads it starts (`title`, which announces an
+Each Topic a key makes is sealed like any other ([ADR 0115](../adr/0115-every-topic-is-sealed.md), [Topics](topics.md#sealed-topics-and-the-hub)):
+its chats see only it, and only the hub's search reaches it. A key's turn may do what its grant allows there
+(`TOOL_NEEDS`): a `write` key is offered no routine, organizing, `diagnose` or apps outside the hub, and never reads
+the Shared folder. Its messages start `[from server <key name>]`: a request from a party the owner connected, never
+the owner's instruction, run on the deployment's models. The Topic and Persona views name the key that made them
+(`madeBy`, display only). It names the threads it starts (`title`, which announces an
 empty one in its Topic's Conversation), and renames, closes and reopens threads within reach, never a Topic's
 Conversation and never pinning one open ([ADR 0090](../adr/0090-a-key-names-closes-and-reads-back-its-threads.md)); its
 forward read shows its messages to Personas with `to` and `author`.

@@ -63,10 +63,10 @@ grants it; owner admission admits it only to an endpoint whose `EndpointAccess` 
 grant past its end (`grant_expired`), counts its requests per minute (600, ADR 0085; past them `rate_limited` with
 `retryAfter`, which the edge answers with `Retry-After`) and syncs the agent's mirror of its lists when the forwarded
 generation moved (`Grants.sync`, `grants/service.ts`). A key's first admitted request in the object's lifetime names
-what it made before names were kept (`KeyNames`, ADR 0108). Past admission a credential reaches what its grant
+what it made before names were kept (`KeyNames`, for display, ADR 0115). Past admission a credential reaches what its grant
 reaches (`grants/policy.ts`, the `app_grant_reach` mirror): its lists hold only what it reaches, and inspection sees
-only the run events of those chats (ADR 0084); a key's Topics are rooms, and its messages carry `[from server <key
-name>]` (ADR 0108). It annotates the request's logs with `goblin.rpc`
+only the run events of those chats (ADR 0084); a key's Topics are sealed like any other, and its messages carry
+`[from server <key name>]`, its turns doing what its grant allows (ADR 0115). It annotates the request's logs with `goblin.rpc`
 (`<group>.<endpoint>`), `goblin.operation` and `ref`, and stamps `ref` on every typed failure.
 
 | Group | Paths under `/api` | Handlers |

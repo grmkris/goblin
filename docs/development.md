@@ -250,14 +250,16 @@ until it runs, real provider and Telegram delivery remain unverified.
   with the Topic's setup (its MCP servers and their tools, skills, apps and subagents; ADR 0040): choose it when you
   create the Topic or from channel info (the top-right info button), under Tools & skills. Channel info also shows
   the description, owner instructions, shared media/files/links, threads and work. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
-  Topics a server's API key made are its rooms (ADR 0108): under your own Topics, each key has one section, folded
-  until you open it (this browser remembers), with how many rooms it has and a dot for unread replies; open, a filter
-  field and the rooms, the latest active first, twenty at a time. A room's bar and channel info say Room, and its info
-  says that goblin there reaches only that Topic. Jump to finds rooms by name.
+  Every Topic is sealed (ADR 0115): goblin there sees only that Topic's chats and files, and the Shared folder when a
+  person writes; Personal is the hub, which reaches every Topic, and its bar says Hub. Channel info says which, and an
+  owner or admin turns the hub on or off there. Topics a server's API key made are listed by the key that made them
+  (display only): under your own Topics, each key has one section, folded until you open it (this browser remembers),
+  with how many Topics it made and a dot for unread replies; open, a filter field and its Topics, the latest active
+  first, twenty at a time. Jump to finds them by name, made by their key.
 - **All threads, Activity, Work and Personas.** All threads lists every thread, unread first; Activity what needs you
   (with Undo for what Goblin organized); Work what runs (Delegates, Personas answering), your routines with their
   controls, every agent app's schedules and recent results. Personas lists yours, then each key's folded under it
-  (ADR 0108); a click opens a profile: edit it (each save is a revision), archive it, or read its revisions.
+  (ADR 0115); a click opens a profile: edit it (each save is a revision), archive it, or read its revisions.
   **Add persona** makes one. The invitations waiting for you show in Activity in every workspace, with Join and No
   thanks, and first in the workspace menu.
 - **Apps, Pinned and an App full screen.** Apps lists your pins, the recent App views from your chats, every
@@ -522,9 +524,10 @@ Chromium, desktop and phone, light and dark: one highlighted row per page (a thr
 Apps, a profile under Personas), the counts, every pin state, the strip with ⌘B/Ctrl+B, its tooltip, a reload that keeps
 it and the Topics list beside its `#`, and the phone's dot and drawer. The page is in a workspace with two invitations
 waiting: the workspace menu's count, its invitations first (a refused Join's words, No thanks in place), each
-workspace's role and its tooltip, and Activity's Join opening the workspace joined. Two keys made rooms and Personas
-(ADR 0108): the folded sections with their counts and unread dot, the room the page shows kept while folded, the
-filter and Show more, a room's channel info, and the Personas page's fold per key.
+workspace's role and its tooltip, and Activity's Join opening the workspace joined. Two keys made Topics and Personas
+(ADR 0115): the folded made-by sections with their counts and unread dot, the Topic the page shows kept while folded,
+the filter and Show more, a sealed Topic's channel info with an admin's hub switch (and the PATCH it sends) and a
+member's note alone, Personal's Hub badge, and the Personas page's fold per key.
 `heavy bun apps/web/test/ui-apps.ts` renders Apps: the four sections in order, pins that do not open keeping their
 place, two accounts on one service, search by label, a closed view reopened in one step, a failed built-app read kept
 to its section and the ⋯ targets.

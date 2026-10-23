@@ -81,9 +81,10 @@ from the same tools a server's key gets. A server the owner runs gets a
 and a lifetime, the same shape an MCP client's consent gives) and, with it, makes Topics and Personas, sends into their
 chats and reads the replies after a cursor, at `/api` or as the same operations on `/mcp`. With the `inspect` extra it
 sees how chats within its reach ran, content-free, down to where each turn's time went (ADR 0084); a call its grant
-does not cover answers with a link where the owner can widen it. A key never keeps the agent active. Each Topic a key makes is a room
-(ADR 0108): its chats reach only that Topic's tools, skills and chats, whoever writes there, the server's messages are
-marked as its requests, and no other chat searches it. A secret that may have leaked is rotated in Settings: the same
+does not cover answers with a link where the owner can widen it. A key never keeps the agent active. Every Topic is sealed
+(ADR 0115): its chats see only it, its own files and, on a person's turn, the Shared folder, and only the hub (Personal,
+unless an admin chose another) reaches every Topic; what a turn may do is its sender's power, so a key's turn does what
+its grant allows and its messages are marked as the server's requests. A secret that may have leaked is rotated in Settings: the same
 key, with all it made, and the old secret refused at once (ADR 0105).
 
 Every turn can be seen end to end (ADR 0024). Beside Pi's own record, each agent keeps a 30-day run ledger of how its
