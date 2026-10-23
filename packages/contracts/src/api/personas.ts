@@ -5,6 +5,7 @@ import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
 import { NonEmptyString } from '../ids.ts'
 import { CreatePersona, PersonaDetail, PersonaPage, PersonaReply, PersonaView, UpdatePersona } from '../personas.ts'
 import { ApiErrors } from './errors.ts'
+import { EndpointAccess } from './access.ts'
 import { EndpointRole } from './role.ts'
 import { EndpointScope } from './scope.ts'
 import { PageQuery } from './page.ts'
@@ -32,22 +33,24 @@ const PersonaQuery = { ...PageQuery, name: Schema.optional(NonEmptyString(32)) }
  * `reply` (ADRs 0081, 0084).
  */
 export class PersonasGroup extends HttpApiGroup.make('personas').add(
-  HttpApiEndpoint.get('list', '/personas', { query: PersonaQuery, success: PersonaPage }).annotate(
-    EndpointScope,
-    'personas',
-  ),
+  HttpApiEndpoint.get('list', '/personas', { query: PersonaQuery, success: PersonaPage })
+    .annotate(EndpointScope, 'personas')
+    .annotate(EndpointAccess, { level: 'read' }),
   HttpApiEndpoint.post('create', '/personas', {
     payload: CreatePersona,
     success: PersonaView.pipe(HttpApiSchema.status(201)),
     error: [ApiErrors.conflict, ApiErrors.invalidInput],
   })
     .annotate(EndpointScope, 'personas')
+    .annotate(EndpointAccess, { level: 'manage' })
     .annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.get('detail', '/personas/:id', {
     params: { id: PersonaParam },
     success: PersonaDetail,
     error: ApiErrors.notFound,
-  }).annotate(EndpointScope, 'personas'),
+  })
+    .annotate(EndpointScope, 'personas')
+    .annotate(EndpointAccess, { level: 'read' }),
   HttpApiEndpoint.patch('update', '/personas/:id', {
     params: { id: PersonaParam },
     payload: UpdatePersona,
@@ -55,6 +58,7 @@ export class PersonasGroup extends HttpApiGroup.make('personas').add(
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput],
   })
     .annotate(EndpointScope, 'personas')
+    .annotate(EndpointAccess, { level: 'manage' })
     .annotate(EndpointRole, 'admin'),
   HttpApiEndpoint.post('reply', '/personas/reply', {
     payload: PersonaReply,

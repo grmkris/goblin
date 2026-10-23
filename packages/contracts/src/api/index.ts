@@ -26,6 +26,8 @@ export { GrantsResident } from './resident.ts'
 export { KeysGroup } from './keys.ts'
 export { WorkspacesGroup } from './workspaces.ts'
 export { EndpointScope } from './scope.ts'
+// What a credential's grant must hold for each owner endpoint, and the group that reads its own grant.
+export { AccessGroup, EndpointAccess } from './access.ts'
 export { EndpointRole } from './role.ts'
 export { InvitationsGroup } from './invitations.ts'
 export { MembersGroup } from './members.ts'

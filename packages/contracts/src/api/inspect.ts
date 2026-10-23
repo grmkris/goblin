@@ -14,6 +14,7 @@ import {
 import { OtlpTraceData } from '../otlp.ts'
 import { FlowName } from '../telemetry.ts'
 import { ApiErrors } from './errors.ts'
+import { EndpointAccess } from './access.ts'
 import { EndpointScope } from './scope.ts'
 
 /** An entry id in a query. */
@@ -57,45 +58,48 @@ const Limit = Schema.NumberFromString.check(
  *   operation's timeline (its turn when it ran one) and the operations related to it.
  *
  * The two conversation reads carry words and need `transcripts`, which only an OAuth client of the owner can hold; the
- * rest are content-free and need `inspect`. A key sees only the run events of chats within its reach (ADR 0084).
+ * rest are content-free and need `inspect`. A key sees only the run events of chats within its reach (ADR 0084). A
+ * credential's grant needs `read` and the `inspect` extra for every one (`EndpointAccess`).
  */
-export class InspectGroup extends HttpApiGroup.make('inspect').add(
-  HttpApiEndpoint.get('conversations', '/inspect/conversations', { success: InspectConversations }).annotate(
-    EndpointScope,
-    'transcripts',
-  ),
-  HttpApiEndpoint.get('conversation', '/inspect/conversation', {
-    query: { conversation: ChatId, before: Schema.optional(Entry) },
-    success: InspectEntries,
-    error: ApiErrors.notFound,
-  }).annotate(EndpointScope, 'transcripts'),
-  HttpApiEndpoint.get('turns', '/inspect/turns', {
-    query: { conversation: Schema.optional(ChatId), since: Schema.optional(Since), limit: Schema.optional(Limit) },
-    success: InspectTurns,
-    error: ApiErrors.notFound,
-  }).annotate(EndpointScope, 'inspect'),
-  HttpApiEndpoint.get('turn', '/inspect/turn', {
-    query: { operation: OperationId, format: Schema.optional(Schema.Literal('otlp')) },
-    success: Schema.Union([TurnTimeline, OtlpTraceData]),
-    error: ApiErrors.notFound,
-  }).annotate(EndpointScope, 'inspect'),
-  HttpApiEndpoint.get('problems', '/inspect/problems', {
-    query: { since: Schema.optional(Since), limit: Schema.optional(Limit), all: Schema.optional(Schema.Boolean) },
-    success: InspectProblems,
-  }).annotate(EndpointScope, 'inspect'),
-  HttpApiEndpoint.get('flows', '/inspect/flows', {
-    query: {
-      since: Schema.optional(Since),
-      limit: Schema.optional(Limit),
-      chat: Schema.optional(ChatId),
-      flow: Schema.optional(FlowName),
-    },
-    success: InspectFlows,
-    error: ApiErrors.notFound,
-  }).annotate(EndpointScope, 'inspect'),
-  HttpApiEndpoint.get('details', '/inspect/details', {
-    query: DetailsQuery,
-    success: InspectDetails,
-    error: [ApiErrors.notFound, ApiErrors.invalidInput],
-  }).annotate(EndpointScope, 'inspect'),
-) {}
+export class InspectGroup extends HttpApiGroup.make('inspect')
+  .add(
+    HttpApiEndpoint.get('conversations', '/inspect/conversations', { success: InspectConversations }).annotate(
+      EndpointScope,
+      'transcripts',
+    ),
+    HttpApiEndpoint.get('conversation', '/inspect/conversation', {
+      query: { conversation: ChatId, before: Schema.optional(Entry) },
+      success: InspectEntries,
+      error: ApiErrors.notFound,
+    }).annotate(EndpointScope, 'transcripts'),
+    HttpApiEndpoint.get('turns', '/inspect/turns', {
+      query: { conversation: Schema.optional(ChatId), since: Schema.optional(Since), limit: Schema.optional(Limit) },
+      success: InspectTurns,
+      error: ApiErrors.notFound,
+    }).annotate(EndpointScope, 'inspect'),
+    HttpApiEndpoint.get('turn', '/inspect/turn', {
+      query: { operation: OperationId, format: Schema.optional(Schema.Literal('otlp')) },
+      success: Schema.Union([TurnTimeline, OtlpTraceData]),
+      error: ApiErrors.notFound,
+    }).annotate(EndpointScope, 'inspect'),
+    HttpApiEndpoint.get('problems', '/inspect/problems', {
+      query: { since: Schema.optional(Since), limit: Schema.optional(Limit), all: Schema.optional(Schema.Boolean) },
+      success: InspectProblems,
+    }).annotate(EndpointScope, 'inspect'),
+    HttpApiEndpoint.get('flows', '/inspect/flows', {
+      query: {
+        since: Schema.optional(Since),
+        limit: Schema.optional(Limit),
+        chat: Schema.optional(ChatId),
+        flow: Schema.optional(FlowName),
+      },
+      success: InspectFlows,
+      error: ApiErrors.notFound,
+    }).annotate(EndpointScope, 'inspect'),
+    HttpApiEndpoint.get('details', '/inspect/details', {
+      query: DetailsQuery,
+      success: InspectDetails,
+      error: [ApiErrors.notFound, ApiErrors.invalidInput],
+    }).annotate(EndpointScope, 'inspect'),
+  )
+  .annotateEndpoints(EndpointAccess, { level: 'read', extra: 'inspect' }) {}

@@ -20,6 +20,7 @@ import { SourceUse } from '../retrieval.ts'
 import { MoveReceipt, MoveToThread } from '../threads.ts'
 import { ApiErrors } from './errors.ts'
 import { EventStream } from './stream.ts'
+import { EndpointAccess } from './access.ts'
 import { EndpointScope } from './scope.ts'
 import { GrantsResident } from './resident.ts'
 
@@ -100,19 +101,25 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     payload: UpdateConversation,
     success: ConversationView,
     error: [ApiErrors.notFound, ApiErrors.invalidInput],
-  }).annotate(EndpointScope, 'conversations'),
+  })
+    .annotate(EndpointScope, 'conversations')
+    .annotate(EndpointAccess, { level: 'write' }),
   HttpApiEndpoint.post('submit', '/conversations/:id/messages', {
     params,
     payload: RunInput,
     success: MessageReceipt.pipe(HttpApiSchema.status(202)),
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput, ApiErrors.budgetExhausted],
-  }).annotate(EndpointScope, 'conversations'),
+  })
+    .annotate(EndpointScope, 'conversations')
+    .annotate(EndpointAccess, { level: 'write' }),
   HttpApiEndpoint.post('startThread', '/conversations/:id/threads', {
     params,
     payload: StartThread,
     success: StartedThread.pipe(HttpApiSchema.status(201)),
     error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput, ApiErrors.budgetExhausted],
-  }).annotate(EndpointScope, 'conversations'),
+  })
+    .annotate(EndpointScope, 'conversations')
+    .annotate(EndpointAccess, { level: 'write' }),
   HttpApiEndpoint.post('move', '/conversations/:id/move', {
     params,
     payload: MoveToThread,
@@ -124,7 +131,9 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     payload: StopConversation,
     success: Schema.Struct({ stopped: Schema.Boolean }),
     error: [ApiErrors.notFound],
-  }).annotate(EndpointScope, 'conversations'),
+  })
+    .annotate(EndpointScope, 'conversations')
+    .annotate(EndpointAccess, { level: 'write' }),
   HttpApiEndpoint.get('queue', '/conversations/:id/queue', {
     params,
     success: ConversationQueue,
@@ -159,6 +168,7 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     error: [ApiErrors.notFound, ApiErrors.conflict],
   })
     .annotate(EndpointScope, 'conversations')
+    .annotate(EndpointAccess, { level: 'read' })
     .annotate(GrantsResident, false),
   HttpApiEndpoint.get('sources', '/conversations/:id/sources', {
     params,
@@ -171,5 +181,6 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     error: [ApiErrors.notFound, ApiErrors.conflict],
   })
     .annotate(EndpointScope, 'conversations')
+    .annotate(EndpointAccess, { level: 'read' })
     .annotate(GrantsResident, false),
 ) {}

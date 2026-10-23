@@ -4,6 +4,7 @@ import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
 import { CreateTopic, TopicPage, TopicSetupEdit, TopicSetupSaved, TopicView, UpdateTopic } from '../topics.ts'
 import { ApiErrors } from './errors.ts'
+import { EndpointAccess } from './access.ts'
 import { EndpointRole } from './role.ts'
 import { EndpointScope } from './scope.ts'
 import { PageQuery } from './page.ts'
@@ -28,28 +29,32 @@ const TopicParam = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 999_
  */
 export class TopicsGroup extends HttpApiGroup.make('topics')
   .add(
-    HttpApiEndpoint.get('list', '/topics', { query: PageQuery, success: TopicPage }),
+    HttpApiEndpoint.get('list', '/topics', { query: PageQuery, success: TopicPage }).annotate(EndpointAccess, {
+      level: 'read',
+    }),
     HttpApiEndpoint.get('get', '/topics/:id', {
       params: { id: TopicParam },
       success: TopicView,
       error: ApiErrors.notFound,
-    }),
+    }).annotate(EndpointAccess, { level: 'read' }),
     HttpApiEndpoint.post('create', '/topics', {
       payload: CreateTopic,
       success: TopicView.pipe(HttpApiSchema.status(201)),
       error: [ApiErrors.conflict, ApiErrors.invalidInput],
-    }),
+    }).annotate(EndpointAccess, { level: 'write' }),
     HttpApiEndpoint.patch('update', '/topics/:id', {
       params: { id: TopicParam },
       payload: UpdateTopic,
       success: TopicView,
       error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput],
-    }),
+    }).annotate(EndpointAccess, { level: 'manage' }),
     HttpApiEndpoint.patch('setSetup', '/topics/:id/setup', {
       params: { id: TopicParam },
       payload: TopicSetupEdit,
       success: TopicSetupSaved,
       error: [ApiErrors.notFound, ApiErrors.conflict, ApiErrors.invalidInput],
-    }).annotate(EndpointRole, 'admin'),
+    })
+      .annotate(EndpointRole, 'admin')
+      .annotate(EndpointAccess, { level: 'manage', extra: 'setup' }),
   )
   .annotateEndpoints(EndpointScope, 'topics') {}

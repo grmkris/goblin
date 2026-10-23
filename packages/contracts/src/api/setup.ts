@@ -1,6 +1,7 @@
 import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { SetupCatalog } from '../setup.ts'
+import { EndpointAccess } from './access.ts'
 import { EndpointScope } from './scope.ts'
 
 /**
@@ -10,5 +11,7 @@ import { EndpointScope } from './scope.ts'
  *   on with the skills each lists now, and the agent's apps.
  */
 export class SetupGroup extends HttpApiGroup.make('setup').add(
-  HttpApiEndpoint.get('catalog', '/setup/catalog', { success: SetupCatalog }).annotate(EndpointScope, 'setup'),
+  HttpApiEndpoint.get('catalog', '/setup/catalog', { success: SetupCatalog })
+    .annotate(EndpointScope, 'setup')
+    .annotate(EndpointAccess, { level: 'read', extra: 'setup' }),
 ) {}

@@ -13,6 +13,7 @@ import {
 } from '../agent.ts'
 import { NonEmptyString } from '../ids.ts'
 import { ApiErrors } from './errors.ts'
+import { EndpointAccess } from './access.ts'
 import { EndpointScope } from './scope.ts'
 import { EndpointRole } from './role.ts'
 
@@ -65,14 +66,20 @@ export class AgentGroup extends HttpApiGroup.make('agent').add(
     EndpointRole,
     'admin',
   ),
-  HttpApiEndpoint.get('models', '/models', { success: ModelOffer }).annotate(EndpointScope, 'personas'),
+  HttpApiEndpoint.get('models', '/models', { success: ModelOffer })
+    .annotate(EndpointScope, 'personas')
+    .annotate(EndpointAccess, { level: 'read' }),
   HttpApiEndpoint.post('ask', '/agent/ask', {
     payload: AgentAsk,
     success: AskResult,
     error: [ApiErrors.conflict, ApiErrors.budgetExhausted],
-  }).annotate(EndpointScope, 'agent'),
+  })
+    .annotate(EndpointScope, 'agent')
+    .annotate(EndpointAccess, { level: 'write' }),
   HttpApiEndpoint.get('recent', '/agent/recent', {
     query: RecentQuery,
     success: Schema.Struct({ messages: Schema.Array(TranscriptMessage) }),
-  }).annotate(EndpointScope, 'agent'),
+  })
+    .annotate(EndpointScope, 'agent')
+    .annotate(EndpointAccess, { level: 'read' }),
 ) {}

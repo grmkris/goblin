@@ -1,5 +1,5 @@
-import type { CallerScope } from '@goblin/contracts'
-import { EndpointScope } from '@goblin/contracts/api'
+import type { CallerScope, Need } from '@goblin/contracts'
+import { EndpointAccess, EndpointScope } from '@goblin/contracts/api'
 import * as Context from 'effect/Context'
 import * as FindMyWay from 'effect/http/FindMyWay'
 import * as HttpApi from 'effect/http-api/HttpApi'
@@ -77,6 +77,27 @@ export const endpointScopes = <Id extends string, Groups extends HttpApiGroup.Co
     },
   })
   return scopes
+}
+
+/**
+ * What each of `api`'s endpoints needs of a credential's grant, by its name (`topics.update`): an endpoint without
+ * `EndpointAccess` is absent, and no credential reaches it.
+ *
+ * @internal Admission still reads `endpointScopes`; until the grant replaces scopes, a test holds every scoped endpoint
+ * to a need here.
+ */
+export const endpointAccess = <Id extends string, Groups extends HttpApiGroup.Constraint>(
+  api: HttpApi.HttpApi<Id, Groups>,
+): ReadonlyMap<string, Need> => {
+  const needs = new Map<string, Need>()
+  HttpApi.reflect(api, {
+    onGroup: () => undefined,
+    onEndpoint: ({ group, endpoint }) => {
+      const need = Context.get(endpoint.annotations, EndpointAccess)
+      if (need !== undefined) needs.set(`${group.identifier}.${endpoint.identifier}`, need)
+    },
+  })
+  return needs
 }
 
 /** HttpApi paths are absolute; the guard only tells the router so. */

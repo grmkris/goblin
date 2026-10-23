@@ -11,6 +11,7 @@ import {
 } from '../published-events.ts'
 import { ApiErrors } from './errors.ts'
 import { GrantsResident } from './resident.ts'
+import { EndpointAccess } from './access.ts'
 import { EndpointScope } from './scope.ts'
 
 /**
@@ -45,4 +46,5 @@ export class EventsGroup extends HttpApiGroup.make('events')
     }),
   )
   .annotateEndpoints(EndpointScope, 'conversations')
+  .annotateEndpoints(EndpointAccess, { level: 'read' })
   .annotateEndpoints(GrantsResident, false) {}
