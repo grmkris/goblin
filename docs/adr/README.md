@@ -89,7 +89,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0095](0095-the-owners-subscription-workspace-takes-no-members.md) | The owner's subscription workspace takes no members | Accepted |
 | [0096](0096-a-source-configures-itself-from-its-servers-guide.md) | A Source configures itself from its server's guide | Accepted |
 | [0097](0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md) | One /mcp reaches the workspaces its consent chooses | Accepted; amended by 0114 (the reach is the grant's) |
-| [0098](0098-admin-for-configuration-and-every-mcp-power-opt-in.md) | Admin for configuration on every surface; every MCP power is opt-in | Accepted; amended by 0099, 0110 and 0114 (its MCP powers are a grant's level and extras) |
+| [0098](0098-admin-for-configuration-and-every-mcp-power-opt-in.md) | Admin for configuration on every surface; every MCP power is opt-in | Accepted; amended by 0099, 0110, 0114 (its MCP powers are a grant's level and extras) and 0117 (`setup` reaches the connections themselves) |
 | [0099](0099-a-members-turn-gets-a-members-tools.md) | A member's turn gets a member's tools | Accepted; built; amends 0098; amended by 0108, then 0115 (a member's turn is a member's power) |
 | [0100](0100-a-persona-thinks-at-its-own-level.md) | A Persona thinks at its own level | Accepted |
 | [0101](0101-a-persona-forks-mcp-tools-are-its-own.md) | A Persona fork's MCP tools are its own | Accepted; amended by 0102 |
@@ -105,6 +105,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0111](0111-agui-run-input-is-the-send.md) | AG-UI's run input is the send, answered with its receipt or its run's events | Accepted; built; supersedes 0081's message body, 0034's `StartThread` and 0033's `SendMessage.personaOrder` |
 | [0112](0112-goblin-publishes-mcp-events.md) | goblin publishes MCP Events: `conversation.updated` by signed webhook or poll | Accepted; built; amends 0081, 0086; amended by 0116 (an OAuth client calls its methods over REST too) |
 | [0113](0113-a-room-runs-in-its-own-object.md) | A room runs in its own object; the workspace object is the control plane | Accepted; slice 1 built, then undone by 0115 (rooms are gone); its later slices wait on a decision of their own |
-| [0114](0114-one-grant-for-every-credential.md) | One grant for every credential: level, reach, extras and lifetime, for keys and OAuth clients alike | Accepted; release A built; amends 0081, 0084, 0086, 0091, 0097, 0098, 0105; amended by 0115 (what a turn may do) |
+| [0114](0114-one-grant-for-every-credential.md) | One grant for every credential: level, reach, extras and lifetime, for keys and OAuth clients alike | Accepted; release A built; amends 0081, 0084, 0086, 0091, 0097, 0098, 0105; amended by 0115 (what a turn may do) and 0117 (what `setup` holds) |
 | [0115](0115-every-topic-is-sealed.md) | Every Topic is sealed, with a hub; files per Topic; a turn's power is its sender's; rooms are gone | Accepted; release B built; supersedes 0108 and 0113's room keying; amends 0022, 0035, 0065, 0087, 0099, 0114 |
 | [0116](0116-an-oauth-client-uses-the-owner-api-too.md) | An OAuth client uses the owner API too: its token on `/w/<slug>/api`, the stream included | Accepted; amends 0086, 0089, 0110, 0112 |
+| [0117](0117-the-setup-extra-reaches-a-workspaces-connections.md) | The setup extra reaches a workspace's connections: adding, signing in, tool grants and skills with `manage` | Accepted; amends 0098, 0114 |
