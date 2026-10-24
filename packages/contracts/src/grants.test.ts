@@ -22,7 +22,7 @@ import {
 
 const decode = Schema.decodeUnknownSync(GrantTerms)
 
-/** A key's reach: its one workspace, Topics 7 and 9, every Persona, the `mycut` connection. */
+/** An installation's reach: its one workspace, Topics 7 and 9, every Persona, the `mycut` connection. */
 const listed: GoblinReach = {
   workspaces: 'list',
   each: [
@@ -39,7 +39,7 @@ const previous: GrantTerms = {
   name: 'saved',
   level: 'read',
   reach: listed,
-  extras: ['setup', 'inspect', 'routines', 'keys'],
+  extras: ['setup', 'inspect', 'routines'],
   lifetime: '7d',
 }
 
@@ -66,16 +66,24 @@ describe('grant terms', () => {
       expect(() => decode({ ...previous, ...invalid }), JSON.stringify(invalid)).toThrow()
   })
 
-  it('summarizes a grant with its id, its credential, its end and its widening link', () => {
+  it('summarizes a grant with its id, whose it is, its credential, its end and its widening link', () => {
     const summary = {
       ...PRESET,
       grantId: 'cg_1',
+      kind: 'client',
       clientId: 'client-1',
       expiresAt: null,
       widenUrl: 'https://goblin.test/consent/widen?grant=cg_1',
     }
     expect(Schema.decodeUnknownSync(AccessSummary)(summary)).toEqual(summary)
-    for (const invalid of [{ expiresAt: 1 }, { level: 'owner' }, { widenUrl: undefined }, { grantId: undefined }])
+    for (const invalid of [
+      { expiresAt: 1 },
+      { level: 'owner' },
+      { widenUrl: undefined },
+      { grantId: undefined },
+      { kind: 'key' },
+      { clientId: undefined },
+    ])
       expect(() => Schema.decodeUnknownSync(AccessSummary)({ ...summary, ...invalid })).toThrow()
   })
 
@@ -115,7 +123,7 @@ describe('the default chain', () => {
 
   it('takes the risky extras off the latest grant without changing it', () => {
     expect(defaultTerms(GRANT_SPEC, { latest: previous })).toEqual({ ...previous, extras: ['inspect'] })
-    expect(previous.extras).toEqual(['setup', 'inspect', 'routines', 'keys'])
+    expect(previous.extras).toEqual(['setup', 'inspect', 'routines'])
     expect(defaultTerms({ ...GRANT_SPEC, extras: [] }, { latest: previous }).extras).toEqual([])
   })
 
@@ -222,18 +230,13 @@ describe('reach', () => {
 })
 
 describe('roles', () => {
-  it('gives an owner every extra, an admin all but keys, and a member write and inspect', () => {
+  it('gives an owner and an admin every extra, and a member write and inspect', () => {
     expect(ROLE_POWER).toEqual({
-      owner: { level: 'manage', extras: ['setup', 'routines', 'inspect', 'keys'] },
+      owner: { level: 'manage', extras: ['setup', 'routines', 'inspect'] },
       admin: { level: 'manage', extras: ['setup', 'routines', 'inspect'] },
       member: { level: 'write', extras: ['inspect'] },
     })
-    expect(GRANT_SPEC.extras.filter((extra) => extra.risky).map((extra) => extra.id)).toEqual([
-      'setup',
-      'routines',
-      'keys',
-    ])
-    expect(GRANT_SPEC.extras.filter((extra) => extra.ownerOnly === true).map((extra) => extra.id)).toEqual(['keys'])
+    expect(GRANT_SPEC.extras.filter((extra) => extra.risky).map((extra) => extra.id)).toEqual(['setup', 'routines'])
   })
 })
 

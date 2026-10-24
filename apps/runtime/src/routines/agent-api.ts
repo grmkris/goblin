@@ -3,14 +3,17 @@ import * as Effect from 'effect/Effect'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { chooseOwnerModel } from '../agent-model.ts'
 import { Budget } from '../budget.ts'
-import { requestKey } from '../grants/policy.ts'
+import { requestApp } from '../grants/policy.ts'
 import { Models } from '../models.ts'
 import { Inference } from '../inference/service.ts'
 import { epochSeconds } from '../clock.ts'
 
-/** The model choice as the request's caller reads it: a server's key never sees the owner's own subscriptions (ADR 0087). */
-const choiceFor = Effect.flatMap(requestKey, (key) =>
-  Models.use((models) => (key === undefined ? models.choice : models.choiceForServers)),
+/**
+ * The model choice as the request's caller reads it: an installed app never sees the owner's own subscriptions (ADR
+ * 0087).
+ */
+const choiceFor = Effect.flatMap(requestApp, (app) =>
+  Models.use((models) => (app === undefined ? models.choice : models.choiceForServers)),
 )
 
 /**

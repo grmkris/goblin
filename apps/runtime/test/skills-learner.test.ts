@@ -205,13 +205,13 @@ describe('the skill learner (unit)', () => {
     model.answer = NEW_SKILL
     const { db, close } = chatDatabase()
     const power = senderPower({
-      kind: 'key',
-      grant: { grantId: 'key-1', level: 'manage', extras: [], topics: 'all', connections: 'all' },
+      kind: 'app',
+      grant: { grantId: 'in-1', level: 'manage', extras: [], topics: 'all', connections: 'all' },
     })
     admitReceipt(db, {
       chat: '1',
       operationId: 'op-key',
-      receipt: { kind: 'send', origin: 'key', power },
+      receipt: { kind: 'send', origin: 'app', power },
       session: () => '1',
       now: 1,
     })
@@ -231,7 +231,7 @@ describe('the skill learner (unit)', () => {
     const layer = Layer.mergeAll(
       sqliteDb(db),
       Layer.succeed(PiSessions, fake<PiSessions['Service']>({ pi: Effect.succeed(harness) })),
-      // The run recorder saw the key's message admitted, so its request id is known without asking Pi.
+      // The run recorder saw the app's message admitted, so its request id is known without asking Pi.
       Layer.succeed(AgentInput, fake<AgentInputs>({ telemetry: fake<RunTelemetry>({ requestOf: () => 'op-key' }) })),
     )
     const run: RunProgram = <A>(program: Parameters<RunProgram>[0]) =>

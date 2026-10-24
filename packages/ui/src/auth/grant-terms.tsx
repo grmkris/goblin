@@ -1,8 +1,8 @@
 // Adapted from grmkris/myapps packages/ui/src/agents/grant-terms.tsx (1f10a299) and the choice row of
 // packages/ui/src/auth/grant-reach.tsx (84525ee0), MIT, same author. What changed: goblin's six lifetimes; each level
 // and extra shows the app's own words (a label and one line) beside its control, the whole row its hit area; a risky
-// extra wears a Risky badge and an owner-only one is disabled for anyone else; the reach is the app's own controls,
-// passed in, since goblin's reach nests Topics, Personas and connections in each workspace.
+// extra wears a Risky badge; the reach is the app's own controls, passed in, since goblin's reach nests Topics,
+// Personas and connections in each workspace.
 import { type ReactNode, useId } from 'react'
 import { Badge } from '../components/badge.tsx'
 import { Checkbox } from '../components/checkbox.tsx'
@@ -31,11 +31,10 @@ export interface GrantTermsShape<L extends string, E extends string, R> {
   readonly lifetime: GrantLifetime
 }
 
-/** One extra the editor offers: a risky one is marked, and only an owner may turn on an owner-only one. */
+/** One extra the editor offers: a risky one is marked. */
 interface GrantExtraOption<E extends string> {
   readonly id: E
   readonly risky: boolean
-  readonly ownerOnly?: boolean
 }
 
 /** The levels in order, least first, and the extras. */
@@ -113,8 +112,6 @@ interface GrantTermsEditorProps<
   readonly onChange: (terms: T) => void
   /** The app's controls for the reach, between the level and the extras. */
   readonly reach: ReactNode
-  /** Whether the person may turn on an owner-only extra; anyone else sees it disabled. */
-  readonly ownerOnlyAllowed?: boolean | undefined
   readonly disabled?: boolean | undefined
   /** More of the grant after its lifetime (what else the app's grants hold). */
   readonly children?: ReactNode
@@ -153,8 +150,6 @@ function LevelChoices<L extends string, E extends string, R, T extends GrantTerm
   )
 }
 
-const OWNER_ONLY = 'Only the workspace owner can turn this on.'
-
 function ExtraChoices<L extends string, E extends string, R, T extends GrantTermsShape<L, E, R>>(
   props: GrantTermsEditorProps<L, E, R, T>,
 ) {
@@ -166,11 +161,8 @@ function ExtraChoices<L extends string, E extends string, R, T extends GrantTerm
       <div className="flex flex-col">
         {spec.extras.map((extra) => {
           const word = words.extras[extra.id]
-          const locked = extra.ownerOnly === true && props.ownerOnlyAllowed !== true
           const on = terms.extras.includes(extra.id)
-          const lines = [word.description, locked ? OWNER_ONLY : undefined, word.note].filter(
-            (line) => line !== undefined,
-          )
+          const lines = [word.description, word.note].filter((line) => line !== undefined)
           return (
             <GrantChoice
               key={extra.id}
@@ -179,8 +171,7 @@ function ExtraChoices<L extends string, E extends string, R, T extends GrantTerm
               label={word.label}
               description={lines.join(' ')}
               badge={extra.risky ? <Badge variant="outline">Risky</Badge> : undefined}
-              // A locked extra that is already on can still be turned off.
-              disabled={disabled === true || (locked && !on)}
+              disabled={disabled}
               onChange={(checked) =>
                 onChange({
                   ...terms,

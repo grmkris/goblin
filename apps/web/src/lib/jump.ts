@@ -39,7 +39,9 @@ export type JumpItem = {
   readonly detail: string
   readonly link: JumpLink
   readonly tile?: string
-  /** Listed only for a query that finds it, never before anything is typed: a Topic a server's key made (ADR 0115). */
+  /**
+   * Listed only for a query that finds it, never before anything is typed: a Topic an installed app made (ADR 0115).
+   */
   readonly asked?: true
 }
 
@@ -150,7 +152,7 @@ function apps({ pins, servers, built, agentApps }: JumpSources): JumpItem[] {
 }
 
 /**
- * Every place, in each kind's own order: the pages; the active Topics, then those each server's key made (ADR 0115);
+ * Every place, in each kind's own order: the pages; the active Topics, then those each installed app made (ADR 0115);
  * the open threads (unread first, then newest), each in its Topic's channel; the Apps; the Personas; and the sections
  * of Settings and Work.
  */
@@ -177,7 +179,7 @@ export function jumpItems(sources: JumpSources): readonly JumpItem[] {
       id: `topic:${String(topic.id)}`,
       kind: 'topic',
       label: topic.name,
-      detail: `Made by ${group.key}`,
+      detail: `Made by ${group.app}`,
       link: { to: '/c/$chatId', params: { chatId: topic.conversation } },
       asked: true,
     })),

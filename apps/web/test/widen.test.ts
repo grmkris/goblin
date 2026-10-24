@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { everything, withWorkspaces } from '../src/lib/grant-reach.ts'
 import { addsNothing, askedWords, parseWiden, reachItemOf, widened, wideningOf, withReachId } from '../src/lib/widen.ts'
 
-const KEY: GrantTerms = presetFor('swarm', ['ws_acme'])
+const INSTALLED: GrantTerms = presetFor('swarm', ['ws_acme'])
 const LISTED: GrantTerms = {
-  ...KEY,
+  ...INSTALLED,
   level: 'read',
   reach: {
     workspaces: 'list',
@@ -17,8 +17,8 @@ const LISTED: GrantTerms = {
 describe("the widening link's terms", () => {
   it('keeps only what the grant contract knows', () => {
     expect(
-      parseWiden({ grant: 'key_1', level: 'manage', reach: 'ws_acme/topic/12', extra: 'inspect', create: 'Launch' }),
-    ).toEqual({ grant: 'key_1', level: 'manage', reach: 'ws_acme/topic/12', extra: 'inspect', create: 'Launch' })
+      parseWiden({ grant: 'inst_1', level: 'manage', reach: 'ws_acme/topic/12', extra: 'inspect', create: 'Launch' }),
+    ).toEqual({ grant: 'inst_1', level: 'manage', reach: 'ws_acme/topic/12', extra: 'inspect', create: 'Launch' })
     expect(parseWiden({ grant: '', level: 'admin', extra: 'spend', reach: 7 })).toEqual({})
   })
 
@@ -79,25 +79,32 @@ describe('the terms a widening asks for', () => {
   it('compares only a live grant that is the one the link names', () => {
     const consent: ConsentTerms = {
       spec: { levels: GRANT_SPEC.levels, extras: GRANT_SPEC.extras, reachOptions: [] },
-      defaults: KEY,
+      defaults: INSTALLED,
       current: LISTED,
-      summary: { ...LISTED, grantId: 'key_1', keyId: 'key_1', expiresAt: null, widenUrl: 'https://app.test/x' },
-      grantId: 'key_1',
+      summary: {
+        ...LISTED,
+        grantId: 'inst_1',
+        kind: 'app',
+        clientId: 'app_swarm',
+        expiresAt: null,
+        widenUrl: 'https://app.test/x',
+      },
+      grantId: 'inst_1',
     }
-    const search = { grant: 'key_1', level: 'write', reach: 'ws_acme/topic/12' } as const
+    const search = { grant: 'inst_1', level: 'write', reach: 'ws_acme/topic/12' } as const
     expect(wideningOf(consent, search)).toMatchObject({
-      grantId: 'key_1',
+      grantId: 'inst_1',
       current: LISTED,
       requested: { level: 'write', reach: { each: [{ topics: { kind: 'list', ids: ['3', '12'] } }] } },
     })
-    expect(wideningOf(consent, { ...search, grant: 'key_2' })).toBeNull()
+    expect(wideningOf(consent, { ...search, grant: 'inst_2' })).toBeNull()
     expect(wideningOf({ ...consent, current: null }, search)).toBeNull()
     const { summary: _summary, ...withoutSummary } = consent
     expect(wideningOf(withoutSummary, search)).toBeNull()
   })
 
   it('says the reach it adds by its names, and what it wants to make', () => {
-    const search = { grant: 'key_1', reach: 'ws_acme/topic/12', create: 'Launch' }
+    const search = { grant: 'inst_1', reach: 'ws_acme/topic/12', create: 'Launch' }
     const requested = widened(LISTED, search)
     expect(askedWords(search, LISTED, requested, { workspace: 'Acme', item: 'Launch plan' })).toEqual([
       'Topic “Launch plan” in Acme',

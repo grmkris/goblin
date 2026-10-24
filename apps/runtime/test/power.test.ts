@@ -76,10 +76,10 @@ const SOURCE_TOOLS = ['source_propose', 'source_routes', 'source_route']
 const APPS = ['app_docs', 'app_inspect', 'app_call', 'app_build', 'app_rollback']
 
 describe("a sender's power (ADR 0115)", () => {
-  it("is a person's role's, a key's grant, a client's grant within its person's role, and an admin's for automation", () => {
+  it("is a person's role's, an app's grant, a client's grant within its person's role, and an admin's for automation", () => {
     for (const role of ['owner', 'admin', 'member'] as const satisfies readonly WorkspaceRole[])
       expect(senderPower({ kind: 'person', role })).toMatchObject({ ...ROLE_POWER[role], server: false })
-    expect(senderPower({ kind: 'key', grant: grant({ level: 'manage', extras: ['setup'] }) })).toEqual({
+    expect(senderPower({ kind: 'app', grant: grant({ level: 'manage', extras: ['setup'] }) })).toEqual({
       level: 'manage',
       extras: ['setup'],
       server: true,
@@ -98,13 +98,13 @@ describe("a sender's power (ADR 0115)", () => {
   })
 
   it('names a list of Topics or connections by its grant, so a hub and a connection can be checked against it', () => {
-    const listed = senderPower({ kind: 'key', grant: grant({ grantId: 'k', topics: 'list', connections: 'list' }) })
+    const listed = senderPower({ kind: 'app', grant: grant({ grantId: 'k', topics: 'list', connections: 'list' }) })
     expect(listed).toMatchObject({ topicLists: ['k'], connectionLists: ['k'] })
   })
 
   it("intersects a run's inputs: the least level, the extras all hold, a server's if any is, every list", () => {
     const owner = senderPower({ kind: 'person', role: 'owner' })
-    const key = senderPower({ kind: 'key', grant: grant({ grantId: 'k', extras: ['inspect'], topics: 'list' }) })
+    const key = senderPower({ kind: 'app', grant: grant({ grantId: 'k', extras: ['inspect'], topics: 'list' }) })
     expect(intersect(owner, key)).toEqual({
       level: 'write',
       extras: ['inspect'],
@@ -116,9 +116,9 @@ describe("a sender's power (ADR 0115)", () => {
     expect(powerOfAll([owner])).toEqual(intersect(AUTOMATION, owner))
   })
 
-  it("reads the sender of a request: a key, a client and its person, a member's session, or no one", () => {
-    const key = credential({ id: 'key-1', level: 'manage' })
-    expect(senderOf({ credential: key })).toMatchObject({ kind: 'key', grant: { grantId: 'key-1', level: 'manage' } })
+  it("reads the sender of a request: an app, a client and its person, a member's session, or no one", () => {
+    const app = credential({ id: 'in-1', level: 'manage' })
+    expect(senderOf({ credential: app })).toMatchObject({ kind: 'app', grant: { grantId: 'in-1', level: 'manage' } })
     const client = credential({ kind: 'client', id: 'c', level: 'write' })
     expect(senderOf({ credential: client, member: { role: 'admin' } })).toMatchObject({ kind: 'client', role: 'admin' })
     expect(senderOf({ credential: client })).toMatchObject({ kind: 'client', role: 'member' })
@@ -126,11 +126,11 @@ describe("a sender's power (ADR 0115)", () => {
     expect(senderOf({})).toBeUndefined()
   })
 
-  it('reads a receipt made before powers were by its origin and role, failing closed for a key', () => {
-    expect(receiptPower({ power: null, origin: 'key' })).toMatchObject({ level: 'read', extras: [], server: true })
+  it('reads a receipt made before powers were by its origin and role, failing closed for an app', () => {
+    expect(receiptPower({ power: null, origin: 'app' })).toMatchObject({ level: 'read', extras: [], server: true })
     expect(receiptPower({ power: null, origin: 'owner', role: 'member' })).toMatchObject({ level: 'write' })
     expect(receiptPower({ power: null, origin: 'source' })).toEqual(AUTOMATION)
-    expect(receiptPower({ power: 'not json', origin: 'key' })).toMatchObject({ server: true, level: 'read' })
+    expect(receiptPower({ power: 'not json', origin: 'app' })).toMatchObject({ server: true, level: 'read' })
   })
 })
 
@@ -138,8 +138,8 @@ describe('what a turn is offered: senders × boundary (ADR 0115)', () => {
   const owner = senderPower({ kind: 'person', role: 'owner' })
   const admin = senderPower({ kind: 'person', role: 'admin' })
   const member = senderPower({ kind: 'person', role: 'member' })
-  const writeKey = senderPower({ kind: 'key', grant: grant() })
-  const manageKey = senderPower({ kind: 'key', grant: grant({ level: 'manage', extras: ['setup', 'routines'] }) })
+  const writeKey = senderPower({ kind: 'app', grant: grant() })
+  const manageKey = senderPower({ kind: 'app', grant: grant({ level: 'manage', extras: ['setup', 'routines'] }) })
   const reader = senderPower({ kind: 'client', role: 'owner', grant: grant({ level: 'read' }) })
 
   it('offers the owner and an admin everything in the hub, and all but the hub-only Source tools in a sealed Topic', () => {
@@ -159,7 +159,7 @@ describe('what a turn is offered: senders × boundary (ADR 0115)', () => {
       expect(tools, name).not.toContain(name)
   })
 
-  it('offers a write key no routine, organizing or diagnose, and no apps outside the hub; in the hub, apps', () => {
+  it('offers a write app no routine, organizing or diagnose, and no apps outside the hub; in the hub, apps', () => {
     const sealed = offered(writeKey, SEALED)
     for (const name of [...ROUTINE_TOOLS, ...ORGANIZE, ...SOURCE_TOOLS, ...APPS, 'diagnose'])
       expect(sealed, name).not.toContain(name)
@@ -185,7 +185,7 @@ describe('what a turn is offered: senders × boundary (ADR 0115)', () => {
   })
 
   it('takes the hub away from a turn a credential with a list of Topics sent, and its connections to its list', () => {
-    const listed = senderPower({ kind: 'key', grant: grant({ grantId: 'k', topics: 'list', connections: 'list' }) })
+    const listed = senderPower({ kind: 'app', grant: grant({ grantId: 'k', topics: 'list', connections: 'list' }) })
     const effective: Effective = effectivePower(intersect(owner, listed), subagents, HUB, (id, connection) =>
       id === 'k' ? connection === 'notes' : false,
     )
@@ -211,7 +211,7 @@ const REQUESTS = new Map<number, string>([
 /** Who admitted each operation, with the power its sender had. */
 const RECEIPTS: readonly (readonly [string, ReceiptInput])[] = [
   ['op-owner', { kind: 'send', origin: 'owner', power: senderPower({ kind: 'person', role: 'owner' }) }],
-  ['op-key', { kind: 'send', origin: 'key', power: senderPower({ kind: 'key', grant: grant() }) }],
+  ['op-key', { kind: 'send', origin: 'app', power: senderPower({ kind: 'app', grant: grant() }) }],
   ['op-member', { kind: 'send', origin: 'owner', power: senderPower({ kind: 'person', role: 'member' }) }],
 ]
 
@@ -295,14 +295,14 @@ const tool = (name: string, ran: string[] = []) =>
   })
 
 describe('the power guard at call time (ADR 0115)', () => {
-  it("refuses routine_propose to a write key's turn, and to a run that batched it with the owner's", async () => {
+  it("refuses routine_propose to a write app's turn, and to a run that batched it with the owner's", async () => {
     expect(await guarded(run, 'routine_propose', callIn(41, 1))).toBeUndefined()
     expect(await guarded(run, 'routine_propose', callIn(41, 2))).toEqual({ block: POWER_TEXT })
     expect(await guarded(run, 'routine_propose', callIn(41, 1, 2))).toEqual({ block: POWER_TEXT })
     expect(await guarded(run, 'topic_setup', callIn(41, 3))).toEqual({ block: POWER_TEXT })
   })
 
-  it("refuses a hub's tool outside a hub for its boundary, and apps to a key's turn there but not in the hub", async () => {
+  it("refuses a hub's tool outside a hub for its boundary, and apps to an installed app's turn there but not in the hub", async () => {
     expect(await guarded(run, 'source_route', callIn(41, 1))).toEqual({
       block: expect.stringContaining('sealed'),
     })

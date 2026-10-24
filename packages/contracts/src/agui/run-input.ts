@@ -27,8 +27,8 @@ export type AppContext = typeof AppContext.Type
 
 /**
  * goblin's parts of a send, `forwardedProps.goblin`: the owner's files, the composer's tags (Personas tagged answer
- * instead of Goblin, in parallel unless `personaOrder` is `sequence`, "then"), and what open Apps shared. A server's key
- * sends only Persona tags of its own Personas.
+ * instead of Goblin, in parallel unless `personaOrder` is `sequence`, "then"), and what open Apps shared. A credential
+ * sends only Persona tags of the Personas it reaches.
  */
 export const SendExtras = Schema.Struct({
   attachments: Schema.optional(Schema.Array(FilePath).check(Schema.isMaxLength(8))),

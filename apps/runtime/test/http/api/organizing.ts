@@ -23,7 +23,6 @@ import { PersonasHandlers } from '../../../src/personas/api.ts'
 import { OrganizeReceipts } from '../../../src/organize/receipts.ts'
 import { PersonaRegistry } from '../../../src/personas/registry.ts'
 import { appConversations } from '../../../src/storage/schema.ts'
-import { KeyNames } from '../../../src/keys/names.ts'
 import { TopicsHandlers } from '../../../src/topics/api.ts'
 import { TopicRegistry } from '../../../src/topics/registry.ts'
 import { currentResident, database, serve, served, sqliteDb, stub } from './fixture.ts'
@@ -115,7 +114,6 @@ export const organizing = (options: { readonly frozen?: boolean } = {}) => {
     served(
       [TopicsGroup, PersonasGroup, OrganizeGroup],
       Layer.mergeAll(TopicsHandlers, PersonasHandlers, OrganizeHandlers),
-      KeyNames.layer,
       grants.layer,
     ).pipe(
       Layer.provide(
@@ -130,7 +128,7 @@ export const organizing = (options: { readonly frozen?: boolean } = {}) => {
           }),
           // A reply to a hold finds no fork here, so it records no receipt.
           stub(ChatOperations),
-          // What API keys made (ADR 0081), on the same SQLite.
+          // What installed apps made (ADR 0115), on the same SQLite.
           sqliteDb(db),
           stub(PiSessions),
           stub(RoutineRuns),
@@ -140,7 +138,7 @@ export const organizing = (options: { readonly frozen?: boolean } = {}) => {
           // Only a Source's route receipt reaches the Sources.
           stub(Sources),
           catalog,
-          // A key's create tells the views that it made what it made (for display, ADR 0115).
+          // An app's create tells the views that it made what it made (for display, ADR 0115).
           changes,
           Layer.succeed(Resident, resident.service),
           FlowEvents.layerWith((event) => Effect.sync(() => void flows.push(event))),

@@ -1,7 +1,6 @@
 import { ownerApiOf } from '@goblin/contracts/api'
 import type { NonEmptyReadonlyArray } from 'effect/Array'
 import type * as Context from 'effect/Context'
-import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as ManagedRuntime from 'effect/ManagedRuntime'
 import * as Schema from 'effect/Schema'
@@ -11,7 +10,6 @@ import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { afterEach } from 'vitest'
 import type { Grants } from '../../../src/grants/service.ts'
 import { OwnerAdmissionLive } from '../../../src/http/api/middleware.ts'
-import { KeyNames } from '../../../src/keys/names.ts'
 import { routeNames } from '../../../src/http/api/context.ts'
 import { AgentHttp } from '../../../src/http/api/server.ts'
 import { chatDatabase } from '../../chats-sqlite.ts'
@@ -20,25 +18,15 @@ import { idleGrants } from '../../grants-fixture.ts'
 export { currentResident } from '../../fixed-services.ts'
 export { type ChatDatabase as Database, sqliteDb } from '../../chats-sqlite.ts'
 
-/** Key names learnt by nothing: what a test that does not look at them serves with. */
-const idleNames = Layer.succeed(KeyNames, KeyNames.of({ learn: () => Effect.void }))
-
 /**
  * `groups` and their `handlers` served the way the agent serves the owner API (`AgentHttp.serve`): behind owner
- * admission, its router and its failure rendering, with `names` learning keys' names (for display, ADR 0115; none by default) and
- * `grants` holding credentials' grants (ADR 0114; none listed by default). Provide it the services the handlers read,
+ * admission, its router and its failure rendering, with `grants` holding credentials' grants (ADR 0114; none listed by
+ * default). Provide it the services the handlers read,
  * then `serve` it.
  */
-export const served = <
-  const Groups extends NonEmptyReadonlyArray<HttpApiGroup.Constraint>,
-  Handlers,
-  R,
-  N = never,
-  G = never,
->(
+export const served = <const Groups extends NonEmptyReadonlyArray<HttpApiGroup.Constraint>, Handlers, R, G = never>(
   groups: Groups,
   handlers: Layer.Layer<Handlers, never, R>,
-  names: Layer.Layer<KeyNames, never, N> = idleNames,
   grants: Layer.Layer<Grants, never, G> = idleGrants,
 ) => {
   const api = ownerApiOf(...groups)
@@ -46,7 +34,7 @@ export const served = <
     [routeNames(api)],
     HttpApiBuilder.layer(api).pipe(
       Layer.provide(handlers),
-      Layer.provide(OwnerAdmissionLive.pipe(Layer.provide(names))),
+      Layer.provide(OwnerAdmissionLive),
       Layer.provide(HttpServer.layerServices),
     ),
   ).pipe(Layer.provideMerge(grants))

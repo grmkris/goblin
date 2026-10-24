@@ -15,13 +15,12 @@ import { requireEvent, selectorOf } from './event.ts'
 import { Published } from './service.ts'
 
 /**
- * Who holds the leases a request makes (ADR 0112): a server's key, an installed app by its installation (ADR 0118), an
- * OAuth client for the person it acts for, or a member's own session.
+ * Who holds the leases a request makes (ADR 0112): an installed app by its installation (ADR 0118), an OAuth client
+ * for the person it acts for, or a member's own session.
  */
 const requestHolder: Effect.Effect<string> = Effect.map(Effect.serviceOption(RequestContext), (context) => {
   const facts = Option.getOrUndefined(context)
   const credential = facts?.credential
-  if (credential?.kind === 'key') return `key:${credential.id}`
   if (credential?.kind === 'app') return `app:${credential.grantId}`
   const user = facts?.member?.user ?? 'owner'
   return credential?.kind === 'client' ? `client:${credential.id}:${user}` : `member:${user}`
@@ -29,11 +28,7 @@ const requestHolder: Effect.Effect<string> = Effect.map(Effect.serviceOption(Req
 
 /** A holder as the Worker names it ending (`/internal/publish/terminate`), as its leases name it. */
 export const holderOf = (holder: LeaseHolder): string =>
-  holder.kind === 'key'
-    ? `key:${holder.keyId}`
-    : holder.kind === 'app'
-      ? `app:${holder.installationId}`
-      : `client:${holder.clientId}:${holder.user}`
+  holder.kind === 'app' ? `app:${holder.installationId}` : `client:${holder.clientId}:${holder.user}`
 
 /**
  * A request's selector, within the caller's reach: its Topic or chat must be there (a chat a Conversation or a thread,

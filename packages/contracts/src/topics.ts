@@ -15,18 +15,17 @@ export const TopicReach = Schema.Literals(['sealed', 'hub'])
 export type TopicReach = typeof TopicReach.Type
 
 /**
- * Which server's key made a Topic, for display only (ADR 0115): `key` is the key's name, or its id while goblin has not
- * learnt the name yet (one made before names were kept, until the key's next request). What anything may do never
- * depends on it.
+ * Which installed app made a Topic, for display only (ADRs 0115, 0118): `app` is the app's name, or the id of the
+ * server that made it where goblin never learnt a name. What anything may do never depends on it.
  */
-const TopicMaker = Schema.Struct({ key: Schema.String })
+const TopicMaker = Schema.Struct({ app: Schema.String })
 
 /**
  * A Topic: a durable container with exactly one Conversation (`conversation`) and any number of Threads under it.
  * Personal (`personal`, id 1) holds today's Main as its Conversation and receives every inbound channel. An archived
  * Topic (`archivedAt`) is out of navigation and of the hub's search. `reach` is how far its chats see (ADR 0115).
  * `revision` counts changes, so an undo can tell whether something touched it since. `setup` is what its chats work
- * with (ADR 0040); `madeBy` says which key made it, when one did, for display only. Times are in seconds.
+ * with (ADR 0040); `madeBy` says which app made it, when one did, for display only. Times are in seconds.
  */
 export const TopicView = Schema.Struct({
   id: TopicId,
@@ -46,7 +45,7 @@ export const TopicView = Schema.Struct({
 export type TopicView = typeof TopicView.Type
 
 /**
- * A Topic in a list (`GET /api/topics`): who it is, how far its chats see (`reach`), which key made it (`madeBy`, for
+ * A Topic in a list (`GET /api/topics`): who it is, how far its chats see (`reach`), which app made it (`madeBy`, for
  * display) and how far it has changed, without its guidance or setup, which `GET /api/topics/:id` answers. `updatedAt`
  * is its last change, in seconds.
  */

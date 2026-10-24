@@ -13,7 +13,7 @@ import type { SQLiteAsyncDatabase } from 'drizzle-orm/sqlite-core/async/db'
 import * as Effect from 'effect/Effect'
 import { type AppError, Conflict, InvalidInput, NotFound, attemptSync } from '../http/errors.ts'
 import { listedIds } from '../grants/mirror.ts'
-import { makerColumn, makerOf } from '../keys/made-by.ts'
+import { makerColumn, makerOf } from '../credentials/made-by.ts'
 import { after, pageOf } from '../storage/page.ts'
 import { appTopics } from '../storage/topics.ts'
 import { storedSetup, topicSetupOf } from './setup.ts'
@@ -40,12 +40,12 @@ export type TopicPorts = {
   readonly seed: (chat: string, operationId: string, seed: TopicSeedData) => Effect.Effect<void, AppError>
 }
 
-/** A Topic's row with the key that made it, when one did, for display (ADR 0115). */
+/** A Topic's row with the app that made it, when one did, for display (ADR 0115). */
 type Made = Row & { readonly maker: string | null | undefined }
 
-/** Which key made a Topic, by name, when one did. */
+/** Which app made a Topic, by name, when one did. */
 const madeByView = (maker: string | null | undefined) =>
-  maker === null || maker === undefined ? {} : { madeBy: { key: maker } }
+  maker === null || maker === undefined ? {} : { madeBy: { app: maker } }
 
 const view = (row: Made): TopicView => ({
   id: row.id,
@@ -118,12 +118,12 @@ export class TopicRegistry<RunResult = unknown> {
     return row
   }
 
-  /** Topics with the key that made each, one statement for any number of them. */
+  /** Topics with the app that made each, one statement for any number of them. */
   #made() {
     return this.#db.select({ ...getTableColumns(appTopics), maker: makerColumn('topic', appTopics.id) }).from(appTopics)
   }
 
-  /** A row just read or written, with the key that made it. */
+  /** A row just read or written, with the app that made it. */
   #view(row: Row): TopicView {
     return view({ ...row, maker: makerOf(this.#db, 'topic', row.id) })
   }
@@ -246,7 +246,7 @@ export class TopicRegistry<RunResult = unknown> {
   /**
    * Rename, archive or restore, and seal or make a hub (ADR 0115), as one change with one new revision. Personal is
    * never archived; a rename or restore onto a name another active Topic has is a `Conflict`. Nothing changed is no
-   * write. Guidance written by a server's key keeps its name (`guidanceBy`), a person's none.
+   * write. Guidance written by an installed app keeps its name (`guidanceBy`), a person's none.
    */
   update(id: number, change: UpdateTopic, now: number, guidanceBy: string | null = null): TopicView {
     const row = this.#row(id)

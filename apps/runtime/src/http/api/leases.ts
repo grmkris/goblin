@@ -15,8 +15,5 @@ export const endLeases = (env: RuntimeEnv, workspaceId: string, holder: LeaseHol
     reportAndRecover('publish.terminate', undefined),
   )
 
-/** A key as the leases it holds name it. */
-export const key = (keyId: string): LeaseHolder => ({ kind: 'key', keyId })
-
 /** An installed app as the leases it holds name it: by its installation (ADR 0118). */
 export const installed = (installationId: string): LeaseHolder => ({ kind: 'app', installationId })

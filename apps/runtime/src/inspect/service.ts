@@ -53,11 +53,11 @@ const FLOWS = 50
 /** The most turns a trace nests under the one it is of. */
 const TRACED_CHILDREN = 20
 
-/** Where a run event belongs for a key: a chat within its reach, one outside it, or no chat at all. */
+/** Where a run event belongs for a credential: a chat within its reach, one outside it, or no chat at all. */
 export type Place = 'in' | 'out' | 'nowhere'
 
 /**
- * What a server's API key may read of the run ledger (ADR 0084): the events of chats within its reach. The reads that
+ * What an installed app may read of the run ledger (ADR 0084): the events of chats within its reach. The reads that
  * take one see only those: a list leaves the rest out, and an operation is there only when some of its events are in
  * reach and none is outside it.
  */

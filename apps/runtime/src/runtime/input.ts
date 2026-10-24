@@ -1,6 +1,6 @@
 import type { Extension } from '@earendil-works/pi-durable'
 import type { PiHarness } from 'agents/harness/pi'
-import type { KeyOrigin } from '@goblin/contracts'
+import type { GrantOrigin } from '@goblin/contracts'
 import * as Context from 'effect/Context'
 import type { AgentApps } from '../agent-apps/engine.ts'
 import type { Applied, Retooled } from '../agent-model.ts'
@@ -56,7 +56,7 @@ export interface AgentInputs {
    * The origins grant `grantId` gives its threads in this workspace now (ADRs 0091, 0114), none once it is gone or
    * ended: what a thread's declared servers are checked against at every use (ADR 0103).
    */
-  readonly grantOrigins: (grantId: string) => Promise<readonly KeyOrigin[] | undefined>
+  readonly grantOrigins: (grantId: string) => Promise<readonly GrantOrigin[] | undefined>
   /** The agent's apps, made before Pi opened (their tools are Pi's). */
   readonly agentApps: AgentApps
   /** The run ledger and log lines the agent's services report to (ADR 0024). */

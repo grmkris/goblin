@@ -1,7 +1,7 @@
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 /**
- * The MCP servers a server's key declared on one of its threads (ADR 0103): by thread and the name its tools take
+ * The MCP servers an installed app declared on one of its threads (ADR 0103): by thread and the name its tools take
  * there, the endpoint and its granted origin, the tools it may call (JSON), its bearer token encrypted with the
  * credential cipher (bound to the workspace, thread, name and endpoint), and the grant of the credential that declared
  * it (ADR 0114), checked again at every use.

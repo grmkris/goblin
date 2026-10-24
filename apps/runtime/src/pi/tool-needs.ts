@@ -59,7 +59,7 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeed>> = {
   mcp_suggest: { level: 'read', extra: 'setup' },
   mcp_request_server: { level: 'read', extra: 'setup' },
   diagnose: { level: 'read', extra: 'inspect' },
-  // Apps are the workspace's: on a person's turn or from a hub, never on a server key's turn elsewhere.
+  // Apps are the workspace's: on a person's turn or from a hub, never on an installed app's turn elsewhere.
   app_docs: { level: 'read', people: true },
   app_inspect: { level: 'read', people: true },
   app_call: APP_CALL,

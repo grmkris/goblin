@@ -6,9 +6,9 @@ import { describe, expect, it } from 'vitest'
 import type { Credential } from '../../src/http/api/principal.ts'
 import { ownerCall } from '../../src/inbound/client.ts'
 import { type CallerReach, mcpServer } from '../../src/inbound/mcp-server.ts'
-import { credential } from '../grants-fixture.ts'
+import { credential, ONE_WORKSPACE } from '../grants-fixture.ts'
 
-const KEY = credential({ id: 'key-1', name: 'swarmm', level: 'read' })
+const APP = credential({ id: 'in-1', name: 'swarmm', level: 'read' })
 const SUBSCRIBED = {
   id: 'sub_1',
   refreshBefore: '2026-10-22T12:00:00.000Z',
@@ -18,7 +18,7 @@ const SUBSCRIBED = {
 }
 
 /** /mcp for `caller` over an agent that records each request and answers `reply`. */
-const handlerFor = (caller: Credential, reply: (request: Request) => Response, reach?: CallerReach) => {
+const handlerFor = (caller: Credential, reply: (request: Request) => Response, reach: CallerReach = ONE_WORKSPACE) => {
   const seen: Request[] = []
   const agent = {
     fetch: async (request: Request) => {
@@ -61,7 +61,7 @@ const refusal = (status: number, error: Record<string, unknown>) => () => Respon
 
 describe('/mcp publishes Events (ADR 0112)', () => {
   it('declares capabilities.events and the extension on the wire, only for a caller holding conversations', async () => {
-    const { handler } = handlerFor(KEY, () => Response.json({}))
+    const { handler } = handlerFor(APP, () => Response.json({}))
     const { client, raw } = await connected(handler)
     // The SDK's client strips the draft top-level capability; its own answer on the wire keeps it.
     expect(raw.join('')).toContain('"events":{}')
@@ -120,7 +120,7 @@ describe('/mcp publishes Events (ADR 0112)', () => {
       [refusal(409, { code: 'conflict', message: 'x', reason: 'event_subscriptions' }), -32013],
     ] as const
     for (const [reply, code] of cases) {
-      const { handler } = handlerFor(KEY, reply)
+      const { handler } = handlerFor(APP, reply)
       const { client } = await connected(handler)
       await expect(
         client.request(
@@ -133,7 +133,7 @@ describe('/mcp publishes Events (ADR 0112)', () => {
       ).rejects.toMatchObject({ code })
       await client.close()
     }
-    const { handler } = handlerFor(KEY, () => Response.json({}))
+    const { handler } = handlerFor(APP, () => Response.json({}))
     const { client } = await connected(handler)
     await expect(
       client.request({ method: 'events/stream', params: { name: 'conversation.updated', arguments: {} } }, Anything),

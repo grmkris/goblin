@@ -84,8 +84,8 @@ function Naming({ workspace }: { readonly workspace: WorkspaceView }) {
             onChange={(event) => setSlug(event.target.value.toLowerCase())}
           />
           <FieldDescription>
-            Its pages live at <code>{`${window.location.origin}/w/${slug}`}</code>. Changing it breaks links that used
-            the old one; API keys and connected clients do not use it.
+            Its pages live at <code>{`${window.location.origin}/w/${slug}`}</code>, and its apps and scripts call it
+            there. Changing it breaks links and calls that used the old one.
           </FieldDescription>
         </Field>
         {managing && (
@@ -159,7 +159,7 @@ export function WorkspaceCard() {
       <CardHeader>
         <CardTitle>This workspace</CardTitle>
         <CardDescription>
-          A workspace has its own agent: its connections, memory, channels, Personas, routines and API keys.
+          A workspace has its own agent: its connections, memory, channels, Personas, routines and apps.
         </CardDescription>
       </CardHeader>
       <CardContent>

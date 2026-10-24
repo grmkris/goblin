@@ -6,7 +6,7 @@ import { requestAuthor, requestFlowOrigin } from '../src/grants/policy.ts'
 import { credential } from './grants-fixture.ts'
 
 const CLIENT = credential({ kind: 'client', id: 'claude', name: 'Claude Code', grantId: 'cg_1' })
-const KEY = credential({ id: 'key-1', name: 'swarmm-prod' })
+const APP = credential({ id: 'in-1', name: 'swarmm-prod' })
 
 /** What `read` says of a request `caller` sent, or a member's own when none. */
 const inRequest = <A>(read: Effect.Effect<A>, caller?: Credential) =>
@@ -34,8 +34,8 @@ describe("where a request's flow comes from (ADR 0037)", () => {
 })
 
 describe("who a request's message is by (ADR 0115)", () => {
-  it("names a server's key as a server by its name, a client by its own, and the owner's session by none", async () => {
-    expect(await inRequest(requestAuthor, KEY)).toBe('server swarmm-prod')
+  it("names an installed app as a server by its name, a client by its own, and the owner's session by none", async () => {
+    expect(await inRequest(requestAuthor, APP)).toBe('server swarmm-prod')
     expect(await inRequest(requestAuthor, CLIENT)).toBe('Claude Code')
     expect(await inRequest(requestAuthor)).toBeUndefined()
   })

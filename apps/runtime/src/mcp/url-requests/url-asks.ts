@@ -82,7 +82,7 @@ function checkOutput(connectionId: string, tool: Tool, result: CallToolResult): 
   return result
 }
 
-/** The answer's place in the retried request: under the server's key, with its request state echoed byte for byte. */
+/** The answer's place in the retried request: under the installed app, with its request state echoed byte for byte. */
 const answered = (answer: UrlAnswer | undefined) =>
   answer === undefined
     ? {}

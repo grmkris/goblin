@@ -1,14 +1,10 @@
 import { AccountApi, type AppError, WorkspaceAccountApi, withRef } from '@goblin/contracts/api'
 import type {
-  ApiKeyView,
   ClientErrorReport,
   ConsentTerms,
-  CreateApiKeyTerms,
-  CreatedApiKey,
   CreateWorkspace,
   GrantTerms,
   InboundClient,
-  UpdateApiKeyTerms,
   UpdateWorkspace,
   WidenResult,
   WorkspaceView,
@@ -18,7 +14,6 @@ import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
-import { type KeyChange, createKey, listKeys, revokeKey, rotateKey, updateKey } from '../../auth/api-keys.ts'
 import { listInboundClients, revokeInboundClient } from '../../auth/clients.ts'
 import {
   type TermsChange,
@@ -45,7 +40,7 @@ import { FlowPointFailure, agentHash, flowPoint } from '../../observability/ae.t
 import { Forbidden, InvalidInput, Unauthenticated, attempt } from '../errors.ts'
 import { RequestContext } from './context.ts'
 import { type AppRecords, appRecords } from './app-records.ts'
-import { endLeases, installed, key } from './leases.ts'
+import { endLeases, installed } from './leases.ts'
 import { type MemberRecords, memberRecords } from './member-records.ts'
 
 /** The account's own records the Worker answers from: auth D1 and Analytics Engine, never an agent. */
@@ -73,24 +68,6 @@ export interface AccountRecords {
   readonly setClientGrant: (person: Person, clientId: string, terms: GrantTerms) => Effect.Effect<TermsChange, AppError>
   readonly grantTerms: (person: Person, grantId: string) => Effect.Effect<ConsentTerms, AppError>
   readonly widen: (person: Person, grantId: string, terms: GrantTerms) => Effect.Effect<TermsChange, AppError>
-  /** A workspace's API keys (ADRs 0081, 0089), and making, rotating and ending one. */
-  readonly keys: (workspaceId: string) => Effect.Effect<readonly ApiKeyView[], AppError>
-  readonly createKey: (
-    workspaceId: string,
-    userId: string,
-    input: CreateApiKeyTerms,
-  ) => Effect.Effect<CreatedApiKey, AppError>
-  /** New terms for one of the workspace's keys' grant (ADRs 0084, 0114), before and after. */
-  readonly updateKey: (
-    workspaceId: string,
-    userId: string,
-    keyId: string,
-    change: UpdateApiKeyTerms,
-  ) => Effect.Effect<KeyChange, AppError>
-  /** A new secret for one of the workspace's keys (ADR 0105): the same key, with its secret this once. */
-  readonly rotateKey: (workspaceId: string, keyId: string) => Effect.Effect<CreatedApiKey, AppError>
-  readonly revokeKey: (workspaceId: string, keyId: string) => Effect.Effect<void, AppError>
-  /** The apps a workspace registered and the apps installed in it, and the install page's calls (ADR 0118). */
   readonly apps: AppRecords
   /**
    * A browser crash's `client_error` flow point (ADR 0037), under the hash of the person when the report came with a
@@ -131,15 +108,13 @@ const clientWorkspaces = (env: RuntimeEnv, userId: string, clientId: string) =>
     reportAndRecover('publish.reach', []),
   )
 
-/** The lease holder a grant's credential is (ADR 0112): its key, its installation, or its client for its person. */
+/** The lease holder a grant's credential is (ADR 0112): its installation, or its client for its person. */
 const holderOfGrant = (change: TermsChange): LeaseHolder | undefined =>
   change.grant.kind === 'app'
     ? installed(change.grant.id)
-    : change.grant.keyId !== undefined
-      ? key(change.grant.keyId)
-      : change.grant.clientId !== undefined && change.grant.userId !== undefined
-        ? { kind: 'client', clientId: change.grant.clientId, user: change.grant.userId }
-        : undefined
+    : change.grant.userId !== undefined
+      ? { kind: 'client', clientId: change.grant.clientId, user: change.grant.userId }
+      : undefined
 
 /**
  * `change` made, after the holder's leases in every workspace whose Topics it narrowed were ended: a lease never
@@ -197,26 +172,6 @@ export const accountRecords = (env: RuntimeEnv): AccountRecords => {
           yield* endLeases(env, workspace.id, holder)
         yield* attempt(() => revokeInboundClient(env, userId, clientId))
       }),
-    keys: (workspaceId) => attempt(() => listKeys(env, workspaceId)),
-    createKey: (workspaceId, userId, input) => attempt(() => createKey(env, workspaceId, userId, input)),
-    updateKey: (workspaceId, userId, keyId, change) =>
-      Effect.tap(
-        attempt(() => updateKey(env, workspaceId, userId, keyId, change)),
-        ({ before, after }) =>
-          narrowedTopics(before.terms.reach, after.terms.reach).length === 0
-            ? Effect.void
-            : endLeases(env, workspaceId, key(keyId)),
-      ),
-    rotateKey: (workspaceId, keyId) =>
-      Effect.andThen(
-        endLeases(env, workspaceId, key(keyId)),
-        attempt(() => rotateKey(env, workspaceId, keyId)),
-      ),
-    revokeKey: (workspaceId, keyId) =>
-      Effect.andThen(
-        endLeases(env, workspaceId, key(keyId)),
-        attempt(() => revokeKey(env, workspaceId, keyId)),
-      ),
     apps: appRecords(env),
   }
 }
@@ -255,7 +210,7 @@ const member = Effect.flatMap(signedIn, ({ records, person }) =>
   ),
 )
 
-/** The member, when they are one of the workspace's owners or admins: who manage its keys and members. */
+/** The member, when they are one of the workspace's owners or admins: who manage its apps and members. */
 export const manager = Effect.flatMap(member, (admitted) =>
   admitted.workspace.role === 'member' ? Effect.fail(new Forbidden({ reason: 'role' })) : Effect.succeed(admitted),
 )
@@ -333,28 +288,7 @@ export const ClientsHandlers = HttpApiBuilder.group(AccountApi, 'clients', (hand
 /** A grant's level and extras as an audit line carries them: a few short tokens, never a name or an id it reaches. */
 export const powerOf = (terms: GrantTerms): readonly string[] => [terms.level, ...terms.extras]
 
-/**
- * A key's grant's new terms (ADRs 0084, 0114), as a manager's change of it is audited: one `api_key` line with the key,
- * the workspace, who changed it and the request's reference, its level and extras before and after, and how many MCP
- * origins it holds now. Never its secret, and no origin, tool or reach id.
- */
-const changeKey = (keyId: string, change: UpdateApiKeyTerms) =>
-  Effect.gen(function* () {
-    const { records, person, workspace } = yield* manager
-    const { before, after } = yield* records.updateKey(workspace.id, person.id, keyId, change)
-    yield* logEvent('info', 'api_key', {
-      id: keyId,
-      agent: workspace.id,
-      by: person.id,
-      kind: 'grant',
-      scopes: powerOf(after.terms),
-      'scopes.before': powerOf(before.terms),
-      count: after.terms.reach.origins.length,
-    })
-    return after
-  })
-
-/** A grant change as its answer says it, after one `grant` audit line like a key's (`changeKey`). */
+/** A grant change as its answer says it, after one `grant` audit line. */
 const audited = (change: TermsChange, by: string): Effect.Effect<WidenResult> =>
   Effect.as(
     logEvent('info', 'grant', {
@@ -394,39 +328,6 @@ export const GrantsHandlers = HttpApiBuilder.group(AccountApi, 'grants', (handle
           Effect.flatMap(records.setClientGrant(person, params.clientId, payload.terms), (change) =>
             audited(change, person.id),
           ),
-        ),
-      ),
-    ),
-)
-
-/**
- * A key's new secret (ADR 0105), as a manager's rotation of it is audited: one `api_key` line (`kind: secret`) with the
- * key, the workspace, who rotated it and the request's reference. Never a secret, the old one or the new.
- */
-const rotateSecret = (keyId: string) =>
-  Effect.gen(function* () {
-    const { records, person, workspace } = yield* manager
-    const rotated = yield* records.rotateKey(workspace.id, keyId)
-    yield* logEvent('info', 'api_key', { id: keyId, agent: workspace.id, by: person.id, kind: 'secret' })
-    return rotated
-  })
-
-export const KeysHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'keys', (handlers) =>
-  handlers
-    .handle('list', () => quoted(Effect.flatMap(manager, ({ records, workspace }) => records.keys(workspace.id))))
-    .handle('create', ({ payload }) =>
-      quoted(
-        Effect.flatMap(manager, ({ records, person, workspace }) =>
-          records.createKey(workspace.id, person.id, payload),
-        ),
-      ),
-    )
-    .handle('update', ({ params, payload }) => quoted(changeKey(params.keyId, payload)))
-    .handle('rotate', ({ params }) => quoted(rotateSecret(params.keyId)))
-    .handle('revoke', ({ params }) =>
-      quoted(
-        Effect.flatMap(manager, ({ records, workspace }) =>
-          Effect.as(records.revokeKey(workspace.id, params.keyId), { revoked: true as const }),
         ),
       ),
     ),

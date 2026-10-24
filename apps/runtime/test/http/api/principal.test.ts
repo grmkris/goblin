@@ -14,7 +14,7 @@ describe('the forwarded member (ADR 0089)', () => {
 
 describe('the forwarded credential of a grant', () => {
   const credential: Credential = {
-    kind: 'key',
+    kind: 'app',
     id: 'k1',
     name: 'swarmm',
     grantId: 'k1',

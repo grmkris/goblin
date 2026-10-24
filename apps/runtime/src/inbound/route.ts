@@ -1,9 +1,7 @@
 import { createMcpHandler } from 'agents/mcp/server'
-import { verifyKey } from '../auth/api-keys.ts'
 import { challengeOf } from '../auth/index.ts'
 import type { RuntimeEnv } from '../env.ts'
 import { refOf, runAtEdge } from '../http/api/edge.ts'
-import { type Credential, bearerKey } from '../http/api/principal.ts'
 import { Unauthenticated } from '../http/errors.ts'
 import { type TokenAccess, callIn, tokenAccess } from './client-access.ts'
 import { ownerCall } from './client.ts'
@@ -17,31 +15,21 @@ export const inboundHosts = (appUrl: string) => ({
 })
 
 /**
- * Who a bearer on /mcp is, and which agents it reaches: a key its own workspace's (ADR 0089), as its credential; an
- * OAuth client those of the workspaces its grant reaches now (ADRs 0097, 0114), acting for its person as a member of
- * each, with the credential its grant makes in each; an installed app those it is installed in (ADR 0118), with each
- * installation's credential and no person.
+ * Who a bearer on /mcp is, and which agents it reaches (ADR 0125): an OAuth client those of the workspaces its grant
+ * reaches now (ADRs 0097, 0114), acting for its person as a member of each, with the credential its grant makes in
+ * each; an installed app those it is installed in (ADR 0118), with each installation's credential and no person.
  */
-type Admitted =
-  | { readonly kind: 'key'; readonly workspaceId: string; readonly credential: Credential; readonly token: string }
-  | ({ readonly token: string } & TokenAccess)
+type Admitted = { readonly token: string } & TokenAccess
 
 /** No bearer at all, or one that was presented and refused: the challenge says which (RFC 6750 §3.1). */
 type Challenged = { readonly kind: 'challenge'; readonly invalidToken: boolean }
 
 /**
- * A server's API key (ADR 0081), an OAuth client a person consented to (ADR 0024) with the grant they gave it and the
- * workspaces it reaches now (ADRs 0097, 0114), or an installed app (ADR 0118). A key that does not admit rejects with its
- * `Unauthenticated`, which
- * the Worker answers in the envelope `/api` uses: there is nothing to sign in to. An OAuth token that does not verify,
- * or no bearer at all, is answered with the sign-in challenge, naming `invalid_token` when one was presented.
+ * An OAuth client a person consented to (ADR 0024) with the grant they gave it and the workspaces it reaches now (ADRs
+ * 0097, 0114), or an installed app (ADR 0118). A token that does not admit, or no bearer at all, is answered with the
+ * sign-in challenge, naming `invalid_token` when one was presented (an old server key's included, ADR 0125).
  */
 const admit = async (request: Request, env: RuntimeEnv): Promise<Admitted | Challenged> => {
-  const key = bearerKey(request)
-  if (key !== undefined) {
-    const { workspaceId, credential } = await verifyKey(env, key)
-    return { kind: 'key', workspaceId, credential, token: key }
-  }
   const header = request.headers.get('authorization') ?? ''
   if (!header.startsWith('Bearer ')) return { kind: 'challenge', invalidToken: false }
   const token = header.slice('Bearer '.length)
@@ -55,28 +43,22 @@ const admit = async (request: Request, env: RuntimeEnv): Promise<Admitted | Chal
 }
 
 /**
- * How each tool call reaches its agent: a key's own workspace with its credential, or the workspace a client's or an
- * app's call names, with the credential its grant makes there (and a client's person's role in it).
+ * How each tool call reaches its agent: the workspace a client's or an app's call names, with the credential its grant
+ * makes there (and a client's person's role in it).
  */
-const callerOf = (admitted: Admitted, env: RuntimeEnv, ref: string): OwnerCaller => {
-  if (admitted.kind === 'key') {
-    const agent = env.AGENTS.getByName(admitted.workspaceId)
-    return (call) => runAtEdge(ownerCall(agent, admitted.credential, undefined, call, { ref }))
-  }
-  return async (call, named) => {
+const callerOf =
+  (admitted: Admitted, env: RuntimeEnv, ref: string): OwnerCaller =>
+  async (call, named) => {
     const workspace = workspaceFor(admitted.reach, named)
     const { credential, member } = callIn(admitted, workspace)
     return runAtEdge(ownerCall(env.AGENTS.getByName(workspace.id), credential, member, call, { ref }))
   }
-}
 
 /**
- * The level and extras a bearer's tools are listed by: a key's or a client's grant's; for an app, the most its
- * installations hold (ADR 0118), since each call goes as one installation's credential and owner admission holds it to
- * that grant.
+ * The level and extras a bearer's tools are listed by: a client's grant's; for an app, the most its installations hold
+ * (ADR 0118), since each call goes as one installation's credential and owner admission holds it to that grant.
  */
 const powerOf = (admitted: Admitted): Power => {
-  if (admitted.kind === 'key') return admitted.credential
   if (admitted.kind === 'client') return admitted.grant
   const grants = [...admitted.installations.values()].map((each) => each.grant)
   const order = ['read', 'write', 'manage'] as const
@@ -86,23 +68,17 @@ const powerOf = (admitted: Admitted): Power => {
 
 /**
  * `/mcp` (ADRs 0086, 0114): one server for every credential, its tools those its grant's level and extras reach, each
- * an owner API call as that credential to an agent: a key's own workspace's (ADR 0089), or for an OAuth client the
- * workspace the call names among those its grant reaches (ADR 0097).
+ * an owner API call as that credential to the agent of the workspace the call names among those it reaches (ADRs 0097,
+ * 0118).
  */
 export const handleInboundMcp = async (request: Request, env: RuntimeEnv): Promise<Response> => {
   const admitted = await admit(request, env)
   if (admitted.kind === 'challenge') return challengeOf(env.APP_URL, admitted)
   const { token } = admitted
   const power = powerOf(admitted)
-  const grantId =
-    admitted.kind === 'key'
-      ? admitted.credential.grantId
-      : admitted.kind === 'client'
-        ? admitted.grant.id
-        : `app:${admitted.clientId}`
+  const grantId = admitted.kind === 'client' ? admitted.grant.id : `app:${admitted.clientId}`
   const call = callerOf(admitted, env, refOf(request))
-  const reach = admitted.kind === 'key' ? undefined : admitted.reach
-  const handler = createMcpHandler(() => mcpServer(power, call, reach), {
+  const handler = createMcpHandler(() => mcpServer(power, call, admitted.reach), {
     route: '/mcp',
     // The canonical host is configuration, not the request's Host/Origin. This keeps custom domains valid while
     // retaining the SDK's DNS-rebinding protection; the Worker redirects alternate hosts before reaching here.
@@ -113,7 +89,7 @@ export const handleInboundMcp = async (request: Request, env: RuntimeEnv): Promi
       token,
       clientId: `grant:${grantId}`,
       scopes: ['goblin'],
-      ...(admitted.kind === 'key' ? {} : { expiresAt: admitted.expiresAt }),
+      expiresAt: admitted.expiresAt,
     },
   })
 }

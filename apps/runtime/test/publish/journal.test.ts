@@ -85,7 +85,7 @@ const owed = (sqlite: ReturnType<typeof setup>['sqlite'], id: string) =>
     .all(id)
 
 describe('the published journal (ADR 0112)', () => {
-  it('journals a wake once and owes it to each lease that takes it, a key only in the Topics its grant lists', () => {
+  it('journals a wake once and owes it to each lease that takes it, an app only in the Topics its grant lists', () => {
     const { db, sqlite } = setup()
     lease(db, 'all-k1', 'key:k1')
     lease(db, 'customer-b-k1', 'key:k1', { topic: 3 })
@@ -121,7 +121,7 @@ describe('the published journal (ADR 0112)', () => {
     expect(nextDue(db)).toBe(NOW + 15_000 + 30_000)
   })
 
-  it('pages a poll after a cursor; null answers where now is; a key reads only the Topics its grant lists and selectors filter', () => {
+  it('pages a poll after a cursor; null answers where now is; an app reads only the Topics its grant lists and selectors filter', () => {
     const { db } = setup()
     for (const [chat, topic] of [
       ['20', 2],

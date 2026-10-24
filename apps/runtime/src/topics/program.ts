@@ -102,7 +102,7 @@ export const updateTopic = (id: number, change: UpdateTopic, provenance: Provena
     const organized = after.name !== before.name || after.archivedAt !== before.archivedAt
     if (after.revision !== before.revision && organized) yield* receipts.record(topicReceipt(before, after, provenance))
     if (change.archived !== true) return after
-    // Its threads keep no MCP servers a key declared on them (ADR 0103), whatever stopping them does; restoring it
+    // Its threads keep no MCP servers an app declared on them (ADR 0103), whatever stopping them does; restoring it
     // brings none back.
     yield* dropTopicServers(id)
     const stops: Exit.Exit<boolean, AppError>[] = []

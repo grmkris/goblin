@@ -23,7 +23,6 @@ export { NotifyGroup, SourcesGroup } from './sources.ts'
 export { TopicsGroup } from './topics.ts'
 export { WorkspaceGroup } from './workspace.ts'
 export { GrantsResident } from './resident.ts'
-export { KeysGroup } from './keys.ts'
 export { DeveloperAppsGroup, InstallGroup, InstallationsGroup } from './installs.ts'
 export { WorkspacesGroup } from './workspaces.ts'
 // The grant's contract (`grants.ts`, ADR 0114): each owner endpoint's need, a credential's own grant, and the grants.

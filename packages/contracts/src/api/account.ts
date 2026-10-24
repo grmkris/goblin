@@ -4,7 +4,6 @@ import { ClientsGroup } from './clients.ts'
 import { GrantsGroup } from './grants.ts'
 import { DeveloperAppsGroup, InstallGroup, InstallationsGroup } from './installs.ts'
 import { InvitationsGroup } from './invitations.ts'
-import { KeysGroup } from './keys.ts'
 import { MembersGroup } from './members.ts'
 import { WorkspacesGroup } from './workspaces.ts'
 
@@ -19,9 +18,9 @@ export class AccountApi extends HttpApi.make('goblin-account')
 
 /**
  * What the Worker answers for a member of one workspace, under `/w/<workspace slug>` (ADRs 0089, 0093), without waking
- * its agent: the workspace's API keys, its members and invitations, the apps it registered and the apps installed in it
+ * its agent: its members and invitations, the apps it registered and the apps installed in it
  * (ADR 0118).
  */
 export class WorkspaceAccountApi extends HttpApi.make('goblin-workspace-account')
-  .add(KeysGroup, MembersGroup, DeveloperAppsGroup, InstallationsGroup)
+  .add(MembersGroup, DeveloperAppsGroup, InstallationsGroup)
   .prefix('/api') {}

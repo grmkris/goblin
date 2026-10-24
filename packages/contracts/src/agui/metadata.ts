@@ -50,12 +50,12 @@ export type StopMark = typeof StopMark.Type
  * - `entryId`: the Pi entry a committed message is (on `TEXT_MESSAGE_END`, `TOOL_CALL_RESULT`, `ACTIVITY_SNAPSHOT` and
  *   every snapshot message), so a reader can page history before it.
  * - `at`: when the message was written (epoch milliseconds), on a message's first event and in snapshots.
- * - A user message: `author` (who wrote it when not the owner's own composer: a Source, a server's key, an MCP client,
- *   a subagent, `Routine`), `member` (a member of a workspace of several people, ADR 0094), `own` (the owner's own turn
- *   that came from elsewhere, ADR 0066), `attachments`, `context` (what an open App shared, untrusted), `selections`
- *   (the composer's `@`/`/` choices), `outcome` (how a held call ended) and `kept` (an outcome kept for the next turn),
- *   `thread` (the thread a shared note or a routine report came from) and `ask` (the Personas it went to instead of
- *   the agent, ADR 0090).
+ * - A user message: `author` (who wrote it when not the owner's own composer: a Source, an installed app, an MCP
+ *   client, a subagent, `Routine`), `member` (a member of a workspace of several people, ADR 0094), `own` (the owner's
+ *   own turn that came from elsewhere, ADR 0066), `attachments`, `context` (what an open App shared, untrusted),
+ *   `selections` (the composer's `@`/`/` choices), `outcome` (how a held call ended) and `kept` (an outcome kept for
+ *   the next turn), `thread` (the thread a shared note or a routine report came from) and `ask` (the Personas it went
+ *   to instead of the agent, ADR 0090).
  * - An assistant message: `persona` (a Persona's answer), `stop` (why it has no whole answer) and `usage` (the tokens
  *   its model call used, as Pi counts them).
  * - A child's final answer in its parent (a Persona's answer, a Delegate's result): `subagentRunId`, the child chat

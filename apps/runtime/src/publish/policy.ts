@@ -12,7 +12,7 @@ export const PUBLISH_LIMITS = {
   defaultTtlMs: 3_600_000,
   minTtlMs: 300_000,
   maxTtlMs: 86_400_000,
-  /** Leases one holder (a key, a client for a person, a member) may hold, and the whole workspace. */
+  /** Leases one holder (an app, a client for a person, a member) may hold, and the whole workspace. */
   perHolder: 32,
   perWorkspace: 256,
   pageEvents: 100,

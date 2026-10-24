@@ -41,14 +41,14 @@ const CLIENT: InboundClient = {
   terms: { ...PRESET, name: 'Claude Code' },
 }
 const SPEC = { levels: GRANT_SPEC.levels, extras: GRANT_SPEC.extras, reachOptions: [] }
-const KEY_TERMS: GrantTerms = { ...presetFor('swarm', ['ws_acme']), level: 'read' }
+const INSTALLED_TERMS: GrantTerms = { ...presetFor('swarm', ['ws_acme']), level: 'read' }
 
 /**
  * The person's account API served in memory (its grants and clients), as the Worker serves it outside any workspace,
  * and one workspace's Topics, Personas and connections under `/w/acme`, as its agent answers them there.
  */
 const fakeWorker = () => {
-  const state = { client: CLIENT, key: KEY_TERMS }
+  const state = { client: CLIENT, installed: INSTALLED_TERMS }
   const Grants = HttpApiBuilder.group(AccountApi, 'grants', (handlers) =>
     handlers.handleAll({
       clientTerms: ({ params }): Effect.Effect<ConsentTerms, NotFound> =>
@@ -64,23 +64,24 @@ const fakeWorker = () => {
         return Effect.succeed({ grantId: `cg_${params.clientId}`, terms: payload.terms, expiresAt: null })
       },
       terms: ({ params }) =>
-        params.id === 'key_1'
+        params.id === 'inst_1'
           ? Effect.succeed({
               spec: SPEC,
-              defaults: KEY_TERMS,
-              current: state.key,
-              grantId: 'key_1',
+              defaults: INSTALLED_TERMS,
+              current: state.installed,
+              grantId: 'inst_1',
               summary: {
-                ...state.key,
-                grantId: 'key_1',
-                keyId: 'key_1',
+                ...state.installed,
+                grantId: 'inst_1',
+                kind: 'app',
+                clientId: 'app_swarm',
                 expiresAt: null,
                 widenUrl: 'https://app.test',
               },
             })
           : Effect.fail(new NotFound({ what: 'grant' })),
       widen: ({ payload }) => {
-        state.key = payload.terms
+        state.installed = payload.terms
         return Effect.succeed({ ...payload, expiresAt: null })
       },
     }),
@@ -175,7 +176,7 @@ const fakeWorker = () => {
     reset: () => {
       seen.length = 0
       state.client = CLIENT
-      state.key = KEY_TERMS
+      state.installed = INSTALLED_TERMS
       for (const served of [worker, agent]) served.calls.length = 0
     },
     dispose: () => Promise.all([worker.dispose(), agent.dispose()]),
@@ -222,15 +223,15 @@ describe("an MCP client's grant (ADR 0114)", () => {
 describe('widening a grant', () => {
   it('reads its terms and saves exactly the approved ones under its id', async () => {
     const client = testQueryClient()
-    const read = await client.query(grantTermsQuery('key_1'))
-    expect(read).toMatchObject({ grantId: 'key_1', current: { level: 'read' } })
+    const read = await client.query(grantTermsQuery('inst_1'))
+    expect(read).toMatchObject({ grantId: 'inst_1', current: { level: 'read' } })
     const widen = new MutationObserver(client, widenGrantMutation)
-    const terms: GrantTerms = { ...KEY_TERMS, level: 'write' }
-    expect(await widen.mutate({ grantId: 'key_1', terms })).toEqual({ grantId: 'key_1', terms, expiresAt: null })
-    expect(fake.state.key).toEqual(terms)
-    expect(client.getQueryState(grantTermsQuery('key_1').queryKey)?.isInvalidated).toBe(true)
+    const terms: GrantTerms = { ...INSTALLED_TERMS, level: 'write' }
+    expect(await widen.mutate({ grantId: 'inst_1', terms })).toEqual({ grantId: 'inst_1', terms, expiresAt: null })
+    expect(fake.state.installed).toEqual(terms)
+    expect(client.getQueryState(grantTermsQuery('inst_1').queryKey)?.isInvalidated).toBe(true)
     const put = fake.calls().find((call) => call.method === 'PUT')
-    expect(new URL(put?.url ?? '').pathname).toBe('/api/grants/key_1')
+    expect(new URL(put?.url ?? '').pathname).toBe('/api/grants/inst_1')
   })
 })
 

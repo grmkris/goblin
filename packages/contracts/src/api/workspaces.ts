@@ -14,10 +14,10 @@ import { API_ERRORS } from './errors.ts'
  *   is given one first, named after them; asking again finds that same one.
  * - `create`: `POST /api/workspaces`, 201 with a new workspace, the person its owner.
  * - `update`: `PATCH /api/workspaces/:workspaceId` renames it or changes its slug, for its owner or an admin. Links that
- *   used the old slug stop working, and so does an MCP client's call naming it by the old slug (ADR 0097: ids stay);
- *   keys do not use it.
- * - `delete`: `DELETE /api/workspaces/:workspaceId`, for its owner: its agent is erased first, then its keys, its
- *   place in MCP clients' reaches and its memberships.
+ *   used the old slug stop working, and so do an MCP client's call naming it by the old slug (ADR 0097: ids stay)
+ *   and an app's or script's calls on `/w/<old slug>/api`.
+ * - `delete`: `DELETE /api/workspaces/:workspaceId`, for its owner: its agent is erased first, then the apps installed
+ *   in it, its place in MCP clients' reaches and its memberships.
  */
 export class WorkspacesGroup extends HttpApiGroup.make('workspaces').add(
   HttpApiEndpoint.get('list', '/workspaces', { success: Schema.Array(WorkspaceView), error: API_ERRORS }),

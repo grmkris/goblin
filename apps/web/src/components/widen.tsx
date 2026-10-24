@@ -10,11 +10,11 @@ import { type AskedNames, type WidenSearch, addsNothing, askedWords, reachItemOf
 import { AuthShell } from './auth-shell.tsx'
 import { GRANT_WORDS, type GrantHolder, GrantLine, grantFailure, reachWords } from './grant-editor.tsx'
 
-/** Whose grant it is: a key's lives in the one workspace it reaches; anything else is a client's. */
+/** Whose grant it is: an installed app's lives in the one workspace it reaches; a client's in the person's. */
 const holderOf = (summary: AccessSummary, workspaces: readonly WorkspaceView[]): GrantHolder => {
   const home = workspaces.find((workspace) => workspace.id === summary.reach.each[0]?.workspace)
-  return summary.keyId !== undefined && home !== undefined
-    ? { kind: 'key', workspace: home }
+  return summary.kind === 'app' && home !== undefined
+    ? { kind: 'app', workspace: home }
     : { kind: 'client', workspaces }
 }
 
@@ -44,10 +44,10 @@ function useAskedNames(
   return { names: { workspace: workspace?.name, item: named }, reading: picking && items.isLoading }
 }
 
-/** Who asks, by the name its grant carries: an API key's, or the MCP client's as it registered. */
+/** Who asks, by the name its grant carries: an installed app's, or the MCP client's as it registered. */
 const identityOf = (summary: AccessSummary, name: string) => (
   <>
-    {summary.keyId === undefined ? 'The MCP client' : 'The API key'} <strong className="break-all">{name}</strong>
+    {summary.kind === 'app' ? 'The app' : 'The MCP client'} <strong className="break-all">{name}</strong>
   </>
 )
 

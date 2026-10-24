@@ -1,3 +1,4 @@
+import type { CallerReach } from '../src/inbound/mcp-server.ts'
 import { GRANT_SPEC, type Extra, type Level, type ReachKind, missingFor, reachId } from '@goblin/contracts'
 import { NotFound, accessInsufficient } from '@goblin/contracts/api'
 import * as Effect from 'effect/Effect'
@@ -11,6 +12,13 @@ export const FIXTURE_APP = 'https://goblin.test'
 
 /** The workspace the fixtures' agent belongs to. */
 export const FIXTURE_WORKSPACE = 'w1'
+
+/** A caller of /mcp that reaches the fixture workspace alone, so its calls never name one (ADR 0097). */
+export const ONE_WORKSPACE: CallerReach = {
+  all: false,
+  named: false,
+  workspaces: [{ id: FIXTURE_WORKSPACE, slug: 'fixture', name: 'Fixture', role: 'owner', members: 1 }],
+}
 
 type Coverage = 'all' | 'list'
 
@@ -29,10 +37,10 @@ export const credential = (parts: {
   readonly origins?: Credential['origins']
   readonly expiresAt?: number | null
 }): Credential => ({
-  kind: parts.kind ?? 'key',
-  id: parts.id ?? 'key-1',
-  name: parts.name ?? parts.id ?? 'key-1',
-  grantId: parts.grantId ?? parts.id ?? 'key-1',
+  kind: parts.kind ?? 'app',
+  id: parts.id ?? 'in-1',
+  name: parts.name ?? parts.id ?? 'in-1',
+  grantId: parts.grantId ?? parts.id ?? 'in-1',
   level: parts.level ?? 'write',
   extras: parts.extras ?? [],
   expiresAt: parts.expiresAt ?? null,

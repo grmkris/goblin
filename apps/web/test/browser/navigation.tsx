@@ -46,8 +46,8 @@ const mcpView = (id: string, conversation: string, title: string, overrides: Par
   ...overrides,
 })
 
-/** A Topic a server's key made (ADR 0115): sealed like any other, made by the agent for the key. */
-const made = (id: number, name: string, key: string): TopicView => ({
+/** A Topic an installed app made (ADR 0115): sealed like any other, made by the agent for the app. */
+const made = (id: number, name: string, app: string): TopicView => ({
   id,
   name,
   conversation: String(id * 10),
@@ -56,17 +56,17 @@ const made = (id: number, name: string, key: string): TopicView => ({
   setup: EVERYTHING,
   createdBy: 'agent',
   createdAt: NOW - 86_400 + id,
-  madeBy: { key },
+  madeBy: { app },
 })
-/** 24 Topics of one key (a few more than its section shows at once) and 2 of another, made a day ago. */
+/** 24 Topics of one app (a few more than its section shows at once) and 2 of another, made a day ago. */
 const MADE: TopicView[] = [
   ...Array.from({ length: 24 }, (_, n) => made(100 + n, `deal-${String(n + 1).padStart(2, '0')}`, 'swarmm-prod')),
   made(200, 'quest-board', 'sidequest-dev'),
   made(201, 'quest-review', 'sidequest-dev'),
 ]
 
-/** A Persona; `key` names the server's key that made it, for display. */
-const persona = (id: number, name: string, role: string, key?: string): PersonaView => ({
+/** A Persona; `app` names the installed app that made it, for display. */
+const persona = (id: number, name: string, role: string, app?: string): PersonaView => ({
   id,
   name,
   avatar: { glyph: name.slice(0, 1).toUpperCase(), hue: id * 37 },
@@ -76,13 +76,13 @@ const persona = (id: number, name: string, role: string, key?: string): PersonaV
   revision: 1,
   createdAt: 1,
   updatedAt: 1,
-  ...(key !== undefined && { madeBy: { key } }),
+  ...(app !== undefined && { madeBy: { app } }),
 })
 
 /**
  * An owner with three Topics (one archived), threads (one unread, one a Delegate at work), pins in every state, an agent
  * app, recent App views, two Personas and an unread notification: every row and count the sidebar draws. Personal is
- * the hub. Two server keys made Topics (one replied to a minute ago, unread) and two more Personas.
+ * the hub. Two installed apps made Topics (one replied to a minute ago, unread) and two more Personas.
  */
 const WORKSPACE: WorkspaceSnapshot = {
   conversations: [

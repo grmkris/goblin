@@ -374,11 +374,11 @@
   background: var(--live);
 }
 /*
- * The Topics a server's key made (ADR 0115), under the Topics: the key's name, then how many in figures that keep their
- * width, and once open a filter field on the sidebar's own surface (16px at a finger, so a phone does not zoom into
- * it) and a quiet line when nothing matches.
+ * The Topics an installed app made (ADR 0115), under the Topics: the app's name, then how many in figures that keep
+ * their width, and once open a filter field on the sidebar's own surface (16px at a finger, so a phone does not zoom
+ * into it) and a quiet line when nothing matches.
  */
-.sidebar-made-key {
+.sidebar-made-app {
   min-width: 0;
   overflow: clip;
   text-overflow: ellipsis;

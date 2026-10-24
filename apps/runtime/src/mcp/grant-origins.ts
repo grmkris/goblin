@@ -1,4 +1,4 @@
-import type { KeyOrigin } from '@goblin/contracts'
+import type { GrantOrigin } from '@goblin/contracts'
 import { coverageIn, grantById, isLive } from '../auth/grants.ts'
 import type { RuntimeEnv } from '../env.ts'
 
@@ -12,7 +12,7 @@ export async function grantOriginsNow(
   env: RuntimeEnv,
   workspaceId: string,
   grantId: string,
-): Promise<readonly KeyOrigin[] | undefined> {
+): Promise<readonly GrantOrigin[] | undefined> {
   const grant = await grantById(env.AUTH_DB, grantId)
   if (grant === undefined || !isLive(grant, Date.now())) return undefined
   if ((await coverageIn(env.AUTH_DB, grant, workspaceId)) === undefined) return undefined

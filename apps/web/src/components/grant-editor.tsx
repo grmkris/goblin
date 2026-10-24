@@ -1,6 +1,7 @@
-// The one grant editor (ADR 0114): a server's API key and an MCP client hold the same grant, so a key's card, the consent
-// page and Settings' MCP clients change it with the same controls. The reach is goblin's own: which workspaces, then in
-// each its Topics, Personas and connections as all or a pick, then the MCP servers the credential may bring.
+// The one grant editor (ADR 0114): an installed app and an MCP client hold the same grant, so the install page, an
+// installation's card, the consent page and Settings' MCP clients change it with the same controls. The reach is
+// goblin's own: which workspaces, then in each its Topics, Personas and connections as all or a pick, then the MCP
+// servers the credential may bring.
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -8,11 +9,11 @@ import {
   GRANT_SPEC,
   type GoblinReach,
   type GrantTerms,
-  type KeyOrigin,
+  type GrantOrigin,
   type Level,
   type WorkspaceReach,
   type WorkspaceView,
-  keyOriginsOf,
+  grantOriginsOf,
 } from '@goblin/contracts'
 import {
   Button,
@@ -70,51 +71,38 @@ export const GRANT_WORDS: GrantWords<Level, Extra> = {
       label: 'Inspect',
       description: 'See how the runs it reaches went: model and tool calls and timings, never their words.',
     },
-    keys: {
-      label: 'Keys',
-      description: "Manage the workspace's API keys.",
-      note: 'Coming later; it opens nothing yet.',
-    },
   },
 }
 
-/** Whose grant it is: a key's, over its one workspace, or an MCP client's, over the person's workspaces. */
+/** Whose grant it is: an installation's, over its one workspace, or an MCP client's, over the person's workspaces. */
 export type GrantHolder =
-  | { readonly kind: 'key'; readonly workspace: WorkspaceView }
+  | { readonly kind: 'app'; readonly workspace: WorkspaceView }
   | { readonly kind: 'client'; readonly workspaces: readonly WorkspaceView[] }
 
 const workspacesOf = (holder: GrantHolder): readonly WorkspaceView[] =>
-  holder.kind === 'key' ? [holder.workspace] : holder.workspaces
+  holder.kind === 'app' ? [holder.workspace] : holder.workspaces
 
-/** The grant's reach in words, as its summary line says it: a key's without naming its workspace. */
+/** The grant's reach in words, as its summary line says it: an installation's without naming its workspace. */
 export const reachWords =
   (holder: GrantHolder) =>
   (reach: GoblinReach): string =>
-    describeReach(reach, workspacesOf(holder), holder.kind === 'key' ? holder.workspace.id : undefined)
+    describeReach(reach, workspacesOf(holder), holder.kind === 'app' ? holder.workspace.id : undefined)
 
-/** Whether the person may grant the owner-only `keys`: they own every workspace the grant reaches. */
-const ownsReach = (reach: GoblinReach, holder: GrantHolder): boolean => {
-  const workspaces = workspacesOf(holder)
-  const reached = reachedWorkspaces(reach, workspaces)
-  return (
-    reached.length > 0 && reached.every((id) => workspaces.find((workspace) => workspace.id === id)?.role === 'owner')
-  )
-}
-
-/** What is wrong with `rows` as a grant's MCP servers, in words, before anything is sent (`keyOriginsOf`). */
+/** What is wrong with `rows` as a grant's MCP servers, in words, before anything is sent (`grantOriginsOf`). */
 const ORIGIN_PROBLEMS = {
-  key_origin: 'Each server needs its own https address of a public host, like https://mcp.example.com, at most 8.',
-  key_origin_tools: 'Each server needs 1 to 50 tool names, separated by commas.',
+  origin: 'Each server needs its own https address of a public host, like https://mcp.example.com, at most 8.',
+  origin_tools: 'Each server needs 1 to 50 tool names, separated by commas.',
 } as const
 
 /**
- * Why saving a grant's terms failed, in words: the grant endpoints' refusals of terms that cannot be given (`keys` from
- * anyone but an owner, servers the contract refuses, terms for another grant), else `messageOf`'s copy for `action`.
+ * Why saving a grant's terms failed, in words: the grant endpoints' refusals of terms that cannot be given (an
+ * installation's from a member, servers the contract refuses, terms for another grant), else `messageOf`'s copy for
+ * `action`.
  */
 export const grantFailure = (error: unknown, action: string): string => {
   if (error instanceof Forbidden && error.reason === 'role')
-    return withRef('Only an owner of the workspace may give Keys: turn it off, or ask an owner.', error)
-  if (error instanceof InvalidInput && (error.reason === 'key_origin' || error.reason === 'key_origin_tools'))
+    return withRef("Only the workspace's owners and admins give an app its access.", error)
+  if (error instanceof InvalidInput && (error.reason === 'origin' || error.reason === 'origin_tools'))
     return withRef(ORIGIN_PROBLEMS[error.reason], error)
   if (error instanceof InvalidInput && error.reason === 'grant')
     return withRef('That access changed meanwhile. Reload the page and try again.', error)
@@ -124,11 +112,11 @@ export const grantFailure = (error: unknown, action: string): string => {
 /** Why `terms` cannot be saved yet, in words; empty when they can. */
 export const grantProblem = (terms: GrantTerms): string => {
   if (!reachesAnything(terms.reach)) return 'Choose at least one workspace.'
-  const checked = keyOriginsOf(terms.reach.origins)
+  const checked = grantOriginsOf(terms.reach.origins)
   return 'problem' in checked ? ORIGIN_PROBLEMS[checked.problem] : ''
 }
 
-/** The grant in one line: "<name> can write everything · no setup, routines, inspect or keys · until revoked". */
+/** The grant in one line: "<name> can write everything · no setup, routines or inspect · until revoked". */
 export function GrantLine(props: { readonly name: string; readonly terms: GrantTerms; readonly holder: GrantHolder }) {
   return (
     <GrantSummary
@@ -286,7 +274,10 @@ function WorkspacesChoice(props: {
   )
 }
 
-/** The reach: a key's Topics, Personas and connections in its workspace, or a client's workspaces and each one's. */
+/**
+ * The reach: an installation's Topics, Personas and connections in its workspace, or a client's workspaces and each
+ * one's.
+ */
 function ReachFields(props: {
   readonly reach: GoblinReach
   readonly holder: GrantHolder
@@ -295,7 +286,7 @@ function ReachFields(props: {
 }) {
   const { reach, holder, onChange, disabled } = props
   const change = (entry: WorkspaceReach) => onChange(withEntry(reach, entry))
-  if (holder.kind === 'key')
+  if (holder.kind === 'app')
     return (
       <WorkspaceFields
         workspace={holder.workspace}
@@ -330,9 +321,9 @@ function ReachFields(props: {
 /** One MCP server being edited: its address and its tools as typed, comma-separated. */
 type OriginRow = { readonly origin: string; readonly tools: string }
 
-const rowsOf = (origins: readonly KeyOrigin[]): readonly OriginRow[] =>
+const rowsOf = (origins: readonly GrantOrigin[]): readonly OriginRow[] =>
   origins.map(({ origin, tools }) => ({ origin, tools: tools.join(', ') }))
-const originsOf = (rows: readonly OriginRow[]): readonly KeyOrigin[] =>
+const originsOf = (rows: readonly OriginRow[]): readonly GrantOrigin[] =>
   rows
     .filter((row) => row.origin.trim() !== '' || row.tools.trim() !== '')
     .map((row) => ({
@@ -348,8 +339,8 @@ const originsOf = (rows: readonly OriginRow[]): readonly KeyOrigin[] =>
  * tools they may call there. The rows keep what is typed; the grant takes what they say.
  */
 function OriginsField(props: {
-  readonly origins: readonly KeyOrigin[]
-  readonly onChange: (origins: readonly KeyOrigin[]) => void
+  readonly origins: readonly GrantOrigin[]
+  readonly onChange: (origins: readonly GrantOrigin[]) => void
   readonly disabled?: boolean | undefined
 }) {
   const [rows, setRows] = useState(() => rowsOf(props.origins))
@@ -405,7 +396,7 @@ function OriginsField(props: {
   )
 }
 
-/** A key's or a client's grant: its level, reach, extras, lifetime and the servers it may bring, controlled. */
+/** An installation's or a client's grant: its level, reach, extras, lifetime and the servers it may bring. */
 export function GrantEditor(props: {
   readonly terms: GrantTerms
   readonly holder: GrantHolder
@@ -419,7 +410,6 @@ export function GrantEditor(props: {
       spec={GRANT_SPEC}
       words={GRANT_WORDS}
       onChange={onChange}
-      ownerOnlyAllowed={ownsReach(terms.reach, holder)}
       disabled={disabled}
       reach={
         <ReachFields

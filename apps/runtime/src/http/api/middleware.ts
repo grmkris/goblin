@@ -19,8 +19,7 @@ import type * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import type * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { type AppError, NotFound, isAppError } from '../errors.ts'
 import { Grants } from '../../grants/service.ts'
-import { KeyNames } from '../../keys/names.ts'
-import { callerMinutes } from '../../keys/rate.ts'
+import { callerMinutes } from '../../credentials/rate.ts'
 import { Resident } from '../../mcp/service.ts'
 import { RequestContext } from './context.ts'
 import { type Credential, type Member, credentialId } from './principal.ts'
@@ -51,10 +50,9 @@ const admitted = <A, E, R, E1, R1>(
 /** Whether `role` reaches an endpoint that needs `needed` (ADR 0093): an owner counts as an admin. */
 const reaches = (role: Member['role'], needed: 'member' | 'admin'): boolean => needed === 'member' || role !== 'member'
 
-/** What admitting a credential takes from the agent: its count per minute, its key names and its grants. */
+/** What admitting a credential takes from the agent: its count per minute and its grants. */
 interface CredentialGate {
   readonly take: ReturnType<typeof callerMinutes>
-  readonly learn: KeyNames['Service']['learn']
   readonly grants: Grants['Service']
 }
 
@@ -64,8 +62,7 @@ interface CredentialGate {
  * the widening link); a client's person's role must hold them too (`ROLE_POWER`, else `Forbidden` `role`: a client
  * never does more than its person may). A grant past its end is `Unauthenticated` (`grant_expired`). Then its requests
  * for the minute (else `rate_limited` with `retryAfter`, ADR 0085), and its grant's reach is mirrored afresh when its
- * generation moved (`Grants.sync`). A key admitted is `learn`t: its first request in the object's lifetime names what
- * it made, for display (ADR 0115).
+ * generation moved (`Grants.sync`).
  */
 /** A client never does more than its person may: their role's power must hold what the endpoint needs. */
 const personHolds = (credential: Credential, member: Member | undefined, need: Need): Effect.Effect<void, AppError> => {
@@ -93,7 +90,6 @@ const admitCredential = (
     const retryAfter = gate.take(credentialId(credential), now)
     if (retryAfter !== undefined) return yield* new Unauthenticated({ reason: 'rate_limited', retryAfter })
     yield* gate.grants.sync(credential)
-    if (credential.kind !== 'client') yield* gate.learn(credential)
   })
 
 /**
@@ -101,7 +97,7 @@ const admitCredential = (
  * `Unauthenticated` (`principal`). A member reaches an endpoint only with the role it needs (`EndpointRole`, ADR 0093;
  * else `Forbidden`, `role`), and so does an OAuth client acting for them. A member's session grants resident authority
  * unless the endpoint says otherwise (`GrantsResident`: changing it must not grant first), then the handler runs. A
- * request from a credential (a server's key or an OAuth client, ADRs 0086, 0114) is admitted by its grant
+ * request from a credential (an OAuth client or an installed app, ADRs 0086, 0114, 0118) is admitted by its grant
  * (`admitCredential`) and never grants it: a credential is not a member's presence. What it reaches past admission is
  * its grant's (`grants/policy.ts`).
  */
@@ -109,8 +105,7 @@ export const OwnerAdmissionLive = Layer.effect(
   OwnerAdmission,
   Effect.gen(function* () {
     const resident = yield* Resident
-    const { learn } = yield* KeyNames
-    const gate: CredentialGate = { take: callerMinutes(), learn, grants: yield* Grants }
+    const gate: CredentialGate = { take: callerMinutes(), grants: yield* Grants }
     const admit = (annotations: Context.Context<never>) =>
       Effect.flatMap(Effect.serviceOption(RequestContext), (context): Effect.Effect<void, AppError> => {
         const facts = Option.getOrUndefined(context)

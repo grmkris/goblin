@@ -1,7 +1,6 @@
 import * as Effect from 'effect/Effect'
 import type { AgentRpc, RuntimeEnv } from '../env.ts'
 import { handleAuth, resourceMetadata, requireUserSession } from '../auth/index.ts'
-import { verifyKey } from '../auth/api-keys.ts'
 import { readBytes } from './body.ts'
 import { NotFound, attempt } from './errors.ts'
 import { accountRecords } from './api/account.ts'
@@ -20,8 +19,8 @@ import { canonicalRedirect } from './canonical.ts'
 import { healthOf } from './health.ts'
 
 /**
- * A workspace's agent (ADR 0089): its name is the workspace's ID, which only a membership, a key, a consent or a signed
- * token supplies, never a request by itself.
+ * A workspace's agent (ADR 0089): its name is the workspace's ID, which only a membership, an installation, a consent
+ * or a signed token supplies, never a request by itself.
  */
 const agentOf = (env: RuntimeEnv, workspaceId: string): DurableObjectStub<AgentRpc> => env.AGENTS.getByName(workspaceId)
 
@@ -33,7 +32,6 @@ const edgeOf = (env: RuntimeEnv): Edge => ({
       attempt(() => requireUserSession(request, env)),
       (session) => session.person,
     ),
-  key: (key) => attempt(() => verifyKey(env, key)),
   client: (token, slug) => attempt(() => tokenAt(env, token, slug)),
   membership: (userId, slug) => attempt(() => membershipAt(env.AUTH_DB, userId, slug)),
   membershipOf: (userId, workspaceId) => attempt(() => membershipOf(env.AUTH_DB, userId, workspaceId)),
@@ -124,12 +122,11 @@ export const worker = {
       return secured(Response.json(resourceMetadata(env)), undefined)
     if (url.pathname.startsWith('/.well-known/') || url.pathname.startsWith('/api/auth/'))
       return handleAuth(request, env)
-    // The typed API (http/api/edge.ts): a person's account endpoints answered here; a member's requests, under their
-    // workspace's path, answered here or forwarded to its agent; and a key's `/api/*` requests forwarded to its own.
+    // The typed API (http/api/edge.ts): a person's account endpoints answered here; a member's or a token's requests,
+    // under their workspace's path, answered here or forwarded to its agent. Nothing else under `/api/*` is served.
     if (isAccountPath(url.pathname)) return runAtEdge((await edge()).account(request, edgeOf(env)))
     if (isWorkspacePath(url.pathname)) return runAtEdge((await edge()).workspace(request, edgeOf(env)))
     if (url.pathname === SIGN_IN_CALLBACK) return runAtEdge((await edge()).signIn(request, edgeOf(env)))
-    if (url.pathname.startsWith('/api/')) return runAtEdge((await edge()).owner(request, edgeOf(env)))
 
     // Every answer quotes the request's reference (its cf-ray), which its failure line carries too.
     return runAtEdge((await edge()).route(request, (ref) => attempt(() => workerRoute(request, env, ref))))

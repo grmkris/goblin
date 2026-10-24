@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import type { PersonaView } from '@goblin/contracts'
 import { Button } from '@goblin/ui'
 import { ChevronRightIcon, PlusIcon } from 'lucide-react'
-import { type KeyPersonas, personasByMaker } from '../../../lib/personas.ts'
+import { type AppPersonas, personasByMaker } from '../../../lib/personas.ts'
 import { usePersonas } from '../../../lib/workspace/hooks.ts'
 import { PageSection } from '../../page-section.tsx'
 import { PersonaAvatar } from '../../persona-avatar.tsx'
@@ -46,14 +46,14 @@ function Archived({ personas }: { readonly personas: readonly PersonaView[] }) {
   )
 }
 
-/** The Personas one server's key made (for display, ADR 0115), folded under the key's name until asked for. */
-function MadeByKey({ group }: { readonly group: KeyPersonas }) {
+/** The Personas one installed app made (for display, ADR 0115), folded under the app's name until asked for. */
+function MadeByApp({ group }: { readonly group: AppPersonas }) {
   const [open, setOpen] = useState(false)
   return (
-    <section className="page-section" aria-label={`Personas ${group.key} made`}>
+    <section className="page-section" aria-label={`Personas ${group.app} made`}>
       <button type="button" className="list-fold" aria-expanded={open} onClick={() => setOpen(!open)}>
         <ChevronRightIcon aria-hidden />
-        Made by {group.key} ({group.personas.length})
+        Made by {group.app} ({group.personas.length})
       </button>
       {open && (
         <ul className="list-rows">
@@ -68,11 +68,12 @@ function MadeByKey({ group }: { readonly group: KeyPersonas }) {
 
 /**
  * `/personas` (ADR 0078): the specialists the owner calls into a conversation with `@name`, by name, each opening its
- * profile to edit; then those each server's key made, folded under the key (for display, ADR 0115); the archived folded at the end.
+ * profile to edit; then those each installed app made, folded under the app (for display, ADR 0115); the archived
+ * folded at the end.
  */
 export function PersonasPage() {
   const personas = usePersonas()
-  const { own: active, keys } = personasByMaker(personas)
+  const { own: active, apps } = personasByMaker(personas)
   const archived = personas.filter((persona) => persona.archivedAt !== undefined)
   return (
     <div className="page-stack">
@@ -98,8 +99,8 @@ export function PersonasPage() {
           </ul>
         )}
       </PageSection>
-      {keys.map((group) => (
-        <MadeByKey key={group.key} group={group} />
+      {apps.map((group) => (
+        <MadeByApp key={group.app} group={group} />
       ))}
       <Archived personas={archived} />
     </div>

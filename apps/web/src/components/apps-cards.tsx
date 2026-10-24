@@ -11,6 +11,8 @@ import {
   presetFor,
 } from '@goblin/contracts'
 import {
+  Alert,
+  AlertDescription,
   Button,
   Card,
   CardContent,
@@ -36,8 +38,7 @@ import {
   updateInstallationMutation,
 } from '../account/queries.ts'
 import { messageOf } from '../lib/query/app-error.ts'
-import { QueryBoundary } from '../lib/query/query-boundary.tsx'
-import { Problem, ShownSecret } from './api-keys-card.tsx'
+import { QueryBoundary, WidenLink } from '../lib/query/query-boundary.tsx'
 import {
   GRANT_WORDS,
   type GrantHolder,
@@ -47,6 +48,43 @@ import {
   grantProblem,
   reachWords,
 } from './grant-editor.tsx'
+
+/** A new app's client secret, or a rotated one's (ADR 0118), shown this once, to copy. */
+function ShownSecret(props: { readonly name: string; readonly secret: string; readonly onDone: () => void }) {
+  return (
+    <FieldGroup>
+      <Alert>
+        <AlertDescription>
+          Copy the app secret for <strong>{props.name}</strong> now. It is not shown again.
+        </AlertDescription>
+      </Alert>
+      <Input readOnly value={props.secret} onFocus={(event) => event.currentTarget.select()} />
+      <Field orientation="horizontal">
+        <Button type="button" onClick={() => void navigator.clipboard.writeText(props.secret)}>
+          Copy
+        </Button>
+        <Button type="button" variant="ghost" onClick={props.onDone}>
+          Done
+        </Button>
+      </Field>
+    </FieldGroup>
+  )
+}
+
+/**
+ * A failure beside the control that failed (with its widening link, when it is one), or what is wrong before anything
+ * is sent.
+ */
+function Problem(props: { readonly text: string; readonly error?: unknown }) {
+  if (props.text === '') return null
+  return (
+    <Alert variant="destructive">
+      <AlertDescription>
+        {props.text} <WidenLink error={props.error} />
+      </AlertDescription>
+    </Alert>
+  )
+}
 
 /** Where a product sends a workspace's admin to install it: goblin's install page for its client. */
 const installLink = (clientId: string): string => `${window.location.origin}/install/${encodeURIComponent(clientId)}`
@@ -70,7 +108,7 @@ function Registered(props: {
             : `Its "Connect goblin" link: ${installLink(props.clientId)}`}
         </FieldDescription>
       </Field>
-      <ShownSecret name={props.name} secret={props.secret} noun="app secret" onDone={props.onDone} />
+      <ShownSecret name={props.name} secret={props.secret} onDone={props.onDone} />
     </FieldGroup>
   )
 }
@@ -158,7 +196,7 @@ function useNewApp(workspace: WorkspaceView) {
  */
 function NewApp(props: { readonly workspace: WorkspaceView }) {
   const { register, fields, set, problem, ready, submit, reset } = useNewApp(props.workspace)
-  const holder: GrantHolder = { kind: 'key', workspace: props.workspace }
+  const holder: GrantHolder = { kind: 'app', workspace: props.workspace }
   const failure = register.error === null ? '' : grantFailure(register.error, 'register that app')
   if (register.data !== undefined)
     return (
@@ -228,9 +266,7 @@ function RotateAppSecret(props: { readonly app: DeveloperApp; readonly onDone: (
   const rotate = useMutation(rotateAppMutation)
   const failure = rotate.error === null ? '' : messageOf(rotate.error, 'rotate that secret')
   if (rotate.data !== undefined)
-    return (
-      <ShownSecret name={props.app.name} secret={rotate.data.clientSecret} noun="app secret" onDone={props.onDone} />
-    )
+    return <ShownSecret name={props.app.name} secret={rotate.data.clientSecret} onDone={props.onDone} />
   return (
     <FieldGroup>
       <Problem text={failure} error={rotate.error} />
@@ -258,7 +294,7 @@ function RotateAppSecret(props: { readonly app: DeveloperApp; readonly onDone: (
 /** The apps this workspace registered, each with what it asks for, its link, a new secret and its end. */
 function DeveloperApps(props: { readonly workspace: WorkspaceView }) {
   const apps = useSuspenseQuery(developerAppsQuery).data
-  const holder: GrantHolder = { kind: 'key', workspace: props.workspace }
+  const holder: GrantHolder = { kind: 'app', workspace: props.workspace }
   const remove = useMutation(deleteAppMutation)
   const [rotating, setRotating] = useState<string>()
   const deleting = remove.isPending ? remove.variables : ''
@@ -387,7 +423,7 @@ const installedLine = (installation: InstallationView): string =>
 /** The apps installed here, each with its grant in a line, changeable and removable. */
 function Installations(props: { readonly workspace: WorkspaceView }) {
   const installations = useSuspenseQuery(installationsQuery).data
-  const holder: GrantHolder = { kind: 'key', workspace: props.workspace }
+  const holder: GrantHolder = { kind: 'app', workspace: props.workspace }
   const uninstall = useMutation(uninstallMutation)
   const [editing, setEditing] = useState<string>()
   const removing = uninstall.isPending ? uninstall.variables : ''

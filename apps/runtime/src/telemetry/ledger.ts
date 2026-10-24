@@ -35,7 +35,7 @@ const eventOf = (row: Row): RunEvent | undefined =>
 
 /**
  * Attributes only the deployment's own logs and traces keep (ADR 0107): its model endpoint's host and port. The ledger
- * drops them, so inspection, which reads only the ledger, never answers them to an owner or a key.
+ * drops them, so inspection, which reads only the ledger, never answers them to an owner or a credential.
  */
 const OPERATOR_ONLY: ReadonlySet<string> = new Set([RunAttribute.serverAddress, RunAttribute.serverPort])
 

@@ -1,5 +1,5 @@
 /**
- * One grant for every credential: what a server's API key, or an OAuth client acting for a person, may do in goblin.
+ * One grant for every credential: what an OAuth client acting for a person, or an installed app, may do in goblin.
  * Its terms are level × reach × extras × lifetime, as in myapps ADR 0015. A refused call answers what is missing and
  * a widening link (`widenUrl`) where the owner can allow it. People keep their workspace roles (`ROLE_POWER`); an OAuth
  * client's power is its person's role and its grant together. Everything here is pure: storage and enforcement live in
@@ -15,7 +15,7 @@
 import * as Schema from 'effect/Schema'
 import type { WorkspaceRole } from './account.ts'
 import { NonEmptyString, WorkspaceId } from './ids.ts'
-import { KeyOrigin } from './origins.ts'
+import { GrantOrigin } from './origins.ts'
 
 /**
  * How much a credential may do within its reach, least first. `read` sees; `write` also sends, creates Topics and
@@ -27,11 +27,9 @@ export type Level = typeof Level.Type
 
 /**
  * Named powers beside the level: `setup` (what setups, Sources and servers use, and with `manage` the connections
- * themselves, ADR 0117; risky), `routines` (risky), `inspect`
- * (run records within reach) and `keys` (risky, and only an owner may grant it; vocabulary only for now, it opens
- * nothing yet).
+ * themselves, ADR 0117; risky), `routines` (risky) and `inspect` (run records within reach).
  */
-export const Extra = Schema.Literals(['setup', 'routines', 'inspect', 'keys'])
+export const Extra = Schema.Literals(['setup', 'routines', 'inspect'])
 export type Extra = typeof Extra.Type
 
 /** How long an approval lasts: until revoked (`never`, the default), or 1, 7, 30, 90 or 365 days. */
@@ -84,8 +82,8 @@ export type WorkspaceReach = typeof WorkspaceReach.Type
 /**
  * A grant's whole reach. `workspaces: 'all'` reaches every workspace the person is a member of at each call, ones they
  * join later included, and one without an entry in `each` with everything in it; `'list'` reaches only the workspaces
- * in `each`. A key's is always the list of its one workspace. `origins` are the MCP servers its threads may bring
- * (ADR 0091), each with exactly the tools they may call there.
+ * in `each`. An installation's is always the list of its one workspace. `origins` are the MCP servers its threads may
+ * bring (ADR 0091), each with exactly the tools they may call there.
  */
 export const GoblinReach = Schema.Struct({
   workspaces: Schema.Literals(['all', 'list']),
@@ -93,7 +91,7 @@ export const GoblinReach = Schema.Struct({
     Schema.isMaxLength(MAX_WORKSPACES),
     Schema.makeFilter((each) => new Set(each.map((reach) => reach.workspace)).size === each.length),
   ),
-  origins: Schema.Array(KeyOrigin),
+  origins: Schema.Array(GrantOrigin),
 })
 export type GoblinReach = typeof GoblinReach.Type
 
@@ -132,7 +130,7 @@ const allowsReach = (reach: GoblinReach, id: string): boolean => {
 /** No extra twice. */
 const Extras = Schema.Array(Extra).check(Schema.makeFilter((extras) => new Set(extras).size === extras.length))
 
-/** A grant's terms: its name (the key's, or the client's as it registered), level, reach, extras and lifetime. */
+/** A grant's terms: its name (the app's or the client's as it registered), level, reach, extras and lifetime. */
 export const GrantTerms = Schema.Struct({
   name: NonEmptyString(100),
   level: Level,
@@ -146,8 +144,6 @@ export type GrantTerms = typeof GrantTerms.Type
 export const ExtraOption = Schema.Struct({
   id: Extra,
   risky: Schema.Boolean,
-  /** Only a workspace's owner may grant it. */
-  ownerOnly: Schema.optionalKey(Schema.Boolean),
 })
 export type ExtraOption = typeof ExtraOption.Type
 
@@ -172,7 +168,7 @@ const everything = (workspace: string): WorkspaceReach => ({
 
 /**
  * A new credential's terms when nothing came before it: `write`, every Topic, Persona and connection, no extras, until
- * revoked, over `workspaces`: all of the person's for an MCP client, or those listed (a key's one workspace).
+ * revoked, over `workspaces`: all of the person's for an MCP client, or those listed (an installation's one workspace).
  */
 export const presetFor = (name: string, workspaces: 'all' | readonly string[]): GrantTerms => ({
   name,
@@ -195,7 +191,6 @@ export const GRANT_SPEC: GrantSpec = {
     { id: 'setup', risky: true },
     { id: 'routines', risky: true },
     { id: 'inspect', risky: false },
-    { id: 'keys', risky: true, ownerOnly: true },
   ],
   preset: PRESET,
   defaultLifetime: 'never',
@@ -203,9 +198,9 @@ export const GRANT_SPEC: GrantSpec = {
 }
 
 /**
- * The terms a consent or a new key starts from: the same client's last terms, else the latest grant of the person's
- * with its risky extras taken off, else the spec's preset. The caller supplies the name in the preset; history keeps
- * its saved name.
+ * The terms a consent or a new installation starts from: the same client's last terms, else the latest grant of the
+ * person's with its risky extras taken off, else the spec's preset. The caller supplies the name in the preset; history
+ * keeps its saved name.
  */
 export const defaultTerms = (
   spec: GrantSpec,
@@ -281,22 +276,23 @@ export interface Power {
   readonly extras: readonly Extra[]
 }
 
-/** Each workspace role's power: an owner everything, an admin all but `keys`, a member `write` and `inspect`. */
+/** Each workspace role's power: an owner or an admin everything, a member `write` and `inspect`. */
 export const ROLE_POWER: Readonly<Record<WorkspaceRole, Power>> = {
-  owner: { level: 'manage', extras: ['setup', 'routines', 'inspect', 'keys'] },
+  owner: { level: 'manage', extras: ['setup', 'routines', 'inspect'] },
   admin: { level: 'manage', extras: ['setup', 'routines', 'inspect'] },
   member: { level: 'write', extras: ['inspect'] },
 }
 
 /**
- * `GET /api/access` and the consent summary: a grant's terms, which grant and credential they are (a key's or a
- * client's id), when it ends (ISO, or `null` until revoked) and its widening link.
+ * `GET /api/access` and the consent summary: a grant's terms, which grant it is and whose (`kind`: a person's MCP
+ * client, or an installed app, ADR 0125) with that credential's client id, when it ends (ISO, or `null` until revoked)
+ * and its widening link.
  */
 export const AccessSummary = Schema.Struct({
   ...GrantTerms.fields,
   grantId: Schema.String,
-  clientId: Schema.optionalKey(Schema.String),
-  keyId: Schema.optionalKey(Schema.String),
+  kind: Schema.Literals(['client', 'app']),
+  clientId: Schema.String,
   expiresAt: Schema.NullOr(Schema.String),
   widenUrl: Schema.String,
 })

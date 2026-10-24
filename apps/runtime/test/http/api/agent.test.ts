@@ -74,9 +74,8 @@ const fixture = (owner: { readonly OWNER_WORKSPACE_ID?: string; readonly OWNER_M
 const ids = async (response: Response) =>
   Schema.decodeUnknownSync(ModelChoice)(await response.json()).options.map((option) => option.id)
 
-/** The grant the edge forwards for a key with `scopes` (ADR 0081). */
-/** A key's credential as the edge forwards it (ADR 0114), its grant `read`. */
-const keyHeaders = () => credentialHeaders(credential({ id: 'key-1', name: 'swarmm', level: 'read' }))
+/** An installed app's credential as the edge forwards it (ADR 0114), its grant `read`. */
+const appHeaders = () => credentialHeaders(credential({ id: 'in-1', name: 'swarmm', level: 'read' }))
 
 describe('the agent group served by the agent', () => {
   it("answers today's usage in tokens against the deployment's cap", async () => {
@@ -136,16 +135,16 @@ describe('the agent group served by the agent', () => {
       models: [expect.objectContaining({ id: 'model-a' }), expect.objectContaining({ id: 'model-b' })],
     }
     expect(await callOwner({ fetch }, (api) => api.agent.models())).toEqual(offer)
-    const answered = await fetch(json('GET', '/api/models', undefined, keyHeaders()))
+    const answered = await fetch(json('GET', '/api/models', undefined, appHeaders()))
     expect(answered.status).toBe(200)
     expect(await answered.json()).toEqual(offer)
-    // The owner's own pick is not a key's to read.
-    const pick = await fetch(json('GET', '/api/agent/model', undefined, keyHeaders()))
+    // The owner's own pick is not an app's to read.
+    const pick = await fetch(json('GET', '/api/agent/model', undefined, appHeaders()))
     expect(pick.status).toBe(403)
     expect(await pick.json()).toMatchObject({ error: { code: 'forbidden', reason: 'credential' } })
   })
 
-  it("offers the owner's own subscriptions to the owner alone, never to a server's key (ADR 0087)", async () => {
+  it("offers the owner's own subscriptions to the owner alone, never to an installed app (ADR 0087)", async () => {
     const { fetch } = fixture({ OWNER_WORKSPACE_ID: 'owner', OWNER_MODELS: 'sub/claude-opus-5-5, model-b' })
     // model-b is every account's, so naming it among the owner's changes nothing.
     expect(await ids(await fetch(json('GET', '/api/agent/model')))).toEqual([
@@ -160,7 +159,7 @@ describe('the agent group served by the agent', () => {
       route: 'Your subscription',
       images: true,
     })
-    const keyed = await fetch(json('GET', '/api/models', undefined, keyHeaders()))
+    const keyed = await fetch(json('GET', '/api/models', undefined, appHeaders()))
     expect(await keyed.json()).toEqual({
       default: 'model-a',
       models: [expect.objectContaining({ id: 'model-a' }), expect.objectContaining({ id: 'model-b' })],

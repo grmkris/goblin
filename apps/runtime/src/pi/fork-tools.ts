@@ -89,8 +89,8 @@ export type BuiltSet = { readonly tools: readonly FrozenTool[]; readonly left: r
 /**
  * Each server's alias. A connection's is its server's own name as `aliasOf` gives it; when two connections, or a
  * connection and a name in `reserved`, would share one, each such connection's gets a short hash of its id
- * (`suffixedAlias`). A thread's server keeps the name its key declared it with, unless a connection's alias is that
- * name: the owner's connections keep their names, and the thread's takes the hash (ADR 0103).
+ * (`suffixedAlias`). A thread's server keeps the name its credential declared it with, unless a connection's alias is
+ * that name: the owner's connections keep their names, and the thread's takes the hash (ADR 0103).
  */
 const aliasesOf = (sources: readonly ToolSource[], reserved: ReadonlySet<string>): ReadonlyMap<string, string> => {
   const connections = sources.filter((source) => source.thread === undefined)
@@ -379,7 +379,7 @@ const failedCall = (cause: unknown): ToolExecutionResult => {
 
 /**
  * One call of a native tool of a server the fork's thread declared (ADR 0103), checked at each call: resident authority
- * (a key's thread runs under it too), the thread still open with that server declared and the tool on its list, and
+ * (an app's thread runs under it too), the thread still open with that server declared and the tool on its list, and
  * the arguments against the frozen schema. Act-only: nothing is held for the owner. Its result is the server's,
  * untrusted, as an `mcp_call`'s.
  */

@@ -40,7 +40,7 @@ const GUIDE = [
 /**
  * The apps this chat may call as they are now, for the trailing context block: they change with every build and the
  * Topic's setup (ADR 0040), the guide never does. Apps are the workspace's (ADR 0115): a turn that may not call them
- * (a server key's, outside a hub) lists none and says nothing of apps.
+ * (an installed app's, outside a hub) lists none and says nothing of apps.
  */
 const appsNow = (apps: AgentApps, run: RunProgram, api: CallApi, context: PiContext): Promise<string | undefined> =>
   run(

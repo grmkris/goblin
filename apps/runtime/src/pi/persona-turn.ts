@@ -124,7 +124,7 @@ type Input = {
    * them, whatever filter it copied at the cut.
    */
   readonly denied?: readonly string[]
-  /** Whether a server's key asked it: its message is a request from a party the owner serves, never the owner's. */
+  /** Whether an installed app asked it: its message is a request from a party the owner serves, never the owner's. */
   readonly server?: boolean
 }
 
@@ -150,7 +150,7 @@ type State =
 
 /**
  * What a Persona answers: the owner's message it was tagged in, the work a routine hands it (ADR 0041), or a message a
- * server's key tagged it in (ADR 0115), a request from a party the owner serves.
+ * installed app tagged it in (ADR 0115), a request from a party the owner serves.
  */
 const ASKED = {
   tagged: (name: string) =>
@@ -491,7 +491,7 @@ function turnTask(run: RunProgram, tools: ForkToolsKit) {
 
 /**
  * What one ask needs: the owner's operation, where it was asked, the Personas in the order they answer, the tools its
- * asker's power does not reach there and whether a server's key asked (ADR 0115).
+ * asker's power does not reach there and whether an installed app asked (ADR 0115).
  */
 export type PersonaAsk = {
   readonly operationId: string

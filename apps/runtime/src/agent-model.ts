@@ -78,7 +78,7 @@ export const chooseOwnerModel = (modelId: string) =>
     const choice = yield* (yield* Models).choose(modelId, yield* epochSeconds)
     const chats = yield* Chats
     const { applied } = yield* AgentInput
-    // The owner chose it in their own session, and main is in Personal, which no key made.
+    // The owner chose it in their own session, and main is in Personal, which no app made.
     yield* useModel(yield* PiSessions, applied, yield* chats.session(chats.primary), false)
     return choice
   })

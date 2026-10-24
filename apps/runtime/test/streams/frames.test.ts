@@ -9,23 +9,22 @@ import * as TestClock from 'effect/testing/TestClock'
 import { sseFrames } from '../../src/streams/frames.ts'
 import { REDACTED, redactSecrets } from '../../src/streams/redact.ts'
 
-/** Secrets shaped as goblin issues them: a server's key, a thread server's token, a Standard Webhooks secret. */
-const KEY = `gbk_${'a1B2'.repeat(10)}`
+/** Secrets shaped as goblin issues them: a thread server's token and a Standard Webhooks secret. */
 const THREAD_TOKEN = `swt_${'x9_Y-'.repeat(6)}`
 const WEBHOOK = `whsec_${btoa('0123456789abcdef0123456789abcdef')}`
 
-/** A tool's result that echoes all three: in its content, in its details and in a nested call's arguments. */
+/** A tool's result that echoes both: in its content, in its details and in a nested call's arguments. */
 const leaky: readonly AguiEvent[] = [
   {
     type: EventType.TOOL_CALL_RESULT,
     messageId: '1:tcall-1',
     toolCallId: 'call-1',
-    content: `Here is the key: ${KEY}`,
+    content: `Here is the token: ${THREAD_TOKEN}`,
     role: 'tool',
     metadata: { goblin: { details: { headers: { authorization: `Bearer ${THREAD_TOKEN}` }, secret: WEBHOOK } } },
   },
   { type: EventType.TOOL_CALL_ARGS, toolCallId: 'call-2', delta: JSON.stringify({ token: THREAD_TOKEN }) },
-  { type: EventType.TEXT_MESSAGE_CONTENT, messageId: '1:a1', delta: 'Nothing secret here; gbk_ alone is a prefix.' },
+  { type: EventType.TEXT_MESSAGE_CONTENT, messageId: '1:a1', delta: 'Nothing secret here; swt_ alone is a prefix.' },
 ]
 
 /** The body `batches` make, as text. */
@@ -47,7 +46,7 @@ describe("a chat's stream on the wire", () => {
       })
       expect(args).toMatchObject({ delta: REDACTED })
       expect(words).toEqual(leaky[2])
-      expect(text).not.toMatch(/gbk_\w{8}|swt_[\w-]{8}|whsec_\S{8}/u)
+      expect(text).not.toMatch(/swt_[\w-]{8}|whsec_\S{8}/u)
     }),
   )
 

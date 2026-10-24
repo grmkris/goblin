@@ -6,7 +6,7 @@ import type { Credential } from '../src/http/api/principal.ts'
 import { credential } from './grants-fixture.ts'
 
 const ORIGINS = [{ origin: 'https://mcp.swarmm.app', tools: ['job_submit', 'job_status'] }]
-const KEY = credential({ id: 'key-1', name: 'swarmm', origins: ORIGINS })
+const APP = credential({ id: 'in-1', name: 'swarmm', origins: ORIGINS })
 const CLIENT = credential({ kind: 'client', id: 'claude', name: 'Claude Code', grantId: 'cg_1', origins: ORIGINS })
 
 /** `confineThreadServer` in a request `forwarded` sent, or a member's session for none. */
@@ -25,7 +25,7 @@ const refusal = (forwarded: Credential | undefined, url: string, tools?: readonl
 
 describe("a thread's MCP server within its grant's origins (ADRs 0091, 0114)", () => {
   it("takes a server on a granted origin, with the tools it names or the origin's whole list, for either kind", async () => {
-    for (const forwarded of [KEY, CLIENT]) {
+    for (const forwarded of [APP, CLIENT]) {
       expect(await Effect.runPromise(confined(forwarded, 'https://mcp.swarmm.app/mcp/job/42', ['job_status']))).toEqual(
         { origin: 'https://mcp.swarmm.app', tools: ['job_status'] },
       )
@@ -37,12 +37,10 @@ describe("a thread's MCP server within its grant's origins (ADRs 0091, 0114)", (
   })
 
   it('refuses another origin, a tool off its list, and a request that is no credential', async () => {
-    expect(await refusal(KEY, 'https://evil.example/mcp')).toBe('key_origin')
-    expect(await refusal(KEY, 'http://mcp.swarmm.app/mcp')).toBe('key_origin')
-    expect(await refusal(KEY, 'https://mcp.swarmm.app/mcp', ['job_submit', 'job_delete'])).toBe('key_origin_tool')
-    expect(await refusal(credential({ kind: 'client', grantId: 'cg_2' }), 'https://mcp.swarmm.app/mcp')).toBe(
-      'key_origin',
-    )
+    expect(await refusal(APP, 'https://evil.example/mcp')).toBe('origin')
+    expect(await refusal(APP, 'http://mcp.swarmm.app/mcp')).toBe('origin')
+    expect(await refusal(APP, 'https://mcp.swarmm.app/mcp', ['job_submit', 'job_delete'])).toBe('origin_tool')
+    expect(await refusal(credential({ kind: 'client', grantId: 'cg_2' }), 'https://mcp.swarmm.app/mcp')).toBe('origin')
     expect(await refusal(undefined, 'https://mcp.swarmm.app/mcp')).toBe('credential_only')
   })
 })

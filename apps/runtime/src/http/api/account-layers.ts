@@ -7,7 +7,6 @@ import {
   ClientsHandlers,
   GrantsHandlers,
   InvitationsHandlers,
-  KeysHandlers,
   MembersHandlers,
   WorkspacesHandlers,
 } from './account.ts'
@@ -28,6 +27,6 @@ export const AccountApiLayer = HttpApiBuilder.layer(AccountApi).pipe(
 
 /** The workspace account API's routes, served by the Worker for a member (`edge.ts`). */
 export const WorkspaceAccountApiLayer = HttpApiBuilder.layer(WorkspaceAccountApi).pipe(
-  Layer.provide([KeysHandlers, MembersHandlers, DeveloperAppsHandlers, InstallationsHandlers]),
+  Layer.provide([MembersHandlers, DeveloperAppsHandlers, InstallationsHandlers]),
   Layer.provide(HttpServer.layerServices),
 )

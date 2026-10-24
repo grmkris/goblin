@@ -18,7 +18,7 @@ import { RequestContext } from '../http/api/context.ts'
 import type { Credential } from '../http/api/principal.ts'
 import { Forbidden, NotFound, attemptSync } from '../http/errors.ts'
 import type { Place, Reach } from '../inspect/service.ts'
-import { recordMaker } from '../keys/made-by.ts'
+import { recordMaker } from '../credentials/made-by.ts'
 import { Changes } from '../runtime/changes.ts'
 import { Db } from '../runtime/db.ts'
 import { mirrorReaches } from './mirror.ts'
@@ -26,7 +26,7 @@ import { type TurnPower, senderOf, senderPower } from './power.ts'
 import { Grants } from './service.ts'
 
 /**
- * What a credential may do inside the agent (ADR 0114): a server's API key or an OAuth client acting for a person
+ * What a credential may do inside the agent (ADR 0114): an installed app or an OAuth client acting for a person
  * reaches what its grant reaches (`Grants`), never more; a client also no more than its person's role. Every program
  * here does nothing for a member's own session, whose role decides.
  */
@@ -38,16 +38,16 @@ export const requestCredential: Effect.Effect<Credential | undefined> = Effect.m
 )
 
 /**
- * The key or installed app the current request came with: its work is a server's (ADRs 0087, 0118), on the
- * deployment's models. None for a member's session, an OAuth client acting for a person or work outside a request.
+ * The installed app the current request came with: its work is a server's (ADRs 0087, 0118), on the deployment's
+ * models. None for a member's session, an OAuth client acting for a person or work outside a request.
  */
-export const requestKey: Effect.Effect<Credential | undefined> = Effect.map(requestCredential, (credential) =>
-  credential?.kind === 'key' || credential?.kind === 'app' ? credential : undefined,
+export const requestApp: Effect.Effect<Credential | undefined> = Effect.map(requestCredential, (credential) =>
+  credential?.kind === 'app' ? credential : undefined,
 )
 
 /**
  * The role of the member the current request acts for (ADR 0093), from their browser or a client acting for them; none
- * for a server's key or work outside a request (a Source, a routine, the system).
+ * for an installed app or work outside a request (a Source, a routine, the system).
  */
 export const requestRole: Effect.Effect<WorkspaceRole | undefined> = Effect.map(
   Effect.serviceOption(RequestContext),
@@ -79,8 +79,8 @@ export const requireAccessFor = (need: Partial<Need> | undefined, configures: bo
   })
 
 /**
- * Where a request's flow comes from (ADR 0037): a credential's (ADR 0086: an OAuth client or a server's key) is an MCP
- * client's, anyone else's the owner's in the app.
+ * Where a request's flow comes from (ADR 0037): a credential's (ADR 0086: an OAuth client or an installed app) is an
+ * MCP client's, anyone else's the owner's in the app.
  */
 export const requestFlowOrigin: Effect.Effect<{ readonly via: 'app' | 'mcp'; readonly actor: 'owner' | 'client' }> =
   Effect.map(requestCredential, (credential) =>
@@ -88,7 +88,7 @@ export const requestFlowOrigin: Effect.Effect<{ readonly via: 'app' | 'mcp'; rea
   )
 
 /**
- * Who a request's message is by, which its content carries first: a server's key by its name (ADR 0115), an OAuth
+ * Who a request's message is by, which its content carries first: an installed app by its name (ADR 0115), an OAuth
  * client by the name it registered (ADR 0086, and for whom in a workspace of several people), or in such a workspace a
  * member by name and ID (ADR 0094); none for a member alone in their workspace, or any other request.
  */
@@ -98,7 +98,7 @@ export const requestAuthor: Effect.Effect<string | undefined> = Effect.map(
     const facts = Option.getOrUndefined(context)
     const member = facts?.member
     const credential = facts?.credential
-    if (credential?.kind === 'key' || credential?.kind === 'app') return serverAuthor(credential.name)
+    if (credential?.kind === 'app') return serverAuthor(credential.name)
     if (credential?.kind === 'client')
       return clientAuthor(credential.name, member?.shared === true ? member.name : undefined)
     if (credential === undefined && member?.shared === true) return memberAuthor(member.name, member.user)
@@ -108,7 +108,7 @@ export const requestAuthor: Effect.Effect<string | undefined> = Effect.map(
 
 /**
  * What the current request's sender may do in a turn its input starts or joins (ADR 0115): a person's role, an OAuth
- * client's grant within its person's role, a server key's grant. None for work outside a request, which is an
+ * client's grant within its person's role, an installed app's grant. None for work outside a request, which is an
  * admin's (`AUTOMATION`).
  */
 export const requestPower: Effect.Effect<TurnPower | undefined> = Effect.map(
@@ -120,8 +120,8 @@ export const requestPower: Effect.Effect<TurnPower | undefined> = Effect.map(
   },
 )
 
-/** A Topic a key's create makes when its body names no setup: nothing but its own chats. */
-export const KEY_TOPIC_SETUP: TopicSetup = { mcpServers: [], skills: [], apps: [], subagents: false }
+/** A Topic an app's create makes when its body names no setup: nothing but its own chats. */
+export const APP_TOPIC_SETUP: TopicSetup = { mcpServers: [], skills: [], apps: [], subagents: false }
 
 /** What a reach check names: a Topic, a Persona or a connection, by its id. */
 type Kind = 'topic' | 'persona' | 'connection'
@@ -151,7 +151,7 @@ export const reachesChat = (chat: string) =>
 
 /**
  * What a credential's create made (ADR 0114): within its reach from then on, listed when its reach of that kind is a
- * list, and a key's recorded as made by it for its views (ADR 0115). A replay (`created` false) of a create must find
+ * list, and an app's recorded as made by it for its views (ADR 0115). A replay (`created` false) of a create must find
  * something it reaches: a grant that listed it on its first try, or one that reaches all; else `AccessInsufficient`,
  * so an operation id never adopts something outside its reach. A replay lists it again in the auth store, in case its
  * first try failed between the mirror and the store.
@@ -170,7 +170,7 @@ export const claim = (kind: 'topic' | 'persona', id: number, created: boolean) =
     if (credential.kind === 'client') return
     const now = yield* epochSeconds
     const db = yield* Db
-    yield* attemptSync(() => recordMaker(db, { keyId: credential.id, name: credential.name }, kind, id, now))
+    yield* attemptSync(() => recordMaker(db, { id: credential.id, name: credential.name }, kind, id, now))
     yield* (yield* Changes).publish(kind === 'topic' ? 'topics.changed' : 'personas.changed', { ids: [id] })
   })
 
@@ -203,7 +203,7 @@ type Setup = Pick<TopicSetup, 'mcpServers' | 'skills' | 'apps'> & { readonly sub
 
 /**
  * Whether a setup gives anything: a server, a skill, an app or subagents. Only such a setup takes a credential's
- * `setup` extra (ADR 0114); the empty one a key's create gets anyway takes none.
+ * `setup` extra (ADR 0114); the empty one an app's create gets anyway takes none.
  */
 export const namesAnything = (setup: Setup | undefined): boolean =>
   setup !== undefined &&
@@ -281,8 +281,8 @@ export const confineSetupEdit = (edit: TopicSetupEdit) =>
 /**
  * An MCP server a credential's thread declares (ADR 0091): only on an origin its grant names, and only tools of that
  * origin's list. The origin and the tools it may call, which are the declared ones or, when it names none, the whole
- * list. A request that is no credential's is refused (`credential_only`), as is any other origin (`key_origin`) or tool
- * (`key_origin_tool`).
+ * list. A request that is no credential's is refused (`credential_only`), as is any other origin (`origin`) or tool
+ * (`origin_tool`).
  */
 export const confineThreadServer = (url: string, tools: readonly string[] | undefined) =>
   Effect.gen(function* () {
@@ -290,9 +290,9 @@ export const confineThreadServer = (url: string, tools: readonly string[] | unde
     if (credential === undefined) return yield* new Forbidden({ reason: 'credential_only' })
     const origin = serverOriginOf(url)
     const granted = credential.origins.find((each) => each.origin === origin)
-    if (granted === undefined) return yield* new Forbidden({ reason: 'key_origin' })
+    if (granted === undefined) return yield* new Forbidden({ reason: 'origin' })
     if (tools !== undefined && !tools.every((tool) => granted.tools.includes(tool)))
-      return yield* new Forbidden({ reason: 'key_origin_tool' })
+      return yield* new Forbidden({ reason: 'origin_tool' })
     return { origin: granted.origin, tools: tools ?? granted.tools }
   })
 

@@ -9,7 +9,7 @@ import {
   namesAnything,
   reachesPersona,
   requestCredential,
-  requestKey,
+  requestApp,
   requireAccessFor,
 } from '../grants/policy.ts'
 import { InvalidInput } from '../http/errors.ts'
@@ -55,10 +55,13 @@ const list = (query: {
     return { personas: page.personas.map(summaryOf), ...(page.next === undefined ? {} : { next: page.next }) }
   })
 
-/** To a server's key the owner's own subscriptions are not on offer, so a Persona it writes never names one (ADR 0087). */
+/**
+ * To an installed app the owner's own subscriptions are not on offer, so a Persona it writes never names one (ADR
+ * 0087).
+ */
 const confineModel = (model: string | null | undefined) =>
   Effect.gen(function* () {
-    if (model === undefined || model === null || (yield* requestKey) === undefined) return
+    if (model === undefined || model === null || (yield* requestApp) === undefined) return
     if ((yield* Personas).ownerOnly(model)) return yield* new InvalidInput({ reason: 'persona_model' })
   })
 
@@ -76,7 +79,7 @@ const confinePersonaSetup = (setup: CreatePersona['setup']) =>
 
 /**
  * A Persona a credential makes (ADR 0114): its setup within its grant, and within its reach from then on (listed when
- * its Personas are a list); a key's is named as made by it (`madeBy`, for display, ADR 0115).
+ * its Personas are a list); an installed app's is named as made by it (`madeBy`, for display, ADR 0115).
  */
 const create = (input: CreatePersona) =>
   Effect.gen(function* () {

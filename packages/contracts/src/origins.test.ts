@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { keyOriginsOf, serverOriginOf } from './origins.ts'
+import { grantOriginsOf, serverOriginOf } from './origins.ts'
 
 const job = (origin: string, tools: readonly string[] = ['job_submit']) => ({ origin, tools })
 
-describe("a key's MCP origins (ADR 0091)", () => {
+describe("a grant's MCP origins (ADR 0091)", () => {
   it('keeps https origins of public hosts, normalized, with their tools once each', () => {
-    expect(keyOriginsOf([job('https://MCP.Swarmm.app/', ['job_submit', 'job_status', 'job_submit'])])).toEqual({
+    expect(grantOriginsOf([job('https://MCP.Swarmm.app/', ['job_submit', 'job_status', 'job_submit'])])).toEqual({
       origins: [{ origin: 'https://mcp.swarmm.app', tools: ['job_submit', 'job_status'] }],
     })
-    expect(keyOriginsOf([job('https://dev.swarmm.app:8443')])).toEqual({
+    expect(grantOriginsOf([job('https://dev.swarmm.app:8443')])).toEqual({
       origins: [job('https://dev.swarmm.app:8443')],
     })
-    expect(keyOriginsOf([])).toEqual({ origins: [] })
+    expect(grantOriginsOf([])).toEqual({ origins: [] })
   })
 
   it.each([
@@ -28,21 +28,21 @@ describe("a key's MCP origins (ADR 0091)", () => {
     ['a localhost name with a trailing dot', 'https://api.localhost.'],
     ['an internal name with a trailing dot', 'https://db.corp.internal.'],
     ['no address at all', 'mcp.swarmm.app'],
-  ])('refuses %s as key_origin', (_case, origin) => {
-    expect(keyOriginsOf([job(origin)])).toEqual({ problem: 'key_origin' })
+  ])('refuses %s as origin', (_case, origin) => {
+    expect(grantOriginsOf([job(origin)])).toEqual({ problem: 'origin' })
   })
 
   it('refuses the same origin twice and more than eight, and tools that are none, all or too many', () => {
-    expect(keyOriginsOf([job('https://a.example'), job('https://A.example/')])).toEqual({ problem: 'key_origin' })
+    expect(grantOriginsOf([job('https://a.example'), job('https://A.example/')])).toEqual({ problem: 'origin' })
     const nine = Array.from({ length: 9 }, (_, n) => job(`https://s${n}.example`))
-    expect(keyOriginsOf(nine)).toEqual({ problem: 'key_origin' })
-    expect(keyOriginsOf([job('https://a.example', [])])).toEqual({ problem: 'key_origin_tools' })
-    expect(keyOriginsOf([job('https://a.example', ['all'])])).toEqual({ problem: 'key_origin_tools' })
+    expect(grantOriginsOf(nine)).toEqual({ problem: 'origin' })
+    expect(grantOriginsOf([job('https://a.example', [])])).toEqual({ problem: 'origin_tools' })
+    expect(grantOriginsOf([job('https://a.example', ['all'])])).toEqual({ problem: 'origin_tools' })
     const many = Array.from({ length: 51 }, (_, n) => `tool_${n}`)
-    expect(keyOriginsOf([job('https://a.example', many)])).toEqual({ problem: 'key_origin_tools' })
+    expect(grantOriginsOf([job('https://a.example', many)])).toEqual({ problem: 'origin_tools' })
   })
 
-  it("names the origin a thread's server url is on, and none for one no key may name", () => {
+  it("names the origin a thread's server url is on, and none for one no grant may name", () => {
     expect(serverOriginOf('https://MCP.swarmm.app/mcp/job/42?token=x')).toBe('https://mcp.swarmm.app')
     expect(serverOriginOf('http://mcp.swarmm.app/mcp')).toBeUndefined()
     expect(serverOriginOf('https://127.0.0.1/mcp')).toBeUndefined()

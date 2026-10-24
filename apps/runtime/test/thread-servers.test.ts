@@ -1,5 +1,5 @@
 import { createRegistry } from '@earendil-works/pi-durable'
-import { type KeyOrigin, ThreadServers } from '@goblin/contracts'
+import { type GrantOrigin, ThreadServers } from '@goblin/contracts'
 import { ProtocolError, ProtocolErrorCode, createMcpHandler } from '@modelcontextprotocol/server'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
@@ -40,12 +40,12 @@ import { executeTool, inConversation } from './pi-tool.ts'
 const ORIGIN = 'https://dev.swarmm.test'
 const TOOLS = ['plan_propose', 'progress_report', 'delivery_submit', 'file_import']
 /** A key whose grant gives Swarmm's dev origin, with its four tools (ADRs 0091, 0114), and lists its Personas. */
-const KEY = credential({ id: 'key-1', name: 'swarmm', personas: 'list', origins: [{ origin: ORIGIN, tools: TOOLS }] })
+const APP = credential({ id: 'in-1', name: 'swarmm', personas: 'list', origins: [{ origin: ORIGIN, tools: TOOLS }] })
 /** An OAuth client whose grant names no origin. */
 const CLIENT = credential({ kind: 'client', id: 'claude', name: 'Claude Code', grantId: 'cg_1' })
 
 /** What each grant gives now, as the auth store would answer it; a grant not here is gone. */
-const keys = new Map<string, readonly KeyOrigin[]>([['key-1', [{ origin: ORIGIN, tools: TOOLS }]]])
+const origins = new Map<string, readonly GrantOrigin[]>([['in-1', [{ origin: ORIGIN, tools: TOOLS }]]])
 
 /** What the fixture server was called with: each call's tool, arguments and bearer. */
 const received: { tool: string; args: unknown; authorization: string | null }[] = []
@@ -108,8 +108,8 @@ const fetcher = async (input: RequestInfo | URL, init?: RequestInit) => {
 
 const database = chatDatabase()
 const db = durable(database.db)
-// Topic 2: its Conversation 19, the thread 20 a key declares Swarmm's server on, the fork 21 of Persona 5 answering
-// there, and the fork 22 of Persona 6, which the key did not make.
+// Topic 2: its Conversation 19, the thread 20 an app declares Swarmm's server on, the fork 21 of Persona 5 answering
+// there, and the fork 22 of Persona 6, which the app did not make.
 db.insert(appConversations)
   .values([
     { chatId: '19', piSession: '19', kind: 'main', role: 'conversation', topicId: 2, createdAt: 1 },
@@ -126,15 +126,15 @@ db.insert(appPersonaChats)
   .run()
 // The key's grant lists Persona 5 alone, as the agent's mirror holds it.
 db.insert(appGrantSync)
-  .values({ grantId: 'key-1', generation: 1, topics: 'all', personas: 'list', connections: 'all', syncedAt: 1 })
+  .values({ grantId: 'in-1', generation: 1, topics: 'all', personas: 'list', connections: 'all', syncedAt: 1 })
   .run()
-db.insert(appGrantReach).values({ grantId: 'key-1', kind: 'persona', resourceId: '5' }).run()
+db.insert(appGrantReach).values({ grantId: 'in-1', kind: 'persona', resourceId: '5' }).run()
 const cipher = await CredentialCipher.fromBase64(btoa(String.fromCharCode(...new Uint8Array(32).fill(7))))
 // SAFETY: these programs read nothing of the instance input but its MCP fetch, workspace and grant origins.
 const instance = {
   mcpFetch: fetcher,
   workspaceId: 'ws-1',
-  grantOrigins: async (grantId: string) => keys.get(grantId),
+  grantOrigins: async (grantId: string) => origins.get(grantId),
 } as AgentInputs
 const base = Layer.mergeAll(
   sqliteDb(database.db),
@@ -179,7 +179,7 @@ const server = (extra: Partial<Declared> = {}): Declared => ({
   ...extra,
 })
 /** Operation `op` of `caller` setting thread 20's servers to `servers`, as a change and a thread operation do. */
-const set = (op: string, servers: readonly Declared[], caller: Credential | undefined = KEY) =>
+const set = (op: string, servers: readonly Declared[], caller: Credential | undefined = APP) =>
   as(
     caller,
     Effect.gen(function* () {
@@ -190,23 +190,23 @@ const set = (op: string, servers: readonly Declared[], caller: Credential | unde
   )
 const setRefused = (op: string, servers: readonly Declared[]) =>
   refusal(
-    KEY,
+    APP,
     Effect.flatMap(prepareServers(servers), (prepared) => applyServers('20', op, prepared)),
   )
 const checkRefused = (op: string, servers: readonly Declared[]) =>
   refusal(
-    KEY,
+    APP,
     Effect.flatMap(prepareServers(servers), (prepared) => checkApply('20', op, prepared)),
   )
-const token = async () => (await as(KEY, threadEndpoint('20', 'swarmm'))).token
-const grantAll = () => keys.set('key-1', [{ origin: ORIGIN, tools: TOOLS }])
+const token = async () => (await as(APP, threadEndpoint('20', 'swarmm'))).token
+const grantAll = () => origins.set('in-1', [{ origin: ORIGIN, tools: TOOLS }])
 
 describe('a thread declares the MCP servers its Personas call (ADR 0103)', () => {
   it('refuses a member, an origin or tool the grant does not give, and an endpoint that is no https name', async () => {
     expect(await refusal(undefined, prepareServers([server()]))).toBe('credential_only')
-    expect(await refusal(CLIENT, prepareServers([server()]))).toBe('key_origin')
-    expect(await refusal(KEY, prepareServers([server({ url: 'https://evil.test/mcp' })]))).toBe('key_origin')
-    expect(await refusal(KEY, prepareServers([server({ tools: ['admin_reset'] })]))).toBe('key_origin_tool')
+    expect(await refusal(CLIENT, prepareServers([server()]))).toBe('origin')
+    expect(await refusal(APP, prepareServers([server({ url: 'https://evil.test/mcp' })]))).toBe('origin')
+    expect(await refusal(APP, prepareServers([server({ tools: ['admin_reset'] })]))).toBe('origin_tool')
     for (const url of [
       'http://dev.swarmm.test/mcp',
       'https://u:p@dev.swarmm.test/mcp',
@@ -215,7 +215,7 @@ describe('a thread declares the MCP servers its Personas call (ADR 0103)', () =>
       'https://[::1]/mcp',
       'not a url',
     ])
-      expect(await refusal(KEY, prepareServers([server({ url })]))).toBe('thread_server_url')
+      expect(await refusal(APP, prepareServers([server({ url })]))).toBe('thread_server_url')
     // The owner may clear a thread's servers, though never declare one.
     expect((await as(undefined, prepareServers([]))).servers).toEqual([])
   })
@@ -230,9 +230,9 @@ describe('a thread declares the MCP servers its Personas call (ADR 0103)', () =>
   })
 
   it("declares on a Thread only: never a Topic's Conversation or a Persona's fork", async () => {
-    await as(KEY, requireThread('20'))
-    expect(await refusal(KEY, requireThread('19'))).toBe('not_a_thread')
-    expect(await refusal(KEY, requireThread('21'))).toBe('not_a_thread')
+    await as(APP, requireThread('20'))
+    expect(await refusal(APP, requireThread('19'))).toBe('not_a_thread')
+    expect(await refusal(APP, requireThread('21'))).toBe('not_a_thread')
   })
 
   it('keeps the token encrypted, bound to its workspace, thread, name and endpoint, and answers servers without it', async () => {
@@ -240,18 +240,18 @@ describe('a thread declares the MCP servers its Personas call (ADR 0103)', () =>
     expect(views).toEqual([{ name: 'swarmm', url: `${ORIGIN}/api/mcp`, tools: ['delivery_submit', 'progress_report'] }])
     const [row] = db.select().from(appThreadServers).all()
     expect(JSON.stringify(row)).not.toContain('secret-token-1')
-    expect(row?.grantId).toBe('key-1')
+    expect(row?.grantId).toBe('in-1')
     expect(await token()).toBe('secret-token-1')
     // Copied to another thread, or pointed at another endpoint, it does not open.
     if (row !== undefined)
       db.insert(appThreadServers)
         .values({ ...row, chatId: '99' })
         .run()
-    expect(await refusal(KEY, threadEndpoint('99', 'swarmm'))).toBe('credential could not be decrypted')
+    expect(await refusal(APP, threadEndpoint('99', 'swarmm'))).toBe('credential could not be decrypted')
     db.update(appThreadServers)
       .set({ url: `${ORIGIN}/other` })
       .run()
-    expect(await refusal(KEY, threadEndpoint('20', 'swarmm'))).toBe('credential could not be decrypted')
+    expect(await refusal(APP, threadEndpoint('20', 'swarmm'))).toBe('credential could not be decrypted')
     db.delete(appThreadServers).run()
   })
 
@@ -277,23 +277,23 @@ describe('a thread declares the MCP servers its Personas call (ADR 0103)', () =>
     await set('op-5', [server({ token: 'second' })])
     expect(await token()).toBe('second')
     // Closing drops them; the operation replayed after a reopen swaps tokens on nothing.
-    await as(KEY, dropThreadServers(['20', '21']))
+    await as(APP, dropThreadServers(['20', '21']))
     await set('op-5', [server({ token: 'third' })])
     expect(threadServerViews(db, '20')).toEqual([])
-    expect(await refusal(KEY, threadEndpoint('20', 'swarmm'))).toBe('NotFound')
+    expect(await refusal(APP, threadEndpoint('20', 'swarmm'))).toBe('NotFound')
   })
 
-  it('stops a server its key no longer grants, at every use, and drops it: a revoked key, or changed origins', async () => {
+  it('stops a server its grant no longer allows, at every use, and drops it: a revoked grant, or changed origins', async () => {
     await set('op-6', [server({ token: 'live' })])
-    keys.set('key-1', [{ origin: ORIGIN, tools: ['delivery_submit'] }])
-    expect((await as(KEY, threadEndpoint('20', 'swarmm'))).tools).toEqual(['delivery_submit'])
-    keys.set('key-1', [{ origin: 'https://other.test', tools: TOOLS }])
-    expect(await refusal(KEY, threadEndpoint('20', 'swarmm'))).toBe('key_origin')
+    origins.set('in-1', [{ origin: ORIGIN, tools: ['delivery_submit'] }])
+    expect((await as(APP, threadEndpoint('20', 'swarmm'))).tools).toEqual(['delivery_submit'])
+    origins.set('in-1', [{ origin: 'https://other.test', tools: TOOLS }])
+    expect(await refusal(APP, threadEndpoint('20', 'swarmm'))).toBe('origin')
     expect(threadServerViews(db, '20')).toEqual([])
     grantAll()
     await set('op-7', [server({ token: 'live' })])
-    keys.delete('key-1')
-    expect(await refusal(KEY, threadEndpoint('20', 'swarmm'))).toBe('key_origin')
+    origins.delete('in-1')
+    expect(await refusal(APP, threadEndpoint('20', 'swarmm'))).toBe('origin')
     expect(db.select().from(appThreadServers).all()).toEqual([])
     grantAll()
   })
@@ -348,7 +348,7 @@ describe("a thread's Persona fork calls its declared server natively (ADR 0101, 
     expect((await installedIn('22')).frozen.set.tools).toEqual([])
   })
 
-  it('calls with the live token, checks arguments first, and stops once its key is revoked', async () => {
+  it('calls with the live token, checks arguments first, and stops once its grant is revoked', async () => {
     answer.mode = 'ok'
     await set('op-9', [server({ token: 'job-token' })])
     const deliver = (await installedIn('21')).tool('swarmm__delivery_submit')
@@ -368,7 +368,7 @@ describe("a thread's Persona fork calls its declared server natively (ADR 0101, 
     await set('op-10', [server({ token: 'rotated' })])
     await executeTool(deliver, { items: [{ fileId: 'f2' }] }, inConversation(21))
     expect(received.at(-1)?.authorization).toBe('Bearer rotated')
-    keys.delete('key-1')
+    origins.delete('in-1')
     const revoked = await executeTool(deliver, { items: [{ fileId: 'f3' }] }, inConversation(21))
     expect(revoked.isError).toBe(true)
     expect(received.at(-1)?.args).toEqual({ items: [{ fileId: 'f2' }] })

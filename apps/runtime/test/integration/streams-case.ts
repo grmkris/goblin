@@ -1,20 +1,18 @@
 // A chat's AG-UI stream on the real Worker and agent (docs/architecture/streams.md, ADR 0110): a member reads it
 // through their workspace with their session, as server-sent events that open with the chat's snapshots and then carry
 // everything live (text, reasoning, tool calls and their results); a reconnect opens with a fresh snapshot that holds
-// what came meanwhile; a server's key reads its own Topic's chat in full and no other chat; and a chat past the readers
-// it takes refuses one more as `stream_busy`.
+// what came meanwhile; an installed app reads its own Topic's chat in full and no other chat; and a chat past the
+// readers it takes refuses one more as `stream_busy`.
 import { EventSchema } from '@ag-ui/core/schemas'
 import { type AguiEvent, ConversationEntries, EventType, TopicView, runInput } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
-import { type Person, call, keyBody, ownerFetch, person, signedIn } from './owner-requests.ts'
+import { type Person, type Server, asServer, call, person, scriptApp, signedIn } from './owner-requests.ts'
 import { waitFor } from './until.ts'
 
 /** How long a case waits for something to show in a stream. */
 const WAIT_MS = 30_000
-
-export const Secret = Schema.Struct({ secret: Schema.String })
 
 /** One event of a `data:` frame, valid AG-UI 1.0 by `@ag-ui/core`'s own schemas. */
 function valid(json: string): AguiEvent {
@@ -91,22 +89,18 @@ export function streamOf(response: Response): StreamRead {
 export const memberStream = async (base: string, who: Person, chat: string) =>
   streamOf(await call(base, who, `/api/conversations/${chat}/stream`))
 
-/** A server's key on the owner API at `base`: a request with it as the bearer, as a server sends one. */
-export const keyFetch =
-  (base: string, secret: string) =>
+/** A server on the owner API at `base`: a request with its token as the bearer, as a server sends one. */
+export const serverFetch =
+  (base: string, server: Server) =>
   (method: string, path: string, body?: unknown): Promise<Response> =>
-    ownerFetch(`${base}${path}`, {
-      method,
-      headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    })
+    asServer(base, server, method, path, body)
 
-/** A new key of `owner` whose grant manages only what it makes (ADR 0114: its Topics and Personas a list), as its secret. */
-export async function newKey(base: string, owner: Person, name: string): Promise<string> {
-  const made = await call(base, owner, '/api/keys', keyBody(owner, name, { lists: true }))
-  expect(made.status, await made.clone().text()).toBe(201)
-  return Schema.decodeUnknownSync(Secret)(await made.json()).secret
-}
+/**
+ * A new script app of `owner` whose grant manages only what it makes (ADR 0114: its Topics and Personas a list), as a
+ * server.
+ */
+export const newServer = (base: string, owner: Person, name: string): Promise<Server> =>
+  scriptApp(base, owner, name, { lists: true })
 
 export const ofType = <T extends EventType>(events: readonly AguiEvent[], type: T) =>
   events.filter((event): event is Extract<AguiEvent, { type: T }> => event.type === type)
@@ -202,37 +196,37 @@ async function reconnect(url: string, owner: Person, gone: StreamRead) {
 }
 
 /**
- * A server's key reads its own Topic's chat in full: the opening with the whole STATE, then its thinking and its
- * answer; another key's Topic and the owner's own chat are out of its grant's reach (ADR 0114: `access_insufficient`).
+ * An installed app reads its own Topic's chat in full: the opening with the whole STATE, then its thinking and its
+ * answer; another app's Topic and the owner's own chat are out of its grant's reach (ADR 0114: `access_insufficient`).
  */
-async function keyReads(url: string, owner: Person) {
-  const asKey = keyFetch(url, await newKey(url, owner, 'streams'))
+async function appReads(url: string, owner: Person) {
+  const asApp = serverFetch(url, await newServer(url, owner, 'streams'))
   const topic = Schema.decodeUnknownSync(TopicView)(
-    await (await asKey('POST', '/api/topics', { name: 'Streamed customer', operationId: 'streams:topic' })).json(),
+    await (await asApp('POST', '/api/topics', { name: 'Streamed customer', operationId: 'streams:topic' })).json(),
   )
   const chat = topic.conversation
-  const stream = streamOf(await asKey('GET', `/api/conversations/${chat}/stream`))
+  const stream = streamOf(await asApp('GET', `/api/conversations/${chat}/stream`))
   await stream.until((events) => events.length >= 2)
   opened(stream.events)
-  const sent = await asKey(
+  const sent = await asApp(
     'POST',
     `/api/conversations/${chat}/messages`,
-    runInput(chat, { input: 'think hello from a key', operationId: 'streams:key:1' }),
+    runInput(chat, { input: 'think hello from an app', operationId: 'streams:app:1' }),
   )
   expect(sent.status, await sent.clone().text()).toBe(202)
   const run = await stream.until(ended)
-  expect(answers(run)).toEqual(['echo: hello from a key'])
+  expect(answers(run)).toEqual(['echo: hello from an app'])
   expect(ofType(run, EventType.REASONING_MESSAGE_CONTENT).map(({ delta }) => delta)).toEqual([
-    'Thinking about hello from a key.',
+    'Thinking about hello from an app.',
   ])
   expect(run.some(({ type }) => type === EventType.STEP_STARTED)).toBe(true)
   await stream.close()
-  const other = keyFetch(url, await newKey(url, owner, 'elsewhere'))
+  const other = serverFetch(url, await newServer(url, owner, 'elsewhere'))
   const theirs = Schema.decodeUnknownSync(TopicView)(
     await (await other('POST', '/api/topics', { name: 'Their customer', operationId: 'streams:other' })).json(),
   )
   for (const outside of [theirs.conversation, '1']) {
-    const refused = await asKey('GET', `/api/conversations/${outside}/stream`)
+    const refused = await asApp('GET', `/api/conversations/${outside}/stream`)
     expect(refused.status).toBe(403)
     expect(refused.headers.get('content-type')).toContain('application/json')
     expect(await refused.json()).toMatchObject({ error: { code: 'access_insufficient' } })
@@ -264,6 +258,6 @@ export async function streamsCase(url: string): Promise<void> {
   const owner = await person(url)
   const first = await memberReads(url, owner)
   await reconnect(url, owner, first)
-  await keyReads(url, owner)
+  await appReads(url, owner)
   await busy(url, owner)
 }

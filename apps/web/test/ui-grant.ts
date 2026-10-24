@@ -1,8 +1,9 @@
 /**
- * Local browser acceptance of the grant editor (ADRs 0114, 0118) against real source components: a key made and changed
- * in Settings, an MCP client's consent changed and approved, a client's grant changed from Settings, a script app
- * registered and an installation's access changed, an app installed from its install page, and a widening approved. Desktop (1440) and phone (390), light and dark; the rows are at least 40px to point at and 44px to touch,
- * and nothing scrolls sideways. No account or agent is used; the Worker's and the agent's answers are routed here.
+ * Local browser acceptance of the grant editor (ADRs 0114, 0118, 0125) against real source components: an MCP client's
+ * consent changed and approved, a client's grant changed from Settings, an installation's access changed and a script
+ * app registered with access picked in Settings, an app installed from its install page, and a widening approved.
+ * Desktop (1440) and phone (390), light and dark; the rows are at least 40px to point at and 44px to touch, and nothing
+ * scrolls sideways. No account or agent is used; the Worker's and the agent's answers are routed here.
  */
 import assert from 'node:assert/strict'
 import { mkdirSync, writeSync } from 'node:fs'
@@ -11,7 +12,6 @@ import { createServer } from 'vite'
 import { type Browser, type BrowserContextOptions, type Page, chromium } from 'playwright-core'
 import { mockRoute, type MockRoute } from './mock-route.ts'
 import {
-  type ApiKeyView,
   type ConsentTerms,
   GRANT_SPEC,
   type GrantTerms,
@@ -59,43 +59,25 @@ const SERVERS = [
   },
 ]
 const SPEC = { levels: GRANT_SPEC.levels, extras: GRANT_SPEC.extras, reachOptions: [] }
-const KEYS: readonly ApiKeyView[] = [
-  {
-    id: 'key_swarm',
-    name: 'swarm',
-    start: 'gbk_aaaaaa',
-    createdAt: '2026-10-20T00:00:00.000Z',
-    lastUsedAt: '2026-10-22T00:00:00.000Z',
-    grantId: 'key_swarm',
-    terms: { ...presetFor('swarm', ['ws_acme']), level: 'manage' },
-  },
-  {
-    id: 'key_crm',
-    name: 'crm',
-    start: 'gbk_bbbbbb',
-    createdAt: '2026-10-21T00:00:00.000Z',
-    expiresAt: '2026-11-20T00:00:00.000Z',
-    grantId: 'key_crm',
-    terms: {
-      name: 'crm',
-      level: 'read',
-      reach: {
-        workspaces: 'list',
-        each: [
-          {
-            workspace: 'ws_acme',
-            topics: { kind: 'list', ids: ['2'] },
-            personas: { kind: 'all' },
-            connections: { kind: 'all' },
-          },
-        ],
-        origins: [{ origin: 'https://mcp.crm.example', tools: ['contact_find', 'note_add'] }],
+/** A script app's grant: read one Topic, with one MCP server it may bring (ADRs 0091, 0103). */
+const CRM_TERMS: GrantTerms = {
+  name: 'crm',
+  level: 'read',
+  reach: {
+    workspaces: 'list',
+    each: [
+      {
+        workspace: 'ws_acme',
+        topics: { kind: 'list', ids: ['2'] },
+        personas: { kind: 'all' },
+        connections: { kind: 'all' },
       },
-      extras: ['inspect'],
-      lifetime: '30d',
-    },
+    ],
+    origins: [{ origin: 'https://mcp.crm.example', tools: ['contact_find', 'note_add'] }],
   },
-]
+  extras: ['inspect'],
+  lifetime: '30d',
+}
 const CLIENT: InboundClient = {
   clientId: 'claude-code',
   name: 'Claude Code',
@@ -104,7 +86,7 @@ const CLIENT: InboundClient = {
   grantId: 'cg_claude',
   terms: { ...PRESET, name: 'Claude Code' },
 }
-const WIDENED: GrantTerms = KEYS[1]?.terms ?? PRESET
+const WIDENED: GrantTerms = CRM_TERMS
 /** A product Acme registered, installed in Acme (ADR 0118), and the install page's answer for it. */
 const APP_TERMS: GrantTerms = presetFor('Swarmm', ['ws_acme'])
 const DEVELOPER_APP = {
@@ -128,6 +110,18 @@ const INSTALLATION = {
   grantId: 'in_swarmm',
   terms: APP_TERMS,
 }
+/** A script app Acme registered for itself, installed there with `CRM_TERMS`. */
+const CRM = {
+  id: 'in_crm',
+  clientId: 'app_crm',
+  name: 'crm',
+  from: 'Acme',
+  approvedBy: 'Kris',
+  createdAt: '2026-10-24T00:00:00.000Z',
+  expiresAt: '2026-11-20T00:00:00.000Z',
+  grantId: 'in_crm',
+  terms: CRM_TERMS,
+}
 
 const errors: string[] = []
 const sent: { readonly label: string; readonly method: string; readonly path: string; readonly body: unknown }[] = []
@@ -149,15 +143,6 @@ const ANSWERS: Readonly<Record<string, (payload: unknown, origin: string) => Ans
       [`GET /w/${slug}/api/mcp/servers`, () => ok(SERVERS)],
     ]),
   ),
-  'GET /api/keys': () => ok(KEYS),
-  'POST /api/keys': (payload) => {
-    // SAFETY: the page sends CreateApiKeyTerms; the assertions below read it as such.
-    const made = payload as { readonly name: string; readonly terms: GrantTerms }
-    const key = { ...KEYS[0], id: 'key_new', name: made.name, grantId: 'key_new', terms: made.terms }
-    return { body: { key, secret: `gbk_${'c'.repeat(64)}` }, status: 201 }
-  },
-  // SAFETY: the page sends UpdateApiKeyTerms.
-  'PATCH /api/keys/key_crm': (payload) => ok({ ...KEYS[1], terms: (payload as { readonly terms: GrantTerms }).terms }),
   'GET /api/developer/apps': () => ok([DEVELOPER_APP]),
   'POST /api/developer/apps': (payload) => {
     // SAFETY: the page sends RegisterApp.
@@ -165,7 +150,7 @@ const ANSWERS: Readonly<Record<string, (payload: unknown, origin: string) => Ans
     const app = { ...DEVELOPER_APP, clientId: 'app_new', name: made.name, returnUrls: [], script: made.script === true }
     return { body: { app, clientSecret: 'app-secret-letters' }, status: 201 }
   },
-  'GET /api/installations': () => ok([INSTALLATION]),
+  'GET /api/installations': () => ok([INSTALLATION, CRM]),
   // SAFETY: the page sends UpdateInstallation.
   'PATCH /api/installations/in_swarmm': (payload) =>
     ok({ ...INSTALLATION, terms: (payload as { readonly terms: GrantTerms }).terms }),
@@ -189,22 +174,23 @@ const ANSWERS: Readonly<Record<string, (payload: unknown, origin: string) => Ans
     ok({ grantId: 'cg_claude', terms: (payload as { readonly terms: GrantTerms }).terms, expiresAt: null }),
   'POST /api/auth/oauth2/consent': (_payload, origin) =>
     ok({ redirect: true, url: `${origin}/grant.html?screen=done` }),
-  'GET /api/grants/key_crm/terms': () =>
+  'GET /api/grants/in_crm/terms': () =>
     ok({
       spec: SPEC,
       defaults: WIDENED,
       current: WIDENED,
-      grantId: 'key_crm',
+      grantId: 'in_crm',
       summary: {
         ...WIDENED,
-        grantId: 'key_crm',
-        keyId: 'key_crm',
+        grantId: 'in_crm',
+        kind: 'app',
+        clientId: 'app_crm',
         expiresAt: '2026-11-20T00:00:00.000Z',
         widenUrl: '',
       },
     } satisfies ConsentTerms),
   // SAFETY: the page sends WidenRequest.
-  'PUT /api/grants/key_crm': (payload) => ok({ ...(payload as object), expiresAt: '2026-11-20T00:00:00.000Z' }),
+  'PUT /api/grants/in_crm': (payload) => ok({ ...(payload as object), expiresAt: '2026-11-20T00:00:00.000Z' }),
 }
 
 /** The answers this page asks for; anything else is a failed fixture. */
@@ -246,60 +232,6 @@ async function checkLayout(page: Page, label: string, touch: boolean) {
 
 const lastSent = (label: string, method: string, at: string) =>
   sent.findLast((each) => each.label === label && each.method === method && each.path === at)?.body
-
-async function keys(page: Page, origin: string, label: string, touch: boolean) {
-  await page.goto(`${origin}grant.html?screen=keys`)
-  await page.getByText('gbk_aaaaaa…').waitFor()
-  await page.getByText(/It can read 1 Topic, all Personas and all connections, and may bring 1 MCP server/u).waitFor()
-  await page.screenshot({ path: path.join(out, `${label}-keys.png`), fullPage: true })
-  await page.getByLabel('Name', { exact: true }).fill('deploy-bot')
-  await page
-    .getByText(/deploy-bot can write everything\s·\sno setup, routines, inspect or keys\s·\suntil revoked/u)
-    .waitFor()
-  await page.getByRole('button', { name: 'Change', exact: true }).click()
-  await page.getByRole('radio', { name: /^Manage/u }).click()
-  await page.getByRole('radiogroup', { name: 'Topics' }).getByRole('radio', { name: 'Pick…' }).click()
-  await page.getByRole('checkbox', { name: 'Launch' }).click()
-  await page.getByRole('checkbox', { name: /^Inspect/u }).click()
-  await page.getByLabel('Access lasts').selectOption('30d')
-  await page.getByText(/deploy-bot can manage 1 Topic, all Personas and all connections\s·\swith inspect/u).waitFor()
-  await checkLayout(page, `${label} keys`, touch)
-  await page.screenshot({ path: path.join(out, `${label}-keys-editor.png`), fullPage: true })
-  await page.getByRole('button', { name: 'Make key' }).click()
-  await page.getByText(/Copy the key for/u).waitFor()
-  await page.screenshot({ path: path.join(out, `${label}-keys-secret.png`), fullPage: true })
-  assert.deepEqual(lastSent(label, 'POST', '/api/keys'), {
-    name: 'deploy-bot',
-    terms: {
-      name: 'deploy-bot',
-      level: 'manage',
-      reach: {
-        workspaces: 'list',
-        each: [
-          {
-            workspace: 'ws_acme',
-            topics: { kind: 'list', ids: ['2'] },
-            personas: { kind: 'all' },
-            connections: { kind: 'all' },
-          },
-        ],
-        origins: [],
-      },
-      extras: ['inspect'],
-      lifetime: '30d',
-    },
-  })
-  await page.getByRole('button', { name: 'Done' }).click()
-  await page.getByRole('button', { name: 'Change access' }).nth(1).click()
-  await page.getByRole('radio', { name: /^Write/u }).click()
-  await page.getByRole('button', { name: 'Save access' }).click()
-  await page.getByRole('button', { name: 'Save access' }).waitFor({ state: 'detached' })
-  assert.equal(
-    // SAFETY: the page sent UpdateApiKeyTerms.
-    (lastSent(label, 'PATCH', '/api/keys/key_crm') as { readonly terms: GrantTerms }).terms.level,
-    'write',
-  )
-}
 
 async function consent(page: Page, origin: string, label: string, touch: boolean) {
   await page.goto(
@@ -364,11 +296,11 @@ async function clients(page: Page, origin: string, label: string, touch: boolean
 }
 
 async function widen(page: Page, origin: string, label: string) {
-  await page.goto(`${origin}grant.html?screen=widen&grant=key_crm&level=manage&reach=ws_acme/topic/3&extra=setup`)
+  await page.goto(`${origin}grant.html?screen=widen&grant=in_crm&level=manage&reach=ws_acme/topic/3&extra=setup`)
   await page.getByRole('heading', { name: 'Approving adds' }).waitFor()
   await page.getByText('Manage instead of read').waitFor()
-  // Names, not ids: the key's from its grant, the Topic's from Acme's own list, the workspace's from the person's.
-  await page.getByText(/The API key crm was refused/u).waitFor()
+  // Names, not ids: the app's from its grant, the Topic's from Acme's own list, the workspace's from the person's.
+  await page.getByText(/The app crm was refused/u).waitFor()
   await page.getByText('Topic “Support” in Acme').waitFor()
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   assert(wide <= 0, `${label} widen: scrolls sideways by ${String(wide)}px`)
@@ -377,11 +309,11 @@ async function widen(page: Page, origin: string, label: string) {
   await page.getByText(/^Approved\./u).waitFor()
   await page.screenshot({ path: path.join(out, `${label}-widen-approved.png`), fullPage: true })
   // SAFETY: the page sent WidenRequest.
-  const approved = lastSent(label, 'PUT', '/api/grants/key_crm') as {
+  const approved = lastSent(label, 'PUT', '/api/grants/in_crm') as {
     readonly grantId: string
     readonly terms: GrantTerms
   }
-  assert.equal(approved.grantId, 'key_crm')
+  assert.equal(approved.grantId, 'in_crm')
   assert.equal(approved.terms.level, 'manage')
   assert.deepEqual(approved.terms.extras, ['inspect', 'setup'])
   assert.deepEqual(approved.terms.reach.each[0]?.topics, { kind: 'list', ids: ['2', '3'] })
@@ -389,10 +321,14 @@ async function widen(page: Page, origin: string, label: string) {
 
 async function apps(page: Page, origin: string, label: string, touch: boolean) {
   await page.goto(`${origin}grant.html?screen=apps`)
-  await page.getByText(/from Acme · installed by Kris/u).waitFor()
+  await page
+    .getByText(/from Acme · installed by Kris/u)
+    .first()
+    .waitFor()
   await page.getByText(/An install can write everything/u).waitFor()
+  await page.getByText(/It can read 1 Topic, all Personas and all connections, and may bring 1 MCP server/u).waitFor()
   await page.screenshot({ path: path.join(out, `${label}-apps.png`), fullPage: true })
-  await page.getByRole('button', { name: 'Change access' }).click()
+  await page.getByRole('button', { name: 'Change access' }).first().click()
   await page.getByRole('radio', { name: /^Read/u }).click()
   await checkLayout(page, `${label} apps`, touch)
   await page.getByRole('button', { name: 'Save access' }).click()
@@ -400,17 +336,45 @@ async function apps(page: Page, origin: string, label: string, touch: boolean) {
   // SAFETY: the page sent UpdateInstallation.
   const changed = lastSent(label, 'PATCH', '/api/installations/in_swarmm') as { readonly terms: GrantTerms }
   assert.equal(changed.terms.level, 'read')
-  await page.getByLabel('Name', { exact: true }).fill('nightly-export')
+  // A script app, how a script or CI calls goblin (ADR 0125), with its access picked before it is registered.
+  await page.getByLabel('Name', { exact: true }).fill('deploy-bot')
   await page.getByRole('switch', { name: /A script of this workspace's/u }).click()
+  await page.getByText(/deploy-bot can write everything\s·\sno setup, routines or inspect\s·\suntil revoked/u).waitFor()
+  await page.getByRole('button', { name: 'Change', exact: true }).click()
+  await page.getByRole('radio', { name: /^Manage/u }).click()
+  await page.getByRole('radiogroup', { name: 'Topics' }).getByRole('radio', { name: 'Pick…' }).click()
+  await page.getByRole('checkbox', { name: 'Launch' }).click()
+  await page.getByRole('checkbox', { name: /^Inspect/u }).click()
+  await page.getByLabel('Access lasts').selectOption('30d')
+  await page.getByText(/deploy-bot can manage 1 Topic, all Personas and all connections\s·\swith inspect/u).waitFor()
+  await checkLayout(page, `${label} apps editor`, touch)
+  await page.screenshot({ path: path.join(out, `${label}-apps-editor.png`), fullPage: true })
   await page.getByRole('button', { name: 'Register app' }).click()
   await page.getByText(/Copy the app secret for/u).waitFor()
   await page.screenshot({ path: path.join(out, `${label}-apps-secret.png`), fullPage: true })
-  // SAFETY: the page sent RegisterApp.
-  const registered = lastSent(label, 'POST', '/api/developer/apps') as {
-    readonly script: boolean
-    readonly returnUrls: unknown
-  }
-  assert.deepEqual([registered.script, registered.returnUrls], [true, []])
+  assert.deepEqual(lastSent(label, 'POST', '/api/developer/apps'), {
+    name: 'deploy-bot',
+    returnUrls: [],
+    script: true,
+    terms: {
+      name: 'deploy-bot',
+      level: 'manage',
+      reach: {
+        workspaces: 'list',
+        each: [
+          {
+            workspace: 'ws_acme',
+            topics: { kind: 'list', ids: ['2'] },
+            personas: { kind: 'all' },
+            connections: { kind: 'all' },
+          },
+        ],
+        origins: [],
+      },
+      extras: ['inspect'],
+      lifetime: '30d',
+    },
+  })
 }
 
 async function install(page: Page, origin: string, label: string, touch: boolean) {
@@ -438,7 +402,7 @@ async function install(page: Page, origin: string, label: string, touch: boolean
 
 async function drive(browser: Browser, origin: string, label: string, options: BrowserContextOptions) {
   const touch = options.hasTouch === true
-  for (const screen of [keys, consent, clients, apps, install] as const) {
+  for (const screen of [consent, clients, apps, install] as const) {
     const page = await browser.newPage(options)
     page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`))
     await serve(page, `${label}-${screen.name}`)

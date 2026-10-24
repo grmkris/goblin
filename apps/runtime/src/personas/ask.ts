@@ -137,7 +137,7 @@ export const askPersonas = (
       operationId: input.operationId,
       receipt: {
         kind: 'persona_ask',
-        origin: from.via === 'mcp' ? 'source' : power.server ? 'key' : 'owner',
+        origin: from.via === 'mcp' ? 'source' : power.server ? 'app' : 'owner',
       },
       flow: { flow: 'persona_ask', via: from.via, actor: 'owner', count: frozen.length, personaOrder: order },
     } as const

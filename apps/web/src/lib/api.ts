@@ -58,7 +58,7 @@ export const owner = makeApiQuery({
   client: HttpApiClient.make(OwnerApi, { transformClient: inThisWorkspace }),
   headers: apiHeaders,
 })
-/** The workspace's own records the Worker answers without waking its agent: its API keys and the member's clients. */
+/** The workspace's own records the Worker answers without waking its agent: its members, apps and installations. */
 export const workspaceAccount = makeApiQuery({
   id: 'goblin/WorkspaceAccountApi',
   client: HttpApiClient.make(WorkspaceAccountApi, { transformClient: inThisWorkspace }),

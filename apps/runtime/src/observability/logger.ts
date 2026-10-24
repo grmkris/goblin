@@ -70,7 +70,7 @@ const frames = (value: unknown): value is readonly string[] =>
   Array.isArray(value) &&
   value.length <= MAX_FRAMES &&
   value.every((frame) => Predicate.isString(frame) && FRAME.test(frame))
-/** A few short tokens: a key's scopes. */
+/** A few short tokens: a grant's level and extras. */
 const tokens = (value: unknown): value is readonly string[] =>
   Array.isArray(value) && value.length <= 8 && value.every((each) => token(40)(each))
 const status = (value: unknown): value is number | string =>

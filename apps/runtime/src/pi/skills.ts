@@ -284,7 +284,7 @@ export function skillLearningExtension(
     hooks: [
       hook(GenerationTask, {
         // Fire and forget after a final answer: the learner may write a skill draft for the owner to review. It never
-        // holds up the turn, and an attempt an eviction cuts short is simply not made. A turn a server's key sent any
+        // holds up the turn, and an attempt an eviction cuts short is simply not made. A turn an installed app sent any
         // input to never drafts a skill of the owner's (ADR 0115): what its power says is read before the answer ends.
         onYield: async (_answer, api, context) => {
           // expected: a power that cannot be read drafts nothing, and the outcome line records it as failed

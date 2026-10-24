@@ -4,7 +4,6 @@ import { type McpServer, ProtocolError } from '@modelcontextprotocol/server'
 import type * as Effect from 'effect/Effect'
 import * as Match from 'effect/Match'
 import * as Option from 'effect/Option'
-import * as Predicate from 'effect/Predicate'
 import * as Schema from 'effect/Schema'
 import { toAppError } from '../http/errors.ts'
 import { base64url, bytesOfBase64url } from '../runtime/purpose-key.ts'
@@ -156,18 +155,14 @@ const methodError = (cause: unknown): ProtocolError =>
     Match.orElse((error) => new ProtocolError(-32603, 'InternalError', encodeError(error))),
   )
 
-/**
- * Where a call is answered: for a client, the workspace a call names among those it reaches (`workspaceFor`), its id;
- * for a server's key, its own workspace, which every call of a key reaches whatever it names.
- */
+/** Where a call is answered: the workspace a call names among those its caller reaches (`workspaceFor`), its id. */
 export type Home = (named: string | undefined) => string
 
-/** The home of a caller: a client's workspace by its reach, a key's own (its credential's `ws.workspace`). */
-export const homeOf = (power: Power, reach: CallerReach | undefined): Home => {
-  const ws: unknown = Predicate.hasProperty(power, 'ws') ? power.ws : undefined
-  const own = Predicate.hasProperty(ws, 'workspace') && Predicate.isString(ws.workspace) ? ws.workspace : ''
-  return (named) => (reach === undefined ? own : workspaceFor(reach, named).id)
-}
+/** The home of a caller, by its reach. */
+export const homeOf =
+  (reach: CallerReach): Home =>
+  (named) =>
+    workspaceFor(reach, named).id
 
 /** What a send's call answers: its chat and its receipt's operation id, which name the send's task. */
 type Sent = { readonly chat: string; readonly operationId: string }

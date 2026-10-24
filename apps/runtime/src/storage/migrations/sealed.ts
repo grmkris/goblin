@@ -2,7 +2,7 @@ import { BREAK, type Migration } from './migration.ts'
 
 /**
  * Every Topic is sealed (ADR 0115): how far each Topic's chats reach (`sealed`, and Personal, id 1, the hub), which
- * replaces the search opt-out; which server's key wrote a Topic's guidance (`guidance_by`, none for a person's; the
+ * replaces the search opt-out; which installed app wrote a Topic's guidance (`guidance_by`, none for a person's; the
  * guidance a room had is its key's, as its chats read it until now); what each operation's sender may do in a turn
  * (`power`, none on the receipts made before, which read by their origin); and what a key made kept for display only,
  * as `app_made_by`. Forward, so production keeps its agents.

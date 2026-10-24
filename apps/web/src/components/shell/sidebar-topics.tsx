@@ -1,5 +1,5 @@
 // The sidebar's Topics (ADR 0078): each channel with its live threads, the archived folded, Add topic and All threads;
-// in the strip, one `#` that lists them beside it. Under them, the Topics each server's key made (ADR 0115), folded.
+// in the strip, one `#` that lists them beside it. Under them, the Topics each installed app made (ADR 0115), folded.
 import { use, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { ConversationView, TopicView } from '@goblin/contracts'
@@ -126,7 +126,7 @@ function AllThreads({ unread }: { readonly unread: number }) {
   )
 }
 
-/** How many of a key's Topics show when its section opens; Show more adds as many again. */
+/** How many of an app's Topics show when its section opens; Show more adds as many again. */
 const MADE_SHOWN = 20
 
 /** The channel of the page, when it shows a channel or a thread of one. */
@@ -140,7 +140,7 @@ function useShowingChannel(): string | undefined {
   return undefined
 }
 
-/** A key's open Topics: a filter field, then the Topics whose name holds it, a few at a time. */
+/** An app's open Topics: a filter field, then the Topics whose name holds it, a few at a time. */
 function MadeList({ group, recent }: { readonly group: MadeByGroup; readonly recent: ReadonlySet<string> }) {
   const [filter, setFilter] = useState('')
   const [shown, setShown] = useState(MADE_SHOWN)
@@ -153,7 +153,7 @@ function MadeList({ group, recent }: { readonly group: MadeByGroup; readonly rec
           className="sidebar-filter"
           value={filter}
           placeholder="Filter topics"
-          aria-label={`Filter the topics ${group.key} made`}
+          aria-label={`Filter the topics ${group.app} made`}
           autoComplete="off"
           spellCheck={false}
           onChange={(event) => setFilter(event.target.value)}
@@ -176,13 +176,13 @@ function MadeList({ group, recent }: { readonly group: MadeByGroup; readonly rec
 }
 
 /**
- * The Topics one server's key made (ADR 0115), a section under the Topics that starts folded (the owner's choice is
- * remembered in this browser): the key's name and how many Topics, with a dot while any has replies the owner has not
+ * The Topics one installed app made (ADR 0115), a section under the Topics that starts folded (the owner's choice is
+ * remembered in this browser): the app's name and how many Topics, with a dot while any has replies the owner has not
  * read. Open, a filter field and the Topics, the latest active first; folded, the Topic the page shows keeps its row,
  * so the page's place still shows. Grouping is for keeping many customers' Topics tidy: each is sealed like any other.
  */
 function MadeBy({ group, recent }: { readonly group: MadeByGroup; readonly recent: ReadonlySet<string> }) {
-  const [folded, toggle] = useFolded(`made:${group.key}`, true)
+  const [folded, toggle] = useFolded(`made:${group.app}`, true)
   const views = useConversations()
   const showing = useShowingChannel()
   const unread = new Set(views.filter(isUnread).map((view) => view.id))
@@ -190,11 +190,11 @@ function MadeBy({ group, recent }: { readonly group: MadeByGroup; readonly recen
   const here = group.topics.find((topic) => topic.conversation === showing)
   const count = group.topics.length
   return (
-    <section className="sidebar-section" aria-label={`Topics ${group.key} made`} data-section="made-by">
+    <section className="sidebar-section" aria-label={`Topics ${group.app} made`} data-section="made-by">
       <div className="sidebar-section-head">
         <button type="button" className="sidebar-section-toggle" aria-expanded={!folded} onClick={toggle}>
           <ChevronRightIcon aria-hidden />
-          <span className="sidebar-made-key">{group.key}</span>
+          <span className="sidebar-made-app">{group.app}</span>
           <span className="sidebar-made-count">
             · {count} {count === 1 ? 'topic' : 'topics'}
           </span>
@@ -219,7 +219,7 @@ function MadeBy({ group, recent }: { readonly group: MadeByGroup; readonly recen
 
 /**
  * The Topics as channels: Personal first, each with its live threads under it, the archived folded, then the rest;
- * under them the Topics each server's key made, the key with the latest activity first.
+ * under them the Topics each installed app made, the app with the latest activity first.
  */
 export function Topics({ unread }: { readonly unread: number }) {
   const recent = useRecentThreads()
@@ -237,7 +237,7 @@ export function Topics({ unread }: { readonly unread: number }) {
         <AllThreads unread={unread} />
       </Section>
       {made.map((group) => (
-        <MadeBy key={group.key} group={group} recent={recent} />
+        <MadeBy key={group.app} group={group} recent={recent} />
       ))}
     </>
   )

@@ -17,8 +17,8 @@ export interface RequestFacts {
   /** The endpoint the request reached, as `<group>.<endpoint>` (`topics.update`). */
   readonly route: string
   /**
-   * The credential the Worker admitted the request for, a key or an OAuth client (ADRs 0086, 0114); none for a member's
-   * session.
+   * The credential the Worker admitted the request for, an OAuth client or an installed app (ADRs 0086, 0114, 0118);
+   * none for a member's session.
    */
   readonly credential?: Credential | undefined
   /** The member the request acts for (ADR 0089): a session's person, or the person an OAuth client acts for. */

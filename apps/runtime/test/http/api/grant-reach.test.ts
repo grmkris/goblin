@@ -10,8 +10,8 @@ import { organizing } from './organizing.ts'
 
 const scout = { name: 'Scout', avatar: { glyph: 'S', hue: 120 }, role: 'Finds things out', instructions: 'Be brief.' }
 
-/** A server's key whose grant is `manage` over every Topic, Persona and connection: Swarmm's after release A. */
-const KEY = credential({ id: 'key-1', name: 'key-1', level: 'manage' })
+/** An installed app whose grant is `manage` over every Topic, Persona and connection: Swarmm's as it installs. */
+const APP = credential({ id: 'in-1', name: 'in-1', level: 'manage' })
 /** A key whose Topics and Personas are lists, growing with what it makes (ADR 0114), and its connections `mycut`. */
 const LISTED = credential({
   id: 'key-2',
@@ -60,14 +60,14 @@ describe('a credential reaches what its grant reaches (ADR 0114)', () => {
   it("reads the owner's own Topics and Personas with a default grant, and makes a Topic narrowed to nothing", async () => {
     const { fetch, topics } = organizing()
     await fetch(post('/api/personas', { ...scout, operationId: 'owner-p' }))
-    const persona = await fetch(get('/api/personas/1', as(KEY)))
+    const persona = await fetch(get('/api/personas/1', as(APP)))
     expect(persona.status).toBe(200)
     expect(await persona.json()).toMatchObject({ persona: { id: 1, name: 'Scout' } })
-    const made = await fetch(post('/api/topics', { name: 'Customer 1', operationId: 'svc:topic:1' }, as(KEY)))
+    const made = await fetch(post('/api/topics', { name: 'Customer 1', operationId: 'svc:topic:1' }, as(APP)))
     expect(made.status).toBe(201)
     expect(topics.get(2).setup).toEqual({ mcpServers: [], skills: [], apps: [], subagents: false })
-    expect((await topicPage(fetch(get('/api/topics', as(KEY))))).topics.map((topic) => topic.id)).toEqual([2, 1])
-    expect((await fetch(json('PATCH', '/api/topics/1', { name: 'Home' }, as(KEY)))).status).toBe(200)
+    expect((await topicPage(fetch(get('/api/topics', as(APP))))).topics.map((topic) => topic.id)).toEqual([2, 1])
+    expect((await fetch(json('PATCH', '/api/topics/1', { name: 'Home' }, as(APP)))).status).toBe(200)
   })
 
   it('seals a Topic with manage, and leaves making a hub to a person (ADR 0115)', async () => {
@@ -76,9 +76,9 @@ describe('a credential reaches what its grant reaches (ADR 0114)', () => {
     const writer = credential({ id: 'key-w', level: 'write' })
     await lacking(await fetch(json('PATCH', '/api/topics/1', { reach: 'sealed' }, as(writer))), { level: 'manage' })
     expect(topics.get(1).reach).toBe('hub')
-    expect((await fetch(json('PATCH', '/api/topics/1', { reach: 'sealed' }, as(KEY)))).status).toBe(200)
+    expect((await fetch(json('PATCH', '/api/topics/1', { reach: 'sealed' }, as(APP)))).status).toBe(200)
     expect(topics.get(1).reach).toBe('sealed')
-    const hub = await fetch(json('PATCH', '/api/topics/2', { reach: 'hub' }, as(KEY)))
+    const hub = await fetch(json('PATCH', '/api/topics/2', { reach: 'hub' }, as(APP)))
     expect(hub.status).toBe(403)
     await refusedFor(hub, 'hub_person')
     // A client acting for a member is refused for the member's role; the owner's session makes a hub.
@@ -90,7 +90,7 @@ describe('a credential reaches what its grant reaches (ADR 0114)', () => {
     expect(topics.get(2).reach).toBe('hub')
   })
 
-  it('appends what a list-reach key makes to its list, and reaches nothing else of that kind', async () => {
+  it('appends what a list-reach app makes to its list, and reaches nothing else of that kind', async () => {
     const { fetch, grants } = organizing()
     grants.set(LISTED)
     await fetch(post('/api/topics', { name: 'Trips', operationId: 'owner-topic' }))
@@ -146,7 +146,7 @@ describe('a credential reaches what its grant reaches (ADR 0114)', () => {
       apps: [],
       subagents: false,
     }
-    await lacking(await fetch(post('/api/topics', { name: 'C', setup, operationId: 'k:c' }, as(KEY))), {
+    await lacking(await fetch(post('/api/topics', { name: 'C', setup, operationId: 'k:c' }, as(APP))), {
       extra: 'setup',
     })
     const setting = credential({ id: 'key-s', level: 'manage', extras: ['setup'] })
@@ -186,19 +186,19 @@ describe('a credential reaches what its grant reaches (ADR 0114)', () => {
     }
   })
 
-  it("never lets a key name one of the owner's own subscriptions for a Persona, while the owner may (ADR 0087)", async () => {
+  it("never lets an app name one of the owner's own subscriptions for a Persona, while the owner may (ADR 0087)", async () => {
     const { fetch } = organizing()
-    const refused = await fetch(post('/api/personas', { ...scout, model: 'sub/opus', operationId: 'svc:p:1' }, as(KEY)))
+    const refused = await fetch(post('/api/personas', { ...scout, model: 'sub/opus', operationId: 'svc:p:1' }, as(APP)))
     expect(refused.status).toBe(400)
     expect(await refused.json()).toMatchObject({ error: { code: 'invalid_input', reason: 'persona_model' } })
-    expect((await fetch(post('/api/personas', { ...scout, operationId: 'svc:p:2' }, as(KEY)))).status).toBe(201)
-    const edited = await fetch(json('PATCH', '/api/personas/1', { model: 'sub/opus', expectedRevision: 1 }, as(KEY)))
+    expect((await fetch(post('/api/personas', { ...scout, operationId: 'svc:p:2' }, as(APP)))).status).toBe(201)
+    const edited = await fetch(json('PATCH', '/api/personas/1', { model: 'sub/opus', expectedRevision: 1 }, as(APP)))
     expect(edited.status).toBe(400)
     const owners = await fetch(post('/api/personas', { ...scout, name: 'Owl', model: 'sub/opus', operationId: 'own' }))
     expect(owners.status).toBe(201)
   })
 
-  it('treats a key and an OAuth client with the same grant alike, a client no more than its person may', async () => {
+  it('treats an installed app and an OAuth client with the same grant alike, a client no more than its person may', async () => {
     const { fetch, grants } = organizing()
     const client: Credential = { ...LISTED, kind: 'client', id: 'claude', name: 'Claude', grantId: 'cg_1' }
     for (const forwarded of [LISTED, client]) grants.set(forwarded)
@@ -239,49 +239,47 @@ describe('a credential reaches what its grant reaches (ADR 0114)', () => {
     expect((await fetch(get('/api/topics/2', as(widened)))).status).toBe(200)
   })
 
-  it('names the key on what it made, to the key and the owner, and on nothing it did not, for display (ADR 0115)', async () => {
+  it('names the app on what it made, to the app and the owner, and on nothing it did not, for display (ADR 0115)', async () => {
     const { fetch, db, topics, personas } = organizing()
-    const named = credential({ id: 'key-1', name: 'swarmm-prod', level: 'manage' })
-    // Made before names were kept: the key's id stands in until its first request names it.
+    const named = credential({ id: 'app-1', name: 'swarmm-prod', level: 'manage' })
+    // One a server made with no name kept: its id stands for it.
     await fetch(post('/api/topics', { name: 'Older', operationId: 'older' }))
-    db.run(sql`INSERT INTO app_made_by (key_id, kind, resource_id, created_at) VALUES ('key-1', 'topic', 2, 1)`)
-    expect(topics.get(2).madeBy).toEqual({ key: 'key-1' })
+    db.run(sql`INSERT INTO app_made_by (key_id, kind, resource_id, created_at) VALUES ('in-1', 'topic', 2, 1)`)
+    expect(topics.get(2).madeBy).toEqual({ app: 'in-1' })
     const made = await fetch(post('/api/topics', { name: 'Customer 1', operationId: 'svc:topic:1' }, as(named)))
-    expect(await made.json()).toMatchObject({ id: 3, madeBy: { key: 'swarmm-prod' } })
-    // The naming of what came before runs beside the request, never in it.
-    await expect.poll(() => topics.get(2).madeBy, { timeout: 1000 }).toEqual({ key: 'swarmm-prod' })
+    expect(await made.json()).toMatchObject({ id: 3, madeBy: { app: 'swarmm-prod' } })
     const persona = await fetch(post('/api/personas', { ...scout, operationId: 'svc:p:1' }, as(named)))
-    expect(await persona.json()).toMatchObject({ id: 1, madeBy: { key: 'swarmm-prod' } })
+    expect(await persona.json()).toMatchObject({ id: 1, madeBy: { app: 'swarmm-prod' } })
     await fetch(post('/api/topics', { name: 'Trips', operationId: 'owner-topic' }))
     await fetch(post('/api/personas', { ...scout, name: 'Owl', operationId: 'owner-p' }))
-    expect(topics.list().map((topic) => [topic.id, topic.madeBy?.key])).toEqual([
+    expect(topics.list().map((topic) => [topic.id, topic.madeBy?.app])).toEqual([
       [1, undefined],
-      [2, 'swarmm-prod'],
+      [2, 'in-1'],
       [3, 'swarmm-prod'],
       [4, undefined],
     ])
-    expect(personas.list().map((each) => [each.id, each.madeBy?.key])).toEqual([
+    expect(personas.list().map((each) => [each.id, each.madeBy?.app])).toEqual([
       [1, 'swarmm-prod'],
       [2, undefined],
     ])
   })
 
-  it("lets the owner set a key's Topic up like any other: what a key's turn may use there is its own grant's (ADR 0115)", async () => {
+  it("lets the owner set an app's Topic up like any other: what an app's turn may use there is its own grant's (ADR 0115)", async () => {
     const { fetch, topics } = organizing()
-    await fetch(post('/api/topics', { name: 'Customer 1', operationId: 'svc:topic:1' }, as(KEY)))
+    await fetch(post('/api/topics', { name: 'Customer 1', operationId: 'svc:topic:1' }, as(APP)))
     const set = await fetch(json('PATCH', '/api/topics/2/setup', { set: EVERYTHING, expectedRevision: 1 }))
     expect(set.status).toBe(200)
     expect(topics.get(2).setup).toEqual(EVERYTHING)
   })
 
-  it("keeps the name of the key that wrote a Topic's guidance, and none once a person writes it (ADR 0115)", async () => {
+  it("keeps the name of the app that wrote a Topic's guidance, and none once a person writes it (ADR 0115)", async () => {
     const { fetch, db } = organizing()
     const guidanceBy = () =>
       db.all<{ by: string | null }>(sql`SELECT guidance_by AS by FROM app_topics WHERE id = 2`)[0]?.by
-    await fetch(post('/api/topics', { name: 'Customer 1', instructions: 'Be brief.', operationId: 'k' }, as(KEY)))
-    expect(guidanceBy()).toBe('key-1')
+    await fetch(post('/api/topics', { name: 'Customer 1', instructions: 'Be brief.', operationId: 'k' }, as(APP)))
+    expect(guidanceBy()).toBe('in-1')
     await fetch(json('PATCH', '/api/topics/2', { name: 'Customer one' }))
-    expect(guidanceBy()).toBe('key-1')
+    expect(guidanceBy()).toBe('in-1')
     await fetch(json('PATCH', '/api/topics/2', { instructions: 'Be kind.', expectedRevision: 2 }))
     expect(guidanceBy()).toBeNull()
   })
@@ -308,11 +306,11 @@ describe('a credential reaches what its grant reaches (ADR 0114)', () => {
     const { fetch } = organizing({ frozen: true })
     const answers = await Promise.all(
       Array.from({ length: 601 }, () =>
-        fetch(get('/api/personas?limit=1', as(KEY))).then((response) => response.status),
+        fetch(get('/api/personas?limit=1', as(APP))).then((response) => response.status),
       ),
     )
     expect(answers.filter((status) => status === 200)).toHaveLength(600)
-    const refused = await fetch(get('/api/personas?limit=1', as(KEY)))
+    const refused = await fetch(get('/api/personas?limit=1', as(APP)))
     expect(refused.status).toBe(401)
     expect(await refused.json()).toMatchObject({
       // At the epoch, the next minute begins in a whole minute.
@@ -331,10 +329,10 @@ describe('a credential reaches what its grant reaches (ADR 0114)', () => {
 
   it('reaches only endpoints that take credentials, and never grants resident authority', async () => {
     const { fetch, resident } = organizing()
-    expect((await fetch(post('/api/topics', { name: 'A', operationId: 'svc:a' }, as(KEY)))).status).toBe(201)
+    expect((await fetch(post('/api/topics', { name: 'A', operationId: 'svc:a' }, as(APP)))).status).toBe(201)
     expect(resident.grants).toHaveLength(0)
     // An endpoint no credential reaches: Undo in the organize log.
-    const undo = await fetch(post('/api/organize/receipt-1/undo', {}, as(KEY)))
+    const undo = await fetch(post('/api/organize/receipt-1/undo', {}, as(APP)))
     expect(undo.status).toBe(403)
     await refusedFor(undo, 'credential')
     await fetch(post('/api/topics', { name: 'B', operationId: 'owner-b' }))

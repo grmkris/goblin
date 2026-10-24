@@ -72,7 +72,7 @@ export type ScopeTopic = {
   /** The channel guidance (ADR 0079); empty when there is none. */
   readonly description: string
   readonly instructions: string
-  /** The server's key that wrote it, by name (ADR 0115); none when a person did. */
+  /** The installed app that wrote it, by name (ADR 0115); none when a person did. */
   readonly guidanceBy: string | null
   readonly holds: (item: SetupItem) => boolean
 }

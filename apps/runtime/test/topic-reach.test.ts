@@ -41,20 +41,20 @@ afterEach(() => {
   for (const close of closes.splice(0)) close()
 })
 
-describe('a Topic a key made takes routines and Sources like any other (ADR 0115)', () => {
-  it('takes a routine whose Topic a key made: tenancy is the sender’s, not the place’s', () => {
+describe('a Topic an app made takes routines and Sources like any other (ADR 0115)', () => {
+  it('takes a routine whose Topic an app made: tenancy is the sender’s, not the place’s', () => {
     const { db, close } = chatDatabase()
     closes.push(close)
     const sqlite = durable(db)
     const routines = new RoutineStore(sqlite, 'owner')
-    sqlite.insert(appMadeBy).values({ keyId: 'key-1', kind: 'topic', resourceId: PERSONAL_TOPIC, createdAt: 1 }).run()
+    sqlite.insert(appMadeBy).values({ makerId: 'in-1', kind: 'topic', resourceId: PERSONAL_TOPIC, createdAt: 1 }).run()
     expect(routines.propose(DEFINITION, 'op-made', 'rt_1', 1_000, PERSONAL_TOPIC).routine.state).toBe('proposed')
   })
 
-  it.effect("routes a Source's conversation into a Topic a key made", () =>
+  it.effect("routes a Source's conversation into a Topic an app made", () =>
     Effect.gen(function* () {
       const { db, engine, ports, active } = yield* sourceWorld()
-      db.insert(appMadeBy).values({ keyId: 'key-1', kind: 'topic', resourceId: 4, createdAt: 1 }).run()
+      db.insert(appMadeBy).values({ makerId: 'in-1', kind: 'topic', resourceId: 4, createdAt: 1 }).run()
       const source = yield* active(PAYLOAD_SETUP)
       yield* engine.takeEvent(source, { eventId: 'e1', data: message('m1') }, ports)
       yield* engine.route(source, { key: DM, target: { to: 'topic', topic: 4 }, by: 'owner' }, ports)

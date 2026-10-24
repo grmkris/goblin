@@ -1,5 +1,4 @@
 import { ClientsCard, DeleteAccountCard } from './account-cards.tsx'
-import { ApiKeysCard } from './api-keys-card.tsx'
 import { DeveloperAppsCard, InstalledAppsCard } from './apps-cards.tsx'
 import { MemoryCard, ResidentCard, UsageCard } from './agent-cards.tsx'
 import { ModelEndpointCard } from './model-endpoint-card.tsx'
@@ -12,9 +11,9 @@ import { useCurrentWorkspace } from '../lib/current-workspace.ts'
 
 /**
  * The workspace's settings, most used first: today's usage, Start and the model, its agent (and where its notices go),
- * the apps installed in it and the apps it registered (ADR 0118), the API keys of servers it runs, the workspace itself
- * (ADR 0089), then the person's own: the MCP clients they connected and each one's grant (ADR 0114), and their
- * account. Routines are on Work.
+ * the apps installed in it and the apps and scripts it registered (ADRs 0118, 0125), the workspace itself (ADR 0089),
+ * then the person's own: the MCP clients they connected and each one's grant (ADR 0114), and their account. Routines
+ * are on Work.
  */
 export function Settings() {
   const workspace = useCurrentWorkspace()
@@ -43,33 +42,18 @@ export function Settings() {
           title="Developer"
           note={
             <>
-              Register a product that workspaces install, or a script for this one. Its backend gets a token from{' '}
+              Register a product that workspaces install, or a script app: how a script, a server or CI of this
+              workspace calls goblin. Its backend gets a token from{' '}
               <code>{`${window.location.origin}/api/auth/oauth2/token`}</code> with its client id and secret
-              (client_credentials) and calls <code>{`${window.location.origin}/w/<slug>/api`}</code> or{' '}
-              <code>/mcp</code>.
+              (client_credentials), or a shell from <code>goblin token</code> with <code>GOBLIN_CLIENT_ID</code> and{' '}
+              <code>GOBLIN_CLIENT_SECRET</code> set, and calls <code>{`${window.location.origin}/w/<slug>/api`}</code>{' '}
+              or <code>/mcp</code>.
             </>
           }
         >
           <DeveloperAppsCard workspace={workspace} />
         </PageSection>
       )}
-      <PageSection
-        id="keys"
-        title="API keys"
-        note={
-          <>
-            For servers this workspace runs: <code>Authorization: Bearer gbk_…</code> on{' '}
-            <code>{`${window.location.origin}/api`}</code> or <code>/mcp</code>; a key reaches only this workspace.
-            Revoking one ends it at once; rotating its secret keeps the key, and the old secret stops working at once.
-          </>
-        }
-      >
-        {managing ? (
-          <ApiKeysCard workspace={workspace} />
-        ) : (
-          <p className="text-sm text-muted-foreground">Only the workspace's owners and admins make keys.</p>
-        )}
-      </PageSection>
       <PageSection id="workspace" title="Workspace">
         <WorkspaceCard />
         {workspace !== undefined && <MembersCard workspace={workspace} />}

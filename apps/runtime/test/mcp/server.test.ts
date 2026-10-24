@@ -12,9 +12,9 @@ import { type CallerReach, mcpServer } from '../../src/inbound/mcp-server.ts'
 import { workspaceFor } from '../../src/inbound/reach.ts'
 import { type OwnerCaller, STREAMED, TOOLS } from '../../src/inbound/tools.ts'
 import { EVENT_METHODS } from '../../src/inbound/events-methods.ts'
-import { credential } from '../grants-fixture.ts'
+import { ONE_WORKSPACE, credential } from '../grants-fixture.ts'
 
-const KEY = credential({ id: 'key-1', name: 'swarmm', level: 'manage' })
+const APP = credential({ id: 'app-1', name: 'swarmm', level: 'manage' })
 /** An OAuth client a person approved with a grant of `level` and `extras` (ADR 0114). */
 const client = (level: Level = 'write', extras: readonly Extra[] = []): Credential =>
   credential({ kind: 'client', id: 'claude-code', name: 'Claude Code', grantId: 'cg_1', level, extras })
@@ -29,16 +29,19 @@ const connect = async (caller: Credential, reply: (request: Request) => Response
     },
   }
   const handler = createMcpHandler(() =>
-    mcpServer(caller, (call) =>
-      Effect.runPromise(
-        ownerCall(
-          agent,
-          caller,
-          caller.kind === 'client' ? { user: 'owner', role: 'owner', name: 'Owner', shared: false } : undefined,
-          call,
-          { ref: 'ref-edge' },
+    mcpServer(
+      caller,
+      (call) =>
+        Effect.runPromise(
+          ownerCall(
+            agent,
+            caller,
+            caller.kind === 'client' ? { user: 'owner', role: 'owner', name: 'Owner', shared: false } : undefined,
+            call,
+            { ref: 'ref-edge' },
+          ),
         ),
-      ),
+      ONE_WORKSPACE,
     ),
   )
   const mcp = new Client({ name: 'probe', version: '1.0.0' })
@@ -50,10 +53,14 @@ const connect = async (caller: Credential, reply: (request: Request) => Response
   return { mcp, seen }
 }
 
+/** The endpoint tools `caller` is offered, sorted: every caller also has `workspace_list`, which names no endpoint. */
 const listed = async (caller: Credential) => {
   const { mcp } = await connect(caller)
   try {
-    return (await mcp.listTools()).tools.map((tool) => tool.name).toSorted()
+    return (await mcp.listTools()).tools
+      .map((tool) => tool.name)
+      .filter((name) => name !== 'workspace_list')
+      .toSorted()
   } finally {
     await mcp.close()
   }
@@ -100,21 +107,21 @@ describe('/mcp for every credential (ADRs 0086, 0114)', () => {
     expect(await listed(client('manage', ['setup', 'routines', 'inspect']))).toEqual(Object.keys(TOOLS).toSorted())
   })
 
-  it('lists the same tools for a key and an OAuth client with the same grant', async () => {
+  it('lists the same tools for an installed app and an OAuth client with the same grant', async () => {
     for (const [level, extras] of [
       ['read', []],
       ['write', ['inspect']],
       ['manage', ['setup', 'routines']],
     ] as const) {
-      const keyed = await listed(credential({ level, extras }))
-      expect(keyed).toEqual(await listed(client(level, extras)))
-      expect(keyed).toEqual(toolsFor(level, extras))
+      const installed = await listed(credential({ level, extras }))
+      expect(installed).toEqual(await listed(client(level, extras)))
+      expect(installed).toEqual(toolsFor(level, extras))
     }
   })
 
   it('calls the owner API as the credential: an owner forward carrying it, never a secret', async () => {
     const page = { personas: [] }
-    for (const caller of [KEY, client('read')]) {
+    for (const caller of [APP, client('read')]) {
       const { mcp, seen } = await connect(caller, () => Response.json(page))
       try {
         const result = await mcp.callTool({ name: 'persona_list', arguments: { name: 'edit', limit: 10 } })
@@ -135,8 +142,8 @@ describe('/mcp for every credential (ADRs 0086, 0114)', () => {
     }
   })
 
-  it('renames or closes a chat as the credential, a key and an OAuth client that write alike (ADR 0090)', async () => {
-    for (const caller of [KEY, client('write')]) {
+  it('renames or closes a chat as the credential, an app and an OAuth client that write alike (ADR 0090)', async () => {
+    for (const caller of [APP, client('write')]) {
       const { mcp, seen } = await connect(caller, () => Response.json({ id: '12', title: 'Job 1, done' }))
       try {
         expect(await listed(caller)).toContain('conversation_update')
@@ -153,7 +160,7 @@ describe('/mcp for every credential (ADRs 0086, 0114)', () => {
 
   it('sends and starts threads with plain fields, as the AG-UI input the endpoints take (ADR 0111)', async () => {
     const receipt = { operationId: 'op-1', session: '12', accepted: true }
-    const { mcp, seen } = await connect(KEY, () => Response.json(receipt, { status: 202 }))
+    const { mcp, seen } = await connect(APP, () => Response.json(receipt, { status: 202 }))
     const selections = [{ kind: 'persona', personaId: 4 }]
     try {
       const message = { input: 'find the venue', operationId: 'op-1', selections }

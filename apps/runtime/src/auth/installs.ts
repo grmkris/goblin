@@ -24,11 +24,11 @@ import {
   coverageIn,
   grantById,
   isLive,
-  keyTerms,
   newGrantStatements,
   newWorkspaceTerms,
   setTerms,
   termsOf,
+  workspaceTerms,
 } from './grants.ts'
 import { createAuth } from './options.ts'
 import { type Person, workspacesOf } from './workspaces.ts'
@@ -37,7 +37,7 @@ import { type Person, workspacesOf } from './workspaces.ts'
  * Apps and their installations (ADR 0118), in goblin's own auth D1 tables (0006) beside Better Auth's. An app is a
  * confidential OAuth client goblin registers server-side with the client_credentials grant; it belongs to the workspace
  * that registered it (`app`), never to a person (its `oauthClient` row names none). An installation is the app in a
- * workspace, with its grant (kind `app`, its id the installation's). Plain async over D1, like `api-keys.ts`; a change
+ * workspace, with its grant (kind `app`, its id the installation's). Plain async over D1, like `clients.ts`; a change
  * that spans rows is one batch.
  */
 
@@ -199,7 +199,7 @@ const installationStatements = (
     db,
     { id: installation.id, kind: 'app', createdBy: installation.userId, name: terms.name },
     { clientId: installation.clientId },
-    keyTerms(terms, installation.workspaceId),
+    workspaceTerms(terms, installation.workspaceId),
     now,
   ),
   db
@@ -246,12 +246,7 @@ export const registerApp = async (
   const db = env.AUTH_DB
   const script = input.script === true
   if (script !== (input.returnUrls.length === 0)) throw new InvalidInput({ reason: 'return_url' })
-  const terms = await newWorkspaceTerms(
-    db,
-    userId,
-    workspace.id,
-    aimedAt({ ...input.terms, name: input.name }, workspace.id),
-  )
+  const terms = newWorkspaceTerms(workspace.id, aimedAt({ ...input.terms, name: input.name }, workspace.id))
   const answer = await adminCreateOf(createAuth(env, db).api)({
     headers,
     body: {
@@ -467,12 +462,7 @@ export const approveInstall = async (
   if (app.script && workspace.id !== row.workspaceId) throw new InvalidInput({ reason: 'workspace' })
   // The return address is checked before anything is written.
   const returnUrl = app.script ? undefined : returnUrlOf(app, approval.returnUrl)
-  const terms = await newWorkspaceTerms(
-    db,
-    person.id,
-    workspace.id,
-    aimedAt({ ...approval.terms, name: app.name }, workspace.id),
-  )
+  const terms = newWorkspaceTerms(workspace.id, aimedAt({ ...approval.terms, name: app.name }, workspace.id))
   const now = Date.now()
   const existing = await db
     .prepare('SELECT "id" FROM "installation" WHERE "clientId" = ? AND "workspaceId" = ?')

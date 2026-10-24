@@ -29,7 +29,7 @@ const use = (inputEntry: number | undefined, topicName = 'Japan', mode = 'auto')
     sources: [source(topicName, '20', 4)],
     retrievedAt: 100,
   })
-const persona = (id: number, name: string, archivedAt?: number, key?: string) =>
+const persona = (id: number, name: string, archivedAt?: number, app?: string) =>
   Schema.decodeUnknownSync(PersonaView)({
     id,
     name,
@@ -41,7 +41,7 @@ const persona = (id: number, name: string, archivedAt?: number, key?: string) =>
     createdAt: 1,
     updatedAt: 1,
     ...(archivedAt !== undefined && { archivedAt }),
-    ...(key !== undefined && { madeBy: { key } }),
+    ...(app !== undefined && { madeBy: { app } }),
   })
 const PARTS = [
   { id: '3:0', kind: 'user' },
@@ -82,8 +82,8 @@ describe('Personas in the composer', () => {
     expect(activePersonas([])).toEqual([])
   })
 
-  it("lists the owner's own Personas apart from each key's, by key and then by name, never an archived one", () => {
-    const { own, keys } = personasByMaker([
+  it("lists the owner's own Personas apart from each app's, by app and then by name, never an archived one", () => {
+    const { own, apps } = personasByMaker([
       persona(1, 'coach'),
       persona(2, 'scout', undefined, 'swarmm-prod'),
       persona(3, 'Analyst', undefined, 'swarmm-prod'),
@@ -91,7 +91,7 @@ describe('Personas in the composer', () => {
       persona(5, 'runner', undefined, 'Sidequest'),
     ])
     expect(own.map(({ name }) => name)).toEqual(['coach'])
-    expect(keys.map(({ key, personas }) => [key, personas.map(({ name }) => name)])).toEqual([
+    expect(apps.map(({ app, personas }) => [app, personas.map(({ name }) => name)])).toEqual([
       ['Sidequest', ['runner']],
       ['swarmm-prod', ['Analyst', 'scout']],
     ])

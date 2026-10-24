@@ -3,7 +3,7 @@ import { OwnerApi } from '@goblin/contracts/api'
 import * as Effect from 'effect/Effect'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import {
-  KEY_TOPIC_SETUP,
+  APP_TOPIC_SETUP,
   claim,
   confineSetup,
   confineSetupEdit,
@@ -11,7 +11,7 @@ import {
   namesAnything,
   reachesTopic,
   requestCredential,
-  requestKey,
+  requestApp,
   requireAccessFor,
   requireAdminFor,
 } from '../grants/policy.ts'
@@ -41,9 +41,11 @@ const needOf = (input: CreateTopic): Partial<Need> => ({
   ...(namesAnything(input.setup) ? { extra: 'setup' } : {}),
 })
 
-/** The Topic a credential makes: a key's names nothing in its setup unless it says, so it starts with its chats alone. */
-const credentialTopic = (input: CreateTopic, keyed: boolean): CreateTopic =>
-  input.setup !== undefined || !keyed ? input : { ...input, setup: KEY_TOPIC_SETUP }
+/**
+ * The Topic a credential makes: an app's names nothing in its setup unless it says, so it starts with its chats alone.
+ */
+const credentialTopic = (input: CreateTopic, fromApp: boolean): CreateTopic =>
+  input.setup !== undefined || !fromApp ? input : { ...input, setup: APP_TOPIC_SETUP }
 
 /**
  * What changing a Topic takes beyond its endpoint (an owner or admin, or a credential's `manage`) and reaching it: making
@@ -63,8 +65,8 @@ const create = (input: CreateTopic) =>
     )
     if ((yield* requestCredential) === undefined) return yield* createTopic(input, { actor: 'owner' })
     yield* requireAccessFor(needOf(input), false)
-    const key = yield* requestKey
-    const making = credentialTopic(input, key !== undefined)
+    const app = yield* requestApp
+    const making = credentialTopic(input, app !== undefined)
     if (making.setup !== undefined) yield* confineSetup(making.setup)
     const made = yield* madeTopic(making, { actor: 'owner' })
     yield* claim('topic', made.topic.id, made.created)
