@@ -53,6 +53,22 @@ async function signIn(base: string, email: string): Promise<{ readonly sent: num
   return { sent: 200, who: { userId: user.id, cookie, ip, email, workspace: '', slug: '' } }
 }
 
+/**
+ * A person `owner` invites with `role` who signs in by code and accepts (ADR 0093): a member of the owner's workspace,
+ * as their browser is.
+ */
+export async function joinedMember(base: string, owner: Person, role: 'member' | 'admin' = 'member'): Promise<Person> {
+  const email = `${crypto.randomUUID()}@fixture.test`
+  const invited = await call(base, owner, '/api/members/invitations', { emails: [email], role })
+  expect(invited.status).toBe(201)
+  const [sent] = Schema.decodeUnknownSync(Sent)(await invited.json())
+  const { who } = await signIn(base, email)
+  if (who === undefined) throw new Error('the invited address could not sign in')
+  const accepted = await call(base, who, `/api/invitations/${sent?.invitation.id ?? ''}/accept`, {})
+  expect(accepted.status).toBe(200)
+  return { ...who, workspace: owner.workspace, slug: owner.slug }
+}
+
 /** `who`'s workspaces, as their browser lists them. */
 const workspacesOf = async (base: string, who: Person) =>
   Schema.decodeUnknownSync(Listed)(await (await call(base, who, '/api/workspaces')).json())

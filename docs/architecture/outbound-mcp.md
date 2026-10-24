@@ -19,7 +19,10 @@ rest of the runtime composes; `resident-api.ts` serves the resident-authority en
 ## Outbound MCP
 
 Connections come from `GOBLIN_MCP_SERVERS` (JSON: `connectionId`, `endpoint`, optional `label`, `issuer` and
-`resource`) and from the owner, who may add up to thirty-two by URL (`app_mcp_connections`, ADR 0006). A server is an
+`resource`) and from the owner, who may add up to thirty-two by URL (`app_mcp_connections`, ADR 0006). An admin adds,
+signs in, grants and removes them in Connections; so may a credential whose grant holds `manage` and `setup`, over the
+owner API or `/mcp`, within its reach ([ADR 0117](../adr/0117-the-setup-extra-reaches-a-workspaces-connections.md)),
+though a sign-in it starts is finished in a member's browser. A server is an
 address and a connection the owner's account on it (ADR 0041): the owner may connect one server several times, each
 connection with its own id, sign-in, grants, skills switch and Events. Every connection has the owner's **label**
 (`app_mcp_labels`, `mcp/servers/labels.ts`), one line of at most eighty characters, unique whatever its case: given when it is

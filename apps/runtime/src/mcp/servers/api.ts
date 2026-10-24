@@ -6,6 +6,7 @@ import * as HttpServerResponse from 'effect/http/HttpServerResponse'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import type * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import { RequestContext } from '../../http/api/context.ts'
+import { claimConnection, reaches, withinConnections } from '../../grants/policy.ts'
 import { InvalidInput } from '../../http/errors.ts'
 import { withFlow } from '../../observability/flows.ts'
 import { AgentInput } from '../../runtime/input.ts'
@@ -39,12 +40,21 @@ const MAX_QUERY = 100
 /** `x-mcp-caller: app` is an App the owner opened; anything else is the owner by hand. */
 const callerOf = (header: string | undefined): 'human' | 'app' => (header === 'app' ? 'app' : 'human')
 
-const servers = endpoint('servers')(() => ownerServers)
+/** A credential's change of a connection reaches it first (ADR 0117); a member's session reaches every one. */
+const reachesConnection = (connectionId: string) => reaches('connection', connectionId)
+
+const servers = endpoint('servers')(() => Effect.flatMap(ownerServers, withinConnections))
+/** A connection a credential adds is within its reach from then on (ADR 0117). */
 const addServer = endpoint('addServer')(({ payload }) =>
-  McpServers.use((offered) => offered.add(payload.endpoint, payload.label, payload.source)),
+  McpServers.use((offered) => offered.add(payload.endpoint, payload.label, payload.source)).pipe(
+    Effect.tap((view) => claimConnection(view.connectionId)),
+  ),
 )
 const renameConnection = endpoint('renameConnection')(({ params, payload }) =>
-  McpServers.use((offered) => offered.rename(params.id, payload.label)),
+  Effect.andThen(
+    reachesConnection(params.id),
+    McpServers.use((offered) => offered.rename(params.id, payload.label)),
+  ),
 )
 const dismissEvents = endpoint('dismissEvents')(({ params }) =>
   Effect.as(
@@ -66,17 +76,30 @@ const addRegistry = endpoint('addRegistry')(({ payload }) =>
 const removeRegistry = endpoint('removeRegistry')(({ payload }) =>
   McpServers.use((offered) => offered.removeRegistry(payload.url)),
 )
-const grants = endpoint('grants')(() => McpGrants.use((owned) => owned.list()))
+const grants = endpoint('grants')(() =>
+  Effect.flatMap(
+    McpGrants.use((owned) => owned.list()),
+    withinConnections,
+  ),
+)
 const setToolGrant = endpoint('setToolGrant')(({ payload }) =>
-  McpGrants.use((owned) => owned.setTool(payload.connectionId, payload.name, payload.allowed)),
+  Effect.andThen(
+    reachesConnection(payload.connectionId),
+    McpGrants.use((owned) => owned.setTool(payload.connectionId, payload.name, payload.allowed)),
+  ),
 )
 const setToolGrants = endpoint('setToolGrants')(({ payload }) =>
-  McpGrants.use((owned) => owned.setTools(payload.connectionId, payload.names, payload.allowed)),
+  Effect.andThen(
+    reachesConnection(payload.connectionId),
+    McpGrants.use((owned) => owned.setTools(payload.connectionId, payload.names, payload.allowed)),
+  ),
 )
 const setToolAskFirst = endpoint('setAskFirst')(({ payload }) =>
   setAskFirst(payload.connectionId, payload.name, payload.enabled),
 )
-const setSkills = endpoint('setSkills')(({ payload }) => setSkillEvents(payload.connectionId, payload.enabled))
+const setSkills = endpoint('setSkills')(({ payload }) =>
+  Effect.andThen(reachesConnection(payload.connectionId), setSkillEvents(payload.connectionId, payload.enabled)),
+)
 const setAppGrant = endpoint('setAppGrant')(({ payload }) =>
   McpGrants.use((owned) => owned.setApp(payload.connectionId, payload.uri, payload.allowed)),
 )
@@ -106,7 +129,10 @@ const tools = endpoint('tools')(({ params, query }) =>
   McpServers.use((offered) => offered.tools(params.id, query.refresh !== undefined)),
 )
 const connect = endpoint('connect')(({ params, payload }) =>
-  McpServers.use((offered) => offered.beginConnect(params.id, payload.scope)),
+  Effect.andThen(
+    reachesConnection(params.id),
+    McpServers.use((offered) => offered.beginConnect(params.id, payload.scope)),
+  ),
 )
 const access = endpoint('access')(({ params }) => McpServers.use((offered) => offered.access(params.id)))
 const stepUp = endpoint('stepUp')(({ params, payload }) =>
@@ -115,8 +141,12 @@ const stepUp = endpoint('stepUp')(({ params, payload }) =>
   ),
 )
 const allowSuggested = endpoint('allowSuggested')(({ params }) => allowSuggestedGrants(params.id))
-const disconnect = endpoint('disconnect')(({ params }) => disconnectOwnerServer(params.id))
-const removeServer = endpoint('removeServer')(({ params }) => removeOwnerServer(params.id))
+const disconnect = endpoint('disconnect')(({ params }) =>
+  Effect.andThen(reachesConnection(params.id), disconnectOwnerServer(params.id)),
+)
+const removeServer = endpoint('removeServer')(({ params }) =>
+  Effect.andThen(reachesConnection(params.id), removeOwnerServer(params.id)),
+)
 const callTool = endpoint('callTool')(({ params, headers, payload }) =>
   McpConnections.use((connections) =>
     connections.callTool(params.id, payload.name, payload.arguments ?? {}, {

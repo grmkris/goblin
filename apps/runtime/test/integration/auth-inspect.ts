@@ -4,6 +4,7 @@ import { InspectConversations } from '@goblin/contracts/inspect'
 import { Schema } from 'effect'
 import { createHash } from 'node:crypto'
 import { expect } from 'vitest'
+import { joinedMember } from './members-case.ts'
 import { type Person, call, keyBody, person } from './owner-requests.ts'
 
 const APP = 'https://goblin.test'
@@ -211,7 +212,12 @@ const MANAGEMENT = [
 const management = (tools: readonly string[]) => tools.filter((name) => MANAGEMENT.includes(name)).toSorted()
 
 /** A key of the owner's (ADR 0081) whose grant is `level` with `extras` over everything, as its id and secret. */
-async function ownerKey(base: string, who: Person, level: 'read' | 'manage', extras: readonly 'inspect'[] = []) {
+async function ownerKey(
+  base: string,
+  who: Person,
+  level: 'read' | 'manage',
+  extras: readonly ('inspect' | 'setup')[] = [],
+) {
   const made = await fetch(`${base}/w/${who.slug}/api/keys`, {
     method: 'POST',
     headers: browserOf(who),
@@ -540,4 +546,92 @@ export async function restBearerCase(base: string) {
   })
   expect(revoked.status).toBe(200)
   expect((await bearer(`/w/${owner.slug}/api/topics`)).status).toBe(401)
+}
+
+/** The tools of a workspace's connections themselves (ADR 0117), sorted. */
+const CONNECTIONS = [
+  'server_add',
+  'server_connect',
+  'server_disconnect',
+  'server_remove',
+  'server_rename',
+  'server_skills_set',
+  'tool_grant_set',
+  'tool_grants_list',
+  'tool_grants_set',
+]
+const ServerAdded = Schema.Struct({ connectionId: Schema.String, label: Schema.String, status: Schema.String })
+
+/**
+ * The setup extra over a workspace's connections (ADR 0117), through the real Worker and agent: an owner's client with
+ * `manage` and `setup` adds a server over /mcp, starts its sign-in, grants its tools, turns its skills off and renames
+ * and removes it; narrowed to `write`, the same REST call answers `access_insufficient` with the widening link; a
+ * member's client is refused by the member's role, whatever its grant.
+ */
+export async function connectionSetupCase(base: string) {
+  const owner = await person(base)
+  const clientId = await register(base, owner)
+  const granted = await authorize(base, owner, clientId, {
+    scope: ALL_SCOPES,
+    terms: { level: 'manage', extras: ['setup'] },
+  })
+  expect((await toolsOf(base, granted.access)).filter((name) => CONNECTIONS.includes(name)).toSorted()).toEqual(
+    CONNECTIONS,
+  )
+  const client = await connect(base, granted.access)
+  try {
+    const added = Schema.decodeUnknownSync(ServerAdded)(
+      await answerOf(client, 'server_add', { endpoint: 'https://second-fixture.test/mcp', label: 'Second' }),
+    )
+    expect(added).toMatchObject({ label: 'Second' })
+    const id = added.connectionId
+    expect(JSON.stringify(await answerOf(client, 'server_connect', { id }))).not.toContain('error')
+    const set = await answerOf(client, 'tool_grants_set', { connectionId: id, names: ['board'], allowed: true })
+    expect(JSON.stringify(set)).toContain('"name":"board"')
+    // A list answers as its text alone (`tools.ts` `text`).
+    const listed = await client.callTool({ name: 'tool_grants_list', arguments: {} })
+    expect(JSON.stringify(listed.content)).toContain(id)
+    expect(await answerOf(client, 'server_skills_set', { connectionId: id, enabled: false })).toEqual({
+      connectionId: id,
+      enabled: false,
+    })
+    expect(await answerOf(client, 'server_rename', { id, label: 'Renamed' })).toMatchObject({ label: 'Renamed' })
+    await answerOf(client, 'server_remove', { id })
+    const servers = await client.callTool({ name: 'server_list', arguments: {} })
+    expect(servers.isError).not.toBe(true)
+    expect(JSON.stringify(servers.content)).not.toContain(id)
+  } finally {
+    await client.close()
+  }
+  // Narrowed to write, the client is offered only the read of them, and a change over REST says what it lacks.
+  await grantOf(base, owner, clientId, { level: 'write', extras: ['setup'] })
+  expect((await toolsOf(base, granted.access)).filter((name) => CONNECTIONS.includes(name))).toEqual([
+    'tool_grants_list',
+  ])
+  const addAs = (access: string, slug: string) =>
+    fetch(`${base}/w/${slug}/api/mcp/servers`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${access}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ endpoint: 'https://third-fixture.test/mcp' }),
+    })
+  const lacking = await addAs(granted.access, owner.slug)
+  expect(lacking.status).toBe(403)
+  expect(await lacking.json()).toMatchObject({ error: { code: 'access_insufficient' } })
+  // A server's key with manage and setup configures its own workspace's connections too.
+  const { secret } = await ownerKey(base, owner, 'manage', ['setup'])
+  const keyed = await fetch(`${base}/api/mcp/servers`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ endpoint: 'https://keyed-fixture.test/mcp' }),
+  })
+  expect(keyed.status, await keyed.clone().text()).toBe(201)
+  // A member's client never configures the workspace, even with a grant that holds it: the member's role refuses it.
+  const member = await joinedMember(base, owner)
+  const theirs = await authorize(base, member, await register(base, member), {
+    scope: ALL_SCOPES,
+    terms: { level: 'manage', extras: ['setup'] },
+  })
+  const refused = await addAs(theirs.access, owner.slug)
+  expect(refused.status).toBe(403)
+  expect(await refused.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
 }

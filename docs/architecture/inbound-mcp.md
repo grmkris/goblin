@@ -56,8 +56,8 @@ server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)
   | `read` | `access_read`, `topic_list`, `topic_get`, `conversation_entries`, `persona_list`, `persona_get`, `models_list`, `get_recent_messages` |
   | `write` | `topic_create`, `conversation_update`, `conversation_send`, `thread_start`, `conversation_stop`, `ask_agent` |
   | `manage` | `topic_update`, `persona_create`, `persona_update` |
-  | `manage` and `setup` | `topic_set_setup` |
-  | `read` and `setup` | `setup_catalog`, `server_list`, `source_list`, `source_routes` |
+  | `read` and `setup` | `setup_catalog`, `server_list`, `tool_grants_list`, `source_list`, `source_routes` |
+  | `manage` and `setup` | `topic_set_setup`, `server_add`, `server_rename`, `server_connect`, `server_disconnect`, `server_remove`, `tool_grant_set`, `tool_grants_set`, `server_skills_set` ([ADR 0117](../adr/0117-the-setup-extra-reaches-a-workspaces-connections.md)) |
   | `read` and `routines` | `routine_list`, `routine_runs` |
   | `write` and `routines` | `routine_propose`, `routine_edit`, `routine_archive`, `routine_pause` |
   | `read` and `inspect` | `inspect_conversations`, `inspect_conversation`, `inspect_turns`, `inspect_turn`, `inspect_problems`, `inspect_flows`, `inspect_details` |

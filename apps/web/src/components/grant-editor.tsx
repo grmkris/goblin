@@ -60,7 +60,11 @@ export const GRANT_WORDS: GrantWords<Level, Extra> = {
     },
   },
   extras: {
-    setup: { label: 'Setup', description: 'Read and change what setups use: MCP servers, skills and Sources.' },
+    setup: {
+      label: 'Setup',
+      description:
+        'Read and change what setups use: MCP servers, skills and Sources. With manage, also add servers, start their sign-in and grant their tools.',
+    },
     routines: { label: 'Routines', description: 'Read and draft routines; a draft runs only once confirmed here.' },
     inspect: {
       label: 'Inspect',

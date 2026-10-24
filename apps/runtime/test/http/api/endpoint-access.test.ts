@@ -21,6 +21,15 @@ const NEEDS = {
   'personas.detail': { level: 'read' },
   'personas.update': { level: 'manage' },
   'mcp.servers': { level: 'read', extra: 'setup' },
+  'mcp.addServer': { level: 'manage', extra: 'setup' },
+  'mcp.renameConnection': { level: 'manage', extra: 'setup' },
+  'mcp.grants': { level: 'read', extra: 'setup' },
+  'mcp.setToolGrant': { level: 'manage', extra: 'setup' },
+  'mcp.setToolGrants': { level: 'manage', extra: 'setup' },
+  'mcp.setSkills': { level: 'manage', extra: 'setup' },
+  'mcp.connect': { level: 'manage', extra: 'setup' },
+  'mcp.disconnect': { level: 'manage', extra: 'setup' },
+  'mcp.removeServer': { level: 'manage', extra: 'setup' },
   'agent.models': { level: 'read' },
   'agent.ask': { level: 'write' },
   'agent.recent': { level: 'read' },
@@ -47,9 +56,9 @@ const NEEDS = {
 }
 
 describe("what a credential's grant must hold for each owner endpoint", () => {
-  it('names a need for exactly the 40 endpoints a credential reaches, and every other refuses one', () => {
+  it('names a need for exactly the 49 endpoints a credential reaches, and every other refuses one', () => {
     expect([...endpointAccess(OwnerApi).keys()].toSorted()).toEqual(Object.keys(NEEDS).toSorted())
-    expect(endpointAccess(OwnerApi).size).toBe(40)
+    expect(endpointAccess(OwnerApi).size).toBe(49)
   })
 
   it('needs a level of each, and an extra of setup, routine and inspection endpoints', () => {

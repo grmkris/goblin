@@ -26,7 +26,8 @@ export const Level = Schema.Literals(['read', 'write', 'manage'])
 export type Level = typeof Level.Type
 
 /**
- * Named powers beside the level: `setup` (what setups, Sources and servers use; risky), `routines` (risky), `inspect`
+ * Named powers beside the level: `setup` (what setups, Sources and servers use, and with `manage` the connections
+ * themselves, ADR 0117; risky), `routines` (risky), `inspect`
  * (run records within reach) and `keys` (risky, and only an owner may grant it; vocabulary only for now, it opens
  * nothing yet).
  */

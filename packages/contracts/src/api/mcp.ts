@@ -54,9 +54,15 @@ const Caller = { 'x-mcp-caller': Schema.optional(Schema.String) }
 /** What a remote call can answer besides its result: the server failed, timed out or wants sign-in again. */
 const REMOTE = [ApiErrors.upstream, ApiErrors.upstreamTimeout, ApiErrors.conflict, ApiErrors.forbidden] as const
 
+/** What changing a workspace's connections needs of a credential (ADR 0117): `manage` with the `setup` extra. */
+const CONFIGURES = { level: 'manage', extra: 'setup' } as const
+
 /**
  * The owner's MCP servers (ADRs 0003, 0005, 0006, 0008, 0028): the offered servers and the catalog to add more from,
- * signing in, exact grants, held calls, and calling a server by hand or from an App. Paths are relative to the API's
+ * signing in, exact grants, held calls, and calling a server by hand or from an App. A credential with the `setup` extra
+ * reads them and, with `manage` too, adds, renames, signs in, disconnects and removes a connection and sets its tool
+ * grants and its skills switch (ADR 0117); finishing a sign-in stays a member's browser, the ask-first switches, App
+ * grants, held calls, the registries and calling a server's tool by hand stay a member's. Paths are relative to the API's
  * `/api` prefix. Every owner endpoint can also answer owner admission's failures; `error` names the ones the endpoint
  * itself produces. Remote results are the server's, untrusted, and answered whole.
  *
@@ -74,13 +80,17 @@ export class McpGroup extends HttpApiGroup.make('mcp').add(
     payload: AddServer,
     success: ServerView.pipe(HttpApiSchema.status(201)),
     error: [ApiErrors.invalidInput, ApiErrors.conflict, ApiErrors.internal],
-  }).annotate(EndpointRole, 'admin'),
+  })
+    .annotate(EndpointRole, 'admin')
+    .annotate(EndpointAccess, CONFIGURES),
   HttpApiEndpoint.patch('renameConnection', '/mcp/:id', {
     params: { id: ConnectionParam },
     payload: RenameConnection,
     success: ServerView,
     error: [ApiErrors.notFound, ApiErrors.conflict],
-  }).annotate(EndpointRole, 'admin'),
+  })
+    .annotate(EndpointRole, 'admin')
+    .annotate(EndpointAccess, CONFIGURES),
   HttpApiEndpoint.get('suggested', '/mcp/suggested', { success: Schema.Array(ServerSuggestion) }),
   HttpApiEndpoint.get('catalog', '/mcp/catalog', {
     query: { q: Schema.optional(Schema.String) },
@@ -98,17 +108,24 @@ export class McpGroup extends HttpApiGroup.make('mcp').add(
     success: Schema.Array(RegistryView),
     error: ApiErrors.invalidInput,
   }).annotate(EndpointRole, 'admin'),
-  HttpApiEndpoint.get('grants', '/mcp/grants', { success: Schema.Array(Grant) }),
+  HttpApiEndpoint.get('grants', '/mcp/grants', { success: Schema.Array(Grant) }).annotate(EndpointAccess, {
+    level: 'read',
+    extra: 'setup',
+  }),
   HttpApiEndpoint.put('setToolGrant', '/mcp/grants', {
     payload: GrantChange,
     success: Schema.Array(Grant),
     error: [ApiErrors.notFound, ...REMOTE],
-  }).annotate(EndpointRole, 'admin'),
+  })
+    .annotate(EndpointRole, 'admin')
+    .annotate(EndpointAccess, CONFIGURES),
   HttpApiEndpoint.put('setToolGrants', '/mcp/grants/batch', {
     payload: GrantBatchChange,
     success: GrantBatchResult,
     error: [ApiErrors.notFound, ...REMOTE],
-  }).annotate(EndpointRole, 'admin'),
+  })
+    .annotate(EndpointRole, 'admin')
+    .annotate(EndpointAccess, CONFIGURES),
   HttpApiEndpoint.put('setAskFirst', '/mcp/ask-first', {
     payload: AskFirstChange,
     success: Schema.Array(Grant),
@@ -118,7 +135,9 @@ export class McpGroup extends HttpApiGroup.make('mcp').add(
     payload: SkillsChange,
     success: SkillsSetting,
     error: [ApiErrors.notFound, ApiErrors.invalidInput, ...REMOTE],
-  }).annotate(EndpointRole, 'admin'),
+  })
+    .annotate(EndpointRole, 'admin')
+    .annotate(EndpointAccess, CONFIGURES),
   HttpApiEndpoint.put('setAppGrant', '/mcp/app-grants', {
     payload: AppGrantChange,
     success: Schema.Array(Grant),
@@ -173,7 +192,9 @@ export class McpGroup extends HttpApiGroup.make('mcp').add(
     payload: ConnectRequest,
     success: ConnectStart,
     error: [ApiErrors.notFound, ApiErrors.invalidInput, ...REMOTE],
-  }).annotate(EndpointRole, 'admin'),
+  })
+    .annotate(EndpointRole, 'admin')
+    .annotate(EndpointAccess, CONFIGURES),
   /** `GET /api/mcp/:id/access`: what a sign-in to this connection can ask for, and what it holds now (ADR 0042). */
   HttpApiEndpoint.get('access', '/mcp/:id/access', {
     params: { id: ConnectionParam },
@@ -200,12 +221,16 @@ export class McpGroup extends HttpApiGroup.make('mcp').add(
     params: { id: ConnectionParam },
     success: Schema.Null,
     error: ApiErrors.notFound,
-  }).annotate(EndpointRole, 'admin'),
+  })
+    .annotate(EndpointRole, 'admin')
+    .annotate(EndpointAccess, CONFIGURES),
   HttpApiEndpoint.post('removeServer', '/mcp/:id/remove', {
     params: { id: ConnectionParam },
     success: Schema.Null,
     error: ApiErrors.invalidInput,
-  }).annotate(EndpointRole, 'admin'),
+  })
+    .annotate(EndpointRole, 'admin')
+    .annotate(EndpointAccess, CONFIGURES),
   HttpApiEndpoint.post('callTool', '/mcp/:id/tools/call', {
     params: { id: ConnectionParam },
     headers: Caller,

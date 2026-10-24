@@ -174,6 +174,31 @@ export const claim = (kind: 'topic' | 'persona', id: number, created: boolean) =
     yield* (yield* Changes).publish(kind === 'topic' ? 'topics.changed' : 'personas.changed', { ids: [id] })
   })
 
+/**
+ * A connection a credential added (ADR 0117): within its reach from then on, listed when its reach of connections is a
+ * list. Nothing for a member's session.
+ */
+export const claimConnection = (connectionId: string) =>
+  Effect.gen(function* () {
+    const credential = yield* requestCredential
+    if (credential === undefined) return
+    yield* Grants.use((grants) => grants.append(credential, { kind: 'connection', id: connectionId }))
+  })
+
+/**
+ * The items of a workspace's connections a request's credential reaches (ADR 0117): every one for a member's session
+ * or a grant that reaches all of them, else those its list names.
+ */
+export const withinConnections = <A extends { readonly connectionId: string }>(items: readonly A[]) =>
+  Effect.gen(function* () {
+    const credential = yield* requestCredential
+    if (credential === undefined) return items
+    const grants = yield* Grants
+    return yield* Effect.filter(items, (item) =>
+      grants.reaches(credential, { kind: 'connection', id: item.connectionId }),
+    )
+  })
+
 type Setup = Pick<TopicSetup, 'mcpServers' | 'skills' | 'apps'> & { readonly subagents?: boolean }
 
 /**

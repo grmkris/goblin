@@ -7,7 +7,7 @@ import { expect } from 'vitest'
 import Stack from './auth-stack.ts'
 import { call, person, signedIn } from './owner-requests.ts'
 import { answerOf } from './probe-reads.ts'
-import { inspectAuthCase, keyWideningCase, reachCase, restBearerCase } from './auth-inspect.ts'
+import { connectionSetupCase, inspectAuthCase, keyWideningCase, reachCase, restBearerCase } from './auth-inspect.ts'
 
 const harness = Test.make({
   providers: Cloudflare.providers(),
@@ -229,5 +229,12 @@ harness.test(
   Effect.gen(function* () {
     const { url } = yield* stack
     yield* Effect.promise(() => restBearerCase(url))
+  }),
+)
+harness.test(
+  "the setup extra over a workspace's connections: an admin's client adds, signs in, grants and removes; a member's never (ADR 0117)",
+  Effect.gen(function* () {
+    const { url } = yield* stack
+    yield* Effect.promise(() => connectionSetupCase(url))
   }),
 )
