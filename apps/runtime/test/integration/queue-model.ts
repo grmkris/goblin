@@ -64,7 +64,8 @@ class QueueModel {
   readonly streams: ProviderStreams = {
     stream: (target, context, options) => {
       const last = context.messages.findLast((message) => message.role === 'user' && !isContextBlock(message))
-      const text = last === undefined ? '' : textOf(last)
+      // The words, without a credential's or a member's author line, so a client's send can be held too.
+      const text = last === undefined ? '' : wordsOf(last)
       // A Persona's fork is held by the `queue-hold:` token in the owner message it answers, keyed with its name.
       const answering = PERSONA_PROMPT.exec(text.split('\n').at(-1) ?? '')?.[1]
       // The token is read from the newest ask only: older asks stay in the chat the fork reads.

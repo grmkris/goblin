@@ -7,7 +7,7 @@ import type {
   Submission,
   UserInput,
 } from '@earendil-works/pi-durable'
-import type { PiModel, PiOperationResult, PiReceipt, PiSubmitOptions } from 'agents/harness/pi'
+import type { PiModel, PiOperationResult, PiPendingOperation, PiReceipt, PiSubmitOptions } from 'agents/harness/pi'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
@@ -26,6 +26,7 @@ const PiOperation = Schema.Literals([
   'conversation',
   'messages',
   'busy',
+  'pending',
   'events',
   'setModel',
 ])
@@ -77,6 +78,8 @@ export class PiSessions extends Context.Service<
     /** The session's active transcript, as Pi's entries. */
     readonly messages: (session: string) => Effect.Effect<EntryRecord[], PiFailure>
     readonly busy: (session: string) => Effect.Effect<boolean, PiFailure>
+    /** The submissions Pi has not settled in `session` yet, oldest first: each `queued` or `running`. */
+    readonly pending: (session: string) => Effect.Effect<readonly PiPendingOperation[], PiFailure>
     /** Puts `session` on `model` for its next turns. */
     readonly setModel: (session: string, model: PiModel) => Effect.Effect<void, PiFailure>
     /** Pi's agent events for `session`: a snapshot, then one batch per commit, until the stream is stopped. */
@@ -121,6 +124,9 @@ export class PiSessions extends Context.Service<
         }),
         busy: Effect.fn('PiSessions.busy')(function* (session: string) {
           return yield* call('busy', () => harness.session(session).busy())
+        }),
+        pending: Effect.fn('PiSessions.pending')(function* (session: string) {
+          return yield* call('pending', () => harness.pending({ session }))
         }),
         events: Effect.fn('PiSessions.events')(function* (session: string) {
           return yield* call('events', () => harness.session(session).events())

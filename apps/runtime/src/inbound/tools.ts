@@ -70,6 +70,7 @@ export const TOOLS = {
   conversation_send: 'conversations.submit',
   thread_start: 'conversations.startThread',
   conversation_entries: 'conversations.entries',
+  conversation_send_status: 'conversations.sendStatus',
   conversation_stop: 'conversations.stop',
   persona_list: 'personas.list',
   models_list: 'agent.models',

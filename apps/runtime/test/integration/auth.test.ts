@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto'
 import { expect } from 'vitest'
 import Stack from './auth-stack.ts'
 import { call, person, signedIn } from './owner-requests.ts'
+import { tasksCase } from './tasks-case.ts'
 import { answerOf } from './probe-reads.ts'
 import { connectionSetupCase, inspectAuthCase, keyWideningCase, reachCase, restBearerCase } from './auth-inspect.ts'
 import { installsCase } from './installs-case.ts'
@@ -244,5 +245,12 @@ harness.test(
   Effect.gen(function* () {
     const { url } = yield* stack
     yield* Effect.promise(() => installsCase(url))
+  }),
+)
+harness.test(
+  'a send is a task when its client follows one: tasks/get to the answer, tasks/cancel, and the receipt otherwise (ADR 0119)',
+  Effect.gen(function* () {
+    const { url } = yield* stack
+    yield* Effect.promise(() => tasksCase(url))
   }),
 )

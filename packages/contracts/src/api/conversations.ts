@@ -2,12 +2,13 @@ import * as Schema from 'effect/Schema'
 import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import * as HttpApiSchema from 'effect/http-api/HttpApiSchema'
-import { ChatId } from '../ids.ts'
+import { ChatId, OperationId } from '../ids.ts'
 import { ComposerOptions } from '../composer.ts'
 import {
   ConversationView,
   CreateConversation,
   MessageReceipt,
+  SendStatus,
   StartThread,
   StartedThread,
   StopConversation,
@@ -74,6 +75,8 @@ const EntriesQuery = {
  *   run id of its message and sends that message as its first, answered there.
  * - `move`: `POST …/:id/move`: Move to thread, as its receipt. The same operation id finds the same move.
  * - `stop`: `POST …/:id/stop`: Stop in the chat; `stopped` says whether anything was running.
+ * - `sendStatus`: `GET …/:id/sends/:operationId`: how one send stands now (`SendStatus`, ADR 0119): queued, working
+ *   and its step, answered with its text, or unanswered. It does not grant resident authority.
  * - `queue` / `removeQueued`: `GET` and `DELETE …/:id/queue`: the owner's queued inputs, and withdrawing one.
  * - `markRead`: `PUT …/:id/read`: the owner has seen the newest reply.
  * - `composer`: `GET …/:id/composer`: what the composer can tag in the chat.
@@ -86,8 +89,9 @@ const EntriesQuery = {
  *   flight, then follows the chat until the reader goes away (at most fifteen minutes; a reconnect opens afresh).
  *   `Conflict` `stream_busy` past the readers a chat or the workspace takes. It does not grant resident authority.
  *
- * A credential reaches `update`, `submit`, `startThread` and `stop` with `write`, and `entries` and `stream` with
- * `read` (ADRs 0081, 0086, 0090, 0114): only in the Topics its grant reaches, and never `keepOpen`.
+ * A credential reaches `update`, `submit`, `startThread` and `stop` with `write`, and `entries`, `sendStatus` and
+ * `stream` with `read` (ADRs 0081, 0086, 0090, 0114, 0119): only in the Topics its grant reaches, and never
+ * `keepOpen`.
  */
 export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
   HttpApiEndpoint.post('create', '/conversations', {
@@ -125,6 +129,13 @@ export class ConversationsGroup extends HttpApiGroup.make('conversations').add(
     success: Schema.Struct({ stopped: Schema.Boolean }),
     error: [ApiErrors.notFound],
   }).annotate(EndpointAccess, { level: 'write' }),
+  HttpApiEndpoint.get('sendStatus', '/conversations/:id/sends/:operationId', {
+    params: { ...params, operationId: OperationId },
+    success: SendStatus,
+    error: [ApiErrors.notFound],
+  })
+    .annotate(EndpointAccess, { level: 'read' })
+    .annotate(GrantsResident, false),
   HttpApiEndpoint.get('queue', '/conversations/:id/queue', {
     params,
     success: ConversationQueue,

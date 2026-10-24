@@ -9,7 +9,7 @@ import type { Credential } from '../../src/http/api/principal.ts'
 import { accessElicitation } from '../../src/inbound/access.ts'
 import { ownerCall } from '../../src/inbound/client.ts'
 import { type CallerReach, mcpServer } from '../../src/inbound/mcp-server.ts'
-import { workspaceFor } from '../../src/inbound/route.ts'
+import { workspaceFor } from '../../src/inbound/reach.ts'
 import { type OwnerCaller, STREAMED, TOOLS } from '../../src/inbound/tools.ts'
 import { EVENT_METHODS } from '../../src/inbound/events-methods.ts'
 import { credential } from '../grants-fixture.ts'
@@ -255,6 +255,7 @@ const context = (capabilities: object | undefined, responses?: Record<string, un
   capabilities,
   inputResponses: responses,
   dropped,
+  tasks: false,
 })
 
 describe('the widening asked for by URL elicitation (ADR 0114)', () => {

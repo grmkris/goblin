@@ -58,7 +58,7 @@ server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)
 
   | Needs | Tools |
   | --- | --- |
-  | `read` | `access_read`, `topic_list`, `topic_get`, `conversation_entries`, `persona_list`, `persona_get`, `models_list`, `get_recent_messages` |
+  | `read` | `access_read`, `topic_list`, `topic_get`, `conversation_entries`, `conversation_send_status`, `persona_list`, `persona_get`, `models_list`, `get_recent_messages` |
   | `write` | `topic_create`, `conversation_update`, `conversation_send`, `thread_start`, `conversation_stop`, `ask_agent` |
   | `manage` | `topic_update`, `persona_create`, `persona_update` |
   | `read` and `setup` | `setup_catalog`, `server_list`, `tool_grants_list`, `source_list`, `source_routes` |
@@ -82,6 +82,18 @@ server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)
   endpoints. A lease is made under its credential's grant, and its fan-out reaches only chats of Topics the grant
   reaches. Revoking a client ends its leases first, in every workspace it reached, and so does a change that narrows
   a grant's Topics.
+- **Tasks.** A send is a task to a client that follows one ([ADR 0119](../adr/0119-a-send-is-a-task-when-its-client-can-follow-one.md),
+  the 2026-07-28 Tasks extension, SEP-2663): `conversation_send` and `thread_start` answer a `CreateTaskResult`
+  (`resultType: "task"`) to a request whose envelope declares `extensions["io.modelcontextprotocol/tasks"]`, once Pi has
+  taken the send; any other gets the receipt and polls `conversation_send_status`. `/mcp` declares the extension and
+  serves `tasks/get` (the send's state, `GET /api/conversations/:id/sends/:operationId`), `tasks/cancel` (Stop with
+  its operation id) and `tasks/update` (an acknowledgement: no send waits for input through a task yet) in
+  `inbound/tasks.ts`. Nothing is stored for a task: its id is `t1.` and base64url JSON of the workspace, the chat, the
+  operation id and when it was made, and grants nothing, since each call checks the workspace against the caller's
+  reach and reads the send. A working task's `statusMessage` is the send's step (`waiting for its turn`, `thinking`,
+  `calling <tool>`, `waiting for a person`); answered it is `completed` with the answer; stopped, `cancelled`; ended
+  otherwise, `completed` with an `isError` result. `tasks/*` without the extension declared answer -32021, an id goblin
+  did not make or out of reach -32602. There are no progress notifications (the extension has none).
 
 - **Reach.** A credential reaches what its grant reaches, checked by each handler (`grants/policy.ts`): a Topic, its
   chats, a Persona or a connection outside it is refused with its reach id. An OAuth client also never does more than

@@ -145,6 +145,20 @@ export const MessageReceipt = Schema.Struct({
 })
 export type MessageReceipt = typeof MessageReceipt.Type
 
+/**
+ * `GET …/:id/sends/:operationId` (ADR 0119): how one send of the chat stands now. `queued` waits behind the chat's
+ * earlier work; `working` runs, `step` saying what it does in plain words (`thinking`, `calling <tool>`, `waiting for a
+ * person`); `answered` settled with its answer's text; `unanswered` settled without one, `reason` in Pi's words
+ * (`aborted` and `withdrawn` when stopped). A send the chat never took is `NotFound` `operation`.
+ */
+export const SendStatus = Schema.Union([
+  Schema.Struct({ status: Schema.Literal('queued') }),
+  Schema.Struct({ status: Schema.Literal('working'), step: Schema.String }),
+  Schema.Struct({ status: Schema.Literal('answered'), text: Schema.String }),
+  Schema.Struct({ status: Schema.Literal('unanswered'), reason: Schema.String }),
+])
+export type SendStatus = typeof SendStatus.Type
+
 /** `POST …/stop`: the owner's Stop, optionally naming the one operation to stop. */
 export const StopConversation = Schema.Struct({ operationId: Schema.optional(OperationId) })
 export type StopConversation = typeof StopConversation.Type

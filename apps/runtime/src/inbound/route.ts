@@ -1,14 +1,14 @@
 import { createMcpHandler } from 'agents/mcp/server'
-import type { WorkspaceView } from '@goblin/contracts'
 import { verifyKey } from '../auth/api-keys.ts'
 import { challengeOf } from '../auth/index.ts'
 import type { RuntimeEnv } from '../env.ts'
 import { refOf, runAtEdge } from '../http/api/edge.ts'
 import { type Credential, bearerKey } from '../http/api/principal.ts'
-import { InvalidInput, NotFound, Unauthenticated } from '../http/errors.ts'
+import { Unauthenticated } from '../http/errors.ts'
 import { type TokenAccess, callIn, tokenAccess } from './client-access.ts'
 import { ownerCall } from './client.ts'
-import { type CallerReach, mcpServer } from './mcp-server.ts'
+import { mcpServer } from './mcp-server.ts'
+import { workspaceFor } from './reach.ts'
 import type { OwnerCaller, Power } from './tools.ts'
 
 export const inboundHosts = (appUrl: string) => ({
@@ -49,25 +49,6 @@ const admit = async (request: Request, env: RuntimeEnv): Promise<Admitted | unde
     if (failure instanceof Unauthenticated) return undefined
     throw failure
   }
-}
-
-/**
- * The workspace a client's call is for: the one it names, by id or slug, or its only one when it names none.
- *
- * @internal Exported for its unit test.
- */
-export const workspaceFor = (reach: CallerReach, named: string | undefined): WorkspaceView => {
-  const [only] = reach.workspaces
-  if (named === undefined) {
-    if (reach.named || only === undefined) throw new InvalidInput({ reason: 'workspace' })
-    return only
-  }
-  // An id first: a slug is its admins' to choose, so one may look like another workspace's id.
-  const chosen =
-    reach.workspaces.find((workspace) => workspace.id === named) ??
-    reach.workspaces.find((workspace) => workspace.slug === named)
-  if (chosen === undefined) throw new NotFound({ what: 'workspace' })
-  return chosen
 }
 
 /**

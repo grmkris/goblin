@@ -80,7 +80,7 @@ only the run events of those chats (ADR 0084); a key's Topics are sealed like an
 
 | Group | Paths under `/api` | Handlers |
 | --- | --- | --- |
-| `conversations` | `/conversations`, `/conversations/:id`, and under it `messages` (a send as AG-UI's `RunAgentInput`, answered with Pi's receipt, or with its run's AG-UI events when asked for `text/event-stream`, ADR 0111, [driving a chat](streams.md#driving-a-chat)), `threads`, `move`, `stop`, `queue`, `read`, `composer`, `history` (older pages, as AG-UI messages), `entries`, `sources`, `stream` (its AG-UI events as server-sent events, every one to every reader that reaches the chat, [chat streams](streams.md)) | `chats/api.ts` |
+| `conversations` | `/conversations`, `/conversations/:id`, and under it `messages` (a send as AG-UI's `RunAgentInput`, answered with Pi's receipt, or with its run's AG-UI events when asked for `text/event-stream`, ADR 0111, [driving a chat](streams.md#driving-a-chat)), `threads`, `move`, `stop`, `sends/:operationId` (how one send stands, ADR 0119), `queue`, `read`, `composer`, `history` (older pages, as AG-UI messages), `entries`, `sources`, `stream` (its AG-UI events as server-sent events, every one to every reader that reaches the chat, [chat streams](streams.md)) | `chats/api.ts` |
 | `inspect` | `GET /inspect/conversations`, `/inspect/conversation`, `/inspect/turns`, `/inspect/turn`, `/inspect/problems`, `/inspect/flows`, `/inspect/details` | `inspect/api.ts` |
 | `events` | `GET /events`, `POST /events/subscribe`, `/events/unsubscribe`, `/events/poll` ([published events](published-events.md), a credential's `read`, ADR 0112) | `publish/api.ts` |
 | `access` | `GET /access` (a credential's own grant as `AccessSummary`, ADR 0114) | `access/api.ts` |

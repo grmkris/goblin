@@ -9,6 +9,7 @@ const NEEDS = {
   'conversations.startThread': { level: 'write' },
   'conversations.stop': { level: 'write' },
   'conversations.entries': { level: 'read' },
+  'conversations.sendStatus': { level: 'read' },
   'conversations.stream': { level: 'read' },
   'topics.list': { level: 'read' },
   'topics.get': { level: 'read' },
@@ -56,9 +57,9 @@ const NEEDS = {
 }
 
 describe("what a credential's grant must hold for each owner endpoint", () => {
-  it('names a need for exactly the 49 endpoints a credential reaches, and every other refuses one', () => {
+  it('names a need for exactly the 50 endpoints a credential reaches, and every other refuses one', () => {
     expect([...endpointAccess(OwnerApi).keys()].toSorted()).toEqual(Object.keys(NEEDS).toSorted())
-    expect(endpointAccess(OwnerApi).size).toBe(49)
+    expect(endpointAccess(OwnerApi).size).toBe(50)
   })
 
   it('needs a level of each, and an extra of setup, routine and inspection endpoints', () => {

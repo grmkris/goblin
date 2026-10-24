@@ -12,7 +12,7 @@ const REDIRECT = 'http://127.0.0.1:9/callback'
 const RESOURCE = `${APP}/mcp`
 const SIGN_IN_SCOPES = 'openid profile email offline_access'
 /** What a client asks for since ADR 0114: the sign-in scopes and `goblin`; what it may do is its grant. */
-const ALL_SCOPES = `${SIGN_IN_SCOPES} goblin`
+export const ALL_SCOPES = `${SIGN_IN_SCOPES} goblin`
 const Registered = Schema.Struct({ client_id: Schema.String })
 const Tokens = Schema.Struct({ access_token: Schema.String, refresh_token: Schema.optional(Schema.String) })
 const Redirect = Schema.Struct({ url: Schema.optional(Schema.String), redirect_uri: Schema.optional(Schema.String) })
@@ -37,7 +37,7 @@ async function next(response: Response): Promise<URL> {
 }
 
 /** Dynamic registration as Claude Code makes it: no scope, so the client may ask for every /mcp scope. */
-async function register(base: string, who: Person): Promise<string> {
+export async function register(base: string, who: Person): Promise<string> {
   const registered = await auth(base, who, '/oauth2/register', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -80,7 +80,7 @@ const termsOf = (who: Person, terms: Terms) => ({
   },
 })
 
-const browserOf = (who: Person) => ({
+export const browserOf = (who: Person) => ({
   cookie: who.cookie,
   origin: APP,
   'x-goblin-csrf': '1',
@@ -112,7 +112,7 @@ type Authorization = {
 }
 
 /** One sign-in of a registered client to /mcp: authorize, the consent page when the owner must answer, token. */
-async function authorize(base: string, who: Person, clientId: string, request: Authorization): Promise<Grant> {
+export async function authorize(base: string, who: Person, clientId: string, request: Authorization): Promise<Grant> {
   const verifier = crypto.randomUUID() + crypto.randomUUID()
   const query = new URLSearchParams({
     response_type: 'code',

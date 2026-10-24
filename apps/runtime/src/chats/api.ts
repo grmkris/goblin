@@ -14,6 +14,7 @@ import type {
 import { OwnerApi } from '@goblin/contracts/api'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
 import * as Stream from 'effect/Stream'
 import type * as HttpServerRequest from 'effect/http/HttpServerRequest'
 import * as HttpServerResponse from 'effect/http/HttpServerResponse'
@@ -40,13 +41,15 @@ import {
 import { Db } from '../runtime/db.ts'
 import { ownerQueue, removeOwnerQueuedInput } from '../conversation-queue.ts'
 import { Retrieval } from '../retrieval/service.ts'
-import { InvalidInput, toAppError } from '../http/errors.ts'
+import { InvalidInput, NotFound, toAppError } from '../http/errors.ts'
 import { entryViews } from '../pi/entry-view.ts'
 import { entryMessages } from '../streams/messages.ts'
 import { PiSessions } from '../pi/sessions.ts'
 import { Invocations } from '../personas/service.ts'
 import { sseFrames } from '../streams/frames.ts'
 import { RunStreams, Streams } from '../streams/service.ts'
+import { settledWithin } from './instance.ts'
+import { stepOf } from './send-status.ts'
 import { Conversations } from './service.ts'
 import { moveToThread } from './mover.ts'
 import { startThread } from './thread-heads.ts'
@@ -189,6 +192,36 @@ const stop = ({ params, payload }: ChatWrite<StopConversation>) =>
     reachesChat(params.id),
     Effect.map(stopChat(params.id, payload.operationId), (stopped) => ({ stopped })),
   )
+/** How long a send's status read waits to see whether Pi settled it: enough for a settled one, never a real wait. */
+const SETTLED_PEEK_MS = 50
+
+/**
+ * How one send of a registered chat stands now (ADR 0119), what `tasks/get` and `conversation_send_status` read:
+ * settled (answered or not) as Pi says, else queued behind earlier work, else working, its step read from the chat's
+ * newest page. Pi answers a send it never took as `not_found`, which is `NotFound` `operation`.
+ */
+const sendStatus = ({ params }: { readonly params: { readonly id: string; readonly operationId: string } }) =>
+  Effect.gen(function* () {
+    yield* reachesChat(params.id)
+    const session = yield* registeredConversation(params.id)
+    const settled = yield* settledWithin(session, params.operationId, SETTLED_PEEK_MS)
+    if (Option.isSome(settled)) {
+      const { status, text, reason } = settled.value
+      if (status === 'done') return { status: 'answered' as const, text: text ?? '' }
+      if (reason === 'not_found') return yield* new NotFound({ what: 'operation' })
+      return { status: 'unanswered' as const, reason: reason ?? 'unanswered' }
+    }
+    const pending = yield* PiSessions.use((pi) => pi.pending(session)).pipe(
+      Effect.catchTag('PiFailure', (failure) => Effect.fail(toAppError(failure.cause))),
+    )
+    if (pending.some((each) => each.operationId === params.operationId && each.status === 'queued'))
+      return { status: 'queued' as const }
+    const { entries } = yield* Conversations.use((conversations) =>
+      conversations.history(params.id, Number.MAX_SAFE_INTEGER),
+    )
+    return { status: 'working' as const, step: stepOf(params.id, entries) }
+  })
+
 const queue = ({ params }: ChatRequest) => ownerQueue(params.id)
 const removeQueued = ({ params, payload }: ChatWrite<QueueRemoval>) => removeOwnerQueuedInput(params.id, payload)
 const markRead = ({ params }: ChatRequest) => Effect.map(markOwnerRead(params.id), (read) => ({ read }))
@@ -276,6 +309,7 @@ export const ConversationsHandlers = HttpApiBuilder.group(OwnerApi, 'conversatio
     .handle('startThread', threadStart)
     .handle('move', move)
     .handle('stop', stop)
+    .handle('sendStatus', sendStatus)
     .handle('queue', queue)
     .handle('removeQueued', removeQueued)
     .handle('markRead', markRead)

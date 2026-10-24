@@ -64,7 +64,10 @@ No string in any frame holds a secret goblin issues or keeps: one that holds som
 
 ## Driving a chat
 
-A send is AG-UI's `RunAgentInput` ([ADR 0111](../adr/0111-agui-run-input-is-the-send.md), `RunInput` in the
+On `/mcp` a send is a tool call instead (`conversation_send`), answered by its receipt or, to a client that follows the
+Tasks extension, by a task that completes with the answer ([ADR 0119](../adr/0119-a-send-is-a-task-when-its-client-can-follow-one.md));
+`GET /api/conversations/:id/sends/:operationId` says how one send stands over HTTP too. Over HTTP a send is AG-UI's
+`RunAgentInput` ([ADR 0111](../adr/0111-agui-run-input-is-the-send.md), `RunInput` in the
 contracts), posted to `POST /api/conversations/:id/messages` with the caller's credential (its grant's `write`):
 
 ```json

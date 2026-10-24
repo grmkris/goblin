@@ -16,12 +16,19 @@ import * as Predicate from 'effect/Predicate'
  * `inputRequired`.
  */
 
-/** What one tool call's request says of the client: its capabilities and the answers to an earlier round's asks. */
+/**
+ * What one call's request says of the client: its capabilities, the answers to an earlier round's asks, and whether
+ * it follows tasks (it declared the Tasks extension, ADR 0119).
+ */
 export interface CallContext {
   readonly capabilities: ClientCapabilities | undefined
   readonly inputResponses: Readonly<Record<string, unknown>> | undefined
   readonly dropped: readonly string[]
+  readonly tasks: boolean
 }
+
+/** The Tasks extension (SEP-2663), which a 2026-07-28 client declares on each request it may get a task for. */
+export const TASKS_EXTENSION = 'io.modelcontextprotocol/tasks'
 
 /** The input key the widening ask goes under. */
 const KEY = 'access'
@@ -42,8 +49,9 @@ const field = (value: unknown, name: string): unknown =>
   Predicate.isObject(value) && Predicate.hasProperty(value, name) ? value[name] : undefined
 
 /**
- * The call context a tool handler's request carries (the SDK's `ctx.mcpReq`): the client's capabilities from the
- * request's envelope, which only a 2026-07-28 request has, and its input responses.
+ * The call context a handler's request carries (the SDK's `ctx.mcpReq`): the client's capabilities from the request's
+ * envelope, which only a 2026-07-28 request has, its input responses, and whether those capabilities declare the Tasks
+ * extension (read from the envelope as sent: the SDK's capability type keeps no extensions).
  */
 export const callContextOf = (ctx: unknown): CallContext => {
   const request = field(ctx, 'mcpReq')
@@ -54,6 +62,7 @@ export const callContextOf = (ctx: unknown): CallContext => {
     capabilities: isCapabilities(capabilities) ? capabilities : undefined,
     inputResponses: isResponses(responses) ? responses : undefined,
     dropped: Array.isArray(dropped) ? dropped.filter(Predicate.isString) : [],
+    tasks: Predicate.isObject(field(field(capabilities, 'extensions'), TASKS_EXTENSION)),
   }
 }
 
