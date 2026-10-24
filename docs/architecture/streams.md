@@ -25,8 +25,10 @@ started it ended.
 ## Reading a stream
 
 1. **Connect.** `GET /api/conversations/:id/stream`: a member's browser under `/w/<slug>/api/…` with its session
-   cookie, a server's key on `/api/…` with the key as its bearer (its grant's `read`, ADR 0114). A key reaches only
-   the chats of the Topics its grant reaches; any other answers `access_insufficient` (403), and a chat that is not
+   cookie, an OAuth client under the same path with its token as its bearer
+   ([ADR 0116](../adr/0116-an-oauth-client-uses-the-owner-api-too.md)), a server's key on `/api/…` with the key as its
+   bearer (a credential's grant's `read`, ADR 0114). A credential reaches only the chats of the Topics its grant
+   reaches; any other answers `access_insufficient` (403), and a chat that is not
    there 404, in the error envelope. The answer is
    `text/event-stream`, never cached.
 2. **Frames.** Each event is one `data:` frame, its JSON on one line, LF line ends: `data: {"type":"RUN_STARTED",…}`

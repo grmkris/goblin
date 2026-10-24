@@ -56,7 +56,8 @@ Which agent a request reaches comes from its credential: a browser session names
 (`/w/<slug>/api/…`), checked against the person's membership in one D1 read on every request; an API key belongs to
 one workspace; an OAuth client reaches the workspaces its grant names ([ADRs
 0097](../adr/0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md), [0114](../adr/0114-one-grant-for-every-credential.md)),
-read with the person's memberships on every call, and each call names the one it is for. A person's clients are
+read with the person's memberships on every call, and each call names the one it is for: in its `/mcp` arguments, or
+in its path (`/w/<slug>/api/…`, [ADR 0116](../adr/0116-an-oauth-client-uses-the-owner-api-too.md)). A person's clients are
 theirs, at `/api/clients` (`auth/clients.ts`).
 
 ### Grants

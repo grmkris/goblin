@@ -57,6 +57,19 @@ const KEY_VIEW = {
 }
 /** The credential the key admits (ADR 0114): `write` over everything of its workspace. */
 const KEY_CREDENTIAL = credential({ id: 'key-1', name: 'swarmm', level: 'write', generation: 3 })
+/** An OAuth client's token the owner consented to (ADR 0116), and one whose grant is only `read`. */
+const TOKEN = 'eyJhbGciOi.eyJzdWIiOiJvd25lciJ9.c2ln'
+const READ_TOKEN = 'eyJhbGciOi.eyJyZWFkIjp0cnVlfQ.c2ln'
+/** The credential the owner's client admits in their workspace: `write` over everything. */
+const CLIENT_CREDENTIAL = credential({
+  kind: 'client',
+  id: 'client.1',
+  name: 'Claude',
+  grantId: 'cg_1',
+  level: 'write',
+})
+/** The owner as the member the client acts for. */
+const CLIENT_MEMBER = { user: OWNER, role: 'owner', name: 'Owner', shared: false } as const
 /** A grant change's answer, as the account records give it. */
 const changed = (grantId: string, terms: GrantTerms) => ({
   grant: {
@@ -161,6 +174,16 @@ const deployment = (
             credential: { ...KEY_CREDENTIAL, ws: { ...KEY_CREDENTIAL.ws, workspace: WS } },
           })
         : Effect.fail(new Unauthenticated({ reason: 'key' })),
+    client: (token, slug) => {
+      if (token !== TOKEN && token !== READ_TOKEN) return Effect.fail(new Unauthenticated({ reason: 'token' }))
+      if (slug !== MEMBERSHIP.slug) return Effect.fail(new NotFound({ what: 'workspace' }))
+      const level = token === TOKEN ? 'write' : 'read'
+      return Effect.succeed({
+        workspace: { ...MEMBERSHIP, role },
+        credential: { ...CLIENT_CREDENTIAL, level, ws: { ...CLIENT_CREDENTIAL.ws, workspace: WS } },
+        member: { ...CLIENT_MEMBER, role },
+      })
+    },
     membership: (userId, slug) =>
       Effect.succeed(userId === OWNER && slug === MEMBERSHIP.slug ? { ...MEMBERSHIP, role } : undefined),
     membershipOf: (userId, workspaceId) =>
@@ -324,8 +347,8 @@ describe("a member's forward (ADR 0089)", () => {
     [
       'a bearer token beside the cookie',
       new Request(`${APP}${BASE}/api/topics`, { headers: { cookie: 'session=owner', authorization: 'Bearer x' } }),
-      401,
-      'unauthenticated',
+      403,
+      'forbidden',
     ],
     [
       'a write without the CSRF header',
@@ -525,6 +548,102 @@ describe("a server's API key (ADR 0081)", () => {
       expect(response.status).toBe(401)
     }
     expect((await through('account', server('/api/workspaces', { method: 'GET' }), edge)).response.status).toBe(401)
+    expect(seen).toHaveLength(0)
+  })
+})
+
+/** A request a client sends with `token`: no cookie and no CSRF header, as a server sends one. */
+const client = (
+  path: string,
+  init: { method?: string; headers?: Record<string, string>; body?: string; token?: string } = {},
+) =>
+  new Request(`${APP}${path}`, {
+    method: init.method ?? 'POST',
+    headers: {
+      authorization: `Bearer ${init.token ?? TOKEN}`,
+      'content-type': 'application/json',
+      ...init.headers,
+    },
+    ...(init.body === undefined ? {} : { body: init.body }),
+  })
+
+describe("an OAuth client's token on its workspace's path (ADR 0116)", () => {
+  it("reaches the workspace's agent with its credential and its person, never the token, a forged caller or an App mark", async () => {
+    const { seen, agents, edge } = deployment()
+    const request = client(`${BASE}/api/topics`, {
+      headers: {
+        'x-mcp-caller': 'app',
+        'x-goblin-caller': '{"kind":"key","id":"forged"}',
+        'x-goblin-member': '{"user":"forged","role":"owner"}',
+      },
+      body: JSON.stringify({ name: 'x' }),
+    })
+    const { response } = await through('workspace', request, edge)
+    expect(response.status).toBe(200)
+    expect(agents).toEqual([WS])
+    const [forwarded] = seen
+    expect(new URL(forwarded?.url ?? '').pathname).toBe('/api/topics')
+    expect(forwarded?.headers.get('authorization')).toBeNull()
+    expect(forwarded?.headers.get('x-mcp-caller')).toBeNull()
+    expect(forwarded?.headers.get('x-goblin-forwarded')).toBe('owner')
+    expect(JSON.parse(forwarded?.headers.get('x-goblin-caller') ?? '')).toEqual({
+      ...CLIENT_CREDENTIAL,
+      ws: { ...CLIENT_CREDENTIAL.ws, workspace: WS },
+    })
+    expect(JSON.parse(forwarded?.headers.get('x-goblin-member') ?? '')).toEqual(CLIENT_MEMBER)
+  })
+
+  it("reads a chat's stream: the agent's server-sent events pass through", async () => {
+    const events = 'data: {"type":"RUN_STARTED"}\n\n'
+    const { edge } = deployment(() => new Response(events, { headers: { 'content-type': 'text/event-stream' } }))
+    const { response } = await through(
+      'workspace',
+      client(`${BASE}/api/conversations/7/stream`, { method: 'GET' }),
+      edge,
+    )
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toBe('text/event-stream')
+    expect(await response.text()).toBe(events)
+  })
+
+  it.each([
+    [
+      'a token that does not admit',
+      client(`${BASE}/api/topics`, { method: 'GET', token: 'eyJ.bm9wZQ.c2ln' }),
+      401,
+      'token',
+    ],
+    ['a workspace outside its reach', client('/w/elsewhere/api/topics', { method: 'GET' }), 404, 'workspace'],
+    [
+      'a session cookie with it',
+      client(`${BASE}/api/topics`, { headers: { cookie: 'session=owner' } }),
+      403,
+      'bearer_and_session',
+    ],
+    ["the workspace's members", client(`${BASE}/api/members`, { method: 'GET' }), 403, 'credential'],
+    ["the workspace's keys", client(`${BASE}/api/keys`, { method: 'GET' }), 403, 'credential'],
+    ['an endpoint no credential reaches', client(`${BASE}/api/agent/resident`, { method: 'GET' }), 403, 'credential'],
+    [
+      'a level its grant lacks',
+      client(`${BASE}/api/topics`, { body: '{}', token: READ_TOKEN }),
+      403,
+      'https://goblin.test/consent/widen?grant=cg_1&level=write',
+    ],
+    ['an extra its grant lacks', client(`${BASE}/api/inspect/turns`, { method: 'GET' }), 403, '"extra":"inspect"'],
+  ] as const)('refuses %s without waking the agent', async (_case, request, status, reason) => {
+    const { seen, edge } = deployment()
+    const { response } = await through('workspace', request, edge)
+    expect(response.status).toBe(status)
+    expect(JSON.stringify(await response.json())).toContain(reason)
+    expect(seen).toHaveLength(0)
+  })
+
+  it('never reaches the person and account routes, which take a session', async () => {
+    const { seen, edge } = deployment()
+    for (const path of ['/api/workspaces', '/api/clients', '/api/invitations']) {
+      const { response } = await through('account', client(path, { method: 'GET' }), edge)
+      expect(response.status).toBe(401)
+    }
     expect(seen).toHaveLength(0)
   })
 })

@@ -14,7 +14,8 @@ const Coverage = Schema.Literals(['all', 'list'])
  * the request reaches whether its Topics, Personas and connections are all or a list, with the reach's generation, so
  * the agent knows when to read the lists again (`Grants.sync`). The lists themselves never travel in the header; the
  * MCP origins its threads may bring do (ADR 0091). It holds what its grant holds, never renews resident authority and
- * is counted per minute. Only the Worker sets it: the edge for a key on `/api`, `/mcp` for either.
+ * is counted per minute. Only the Worker sets it: the edge for a key on `/api` or an OAuth client on `/w/<slug>/api`
+ * (ADR 0116), `/mcp` for either.
  */
 export const Credential = Schema.Struct({
   kind: Schema.Literals(['key', 'client']),
@@ -39,7 +40,7 @@ const ForwardedCredential = Schema.fromJsonString(Credential)
 
 /**
  * The person a request acts for in its workspace (ADR 0089): their user ID and role. The edge forwards it for a
- * member's session, and `/mcp` for the person an OAuth client acts for.
+ * member's session, and the edge (ADR 0116) and `/mcp` for the person an OAuth client acts for.
  */
 export interface Member {
   readonly user: string
@@ -106,6 +107,17 @@ export const forwardedPrincipal = (
 
 /** One name for a credential, for its per-minute count (ADR 0085): its grant's. */
 export const credentialId = (credential: Credential): string => `grant:${credential.grantId}`
+
+/**
+ * The OAuth client token a request carries (ADR 0116): its `Authorization` bearer when that is not a key's. Whether it is
+ * one is the client check's to say (`inbound/client-access.ts`).
+ */
+export const bearerToken = (request: Request): string | undefined => {
+  const header = request.headers.get('authorization')
+  if (header === null || !header.startsWith('Bearer ')) return undefined
+  const token = header.slice('Bearer '.length)
+  return token === '' || token.startsWith(KEY_PREFIX) ? undefined : token
+}
 
 /** The key a request carries, when its `Authorization` header is a `gbk_` bearer: never an inbound OAuth token. */
 export const bearerKey = (request: Request): string | undefined => {

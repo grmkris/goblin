@@ -7,7 +7,7 @@ import { expect } from 'vitest'
 import Stack from './auth-stack.ts'
 import { call, person, signedIn } from './owner-requests.ts'
 import { answerOf } from './probe-reads.ts'
-import { inspectAuthCase, keyWideningCase, reachCase } from './auth-inspect.ts'
+import { inspectAuthCase, keyWideningCase, reachCase, restBearerCase } from './auth-inspect.ts'
 
 const harness = Test.make({
   providers: Cloudflare.providers(),
@@ -222,5 +222,12 @@ harness.test(
     yield* Effect.promise(() => inspectAuthCase(url))
     yield* Effect.promise(() => reachCase(url))
     yield* Effect.promise(() => keyWideningCase(url))
+  }),
+)
+harness.test(
+  "an OAuth client's token on its workspace's path: the owner API and a chat's stream, its reach and its end (ADR 0116)",
+  Effect.gen(function* () {
+    const { url } = yield* stack
+    yield* Effect.promise(() => restBearerCase(url))
   }),
 )

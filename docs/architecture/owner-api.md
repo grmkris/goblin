@@ -12,12 +12,18 @@ account API is answered in the Worker (`http/api/account.ts`): `workspaces` for 
 `clientErrors`, a browser crash report, without a session. A member's request names its workspace's slug in its path
 (`/w/<slug>/api/…`): the edge admits the session as below, then reads the person's membership of that workspace (a 404
 when there is none), answers the workspace account API's groups itself (`keys`, for an owner or admin, and `clients`,
-the OAuth clients the member connected to it) and forwards every other path to the workspace's agent as `/api/…`. A
-server's request reaches `/api/…` with its key alone, and goes to the key's workspace. Every request on its way to an
-agent is admitted in this order, then forwarded:
+the OAuth clients the member connected to it) and forwards every other path to the workspace's agent as `/api/…`. An
+OAuth client's token on the same path ([ADR 0116](../adr/0116-an-oauth-client-uses-the-owner-api-too.md)) is admitted
+by the workspaces its grant reaches for its person instead (`inbound/client-access.ts`, as `/mcp` admits it), and only
+forwarded. A server's request reaches `/api/…` with its key alone, and goes to the key's workspace. Every request on
+its way to an agent is admitted in this order, then forwarded:
 
 1. a write whose `Origin` names another site is refused;
-2. the session comes from the cookie alone, and any `Authorization` header but a server API key is refused. A
+2. the session comes from the cookie alone, and an `Authorization` header with one is refused (`bearer_and_session`).
+   An OAuth client's bearer on `/w/<slug>/api/…` is admitted instead: its token as `/mcp` checks it, the workspace at
+   the slug among those it reaches now (else `NotFound` `workspace`), never the workspace account API (`Forbidden`
+   `credential`), the same `EndpointAccess` check as a key's below, and forwarded with its credential and its person as
+   the member, whose role the agent holds it to. A
    `Bearer gbk_…` key ([ADR 0081](../adr/0081-api-keys-and-the-same-operations-over-mcp.md)) is admitted instead of a
    session: verified in the auth D1 with its grant ([ADR 0114](../adr/0114-one-grant-for-every-credential.md); a
    grant past its end is `grant_expired`), refused with a cookie or an `Origin`, and only for an endpoint annotated
@@ -58,7 +64,8 @@ those changes refuse on a member's turn the same way (ADR 0099, `pi/asker.ts`): 
 member who asked on its receipt, and a tool reads its run's inputs back to them. A member's request gets a
 grant of resident authority, except where an endpoint is
 annotated `GrantsResident: false` (`POST /api/agent/resident`, the event streams, the entries read, the files group and the
-OAuth callback). A request from a credential (ADRs 0086, 0114: a server's key, or an OAuth client on `/mcp`) never
+OAuth callback). A request from a credential (ADRs 0086, 0114, 0116: a server's key, or an OAuth client on `/mcp` or a
+workspace's path) never
 grants it; owner admission admits it only to an endpoint whose `EndpointAccess` its grant holds (else `credential` or
 `AccessInsufficient`), for a client also only where its person's role holds it (`ROLE_POWER`, else `role`), refuses a
 grant past its end (`grant_expired`), counts its requests per minute (600, ADR 0085; past them `rate_limited` with

@@ -1,13 +1,12 @@
 import { createMcpHandler } from 'agents/mcp/server'
 import type { WorkspaceView } from '@goblin/contracts'
-import { credentialOf, verifyKey } from '../auth/api-keys.ts'
-import { type GrantRecord, type WorkspaceCoverage, coveragesOf } from '../auth/grants.ts'
-import { challengeOf, clientName, verifyClientToken } from '../auth/index.ts'
-import { reachedBy } from '../auth/workspaces.ts'
+import { verifyKey } from '../auth/api-keys.ts'
+import { challengeOf } from '../auth/index.ts'
 import type { RuntimeEnv } from '../env.ts'
 import { refOf, runAtEdge } from '../http/api/edge.ts'
-import { type Credential, bearerKey, memberName } from '../http/api/principal.ts'
-import { InvalidInput, NotFound } from '../http/errors.ts'
+import { type Credential, bearerKey } from '../http/api/principal.ts'
+import { InvalidInput, NotFound, Unauthenticated } from '../http/errors.ts'
+import { type ClientAccess, clientAccess, clientIn } from './client-access.ts'
 import { ownerCall } from './client.ts'
 import { type CallerReach, mcpServer } from './mcp-server.ts'
 import type { OwnerCaller } from './tools.ts'
@@ -24,17 +23,7 @@ export const inboundHosts = (appUrl: string) => ({
  */
 type Admitted =
   | { readonly kind: 'key'; readonly workspaceId: string; readonly credential: Credential; readonly token: string }
-  | {
-      readonly kind: 'client'
-      readonly clientId: string
-      readonly name: string
-      readonly grant: GrantRecord
-      readonly coverage: ReadonlyMap<string, WorkspaceCoverage>
-      readonly person: { readonly user: string; readonly name: string }
-      readonly reach: CallerReach
-      readonly token: string
-      readonly expiresAt: number
-    }
+  | ({ readonly kind: 'client'; readonly token: string } & ClientAccess)
 
 /**
  * A server's API key (ADR 0081), or an OAuth client a person consented to (ADR 0024) with the grant they gave it and
@@ -51,36 +40,12 @@ const admit = async (request: Request, env: RuntimeEnv): Promise<Admitted | unde
   const header = request.headers.get('authorization') ?? ''
   if (!header.startsWith('Bearer ')) return undefined
   const token = header.slice('Bearer '.length)
-  let principal: Awaited<ReturnType<typeof verifyClientToken>>
   try {
-    principal = await verifyClientToken(token, env)
-  } catch {
-    // expected: a token that does not verify is answered with the sign-in challenge, as a missing one is.
-    return undefined
-  }
-  const [name, reached, coverage, person] = await Promise.all([
-    clientName(principal.clientId, env),
-    reachedBy(env.AUTH_DB, principal.subject, principal.clientId),
-    coveragesOf(env.AUTH_DB, principal.grant),
-    env.AUTH_DB.prepare('SELECT name, email FROM user WHERE id = ?')
-      .bind(principal.subject)
-      .first<{ name: string; email: string }>(),
-  ])
-  if (person === null) return undefined
-  const workspaces = reached?.workspaces ?? []
-  const all = reached?.all ?? false
-  return {
-    kind: 'client',
-    clientId: principal.clientId,
-    name: name ?? 'an MCP client',
-    grant: principal.grant,
-    coverage,
-    person: { user: principal.subject, name: memberName(person) },
-    // A client given exactly one workspace never names it; "all" always does, so joining another never changes what
-    // a call without a workspace means.
-    reach: { all, workspaces, named: all || workspaces.length !== 1 },
-    token,
-    expiresAt: principal.expiresAt,
+    return { kind: 'client', token, ...(await clientAccess(env, token)) }
+  } catch (failure) {
+    // expected: a token that does not admit is answered with the sign-in challenge, as a missing one is.
+    if (failure instanceof Unauthenticated) return undefined
+    throw failure
   }
 }
 
@@ -112,18 +77,9 @@ const callerOf = (admitted: Admitted, env: RuntimeEnv, ref: string): OwnerCaller
     const agent = env.AGENTS.getByName(admitted.workspaceId)
     return (call) => runAtEdge(ownerCall(agent, admitted.credential, undefined, call, { ref }))
   }
-  const { grant, coverage, person, reach } = admitted
   return async (call, named) => {
-    const workspace = workspaceFor(reach, named)
-    const ws = coverage.get(workspace.id) ?? {
-      workspace: workspace.id,
-      topics: 'all',
-      personas: 'all',
-      connections: 'all',
-      generation: 0,
-    }
-    const credential = credentialOf(grant, { id: admitted.clientId, name: admitted.name }, ws)
-    const member = { ...person, role: workspace.role, shared: workspace.members > 1 }
+    const workspace = workspaceFor(admitted.reach, named)
+    const { credential, member } = clientIn(admitted, workspace)
     return runAtEdge(ownerCall(env.AGENTS.getByName(workspace.id), credential, member, call, { ref }))
   }
 }

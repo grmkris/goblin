@@ -10,6 +10,7 @@ import { membershipAt, membershipOf } from '../auth/workspaces.ts'
 import { secured } from './api/render.ts'
 import { nowSeconds } from '../clock.ts'
 import { fileLinkClaims } from '../files/link-token.ts'
+import { clientAt } from '../inbound/client-access.ts'
 import { deliverEvents, linkedFile } from '../inbound/client.ts'
 import { handleInboundMcp } from '../inbound/route.ts'
 import { eventsHookTokenValid } from '../mcp/events/route-token.ts'
@@ -33,6 +34,7 @@ const edgeOf = (env: RuntimeEnv): Edge => ({
       (session) => session.person,
     ),
   key: (key) => attempt(() => verifyKey(env, key)),
+  client: (token, slug) => attempt(() => clientAt(env, token, slug)),
   membership: (userId, slug) => attempt(() => membershipAt(env.AUTH_DB, userId, slug)),
   membershipOf: (userId, workspaceId) => attempt(() => membershipOf(env.AUTH_DB, userId, workspaceId)),
   agent: (workspaceId) => agentOf(env, workspaceId),

@@ -59,7 +59,8 @@ infrastructure. Read
   `GOBLIN_BREAK_GLASS=1 GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset`, re-create it with a
   break-glass `deploy:prod` of the same sha, and promote that sha once CI is back on. A workspace owns its agent, named
   by the workspace's ID (ADR 0089): a request reaches it only through its credential's workspace (a key's), a workspace
-  an OAuth client's call names among those its reach covers (ADR 0097), or for a browser session the slug in its path,
+  an OAuth client's call names among those its reach covers (its `/mcp` arguments or its `/w/<slug>/api` path; ADRs
+  0097, 0116), or for a browser session the slug in its path,
   each after a live membership check. Never add a route that takes an agent
   name from the request.
   Telemetry never carries content ([ADR 0024](docs/adr/0024-observing-conversations.md)).

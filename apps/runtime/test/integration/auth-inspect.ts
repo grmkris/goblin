@@ -1,4 +1,5 @@
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
+import { TopicView } from '@goblin/contracts'
 import { InspectConversations } from '@goblin/contracts/inspect'
 import { Schema } from 'effect'
 import { createHash } from 'node:crypto'
@@ -467,4 +468,76 @@ export async function reachCase(base: string) {
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
   })
   expect(after.status).toBe(401)
+}
+
+/** The first frame of a chat's stream that holds `type`, read from `response`'s body; the body is cancelled after. */
+async function frameOf(response: Response, type: string): Promise<string> {
+  const reader = response.body?.getReader()
+  if (reader === undefined) throw new Error('a stream without a body')
+  const decoder = new TextDecoder()
+  let read = ''
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) throw new Error(`the stream ended before ${type}`)
+      read += decoder.decode(value, { stream: true })
+      const frame = read.split('\n').find((line) => line.startsWith('data: ') && line.includes(`"${type}"`))
+      if (frame !== undefined) return frame
+    }
+  } finally {
+    await reader.cancel()
+  }
+}
+
+/**
+ * An OAuth client's token on its workspace's path (ADR 0116), through the real Worker and agent: it reads and makes
+ * Topics with no CSRF header and follows a chat's stream, as the person it acts for; a workspace its grant does not
+ * reach is not there, the people's paths refuse it, and revoking the client ends it.
+ */
+export async function restBearerCase(base: string) {
+  const owner = await person(base)
+  const made = await call(base, owner, '/api/workspaces', {
+    name: 'Elsewhere',
+    slug: `elsewhere-${crypto.randomUUID().slice(0, 6)}`,
+  })
+  expect(made.status).toBe(201)
+  const elsewhere = Schema.decodeUnknownSync(Schema.Struct({ slug: Schema.String }))(await made.json())
+  const clientId = await register(base, owner)
+  const granted = await authorize(base, owner, clientId, {
+    scope: ALL_SCOPES,
+    terms: { level: 'write', workspaces: [owner.workspace] },
+  })
+  const bearer = (path: string, init: { method?: string; body?: unknown; headers?: Record<string, string> } = {}) =>
+    fetch(`${base}${path}`, {
+      method: init.method ?? 'GET',
+      headers: { authorization: `Bearer ${granted.access}`, 'content-type': 'application/json', ...init.headers },
+      ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+    })
+  const name = `Bearer ${crypto.randomUUID().slice(0, 6)}`
+  const created = await bearer(`/w/${owner.slug}/api/topics`, {
+    method: 'POST',
+    body: { name, operationId: `bearer:${name}` },
+  })
+  expect(created.status, await created.clone().text()).toBe(201)
+  const topic = Schema.decodeUnknownSync(TopicView)(await created.json())
+  const listed = await bearer(`/w/${owner.slug}/api/topics`)
+  expect(listed.status).toBe(200)
+  expect(await listed.text()).toContain(name)
+  const stream = await bearer(`/w/${owner.slug}/api/conversations/${topic.conversation}/stream`, {
+    headers: { accept: 'text/event-stream' },
+  })
+  expect(stream.status, stream.status === 200 ? '' : await stream.clone().text()).toBe(200)
+  expect(stream.headers.get('content-type')).toContain('text/event-stream')
+  expect(await frameOf(stream, 'MESSAGES_SNAPSHOT')).toContain('"messages"')
+  // Outside its reach, on the people's paths, and with a session beside it, the token reaches nothing.
+  expect((await bearer(`/w/${elsewhere.slug}/api/topics`)).status).toBe(404)
+  expect((await bearer(`/w/${owner.slug}/api/members`)).status).toBe(403)
+  expect((await bearer('/api/workspaces')).status).toBe(401)
+  expect((await bearer(`/w/${owner.slug}/api/topics`, { headers: { cookie: owner.cookie } })).status).toBe(403)
+  const revoked = await fetch(`${base}/api/clients/${clientId}`, {
+    method: 'DELETE',
+    headers: { cookie: owner.cookie, origin: APP, 'x-goblin-csrf': '1', 'cf-connecting-ip': owner.ip },
+  })
+  expect(revoked.status).toBe(200)
+  expect((await bearer(`/w/${owner.slug}/api/topics`)).status).toBe(401)
 }

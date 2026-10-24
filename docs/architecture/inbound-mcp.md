@@ -46,9 +46,10 @@ server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)
   (`PlainSend`, `PlainThreadStart`: the words, the operation id and goblin's parts), which their adapters send as the
   AG-UI `RunAgentInput` the endpoints take (contracts' `runInput` and `threadStart`,
   [ADR 0111](../adr/0111-agui-run-input-is-the-send.md)), and answer the receipt. Every endpoint a credential reaches
-  has its tool but a chat's stream (`STREAMED`, ADR 0110): server-sent events a key reads over HTTP itself
-  (`GET /api/conversations/:id/stream`, [chat streams](streams.md)), which one tool answer cannot carry; the server's
-  instructions name it.
+  has its tool but a chat's stream (`STREAMED`, ADR 0110): server-sent events a credential reads over HTTP itself
+  ([chat streams](streams.md)), which one tool answer cannot carry: a key at `GET /api/conversations/:id/stream`, an
+  OAuth client's token at `GET /w/<slug>/api/conversations/:id/stream`
+  ([ADR 0116](../adr/0116-an-oauth-client-uses-the-owner-api-too.md)). The server's instructions name both.
 
   | Needs | Tools |
   | --- | --- |

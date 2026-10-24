@@ -42,6 +42,7 @@ import {
   MEMBER_HEADER,
   type Member,
   bearerKey,
+  bearerToken,
   credentialHeader,
   memberHeader,
   memberName,
@@ -52,8 +53,9 @@ import { answer, refusal, secured } from './render.ts'
  * The Worker side of the typed API (ADRs 0038, 0089). The Worker keeps the session, origin and CSRF checks and answers
  * the account APIs itself. It forwards every other request to the agent of one workspace, marked as an owner forward so
  * the agent never takes it for an internal request, with who it comes from. The credential decides the workspace: a
- * member's session names it in the path (`/w/<workspace slug>/api/…`), checked against their membership; a server's API
- * key (ADR 0081) belongs to one and reaches it at `/api/…`. An outbound sign-in comes back to one address for every
+ * member's session names it in the path (`/w/<workspace slug>/api/…`), checked against their membership, and so does an
+ * OAuth client's token, checked against the workspaces its grant reaches for its person (ADR 0116); a server's API key
+ * (ADR 0081) belongs to one and reaches it at `/api/…`. An outbound sign-in comes back to one address for every
  * workspace, its `state` naming the workspace, checked against the person's membership the same way.
  */
 
@@ -79,6 +81,18 @@ export interface Edge {
   readonly key: (
     key: string,
   ) => Effect.Effect<{ readonly workspaceId: string; readonly credential: Credential }, AppError>
+  /**
+   * An OAuth client's token on a workspace's path (ADR 0116): the workspace at the slug among those its grant reaches
+   * now for its person, the credential its grant makes there and the person as a member of it; `Unauthenticated` for a
+   * token that does not admit, `NotFound` `workspace` for a slug it does not reach.
+   */
+  readonly client: (
+    token: string,
+    slug: string,
+  ) => Effect.Effect<
+    { readonly workspace: WorkspaceView; readonly credential: Credential; readonly member: Member },
+    AppError
+  >
   /** A person's membership of the workspace at a slug, read now: the workspace and their role, or none. */
   readonly membership: (userId: string, slug: string) => Effect.Effect<WorkspaceView | undefined, AppError>
   /** A person's membership of the workspace with an ID, read now: the workspace and their role, or none. */
@@ -119,22 +133,26 @@ const OWNER_PREFIX = '/api/'
 /** A member's path: a workspace's slug, then the API path its agent or the workspace account API answers. */
 const WORKSPACE_PATH = /^\/w\/([\w-]{1,200})(\/api\/.*)$/u
 
-/** Who a forwarded request comes from: a member (a session) or a credential (a key). */
-type Principal = { readonly member: Member } | { readonly credential: Credential }
+/**
+ * Who a forwarded request comes from: a member (a session), a credential (a key), or a credential acting for its person
+ * as a member (an OAuth client, ADR 0116).
+ */
+type Principal =
+  | { readonly member: Member; readonly credential?: undefined }
+  | { readonly credential: Credential; readonly member?: Member }
 
 /**
  * The headers an owner request carries to its agent: the edge's reference, the owner-forward mark and `FORWARDED`;
- * then its member, or a key's credential and never an App's caller mark.
+ * then its credential (never with an App's caller mark) and its member, whichever it has.
  */
-const forwardedHeaders = (request: Request, ref: string, principal: Principal): Headers => {
+const forwardedHeaders = (request: Request, ref: string, { credential, member }: Principal): Headers => {
   const headers = new Headers({ 'x-goblin-ref': ref, [FORWARDED_HEADER]: 'owner' })
-  const keyed = 'credential' in principal
   for (const name of FORWARDED) {
     const value = request.headers.get(name)
-    if (value !== null && !(keyed && name === 'x-mcp-caller')) headers.set(name, value)
+    if (value !== null && !(credential !== undefined && name === 'x-mcp-caller')) headers.set(name, value)
   }
-  if (keyed) headers.set(CALLER_HEADER, credentialHeader(principal.credential))
-  else headers.set(MEMBER_HEADER, memberHeader(principal.member))
+  if (credential !== undefined) headers.set(CALLER_HEADER, credentialHeader(credential))
+  if (member !== undefined) headers.set(MEMBER_HEADER, memberHeader(member))
   return headers
 }
 
@@ -179,10 +197,19 @@ const admitMember = (
   })
 
 /**
+ * Whether a credential's grant holds what the endpoint a request names needs (ADR 0114): `need`, none for an endpoint no
+ * credential reaches (`Forbidden` `credential`), else `AccessInsufficient` with what it lacks and the link to widen it.
+ */
+const holds = (edge: Edge, credential: Credential, need: Need | undefined): Effect.Effect<void, AppError> => {
+  if (need === undefined) return Effect.fail(new Forbidden({ reason: 'credential' }))
+  const missing = missingFor(GRANT_SPEC, credential, need)
+  return missing === null ? Effect.void : accessInsufficient(edge.origin, credential.grantId, missing)
+}
+
+/**
  * Admission of a server by its API key (ADR 0081): a key is a server's, so a browser's cookie or Origin with it is
- * refused; the key must admit, and its grant must hold what the endpoint the request names needs (ADR 0114: `need`,
- * none for an endpoint no credential reaches, `Forbidden` `credential`), else `AccessInsufficient` with what it lacks
- * and the link to widen it. The workspace the key belongs to, and its credential (ADR 0086).
+ * refused; the key must admit, and its grant must hold what the endpoint needs (`holds`). The workspace the key
+ * belongs to, and its credential (ADR 0086).
  */
 const admitKey = (
   request: Request,
@@ -194,9 +221,30 @@ const admitKey = (
     if (request.headers.has('cookie') || request.headers.has('origin'))
       return yield* new Forbidden({ reason: 'key_browser' })
     const admitted = yield* edge.key(key)
-    if (need === undefined) return yield* new Forbidden({ reason: 'credential' })
-    const missing = missingFor(GRANT_SPEC, admitted.credential, need)
-    if (missing !== null) return yield* accessInsufficient(edge.origin, admitted.credential.grantId, missing)
+    yield* holds(edge, admitted.credential, need)
+    return admitted
+  })
+
+/**
+ * Admission of an OAuth client by its token on a workspace's path (ADR 0116): one request has one principal, so a
+ * session cookie with it is refused; the token must admit and reach the workspace at `slug` for its person, and its
+ * grant must hold what the endpoint needs (`holds`). The workspace, the credential its grant makes there and the person
+ * as a member of it, whose role the agent holds the request to as it does a `/mcp` call's.
+ */
+const admitClient = (
+  request: Request,
+  edge: Edge,
+  token: string,
+  slug: string,
+  need: Need | undefined,
+): Effect.Effect<
+  { readonly workspace: WorkspaceView; readonly credential: Credential; readonly member: Member },
+  AppError
+> =>
+  Effect.gen(function* () {
+    if (request.headers.has('cookie')) return yield* new Forbidden({ reason: 'bearer_and_session' })
+    const admitted = yield* edge.client(token, slug)
+    yield* holds(edge, admitted.credential, need)
     return admitted
   })
 
@@ -321,7 +369,8 @@ export interface EdgeHttp {
   /**
    * Admits a member's request (`/w/<workspace slug>/api/…`, `isWorkspacePath`) by their session and membership, then
    * answers the workspace account API's paths in the Worker and forwards every other to the workspace's agent with the
-   * member, under its `/api/…` path.
+   * member, under its `/api/…` path. An OAuth client's token there (ADR 0116) is admitted instead by the workspaces its
+   * grant reaches, and only forwarded: the account paths are people's.
    */
   readonly workspace: (request: Request, edge: Edge) => Effect.Effect<Response>
   /**
@@ -469,8 +518,63 @@ const accountOf =
     return Effect.provideContext(served, observed)
   }
 
+/** A request under a workspace's path, before its admission: where it goes, as its `/api/…` `path` and `search`. */
+type WorkspaceRequest = Omit<MemberForward, 'person' | 'member'>
+
+/**
+ * An OAuth client's request on a workspace's path (ADR 0116): never the workspace account API, which is people's;
+ * else admitted by its token (`admitClient`) and forwarded with its credential and the person it acts for.
+ */
+const forwardClient = (
+  at: WorkspaceRequest,
+  client: {
+    readonly token: string
+    readonly slug: string
+    readonly inAccount: boolean
+    readonly need: Need | undefined
+  },
+  known: (workspaceId: string) => void,
+) =>
+  Effect.gen(function* () {
+    if (client.inAccount) return yield* new Forbidden({ reason: 'credential' })
+    const admitted = yield* admitClient(at.request, at.edge, client.token, client.slug, client.need)
+    known(admitted.workspace.id)
+    return yield* forward({
+      ...at,
+      principal: { credential: admitted.credential, member: admitted.member },
+      agent: at.edge.agent(admitted.workspace.id),
+    })
+  })
+
+/** A member's request of the workspace account API (members, keys), answered in the Worker; `route` the one it names. */
+const answerWorkspaceAccount = (
+  workspaceHttp: AccountHttp,
+  at: WorkspaceRequest & { readonly facts: RequestFacts; readonly named: string | undefined },
+  person: Person,
+  member: WorkspaceView,
+) =>
+  Effect.gen(function* () {
+    const { request, path, search, edge, facts } = at
+    if (at.named === undefined) return yield* new NotFound({ what: 'route' })
+    const body = yield* bounded(request, JSON_BODY_LIMIT)
+    const admitted = new Request(`https://edge${path}${search}`, {
+      method: request.method,
+      headers: request.headers,
+      body,
+    })
+    const account = { records: edge.records, person: Option.some(person), workspace: Option.some(member) }
+    return yield* answer(
+      workspaceHttp.pipe(
+        Effect.provideService(AccountRequest, { ...account, headers: request.headers }),
+        Effect.provideService(RequestContext, facts),
+      ),
+      admitted,
+      facts,
+    )
+  })
+
 const workspaceOf =
-  ({ workspaceHttp, workspaceAccountRoute, ownerRoute, observed }: Built): EdgeHttp['workspace'] =>
+  ({ workspaceHttp, workspaceAccountRoute, ownerRoute, ownerNeeds, observed }: Built): EdgeHttp['workspace'] =>
   (request, edge) => {
     const url = new URL(request.url)
     const [, slug = '', path = url.pathname] = WORKSPACE_PATH.exec(url.pathname) ?? []
@@ -478,38 +582,17 @@ const workspaceOf =
     const inAccount = isWorkspaceAccountPath(path)
     const route = inAccount ? workspaceAccountRoute(named) : ownerRoute(named)
     const facts = { ...requestFacts(request, route ?? routeTemplate(path)), ref: refOf(request) }
+    const token = bearerToken(request)
+    const client = token === undefined ? undefined : { token, slug, inAccount, need: ownerNeeds.get(facts.route) }
+    const at: WorkspaceRequest = { request, ref: facts.ref, route: facts.route, path, search: url.search, edge }
     const served = settle(request, facts, (known) =>
       Effect.gen(function* () {
         if (slug === '' || isAccountPath(path)) return yield* new NotFound({ what: 'route' })
+        if (client !== undefined) return yield* forwardClient(at, client, known)
         const { person, workspace: member } = yield* admitMember(request, edge, { slug })
         known(member.id)
-        if (!inAccount)
-          return yield* forwardMember({
-            request,
-            ref: facts.ref,
-            route: facts.route,
-            path,
-            search: url.search,
-            person,
-            member,
-            edge,
-          })
-        if (route === undefined) return yield* new NotFound({ what: 'route' })
-        const body = yield* bounded(request, JSON_BODY_LIMIT)
-        const admitted = new Request(`https://edge${path}${url.search}`, {
-          method: request.method,
-          headers: request.headers,
-          body,
-        })
-        const account = { records: edge.records, person: Option.some(person), workspace: Option.some(member) }
-        return yield* answer(
-          workspaceHttp.pipe(
-            Effect.provideService(AccountRequest, { ...account, headers: request.headers }),
-            Effect.provideService(RequestContext, facts),
-          ),
-          admitted,
-          facts,
-        )
+        if (!inAccount) return yield* forwardMember({ ...at, person, member })
+        return yield* answerWorkspaceAccount(workspaceHttp, { ...at, facts, named: route }, person, member)
       }),
     )
     return Effect.provideContext(served, observed)
