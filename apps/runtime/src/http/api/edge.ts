@@ -1,10 +1,9 @@
-import { GRANT_SPEC, type Need, ROLE_POWER, type WorkspaceView, missingFor } from '@goblin/contracts'
+import type { Need, WorkspaceView } from '@goblin/contracts'
 import {
   AccountApi,
   AppError,
   ErrorEnvelope,
   Forbidden,
-  accessInsufficient,
   NotFound,
   OwnerApi,
   WorkspaceAccountApi,
@@ -27,6 +26,7 @@ import { attempt, isAppError } from '../errors.ts'
 import type { Person } from '../../auth/workspaces.ts'
 import { stateWorkspace } from '../../mcp/oauth/sign-in.ts'
 import { AccountRequest, type AccountRecords } from './account.ts'
+import { type CredentialEdge, admitClient, admitKey } from './admission.ts'
 import { AccountApiLayer, WorkspaceAccountApiLayer } from './account-layers.ts'
 import {
   RequestContext,
@@ -69,26 +69,10 @@ export const runAtEdge = <A, E>(program: Effect.Effect<A, E>): Promise<A> => Eff
 /** The part of an agent's Durable Object stub the edge calls. */
 type AgentFetch = { readonly fetch: (request: Request) => Promise<Response> }
 
-/** What the edge asks of the deployment, for one request. */
-export interface Edge {
-  /** The app's own origin: every browser write comes from it. */
-  readonly origin: string
+/** What the edge asks of the deployment, for one request: besides how it admits a credential (`CredentialEdge`). */
+export interface Edge extends CredentialEdge {
   /** The signed-in person of a request, from its session cookie alone: any `Authorization` header is refused. */
   readonly session: (request: Request) => Effect.Effect<Person, AppError>
-  /**
-   * The workspace a server's API key belongs to, and the credential its grant makes there (ADR 0114);
-   * `Unauthenticated` for any key that does not admit.
-   */
-  readonly key: (
-    key: string,
-  ) => Effect.Effect<{ readonly workspaceId: string; readonly credential: Credential }, AppError>
-  /**
-   * An OAuth token on a workspace's path (ADR 0116): the workspace at the slug among those it reaches now, the credential
-   * its grant makes there, and for a client acting for a person that person as a member of it (an installed app's, ADR
-   * 0118, acts for no one); `Unauthenticated` for a token that does not admit, `NotFound` `workspace` for a slug it does
-   * not reach.
-   */
-  readonly client: (token: string, slug: string) => Effect.Effect<TokenAdmission, AppError>
   /** A person's membership of the workspace at a slug, read now: the workspace and their role, or none. */
   readonly membership: (userId: string, slug: string) => Effect.Effect<WorkspaceView | undefined, AppError>
   /** A person's membership of the workspace with an ID, read now: the workspace and their role, or none. */
@@ -97,13 +81,6 @@ export interface Edge {
   readonly agent: (workspaceId: string) => AgentFetch
   /** The account's own records, for the account APIs. */
   readonly records: AccountRecords
-}
-
-/** An OAuth token admitted on a workspace's path: its workspace, credential, and the person it acts for if any. */
-export interface TokenAdmission {
-  readonly workspace: WorkspaceView
-  readonly credential: Credential
-  readonly member?: Member
 }
 
 /** What the agent receives besides method, path and body. Cookies and authorization stay at the edge. */
@@ -197,62 +174,6 @@ const admitMember = (
       : edge.membershipOf(person.id, workspace.id)
     if (member === undefined) return yield* new NotFound({ what: 'workspace' })
     return { person, workspace: member }
-  })
-
-/**
- * Whether a credential's grant holds what the endpoint a request names needs (ADR 0114): `need`, none for an endpoint no
- * credential reaches (`Forbidden` `credential`), else `AccessInsufficient` with what it lacks and the link to widen it.
- */
-const holds = (edge: Edge, credential: Credential, need: Need | undefined): Effect.Effect<void, AppError> => {
-  if (need === undefined) return Effect.fail(new Forbidden({ reason: 'credential' }))
-  const missing = missingFor(GRANT_SPEC, credential, need)
-  return missing === null ? Effect.void : accessInsufficient(edge.origin, credential.grantId, missing)
-}
-
-/**
- * Admission of a server by its API key (ADR 0081): a key is a server's, so a browser's cookie or Origin with it is
- * refused; the key must admit, and its grant must hold what the endpoint needs (`holds`). The workspace the key
- * belongs to, and its credential (ADR 0086).
- */
-const admitKey = (
-  request: Request,
-  edge: Edge,
-  key: string,
-  need: Need | undefined,
-): Effect.Effect<{ readonly workspaceId: string; readonly credential: Credential }, AppError> =>
-  Effect.gen(function* () {
-    if (request.headers.has('cookie') || request.headers.has('origin'))
-      return yield* new Forbidden({ reason: 'key_browser' })
-    const admitted = yield* edge.key(key)
-    yield* holds(edge, admitted.credential, need)
-    return admitted
-  })
-
-/**
- * Admission of an OAuth token on a workspace's path (ADRs 0116, 0118): one request has one principal, so a session
- * cookie with it is refused; the token must admit and reach the workspace at `slug` (for a client, for its person; for
- * an app, by its installation), a client's person's role must be able to hold what the endpoint needs (`role`), and its
- * grant must hold it (`holds`). The workspace, the
- * credential its grant makes there and, for a client, its person as a member of it, whose role the agent holds the
- * request to as it does a `/mcp` call's.
- */
-const admitClient = (
-  request: Request,
-  edge: Edge,
-  token: string,
-  slug: string,
-  need: Need | undefined,
-): Effect.Effect<TokenAdmission, AppError> =>
-  Effect.gen(function* () {
-    if (request.headers.has('cookie')) return yield* new Forbidden({ reason: 'bearer_and_session' })
-    const admitted = yield* edge.client(token, slug)
-    // What a client's person's role could never hold (ROLE_POWER) is refused for it, not offered as a widening; an
-    // app has no person, and its installation's grant was capped by its installer's role.
-    const role = admitted.member?.role
-    if (need !== undefined && role !== undefined && missingFor(GRANT_SPEC, ROLE_POWER[role], need) !== null)
-      return yield* new Forbidden({ reason: 'role' })
-    yield* holds(edge, admitted.credential, need)
-    return admitted
   })
 
 /** A body read up to `limit` bytes; past it, `PayloadTooLarge` (`readBytes`). */
