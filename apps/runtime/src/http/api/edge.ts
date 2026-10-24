@@ -1,4 +1,4 @@
-import { GRANT_SPEC, type Need, type WorkspaceView, missingFor } from '@goblin/contracts'
+import { GRANT_SPEC, type Need, ROLE_POWER, type WorkspaceView, missingFor } from '@goblin/contracts'
 import {
   AccountApi,
   AppError,
@@ -68,6 +68,13 @@ export const runAtEdge = <A, E>(program: Effect.Effect<A, E>): Promise<A> => Eff
 /** The part of an agent's Durable Object stub the edge calls. */
 type AgentFetch = { readonly fetch: (request: Request) => Promise<Response> }
 
+/** An OAuth client admitted on a workspace's path (ADR 0116): the workspace, its grant's credential there, its person. */
+export interface ClientAdmission {
+  readonly workspace: WorkspaceView
+  readonly credential: Credential
+  readonly member: Member
+}
+
 /** What the edge asks of the deployment, for one request. */
 export interface Edge {
   /** The app's own origin: every browser write comes from it. */
@@ -86,13 +93,7 @@ export interface Edge {
    * now for its person, the credential its grant makes there and the person as a member of it; `Unauthenticated` for a
    * token that does not admit, `NotFound` `workspace` for a slug it does not reach.
    */
-  readonly client: (
-    token: string,
-    slug: string,
-  ) => Effect.Effect<
-    { readonly workspace: WorkspaceView; readonly credential: Credential; readonly member: Member },
-    AppError
-  >
+  readonly client: (token: string, slug: string) => Effect.Effect<ClientAdmission, AppError>
   /** A person's membership of the workspace at a slug, read now: the workspace and their role, or none. */
   readonly membership: (userId: string, slug: string) => Effect.Effect<WorkspaceView | undefined, AppError>
   /** A person's membership of the workspace with an ID, read now: the workspace and their role, or none. */
@@ -227,8 +228,8 @@ const admitKey = (
 
 /**
  * Admission of an OAuth client by its token on a workspace's path (ADR 0116): one request has one principal, so a
- * session cookie with it is refused; the token must admit and reach the workspace at `slug` for its person, and its
- * grant must hold what the endpoint needs (`holds`). The workspace, the credential its grant makes there and the person
+ * session cookie with it is refused; the token must admit and reach the workspace at `slug` for its person, the
+ * person's role must be able to hold what the endpoint needs (`role`), and its grant must hold it (`holds`). The workspace, the credential its grant makes there and the person
  * as a member of it, whose role the agent holds the request to as it does a `/mcp` call's.
  */
 const admitClient = (
@@ -237,13 +238,13 @@ const admitClient = (
   token: string,
   slug: string,
   need: Need | undefined,
-): Effect.Effect<
-  { readonly workspace: WorkspaceView; readonly credential: Credential; readonly member: Member },
-  AppError
-> =>
+): Effect.Effect<ClientAdmission, AppError> =>
   Effect.gen(function* () {
     if (request.headers.has('cookie')) return yield* new Forbidden({ reason: 'bearer_and_session' })
     const admitted = yield* edge.client(token, slug)
+    // What the person's role could never hold (ROLE_POWER) is refused for it, not offered as a widening.
+    if (need !== undefined && missingFor(GRANT_SPEC, ROLE_POWER[admitted.member.role], need) !== null)
+      return yield* new Forbidden({ reason: 'role' })
     yield* holds(edge, admitted.credential, need)
     return admitted
   })

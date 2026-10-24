@@ -638,6 +638,14 @@ describe("an OAuth client's token on its workspace's path (ADR 0116)", () => {
     expect(seen).toHaveLength(0)
   })
 
+  it("refuses what its person's role could never hold for the role, not with a widening link", async () => {
+    const { seen, edge } = deployment(undefined, undefined, 'member')
+    const { response } = await through('workspace', client(`${BASE}/api/personas`, { body: '{}' }), edge)
+    expect(response.status).toBe(403)
+    expect(await response.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
+    expect(seen).toHaveLength(0)
+  })
+
   it('never reaches the person and account routes, which take a session', async () => {
     const { seen, edge } = deployment()
     for (const path of ['/api/workspaces', '/api/clients', '/api/invitations']) {
