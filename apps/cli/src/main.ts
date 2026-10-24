@@ -6,7 +6,8 @@ import * as Schema from 'effect/Schema'
 import { type Args, UsageError, parseArgs } from './args.ts'
 import { type ToolInfo, argumentsFor, commandOf, usage } from './commands.ts'
 import { type Settings, settingsOf } from './config.ts'
-import { connect, logout } from './connect.ts'
+import { accessToken, connect, logout } from './connect.ts'
+import { follow, slugFor } from './follow.ts'
 import { logs } from './logs.ts'
 import { lookup } from './lookup.ts'
 import { type ReadEntries, traceIdOf, withContent } from './otlp.ts'
@@ -28,6 +29,7 @@ const HELP = `goblin: your goblin agent from the terminal, as an MCP client of /
   goblin lookup <ref|request|op>  those lines, then the details of the operation they name
   goblin stats [--since 24h]   flow totals across every agent (Analytics Engine)
   goblin ask_agent <message>   ask your agent in its main conversation
+  goblin follow <chat>         a chat live, as it happens (--json: each of its AG-UI events)
   goblin logout
 
   --origin URL   your goblin's address (or GOBLIN_ORIGIN); required
@@ -149,6 +151,14 @@ async function main(argv: readonly string[]): Promise<number> {
         for (const tool of await listTools(client))
           console.log(`${commandOf(tool.name).padEnd(14)} ${tool.description ?? ''}`)
         return 0
+      })
+    case 'follow':
+      return withClient(settings, args, async (client) => {
+        const [chat] = args.positionals
+        if (chat === undefined) throw new UsageError('goblin follow <chat>: name the chat to follow.')
+        const slug = await slugFor(client, settings.workspace)
+        const token = await accessToken(settings)
+        return follow({ origin: settings.origin, slug, chat, token, json: settings.json })
       })
     case 'logs':
       console.log(await logs(args, settings.origin, Date.now()))

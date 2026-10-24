@@ -363,6 +363,7 @@ until it runs, real provider and Telegram delivery remain unverified.
   bun run goblin logs <operation-id>     # Workers Logs lines that mention an id
   bun run goblin lookup 7f3a9c12        # a reference the app showed: its log lines, then its operation's details
   bun run goblin stats --since 24h      # flow totals across every agent of the stage (Analytics Engine)
+  bun run goblin follow 12              # a chat live, as it happens (--json: each of its AG-UI events)
   ```
 
   Problems filter expected authority waits and confirmed automatic model retries before applying the limit. They keep

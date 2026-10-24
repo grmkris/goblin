@@ -48,6 +48,18 @@ export async function connect(settings: Settings, browser: boolean): Promise<Cli
   return open(settings.endpoint, provider)
 }
 
+/**
+ * The access token the endpoint's sign-in holds now, which `connect` refreshed where it had to: the CLI's bearer for
+ * the owner API (ADR 0116).
+ */
+export async function accessToken(settings: Settings): Promise<string> {
+  const store = new CredentialStore(settings.store)
+  const provider = new CliAuthProvider(store, settings.endpoint.href, settings.redirect.href, settings.scope, () => {})
+  const tokens = await provider.tokens()
+  if (tokens === undefined) throw new Error('Not signed in here: run goblin login.')
+  return tokens.access_token
+}
+
 /** Forget the endpoint's sign-in on this machine (the client stays registered until revoked in Settings). */
 export async function logout(settings: Settings): Promise<void> {
   await new CredentialStore(settings.store).remove(settings.endpoint.href)
