@@ -2,7 +2,9 @@ import type {
   CreateApiKeyTerms,
   CreateWorkspace,
   GrantTerms,
+  InstallApproval,
   InviteMembers,
+  RegisterApp,
   UpdateWorkspace,
   WorkspaceRole,
 } from '@goblin/contracts'
@@ -22,6 +24,9 @@ const accountKeys = {
   mine: ['account', 'invitations', 'mine'] as const,
   clients: ['account', 'clients'] as const,
   keys: ['account', 'keys'] as const,
+  apps: ['account', 'apps'] as const,
+  installations: ['account', 'installations'] as const,
+  install: (clientId: string) => ['account', 'install', clientId] as const,
   clientTerms: (clientId: string) => ['account', 'clients', clientId, 'terms'] as const,
   grantTerms: (grantId: string) => ['account', 'grants', grantId, 'terms'] as const,
   reach: (slug: string, kind: 'topics' | 'personas' | 'connections') => ['account', 'reach', slug, kind] as const,
@@ -103,12 +108,13 @@ export const widenGrantMutation = mutationOptions({
   onSuccess: (_saved, { grantId }, _result, { client }) => grantsChanged(client, grantId),
 })
 
-/** Every read a grant's new terms change: its own, and the keys and clients that show them. */
+/** Every read a grant's new terms change: its own, and the keys, clients and installations that show them. */
 const grantsChanged = (client: QueryClient, grantId: string) =>
   Promise.all([
     client.invalidateQueries({ queryKey: accountKeys.grantTerms(grantId) }),
     client.invalidateQueries({ queryKey: accountKeys.keys }),
     client.invalidateQueries({ queryKey: accountKeys.clients }),
+    client.invalidateQueries({ queryKey: accountKeys.installations }),
   ])
 
 /** Ends one client's access at once. */
@@ -150,6 +156,80 @@ export const rotateKeyMutation = mutationOptions({
 export const revokeKeyMutation = mutationOptions({
   ...workspaceAccount.apiMutation({ mutationFn: (api, keyId: string) => api.keys.revoke({ params: { keyId } }) }),
   onSuccess: (_revoked, _keyId, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),
+})
+
+/** The apps this workspace registered (ADR 0118), newest first, without secrets. */
+export const developerAppsQuery = workspaceAccount.apiQuery({
+  queryKey: accountKeys.apps,
+  queryFn: (api) => api.developerApps.list(),
+})
+
+/** A new app; its answer holds the client secret, never shown again (and a script app's installation). */
+export const registerAppMutation = mutationOptions({
+  ...workspaceAccount.apiMutation({
+    mutationFn: (api, payload: RegisterApp) => api.developerApps.register({ payload }),
+  }),
+  onSuccess: (_made, _payload, _result, { client }) =>
+    Promise.all([
+      client.invalidateQueries({ queryKey: accountKeys.apps }),
+      client.invalidateQueries({ queryKey: accountKeys.installations }),
+    ]),
+})
+
+/** A new client secret for one app, shown once; the old one is refused from then on. */
+export const rotateAppMutation = mutationOptions({
+  ...workspaceAccount.apiMutation({
+    mutationFn: (api, clientId: string) => api.developerApps.rotate({ params: { clientId } }),
+  }),
+})
+
+/** Ends one app and every installation of it. */
+export const deleteAppMutation = mutationOptions({
+  ...workspaceAccount.apiMutation({
+    mutationFn: (api, clientId: string) => api.developerApps.delete({ params: { clientId } }),
+  }),
+  onSuccess: (_deleted, _clientId, _result, { client }) =>
+    Promise.all([
+      client.invalidateQueries({ queryKey: accountKeys.apps }),
+      client.invalidateQueries({ queryKey: accountKeys.installations }),
+    ]),
+})
+
+/** The apps installed in this workspace (ADR 0118), each with its grant. */
+export const installationsQuery = workspaceAccount.apiQuery({
+  queryKey: accountKeys.installations,
+  queryFn: (api) => api.installations.list(),
+})
+
+/** New terms for one installation's grant. */
+export const updateInstallationMutation = mutationOptions({
+  ...workspaceAccount.apiMutation({
+    mutationFn: (api, { id, terms }: { readonly id: string; readonly terms: GrantTerms }) =>
+      api.installations.update({ params: { id }, payload: { terms } }),
+  }),
+  onSuccess: (_updated, _change, _result, { client }) =>
+    client.invalidateQueries({ queryKey: accountKeys.installations }),
+})
+
+/** Ends one installation at once. */
+export const uninstallMutation = mutationOptions({
+  ...workspaceAccount.apiMutation({ mutationFn: (api, id: string) => api.installations.uninstall({ params: { id } }) }),
+  onSuccess: (_removed, _id, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.installations }),
+})
+
+/** What the install page shows for an app: the app, where the person may install it, and its grant's defaults. */
+export const installInfoQuery = (clientId: string) =>
+  account.apiQuery({
+    queryKey: accountKeys.install(clientId),
+    queryFn: (api) => api.install.info({ params: { clientId } }),
+  })
+
+/** Installs an app with the terms the person approved; the answer says where to send them back. */
+export const approveInstallMutation = mutationOptions({
+  ...account.apiMutation({
+    mutationFn: (api, { clientId, ...payload }: InstallApproval & { readonly clientId: string }) =>
+      api.install.approve({ params: { clientId }, payload }),
+  }),
 })
 
 /** The workspace's members (ADR 0093), owners first. */

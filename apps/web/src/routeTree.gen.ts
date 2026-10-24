@@ -26,6 +26,7 @@ import { Route as AppsIndexRouteImport } from './routes/apps.index'
 import { Route as AppsNameRouteImport } from './routes/apps.$name'
 import { Route as CChatIdRouteImport } from './routes/c.$chatId'
 import { Route as ConsentWidenRouteImport } from './routes/consent_.widen'
+import { Route as InstallClientIdRouteImport } from './routes/install.$clientId'
 import { Route as InviteIdRouteImport } from './routes/invite.$id'
 import { Route as PIdRouteImport } from './routes/p.$id'
 import { Route as StartIndexRouteImport } from './routes/start.index'
@@ -117,6 +118,11 @@ const ConsentWidenRoute = ConsentWidenRouteImport.update({
   path: '/consent/widen',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InstallClientIdRoute = InstallClientIdRouteImport.update({
+  id: '/install/$clientId',
+  path: '/install/$clientId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InviteIdRoute = InviteIdRouteImport.update({
   id: '/invite/$id',
   path: '/invite/$id',
@@ -161,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/apps/$name': typeof AppsNameRoute
   '/c/$chatId': typeof CChatIdRoute
   '/consent/widen': typeof ConsentWidenRoute
+  '/install/$clientId': typeof InstallClientIdRoute
   '/invite/$id': typeof InviteIdRoute
   '/p/$id': typeof PIdRoute
   '/start/$step': typeof StartStepRoute
@@ -185,6 +192,7 @@ export interface FileRoutesByTo {
   '/apps/$name': typeof AppsNameRoute
   '/c/$chatId': typeof CChatIdRoute
   '/consent/widen': typeof ConsentWidenRoute
+  '/install/$clientId': typeof InstallClientIdRoute
   '/invite/$id': typeof InviteIdRoute
   '/p/$id': typeof PIdRoute
   '/start/$step': typeof StartStepRoute
@@ -210,6 +218,7 @@ export interface FileRoutesById {
   '/apps/$name': typeof AppsNameRoute
   '/c/$chatId': typeof CChatIdRoute
   '/consent_/widen': typeof ConsentWidenRoute
+  '/install/$clientId': typeof InstallClientIdRoute
   '/invite/$id': typeof InviteIdRoute
   '/p/$id': typeof PIdRoute
   '/start/$step': typeof StartStepRoute
@@ -236,6 +245,7 @@ export interface FileRouteTypes {
     | '/apps/$name'
     | '/c/$chatId'
     | '/consent/widen'
+    | '/install/$clientId'
     | '/invite/$id'
     | '/p/$id'
     | '/start/$step'
@@ -260,6 +270,7 @@ export interface FileRouteTypes {
     | '/apps/$name'
     | '/c/$chatId'
     | '/consent/widen'
+    | '/install/$clientId'
     | '/invite/$id'
     | '/p/$id'
     | '/start/$step'
@@ -284,6 +295,7 @@ export interface FileRouteTypes {
     | '/apps/$name'
     | '/c/$chatId'
     | '/consent_/widen'
+    | '/install/$clientId'
     | '/invite/$id'
     | '/p/$id'
     | '/start/$step'
@@ -309,6 +321,7 @@ export interface RootRouteChildren {
   AppsNameRoute: typeof AppsNameRoute
   CChatIdRoute: typeof CChatIdRoute
   ConsentWidenRoute: typeof ConsentWidenRoute
+  InstallClientIdRoute: typeof InstallClientIdRoute
   InviteIdRoute: typeof InviteIdRoute
   PIdRoute: typeof PIdRoute
   StartStepRoute: typeof StartStepRoute
@@ -438,6 +451,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsentWidenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/install/$clientId': {
+      id: '/install/$clientId'
+      path: '/install/$clientId'
+      fullPath: '/install/$clientId'
+      preLoaderRoute: typeof InstallClientIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/invite/$id': {
       id: '/invite/$id'
       path: '/invite/$id'
@@ -493,6 +513,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppsNameRoute: AppsNameRoute,
   CChatIdRoute: CChatIdRoute,
   ConsentWidenRoute: ConsentWidenRoute,
+  InstallClientIdRoute: InstallClientIdRoute,
   InviteIdRoute: InviteIdRoute,
   PIdRoute: PIdRoute,
   StartStepRoute: StartStepRoute,

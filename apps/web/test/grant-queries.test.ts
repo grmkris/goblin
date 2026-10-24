@@ -97,7 +97,13 @@ const fakeWorker = () => {
   const ClientErrors = HttpApiBuilder.group(AccountApi, 'clientErrors', (handlers) =>
     handlers.handleAll(unusedHandlers(AccountApi.groups.clientErrors)),
   )
-  const worker = fakeHttpApi(AccountApi, Layer.mergeAll(Grants, Clients, Workspaces, Invitations, ClientErrors))
+  const Install = HttpApiBuilder.group(AccountApi, 'install', (handlers) =>
+    handlers.handleAll(unusedHandlers(AccountApi.groups.install)),
+  )
+  const worker = fakeHttpApi(
+    AccountApi,
+    Layer.mergeAll(Grants, Clients, Workspaces, Invitations, Install, ClientErrors),
+  )
   const gate = Layer.succeed(
     OwnerAdmission,
     OwnerAdmission.of((handler) => handler),

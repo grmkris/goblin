@@ -1,5 +1,6 @@
 import { ClientsCard, DeleteAccountCard } from './account-cards.tsx'
 import { ApiKeysCard } from './api-keys-card.tsx'
+import { DeveloperAppsCard, InstalledAppsCard } from './apps-cards.tsx'
 import { MemoryCard, ResidentCard, UsageCard } from './agent-cards.tsx'
 import { ModelEndpointCard } from './model-endpoint-card.tsx'
 import { NotifySinkCard } from './notify-sink-card.tsx'
@@ -11,8 +12,9 @@ import { useCurrentWorkspace } from '../lib/current-workspace.ts'
 
 /**
  * The workspace's settings, most used first: today's usage, Start and the model, its agent (and where its notices go),
- * the API keys of servers it runs, the workspace itself (ADR 0089), then the person's own: the MCP clients they
- * connected and each one's grant (ADR 0114), and their account. Routines are on Work.
+ * the apps installed in it and the apps it registered (ADR 0118), the API keys of servers it runs, the workspace itself
+ * (ADR 0089), then the person's own: the MCP clients they connected and each one's grant (ADR 0114), and their
+ * account. Routines are on Work.
  */
 export function Settings() {
   const workspace = useCurrentWorkspace()
@@ -30,6 +32,27 @@ export function Settings() {
         <MemoryCard />
         {managing && <NotifySinkCard />}
       </PageSection>
+      {managing && (
+        <PageSection id="installed" title="Installed apps">
+          <InstalledAppsCard workspace={workspace} />
+        </PageSection>
+      )}
+      {managing && (
+        <PageSection
+          id="developer"
+          title="Developer"
+          note={
+            <>
+              Register a product that workspaces install, or a script for this one. Its backend gets a token from{' '}
+              <code>{`${window.location.origin}/api/auth/oauth2/token`}</code> with its client id and secret
+              (client_credentials) and calls <code>{`${window.location.origin}/w/<slug>/api`}</code> or{' '}
+              <code>/mcp</code>.
+            </>
+          }
+        >
+          <DeveloperAppsCard workspace={workspace} />
+        </PageSection>
+      )}
       <PageSection
         id="keys"
         title="API keys"

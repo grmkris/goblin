@@ -1,7 +1,7 @@
 /**
- * Local browser acceptance of the grant editor (ADR 0114) against real source components: a key made and changed in
- * Settings, an MCP client's consent changed and approved, a client's grant changed from Settings, and a widening
- * approved. Desktop (1440) and phone (390), light and dark; the rows are at least 40px to point at and 44px to touch,
+ * Local browser acceptance of the grant editor (ADRs 0114, 0118) against real source components: a key made and changed
+ * in Settings, an MCP client's consent changed and approved, a client's grant changed from Settings, a script app
+ * registered and an installation's access changed, an app installed from its install page, and a widening approved. Desktop (1440) and phone (390), light and dark; the rows are at least 40px to point at and 44px to touch,
  * and nothing scrolls sideways. No account or agent is used; the Worker's and the agent's answers are routed here.
  */
 import assert from 'node:assert/strict'
@@ -104,6 +104,29 @@ const CLIENT: InboundClient = {
   terms: { ...PRESET, name: 'Claude Code' },
 }
 const WIDENED: GrantTerms = KEYS[1]?.terms ?? PRESET
+/** A product Acme registered, installed in Acme (ADR 0118), and the install page's answer for it. */
+const APP_TERMS: GrantTerms = presetFor('Swarmm', ['ws_acme'])
+const DEVELOPER_APP = {
+  clientId: 'app_swarmm',
+  name: 'Swarmm',
+  homepage: 'https://swarmm.app',
+  returnUrls: ['https://swarmm.app/goblin/installed'],
+  terms: APP_TERMS,
+  script: false,
+  createdAt: '2026-10-24T00:00:00.000Z',
+  installations: 1,
+}
+const INSTALLATION = {
+  id: 'in_swarmm',
+  clientId: 'app_swarmm',
+  name: 'Swarmm',
+  homepage: 'https://swarmm.app',
+  from: 'Acme',
+  approvedBy: 'Kris',
+  createdAt: '2026-10-24T00:00:00.000Z',
+  grantId: 'in_swarmm',
+  terms: APP_TERMS,
+}
 
 const errors: string[] = []
 const sent: { readonly label: string; readonly method: string; readonly path: string; readonly body: unknown }[] = []
@@ -134,6 +157,29 @@ const ANSWERS: Readonly<Record<string, (payload: unknown, origin: string) => Ans
   },
   // SAFETY: the page sends UpdateApiKeyTerms.
   'PATCH /api/keys/key_crm': (payload) => ok({ ...KEYS[1], terms: (payload as { readonly terms: GrantTerms }).terms }),
+  'GET /api/developer/apps': () => ok([DEVELOPER_APP]),
+  'POST /api/developer/apps': (payload) => {
+    // SAFETY: the page sends RegisterApp.
+    const made = payload as { readonly name: string; readonly terms: GrantTerms; readonly script?: boolean }
+    const app = { ...DEVELOPER_APP, clientId: 'app_new', name: made.name, returnUrls: [], script: made.script === true }
+    return { body: { app, clientSecret: 'app-secret-letters' }, status: 201 }
+  },
+  'GET /api/installations': () => ok([INSTALLATION]),
+  // SAFETY: the page sends UpdateInstallation.
+  'PATCH /api/installations/in_swarmm': (payload) =>
+    ok({ ...INSTALLATION, terms: (payload as { readonly terms: GrantTerms }).terms }),
+  'GET /api/install/app_swarmm': () =>
+    ok({
+      clientId: 'app_swarmm',
+      name: 'Swarmm',
+      homepage: 'https://swarmm.app',
+      from: 'Swarmm Inc',
+      script: false,
+      workspaces: WORKSPACES.map(({ id, name, slug, role }) => ({ id, name, slug, role, installed: false })),
+      consent: { spec: SPEC, defaults: APP_TERMS, current: null } satisfies ConsentTerms,
+    }),
+  'POST /api/install/app_swarmm': (_payload, origin) =>
+    ok({ installation: INSTALLATION, redirect: `${origin}/grant.html?screen=done` }),
   'GET /api/clients': () => ok([CLIENT]),
   'GET /api/clients/claude-code/terms': () =>
     ok({ spec: SPEC, defaults: CLIENT.terms ?? PRESET, current: null } satisfies ConsentTerms),
@@ -335,9 +381,58 @@ async function widen(page: Page, origin: string, label: string) {
   assert.deepEqual(approved.terms.reach.each[0]?.topics, { kind: 'list', ids: ['2', '3'] })
 }
 
+async function apps(page: Page, origin: string, label: string, touch: boolean) {
+  await page.goto(`${origin}grant.html?screen=apps`)
+  await page.getByText(/from Acme · installed by Kris/u).waitFor()
+  await page.getByText(/An install can write everything/u).waitFor()
+  await page.screenshot({ path: path.join(out, `${label}-apps.png`), fullPage: true })
+  await page.getByRole('button', { name: 'Change access' }).click()
+  await page.getByRole('radio', { name: /^Read/u }).click()
+  await checkLayout(page, `${label} apps`, touch)
+  await page.getByRole('button', { name: 'Save access' }).click()
+  await page.getByRole('button', { name: 'Save access' }).waitFor({ state: 'detached' })
+  // SAFETY: the page sent UpdateInstallation.
+  const changed = lastSent(label, 'PATCH', '/api/installations/in_swarmm') as { readonly terms: GrantTerms }
+  assert.equal(changed.terms.level, 'read')
+  await page.getByLabel('Name', { exact: true }).fill('nightly-export')
+  await page.getByRole('switch', { name: /A script of this workspace's/u }).click()
+  await page.getByRole('button', { name: 'Register app' }).click()
+  await page.getByText(/Copy the app secret for/u).waitFor()
+  await page.screenshot({ path: path.join(out, `${label}-apps-secret.png`), fullPage: true })
+  // SAFETY: the page sent RegisterApp.
+  const registered = lastSent(label, 'POST', '/api/developer/apps') as {
+    readonly script: boolean
+    readonly returnUrls: unknown
+  }
+  assert.deepEqual([registered.script, registered.returnUrls], [true, []])
+}
+
+async function install(page: Page, origin: string, label: string, touch: boolean) {
+  await page.goto(`${origin}grant.html?screen=install&client_id=app_swarmm&state=opaque-7`)
+  await page.getByRole('heading', { name: 'Install “Swarmm”?' }).waitFor()
+  await page.getByText(/acts as Swarmm, never as you/u).waitFor()
+  await page.screenshot({ path: path.join(out, `${label}-install.png`), fullPage: true })
+  await page.getByLabel('Workspace').selectOption('ws_beta')
+  await page.getByRole('button', { name: 'Change', exact: true }).click()
+  await checkLayout(page, `${label} install`, touch)
+  await page.screenshot({ path: path.join(out, `${label}-install-editor.png`), fullPage: true })
+  await page.getByRole('button', { name: 'Install' }).click()
+  await page.getByText('Back at the client.').waitFor()
+  // SAFETY: the page sent InstallApproval.
+  const approved = lastSent(label, 'POST', '/api/install/app_swarmm') as {
+    readonly workspace: string
+    readonly state: string
+    readonly terms: GrantTerms
+  }
+  assert.deepEqual(
+    [approved.workspace, approved.state, approved.terms.reach.each[0]?.workspace],
+    ['ws_beta', 'opaque-7', 'ws_beta'],
+  )
+}
+
 async function drive(browser: Browser, origin: string, label: string, options: BrowserContextOptions) {
   const touch = options.hasTouch === true
-  for (const screen of [keys, consent, clients] as const) {
+  for (const screen of [keys, consent, clients, apps, install] as const) {
     const page = await browser.newPage(options)
     page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`))
     await serve(page, `${label}-${screen.name}`)

@@ -38,13 +38,21 @@ import {
   reachWords,
 } from './grant-editor.tsx'
 
-/** A new key's secret, or a rotated key's new one (ADR 0105), shown this once, to copy. */
-function ShownSecret(props: { readonly name: string; readonly secret: string; readonly onDone: () => void }) {
+/**
+ * A new key's or app's secret, or a rotated one's (ADRs 0105, 0118), shown this once, to copy; `noun` says which it is
+ * ("key" unless said).
+ */
+export function ShownSecret(props: {
+  readonly name: string
+  readonly secret: string
+  readonly onDone: () => void
+  readonly noun?: string
+}) {
   return (
     <FieldGroup>
       <Alert>
         <AlertDescription>
-          Copy the key for <strong>{props.name}</strong> now. It is not shown again.
+          Copy the {props.noun ?? 'key'} for <strong>{props.name}</strong> now. It is not shown again.
         </AlertDescription>
       </Alert>
       <Input readOnly value={props.secret} onFocus={(event) => event.currentTarget.select()} />
@@ -64,7 +72,7 @@ function ShownSecret(props: { readonly name: string; readonly secret: string; re
  * A failure beside the control that failed (with its widening link, when it is one), or what is wrong before anything
  * is sent.
  */
-function Problem(props: { readonly text: string; readonly error?: unknown }) {
+export function Problem(props: { readonly text: string; readonly error?: unknown }) {
   if (props.text === '') return null
   return (
     <Alert variant="destructive">
