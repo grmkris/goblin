@@ -14,6 +14,8 @@ const string = Schema.decodeUnknownSync(Schema.String)
 const REDIRECT_URI = 'http://127.0.0.1:9/callback'
 /** The name the smoke's client registers with, which its messages carry as their author. */
 export const SMOKE_CLIENT_NAME = 'goblin-smoke'
+/** Personal's Conversation, the agent's main chat (ADR 0086), where the smoke's client talks: chat 1. */
+export const MAIN_CHAT = '1'
 
 export const base64url = (bytes: Buffer): string => bytes.toString('base64url')
 
@@ -127,7 +129,31 @@ class InboundClient {
     return object(JSON.parse(string(first?.['text'])))
   }
 
+  /**
+   * A message into main and how it stands once settled, or after 100 s: `conversation_send`, then
+   * `conversation_send_status` every 2 s, as a client without the Tasks extension follows its send (ADR 0119).
+   */
   async ask(input: string): Promise<JsonObject> {
-    return this.tool('ask_agent', { input, operationId: operationId('inbound'), waitSeconds: 100 })
+    const id = operationId('inbound')
+    await this.tool('conversation_send', { chat: MAIN_CHAT, message: { input, operationId: id } })
+    const deadline = Date.now() + 100_000
+    let status = await this.tool('conversation_send_status', { chat: MAIN_CHAT, operationId: id })
+    while ((status['status'] === 'queued' || status['status'] === 'working') && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      status = await this.tool('conversation_send_status', { chat: MAIN_CHAT, operationId: id })
+    }
+    return status
+  }
+
+  /** Every entry of `chat`, oldest first: `conversation_entries` paged to its end. */
+  async entries(chat: string): Promise<JsonObject[]> {
+    const all: JsonObject[] = []
+    let after = 0
+    for (;;) {
+      const page = await this.tool('conversation_entries', { chat, after, limit: 100 })
+      all.push(...objects(page['entries']))
+      if (page['more'] !== true || typeof page['next'] !== 'number') return all
+      after = page['next']
+    }
   }
 }

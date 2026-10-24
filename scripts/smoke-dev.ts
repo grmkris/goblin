@@ -14,7 +14,7 @@ import { runInput } from '../packages/contracts/src/agui/run-input.ts'
 import type { ToolView } from '../packages/contracts/src/mcp.ts'
 import { appChecks } from './smoke-apps.ts'
 import { DevClient, type Step } from './smoke-client.ts'
-import { InboundClient, SMOKE_CLIENT_NAME, base64url, operationId } from './smoke-inbound.ts'
+import { InboundClient, MAIN_CHAT, SMOKE_CLIENT_NAME, base64url, operationId } from './smoke-inbound.ts'
 import { edgeChecks, internalChecks } from './smoke-edge.ts'
 import { delegateReported, idleAfter, marksOf, openingOf } from './smoke-entries.ts'
 import { publicSmoke } from './smoke-public.ts'
@@ -130,7 +130,7 @@ async function residentToolTurn(client: InboundClient, servers: readonly ServerR
     `Call mcp_call exactly once with connectionId "${probed.connectionId}", name "${probed.probeTool}" and ` +
       `arguments {}. After a successful result reply with exactly ${MCP_MARKER}; otherwise describe the failure.`,
   )
-  if (used['status'] !== 'done' || used['text'] !== MCP_MARKER) throw new Error('resident_tool_turn_failed')
+  if (used['status'] !== 'answered' || used['text'] !== MCP_MARKER) throw new Error('resident_tool_turn_failed')
   return 'ok'
 }
 
@@ -268,16 +268,16 @@ const revokeClient = (dev: DevClient, clientId: string) =>
  * one that failed.
  */
 function notTheMarker(reply: JsonObject): string | undefined {
-  if (reply['status'] === 'done' && reply['text'] === DEV_MARKER) return undefined
-  const why = reply['status'] === 'done' ? `text:${typeof reply['text']}` : (reply['reason'] ?? 'none')
+  if (reply['status'] === 'answered' && reply['text'] === DEV_MARKER) return undefined
+  const why = reply['status'] === 'answered' ? `text:${typeof reply['text']}` : (reply['reason'] ?? 'none')
   return `${JSON.stringify(reply['status'])}:${JSON.stringify(why)}`
 }
 
 /** The inbound client without a model call (ADR 0106): opened, main's recent messages read, then revoked. */
 async function inboundReads(dev: DevClient, client: InboundClient) {
   await inboundOpen(client)
-  const recent = await client.tool('get_recent_messages', { limit: 10 })
-  if (!Array.isArray(recent['messages'])) throw new Error('inbound_history_missing')
+  const recent = await client.tool('conversation_entries', { chat: MAIN_CHAT, after: 0, limit: 10 })
+  if (!Array.isArray(recent['entries'])) throw new Error('inbound_history_missing')
   await inboundRevoked(dev, client)
   return { initialized: true, modelTurn: 'skipped', residentTool: 'skipped', history: 'read', revokedThen401: true }
 }
@@ -292,7 +292,8 @@ async function inboundOpen(client: InboundClient): Promise<void> {
   })
   const listed = await client.rpc('tools/list')
   const names = objects(listed.result?.['tools'] ?? []).map((tool) => tool['name'])
-  if (init.result === undefined || !names.includes('ask_agent') || !names.includes('get_recent_messages'))
+  const sends = ['conversation_send', 'conversation_send_status', 'conversation_entries']
+  if (init.result === undefined || !sends.every((name) => names.includes(name)))
     throw new Error('inbound_tools_missing')
   // Its grant holds `inspect`, so the same /mcp offers read-only inspection (ADRs 0024, 0114). It reads without a
   // model.
@@ -316,11 +317,10 @@ async function inboundChecks(dev: DevClient, client: InboundClient, servers: rea
   const unexpected = notTheMarker(reply)
   if (unexpected !== undefined) throw new Error(`inbound_model_turn_failed:${unexpected}`)
   const residentTool = await residentToolTurn(client, servers)
-  const recent = await client.tool('get_recent_messages', { limit: 10 })
-  const messages = objects(recent['messages'])
+  const messages = (await client.entries(MAIN_CHAT)).filter((entry) => entry['kind'] === 'message')
   const texts = messages.map((message) => message['text'])
   if (!texts.includes(DEV_MARKER)) throw new Error('inbound_history_missing')
-  const smokeMessage = messages.findLast((message) => message['role'] === 'user' && message['text'] === smokeInput)
+  const smokeMessage = messages.findLast((message) => message['role'] === 'owner' && message['text'] === smokeInput)
   if (smokeMessage?.['author'] !== SMOKE_CLIENT_NAME) throw new Error('inbound_author_missing')
   await inboundRevoked(dev, client)
   return { initialized: true, modelTurn: 'ok', residentTool, history: 'ok', author: 'ok', revokedThen401: true }
