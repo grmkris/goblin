@@ -27,6 +27,11 @@ export interface RuntimeEnv {
   readonly LOADER?: WorkerLoader
   /** Local-only spike opt-in. Unset preserves the existing async Dynamic Worker code_run backend. */
   readonly DQUICKTS_CODE_RUN?: string
+  readonly DQUICKTS_ENGINE?: string
+  readonly DQUICKTS_NATIVE_URL?: string
+  /** Ephemeral local fixture credential, never a deployed secret. */
+  readonly DQUICKTS_NATIVE_TOKEN?: string
+  readonly DQUICKTS_NATIVE_BUILD?: string
   /** Fixtures only: a published Events delivery's first retry delay in ms, 15 s unless set (`publish/policy.ts`). */
   readonly PUBLISH_RETRY_MS?: string
   readonly APP_URL: string

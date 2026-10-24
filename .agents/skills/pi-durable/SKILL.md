@@ -5,6 +5,10 @@ description: Change goblin's Pi Durable and PiHarness integration - sessions, su
 
 # Pi Durable in goblin
 
+The local/test dquickts spike also supports `DQUICKTS_ENGINE=native` (ADR 0116): Pi recovery and the SQLite
+journal stay in the agent; only bounded VM slices cross the authenticated loopback service hop. Its test setup owns
+the service lifetime. WASM remains the experimental default and the feature flag defaults off.
+
 Pi Durable owns transcripts, tasks, steering and recovery. Use the pinned native harness; do not rebuild these.
 
 - `PiHarness` is registered with `lifecycle.use` in `PersonalAgent`. Main is the stable chat id `PRIMARY_CHAT` (`1`),

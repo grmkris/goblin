@@ -8,12 +8,13 @@ import { SlowFiles, TimedIsolates } from './durable-code-baseline.ts'
 import { ownerSend } from './probe-reads.ts'
 import { until } from './until.ts'
 import { runScript } from '../../src/agent-apps/script.ts'
+import { nativeBackend } from '../../src/agent-apps/dquickts/native.ts'
 
 const recoveryCode =
   "const state = {count:40,label:'kept'}; state.count += tools.call('fixture','effect',{}); const text = files.read('/agent/wait.txt'); return {...state,text}"
 const filesOf = ({ storage, env, name }: Inside) => new FileStore(storage.sql, env.FILES, () => name)
 const runnerOf = (inside: Inside, slots = new TimedIsolates(inside.env.LOADER)) =>
-  new DurableScripts(new CodeStore(drizzle(inside.storage)), slots)
+  new DurableScripts(new CodeStore(drizzle(inside.storage)), slots, undefined, nativeBackend(inside.env))
 const toolOf = (files: FileStore) => async () => {
   const prior = (await files.text('/agent/effects.txt', 0, 100)).text
   await files.write('agent', '/agent/effects.txt', `${prior}x`, 'text/plain', prior.length + 1)
@@ -241,13 +242,18 @@ async function safety(inside: Inside) {
     'foreign',
   )
   const rejected = await runnerOf(inside, slots).run('foreign', code, host)
-  const limited = new DurableScripts(store, slots, {
-    wallMs: 30000,
-    calls: 1,
-    fuel: 1000,
-    snapshotBytes: 1048576,
-    steps: 200,
-  })
+  const limited = new DurableScripts(
+    store,
+    slots,
+    {
+      wallMs: 30000,
+      calls: 1,
+      fuel: 1000,
+      snapshotBytes: 1048576,
+      steps: 200,
+    },
+    nativeBackend(inside.env),
+  )
   const limit = await limited.run(
     'limit',
     "tools.call('fixture','read',{}); return tools.call('fixture','read',{})",

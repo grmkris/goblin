@@ -6,6 +6,8 @@ export type CodeCheckpoint = {
   readonly build: string
   readonly expiresAt: number
   readonly fuel: number
+  /** Native only: remaining CPU; an in-flight slice's reservation has already been subtracted. */
+  readonly cpuRemainingMs?: number
   readonly sequence: number
   readonly steps: number
   readonly call?: { readonly callName: string; readonly args: unknown }

@@ -1,0 +1,289 @@
+$ heavy bash vendor/dquickts/build-native.sh .local/durable-code/source
+exit 0
+27ab5d6c5f400b9db980e9dcafaba1a2bc905204e2d1b104587e5bf065e656cd  $REPO/.local/native/dquickts-native
+
+$ heavy bun --cwd apps/runtime test:unit
+exit 0
+$ vitest run --config vitest.config.ts
+
+ RUN  v5.0.5 $REPO/apps/runtime
+
+
+ Test Files  184 passed (184)
+      Tests  1217 passed (1217)
+   Start at  02:08:35
+   Duration  53.05s (import 71%, tests 21%, transform 8%)
+
+    Isolate  184 workers spawned · ~362ms startup each (spawn + environment, per file)
+             at least ~4.08s faster with isolate: false — reuses workers across files instead of one per file
+
+$ GOBLIN_HARNESS_PORT=22861 heavy bun --cwd apps/runtime test:integration test/integration/durable-code.test.ts test/integration/code-recovery.test.ts
+exit 0
+$ vitest run --config vitest.integration.config.ts test/integration/durable-code.test.ts test/integration/code-recovery.test.ts
+
+ RUN  v5.0.5 $REPO/apps/runtime
+
+
+ Test Files  2 passed (2)
+      Tests  9 passed (9)
+   Start at  02:10:46
+   Duration  29.95s (tests 87%, import 12%)
+
+$ GOBLIN_DQUICKTS_ENGINE=native GOBLIN_HARNESS_PORT=23261 heavy bun --cwd apps/runtime test:integration test/integration/durable-code.test.ts test/integration/code-recovery.test.ts
+exit 0
+$ vitest run --config vitest.integration.config.ts test/integration/durable-code.test.ts test/integration/code-recovery.test.ts
+
+ RUN  v5.0.5 $REPO/apps/runtime
+
+
+ Test Files  2 passed (2)
+      Tests  14 passed (14)
+   Start at  02:19:34
+   Duration  20.73s (tests 83%, import 17%)
+
+$ heavy bun --cwd apps/runtime typecheck
+exit 0
+$ tsc -p tsconfig.json
+
+$ heavy bun --cwd apps/runtime effect:check
+exit 0
+$ bun ../../tools/effect-check.ts tsconfig.json
+apps/runtime/tsconfig.json: 0 findings in 770 files
+
+$ heavy bun run check:files --lint-only apps/runtime/src/agent-apps/dquickts/native.ts apps/runtime/src/agent-apps/dquickts/runner.ts apps/runtime/src/storage/durable-code.ts apps/runtime/src/env.ts apps/runtime/src/agent.ts apps/runtime/test/native-service.ts apps/runtime/test/durable-code.test.ts apps/runtime/test/integration/native-code-probe.ts apps/runtime/test/integration/native-code-checks.ts apps/runtime/test/integration/durable-code-probe.ts apps/runtime/test/integration/durable-code.test.ts apps/runtime/test/integration/worker.ts apps/runtime/test/integration/stack.ts
+exit 0
+$ bun tools/check-files.ts --lint-only apps/runtime/src/agent-apps/dquickts/native.ts apps/runtime/src/agent-apps/dquickts/runner.ts apps/runtime/src/storage/durable-code.ts apps/runtime/src/env.ts apps/runtime/src/agent.ts apps/runtime/test/native-service.ts apps/runtime/test/durable-code.test.ts apps/runtime/test/integration/native-code-probe.ts apps/runtime/test/integration/native-code-checks.ts apps/runtime/test/integration/durable-code-probe.ts apps/runtime/test/integration/durable-code.test.ts apps/runtime/test/integration/worker.ts apps/runtime/test/integration/stack.ts
+
+$ node_modules/.bin/oxfmt -c oxfmt.config.ts --check --no-error-on-unmatched-pattern apps/runtime/src/agent-apps/dquickts/native.ts apps/runtime/src/agent-apps/dquickts/runner.ts apps/runtime/src/agent.ts apps/runtime/src/env.ts apps/runtime/src/storage/durable-code.ts apps/runtime/test/durable-code.test.ts apps/runtime/test/integration/durable-code-probe.ts apps/runtime/test/integration/durable-code.test.ts apps/runtime/test/integration/native-code-checks.ts apps/runtime/test/integration/native-code-probe.ts apps/runtime/test/integration/stack.ts apps/runtime/test/integration/worker.ts apps/runtime/test/native-service.ts
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 306ms on 13 files using 16 threads.
+
+$ node_modules/.bin/oxlint -c oxlint.config.ts apps/runtime/src/agent-apps/dquickts/native.ts apps/runtime/src/agent-apps/dquickts/runner.ts apps/runtime/src/agent.ts apps/runtime/src/env.ts apps/runtime/src/storage/durable-code.ts apps/runtime/test/durable-code.test.ts apps/runtime/test/integration/durable-code-probe.ts apps/runtime/test/integration/durable-code.test.ts apps/runtime/test/integration/native-code-checks.ts apps/runtime/test/integration/native-code-probe.ts apps/runtime/test/integration/stack.ts apps/runtime/test/integration/worker.ts apps/runtime/test/native-service.ts
+
+check:files --lint-only: 13 files
+| Step | Result | Detail |
+| :-- | :-- | :-- |
+| format | pass | 13 files |
+| lint | pass | 13 files |
+
+$ heavy bun run check
+exit 1
+$ bun run test:release && bun run fmt:check && bun run agents:check && bun run check:patches && bun run check:chat-ids && bun run check:terms && bun run graph && bun run typecheck && bun run lint:gate && bun run dupes && bun run test && bun run test:integration && bun run test:integration:permuted && bun run build
+$ python3 -B scripts/release_test.py && python3 -B scripts/promote_test.py && python3 -B scripts/ci_credentials_test.py
+..............--- last 40 lines of smoke-1.log ---
+
+---
+smoke failed; trying again in 240 s (2 of 3)
+--- last 40 lines of smoke-2.log ---
+
+---
+smoke failed; trying again in 240 s (3 of 3)
+--- last 40 lines of smoke-1.log ---
+
+---
+smoke failed; trying again in 240 s (2 of 3)
+--- last 40 lines of smoke-2.log ---
+
+---
+smoke failed; trying again in 240 s (3 of 3)
+--- last 40 lines of smoke-3.log ---
+
+---
+.
+----------------------------------------------------------------------
+Ran 15 tests in 0.211s
+
+OK
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+OK
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.710s
+
+OK
+$ oxfmt -c oxfmt.config.ts --check
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 738ms on 1644 files using 16 threads.
+$ bun x repoagents@1.1.0 check && bun tools/agents-check.ts
+repoagents: ok
+agents:check passed
+$ bun tools/check-patches.ts
+check:patches: @openuidev/react-lang@1.0.1, @shadcn/react@0.3.1 patched
+$ bun tools/check-chat-ids.ts
+chat-id guard passed
+$ bun tools/check-terms.ts
+retired-terms guard passed
+$ bun tools/check-graph.ts
+Graph check passed (9 workspaces, 8 reachable from an app)
+$ tsc -p tsconfig.json && turbo run typecheck
+scripts/fixtures/mcp-app/server.ts(1,42): error TS2307: Cannot find module '@modelcontextprotocol/server' or its corresponding type declarations.
+scripts/fixtures/mcp-app/server.ts(45,6): error TS7006: Parameter 'request' implicitly has an 'any' type.
+scripts/fixtures/mcp-app/server.ts(47,90): error TS7006: Parameter 'request' implicitly has an 'any' type.
+error: script "typecheck" exited with code 1
+error: script "check" exited with code 1
+
+$ heavy bun run check:fast
+exit 1
+$ bun run test:release && bun run fmt:check && bun run agents:check && bun run check:patches && bun run check:chat-ids && bun run check:terms && bun run lint && bun run typecheck && bun run test:unit
+$ python3 -B scripts/release_test.py && python3 -B scripts/promote_test.py && python3 -B scripts/ci_credentials_test.py
+..............--- last 40 lines of smoke-1.log ---
+
+---
+smoke failed; trying again in 240 s (2 of 3)
+--- last 40 lines of smoke-2.log ---
+
+---
+smoke failed; trying again in 240 s (3 of 3)
+--- last 40 lines of smoke-1.log ---
+
+---
+smoke failed; trying again in 240 s (2 of 3)
+--- last 40 lines of smoke-2.log ---
+
+---
+smoke failed; trying again in 240 s (3 of 3)
+--- last 40 lines of smoke-3.log ---
+
+---
+.
+----------------------------------------------------------------------
+Ran 15 tests in 0.277s
+
+OK
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.001s
+
+OK
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.701s
+
+OK
+$ oxfmt -c oxfmt.config.ts --check
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 1070ms on 1644 files using 16 threads.
+$ bun x repoagents@1.1.0 check && bun tools/agents-check.ts
+repoagents: ok
+agents:check passed
+$ bun tools/check-patches.ts
+check:patches: @openuidev/react-lang@1.0.1, @shadcn/react@0.3.1 patched
+$ bun tools/check-chat-ids.ts
+chat-id guard passed
+$ bun tools/check-terms.ts
+retired-terms guard passed
+$ oxlint -c oxlint.config.ts .
+scripts/fixtures/mcp-app/server.ts:26:3: error: Unused oxlint-disable directive (no problems were reported).
+error: script "lint" exited with code 1
+error: script "check:fast" exited with code 1
+
+$ heavy bun run lint:gate
+exit 1
+$ bun tools/lint-gate.ts
+scripts/fixtures/mcp-app/server.ts:26:oxlint oxlint(unused-disable-directive)
+scripts/fixtures/mcp-app/package.json:11:knip knip(production:dependencies)
+lint:gate: 2 findings, 0 collection failures
+error: script "lint:gate" exited with code 1
+
+$ heavy bun run check (unmodified e06aae340b9b942343ebc7c36b7e024a401a1897)
+exit 1
+$ bun run test:release && bun run fmt:check && bun run agents:check && bun run check:patches && bun run check:chat-ids && bun run check:terms && bun run graph && bun run typecheck && bun run lint:gate && bun run dupes && bun run test && bun run test:integration && bun run test:integration:permuted && bun run build
+$ python3 -B scripts/release_test.py && python3 -B scripts/promote_test.py && python3 -B scripts/ci_credentials_test.py
+..............--- last 40 lines of smoke-1.log ---
+
+---
+smoke failed; trying again in 240 s (2 of 3)
+--- last 40 lines of smoke-2.log ---
+
+---
+smoke failed; trying again in 240 s (3 of 3)
+--- last 40 lines of smoke-1.log ---
+
+---
+smoke failed; trying again in 240 s (2 of 3)
+--- last 40 lines of smoke-2.log ---
+
+---
+smoke failed; trying again in 240 s (3 of 3)
+--- last 40 lines of smoke-3.log ---
+
+---
+.
+----------------------------------------------------------------------
+Ran 15 tests in 0.321s
+
+OK
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+OK
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.767s
+
+OK
+$ oxfmt -c oxfmt.config.ts --check
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 1607ms on 1625 files using 16 threads.
+$ bun x repoagents@1.1.0 check && bun tools/agents-check.ts
+repoagents: ok
+agents:check passed
+$ bun tools/check-patches.ts
+check:patches: @openuidev/react-lang@1.0.1, @shadcn/react@0.3.1 patched
+$ bun tools/check-chat-ids.ts
+chat-id guard passed
+$ bun tools/check-terms.ts
+retired-terms guard passed
+$ bun tools/check-graph.ts
+Graph check passed (9 workspaces, 8 reachable from an app)
+$ tsc -p tsconfig.json && turbo run typecheck
+scripts/fixtures/mcp-app/server.ts(1,42): error TS2307: Cannot find module '@modelcontextprotocol/server' or its corresponding type declarations.
+scripts/fixtures/mcp-app/server.ts(45,6): error TS7006: Parameter 'request' implicitly has an 'any' type.
+scripts/fixtures/mcp-app/server.ts(47,90): error TS7006: Parameter 'request' implicitly has an 'any' type.
+error: script "typecheck" exited with code 1
+error: script "check" exited with code 1
+
+$ heavy bun run lint:gate (same unmodified base)
+exit 1
+$ bun tools/lint-gate.ts
+scripts/fixtures/mcp-app/server.ts:26:oxlint oxlint(unused-disable-directive)
+scripts/fixtures/mcp-app/package.json:11:knip knip(production:dependencies)
+lint:gate: 2 findings, 0 collection failures
+error: script "lint:gate" exited with code 1
+
+Base source before/after: git diff --exit-code HEAD => exit 0, both receipts empty.
+The owned temporary base checkout was removed after the gates.
+$ python3 vendor/dquickts/summarize-native.py => exit 0; measurements.json
+No Worker CPU or billed DO duration measured.
+
+$ bun run agents:check
+exit 0
+$ bun x repoagents@1.1.0 check && bun tools/agents-check.ts
+repoagents: ok
+agents:check passed
+
+$ sha256sum -c vendor/dquickts/SHA256SUMS
+exit 0; engine.wasm: OK
+
+$ python3 vendor/dquickts/summarize.py e06aae340b9b942343ebc7c36b7e024a401a1897
+exit 0; reads current wasm-* receipts
+
+Final documentation/source verification:
+$ git diff --check
+exit 0
+$ bun run agents:check
+exit 0; repoagents: ok; agents:check passed
+$ bun run fmt:check
+exit 0; all 1644 matched files formatted

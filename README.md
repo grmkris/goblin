@@ -73,7 +73,8 @@ goblin's components, charts, maps and diagrams, schedules that run on their own,
 the owner's MCP tools, a cheap model, notifications, other apps) that each wait for the owner's Allow. The Apps page lists them; an app can
 fill the workspace with its conversation docked beside it, roll back to an earlier version, or be deleted.
 
-An opt-in local/test [durable code spike](SPIKE_RESULTS.md) checkpoints synchronous TypeScript with dquickts WASM;
+An opt-in local/test [durable code spike](SPIKE_RESULTS.md) checkpoints synchronous TypeScript with selectable
+dquickts WASM or a limited native child process over loopback HTTP;
 the default `code_run` still uses the async Dynamic Worker backend. It is disabled on dev and prod.
 
 goblin is reachable by AI clients over MCP and by scripts over the API (ADRs 0081, 0086). An MCP client (Claude Code,

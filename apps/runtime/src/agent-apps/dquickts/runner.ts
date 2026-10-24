@@ -6,6 +6,7 @@ import { ScriptResult } from '../script-result.ts'
 import { COMPUTE_QUANTUM, Dquickts } from './abi.ts'
 import { codeDeadline, codeReadOnly, dispatchCodeHost, type CodeHost } from './host.ts'
 import { durableSource } from './source.ts'
+import { NativeEngine } from './native.ts'
 import {
   checkpointDigest,
   CodeStore,
@@ -31,25 +32,34 @@ const LIMITS: CodeLimits = { wallMs: 30000, calls: 100, fuel: 1000, snapshotByte
 
 /**
  * Pi invokes one run id at a time; on tool recovery it invokes the same id. Each boundary stores a delta against the
- * original base, disposes WASM and releases the shared isolate slot before waiting on the host. No script is replayed.
+ * original base, ends the WASM/native slice and releases the shared slot before waiting on the host. No script is replayed.
  */
 export class DurableScripts {
   readonly #store: CodeStore
   readonly #slots: Isolates
   readonly #limits: CodeLimits
   readonly #module: WebAssembly.Module | undefined
-  constructor(store: CodeStore, slots: Isolates, limits = LIMITS, module?: WebAssembly.Module) {
+  readonly #native: NativeEngine | undefined
+  readonly #build: string
+  constructor(store: CodeStore, slots: Isolates, limits = LIMITS, module?: WebAssembly.Module | NativeEngine) {
     this.#store = store
     this.#slots = slots
     this.#limits = limits
-    this.#module = module
+    this.#native = module instanceof NativeEngine ? module : undefined
+    this.#module = module instanceof NativeEngine ? undefined : module
+    this.#build = this.#native?.build ?? BUILD
+  }
+
+  async #wasm(): Promise<WebAssembly.Module | undefined> {
+    if (this.#native !== undefined) return undefined
+    return this.#module ?? (await import('./module.ts')).default
   }
 
   async run(id: string, code: string, host: CodeHost): Promise<ScriptResult> {
-    const module = this.#module ?? (await import('./module.ts')).default
+    const module = await this.#wasm()
     const hash = await sha256Hex(code)
     let row = this.#store.read(id)
-    if (row !== undefined && (row.checkpoint.codeHash !== hash || row.checkpoint.build !== BUILD))
+    if (row !== undefined && (row.checkpoint.codeHash !== hash || row.checkpoint.build !== this.#build))
       return failed('snapshot belongs to another source or engine build')
     try {
       if (row !== undefined && (await checkpointDigest(row)) !== row.digest)
@@ -59,7 +69,8 @@ export class DurableScripts {
           id,
           {
             codeHash: hash,
-            build: BUILD,
+            build: this.#build,
+            ...(this.#native === undefined ? {} : { cpuRemainingMs: this.#native.cpuBudgetMs }),
             expiresAt: Date.now() + this.#limits.wallMs,
             fuel: this.#limits.fuel,
             sequence: 0,
@@ -127,13 +138,41 @@ export class DurableScripts {
     return response
   }
 
-  async #advance(
-    module: WebAssembly.Module,
+  async #advanceNative(
     id: string,
     checkpoint: CodeCheckpoint,
     code?: string,
     resume?: { readonly row: CodeRow; readonly response: CallResponse },
   ): Promise<CodeRow> {
+    this.#check(checkpoint)
+    if (this.#native === undefined || (checkpoint.cpuRemainingMs ?? 0) <= 20)
+      throw new Error('native cumulative CPU limit exceeded')
+    // Reserve a bounded CPU slice before HTTP dispatch. A lost reply forfeits that reservation.
+    await this.#store.put(
+      id,
+      { ...checkpoint, cpuRemainingMs: (checkpoint.cpuRemainingMs ?? 0) - this.#native.reservation(checkpoint) },
+      resume?.row.base ?? '',
+      resume?.row.delta ?? '',
+    )
+    const native = this.#native
+    const stepped = await this.#slots.call(this.#limits.wallMs, 'native script slice', () =>
+      native.advance(id, checkpoint, code, resume),
+    )
+    if (Date.now() >= checkpoint.expiresAt) throw new Error('cumulative script wall limit exceeded')
+    if (decodeSnapshot(stepped.base).byteLength > this.#limits.snapshotBytes)
+      throw new Error('snapshot byte limit exceeded')
+    return this.#store.put(id, stepped.checkpoint, stepped.base, stepped.delta)
+  }
+
+  async #advance(
+    module: WebAssembly.Module | undefined,
+    id: string,
+    checkpoint: CodeCheckpoint,
+    code?: string,
+    resume?: { readonly row: CodeRow; readonly response: CallResponse },
+  ): Promise<CodeRow> {
+    if (this.#native !== undefined) return this.#advanceNative(id, checkpoint, code, resume)
+    if (module === undefined) throw new Error('WASM module missing')
     this.#check(checkpoint)
     // Debit the maximum compute quantum before restoring. A crash cannot replenish instruction fuel; successful
     // checkpoints refund the unused reservation by recording the VM's exact remaining budget.

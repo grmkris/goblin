@@ -1,0 +1,58 @@
+$ bun run test:release && bun run fmt:check && bun run agents:check && bun run check:patches && bun run check:chat-ids && bun run check:terms && bun run graph && bun run typecheck && bun run lint:gate && bun run dupes && bun run test && bun run test:integration && bun run test:integration:permuted && bun run build
+$ python3 -B scripts/release_test.py && python3 -B scripts/promote_test.py && python3 -B scripts/ci_credentials_test.py
+..............--- last 40 lines of smoke-1.log ---
+
+---
+smoke failed; trying again in 240 s (2 of 3)
+--- last 40 lines of smoke-2.log ---
+
+---
+smoke failed; trying again in 240 s (3 of 3)
+--- last 40 lines of smoke-1.log ---
+
+---
+smoke failed; trying again in 240 s (2 of 3)
+--- last 40 lines of smoke-2.log ---
+
+---
+smoke failed; trying again in 240 s (3 of 3)
+--- last 40 lines of smoke-3.log ---
+
+---
+.
+----------------------------------------------------------------------
+Ran 15 tests in 0.321s
+
+OK
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+OK
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.767s
+
+OK
+$ oxfmt -c oxfmt.config.ts --check
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 1607ms on 1625 files using 16 threads.
+$ bun x repoagents@1.1.0 check && bun tools/agents-check.ts
+repoagents: ok
+agents:check passed
+$ bun tools/check-patches.ts
+check:patches: @openuidev/react-lang@1.0.1, @shadcn/react@0.3.1 patched
+$ bun tools/check-chat-ids.ts
+chat-id guard passed
+$ bun tools/check-terms.ts
+retired-terms guard passed
+$ bun tools/check-graph.ts
+Graph check passed (9 workspaces, 8 reachable from an app)
+$ tsc -p tsconfig.json && turbo run typecheck
+scripts/fixtures/mcp-app/server.ts(1,42): error TS2307: Cannot find module '@modelcontextprotocol/server' or its corresponding type declarations.
+scripts/fixtures/mcp-app/server.ts(45,6): error TS7006: Parameter 'request' implicitly has an 'any' type.
+scripts/fixtures/mcp-app/server.ts(47,90): error TS7006: Parameter 'request' implicitly has an 'any' type.
+error: script "typecheck" exited with code 1
+error: script "check" exited with code 1

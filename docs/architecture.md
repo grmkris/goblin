@@ -30,7 +30,8 @@ flowchart LR
 - [Chat blocks](architecture/chat-blocks.md): diagrams, charts and maps in replies.
 - [MCP Apps host](architecture/mcp-apps.md): sandboxed server UIs.
 - [Agent apps](architecture/agent-apps.md): apps goblin builds in Dynamic Workers, with a default-off local dquickts
-  `code_run` experiment ([ADR 0115](adr/0115-durable-code-run-with-dquickts.md)).
+  `code_run` experiment (WASM or local native service, [ADRs 0115](adr/0115-durable-code-run-with-dquickts.md) and
+  [0116](adr/0116-native-dquickts-service.md)).
 - [Files](architecture/files.md): owner files in SQLite and R2.
 - [Topics, Personas and memory](architecture/topics.md): Topics, Personas, organize receipts, retrieval and Topic memory.
 - [Models](architecture/models.md): model calls and daily token usage.

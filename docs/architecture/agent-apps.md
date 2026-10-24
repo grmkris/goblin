@@ -1,8 +1,9 @@
 # Agent apps
 
 The default-off local/test dquickts `code_run` experiment is described by
-[ADR 0115](../adr/0115-durable-code-run-with-dquickts.md). When opted in, synchronous TypeScript checkpoints a trusted
-base/delta heap and per-call journal in the owning agent's SQLite. Pi recovery restores it in a fresh WASM instance;
+[ADRs 0115](../adr/0115-durable-code-run-with-dquickts.md) and [0116](../adr/0116-native-dquickts-service.md).
+When opted in, synchronous TypeScript checkpoints a trusted base/delta heap and per-call journal in the owning
+agent's SQLite. Pi recovery restores it in a fresh WASM instance or a limited native process over loopback HTTP;
 unfinished writes are indeterminate. The default async Dynamic Worker backend described below is still the deployed path.
 
 ## Agent apps

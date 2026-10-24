@@ -296,12 +296,18 @@ describe('dquickts durable code adapter', () => {
     for (let i = 0; i < 9; i += 1) {
       const vm = new Dquickts(module)
       vm.init()
+      const baseStart = performance.now()
       const base = vm.snapshot(1)
+      const baseMs = performance.now() - baseStart
       vm.budget(1000)
+      const evalStart = performance.now()
       expect(
         vm.eval(durableSource("const state = {n:40}; state.n += tools.call('fixture','lookup',{}); return state")),
       ).toBe(1)
+      const evalMs = performance.now() - evalStart
+      const deltaStart = performance.now()
       const delta = vm.snapshot(2)
+      const snapshotMs = baseMs + performance.now() - deltaStart
       vm.dispose()
       const fresh = new Dquickts(module)
       const start = performance.now()
@@ -311,7 +317,7 @@ describe('dquickts durable code adapter', () => {
       const restoreResumeMs = performance.now() - start
       expect(JSON.parse(fresh.output())).toMatchObject({ value: { n: 42 } })
       fresh.dispose()
-      samples.push({ baseBytes: base.byteLength, deltaBytes: delta.byteLength, restoreResumeMs })
+      samples.push({ baseBytes: base.byteLength, deltaBytes: delta.byteLength, evalMs, snapshotMs, restoreResumeMs })
     }
     writeFileSync('../../.local/durable-code/snapshot.json', JSON.stringify({ samples }, null, 2))
   })

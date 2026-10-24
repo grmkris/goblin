@@ -1,0 +1,5 @@
+$ bun tools/lint-gate.ts
+scripts/fixtures/mcp-app/server.ts:26:oxlint oxlint(unused-disable-directive)
+scripts/fixtures/mcp-app/package.json:11:knip knip(production:dependencies)
+lint:gate: 2 findings, 0 collection failures
+error: script "lint:gate" exited with code 1

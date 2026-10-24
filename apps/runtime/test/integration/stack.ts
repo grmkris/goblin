@@ -14,6 +14,10 @@ export default Alchemy.Stack(
     const profile = yield* Config.String('GOBLIN_PRIMARY_PROFILE').pipe(Config.withDefault('root'))
     const port = yield* Config.Port('GOBLIN_HARNESS_PORT')
     const durable = yield* Config.String('GOBLIN_DQUICKTS').pipe(Config.withDefault(''))
+    const engine = yield* Config.String('GOBLIN_DQUICKTS_ENGINE').pipe(Config.withDefault('wasm'))
+    const nativeUrl = yield* Config.String('GOBLIN_NATIVE_URL').pipe(Config.withDefault(''))
+    const nativeToken = yield* Config.String('GOBLIN_NATIVE_TOKEN').pipe(Config.withDefault(''))
+    const nativeBuild = yield* Config.String('GOBLIN_NATIVE_BUILD').pipe(Config.withDefault(''))
     const files = yield* Cloudflare.R2.Bucket('NativeFiles')
     const auth = yield* Cloudflare.D1.Database('NativeAccountUsage', {
       migrations: fileURLToPath(new URL('../../migrations', import.meta.url).href),
@@ -28,6 +32,10 @@ export default Alchemy.Stack(
         FILES: files,
         LOADER: Cloudflare.WorkerLoader(),
         DQUICKTS_CODE_RUN: durable,
+        DQUICKTS_ENGINE: engine,
+        DQUICKTS_NATIVE_URL: nativeUrl,
+        DQUICKTS_NATIVE_TOKEN: nativeToken,
+        DQUICKTS_NATIVE_BUILD: nativeBuild,
         STAGE: 'test',
         LIFECYCLE: Cloudflare.DurableObject('NativeLifecycleProbe'),
         MODEL_BASE_URL: 'https://no-model-calls.invalid/v1',

@@ -13,6 +13,7 @@ import { probes as appsProbes } from './apps-probe.ts'
 import { probes as codeRecoveryProbes } from './code-recovery-probe.ts'
 import { probes as durableCodeBaseline } from './durable-code-baseline.ts'
 import { probes as durableCodeProbes } from './durable-code-probe.ts'
+import { probes as nativeCodeProbes } from './native-code-probe.ts'
 import { probes as composerProbes } from './composer-probe.ts'
 import { probes as conversationProbes } from './conversation-probe.ts'
 import { probes as ingressProbes } from './events-ingress-case.ts'
@@ -55,6 +56,7 @@ const PROBES = registry(
   codeRecoveryProbes,
   durableCodeBaseline,
   durableCodeProbes,
+  nativeCodeProbes,
   composerProbes,
   conversationOpsProbes,
   conversationProbes,

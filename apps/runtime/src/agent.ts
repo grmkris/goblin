@@ -14,6 +14,7 @@ import { type AgentApps, agentApps } from './agent-apps/engine.ts'
 import { appPorts } from './agent-apps/ports.ts'
 import { DurableScripts } from './agent-apps/dquickts/runner.ts'
 import { CodeStore } from './agent-apps/dquickts/store.ts'
+import { nativeBackend } from './agent-apps/dquickts/native.ts'
 import { drizzle } from 'drizzle-orm/durable-sqlite'
 import { JOB_CALLBACK, type JobSchedules, type JobSlot } from './agent-apps/jobs.ts'
 import { reconcileAppJobs, runAppJob } from './agent-apps/wake.ts'
@@ -135,7 +136,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     const appsRun = env.LOADER !== undefined
     const durableCode =
       env.DQUICKTS_CODE_RUN === 'spike' && (env.STAGE === 'local' || env.STAGE === 'test')
-        ? new DurableScripts(new CodeStore(drizzle(ctx.storage)), apps.isolates)
+        ? new DurableScripts(new CodeStore(drizzle(ctx.storage)), apps.isolates, undefined, nativeBackend(env))
         : undefined
     const execution = [
       ...tools,

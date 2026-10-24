@@ -9,6 +9,9 @@ The default-off dquickts spike's unit tests are `test/durable-code.test.ts`; its
 `test/integration/durable-code.test.ts`. The latter exercises the flagged Pi tool, explicit object eviction, the
 per-call journal, build/integrity guards, cumulative limits and eight suspended runs admitting a ninth sandbox job.
 Tests write synthetic measurement JSON under `.local/durable-code`. Those timings are neither billing nor deployed CPU.
+Set `GOBLIN_DQUICKTS_ENGINE=native` after building `vendor/dquickts/build-native.sh` to run the same recovery suite
+plus native auth/MAC, kernel CPU/memory/network/wall and latency/agent timer probes. Setup owns and stops a loopback
+service with an ephemeral test bearer; extra receipts go to `.local/native`. See the vendor README for exact commands.
 
 Choose the test that proves the claim: unit tests, local workerd integration, reconstruction, and the deployed dev
 smoke are different evidence.

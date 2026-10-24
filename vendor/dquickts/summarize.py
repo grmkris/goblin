@@ -7,7 +7,7 @@ import sys
 
 root = Path(__file__).resolve().parents[2]
 receipts = root / '.local/durable-code'
-data = {name: json.loads((receipts / f'{name}.json').read_text())
+data = {name: json.loads((receipts / f'{"wasm-" if name in ("after", "replay", "recovery") else ""}{name}.json').read_text())
         for name in ('baseline-control', 'baseline', 'after', 'snapshot', 'replay', 'recovery')}
 # The synthetic instance token is irrelevant to timing and is omitted from the public receipt.
 data['recovery'].pop('instance', None)

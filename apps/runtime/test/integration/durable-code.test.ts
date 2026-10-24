@@ -2,12 +2,17 @@ import * as Alchemy from 'alchemy'
 import * as Cloudflare from 'alchemy/Cloudflare'
 import * as Test from 'alchemy/Test/Vitest'
 import { Config, ConfigProvider, Effect, Schema } from 'effect'
-import { expect } from 'vitest'
+import { afterAll, expect } from 'vitest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { evict, freshName, nativeFetch, probeOf } from './native-case.ts'
 import { until } from './until.ts'
 import Stack from './stack.ts'
+import { startNativeService, type NativeService } from '../native-service.ts'
+import { nativeCases } from './native-code-checks.ts'
 mkdirSync('../../.local/durable-code', { recursive: true })
+const engine = await Effect.runPromise(Config.String('GOBLIN_DQUICKTS_ENGINE').pipe(Config.withDefault('wasm')))
+let service: NativeService | undefined
+afterAll(async () => service?.stop())
 
 const harness = Test.make({
   providers: Cloudflare.providers(),
@@ -18,17 +23,21 @@ const harness = Test.make({
 const stack = harness.beforeAll(
   Effect.gen(function* () {
     const port = yield* Config.Port('GOBLIN_HARNESS_PORT')
-    return yield* harness
-      .deploy(Stack)
-      .pipe(
-        Effect.provide(
-          ConfigProvider.layer(
-            ConfigProvider.fromUnknown({ GOBLIN_HARNESS_PORT: port + 80, GOBLIN_DQUICKTS: 'spike' }).pipe(
-              ConfigProvider.orElse(ConfigProvider.fromEnv()),
-            ),
-          ),
+    if (engine === 'native') service = yield* Effect.promise(startNativeService)
+    return yield* harness.deploy(Stack).pipe(
+      Effect.provide(
+        ConfigProvider.layer(
+          ConfigProvider.fromUnknown({
+            GOBLIN_HARNESS_PORT: port + 80,
+            GOBLIN_DQUICKTS: 'spike',
+            GOBLIN_DQUICKTS_ENGINE: engine,
+            GOBLIN_NATIVE_URL: service?.url ?? '',
+            GOBLIN_NATIVE_TOKEN: service?.token ?? '',
+            GOBLIN_NATIVE_BUILD: service?.build ?? '',
+          }).pipe(ConfigProvider.orElse(ConfigProvider.fromEnv())),
         ),
-      )
+      ),
+    )
   }),
 )
 
@@ -38,7 +47,7 @@ harness.test(
     const { url } = yield* stack
     const result = yield* Effect.promise(() => probeOf(url, 'durable-code-measure', Schema.Unknown))
     expect(result).toMatchObject({ samples: Array.from({ length: 5 }, () => ({ result: { ok: true, value: 3 } })) })
-    writeFileSync('../../.local/durable-code/after.json', JSON.stringify(result, null, 2))
+    writeFileSync(`../../.local/durable-code/${engine}-after.json`, JSON.stringify(result, null, 2))
   }),
 )
 
@@ -66,7 +75,7 @@ harness.test(
         replayed: { ok: true, value: 3 },
       })),
     })
-    writeFileSync('../../.local/durable-code/replay.json', JSON.stringify(result, null, 2))
+    writeFileSync(`../../.local/durable-code/${engine}-replay.json`, JSON.stringify(result, null, 2))
   }),
 )
 
@@ -148,7 +157,7 @@ harness.test(
       expect(after.instance).not.toBe(first.instance)
       expect(after.effects).toBe('x')
       expect(after.result).toMatchObject({ ok: true, value: { count: 42, label: 'kept', text: 'restored' } })
-      writeFileSync('../../.local/durable-code/recovery.json', JSON.stringify(after, null, 2))
+      writeFileSync(`../../.local/durable-code/${engine}-recovery.json`, JSON.stringify(after, null, 2))
     })
   }),
 )
@@ -177,3 +186,15 @@ harness.test(
     writeFileSync('../../.local/durable-code/baseline.json', JSON.stringify(result, null, 2))
   }),
 )
+
+if (engine === 'native')
+  for (const check of nativeCases)
+    harness.test(
+      `native dquickts: ${check.title}`,
+      Effect.gen(function* () {
+        const { url } = yield* stack
+        const owned = service
+        if (owned === undefined) throw new Error('native fixture missing')
+        yield* Effect.promise(() => check.run(owned, url))
+      }),
+    )

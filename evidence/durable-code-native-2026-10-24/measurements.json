@@ -1,0 +1,882 @@
+{
+  "summary": {
+    "wasm": {
+      "slowHostWallMedianMs": 206,
+      "slowHostOccupiedMedianMs": 31,
+      "recoveryMedianMs": 57,
+      "replayMedianMs": 164,
+      "evictionResumeMs": 8,
+      "heavyElapsedMedianMs": 160,
+      "heavyMaxTimerDelayMedianMs": 159
+    },
+    "native": {
+      "slowHostWallMedianMs": 243,
+      "slowHostOccupiedMedianMs": 71,
+      "recoveryMedianMs": 68,
+      "replayMedianMs": 165,
+      "evictionResumeMs": 21,
+      "heavyElapsedMedianMs": 43,
+      "heavyMaxTimerDelayMedianMs": 6
+    },
+    "nativeOperations": {
+      "evalHttpMs": 15.910975000002509,
+      "snapshotHttpMs": 12.899607999999716,
+      "restoreHttpMs": 14.773611000000528,
+      "resumeHttpMs": 13.53437699999995,
+      "evalMs": 0.331546,
+      "snapshotMs": 0.971255,
+      "restoreResumeMs": 0.49376,
+      "baseBytes": [
+        13063
+      ],
+      "deltaBytes": [
+        3945
+      ]
+    },
+    "wasmOperations": {
+      "evalMs": 0.6039129999990109,
+      "snapshotMs": 0.7844230000009702,
+      "restoreResumeMs": 1.0884569999998348
+    },
+    "cpuAcrossFourSuspensionsMs": 88.00699999999999,
+    "cpuBudgetMs": 100,
+    "nativeBinarySha256": "27ab5d6c5f400b9db980e9dcafaba1a2bc905204e2d1b104587e5bf065e656cd",
+    "nativeBuild": "e8bdcbbcacc9dbb5d0a922df14d4e9ef920aa454ca6ec0b5c712894fd8105a65"
+  },
+  "raw": {
+    "cpu": {
+      "worker": {
+        "result": {
+          "ok": false,
+          "error": "native cumulative CPU limit exceeded",
+          "logs": []
+        },
+        "again": {
+          "ok": false,
+          "error": "native cumulative CPU limit exceeded",
+          "logs": []
+        },
+        "calls": 4,
+        "remaining": 0
+      },
+      "samples": [
+        {
+          "cpuMs": 4.4399999999999995,
+          "remainingCpuMs": 95.56
+        },
+        {
+          "cpuMs": 3.7779999999999996,
+          "remainingCpuMs": 91.782
+        },
+        {
+          "cpuMs": 4.154,
+          "remainingCpuMs": 87.628
+        },
+        {
+          "cpuMs": 3.8289999999999997,
+          "remainingCpuMs": 83.799
+        },
+        {
+          "cpuMs": 71.806,
+          "signal": 27,
+          "error": "native cumulative CPU limit exceeded"
+        }
+      ]
+    },
+    "isolation": {
+      "network": {
+        "status": 200,
+        "answer": {
+          "ok": true,
+          "status": 0,
+          "output": "{\"ok\":true,\"value\":{\"errno\":1},\"logs\":[]}",
+          "snapshot": null,
+          "cpuMs": 3.586,
+          "cpuUsedMs": 3.586,
+          "remainingCpuMs": 496.414,
+          "timing": {
+            "evalMs": 0,
+            "snapshotMs": 0,
+            "restoreResumeMs": 0
+          }
+        }
+      },
+      "memory": {
+        "status": 200,
+        "answer": {
+          "ok": true,
+          "status": 0,
+          "output": "{\"ok\":true,\"value\":{\"errno\":12},\"logs\":[]}",
+          "snapshot": null,
+          "cpuMs": 4.59,
+          "cpuUsedMs": 4.59,
+          "remainingCpuMs": 495.41,
+          "timing": {
+            "evalMs": 0,
+            "snapshotMs": 0,
+            "restoreResumeMs": 0
+          }
+        }
+      },
+      "bomb": {
+        "status": 200,
+        "answer": {
+          "ok": true,
+          "status": -1,
+          "output": "InternalError: out of memory",
+          "snapshot": null,
+          "cpuMs": 4.637,
+          "cpuUsedMs": 4.637,
+          "remainingCpuMs": 495.363,
+          "timing": {
+            "evalMs": 0.116802,
+            "snapshotMs": 0.635961,
+            "restoreResumeMs": 0
+          }
+        }
+      },
+      "wall": {
+        "status": 200,
+        "answer": {
+          "ok": false,
+          "error": "native wall limit exceeded",
+          "cpuMs": 4.374,
+          "cpuUsedMs": 4.374,
+          "signal": 14
+        }
+      }
+    },
+    "latency": {
+      "samples": [
+        {
+          "evalHttpMs": 15.910975000002509,
+          "snapshotHttpMs": 13.686846999997215,
+          "restoreHttpMs": 20.11229699999967,
+          "resumeHttpMs": 12.889352999998664,
+          "evalTiming": {
+            "evalMs": 0.304374,
+            "snapshotMs": 0.825779,
+            "restoreResumeMs": 0
+          },
+          "snapshotTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0.276642,
+            "restoreResumeMs": 0.446727
+          },
+          "resumeTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0,
+            "restoreResumeMs": 0.59644
+          },
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "cpuMs": 18.538
+        },
+        {
+          "evalHttpMs": 18.736800999999105,
+          "snapshotHttpMs": 9.959413000000495,
+          "restoreHttpMs": 14.773611000000528,
+          "resumeHttpMs": 13.53437699999995,
+          "evalTiming": {
+            "evalMs": 0.317585,
+            "snapshotMs": 0.991276,
+            "restoreResumeMs": 0
+          },
+          "snapshotTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0.164025,
+            "restoreResumeMs": 0.783271
+          },
+          "resumeTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0,
+            "restoreResumeMs": 0.659159
+          },
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "cpuMs": 18.345
+        },
+        {
+          "evalHttpMs": 13.856180999999197,
+          "snapshotHttpMs": 12.060930999999982,
+          "restoreHttpMs": 10.750206000000617,
+          "resumeHttpMs": 12.721310999997513,
+          "evalTiming": {
+            "evalMs": 0.34058,
+            "snapshotMs": 2.285716,
+            "restoreResumeMs": 0
+          },
+          "snapshotTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0.240204,
+            "restoreResumeMs": 0.519951
+          },
+          "resumeTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0,
+            "restoreResumeMs": 0.444844
+          },
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "cpuMs": 18.631
+        },
+        {
+          "evalHttpMs": 15.195579999999609,
+          "snapshotHttpMs": 23.291055999998207,
+          "restoreHttpMs": 13.27039700000023,
+          "resumeHttpMs": 13.928422999997565,
+          "evalTiming": {
+            "evalMs": 0.331546,
+            "snapshotMs": 1.171687,
+            "restoreResumeMs": 0
+          },
+          "snapshotTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0.184537,
+            "restoreResumeMs": 0.525068
+          },
+          "resumeTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0,
+            "restoreResumeMs": 0.554575
+          },
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "cpuMs": 21.788
+        },
+        {
+          "evalHttpMs": 17.767369999997754,
+          "snapshotHttpMs": 11.245899000001373,
+          "restoreHttpMs": 15.06343299999935,
+          "resumeHttpMs": 20.908088000000134,
+          "evalTiming": {
+            "evalMs": 0.295231,
+            "snapshotMs": 0.796851,
+            "restoreResumeMs": 0
+          },
+          "snapshotTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0.18644,
+            "restoreResumeMs": 0.495902
+          },
+          "resumeTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0,
+            "restoreResumeMs": 0.443401
+          },
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "cpuMs": 20.154
+        },
+        {
+          "evalHttpMs": 12.536442000000534,
+          "snapshotHttpMs": 13.078917999999248,
+          "restoreHttpMs": 10.533809000000474,
+          "resumeHttpMs": 11.076386000000639,
+          "evalTiming": {
+            "evalMs": 0.334742,
+            "snapshotMs": 0.971255,
+            "restoreResumeMs": 0
+          },
+          "snapshotTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0.213694,
+            "restoreResumeMs": 0.537718
+          },
+          "resumeTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0,
+            "restoreResumeMs": 0.428468
+          },
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "cpuMs": 19.639
+        },
+        {
+          "evalHttpMs": 12.08628999999928,
+          "snapshotHttpMs": 12.899607999999716,
+          "restoreHttpMs": 13.724374999997963,
+          "resumeHttpMs": 14.847976999997627,
+          "evalTiming": {
+            "evalMs": 0.34648,
+            "snapshotMs": 0.801962,
+            "restoreResumeMs": 0
+          },
+          "snapshotTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0.175714,
+            "restoreResumeMs": 0.36491
+          },
+          "resumeTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0,
+            "restoreResumeMs": 0.546812
+          },
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "cpuMs": 18.083
+        },
+        {
+          "evalHttpMs": 34.727601999999024,
+          "snapshotHttpMs": 32.00792100000035,
+          "restoreHttpMs": 19.05601899999965,
+          "resumeHttpMs": 14.310059000003093,
+          "evalTiming": {
+            "evalMs": 0.289791,
+            "snapshotMs": 4.668111,
+            "restoreResumeMs": 0
+          },
+          "snapshotTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0.175374,
+            "restoreResumeMs": 1.350096
+          },
+          "resumeTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0,
+            "restoreResumeMs": 0.49376
+          },
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "cpuMs": 20.103
+        },
+        {
+          "evalHttpMs": 18.169526999998197,
+          "snapshotHttpMs": 11.78620199999932,
+          "restoreHttpMs": 19.177448999998887,
+          "resumeHttpMs": 11.592178999999305,
+          "evalTiming": {
+            "evalMs": 0.336926,
+            "snapshotMs": 0.726373,
+            "restoreResumeMs": 0
+          },
+          "snapshotTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0.21808,
+            "restoreResumeMs": 0.62175
+          },
+          "resumeTiming": {
+            "evalMs": 0,
+            "snapshotMs": 0,
+            "restoreResumeMs": 0.48676
+          },
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "cpuMs": 19.319000000000003
+        }
+      ]
+    },
+    "blocked": {
+      "samples": [
+        {
+          "engine": "wasm",
+          "sample": 0,
+          "result": {
+            "ok": true,
+            "value": 499999500000,
+            "logs": []
+          },
+          "elapsedMs": 215,
+          "maxTimerDelayMs": 213,
+          "ticks": 1
+        },
+        {
+          "engine": "wasm",
+          "sample": 1,
+          "result": {
+            "ok": true,
+            "value": 499999500000,
+            "logs": []
+          },
+          "elapsedMs": 180,
+          "maxTimerDelayMs": 171,
+          "ticks": 1
+        },
+        {
+          "engine": "wasm",
+          "sample": 2,
+          "result": {
+            "ok": true,
+            "value": 499999500000,
+            "logs": []
+          },
+          "elapsedMs": 160,
+          "maxTimerDelayMs": 159,
+          "ticks": 1
+        },
+        {
+          "engine": "wasm",
+          "sample": 3,
+          "result": {
+            "ok": true,
+            "value": 499999500000,
+            "logs": []
+          },
+          "elapsedMs": 131,
+          "maxTimerDelayMs": 129,
+          "ticks": 1
+        },
+        {
+          "engine": "wasm",
+          "sample": 4,
+          "result": {
+            "ok": true,
+            "value": 499999500000,
+            "logs": []
+          },
+          "elapsedMs": 101,
+          "maxTimerDelayMs": 99,
+          "ticks": 1
+        },
+        {
+          "engine": "native",
+          "sample": 0,
+          "result": {
+            "ok": true,
+            "value": 499999500000,
+            "logs": []
+          },
+          "elapsedMs": 44,
+          "maxTimerDelayMs": 7,
+          "ticks": 17
+        },
+        {
+          "engine": "native",
+          "sample": 1,
+          "result": {
+            "ok": true,
+            "value": 499999500000,
+            "logs": []
+          },
+          "elapsedMs": 46,
+          "maxTimerDelayMs": 6,
+          "ticks": 17
+        },
+        {
+          "engine": "native",
+          "sample": 2,
+          "result": {
+            "ok": true,
+            "value": 499999500000,
+            "logs": []
+          },
+          "elapsedMs": 39,
+          "maxTimerDelayMs": 6,
+          "ticks": 15
+        },
+        {
+          "engine": "native",
+          "sample": 3,
+          "result": {
+            "ok": true,
+            "value": 499999500000,
+            "logs": []
+          },
+          "elapsedMs": 39,
+          "maxTimerDelayMs": 5,
+          "ticks": 15
+        },
+        {
+          "engine": "native",
+          "sample": 4,
+          "result": {
+            "ok": true,
+            "value": 499999500000,
+            "logs": []
+          },
+          "elapsedMs": 43,
+          "maxTimerDelayMs": 7,
+          "ticks": 14
+        }
+      ]
+    },
+    "wasm-after": {
+      "samples": [
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 252,
+          "occupiedMs": 72
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 206,
+          "occupiedMs": 35
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 195,
+          "occupiedMs": 31
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 245,
+          "occupiedMs": 18
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 183,
+          "occupiedMs": 23
+        }
+      ]
+    },
+    "wasm-replay": {
+      "samples": [
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 59,
+          "replayMs": 173
+        },
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 62,
+          "replayMs": 226
+        },
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 57,
+          "replayMs": 161
+        },
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 56,
+          "replayMs": 164
+        },
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 56,
+          "replayMs": 162
+        }
+      ]
+    },
+    "wasm-recovery": {
+      "effects": "x",
+      "result": {
+        "ok": true,
+        "value": {
+          "count": 42,
+          "label": "kept",
+          "text": "restored"
+        },
+        "logs": []
+      },
+      "recoveryMs": 8
+    },
+    "native-after": {
+      "samples": [
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 336,
+          "occupiedMs": 157
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 242,
+          "occupiedMs": 69
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 243,
+          "occupiedMs": 71
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 243,
+          "occupiedMs": 71
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 239,
+          "occupiedMs": 64
+        }
+      ]
+    },
+    "native-replay": {
+      "samples": [
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 115,
+          "replayMs": 169
+        },
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 66,
+          "replayMs": 161
+        },
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 99,
+          "replayMs": 168
+        },
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 68,
+          "replayMs": 162
+        },
+        {
+          "restored": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "replayed": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "restoreMs": 67,
+          "replayMs": 165
+        }
+      ]
+    },
+    "native-recovery": {
+      "effects": "x",
+      "result": {
+        "ok": true,
+        "value": {
+          "count": 42,
+          "label": "kept",
+          "text": "restored"
+        },
+        "logs": []
+      },
+      "recoveryMs": 21
+    },
+    "wasm-snapshot": {
+      "samples": [
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "evalMs": 0.6039129999990109,
+          "snapshotMs": 0.7582120000006398,
+          "restoreResumeMs": 1.0884569999998348
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "evalMs": 0.5969609999992826,
+          "snapshotMs": 0.8622140000006766,
+          "restoreResumeMs": 7.142319000000498
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "evalMs": 11.87864400000035,
+          "snapshotMs": 1.015081999999893,
+          "restoreResumeMs": 0.9557910000003176
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "evalMs": 21.85097599999972,
+          "snapshotMs": 2.2241589999994176,
+          "restoreResumeMs": 23.04009000000042
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "evalMs": 10.800582999998369,
+          "snapshotMs": 0.7844230000009702,
+          "restoreResumeMs": 12.401640000000043
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "evalMs": 0.3823769999999058,
+          "snapshotMs": 0.5939650000000256,
+          "restoreResumeMs": 0.7711030000009487
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "evalMs": 0.42098599999917496,
+          "snapshotMs": 0.6123440000010305,
+          "restoreResumeMs": 5.772200999999768
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "evalMs": 0.4220179999992979,
+          "snapshotMs": 0.6002369999987422,
+          "restoreResumeMs": 0.7214860000003682
+        },
+        {
+          "baseBytes": 13063,
+          "deltaBytes": 3945,
+          "evalMs": 4.30898999999954,
+          "snapshotMs": 0.7858450000003359,
+          "restoreResumeMs": 0.6842770000002929
+        }
+      ]
+    },
+    "baseline-control": {
+      "samples": [
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 174,
+          "occupiedMs": 174
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 250,
+          "occupiedMs": 250
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 156,
+          "occupiedMs": 155
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 158,
+          "occupiedMs": 158
+        },
+        {
+          "result": {
+            "ok": true,
+            "value": 3,
+            "logs": []
+          },
+          "wallMs": 159,
+          "occupiedMs": 159
+        }
+      ]
+    }
+  }
+}
