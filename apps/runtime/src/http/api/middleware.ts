@@ -93,7 +93,7 @@ const admitCredential = (
     const retryAfter = gate.take(credentialId(credential), now)
     if (retryAfter !== undefined) return yield* new Unauthenticated({ reason: 'rate_limited', retryAfter })
     yield* gate.grants.sync(credential)
-    if (credential.kind === 'key') yield* gate.learn(credential)
+    if (credential.kind !== 'client') yield* gate.learn(credential)
   })
 
 /**

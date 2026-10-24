@@ -70,6 +70,9 @@ const CLIENT_CREDENTIAL = credential({
 })
 /** The owner as the member the client acts for. */
 const CLIENT_MEMBER = { user: OWNER, role: 'owner', name: 'Owner', shared: false } as const
+/** An installed app's token (ADR 0118), and the credential its installation makes: `write`, acting for no one. */
+const APP_TOKEN = 'eyJhbGciOi.eyJhcHAiOnRydWV9.c2ln'
+const APP_CREDENTIAL = credential({ kind: 'app', id: 'app.1', name: 'Product', grantId: 'in_1', level: 'write' })
 /** A grant change's answer, as the account records give it. */
 const changed = (grantId: string, terms: GrantTerms) => ({
   grant: {
@@ -140,6 +143,7 @@ const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
         ? Effect.succeed({ key: { ...KEY_VIEW, start: ROTATED.slice(0, 10) }, secret: ROTATED })
         : Effect.fail(new NotFound({ what: 'key' })),
     revokeKey: () => Effect.void,
+    apps: fake<AccountRecords['apps']>({ list: () => Effect.succeed([]), installations: () => Effect.succeed([]) }),
     crash: (report, userId) => {
       crashes.push(Option.getOrUndefined(userId))
       return crash(report, userId)
@@ -175,6 +179,11 @@ const deployment = (
           })
         : Effect.fail(new Unauthenticated({ reason: 'key' })),
     client: (token, slug) => {
+      if (token === APP_TOKEN && slug === MEMBERSHIP.slug)
+        return Effect.succeed({
+          workspace: { ...MEMBERSHIP, role: 'member' },
+          credential: { ...APP_CREDENTIAL, ws: { ...APP_CREDENTIAL.ws, workspace: WS } },
+        })
       if (token !== TOKEN && token !== READ_TOKEN) return Effect.fail(new Unauthenticated({ reason: 'token' }))
       if (slug !== MEMBERSHIP.slug) return Effect.fail(new NotFound({ what: 'workspace' }))
       const level = token === TOKEN ? 'write' : 'read'
@@ -591,6 +600,17 @@ describe("an OAuth client's token on its workspace's path (ADR 0116)", () => {
       ws: { ...CLIENT_CREDENTIAL.ws, workspace: WS },
     })
     expect(JSON.parse(forwarded?.headers.get('x-goblin-member') ?? '')).toEqual(CLIENT_MEMBER)
+  })
+
+  it("forwards an installed app's credential and no member: an app acts for no one (ADR 0118)", async () => {
+    const { seen, agents, edge } = deployment()
+    const request = client(`${BASE}/api/topics`, { token: APP_TOKEN, body: JSON.stringify({ name: 'x' }) })
+    const { response } = await through('workspace', request, edge)
+    expect(response.status).toBe(200)
+    expect(agents).toEqual([WS])
+    const [forwarded] = seen
+    expect(JSON.parse(forwarded?.headers.get('x-goblin-caller') ?? '')).toMatchObject({ kind: 'app', grantId: 'in_1' })
+    expect(forwarded?.headers.get('x-goblin-member')).toBeNull()
   })
 
   it("reads a chat's stream: the agent's server-sent events pass through", async () => {

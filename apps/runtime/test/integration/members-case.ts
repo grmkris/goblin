@@ -25,7 +25,7 @@ const Listed = Schema.Array(Schema.Struct({ id: Schema.String, slug: Schema.Stri
  * A sign-in by emailed code while sign-up is closed, for `email`: its session, or the refusal of its code's send. No
  * first workspace is asked for, as `person` asks.
  */
-async function signIn(base: string, email: string): Promise<{ readonly sent: number; readonly who?: Person }> {
+export async function signIn(base: string, email: string): Promise<{ readonly sent: number; readonly who?: Person }> {
   const ip = `2001:db8:${Array.from(crypto.getRandomValues(new Uint16Array(4)), (n) => n.toString(16)).join(':')}:0:2`
   const headers = { origin: APP, 'content-type': 'application/json', 'cf-connecting-ip': ip, ...CLOSED }
   const sent = await ownerFetch(`${base}/api/auth/email-otp/send-verification-otp`, {

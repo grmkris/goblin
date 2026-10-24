@@ -10,7 +10,7 @@ import {
   createKeyGrant,
   grantOfKey,
   isLive,
-  newKeyTerms,
+  newWorkspaceTerms,
   setTerms,
   termsOf,
 } from './grants.ts'
@@ -136,7 +136,7 @@ export const createKey = async (
 ): Promise<CreatedApiKey> => {
   const now = Date.now()
   // The terms are checked as the grant they will be before the key exists: only an owner gives `keys`, origins clean.
-  const terms = await newKeyTerms(env.AUTH_DB, userId, workspaceId, { ...input.terms, name: input.name })
+  const terms = await newWorkspaceTerms(env.AUTH_DB, userId, workspaceId, { ...input.terms, name: input.name })
   const auth = createAuth(env, env.AUTH_DB)
   const created = await auth.api.createApiKey({
     body: { organizationId: workspaceId, userId, name: input.name, metadata: { createdBy: userId } },

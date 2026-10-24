@@ -26,7 +26,8 @@ import { crossOrigin, forgedWrite } from '../csrf.ts'
 import { attempt, isAppError } from '../errors.ts'
 import type { Person } from '../../auth/workspaces.ts'
 import { stateWorkspace } from '../../mcp/oauth/sign-in.ts'
-import { AccountApiLayer, AccountRequest, type AccountRecords, WorkspaceAccountApiLayer } from './account.ts'
+import { AccountRequest, type AccountRecords } from './account.ts'
+import { AccountApiLayer, WorkspaceAccountApiLayer } from './account-layers.ts'
 import {
   RequestContext,
   type RequestFacts,
@@ -68,13 +69,6 @@ export const runAtEdge = <A, E>(program: Effect.Effect<A, E>): Promise<A> => Eff
 /** The part of an agent's Durable Object stub the edge calls. */
 type AgentFetch = { readonly fetch: (request: Request) => Promise<Response> }
 
-/** An OAuth client admitted on a workspace's path (ADR 0116): the workspace, its grant's credential there, its person. */
-export interface ClientAdmission {
-  readonly workspace: WorkspaceView
-  readonly credential: Credential
-  readonly member: Member
-}
-
 /** What the edge asks of the deployment, for one request. */
 export interface Edge {
   /** The app's own origin: every browser write comes from it. */
@@ -89,11 +83,12 @@ export interface Edge {
     key: string,
   ) => Effect.Effect<{ readonly workspaceId: string; readonly credential: Credential }, AppError>
   /**
-   * An OAuth client's token on a workspace's path (ADR 0116): the workspace at the slug among those its grant reaches
-   * now for its person, the credential its grant makes there and the person as a member of it; `Unauthenticated` for a
-   * token that does not admit, `NotFound` `workspace` for a slug it does not reach.
+   * An OAuth token on a workspace's path (ADR 0116): the workspace at the slug among those it reaches now, the credential
+   * its grant makes there, and for a client acting for a person that person as a member of it (an installed app's, ADR
+   * 0118, acts for no one); `Unauthenticated` for a token that does not admit, `NotFound` `workspace` for a slug it does
+   * not reach.
    */
-  readonly client: (token: string, slug: string) => Effect.Effect<ClientAdmission, AppError>
+  readonly client: (token: string, slug: string) => Effect.Effect<TokenAdmission, AppError>
   /** A person's membership of the workspace at a slug, read now: the workspace and their role, or none. */
   readonly membership: (userId: string, slug: string) => Effect.Effect<WorkspaceView | undefined, AppError>
   /** A person's membership of the workspace with an ID, read now: the workspace and their role, or none. */
@@ -102,6 +97,13 @@ export interface Edge {
   readonly agent: (workspaceId: string) => AgentFetch
   /** The account's own records, for the account APIs. */
   readonly records: AccountRecords
+}
+
+/** An OAuth token admitted on a workspace's path: its workspace, credential, and the person it acts for if any. */
+export interface TokenAdmission {
+  readonly workspace: WorkspaceView
+  readonly credential: Credential
+  readonly member?: Member
 }
 
 /** What the agent receives besides method, path and body. Cookies and authorization stay at the edge. */
@@ -227,10 +229,12 @@ const admitKey = (
   })
 
 /**
- * Admission of an OAuth client by its token on a workspace's path (ADR 0116): one request has one principal, so a
- * session cookie with it is refused; the token must admit and reach the workspace at `slug` for its person, the
- * person's role must be able to hold what the endpoint needs (`role`), and its grant must hold it (`holds`). The workspace, the credential its grant makes there and the person
- * as a member of it, whose role the agent holds the request to as it does a `/mcp` call's.
+ * Admission of an OAuth token on a workspace's path (ADRs 0116, 0118): one request has one principal, so a session
+ * cookie with it is refused; the token must admit and reach the workspace at `slug` (for a client, for its person; for
+ * an app, by its installation), a client's person's role must be able to hold what the endpoint needs (`role`), and its
+ * grant must hold it (`holds`). The workspace, the
+ * credential its grant makes there and, for a client, its person as a member of it, whose role the agent holds the
+ * request to as it does a `/mcp` call's.
  */
 const admitClient = (
   request: Request,
@@ -238,12 +242,14 @@ const admitClient = (
   token: string,
   slug: string,
   need: Need | undefined,
-): Effect.Effect<ClientAdmission, AppError> =>
+): Effect.Effect<TokenAdmission, AppError> =>
   Effect.gen(function* () {
     if (request.headers.has('cookie')) return yield* new Forbidden({ reason: 'bearer_and_session' })
     const admitted = yield* edge.client(token, slug)
-    // What the person's role could never hold (ROLE_POWER) is refused for it, not offered as a widening.
-    if (need !== undefined && missingFor(GRANT_SPEC, ROLE_POWER[admitted.member.role], need) !== null)
+    // What a client's person's role could never hold (ROLE_POWER) is refused for it, not offered as a widening; an
+    // app has no person, and its installation's grant was capped by its installer's role.
+    const role = admitted.member?.role
+    if (need !== undefined && role !== undefined && missingFor(GRANT_SPEC, ROLE_POWER[role], need) !== null)
       return yield* new Forbidden({ reason: 'role' })
     yield* holds(edge, admitted.credential, need)
     return admitted
@@ -334,10 +340,11 @@ const ACCOUNT_PATHS = [
   '/api/invitations',
   '/api/clients',
   '/api/grants',
+  '/api/install',
   '/api/client-errors',
 ] as const
 /** The workspace account API's paths, under `/w/<workspace slug>`: answered by the Worker, never the agent. */
-const WORKSPACE_ACCOUNT_PATHS = ['/api/keys', '/api/members'] as const
+const WORKSPACE_ACCOUNT_PATHS = ['/api/keys', '/api/members', '/api/developer', '/api/installations'] as const
 const under = (path: string, prefix: string): boolean => path === prefix || path.startsWith(`${prefix}/`)
 export const isAccountPath = (path: string): boolean => ACCOUNT_PATHS.some((prefix) => under(path, prefix))
 const isWorkspaceAccountPath = (path: string): boolean => WORKSPACE_ACCOUNT_PATHS.some((prefix) => under(path, prefix))
@@ -540,9 +547,10 @@ const forwardClient = (
     if (client.inAccount) return yield* new Forbidden({ reason: 'credential' })
     const admitted = yield* admitClient(at.request, at.edge, client.token, client.slug, client.need)
     known(admitted.workspace.id)
+    const { credential, member } = admitted
     return yield* forward({
       ...at,
-      principal: { credential: admitted.credential, member: admitted.member },
+      principal: member === undefined ? { credential } : { credential, member },
       agent: at.edge.agent(admitted.workspace.id),
     })
   })

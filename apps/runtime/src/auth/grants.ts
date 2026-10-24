@@ -18,7 +18,8 @@ import { Forbidden, InvalidInput, NotFound } from '../http/errors.ts'
 
 /**
  * Every credential's grant (`packages/contracts/src/grants.ts`, myapps ADR 0015) in goblin's own auth D1 tables (0005):
- * a server's API key has one, its id the key's own; an OAuth client has one per person who approved it. Its terms are
+ * a server's API key has one, its id the key's own; an OAuth client has one per person who approved it; an installed
+ * app (ADR 0118, 0006) one per installation, its id the installation's. Its terms are
  * the row (level, extras, lifetime, origins, whether it reaches all of its person's workspaces), one `grantWorkspace`
  * row per workspace it names (each kind `all` or `list`, with the generation an agent compares to know its lists
  * moved) and the listed ids in `grantReach`. Plain async over D1, like `clients.ts`; a change that spans rows is one
@@ -33,7 +34,7 @@ export type Coverage = 'all' | 'list'
 /** A grant as the auth store keeps it; times are epoch milliseconds. */
 export interface GrantRecord {
   readonly id: string
-  readonly kind: 'key' | 'client'
+  readonly kind: 'key' | 'client' | 'app'
   readonly keyId: string | undefined
   readonly clientId: string | undefined
   readonly userId: string | undefined
@@ -101,7 +102,7 @@ const iso = (at: number): string => new Date(at).toISOString()
 /** A row as its record; anything unreadable reads as the least it could mean (`read`, no extras, no origins). */
 const recordOf = (row: GrantRow): GrantRecord => ({
   id: row.id,
-  kind: row.kind === 'key' ? 'key' : 'client',
+  kind: row.kind === 'key' || row.kind === 'app' ? row.kind : 'client',
   keyId: row.keyId ?? undefined,
   clientId: row.clientId ?? undefined,
   userId: row.userId ?? undefined,
@@ -389,10 +390,18 @@ const rolesOf = async (db: Database, userId: string): Promise<ReadonlyMap<string
   )
 }
 
-/** The workspace key `keyId` belongs to. */
-const keyWorkspace = async (db: Database, keyId: string): Promise<string | undefined> =>
-  (await db.prepare('SELECT "referenceId" FROM "apikey" WHERE "id" = ?').bind(keyId).first<{ referenceId: string }>())
-    ?.referenceId
+/** The one workspace a key's grant (its key's) or an installed app's (its installation's, ADR 0118) belongs to. */
+const workspaceOfGrant = async (db: Database, grant: GrantRecord): Promise<string | undefined> =>
+  (
+    await db
+      .prepare(
+        grant.kind === 'app'
+          ? 'SELECT "workspaceId" AS workspace FROM "installation" WHERE "id" = ?'
+          : 'SELECT "referenceId" AS workspace FROM "apikey" WHERE "id" = ?',
+      )
+      .bind(grant.kind === 'app' ? grant.id : (grant.keyId ?? ''))
+      .first<{ workspace: string }>()
+  )?.workspace
 
 /** Only an owner may grant `keys` (vocabulary only for now): a role that may not is `Forbidden` `role`. */
 const ownerOnly = (terms: GrantTerms, owner: boolean): void => {
@@ -400,9 +409,9 @@ const ownerOnly = (terms: GrantTerms, owner: boolean): void => {
 }
 
 /**
- * The terms `approver` (a person's user ID) may give `grant`, as saved: a key's need an owner or admin of its workspace
- * and reach only it; a client's need its own person and reach only workspaces they are a member of. A grant they may
- * not approve is `NotFound` (`grant`), so asking reveals none.
+ * The terms `approver` (a person's user ID) may give `grant`, as saved: a key's or an installed app's need an owner or
+ * admin of its workspace and reach only it; a client's need its own person and reach only workspaces they are a member
+ * of. A grant they may not approve is `NotFound` (`grant`), so asking reveals none.
  */
 export const approvedTerms = async (
   db: Database,
@@ -411,8 +420,8 @@ export const approvedTerms = async (
   terms: GrantTerms,
 ): Promise<GrantTerms> => {
   const roles = await rolesOf(db, approver)
-  if (grant.kind === 'key') {
-    const workspace = grant.keyId === undefined ? undefined : await keyWorkspace(db, grant.keyId)
+  if (grant.kind !== 'client') {
+    const workspace = await workspaceOfGrant(db, grant)
     const role = workspace === undefined ? undefined : roles.get(workspace)
     if (workspace === undefined || role === undefined || role === 'member') throw new NotFound({ what: 'grant' })
     ownerOnly(terms, role === 'owner')
@@ -424,10 +433,10 @@ export const approvedTerms = async (
 }
 
 /**
- * The terms a new key of `workspaceId` starts with, made by `userId`: its one workspace, origins checked, and `keys`
- * only from an owner. The plugin checks that they may make keys there at all.
+ * The terms a new key or installation of `workspaceId` starts with, made by `userId`: its one workspace, origins
+ * checked, and `keys` only from an owner. The caller checks that they may make keys or install apps there at all.
  */
-export const newKeyTerms = async (
+export const newWorkspaceTerms = async (
   db: Database,
   userId: string,
   workspaceId: string,
@@ -438,10 +447,13 @@ export const newKeyTerms = async (
   return { ...saved, reach: { ...saved.reach, origins: checkedOrigins(saved.reach.origins) } }
 }
 
-/** Whether `approver` may see and change `grant`: its key's workspace's owner or admin, or its client's person. */
+/**
+ * Whether `approver` may see and change `grant`: its key's or installation's workspace's owner or admin, or its
+ * client's person.
+ */
 export const mayApprove = async (db: Database, approver: string, grant: GrantRecord): Promise<boolean> => {
   if (grant.kind === 'client') return grant.userId === approver
-  const workspace = grant.keyId === undefined ? undefined : await keyWorkspace(db, grant.keyId)
+  const workspace = await workspaceOfGrant(db, grant)
   const role = workspace === undefined ? undefined : (await rolesOf(db, approver)).get(workspace)
   return role === 'owner' || role === 'admin'
 }
@@ -465,7 +477,7 @@ export const setTerms = async (
 /** The statement that makes a grant row; its terms follow (`termsStatements`). */
 const insertGrant = (
   db: Database,
-  row: { readonly id: string; readonly kind: 'key' | 'client'; readonly createdBy: string; readonly name: string },
+  row: { readonly id: string; readonly kind: GrantRecord['kind']; readonly createdBy: string; readonly name: string },
   owner: { readonly keyId?: string; readonly clientId?: string; readonly userId?: string },
   now: number,
 ) =>
@@ -497,12 +509,22 @@ export const createKeyGrant = async (
   now: number,
 ): Promise<GrantTerms> => {
   const saved = keyTerms(terms, key.workspaceId)
-  await db.batch([
-    insertGrant(db, { id: key.keyId, kind: 'key', createdBy: key.userId, name: terms.name }, { keyId: key.keyId }, now),
-    ...termsStatements(db, key.keyId, saved, now),
-  ])
+  const row = { id: key.keyId, kind: 'key', createdBy: key.userId, name: terms.name } as const
+  await db.batch([...newGrantStatements(db, row, { keyId: key.keyId }, saved, now)])
   return saved
 }
+
+/**
+ * The statements that make grant `row` (as `owner`'s: a key, a client and person, or an app's client) with `terms` as
+ * saved; a caller adds its own to the same batch.
+ */
+export const newGrantStatements = (
+  db: Database,
+  row: { readonly id: string; readonly kind: GrantRecord['kind']; readonly createdBy: string; readonly name: string },
+  owner: { readonly keyId?: string; readonly clientId?: string; readonly userId?: string },
+  terms: GrantTerms,
+  now: number,
+): readonly D1PreparedStatement[] => [insertGrant(db, row, owner, now), ...termsStatements(db, row.id, terms, now)]
 
 /**
  * `terms` as the grant `userId` gives MCP client `clientId` (the consent page before its consent, Settings later): a

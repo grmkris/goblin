@@ -16,7 +16,7 @@ type Coverage = 'all' | 'list'
 
 /** A credential as the Worker forwards it, from what a test cares about; the rest every Topic, Persona and connection. */
 export const credential = (parts: {
-  readonly kind?: 'key' | 'client'
+  readonly kind?: Credential['kind']
   readonly id?: string
   readonly name?: string
   readonly grantId?: string

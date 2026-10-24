@@ -77,7 +77,7 @@ export class InboundGroup extends HttpApiGroup.make('inbound').add(
 
 /**
  * Who a published Events lease belongs to (ADR 0112), as the Worker names one whose access it is about to end: a
- * server's key, or an OAuth client acting for a person.
+ * server's key, an OAuth client acting for a person, or an installed app (ADR 0118).
  */
 export const LeaseHolder = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('key'), keyId: Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u)) }),
@@ -85,6 +85,11 @@ export const LeaseHolder = Schema.Union([
     kind: Schema.Literal('client'),
     clientId: Schema.String.check(Schema.isPattern(/^[\w.:-]{1,200}$/u)),
     user: Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u)),
+  }),
+  // An installed app (ADR 0118), by its installation: its grant's id.
+  Schema.Struct({
+    kind: Schema.Literal('app'),
+    installationId: Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u)),
   }),
 ])
 export type LeaseHolder = typeof LeaseHolder.Type

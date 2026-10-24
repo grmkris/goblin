@@ -277,13 +277,18 @@ describe('server API keys (ADRs 0081, 0114)', () => {
     expect(bearerKey(new Request(APP))).toBeUndefined()
   })
 
-  it("serves none of the key and workspace plugins' own routes", async () => {
+  it("serves none of the key, workspace and OAuth client plugins' own management routes (ADR 0118)", async () => {
     const { env } = fixture()
     const paths = [
       ...['create', 'list', 'get', 'update', 'delete', 'verify'].map((path) => `api-key/${path}`),
       ...['create', 'list', 'set-active', 'invite-member', 'accept-invitation', 'add-member', 'update'].map(
         (path) => `organization/${path}`,
       ),
+      ...['create-client', 'update-client', 'delete-client', 'get-client', 'get-clients', 'client/rotate-secret'].map(
+        (path) => `oauth2/${path}`,
+      ),
+      'admin/oauth2/create-client',
+      'admin/oauth2/update-client',
     ]
     for (const path of paths) {
       const response = await handleAuth(

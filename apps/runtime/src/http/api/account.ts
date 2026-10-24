@@ -16,9 +16,7 @@ import type {
 import type { FlowEvent } from '@goblin/contracts/telemetry'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
-import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
-import * as HttpServer from 'effect/http/HttpServer'
 import * as HttpApiBuilder from 'effect/http-api/HttpApiBuilder'
 import { type KeyChange, createKey, listKeys, revokeKey, rotateKey, updateKey } from '../../auth/api-keys.ts'
 import { listInboundClients, revokeInboundClient } from '../../auth/clients.ts'
@@ -40,13 +38,14 @@ import {
   workspacesOf,
 } from '../../auth/workspaces.ts'
 import type { LeaseHolder } from '@goblin/contracts/internal'
-import { internalCall } from '../../inbound/client.ts'
 import type { RuntimeEnv } from '../../env.ts'
 import { logEvent } from '../../observability/logger.ts'
 import { reportAndRecover } from '../../observability/report.ts'
 import { FlowPointFailure, agentHash, flowPoint } from '../../observability/ae.ts'
 import { Forbidden, InvalidInput, Unauthenticated, attempt } from '../errors.ts'
 import { RequestContext } from './context.ts'
+import { type AppRecords, appRecords } from './app-records.ts'
+import { endLeases, installed, key } from './leases.ts'
 import { type MemberRecords, memberRecords } from './member-records.ts'
 
 /** The account's own records the Worker answers from: auth D1 and Analytics Engine, never an agent. */
@@ -91,6 +90,8 @@ export interface AccountRecords {
   /** A new secret for one of the workspace's keys (ADR 0105): the same key, with its secret this once. */
   readonly rotateKey: (workspaceId: string, keyId: string) => Effect.Effect<CreatedApiKey, AppError>
   readonly revokeKey: (workspaceId: string, keyId: string) => Effect.Effect<void, AppError>
+  /** The apps a workspace registered and the apps installed in it, and the install page's calls (ADR 0118). */
+  readonly apps: AppRecords
   /**
    * A browser crash's `client_error` flow point (ADR 0037), under the hash of the person when the report came with a
    * session; nothing without the `FLOWS` binding.
@@ -123,20 +124,6 @@ export const crashPoint = (
   return agent === undefined ? { ...point, indexes: [] } : point
 }
 
-/**
- * Ends every published Events lease `holder` holds in workspace `workspaceId` (ADR 0112), before their access ends: one
- * `terminated` control goes to each. A failure is reported and the access still ends; a lease it missed lapses at its
- * end, a day at most.
- */
-const endLeases = (env: RuntimeEnv, workspaceId: string, holder: LeaseHolder) =>
-  internalCall(env.AGENTS.getByName(workspaceId), (api) => api.publish.terminate({ payload: { holder } })).pipe(
-    Effect.asVoid,
-    reportAndRecover('publish.terminate', undefined),
-  )
-
-/** A key as the leases it holds name it. */
-const key = (keyId: string): LeaseHolder => ({ kind: 'key', keyId })
-
 /** The workspaces client `clientId` reaches for `userId` now: where its leases are. */
 const clientWorkspaces = (env: RuntimeEnv, userId: string, clientId: string) =>
   attempt(() => reachedBy(env.AUTH_DB, userId, clientId)).pipe(
@@ -144,13 +131,15 @@ const clientWorkspaces = (env: RuntimeEnv, userId: string, clientId: string) =>
     reportAndRecover('publish.reach', []),
   )
 
-/** The lease holder a grant's credential is (ADR 0112): its key, or its client for its person. */
+/** The lease holder a grant's credential is (ADR 0112): its key, its installation, or its client for its person. */
 const holderOfGrant = (change: TermsChange): LeaseHolder | undefined =>
-  change.grant.keyId !== undefined
-    ? key(change.grant.keyId)
-    : change.grant.clientId !== undefined && change.grant.userId !== undefined
-      ? { kind: 'client', clientId: change.grant.clientId, user: change.grant.userId }
-      : undefined
+  change.grant.kind === 'app'
+    ? installed(change.grant.id)
+    : change.grant.keyId !== undefined
+      ? key(change.grant.keyId)
+      : change.grant.clientId !== undefined && change.grant.userId !== undefined
+        ? { kind: 'client', clientId: change.grant.clientId, user: change.grant.userId }
+        : undefined
 
 /**
  * `change` made, after the holder's leases in every workspace whose Topics it narrowed were ended: a lease never
@@ -228,6 +217,7 @@ export const accountRecords = (env: RuntimeEnv): AccountRecords => {
         endLeases(env, workspaceId, key(keyId)),
         attempt(() => revokeKey(env, workspaceId, keyId)),
       ),
+    apps: appRecords(env),
   }
 }
 
@@ -248,7 +238,7 @@ export class AccountRequest extends Context.Service<
 >()('goblin/http/AccountRequest') {}
 
 /** The signed-in person. Admission has checked the session already; this only says so to the types. */
-const signedIn = AccountRequest.use(({ records, person }) =>
+export const signedIn = AccountRequest.use(({ records, person }) =>
   Option.match(person, {
     onNone: () => Effect.fail(new Unauthenticated({ reason: 'session required' })),
     onSome: (signed) => Effect.succeed({ records, person: signed }),
@@ -266,12 +256,12 @@ const member = Effect.flatMap(signedIn, ({ records, person }) =>
 )
 
 /** The member, when they are one of the workspace's owners or admins: who manage its keys and members. */
-const manager = Effect.flatMap(member, (admitted) =>
+export const manager = Effect.flatMap(member, (admitted) =>
   admitted.workspace.role === 'member' ? Effect.fail(new Forbidden({ reason: 'role' })) : Effect.succeed(admitted),
 )
 
 /** `self`, its failure quoting the request's reference, as owner admission quotes it. */
-const quoted = <A, E extends AppError, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+export const quoted = <A, E extends AppError, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
   Effect.flatMap(Effect.serviceOption(RequestContext), (context) => {
     const ref = Option.getOrUndefined(context)?.ref
     if (ref === undefined) return self
@@ -305,7 +295,7 @@ const logReport = (report: ClientErrorReport) =>
     ...(report.ref === undefined ? {} : { ref: report.ref }),
   })
 
-const WorkspacesHandlers = HttpApiBuilder.group(AccountApi, 'workspaces', (handlers) =>
+export const WorkspacesHandlers = HttpApiBuilder.group(AccountApi, 'workspaces', (handlers) =>
   handlers
     .handle('list', () => quoted(Effect.flatMap(signedIn, ({ records, person }) => records.workspaces(person))))
     .handle('create', ({ payload }) =>
@@ -328,7 +318,7 @@ const WorkspacesHandlers = HttpApiBuilder.group(AccountApi, 'workspaces', (handl
 )
 
 /** A person's MCP clients and the workspaces each reaches (ADR 0097): theirs alone, whatever workspace they are in. */
-const ClientsHandlers = HttpApiBuilder.group(AccountApi, 'clients', (handlers) =>
+export const ClientsHandlers = HttpApiBuilder.group(AccountApi, 'clients', (handlers) =>
   handlers
     .handle('list', () => quoted(Effect.flatMap(signedIn, ({ records, person }) => records.clients(person.id))))
     .handle('revoke', ({ params }) =>
@@ -341,7 +331,7 @@ const ClientsHandlers = HttpApiBuilder.group(AccountApi, 'clients', (handlers) =
 )
 
 /** A grant's level and extras as an audit line carries them: a few short tokens, never a name or an id it reaches. */
-const powerOf = (terms: GrantTerms): readonly string[] => [terms.level, ...terms.extras]
+export const powerOf = (terms: GrantTerms): readonly string[] => [terms.level, ...terms.extras]
 
 /**
  * A key's grant's new terms (ADRs 0084, 0114), as a manager's change of it is audited: one `api_key` line with the key,
@@ -381,7 +371,7 @@ const audited = (change: TermsChange, by: string): Effect.Effect<WidenResult> =>
  * Grants as the person approving them sees them (ADR 0114): what the consent and widening pages show, and their
  * approval, widened or narrowed. Theirs alone: a grant they may not approve is not found.
  */
-const GrantsHandlers = HttpApiBuilder.group(AccountApi, 'grants', (handlers) =>
+export const GrantsHandlers = HttpApiBuilder.group(AccountApi, 'grants', (handlers) =>
   handlers
     .handle('terms', ({ params }) =>
       quoted(Effect.flatMap(signedIn, ({ records, person }) => records.grantTerms(person, params.id))),
@@ -421,7 +411,7 @@ const rotateSecret = (keyId: string) =>
     return rotated
   })
 
-const KeysHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'keys', (handlers) =>
+export const KeysHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'keys', (handlers) =>
   handlers
     .handle('list', () => quoted(Effect.flatMap(manager, ({ records, workspace }) => records.keys(workspace.id))))
     .handle('create', ({ payload }) =>
@@ -443,7 +433,7 @@ const KeysHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'keys', (handlers
 )
 
 /** The person's invitations (ADR 0093): one's preview needs no session, the rest the person it is for. */
-const InvitationsHandlers = HttpApiBuilder.group(AccountApi, 'invitations', (handlers) =>
+export const InvitationsHandlers = HttpApiBuilder.group(AccountApi, 'invitations', (handlers) =>
   handlers
     .handle('mine', () => quoted(Effect.flatMap(signedIn, ({ records, person }) => records.members.mine(person))))
     .handle('preview', ({ params }) => quoted(AccountRequest.use(({ records }) => records.members.preview(params.id))))
@@ -463,7 +453,7 @@ const InvitationsHandlers = HttpApiBuilder.group(AccountApi, 'invitations', (han
  * A workspace's members and invitations (ADR 0093): every member reads its members and may leave; its owners and
  * admins invite, change and remove (and `auth/members.ts` decides who may change whom).
  */
-const MembersHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'members', (handlers) =>
+export const MembersHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'members', (handlers) =>
   handlers
     .handle('list', () =>
       quoted(Effect.flatMap(member, ({ records, workspace }) => records.members.list(workspace.id))),
@@ -513,18 +503,6 @@ const MembersHandlers = HttpApiBuilder.group(WorkspaceAccountApi, 'members', (ha
     ),
 )
 
-const ClientErrorsHandlers = HttpApiBuilder.group(AccountApi, 'clientErrors', (handlers) =>
+export const ClientErrorsHandlers = HttpApiBuilder.group(AccountApi, 'clientErrors', (handlers) =>
   handlers.handle('report', ({ payload }) => takeReport(payload)),
-)
-
-/** The account API's routes, served by the Worker (`edge.ts`). */
-export const AccountApiLayer = HttpApiBuilder.layer(AccountApi).pipe(
-  Layer.provide([WorkspacesHandlers, InvitationsHandlers, ClientsHandlers, GrantsHandlers, ClientErrorsHandlers]),
-  Layer.provide(HttpServer.layerServices),
-)
-
-/** The workspace account API's routes, served by the Worker for a member (`edge.ts`). */
-export const WorkspaceAccountApiLayer = HttpApiBuilder.layer(WorkspaceAccountApi).pipe(
-  Layer.provide([KeysHandlers, MembersHandlers]),
-  Layer.provide(HttpServer.layerServices),
 )

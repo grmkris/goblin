@@ -74,7 +74,11 @@ const reachOptions = (workspaces: readonly WorkspaceView[], reach: GoblinReach |
     }
   })
 
-const spec = (workspaces: readonly WorkspaceView[], reach: GoblinReach | undefined): ConsentTerms['spec'] => ({
+/** The grant editor's spec over `workspaces`: the levels and extras, and what may be reached in each. */
+export const consentSpec = (
+  workspaces: readonly WorkspaceView[],
+  reach: GoblinReach | undefined,
+): ConsentTerms['spec'] => ({
   levels: GRANT_SPEC.levels,
   extras: GRANT_SPEC.extras,
   reachOptions: reachOptions(workspaces, reach),
@@ -109,7 +113,7 @@ export const clientTerms = async (env: RuntimeEnv, person: Person, clientId: str
     },
   )
   return {
-    spec: spec(workspaces, current?.reach ?? defaults.reach),
+    spec: consentSpec(workspaces, current?.reach ?? defaults.reach),
     defaults,
     current,
     ...(live === undefined || current === null
@@ -127,16 +131,16 @@ const approvable = async (env: RuntimeEnv, person: Person, grantId: string): Pro
 
 /**
  * What the widening page shows `person` for grant `grantId`: its terms (as the defaults too), summary and id, and what
- * may be chosen: the key's workspace for a key's, the person's workspaces for a client's.
+ * may be chosen: the key's or installation's workspace for theirs, the person's workspaces for a client's.
  */
 export const grantTerms = async (env: RuntimeEnv, person: Person, grantId: string): Promise<ConsentTerms> => {
   const grant = await approvable(env, person, grantId)
   const current = await termsOf(env.AUTH_DB, grant)
   const mine = await workspacesOf(env.AUTH_DB, person, new Date())
   const named = new Set(current.reach.each.map((each) => each.workspace))
-  const workspaces = grant.kind === 'key' ? mine.filter((workspace) => named.has(workspace.id)) : mine
+  const workspaces = grant.kind === 'client' ? mine : mine.filter((workspace) => named.has(workspace.id))
   return {
-    spec: spec(workspaces, current.reach),
+    spec: consentSpec(workspaces, current.reach),
     defaults: current,
     current,
     summary: summaryOf(env.APP_URL, grant, current),

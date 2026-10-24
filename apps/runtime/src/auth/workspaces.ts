@@ -74,7 +74,7 @@ export interface Reached {
 /**
  * What `userId`'s grant to MCP client `clientId` reaches now (ADRs 0097, 0114): every workspace they are a member of
  * when it reaches all of theirs (ones joined since included), else those it names that they still are; none without a
- * grant, or with a revoked one. Its end is the token's check (`verifyClientToken`). One D1 round trip, read on every
+ * grant, or with a revoked one. Its end is the token's check (`verifyAccessToken`). One D1 round trip, read on every
  * call.
  */
 export const reachedBy = async (db: Database, userId: string, clientId: string): Promise<Reached | undefined> => {
@@ -220,12 +220,19 @@ export const updateWorkspace = async (
 }
 
 /**
- * Removes a workspace's records once its agent is gone: its keys with their grants, its place in MCP clients' grants
- * (ADRs 0097, 0114), and the workspace, whose memberships and invitations go with it.
+ * Removes a workspace's records once its agent is gone: its keys with their grants, the apps installed in it with their
+ * grants and the apps it registered with every installation of them (ADR 0118), its place in MCP clients' grants (ADRs
+ * 0097, 0114), and the workspace, whose memberships and invitations go with it.
  */
 const removeRecords = (db: Database, workspaceId: string) =>
   db.batch([
     db.prepare('DELETE FROM "grant" WHERE "keyId" IN (SELECT id FROM apikey WHERE referenceId = ?)').bind(workspaceId),
+    db
+      .prepare('DELETE FROM "grant" WHERE "id" IN (SELECT "id" FROM "installation" WHERE "workspaceId" = ?)')
+      .bind(workspaceId),
+    db
+      .prepare('DELETE FROM "oauthClient" WHERE "clientId" IN (SELECT "clientId" FROM "app" WHERE "workspaceId" = ?)')
+      .bind(workspaceId),
     db.prepare('DELETE FROM apikey WHERE referenceId = ?').bind(workspaceId),
     db.prepare('DELETE FROM "grantWorkspace" WHERE "workspaceId" = ?').bind(workspaceId),
     db.prepare('DELETE FROM organization WHERE id = ?').bind(workspaceId),

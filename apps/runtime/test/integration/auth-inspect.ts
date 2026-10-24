@@ -168,7 +168,7 @@ async function token(base: string, who: Person, form: Record<string, string>) {
 }
 
 /** An MCP client of /mcp with a bearer token, through the real Worker. */
-async function connect(base: string, access: string) {
+export async function connect(base: string, access: string) {
   const client = new Client({ name: 'inspect-fixture', version: '1.0.0' })
   await client.connect(
     new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
@@ -410,7 +410,7 @@ export async function keyWideningCase(base: string) {
 }
 
 /** A tool call's structured answer, or its error result's text. */
-const answerOf = async (client: Client, name: string, args: Record<string, unknown>) => {
+export const answerOf = async (client: Client, name: string, args: Record<string, unknown>) => {
   const result = await client.callTool({ name, arguments: args })
   return result.isError === true ? { error: JSON.stringify(result.content) } : result.structuredContent
 }

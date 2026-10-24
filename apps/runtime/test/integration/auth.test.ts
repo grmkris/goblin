@@ -8,6 +8,7 @@ import Stack from './auth-stack.ts'
 import { call, person, signedIn } from './owner-requests.ts'
 import { answerOf } from './probe-reads.ts'
 import { connectionSetupCase, inspectAuthCase, keyWideningCase, reachCase, restBearerCase } from './auth-inspect.ts'
+import { installsCase } from './installs-case.ts'
 
 const harness = Test.make({
   providers: Cloudflare.providers(),
@@ -236,5 +237,12 @@ harness.test(
   Effect.gen(function* () {
     const { url } = yield* stack
     yield* Effect.promise(() => connectionSetupCase(url))
+  }),
+)
+harness.test(
+  'apps install into a workspace and reach it with their own token, and nothing else (ADR 0118)',
+  Effect.gen(function* () {
+    const { url } = yield* stack
+    yield* Effect.promise(() => installsCase(url))
   }),
 )

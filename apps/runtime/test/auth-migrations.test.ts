@@ -79,8 +79,11 @@ const OWN_INDEXES: Readonly<Record<string, readonly { unique: boolean; columns: 
   member: [{ unique: true, columns: ['organizationId', 'userId'] }],
 }
 
-/** goblin's own tables in the auth D1, beside Better Auth's: each credential's grant, its workspaces and its lists. */
-const OWN_TABLES = ['grant', 'grantWorkspace', 'grantReach'] as const
+/**
+ * goblin's own tables in the auth D1, beside Better Auth's: each credential's grant, its workspaces and its lists, and
+ * the apps workspaces registered and installed (ADR 0118).
+ */
+const OWN_TABLES = ['app', 'grant', 'grantWorkspace', 'grantReach', 'installation'] as const
 
 /** Compare the SQL to the installed Better Auth schema, not to a second manually maintained column list. */
 function checkTable(db: DatabaseSync, table: string, schema: ReturnType<typeof getSchema>[string]) {
@@ -151,6 +154,7 @@ describe('auth D1 baseline', () => {
       '0003_mcp_reach.sql',
       '0004_mcp_powers.sql',
       '0005_grants.sql',
+      '0006_apps.sql',
     ])
     const { db, auth } = fixture()
     await auth.$context
@@ -611,6 +615,66 @@ describe('auth D1 baseline', () => {
     expect(
       rows("SELECT name FROM sqlite_master WHERE name IN ('mcpReach', 'mcpReachWorkspace', 'grantConsent')"),
     ).toEqual([])
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+  })
+
+  it('rebuilds the grant tables keeping every grant, and takes apps and their installations, which cascade (ADR 0118)', () => {
+    const db = new DatabaseSync(':memory:')
+    databases.push(db)
+    const apps = '0006_apps.sql'
+    for (const name of migrations.slice(0, migrations.indexOf(apps))) db.exec(readFileSync(join(DIR, name), 'utf8'))
+    db.exec(`
+      INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt)
+        VALUES ('u1', 'Kris', 'kris@example.test', 1, '${NOW}', '${NOW}');
+      INSERT INTO organization (id, name, slug, createdAt) VALUES ('w1', 'Mine', 'mine', '${NOW}');
+      INSERT INTO apikey (id, configId, referenceId, key, createdAt, updatedAt) VALUES ('k1', 'default', 'w1', 'h', '${NOW}', '${NOW}');
+      INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]'), ('c2', 'client-2', '[]');
+      INSERT INTO "grant" (id, kind, keyId, name, level, extras, lifetime, workspacesAll, origins, createdAt, updatedAt)
+        VALUES ('k1', 'key', 'k1', 'svc', 'manage', '["setup"]', '365d', 0, '[]', '${NOW}', '${NOW}');
+      INSERT INTO "grant" (id, kind, clientId, userId, name, level, createdAt, updatedAt)
+        VALUES ('cg_1', 'client', 'client-1', 'u1', 'Claude', 'write', '${NOW}', '${NOW}');
+      INSERT INTO grantWorkspace (grantId, workspaceId, topics, personas, connections, generation)
+        VALUES ('k1', 'w1', 'all', 'all', 'list', 7), ('cg_1', 'w1', 'list', 'all', 'all', 3);
+      INSERT INTO grantReach (grantId, workspaceId, kind, resourceId) VALUES ('k1', 'w1', 'connection', 'mysi'),
+        ('cg_1', 'w1', 'topic', '1');
+    `)
+    const rows = (sql: string) => db.prepare(sql).all()
+    const before = {
+      grants: rows('SELECT * FROM "grant" ORDER BY id'),
+      workspaces: rows('SELECT * FROM grantWorkspace ORDER BY grantId'),
+      listed: rows('SELECT * FROM grantReach ORDER BY grantId'),
+    }
+    db.exec(readFileSync(join(DIR, apps), 'utf8'))
+    expect({
+      grants: rows('SELECT * FROM "grant" ORDER BY id'),
+      workspaces: rows('SELECT * FROM grantWorkspace ORDER BY grantId'),
+      listed: rows('SELECT * FROM grantReach ORDER BY grantId'),
+    }).toEqual(before)
+    // An app's grant names its client and no person; any other shape is refused.
+    db.exec(`
+      INSERT INTO app (clientId, workspaceId, terms, script, createdBy, createdAt) VALUES ('client-2', 'w1', '{}', 0, 'u1', '${NOW}');
+      INSERT INTO "grant" (id, kind, clientId, name, level, createdAt, updatedAt)
+        VALUES ('in_1', 'app', 'client-2', 'Swarmm', 'write', '${NOW}', '${NOW}');
+      INSERT INTO grantWorkspace (grantId, workspaceId) VALUES ('in_1', 'w1');
+      INSERT INTO installation (id, clientId, workspaceId, approvedBy, createdAt) VALUES ('in_1', 'client-2', 'w1', 'u1', '${NOW}');
+    `)
+    const insertGrant = db.prepare(
+      'INSERT INTO "grant" (id, kind, keyId, clientId, userId, name, level, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    )
+    expect(() => insertGrant.run('in_2', 'app', null, 'client-2', 'u1', 'x', 'read', NOW, NOW)).toThrow()
+    expect(() => insertGrant.run('in_3', 'app', 'k1', 'client-2', null, 'x', 'read', NOW, NOW)).toThrow()
+    expect(() =>
+      db
+        .prepare('INSERT INTO installation (id, clientId, workspaceId, createdAt) VALUES (?, ?, ?, ?)')
+        .run('k1', 'client-2', 'w1', NOW),
+    ).toThrow()
+    // The person who approved it may go; the installation stays. The client going takes the app and all of it.
+    db.exec("DELETE FROM user WHERE id = 'u1'")
+    expect(rows('SELECT id, approvedBy FROM installation')).toEqual([{ id: 'in_1', approvedBy: 'u1' }])
+    db.exec("DELETE FROM oauthClient WHERE clientId = 'client-2'")
+    for (const table of ['app', 'installation'])
+      expect(db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get(), table).toEqual({ count: 0 })
+    expect(rows('SELECT id FROM "grant" ORDER BY id')).toEqual([{ id: 'k1' }])
     expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([])
   })
 

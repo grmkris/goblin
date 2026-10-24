@@ -97,7 +97,8 @@ export const senderOf = (facts: {
 }): Sender | undefined => {
   const { credential, member } = facts
   const grant = grantOf
-  if (credential?.kind === 'key') return { kind: 'key', grant: grant(credential) }
+  // An installed app's work is a server's, as a key's is (ADR 0118).
+  if (credential?.kind === 'key' || credential?.kind === 'app') return { kind: 'key', grant: grant(credential) }
   // A client acts for a person; one forwarded without them holds no more than a member would.
   if (credential?.kind === 'client') return { kind: 'client', role: member?.role ?? 'member', grant: grant(credential) }
   return member === undefined ? undefined : { kind: 'person', role: member.role }

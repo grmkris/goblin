@@ -11,6 +11,7 @@ import { safeErrorType } from '../observability/report.ts'
 import { CODE_SEND, CODE_SIGN_IN, guardEmailCode } from './email-code.ts'
 import { codeMail, mailerOf } from './mail.ts'
 import { guardOidc, oidcPlugin, oidcProviderOf, refuseUnverifiedOidcUser, withoutProviderTokens } from './oidc.ts'
+import { clientSecretHash } from './client-secret.ts'
 import { KEY_LENGTH, KEY_PREFIX, KEY_START_LENGTH, MCP_SCOPES, mcpResource } from './resources.ts'
 import { workspaceAccess } from './roles.ts'
 import { deleteAgentOf } from './account.ts'
@@ -237,6 +238,13 @@ const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeed
     // A consent names no workspace (ADR 0097): which of the person's workspaces a client reaches is its grant's reach,
     // which the consent page sets first and every /mcp call reads, so the standard consent and its re-authorization
     // apply.
+    // An app's secret is kept as Better Auth's default hash, named here so goblin's rotation writes the same
+    // (`client-secret.ts`, ADR 0118).
+    storeClientSecret: { hash: clientSecretHash },
+    // Only goblin registers clients with the client_credentials grant: server-side, after its own check that the
+    // person manages the workspace (`installs.ts`). Better Auth's own client endpoints are not served (`handleAuth`), so
+    // this hook only ever answers goblin's calls.
+    clientPrivileges: () => true,
   })
   return {
     appName: 'goblin',

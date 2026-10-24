@@ -33,17 +33,23 @@ export const requireUserSession = async (request: Request, env: RuntimeEnv): Pro
 }
 
 /**
- * An inbound MCP client's access token: a signature from our own JWKS (read locally, no self-fetch), our issuer and
- * /mcp audience, an enabled client, the person's standing consent to it (ADR 0097: a consent names no workspace) and
- * the live grant they gave it (ADR 0114). The token's scopes count for nothing: what it may do is that grant, read on
- * every call, so changing it in Settings applies to the live token at once and revoking the client ends it. A grant
- * past its end ends the consent and the client's refresh tokens with it (`grant_expired`), so the next sign-in asks
- * again, pre-filled with the same terms.
+ * A verified access token: an OAuth client acting for a person, with the grant they gave it, or an installed app's own
+ * (ADR 0118), whose subject is its client and whose grants are its installations' (`installs.ts`).
  */
-export const verifyClientToken = async (
-  token: string,
-  env: RuntimeEnv,
-): Promise<ClientPrincipal & { readonly grant: GrantRecord }> => {
+export type VerifiedToken =
+  | (ClientPrincipal & { readonly kind: 'client'; readonly grant: GrantRecord })
+  | (ClientPrincipal & { readonly kind: 'app' })
+
+/**
+ * An inbound access token: a signature from our own JWKS (read locally, no self-fetch), our issuer and /mcp audience
+ * and an enabled client. Then, for a token whose subject is its own client (the client_credentials grant), that the
+ * client is an app a workspace registered (ADR 0118); for any other, the person's standing consent to the client
+ * (ADR 0097: a consent names no workspace) and the live grant they gave it (ADR 0114). The token's scopes count for
+ * nothing: what it may do is a grant, read on every call, so changing it applies to the live token at once and revoking
+ * or uninstalling ends it. A client grant past its end ends the consent and the client's refresh tokens with it
+ * (`grant_expired`), so the next sign-in asks again, pre-filled with the same terms.
+ */
+export const verifyAccessToken = async (token: string, env: RuntimeEnv): Promise<VerifiedToken> => {
   const auth = createAuth(env, env.AUTH_DB)
   const resource = mcpResource(env.APP_URL)
   let claims: TokenClaims
@@ -61,6 +67,15 @@ export const verifyClientToken = async (
     .bind(principal.clientId)
     .first<{ disabled: number | null }>()
   if (client === null || client.disabled === 1) throw new Unauthenticated({ reason: 'client revoked' })
+  if (principal.subject === principal.clientId) {
+    // No person: an app's own token. Only an app a workspace registered may hold one; what it reaches is its
+    // installations, which the caller reads.
+    const app = await env.AUTH_DB.prepare('SELECT 1 AS present FROM "app" WHERE "clientId" = ?')
+      .bind(principal.clientId)
+      .first<{ present: number }>()
+    if (app === null) throw new Unauthenticated({ reason: 'client' })
+    return { ...principal, kind: 'app' }
+  }
   const consent = await env.AUTH_DB.prepare(
     'SELECT 1 AS present FROM oauthConsent WHERE clientId = ? AND userId = ? AND referenceId IS NULL',
   )
@@ -74,8 +89,22 @@ export const verifyClientToken = async (
     await revokeClientGrant(env.AUTH_DB, principal.subject, principal.clientId, now)
     throw new Unauthenticated({ reason: 'grant_expired' })
   }
-  return { ...principal, grant }
+  return { ...principal, kind: 'client', grant }
 }
+
+/**
+ * Better Auth's own OAuth client management (ADR 0118): goblin registers, rotates and ends the clients apps are through
+ * its account API, so none of these is served. Registration (`/oauth2/register`), the consent page's reads and the
+ * OAuth flow itself are.
+ */
+const CLIENT_ROUTES: ReadonlySet<string> = new Set([
+  '/oauth2/create-client',
+  '/oauth2/update-client',
+  '/oauth2/delete-client',
+  '/oauth2/get-client',
+  '/oauth2/get-clients',
+  '/oauth2/client/rotate-secret',
+])
 
 /**
  * No logging of auth request content; the provider owns its discovery/OAuth responses. The OpenID Connect provider is
@@ -83,9 +112,14 @@ export const verifyClientToken = async (
  */
 export const handleAuth = (request: Request, env: RuntimeEnv): Promise<Response> => {
   const path = new URL(request.url).pathname
-  // API keys and workspaces are made, changed and ended only through the account APIs (ADRs 0081, 0089): none of
-  // their plugins' own routes is served.
-  if (path.startsWith(`${AUTH_BASE_PATH}/api-key/`) || path.startsWith(`${AUTH_BASE_PATH}/organization/`))
+  // API keys, workspaces and apps are made, changed and ended only through the account APIs (ADRs 0081, 0089, 0118):
+  // none of their plugins' own routes is served.
+  if (
+    path.startsWith(`${AUTH_BASE_PATH}/api-key/`) ||
+    path.startsWith(`${AUTH_BASE_PATH}/organization/`) ||
+    path.startsWith(`${AUTH_BASE_PATH}/admin/`) ||
+    CLIENT_ROUTES.has(path.slice(AUTH_BASE_PATH.length))
+  )
     return Promise.resolve(new Response('Not found', { status: 404 }))
   const provider = path.startsWith(`${AUTH_BASE_PATH}/`) && isOidcPath(path.slice(AUTH_BASE_PATH.length))
   return createAuth(env, env.AUTH_DB, { provider }).handler(request)

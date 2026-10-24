@@ -38,11 +38,11 @@ export const requestCredential: Effect.Effect<Credential | undefined> = Effect.m
 )
 
 /**
- * The key the current request came with: its work is a server's (ADR 0087), on the deployment's models. None for a
- * member's session, an OAuth client acting for a person or work outside a request.
+ * The key or installed app the current request came with: its work is a server's (ADRs 0087, 0118), on the
+ * deployment's models. None for a member's session, an OAuth client acting for a person or work outside a request.
  */
 export const requestKey: Effect.Effect<Credential | undefined> = Effect.map(requestCredential, (credential) =>
-  credential?.kind === 'key' ? credential : undefined,
+  credential?.kind === 'key' || credential?.kind === 'app' ? credential : undefined,
 )
 
 /**
@@ -98,7 +98,7 @@ export const requestAuthor: Effect.Effect<string | undefined> = Effect.map(
     const facts = Option.getOrUndefined(context)
     const member = facts?.member
     const credential = facts?.credential
-    if (credential?.kind === 'key') return serverAuthor(credential.name)
+    if (credential?.kind === 'key' || credential?.kind === 'app') return serverAuthor(credential.name)
     if (credential?.kind === 'client')
       return clientAuthor(credential.name, member?.shared === true ? member.name : undefined)
     if (credential === undefined && member?.shared === true) return memberAuthor(member.name, member.user)
@@ -167,7 +167,7 @@ export const claim = (kind: 'topic' | 'persona', id: number, created: boolean) =
       return yield* grants.append(credential, item)
     }
     yield* grants.append(credential, item)
-    if (credential.kind !== 'key') return
+    if (credential.kind === 'client') return
     const now = yield* epochSeconds
     const db = yield* Db
     yield* attemptSync(() => recordMaker(db, { keyId: credential.id, name: credential.name }, kind, id, now))

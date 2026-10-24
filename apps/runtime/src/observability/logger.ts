@@ -19,6 +19,7 @@ import { sanitizeAttributes } from '../telemetry/safety.ts'
 /** What a line is about. Closed: an area that writes a new kind of line adds it here, in alphabetical order. */
 const LOG_EVENTS = [
   'api_key',
+  'app',
   'client_error',
   'failure',
   'file-link',

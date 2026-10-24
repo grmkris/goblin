@@ -25,6 +25,7 @@ const PERSON_PATHS = [
   '/api/invitations',
   '/api/clients',
   '/api/grants',
+  '/api/install/',
   '/api/client-errors',
 ]
 
