@@ -58,7 +58,30 @@ one workspace; an OAuth client reaches the workspaces its grant names ([ADRs
 0097](../adr/0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md), [0114](../adr/0114-one-grant-for-every-credential.md)),
 read with the person's memberships on every call, and each call names the one it is for: in its `/mcp` arguments, or
 in its path (`/w/<slug>/api/…`, [ADR 0116](../adr/0116-an-oauth-client-uses-the-owner-api-too.md)). A person's clients are
-theirs, at `/api/clients` (`auth/clients.ts`).
+theirs, at `/api/clients` (`auth/clients.ts`). An installed app reaches the workspaces it is installed in, read on every
+call, and names one the same way ([ADR 0118](../adr/0118-a-product-installs-into-a-workspace.md)).
+
+### Apps and installations
+
+A product, or a script, reaches goblin as an app ([ADR 0118](../adr/0118-a-product-installs-into-a-workspace.md),
+`auth/installs.ts`): a confidential OAuth client a workspace registers (Settings → Developer,
+`/w/<slug>/api/developer/apps`, an owner or admin), made server-side through Better Auth's admin registration with the
+`client_credentials` grant and `client_secret_basic`, and given to the workspace (its `oauthClient` row names no
+person). goblin's `app` table keeps whose it is, the terms it asks for and whether it is a script app. Its secret is
+shown once; rotating writes the hash the token endpoint checks (`auth/client-secret.ts`, `storeClientSecret`). Better
+Auth's own client endpoints are not served (`handleAuth`).
+
+An owner or admin of a workspace installs it there from `/install/<clientId>` (`GET|POST /api/install/:clientId`):
+one of the workspaces they own or administer, the grant editor prefilled with what the app asks for. The installation
+(`installation`, once per app and workspace) has a grant of kind `app` whose id is its own, reaching that workspace
+only; Settings → Installed apps (`/w/<slug>/api/installations`) changes or ends it. Approving sends the person back to
+a return address the app registered, with `installation`, `workspace` and `state`. A script app has none and is
+installed in its own workspace as it is registered.
+
+The app's backend gets an hour-long token from `POST /api/auth/oauth2/token` (`grant_type=client_credentials`, HTTP
+Basic, `resource=<origin>/mcp`, `scope=goblin`; `goblin token` in the CLI). Its subject is the client
+(`verifyAccessToken`), and it reaches the workspaces the app is installed in now, as a bearer on `/w/<slug>/api/…` or on
+`/mcp` (`inbound/client-access.ts`), each request as that installation's credential (kind `app`) with no member.
 
 ### Grants
 
@@ -67,11 +90,12 @@ Every credential has one grant ([ADR 0114](../adr/0114-one-grant-for-every-crede
 (its level, extras, lifetime and end, whether it reaches all of its person's workspaces, the MCP origins its threads
 may bring, revoked or not), `grantWorkspace` (per workspace, Topics, Personas and connections each `all` or `list`,
 and a generation that only moves on) and `grantReach` (the listed ids). A key's grant has the key's id and reaches its
-one workspace; a client's has its own id (`cg_…`), one per client and person. A change bumps the generation of every
+one workspace; a client's has its own id (`cg_…`), one per client and person; an installation's has the installation's
+id and reaches its one workspace. A change bumps the generation of every
 workspace it names, and a credential's create appends what it made to a list it has (`appendReach`).
 
-Approving is the person's who may: a key's grant an owner or admin of its workspace, a client's its own person; only
-an owner gives `keys`. A grant they may not approve is not found. `GET /api/grants/:id/terms` and `PUT /api/grants/:id`
+Approving is the person's who may: a key's or an installation's grant an owner or admin of its workspace, a client's its
+own person; only an owner gives `keys`. A grant they may not approve is not found. `GET /api/grants/:id/terms` and `PUT /api/grants/:id`
 serve the widening page a refusal links to (`/consent/widen?grant=…`); `GET /api/clients/:clientId/terms` and
 `PUT /api/clients/:clientId/grant` the consent page (before the consent) and Settings (`auth/consent-terms.ts`). A change
 that narrows a grant's Topics ends its holder's published Events leases there first.

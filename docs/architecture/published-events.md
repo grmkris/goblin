@@ -79,7 +79,8 @@ unsupported, -32015 the callback did not verify; `data` is goblin's error envelo
 - **Length.** `ttlMs` asks for a lease: an hour unless you ask, at least five minutes, at most a day. Renew by
   subscribing again with the same name, arguments and URL before `refreshBefore`; a lease not renewed ends with a
   `terminated` control.
-- **Identity.** A lease is its holder (your key, or your client for its person), its selector and its URL: subscribing
+- **Identity.** A lease is its holder (your key, your app's installation, or your client for its person), its
+  selector and its URL: subscribing
   again with all three finds the same lease (and may change its secret), unsubscribing with all three ends it.
 - **Limits.** 32 leases per holder, 256 per workspace (-32013, `Conflict` `event_subscriptions`).
 

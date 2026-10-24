@@ -31,6 +31,11 @@ server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)
   local JWKS, names `/mcp` as audience, comes from an enabled client, and the person's consent and a live grant still
   exist; its scope claim counts for nothing (`auth/service.ts`). A grant past its end deletes the consent and revokes
   the refresh tokens (`grant_expired`), so the next sign-in asks again.
+- **Installed apps.** A token whose subject is its own client is an app's
+  ([ADR 0118](../adr/0118-a-product-installs-into-a-workspace.md)): no consent, no person. It reaches the workspaces the
+  app is installed in now, each with that installation's grant, and every call goes to one as that installation's
+  credential (kind `app`) with no member. Its tools are listed by the most its installations hold; owner admission
+  holds each call to its own installation's grant.
 - **Workspaces.** Every request reads the grant's workspaces (`reachedBy`, `auth/workspaces.ts`): the person's
   memberships when it reaches all of them, else those it names that they are still a member of, with their role in
   each. A client given exactly one never names it; any other has a required `workspace` argument (an id or slug) on

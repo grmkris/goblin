@@ -11,11 +11,12 @@ in `packages/contracts/src/api`: `OwnerApi`, which each workspace's agent serves
 account API is answered in the Worker (`http/api/account.ts`): `workspaces` for any signed-in person, and
 `clientErrors`, a browser crash report, without a session. A member's request names its workspace's slug in its path
 (`/w/<slug>/api/…`): the edge admits the session as below, then reads the person's membership of that workspace (a 404
-when there is none), answers the workspace account API's groups itself (`keys`, for an owner or admin, and `clients`,
-the OAuth clients the member connected to it) and forwards every other path to the workspace's agent as `/api/…`. An
-OAuth client's token on the same path ([ADR 0116](../adr/0116-an-oauth-client-uses-the-owner-api-too.md)) is admitted
-by the workspaces its grant reaches for its person instead (`inbound/client-access.ts`, as `/mcp` admits it), and only
-forwarded. A server's request reaches `/api/…` with its key alone, and goes to the key's workspace. Every request on
+when there is none), answers the workspace account API's groups itself (`keys`, `developerApps` and `installations`
+for an owner or admin, and `clients`, the OAuth clients the member connected to it) and forwards every other path to the workspace's agent as `/api/…`. An
+OAuth client's or an installed app's token on the same path ([ADRs 0116](../adr/0116-an-oauth-client-uses-the-owner-api-too.md),
+[0118](../adr/0118-a-product-installs-into-a-workspace.md)) is admitted by the workspaces it reaches instead (a client's
+grant for its person, an app's installations; `inbound/client-access.ts`, as `/mcp` admits it), and only forwarded,
+an app's with no member. A server's request reaches `/api/…` with its key alone, and goes to the key's workspace. Every request on
 its way to an agent is admitted in this order, then forwarded:
 
 1. a write whose `Origin` names another site is refused;

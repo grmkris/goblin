@@ -85,7 +85,10 @@ does not cover answers with a link where the owner can widen it. A key never kee
 (ADR 0115): its chats see only it, its own files and, on a person's turn, the Shared folder, and only the hub (Personal,
 unless an admin chose another) reaches every Topic; what a turn may do is its sender's power, so a key's turn does what
 its grant allows and its messages are marked as the server's requests. A secret that may have leaked is rotated in Settings: the same
-key, with all it made, and the old secret refused at once (ADR 0105).
+key, with all it made, and the old secret refused at once (ADR 0105). A product built on goblin installs instead of holding a key (ADR
+0118): its workspace registers it as an app (Settings → Developer), any workspace's owner or admin installs it from
+its "Connect goblin" link with a grant, and its backend's own client_credentials token reaches the workspaces it is
+installed in, as a server, at `/w/<slug>/api` and on `/mcp`; a script app does the same for one workspace's scripts.
 
 Every turn can be seen end to end (ADR 0024). Beside Pi's own record, each agent keeps a 30-day run ledger of how its
 turns ran: model attempts, tool calls, retries, MCP steps, Source replies, timings, tokens and errors, never content.
