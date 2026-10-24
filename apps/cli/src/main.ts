@@ -3,7 +3,7 @@ import { InspectEntries, OtlpTraceData } from '@goblin/contracts/inspect'
 import type { Client } from '@modelcontextprotocol/client'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { type Args, UsageError, parseArgs } from './args.ts'
+import { type Args, UsageError, flagText, parseArgs } from './args.ts'
 import { type ToolInfo, argumentsFor, commandOf, usage } from './commands.ts'
 import { type Settings, settingsOf } from './config.ts'
 import { accessToken, connect, logout } from './connect.ts'
@@ -13,6 +13,7 @@ import { lookup } from './lookup.ts'
 import { type ReadEntries, traceIdOf, withContent } from './otlp.ts'
 import { failureText, render } from './render.ts'
 import { stats } from './stats.ts'
+import { appCredentials, appToken } from './token.ts'
 
 const HELP = `goblin: your goblin agent from the terminal, as an MCP client of /mcp (ADR 0024)
 
@@ -30,6 +31,7 @@ const HELP = `goblin: your goblin agent from the terminal, as an MCP client of /
   goblin stats [--since 24h]   flow totals across every agent (Analytics Engine)
   goblin ask_agent <message>   ask your agent in its main conversation
   goblin follow <chat>         a chat live, as it happens (--json: each of its AG-UI events)
+  goblin token                 an installed app's access token, from GOBLIN_CLIENT_ID and GOBLIN_CLIENT_SECRET (ADR 0118)
   goblin logout
 
   --origin URL   your goblin's address (or GOBLIN_ORIGIN); required
@@ -160,6 +162,11 @@ async function main(argv: readonly string[]): Promise<number> {
         const token = await accessToken(settings)
         return follow({ origin: settings.origin, slug, chat, token, json: settings.json })
       })
+    case 'token': {
+      const { token } = await appToken(settings.origin, await appCredentials(flagText(args, 'client-id')))
+      console.log(token)
+      return 0
+    }
     case 'logs':
       console.log(await logs(args, settings.origin, Date.now()))
       return 0
