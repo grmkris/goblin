@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@better-auth/oauth-provider": "1.7.11",
-    "@durable-streams/server-cloudflare": "0.1.1",
     "@goblin/app": "workspace:*",
     "@goblin/contracts": "workspace:*",
     "@goblin/kit": "workspace:*",

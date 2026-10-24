@@ -2,10 +2,7 @@
 
 ## Infrastructure
 
-`apps/web/alchemy.run.ts` declares the Vite Worker, the `PersonalAgent` namespace, the `STREAMS` namespace (the
-`StreamObject` of `@durable-streams/server-cloudflare`, dormant: since ADR 0110 the agent serves each chat's stream
-itself and nothing reads or writes these objects; the class, its binding and apps/web's dependency go in a reviewed
-infrastructure step, because deleting a Durable Object class is a destructive plan CI refuses), the D1 database, the `FILES` R2 bucket, the `FLOWS` Analytics Engine dataset (`goblin-<stage>-flows`, ADR 0037) and the `LOADER` Worker Loader
+`apps/web/alchemy.run.ts` declares the Vite Worker, the `PersonalAgent` namespace, the D1 database, the `FILES` R2 bucket, the `FLOWS` Analytics Engine dataset (`goblin-<stage>-flows`, ADR 0037) and the `LOADER` Worker Loader
 (Dynamic Workers, open beta, Workers Paid); it is goblin's deployment entrypoint.
 
 What a deployment does comes from its configuration, never from its stage's name

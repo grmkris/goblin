@@ -104,9 +104,6 @@ export default Alchemy.Stack(
     // Dynamic Workers for agent apps and `code_run` (ADR 0021): open beta, Workers Paid.
     const loader = (yield* switchedOn('GOBLIN_AGENT_APPS')) ? { LOADER: Cloudflare.WorkerLoader() } : {}
     const agents = Cloudflare.DurableObject('PersonalAgent', { className: 'PersonalAgent' })
-    // Dormant: nothing uses the Durable Streams class since ADR 0110 (the agent serves each chat's stream itself). It
-    // stays bound until a reviewed infra step removes it, since deleting a Durable Object class is a destructive plan.
-    const streams = Cloudflare.DurableObject('StreamObject', { className: 'StreamObject' })
     const web = yield* Cloudflare.Website.Vite('Web', {
       name: stage.workerName,
       rootDir: root,
@@ -130,7 +127,6 @@ export default Alchemy.Stack(
       },
       env: {
         AGENTS: agents,
-        STREAMS: streams,
         AUTH_DB: db,
         ...files,
         ...flows,

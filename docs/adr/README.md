@@ -100,7 +100,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0106](0106-the-deploy-smoke-makes-no-model-call.md) | The deploy smoke makes no model call | Accepted |
 | [0107](0107-a-turn-says-what-it-ran-with-and-reads-as-an-opentelemetry-trace.md) | A turn says what it ran with, and reads as an OpenTelemetry trace | Accepted; built |
 | [0108](archive/0108-a-keys-topic-is-a-room.md) | A key's Topic is a room | Superseded by 0115 |
-| [0109](0109-every-chat-streams-ag-ui-through-a-durable-stream.md) | Every chat streams AG-UI events through a durable stream | Accepted; built; amends 0081; its transport, join, signed URL, epochs and tiers superseded by 0110 |
+| [0109](0109-every-chat-streams-ag-ui-through-a-durable-stream.md) | Every chat streams AG-UI events through a durable stream | Accepted; built; amends 0081; its transport, join, signed URL, epochs and tiers superseded by 0110; the Durable Streams class removed from every stage (2026-10-24) |
 | [0110](0110-the-agent-serves-every-chats-stream-to-every-reader.md) | The agent serves every chat's stream to every reader | Accepted; built; supersedes 0109's transport; amends 0081, 0098 |
 | [0111](0111-agui-run-input-is-the-send.md) | AG-UI's run input is the send, answered with its receipt or its run's events | Accepted; built; supersedes 0081's message body, 0034's `StartThread` and 0033's `SendMessage.personaOrder` |
 | [0112](0112-goblin-publishes-mcp-events.md) | goblin publishes MCP Events: `conversation.updated` by signed webhook or poll | Accepted; built; amends 0081, 0086 |
