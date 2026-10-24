@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { needsAttention } from '../src/telemetry/attention.ts'
 import { coverageGaps } from '../src/inspect/coverage.ts'
 import { answerAttributes, outcomeOf } from '../src/telemetry/attributes.ts'
-import { safeFailureCode, sanitizeAttributes } from '../src/telemetry/safety.ts'
+import { failureSummary, safeFailureCode, sanitizeAttributes } from '../src/telemetry/safety.ts'
 
 const event = (overrides: Partial<RunEvent> = {}): RunEvent => ({
   id: 'failed',
@@ -51,6 +51,13 @@ describe('safe telemetry and attention', () => {
     })
     expect(JSON.stringify(failed)).not.toContain('0x76C7')
     expect(safeFailureCode('payment_refused:insufficient_funds')).toBe('error')
+  })
+
+  it('names a refusal outside the turn’s power and keeps it among the problems: a grant short of a Persona’s tools (ADR 0115)', () => {
+    expect(failureSummary('outside_power')).toBe('Outside the turn’s power.')
+    expect(
+      needsAttention(event({ kind: 'tool.call', attributes: { [RunAttribute.errorType]: 'outside_power' } }), []),
+    ).toBe(true)
   })
 
   it('hides only confirmed model retries and known authority waits', () => {

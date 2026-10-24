@@ -125,7 +125,7 @@ export function powerGuardExtension(run: RunProgram): Extension {
 const refused = (text: string): ToolExecutionResult => ({
   output: [{ type: 'text', text }],
   isError: true,
-  diagnostics: [{ severity: 'error', code: 'forbidden', message: text }],
+  diagnostics: [{ severity: 'error', code: 'outside_power', message: text }],
 })
 
 /** `tool` checked against its turn's power before it runs: refused, it does nothing. */

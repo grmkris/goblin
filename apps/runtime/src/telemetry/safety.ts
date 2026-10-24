@@ -41,6 +41,7 @@ const FAILURES: Readonly<Record<string, string>> = {
   blocked: 'Execution blocked.',
   capability_off: 'Capability disabled in this conversation.',
   not_in_topic: 'Not in the Topic setup.',
+  outside_power: 'Outside the turn’s power.',
   interrupted: 'Execution interrupted.',
   aborted: 'Execution cancelled.',
 }
