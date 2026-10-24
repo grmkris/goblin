@@ -47,7 +47,7 @@ a conversation outside it.
   chat's own message naming it in `metadata.goblin.subagentRunId`. The runtime translates a child over its own cursor
   (`streams/children.ts`, kept in each reader's) and follows it with a watch of its own (`streams/child-follow.ts`:
   Personas by `invocations.changed`, subagents by `conversations.changed`) while its parent has readers. Every reader,
-  a server's key included, gets the child's work in full. The reducer keeps a child's events with it
+  an installed app included, gets the child's work in full. The reducer keeps a child's events with it
   (`ConversationProjection.children`), never in the transcript; the rows after the transcript
   (`components/shell/answering.tsx`) show who works from it, and a Persona waiting its turn from the workspace feed. A
   connection's opening starts the children working then; never infer a child from Pi's entries in the browser.

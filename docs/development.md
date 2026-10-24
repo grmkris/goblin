@@ -225,32 +225,38 @@ until it runs, real provider and Telegram delivery remain unverified.
 
 ## Using it
 
-- **API keys.** Settings → API keys makes a key for a server you run (ADR 0081); copy the `gbk_…` secret then, it is
-  not shown again. Rotate secret gives the same key a new one when the old one may have leaked (ADR 0105): the old one
-  is refused at once, so give the server the new one. A key's requests carry no cookie or `Origin`:
+- **Scripts and servers.** A script, a server you run or CI calls goblin as a script app (ADRs 0118, 0125): Settings →
+  Developer, a name, "A script of this workspace's" on and the access it gets; copy the client id and secret then, the
+  secret is not shown again. Rotate secret gives the app a new one when the old one may have leaked: the old one admits
+  nothing from then on, so give the script the new one. `goblin token` (with `GOBLIN_CLIENT_ID` and
+  `GOBLIN_CLIENT_SECRET` set) prints an access token for an hour; its requests carry no cookie or `Origin`, and every
+  path names the workspace:
 
   ```sh
-  curl -sS -X POST "$GOBLIN_ORIGIN/api/topics" -H "authorization: Bearer $GOBLIN_KEY" \
+  TOKEN=$(goblin token --origin "$GOBLIN_ORIGIN")
+  API="$GOBLIN_ORIGIN/w/<slug>/api"
+  curl -sS -X POST "$API/topics" -H "authorization: Bearer $TOKEN" \
     -H 'content-type: application/json' -d '{"name":"Service test","operationId":"svc:topic:1"}'
   # A message is AG-UI's RunAgentInput (ADR 0111): 202 and the receipt, or with -H 'accept: text/event-stream' and -N
   # the run it starts as AG-UI events (docs/architecture/streams.md, "Driving a chat").
-  curl -sS -X POST "$GOBLIN_ORIGIN/api/conversations/<chat>/messages" -H "authorization: Bearer $GOBLIN_KEY" \
+  curl -sS -X POST "$API/conversations/<chat>/messages" -H "authorization: Bearer $TOKEN" \
     -H 'content-type: application/json' \
     -d '{"threadId":"<chat>","runId":"svc:msg:1","messages":[{"id":"m1","role":"user","content":"Hello"}]}'
-  curl -sS "$GOBLIN_ORIGIN/api/conversations/<chat>/entries?after=0" -H "authorization: Bearer $GOBLIN_KEY"
+  curl -sS "$API/conversations/<chat>/entries?after=0" -H "authorization: Bearer $TOKEN"
   # Follow the chat live instead (docs/architecture/streams.md): its AG-UI events as server-sent events, in full,
   # opening with the chat's snapshot; a reconnect opens with a fresh one.
-  curl -sS -N "$GOBLIN_ORIGIN/api/conversations/<chat>/stream" -H "authorization: Bearer $GOBLIN_KEY"
+  curl -sS -N "$API/conversations/<chat>/stream" -H "authorization: Bearer $TOKEN"
   ```
 
-  The same key on `/mcp` lists `topic_create`, `conversation_send`, `conversation_entries` and the rest for its
-  scopes. For your own MCP client use OAuth instead: an `.mcp.json` entry with only the URL
+  The same token on `/mcp` lists `topic_create`, `conversation_send`, `conversation_entries` and the rest its grant
+  holds. For your own MCP client use OAuth instead: an `.mcp.json` entry with only the URL
   (`{"type": "http", "url": "$GOBLIN_ORIGIN/mcp"}`, no `headers`) signs in at the consent page, where Change sets its
   grant's level, reach, extras and lifetime (ADR 0114). With the
-  `inspect` extra (Change access on the key in Settings), see where a Persona's answer spent its time:
+  `inspect` extra (Change access on the app under Settings → Installed apps), see where a Persona's answer spent its
+  time:
 
   ```sh
-  curl -sS "$GOBLIN_ORIGIN/api/inspect/turn?operation=persona:svc:job:1:first:<persona>" -H "authorization: Bearer $GOBLIN_KEY"
+  curl -sS "$API/inspect/turn?operation=persona:svc:job:1:first:<persona>" -H "authorization: Bearer $TOKEN"
   ```
 
 - **Tool details.** Open a tool line in a conversation to inspect Input and Output. JSON branches fold, long strings
@@ -296,13 +302,13 @@ until it runs, real provider and Telegram delivery remain unverified.
   the description, owner instructions, shared media/files/links, threads and work. Settings shows main's remembered-message count; see the architecture for memory and `zoom`.
   Every Topic is sealed (ADR 0115): goblin there sees only that Topic's chats and files, and the Shared folder when a
   person writes; Personal is the hub, which reaches every Topic, and its bar says Hub. Channel info says which, and an
-  owner or admin turns the hub on or off there. Topics a server's API key made are listed by the key that made them
-  (display only): under your own Topics, each key has one section, folded until you open it (this browser remembers),
+  owner or admin turns the hub on or off there. Topics an installed app made are listed by the app that made them
+  (display only): under your own Topics, each app has one section, folded until you open it (this browser remembers),
   with how many Topics it made and a dot for unread replies; open, a filter field and its Topics, the latest active
-  first, twenty at a time. Jump to finds them by name, made by their key.
+  first, twenty at a time. Jump to finds them by name, made by their app.
 - **All threads, Activity, Work and Personas.** All threads lists every thread, unread first; Activity what needs you
   (with Undo for what Goblin organized); Work what runs (Delegates, Personas answering), your routines with their
-  controls, every agent app's schedules and recent results. Personas lists yours, then each key's folded under it
+  controls, every agent app's schedules and recent results. Personas lists yours, then each app's folded under it
   (ADR 0115); a click opens a profile: edit it (each save is a revision), archive it, or read its revisions.
   **Add persona** makes one. The invitations waiting for you show in Activity in every workspace, with Join and No
   thanks, and first in the workspace menu.
@@ -558,10 +564,11 @@ touch rows of 44px, no sideways scroll, and Save as the owner API's compare-and-
 Screenshots go under `.local/goblin-acceptance/setup-*`; this is browser fixture evidence only.
 
 `heavy bun apps/web/test/ui-grant.ts` renders the grant editor (ADR 0114) from source in local Chromium at 1440 and
-390px, light and dark, with the Worker's and the agents' answers routed in: a key made from the preset narrowed to a
-picked Topic with `inspect` for 30 days and another key's access changed in Settings, an MCP client's consent changed
-to one workspace and approved (the grant saved before Better Auth's consent), a client's grant changed from Settings,
-and a widening link approved with exactly what it asked for added. Every choice row is 40px to point at and 44px to
+390px, light and dark, with the Worker's and the agents' answers routed in: an MCP client's consent changed to one
+workspace and approved (the grant saved before Better Auth's consent), a client's grant changed from Settings, an
+installation's access changed and a script app registered from the preset narrowed to a picked Topic with `inspect`
+for 30 days in Settings, an app installed from its install page, and a widening link approved with exactly what it
+asked for added. Every choice row is 40px to point at and 44px to
 touch, and nothing scrolls sideways. Screenshots go under `.local/goblin-acceptance/grant-*`; this is browser fixture
 evidence only.
 
@@ -570,10 +577,10 @@ Chromium, desktop and phone, light and dark: one highlighted row per page (a thr
 Apps, a profile under Personas), the counts, every pin state, the strip with ⌘B/Ctrl+B, its tooltip, a reload that keeps
 it and the Topics list beside its `#`, and the phone's dot and drawer. The page is in a workspace with two invitations
 waiting: the workspace menu's count, its invitations first (a refused Join's words, No thanks in place), each
-workspace's role and its tooltip, and Activity's Join opening the workspace joined. Two keys made Topics and Personas
+workspace's role and its tooltip, and Activity's Join opening the workspace joined. Two apps made Topics and Personas
 (ADR 0115): the folded made-by sections with their counts and unread dot, the Topic the page shows kept while folded,
 the filter and Show more, a sealed Topic's channel info with an admin's hub switch (and the PATCH it sends) and a
-member's note alone, Personal's Hub badge, and the Personas page's fold per key.
+member's note alone, Personal's Hub badge, and the Personas page's fold per app.
 `heavy bun apps/web/test/ui-apps.ts` renders Apps: the four sections in order, pins that do not open keeping their
 place, two accounts on one service, search by label, a closed view reopened in one step, a failed built-app read kept
 to its section and the ⋯ targets.

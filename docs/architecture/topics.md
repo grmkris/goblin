@@ -66,8 +66,8 @@ native profiles. Neither is deployed-stage evidence.
 
 Every Topic is **sealed** ([ADR 0115](../adr/0115-every-topic-is-sealed.md)) unless it is a **hub**:
 `app_topics.reach` is `sealed` (the default) or `hub`, and the forward migration `SEALED` made Personal the hub.
-`TopicView` and `TopicSummary` carry `reach`, and `madeBy: { key }` when a server's key made the Topic, from
-`app_made_by` (display only: the sidebar groups each key's Topics under its name; nothing anything may do depends on
+`TopicView` and `TopicSummary` carry `reach`, and `madeBy: { app }` when an installed app made the Topic, from
+`app_made_by` (display only: the sidebar groups each app's Topics under its name; nothing anything may do depends on
 it). A chat's **boundary** is its chain root's Topic and whether that Topic is a hub (`topics/boundary.ts`; every
 thread, subagent, Persona fork and routine run is registered in the Topic it came from), and `chatScope` gives it as
 `SetupScope.boundary`.
@@ -82,7 +82,7 @@ thread, subagent, Persona fork and routine run is registered in the Topic it cam
 - A credential whose Topics are a list never gets a hub's reach: in a hub, its turn reaches only its own Topic.
 
 **What a turn may do is its power** (`grants/power.ts`): its senders' (a person's role, `ROLE_POWER`; an OAuth client's
-grant within its person's role; a key's grant; an admin's for work no one sent), recorded with each input's receipt at
+grant within its person's role; an installed app's grant; an admin's for work no one sent), recorded with each input's receipt at
 admission (`app_chat_operations.power`, `chats/operations.ts`) and intersected over a run's inputs (`turnPower`,
 `pi/asker.ts`; a Persona's turn is its asker's, a subagent's message its spawner's, carried in a `relay` receipt, and
 a synthesized report back again). Each input's request id comes from the run recorder (`RunTelemetry.requestOf`,
@@ -102,10 +102,10 @@ it:
   arguments the tool checks itself: a setup it brings (`requirePower` `setup`), another Topic (`requireWithin`), an MCP
   connection (`reachesConnection`, in `callRemoteTool` and `skill_activate`).
 
-Tenancy is the sender's: a key's message starts `[from server <key name>]`, its receipt's origin is `key`, it runs on
+Tenancy is the sender's: an app's message starts `[from server <app name>]`, its receipt's origin is `app`, it runs on
 the deployment's models (`Models.forServers`) and never answers a routine's question; the skill learner never drafts
-from a turn a key sent input to; a Persona a key tags is told the server asks. Guidance a key writes is kept with its
-name (`app_topics.guidance_by`) and read as that server's operator guidance, never the owner's (`topics/context.ts`).
+from a turn an app sent input to; a Persona an app tags is told the server asks. Guidance an app writes is kept with
+its name (`app_topics.guidance_by`) and read as that server's operator guidance, never the owner's (`topics/context.ts`).
 Unit tests (`power`, `topic-boundary`, `topic-reach`, `topic-setup-scope`, `retrieval`, `grant-reach`, `asker`) and the
 local workerd cases `sealed-case.ts` and `thread-servers-case.ts` prove it; neither is deployed-stage evidence.
 

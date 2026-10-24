@@ -24,10 +24,10 @@ infrastructure. Read
   untouchable.
 - Keep SQLite transactions short. Never hold a transaction or lifecycle gate across model calls, network waits or
   token refreshes.
-- Better Auth (`mcp()` + `jwt()` + `apiKey()` + `organization()`) lives in an isolated D1 auth store. Do not add
-  `oauthProvider()` or a custom adapter. A credential (a server API key or an OAuth client) reaches what its grant
-  reaches, an OAuth client never more than its person's role, and neither renews resident authority (ADRs 0081,
-  0114).
+- Better Auth (`mcp()` + `jwt()` + `organization()`) lives in an isolated D1 auth store. Do not add
+  `oauthProvider()`, `apiKey()` or a custom adapter. A credential (an OAuth client acting for a person, or an installed
+  app) reaches what its grant reaches, an OAuth client never more than its person's role, and neither renews resident
+  authority (ADRs 0114, 0118, 0125).
 - Every Topic is sealed: its chats see only it, and only a hub reaches every Topic (ADR 0115). What a turn may do is its
   senders' power (`grants/power.ts`), never who made the Topic: every Pi tool has its need in `pi/tool-needs.ts`, and a
   tool without one is never offered and never runs.
@@ -58,11 +58,10 @@ infrastructure. Read
   its auth D1 into `.local` (`wrangler d1 export goblin-prod-auth --remote`), pause CI, then
   `GOBLIN_BREAK_GLASS=1 GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset`, re-create it with a
   break-glass `deploy:prod` of the same sha, and promote that sha once CI is back on. A workspace owns its agent, named
-  by the workspace's ID (ADR 0089): a request reaches it only through its credential's workspace (a key's), a workspace
-  an OAuth client's call names among those its reach covers (its `/mcp` arguments or its `/w/<slug>/api` path; ADRs
-  0097, 0116), an app's installation in the workspace its call names (ADR 0118), or for a browser session the slug in
-  its path,
-  each after a live membership check. Never add a route that takes an agent
+  by the workspace's ID (ADR 0089): a request reaches it only through a workspace an OAuth client's call names among
+  those its reach covers (its `/mcp` arguments or its `/w/<slug>/api` path; ADRs 0097, 0116), an app's installation in
+  the workspace its call names (ADR 0118), or for a browser session the slug in its path, each after a live membership
+  check. Never add a route that takes an agent
   name from the request.
   Telemetry never carries content ([ADR 0024](docs/adr/0024-observing-conversations.md)).
 

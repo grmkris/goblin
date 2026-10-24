@@ -86,7 +86,7 @@ export class DevClient {
     return this.#run(Effect.flatMap(this.#owner, call), signal)
   }
 
-  /** One workspace account API call (its keys and members), as `owner` runs one. */
+  /** One workspace account API call (its members, apps and installations), as `owner` runs one. */
   account<A, E>(call: (api: AccountClient) => Effect.Effect<A, E>, signal?: AbortSignal): Promise<A> {
     return this.#run(Effect.flatMap(this.#account, call), signal)
   }

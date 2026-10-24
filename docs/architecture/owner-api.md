@@ -11,28 +11,27 @@ in `packages/contracts/src/api`: `OwnerApi`, which each workspace's agent serves
 account API is answered in the Worker (`http/api/account.ts`): `workspaces` for any signed-in person, and
 `clientErrors`, a browser crash report, without a session. A member's request names its workspace's slug in its path
 (`/w/<slug>/api/…`): the edge admits the session as below, then reads the person's membership of that workspace (a 404
-when there is none), answers the workspace account API's groups itself (`keys`, `developerApps` and `installations`
-for an owner or admin, and `clients`, the OAuth clients the member connected to it) and forwards every other path to the workspace's agent as `/api/…`. An
+when there is none), answers the workspace account API's groups itself (`members`, and `developerApps` and
+`installations` for an owner or admin, and `clients`, the OAuth clients the member connected to it) and forwards every other path to the workspace's agent as `/api/…`. An
 OAuth client's or an installed app's token on the same path ([ADRs 0116](../adr/0116-an-oauth-client-uses-the-owner-api-too.md),
 [0118](../adr/0118-a-product-installs-into-a-workspace.md)) is admitted by the workspaces it reaches instead (a client's
 grant for its person, an app's installations; `inbound/client-access.ts`, as `/mcp` admits it), and only forwarded,
-an app's with no member. A server's request reaches `/api/…` with its key alone, and goes to the key's workspace. Every request on
-its way to an agent is admitted in this order, then forwarded:
+an app's with no member. Nothing reaches an agent on bare `/api/…` ([ADR 0125](../adr/0125-keys-are-gone.md)): a
+bearer there is no route. Every request on its way to an agent is admitted in this order, then forwarded:
 
 1. a write whose `Origin` names another site is refused;
 2. the session comes from the cookie alone, and an `Authorization` header with one is refused (`bearer_and_session`).
-   An OAuth client's bearer on `/w/<slug>/api/…` is admitted instead: its token as `/mcp` checks it, the workspace at
-   the slug among those it reaches now (else `NotFound` `workspace`), never the workspace account API (`Forbidden`
-   `credential`), the same `EndpointAccess` check as a key's below, and forwarded with its credential and its person as
-   the member, whose role the agent holds it to. A
-   `Bearer gbk_…` key ([ADR 0081](../adr/0081-api-keys-and-the-same-operations-over-mcp.md)) is admitted instead of a
-   session: verified in the auth D1 with its grant ([ADR 0114](../adr/0114-one-grant-for-every-credential.md); a
-   grant past its end is `grant_expired`), refused with a cookie or an `Origin`, and only for an endpoint annotated
-   `EndpointAccess` whose level and extra its grant holds (`endpointAccess`; an endpoint without one is `Forbidden`
-   `credential`, a grant that lacks them `AccessInsufficient` with the widening link); it needs no CSRF header, and it
-   is forwarded as the request's credential in `x-goblin-caller` (ADR 0086), which `/mcp` also sets for an OAuth
-   client: its kind, id and name, its grant's id, level, extras, end and origins, and in this workspace whether its
-   Topics, Personas and connections are all or a list, with their generation (never the lists);
+   An OAuth access token on `/w/<slug>/api/…`, a client's or an installed app's, is admitted instead
+   (`admitClient`): its token as `/mcp` checks it with its grant
+   ([ADR 0114](../adr/0114-one-grant-for-every-credential.md)), refused with a cookie (`bearer_and_session`), the
+   workspace at the slug among those it reaches now (else `NotFound` `workspace`), never the workspace account API
+   (`Forbidden` `credential`), and only for an endpoint annotated `EndpointAccess` whose level and extra its grant
+   holds (`endpointAccess`; an endpoint without one is `Forbidden` `credential`, a grant that lacks them
+   `AccessInsufficient` with the widening link, and what a client's person's role could never hold `Forbidden`
+   `role`). It needs no CSRF header, and it is forwarded as the request's credential in `x-goblin-caller` (ADR 0086),
+   which `/mcp` also sets: its kind (`client` or `app`), id and name, its grant's id, level, extras, end and origins,
+   and in this workspace whether its Topics, Personas and connections are all or a list, with their generation (never
+   the lists). A client's person is forwarded as the member too, whose role the agent holds it to; an app has none;
 3. every write needs the app's own `Origin` and `x-goblin-csrf: 1` (`http/csrf.ts`), which the web sends on every write;
 4. a body is capped at 64 KiB, except a send's and a thread operation's, at 1 MiB (an AG-UI `RunAgentInput`, which a
    stock client sends with the whole conversation, [ADR 0111](../adr/0111-agui-run-input-is-the-send.md)), and file
@@ -41,7 +40,7 @@ its way to an agent is admitted in this order, then forwarded:
    `last-event-id`, `x-goblin-request`, `x-goblin-operation` and `x-mcp-caller`, plus the edge's reference in
    `x-goblin-ref` (the request's cf-ray, or a random id where there is none), `x-goblin-forwarded: owner` and who it
    comes from: the member (`x-goblin-member`: their user ID, role, name and whether the workspace is shared, ADR
-   0094) or the key's credential (`x-goblin-caller`). Cookies and authorization stay at the edge. Only an `/api/*` path that is not an account API's is forwarded, as the parsed URL
+   0094) and the credential (`x-goblin-caller`). Cookies and authorization stay at the edge. Only an `/api/*` path that is not an account API's is forwarded, as the parsed URL
    names it; anything else is a 404.
 
 Every answer carries `x-goblin-ref`, `cache-control: no-store` and `nosniff`. Each failed one, the edge's refusals and
@@ -65,17 +64,15 @@ those changes refuse on a member's turn the same way (ADR 0099, `pi/asker.ts`): 
 member who asked on its receipt, and a tool reads its run's inputs back to them. A member's request gets a
 grant of resident authority, except where an endpoint is
 annotated `GrantsResident: false` (`POST /api/agent/resident`, the event streams, the entries read, the files group and the
-OAuth callback). A request from a credential (ADRs 0086, 0114, 0116: a server's key, or an OAuth client on `/mcp` or a
-workspace's path) never
-grants it; owner admission admits it only to an endpoint whose `EndpointAccess` its grant holds (else `credential` or
+OAuth callback). A request from a credential (ADRs 0086, 0114, 0116, 0118: an OAuth client or an installed app, on
+`/mcp` or a workspace's path) never grants it; owner admission admits it only to an endpoint whose `EndpointAccess` its grant holds (else `credential` or
 `AccessInsufficient`), for a client also only where its person's role holds it (`ROLE_POWER`, else `role`), refuses a
 grant past its end (`grant_expired`), counts its requests per minute (600, ADR 0085; past them `rate_limited` with
 `retryAfter`, which the edge answers with `Retry-After`) and syncs the agent's mirror of its lists when the forwarded
-generation moved (`Grants.sync`, `grants/service.ts`). A key's first admitted request in the object's lifetime names
-what it made before names were kept (`KeyNames`, for display, ADR 0115). Past admission a credential reaches what its grant
-reaches (`grants/policy.ts`, the `app_grant_reach` mirror): its lists hold only what it reaches, and inspection sees
-only the run events of those chats (ADR 0084); a key's Topics are sealed like any other, and its messages carry
-`[from server <key name>]`, its turns doing what its grant allows (ADR 0115). It annotates the request's logs with `goblin.rpc`
+generation moved (`Grants.sync`, `grants/service.ts`). Past admission a credential reaches what its grant reaches
+(`grants/policy.ts`, the `app_grant_reach` mirror): its lists hold only what it reaches, and inspection sees only the
+run events of those chats (ADR 0084); an app's Topics are sealed like any other, named as made by it (`madeBy`, for
+display), and its messages carry `[from server <app name>]`, its turns doing what its grant allows (ADR 0115). It annotates the request's logs with `goblin.rpc`
 (`<group>.<endpoint>`), `goblin.operation` and `ref`, and stamps `ref` on every typed failure.
 
 | Group | Paths under `/api` | Handlers |
@@ -97,10 +94,10 @@ only the run events of those chats (ADR 0084); a key's Topics are sealed like an
 | `agentApps` | `/agent-apps`, `/agent-apps/:name` | `agent-apps/api.ts` |
 | `workspace` | `GET /workspace/events` (SSE) | `workspace/api.ts` |
 | `files` | `GET /files`, `GET`/`PUT`/`DELETE /files/content` | `files/api.ts` |
-| account (Worker) | `clients`: `/clients`, `/clients/:clientId`; `grants`: `GET /grants/:id/terms`, `PUT /grants/:id`, `GET /clients/:clientId/terms`, `PUT /clients/:clientId/grant` (ADR 0114); `keys`: `/keys`, `/keys/:keyId` (`PATCH` gives a key's grant new terms, ADRs 0084, 0114), `/keys/:keyId/rotate` (a new secret, ADR 0105); `clientErrors`: `/client-errors` | `http/api/account.ts` |
+| account (Worker) | `clients`: `/clients`, `/clients/:clientId`; `grants`: `GET /grants/:id/terms`, `PUT /grants/:id`, `GET /clients/:clientId/terms`, `PUT /clients/:clientId/grant` (ADR 0114); `members`; `developerApps`: `/developer/apps`, `/developer/apps/:clientId`, `/developer/apps/:clientId/rotate` (a new client secret, ADR 0118); `installations`: `/installations`, `/installations/:id` (`PATCH` gives an installation's grant new terms); `install`: `/install/:clientId`; `clientErrors`: `/client-errors` | `http/api/account.ts`, `auth/installs.ts` |
 
 What is not JSON in and out is served through HttpApi's raw handlers, all annotated `GrantsResident: false`: the two
-event streams (SSE: the workspace feed and a chat's AG-UI stream, which a key reads too), the owner's file bytes (streamed both ways, never buffered), and `mcp.oauthCallback`, a redirect
+event streams (SSE: the workspace feed and a chat's AG-UI stream, which a credential reads too), the owner's file bytes (streamed both ways, never buffered), and `mcp.oauthCallback`, a redirect
 to Connections that carries `ref` when it failed. A streamed answer owns its body, past the request's scope. Any path
 no endpoint names is a 404 in the envelope.
 
@@ -118,8 +115,9 @@ Callers that are not the owner's browser reach the agent through its internal AP
 only from `@goblin/contracts/internal`), which the Worker calls on the agent's stub with a typed client
 (`inbound/client.ts`) after its own check of the caller (a bearer token, a hook's route token, a file link's token):
 `ask`, `recent` and `inspect` (inbound `/mcp`), `mcpEvents` (the Events hook), `linkedFile` (a file link, ADR 0070) and
-`publish.terminate` (`POST /internal/publish/terminate`, ADR 0112), which the account API calls before it revokes,
-rotates or narrows a key, or revokes an OAuth client, so the holder's Events leases end with `terminated` first. Its gate (`InternalGate`, `http/api/middleware.ts`)
+`publish.terminate` (`POST /internal/publish/terminate`, ADR 0112), which the account API calls before it uninstalls
+or narrows an installation, deletes an app, or revokes an OAuth client, so the holder's Events leases end with
+`terminated` first. Its gate (`InternalGate`, `http/api/middleware.ts`)
 refuses a request carrying the owner forward's mark; it never grants resident authority. One Durable Object RPC
 method remains, `deleteAgentData` (account deletion): Workers RPC drops custom error classes, so it returns an encoded
 `RpcResult` (`http/rpc.ts`) that the Worker unwraps.

@@ -9,14 +9,14 @@ enter the workerd bundle.
   in its group in `packages/contracts/src/api` and a handler in its area's `api.ts`, served by the agent
   (`http/api/server.ts`) behind the Worker's edge (`http/api/edge.ts`) and owner admission (`OwnerAdmission`,
   `http/api/middleware.ts`). Never add a Durable Object RPC method or a Worker route for the owner. `/mcp` calls the
-  owner API as its caller, a key or an OAuth client of the owner (ADR 0086, `ownerCall` in `inbound/client.ts`); the
+  owner API as its caller, an installed app or an OAuth client (ADR 0086, `ownerCall` in `inbound/client.ts`); the
   Worker's other callers (the hooks, file links) use the internal API (`@goblin/contracts/internal`, behind
   `InternalGate`, `internalCall`); the one RPC method left, `deleteAgentData`, returns an encoded
   result (`http/rpc.ts`), because Workers RPC drops error classes. Annotate an endpoint `EndpointAccess` (the level and
-  extra it needs of a credential's grant, ADR 0114) only on purpose: it opens the endpoint to credentials (servers'
-  keys and OAuth clients) over HTTP and `/mcp`, so it needs a tool in `inbound/tools.ts`'s registry and its handler
+  extra it needs of a credential's grant, ADR 0114) only on purpose: it opens the endpoint to credentials (installed
+  apps and OAuth clients) over HTTP and `/mcp`, so it needs a tool in `inbound/tools.ts`'s registry and its handler
   must check the reach of what it touches with `grants/policy.ts` (`reaches*`, `claim`, `confineSetup`). Never for
-  MCP tool grants, resident authority, files or keys.
+  MCP tool grants, resident authority, files or the workspace account API.
 - **Composition.** Services are `Context.Service` tags in `<area>/service.ts`, built by their area's layer in
   `layers/` over the core layer (`layers/core.ts`). `layers/index.ts` orders the start's steps, which are the boot
   contract (keep their order and every await), then the area layers. A stateful object is made once, by its layer,

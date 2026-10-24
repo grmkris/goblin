@@ -16,7 +16,7 @@ writes, and refuses a read outside it as not found and a write outside it as `Fo
 
 - the owner's API (`/api/files`) and goblin's own keeping (`OWNER_VIEW`) read and write everything;
 - a turn (`viewOf(boundary, people)`, from its power, `pi/power.ts`) reads its own Topic's folder, every Topic's from a
-  hub, and the Shared folder only on a person's turn (never on a turn a server's key sent an input to), and writes only
+  hub, and the Shared folder only on a person's turn (never on a turn an installed app sent an input to), and writes only
   under its Topic's `agent` folder.
 
 The agent reaches them with `files_list` (its Topic's folder when it names none), `files_read` (text, 48 KB a page),

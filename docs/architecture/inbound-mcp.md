@@ -5,8 +5,8 @@
 The agent acts for the owner when the owner is not there, so it needs its own standing permission rather than a
 borrowed browser session. Resident authority (`app_resident`, the `Resident` service) lasts until the owner revokes it
 (ADR 0088). Owner admission grants it on the owner's first API request, and on every one after except changing it
-(`POST /api/agent/resident`), the event streams, the files and the OAuth callback; no caller (an OAuth client or a key,
-ADR 0086) and no internal call (hooks, file links) grants it. Turning it off in Settings ("Work while you're away")
+(`POST /api/agent/resident`), the event streams, the files and the OAuth callback; no caller (an OAuth client or an
+installed app, ADR 0086) and no internal call (hooks, file links) grants it. Turning it off in Settings ("Work while you're away")
 sticks: activity does not re-enable it, only the explicit toggle does.
 Model MCP tools, skills and scheduled Source pulls and replies require current authority. The
 owner's own `mcp` endpoints grant it like the rest and do not call `requireResident`; their tool and resource calls
@@ -16,9 +16,10 @@ still check exact grants (`mcp/servers/api.ts`, `pi/resident-mcp.ts`, `pi/skills
 
 goblin is an MCP server at `/mcp`, the one protected resource of Better Auth's `mcp()` authorization server, and one
 server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)): an OAuth client acting for a person
-(Claude Code, claude.ai, VS Code) or a server's API key. What either may do is its grant ([ADR
+(Claude Code, claude.ai, VS Code) or an installed app ([ADR 0125](../adr/0125-keys-are-gone.md): no other bearer is
+admitted, and one that is not an access token gets the sign-in challenge, naming `invalid_token`). What either may do is its grant ([ADR
 0114](../adr/0114-one-grant-for-every-credential.md), [accounts](accounts.md#grants)): a level (`read` < `write` <
-`manage`), extras (`setup`, `routines`, `inspect`, `keys`), a reach of Topics, Personas and connections per workspace
+`manage`), extras (`setup`, `routines`, `inspect`), a reach of Topics, Personas and connections per workspace
 (each all, or a list that grows with what it makes) and a lifetime.
 
 - **Signing in** ([ADR 0122](../adr/0122-inbound-oauth-follows-the-mcp-authorization-spec.md)). A client is its
@@ -46,10 +47,11 @@ server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)
   holds each call to its own installation's grant.
 - **Workspaces.** Every request reads the grant's workspaces (`reachedBy`, `auth/workspaces.ts`): the person's
   memberships when it reaches all of them, else those it names that they are still a member of, with their role in
-  each. A client given exactly one never names it; any other has a required `workspace` argument (an id or slug) on
-  every tool, added as each tool registers (`inbound/mcp-server.ts`), and `workspace_list` plus the server's
-  instructions name what it reaches. Each call goes to that workspace's agent with the credential its grant makes
-  there and the person as a member with their role there (`inbound/route.ts`). A key's calls reach its own workspace.
+  each; an app's are its installations. Every tool takes a `workspace` argument (an id or slug), added as each tool
+  registers (`inbound/mcp-server.ts`): optional for a caller that reaches exactly one, required for any other; and
+  `workspace_list` plus the server's instructions name what it reaches. Each call goes to that workspace's agent with
+  the credential its grant makes there and, for a client, the person as a member with their role there
+  (`inbound/route.ts`).
 - **Tools.** One registry (`inbound/tools.ts`, the tools in `inbound/mcp-server.ts`, `inbound/inspect-tools.ts` and
   `inbound/config-tools.ts`): each tool calls one owner endpoint as the credential (`ownerCall`, forwarding
   `x-goblin-caller`) and is listed only when the grant's level and extras hold what that endpoint's `EndpointAccess`
@@ -60,9 +62,9 @@ server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)
   AG-UI `RunAgentInput` the endpoints take (contracts' `runInput` and `threadStart`,
   [ADR 0111](../adr/0111-agui-run-input-is-the-send.md)), and answer the receipt. Every endpoint a credential reaches
   has its tool but a chat's stream (`STREAMED`, ADR 0110): server-sent events a credential reads over HTTP itself
-  ([chat streams](streams.md)), which one tool answer cannot carry: a key at `GET /api/conversations/:id/stream`, an
-  OAuth client's token at `GET /w/<slug>/api/conversations/:id/stream`
-  ([ADR 0116](../adr/0116-an-oauth-client-uses-the-owner-api-too.md)). The server's instructions name both.
+  ([chat streams](streams.md)), which one tool answer cannot carry: its token at
+  `GET /w/<slug>/api/conversations/:id/stream` ([ADR 0116](../adr/0116-an-oauth-client-uses-the-owner-api-too.md)).
+  The server's instructions say so.
 
   | Needs | Tools |
   | --- | --- |
@@ -77,7 +79,7 @@ server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)
 
 - **Refusals and widening.** A call its grant does not cover answers `access_insufficient` (403): what is missing (a
   level, an extra, or a reach id `<workspace>/<kind>/<id>`) and `widenUrl`, the page where the grant's approver (an
-  owner or admin of a key's workspace, a client's person) widens it (`/consent/widen?grant=…`). On `/mcp` a client that
+  owner or admin of an installation's workspace, a client's person) widens it (`/consent/widen?grant=…`). On `/mcp` a client that
   declares URL elicitation is asked to open that page, once per call, on the 2026-07-28 protocol's input-required
   round (`inbound/access.ts`, ported from myapps); any other gets the refusal as the tool's error result.
   `access_read` (`GET /api/access`) answers the credential's own grant: its terms, when it ends and its widening link.
@@ -105,8 +107,7 @@ server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)
 
 - **Reach.** A credential reaches what its grant reaches, checked by each handler (`grants/policy.ts`): a Topic, its
   chats, a Persona or a connection outside it is refused with its reach id. An OAuth client also never does more than
-  its person may: its person's role (`ROLE_POWER`: an owner everything, an admin all but `keys`, a member `write` and
-  `inspect`) must hold what the endpoint needs, else `Forbidden` `role`. A message a credential sends into a chat
+  its person may: its person's role (`ROLE_POWER`: an owner or an admin everything, a member `write` and `inspect`) must hold what the endpoint needs, else `Forbidden` `role`. A message a credential sends into a chat
   carries its name. Asking the agent itself is a send into Personal's Conversation (chat `1`), which the grant must
   reach; nothing waits (ADR 0119): a send answers its receipt, or a task to a client that follows one, and a stable
   `operationId` makes retries idempotent; it runs the model, so it counts toward the day's tokens. The inspection tools
@@ -119,35 +120,35 @@ server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)
   the person's consent to it and revokes its refresh tokens (`auth/clients.ts`); its next call gets a 401. Changing its
   grant in Settings applies to the live token at once.
 
-## API keys
+## Apps on the API and `/mcp`
 
-A server the owner runs uses an API key instead of a session ([ADR 0081](../adr/0081-api-keys-and-the-same-operations-over-mcp.md)).
-An owner or admin makes one in Settings with a name and its grant's terms (`POST /w/<slug>/api/keys`, `{ name, terms }`):
-by default `write`, every Topic, Persona and connection of the workspace, no extras, until revoked. Changing its terms
-later (`PATCH /api/keys/:keyId`, `{ terms }`) keeps the same key and is logged as one `api_key` line (its level and
-extras before and after, how many origins, never one). A key that follows its Topics subscribes to their
-`conversation.updated` wakes instead of polling ([published events](published-events.md), ADR 0112); revoking or
-rotating it, or a change that narrows its Topics, ends its leases first, each told `terminated`. Rotate secret gives a
-key a new secret (`POST /api/keys/:keyId/rotate`, [ADR 0105](../adr/archive/0105-a-keys-secret-rotates-in-place.md)), shown
-once: the same key with its grant, and the old secret is refused at once. Better Auth's `apiKey()` plugin keeps it
-hashed in the auth D1 with who made it (`auth/api-keys.ts`), and no expiry of its own: its end is its grant's; its own
-routes are not served. Its grant may also name MCP server origins, each with exactly the tools its threads may call
-there ([ADR 0091](../adr/0091-a-key-names-the-mcp-servers-its-threads-may-use.md)): https origins of public hosts only,
-at most 8, each with 1 to 50 named tools; a client's grant may too. A thread's server is checked against them
-(`confineThreadServer`), so a credential's threads reach no host its grant does not name. With
-`Authorization: Bearer gbk_…` a key is a credential on `/api` (the owner endpoints whose `EndpointAccess` its grant
-holds; the edge refuses the rest before an agent wakes) and on `/mcp` (the tools above). A key that does not admit on
-`/mcp` gets the same envelope as on `/api`.
+A server, a script or CI reaches goblin as an app ([ADR 0118](../adr/0118-a-product-installs-into-a-workspace.md),
+[accounts](accounts.md#apps-and-installations)): a product any workspace installs, or a script app installed in the
+workspace that registered it. Server API keys are gone ([ADR 0125](../adr/0125-keys-are-gone.md)). Its backend gets a
+token with client_credentials (`/api/auth/oauth2/token`, HTTP Basic; `goblin token` from a shell, with
+`GOBLIN_CLIENT_ID` and `GOBLIN_CLIENT_SECRET`) and calls `/w/<slug>/api/…` (the owner endpoints whose `EndpointAccess`
+its installation's grant holds; the edge refuses the rest before an agent wakes) or `/mcp` (the tools above). A bearer
+on bare `/api/…` is no route (404). An installation's grant starts from the terms the app asks for: by default
+`write`, every Topic, Persona and connection of the workspace, no extras, until removed. Changing it
+(`PATCH /w/<slug>/api/installations/:id`, `{ terms }`) keeps the same installation. An app that follows its Topics
+subscribes to their `conversation.updated` wakes instead of polling ([published events](published-events.md), ADR
+0112); uninstalling it, deleting the app, or a change that narrows its Topics, ends its leases first, each told
+`terminated`. Rotating its secret (`POST /w/<slug>/api/developer/apps/:clientId/rotate`) keeps the app and its
+installations: the new secret is shown once, the old one admits nothing from then on, and tokens it got end within the
+hour. Its grant may also name MCP server origins, each with exactly the tools its threads may call there
+([ADR 0091](../adr/0091-a-key-names-the-mcp-servers-its-threads-may-use.md)): https origins of public hosts only, at
+most 8, each with 1 to 50 named tools; a client's grant may too. A thread's server is checked against them
+(`confineThreadServer`), so a credential's threads reach no host its grant does not name.
 
-A key reaches what its grant reaches; one whose Topics or Personas are a list has what it makes added to its list, and
-an operation id never adopts something outside it. Its Topics start with nothing in their setup, and a setup a
+An app reaches what its grant reaches; one whose Topics or Personas are a list has what it makes added to its list,
+and an operation id never adopts something outside it. Its Topics start with nothing in their setup, and a setup a
 credential writes names only connections it reaches (with a list of connections, never `all`, apps or subagents).
-Each Topic a key makes is sealed like any other ([ADR 0115](../adr/0115-every-topic-is-sealed.md), [Topics](topics.md#sealed-topics-and-the-hub)):
-its chats see only it, and only the hub's search reaches it. A key's turn may do what its grant allows there
-(`TOOL_NEEDS`): a `write` key is offered no routine, organizing, `diagnose` or apps outside the hub, and never reads
-the Shared folder. Its messages start `[from server <key name>]`: a request from a party the owner connected, never
-the owner's instruction, run on the deployment's models. The Topic and Persona views name the key that made them
-(`madeBy`, display only). It names the threads it starts (`title`, which announces an
+Each Topic an app makes is sealed like any other ([ADR 0115](../adr/0115-every-topic-is-sealed.md), [Topics](topics.md#sealed-topics-and-the-hub)):
+its chats see only it, and only the hub's search reaches it. An app's turn may do what its grant allows there
+(`TOOL_NEEDS`): a `write` app is offered no routine, organizing, `diagnose` or apps outside the hub, and never reads
+the Shared folder. Its messages start `[from server <app name>]`: a request from a party the owner connected, never
+the owner's instruction, run on the deployment's models. The Topic and Persona views name the app that made them
+(`madeBy: { app }`, display only). It names the threads it starts (`title`, which announces an
 empty one in its Topic's Conversation), and renames, closes and reopens threads within reach, never a Topic's
 Conversation and never pinning one open ([ADR 0090](../adr/0090-a-key-names-closes-and-reads-back-its-threads.md)); its
 forward read shows its messages to Personas with `to` and `author`.
