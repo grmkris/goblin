@@ -47,7 +47,7 @@ describe("what a server's JSON-RPC error says (unit, ADR 0092)", () => {
     expect(said).not.toMatch(/\p{Cc}/u)
     // Of `data`, only text is kept; nothing is kept of a server that says nothing.
     expect(mapMcpError(new ProtocolError(-32_602, 'Bad call', 'treeId is required'), 'myplan')).toMatchObject({
-      serverMessage: 'Bad call — treeId is required',
+      serverMessage: 'Bad call: treeId is required',
     })
     expect(mapMcpError(new ProtocolError(-32_602, 'Bad call', { token: 'secret' }), 'myplan')).toMatchObject({
       serverMessage: 'Bad call',

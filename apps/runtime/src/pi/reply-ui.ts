@@ -12,7 +12,7 @@ ChoiceField(name, label, options, value)
 ActionButton(label)
 Cards([{title, description, detail, label}])
 Metrics([{label, value, note}])
-Chart(spec) — a string containing the same JSON as a chart fence
+Chart(spec): a string containing the same JSON as a chart fence
 Note(title, body)
 
 An ActionButton or Cards button sends its visible label and the visible form values as the owner's next ordinary message in this chat. Use clear labels that say what the owner is asking. There is no hidden action or direct tool execution, and a click grants no permission. Do not ask for passwords or credentials. Form edits stay in the tab and reset on reload; sent values become normal conversation messages. Summarize essential results in prose so the reply remains useful where the block is shown as code.

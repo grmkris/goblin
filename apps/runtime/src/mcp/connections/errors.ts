@@ -70,7 +70,7 @@ const SERVER_MESSAGE = 500
  */
 const serverMessageOf = (error: ProtocolError): { readonly serverMessage?: string } => {
   const parts = [error.message, Predicate.isString(error.data) ? error.data : ''].filter((part) => part.trim() !== '')
-  const said = oneLine(parts.join(' — '), SERVER_MESSAGE)
+  const said = oneLine(parts.join(': '), SERVER_MESSAGE)
   return said === '' ? {} : { serverMessage: said }
 }
 

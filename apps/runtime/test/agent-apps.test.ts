@@ -188,11 +188,11 @@ describe('app locks', () => {
     expect(refusal).toBeInstanceOf(Error)
     const crossed: unknown = structuredClone(refusal)
     expect(crossed).toBeInstanceOf(Error)
-    expect(crossed).toHaveProperty('message', 'InvalidInput — reason: the agent writes only /agent')
+    expect(crossed).toHaveProperty('message', 'InvalidInput: reason: the agent writes only /agent')
   })
   it('turn tagged errors into one readable line', () => {
     expect(problemText(new InvalidInput({ reason: 'input: /by must be >= 1' }))).toBe(
-      'InvalidInput — reason: input: /by must be >= 1',
+      'InvalidInput: reason: input: /by must be >= 1',
     )
   })
 })

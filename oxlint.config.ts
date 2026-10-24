@@ -136,6 +136,11 @@ export default defineConfig({
     'typescript/no-unsafe-return': 'error',
   },
   overrides: [
+    // Shipped UI, agent tool descriptions and error copy. Tests may carry arbitrary remote text.
+    {
+      files: ['apps/*/src/**', 'packages/*/src/**', 'packages/ui/gallery/**'],
+      rules: { 'goblin/no-em-dash-copy': 'error' },
+    },
     // Stack files declare the named Cloudflare resources; their physical names come from the stage (ADR 0002).
     {
       files: ['apps/*/alchemy.run.ts'],

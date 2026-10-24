@@ -146,7 +146,7 @@ async function appsEngineProbe(storage: DurableObjectStorage, env: RuntimeEnv, o
     total,
     label: refusal(label),
     listed,
-    badInput: badInput.ok ? 'accepted' : badInput.error.split(' — ')[0],
+    badInput: badInput.ok ? 'accepted' : badInput.error.split(': ')[0],
     failing: refusal(failing),
     afterFailing,
     log,

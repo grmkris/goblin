@@ -64,7 +64,7 @@ export function problemText(cause: unknown): string {
     const fields = Object.entries(cause)
       .filter(([key]) => key !== '_tag' && key !== 'stack' && key !== 'message')
       .map(([key, value]) => `${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`)
-    return [String(cause._tag), ...fields].join(' — ')
+    return [String(cause._tag), ...fields].join(': ')
   }
   return cause instanceof Error && cause.message !== '' ? cause.message : 'The call failed.'
 }

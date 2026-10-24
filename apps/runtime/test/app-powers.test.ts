@@ -142,7 +142,7 @@ describe("an agent app's powers over the agent's services", () => {
 
   it('say why a job waits', async () => {
     expect(await world({ resident: false }).powers.blocked()).toBe(
-      'waiting for the owner (ResidentInactive — state: revoked)',
+      'waiting for the owner (ResidentInactive: state: revoked)',
     )
     expect(await world().powers.blocked()).toBeUndefined()
   })

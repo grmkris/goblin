@@ -1,6 +1,6 @@
 # goblin: instructions for coding agents
 
-Master file. `CLAUDE.md` is a symlink to it — edit `AGENTS.md`. Agent config: `.agents/skills` (master) → `.claude/skills` links; `.mcp.json` → generated `.codex/config.toml` + `.cursor/mcp.json`. Run `bunx repoagents` after changing any of them.
+Master file. `CLAUDE.md` is a symlink to it: edit `AGENTS.md`. Agent config: `.agents/skills` (master) → `.claude/skills` links; `.mcp.json` → generated `.codex/config.toml` + `.cursor/mcp.json`. Run `bunx repoagents` after changing any of them.
 
 goblin gives every workspace its own resident agent on Cloudflare, and every user a workspace of their own: one native
 Agents SDK Durable Object per workspace runs Pi Durable for conversations and execution; Effect composes application services; Alchemy owns
@@ -68,6 +68,7 @@ infrastructure. Read
 
 ## Quality
 
+- No speculative complexity without the user's buy-in: build what was asked, not robustness or abstraction nobody requested.
 - Run `bun run check:fast` while iterating and `bun run check` before claiming completion.
 - New code has zero lint, Effect or Knip findings. Fix code first; every disable states a specific reason and every
   unavoidable type assertion carries a `// SAFETY:` comment.

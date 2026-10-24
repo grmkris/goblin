@@ -243,7 +243,7 @@ export function App() {
         <div className="spike-intro">
           <h1 className="text-3xl font-semibold tracking-tight text-balance">A reply you can work with.</h1>
           <p className="text-muted-foreground text-pretty">
-            Compare, choose, and fill in the details — right inside the conversation.
+            Compare, choose, and fill in the details, right inside the conversation.
           </p>
         </div>
         <Tabs value={selected} onValueChange={setSelected}>

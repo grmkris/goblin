@@ -79,7 +79,7 @@ const buildTool = (apps: AgentApps, run: RunProgram) =>
   typedTool({
     name: 'app_build',
     description:
-      'Create an app, or change one by name. A new app sends `files` ({"app.ts": "...", "view.tsx": "..."} — the view is optional); a change sends the files it replaces or `edits` (find must occur exactly once). Returns the new version and its members (call them with app_call), or the problems to fix.',
+      'Create an app, or change one by name. A new app sends `files` ({"app.ts": "...", "view.tsx": "..."}: the view is optional); a change sends the files it replaces or `edits` (find must occur exactly once). Returns the new version and its members (call them with app_call), or the problems to fix.',
     input: Schema.Struct({
       name: AppName.annotate({ description: 'kebab-case, like reading-list' }),
       // A plain key keeps the value type in the JSON Schema; the builder checks each file name.
