@@ -77,10 +77,10 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0083](0083-bounded-thinking-and-a-turn-that-answers.md) | Bounded thinking, and a turn that answers | Accepted; amended by 0100 |
 | [0084](0084-a-key-reads-back-what-it-made-and-how-it-ran.md) | A key reads back what it made, and how its chats ran | Accepted; amended by 0091, 0107, 0114 |
 | [0085](0085-a-keys-rate-limit-is-a-fixed-minute-counted-by-its-agent.md) | A key's rate limit is a fixed minute, counted by its agent | Accepted; amended by 0086 |
-| [0086](0086-one-mcp-for-every-caller.md) | One /mcp for every caller | Accepted; amended by 0089, 0090, 0094, 0097, 0098, 0112, 0114 |
+| [0086](0086-one-mcp-for-every-caller.md) | One /mcp for every caller | Accepted; amended by 0089, 0090, 0094, 0097, 0098, 0112, 0114, 0116 (an OAuth client also uses the owner API) |
 | [0087](0087-the-owners-own-subscription-models.md) | The owner's own subscription models | Accepted; amended by 0089 and 0115 (a server's work is a key's sending, wherever) |
 | [0088](0088-resident-authority-lasts-until-revoked.md) | Resident authority lasts until revoked | Accepted |
-| [0089](0089-workspaces-own-agents.md) | Workspaces own agents | Accepted; amended by 0093; its consent naming one workspace superseded by 0097 |
+| [0089](0089-workspaces-own-agents.md) | Workspaces own agents | Accepted; amended by 0093 and 0116 (an OAuth client's path names its workspace); its consent naming one workspace superseded by 0097 |
 | [0090](0090-a-key-names-closes-and-reads-back-its-threads.md) | A key names, closes and reads back its threads | Accepted; amended by 0103 |
 | [0091](0091-a-key-names-the-mcp-servers-its-threads-may-use.md) | A key names the MCP servers its threads may use | Accepted; amended by 0114 (origins are any credential's grant's) |
 | [0092](0092-mcp-calls-are-checked-against-their-schema-and-keep-the-servers-message.md) | MCP calls are checked against their schema and keep the server's message | Accepted |
@@ -101,9 +101,10 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0107](0107-a-turn-says-what-it-ran-with-and-reads-as-an-opentelemetry-trace.md) | A turn says what it ran with, and reads as an OpenTelemetry trace | Accepted; built |
 | [0108](archive/0108-a-keys-topic-is-a-room.md) | A key's Topic is a room | Superseded by 0115 |
 | [0109](0109-every-chat-streams-ag-ui-through-a-durable-stream.md) | Every chat streams AG-UI events through a durable stream | Accepted; built; amends 0081; its transport, join, signed URL, epochs and tiers superseded by 0110; the Durable Streams class removed from every stage (2026-10-24) |
-| [0110](0110-the-agent-serves-every-chats-stream-to-every-reader.md) | The agent serves every chat's stream to every reader | Accepted; built; supersedes 0109's transport; amends 0081, 0098 |
+| [0110](0110-the-agent-serves-every-chats-stream-to-every-reader.md) | The agent serves every chat's stream to every reader | Accepted; built; supersedes 0109's transport; amends 0081, 0098; amended by 0116 (an OAuth client reads it too) |
 | [0111](0111-agui-run-input-is-the-send.md) | AG-UI's run input is the send, answered with its receipt or its run's events | Accepted; built; supersedes 0081's message body, 0034's `StartThread` and 0033's `SendMessage.personaOrder` |
-| [0112](0112-goblin-publishes-mcp-events.md) | goblin publishes MCP Events: `conversation.updated` by signed webhook or poll | Accepted; built; amends 0081, 0086 |
+| [0112](0112-goblin-publishes-mcp-events.md) | goblin publishes MCP Events: `conversation.updated` by signed webhook or poll | Accepted; built; amends 0081, 0086; amended by 0116 (an OAuth client calls its methods over REST too) |
 | [0113](0113-a-room-runs-in-its-own-object.md) | A room runs in its own object; the workspace object is the control plane | Accepted; slice 1 built, then undone by 0115 (rooms are gone); its later slices wait on a decision of their own |
 | [0114](0114-one-grant-for-every-credential.md) | One grant for every credential: level, reach, extras and lifetime, for keys and OAuth clients alike | Accepted; release A built; amends 0081, 0084, 0086, 0091, 0097, 0098, 0105; amended by 0115 (what a turn may do) |
 | [0115](0115-every-topic-is-sealed.md) | Every Topic is sealed, with a hub; files per Topic; a turn's power is its sender's; rooms are gone | Accepted; release B built; supersedes 0108 and 0113's room keying; amends 0022, 0035, 0065, 0087, 0099, 0114 |
+| [0116](0116-an-oauth-client-uses-the-owner-api-too.md) | An OAuth client uses the owner API too: its token on `/w/<slug>/api`, the stream included | Accepted; amends 0086, 0089, 0110, 0112 |
