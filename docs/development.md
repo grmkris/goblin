@@ -471,7 +471,9 @@ Promote with `bun run promote <full-sha>` from any checkout with `gh` signed in 
 it requires that SHA's dev Check, its `dev-acceptance` receipt (authenticated, at the live dev Worker version) and a
 fast-forward, then moves `prod`. That push runs Deploy prod, which repeats those checks, refuses a forced push, and
 releases goblin prod.
-Destructive plans still require a separate explicit reset decision.
+Destructive plans still require a separate explicit reset decision: CI refuses a plan that deletes, replaces,
+destroys or unbinds anything (unbinding a Durable Object namespace deletes its class and its data), and such a change
+is released by hand, break-glass, once its plan has been reviewed.
 
 Alchemy state for dev and prod lives in the account's shared Cloudflare state store (`scripts/alchemy-state.ts`), the
 `alchemy-state-store` Worker myapps also uses; every other stage keeps local `.alchemy/state`. The store has no lock, so

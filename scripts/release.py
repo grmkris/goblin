@@ -43,10 +43,12 @@ def envfile(path):
 
 
 def safe_plan(output):
-    # Plan tables label destructive actions Delete/Replace. Unknown output fails closed. A colour code would hide a
-    # word boundary, so it is stripped first.
+    # Plan tables label destructive actions Delete/Replace. An unbound binding is one too: unbinding a Durable Object
+    # namespace makes Alchemy delete its class and every object's data (`deleted_classes`), and a plan line does not say
+    # a binding's kind, so every unbind takes the separate review. Unknown output fails closed. A colour code would hide
+    # a word boundary, so it is stripped first.
     plain = ANSI.sub("", output)
-    if re.search(r"\b(delete|replace|destroy)\b", plain, re.I):
+    if re.search(r"\b(delete|replace|destroy|unbind)\b", plain, re.I):
         raise RuntimeError("destructive_plan_requires_separate_review")
     if not re.search(r"No changes|Create|Update", plain, re.I):
         raise RuntimeError("unrecognized_plan_output")

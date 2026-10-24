@@ -41,7 +41,7 @@ class ReleaseTest(unittest.TestCase):
 
     def test_rejects_destructive_and_unrecognized_plans(self):
         for plan in ["Delete Files", "Replace goblinAuth", "Destroy Web", "partial output",
-                     "[Files] \x1b[38;2;255;0;0mdelete\x1b[0m"]:
+                     "[Files] \x1b[38;2;255;0;0mdelete\x1b[0m", "[Web] update\n[Web/STREAMS] unbind"]:
             with self.assertRaises(RuntimeError):
                 safe_plan(plan)
         for plan in ["No changes", "Create Web", "Update Web", "Plan: 3 to create, 23 binding changes", "[Web] update"]:
