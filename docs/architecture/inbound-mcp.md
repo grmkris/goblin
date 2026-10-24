@@ -128,7 +128,7 @@ later (`PATCH /api/keys/:keyId`, `{ terms }`) keeps the same key and is logged a
 extras before and after, how many origins, never one). A key that follows its Topics subscribes to their
 `conversation.updated` wakes instead of polling ([published events](published-events.md), ADR 0112); revoking or
 rotating it, or a change that narrows its Topics, ends its leases first, each told `terminated`. Rotate secret gives a
-key a new secret (`POST /api/keys/:keyId/rotate`, [ADR 0105](../adr/0105-a-keys-secret-rotates-in-place.md)), shown
+key a new secret (`POST /api/keys/:keyId/rotate`, [ADR 0105](../adr/archive/0105-a-keys-secret-rotates-in-place.md)), shown
 once: the same key with its grant, and the old secret is refused at once. Better Auth's `apiKey()` plugin keeps it
 hashed in the auth D1 with who made it (`auth/api-keys.ts`), and no expiry of its own: its end is its grant's; its own
 routes are not served. Its grant may also name MCP server origins, each with exactly the tools its threads may call
