@@ -23,12 +23,13 @@ export const AppName = Schema.String.check(
 )
 
 /**
- * An address of an app's own: `https`, or `http` on a loopback host for a local run. An install sends the person back
+ * An address of an app's own: `https` only (the OAuth provider takes no other return address for a confidential client,
+ * and a local run needs none: a script app has no return address). An install sends the person back
  * only to one the app registered.
  */
 export const AppUrl = Schema.String.check(
   Schema.isMaxLength(2048),
-  Schema.isPattern(/^(?:https:\/\/[^\s/?#]+|http:\/\/(?:127\.0\.0\.1|localhost)(?::\d{1,5})?)(?:[/?#][^\s]*)?$/u),
+  Schema.isPattern(/^https:\/\/[^\s/?#]+(?:[/?#][^\s]*)?$/u),
 )
 
 /**

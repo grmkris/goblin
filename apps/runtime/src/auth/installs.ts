@@ -1,3 +1,4 @@
+import { APIError } from 'better-auth/api'
 import {
   type DeveloperApp,
   GrantTerms,
@@ -263,6 +264,10 @@ export const registerApp = async (
       client_credentials_scopes: ['goblin'],
       scope: 'goblin',
     },
+  }).catch((cause: unknown) => {
+    // The provider refusing the registration (an address it will not take) is the input's fault, not ours.
+    if (cause instanceof APIError && cause.statusCode < 500) throw new InvalidInput({ reason: 'return_url' })
+    throw cause
   })
   const created = Option.getOrUndefined(decodeCreated(answer))
   if (created === undefined) throw new Internal({ reason: 'app_registration' })
