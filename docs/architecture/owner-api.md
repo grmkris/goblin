@@ -114,7 +114,7 @@ locations and never its message. The Worker's own routes (`/mcp`'s failures asid
 Callers that are not the owner's browser reach the agent through its internal API (`InternalApi`, `/internal`, exported
 only from `@goblin/contracts/internal`), which the Worker calls on the agent's stub with a typed client
 (`inbound/client.ts`) after its own check of the caller (a bearer token, a hook's route token, a file link's token):
-`ask`, `recent` and `inspect` (inbound `/mcp`), `mcpEvents` (the Events hook), `linkedFile` (a file link, ADR 0070) and
+`inspect` (inbound `/mcp`), `mcpEvents` (the Events hook), `linkedFile` (a file link, ADR 0070) and
 `publish.terminate` (`POST /internal/publish/terminate`, ADR 0112), which the account API calls before it uninstalls
 or narrows an installation, deletes an app, or revokes an OAuth client, so the holder's Events leases end with
 `terminated` first. Its gate (`InternalGate`, `http/api/middleware.ts`)
