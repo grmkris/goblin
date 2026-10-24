@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, writeFileSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 import { createServer } from 'vite'
 import { sentOf } from './agui-route.ts'
 
@@ -23,7 +24,7 @@ try {
     })
     const submissions: { url: string; input: string; operationId: string; csrf: string | undefined }[] = []
     let release: (() => void) | undefined
-    await page.route('**/api/conversations/*/messages', async (route) => {
+    await mockRoute(page, '**/api/conversations/*/messages', async (route) => {
       const request = route.request()
       const body = sentOf(JSON.parse(request.postData() ?? '{}'))
       submissions.push({

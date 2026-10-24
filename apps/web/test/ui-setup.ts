@@ -8,6 +8,7 @@ import { mkdirSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { type Browser, type BrowserContextOptions, chromium } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 
 const STDOUT = 1
 const out = path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance', `setup-${Date.now()}`)
@@ -47,8 +48,8 @@ const saves: unknown[] = []
 async function drive(browser: Browser, origin: string, label: string, options: BrowserContextOptions) {
   const page = await browser.newPage(options)
   page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`))
-  await page.route('**/api/setup/catalog', (route) => route.fulfill({ json: CATALOG }))
-  await page.route('**/api/topics/2/setup', (route) => {
+  await mockRoute(page, '**/api/setup/catalog', (route) => route.fulfill({ json: CATALOG }))
+  await mockRoute(page, '**/api/topics/2/setup', (route) => {
     // SAFETY: the page sends the owner API's TopicSetupEdit, and the editor only ever sends a whole setup.
     const body = route.request().postDataJSON() as { readonly set: unknown; readonly expectedRevision: number }
     saves.push(body)

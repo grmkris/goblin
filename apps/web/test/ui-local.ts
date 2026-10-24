@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { chromium, type Browser, type BrowserContextOptions } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 
 // SAFETY: @cloudflare/workers-types declares the Buffer global `any` over @types/node's; this script runs under Bun.
 const NodeBuffer = Buffer as BufferConstructor
@@ -54,10 +55,10 @@ async function attachments(browser: Browser, origin: string) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true })
   page.on('pageerror', (error) => errors.push(`attachments: ${error.message}`))
   let attempts = 0
-  await page.route('**/api/files?*', (route) =>
+  await mockRoute(page, '**/api/files?*', (route) =>
     route.fulfill({ json: { entries: [], usedBytes: 0, limitBytes: 536870912 } }),
   )
-  await page.route('**/api/files/content?*', (route) => {
+  await mockRoute(page, '**/api/files/content?*', (route) => {
     attempts += 1
     return route.fulfill(
       attempts === 1
@@ -125,8 +126,6 @@ async function styles(browser: Browser, origin: string, label: string, options: 
   await page.screenshot({ path: path.join(out, `styles-${label}.png`) })
   const card = page.locator('[data-sample="interactive-card"]')
   await card.hover()
-  await card.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
-  const hover = await card.evaluate((element) => getComputedStyle(element).backgroundColor)
   const fine = await page.evaluate(() => matchMedia('(hover: hover) and (pointer: fine)').matches)
   const expectedHover = await card.evaluate((element) => {
     const probe = document.createElement('span')
@@ -136,6 +135,17 @@ async function styles(browser: Browser, origin: string, label: string, options: 
     probe.remove()
     return color
   })
+  if (fine)
+    // Two animation frames can still sample the middle of the CSS transition, even under reduced motion.
+    await page.waitForFunction(
+      (expected) => {
+        const element = document.querySelector('[data-sample="interactive-card"]')
+        return element !== null && getComputedStyle(element).backgroundColor === expected
+      },
+      expectedHover,
+      { timeout: 3000 },
+    )
+  const hover = await card.evaluate((element) => getComputedStyle(element).backgroundColor)
   if (fine) assert.equal(hover, expectedHover, 'interactive card tints on hover')
   await page.getByRole('button', { name: 'Thoughts' }).click()
   const panel = page.locator('[data-slot="reasoning-content"]')

@@ -4,6 +4,7 @@ import { mkdirSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { chromium } from 'playwright-core'
+import { mockRoute } from './mock-route.ts'
 import type { ServerView, SetupCatalog, ToolView } from '@goblin/contracts'
 import { SHELF } from './browser/services-fixture.ts'
 
@@ -77,7 +78,8 @@ try {
       let catalogRelease = Promise.withResolvers<void>()
       let release = Promise.withResolvers<void>()
       page.on('pageerror', (error) => errors.push(error.message))
-      await page.route(
+      await mockRoute(
+        page,
         (url) => url.pathname.startsWith('/api/'),
         async (route) => {
           const request = route.request()
@@ -122,7 +124,7 @@ try {
           return route.fulfill({ status: 404, json: { error: { code: 'not_found', message: 'Not in fixture' } } })
         },
       )
-      await page.route('**/api/mcp/skills', (route) => {
+      await mockRoute(page, '**/api/mcp/skills', (route) => {
         const change = JSON.parse(route.request().postData() ?? '{}')
         writes.push('PUT /api/mcp/skills')
         servers = servers.map((server) =>
@@ -130,7 +132,7 @@ try {
         )
         return route.fulfill({ json: change })
       })
-      await page.route('**/api/setup/catalog', async (route) => {
+      await mockRoute(page, '**/api/setup/catalog', async (route) => {
         catalogReads += 1
         await catalogRelease.promise
         return route.fulfill({

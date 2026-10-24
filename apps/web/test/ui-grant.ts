@@ -8,7 +8,8 @@ import assert from 'node:assert/strict'
 import { mkdirSync, writeSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
-import { type Browser, type BrowserContextOptions, type Page, type Route, chromium } from 'playwright-core'
+import { type Browser, type BrowserContextOptions, type Page, chromium } from 'playwright-core'
+import { mockRoute, type MockRoute } from './mock-route.ts'
 import {
   type ApiKeyView,
   type ConsentTerms,
@@ -208,9 +209,10 @@ const ANSWERS: Readonly<Record<string, (payload: unknown, origin: string) => Ans
 
 /** The answers this page asks for; anything else is a failed fixture. */
 async function serve(page: Page, label: string) {
-  await page.route(
+  await mockRoute(
+    page,
     (url) => url.pathname.startsWith('/api/') || url.pathname.startsWith('/w/'),
-    async (route: Route) => {
+    async (route: MockRoute) => {
       const request = route.request()
       const url = new URL(request.url())
       const body: unknown = request.method() === 'GET' ? undefined : request.postDataJSON()
