@@ -32,7 +32,11 @@ describe('goblin command lines (unit)', () => {
   })
 
   it('names commands after their tools', () => {
-    expect(['inspect_turn', 'inspect_problems', 'ask_agent'].map(commandOf)).toEqual(['turn', 'problems', 'ask_agent'])
+    expect(['inspect_turn', 'inspect_problems', 'conversation_send'].map(commandOf)).toEqual([
+      'turn',
+      'problems',
+      'conversation_send',
+    ])
   })
 
   it("reads a tool's arguments against its own schema", () => {

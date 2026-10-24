@@ -32,8 +32,6 @@ const NEEDS = {
   'mcp.disconnect': { level: 'manage', extra: 'setup' },
   'mcp.removeServer': { level: 'manage', extra: 'setup' },
   'agent.models': { level: 'read' },
-  'agent.ask': { level: 'write' },
-  'agent.recent': { level: 'read' },
   'routines.list': { level: 'read', extra: 'routines' },
   'routines.propose': { level: 'write', extra: 'routines' },
   'routines.edit': { level: 'write', extra: 'routines' },
@@ -57,9 +55,9 @@ const NEEDS = {
 }
 
 describe("what a credential's grant must hold for each owner endpoint", () => {
-  it('names a need for exactly the 50 endpoints a credential reaches, and every other refuses one', () => {
+  it('names a need for exactly the 48 endpoints a credential reaches, and every other refuses one', () => {
     expect([...endpointAccess(OwnerApi).keys()].toSorted()).toEqual(Object.keys(NEEDS).toSorted())
-    expect(endpointAccess(OwnerApi).size).toBe(50)
+    expect(endpointAccess(OwnerApi).size).toBe(48)
   })
 
   it('needs a level of each, and an extra of setup, routine and inspection endpoints', () => {

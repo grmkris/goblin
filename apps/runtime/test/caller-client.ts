@@ -1,3 +1,4 @@
+import { runInput } from '@goblin/contracts'
 import type { InspectQuery } from '@goblin/contracts/inspect'
 import * as Effect from 'effect/Effect'
 import type { Credential } from '../src/http/api/principal.ts'
@@ -36,13 +37,15 @@ const callerResult = async <A, E>(
     await Effect.runPromiseExit(ownerCall(agent, caller, caller.kind === 'client' ? PROBE_MEMBER : undefined, call)),
   )
 
-/** A client's question in main (`POST /api/agent/ask`), as /mcp's `ask_agent` asks it, labelled `author`. */
-export const askResult = (agent: AgentFetch, author: string, input: string, operationId: string, waitMs: number) =>
-  callerResult(agent, fixtureClient(author), (api) => api.agent.ask({ payload: { input, operationId, waitMs } }))
+/** A client's send in `chat` (`POST /api/conversations/:id/messages`), as /mcp's `conversation_send` sends it, labelled `author`. */
+export const clientSendResult = (agent: AgentFetch, author: string, chat: string, input: string, operationId: string) =>
+  callerResult(agent, fixtureClient(author), (api) =>
+    api.conversations.submit({ params: { id: chat }, payload: runInput(chat, { input, operationId }) }),
+  )
 
-/** Main's newest `limit` messages (`GET /api/agent/recent`), as /mcp's `get_recent_messages` reads them. */
-export const recentResult = (agent: AgentFetch, limit: number) =>
-  callerResult(agent, fixtureClient(), (api) => api.agent.recent({ query: { limit } }))
+/** How a send stands (`GET /api/conversations/:id/sends/:operationId`), as /mcp's `conversation_send_status` reads it. */
+export const sendStatusResult = (agent: AgentFetch, chat: string, operationId: string) =>
+  callerResult(agent, fixtureClient(), (api) => api.conversations.sendStatus({ params: { id: chat, operationId } }))
 
 /** `value` without the fields it leaves undefined, as an endpoint's query takes it. */
 const given = <T extends object>(value: T): T =>

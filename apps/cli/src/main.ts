@@ -29,7 +29,6 @@ const HELP = `goblin: your goblin agent from the terminal, as an MCP client of /
   goblin logs <id> [--since 6h]  Workers Logs lines that mention an id
   goblin lookup <ref|request|op>  those lines, then the details of the operation they name
   goblin stats [--since 24h]   flow totals across every agent (Analytics Engine)
-  goblin ask_agent <message>   ask your agent in its main conversation
   goblin follow <chat>         a chat live, as it happens (--json: each of its AG-UI events)
   goblin token                 an installed app's access token, from GOBLIN_CLIENT_ID and GOBLIN_CLIENT_SECRET (ADR 0118)
   goblin logout

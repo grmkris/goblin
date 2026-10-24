@@ -131,15 +131,6 @@ export async function topicsCase(url: string): Promise<void> {
   const topic = await createOnce(url, owner)
   const thread = await workIn(url, owner, topic)
   await archiveAndRestore(url, owner, topic, thread)
-  // An inbound client still talks in Personal's Conversation, never in the Topic the owner used last.
-  const inbound = await lever(url, owner, 'topics/inbound', {
-    input: 'inbound lands in personal',
-    operationId: crypto.randomUUID(),
-  })
-  expect(inbound.status).toBe(200)
-  const me = signedIn(url, owner)
-  expect(await snapshotText(me, '1')).toContain('inbound lands in personal')
-  expect(await snapshotText(me, topic.conversation)).not.toContain('inbound lands in personal')
   // Another account sees only its own Personal, and cannot reach the owner's Topic.
   expect((await topics(url, other)).map((each) => each.id)).toEqual([1])
   const takenOver = await ownerResult(signedIn(url, other), (api) =>

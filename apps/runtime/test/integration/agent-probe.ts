@@ -4,7 +4,6 @@ import { bindEndpoints } from '../../src/mcp/oauth/endpoints.ts'
 import { AddedServerStore } from '../../src/mcp/servers/servers.ts'
 import { runApplicationMigrations } from '../../src/storage/migrations.ts'
 import { appMcpCredentials, appMcpEndpoints, appMcpGrants, appMcpOauthPending } from '../../src/storage/schema.ts'
-import { askResult, recentResult } from '../caller-client.ts'
 import { type AgentFetch, callOwner } from '../owner-client.ts'
 import { type ProbeEnv, type Probes, type ProbeStub, inAgent, inWorker } from './probe.ts'
 import {
@@ -105,7 +104,6 @@ async function ownerApiSequence(agent: ProbeStub) {
   const unknownApp = await ownerResult(agent, (api) =>
     api.mcp.setAppGrant({ payload: { connectionId: 'missing', uri: 'ui://missing/app.html', allowed: true } }),
   )
-  const noConversation = await recentResult(agent, 5)
   const thread = await ownerCreate(agent, {})
   const threads = await workspaceConversations(agent)
   const badBranch = await branchMain(agent, 999_999)
@@ -116,7 +114,6 @@ async function ownerApiSequence(agent: ProbeStub) {
   const model = await ownerResult(agent, (api) => api.agent.model())
   const unknownModel = await ownerResult(agent, (api) => api.agent.chooseModel({ payload: { model: 'not-offered' } }))
   await callOwner(agent, (api) => api.resident.set({ payload: { enabled: false } }))
-  const askWhileRevoked = await askResult(agent, 'Test client', 'hello', 'op-1', 1000)
   return {
     first,
     revoked,
@@ -125,7 +122,6 @@ async function ownerApiSequence(agent: ProbeStub) {
     servers,
     unknownServer,
     unknownApp,
-    noConversation,
     threads,
     badBranch,
     unknownThread,
@@ -134,7 +130,6 @@ async function ownerApiSequence(agent: ProbeStub) {
     usage,
     model,
     unknownModel,
-    askWhileRevoked,
   }
 }
 

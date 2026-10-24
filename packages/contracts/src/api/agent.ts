@@ -1,25 +1,11 @@
 import * as Schema from 'effect/Schema'
 import * as HttpApiEndpoint from 'effect/http-api/HttpApiEndpoint'
 import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
-import {
-  AgentAsk,
-  AskResult,
-  ModelChoice,
-  ModelEndpointInput,
-  ModelEndpointView,
-  ModelOffer,
-  TranscriptMessage,
-  UsageToday,
-} from '../agent.ts'
+import { ModelChoice, ModelEndpointInput, ModelEndpointView, ModelOffer, UsageToday } from '../agent.ts'
 import { NonEmptyString } from '../ids.ts'
 import { ApiErrors } from './errors.ts'
 import { EndpointAccess } from './access.ts'
 import { EndpointRole } from './role.ts'
-
-/** `?limit=`: how many of the newest messages, 1 to 50. */
-const RecentQuery = {
-  limit: Schema.NumberFromString.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 50 })),
-}
 
 /** The owner's pick of a model the deployment offers. */
 const ModelPick = Schema.Struct({ model: NonEmptyString(128) })
@@ -37,13 +23,8 @@ const ModelPick = Schema.Struct({ model: NonEmptyString(128) })
  *   deployment's.
  * - `models`: `GET /api/models`, the models a Persona may name now. A credential reaches it with `read` (ADR 0084), so
  *   a server can check a model before it writes a Persona.
- * - `ask`: `POST /api/agent/ask`, a question for the agent in main, labelled with the caller's name, answered when it
- *   settles within `waitMs` (else `running`, to ask again with the same operation id). It needs current resident
- *   authority and never grants it.
- * - `recent`: `GET /api/agent/recent?limit=`, the newest messages of main.
  *
- * A credential reaches `ask` with `write` and `recent` with `read` (ADRs 0086, 0114); both are main's, Personal's
- * Conversation, so its grant must reach Personal (Topic 1).
+ * A question for the agent is a send into Personal's Conversation like any other (ADR 0119: no `ask`, no `recent`).
  */
 export class AgentGroup extends HttpApiGroup.make('agent').add(
   HttpApiEndpoint.get('usage', '/agent/usage', { success: UsageToday }),
@@ -67,13 +48,4 @@ export class AgentGroup extends HttpApiGroup.make('agent').add(
     'admin',
   ),
   HttpApiEndpoint.get('models', '/models', { success: ModelOffer }).annotate(EndpointAccess, { level: 'read' }),
-  HttpApiEndpoint.post('ask', '/agent/ask', {
-    payload: AgentAsk,
-    success: AskResult,
-    error: [ApiErrors.conflict, ApiErrors.budgetExhausted],
-  }).annotate(EndpointAccess, { level: 'write' }),
-  HttpApiEndpoint.get('recent', '/agent/recent', {
-    query: RecentQuery,
-    success: Schema.Struct({ messages: Schema.Array(TranscriptMessage) }),
-  }).annotate(EndpointAccess, { level: 'read' }),
 ) {}

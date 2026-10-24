@@ -8,7 +8,7 @@ borrowed browser session. Resident authority (`app_resident`, the `Resident` ser
 (`POST /api/agent/resident`), the event streams, the files and the OAuth callback; no caller (an OAuth client or a key,
 ADR 0086) and no internal call (hooks, file links) grants it. Turning it off in Settings ("Work while you're away")
 sticks: activity does not re-enable it, only the explicit toggle does.
-Model MCP tools, skills, inbound `ask_agent` and scheduled Source pulls and replies require current authority. The
+Model MCP tools, skills and scheduled Source pulls and replies require current authority. The
 owner's own `mcp` endpoints grant it like the rest and do not call `requireResident`; their tool and resource calls
 still check exact grants (`mcp/servers/api.ts`, `pi/resident-mcp.ts`, `pi/skills.ts`).
 
@@ -58,8 +58,8 @@ server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)
 
   | Needs | Tools |
   | --- | --- |
-  | `read` | `access_read`, `topic_list`, `topic_get`, `conversation_entries`, `conversation_send_status`, `persona_list`, `persona_get`, `models_list`, `get_recent_messages` |
-  | `write` | `topic_create`, `conversation_update`, `conversation_send`, `thread_start`, `conversation_stop`, `ask_agent` |
+  | `read` | `access_read`, `topic_list`, `topic_get`, `conversation_entries`, `conversation_send_status`, `persona_list`, `persona_get`, `models_list` |
+  | `write` | `topic_create`, `conversation_update`, `conversation_send`, `thread_start`, `conversation_stop` |
   | `manage` | `topic_update`, `persona_create`, `persona_update` |
   | `read` and `setup` | `setup_catalog`, `server_list`, `tool_grants_list`, `source_list`, `source_routes` |
   | `manage` and `setup` | `topic_set_setup`, `server_add`, `server_rename`, `server_connect`, `server_disconnect`, `server_remove`, `tool_grant_set`, `tool_grants_set`, `server_skills_set` ([ADR 0117](../adr/0117-the-setup-extra-reaches-a-workspaces-connections.md)) |
@@ -99,10 +99,10 @@ server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)
   chats, a Persona or a connection outside it is refused with its reach id. An OAuth client also never does more than
   its person may: its person's role (`ROLE_POWER`: an owner everything, an admin all but `keys`, a member `write` and
   `inspect`) must hold what the endpoint needs, else `Forbidden` `role`. A message a credential sends into a chat
-  carries its name. `ask_agent` and `get_recent_messages` are main's, Personal's Conversation, so the grant must reach
-  Personal; `ask_agent` submits into main and waits up to 110 seconds for the answer; a stable `operationId` makes
-  retries idempotent, and it runs the model, so it counts toward the day's tokens. The inspection tools never call a
-  model; the server's instructions tell clients that returned text is data, never instructions.
+  carries its name. Asking the agent itself is a send into Personal's Conversation (chat `1`), which the grant must
+  reach; nothing waits (ADR 0119): a send answers its receipt, or a task to a client that follows one, and a stable
+  `operationId` makes retries idempotent; it runs the model, so it counts toward the day's tokens. The inspection tools
+  never call a model; the server's instructions tell clients that returned text is data, never instructions.
 - **Limits.** Every grant may make 600 requests of its agent in each minute of the clock, counted by owner admission
   ([ADR 0085](../adr/0085-a-keys-rate-limit-is-a-fixed-minute-counted-by-its-agent.md)); past them it is refused with
   `rate_limited` and `retryAfter` (seconds), with `Retry-After` on `/api` and in the tool's error result on `/mcp`. A

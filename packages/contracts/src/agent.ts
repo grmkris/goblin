@@ -85,22 +85,3 @@ export const TranscriptMessage = Schema.Struct({
   author: Schema.optionalKey(Schema.String),
 })
 export type TranscriptMessage = typeof TranscriptMessage.Type
-
-/**
- * `POST /api/agent/ask`: a question for the agent in main, labelled with the caller's name (ADR 0086), and how long to
- * wait for the answer before answering `running`.
- */
-export const AgentAsk = Schema.Struct({
-  input: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(20_000)),
-  operationId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
-  waitMs: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 110_000 })),
-})
-export type AgentAsk = typeof AgentAsk.Type
-
-/** The answer, or `running` with the operation id to wait again, or why the turn ended without one. */
-export const AskResult = Schema.Union([
-  Schema.Struct({ status: Schema.Literal('done'), operationId: Schema.String, text: Schema.String }),
-  Schema.Struct({ status: Schema.Literal('running'), operationId: Schema.String }),
-  Schema.Struct({ status: Schema.Literal('unanswered'), operationId: Schema.String, reason: Schema.String }),
-])
-export type AskResult = typeof AskResult.Type

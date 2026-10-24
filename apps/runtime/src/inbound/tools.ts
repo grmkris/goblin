@@ -59,8 +59,6 @@ export interface CallTarget {
  */
 export const TOOLS = {
   access_read: 'access.read',
-  ask_agent: 'agent.ask',
-  get_recent_messages: 'agent.recent',
   topic_list: 'topics.list',
   topic_get: 'topics.get',
   topic_create: 'topics.create',

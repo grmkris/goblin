@@ -90,7 +90,7 @@ only the run events of those chats (ADR 0084); a key's Topics are sealed like an
 | `organize` | `/organize/:id/undo` | `organize/api.ts` |
 | `mcp` | `/mcp/servers`, `/mcp/suggested`, `/mcp/catalog`, `/mcp/registries`, `/mcp/registries/remove`, `/mcp/grants`, `/mcp/grants/batch`, `/mcp/ask-first`, `/mcp/skills`, `/mcp/app-grants`, `/mcp/approvals/:id`, `/mcp/url-requests/:id`, `/mcp/oauth/callback`, and `/mcp/:id/` `tools`, `events`, `connect`, `step-up`, `disconnect`, `remove`, `tools/call`, `resources/read` (a credential's `setup` reads the servers and grants, and with `manage` adds, renames, signs in, disconnects and removes a connection and sets its grants and skills, within its reach, ADR 0117) | `mcp/servers/api.ts` |
 | `resident` | `/agent/resident` | `mcp/resident-api.ts` |
-| `agent` | `/agent/usage`, `/agent/model`, `/agent/model-endpoint`, `GET /models`, `POST /agent/ask`, `GET /agent/recent` | `routines/agent-api.ts` |
+| `agent` | `/agent/usage`, `/agent/model`, `/agent/model-endpoint`, `GET /models` | `routines/agent-api.ts` |
 | `memory` | `/agent/memory` | `memory/api.ts` |
 | `routines` | `/routines`, `/routines/settings`, `/routines/:id`, and under it `confirm`, `pause`, `run`, `runs` | `routines/api.ts` |
 | `apps` | `/apps`, `/apps/:id`, and under it `launch`, `state`, `call`, `diagnostics` | `apps/api.ts` |

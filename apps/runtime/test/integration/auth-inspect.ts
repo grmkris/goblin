@@ -294,7 +294,7 @@ export async function inspectAuthCase(base: string) {
   const readTools = await toolsOf(base, reading.access)
   expect(readTools).toEqual(expect.arrayContaining(['access_read', 'topic_list', 'persona_get', 'workspace_list']))
   expect(inspection(readTools)).toEqual([])
-  expect(readTools).not.toContain('ask_agent')
+  expect(readTools).not.toContain('conversation_send')
   expect(readTools).not.toContain('conversation_send')
 
   // Settings widens it: the same live token now lists inspection and management, without signing in again.

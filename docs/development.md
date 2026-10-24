@@ -337,14 +337,15 @@ until it runs, real provider and Telegram delivery remain unverified.
   claude mcp add --transport http goblin https://dev.goblin.surf/mcp
   ```
 
-  Sign in and approve in the browser. It gets `ask_agent` and `get_recent_messages` in the agent's main conversation,
-  with its messages labelled by client name, and, if you turn on "Also let it read your conversations and runs" on
+  Sign in and approve in the browser. It gets the Topic, chat and Persona tools its grant holds (a send into chat `1`
+  asks the agent itself; `conversation_send_status` says how a send stands), with its messages labelled by client
+  name, and, if you turn on "Also let it read your conversations and runs" on
   the consent page (it starts off), the read-only inspection tools (ADR 0024). Revoke it under Settings → Connected clients. A connection made before inspection joined `/mcp`
   gets those tools after reconnecting once (in Claude Code: `/mcp` → goblin → Clear authentication).
 - **Inspect your agent from a coding agent.** Start with `inspect_problems` or `inspect_turns`, then `inspect_turn`
   with an operation id (a Source message is `source-<source>-<message>`), then `inspect_conversation` for the words.
   `inspect_flows` shows how conversations moved (sends, replies, thread starts, moves, Personas, Delegates) and
-  `inspect_details` the operation behind a message. Reading never calls a model; `ask_agent` does.
+  `inspect_details` the operation behind a message. Reading never calls a model; a send does.
 - **The `goblin` CLI** (`apps/cli`) is the same from a terminal: an MCP client of `/mcp` that asks for `goblin`, its
   grant the one its person approves on the consent page (with `inspect` for these commands, ADR 0114), whose
   commands come from the server's tools (`goblin turn <operation id>` reads one turn).

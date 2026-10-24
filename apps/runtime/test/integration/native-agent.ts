@@ -23,7 +23,6 @@ const OwnerApiRun = Schema.Struct({
   servers: Ok(Schema.Array(Schema.Unknown)),
   unknownServer: Refused,
   unknownApp: Refused,
-  noConversation: Ok(Schema.Struct({ messages: Schema.Array(Schema.Unknown) })),
   threads: Schema.Array(Listed),
   badBranch: Refused,
   unknownThread: Refused,
@@ -32,7 +31,6 @@ const OwnerApiRun = Schema.Struct({
   usage: Ok(Schema.Struct({ used: Schema.Number, limit: Schema.NullOr(Schema.Number), resetsAt: Schema.Number })),
   model: Ok(Schema.Struct({ current: Schema.String, default: Schema.String, options: Schema.Array(Schema.Unknown) })),
   unknownModel: Refused,
-  askWhileRevoked: Refused,
 })
 
 /** The owner API through a real stub, then Events ingress on another agent. */
@@ -42,7 +40,6 @@ async function ownerApiChecks(base: string): Promise<void> {
   expect(states.map(({ state }) => state)).toEqual(['active', 'revoked', 'revoked', 'active'])
   expect(result.servers.value).toEqual([])
   expect([result.unknownServer.error._tag, result.unknownApp.error._tag]).toEqual(['NotFound', 'NotFound'])
-  expect(result.noConversation.value).toEqual({ messages: [] })
   // Main is registered on first use; an empty thread joins it. Only registered conversations reach Pi.
   expect(result.threads.map(({ kind, closedAt }) => ({ kind, closed: closedAt !== undefined }))).toEqual([
     { kind: 'main', closed: false },
@@ -58,7 +55,6 @@ async function ownerApiChecks(base: string): Promise<void> {
   // No pick yet: the deployment default; a model the deployment does not offer is refused (app_model_choice exists).
   expect(result.model.value).toMatchObject({ current: 'storage-only', default: 'storage-only' })
   expect(result.unknownModel.error._tag).toBe('InvalidInput')
-  expect(result.askWhileRevoked.error._tag).toBe('ResidentInactive')
   // Events ingress: the owner's refusal answers 410.
   expect(await probeOf(base, 'events-ingress', Schema.Unknown)).toEqual({ revoked: 410 })
 }
@@ -232,7 +228,7 @@ async function inboundHostChecks(base: string): Promise<void> {
     })
   const valid = await send('https://dev.goblin.surf')
   expect(valid.status).toBe(200)
-  expect(await valid.text()).toContain('ask_agent')
+  expect(await valid.text()).toContain('conversation_send')
   expect((await send('https://attacker.example')).status).toBe(403)
 }
 

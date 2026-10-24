@@ -90,7 +90,7 @@ describe('/mcp for every credential (ADRs 0086, 0114)', () => {
     expect(reads).not.toContain('conversation_send')
     const writes = await listed(client('write'))
     expect(writes).toEqual(toolsFor('write'))
-    expect(writes).toEqual(expect.arrayContaining(['conversation_send', 'topic_create', 'ask_agent']))
+    expect(writes).toEqual(expect.arrayContaining(['conversation_send', 'topic_create', 'thread_start']))
     expect(writes).not.toContain('persona_create')
     expect(writes.filter((tool) => tool.startsWith('inspect_') || tool.startsWith('routine_'))).toEqual([])
     expect(await listed(client('manage'))).toEqual(expect.arrayContaining(['persona_create', 'topic_update']))
@@ -179,22 +179,16 @@ describe('/mcp for every credential (ADRs 0086, 0114)', () => {
     }
   })
 
-  it('asks the agent in main with a bounded wait, and reads main back', async () => {
-    const answer = { status: 'done', operationId: 'op-1', text: 'pong' }
-    const { mcp, seen } = await connect(client('write'), (request) =>
-      Response.json(
-        new URL(request.url).pathname === '/api/agent/ask' ? answer : { messages: [{ role: 'assistant', text: 'hi' }] },
-      ),
-    )
+  it('reads how one send stands by its chat and operation id, which a client polls instead of waiting', async () => {
+    const answered = { status: 'answered', text: 'pong' }
+    const { mcp, seen } = await connect(client('read'), () => Response.json(answered))
     try {
-      const asked = await mcp.callTool({ name: 'ask_agent', arguments: { input: 'ping', operationId: 'op-1' } })
-      expect(textOf(asked)).toEqual(answer)
-      expect(await seen[0]?.json()).toEqual({ input: 'ping', operationId: 'op-1', waitMs: 50_000 })
-      const tooLong = await mcp.callTool({ name: 'ask_agent', arguments: { input: 'ping', waitSeconds: 600 } })
-      expect(tooLong.isError).toBe(true)
-      const recent = await mcp.callTool({ name: 'get_recent_messages', arguments: { limit: 5 } })
-      expect(textOf(recent)).toEqual({ messages: [{ role: 'assistant', text: 'hi' }] })
-      expect(new URL(seen[1]?.url ?? '').searchParams.get('limit')).toBe('5')
+      const status = await mcp.callTool({
+        name: 'conversation_send_status',
+        arguments: { chat: '12', operationId: 'swarmm:dev:op-1' },
+      })
+      expect(textOf(status)).toEqual(answered)
+      expect(new URL(seen[0]?.url ?? '').pathname).toBe('/api/conversations/12/sends/swarmm%3Adev%3Aop-1')
     } finally {
       await mcp.close()
     }
@@ -224,7 +218,10 @@ describe('/mcp for every credential (ADRs 0086, 0114)', () => {
     const refusal = new BudgetExhausted({ limit: 2_000_000, resetsAt: 86_400 })
     const { mcp } = await connect(client('write'), () => Response.json(envelopeOf(refusal), { status: 429 }))
     try {
-      const refused = await mcp.callTool({ name: 'ask_agent', arguments: { input: 'ping' } })
+      const refused = await mcp.callTool({
+        name: 'conversation_send',
+        arguments: { chat: '1', message: { input: 'ping', operationId: 'op-1' } },
+      })
       expect(refused.isError).toBe(true)
       expect(textOf(refused)).toEqual({ _tag: 'BudgetExhausted', limit: 2_000_000, resetsAt: 86_400 })
     } finally {
@@ -236,7 +233,10 @@ describe('/mcp for every credential (ADRs 0086, 0114)', () => {
     const refusal = accessInsufficient('https://goblin.test', 'cg_1', { reachId: 'w1/topic/1' })
     const { mcp } = await connect(client('write'), () => Response.json(envelopeOf(refusal), { status: 403 }))
     try {
-      const refused = await mcp.callTool({ name: 'ask_agent', arguments: { input: 'ping' } })
+      const refused = await mcp.callTool({
+        name: 'conversation_send',
+        arguments: { chat: '1', message: { input: 'ping', operationId: 'op-1' } },
+      })
       expect(refused.isError).toBe(true)
       expect(textOf(refused)).toEqual({
         _tag: 'AccessInsufficient',

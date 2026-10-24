@@ -14,8 +14,6 @@ import { AppsMcpFixture } from './apps-mcp.ts'
 import { permutePrimary, profileEnabled } from './primary-profile.ts'
 import { chatSession } from '../../src/chats/directory.ts'
 import { drizzle } from 'drizzle-orm/durable-sqlite'
-import { unwrap } from '../../src/http/rpc.ts'
-import { askResult } from '../caller-client.ts'
 import type { MovePhase } from '../../src/chats/mover.ts'
 import { moveState, readRounds } from './move-probe.ts'
 import { ownerSend } from './probe-reads.ts'
@@ -81,13 +79,6 @@ export class OwnerAgent extends PersonalAgent {
     }
     if (path === '/test/topics/sessions')
       return Response.json({ sessions: (await this.harness.sessions.list()).length })
-    if (path === '/test/topics/inbound') {
-      const { input, operationId } = Schema.decodeUnknownSync(
-        Schema.Struct({ input: Schema.String, operationId: Schema.String }),
-      )(await request.json())
-      const self = { fetch: (internal: Request) => this.onRequest(internal) }
-      return Response.json(unwrap(await askResult(self, 'topics-client', input, operationId, 5000)))
-    }
     if (path.startsWith('/test/move/')) return this.#moveProbe(path, request)
     if (path === '/test/queue/held') return Response.json({ inputs: queueModel(this).held() })
     if (path === '/test/queue/seen') return Response.json({ requests: queueModel(this).requests() })
