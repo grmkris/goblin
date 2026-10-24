@@ -6,7 +6,7 @@ import { Alert, AlertDescription, Skeleton, WidenApproval, failed, succeeded } f
 import { grantTermsQuery, reachItemsQuery, widenGrantMutation, workspacesQuery } from '../account/queries.ts'
 import { FIELD_OF } from '../lib/grant-reach.ts'
 import { describeError, messageOf } from '../lib/query/app-error.ts'
-import { type AskedNames, type WidenSearch, askedWords, reachItemOf, wideningOf } from '../lib/widen.ts'
+import { type AskedNames, type WidenSearch, addsNothing, askedWords, reachItemOf, wideningOf } from '../lib/widen.ts'
 import { AuthShell } from './auth-shell.tsx'
 import { GRANT_WORDS, type GrantHolder, GrantLine, grantFailure, reachWords } from './grant-editor.tsx'
 
@@ -93,6 +93,14 @@ function Comparison(props: { readonly search: WidenSearch; readonly grantId: str
       </Alert>
     )
   const holder = holderOf(widening.summary, workspaces)
+  // An Approve that would save the same terms only looks like a change: say so, and where its access is changed.
+  if (addsNothing(widening.current, widening.requested))
+    return (
+      <Decided>
+        This link asks for nothing {widening.current.name} does not have already. To give it more, such as another
+        workspace, change its access in <Link to="/settings">Settings</Link>.
+      </Decided>
+    )
   if (denied) return <Decided>Nothing changed. {widening.current.name} keeps the access it had.</Decided>
   if (save.data !== undefined)
     return (

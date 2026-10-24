@@ -91,6 +91,13 @@ export const widened = (current: GrantTerms, search: WidenSearch): GrantTerms =>
 })
 
 /**
+ * Whether `requested` (`widened` of `current`) adds nothing: a link that names no level, extra or reach item, or only
+ * ones the grant holds already. `widened` keeps each part it leaves alone as it was, so the parts compare by identity.
+ */
+export const addsNothing = (current: GrantTerms, requested: GrantTerms): boolean =>
+  requested.level === current.level && requested.extras === current.extras && requested.reach === current.reach
+
+/**
  * What the page compares: only a live grant of the person's, the very one the link names, can be widened (myapps'
  * `wideningGrant`, 3b94a770); otherwise none.
  */

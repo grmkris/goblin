@@ -1,7 +1,7 @@
 import { type ConsentTerms, GRANT_SPEC, type GrantTerms, PRESET, presetFor } from '@goblin/contracts'
 import { describe, expect, it } from 'vitest'
 import { everything, withWorkspaces } from '../src/lib/grant-reach.ts'
-import { askedWords, parseWiden, reachItemOf, widened, wideningOf, withReachId } from '../src/lib/widen.ts'
+import { addsNothing, askedWords, parseWiden, reachItemOf, widened, wideningOf, withReachId } from '../src/lib/widen.ts'
 
 const KEY: GrantTerms = presetFor('swarm', ['ws_acme'])
 const LISTED: GrantTerms = {
@@ -65,6 +65,15 @@ describe('the terms a widening asks for', () => {
     const managing = { ...LISTED, level: 'manage' as const, extras: ['setup' as const] }
     expect(widened(managing, { level: 'read', extra: 'setup' })).toEqual(managing)
     expect(widened(LISTED, {})).toEqual(LISTED)
+  })
+
+  it('knows a link that asks for nothing new, which the page does not offer to approve', () => {
+    expect(addsNothing(LISTED, widened(LISTED, {}))).toBe(true)
+    expect(addsNothing(LISTED, widened(LISTED, { level: 'read' }))).toBe(true)
+    expect(addsNothing(LISTED, widened(LISTED, { level: 'write' }))).toBe(false)
+    expect(addsNothing(LISTED, widened(LISTED, { extra: 'inspect' }))).toBe(false)
+    expect(addsNothing(LISTED, widened(LISTED, { reach: 'ws_acme/topic/3' }))).toBe(true)
+    expect(addsNothing(LISTED, widened(LISTED, { reach: 'ws_acme/topic/4' }))).toBe(false)
   })
 
   it('compares only a live grant that is the one the link names', () => {
