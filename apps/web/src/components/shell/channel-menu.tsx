@@ -10,14 +10,16 @@ import {
   DropdownMenuTrigger,
 } from '@goblin/ui'
 import { ArchiveIcon, ArchiveRestoreIcon, EllipsisIcon, PencilIcon } from 'lucide-react'
+import { useConfigures } from '../../lib/current-workspace.ts'
 import { messageOf } from '../../lib/query/app-error.ts'
 import { isArchived } from '../../lib/topics.ts'
 import { updateWorkspaceTopicMutation } from '../../lib/workspace/mutations.ts'
 import { TopicDialog } from './topic-dialog.tsx'
 
 /**
- * A channel's actions, in its info panel's header: rename, and archive it or restore it (never Personal). Whether it is
- * sealed or a hub is the Overview's (`ChannelReach`). A failure shows in the panel and under the chat's bar.
+ * A channel's actions, in its info panel's header: rename, and archive it or restore it (never Personal), an owner's or
+ * admin's (ADR 0115), so a member sees none. Whether it is sealed or a hub is the Overview's (`ChannelReach`). A
+ * failure shows in the panel and under the chat's bar.
  */
 export function ChannelMenu({
   topic,
@@ -28,12 +30,14 @@ export function ChannelMenu({
 }) {
   const update = useMutation(updateWorkspaceTopicMutation)
   const [renaming, setRenaming] = useState(false)
+  const configures = useConfigures()
   const change = (patch: UpdateTopic) =>
     update.mutate(
       { id: topic.id, change: patch },
       { onError: (failure) => onFailure(messageOf(failure, 'change the topic')) },
     )
   const archived = isArchived(topic)
+  if (!configures) return null
   return (
     <>
       <DropdownMenu>
@@ -62,8 +66,8 @@ export function ChannelMenu({
 }
 
 /**
- * In place of an archived Topic's composer: it is archived, and Restore brings it back to the sidebar and to search.
- * Nothing that was stopped starts again on its own.
+ * In place of an archived Topic's composer: it is archived, and Restore (an owner's or admin's) brings it back to the
+ * sidebar and to search. Nothing that was stopped starts again on its own.
  */
 export function ArchivedBanner({
   topic,
@@ -73,24 +77,27 @@ export function ArchivedBanner({
   readonly onFailure: (text: string) => void
 }) {
   const restore = useMutation(updateWorkspaceTopicMutation)
+  const configures = useConfigures()
   return (
     <div className="chat-dock">
       <div className="chat-closed" role="status">
         <span>#{topic.name} is archived.</span>
-        <Button
-          variant="outline"
-          size="sm"
-          pending={restore.isPending}
-          onClick={() =>
-            restore.mutate(
-              { id: topic.id, change: { archived: false } },
-              { onError: (failure) => onFailure(messageOf(failure, 'restore the topic')) },
-            )
-          }
-        >
-          <ArchiveRestoreIcon data-icon="inline-start" />
-          Restore
-        </Button>
+        {configures && (
+          <Button
+            variant="outline"
+            size="sm"
+            pending={restore.isPending}
+            onClick={() =>
+              restore.mutate(
+                { id: topic.id, change: { archived: false } },
+                { onError: (failure) => onFailure(messageOf(failure, 'restore the topic')) },
+              )
+            }
+          >
+            <ArchiveRestoreIcon data-icon="inline-start" />
+            Restore
+          </Button>
+        )}
       </div>
     </div>
   )

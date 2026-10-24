@@ -45,6 +45,8 @@ describe('admin for configuration (ADRs 0093, 0098)', () => {
         'personas.create',
         'personas.update',
         'topics.setSetup',
+        // Every change to a Topic, its name and archiving included (ADR 0115).
+        'topics.update',
         'routines.propose',
         'routines.edit',
         'routines.archive',

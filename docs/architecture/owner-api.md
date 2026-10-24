@@ -49,9 +49,10 @@ from context. Owner admission (the `OwnerAdmission` middleware, `http/api/middle
 before its handler, and before its body is decoded. A forward that names neither a member nor a caller, or names one in
 a header that does not decode, is `Unauthenticated` (`principal`), never taken for the owner. A member below the
 endpoint's `EndpointRole` (`admin` for what changes the agent's authority, ADR 0093, and what it works with: Personas,
-a Topic's setup, routine writes, ADR 0098) is `Forbidden` (`role`), and so is an OAuth client acting for one. Where one
-endpoint serves both, `requireAdminFor` (`grants/policy.ts`) refuses a member the admin's part: a Topic's description,
-guidance or setup on create and update, and Undo of a receipt whose change took an admin; `requireAccessFor` asks a
+a Topic's setup, routine writes, ADR 0098; and every change to a Topic, its name, archiving and whether it is the hub
+included, ADR 0115) is `Forbidden` (`role`), and so is an OAuth client acting for one. Where one endpoint serves both,
+`requireAdminFor` (`grants/policy.ts`) refuses a member the admin's part: a Topic's description, guidance or setup on
+create, and Undo of a receipt whose change took an admin; `requireAccessFor` asks a
 credential's grant for the same parts (`manage` for guidance, `setup` for a setup). The agent's own tools for
 those changes refuse on a member's turn the same way (ADR 0099, `pi/asker.ts`): each admission records the role of the
 member who asked on its receipt, and a tool reads its run's inputs back to them. A member's request gets a

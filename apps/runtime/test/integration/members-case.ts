@@ -12,6 +12,7 @@ import {
   workspaceOf,
   type Person,
 } from './owner-requests.ts'
+import { ownerResult } from './probe-reads.ts'
 import { waitFor } from './until.ts'
 
 const APP = 'https://goblin.test'
@@ -133,7 +134,9 @@ export async function membersCase(url: string): Promise<void> {
   const member = { ...guest, workspace: owner.workspace, slug: owner.slug }
 
   const name = `Guest topic ${crypto.randomUUID().slice(0, 8)}`
-  expect((await call(url, member, '/api/topics', { name, operationId: crypto.randomUUID() })).status).toBe(201)
+  const made = await call(url, member, '/api/topics', { name, operationId: crypto.randomUUID() })
+  expect(made.status).toBe(201)
+  const { id: guestTopic } = Schema.decodeUnknownSync(Schema.Struct({ id: Schema.Number }))(await made.json())
   expect((await workspaceOf(url, owner)).topics?.some((topic) => topic.name === name)).toBe(true)
   // The workspace has two people now: each one's message carries who wrote it, by name and ID (ADR 0094).
   const words = `Hello from the guest ${crypto.randomUUID().slice(0, 8)}`
@@ -170,6 +173,15 @@ export async function membersCase(url: string): Promise<void> {
     operationId: crypto.randomUUID(),
   })
   expect(described.status).toBe(403)
+  // Renaming, archiving or restoring a Topic takes an admin as well (ADR 0115), even one the member made.
+  const asMember = signedIn(url, member)
+  for (const change of [{ name: `Renamed ${crypto.randomUUID().slice(0, 6)}` }, { archived: true }])
+    expect(
+      await ownerResult(asMember, (api) => api.topics.update({ params: { id: guestTopic }, payload: change })),
+    ).toMatchObject({
+      ok: false,
+      error: { _tag: 'Forbidden', reason: 'role' },
+    })
   await agentToolsTakeAnAdmin(url, owner, member)
 
   const removed = await ownerFetch(`${url}/w/${owner.slug}/api/members/${guest.userId}`, {

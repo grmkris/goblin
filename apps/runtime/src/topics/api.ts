@@ -46,17 +46,14 @@ const credentialTopic = (input: CreateTopic, keyed: boolean): CreateTopic =>
   input.setup !== undefined || !keyed ? input : { ...input, setup: KEY_TOPIC_SETUP }
 
 /**
- * What changing a Topic takes beyond reaching it: its guidance or reach an admin, or a credential's `manage` (ADR 0115);
- * making it a hub a person, never a credential, so what a credential's content steers can never be read from
- * everywhere.
+ * What changing a Topic takes beyond its endpoint (an owner or admin, or a credential's `manage`) and reaching it: making
+ * it the hub takes a person, never a credential, so what a credential's content steers can never be read from
+ * everywhere (ADR 0115).
  */
 const updating = (change: UpdateTopic) =>
   Effect.gen(function* () {
-    const guidance = change.description !== undefined || change.instructions !== undefined
-    yield* requireAdminFor(guidance || change.reach !== undefined)
-    if ((yield* requestCredential) === undefined || change.reach === undefined) return
-    if (change.reach === 'hub') return yield* new Forbidden({ reason: 'hub_person' })
-    yield* requireAccessFor({ level: 'manage' }, false)
+    if (change.reach === 'hub' && (yield* requestCredential) !== undefined)
+      return yield* new Forbidden({ reason: 'hub_person' })
   })
 
 const create = (input: CreateTopic) =>

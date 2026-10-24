@@ -48,5 +48,6 @@ exports[`admin for configuration (ADRs 0093, 0098) > takes an admin for what cha
   "sources.resume",
   "sources.route",
   "topics.setSetup",
+  "topics.update",
 ]
 `;
