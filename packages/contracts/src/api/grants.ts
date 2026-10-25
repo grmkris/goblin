@@ -7,7 +7,8 @@ import { API_ERRORS } from './errors.ts'
 /** A grant's id in a path: a key's id, or `cg_` and a client grant's own. */
 const GrantId = Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u))
 /** A registered client's id in a path. */
-const ClientId = Schema.String.check(Schema.isPattern(/^[\w.-]{1,200}$/u))
+/** Better Auth's own id, or a Client ID Metadata Document's https URL (ADR 0122). */
+const ClientId = Schema.String.check(Schema.isPattern(/^(?:[\w.-]{1,200}|https:\/\/[^\s#]{1,2000})$/u))
 
 /**
  * Grants, as the person who approves them sees them (`grants.ts`, ADR 0114), served by the Worker for their session

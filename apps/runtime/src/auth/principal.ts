@@ -36,6 +36,7 @@ export const clientFromClaims = (
     throw new Unauthenticated({ reason: 'expired' })
   if (!text(claims.sub)) throw new Unauthenticated({ reason: 'subject' })
   if (!text(clientId)) throw new Unauthenticated({ reason: 'client' })
+  // DPoP is not implemented (ADR 0122): our server binds no token, so a confirmation claim is never ours to honour.
   if (claims.cnf !== undefined) throw new Unauthenticated({ reason: 'sender-constrained tokens are not supported' })
   return { clientId, subject: claims.sub, expiresAt: claims.exp }
 }

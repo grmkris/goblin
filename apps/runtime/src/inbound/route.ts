@@ -26,27 +26,30 @@ type Admitted =
   | { readonly kind: 'key'; readonly workspaceId: string; readonly credential: Credential; readonly token: string }
   | ({ readonly token: string } & TokenAccess)
 
+/** No bearer at all, or one that was presented and refused: the challenge says which (RFC 6750 §3.1). */
+type Challenged = { readonly kind: 'challenge'; readonly invalidToken: boolean }
+
 /**
  * A server's API key (ADR 0081), an OAuth client a person consented to (ADR 0024) with the grant they gave it and the
  * workspaces it reaches now (ADRs 0097, 0114), or an installed app (ADR 0118). A key that does not admit rejects with its
  * `Unauthenticated`, which
  * the Worker answers in the envelope `/api` uses: there is nothing to sign in to. An OAuth token that does not verify,
- * or no bearer at all, is answered with the sign-in challenge.
+ * or no bearer at all, is answered with the sign-in challenge, naming `invalid_token` when one was presented.
  */
-const admit = async (request: Request, env: RuntimeEnv): Promise<Admitted | undefined> => {
+const admit = async (request: Request, env: RuntimeEnv): Promise<Admitted | Challenged> => {
   const key = bearerKey(request)
   if (key !== undefined) {
     const { workspaceId, credential } = await verifyKey(env, key)
     return { kind: 'key', workspaceId, credential, token: key }
   }
   const header = request.headers.get('authorization') ?? ''
-  if (!header.startsWith('Bearer ')) return undefined
+  if (!header.startsWith('Bearer ')) return { kind: 'challenge', invalidToken: false }
   const token = header.slice('Bearer '.length)
   try {
     return { token, ...(await tokenAccess(env, token)) }
   } catch (failure) {
     // expected: a token that does not admit is answered with the sign-in challenge, as a missing one is.
-    if (failure instanceof Unauthenticated) return undefined
+    if (failure instanceof Unauthenticated) return { kind: 'challenge', invalidToken: true }
     throw failure
   }
 }
@@ -88,7 +91,7 @@ const powerOf = (admitted: Admitted): Power => {
  */
 export const handleInboundMcp = async (request: Request, env: RuntimeEnv): Promise<Response> => {
   const admitted = await admit(request, env)
-  if (admitted === undefined) return challengeOf(env.APP_URL)
+  if (admitted.kind === 'challenge') return challengeOf(env.APP_URL, admitted)
   const { token } = admitted
   const power = powerOf(admitted)
   const grantId =

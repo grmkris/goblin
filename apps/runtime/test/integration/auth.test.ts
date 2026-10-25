@@ -10,6 +10,7 @@ import { tasksCase } from './tasks-case.ts'
 import { answerOf } from './probe-reads.ts'
 import { connectionSetupCase, inspectAuthCase, keyWideningCase, reachCase, restBearerCase } from './auth-inspect.ts'
 import { installsCase } from './installs-case.ts'
+import { cimdCase, protocolCase } from './protocol-case.ts'
 
 const harness = Test.make({
   providers: Cloudflare.providers(),
@@ -238,6 +239,20 @@ harness.test(
   Effect.gen(function* () {
     const { url } = yield* stack
     yield* Effect.promise(() => connectionSetupCase(url))
+  }),
+)
+harness.test(
+  'the MCP authorization spec on the wire: discovery without DPoP, registration rules, loopback ports, offline_access, invalid_token, RFC 7009 (ADR 0122)',
+  Effect.gen(function* () {
+    const { url } = yield* stack
+    yield* Effect.promise(() => protocolCase(url))
+  }),
+)
+harness.test(
+  'a Client ID Metadata Document is a client: consent by its name, a token that reaches /mcp, refusals for a scheme and a redirecting document (ADR 0122)',
+  Effect.gen(function* () {
+    const { url } = yield* stack
+    yield* Effect.promise(() => cimdCase(url))
   }),
 )
 harness.test(

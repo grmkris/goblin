@@ -4,6 +4,7 @@ import { nowSeconds } from '../clock.ts'
 import { Unauthenticated } from '../http/errors.ts'
 import { isOidcPath } from './oidc.ts'
 import { AUTH_BASE_PATH, authIssuer, createAuth } from './options.ts'
+import { isDiscoveryPath, withoutDpopMetadata, withoutDpopProof } from './protocol.ts'
 import { type GrantRecord, grantOfClient, isLive, revokeClientGrant } from './grants.ts'
 import { clientFromClaims, type ClientPrincipal, type TokenClaims } from './principal.ts'
 import { mcpResource, protectedResourceMetadata } from './resources.ts'
@@ -107,10 +108,10 @@ const CLIENT_ROUTES: ReadonlySet<string> = new Set([
 ])
 
 /**
- * No logging of auth request content; the provider owns its discovery/OAuth responses. The OpenID Connect provider is
- * built only for its own two routes.
+ * No logging of auth request content; the provider owns its discovery/OAuth responses, with DPoP taken out of both (ADR
+ * 0122, `protocol.ts`). The OpenID Connect provider is built only for its own two routes.
  */
-export const handleAuth = (request: Request, env: RuntimeEnv): Promise<Response> => {
+export const handleAuth = async (request: Request, env: RuntimeEnv): Promise<Response> => {
   const path = new URL(request.url).pathname
   // API keys, workspaces and apps are made, changed and ended only through the account APIs (ADRs 0081, 0089, 0118):
   // none of their plugins' own routes is served.
@@ -120,9 +121,12 @@ export const handleAuth = (request: Request, env: RuntimeEnv): Promise<Response>
     path.startsWith(`${AUTH_BASE_PATH}/admin/`) ||
     CLIENT_ROUTES.has(path.slice(AUTH_BASE_PATH.length))
   )
-    return Promise.resolve(new Response('Not found', { status: 404 }))
+    return new Response('Not found', { status: 404 })
   const provider = path.startsWith(`${AUTH_BASE_PATH}/`) && isOidcPath(path.slice(AUTH_BASE_PATH.length))
-  return createAuth(env, env.AUTH_DB, { provider }).handler(request)
+  const auth = createAuth(env, env.AUTH_DB, { provider })
+  if (path === `${AUTH_BASE_PATH}/oauth2/token`) return auth.handler(withoutDpopProof(request))
+  const response = await auth.handler(request)
+  return isDiscoveryPath(path) ? withoutDpopMetadata(response) : response
 }
 
 /** RFC 9728 metadata for /mcp, served at every `/.well-known/oauth-protected-resource…` path. */

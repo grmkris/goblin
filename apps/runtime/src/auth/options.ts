@@ -1,5 +1,6 @@
 import { Predicate } from 'effect'
 import { apiKey } from '@better-auth/api-key'
+import { cimd } from '@better-auth/cimd'
 import { mcp } from '@better-auth/mcp'
 import { type Account, betterAuth, type BetterAuthPlugin } from 'better-auth'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
@@ -12,6 +13,7 @@ import { CODE_SEND, CODE_SIGN_IN, guardEmailCode } from './email-code.ts'
 import { codeMail, mailerOf } from './mail.ts'
 import { guardOidc, oidcPlugin, oidcProviderOf, refuseUnverifiedOidcUser, withoutProviderTokens } from './oidc.ts'
 import { clientSecretHash } from './client-secret.ts'
+import { guardAuthorization, guardRegistration } from './protocol.ts'
 import { KEY_LENGTH, KEY_PREFIX, KEY_START_LENGTH, MCP_SCOPES, mcpResource } from './resources.ts'
 import { workspaceAccess } from './roles.ts'
 import { deleteAgentOf } from './account.ts'
@@ -20,29 +22,8 @@ import { deleteOwnedAlone } from './workspaces.ts'
 export const AUTH_BASE_PATH = '/api/auth'
 export const authIssuer = (appUrl: string): string => `${appUrl.replace(/\/$/u, '')}${AUTH_BASE_PATH}`
 
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
-const isLoopbackHttp = (uri: unknown): boolean => {
-  if (!Predicate.isString(uri)) return false
-  try {
-    const url = new URL(uri)
-    return url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname)
-  } catch {
-    // expected: a redirect URI that does not parse is not a loopback one.
-    return false
-  }
-}
-
-/**
- * MCP clients (Claude Code and others) register http loopback redirects without saying `application_type`, and the
- * provider defaults that to `web`, which forbids them. A registration whose every redirect is http loopback is a
- * native app by RFC 8252; say so. Anything else keeps the provider's rules.
- */
-export const markLoopbackClientsNative = (body: unknown): void => {
-  if (!Predicate.isObject(body) || 'application_type' in body) return
-  const uris = 'redirect_uris' in body ? body.redirect_uris : undefined
-  if (Array.isArray(uris) && uris.length > 0 && uris.every(isLoopbackHttp))
-    Object.assign(body, { application_type: 'native' })
-}
+/** Fifteen minutes: an access token is short-lived (the spec's SHOULD); a client refreshes, and a revoke ends it anyway. */
+const ACCESS_TOKEN_SECONDS = 900
 
 export type AuthEnvironment = Pick<
   RuntimeEnv,
@@ -58,6 +39,7 @@ export type AuthEnvironment = Pick<
   | 'OIDC_CLIENT_ID'
   | 'OIDC_CLIENT_SECRET'
   | 'OIDC_LABEL'
+  | 'CLIENT_METADATA_FETCH'
 >
 
 /** Per-IP limits on the endpoints that create accounts or send mail; everything else keeps the default window. */
@@ -167,8 +149,13 @@ const bodyField = (body: unknown, name: string): unknown => (Predicate.hasProper
 /** Every gate Better Auth's own options cannot express, before any endpoint runs. */
 const beforeAuth = (env: AuthEnvironment, database: D1Database) =>
   createAuthMiddleware(async (context) => {
+    // The MCP authorization spec's rules for a registration and an authorization (ADR 0122, `protocol.ts`).
     if (context.path === '/oauth2/register') {
-      markLoopbackClientsNative(context.body)
+      guardRegistration(context.body)
+      return
+    }
+    if (context.path === '/oauth2/authorize') {
+      guardAuthorization(context.query)
       return
     }
     if (unavailableMethod(context.path ?? '')) throw new APIError('NOT_FOUND', { message: 'Not found' })
@@ -228,11 +215,15 @@ const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeed
     scopes: [...MCP_SCOPES],
     loginPage: '/login',
     consentPage: '/consent',
-    // MCP clients (Claude Code and others) register themselves before the owner signs in. Registration grants
-    // nothing: every client needs its person's consent and a grant they approve (ADR 0114). Only the /mcp resource can
-    // be requested.
+    accessTokenExpiresIn: ACCESS_TOKEN_SECONDS,
+    // MCP clients register themselves before the owner signs in: by a Client ID Metadata Document (`cimd()` below, the
+    // spec's preferred way) or dynamically, until the clients that matter are seen connecting by document (ADR 0122).
+    // Registration grants nothing: every client needs its person's consent and a grant they approve (ADR 0114). Only
+    // the /mcp resource can be requested. A dynamic registration that says no `application_type` is native when a
+    // redirect is http on loopback, as Claude Code's and VS Code's are (RFC 8252), else web.
     allowDynamicClientRegistration: true,
     allowUnauthenticatedClientRegistration: true,
+    clientRegistrationDefaultApplicationType: 'infer',
     clientRegistrationAllowedResources: [resource],
     clientRegistrationDefaultScopes: [...MCP_SCOPES],
     // A consent names no workspace (ADR 0097): which of the person's workspaces a client reaches is its grant's reach,
@@ -291,6 +282,14 @@ const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeed
       jwt({ disableSettingJwtHeader: true, jwt: { issuer: authIssuer(env.APP_URL), audience: resource } }),
       // SAFETY: Better Auth 1.7.6 MCP endpoint metadata types violate exactOptionalPropertyTypes; runtime shape is the pinned official plugin.
       oauthPlugin as BetterAuthPlugin,
+      // Client ID Metadata Documents (ADR 0122): a client is the https URL of its own metadata, fetched once an hour at
+      // most, validated against the MCP profile and kept as an `oauthClient` row like any other. The fetch is the
+      // Worker's own `fetch`, which `global_fetch_strictly_public` keeps off private and special-use addresses
+      // (`apps/web/alchemy.run.ts`); the plugin refuses redirects and non-https ids itself. A fixture hands its own.
+      cimd({
+        fetchClientMetadataResource: env.CLIENT_METADATA_FETCH ?? ((input, init) => fetch(input, init)),
+        metadataProfile: 'mcp-2026-07-28',
+      }),
       codePlugin(env, delivery),
       workspacePlugin(),
       keyPlugin(),

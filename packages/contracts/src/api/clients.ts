@@ -5,7 +5,8 @@ import { InboundClient } from '../account.ts'
 import { API_ERRORS } from './errors.ts'
 
 /** A registered client's id in a path. */
-const ClientId = Schema.String.check(Schema.isPattern(/^[\w.-]{1,200}$/u))
+/** Better Auth's own id, or a Client ID Metadata Document's https URL (ADR 0122). */
+const ClientId = Schema.String.check(Schema.isPattern(/^(?:[\w.-]{1,200}|https:\/\/[^\s#]{1,2000})$/u))
 
 /**
  * The MCP clients a person let use goblin (ADRs 0024, 0097), served by the Worker for their session without waking an

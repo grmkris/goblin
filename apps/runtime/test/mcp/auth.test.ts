@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { markLoopbackClientsNative } from '../../src/auth/options.ts'
+import {
+  guardAuthorization,
+  guardRegistration,
+  isAllowedRedirectUri,
+  isDiscoveryPath,
+  withoutDpopMetadata,
+  withoutDpopProof,
+} from '../../src/auth/protocol.ts'
 import { signupAllowed, signupMode } from '../../src/auth/signup.ts'
 import { clientFromClaims } from '../../src/auth/principal.ts'
 
@@ -41,20 +48,106 @@ describe('inbound client claims (unit)', () => {
   })
 })
 
-describe('dynamic registration of loopback MCP clients (unit)', () => {
-  it('marks http-loopback-only registrations native and leaves the rest alone', () => {
-    const loopback = { redirect_uris: ['http://localhost:33418/callback', 'http://127.0.0.1:9/cb'] }
-    markLoopbackClientsNative(loopback)
-    expect(loopback).toMatchObject({ application_type: 'native' })
-    const web = { redirect_uris: ['https://app.example/cb'] }
-    markLoopbackClientsNative(web)
-    expect(web).not.toHaveProperty('application_type')
-    const mixed = { redirect_uris: ['http://localhost/cb', 'http://evil.example/cb'] }
-    markLoopbackClientsNative(mixed)
-    expect(mixed).not.toHaveProperty('application_type')
-    const declared = { redirect_uris: ['http://localhost/cb'], application_type: 'web' }
-    markLoopbackClientsNative(declared)
-    expect(declared.application_type).toBe('web')
+/** What a refused registration or authorization answers: the OAuth error, or `accepted`. */
+const outcome = (run: () => void): string => {
+  try {
+    run()
+    return 'accepted'
+  } catch (error) {
+    // expected: the test asserts on the OAuth error the guard refuses with
+    return error instanceof Error && 'body' in error ? JSON.stringify(error.body) : 'unknown'
+  }
+}
+
+describe('what the MCP authorization spec asks of registration and authorization (unit, ADR 0122)', () => {
+  it('allows a redirect URI that is localhost or https, and nothing else', () => {
+    for (const uri of [
+      'http://localhost:33418/callback',
+      'http://127.0.0.1:9/cb',
+      'http://[::1]:7/cb',
+      'https://claude.ai/api/mcp/auth_callback',
+      'https://vscode.dev/redirect',
+    ])
+      expect(isAllowedRedirectUri(uri), uri).toBe(true)
+    for (const uri of [
+      'cursor://anysphere.cursor-mcp/oauth/callback',
+      'com.example.app:/callback',
+      'http://evil.example/cb',
+      'http://localhost.evil.example/cb',
+      'not a uri',
+      42,
+    ])
+      expect(isAllowedRedirectUri(uri), String(uri)).toBe(false)
+  })
+  it('refuses a registration with a private-use scheme, narrows its grants and binds no DPoP', () => {
+    const cursor = { redirect_uris: ['http://127.0.0.1:9/cb', 'cursor://anysphere.cursor-mcp/oauth/callback'] }
+    expect(outcome(() => guardRegistration(cursor))).toContain('"invalid_redirect_uri"')
+    const vscode = {
+      redirect_uris: ['http://127.0.0.1:33418/', 'https://vscode.dev/redirect'],
+      grant_types: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code'],
+      dpop_bound_access_tokens: true,
+    }
+    expect(outcome(() => guardRegistration(vscode))).toBe('accepted')
+    expect(vscode).toEqual({
+      redirect_uris: ['http://127.0.0.1:33418/', 'https://vscode.dev/redirect'],
+      grant_types: ['authorization_code', 'refresh_token'],
+    })
+    const confidential = { redirect_uris: ['https://app.example/cb'], grant_types: ['client_credentials'] }
+    guardRegistration(confidential)
+    expect(confidential.grant_types).toEqual([])
+    // A body without the fields is left alone, as is anything that is not a body.
+    const bare = { client_name: 'x' }
+    guardRegistration(bare)
+    expect(bare).toEqual({ client_name: 'x' })
+    guardRegistration(undefined)
+  })
+  it('refuses an authorization to a private-use redirect, asks offline_access and drops a DPoP thumbprint', () => {
+    expect(
+      outcome(() =>
+        guardAuthorization({ redirect_uri: 'cursor://anysphere.cursor-mcp/oauth/callback', scope: 'goblin' }),
+      ),
+    ).toContain('"invalid_request"')
+    const asked = { redirect_uri: 'http://127.0.0.1:50222/callback', scope: 'goblin', dpop_jkt: 'x'.repeat(43) }
+    guardAuthorization(asked)
+    expect(asked).toEqual({ redirect_uri: 'http://127.0.0.1:50222/callback', scope: 'goblin offline_access' })
+    const already = { scope: 'openid offline_access goblin' }
+    guardAuthorization(already)
+    expect(already.scope).toBe('openid offline_access goblin')
+    const empty = { scope: '' }
+    guardAuthorization(empty)
+    expect(empty.scope).toBe('offline_access')
+    // No scope at all keeps the client's registered scopes, which hold it.
+    const none = { redirect_uri: 'https://claude.ai/api/mcp/auth_callback' }
+    guardAuthorization(none)
+    expect(none).not.toHaveProperty('scope')
+  })
+  it('takes the DPoP proof off a token request and the algorithms off a discovery document', async () => {
+    const proven = new Request('https://goblin.test/api/auth/oauth2/token', {
+      method: 'POST',
+      headers: { dpop: 'proof', 'content-type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=refresh_token',
+    })
+    const bearer = withoutDpopProof(proven)
+    expect(bearer.headers.has('dpop')).toBe(false)
+    expect(bearer.headers.get('content-type')).toBe('application/x-www-form-urlencoded')
+    expect(await bearer.text()).toBe('grant_type=refresh_token')
+    const plain = new Request('https://goblin.test/api/auth/oauth2/token', { method: 'POST' })
+    expect(withoutDpopProof(plain)).toBe(plain)
+    for (const path of [
+      '/.well-known/oauth-authorization-server',
+      '/.well-known/oauth-authorization-server/api/auth',
+      '/api/auth/.well-known/openid-configuration',
+    ])
+      expect(isDiscoveryPath(path), path).toBe(true)
+    expect(isDiscoveryPath('/api/auth/oauth2/token')).toBe(false)
+    const document = { issuer: 'https://goblin.test/api/auth', dpop_signing_alg_values_supported: ['ES256'] }
+    const stripped = await withoutDpopMetadata(
+      Response.json(document, { headers: { 'cache-control': 'public, max-age=60' } }),
+    )
+    expect(await stripped.json()).toEqual({ issuer: 'https://goblin.test/api/auth' })
+    expect(stripped.headers.get('cache-control')).toBe('public, max-age=60')
+    const refused = new Response('nope', { status: 404 })
+    expect(await withoutDpopMetadata(refused)).toBe(refused)
   })
 })
 

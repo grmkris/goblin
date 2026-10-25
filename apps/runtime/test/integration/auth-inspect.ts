@@ -7,20 +7,31 @@ import { expect } from 'vitest'
 import { joinedMember } from './members-case.ts'
 import { type Person, call, keyBody, person } from './owner-requests.ts'
 
-const APP = 'https://goblin.test'
-const REDIRECT = 'http://127.0.0.1:9/callback'
-const RESOURCE = `${APP}/mcp`
+export const APP = 'https://goblin.test'
+export const REDIRECT = 'http://127.0.0.1:9/callback'
+export const RESOURCE = `${APP}/mcp`
 const SIGN_IN_SCOPES = 'openid profile email offline_access'
 /** What a client asks for since ADR 0114: the sign-in scopes and `goblin`; what it may do is its grant. */
 export const ALL_SCOPES = `${SIGN_IN_SCOPES} goblin`
 const Registered = Schema.Struct({ client_id: Schema.String })
-const Tokens = Schema.Struct({ access_token: Schema.String, refresh_token: Schema.optional(Schema.String) })
+const Tokens = Schema.Struct({
+  access_token: Schema.String,
+  token_type: Schema.String,
+  refresh_token: Schema.optional(Schema.String),
+})
 const Redirect = Schema.Struct({ url: Schema.optional(Schema.String), redirect_uri: Schema.optional(Schema.String) })
 
-type Grant = { readonly access: string; readonly refresh: string | undefined; readonly asked: boolean }
+type Grant = {
+  readonly access: string
+  readonly tokenType: string
+  readonly refresh: string | undefined
+  readonly asked: boolean
+  /** The scope the consent page was asked to show, when it was. */
+  readonly askedScope: string | undefined
+}
 
 type AuthInit = { readonly method?: string; readonly headers?: Record<string, string>; readonly body?: string }
-const auth = (base: string, who: Person, path: string, init: AuthInit = {}) =>
+export const auth = (base: string, who: Person, path: string, init: AuthInit = {}) =>
   fetch(`${base}/api/auth${path}`, {
     redirect: 'manual',
     ...(init.method === undefined ? {} : { method: init.method }),
@@ -29,7 +40,7 @@ const auth = (base: string, who: Person, path: string, init: AuthInit = {}) =>
   })
 
 /** Where an authorize or consent step sends the browser: a redirect, or the provider's JSON `{ url }`. */
-async function next(response: Response): Promise<URL> {
+export async function next(response: Response): Promise<URL> {
   const location = response.headers.get('location')
   if (location !== null) return new URL(location, APP)
   const body = Schema.decodeUnknownSync(Redirect)(await response.json())
@@ -93,8 +104,8 @@ const GrantSaved = Schema.Struct({ grantId: Schema.String })
  * What the consent page does before the consent itself, and Settings does later (ADR 0114): the grant the person gives
  * the client, which a live token follows at once. Its id.
  */
-async function grantOf(base: string, who: Person, clientId: string, terms: Terms): Promise<string> {
-  const set = await fetch(`${base}/api/clients/${clientId}/grant`, {
+export async function grantOf(base: string, who: Person, clientId: string, terms: Terms): Promise<string> {
+  const set = await fetch(`${base}/api/clients/${encodeURIComponent(clientId)}/grant`, {
     method: 'PUT',
     headers: browserOf(who),
     body: JSON.stringify({ terms: termsOf(who, terms) }),
@@ -109,21 +120,29 @@ type Authorization = {
   readonly prompt?: 'consent'
   /** The grant the consent page gives it (ADR 0114); `write` over the person's own workspace by default. */
   readonly terms?: Terms
+  /** The redirect this authorization uses, the registered one unless said: loopback ports vary (ADR 0122). */
+  readonly redirect?: string
+  /** More authorization parameters, as a client sends them. */
+  readonly query?: Record<string, string>
+  /** More headers on the token request, as a client sends them. */
+  readonly tokenHeaders?: Record<string, string>
 }
 
 /** One sign-in of a registered client to /mcp: authorize, the consent page when the owner must answer, token. */
 export async function authorize(base: string, who: Person, clientId: string, request: Authorization): Promise<Grant> {
   const verifier = crypto.randomUUID() + crypto.randomUUID()
+  const redirect = request.redirect ?? REDIRECT
   const query = new URLSearchParams({
     response_type: 'code',
     client_id: clientId,
-    redirect_uri: REDIRECT,
+    redirect_uri: redirect,
     scope: request.scope,
     resource: RESOURCE,
     code_challenge: createHash('sha256').update(verifier).digest('base64url'),
     code_challenge_method: 'S256',
     state: 'fixture',
     ...(request.prompt === undefined ? {} : { prompt: request.prompt }),
+    ...request.query,
   })
   let landing = await next(
     await auth(base, who, `/oauth2/authorize?${query.toString()}`, {
@@ -131,9 +150,10 @@ export async function authorize(base: string, who: Person, clientId: string, req
     }),
   )
   const asked = landing.pathname === '/consent'
+  const askedScope = asked ? (landing.searchParams.get('scope') ?? undefined) : undefined
   if (asked) {
-    // What the consent page reads to say what the client asks for.
-    expect(landing.searchParams.get('scope')).toBe(request.scope)
+    // What the consent page reads to say what the client asks for: at least what it asked (`offline_access` is added).
+    expect(askedScope?.split(' ')).toEqual(expect.arrayContaining(request.scope.split(' ')))
     expect(landing.searchParams.getAll('resource')).toEqual([RESOURCE])
     await grantOf(base, who, clientId, request.terms ?? { level: 'write' })
     const consented = await auth(base, who, '/oauth2/consent', {
@@ -146,21 +166,32 @@ export async function authorize(base: string, who: Person, clientId: string, req
   }
   const code = landing.searchParams.get('code') ?? ''
   expect(code, landing.href).not.toBe('')
-  const tokens = await token(base, who, {
-    grant_type: 'authorization_code',
-    code,
-    redirect_uri: REDIRECT,
-    client_id: clientId,
-    code_verifier: verifier,
-    resource: RESOURCE,
-  })
-  return { access: tokens.access_token, refresh: tokens.refresh_token, asked }
+  expect(landing.origin + landing.pathname).toBe(redirect)
+  const tokens = await token(
+    base,
+    who,
+    {
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirect,
+      client_id: clientId,
+      code_verifier: verifier,
+      resource: RESOURCE,
+    },
+    request.tokenHeaders,
+  )
+  return { access: tokens.access_token, tokenType: tokens.token_type, refresh: tokens.refresh_token, asked, askedScope }
 }
 
-async function token(base: string, who: Person, form: Record<string, string>) {
+export async function token(
+  base: string,
+  who: Person,
+  form: Record<string, string>,
+  headers: Record<string, string> = {},
+) {
   const response = await auth(base, who, '/oauth2/token', {
     method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
     body: new URLSearchParams(form).toString(),
   })
   expect(response.status, await response.clone().text()).toBe(200)
@@ -256,17 +287,17 @@ const INSPECTION = [
   'inspect_details',
 ]
 
-/** One resource: every metadata path names /mcp and offers `goblin`; the 401 asks for it. */
+/** One resource: every metadata path names /mcp and offers `goblin` alone; the 401 asks for it (ADR 0122). */
 async function discoveryCase(base: string) {
   for (const path of ['', '/mcp', '/mcp/inspect'])
     expect(await (await fetch(`${base}/.well-known/oauth-protected-resource${path}`)).json(), path).toMatchObject({
       resource: RESOURCE,
-      scopes_supported: ALL_SCOPES.split(' '),
+      scopes_supported: ['goblin'],
     })
   const challenge = await fetch(`${base}/mcp`, { method: 'POST' })
   expect(challenge.status).toBe(401)
   expect(challenge.headers.get('www-authenticate')).toBe(
-    `Bearer resource_metadata="${APP}/.well-known/oauth-protected-resource/mcp", scope="${ALL_SCOPES}"`,
+    `Bearer resource_metadata="${APP}/.well-known/oauth-protected-resource/mcp", scope="goblin"`,
   )
   // The first cut's separate endpoints are gone (ADR 0024 amendments).
   expect((await fetch(`${base}/mcp/inspect`, { method: 'POST' })).status).toBe(404)

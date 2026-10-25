@@ -27,6 +27,11 @@ export interface RuntimeEnv {
   readonly LOADER?: WorkerLoader
   /** Fixtures only: a published Events delivery's first retry delay in ms, 15 s unless set (`publish/policy.ts`). */
   readonly PUBLISH_RETRY_MS?: string
+  /**
+   * Fixtures only: what fetches a client's metadata document (ADR 0122, `auth/options.ts`). The deployed Worker uses
+   * its own `fetch`, held to public addresses by `global_fetch_strictly_public`.
+   */
+  readonly CLIENT_METADATA_FETCH?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
   readonly APP_URL: string
   readonly BETTER_AUTH_SECRET: string
   /** Cloudflare Email Sending; with `MAIL_SENDER` it turns on email verification (`auth/mail.ts`). */
