@@ -5,11 +5,11 @@ remote/test content, and permits only the named empty-cell marker. The quality i
 complexity without the user's buy-in. The decision lives in `docs/agents/lint-quality.md`, following the repository's
 existing lint-rule documentation convention; no new ADR or migration was needed.
 
-`heavy bun run check` passed at `6fb76978f2f59fa1e9fb72df5bced252d0d0e67f`, including unit tests, both native integration
+`heavy bun run check` passed at `ae294d2bc3b657dc8fedd29eba1ee0be1ccc8aff` after the evidence rebase, including unit tests, both native integration
 orders, the zero-finding lint/Effect/Knip gate and the build. A standalone MCP fixture dependency installation was
 required in the fresh worktree. No product source change was needed for that setup issue.
 
-[Dev CI](https://github.com/grmkris/goblin/actions/runs/40147616590) passed. `dev.json` retains the accepted SHA,
+[Dev CI](https://github.com/grmkris/goblin/actions/runs/40149924606) passed. `dev.json` retains the accepted SHA,
 live Worker version, authenticated acceptance, drift result and migration inventory from its `dev-acceptance` artifact.
 
 The production promotion command passed every preflight and moved prod to that exact SHA.

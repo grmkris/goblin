@@ -1,9 +1,9 @@
 {
   "utc": "20261025T004531Z",
   "stage": "dev",
-  "sha": "6fb76978f2f59fa1e9fb72df5bced252d0d0e67f",
-  "ci": "https://github.com/grmkris/goblin/actions/runs/40147616590",
-  "version": "63398047-0ad9-40a3-941d-d3ee36b52f75",
+  "sha": "ae294d2bc3b657dc8fedd29eba1ee0be1ccc8aff",
+  "ci": "https://github.com/grmkris/goblin/actions/runs/40149924606",
+  "version": "f9de43cf-ccd3-4e64-a6eb-da74ef9556d1",
   "acceptance": "authenticated",
   "drift": "verified",
   "migrations": [
