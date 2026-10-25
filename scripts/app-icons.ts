@@ -4,7 +4,8 @@
  * a maskable one for Android (the mark inside its safe zone), all on the page's opaque background, which iOS needs
  * (it composites transparency on black), an SVG favicon that follows the light or dark scheme, the startup image
  * for every iPhone and iPad screen a Home Screen app opens on (apps/web/src/lib/startup-images.ts), and the landing's
- * 1200x630 link preview (`og.png`): the mark and the headline on the moss field, set in Geist by a local Chromium.
+ * 1200x630 link preview (`og.png`): the mark and the headline on the moss field beside the hero's night etching, set in
+ * Geist by a local Chromium.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -89,18 +90,31 @@ const GEIST = readFileSync(
     '../packages/ui/node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2',
   ),
 ).toString('base64')
+/**
+ * The hero's night etching (landing.css): lichen lines on the field, covering it from the bottom left, with the
+ * lantern's warm light where the drawing has it (`--presence-warm` in light).
+ */
+const NIGHT = readFileSync(
+  resolve(import.meta.dirname, '../apps/web/src/assets/landing/etching-night-1400.jpg'),
+).toString('base64')
+const SCENE = { ratio: 2000 / 1129, glowX: 0.4007, glowY: 0.612, glowSize: 0.15 }
+const sceneHeight = 1200 / SCENE.ratio
+/** How far the scene sinks below the image's foot, so its hills and cottage sit under the words. */
+const sink = 48
 const OG = `<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face{font-family:Geist;src:url(data:font/woff2;base64,${GEIST}) format('woff2');font-weight:100 900}
 *{margin:0;box-sizing:border-box}
-html,body{width:1200px;height:630px;background:${MOSS.field};color:${MOSS.ink};font-family:Geist;-webkit-font-smoothing:antialiased}
-main{display:flex;flex-direction:column;justify-content:space-between;height:100%;padding:72px 80px}
-.brand{display:flex;align-items:center;gap:18px;font-size:40px;font-weight:640;letter-spacing:-0.015em}
-.tile{display:grid;place-items:center;width:64px;height:64px;border-radius:18px;background:${MOSS.tile};color:${MOSS.tileInk}}
-h1{font-size:104px;font-weight:680;line-height:0.95;letter-spacing:-0.04em;max-width:880px}
-p{max-width:820px;color:${MOSS.muted};font-size:31px;line-height:1.4}
-</style></head><body><main>
-<div class="brand"><span class="tile"><svg width="38" height="38" viewBox="0 0 24 24" stroke="currentColor" ${STROKE}>${paths}</svg></span>goblin</div>
-<div><h1>Your own goblin, always on.</h1></div>
+html,body{width:1200px;height:630px;overflow:hidden;background:${MOSS.field};color:${MOSS.ink};font-family:Geist;-webkit-font-smoothing:antialiased}
+.scene{position:absolute;left:0;bottom:-${sink}px;width:1200px;height:${sceneHeight}px;background:rgb(228 237 200 / 0.42);mask:url(data:image/jpeg;base64,${NIGHT}) luminance 0 0/100% 100% no-repeat}
+.glow{position:absolute;left:${1200 * SCENE.glowX}px;top:${630 + sink - sceneHeight + sceneHeight * SCENE.glowY}px;width:${1200 * SCENE.glowSize}px;height:${1200 * SCENE.glowSize}px;translate:-50% -50%;border-radius:50%;background:radial-gradient(closest-side,oklch(0.8 0.14 70 / 0.46),oklch(0.8 0.14 70 / 0.14) 42%,transparent);mix-blend-mode:screen}
+main{position:relative;display:flex;flex-direction:column;height:100%;margin-left:590px;padding:64px 56px 0 0}
+.brand{display:flex;align-items:center;gap:16px;margin-bottom:64px;font-size:36px;font-weight:640;letter-spacing:-0.015em}
+.tile{display:grid;place-items:center;width:56px;height:56px;border-radius:16px;background:${MOSS.tile};color:${MOSS.tileInk}}
+h1{font-size:66px;font-weight:680;line-height:0.98;letter-spacing:-0.04em}
+p{margin-top:26px;color:${MOSS.muted};font-size:26px;line-height:1.4}
+</style></head><body><div class="scene"></div><div class="glow"></div><main>
+<div class="brand"><span class="tile"><svg width="34" height="34" viewBox="0 0 24 24" stroke="currentColor" ${STROKE}>${paths}</svg></span>goblin</div>
+<h1>Your own goblin,<br>always on.</h1>
 <p>A personal agent that keeps working while you're away, and asks before it spends.</p>
 </main></body></html>`
 
