@@ -12,7 +12,8 @@ required in the fresh worktree. No product source change was needed for that set
 [Dev CI](https://github.com/grmkris/goblin/actions/runs/40149924606) passed. `dev.json` retains the accepted SHA,
 live Worker version, authenticated acceptance, drift result and migration inventory from its `dev-acceptance` artifact.
 
-The production promotion command passed every preflight and moved prod to that exact SHA.
+The production promotion command passed every preflight and moved prod to the runtime release
+`6fb76978f2f59fa1e9fb72df5bced252d0d0e67f`. Later tooling and evidence changes remain on dev.
 [Production CI](https://github.com/grmkris/goblin/actions/runs/40148148163) passed, including public production
 acceptance and verified drift. `prod.json` preserves its sanitized `prod-acceptance` receipt.
 
