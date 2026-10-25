@@ -1,6 +1,7 @@
 // One part of a marketing page's story: a heading and a little copy on one side, one real visual (a screenshot, a
 // fragment of the product's UI) on the other. Asymmetric on a desktop, five columns of copy beside seven of visual, and
-// `flip` swaps the sides so a page does not march down one edge; on a phone, the copy, then its visual.
+// `flip` swaps the sides so a page does not march down one edge; on a phone, the copy, then its visual. `art` is a
+// small drawing over the heading, the way a storybook opens a chapter.
 import { type ReactNode, useId } from 'react'
 
 export interface SectionProps {
@@ -9,10 +10,12 @@ export interface SectionProps {
   /** The copy under the heading: paragraphs, a short list, a link. */
   readonly children: ReactNode
   readonly visual: ReactNode
+  /** A drawing over the heading, decoration only (it is hidden from assistive tech). */
+  readonly art?: ReactNode
   readonly flip?: boolean
 }
 
-export function Section({ id, title, children, visual, flip = false }: SectionProps) {
+export function Section({ id, title, children, visual, art, flip = false }: SectionProps) {
   const titleId = useId()
   return (
     <section
@@ -23,6 +26,11 @@ export function Section({ id, title, children, visual, flip = false }: SectionPr
       className="site-width site-section"
     >
       <div className="site-section-copy">
+        {art === undefined ? null : (
+          <div aria-hidden className="site-section-art">
+            {art}
+          </div>
+        )}
         <h2 id={titleId} className="site-heading">
           {title}
         </h2>

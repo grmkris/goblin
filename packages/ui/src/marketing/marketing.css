@@ -325,6 +325,61 @@
     min-height: 0;
   }
 
+  /*
+   * A field with a drawing etched into it (`data-art`). The field stops short of the panel's foot, so the panel rises
+   * out of it onto the page (`--moss-frame-overhang`). On a phone and a tablet the drawing is a band between the copy
+   * and the panel, which overlaps the band's foot; from a desktop up it fills the field behind everything, and the copy
+   * and the panel share the right seven columns, over the drawing's sky and beside its subject. The art's box is a size
+   * container, so a drawing can cover it with container units.
+   */
+  .moss-frame[data-art] {
+    --moss-frame-overhang: 9rem;
+    position: relative;
+    overflow-x: clip;
+    background: linear-gradient(var(--shell) calc(100% - var(--moss-frame-overhang)), transparent 0);
+  }
+  .moss-frame[data-art] .moss-frame-grid {
+    padding-block-end: 0;
+  }
+  .moss-frame-art {
+    position: relative;
+    z-index: -1;
+    overflow: clip;
+    container-type: size;
+    pointer-events: none;
+  }
+  @media (max-width: 63.99rem) {
+    .moss-frame[data-art] .moss-frame-grid {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: 0;
+    }
+    .moss-frame-art {
+      height: clamp(17rem, 70vw, 30rem);
+      margin-inline: calc(50% - 50vw);
+      margin-block: 0.5rem -1.5rem;
+    }
+  }
+  @media (min-width: 64rem) {
+    .moss-frame[data-art] {
+      --moss-frame-overhang: 15rem;
+    }
+    .moss-frame[data-art] .moss-frame-grid {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      align-items: start;
+      row-gap: 3rem;
+      padding-block-start: 3.5rem;
+    }
+    .moss-frame[data-art] :is(.moss-frame-copy, .moss-frame-panel) {
+      grid-column: 6 / -1;
+    }
+    /* The drawing fades out before the field's foot, so whatever it holds there never ends on a hard line. */
+    .moss-frame-art {
+      position: absolute;
+      inset: 0 0 var(--moss-frame-overhang);
+      mask-image: linear-gradient(black calc(100% - 6rem), transparent);
+    }
+  }
+
   /* A section: copy (five columns) beside its visual (seven), swapped by `data-flip`; stacked on a phone. */
   .site-section {
     display: grid;
@@ -358,6 +413,11 @@
     min-width: 0;
     flex-direction: column;
     gap: 1.25rem;
+  }
+  /* A chapter's drawing over its heading, at the start of the copy. */
+  .site-section-art {
+    display: flex;
+    margin-block-end: 0.25rem;
   }
   .site-section-text {
     display: flex;
