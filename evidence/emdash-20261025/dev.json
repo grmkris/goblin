@@ -1,0 +1,20 @@
+{
+  "utc": "20261025T004531Z",
+  "stage": "dev",
+  "sha": "6fb76978f2f59fa1e9fb72df5bced252d0d0e67f",
+  "ci": "https://github.com/grmkris/goblin/actions/runs/40147616590",
+  "version": "63398047-0ad9-40a3-941d-d3ee36b52f75",
+  "acceptance": "authenticated",
+  "drift": "verified",
+  "migrations": [
+    "0000_baseline.sql",
+    "0001_api_keys.sql",
+    "0002_workspaces.sql",
+    "0003_mcp_reach.sql",
+    "0004_mcp_powers.sql",
+    "0005_grants.sql",
+    "0006_apps.sql"
+  ],
+  "artifact": "dev-acceptance",
+  "localGateExit": 0
+}
