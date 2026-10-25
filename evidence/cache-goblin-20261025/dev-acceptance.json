@@ -1,0 +1,12 @@
+{
+  "utc": "20261025T001343Z",
+  "stage": "dev",
+  "sha": "20e928c7a0ae5ec9e5a7faae724e92b3a7367b55",
+  "version": "af379856-bc77-43e3-8ce9-bcc76944b9ec",
+  "acceptance": "authenticated",
+  "drift": "verified",
+  "ci": "https://github.com/grmkris/goblin/actions/runs/40145448466",
+  "artifact": "dev-acceptance",
+  "localGateExit": 0,
+  "localWarmAssets": "17/17 reused on all six warm loads; zero transferred asset bytes"
+}
