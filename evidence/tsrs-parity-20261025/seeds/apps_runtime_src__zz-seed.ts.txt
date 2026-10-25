@@ -1,0 +1,14 @@
+import { Effect } from 'effect'
+import { Seed } from './zz-seed-types.ts'
+export const d = document.title
+export const b = Bun.version
+export function f(a) {
+  return a
+}
+// @ts-expect-error -- nothing to expect
+export const ok = 1
+export const s: Seed = { x: 1 }
+export const eff: Effect.Effect<string> = Effect.succeed(1)
+const r: Record<string, number> = {}
+export const v: number = r['k']
+export const w = new Worker('x')

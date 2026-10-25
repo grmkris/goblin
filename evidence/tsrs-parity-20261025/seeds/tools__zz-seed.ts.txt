@@ -1,0 +1,15 @@
+import type { Foo } from './zz-nope.ts'
+import { readFileSync } from 'node:fs'
+enum E {
+  A,
+}
+export const e = E.A
+const xs: number[] = []
+export const first: number = xs[0]
+interface O {
+  a?: string
+}
+export const o: O = { a: undefined }
+export const n: string = readFileSync
+export type F = Foo
+export const b: string = Bun.version.length

@@ -1,0 +1,4 @@
+import { Schema } from 'effect'
+export const s: Schema.Codec<number> = Schema.String
+export const t = Schema.Struct({ a: Schema.String }).make({ a: 1 })
+export const u: readonly string[] = [1, 2]

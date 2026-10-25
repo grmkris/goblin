@@ -1,0 +1,9 @@
+import { useState } from 'react'
+export const C = () => <div foo={1} />
+export const D = () => {
+  const [n, setN] = useState(0)
+  setN('x')
+  return <span>{n.toUpperCase()}</span>
+}
+const n: number = 'x'
+export const m = n
