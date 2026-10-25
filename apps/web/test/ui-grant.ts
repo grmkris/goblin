@@ -302,8 +302,12 @@ async function keys(page: Page, origin: string, label: string, touch: boolean) {
 }
 
 async function consent(page: Page, origin: string, label: string, touch: boolean) {
-  await page.goto(`${origin}grant.html?screen=consent&client_id=claude-code`)
+  await page.goto(
+    `${origin}grant.html?screen=consent&client_id=claude-code&redirect_uri=${encodeURIComponent('http://localhost:52345/callback')}`,
+  )
   await page.getByRole('heading', { name: 'Allow “Claude Code” to use goblin?' }).waitFor()
+  // Where the code goes is shown (the spec's redirect host), with the loopback note for an app on this computer.
+  await page.getByText(/Sends you back to localhost:52345, an app on this computer/u).waitFor()
   await page.getByText(/Claude Code can write everything in all your workspaces/u).waitFor()
   await page.screenshot({ path: path.join(out, `${label}-consent.png`), fullPage: true })
   await page.getByRole('button', { name: 'Change', exact: true }).click()

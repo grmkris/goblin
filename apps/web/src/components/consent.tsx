@@ -10,6 +10,25 @@ import { AuthShell } from './auth-shell.tsx'
 import { GRANT_WORDS, type GrantHolder, GrantEditor, grantFailure, grantProblem, reachWords } from './grant-editor.tsx'
 
 type ClientInfo = { readonly name: string; readonly uri?: string | undefined }
+/** Where this authorization sends the person back: the redirect's host, and whether that is this computer. */
+type ReturnAddress = { readonly host: string; readonly loopback: boolean }
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(['localhost', '127.0.0.1', '[::1]'])
+
+/**
+ * The redirect URI of the authorization request on this page (the spec has the server show its host, so the person
+ * sees where the code goes): its host, or nothing when the request named none.
+ */
+export const returnAddressOf = (search: string): ReturnAddress | undefined => {
+  const redirect = new URLSearchParams(search).get('redirect_uri')
+  if (redirect === null) return undefined
+  try {
+    const { hostname, host } = new URL(redirect)
+    return { host, loopback: LOOPBACK_HOSTS.has(hostname) }
+  } catch {
+    // expected: a redirect that does not parse is shown as nothing; the server refuses it anyway.
+    return undefined
+  }
+}
 /** The client asking, once looked up, or why it could not be: then the owner is not asked to allow it. */
 type ClientLookup =
   | { readonly kind: 'loading' }
@@ -29,10 +48,14 @@ function useClient(clientId: string): ClientLookup {
 }
 
 /**
- * Who asks: the name and address the client registered (its own claim, not verified), its exact id, and the account
- * it would act for.
+ * Who asks: the name and address the client registered (its own claim, not verified), its exact id, where it sends the
+ * person back, and the account it would act for.
  */
-function ClientIdentity(props: { readonly clientId: string; readonly client: ClientInfo | undefined }) {
+function ClientIdentity(props: {
+  readonly clientId: string
+  readonly client: ClientInfo | undefined
+  readonly returnTo: ReturnAddress | undefined
+}) {
   const person = useQuery(sessionPersonQuery).data
   return (
     <Card size="sm">
@@ -51,6 +74,12 @@ function ClientIdentity(props: { readonly clientId: string; readonly client: Cli
           <p className="m-0 text-xs text-muted-foreground">
             Client ID <code className="break-all text-foreground">{props.clientId}</code>
           </p>
+          {props.returnTo && (
+            <p className="m-0 text-xs text-muted-foreground">
+              Sends you back to <code className="break-all text-foreground">{props.returnTo.host}</code>
+              {props.returnTo.loopback && ', an app on this computer'}
+            </p>
+          )}
           {person && <p className="m-0 text-xs text-muted-foreground">For {person.email}</p>}
         </div>
       </CardContent>
@@ -144,6 +173,7 @@ function Offer(props: {
  */
 export function Consent() {
   const clientId = new URLSearchParams(window.location.search).get('client_id') ?? ''
+  const returnTo = returnAddressOf(window.location.search)
   const lookup = useClient(clientId)
   const client = lookup.kind === 'found' ? lookup.client : undefined
   const workspaces = useQuery(workspacesQuery).data
@@ -159,7 +189,7 @@ export function Consent() {
       footer={<p>Change or revoke it any time in Settings.</p>}
     >
       <div className="auth-body">
-        <ClientIdentity clientId={clientId} client={client} />
+        <ClientIdentity clientId={clientId} client={client} returnTo={returnTo} />
         {workspaces?.length === 0 ? (
           <NoWorkspace />
         ) : offer.terms === undefined || workspaces === undefined || client === undefined ? (
