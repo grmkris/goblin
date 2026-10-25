@@ -120,6 +120,13 @@ describe('the checker', () => {
   test('effect-tsrs runs as its native binary', () => {
     const [tsrs, ...tsrsArgs] = effectArgs('tools/tsconfig.json')
     expect(tsrs).toMatch(/@yielded\/effect-tsrs-[a-z0-9]+-[a-z0-9]+\/bin\/effect-tsrs$/u)
-    expect(tsrsArgs).toEqual(['diagnostics', '-p', path.join(repoRoot, 'tools/tsconfig.json'), '--format', 'json'])
+    expect(tsrsArgs).toEqual([
+      'diagnostics',
+      '-p',
+      path.join(repoRoot, 'tools/tsconfig.json'),
+      '--type-check',
+      '--format',
+      'json',
+    ])
   })
 })

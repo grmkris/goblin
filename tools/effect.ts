@@ -25,12 +25,16 @@ export const effectTsrs = (): string => {
   return fromLauncher.resolve(`@yielded/effect-tsrs-${process.platform}-${process.arch}/bin/effect-tsrs`)
 }
 
-/** The command that prints one project's diagnostics as JSON (`decodeEffect` in report.ts reads it). */
+/**
+ * The command that prints one project's diagnostics as JSON (`decodeEffect` in report.ts reads it). `--type-check` adds
+ * the TypeScript diagnostics tsc reports, which effect-tsrs leaves out by default since 0.2.2.
+ */
 export const effectArgs = (tsconfig: string): string[] => [
   effectTsrs(),
   'diagnostics',
   '-p',
   path.resolve(repoRoot, tsconfig),
+  '--type-check',
   '--format',
   'json',
 ]
@@ -148,8 +152,8 @@ export const pluginBlock = (tsconfig: string): PluginEntry | undefined =>
 
 /**
  * Why a project's Effect diagnostics would be incomplete: its tsconfig neither sets nor inherits the plugin block, so
- * the checker would run without goblin's severities. Undefined when it has the block. effect-tsrs does not count the
- * files it checks without the plugin, so this is read from the tsconfig before the run.
+ * the checker would run without goblin's severities. Undefined when it has the block. Read from the tsconfig before the
+ * run; effect-tsrs then also counts the files it checked without the plugin (`uncheckedFiles` in report.ts).
  */
 export const missingPlugin = (tsconfig: string): string | undefined =>
   pluginBlock(tsconfig) === undefined

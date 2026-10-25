@@ -3,7 +3,7 @@ import json, os, re, shutil, subprocess, sys
 repo = sys.argv[1]
 seeds = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'seeds')
 TSC = os.path.join(repo, 'node_modules/.bin/tsc')
-TSRS = os.path.join(repo, 'tools/node_modules/.bin/effect-tsrs')
+TSRS = os.environ.get('EFFECT_TSRS', os.path.join(repo, 'tools/node_modules/.bin/effect-tsrs'))
 projects = ['tools/tsconfig.json', 'apps/runtime/tsconfig.json', 'apps/web/tsconfig.json', 'packages/contracts/tsconfig.json', 'tsconfig.json']
 placed = []
 LINE = re.compile(r'^(.+?)\((\d+),(\d+)\): error TS(\d+): (.*)$')

@@ -86,3 +86,36 @@ The peak of `lint:gate` is oxlint's type-aware pass (oxlint-tsgolint), which thi
 `parity.json` holds every number and set difference (all empty). Rerun with
 `python3 -I evidence/tsrs-parity-20261025/parity.py "$PWD" <outdir> 3 <tsconfig>...` from the repository root, through
 `heavy`.
+
+## Rerun on effect-tsrs 0.2.2 (ADR 0121)
+
+Before the pin moved from 0.2.0 to 0.2.2 (still tsrs rev 8f135f1), the same method ran again on every project, on goblin
+`dev` at 6ea77818 (tsc 7.0.2, effect-tsgo 0.54.0). 0.2.2 reports the TypeScript diagnostics only with `--type-check`, so
+`parity.py` ran it through a two-line wrapper that appends that flag (`EFFECT_TSRS=<wrapper>`); `seeded.py` takes the
+same override now. Results: `parity-0.2.2.json`, `seeded-0.2.2.json`.
+
+| Project | Own files | tsc | effect-tsgo | effect-tsrs 0.2.2, 3 runs | Effect diagnostics / gating | Effect equal | TS equal (errors) | Deterministic |
+| :-- | --: | --: | --: | --: | --: | :-- | :-- | :-- |
+| `tsconfig.json` | 70 | 5.99 s, 936 MB | 6.38 s, 982 MB | 2.59 / 2.07 / 2.07 s, 362 MB | 19 / 8 | yes | yes (0) | yes |
+| `apps/cli/tsconfig.json` | 22 | 0.84 s, 181 MB | 1.66 s, 190 MB | 0.37 / 0.36 / 0.33 s, 74 MB | 9 / 0 | yes | yes (0) | yes |
+| `apps/openui-spike/tsconfig.json` | 7 | 5.27 s, 884 MB | 4.28 s, 752 MB | 2.01 / 1.91 / 1.59 s, 339 MB | 0 / 0 | yes | yes (0) | yes |
+| `apps/runtime/tsconfig.json` | 773 | 15.37 s, 1881 MB | 25.83 s, 2020 MB | 11.51 / 12.21 / 12.37 s, 607 MB | 212 / 0 | yes | yes (0) | yes |
+| `apps/web/tsconfig.json` | 459 | 16.81 s, 1675 MB | 11.77 s, 1220 MB | 8.68 / 7.89 / 7.17 s, 517 MB | 17 / 0 | yes | yes (0) | yes |
+| `packages/app/tsconfig.json` | 13 | 0.3 s, 81 MB | 1.03 s, 190 MB | 0.12 / 0.13 / 0.14 s, 39 MB | 0 / 0 | yes | yes (0) | yes |
+| `packages/app/tsconfig.ui.json` | 9 | 1.44 s, 304 MB | 1.37 s, 215 MB | 0.55 / 0.54 / 0.67 s, 111 MB | 0 / 0 | yes | yes (0) | yes |
+| `packages/app/tsconfig.render.json` | 3 | 1.16 s, 190 MB | 1.14 s, 190 MB | 0.35 / 0.33 / 0.37 s, 64 MB | 0 / 0 | yes | yes (0) | yes |
+| `packages/contracts/tsconfig.json` | 85 | 2.01 s, 274 MB | 2.9 s, 301 MB | 0.78 / 0.67 / 0.81 s, 89 MB | 150 / 0 | yes | yes (0) | yes |
+| `packages/kit/tsconfig.json` | 13 | 0.7 s, 191 MB | 1.42 s, 204 MB | 0.32 / 0.39 / 0.29 s, 80 MB | 0 / 0 | yes | yes (0) | yes |
+| `packages/ui/tsconfig.json` | 62 | 1.05 s, 216 MB | 1.81 s, 234 MB | 0.47 / 0.42 / 0.44 s, 77 MB | 0 / 0 | yes | yes (0) | yes |
+| `tools/tsconfig.json` | 45 | 2.82 s, 383 MB | 3.28 s, 379 MB | 0.96 / 0.97 / 0.91 s, 123 MB | 16 / 8 | yes | yes (0) | yes |
+| **Sum / peak** | | **53.8 s, 1881 MB** | **62.9 s, 2020 MB** | **28.7 s, 607 MB** | **423 / 16** | | | |
+
+- The Effect and TypeScript diagnostics are identical on all 12 projects, and three runs per project gave byte-identical
+  output. The seeded run gave the same 28 errors at the same positions with the same codes (one message again differs
+  only in how a long type is elided); both checkers exit 1 on them.
+- 0.2.2 reports Effect diagnostics only on a project's own files, as effect-tsgo does: 423 in all, where 0.2.0 reported
+  684 with the cross-workspace repeats. The own-file count moved only with the tree (419 → 423: two more each in the
+  root and tools projects, which effect-tsgo reports too).
+- 0.2.2 counts the files it checks without the plugin again (`summary.filesWithoutPlugin`, 0 on every project).
+- It honours `singleThreaded: true` from tsconfig.base.json (user time about equal to wall time), so the peak stays
+  0.6 GB.
