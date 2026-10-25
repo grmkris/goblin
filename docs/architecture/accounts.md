@@ -149,12 +149,21 @@ sidebar's goblin mark links to `/`, which the cached session turns into the owne
 deleting the account `assign('/')`, so the server's cookie check sends each to their chat or to the landing.
 
 The landing is built from `@goblin/ui`'s marketing parts (`src/marketing`: `SiteBar`, `MossFrame`, `Section`,
-`SiteFooter`). Its hero plays one scripted session in goblin's panel (`hero-session.tsx`): the entrances are CSS, timed
+`SiteFooter`) and reads as a storybook: its moss field is etched with goblin reading on its doorstep at night (the
+`MossFrame`'s `art`), each chapter after it opens with a small drawing over its heading (the `Section`'s `art`), and the
+close is the same field at dawn. The drawings are engravings generated as pure ink on a plain ground and kept as grey
+images of how much ink each pixel holds (`scripts/landing-art.ts`, committed under `assets/landing/etching-*`), which
+`landing.css` uses as luminance masks over a token: lichen on moss, the page's moss in the chapters, in light and dark
+alike, with the lantern's and the sunrise's light in `--presence-warm`. A browser without luminance masks shows no
+drawings. The chapter on permissions shows a connection's tools in the app's own rows, with switches that work on the
+page only (`tool-card.tsx`), and the questions answer what a visitor asks before signing up. Its hero plays one scripted
+session in goblin's panel (`hero-session.tsx`): the entrances are CSS, timed
 from the first paint, and the script follows the same animation clock for the presence orb and owns the answer to its
 question, which the visitor may give or which gives itself after about six seconds in view; under reduced motion it
 starts at the question. Claude Code's command names the page's own origin. The Source link waits behind a constant
 until the public repository is public. The head carries Open Graph and Twitter tags with `public/og.png`
-(`bun run icons`) and the canonical URL, both on the deployment's own origin (`lib/origin.ts`: `APP_URL`, which the
+(`bun run icons`: the headline beside the hero's night etching) and the canonical URL, both on the deployment's own
+origin (`lib/origin.ts`: `APP_URL`, which the
 canonical redirect makes every page request's origin, ADR 0064), and the web Worker serves `/robots.txt` by stage:
 production allows everything but `/api/` and `/mcp`, other stages nothing. `Meet your goblin` opens `/login?new=1`,
 `Authentication` in create mode where sign-up is open or by invite.
