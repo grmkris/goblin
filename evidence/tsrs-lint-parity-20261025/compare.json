@@ -1,0 +1,22 @@
+{
+  "a": "evidence/adopt/goblin-stock.json",
+  "b": "evidence/adopt/goblin-pinned.json",
+  "aFiles": 1547,
+  "bFiles": 1547,
+  "aDiagnostics": 5,
+  "bDiagnostics": 5,
+  "aSet": 5,
+  "bSet": 5,
+  "intersection": 5,
+  "aOnlyByRule": {},
+  "bOnlyByRule": {},
+  "byRule": {
+    "<unused-disable>": 1,
+    "goblin/no-process-env": 2,
+    "typescript/no-unsafe-assignment": 1,
+    "typescript/no-unsafe-call": 1
+  },
+  "identical": true,
+  "aOnly": [],
+  "bOnly": []
+}

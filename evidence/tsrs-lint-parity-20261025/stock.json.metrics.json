@@ -1,0 +1,31 @@
+{
+  "backendEnv": {},
+  "childSystemSeconds": 8.49053,
+  "childUserSeconds": 107.842136,
+  "command": [
+    "/home/kristjan/code/goblin.wt/night-tsrslint-adopt/node_modules/.bin/oxlint",
+    "-c",
+    "oxlint.config.ts",
+    "-f",
+    "json",
+    "."
+  ],
+  "cwd": "/home/kristjan/code/goblin.wt/night-tsrslint-adopt",
+  "exitCode": 1,
+  "label": "goblin-stock",
+  "loadAverageEnd": [
+    18.375,
+    19.80126953125,
+    18.26318359375
+  ],
+  "loadAverageStart": [
+    20.5458984375,
+    20.28369140625,
+    18.3515625
+  ],
+  "output": "/home/kristjan/spikes/tsrslint-20261025/evidence/adopt/goblin-stock.json",
+  "resourceMaxRssKb": 3791460,
+  "sampledTreePeakRssKb": 5469732,
+  "samples": 334,
+  "wallSeconds": 35.167
+}

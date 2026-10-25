@@ -1,0 +1,33 @@
+{
+  "backendEnv": {
+    "OXLINT_TSGOLINT_PATH": "/home/kristjan/spikes/tsrslint-20261025/scripts/adopt/tee-helper.sh"
+  },
+  "childSystemSeconds": 5.397551,
+  "childUserSeconds": 54.915903,
+  "command": [
+    "/home/kristjan/code/goblin.wt/night-tsrslint-adopt/node_modules/.bin/oxlint",
+    "-c",
+    "oxlint.config.ts",
+    "-f",
+    "json",
+    "."
+  ],
+  "cwd": "/home/kristjan/code/goblin.wt/night-tsrslint-adopt",
+  "exitCode": 1,
+  "label": "goblin-pinned",
+  "loadAverageEnd": [
+    21.18408203125,
+    20.2568359375,
+    18.44970703125
+  ],
+  "loadAverageStart": [
+    18.375,
+    19.80126953125,
+    18.26318359375
+  ],
+  "output": "/home/kristjan/spikes/tsrslint-20261025/evidence/adopt/goblin-pinned.json",
+  "resourceMaxRssKb": 1715796,
+  "sampledTreePeakRssKb": 3215980,
+  "samples": 246,
+  "wallSeconds": 26.427
+}
