@@ -41,7 +41,11 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   Record a result's content with `recordedContent` (links without query or fragment) wherever it reaches a transcript
   or an outcome.
 - Inbound tokens must verify locally, name `/mcp` as audience, come from an enabled client with live consent and a live
-  grant (ADR 0114); their scope claim (`goblin`) counts for nothing. Every credential, key or client, has one grant:
+  grant (ADR 0114); their scope claim (`goblin`) counts for nothing. Inbound OAuth follows the MCP authorization spec
+  (ADR 0122, `auth/protocol.ts`): a client is its Client ID Metadata Document (dynamic registration stays until the
+  known clients connect that way), redirect URIs are `localhost` or https (no `cursor://`), tokens are plain bearer with
+  DPoP stripped, every authorization asks `offline_access`, the 401 names `goblin` alone and says `invalid_token` for a
+  refused bearer. Never add a DPoP path without proof checks at `/mcp`. Every credential, key or client, has one grant:
   level × reach × extras × lifetime (`packages/contracts/src/grants.ts`, stored in `auth/grants.ts`, mirrored in the
   agent by `grants/service.ts`). The workspaces a client reaches are its grant's (ADR 0097), read with the person's
   memberships on every call: a tool

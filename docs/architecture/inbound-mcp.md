@@ -16,21 +16,29 @@ still check exact grants (`mcp/servers/api.ts`, `pi/resident-mcp.ts`, `pi/skills
 
 goblin is an MCP server at `/mcp`, the one protected resource of Better Auth's `mcp()` authorization server, and one
 server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)): an OAuth client acting for a person
-(Claude Code, claude.ai, Cursor) or a server's API key. What either may do is its grant ([ADR
+(Claude Code, claude.ai, VS Code) or a server's API key. What either may do is its grant ([ADR
 0114](../adr/0114-one-grant-for-every-credential.md), [accounts](accounts.md#grants)): a level (`read` < `write` <
 `manage`), extras (`setup`, `routines`, `inspect`, `keys`), a reach of Topics, Personas and connections per workspace
 (each all, or a list that grows with what it makes) and a lifetime.
 
-- **Signing in.** Clients register dynamically (open, and restricted to `/mcp`); a registration whose redirects are
-  all http loopback is marked native, which is how Claude Code registers. A client asks for the sign-in scopes and
-  `goblin`, the one scope that reaches goblin (`MCP_SCOPES`, `auth/resources.ts`; an unauthenticated request gets a 401
-  naming the metadata and those scopes). The person signs in and consents at `/consent`, which first saves the grant
-  they give it (`PUT /api/clients/:clientId/grant`), pre-filled by the default chain: the same client's last terms,
-  else their latest grant without its risky extras, else the preset (`write`, every Topic, Persona and connection, no
-  extras, until revoked, over all of their workspaces). A Bearer token is accepted only if it verifies against the
-  local JWKS, names `/mcp` as audience, comes from an enabled client, and the person's consent and a live grant still
-  exist; its scope claim counts for nothing (`auth/service.ts`). A grant past its end deletes the consent and revokes
-  the refresh tokens (`grant_expired`), so the next sign-in asks again.
+- **Signing in** ([ADR 0122](../adr/0122-inbound-oauth-follows-the-mcp-authorization-spec.md)). A client is its
+  Client ID Metadata Document: an https URL as `client_id`, fetched and kept by `cimd()`, or, until the clients that
+  matter are seen connecting that way, a dynamic registration (open, restricted to `/mcp`, native when a redirect is
+  http on loopback, its grant types narrowed to `authorization_code` and `refresh_token`). Every redirect URI is
+  `localhost` (any port) or https; a private-use scheme is refused at registration and at authorization
+  (`auth/protocol.ts`). An unauthenticated request gets a 401 naming the metadata and `goblin`, the one scope that
+  reaches goblin (`RESOURCE_SCOPES`, `auth/resources.ts`; the authorization server offers the sign-in scopes and
+  `offline_access` too, `MCP_SCOPES`, and every authorization asks `offline_access`, so a client that registered
+  `refresh_token` gets one without asking). The person signs in and consents at `/consent`, which shows the client's
+  name and where it sends them back, and first saves the grant they give it (`PUT /api/clients/:clientId/grant`),
+  pre-filled by the default chain: the same client's last terms, else their latest grant without its risky extras, else
+  the preset (`write`, every Topic, Persona and connection, no extras, until revoked, over all of their workspaces).
+  Tokens are plain bearer, fifteen minutes long, with no DPoP anywhere (not advertised, not read, not bound). A Bearer
+  token is accepted only if it verifies against the local JWKS, names `/mcp` as audience, comes from an enabled client,
+  and the person's consent and a live grant still exist; its scope claim counts for nothing (`auth/service.ts`). One
+  that is presented and refused gets 401 `error="invalid_token"`. A grant past its end deletes the consent and revokes
+  the refresh tokens (`grant_expired`), so the next sign-in asks again. Revoking an unknown token answers 200 (RFC 7009;
+  Better Auth patched, `patches/better-auth-oauth-provider/`).
 - **Installed apps.** A token whose subject is its own client is an app's
   ([ADR 0118](../adr/0118-a-product-installs-into-a-workspace.md)): no consent, no person. It reaches the workspaces the
   app is installed in now, each with that installation's grant, and every call goes to one as that installation's
