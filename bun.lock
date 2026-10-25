@@ -243,6 +243,7 @@
         "@oxlint/plugins": "1.89.0",
         "@types/bun": "1.4.2",
         "@types/node": "22.20.5",
+        "@yielded/effect-tsrs": "0.2.0",
         "effect": "4.0.5",
         "oxc-parser": "0.155.0",
         "oxlint": "1.89.0",
@@ -1317,6 +1318,18 @@
     "@vitest/mocker": ["@vitest/mocker@5.0.5", "", { "dependencies": { "@jridgewell/trace-mapping": "0.3.31", "@vitest/spy": "5.0.5", "estree-walker": "^3.0.3", "magic-string": "^1.4.3" }, "peerDependencies": { "msw": "^2.4.9 || ^3.0.0", "vite": "^6.0.0 || ^7.0.0 || ^8.0.0" }, "optionalPeers": ["msw", "vite"] }, "sha512-xLL3lkDegJZw+MGoGaCCsFayDZthGgpAtr3Vziyfc4p7xH89K7KRPcRBBh/kEYm0Aqkt5DtTmkYpBtRV/FrHZg=="],
 
     "@vitest/spy": ["@vitest/spy@5.0.5", "", {}, "sha512-lwJRExuH417257Q5wv9QYugN9IMJkoxcrKrYxGPQkBzl7wlNpTUxD/5yNX4ESKVUIShKPgkGchYPFMWOOk0wzw=="],
+
+    "@yielded/effect-tsrs": ["@yielded/effect-tsrs@0.2.0", "", { "optionalDependencies": { "@yielded/effect-tsrs-darwin-arm64": "0.2.0", "@yielded/effect-tsrs-darwin-x64": "0.2.0", "@yielded/effect-tsrs-linux-arm64": "0.2.0", "@yielded/effect-tsrs-linux-x64": "0.2.0", "@yielded/effect-tsrs-win32-x64": "0.2.0" }, "bin": { "effect-tsrs": "bin/effect-tsrs.js" } }, "sha512-OUk6AVK2z6VGPkMn7vE1axevNZmeoCkLGXF/rYa7d1kJ/Jl06su/FKwgoacABUmL4lyfNUvE8Y0twU21WXtXtg=="],
+
+    "@yielded/effect-tsrs-darwin-arm64": ["@yielded/effect-tsrs-darwin-arm64@0.2.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-WxY+nUP25AxGWVB1EgTO2TS5yN9zZA/3orVMh0SuJ4CuIDZ/xXJu5k9iMSrYixuj6QBva+iQsCbrMKxxUo3zgg=="],
+
+    "@yielded/effect-tsrs-darwin-x64": ["@yielded/effect-tsrs-darwin-x64@0.2.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-DAPPKFCxs1pPcF5hlQeuNOqIgFIxYTMbqzIiv5VmaaLMpBRvq/M68V9IWfhgOP1l0XucgAG33l8CiGCPIwTlaw=="],
+
+    "@yielded/effect-tsrs-linux-arm64": ["@yielded/effect-tsrs-linux-arm64@0.2.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-+4Bql/5SXuEz6Nsq4fcttv82Nu7DnhrZI2fYYln7LUBFwQjS6Ul8DaXO7OZhkbT9BWLNvriwT31LXVEJwfmjkg=="],
+
+    "@yielded/effect-tsrs-linux-x64": ["@yielded/effect-tsrs-linux-x64@0.2.0", "", { "os": "linux", "cpu": "x64" }, "sha512-MF3HC+ctlM7xYX/iggq8gBhjdQ8A5Ot5828LeWvVKLeFA9Ei3Gtxumm75qLjTIYrNXHYnv9GjDvvwCFe/mqbgg=="],
+
+    "@yielded/effect-tsrs-win32-x64": ["@yielded/effect-tsrs-win32-x64@0.2.0", "", { "os": "win32", "cpu": "x64" }, "sha512-yxSbAzG2K9z9EsxEb+NGAMWKIeZEAXTIIQuoIz53sYyJFSZvdK27J1Zo3kRAXNQjCbBfmrqcgNbnG16D+zx92w=="],
 
     "abort-controller": ["abort-controller@3.0.0", "", { "dependencies": { "event-target-shim": "^5.0.0" } }, "sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg=="],
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { verifiedEffectOutput } from '../effect.ts'
-import { decodeEffect, fromEffect, fromKnip } from '../report.ts'
+import { decodeEffect, fromEffect, fromKnip, typescriptErrors, uncheckedFiles } from '../report.ts'
 import { repoRoot } from '../run.ts'
 
 const summary = { filesChecked: 1, filesWithoutPlugin: 0 }
@@ -22,7 +22,7 @@ describe('knip input', () => {
   })
 })
 
-describe('effect-tsgo input', () => {
+describe('Effect diagnostics input', () => {
   test('errors and warnings become findings with repository-relative paths; messages and suggestions do not', () => {
     const file = `${repoRoot}/apps/runtime/src/a.ts`
     const output = decodeEffect({
@@ -53,6 +53,46 @@ describe('effect-tsgo input', () => {
       ['effect(unusedDirective)', 4],
       ['effect(unusedDirective)', 9],
     ])
+  })
+})
+
+describe('effect-tsrs output', () => {
+  test('its TypeScript errors print as tsc prints them; one about the program has no position', () => {
+    const output = decodeEffect({
+      diagnostics: [],
+      typescriptDiagnostics: [
+        {
+          code: 2322,
+          severity: 'error',
+          message: "Type 'string' is not assignable to type 'number'.",
+          location: {
+            file: `${repoRoot}/tools/a.ts`,
+            start: 6,
+            length: 1,
+            line: 1,
+            column: 7,
+            endLine: 1,
+            endColumn: 8,
+          },
+        },
+        { code: 5023, severity: 'error', message: "Unknown compiler option 'x'." },
+        { code: 6385, severity: 'suggestion', message: 'deprecated', location: { file: 'b.ts', line: 1, column: 1 } },
+      ],
+      summary: { filesChecked: 1, errors: 0, warnings: 0, messages: 0 },
+      timings: { totalMs: 1 },
+    })
+    expect(typescriptErrors(output)).toEqual([
+      "tools/a.ts(1,7): error TS2322: Type 'string' is not assignable to type 'number'.",
+      "error TS5023: Unknown compiler option 'x'.",
+    ])
+  })
+
+  test('it does not count files without the plugin; effect-tsgo does, and any fails the check', () => {
+    const tsrs = decodeEffect({ diagnostics: [], typescriptDiagnostics: [], summary: { filesChecked: 3 } })
+    expect(uncheckedFiles('tools/tsconfig.json', tsrs)).toBeUndefined()
+    expect(typescriptErrors(decodeEffect({ diagnostics: [], summary }))).toEqual([])
+    const tsgo = decodeEffect({ diagnostics: [], summary: { filesChecked: 3, filesWithoutPlugin: 2 } })
+    expect(uncheckedFiles('tools/tsconfig.json', tsgo)).toContain('2 files went unchecked')
   })
 })
 

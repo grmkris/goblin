@@ -8,8 +8,9 @@
  *   bun run lint:report --only oxlint            one gate only (`oxlint`, `effect` or `knip`); the default is all
  *
  * Use it before and after a change: a change must not add findings. The whole-repository lint is type-aware, and
- * effect:check type-checks every project once more; both run through `heavy` when it is installed. The Effect
- * findings are what effect:check gates: errors, warnings and directives that change nothing.
+ * the Effect collector type-checks every project once more (tools/pass.ts); both run through `heavy` when it is
+ * installed. The Effect findings are what `bun run typecheck` gates: errors, warnings and directives that change
+ * nothing.
  * The collectors are in tools/findings.ts, shared with `bun run lint:gate`. When a tool did not run, or an Effect
  * project left files unchecked, the report is printed and the command exits 1.
  */

@@ -85,7 +85,7 @@ export const safeFixCodes = (rules: unknown): Set<string> =>
 export const ruleCode = (scope: string, rule: string): string => `${scope.split('_').join('-')}(${rule})`
 
 // ---------------------------------------------------------------------------------------------------------------------
-// effect-tsgo
+// effect-tsrs and effect-tsgo
 
 const EffectDiagnostic = Schema.Struct({
   file: Schema.String,
@@ -98,17 +98,43 @@ const EffectDiagnostic = Schema.Struct({
 })
 export type EffectDiagnostic = typeof EffectDiagnostic.Type
 
+/** A TypeScript diagnostic in effect-tsrs output; one about the options or the program as a whole has no location. */
+const TypescriptDiagnostic = Schema.Struct({
+  code: Schema.Number,
+  severity: Schema.String,
+  message: Schema.String,
+  location: Schema.optional(Schema.Struct({ file: Schema.String, line: Schema.Number, column: Schema.Number })),
+})
+
 const EffectOutput = Schema.Struct({
   diagnostics: Schema.Array(EffectDiagnostic),
-  summary: Schema.Struct({ filesChecked: Schema.Number, filesWithoutPlugin: Schema.Number }),
+  // effect-tsrs reports the TypeScript diagnostics of the same program; effect-tsgo reports none and counts the files
+  // it checked without the plugin instead.
+  typescriptDiagnostics: Schema.optional(Schema.Array(TypescriptDiagnostic)),
+  summary: Schema.Struct({ filesChecked: Schema.Number, filesWithoutPlugin: Schema.optional(Schema.Number) }),
 })
 export type EffectOutput = typeof EffectOutput.Type
 
-/** `effect-tsgo diagnostics --format json` output. */
+/** `effect-tsrs diagnostics --format json` or `effect-tsgo diagnostics --format json` output. */
 export const decodeEffect = Schema.decodeUnknownSync(EffectOutput)
 
-/** effect-tsgo's code for an `@effect-diagnostics` directive that changes nothing. It has no diagnostic name. */
+/**
+ * The code of an `@effect-diagnostics` directive that changes nothing. effect-tsrs names it `unusedDirective`,
+ * effect-tsgo `effect(377000)`.
+ */
 export const UNUSED_DIRECTIVE = 377000
+
+/** The TypeScript errors of effect-tsrs output, one line each as `tsc --pretty false` prints them. */
+export const typescriptErrors = (output: EffectOutput): string[] =>
+  (output.typescriptDiagnostics ?? [])
+    .filter((diagnostic) => diagnostic.severity === 'error')
+    .map(({ code, message, location }) => {
+      const where =
+        location === undefined
+          ? ''
+          : `${path.relative(repoRoot, location.file).split(path.sep).join('/')}(${location.line},${location.column}): `
+      return `${where}error TS${code}: ${message}`
+    })
 
 /**
  * The diagnostics that gate, with repository-relative paths: errors, warnings (tsconfig.base.json turns off the
@@ -128,16 +154,17 @@ export const gatingDiagnostics = (output: EffectOutput): EffectDiagnostic[] =>
     }))
 
 /**
- * Why a project's diagnostics are incomplete: files its tsconfig checks without the plugin, which go unchecked. `label`
- * names the project in the message. Undefined when every file was checked.
+ * Why a project's diagnostics are incomplete by effect-tsgo's count: files its tsconfig checks without the plugin, which
+ * go unchecked. `label` names the project in the message. Undefined when every file was checked, and for effect-tsrs,
+ * which does not count them (`missingPlugin` in effect.ts reads the tsconfig instead).
  */
 export const uncheckedFiles = (label: string, output: EffectOutput): string | undefined =>
-  output.summary.filesWithoutPlugin > 0
+  (output.summary.filesWithoutPlugin ?? 0) > 0
     ? `${label}: ${output.summary.filesWithoutPlugin} files went unchecked because this tsconfig does not enable ` +
-      `@effect/language-service. Extend tsconfig.base.json, or copy its plugin block (docs/agents/effect.md).`
+      `@effect/language-service. Extend tsconfig.base.json, or copy its plugin block (docs/agents/lint-quality.md).`
     : undefined
 
-/** effect-tsgo output as findings. Its diagnostics have no automatic fix here (quick fixes are editor-only). */
+/** Effect diagnostics as findings. They have no automatic fix here (quick fixes are editor-only). */
 export const fromEffect = (output: EffectOutput): Finding[] =>
   gatingDiagnostics(output).map((diagnostic) => ({
     source: 'effect',

@@ -1,10 +1,11 @@
 /**
- * The pure half of `bun run effect:check`: which tsconfigs each workspace checks, and the tsconfig reading the checks
- * need. tools/effect-check.ts runs `effect-tsgo diagnostics` on them; tools/report.ts turns its output into findings.
+ * The pure half of `bun run typecheck`: which tsconfigs each workspace checks, which checker runs them, and the tsconfig
+ * reading the checks need. tools/pass.ts runs one project's pass; tools/report.ts turns its output into findings.
  * Node APIs only: Vitest runs under Node.
  */
-import { Schema } from 'effect'
-import { readFileSync } from 'node:fs'
+import { Config, Effect, Schema } from 'effect'
+import { existsSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { parseSync } from 'oxc-parser'
 import { nodes } from './graph.ts'
@@ -12,41 +13,51 @@ import { UNUSED_DIRECTIVE } from './report.ts'
 import type { EffectOutput } from './report.ts'
 import { repoRoot } from './run.ts'
 
-/** The plugin name `@effect/tsgo` reads its options under, in `compilerOptions.plugins`. */
+/** The plugin name effect-tsrs and `@effect/tsgo` read their options under, in `compilerOptions.plugins`. */
 export const PLUGIN = '@effect/language-service'
+
+/**
+ * Which checker runs a project's pass (ADR 0120): `tsrs`, the default, is effect-tsrs, one run that reports the
+ * TypeScript and the Effect diagnostics; `tsgo` is the pair it replaced, tsc and effect-tsgo, kept as a fallback while
+ * effect-tsrs is new. Read from `EFFECT_CHECKER`; any other value fails the run.
+ */
+export const CHECKER = Config.Literals(['tsrs', 'tsgo'], 'EFFECT_CHECKER').pipe(Config.withDefault('tsrs' as const))
+export type Checker = 'tsrs' | 'tsgo'
+
+/** The checker this run uses. */
+export const checker = (): Checker => Effect.runSync(CHECKER)
 
 /** The effect-tsgo binary, a dependency of this workspace. */
 export const effectTsgo = path.join(import.meta.dirname, 'node_modules/.bin/effect-tsgo')
 
-/** The command that prints one project's diagnostics as JSON (`decodeEffect` in report.ts reads it). */
-export const effectTsgoArgs = (tsconfig: string): string[] => [
-  effectTsgo,
-  'diagnostics',
-  '--project',
-  path.resolve(repoRoot, tsconfig),
-  '--format',
-  'json',
-]
+/**
+ * The effect-tsrs binary: the static executable of `@yielded/effect-tsrs`'s package for this platform, found as its Node
+ * launcher (`bin/native.mjs`) finds it. Running it directly needs no Node and no launcher process.
+ */
+export const effectTsrs = (): string => {
+  const fromLauncher = createRequire(createRequire(import.meta.url).resolve('@yielded/effect-tsrs/package.json'))
+  return fromLauncher.resolve(`@yielded/effect-tsrs-${process.platform}-${process.arch}/bin/effect-tsrs`)
+}
 
-/** Workspaces without `effect:check`: vendored code the gates do not cover. */
+/** The command that prints one project's diagnostics as JSON (`decodeEffect` in report.ts reads it). */
+export const effectArgs = (tsconfig: string, using: Checker): string[] => {
+  const project = path.resolve(repoRoot, tsconfig)
+  return using === 'tsrs'
+    ? [effectTsrs(), 'diagnostics', '-p', project, '--format', 'json']
+    : [effectTsgo, 'diagnostics', '--project', project, '--format', 'json']
+}
+
+/** Workspaces without a typecheck: vendored code the gates do not cover. */
 export const OUT_OF_SCOPE = new Set<string>()
 
-/** Tsconfigs a `typecheck` script checks: each `tsc -p <file>`, or `tsconfig.json` for a bare `tsc`. */
-export const typecheckProjects = (script: string): string[] =>
-  script
-    .split('&&')
-    .map((command) => command.trim().split(/\s+/u))
-    .filter((words) => words[0] === 'tsc')
-    .map((words) => {
-      const flag = words.indexOf('-p')
-      return flag === -1 ? 'tsconfig.json' : (words[flag + 1] ?? 'tsconfig.json')
-    })
-
-/** Tsconfigs an `effect:check` script checks: the arguments of `effect-check.ts`. */
-export const effectCheckProjects = (script: string): string[] => {
-  const command = script.split('&&').find((part) => part.includes('effect-check.ts')) ?? ''
+/** Tsconfigs a `typecheck` script checks: the arguments of `tools/typecheck.ts`, none when it does not run it. */
+export const typecheckProjects = (script: string): string[] => {
+  const command = script.split('&&').find((part) => part.includes('typecheck.ts'))
+  if (command === undefined) return []
   const words = command.trim().split(/\s+/u)
-  return words.slice(words.findIndex((word) => word.endsWith('effect-check.ts')) + 1)
+  return words
+    .slice(words.findIndex((word) => word.endsWith('typecheck.ts')) + 1)
+    .filter((word) => !word.startsWith('-'))
 }
 
 export interface Project {
@@ -61,29 +72,20 @@ const decodeManifest = Schema.decodeUnknownSync(Manifest)
 const scriptsOf = (dir: string): Readonly<Record<string, string>> =>
   decodeManifest(JSON.parse(readFileSync(path.join(repoRoot, dir, 'package.json'), 'utf8'))).scripts ?? {}
 
-/** Every workspace's `typecheck` and `effect:check` scripts (absent ones as undefined). */
-export const workspaceScripts = (): Array<{
-  readonly dir: string
-  readonly typecheck: string | undefined
-  readonly effectCheck: string | undefined
-}> =>
-  nodes.map((node) => {
-    const scripts = scriptsOf(node.dir)
-    return { dir: node.dir, typecheck: scripts['typecheck'], effectCheck: scripts['effect:check'] }
-  })
+/** Every workspace's `typecheck` script (undefined when it has none). */
+export const workspaceScripts = (): Array<{ readonly dir: string; readonly typecheck: string | undefined }> =>
+  nodes.map((node) => ({ dir: node.dir, typecheck: scriptsOf(node.dir)['typecheck'] }))
 
-/** Every project `bun run effect:check` checks: the root tsconfig, then each workspace's `effect:check` tsconfigs. */
+/**
+ * Every project `bun run typecheck` checks: the root tsconfig, then each workspace's `typecheck` tsconfigs. A workspace
+ * whose `typecheck` does not run tools/typecheck.ts would skip the Effect diagnostics, so it throws.
+ */
 export const effectProjects = (): Project[] => {
   const projects: Project[] = [{ dir: '.', tsconfig: 'tsconfig.json' }]
-  for (const { dir, typecheck, effectCheck } of workspaceScripts()) {
-    if (typecheck === undefined || effectCheck === undefined) {
-      throw new Error(`${dir}: both typecheck and effect:check scripts are required`)
-    }
-    const typed = typecheckProjects(typecheck)
-    const checked = effectCheckProjects(effectCheck)
-    if (typed.length === 0 || checked.length === 0 || JSON.stringify(typed) !== JSON.stringify(checked)) {
-      throw new Error(`${dir}: typecheck and effect:check must name the same supported projects`)
-    }
+  for (const { dir, typecheck } of workspaceScripts()) {
+    const checked = typecheck === undefined ? [] : typecheckProjects(typecheck)
+    if (checked.length === 0)
+      throw new Error(`${dir}: its typecheck script must run tools/typecheck.ts on its tsconfigs`)
     projects.push(...checked.map((tsconfig) => ({ dir, tsconfig })))
   }
   return projects
@@ -120,17 +122,52 @@ const endOfString = (text: string, start: number): number => {
 
 type PluginEntry = Readonly<Record<string, unknown>>
 const Tsconfig = Schema.Struct({
+  extends: Schema.optional(Schema.Union([Schema.String, Schema.Array(Schema.String)])),
   compilerOptions: Schema.optional(
     Schema.Struct({ plugins: Schema.optional(Schema.Array(Schema.Record(Schema.String, Schema.Unknown))) }),
   ),
 })
 const decodeTsconfig = Schema.decodeUnknownSync(Tsconfig)
 
-/** The `@effect/language-service` entry of a tsconfig's own `compilerOptions.plugins` (not inherited), if any. */
+/**
+ * The files a tsconfig's `extends` names, in order, as TypeScript finds them: relative to the tsconfig, with `.json`
+ * added when the name has none. A package's tsconfig is not followed: it throws, so the check never guesses.
+ */
+const extended = (file: string, names: string | readonly string[] | undefined): string[] =>
+  (names === undefined ? [] : typeof names === 'string' ? [names] : names).map((name) => {
+    if (!/^\.\.?\//u.test(name)) throw new Error(`${file}: cannot follow extends "${name}"; name a relative path`)
+    const target = path.resolve(path.dirname(file), name)
+    return existsSync(target) || target.endsWith('.json') ? target : `${target}.json`
+  })
+
+/**
+ * The `compilerOptions.plugins` a tsconfig ends up with: its own when it sets them, else those of what it extends, the
+ * last `extends` entry that has any winning. TypeScript replaces `plugins` from a parent, never merges it.
+ */
+const effectivePlugins = (file: string, seen: ReadonlySet<string>): readonly PluginEntry[] | undefined => {
+  if (seen.has(file)) throw new Error(`${file}: extends itself`)
+  const config = decodeTsconfig(JSON.parse(stripJsonc(readFileSync(file, 'utf8'))))
+  if (config.compilerOptions?.plugins !== undefined) return config.compilerOptions.plugins
+  return extended(file, config.extends)
+    .toReversed()
+    .map((parent) => effectivePlugins(parent, new Set([...seen, file])))
+    .find((plugins) => plugins !== undefined)
+}
+
+/** The `@effect/language-service` entry a tsconfig (repository-relative or absolute) sets or inherits, if any. */
 export const pluginBlock = (tsconfig: string): PluginEntry | undefined =>
-  decodeTsconfig(
-    JSON.parse(stripJsonc(readFileSync(path.join(repoRoot, tsconfig), 'utf8'))),
-  ).compilerOptions?.plugins?.find((plugin) => plugin['name'] === PLUGIN)
+  effectivePlugins(path.resolve(repoRoot, tsconfig), new Set())?.find((plugin) => plugin['name'] === PLUGIN)
+
+/**
+ * Why a project's Effect diagnostics would be incomplete: its tsconfig neither sets nor inherits the plugin block, so
+ * the checker would run without goblin's severities. Undefined when it has the block. effect-tsrs, unlike effect-tsgo,
+ * does not count the files it checks without the plugin, so this is read from the tsconfig before the run.
+ */
+export const missingPlugin = (tsconfig: string): string | undefined =>
+  pluginBlock(tsconfig) === undefined
+    ? `${path.relative(repoRoot, path.resolve(repoRoot, tsconfig))}: does not enable ${PLUGIN}, so its files would ` +
+      `go unchecked. Extend tsconfig.base.json, or copy its plugin block (docs/agents/lint-quality.md).`
+    : undefined
 
 /**
  * The Effect diagnostics about global APIs (Date, fetch, timers, console, randomness, UUIDs, the environment, Node
@@ -161,8 +198,8 @@ export const severities = (block: PluginEntry | undefined): Readonly<Record<stri
   decodeSeverities(block?.['diagnosticSeverity'])
 
 /**
- * effect-tsgo also reads directive-shaped text inside strings (a lint rule's test cases), and reports it as a directive
- * that changes nothing. Only a directive inside a real comment is kept. Ported from myapps (`grmkris/myapps`
+ * effect-tsrs and effect-tsgo also read directive-shaped text inside strings (a lint rule's test cases), and report it
+ * as a directive that changes nothing. Only a directive inside a real comment is kept. Ported from myapps (`grmkris/myapps`
  * `27416c98`, `tools/effect.ts`). A source that cannot be read or parsed throws: the gate fails instead of guessing.
  */
 export const verifiedEffectOutput = (

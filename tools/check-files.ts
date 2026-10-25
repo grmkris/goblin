@@ -10,8 +10,8 @@
  * Steps, all of them run and a summary table at the end; the exit status is non-zero if any step failed:
  *   1. format     oxfmt --check on the files oxfmt.config.ts does not ignore
  *   2. lint       oxlint (type-aware through the config) on lintable files oxlint.config.ts does not ignore
- *   3. typecheck  turbo typecheck and effect:check for the owning workspaces (tools/graph.ts); tsc and effect-check on
- *                 the root tsconfig for root files
+ *   3. typecheck  turbo typecheck (TypeScript and Effect diagnostics, tools/typecheck.ts) for the owning workspaces
+ *                 (tools/graph.ts); tools/typecheck.ts on the root tsconfig for root files
  *   4. graph      bun run graph, when a package.json or tools/graph.ts is among the files
  *   5. agents     bun run agents:check, once it exists, when an agent file is among the files
  * Steps 2 and 3 run through `heavy` when it is installed (retrying while every slot is busy). `--lint-only` skips heavy:
@@ -102,45 +102,32 @@ const lint = async (files: readonly string[], heavy: boolean): Promise<StepResul
   return { step: 'lint', outcome: result.exitCode === 0 ? 'pass' : 'fail', detail }
 }
 
-/** Root-owned files belong to the root tsconfig: tsc, then the Effect diagnostics once effect:check exists. */
-const rootChecks = async (scripts: Readonly<Record<string, string>>): Promise<StepResult[]> => {
-  const commands: Array<readonly [string, readonly string[]]> = [['typecheck', [bin('tsc'), '-p', 'tsconfig.json']]]
-  if ('effect:check' in scripts) commands.push(['effect:check', ['bun', 'tools/effect-check.ts', 'tsconfig.json']])
-  const results: StepResult[] = []
-  for (const [step, argv] of commands) {
-    announce(argv)
-    const result = await run(argv, { heavy: true, inherit: true })
-    results.push({ step, outcome: result.exitCode === 0 ? 'pass' : 'fail', detail: 'root tsconfig.json' })
-  }
-  return results
+/** Root-owned files belong to the root tsconfig: its TypeScript and Effect diagnostics. */
+const rootCheck = async (): Promise<StepResult> => {
+  const argv = ['bun', 'tools/typecheck.ts', 'tsconfig.json']
+  announce(argv)
+  const result = await run(argv, { heavy: true, inherit: true })
+  return { step: 'typecheck', outcome: result.exitCode === 0 ? 'pass' : 'fail', detail: 'root tsconfig.json' }
 }
 
-const typecheck = async (
-  files: readonly string[],
-  scripts: Readonly<Record<string, string>>,
-): Promise<StepResult[]> => {
+const typecheck = async (files: readonly string[]): Promise<StepResult[]> => {
   const owners = new Set(files.filter((file) => TYPED.test(file)).map(workspaceOf))
   if (owners.size === 0) return [{ step: 'typecheck', outcome: 'skipped', detail: 'no TypeScript or JSON files' }]
   const results: StepResult[] = []
   const names = nodes.filter((node) => owners.has(node.dir)).map((node) => node.name)
   if (names.length > 0) {
-    const tasks = ['typecheck', ...('effect:check' in scripts ? ['effect:check'] : [])]
     const argv = [
       bin('turbo'),
       'run',
-      ...tasks,
+      'typecheck',
       '--output-logs=errors-only',
       ...names.map((name) => `--filter=${name}`),
     ]
     announce(argv)
     const result = await run(argv, { heavy: true, inherit: true })
-    results.push({
-      step: tasks.join(' + '),
-      outcome: result.exitCode === 0 ? 'pass' : 'fail',
-      detail: names.join(', '),
-    })
+    results.push({ step: 'typecheck', outcome: result.exitCode === 0 ? 'pass' : 'fail', detail: names.join(', ') })
   }
-  if (owners.has(ROOT_WORKSPACE)) results.push(...(await rootChecks(scripts)))
+  if (owners.has(ROOT_WORKSPACE)) results.push(await rootCheck())
   return results
 }
 
@@ -168,7 +155,7 @@ if (!lintOnly) {
   const scripts = Schema.decodeUnknownSync(RootManifest)(
     await Bun.file(path.join(repoRoot, 'package.json')).json(),
   ).scripts
-  results.push(...(await typecheck(files, scripts)))
+  results.push(...(await typecheck(files)))
   if (files.some((file) => file.endsWith('package.json') || file === 'tools/graph.ts')) {
     results.push(await script('graph', 'a manifest or tools/graph.ts changed'))
   }

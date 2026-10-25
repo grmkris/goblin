@@ -10,8 +10,7 @@
     "./canonical": "./src/http/canonical.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
-    "effect:check": "bun ../../tools/effect-check.ts tsconfig.json",
+    "typecheck": "bun ../../tools/typecheck.ts tsconfig.json",
     "test": "vitest run",
     "test:unit": "vitest run --config vitest.config.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts",

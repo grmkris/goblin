@@ -17,9 +17,10 @@
     "noEmit": true,
     "singleThreaded": true,
     "types": ["node"],
-    // Effect language-service diagnostics, run by `bun run effect:check` (tools/effect-check.ts; docs/agents/effect.md).
+    // Effect language-service diagnostics, run with the TypeScript ones by `bun run typecheck` (tools/typecheck.ts on
+    // effect-tsrs, ADR 0120; docs/agents/lint-quality.md). Editors read the same block through @effect/tsgo.
     // Errors, warnings and `@effect-diagnostics` directives that change nothing gate; messages and suggestions show in
-    // editors only. Diagnostics left out keep @effect/tsgo's default severity. Override globs are relative to the
+    // editors only. Diagnostics left out keep their default severity. Override globs are relative to the
     // tsconfig that holds this block and must end in a file pattern (`**/*`, not `**`).
     "plugins": [
       {

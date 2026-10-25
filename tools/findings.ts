@@ -1,15 +1,16 @@
 /**
  * The collectors of `bun run lint:report` and `bun run lint:gate`: every finding of oxlint (type-aware), of the Effect
- * diagnostics of every effect:check project, and of knip as configured and in production mode, together with the
- * reasons a collection is incomplete. Each
- * tool runs from the repository root, through `heavy` when it is installed (tools/run.ts). The Effect diagnostics that
- * gate are errors, warnings and directives that change nothing (`gatingDiagnostics` in report.ts).
+ * diagnostics of every typecheck project (tools/pass.ts), and of knip as configured and in production mode, together
+ * with the reasons a collection is incomplete. Each tool runs from the repository root, through `heavy` when it is
+ * installed (tools/run.ts). The Effect diagnostics that gate are errors, warnings and directives that change nothing
+ * (`gatingDiagnostics` in report.ts).
  */
 import { Schema } from 'effect'
 import path from 'node:path'
-import { effectProjects, effectTsgoArgs, verifiedEffectOutput } from './effect.ts'
+import { checker, effectProjects } from './effect.ts'
 import type { Project } from './effect.ts'
-import { decodeEffect, fromEffect, fromKnip, fromOxlint, safeFixCodes, uncheckedFiles } from './report.ts'
+import { pass } from './pass.ts'
+import { fromEffect, fromKnip, fromOxlint, safeFixCodes } from './report.ts'
 import type { Finding, Source } from './report.ts'
 import { bin, repoRoot, run } from './run.ts'
 import type { RunResult } from './run.ts'
@@ -97,19 +98,28 @@ export const oxlintFindings = async (config: string): Promise<Collected> => {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// effect-tsgo
+// Effect diagnostics
 
-/** Projects checked at the same time, as `turbo run effect:check --concurrency=2` does: each is a full type check. */
-const EFFECT_CONCURRENCY = 1
+/**
+ * Projects checked at the same time. Each is a full type check: effect-tsrs holds at most about 0.6 GB on one thread,
+ * effect-tsgo about 2 GB.
+ */
+const EFFECT_CONCURRENCY = { tsrs: 4, tsgo: 1 } as const
 
+/**
+ * One project's Effect findings. effect-tsrs reports the project's TypeScript errors in the same run; a project with any
+ * fails the collection, since its Effect diagnostics are incomplete. effect-tsgo reports none, and tsc is not run here.
+ */
 const effectProject = async ({ dir, tsconfig }: Project): Promise<Collected> => {
-  const label = path.join(dir, tsconfig)
-  const result = await run(effectTsgoArgs(label))
-  const failures = didNotRun(`effect-tsgo on ${label}`, result)
-  if (failures.length > 0) return { findings: [], failures }
-  const output = verifiedEffectOutput(decodeEffect(JSON.parse(result.stdout)))
-  const unchecked = uncheckedFiles(label, output)
-  return { findings: fromEffect(output), failures: unchecked === undefined ? [] : [unchecked] }
+  const result = await pass(path.join(dir, tsconfig), checker(), false)
+  const typescript =
+    result.typescript.length === 0
+      ? []
+      : [`${result.label}: ${result.typescript.length} TypeScript errors (\`bun run typecheck\` lists them)`]
+  return {
+    findings: result.effect === undefined ? [] : fromEffect(result.effect),
+    failures: [...result.failures, ...typescript],
+  }
 }
 
 /** `fn` over `items`, at most `limit` at a time; the results keep the order of `items`. */
@@ -124,7 +134,7 @@ const mapLimit = async <A, B>(items: readonly A[], limit: number, fn: (item: A) 
 }
 
 export const effectFindings = async (): Promise<Collected> => {
-  const results = await mapLimit(effectProjects(), EFFECT_CONCURRENCY, effectProject)
+  const results = await mapLimit(effectProjects(), EFFECT_CONCURRENCY[checker()], effectProject)
   const seen = new Map<string, Finding>()
   for (const finding of results.flatMap((result) => result.findings)) {
     seen.set(`${finding.file}:${finding.line}:${finding.rule}`, finding)

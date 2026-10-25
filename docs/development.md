@@ -57,13 +57,14 @@ print or commit the cookie. Smoke validates the file origin and the authenticate
 ## Gates
 
 ```sh
-heavy bun run check:fast    # format, agent/docs checks, lint, typecheck, unit tests
+heavy bun run check:fast    # format, agent/docs checks, lint, typecheck (TypeScript and Effect), unit tests
 heavy bun run check         # everything, including graph, Knip, duplication, workerd integration tests and the build
 ```
 
 Run expensive commands through `heavy`. Exit 75 means another heavy job is running: retry, do not treat it as a
-failure. Never pipe `heavy`. Focused commands: `bun run test:unit`, `bun run test:integration`, `bun run typecheck`,
-`bun run effect:check`, `bun run lint:gate`, `bun run check:files <paths>`.
+failure. Never pipe `heavy`. Focused commands: `bun run test:unit`, `bun run test:integration`, `bun run typecheck`
+(TypeScript and Effect diagnostics in one effect-tsrs pass per project; `EFFECT_CHECKER=tsgo` runs tsc and effect-tsgo
+instead, ADR 0120), `bun run lint:gate`, `bun run check:files <paths>`.
 
 If a check fails, look at `git status` first. Another agent's half-finished file failing is not your change failing.
 

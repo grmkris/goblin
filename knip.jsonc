@@ -44,7 +44,8 @@
     "tools": {
       "entry": ["*.ts!", "oxlint/*.ts!"],
       "project": ["*.ts!", "oxlint/**/*.ts!", "test/**/*.ts"],
-      "ignoreDependencies": ["@effect/tsgo"],
+      // Run as binaries by path (tools/effect.ts): effect-tsrs's native executable, and effect-tsgo for the fallback.
+      "ignoreDependencies": ["@effect/tsgo", "@yielded/effect-tsrs"],
     },
     "apps/runtime": {
       // Hand-run: a probe of a model provider, and the recorder of the AG-UI stream fixtures; not part of the agent.

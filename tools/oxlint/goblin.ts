@@ -285,7 +285,7 @@ export const resourceNameViaStage = defineRule({
 
 const DIRECTIVE = /^\s*(?:oxlint|eslint)-disable(?:-next-line|-line)?(?:\s|$)/
 /**
- * `@effect-diagnostics[-next-line] <name>:<severity>` below `error` (effect:check). A lowered severity is as good as
+ * `@effect-diagnostics[-next-line] <name>:<severity>` below `error` (typecheck). A lowered severity is as good as
  * off: messages and suggestions never gate, and a warning is one stop from either. Raising one to `error` needs no
  * reason.
  */

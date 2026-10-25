@@ -2,8 +2,12 @@
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["tsconfig.base.json"],
   "tasks": {
-    "typecheck": { "dependsOn": ["^typecheck"], "outputs": [] },
-    "effect:check": { "dependsOn": ["^effect:check"], "outputs": [] },
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tools/*.ts", "$TURBO_ROOT$/tools/package.json"],
+      "env": ["EFFECT_CHECKER"],
+      "outputs": []
+    },
     "test": { "dependsOn": ["^typecheck"], "outputs": [] },
     "test:unit": { "dependsOn": ["^typecheck"], "outputs": [] },
     "test:integration": {

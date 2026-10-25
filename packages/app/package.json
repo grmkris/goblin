@@ -13,8 +13,7 @@
   },
   "scripts": {
     "build": "bun scripts/build.ts",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.ui.json && tsc -p tsconfig.render.json",
-    "effect:check": "bun ../../tools/effect-check.ts tsconfig.json tsconfig.ui.json tsconfig.render.json",
+    "typecheck": "bun ../../tools/typecheck.ts tsconfig.json tsconfig.ui.json tsconfig.render.json",
     "test": "vitest run",
     "test:unit": "vitest run"
   },
