@@ -76,6 +76,19 @@ export const guardAuthorization = (query: unknown): void => {
   if ('dpop_jkt' in query) delete query.dpop_jkt
 }
 
+/** What fetches a client's metadata document: `fetch`'s shape, as the cimd plugin takes it. */
+export type ClientMetadataFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+
+/**
+ * The cimd plugin asks its fetch for `redirect: 'error'`, which workerd refuses ("won't be implemented since it does
+ * not make sense at the edge; use manual"). `manual` keeps the same promise: a redirect comes back as its 3xx answer,
+ * never followed, and the plugin refuses any status but 200.
+ */
+export const manualRedirects =
+  (fetcher: ClientMetadataFetch): ClientMetadataFetch =>
+  (input, init) =>
+    fetcher(input, { ...init, redirect: 'manual' })
+
 /** The token request without its DPoP proof: an authorization server without DPoP ignores it (RFC 9449 §5) and issues a bearer token. */
 export const withoutDpopProof = (request: Request): Request => {
   if (!request.headers.has('dpop')) return request

@@ -29,8 +29,15 @@ const DOCUMENTS: Readonly<Record<string, Record<string, unknown>>> = {
     token_endpoint_auth_method: 'none',
   },
 }
-/** The fixture's metadata documents, in place of the network: the deployed Worker fetches them itself. */
-const documentFetch = (input: RequestInfo | URL): Promise<Response> => {
+/**
+ * The fixture's metadata documents, in place of the network: the deployed Worker fetches them itself. As workerd, it
+ * refuses `redirect: 'error'`, so the plugin's call must arrive as `manual` (`protocol.ts` `manualRedirects`).
+ */
+const documentFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  if (init?.redirect !== 'manual')
+    return Promise.reject(
+      new TypeError(`Invalid redirect value, must be one of "follow" or "manual": ${init?.redirect}`),
+    )
   const url = input instanceof Request ? input.url : String(input)
   if (url === MOVED_CLIENT)
     return Promise.resolve(new Response(null, { status: 302, headers: { location: DOCUMENT_CLIENT } }))

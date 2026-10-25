@@ -13,7 +13,7 @@ import { CODE_SEND, CODE_SIGN_IN, guardEmailCode } from './email-code.ts'
 import { codeMail, mailerOf } from './mail.ts'
 import { guardOidc, oidcPlugin, oidcProviderOf, refuseUnverifiedOidcUser, withoutProviderTokens } from './oidc.ts'
 import { clientSecretHash } from './client-secret.ts'
-import { guardAuthorization, guardRegistration } from './protocol.ts'
+import { guardAuthorization, guardRegistration, manualRedirects } from './protocol.ts'
 import { KEY_LENGTH, KEY_PREFIX, KEY_START_LENGTH, MCP_SCOPES, mcpResource } from './resources.ts'
 import { workspaceAccess } from './roles.ts'
 import { deleteAgentOf } from './account.ts'
@@ -286,12 +286,12 @@ const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeed
       oauthPlugin as BetterAuthPlugin,
       // Client ID Metadata Documents (ADR 0122): a client is the https URL of its own metadata, fetched once an hour at
       // most, validated against the MCP profile and kept as an `oauthClient` row like any other. The fetch is the
-      // Worker's own `fetch`, and the plugin bounds it: https ids only, loopback and other special-use hosts refused by
-      // name, no redirects, a 5 KB and 5 s cap, a fetch budget per origin; `global_fetch_strictly_public`
-      // (`apps/web/alchemy.run.ts`) keeps a document URL on goblin's own hostname from reaching past Cloudflare's front
-      // door. A fixture hands its own.
+      // Worker's own `fetch` (a fixture hands its own), with redirects answered rather than followed, and the plugin
+      // bounds it: https ids only, loopback and other special-use hosts refused by name, a 5 KB and 5 s cap, a fetch
+      // budget per origin; `global_fetch_strictly_public` (`apps/web/alchemy.run.ts`) keeps a document URL on goblin's
+      // own hostname from reaching past Cloudflare's front door.
       cimd({
-        fetchClientMetadataResource: env.CLIENT_METADATA_FETCH ?? ((input, init) => fetch(input, init)),
+        fetchClientMetadataResource: manualRedirects(env.CLIENT_METADATA_FETCH ?? fetch),
         metadataProfile: 'mcp-2026-07-28',
       }),
       codePlugin(env, delivery),

@@ -4,6 +4,7 @@ import {
   guardRegistration,
   isAllowedRedirectUri,
   isDiscoveryPath,
+  manualRedirects,
   withoutDpopMetadata,
   withoutDpopProof,
 } from '../../src/auth/protocol.ts'
@@ -120,6 +121,19 @@ describe('what the MCP authorization spec asks of registration and authorization
     const none = { redirect_uri: 'https://claude.ai/api/mcp/auth_callback' }
     guardAuthorization(none)
     expect(none).not.toHaveProperty('scope')
+  })
+  it("asks the metadata fetch for manual redirects, which workerd has where the plugin asks 'error'", async () => {
+    const seen: RequestInit[] = []
+    const fetcher = manualRedirects((_, init) => {
+      seen.push(init ?? {})
+      return Promise.resolve(new Response(null, { status: 302, headers: { location: 'https://elsewhere.test/' } }))
+    })
+    const answer = await fetcher('https://client.test/cimd.json', {
+      redirect: 'error',
+      headers: { accept: 'application/json' },
+    })
+    expect(seen).toEqual([{ redirect: 'manual', headers: { accept: 'application/json' } }])
+    expect([answer.status, answer.redirected]).toEqual([302, false])
   })
   it('takes the DPoP proof off a token request and the algorithms off a discovery document', async () => {
     const proven = new Request('https://goblin.test/api/auth/oauth2/token', {
