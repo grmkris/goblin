@@ -155,7 +155,9 @@ const beforeAuth = (env: AuthEnvironment, database: D1Database) =>
       return
     }
     if (context.path === '/oauth2/authorize') {
+      // The parameters are the query of a GET or the form body of a POST: both are guarded, since the endpoint takes both.
       guardAuthorization(context.query)
+      guardAuthorization(context.body)
       return
     }
     if (unavailableMethod(context.path ?? '')) throw new APIError('NOT_FOUND', { message: 'Not found' })
@@ -284,8 +286,10 @@ const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeed
       oauthPlugin as BetterAuthPlugin,
       // Client ID Metadata Documents (ADR 0122): a client is the https URL of its own metadata, fetched once an hour at
       // most, validated against the MCP profile and kept as an `oauthClient` row like any other. The fetch is the
-      // Worker's own `fetch`, which `global_fetch_strictly_public` keeps off private and special-use addresses
-      // (`apps/web/alchemy.run.ts`); the plugin refuses redirects and non-https ids itself. A fixture hands its own.
+      // Worker's own `fetch`, and the plugin bounds it: https ids only, loopback and other special-use hosts refused by
+      // name, no redirects, a 5 KB and 5 s cap, a fetch budget per origin; `global_fetch_strictly_public`
+      // (`apps/web/alchemy.run.ts`) keeps a document URL on goblin's own hostname from reaching past Cloudflare's front
+      // door. A fixture hands its own.
       cimd({
         fetchClientMetadataResource: env.CLIENT_METADATA_FETCH ?? ((input, init) => fetch(input, init)),
         metadataProfile: 'mcp-2026-07-28',

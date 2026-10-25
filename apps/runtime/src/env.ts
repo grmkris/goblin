@@ -29,7 +29,7 @@ export interface RuntimeEnv {
   readonly PUBLISH_RETRY_MS?: string
   /**
    * Fixtures only: what fetches a client's metadata document (ADR 0122, `auth/options.ts`). The deployed Worker uses
-   * its own `fetch`, held to public addresses by `global_fetch_strictly_public`.
+   * its own `fetch`, within the bounds the cimd plugin sets.
    */
   readonly CLIENT_METADATA_FETCH?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
   readonly APP_URL: string

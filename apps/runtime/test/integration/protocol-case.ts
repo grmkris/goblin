@@ -69,6 +69,8 @@ async function metadataCase(base: string) {
       client_id_metadata_document_supported: true,
     })
     expect(document.dpop_signing_alg_values_supported, path).toBeUndefined()
+    const head = await fetch(`${base}${path}`, { method: 'HEAD' })
+    expect(head.status, `HEAD ${path}`).toBe(200)
   }
 }
 
@@ -160,6 +162,14 @@ async function tokenCase(base: string, who: Person) {
   })
   expect(refused.status).toBe(400)
   expect(refused.headers.get('location')).toBeNull()
+  // The endpoint takes the same parameters as a POST form; the rule holds there too.
+  const posted = await auth(base, who, '/oauth2/authorize', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'text/html' },
+    body: query.toString(),
+  })
+  expect(posted.status).toBe(400)
+  expect(posted.headers.get('location')).toBeNull()
 }
 
 /** RFC 7009: revoking an unknown token, or one already revoked, answers 200; the token is dead either way. */

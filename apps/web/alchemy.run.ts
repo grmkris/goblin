@@ -118,13 +118,11 @@ export default Alchemy.Stack(
               ...(stage.name === 'prod' ? { aliases: [`www.${domain}`] } : {}),
             },
           }),
-      // A deployed Worker fetches public addresses only (`global_fetch_strictly_public`): what bounds the fetch of a
-      // client's metadata document (ADR 0122), as it does the owner's MCP servers and published Events. Local keeps its
-      // model endpoint on loopback (`scripts/stage.ts`), so it stays off there.
-      compatibility: {
-        date: '2026-09-25',
-        flags: ['nodejs_compat', ...(stage.name === 'local' ? [] : ['global_fetch_strictly_public'])],
-      },
+      // `global_fetch_strictly_public`: a fetch of this Worker's own hostname goes through Cloudflare's front door like
+      // any request from the Internet, never straight to an origin behind it. Cloudflare's OAuth library requires it
+      // for Client ID Metadata Documents, whose ids are URLs a client chooses (ADR 0122); the other bounds on that fetch
+      // are the cimd plugin's own (`apps/runtime/src/auth/options.ts`).
+      compatibility: { date: '2026-09-25', flags: ['nodejs_compat', 'global_fetch_strictly_public'] },
       observability: stage.observability,
       dev: { port: 18971, strictPort: true },
       memo: {

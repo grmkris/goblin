@@ -58,7 +58,10 @@ export const guardRegistration = (body: unknown): void => {
   if ('dpop_bound_access_tokens' in body) delete body.dpop_bound_access_tokens
 }
 
-/** `/oauth2/authorize`: the redirect allowed, `offline_access` asked, no DPoP thumbprint; the query is changed in place. */
+/**
+ * `/oauth2/authorize`: the redirect allowed, `offline_access` asked, no DPoP thumbprint; the parameters (a GET's query
+ * or a POST's form) are changed in place.
+ */
 export const guardAuthorization = (query: unknown): void => {
   if (!Predicate.isObject(query)) return
   const redirect = field(query, 'redirect_uri')
@@ -84,9 +87,13 @@ export const withoutDpopProof = (request: Request): Request => {
 /** Whether `path` serves one of the two authorization server documents, at any of the spec's discovery locations. */
 export const isDiscoveryPath = (path: string): boolean => DISCOVERY_PATHS.some((known) => path.includes(known))
 
-/** A discovery document that offers no DPoP; any other answer is returned as it came. */
+/** A discovery document that offers no DPoP; any other answer (an error, a HEAD's empty body) is returned as it came. */
 export const withoutDpopMetadata = async (response: Response): Promise<Response> => {
-  if (response.status !== 200 || !(response.headers.get('content-type') ?? '').includes('application/json'))
+  if (
+    response.status !== 200 ||
+    response.body === null ||
+    !(response.headers.get('content-type') ?? '').includes('application/json')
+  )
     return response
   const document: unknown = await response.json()
   const offered =

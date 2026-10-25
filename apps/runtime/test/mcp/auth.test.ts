@@ -148,6 +148,8 @@ describe('what the MCP authorization spec asks of registration and authorization
     expect(stripped.headers.get('cache-control')).toBe('public, max-age=60')
     const refused = new Response('nope', { status: 404 })
     expect(await withoutDpopMetadata(refused)).toBe(refused)
+    const head = new Response(null, { status: 200, headers: { 'content-type': 'application/json' } })
+    expect(await withoutDpopMetadata(head)).toBe(head)
   })
 })
 

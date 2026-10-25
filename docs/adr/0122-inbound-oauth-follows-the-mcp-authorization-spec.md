@@ -27,10 +27,12 @@ of the spec in six places:
 
 **A client is its metadata document.** `cimd()` (`@better-auth/cimd`, pinned with the rest of Better Auth) resolves a
 `client_id` that is an https URL by fetching, validating (MCP profile) and keeping that document as an `oauthClient`
-row, refetched an hour after at most. The fetch is the Worker's own `fetch`, held to public addresses by the
-`global_fetch_strictly_public` compatibility flag on dev and prod (local keeps its model endpoint on loopback and stays
-off it); the plugin itself refuses non-https ids, special-use hosts and redirects. Discovery says so
-(`client_id_metadata_document_supported: true`). Dynamic registration stays open **until** the clients that matter
+row, refetched an hour after at most. The fetch is the Worker's own `fetch`, within the plugin's bounds: https ids only,
+loopback and other special-use hosts refused by name, no redirects, a 5 KB and 5 s cap and a fetch budget per origin.
+The `global_fetch_strictly_public` compatibility flag, which Cloudflare's own OAuth library requires for metadata
+documents, adds that a fetch of goblin's own hostname goes through Cloudflare's front door like any request from the
+Internet, never straight to an origin; it is not a private-address filter, and what remains is DNS rebinding from the
+edge, which Workers cannot close. Discovery says so (`client_id_metadata_document_supported: true`). Dynamic registration stays open **until** the clients that matter
 (Claude, Claude Code, ChatGPT, Codex, VS Code, Cursor) are seen connecting by document on dev; it is then removed in a
 follow-up ADR. Until then a registration that says no `application_type` is native when a redirect is http on loopback
 (`clientRegistrationDefaultApplicationType: 'infer'`), and its grant types are narrowed to `authorization_code` and
@@ -38,9 +40,9 @@ follow-up ADR. Until then a registration that says no `application_type` is nati
 asked and returns what it registered). `client_credentials` remains goblin's own apps' (ADR 0118), registered
 server-side.
 
-**A redirect URI is `localhost` or https**, at registration and at authorization (`auth/protocol.ts`): `cursor://` and
-every other private-use scheme are refused with `invalid_redirect_uri` / `invalid_request`, never redirected to. A
-metadata document listing one gets no further than a registration would. For http on the loopback names and literals
+**A redirect URI is `localhost` or https**, at registration and at authorization (`auth/protocol.ts`, on a GET's query
+and a POST's form alike): `cursor://` and every other private-use scheme are refused with `invalid_redirect_uri` /
+`invalid_request`, never redirected to. A metadata document listing one gets no further than a registration would. For http on the loopback names and literals
 the port is free (OAuth 2.1 §8.4.2, RFC 8252 §7.3), which Better Auth 1.7.11 does; everything else matches exactly.
 The consent page shows the authorization's redirect host, with a note when it is this computer.
 
