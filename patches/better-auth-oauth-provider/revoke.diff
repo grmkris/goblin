@@ -1,0 +1,5 @@
+--- src/revoke.ts
++++ src/revoke.ts
+@@ -1 +1 @@
+-			if (error.name === "BAD_REQUEST") return null;
++			if (error.status === "BAD_REQUEST") return null;
