@@ -34,8 +34,10 @@ export const noEmDashCopy = defineRule({
     const filename = context.filename.replaceAll('\\', '/')
     if (/(?:^|\/)(?:test|tests)\//u.test(filename) || /\.test\.[cm]?[jt]sx?$/u.test(filename)) return {}
     const check = (node: ESTree.Node, value: string): void => {
-      const copy = node.type === 'JSXText' || node.parent?.type === 'JSXAttribute'
-        ? value.replaceAll(/&(?:mdash|#0*8212|#x0*2014);/giu, '\u2014') : value
+      const copy =
+        node.type === 'JSXText' || node.parent?.type === 'JSXAttribute'
+          ? value.replaceAll(/&(?:mdash|#0*8212|#x0*2014);/giu, '\u2014')
+          : value
       if (!copy.includes('\u2014')) return
       const parent = node.parent
       if (
