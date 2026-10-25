@@ -2,8 +2,9 @@
  * Local browser look at goblin's landing (`/`, signed out) against its real source components, at phone and desktop
  * widths in light and dark: the hero's session playing, waiting on its question, answered by pressing Allow or on its
  * own, and at its end; the page in full; and, under reduced motion, the session already at its question, with Allow
- * still answering it. `/health` and the session check are routed here; no account is made. It checks the way in, that a
- * signed-in session leaves for its channel, and that nothing scrolls sideways, and keeps screenshots.
+ * still answering it. `/health` and the session check are routed here; no account is made. It checks the way in and that
+ * nothing scrolls sideways, and keeps screenshots. Whether a signed-in session leaves for its workspace is Home's
+ * (`routes/index.tsx`, ADR 0089), which this fixture does not draw.
  *
  *   heavy bun apps/web/test/ui-landing.ts [--out <dir>]
  */
@@ -24,8 +25,8 @@ mkdirSync(out, { recursive: true, mode: 0o700 })
 const HEALTH = { ok: true, service: 'goblin', stage: 'dev', signup: 'invite', signIn: [{ method: 'email' }] }
 const errors: string[] = []
 
-/** A page of the fixture with `/health` and Better Auth's session answered: signed out unless `signedIn`. */
-async function open(browser: Browser, origin: string, label: string, context: BrowserContextOptions, signedIn = false) {
+/** A page of the fixture with `/health` and Better Auth's session answered, signed out. */
+async function open(browser: Browser, origin: string, label: string, context: BrowserContextOptions) {
   const page = await browser.newPage(context)
   page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`))
   page.on('response', (response) => {
@@ -37,11 +38,7 @@ async function open(browser: Browser, origin: string, label: string, context: Br
     return route.fulfill({ status: 404 })
   })
   await mockRoute(page, '**/health', (route) => route.fulfill({ json: HEALTH }))
-  await mockRoute(page, '**/api/auth/get-session', (route) =>
-    route.fulfill({
-      json: signedIn ? { session: { id: 's', userId: 'u' }, user: { id: 'u', email: 'owner@example.com' } } : null,
-    }),
-  )
+  await mockRoute(page, '**/api/auth/get-session', (route) => route.fulfill({ json: null }))
   await page.goto(`${origin}landing.html`)
   await page.locator('.hero-session').waitFor()
   return page
@@ -109,13 +106,6 @@ async function still(browser: Browser, origin: string, label: string, context: B
   await page.close()
 }
 
-/** A session the check finds signed in leaves the landing for its channel. */
-async function leavesWhenSignedIn(browser: Browser, origin: string) {
-  const page = await open(browser, origin, 'signed-in', { viewport: { width: 1280, height: 800 } }, true)
-  await page.locator('#channel').waitFor({ timeout: 3000 })
-  await page.close()
-}
-
 const vite = await createServer({ configFile: path.join(import.meta.dirname, 'browser/vite.config.ts') })
 await vite.listen()
 const origin = vite.resolvedUrls?.local[0]
@@ -130,7 +120,6 @@ try {
   await drive(browser, origin, 'desktop-light', { ...desktop, colorScheme: 'light' }, true)
   await still(browser, origin, 'phone-light-reduced', { ...phone, colorScheme: 'light' })
   await still(browser, origin, 'desktop-dark-reduced', { ...desktop, colorScheme: 'dark' })
-  await leavesWhenSignedIn(browser, origin)
   assert.deepEqual(errors, [])
   writeSync(STDOUT, `${JSON.stringify({ ok: true, out })}\n`)
 } finally {
