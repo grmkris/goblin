@@ -1,8 +1,11 @@
 {
   // TypeScript language features run on tsrs, the repository's pinned compiler: the TypeScript 7 extension starts
   // .vscode/tsrs/tsgo, which runs node_modules/.bin/tsrs. Lint is the oxc extension: node_modules' oxlint with
-  // oxlint.config.ts. Effect diagnostics come from `bun run typecheck` (docs/development.md "Editors").
+  // oxlint.config.ts, and its type-aware rules run on the pinned tsrs-lint that `bun tools/tsrs-lint.ts` caches
+  // (the tag below equals the pin in tools/tsrs-lint.ts). Effect diagnostics come from `bun run typecheck`
+  // (docs/development.md "Editors").
   "js/ts.experimental.useTsgo": true,
   "js/ts.tsdk.path": "./.vscode/tsrs",
-  "oxc.enable.oxlint": true
+  "oxc.enable.oxlint": true,
+  "oxc.path.tsgolint": "${userHome}/.cache/tsrs-lint/lint-pr624-0acc433-regions.1/tsrs-lint"
 }

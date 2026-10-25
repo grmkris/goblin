@@ -52,8 +52,9 @@ export default defineConfig({
     // Vendored skills (from .agents/skills/sources.json) and harness link and state directories.
     ...agentIgnorePatterns(),
   ],
-  // Type-aware rules run through oxlint-tsgolint, pinned with TypeScript in package.json. A bare `oxlint`
-  // therefore matches CI. `--type-check` is never used: it picks the wrong tsconfig in workspaces with several.
+  // Type-aware rules run through tsrs-lint, the pinned release tools/tsrs-lint.ts fetches and names in
+  // OXLINT_TSGOLINT_PATH (ADR 0123): run oxlint as `bun run lint`, which sets it; a bare `oxlint` has no backend.
+  // `--type-check` is never used: it picks the wrong tsconfig in workspaces with several.
   options: { typeAware: true, reportUnusedDisableDirectives: 'error' },
   jsPlugins: [
     './tools/oxlint/boundaries.ts',
@@ -151,7 +152,8 @@ export default defineConfig({
     // - scripts/stage.ts builds and scrubs the child environment of every stage run (ADR 0001; decision F4 in
     //   docs/agents/lint-quality.md).
     {
-      files: ['**/vitest*.config.ts', '**/vite.config.ts', 'scripts/stage.ts'],
+      // tools/tsrs-lint.ts passes this process's environment on to oxlint, plus the lint backend (ADR 0123).
+      files: ['**/vitest*.config.ts', '**/vite.config.ts', 'scripts/stage.ts', 'tools/tsrs-lint.ts'],
       rules: { 'goblin/no-process-env': 'off' },
     },
     // shadcn's design-system rules on the web views and the shadcn package: theme tokens, no raw colours, inline

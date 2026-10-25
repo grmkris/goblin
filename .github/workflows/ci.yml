@@ -28,6 +28,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun install --frozen-lockfile
         working-directory: scripts/fixtures/mcp-app
+      # The type-aware lint backend, a pinned release binary verified by checksum (tools/tsrs-lint.ts, ADR 0123).
+      - run: bun tools/tsrs-lint.ts
       - run: bun run check
 
   # Every green push to dev deploys goblin dev. The stage's secrets live in the `dev` environment,
