@@ -24,9 +24,9 @@ const TOOLS: readonly Tool[] = [
     policy: 'run',
   },
   {
-    name: 'mygram_message_send',
+    name: 'myinbox_message_send',
     title: 'Send a message',
-    about: "Send a message to the person's Telegram.",
+    about: 'Send mail from one of your addresses.',
     policy: 'ask',
   },
   {
