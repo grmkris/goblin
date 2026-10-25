@@ -44,7 +44,8 @@
     "tools": {
       "entry": ["*.ts!", "oxlint/*.ts!"],
       "project": ["*.ts!", "oxlint/**/*.ts!", "test/**/*.ts"],
-      // Run as binaries by path (tools/effect.ts): effect-tsrs's native executable, and effect-tsgo for the fallback.
+      // effect-tsrs runs as its native executable, found by path (tools/effect.ts). Nothing here runs effect-tsgo: it is
+      // the language service editors read the tsconfig plugin block through (ADR 0121).
       "ignoreDependencies": ["@effect/tsgo", "@yielded/effect-tsrs"],
     },
     "apps/runtime": {

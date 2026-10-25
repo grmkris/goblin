@@ -87,12 +87,12 @@ describe('effect-tsrs output', () => {
     ])
   })
 
-  test('it does not count files without the plugin; effect-tsgo does, and any fails the check', () => {
-    const tsrs = decodeEffect({ diagnostics: [], typescriptDiagnostics: [], summary: { filesChecked: 3 } })
-    expect(uncheckedFiles('tools/tsconfig.json', tsrs)).toBeUndefined()
+  test('files counted without the plugin fail the check; output without a count does not', () => {
+    const uncounted = decodeEffect({ diagnostics: [], typescriptDiagnostics: [], summary: { filesChecked: 3 } })
+    expect(uncheckedFiles('tools/tsconfig.json', uncounted)).toBeUndefined()
     expect(typescriptErrors(decodeEffect({ diagnostics: [], summary }))).toEqual([])
-    const tsgo = decodeEffect({ diagnostics: [], summary: { filesChecked: 3, filesWithoutPlugin: 2 } })
-    expect(uncheckedFiles('tools/tsconfig.json', tsgo)).toContain('2 files went unchecked')
+    const counted = decodeEffect({ diagnostics: [], summary: { filesChecked: 3, filesWithoutPlugin: 2 } })
+    expect(uncheckedFiles('tools/tsconfig.json', counted)).toContain('2 files went unchecked')
   })
 })
 

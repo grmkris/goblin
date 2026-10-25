@@ -63,8 +63,8 @@ heavy bun run check         # everything, including graph, Knip, duplication, wo
 
 Run expensive commands through `heavy`. Exit 75 means another heavy job is running: retry, do not treat it as a
 failure. Never pipe `heavy`. Focused commands: `bun run test:unit`, `bun run test:integration`, `bun run typecheck`
-(TypeScript and Effect diagnostics in one effect-tsrs pass per project; `EFFECT_CHECKER=tsgo` runs tsc and effect-tsgo
-instead, ADR 0120), `bun run lint:gate`, `bun run check:files <paths>`.
+(TypeScript and Effect diagnostics in one effect-tsrs pass per project, ADRs 0120 and 0121), `bun run lint:gate`,
+`bun run check:files <paths>`.
 
 If a check fails, look at `git status` first. Another agent's half-finished file failing is not your change failing.
 

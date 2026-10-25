@@ -7,7 +7,7 @@
  */
 import { Schema } from 'effect'
 import path from 'node:path'
-import { checker, effectProjects } from './effect.ts'
+import { effectProjects } from './effect.ts'
 import type { Project } from './effect.ts'
 import { pass } from './pass.ts'
 import { fromEffect, fromKnip, fromOxlint, safeFixCodes } from './report.ts'
@@ -100,18 +100,15 @@ export const oxlintFindings = async (config: string): Promise<Collected> => {
 // ---------------------------------------------------------------------------------------------------------------------
 // Effect diagnostics
 
-/**
- * Projects checked at the same time. Each is a full type check: effect-tsrs holds at most about 0.6 GB on one thread,
- * effect-tsgo about 2 GB.
- */
-const EFFECT_CONCURRENCY = { tsrs: 4, tsgo: 1 } as const
+/** Projects checked at the same time. Each is a full type check: effect-tsrs holds at most about 0.6 GB on one thread. */
+const EFFECT_CONCURRENCY = 4
 
 /**
  * One project's Effect findings. effect-tsrs reports the project's TypeScript errors in the same run; a project with any
- * fails the collection, since its Effect diagnostics are incomplete. effect-tsgo reports none, and tsc is not run here.
+ * fails the collection, since its Effect diagnostics are incomplete.
  */
 const effectProject = async ({ dir, tsconfig }: Project): Promise<Collected> => {
-  const result = await pass(path.join(dir, tsconfig), checker(), false)
+  const result = await pass(path.join(dir, tsconfig))
   const typescript =
     result.typescript.length === 0
       ? []
@@ -134,7 +131,7 @@ const mapLimit = async <A, B>(items: readonly A[], limit: number, fn: (item: A) 
 }
 
 export const effectFindings = async (): Promise<Collected> => {
-  const results = await mapLimit(effectProjects(), EFFECT_CONCURRENCY[checker()], effectProject)
+  const results = await mapLimit(effectProjects(), EFFECT_CONCURRENCY, effectProject)
   const seen = new Map<string, Finding>()
   for (const finding of results.flatMap((result) => result.findings)) {
     seen.set(`${finding.file}:${finding.line}:${finding.rule}`, finding)

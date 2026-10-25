@@ -1,10 +1,8 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { ConfigProvider, Effect } from 'effect'
 import { afterEach, describe, expect, test } from 'vitest'
 import {
-  CHECKER,
   GLOBAL_API_DIAGNOSTICS,
   PLUGIN,
   effectArgs,
@@ -118,25 +116,10 @@ describe('the Effect plugin block through extends', () => {
   })
 })
 
-const parse = (env: Readonly<Record<string, string>>) => Effect.runSync(CHECKER.parse(ConfigProvider.fromUnknown(env)))
-
 describe('the checker', () => {
-  test('effect-tsrs by default, effect-tsgo with EFFECT_CHECKER=tsgo, and nothing else', () => {
-    expect(parse({})).toBe('tsrs')
-    expect(parse({ EFFECT_CHECKER: 'tsgo' })).toBe('tsgo')
-    expect(() => parse({ EFFECT_CHECKER: 'tsc' })).toThrow()
-  })
-
-  test('effect-tsrs runs as its native binary; effect-tsgo through its launcher', () => {
-    const [tsrs, ...tsrsArgs] = effectArgs('tools/tsconfig.json', 'tsrs')
+  test('effect-tsrs runs as its native binary', () => {
+    const [tsrs, ...tsrsArgs] = effectArgs('tools/tsconfig.json')
     expect(tsrs).toMatch(/@yielded\/effect-tsrs-[a-z0-9]+-[a-z0-9]+\/bin\/effect-tsrs$/u)
     expect(tsrsArgs).toEqual(['diagnostics', '-p', path.join(repoRoot, 'tools/tsconfig.json'), '--format', 'json'])
-    expect(effectArgs('tools/tsconfig.json', 'tsgo').slice(1)).toEqual([
-      'diagnostics',
-      '--project',
-      path.join(repoRoot, 'tools/tsconfig.json'),
-      '--format',
-      'json',
-    ])
   })
 })

@@ -1,9 +1,9 @@
 /**
- * The pure half of `bun run typecheck`: which tsconfigs each workspace checks, which checker runs them, and the tsconfig
- * reading the checks need. tools/pass.ts runs one project's pass; tools/report.ts turns its output into findings.
- * Node APIs only: Vitest runs under Node.
+ * The pure half of `bun run typecheck`: which tsconfigs each workspace checks, the effect-tsrs command that checks them,
+ * and the tsconfig reading the checks need. tools/pass.ts runs one project's pass; tools/report.ts turns its output into
+ * findings. Node APIs only: Vitest runs under Node.
  */
-import { Config, Effect, Schema } from 'effect'
+import { Schema } from 'effect'
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
@@ -13,22 +13,8 @@ import { UNUSED_DIRECTIVE } from './report.ts'
 import type { EffectOutput } from './report.ts'
 import { repoRoot } from './run.ts'
 
-/** The plugin name effect-tsrs and `@effect/tsgo` read their options under, in `compilerOptions.plugins`. */
+/** The plugin name effect-tsrs and editors' `@effect/tsgo` read their options under, in `compilerOptions.plugins`. */
 export const PLUGIN = '@effect/language-service'
-
-/**
- * Which checker runs a project's pass (ADR 0120): `tsrs`, the default, is effect-tsrs, one run that reports the
- * TypeScript and the Effect diagnostics; `tsgo` is the pair it replaced, tsc and effect-tsgo, kept as a fallback while
- * effect-tsrs is new. Read from `EFFECT_CHECKER`; any other value fails the run.
- */
-export const CHECKER = Config.Literals(['tsrs', 'tsgo'], 'EFFECT_CHECKER').pipe(Config.withDefault('tsrs' as const))
-export type Checker = 'tsrs' | 'tsgo'
-
-/** The checker this run uses. */
-export const checker = (): Checker => Effect.runSync(CHECKER)
-
-/** The effect-tsgo binary, a dependency of this workspace. */
-export const effectTsgo = path.join(import.meta.dirname, 'node_modules/.bin/effect-tsgo')
 
 /**
  * The effect-tsrs binary: the static executable of `@yielded/effect-tsrs`'s package for this platform, found as its Node
@@ -40,12 +26,14 @@ export const effectTsrs = (): string => {
 }
 
 /** The command that prints one project's diagnostics as JSON (`decodeEffect` in report.ts reads it). */
-export const effectArgs = (tsconfig: string, using: Checker): string[] => {
-  const project = path.resolve(repoRoot, tsconfig)
-  return using === 'tsrs'
-    ? [effectTsrs(), 'diagnostics', '-p', project, '--format', 'json']
-    : [effectTsgo, 'diagnostics', '--project', project, '--format', 'json']
-}
+export const effectArgs = (tsconfig: string): string[] => [
+  effectTsrs(),
+  'diagnostics',
+  '-p',
+  path.resolve(repoRoot, tsconfig),
+  '--format',
+  'json',
+]
 
 /** Workspaces without a typecheck: vendored code the gates do not cover. */
 export const OUT_OF_SCOPE = new Set<string>()
@@ -160,8 +148,8 @@ export const pluginBlock = (tsconfig: string): PluginEntry | undefined =>
 
 /**
  * Why a project's Effect diagnostics would be incomplete: its tsconfig neither sets nor inherits the plugin block, so
- * the checker would run without goblin's severities. Undefined when it has the block. effect-tsrs, unlike effect-tsgo,
- * does not count the files it checks without the plugin, so this is read from the tsconfig before the run.
+ * the checker would run without goblin's severities. Undefined when it has the block. effect-tsrs does not count the
+ * files it checks without the plugin, so this is read from the tsconfig before the run.
  */
 export const missingPlugin = (tsconfig: string): string | undefined =>
   pluginBlock(tsconfig) === undefined
@@ -198,8 +186,8 @@ export const severities = (block: PluginEntry | undefined): Readonly<Record<stri
   decodeSeverities(block?.['diagnosticSeverity'])
 
 /**
- * effect-tsrs and effect-tsgo also read directive-shaped text inside strings (a lint rule's test cases), and report it
- * as a directive that changes nothing. Only a directive inside a real comment is kept. Ported from myapps (`grmkris/myapps`
+ * effect-tsrs also reads directive-shaped text inside strings (a lint rule's test cases), as effect-tsgo did, and
+ * reports it as a directive that changes nothing. Only a directive inside a real comment is kept. Ported from myapps (`grmkris/myapps`
  * `27416c98`, `tools/effect.ts`). A source that cannot be read or parsed throws: the gate fails instead of guessing.
  */
 export const verifiedEffectOutput = (

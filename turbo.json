@@ -5,7 +5,6 @@
     "typecheck": {
       "dependsOn": ["^typecheck"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tools/*.ts", "$TURBO_ROOT$/tools/package.json"],
-      "env": ["EFFECT_CHECKER"],
       "outputs": []
     },
     "test": { "dependsOn": ["^typecheck"], "outputs": [] },
