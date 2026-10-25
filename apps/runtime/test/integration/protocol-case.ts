@@ -55,7 +55,10 @@ const mcpWith = (base: string, headers: Record<string, string>) =>
  * issuer with a path has (RFC 8414 §3.1 path-inserted; OpenID path-appended).
  */
 async function metadataCase(base: string) {
-  for (const path of ['/.well-known/oauth-authorization-server/api/auth', '/api/auth/.well-known/openid-configuration']) {
+  for (const path of [
+    '/.well-known/oauth-authorization-server/api/auth',
+    '/api/auth/.well-known/openid-configuration',
+  ]) {
     const response = await fetch(`${base}${path}`)
     expect(response.status, path).toBe(200)
     const document = Schema.decodeUnknownSync(Metadata)(await response.json())
