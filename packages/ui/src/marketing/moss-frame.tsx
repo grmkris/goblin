@@ -3,10 +3,9 @@
 // where the product's characteristic moment plays. On a phone the copy comes first and the panel runs full width under
 // it.
 //
-// With `art`, a drawing is etched into the field: on a desktop the copy sits over its open sky with the panel under
-// the copy, beside the drawing's subject, and the panel rises out of the field onto the page; on a phone and a tablet
-// the drawing is a band between the copy and the panel. The art fills its box, which is a size container
-// (`marketing.css`), so a drawing can cover it with container units.
+// With `backdrop="page"` the page draws the field and a scene behind the hero (and behind everything after it): the
+// hero paints nothing of its own, and leaves the scene room. On a desktop the copy and the panel keep to the right seven
+// columns, beside the scene's subject; on a phone and a tablet a stretch between the copy and the panel stays open.
 import { type ReactNode, useId } from 'react'
 
 export interface MossFrameProps {
@@ -20,8 +19,8 @@ export interface MossFrameProps {
   readonly actions: ReactNode
   /** A small line under the actions: the price, a fact. */
   readonly note?: ReactNode
-  /** A drawing etched into the field, decoration only (it is hidden from assistive tech). */
-  readonly art?: ReactNode
+  /** `own` (the default) paints the moss field; `page` leaves it, and a scene, to the page behind the hero. */
+  readonly backdrop?: 'own' | 'page'
   /** The panel's name, in its top bar ("# Islands", "Payments"); assistive tech calls the panel by it too. */
   readonly panelLabel: string
   /** At the end of the panel's top bar: a status. */
@@ -38,7 +37,7 @@ export function MossFrame({
   lede,
   actions,
   note,
-  art,
+  backdrop = 'own',
   panelLabel,
   panelStatus,
   panel,
@@ -46,13 +45,7 @@ export function MossFrame({
 }: MossFrameProps) {
   const titleId = useId()
   return (
-    <section
-      id={id}
-      aria-labelledby={titleId}
-      data-slot="moss-frame"
-      data-art={art === undefined ? undefined : ''}
-      className="moss-frame"
-    >
+    <section id={id} aria-labelledby={titleId} data-slot="moss-frame" data-backdrop={backdrop} className="moss-frame">
       <div className="site-width moss-frame-grid">
         <div className="moss-frame-copy">
           <h1 id={titleId} className="site-display">
@@ -62,11 +55,6 @@ export function MossFrame({
           <div className="moss-frame-actions">{actions}</div>
           {note === undefined ? null : <p className="site-small moss-frame-note">{note}</p>}
         </div>
-        {art === undefined ? null : (
-          <div aria-hidden className="moss-frame-art">
-            {art}
-          </div>
-        )}
         <div role="region" aria-label={panelLabel} className="moss-frame-panel">
           <div className="moss-frame-panel-bar">
             <p className="moss-frame-panel-label">{panelLabel}</p>

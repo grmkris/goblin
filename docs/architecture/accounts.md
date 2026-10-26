@@ -149,13 +149,16 @@ sidebar's goblin mark links to `/`, which the cached session turns into the owne
 deleting the account `assign('/')`, so the server's cookie check sends each to their chat or to the landing.
 
 The landing is built from `@goblin/ui`'s marketing parts (`src/marketing`: `SiteBar`, `MossFrame`, `Section`,
-`SiteFooter`) and reads as a storybook: its moss field is etched with goblin reading on its doorstep at night (the
-`MossFrame`'s `art`), each chapter after it opens with a small drawing over its heading (the `Section`'s `art`), and the
-close is the same field at dawn. The drawings are engravings generated as pure ink on a plain ground and kept as grey
-images of how much ink each pixel holds (`scripts/landing-art.ts`, committed under `assets/landing/etching-*`), which
-`landing.css` uses as luminance masks over a token: lichen on moss, the page's moss in the chapters, in light and dark
-alike, with the lantern's and the sunrise's light in `--presence-warm`. A browser without luminance masks shows no
-drawings. The chapter on permissions shows a connection's tools in the app's own rows, with switches that work on the
+`SiteFooter`) and reads as a storybook told over one night. The whole page is the moss field, with the night drawn
+behind all of it (`World` in `landing.tsx`): goblin reading on its doorstep by its lantern, fixed while the page moves
+over it. The hero leaves it room (`MossFrame`'s `backdrop="page"`), each chapter opens with a small drawing over its
+heading (the `Section`'s `art`), and two scroll timelines tell the time: the night dims as the hero leaves, and turns to
+dawn, the sky warming, as the close comes in. Fireflies drift, the lantern flickers and a few stars twinkle; under
+reduced motion all of it is still, and where scroll timelines are missing the night stays, dimmed. The drawings are
+engravings generated as pure ink on a plain ground and kept as grey images of how much ink each pixel holds
+(`scripts/landing-art.ts`, committed under `assets/landing/etching-*`), which `landing.css` uses as luminance masks over
+a token, lichen on moss in light and dark alike, with the lantern's and the sunrise's light in `--presence-warm`. A
+browser without luminance masks shows no drawings. The chapter on permissions shows a connection's tools in the app's own rows, with switches that work on the
 page only (`tool-card.tsx`), and the questions answer what a visitor asks before signing up. Its hero plays one scripted
 session in goblin's panel (`hero-session.tsx`): the entrances are CSS, timed
 from the first paint, and the script follows the same animation clock for the presence orb and owns the answer to its

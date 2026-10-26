@@ -1,21 +1,31 @@
 /*
  * goblin's landing at `/` (components/landing, routes/index.tsx), around the shared marketing parts in @goblin/ui
- * (`marketing.css`). The hero panel plays one short session, timed here: each step enters with a 6px rise once, from
- * the first paint, and the script follows the same clock (hero-session.tsx keeps its STEPS in step with `--at`).
- * Nothing else on the page moves by itself. Screenshots carry a 1px outline in pure black or white at 10%.
+ * (`marketing.css`). The whole page is the moss field, with one night drawn behind all of it (the world, below): the
+ * night stays put while the page moves over it, dims behind the chapters, and turns to dawn as the close comes in.
+ * The hero panel plays one short session, timed here: each step enters with a 6px rise once, from the first paint, and
+ * the script follows the same clock (hero-session.tsx keeps its STEPS in step with `--at`). Screenshots carry a 1px
+ * outline in white at 12%.
  *
  * The drawings are etchings (scripts/landing-art.ts): grey images of how much ink each pixel holds, used as luminance
- * masks over a token, so the moss fields carry lichen lines and the chapters the page's moss, in light and dark alike.
- * The only warm colour is the light in them (`--presence-warm`, the colour goblin waits for you in). A browser without
- * luminance masks shows no drawings, never a filled box.
+ * masks over a token, so they are lichen on moss in light and dark alike. The only warm colour is the light in them
+ * (`--presence-warm`, the colour goblin waits for you in). A browser without luminance masks shows no drawings, never a
+ * filled box.
  */
 .landing-root {
   --etch-field: oklch(0.93 0.05 118 / 0.42);
-  --etch-page: var(--shell);
+  --etch-page: oklch(0.93 0.05 118 / 0.78);
+  /* What sits on the field: words in the shell's colours, lines and links in its own. */
+  --field-text: color-mix(in oklab, var(--shell-foreground) 84%, var(--shell));
+  --field-muted: var(--shell-muted);
+  --field-line: var(--shell-border);
+  --field-link: var(--shell-ring);
   display: block;
+  isolation: isolate;
   min-height: 100dvh;
-  background: var(--background);
+  background: var(--shell);
+  color: var(--shell-foreground);
   -webkit-font-smoothing: antialiased;
+  timeline-scope: --landing-hero, --landing-close;
 }
 .dark .landing-root {
   --etch-field: oklch(0.93 0.05 118 / 0.3);
@@ -57,20 +67,130 @@
 }
 
 /*
- * A moss field's scene covers its box (a size container) from the bottom left, the drawing's own proportions kept,
- * zoomed where the box is a narrow band so goblin stays the size of a figure. The light sits where the drawing has it.
+ * The world: the field's night, fixed behind the whole page at the large viewport's height (so a phone's bars coming
+ * and going never resize it), a size container its scenes cover. The night layer dims as the hero leaves; the dawn
+ * layer, the warmth in the sky and the night's fading out follow the close coming in. Where scroll timelines are
+ * missing the night stays, dimmed, and dawn never comes.
+ */
+.landing-world {
+  position: fixed;
+  z-index: -1;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100lvh;
+  overflow: clip;
+  container-type: size;
+  pointer-events: none;
+}
+.landing-world > *,
+.landing-world-fade {
+  position: absolute;
+  inset: 0;
+}
+.landing-world-night {
+  opacity: 0.6;
+}
+.landing-world-dawn,
+.landing-world-sky {
+  opacity: 0;
+}
+.landing-world-sky {
+  background: radial-gradient(
+    110% 70% at 74% 78%,
+    color-mix(in oklch, var(--presence-warm) 26%, transparent),
+    transparent 62%
+  );
+}
+.landing-root .moss-frame {
+  view-timeline: --landing-hero block;
+}
+.landing-close {
+  view-timeline: --landing-close block;
+}
+@supports (animation-timeline: view()) {
+  .landing-world-night {
+    animation: landing-dim linear both;
+    animation-timeline: --landing-hero;
+    animation-range: exit 0% exit 100%;
+  }
+  .landing-world-fade {
+    animation: landing-out linear both;
+    animation-timeline: --landing-close;
+    animation-range: entry 0% entry 100%;
+  }
+  .landing-world-dawn,
+  .landing-world-sky {
+    animation: landing-in linear both;
+    animation-timeline: --landing-close;
+    animation-range: entry 0% entry 100%;
+  }
+}
+@keyframes landing-dim {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.42;
+  }
+}
+@keyframes landing-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes landing-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * A scene covers the world from the bottom left, the drawing's own proportions kept. Where the world is taller than
+ * wide (a phone held upright) it is drawn at two and a half widths instead, shifted so goblin stands near the middle,
+ * with its sky fading into the field's. Its light, its fireflies and its stars sit where the drawing has them.
  */
 .landing-scene {
   position: absolute;
   bottom: 0;
   left: 0;
-  width: calc(max(100cqw, 100cqh * var(--scene-ratio)) * var(--scene-zoom, 1));
+  width: max(100cqw, 100cqh * var(--scene-ratio));
   aspect-ratio: var(--scene-ratio);
+}
+@container (aspect-ratio < 1) {
+  .landing-scene {
+    left: -32cqw;
+    width: 250cqw;
+    mask-image: linear-gradient(transparent, black 26%);
+  }
 }
 .landing-scene > .landing-etching {
   position: absolute;
   inset: 0;
   background: var(--etch-field);
+}
+.landing-scene[data-scene='night'] {
+  --scene-ratio: 2000 / 1129;
+}
+.landing-scene[data-scene='night'] > .landing-etching {
+  mask-image: url('./assets/landing/etching-night-1400.jpg');
+}
+.landing-scene[data-scene='dawn'] {
+  --scene-ratio: 2000 / 1129;
+}
+.landing-scene[data-scene='dawn'] > .landing-etching {
+  mask-image: url('./assets/landing/etching-dawn-1400.jpg');
+}
+@media (min-width: 64rem) {
+  .landing-scene[data-scene='night'] > .landing-etching {
+    mask-image: url('./assets/landing/etching-night-2000.jpg');
+  }
+  .landing-scene[data-scene='dawn'] > .landing-etching {
+    mask-image: url('./assets/landing/etching-dawn-2000.jpg');
+  }
 }
 .landing-glow {
   position: absolute;
@@ -82,51 +202,122 @@
   border-radius: var(--radius-pill);
   background: radial-gradient(
     closest-side,
-    color-mix(in oklch, var(--presence-warm) 46%, transparent),
-    color-mix(in oklch, var(--presence-warm) 14%, transparent) 42%,
+    color-mix(in oklch, var(--presence-warm) 52%, transparent),
+    color-mix(in oklch, var(--presence-warm) 16%, transparent) 42%,
     transparent
   );
-  mix-blend-mode: screen;
 }
-.landing-scene[data-scene='night'] {
-  --scene-ratio: 2000 / 1129;
+.landing-glow[data-light='lantern'] {
   --glow-x: 40.07%;
   --glow-y: 61.2%;
   --glow-size: 15%;
 }
-.landing-scene[data-scene='night'] > .landing-etching {
-  mask-image: url('./assets/landing/etching-night-1400.jpg');
-}
-.landing-scene[data-scene='dawn'] {
-  --scene-ratio: 2000 / 847;
+.landing-glow[data-light='sun'] {
   --glow-x: 74.5%;
-  --glow-y: 63.2%;
-  --glow-size: 34%;
+  --glow-y: 72.4%;
+  --glow-size: 38%;
 }
-.landing-scene[data-scene='dawn'] > .landing-etching {
-  mask-image: url('./assets/landing/etching-dawn-1400.jpg');
+.landing-firefly {
+  position: absolute;
+  top: var(--y);
+  left: var(--x);
+  width: 0.3125rem;
+  aspect-ratio: 1;
+  border-radius: var(--radius-pill);
+  background: oklch(0.96 0.09 100);
+  box-shadow:
+    0 0 0.375rem 0.125rem color-mix(in oklch, var(--presence-warm) 70%, transparent),
+    0 0 1.25rem 0.375rem color-mix(in oklch, var(--presence-warm) 22%, transparent);
+  opacity: 0.7;
 }
-@media (max-width: 63.99rem) {
-  .moss-frame-art > .landing-scene {
-    --scene-zoom: 1.55;
+.landing-star {
+  position: absolute;
+  top: var(--y);
+  left: var(--x);
+  width: 0.1875rem;
+  aspect-ratio: 1;
+  border-radius: var(--radius-pill);
+  background: oklch(0.96 0.04 110);
+  box-shadow: 0 0 0.375rem oklch(0.96 0.04 110 / 0.6);
+  opacity: 0.55;
+}
+
+/*
+ * The night's own life, for people who have not asked for less motion: the lantern flickers, fireflies drift and blink
+ * over the grass, and a few stars twinkle. Each is small, and none keeps one rhythm long, so nothing large pulses.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .landing-glow[data-light='lantern'] {
+    animation: landing-flicker 4.7s linear infinite;
+  }
+  .landing-firefly {
+    animation:
+      landing-drift var(--drift) var(--ease-in-out) var(--delay) infinite alternate,
+      landing-blink var(--blink) ease-in-out var(--delay) infinite;
+  }
+  .landing-star {
+    animation: landing-twinkle var(--blink) ease-in-out var(--delay) infinite;
   }
 }
-@media (min-width: 64rem) {
-  /*
-   * Beside the copy the night spans the field's width from its top, so goblin sits by the words above the fold, and its
-   * grass fades into the field under the panel.
-   */
-  .moss-frame-art > .landing-scene {
-    top: 0;
-    bottom: auto;
-    width: 100cqw;
-    mask-image: linear-gradient(black 86%, transparent);
+@keyframes landing-flicker {
+  0%,
+  100% {
+    opacity: 1;
   }
-  .landing-scene[data-scene='night'] > .landing-etching {
-    mask-image: url('./assets/landing/etching-night-2000.jpg');
+  8% {
+    opacity: 0.8;
   }
-  .landing-scene[data-scene='dawn'] > .landing-etching {
-    mask-image: url('./assets/landing/etching-dawn-2000.jpg');
+  13% {
+    opacity: 0.96;
+  }
+  31% {
+    opacity: 0.86;
+  }
+  44% {
+    opacity: 1;
+  }
+  58% {
+    opacity: 0.76;
+  }
+  64% {
+    opacity: 0.94;
+  }
+  83% {
+    opacity: 0.85;
+  }
+}
+@keyframes landing-drift {
+  0% {
+    translate: 0 0;
+  }
+  50% {
+    translate: var(--dx) calc(var(--dy) * -1);
+  }
+  100% {
+    translate: calc(var(--dx) * -0.6) var(--dy);
+  }
+}
+@keyframes landing-blink {
+  0%,
+  100% {
+    opacity: 0.1;
+  }
+  38% {
+    opacity: 1;
+  }
+  62% {
+    opacity: 0.85;
+  }
+}
+@keyframes landing-twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+    scale: 0.8;
+  }
+  50% {
+    opacity: 0.95;
+    scale: 1;
   }
 }
 
@@ -464,15 +655,12 @@
   width: 100%;
   height: auto;
   border-radius: 1rem;
-  outline: 1px solid oklch(0 0 0 / 0.1);
+  outline: 1px solid oklch(1 0 none / 0.12);
   outline-offset: -1px;
-  box-shadow: var(--shadow-2);
-}
-.dark .landing-shot img {
-  outline-color: oklch(1 0 0 / 0.1);
+  box-shadow: var(--shadow-3);
 }
 .landing-shot figcaption {
-  color: var(--muted-foreground);
+  color: var(--field-muted);
   font-size: var(--text-13);
   text-wrap: pretty;
 }
@@ -483,14 +671,14 @@
   margin: 0;
 }
 .landing-points dt {
-  color: var(--foreground);
+  color: var(--shell-foreground);
   font-weight: 600;
 }
 .landing-points dd {
   margin: 0;
 }
 .landing-link {
-  color: var(--moss);
+  color: var(--field-link);
   font-weight: 500;
   text-decoration: underline;
   text-decoration-thickness: from-font;
@@ -498,7 +686,7 @@
 }
 .landing-link:focus-visible {
   border-radius: 0.25rem;
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--shell-ring);
   outline-offset: 2px;
 }
 
@@ -515,14 +703,14 @@
   grid-template-columns: minmax(0, 8.5rem) minmax(0, 1fr);
   gap: 1rem;
   padding-block: 0.5rem;
-  border-block-start: 1px solid var(--border);
+  border-block-start: 1px solid var(--field-line);
 }
 .landing-shelf dt {
-  color: var(--muted-foreground);
+  color: var(--field-muted);
 }
 .landing-shelf dd {
   margin: 0;
-  color: var(--foreground);
+  color: var(--shell-foreground);
   text-wrap: pretty;
 }
 
@@ -610,6 +798,7 @@
   padding: 0 1.25rem 0.375rem;
   border-radius: 1rem;
   background: var(--card);
+  color: var(--card-foreground);
   box-shadow:
     0 0 0 1px var(--hairline),
     var(--shadow-2);
@@ -663,7 +852,7 @@
   margin-inline-start: auto;
 }
 .landing-tools figcaption {
-  color: var(--muted-foreground);
+  color: var(--field-muted);
   font-size: var(--text-13);
   text-wrap: pretty;
 }
@@ -675,10 +864,10 @@
 .landing-faq {
   display: flex;
   flex-direction: column;
-  border-block-start: 1px solid var(--border);
+  border-block-start: 1px solid var(--field-line);
 }
 .landing-faq details {
-  border-block-end: 1px solid var(--border);
+  border-block-end: 1px solid var(--field-line);
 }
 .landing-faq summary {
   display: flex;
@@ -687,7 +876,7 @@
   gap: 1.5rem;
   min-height: 3.5rem;
   padding-block: 0.75rem;
-  color: var(--foreground);
+  color: var(--shell-foreground);
   font-size: 1.0625rem;
   font-weight: 560;
   letter-spacing: -0.01em;
@@ -704,8 +893,8 @@
   flex: none;
   width: 0.5rem;
   height: 0.5rem;
-  border-block-end: 1.5px solid var(--muted-foreground);
-  border-inline-end: 1.5px solid var(--muted-foreground);
+  border-block-end: 1.5px solid var(--field-muted);
+  border-inline-end: 1.5px solid var(--field-muted);
   rotate: 45deg;
   translate: 0 -0.125rem;
 }
@@ -722,42 +911,25 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .landing-faq summary:hover {
-    color: var(--moss);
+    color: var(--field-link);
   }
 }
 .landing-faq summary:focus-visible {
   border-radius: 0.375rem;
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--shell-ring);
   outline-offset: 2px;
 }
 .landing-faq details > p {
   max-width: 60ch;
   margin: 0;
   padding-block-end: 1.125rem;
-  color: color-mix(in oklab, var(--foreground) 78%, var(--background));
+  color: var(--field-text);
   font-size: 1rem;
   line-height: 1.55;
   text-wrap: pretty;
 }
 
-/*
- * The close: the moss field at dawn, etched like the hero, with the line and the way in over its sky in the hero's
- * columns, and the landscape under them.
- */
-.landing-close {
-  position: relative;
-  isolation: isolate;
-  overflow: clip;
-  background: var(--shell);
-  color: var(--shell-foreground);
-}
-.landing-close-art {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  container-type: size;
-  pointer-events: none;
-}
+/* The close: the line and the way in over dawn's sky in the hero's columns, with the landscape under them. */
 .landing-close-row {
   display: flex;
   flex-direction: column;
@@ -778,4 +950,29 @@
 }
 .landing-close-row > h2 {
   max-width: 16ch;
+}
+
+/* The shared sections and foot, on the field: the shell's words and lines, the foot a band of the rail's darker moss. */
+.landing-root .site-section-text {
+  color: var(--field-text);
+}
+.landing-root .site-footer {
+  border-block-start-color: var(--field-line);
+  background: var(--shell-rail);
+  color: var(--shell-foreground);
+}
+.landing-root :is(.site-footer-note, .site-footer-link) {
+  color: var(--field-muted);
+}
+@media (hover: hover) and (pointer: fine) {
+  .landing-root .site-footer-link:hover {
+    color: var(--shell-foreground);
+  }
+}
+.landing-root .site-footer-link:focus-visible {
+  outline-color: var(--shell-ring);
+}
+.landing-root .site-footer .site-brand-tile {
+  background: var(--shell-active);
+  color: var(--shell-active-foreground);
 }
