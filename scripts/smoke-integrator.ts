@@ -232,16 +232,10 @@ export async function integratorChecks(dev: DevClient): Promise<IntegratorReport
       state,
     })
     if (installed !== '') throw new Error(`install_${installed.replaceAll(' ', '_')}`)
-    const declined = await dev.send(`/api/install/${clientId}/decline`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ state, returnUrl: RETURN_URL }),
-    })
-    if (declined.status !== 200) throw new Error(`decline_refused: ${declined.status}`)
-    const decline = redirectMismatch(string(object(await declined.json())['redirect']), {
-      error: 'access_denied',
-      state,
-    })
+    const declined = await dev.person((api) =>
+      api.install.decline({ params: { clientId }, payload: { state, returnUrl: RETURN_URL } }),
+    )
+    const decline = redirectMismatch(declined.redirect, { error: 'access_denied', state })
     if (decline !== '') throw new Error(`decline_${decline.replaceAll(' ', '_')}`)
     const token = await appToken(dev, clientId, registered.clientSecret)
     const checks = await appChecks(dev, token)
