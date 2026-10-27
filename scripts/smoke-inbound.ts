@@ -16,6 +16,9 @@ const REDIRECT_URI = 'http://127.0.0.1:9/callback'
 export const SMOKE_CLIENT_NAME = 'goblin-smoke'
 /** Personal's Conversation, the agent's main chat (ADR 0086), where the smoke's client talks: chat 1. */
 export const MAIN_CHAT = '1'
+/** The protocol revision whose requests may declare the Tasks extension (ADR 0119), and that extension. */
+const MODERN = '2026-07-28'
+const TASKS = 'io.modelcontextprotocol/tasks'
 
 export const base64url = (bytes: Buffer): string => bytes.toString('base64url')
 
@@ -117,6 +120,55 @@ class InboundClient {
     const message = object(JSON.parse(payload))
     if (message['error'] !== undefined) throw new Error(`mcp_rpc_error: ${method}`)
     return { status: response.status, result: object(message['result']) }
+  }
+
+  /**
+   * One request on the 2026-07-28 protocol, by hand: the SDK's client refuses a result type it does not know, and a task
+   * (ADR 0119) is one. Its `_meta` envelope declares the Tasks extension when `tasks`; `name` is what `Mcp-Name` mirrors.
+   * The answer's result or its error, as sent.
+   */
+  async modern(
+    method: string,
+    params: JsonObject,
+    options: { readonly tasks: boolean; readonly name?: string },
+  ): Promise<{ readonly result?: JsonObject; readonly error?: JsonObject }> {
+    const response = await this.#dev.send('/mcp', {
+      method: 'POST',
+      owner: false,
+      headers: {
+        authorization: `Bearer ${this.#token}`,
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+        'mcp-protocol-version': MODERN,
+        'mcp-method': method,
+        ...(options.name === undefined ? {} : { 'mcp-name': options.name }),
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: this.#nextId++,
+        method,
+        params: {
+          ...params,
+          _meta: {
+            'io.modelcontextprotocol/protocolVersion': MODERN,
+            'io.modelcontextprotocol/clientInfo': { name: SMOKE_CLIENT_NAME, version: '1' },
+            'io.modelcontextprotocol/clientCapabilities': options.tasks ? { extensions: { [TASKS]: {} } } : {},
+          },
+        },
+      }),
+    })
+    const body = await response.text()
+    const payload = response.headers.get('content-type')?.includes('text/event-stream')
+      ? (body
+          .split('\n')
+          .findLast((line) => line.startsWith('data: '))
+          ?.slice('data: '.length) ?? '{}')
+      : body
+    const message = object(JSON.parse(payload))
+    return {
+      ...(message['result'] === undefined ? {} : { result: object(message['result']) }),
+      ...(message['error'] === undefined ? {} : { error: object(message['error']) }),
+    }
   }
 
   async tool(name: string, args: JsonObject): Promise<JsonObject> {

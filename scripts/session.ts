@@ -1,5 +1,5 @@
 /**
- * The owner session that `smoke:dev` and `ui:acceptance` sign in with: `{"origin": …, "cookie": …}`, captured through a
+ * The session that `smoke:local` and `ui:acceptance` sign in with: `{"origin": …, "cookie": …}`, captured through a
  * real OTP login and saved in a mode-600 file (scripts/README.md).
  */
 import { Option, Schema } from 'effect'

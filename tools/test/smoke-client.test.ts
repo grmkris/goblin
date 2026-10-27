@@ -2,7 +2,6 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingHttpHeaders, type ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import * as Redacted from 'effect/Redacted'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { DevClient, type Step } from '../../scripts/smoke-client.ts'
 import { idleAfter, openingOf } from '../../scripts/smoke-entries.ts'
@@ -62,7 +61,7 @@ beforeAll(async () => {
   writeFileSync(file, JSON.stringify({ origin, cookie: COOKIE }))
   chmodSync(file, 0o600)
   dev = new DevClient(new URL(origin), steps)
-  await dev.useSession(file, Redacted.make(OWNER))
+  await dev.useSession(file, OWNER)
 })
 afterAll(() => {
   server.close()
@@ -102,6 +101,26 @@ describe('DevClient', () => {
     expect(idleAfter(opening)).toBe(false)
     expect(idleAfter(opening.slice(0, 2))).toBe(true)
     expect(steps.at(-1)).toEqual({ step: 'GET /api/conversations/1/stream', status: 200, ref: 'ref-stream' })
+  })
+
+  it("sends a person's own paths as they are, a member's under the workspace unless told not to", async () => {
+    seen.length = 0
+    await dev.send('/api/install/app-1')
+    await dev.send('/api/grants/clients/c-1', { method: 'PUT' })
+    await dev.send('/api/installations')
+    await dev.send('/api/topics', { workspace: false })
+    expect(seen.map((request) => request.url)).toEqual([
+      '/api/install/app-1',
+      '/api/grants/clients/c-1',
+      '/w/owner/api/installations',
+      '/api/topics',
+    ])
+    expect(dev.slug).toBe('owner')
+  })
+
+  it('refuses a session that is not the expected person', async () => {
+    const other = new DevClient(new URL(dev.origin), [])
+    await expect(other.useCookie(COOKIE, 'someone@example.com')).rejects.toThrow(/^session_owner_mismatch$/u)
   })
 
   it('leaves the session out of a request that asks for it', async () => {

@@ -1,8 +1,9 @@
 import { internalChecks } from './smoke-edge.ts'
 
 /**
- * Production without a signed-in session: public health, admission, page, metadata, internal-route and canonical
- * redirect checks. Sign-up is invite-only, refused without the code, or open, and `/health` lists a way to sign in.
+ * A stage the smoke cannot sign in to (ADR 0128): public health, admission, page, metadata and internal-route checks,
+ * and on prod the canonical redirect. Sign-up is invite-only, refused without the code, or open, and `/health` lists a
+ * way to sign in.
  */
 type Client = {
   readonly origin: string
@@ -15,18 +16,18 @@ export async function publicSmoke(
   health: Record<string, unknown>,
   signup: string,
   steps: Array<{ readonly step: string; readonly status: number }>,
-  refusedSignup: () => Promise<void>,
+  checks: { readonly refusedSignup: () => Promise<void>; readonly alias: boolean },
 ): Promise<void> {
   const signIn = health['signIn']
   if ((signup !== 'invite' && signup !== 'open') || !Array.isArray(signIn) || signIn.length === 0)
-    throw new Error('prod_admission_policy_mismatch')
+    throw new Error('admission_policy_mismatch')
   // A member's path without a session (ADR 0089): refused before any workspace is looked up.
   const probe = await dev.send('/w/smoke-probe/api/agent/usage', { owner: false })
   if (probe.status !== 401) throw new Error('anonymous_auth_probe_not_refused')
   await internalChecks(dev.origin, steps)
-  if (signup === 'invite') await refusedSignup()
+  if (signup === 'invite') await checks.refusedSignup()
   const metadata = await dev.json('/.well-known/oauth-protected-resource', { owner: false })
-  if (metadata['resource'] !== `${dev.origin}/mcp`) throw new Error('prod_mcp_resource_mismatch')
+  if (metadata['resource'] !== `${dev.origin}/mcp`) throw new Error('mcp_resource_mismatch')
   // Signed out, Home is goblin's landing (routes/index.tsx); a redirect, as a session would get, is followed once,
   // only within the origin.
   const home = await dev.send('/', { owner: false })
@@ -36,9 +37,11 @@ export async function publicSmoke(
     home.status >= 300 && home.status < 400 && target?.origin === dev.origin
       ? await dev.send(target.pathname, { owner: false })
       : home
-  if (!page.ok || !(await page.text()).includes('goblin')) throw new Error('prod_page_unavailable')
+  if (!page.ok || !(await page.text()).includes('goblin')) throw new Error('page_unavailable')
+  // Only prod has a www alias: dev.goblin.surf has none.
+  if (!checks.alias) return
   const alias = await fetch(new URL('/health', `https://www.${new URL(dev.origin).hostname}`), { redirect: 'manual' })
   if (alias.status !== 301 || alias.headers.get('location') !== `${dev.origin}/health`)
-    throw new Error('prod_alias_not_canonical')
+    throw new Error('alias_not_canonical')
   steps.push({ step: 'www redirects to canonical origin', status: alias.status })
 }

@@ -1,15 +1,14 @@
 /**
- * Everything the smoke sends to one stage: the owner's cookie once signed in, a fresh `x-goblin-request` id, the CSRF
- * header on every write, and each answer's status and reference (`x-goblin-ref`, which finds its log lines) logged as a
- * step. Once signed in, a member's calls go under the owner's first workspace (`/w/<slug>/api/…`, ADR 0089), as the
- * app's do. The owner and account APIs go through their typed clients; Better Auth, `/mcp`, `/health` and the owner's
- * file bytes are plain requests.
+ * Everything the smoke sends to one stage: the signed-in person's cookie, held in memory only (ADR 0128), a fresh
+ * `x-goblin-request` id, the CSRF header on every write, and each answer's status and reference (`x-goblin-ref`, which
+ * finds its log lines) logged as a step. Once signed in, a member's calls go under the person's workspace
+ * (`/w/<slug>/api/…`, ADR 0089), as the app's do. The owner and account APIs go through their typed clients; Better
+ * Auth, `/mcp`, `/health` and the owner's file bytes are plain requests.
  */
 import * as Cause from 'effect/Cause'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
 import * as Predicate from 'effect/Predicate'
-import * as Redacted from 'effect/Redacted'
 import * as Schema from 'effect/Schema'
 import * as FetchHttpClient from 'effect/http/FetchHttpClient'
 import * as HttpClient from 'effect/http/HttpClient'
@@ -24,13 +23,24 @@ export type Step = { readonly step: string; readonly status: number; readonly re
 export type OwnerClient = HttpApiClient.ForApi<typeof OwnerApi>
 export type AccountClient = HttpApiClient.ForApi<typeof WorkspaceAccountApi>
 export type PersonClient = HttpApiClient.ForApi<typeof AccountApi>
-/** A plain request: `owner: false` leaves out the session cookie, `csrf: false` the header every write carries. */
-export type SendInit = RequestInit & { readonly owner?: boolean; readonly csrf?: boolean }
+/**
+ * A plain request: `owner: false` leaves out the session cookie, `csrf: false` the header every write carries, and
+ * `workspace: false` sends an `/api/…` path as it is, outside the workspace's.
+ */
+export type SendInit = RequestInit & { readonly owner?: boolean; readonly csrf?: boolean; readonly workspace?: boolean }
 
 const JsonObject = Schema.Record(Schema.String, Schema.MutableJson)
 const Workspaces = Schema.Array(Schema.Struct({ id: Schema.String, slug: Schema.String }))
 /** A person's own paths, which no workspace prefix goes in front of. */
-const PERSON_PATHS = ['/api/auth/', '/api/workspaces', '/api/invitations', '/api/clients', '/api/client-errors']
+const PERSON_PATHS = [
+  '/api/auth/',
+  '/api/workspaces',
+  '/api/invitations',
+  '/api/clients',
+  '/api/grants',
+  '/api/install/',
+  '/api/client-errors',
+]
 const object = Schema.decodeUnknownSync(JsonObject)
 const string = Schema.decodeUnknownSync(Schema.String)
 const REQUEST_TIMEOUT_MS = 150_000
@@ -96,17 +106,22 @@ export class DevClient {
     return this.#run(Effect.flatMap(this.#person, call), signal)
   }
 
-  /** The owner's first workspace's id, once signed in. */
+  /** The signed-in person's workspace's id. */
   get workspaceId(): string {
     return this.#workspaceId
   }
 
+  /** The signed-in person's workspace's slug. */
+  get slug(): string {
+    return this.#slug
+  }
+
   async send(path: string, init: SendInit = {}): Promise<Response> {
-    const { owner = true, csrf = true, ...rest } = init
+    const { owner = true, csrf = true, workspace = true, ...rest } = init
     const method = rest.method ?? 'GET'
     const headers = new Headers(rest.headers)
     for (const [name, value] of Object.entries(this.#headers(method, owner, csrf))) headers.set(name, value)
-    const response = await fetch(new URL(this.#inWorkspace(path), this.#url), {
+    const response = await fetch(new URL(workspace ? this.#inWorkspace(path) : path, this.#url), {
       ...rest,
       headers,
       redirect: 'manual',
@@ -122,19 +137,31 @@ export class DevClient {
     return object(await response.json())
   }
 
-  /** Signs in with the saved session (`session.ts`) once it is this stage's and still the owner's. */
-  async useSession(file: string, email: Redacted.Redacted): Promise<void> {
+  /**
+   * Signs in with a saved session file (`session.ts`): only a local run against the local stack does, never CI, which
+   * signs in by email code (`smoke-signin.ts`, ADR 0128).
+   */
+  async useSession(file: string, email: string): Promise<void> {
     const saved = readSession(file)
     if (saved.origin !== this.origin) throw new Error('session_origin_mismatch')
-    this.#cookie = saved.cookie
+    await this.useCookie(saved.cookie, email)
+  }
+
+  /**
+   * Holds `cookie`, a session this process just signed in with, once it is still `email`'s, and works in the person's
+   * first workspace (listing them gives a person without one their own).
+   */
+  async useCookie(cookie: string, email: string): Promise<void> {
+    this.#cookie = cookie
     const session = await this.json('/api/auth/get-session')
     const owner = object(session['user'])
-    if (string(owner['email']) !== Redacted.value(email)) throw new Error('session_owner_mismatch')
+    if (string(owner['email']) !== email) throw new Error('session_owner_mismatch')
     if (Date.parse(string(object(session['session'])['expiresAt'])) <= Date.now()) throw new Error('session_expired')
-    const [first] = Schema.decodeUnknownSync(Workspaces)(await (await this.send('/api/workspaces')).json())
-    if (first === undefined) throw new Error('no_workspace')
-    this.#slug = first.slug
-    this.#workspaceId = first.id
+    const workspaces = Schema.decodeUnknownSync(Workspaces)(await (await this.send('/api/workspaces')).json())
+    const [chosen] = workspaces
+    if (chosen === undefined) throw new Error('no_workspace')
+    this.#slug = chosen.slug
+    this.#workspaceId = chosen.id
   }
 
   /** What every request carries; the cookie is read when the request goes out, so it follows `useSession`. */

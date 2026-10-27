@@ -1,11 +1,14 @@
 /**
- * Acceptance against the retained dev Worker (`smoke:dev`), which every dev deploy runs, or the local stack
- * (`smoke:local`). Never imported by the deployed Worker. By default it makes no model call (ADR 0106): it reads the
- * owner's state, round-trips a file, checks the edge and the MCP servers, and drives an inbound client up to its tool
- * list and an inspection read. With `GOBLIN_SMOKE_TURNS=1` it also runs the agent turns, and with `GOBLIN_SMOKE_MODEL`
- * set they answer on that model, the owner's own pick put back afterwards, whatever failed. Grants stay as the owner set
- * them. Turns run in main and a side thread closed afterwards; the throwaway inbound client is revoked before the script
- * exits, and the one file it uploads is deleted again.
+ * Acceptance against a deployed stage (`smoke:dev`, `smoke:prod`), which every dev and prod deploy runs, or the local
+ * stack (`smoke:local`). Never imported by the deployed Worker. It signs in as the checks account by an emailed code read
+ * through a mysi workload (ADR 0128), the session held in memory only; the local stack signs in with a saved session
+ * file instead. Signed in, it reads the person's state, round-trips a file, checks the edge and the MCP servers, drives
+ * an inbound client up to its tool list and an inspection read, and runs the integrator paths around the deploy's one
+ * model turn (`smoke-integrator.ts`). Without the mailbox it runs the public checks and records why it did not sign in.
+ * With `GOBLIN_SMOKE_TURNS=1` it also runs the agent turns of ADR 0106. `GOBLIN_SMOKE_MODEL` picks the model every turn
+ * answers on, the person's own pick put back afterwards, whatever failed. Turns run in main and a side thread closed
+ * afterwards; the throwaway clients and the app are revoked and deleted before the script exits, and the one file it
+ * uploads is deleted again.
  */
 import { Config, Effect, Option, Redacted, Schema } from 'effect'
 import { randomBytes } from 'node:crypto'
@@ -17,8 +20,11 @@ import { DevClient, type Step } from './smoke-client.ts'
 import { InboundClient, MAIN_CHAT, SMOKE_CLIENT_NAME, base64url, operationId } from './smoke-inbound.ts'
 import { edgeChecks, internalChecks } from './smoke-edge.ts'
 import { delegateReported, idleAfter, marksOf, openingOf } from './smoke-entries.ts'
+import { type IntegratorReport, integratorChecks } from './smoke-integrator.ts'
 import { publicSmoke } from './smoke-public.ts'
 import { clientBuild, flowsCheck } from './smoke-release.ts'
+import { signInByEmail, signInPlan } from './smoke-signin.ts'
+import { mysiOrigin, openWorkload } from './smoke-workload.ts'
 
 const ObjectSchema = Schema.Record(Schema.String, Schema.MutableJson)
 type JsonObject = typeof ObjectSchema.Type
@@ -30,29 +36,36 @@ const MCP_MARKER = 'GOBLIN_MCP_OK'
 /** Main's newest page of history. */
 const MAIN_HISTORY = { params: { id: '1' }, query: { before: 2_147_483_647 } } as const
 
-type Settings = {
-  readonly stage: string
-  readonly url: string
-  readonly email: Redacted.Redacted
-  readonly sessionFile: string
-  readonly turns: boolean
-}
+const optional = (name: string) => Config.String(name).pipe(Config.withDefault(''))
+const secret = (name: string) => Config.Redacted(name).pipe(Config.withDefault(Redacted.make('')))
 
 const settings = Effect.gen(function* () {
   return {
     stage: yield* Config.String('GOBLIN_STAGE'),
     url: yield* Config.String('GOBLIN_APP_URL'),
-    email: yield* Config.Redacted('GOBLIN_OWNER_EMAIL').pipe(Config.withDefault(Redacted.make(''))),
-    sessionFile: yield* Config.String('GOBLIN_SMOKE_SESSION_FILE').pipe(Config.withDefault('')),
+    /** The checks account the smoke signs in as (ADR 0128), from CI's configuration; unset, it does not sign in. */
+    email: yield* optional('GOBLIN_SMOKE_EMAIL'),
+    /** The stage's invite code, so the first sign-in after a reset makes the checks account again. */
+    inviteCode: yield* secret('GOBLIN_SIGNUP_INVITE_CODE'),
+    /** The local stack only: a saved session file (`session.ts`) and the owner it must belong to. */
+    sessionFile: yield* optional('GOBLIN_SMOKE_SESSION_FILE'),
+    ownerEmail: yield* secret('GOBLIN_OWNER_EMAIL'),
+    /** The mysi workload that reads the checks account's mailbox, and the deploy job's OIDC request. */
+    mailbox: {
+      origin: yield* mysiOrigin,
+      clientId: yield* optional('GOBLIN_SMOKE_MAILBOX_WORKLOAD'),
+      requestUrl: yield* optional('ACTIONS_ID_TOKEN_REQUEST_URL'),
+      requestToken: yield* secret('ACTIONS_ID_TOKEN_REQUEST_TOKEN'),
+    },
     /** Whether the smoke runs agent turns, which spend model tokens (ADR 0106); off unless `GOBLIN_SMOKE_TURNS=1`. */
     turns: yield* Config.Boolean('GOBLIN_SMOKE_TURNS').pipe(Config.withDefault(false)),
-    /** The model the smoke's agent turns run on (dev: an Alibaba Token Plan model); unset: the owner's own pick. */
+    /** The model the smoke's turns run on (the stage's cheapest, ADR 0128); unset: the person's own pick. */
     smokeModel: Option.getOrUndefined(yield* Config.option(Config.String('GOBLIN_SMOKE_MODEL'))),
   }
 })
 
 /** Smoke follows the stage's configured APP_URL; local remains tied to the local stack. */
-function targetUrl(config: Settings): URL {
+function targetUrl(config: { readonly stage: string; readonly url: string }): URL {
   const url = new URL(config.url)
   const deployed = (config.stage === 'dev' || config.stage === 'prod') && url.protocol === 'https:'
   const local = config.stage === 'local' && url.origin === 'http://localhost:18971'
@@ -328,7 +341,7 @@ async function inboundChecks(dev: DevClient, client: InboundClient, servers: rea
 
 const putModel = (dev: DevClient, model: string) => dev.owner((api) => api.agent.chooseModel({ payload: { model } }))
 
-/** Runs `work` with the agent answering on `model`, then puts the owner's own pick back, whatever happened. */
+/** Runs `work` with the agent answering on `model`, then puts the person's own pick back, whatever happened. */
 async function withModel<T>(dev: DevClient, model: string | undefined, work: () => Promise<T>): Promise<T> {
   if (model === undefined) return work()
   const choice = await dev.owner((api) => api.agent.model())
@@ -404,6 +417,10 @@ type Receipt = {
   readonly edge: Awaited<ReturnType<typeof edgeChecks>>['edge']
   readonly internal: Awaited<ReturnType<typeof internalChecks>>['internal']
   readonly app?: 'ok'
+  /** How the smoke signed in (ADR 0128). */
+  readonly signIn: string
+  /** The integrator paths around the deploy's one model turn (ADR 0128). */
+  readonly integrator: IntegratorReport
   /** The commit the deployed client bundle names, or why it was not checked. */
   readonly build: string
   /** `ok`: the smoke's sends reached the flows dataset; or why it was not checked. */
@@ -426,11 +443,16 @@ async function serverReports(dev: DevClient): Promise<readonly ServerReport[]> {
   return reports
 }
 
-async function smokeDev(
-  steps: Step[],
-): Promise<
-  Receipt | { readonly stage: string; readonly signup: string; readonly mode: 'read-only'; readonly build: string }
-> {
+/** What a smoke that could not sign in passed: the public checks, and why it did not sign in (ADR 0128). */
+type PublicReceipt = {
+  readonly stage: string
+  readonly signup: string
+  readonly mode: 'read-only'
+  readonly signIn: string
+  readonly build: string
+}
+
+async function smokeDev(steps: Step[]): Promise<Receipt | PublicReceipt> {
   const started = Date.now()
   const config = await Effect.runPromise(settings)
   if ((await stat(new URL(`../.local/${config.stage}.env`, import.meta.url))).mode & 0o077)
@@ -440,12 +462,16 @@ async function smokeDev(
   if (health['stage'] !== config.stage || health['service'] !== 'goblin') throw new Error('stage_health_mismatch')
   const signup = string(health['signup'])
   const build = await clientBuild(dev, config.stage)
-  if (config.stage === 'prod' && (Redacted.value(config.email) === '' || config.sessionFile === '')) {
-    await publicSmoke(dev, health, signup, steps, () => refusedSignup(dev, steps))
-    return { stage: config.stage, signup, mode: 'read-only', build }
+  const plan = signInPlan({ ...config, workload: config.mailbox })
+  if (plan.kind === 'none') {
+    const checks = { refusedSignup: () => refusedSignup(dev, steps), alias: config.stage === 'prod' }
+    await publicSmoke(dev, health, signup, steps, checks)
+    return { stage: config.stage, signup, mode: 'read-only', signIn: plan.reason, build }
   }
   if (signup !== 'open') await refusedSignup(dev, steps)
-  await dev.useSession(config.sessionFile, config.email)
+  if (plan.kind === 'session') await dev.useSession(config.sessionFile, Redacted.value(config.ownerEmail))
+  else await signInByEmail(dev, await openWorkload(config.mailbox), config.email, config.inviteCode)
+  const signIn = plan.kind === 'session' ? 'saved session' : 'email code via mysi'
   const { resident } = await ownerReads(dev)
   const { files } = await fileChecks(dev)
   const { edge } = await edgeChecks(dev)
@@ -453,22 +479,12 @@ async function smokeDev(
   const servers = await serverReports(dev)
   const client = await InboundClient.register(dev)
   try {
+    const model = config.smokeModel ?? 'own pick'
+    const shared = { stage: config.stage, model, signup, signIn, resident, servers, files, edge, internal, build }
     if (!config.turns) {
       const inbound = await inboundReads(dev, client)
-      const flows = 'skipped: no agent turns ran (GOBLIN_SMOKE_TURNS unset)'
-      return {
-        stage: config.stage,
-        model: 'none',
-        signup,
-        resident,
-        servers,
-        files,
-        edge,
-        internal,
-        build,
-        flows,
-        inbound,
-      }
+      const integrator = await withModel(dev, config.smokeModel, () => integratorChecks(dev))
+      return { ...shared, flows: await flowsCheck(config.stage, started), inbound, integrator }
     }
     const checks = await withModel(dev, config.smokeModel, async () => {
       const inbound = await inboundChecks(dev, client, servers)
@@ -476,11 +492,10 @@ async function smokeDev(
       const subagent = await subagentChecks(dev)
       const memory = await memoryChecks(dev)
       const app = await appChecks(dev, { submit: submitMessage, idle: waitForIdle, close: closeThread })
-      return { inbound, ...thread, ...subagent, ...memory, ...app }
+      const integrator = await integratorChecks(dev)
+      return { inbound, ...thread, ...subagent, ...memory, ...app, integrator }
     })
-    const model = config.smokeModel ?? 'owner pick'
-    const flows = await flowsCheck(config.stage, started)
-    return { stage: config.stage, model, signup, resident, servers, files, edge, internal, build, flows, ...checks }
+    return { ...shared, flows: await flowsCheck(config.stage, started), ...checks }
   } finally {
     // Never leave the throwaway client authorized, whatever failed above.
     // expected: the step list records the revoke's answer; a refusal here must not hide the failure above
