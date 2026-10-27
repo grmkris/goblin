@@ -85,6 +85,23 @@ export const EXPECTED_ERROR_TAGS: ReadonlySet<string> = new Set([
   'UpstreamMcp',
 ])
 
+/** The Workers runtime's words when it restarts a Durable Object onto a deploy's code. */
+const CODE_UPDATE_RESET = 'Durable Object reset because its code was updated'
+
+/**
+ * Whether `error`, or one of its first causes, is a Durable Object restarted onto a deploy's code: a deploy, not a fault,
+ * which Pi recovers from. Its text is only matched, never logged.
+ */
+const restartedByDeploy = (error: unknown): boolean => {
+  let current = error
+  for (let depth = 0; depth < 4 && Predicate.isObject(current); depth += 1) {
+    if ('message' in current && Predicate.isString(current.message) && current.message.includes(CODE_UPDATE_RESET))
+      return true
+    current = 'cause' in current ? current.cause : undefined
+  }
+  return false
+}
+
 /** `type` is an expected typed failure, and the cause failed with it rather than dying of it. */
 const answered = (cause: Cause.Cause<unknown>, type: string): boolean =>
   EXPECTED_ERROR_TAGS.has(type) &&
@@ -93,21 +110,24 @@ const answered = (cause: Cause.Cause<unknown>, type: string): boolean =>
 /**
  * Logs each reported failure as one `failure` line: where, its type, its stack locations and a severity. An expected
  * typed failure (`EXPECTED_ERROR_TAGS`) is not logged. An error that declares a severity (`expectedFailure`) keeps it;
- * an expected owner decision (budget, grant, authorization) that died is `Info`; anything else is `Error`.
- * Interruptions and errors marked to skip are not reported.
+ * an expected owner decision (budget, grant, authorization) that died is `Info`, and so is a Durable Object restarted
+ * onto a deploy's code (`restartedByDeploy`, with `code: code_update`); anything else is `Error`. Interruptions and
+ * errors marked to skip are not reported.
  */
 export const goblinReporter = ErrorReporter.make(({ cause, error, severity: declared, fiber }) => {
   const type = safeErrorType(error)
   if (answered(cause, type)) return
+  const deploy = restartedByDeploy(error)
   const severity: Severity = Object.hasOwn(error, ErrorReporter.severity)
     ? declared
-    : expectedCode(type)
+    : deploy || expectedCode(type)
       ? 'Info'
       : 'Error'
   writeFiberLine(fiber, LEVELS[severity], {
     event: 'failure',
     where: fiber.getRef(References.CurrentLogAnnotations)[WHERE] ?? 'unknown',
     'error.type': type,
+    ...(deploy ? { code: 'code_update' } : {}),
     frames: framesOf(error),
     severity,
   })

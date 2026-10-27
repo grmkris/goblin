@@ -102,6 +102,26 @@ describe('failure reporter', () => {
     }),
   )
 
+  it.effect('logs a Durable Object restarted onto new code at Info as code_update, never its message', () =>
+    Effect.gen(function* () {
+      const reset = new Error('SQL query failed', {
+        cause: new Error('Durable Object reset because its code was updated.'),
+      })
+      reset.name = 'DrizzleQueryError'
+      const { lines } = yield* withLines(
+        Effect.gen(function* () {
+          yield* Effect.exit(Effect.die(reset).pipe(reportFailure('telemetry.ledger')))
+          yield* Effect.exit(Effect.die(new Error('something else')).pipe(reportFailure('other')))
+        }).pipe(Effect.provide(ReporterLive)),
+      )
+      expect(lines.map(({ line }) => [line['where'], line['severity'], line['code']])).toEqual([
+        ['telemetry.ledger', 'Info', 'code_update'],
+        ['other', 'Error', undefined],
+      ])
+      expect(JSON.stringify(lines)).not.toContain('reset because')
+    }),
+  )
+
   it.effect('recovers with the fallback after reporting, and lets an interruption interrupt', () =>
     Effect.gen(function* () {
       const { value, lines } = yield* withLines(

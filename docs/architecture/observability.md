@@ -103,7 +103,9 @@ A failure that should be seen is reported by the failure reporter (`observabilit
 the `file:line:col` locations of its stack and a severity, never its message. The typed answers an owner gets in the
 normal course (every `AppError` but `Internal`: a 404, a 409) are not reported when they arrive as failures.
 `reportFailure(where)` reports and keeps failing; `reportAndRecover(where, fallback)` reports and falls back, for a
-legitimate fallback only; `expectedFailure` marks an error to log at `Info` or not at all. Every program the bridge
+legitimate fallback only; `expectedFailure` marks an error to log at `Info` or not at all. A Durable Object that
+Cloudflare reset because its code was updated (a deploy) fails what was in flight, often as a storage error: the
+reporter finds that reset in the cause chain and logs it at `Info` with `code` `code_update`. Every program the bridge
 runs, every owner API request and every change handler is reported this way, and `toAppError` (`http/errors.ts`)
 reports an unexpected failure where it becomes `Internal`.
 
