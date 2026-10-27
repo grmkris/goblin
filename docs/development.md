@@ -450,7 +450,9 @@ until it runs, real provider and Telegram delivery remain unverified.
   Until launch goblin is greenfield: a migration is edited in place as if the schema had always been so, and a
   release that edits an applied one resets dev first (`GOBLIN_BREAK_GLASS=1 bun run destroy:dev -- --confirm-reset`, then
   `GOBLIN_BREAK_GLASS=1 bun run deploy:dev` re-creates it, since CI refuses a plan that creates goblinAuth); a new table or column
-  may also arrive as its own migration, which needs no reset. Never touch Pi or Agents tables.
+  may also arrive as its own migration, which needs no reset. A migration drops a table or column only once the
+  release before it stopped using it: a deploy applies migrations while the previous Worker still serves, and a
+  rollback runs that Worker again, so neither may meet a missing table. Never touch Pi or Agents tables.
 - Owner API endpoints: add the endpoint to its area's group in `packages/contracts/src/api/` (paths are relative to
   `/api`; `error` names the failures the endpoint itself produces), then its handler in the area's `api.ts`
   (`http/api/groups.ts` wires every group). Owner admission runs before each request; nothing in the Worker changes.
@@ -459,7 +461,8 @@ until it runs, real provider and Telegram delivery remain unverified.
   `inbound/client.ts`; never add a Durable Object RPC method.
   Test a group by serving it alone (`served([Group], handlers)` in `apps/runtime/test/http/api/fixture.ts`),
   and call it from the web through a factory in the feature's `queries.ts` (ADR 0038).
-- Auth tables: Better Auth's schema lives in `apps/runtime/migrations` and is applied by the Alchemy D1 resource.
+- Auth tables: Better Auth's schema lives in `apps/runtime/migrations` and is applied by the Alchemy D1 resource. The
+  same rule holds: drop only what the previous release no longer reads.
 - Bindings: declare them in `apps/runtime/src/env.ts` and `apps/web/alchemy.run.ts` together, and in the integration
   stacks (`apps/runtime/test/integration/*-stack.ts`, `stack.ts`) when the runtime reads them.
 - Agent apps: `packages/app` holds the SDK, release entry, transpiler and the agent's docs; `bun run build` there writes

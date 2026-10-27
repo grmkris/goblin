@@ -53,7 +53,9 @@ infrastructure. Read
   goblin is greenfield until launch (owner, 2026-10-11): no backwards compatibility, no legacy decoders; migrations are
   edited in place as if the schema had always been so, and a release that edits an applied one resets dev first
   (`GOBLIN_BREAK_GLASS=1 bun run destroy:dev -- --confirm-reset`, then `GOBLIN_BREAK_GLASS=1 bun run deploy:dev`
-  re-creates it: CI refuses a plan that would create goblinAuth, Files or Web). Prod is reset only when the owner
+  re-creates it: CI refuses a plan that would create goblinAuth, Files or Web). A migration drops a table or column
+  only once the release before it stopped using it, so the Worker still serving mid-rollout never meets a missing one
+  (owner, 2026-10-27). Prod is reset only when the owner
   decides, as for the hackathon release (owner, 2026-10-12) and the channel-info baseline (owner, 2026-10-20): export
   its auth D1 into `.local` (`wrangler d1 export goblin-prod-auth --remote`), pause CI, then
   `GOBLIN_BREAK_GLASS=1 GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset`, re-create it with a
