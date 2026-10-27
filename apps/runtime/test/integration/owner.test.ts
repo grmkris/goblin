@@ -15,7 +15,7 @@ import { threadServersCase } from './thread-servers-case.ts'
 import { membersCase } from './members-case.ts'
 import { sealedCase } from './sealed-case.ts'
 import { threadHeadsCase } from './thread-heads-case.ts'
-import { organizeCase, personasCase } from './persona-case.ts'
+import { organizeCase, personaRestartCase, personasCase } from './persona-case.ts'
 import { personaHoldsCase } from './persona-holds-case.ts'
 import { personaQuestionsCase } from './persona-questions-case.ts'
 import { retrievalCase } from './retrieval-case.ts'
@@ -79,6 +79,11 @@ harness.test(
   'native: tagged Personas answer attributed in the chat without Goblin, in order, at their revision, and Stop drops them',
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => personasCase(url)))),
   { timeout: 240_000 },
+)
+harness.test(
+  'native: a Persona turn the agent restarts under still answers, though the budget was spent since it was asked',
+  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => personaRestartCase(url)))),
+  { timeout: 120_000 },
 )
 harness.test(
   "native: a Persona's ask-first call and tool to allow wait for the owner and resume; a routine hands work to a Persona",

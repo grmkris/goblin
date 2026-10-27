@@ -26,8 +26,6 @@ import {
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
-import * as Predicate from 'effect/Predicate'
-import type { PersonaFailure } from '@goblin/contracts'
 import { requireBudget } from '../budget.ts'
 import { Conversations } from '../chats/service.ts'
 import { requireResident } from '../mcp/service.ts'
@@ -41,8 +39,19 @@ import { BACKGROUND, entryId } from './context.ts'
 import { type ForkToolsKit, freezeForkTools, toolsText, withForkTools } from './fork-tools.ts'
 import { PERSONA_DENIED_TOOLS, PERSONA_EXTENSION, personaSelection } from './persona-selection.ts'
 import { questionJson } from './ask-user.ts'
-import { NO_ANSWER, modelRef } from './model.ts'
+import { modelRef } from './model.ts'
 import { holdJson, readAnswer } from './persona-answer.ts'
+import {
+  ANSWER_UNWRITTEN,
+  ASK_MISSING,
+  FORK_MISSING,
+  type Unanswered,
+  answerFlow,
+  failed,
+  failure,
+  refusalOf,
+  unansweredOf,
+} from './persona-failures.ts'
 import { ConversationMissing } from './subagent-relay.ts'
 import { epochSeconds } from '../clock.ts'
 import { logEvent } from '../observability/logger.ts'
@@ -134,7 +143,10 @@ type State =
   | { readonly phase: 'place'; readonly polls: number }
   | { readonly phase: 'fork'; readonly at: number }
   | { readonly phase: 'register'; readonly fork: ConversationId }
-  | { readonly phase: 'ask'; readonly fork: ConversationId }
+  /** Until the fork is prompted: `retried` once a transient refusal of its admission was tried again. */
+  | { readonly phase: 'ask'; readonly fork: ConversationId; readonly retried?: boolean }
+  /** The fork is prompted: a restart waits for its answer again, and never asks for admission twice. */
+  | { readonly phase: 'await'; readonly fork: ConversationId }
   /**
    * The answer, what it stopped on when the Persona needs the owner first (ADR 0041), and what it asked with `ask_user`
    * (ADR 0082).
@@ -197,22 +209,15 @@ export async function markPersona(tx: Tx, conversation: ConversationId, text: st
 }
 
 const terminal = { status: 'terminal', outcome: { status: 'completed', result: null } } as const
-const failed = (message: string) => ({ status: 'terminal', outcome: { status: 'failed', error: { message } } }) as const
 
-/** The instance clock in epoch seconds, as the invocation rows and the budget keep time. */
-
-/** How a Persona's answer flow ended: answered, failed, or stopped by the owner (a refusal of the work). */
-const ANSWER_STATUS = {
-  answered: { status: 'ok' },
-  failed: { status: 'error', errorType: 'failed' },
-  stopped: { status: 'refused', errorType: 'stopped' },
-} as const
+/** How long a transient refusal of a turn's admission waits before it is tried once more. */
+const RETRY_MS = 2000
 
 /**
  * Settles an invocation row: answered with its entry, failed with why, or stopped. The call that settles it records the
- * Persona's `persona_answer` flow, once; a settled row stays as it is and records nothing.
+ * Persona's `persona_answer` flow, once, under `code` when it failed; a settled row stays as it is and records nothing.
  */
-const settle = (input: Input, settlement: Settlement) =>
+const settle = (input: Input, settlement: Settlement, code?: string) =>
   Effect.gen(function* () {
     const now = yield* epochSeconds
     const settled = yield* (yield* Invocations).settle(input.operationId, input.persona.id, settlement, now)
@@ -224,26 +229,9 @@ const settle = (input: Input, settlement: Settlement) =>
       chat: input.chat,
       operationId: input.operationId,
       ...(input.mode === undefined ? {} : { personaOrder: input.mode }),
-      ...ANSWER_STATUS[settlement.state],
+      ...answerFlow(settlement, code),
     })
   })
-
-const failure = (reason: PersonaFailure): Settlement => ({ state: 'failed', reason })
-
-/**
- * Why a Persona's fork gave no answer, from how Pi settled its prompt (ADR 0083): its model call failed, or its model
- * gave none, also when goblin's model streams asked it again (`NO_ANSWER`).
- */
-export const failureOf = (settled: { readonly status: string; readonly reason?: string; readonly detail?: unknown }) =>
-  settled.status === 'unanswered' &&
-  (settled.reason === 'model_error' || settled.reason === 'no_model') &&
-  settled.detail !== NO_ANSWER
-    ? 'model_error'
-    : 'no_answer'
-
-/** Why a Persona may not answer now: the day's model budget is spent, or the owner's authority is not current. */
-const refusalOf = (error: unknown): PersonaFailure =>
-  Predicate.isTagged(error, 'BudgetExhausted') ? 'budget' : 'unavailable'
 
 /**
  * What a Persona's fork works with: its Topic's setup joined with the setup the ask froze (ADR 0040), never subagents.
@@ -303,14 +291,14 @@ const placePhase =
       const ask = await tx.submissionByRequest(parent, operationId)
       if (ask === undefined || ask.status === 'unanswered') {
         seen.outcome = 'missing'
-        return failed('The owner message is not in the chat.')
+        return failed('The owner message is not in the chat.', ASK_MISSING.code)
       }
       if (ask.status !== 'done') return { status: 'running', checkpoint: { phase: 'place', polls: polls + 1 } }
       seen.outcome = 'placed'
       const at = before?.state === 'answered' && before.answerEntry !== undefined ? before.answerEntry : ask.entry
       return { status: 'running', checkpoint: { phase: 'fork', at } }
     }, context)
-    if (seen.outcome === 'missing') await run(settle(task.input, failure('unavailable')))
+    if (seen.outcome === 'missing') await run(settle(task.input, failure(ASK_MISSING.reason), ASK_MISSING.code))
     if (seen.outcome === 'waiting') await runtime.sleep(runtime.now() + Math.min(2000, 250 * (polls + 1)), context)
   }
 
@@ -392,40 +380,80 @@ const promptOf = ({ operationId, persona, resume }: Input) =>
       }
     : { content: resume.text, requestId: personaPromptId(operationId, persona.id, true) }
 
+type Runtime = Parameters<Phase<'ask'>>[1]
+type PhaseContext = Parameters<Phase<'ask'>>[2]
+
+/** Gives the turn up: its invocation settles failed with why, and the task ends failed under the same code. */
+const giveUp = async (run: RunProgram, input: Input, runtime: Runtime, context: PhaseContext, why: Unanswered) => {
+  await run(settle(input, failure(why.reason), why.code))
+  await runtime.commit(() => failed('The Persona could not answer.', why.code), context)
+}
+
 /**
- * Prompts the fork and takes its answer, and what it stopped on when it needs the owner first (ADR 0041); a stopped,
- * empty or refused answer settles the invocation instead.
+ * Asks the fork once: a turn is admitted (the owner's authority is current and the day's budget is not spent) only
+ * before its prompt is submitted. A transient refusal is tried once more after a short sleep; a refusal that stands, or
+ * a second one, settles the invocation. A turn whose prompt is in the fork already (a restart after it was asked) only
+ * waits for it, never refused for what changed since it was admitted.
+ *
+ * @internal Exported for its unit test.
  */
-const askPhase =
+export const askPhase =
   (run: RunProgram): Phase<'ask'> =>
+  async (task, runtime, context) => {
+    const { fork, retried } = task.state.checkpoint
+    const { content, requestId } = promptOf(task.input)
+    const asked = { before: false }
+    await runtime.commit(async (tx) => {
+      if ((await tx.submissionByRequest(fork, requestId)) === undefined) return undefined
+      asked.before = true
+      return { status: 'running', checkpoint: { phase: 'await', fork } }
+    }, context)
+    if (asked.before) return
+    const conversation = await runtime.conversation(fork, context)
+    if (conversation === undefined) return giveUp(run, task.input, runtime, context, FORK_MISSING)
+    const refused = await run(mayAnswer).then(
+      () => undefined,
+      (error: unknown) => ({ error }),
+    )
+    if (refused !== undefined) {
+      const why = refusalOf(refused.error)
+      if (!why.final && retried !== true) {
+        await runtime.commit(() => ({ status: 'running', checkpoint: { phase: 'ask', fork, retried: true } }), context)
+        await runtime.sleep(runtime.now() + RETRY_MS, context)
+        return
+      }
+      return giveUp(run, task.input, runtime, context, why)
+    }
+    await conversation.submit({ type: 'input', content, whenBusy: 'followUp', requestId }, context)
+    await runtime.commit(() => ({ status: 'running', checkpoint: { phase: 'await', fork } }), context)
+  }
+
+/**
+ * Waits for the fork's answer and takes it, and what it stopped on when it needs the owner first (ADR 0041); a
+ * stopped, empty or failed answer settles the invocation instead. Submitting the prompt again under its request id
+ * answers the submission already made, so a restart only waits again.
+ */
+const awaitPhase =
+  (run: RunProgram): Phase<'await'> =>
   async (task, runtime, context) => {
     const { fork } = task.state.checkpoint
     const conversation = await runtime.conversation(fork, context)
-    const refused = await run(mayAnswer).then(
-      () => undefined,
-      (error: unknown) => refusalOf(error),
-    )
-    if (conversation === undefined || refused !== undefined) {
-      await run(settle(task.input, failure(refused ?? 'unavailable')))
-      await runtime.commit(() => failed('The Persona could not answer.'), context)
-      return
-    }
+    if (conversation === undefined) return giveUp(run, task.input, runtime, context, FORK_MISSING)
     const { content, requestId } = promptOf(task.input)
     const submitted = await conversation.submit({ type: 'input', content, whenBusy: 'followUp', requestId }, context)
     const settled = await submitted.wait(context)
+    const aborted = settled.status === 'unanswered' && settled.reason === 'aborted'
+    const why = aborted ? { reason: 'no_answer' as const, code: 'aborted' } : unansweredOf(settled)
     // The answer is an entry of the fork, which the turn's own conversation cannot see: read it in a commit.
     const read = { answered: false }
     await runtime.commit(async (tx) => {
       const final = settled.status === 'done' && settled.type === 'input' ? settled.answer : undefined
       const answer = await readAnswer(tx, fork, requestId, final)
       read.answered = answer !== undefined
-      if (answer === undefined) return failed('The Persona gave no answer.')
+      if (answer === undefined) return failed('The Persona gave no answer.', why.code)
       return { status: 'running', checkpoint: { phase: 'write', ...answer, fork } }
     }, context)
-    if (!read.answered) {
-      const aborted = settled.status === 'unanswered' && settled.reason === 'aborted'
-      await run(settle(task.input, aborted ? { state: 'stopped' } : failure(failureOf(settled))))
-    }
+    if (!read.answered) await run(settle(task.input, aborted ? { state: 'stopped' } : failure(why.reason), why.code))
   }
 
 /**
@@ -461,13 +489,18 @@ const writePhase =
         return Option.getOrUndefined(yield* written.placed)
       }),
     )
-    await run(settle(task.input, entry === undefined ? failure('unavailable') : { state: 'answered', entry }))
+    await run(
+      entry === undefined
+        ? settle(task.input, failure(ANSWER_UNWRITTEN.reason), ANSWER_UNWRITTEN.code)
+        : settle(task.input, { state: 'answered', entry }),
+    )
     await runtime.commit(() => terminal, context)
   }
 
 /**
- * The Persona turn: wait for the one before it, fork the chat, ask the fork, write the answer back attributed. A turn
- * that resumes a hold (ADR 0041) asks the Persona's fork again with the owner's reply and writes its next answer.
+ * The Persona turn: wait for the one before it, fork the chat, ask the fork, wait for its answer, write it back
+ * attributed. A turn that resumes a hold (ADR 0041) asks the Persona's fork again with the owner's reply and writes its
+ * next answer.
  */
 function turnTask(run: RunProgram, tools: ForkToolsKit) {
   return defineTask<Input, State, null>({
@@ -480,6 +513,7 @@ function turnTask(run: RunProgram, tools: ForkToolsKit) {
       fork: forkPhase,
       register: registerPhase(run, tools),
       ask: askPhase(run),
+      await: awaitPhase(run),
       write: writePhase(run),
     },
     abort: async (task, runtime, context) => {

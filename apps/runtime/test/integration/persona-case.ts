@@ -376,6 +376,25 @@ export async function personasCase(url: string): Promise<void> {
   await setups(url, owner)
 }
 
+/**
+ * A Persona's turn the agent restarts under waits for its fork's answer again, never asking for admission twice: the
+ * day's budget spent since it was asked does not take the answer it is already giving.
+ */
+export async function personaRestartCase(url: string): Promise<void> {
+  const owner = await ready(url)
+  const steady = await makePersona(url, owner, definition('Steady'))
+  const key = 'queue-hold:restart@Steady'
+  const { operationId } = await send(url, owner, 'queue-hold:restart', [steady])
+  await holding(url, owner, key)
+  await lever(url, owner, 'approvals/spent')
+  await lever(url, owner, 'power/restart', {})
+  // The restarted agent asks the model again for the generation the restart cut, and the queue model holds it again.
+  await holding(url, owner, key)
+  expect((await lever(url, owner, 'queue/release', { input: key })).status).toBe(200)
+  const [answer] = await answersBy(url, owner, 'Steady', 1)
+  expect(answer).toMatchObject({ persona: steady.id, operationId, revision: 1 })
+}
+
 const ask = async (url: string, owner: Person, input: string, expected: string) => {
   expect((await send(url, owner, input, [])).answered).toBe('ok')
   await showing(signedIn(url, owner), '1', expected)
