@@ -49,7 +49,9 @@ admitted, and one that is not an access token gets the sign-in challenge, naming
   memberships when it reaches all of them, else those it names that they are still a member of, with their role in
   each; an app's are its installations, with no role, since an app is no member. Every tool takes a `workspace` argument (an id or slug), added as each tool
   registers (`inbound/mcp-server.ts`): optional for a caller that reaches exactly one, required for any other; and
-  `workspace_list` plus the server's instructions name what it reaches. Each call goes to that workspace's agent with
+  `workspace_list` plus the server's instructions name what it reaches. A client naming another workspace its person
+  belongs to is refused with the link that adds it ([ADR 0127](../adr/0127-a-client-may-ask-for-a-workspace-its-person-belongs-to.md)); one they are not in, or one an app is not
+  installed in, is `NotFound` `workspace`. Each call goes to that workspace's agent with
   the credential its grant makes there and, for a client, the person as a member with their role there
   (`inbound/route.ts`).
 - **Tools.** One registry (`inbound/tools.ts`, the tools in `inbound/mcp-server.ts`, `inbound/inspect-tools.ts` and
@@ -78,7 +80,8 @@ admitted, and one that is not an access token gets the sign-in challenge, naming
   | `read` and `inspect` | `inspect_conversations`, `inspect_conversation`, `inspect_turns`, `inspect_turn`, `inspect_problems`, `inspect_flows`, `inspect_details` |
 
 - **Refusals and widening.** A call its grant does not cover answers `access_insufficient` (403): what is missing (a
-  level, an extra, or a reach id `<workspace>/<kind>/<id>`) and `widenUrl`, the page where the grant's approver (an
+  level, an extra, a reach id `<workspace>/<kind>/<id>`, or a bare `<workspace>` for one of a client's person's
+  workspaces outside its reach, which approving adds whole: ADR 0127) and `widenUrl`, the page where the grant's approver (an
   owner or admin of an installation's workspace, a client's person) widens it (`/consent/widen?grant=…`). On `/mcp` a client that
   declares URL elicitation is asked to open that page, once per call, on the 2026-07-28 protocol's input-required
   round (`inbound/access.ts`, ported from myapps); any other gets the refusal as the tool's error result.

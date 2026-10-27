@@ -3,10 +3,9 @@ import { challengeOf } from '../auth/index.ts'
 import type { RuntimeEnv } from '../env.ts'
 import { refOf, runAtEdge } from '../http/api/edge.ts'
 import { Unauthenticated } from '../http/errors.ts'
-import { type TokenAccess, callIn, tokenAccess } from './client-access.ts'
+import { type TokenAccess, callIn, reachedFor, tokenAccess } from './client-access.ts'
 import { ownerCall } from './client.ts'
 import { mcpServer } from './mcp-server.ts'
-import { workspaceFor } from './reach.ts'
 import type { OwnerCaller, Power } from './tools.ts'
 
 export const inboundHosts = (appUrl: string) => ({
@@ -49,7 +48,7 @@ const admit = async (request: Request, env: RuntimeEnv): Promise<Admitted | Chal
 const callerOf =
   (admitted: Admitted, env: RuntimeEnv, ref: string): OwnerCaller =>
   async (call, named) => {
-    const workspace = workspaceFor(admitted.reach, named)
+    const workspace = reachedFor(admitted, named, env.APP_URL)
     const { credential, member } = callIn(admitted, workspace)
     return runAtEdge(ownerCall(env.AGENTS.getByName(workspace.id), credential, member, call, { ref }))
   }

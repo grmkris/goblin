@@ -24,7 +24,9 @@ bearer there is no route. Every request on its way to an agent is admitted in th
    An OAuth access token on `/w/<slug>/api/…`, a client's or an installed app's, is admitted instead
    (`admitClient`): its token as `/mcp` checks it with its grant
    ([ADR 0114](../adr/0114-one-grant-for-every-credential.md)), refused with a cookie (`bearer_and_session`), the
-   workspace at the slug among those it reaches now (else `NotFound` `workspace`), never the workspace account API
+   workspace at the slug among those it reaches now (one of a client's person's workspaces outside its grant is
+   `AccessInsufficient` with the link that adds it, [ADR 0127](../adr/0127-a-client-may-ask-for-a-workspace-its-person-belongs-to.md); any other is
+   `NotFound` `workspace`), never the workspace account API
    (`Forbidden` `credential`), and only for an endpoint annotated `EndpointAccess` whose level and extra its grant
    holds (`endpointAccess`; an endpoint without one is `Forbidden` `credential`, a grant that lacks them
    `AccessInsufficient` with the widening link, and what a client's person's role could never hold `Forbidden`

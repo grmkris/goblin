@@ -1,4 +1,5 @@
 import type { WorkspaceView } from '@goblin/contracts'
+import { type AccessInsufficient, accessInsufficient } from '@goblin/contracts/api'
 import { type GrantRecord, type WorkspaceCoverage, coveragesOf, credentialOf } from '../auth/grants.ts'
 import { clientName, verifyAccessToken } from '../auth/index.ts'
 import { type AppInstallation, appInstallations } from '../auth/installs.ts'
@@ -7,6 +8,7 @@ import type { RuntimeEnv } from '../env.ts'
 import { type Credential, type Member, memberName } from '../http/api/principal.ts'
 import { NotFound, Unauthenticated } from '../http/errors.ts'
 import type { CallerReach } from './mcp-server.ts'
+import { workspaceFor } from './reach.ts'
 
 /**
  * An OAuth client's token, admitted (ADRs 0024, 0097, 0114): the client, the grant its person gave it, what that grant
@@ -20,6 +22,8 @@ export interface ClientAccess {
   readonly coverage: ReadonlyMap<string, WorkspaceCoverage>
   readonly person: { readonly user: string; readonly name: string }
   readonly reach: CallerReach<WorkspaceView>
+  /** The person's other workspaces, which its grant does not reach: a call naming one may ask to widen (ADR 0127). */
+  readonly outside: readonly WorkspaceView[]
   readonly expiresAt: number
 }
 
@@ -83,6 +87,7 @@ export const tokenAccess = async (env: RuntimeEnv, token: string): Promise<Token
     coverage,
     person: { user: verified.subject, name: memberName(person) },
     reach: reachOf(reached?.all ?? false, reached?.workspaces ?? []),
+    outside: reached?.outside ?? [],
     expiresAt: verified.expiresAt,
   }
 }
@@ -125,8 +130,43 @@ export const callIn = (access: TokenAccess, workspace: ReachedWorkspace): TokenC
 }
 
 /**
+ * The refusal for a workspace a token does not reach, which `pick` finds among a client's person's other workspaces:
+ * for one they belong to, `AccessInsufficient` with the link to widen the grant by that workspace, which they may
+ * approve (ADR 0127); for any other workspace, and for an app, `NotFound` `workspace`, as a session that is no member
+ * gets.
+ */
+const outsideReach = (
+  access: TokenAccess,
+  pick: (outside: readonly WorkspaceView[]) => WorkspaceView | undefined,
+  appUrl: string,
+): AccessInsufficient | NotFound => {
+  if (access.kind !== 'client') return new NotFound({ what: 'workspace' })
+  const member = pick(access.outside)
+  return member === undefined
+    ? new NotFound({ what: 'workspace' })
+    : accessInsufficient(appUrl, access.grant.id, { reachId: member.id })
+}
+
+/**
+ * The workspace a token's call names on `/mcp` (by id, then slug) among those it reaches, or its only one when it names
+ * none (`workspaceFor`); a named one outside its reach is refused as `outsideReach` says.
+ */
+export const reachedFor = (access: TokenAccess, named: string | undefined, appUrl: string): ReachedWorkspace => {
+  try {
+    return workspaceFor<ReachedWorkspace>(access.reach, named)
+  } catch (failure) {
+    if (!(failure instanceof NotFound) || named === undefined) throw failure
+    // An id first, as `workspaceFor` reads one: a slug is its admins' to choose.
+    const pick = (outside: readonly WorkspaceView[]) =>
+      outside.find((each) => each.id === named) ?? outside.find((each) => each.slug === named)
+    throw outsideReach(access, pick, appUrl)
+  }
+}
+
+/**
  * A token on a workspace's path (ADRs 0116, 0118): the workspace at `slug` among those it reaches now, and its call
- * there. `NotFound` `workspace` for a slug it does not reach, as a session that is no member gets.
+ * there. A client's person's own workspace outside its grant is `AccessInsufficient` with its widening link (ADR
+ * 0127); any other slug is `NotFound` `workspace`, as a session that is no member gets.
  */
 export const tokenAt = async (
   env: RuntimeEnv,
@@ -135,6 +175,7 @@ export const tokenAt = async (
 ): Promise<TokenCall & { readonly workspace: ReachedWorkspace }> => {
   const access = await tokenAccess(env, token)
   const workspace = access.reach.workspaces.find((each) => each.slug === slug)
-  if (workspace === undefined) throw new NotFound({ what: 'workspace' })
+  if (workspace === undefined)
+    throw outsideReach(access, (outside) => outside.find((each) => each.slug === slug), env.APP_URL)
   return { workspace, ...callIn(access, workspace) }
 }

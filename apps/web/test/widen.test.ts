@@ -40,7 +40,7 @@ describe('the terms a widening asks for', () => {
     expect(withReachId(LISTED.reach, 'nonsense/x')).toBe(LISTED.reach)
   })
 
-  it('adds a workspace the grant lists without, with only the asked item in it', () => {
+  it('adds a workspace the grant lists without: whole when the link names the workspace, else with only the asked item', () => {
     const none = withWorkspaces(PRESET.reach, [])
     expect(withReachId(none, 'ws_beta/connection/notes').each).toEqual([
       {
@@ -50,14 +50,7 @@ describe('the terms a widening asks for', () => {
         connections: { kind: 'list', ids: ['notes'] },
       },
     ])
-    expect(withReachId(none, 'ws_beta').each).toEqual([
-      {
-        workspace: 'ws_beta',
-        topics: { kind: 'list', ids: [] },
-        personas: { kind: 'list', ids: [] },
-        connections: { kind: 'list', ids: [] },
-      },
-    ])
+    expect(withReachId(none, 'ws_beta').each).toEqual([everything('ws_beta')])
   })
 
   it('raises the level and adds the extra, never lowering or taking anything away', () => {
@@ -113,7 +106,7 @@ describe('the terms a widening asks for', () => {
     expect(askedWords({ reach: 'ws_acme/topic/3' }, LISTED, LISTED, { workspace: 'Acme' })).toEqual([])
     const none = { ...LISTED, reach: withWorkspaces(LISTED.reach, []) }
     expect(askedWords({ reach: 'ws_acme' }, none, widened(none, { reach: 'ws_acme' }), { workspace: 'Acme' })).toEqual([
-      'The workspace Acme',
+      'The whole workspace Acme: every Topic, Persona and connection in it',
     ])
   })
 

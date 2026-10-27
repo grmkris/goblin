@@ -545,7 +545,8 @@ export async function restBearerCase(base: string) {
   expect(stream.headers.get('content-type')).toContain('text/event-stream')
   expect(await frameOf(stream, 'MESSAGES_SNAPSHOT')).toContain('"messages"')
   // Outside its reach, on the people's paths, and with a session beside it, the token reaches nothing.
-  expect((await bearer(`/w/${elsewhere.slug}/api/topics`)).status).toBe(404)
+  // The person's own workspace outside the grant asks to widen by it (ADR 0127); `workspaceWidenCase` follows that.
+  expect((await bearer(`/w/${elsewhere.slug}/api/topics`)).status).toBe(403)
   expect((await bearer(`/w/${owner.slug}/api/members`)).status).toBe(403)
   expect((await bearer('/api/workspaces')).status).toBe(401)
   expect((await bearer(`/w/${owner.slug}/api/topics`, { headers: { cookie: owner.cookie } })).status).toBe(403)
@@ -654,4 +655,63 @@ export async function connectionSetupCase(base: string) {
   const refused = await addAs(theirs.access, owner.slug)
   expect(refused.status).toBe(403)
   expect(await refused.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
+}
+
+const WidenRefusal = Schema.Struct({
+  error: Schema.Struct({ code: Schema.Literal('access_insufficient'), widenUrl: Schema.String }),
+})
+
+/**
+ * ADR 0127 on the real Worker: a client whose grant reaches one of its person's workspaces, naming another of theirs,
+ * is refused with the link that widens its grant by that whole workspace, on REST and on /mcp; one its person is not in
+ * stays not found. Approved as the widening page approves it, the same token reaches it.
+ */
+export async function workspaceWidenCase(base: string) {
+  const owner = await person(base)
+  const made = await call(base, owner, '/api/workspaces', {
+    name: 'Team',
+    slug: `team-${crypto.randomUUID().slice(0, 6)}`,
+  })
+  expect(made.status).toBe(201)
+  const team = Schema.decodeUnknownSync(Schema.Struct({ id: Schema.String, slug: Schema.String }))(await made.json())
+  const stranger = await person(base)
+  const clientId = await register(base, owner)
+  const granted = await authorize(base, owner, clientId, {
+    scope: ALL_SCOPES,
+    terms: { level: 'write', workspaces: [owner.workspace] },
+  })
+  const bearer = (path: string) => fetch(`${base}${path}`, { headers: { authorization: `Bearer ${granted.access}` } })
+
+  // REST: the person's own workspace outside the grant asks to widen by it whole; a stranger's is not there.
+  const refused = await bearer(`/w/${team.slug}/api/topics`)
+  expect(refused.status, await refused.clone().text()).toBe(403)
+  const link = new URL(Schema.decodeUnknownSync(WidenRefusal)(await refused.json()).error.widenUrl)
+  expect([link.pathname, link.searchParams.get('reach')]).toEqual(['/consent/widen', team.id])
+  const grantId = link.searchParams.get('grant') ?? ''
+  expect((await bearer(`/w/${stranger.slug}/api/topics`)).status).toBe(404)
+
+  // /mcp: the same refusal as the tool's error result; the stranger's workspace is still not found.
+  const client = await connect(base, granted.access)
+  try {
+    const outside = await client.callTool({ name: 'topic_list', arguments: { workspace: team.slug } })
+    expect(outside.isError).toBe(true)
+    const [text] = Schema.decodeUnknownSync(Schema.Array(Schema.Struct({ text: Schema.String })))(outside.content)
+    const { widenUrl } = Schema.decodeUnknownSync(Refused)(JSON.parse(text?.text ?? '{}'))
+    expect(new URL(widenUrl).searchParams.get('reach')).toBe(team.id)
+    expect(JSON.stringify(await answerOf(client, 'topic_list', { workspace: stranger.slug }))).toContain('NotFound')
+  } finally {
+    await client.close()
+  }
+
+  // Approved as the widening page approves it, the workspace joins the grant and the same token reaches it.
+  const widened = await fetch(`${base}/api/grants/${grantId}`, {
+    method: 'PUT',
+    headers: browserOf(owner),
+    body: JSON.stringify({
+      grantId,
+      terms: termsOf(owner, { level: 'write', workspaces: [owner.workspace, team.id] }),
+    }),
+  })
+  expect(widened.status, await widened.clone().text()).toBe(200)
+  expect((await bearer(`/w/${team.slug}/api/topics`)).status).toBe(200)
 }

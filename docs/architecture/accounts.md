@@ -58,7 +58,8 @@ Which agent a request reaches comes from its credential: a browser session names
 0097](../adr/0097-one-mcp-reaches-the-workspaces-its-consent-chooses.md), [0114](../adr/0114-one-grant-for-every-credential.md)),
 read with the person's memberships on every call, and each call names the one it is for: in its `/mcp` arguments, or
 in its path (`/w/<slug>/api/…`, [ADR 0116](../adr/0116-an-oauth-client-uses-the-owner-api-too.md)). A person's clients are
-theirs, at `/api/clients` (`auth/clients.ts`). An installed app reaches the workspaces it is installed in, read on every
+theirs, at `/api/clients` (`auth/clients.ts`). One of its person's workspaces outside its grant is refused with a link
+that adds it whole ([ADR 0127](../adr/0127-a-client-may-ask-for-a-workspace-its-person-belongs-to.md)). An installed app reaches the workspaces it is installed in, read on every
 call, and names one the same way ([ADR 0118](../adr/0118-a-product-installs-into-a-workspace.md)).
 
 ### Apps and installations

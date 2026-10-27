@@ -71,20 +71,24 @@ export const membershipOf = async (
   return row === null ? undefined : viewOf(row)
 }
 
-/** The workspaces an MCP client reaches for its person now (ADRs 0097, 0114), and whether its grant reaches all. */
+/**
+ * The workspaces an MCP client reaches for its person now (ADRs 0097, 0114), whether its grant reaches all, and the
+ * person's other workspaces, which its grant does not reach (`outside`): a call naming one may ask to widen (ADR 0127).
+ */
 export interface Reached {
   readonly all: boolean
   readonly workspaces: readonly WorkspaceView[]
+  readonly outside: readonly WorkspaceView[]
 }
 
 /**
  * What `userId`'s grant to MCP client `clientId` reaches now (ADRs 0097, 0114): every workspace they are a member of
- * when it reaches all of theirs (ones joined since included), else those it names that they still are; none without a
- * grant, or with a revoked one. Its end is the token's check (`verifyAccessToken`). One D1 round trip, read on every
- * call.
+ * when it reaches all of theirs (ones joined since included), else those it names that they still are, and their other
+ * workspaces; none without a grant, or with a revoked one. Its end is the token's check (`verifyAccessToken`). One D1
+ * round trip, read on every call.
  */
 export const reachedBy = async (db: Database, userId: string, clientId: string): Promise<Reached | undefined> => {
-  const [grant, listed] = await db.batch<Row & { readonly everything?: number }>([
+  const [grant, listed, memberships] = await db.batch<Row & { readonly everything?: number }>([
     db
       .prepare(
         'SELECT "workspacesAll" AS everything FROM "grant" WHERE "clientId" = ? AND "userId" = ? AND "revokedAt" IS NULL',
@@ -98,10 +102,14 @@ export const reachedBy = async (db: Database, userId: string, clientId: string):
         ORDER BY m.createdAt, o.id`,
       )
       .bind(userId, clientId),
+    db.prepare(`${SELECT} WHERE m.userId = ? ORDER BY m.createdAt, o.id`).bind(userId),
   ])
   const [row] = grant?.results ?? []
   if (row === undefined) return undefined
-  return { all: row.everything === 1, workspaces: (listed?.results ?? []).map(viewOf) }
+  const workspaces = (listed?.results ?? []).map(viewOf)
+  const reached = new Set(workspaces.map((each) => each.id))
+  const outside = (memberships?.results ?? []).map(viewOf).filter((each) => !reached.has(each.id))
+  return { all: row.everything === 1, workspaces, outside }
 }
 
 const listOf = async (db: Database, userId: string): Promise<readonly WorkspaceView[]> =>

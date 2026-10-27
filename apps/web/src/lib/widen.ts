@@ -14,7 +14,7 @@ import {
   levelAtLeast,
 } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
-import { FIELD_OF, entryOf, withEntry } from './grant-reach.ts'
+import { FIELD_OF, entryOf, everything, withEntry } from './grant-reach.ts'
 
 /** What the link carries: the grant, and the level, reach item, extra or new thing it was refused for. */
 export interface WidenSearch {
@@ -60,8 +60,10 @@ export const reachItemOf = (
 }
 
 /**
- * `reach` widened by one reach id and nothing more: a workspace it lists without one gains it with nothing else in it,
- * and an item joins its kind's list. What it already reaches stays as it is.
+ * `reach` widened by one reach id and nothing more. A bare workspace it does not list joins whole, every Topic, Persona
+ * and connection in it (ADR 0127: a client asks for a workspace its person belongs to). An item in a workspace it does
+ * not list joins it with nothing else, and an item in one it lists joins its kind's list. What it already reaches stays
+ * as it is.
  */
 export const withReachId = (reach: GoblinReach, reachId: string): GoblinReach => {
   const item = reachItemOf(reachId)
@@ -71,7 +73,7 @@ export const withReachId = (reach: GoblinReach, reachId: string): GoblinReach =>
   const entry = listed
     ? entryOf(reach, item.workspace)
     : { workspace: item.workspace, topics: none, personas: none, connections: none }
-  if (item.kind === undefined) return listed ? reach : withEntry(reach, entry)
+  if (item.kind === undefined) return listed ? reach : withEntry(reach, everything(item.workspace))
   const field = FIELD_OF[item.kind]
   const list = entry[field]
   if (list.kind === 'all' || list.ids.includes(item.id)) return listed ? reach : withEntry(reach, entry)
@@ -137,7 +139,9 @@ export const askedWords = (
   const where = names.workspace ?? item?.workspace ?? ''
   const what = (id: string) => (names.item === undefined ? id : `“${names.item}”`)
   return [
-    ...(adds && item.kind === undefined ? [`The workspace ${where}`] : []),
+    ...(adds && item.kind === undefined
+      ? [`The whole workspace ${where}: every Topic, Persona and connection in it`]
+      : []),
     ...(adds && item.kind !== undefined ? [`${KIND_WORDS[item.kind]} ${what(item.id)} in ${where}`] : []),
     ...(search.create === undefined ? [] : [`To make “${search.create}”`]),
   ]

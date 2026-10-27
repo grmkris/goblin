@@ -8,7 +8,14 @@ import Stack from './auth-stack.ts'
 import { call, person, signedIn } from './owner-requests.ts'
 import { tasksCase } from './tasks-case.ts'
 import { answerOf } from './probe-reads.ts'
-import { appWideningCase, connectionSetupCase, inspectAuthCase, reachCase, restBearerCase } from './auth-inspect.ts'
+import {
+  appWideningCase,
+  connectionSetupCase,
+  inspectAuthCase,
+  reachCase,
+  restBearerCase,
+  workspaceWidenCase,
+} from './auth-inspect.ts'
 import { installsCase } from './installs-case.ts'
 import { cimdCase, protocolCase } from './protocol-case.ts'
 
@@ -232,6 +239,13 @@ harness.test(
   Effect.gen(function* () {
     const { url } = yield* stack
     yield* Effect.promise(() => restBearerCase(url))
+  }),
+)
+harness.test(
+  'a client asks for a workspace its person belongs to: refused with a link that adds it whole, then reached (ADR 0127)',
+  Effect.gen(function* () {
+    const { url } = yield* stack
+    yield* Effect.promise(() => workspaceWidenCase(url))
   }),
 )
 harness.test(
