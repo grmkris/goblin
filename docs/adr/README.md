@@ -37,7 +37,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0034](0034-move-to-thread.md) | Start thread and Move to thread | Accepted; amended by 0067; its `StartThread` body superseded by 0111 |
 | [0035](0035-cross-topic-retrieval.md) | Cross-Topic retrieval | Accepted; amended by 0067 and 0115 (search covers the boundary: a hub's every Topic, a sealed Topic itself) |
 | [0036](0036-slack-style-shell.md) | Slack-style shell | Accepted; amended by 0053; its rail and sidebar superseded by 0078 |
-| [0037](0037-conversation-flows-and-failure-reporting.md) | Conversation flows and failure reporting | Accepted |
+| [0037](0037-conversation-flows-and-failure-reporting.md) | Conversation flows and failure reporting | Accepted; amended by 0124 (its flow points and references are read through Cloudflare's MCP) |
 | [0038](0038-typed-owner-api-served-by-the-agent.md) | Typed owner API served by the agent | Accepted; amended by 0081 |
 | [0039](0039-chat-markdown-through-streamdown.md) | Chat Markdown through Streamdown, and what a reply may load | Accepted |
 | [0040](0040-topic-and-persona-setup.md) | Topic setup and Persona setup | Accepted; amended by 0067 |
@@ -115,3 +115,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0121](0121-tsrs-only-the-fallback-is-gone.md) | tsrs only: the `EFFECT_CHECKER=tsgo` fallback is gone, and effect-tsrs moves to 0.2.2 with `--type-check` | Accepted; built; amends 0120 |
 | [0122](0122-inbound-oauth-follows-the-mcp-authorization-spec.md) | Inbound OAuth follows the MCP authorization spec: Client ID Metadata Documents, bearer tokens without DPoP, redirects `localhost` or https, `offline_access` by rule, `invalid_token`, RFC 7009 | Accepted; built; amends 0024, 0086, 0114 |
 | [0123](0123-type-aware-lint-runs-on-tsrs-lint.md) | Type-aware lint runs on tsrs-lint, a pinned release of our tsrs fork: `tools/tsrs-lint.ts` fetches and verifies it, oxlint-tsgolint is gone, no fallback | Accepted; built; amends 0120, 0121 |
+| [0124](0124-cloudflare-data-is-read-through-cloudflares-mcp.md) | Cloudflare's own data is read through Cloudflare's MCP: the CLI's `logs`, `lookup` and `stats` go | Accepted; amends 0037 |
