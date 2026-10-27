@@ -158,6 +158,7 @@ describe('auth D1 baseline', () => {
       '0005_grants.sql',
       '0006_apps.sql',
       '0007_no_keys.sql',
+      '0008_no_key_extras.sql',
     ])
     const { db, auth } = fixture()
     await auth.$context
@@ -405,6 +406,61 @@ describe('auth D1 baseline', () => {
     expect(tables.filter((name) => String(name).endsWith('_0007'))).toEqual([])
     expect(rows('PRAGMA table_info("grant")').map((column) => column['name'])).not.toContain('keyId')
     expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+  })
+
+  it('removes only the retired extra from client grants, installations and app terms (0008, ADR 0126)', () => {
+    const db = new DatabaseSync(':memory:')
+    databases.push(db)
+    const migration = '0008_no_key_extras.sql'
+    for (const name of migrations.slice(0, migrations.indexOf(migration)))
+      db.exec(readFileSync(join(DIR, name), 'utf8'))
+    db.exec(`
+      INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt)
+        VALUES ('u1', 'Owner', 'owner@example.test', 1, '${NOW}', '${NOW}');
+      INSERT INTO organization (id, name, slug, createdAt) VALUES ('w1', 'Mine', 'mine', '${NOW}');
+      INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]'), ('c2', 'app-1', '[]');
+      INSERT INTO "grant" (id, kind, clientId, userId, name, level, extras, lifetime, expiresAt, origins, revokedAt, createdAt, updatedAt)
+        VALUES ('cg_1', 'client', 'client-1', 'u1', 'Client', 'manage', '["keys","inspect","setup"]', '30d', '${NOW}', '[]', '${NOW}', '${NOW}', '${NOW}'),
+               ('in_1', 'app', 'app-1', null, 'App', 'read', '["keys"]', 'never', null, '[{"origin":"https://app.example.test/mcp","tools":["plan"]}]', null, '${NOW}', '${NOW}');
+      INSERT INTO app (clientId, workspaceId, terms, script, createdBy, createdAt)
+        VALUES ('app-1', 'w1', '{"level":"read","extras":["keys","routines"],"lifetime":"never","reach":{"workspaces":"list","each":[],"origins":[]}}', 1, 'u1', '${NOW}');
+      INSERT INTO installation (id, clientId, workspaceId, approvedBy, createdAt)
+        VALUES ('in_1', 'app-1', 'w1', 'u1', '${NOW}');
+      INSERT INTO grantWorkspace (grantId, workspaceId, topics, personas, connections, generation)
+        VALUES ('cg_1', 'w1', 'list', 'all', 'all', 3), ('in_1', 'w1', 'list', 'list', 'list', 5);
+      INSERT INTO grantReach (grantId, workspaceId, kind, resourceId)
+        VALUES ('cg_1', 'w1', 'topic', '1'), ('in_1', 'w1', 'persona', '2'), ('in_1', 'w1', 'connection', 'mycut');
+    `)
+    const rows = (table: string) => db.prepare(`SELECT * FROM "${table}"`).all()
+    const before = rows('grant')
+    const app = rows('app')[0]
+    const related = ['installation', 'grantWorkspace', 'grantReach'].map(rows)
+    const sql = readFileSync(join(DIR, migration), 'utf8')
+    db.exec(sql)
+    expect(rows('grant')).toEqual(
+      before.map((row) => ({
+        ...row,
+        extras: row['id'] === 'cg_1' ? '["inspect","setup"]' : '[]',
+      })),
+    )
+    expect(rows('app')).toEqual([
+      {
+        ...app,
+        terms: JSON.stringify({ ...JSON.parse(String(app?.['terms'])), extras: ['routines'] }),
+      },
+    ])
+    expect(['installation', 'grantWorkspace', 'grantReach'].map(rows)).toEqual(related)
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    const migrated = [rows('grant'), rows('app')]
+    db.exec(sql)
+    expect([rows('grant'), rows('app')]).toEqual(migrated)
+    for (const unchanged of ['{broken', 'null', '[]', '["inspect"]']) {
+      db.prepare('UPDATE "grant" SET extras = ?').run(unchanged)
+      db.prepare('UPDATE app SET terms = ?').run(unchanged)
+      db.exec(sql)
+      expect(rows('grant').map((row) => row['extras'])).toEqual([unchanged, unchanged])
+      expect(rows('app')[0]?.['terms']).toBe(unchanged)
+    }
   })
 
   it("turns a seeded 0004 database's keys and consents into grants, row for row of the mapping (0005, ADR 0114)", () => {

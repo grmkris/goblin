@@ -43,9 +43,13 @@ This is a fresh schema, with no upgrade path for the previous application or aut
 either baseline must reset disposable dev before recreating it, following the reset/setup checklist in
 [development](../development.md). Existing deployments must not receive these migrations without that reset.
 
-Production keeps its agents through forward migrations after the baseline (`MIGRATIONS`); the last, `SEALED` (ADR
+Production keeps its agents through forward migrations after the baseline (`MIGRATIONS`); `SEALED` (ADR
 0115), adds each Topic's reach (Personal the hub) and `guidance_by`, drops the search opt-out, adds receipts' `power`
 and renames `app_key_reach` to `app_made_by`; its unit test runs it on a seeded database from before it.
+
+`NO_KEY_POWERS` and auth D1 `0008_no_key_extras.sql` finish retiring the `keys` extra without losing other approved
+powers (ADR 0126). They preserve the surviving grants, app terms and stored receipt scopes, and rename historical
+receipt origin `key` to `app`. They do not reactivate old credentials or require a reset.
 
 Unit tests compare the baseline's complete table and column inventory with the current Drizzle declarations,
 including types, defaults and nullability; they exercise partial uniqueness and FTS insert/update/delete triggers.

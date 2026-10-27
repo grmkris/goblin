@@ -117,3 +117,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0123](0123-type-aware-lint-runs-on-tsrs-lint.md) | Type-aware lint runs on tsrs-lint, a pinned release of our tsrs fork: `tools/tsrs-lint.ts` fetches and verifies it, oxlint-tsgolint is gone, no fallback | Accepted; built; amends 0120, 0121 |
 | [0124](0124-cloudflare-data-is-read-through-cloudflares-mcp.md) | Cloudflare's own data is read through Cloudflare's MCP: the CLI's `logs`, `lookup` and `stats` go | Accepted; amends 0037 |
 | [0125](0125-keys-are-gone.md) | Keys are gone: every credential is a person's client or an installed app | Accepted; supersedes 0105 and the key parts of 0081, 0084, 0085, 0090, 0091, 0114, 0116 and 0118 |
+| [0126](0126-preserve-powers-when-keys-retire.md) | Preserve approved powers when keys retire | Accepted; amends 0125's migration and stored receipt behavior |

@@ -9,6 +9,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/node-sqlite'
 import { BREAK } from '../src/storage/migrations/migration.ts'
 import { residentStatus } from '../src/resident.ts'
+import { receiptPower } from '../src/grants/power.ts'
 
 const databases: ReturnType<typeof chatDatabase>[] = []
 afterEach(() => {
@@ -61,6 +62,48 @@ describe('resident authority until revoked (ADR 0088)', () => {
     rest()
     expect(sqlite.prepare('SELECT * FROM app_resident').all()).toEqual([{ id: 1, granted_at: 100, revoked_at: null }])
     expect(residentStatus(drizzle({ client: sqlite }))).toEqual({ state: 'active', grantedAt: 100 })
+    sqlite.close()
+  })
+})
+
+describe('retired key powers (ADR 0126)', () => {
+  it('leaves absent, unreadable and already current powers unchanged', () => {
+    const { sqlite, rest } = before('20261027000000_no_key_powers')
+    const values = [null, '{broken', '{"extras":["inspect"],"level":"read"}']
+    const insert = sqlite.prepare(
+      "INSERT INTO app_chat_operations (chat_id, operation_id, session_id, admitted_at, kind, origin, state, power) VALUES ('1', ?, '41', 1, 'send', 'app', 'settled', ?)",
+    )
+    for (const [index, power] of values.entries()) insert.run(String(index), power)
+    rest()
+    expect(
+      sqlite
+        .prepare('SELECT power FROM app_chat_operations ORDER BY operation_id')
+        .all()
+        .map((row) => row['power']),
+    ).toEqual(values)
+    sqlite.close()
+  })
+  it('preserves a limited turn and its server attribution, removing only the retired extra', () => {
+    const { sqlite, rest } = before('20261027000000_no_key_powers')
+    const power = {
+      level: 'read',
+      extras: ['keys', 'inspect'],
+      server: true,
+      topicLists: ['grant-1'],
+      connectionLists: [],
+    }
+    sqlite
+      .prepare(
+        "INSERT INTO app_chat_operations (chat_id, operation_id, session_id, admitted_at, kind, origin, state, power) VALUES ('1', 'op', '41', 1, 'send', 'key', 'settled', ?)",
+      )
+      .run(JSON.stringify(power))
+    rest()
+    const row = sqlite.prepare('SELECT origin, power FROM app_chat_operations').get()
+    expect(row?.['origin']).toBe('app')
+    expect(receiptPower({ power: String(row?.['power']), origin: String(row?.['origin']) })).toEqual({
+      ...power,
+      extras: ['inspect'],
+    })
     sqlite.close()
   })
 })
@@ -157,7 +200,7 @@ describe('every Topic is sealed (ADR 0115)', () => {
     expect(columns.map((column) => column['name'])).not.toContain('search_excluded')
     expect(() => sqlite.exec("UPDATE app_topics SET reach = 'open' WHERE id = 2")).toThrow(/CHECK/u)
     expect(sqlite.prepare('SELECT operation_id, origin, power FROM app_chat_operations').all()).toEqual([
-      { operation_id: 'op', origin: 'key', power: null },
+      { operation_id: 'op', origin: 'app', power: null },
     ])
     expect(sqlite.prepare('SELECT key_id, resource_id, key_name FROM app_made_by').all()).toEqual([
       { key_id: 'key-1', resource_id: 2, key_name: 'swarmm' },
@@ -207,6 +250,7 @@ describe('fresh application baseline', () => {
       '20261023010000_publish',
       '20261023200000_grants',
       '20261024000000_sealed',
+      '20261027000000_no_key_powers',
     ])
     // An additive migration that alters a table names it too, so a table may be named more than once; one that drops
     // or renames a table names it, and it is no live table (ADR 0110's chat streams, ADR 0115's key reach).
