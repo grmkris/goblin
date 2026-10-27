@@ -325,6 +325,32 @@
     min-height: 0;
   }
 
+  /*
+   * The page's own field and scene behind the hero (`data-backdrop='page'`): the hero paints nothing, and leaves the
+   * scene room. On a phone and a tablet a stretch between the copy and the panel stays open for it; from a desktop up
+   * the copy and the panel share the right seven columns, beside the scene's subject.
+   */
+  .moss-frame[data-backdrop='page'] {
+    background: none;
+  }
+  @media (max-width: 63.99rem) {
+    .moss-frame[data-backdrop='page'] .moss-frame-grid {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: clamp(13rem, 46svh, 26rem);
+    }
+  }
+  @media (min-width: 64rem) {
+    .moss-frame[data-backdrop='page'] .moss-frame-grid {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      align-items: start;
+      row-gap: 3rem;
+      padding-block-start: 3.5rem;
+    }
+    .moss-frame[data-backdrop='page'] :is(.moss-frame-copy, .moss-frame-panel) {
+      grid-column: 6 / -1;
+    }
+  }
+
   /* A section: copy (five columns) beside its visual (seven), swapped by `data-flip`; stacked on a phone. */
   .site-section {
     display: grid;
@@ -358,6 +384,11 @@
     min-width: 0;
     flex-direction: column;
     gap: 1.25rem;
+  }
+  /* A chapter's drawing over its heading, at the start of the copy. */
+  .site-section-art {
+    display: flex;
+    margin-block-end: 0.25rem;
   }
   .site-section-text {
     display: flex;

@@ -1,14 +1,353 @@
 /*
  * goblin's landing at `/` (components/landing, routes/index.tsx), around the shared marketing parts in @goblin/ui
- * (`marketing.css`). The hero panel plays one short session, timed here: each step enters with a 6px rise once, from
- * the first paint, and the script follows the same clock (hero-session.tsx keeps its STEPS in step with `--at`).
- * Nothing else on the page moves by itself. Screenshots carry a 1px outline in pure black or white at 10%.
+ * (`marketing.css`). The whole page is the moss field, with one night drawn behind all of it (the world, below): the
+ * night stays put while the page moves over it, dims behind the chapters, and turns to dawn as the close comes in.
+ * The hero panel plays one short session, timed here: each step enters with a 6px rise once, from the first paint, and
+ * the script follows the same clock (hero-session.tsx keeps its STEPS in step with `--at`). Screenshots carry a 1px
+ * outline in white at 12%.
+ *
+ * The drawings are etchings (scripts/landing-art.ts): grey images of how much ink each pixel holds, used as luminance
+ * masks over a token, so they are lichen on moss in light and dark alike. The only warm colour is the light in them
+ * (`--presence-warm`, the colour goblin waits for you in). A browser without luminance masks shows no drawings, never a
+ * filled box.
  */
 .landing-root {
+  --etch-field: oklch(0.93 0.05 118 / 0.42);
+  --etch-page: oklch(0.93 0.05 118 / 0.78);
+  /* What sits on the field: words in the shell's colours, lines and links in its own. */
+  --field-text: color-mix(in oklab, var(--shell-foreground) 84%, var(--shell));
+  --field-muted: var(--shell-muted);
+  --field-line: var(--shell-border);
+  --field-link: var(--shell-ring);
   display: block;
+  isolation: isolate;
   min-height: 100dvh;
-  background: var(--background);
+  background: var(--shell);
+  color: var(--shell-foreground);
   -webkit-font-smoothing: antialiased;
+  timeline-scope: --landing-hero, --landing-close;
+}
+.dark .landing-root {
+  --etch-field: oklch(0.93 0.05 118 / 0.3);
+  --etch-page: oklch(0.93 0.05 118 / 0.62);
+}
+
+/* Past the bar to the hero, for a keyboard: shown only while it has focus. */
+.landing-skip {
+  position: absolute;
+  z-index: calc(var(--z-chrome) + 1);
+  top: calc(var(--safe-top) + 0.5rem);
+  left: max(0.5rem, var(--safe-left));
+  padding: 0.625rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 560;
+  translate: 0 calc(-100% - 1rem);
+}
+.landing-skip:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  translate: 0 0;
+}
+
+/* An etching: its drawing is the mask, the token its ink. */
+.landing-etching {
+  display: none;
+}
+@supports (mask-mode: luminance) {
+  .landing-etching {
+    display: block;
+    mask-mode: luminance;
+    mask-position: center;
+    mask-repeat: no-repeat;
+    mask-size: 100% 100%;
+  }
+}
+
+/*
+ * The world: the field's night, fixed behind the whole page at the large viewport's height (so a phone's bars coming
+ * and going never resize it), a size container its scenes cover. The night layer dims as the hero leaves; the dawn
+ * layer, the warmth in the sky and the night's fading out follow the close coming in. Where scroll timelines are
+ * missing the night stays, dimmed, and dawn never comes.
+ */
+.landing-world {
+  position: fixed;
+  z-index: -1;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100lvh;
+  overflow: clip;
+  container-type: size;
+  pointer-events: none;
+}
+.landing-world > *,
+.landing-world-fade {
+  position: absolute;
+  inset: 0;
+}
+.landing-world-night {
+  opacity: 0.6;
+}
+.landing-world-dawn,
+.landing-world-sky {
+  opacity: 0;
+}
+.landing-world-sky {
+  background: radial-gradient(
+    110% 70% at 74% 78%,
+    color-mix(in oklch, var(--presence-warm) 26%, transparent),
+    transparent 62%
+  );
+}
+.landing-root .moss-frame {
+  view-timeline: --landing-hero block;
+}
+.landing-close {
+  view-timeline: --landing-close block;
+}
+@supports (animation-timeline: view()) {
+  .landing-world-night {
+    animation: landing-dim linear both;
+    animation-timeline: --landing-hero;
+    animation-range: exit 0% exit 100%;
+  }
+  .landing-world-fade {
+    animation: landing-out linear both;
+    animation-timeline: --landing-close;
+    animation-range: entry 0% entry 100%;
+  }
+  .landing-world-dawn,
+  .landing-world-sky {
+    animation: landing-in linear both;
+    animation-timeline: --landing-close;
+    animation-range: entry 0% entry 100%;
+  }
+}
+@keyframes landing-dim {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.42;
+  }
+}
+@keyframes landing-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes landing-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * A scene covers the world from the bottom left, the drawing's own proportions kept. Where the world is taller than
+ * wide (a phone held upright) it is drawn at two and a half widths instead, shifted so goblin stands near the middle,
+ * with its sky fading into the field's. Its light, its fireflies and its stars sit where the drawing has them.
+ */
+.landing-scene {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: max(100cqw, 100cqh * var(--scene-ratio));
+  aspect-ratio: var(--scene-ratio);
+}
+@container (aspect-ratio < 1) {
+  .landing-scene {
+    left: -32cqw;
+    width: 250cqw;
+    mask-image: linear-gradient(transparent, black 26%);
+  }
+}
+.landing-scene > .landing-etching {
+  position: absolute;
+  inset: 0;
+  background: var(--etch-field);
+}
+.landing-scene[data-scene='night'] {
+  --scene-ratio: 2000 / 1129;
+}
+.landing-scene[data-scene='night'] > .landing-etching {
+  mask-image: url('./assets/landing/etching-night-1400.jpg');
+}
+.landing-scene[data-scene='dawn'] {
+  --scene-ratio: 2000 / 1129;
+}
+.landing-scene[data-scene='dawn'] > .landing-etching {
+  mask-image: url('./assets/landing/etching-dawn-1400.jpg');
+}
+@media (min-width: 64rem) {
+  .landing-scene[data-scene='night'] > .landing-etching {
+    mask-image: url('./assets/landing/etching-night-2000.jpg');
+  }
+  .landing-scene[data-scene='dawn'] > .landing-etching {
+    mask-image: url('./assets/landing/etching-dawn-2000.jpg');
+  }
+}
+.landing-glow {
+  position: absolute;
+  top: var(--glow-y);
+  left: var(--glow-x);
+  width: var(--glow-size);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: var(--radius-pill);
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklch, var(--presence-warm) 52%, transparent),
+    color-mix(in oklch, var(--presence-warm) 16%, transparent) 42%,
+    transparent
+  );
+}
+.landing-glow[data-light='lantern'] {
+  --glow-x: 40.07%;
+  --glow-y: 61.2%;
+  --glow-size: 15%;
+}
+.landing-glow[data-light='sun'] {
+  --glow-x: 74.5%;
+  --glow-y: 72.4%;
+  --glow-size: 38%;
+}
+.landing-firefly {
+  position: absolute;
+  top: var(--y);
+  left: var(--x);
+  width: 0.3125rem;
+  aspect-ratio: 1;
+  border-radius: var(--radius-pill);
+  background: oklch(0.96 0.09 100);
+  box-shadow:
+    0 0 0.375rem 0.125rem color-mix(in oklch, var(--presence-warm) 70%, transparent),
+    0 0 1.25rem 0.375rem color-mix(in oklch, var(--presence-warm) 22%, transparent);
+  opacity: 0.7;
+}
+.landing-star {
+  position: absolute;
+  top: var(--y);
+  left: var(--x);
+  width: 0.1875rem;
+  aspect-ratio: 1;
+  border-radius: var(--radius-pill);
+  background: oklch(0.96 0.04 110);
+  box-shadow: 0 0 0.375rem oklch(0.96 0.04 110 / 0.6);
+  opacity: 0.55;
+}
+
+/*
+ * The night's own life, for people who have not asked for less motion: the lantern flickers, fireflies drift and blink
+ * over the grass, and a few stars twinkle. Each is small, and none keeps one rhythm long, so nothing large pulses.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .landing-glow[data-light='lantern'] {
+    animation: landing-flicker 4.7s linear infinite;
+  }
+  .landing-firefly {
+    animation:
+      landing-drift var(--drift) var(--ease-in-out) var(--delay) infinite alternate,
+      landing-blink var(--blink) ease-in-out var(--delay) infinite;
+  }
+  .landing-star {
+    animation: landing-twinkle var(--blink) ease-in-out var(--delay) infinite;
+  }
+}
+@keyframes landing-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  8% {
+    opacity: 0.8;
+  }
+  13% {
+    opacity: 0.96;
+  }
+  31% {
+    opacity: 0.86;
+  }
+  44% {
+    opacity: 1;
+  }
+  58% {
+    opacity: 0.76;
+  }
+  64% {
+    opacity: 0.94;
+  }
+  83% {
+    opacity: 0.85;
+  }
+}
+@keyframes landing-drift {
+  0% {
+    translate: 0 0;
+  }
+  50% {
+    translate: var(--dx) calc(var(--dy) * -1);
+  }
+  100% {
+    translate: calc(var(--dx) * -0.6) var(--dy);
+  }
+}
+@keyframes landing-blink {
+  0%,
+  100% {
+    opacity: 0.1;
+  }
+  38% {
+    opacity: 1;
+  }
+  62% {
+    opacity: 0.85;
+  }
+}
+@keyframes landing-twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+    scale: 0.8;
+  }
+  50% {
+    opacity: 0.95;
+    scale: 1;
+  }
+}
+
+/* A chapter's drawing: a figure at the work the chapter is about, in the page's moss, the height of four lines. */
+.landing-chapter {
+  height: 8.5rem;
+  aspect-ratio: var(--chapter-ratio);
+  margin-inline-start: -0.5rem;
+  background: var(--etch-page);
+}
+@media (min-width: 48rem) {
+  .landing-chapter {
+    height: 10.5rem;
+  }
+}
+.landing-chapter[data-chapter='away'] {
+  --chapter-ratio: 672 / 823;
+  mask-image: url('./assets/landing/etching-away.jpg');
+}
+.landing-chapter[data-chapter='keys'] {
+  --chapter-ratio: 672 / 636;
+  mask-image: url('./assets/landing/etching-keys.jpg');
+}
+.landing-chapter[data-chapter='connect'] {
+  --chapter-ratio: 672 / 726;
+  mask-image: url('./assets/landing/etching-connect.jpg');
+}
+.landing-chapter[data-chapter='open'] {
+  --chapter-ratio: 672 / 538;
+  mask-image: url('./assets/landing/etching-open.jpg');
 }
 
 /* The session in the hero's panel: the owner's message, a tool, an App, goblin's words, its question, its last line. */
@@ -316,15 +655,12 @@
   width: 100%;
   height: auto;
   border-radius: 1rem;
-  outline: 1px solid oklch(0 0 0 / 0.1);
+  outline: 1px solid oklch(1 0 none / 0.12);
   outline-offset: -1px;
-  box-shadow: var(--shadow-2);
-}
-.dark .landing-shot img {
-  outline-color: oklch(1 0 0 / 0.1);
+  box-shadow: var(--shadow-3);
 }
 .landing-shot figcaption {
-  color: var(--muted-foreground);
+  color: var(--field-muted);
   font-size: var(--text-13);
   text-wrap: pretty;
 }
@@ -335,14 +671,14 @@
   margin: 0;
 }
 .landing-points dt {
-  color: var(--foreground);
+  color: var(--shell-foreground);
   font-weight: 600;
 }
 .landing-points dd {
   margin: 0;
 }
 .landing-link {
-  color: var(--moss);
+  color: var(--field-link);
   font-weight: 500;
   text-decoration: underline;
   text-decoration-thickness: from-font;
@@ -350,7 +686,7 @@
 }
 .landing-link:focus-visible {
   border-radius: 0.25rem;
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--shell-ring);
   outline-offset: 2px;
 }
 
@@ -367,14 +703,14 @@
   grid-template-columns: minmax(0, 8.5rem) minmax(0, 1fr);
   gap: 1rem;
   padding-block: 0.5rem;
-  border-block-start: 1px solid var(--border);
+  border-block-start: 1px solid var(--field-line);
 }
 .landing-shelf dt {
-  color: var(--muted-foreground);
+  color: var(--field-muted);
 }
 .landing-shelf dd {
   margin: 0;
-  color: var(--foreground);
+  color: var(--shell-foreground);
   text-wrap: pretty;
 }
 
@@ -451,24 +787,192 @@
   height: 0.875rem;
 }
 
-/* The close: the moss field again, the promises and the way in. */
-.landing-close {
-  background: var(--shell);
-  color: var(--shell-foreground);
+/* A connection's tools, as goblin lists them (tool-card.tsx), on a card in the app's own rows. */
+.landing-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
 }
+.landing-tools-card {
+  padding: 0 1.25rem 0.375rem;
+  border-radius: 1rem;
+  background: var(--card);
+  color: var(--card-foreground);
+  box-shadow:
+    0 0 0 1px var(--hairline),
+    var(--shadow-2);
+}
+.landing-tools-head {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 3.5rem;
+  border-block-end: 1px solid var(--border);
+}
+/* The tile's corner is the card's less its inset (8 = 16 − 8, as near as the head's padding allows). */
+.landing-tools-tile {
+  display: grid;
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: var(--moss);
+  color: var(--moss-foreground);
+}
+.landing-tools-tile > svg {
+  width: 1rem;
+  height: 1rem;
+}
+.landing-tools-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.landing-tools-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.landing-tools-list > li + li {
+  border-block-start: 1px solid var(--hairline);
+}
+/* Where the card is narrow, a tool's choice and switch wrap under its name and keep to the end. */
+.landing-tools-list .grant-row {
+  flex-wrap: wrap;
+  row-gap: 0.25rem;
+  min-height: 3.75rem;
+}
+.landing-tools-list .grant-text {
+  flex: 1 1 13rem;
+}
+.landing-tools-list [data-slot='native-select-wrapper'] {
+  margin-inline-start: auto;
+}
+.landing-tools figcaption {
+  color: var(--field-muted);
+  font-size: var(--text-13);
+  text-wrap: pretty;
+}
+
+/* The questions: each a row that opens to its answer, between hairlines; the heading stays put as they open. */
+.site-section:has(> .site-section-visual > .landing-faq) {
+  align-items: start;
+}
+.landing-faq {
+  display: flex;
+  flex-direction: column;
+  border-block-start: 1px solid var(--field-line);
+}
+.landing-faq details {
+  border-block-end: 1px solid var(--field-line);
+}
+.landing-faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  min-height: 3.5rem;
+  padding-block: 0.75rem;
+  color: var(--shell-foreground);
+  font-size: 1.0625rem;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+  list-style: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.landing-faq summary::-webkit-details-marker {
+  display: none;
+}
+.landing-faq summary::after {
+  content: '';
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-block-end: 1.5px solid var(--field-muted);
+  border-inline-end: 1.5px solid var(--field-muted);
+  rotate: 45deg;
+  translate: 0 -0.125rem;
+}
+.landing-faq details[open] > summary::after {
+  rotate: 225deg;
+  translate: 0 0.125rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .landing-faq summary::after {
+    transition:
+      rotate 200ms var(--ease-out),
+      translate 200ms var(--ease-out);
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .landing-faq summary:hover {
+    color: var(--field-link);
+  }
+}
+.landing-faq summary:focus-visible {
+  border-radius: 0.375rem;
+  outline: 2px solid var(--shell-ring);
+  outline-offset: 2px;
+}
+.landing-faq details > p {
+  max-width: 60ch;
+  margin: 0;
+  padding-block-end: 1.125rem;
+  color: var(--field-text);
+  font-size: 1rem;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* The close: the line and the way in over dawn's sky in the hero's columns, with the landscape under them. */
 .landing-close-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1.5rem 3rem;
-  padding-block: 4rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.5rem;
+  padding-block: 3.5rem clamp(13rem, 52vw, 22rem);
 }
-@media (min-width: 48rem) {
+@media (min-width: 64rem) {
   .landing-close-row {
-    padding-block: 6rem;
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    padding-block: 6rem 22rem;
+  }
+  .landing-close-row > * {
+    grid-column: 6 / -1;
+    justify-self: start;
   }
 }
 .landing-close-row > h2 {
-  max-width: 18ch;
+  max-width: 16ch;
+}
+
+/* The shared sections and foot, on the field: the shell's words and lines, the foot a band of the rail's darker moss. */
+.landing-root .site-section-text {
+  color: var(--field-text);
+}
+.landing-root .site-footer {
+  border-block-start-color: var(--field-line);
+  background: var(--shell-rail);
+  color: var(--shell-foreground);
+}
+.landing-root :is(.site-footer-note, .site-footer-link) {
+  color: var(--field-muted);
+}
+@media (hover: hover) and (pointer: fine) {
+  .landing-root .site-footer-link:hover {
+    color: var(--shell-foreground);
+  }
+}
+.landing-root .site-footer-link:focus-visible {
+  outline-color: var(--shell-ring);
+}
+.landing-root .site-footer .site-brand-tile {
+  background: var(--shell-active);
+  color: var(--shell-active-foreground);
 }

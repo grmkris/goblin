@@ -14,7 +14,7 @@ import '../../src/styles.css'
 // The app's theme script is not on a fixture page: follow the colour scheme the browser asks for.
 document.documentElement.classList.toggle('dark', matchMedia('(prefers-color-scheme: dark)').matches)
 
-/** goblin's landing as `/` renders it for a visitor who is signed out, and the channel it leaves for once signed in. */
+/** goblin's landing as `/` renders it for a visitor who is signed out. */
 const root = createRootRoute({
   component: () => (
     <main className="landing-root">
@@ -23,16 +23,8 @@ const root = createRootRoute({
   ),
 })
 const home = createRoute({ getParentRoute: () => root, path: '/', component: Landing })
-const channel = createRoute({
-  getParentRoute: () => root,
-  path: '/c/$chatId',
-  component: function Channel() {
-    const { chatId } = channel.useParams()
-    return <p id="channel">Channel {chatId}</p>
-  },
-})
 const router = createRouter({
-  routeTree: root.addChildren([home, channel]),
+  routeTree: root.addChildren([home]),
   history: createMemoryHistory({ initialEntries: ['/'] }),
 })
 

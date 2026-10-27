@@ -2,9 +2,15 @@
 // with the headline, one line and the invitation on it, and beside them the off-white message area as a framed panel,
 // where the product's characteristic moment plays. On a phone the copy comes first and the panel runs full width under
 // it.
+//
+// With `backdrop="page"` the page draws the field and a scene behind the hero (and behind everything after it): the
+// hero paints nothing of its own, and leaves the scene room. On a desktop the copy and the panel keep to the right seven
+// columns, beside the scene's subject; on a phone and a tablet a stretch between the copy and the panel stays open.
 import { type ReactNode, useId } from 'react'
 
 export interface MossFrameProps {
+  /** The section's id, for a skip link or an anchor. */
+  readonly id?: string
   /** The page's one headline (its `<h1>`). */
   readonly title: ReactNode
   /** One line under it: what the product is. */
@@ -13,6 +19,8 @@ export interface MossFrameProps {
   readonly actions: ReactNode
   /** A small line under the actions: the price, a fact. */
   readonly note?: ReactNode
+  /** `own` (the default) paints the moss field; `page` leaves it, and a scene, to the page behind the hero. */
+  readonly backdrop?: 'own' | 'page'
   /** The panel's name, in its top bar ("# Islands", "Payments"); assistive tech calls the panel by it too. */
   readonly panelLabel: string
   /** At the end of the panel's top bar: a status. */
@@ -23,10 +31,21 @@ export interface MossFrameProps {
   readonly panelFooter?: ReactNode
 }
 
-export function MossFrame({ title, lede, actions, note, panelLabel, panelStatus, panel, panelFooter }: MossFrameProps) {
+export function MossFrame({
+  id,
+  title,
+  lede,
+  actions,
+  note,
+  backdrop = 'own',
+  panelLabel,
+  panelStatus,
+  panel,
+  panelFooter,
+}: MossFrameProps) {
   const titleId = useId()
   return (
-    <section aria-labelledby={titleId} data-slot="moss-frame" className="moss-frame">
+    <section id={id} aria-labelledby={titleId} data-slot="moss-frame" data-backdrop={backdrop} className="moss-frame">
       <div className="site-width moss-frame-grid">
         <div className="moss-frame-copy">
           <h1 id={titleId} className="site-display">
