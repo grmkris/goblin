@@ -14,7 +14,7 @@ optional (`GOBLIN_MODEL_*`), and so are three bindings, each on unless its switc
 (the `FILES` bucket; without it files up to 128 KiB stay in the agent's SQLite and a larger one is refused as too
 large), `GOBLIN_AGENT_APPS` (the `LOADER`; without it the agent has no app or `code_run` tools, an app view or job
 that needs an isolate is refused, and Apps has no Built for you) and `GOBLIN_FLOWS` (the dataset; without it no flow point
-is written and `goblin stats` has nothing to read). None is needed for the agent to start, and `/health` lists what
+is written and there are no flow totals to read). None is needed for the agent to start, and `/health` lists what
 the deployment has (`features`). goblin's own stages keep every binding.
 `scripts/stage.ts` builds `packages/app`'s toolchain before Alchemy runs. The local stage runs in workerd with CLIProxy; the dev stage calls Railway LiteLLM with a
 dedicated model-limited, budget-capped key. Offered models and the optional daily token cap per account come from stage

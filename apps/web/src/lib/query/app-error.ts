@@ -170,7 +170,7 @@ export function describeError(error: unknown): AppErrorView {
 
 /**
  * `text` ending with a reference to quote ("… · ref 7f3a9c12"): its first eight characters are enough to find it
- * (`goblin lookup`). The one place copy gains its reference.
+ * (its log lines in Workers Observability, ADR 0124). The one place copy gains its reference.
  */
 const quoting = (text: string, ref: string | undefined): string =>
   ref === undefined ? text : `${text} · ref ${ref.slice(0, 8)}`

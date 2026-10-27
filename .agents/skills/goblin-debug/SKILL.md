@@ -1,6 +1,6 @@
 ---
 name: goblin-debug
-description: Find out what happened in a goblin turn (a Source message with no answer, a failing MCP tool, a slow or wrong reply) from the run ledger and conversations, via the inspect tools on /mcp, the goblin CLI or Workers Logs.
+description: Find out what happened in a goblin turn (a message with no answer, a failing MCP tool, a slow or wrong reply) via /mcp's inspect tools, the goblin CLI, and Cloudflare's MCP for Worker logs and flows.
 ---
 
 # Debugging a goblin turn
@@ -12,11 +12,11 @@ is read-only: no query changes the agent or calls a model.
 
 - MCP: `claude mcp add --transport http goblin https://dev.goblin.surf/mcp`, then the owner approves in the browser,
   inspection included when its grant holds the `inspect` extra (ADR 0114; Settings → MCP clients changes it live). Tools: `inspect_problems`, `inspect_turns`, `inspect_turn`,
-  `inspect_conversation`, `inspect_conversations`, `inspect_flows`, `inspect_details`, beside `ask_agent`. A connection that lists no `inspect_*` tools
+  `inspect_conversation`, `inspect_conversations`, `inspect_flows`, `inspect_details`. A connection that lists no `inspect_*` tools
   was approved before inspection joined `/mcp`: reconnect once (Claude Code: `/mcp` → goblin → Clear
   authentication).
 - Terminal: `bun run goblin login` once, then
-  `bun run goblin problems|turns|turn|conversation|flows|details|logs|lookup|stats …`
+  `bun run goblin problems|turns|turn|conversation|flows|details …`
   (`--origin http://localhost:18971` for a local stack, `--json` for the raw result).
 
 ## Work from the outside in
@@ -42,14 +42,14 @@ is read-only: no query changes the agent or calls a model.
    `details --operation <id>` (or `--chat <id> --entry <id>` for an answer or tool result) is one operation's
    timeline, with a turn when it ran one, and the operations related to it: its parent, the thread it started, the
    Personas it asked.
-6. `lookup <ref|request|operation>`: the reference the app shows with an error (`… · ref 7f3a9c12`: the start of the
-   Worker's cf-ray, or of the browser's request id when no answer came), a request id or an operation id; it finds the
-   Worker's log lines that mention it, then shows the details of the operation they name (Cloudflare credentials as
-   for `logs`).
-7. `stats --since 24h`: flow totals across every agent of the stage (Analytics Engine, hashed agent ids), to see
-   whether a flow fails for everyone or for one owner (the token needs Account Analytics read).
-8. `logs <operation id>`: the Worker's own lines for that id (needs `CLOUDFLARE_API_TOKEN` and
-   `CLOUDFLARE_ACCOUNT_ID` in your shell; seven days of retention).
+6. A reference the app shows with an error (`… · ref 7f3a9c12`: the start of the Worker's cf-ray, or of the
+   browser's request id when no answer came), a request id or an operation id: the Worker's own log lines through
+   Cloudflare's MCP (ADR 0124): `POST /accounts/:account/workers/observability/telemetry/query`, `view: events`,
+   filtered on `$metadata.service` = `goblin-dev` or `goblin-prod`, the id as `needle`; seven days of retention. Then
+   `details --operation` for the operation a line names.
+7. Flow totals across every agent of the stage (Analytics Engine, hashed agent ids), to see whether a flow fails for
+   everyone or for one owner: Analytics Engine SQL through Cloudflare's MCP over `goblin-<stage>-flows` (`blob1` the
+   flow, `blob5` the outcome, `index1` the agent, `double3` the duration, weighted by `_sample_interval`).
 
 The owner can also ask the agent itself ("why did that fail?"): its `diagnose` tool reads the same ledger.
 Use `all: true` to include expected waits and confirmed recovered attempts. Full turn timelines are never filtered.

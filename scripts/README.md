@@ -87,8 +87,7 @@ step. Unset, turns use the owner's pick. Housekeeping still uses `GOBLIN_MEMORY_
    closes;
 9. the smoke's own sends reached the stage's Analytics Engine flows dataset (`goblin-<stage>-flows`, ADR 0037): a
    `send` point since the smoke started, waited for up to two minutes. It reads with the operator's own
-   `CLOUDFLARE_API_TOKEN` (Account Analytics read) and `CLOUDFLARE_ACCOUNT_ID` from the environment, as `goblin stats`
-   does; without them, or with a token that cannot read Analytics Engine, the receipt says why it was skipped.
+   `CLOUDFLARE_API_TOKEN` (Account Analytics read) and `CLOUDFLARE_ACCOUNT_ID` from the environment; without them, or with a token that cannot read Analytics Engine, the receipt says why it was skipped.
 
 Inbound turns run in main as `goblin-smoke`. The threads are archived, the app deleted and the client revoked through
 `finally` cleanup; their history and the subagent remain. Cleanup requests can themselves fail.
@@ -112,7 +111,7 @@ statuses, counts and booleans, never tokens, cookies or message bodies.
 | `subagent`                             | `reported`: the Delegate's result reached main (passively, or answered when synthesis was asked for).          |
 | `memory.messages`                      | Messages logged since memory activation; must be greater than zero.                                            |
 | `memory.summarized`                    | Messages covered before the newest input by the last placed memory view; recorded without a minimum assertion. |
-| `utc`, `status`, `steps`               | Completion timestamp, `passed` and HTTP steps with status and the answer's ref (`goblin lookup <ref>`).        |
+| `utc`, `status`, `steps`               | Completion timestamp, `passed` and HTTP steps with status and the answer's ref (its log lines, ADR 0124).      |
 
 Not covered here: the owner's Connect flow (it needs the owner at the remote server's consent screen), rendering
 MCP Apps, the browser UI, thread branching, memory-summary quality, skills, and live Source message/reply or notice

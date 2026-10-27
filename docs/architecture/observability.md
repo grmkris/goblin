@@ -114,8 +114,8 @@ References join what the owner sees to the logs:
 4. The web quotes the reference with a failure ("… · ref 7f3a9c12"): the answer's, or the request id when nothing
    answered (`describeError` and `messageOf`, `lib/query/app-error.ts`). Sign-in and `/health`, outside the API, do the
    same (`AuthRefused`, `auth/queries.ts`).
-5. `goblin lookup <ref|request|operation>` finds the Worker's log lines that mention it, then shows the details of the
-   operation they name.
+5. The Worker's log lines that mention it (Workers Observability, through Cloudflare's MCP, ADR 0124) name the
+   operation, whose details `inspect_details` shows.
 
 A crash nothing on the page caught (a route that failed with a defect, an uncaught error or unhandled rejection) is
 reported to `POST /api/client-errors` (`lib/query/crash-report.ts`): each distinct crash once, at most five a page
@@ -126,8 +126,8 @@ crash. The Worker logs it as one `client_error` line and writes a `client_error`
 For the operator, flow steps also go to Workers Analytics Engine (`observability/ae.ts`, ADR 0037): the optional
 `FLOWS` dataset (`goblin-<stage>-flows`), one point per operation (its first step), indexed by a hashed agent id (an
 HMAC of the user id under a key derived from `GOBLIN_CREDENTIAL_KEY`), with closed classes, counts and timings and no
-chat or operation ids. Without the binding nothing is written. `goblin stats` sums them per flow and outcome through
-the Analytics Engine SQL API with the operator's own Cloudflare token.
+chat or operation ids. Without the binding nothing is written. They are summed per flow and outcome with the Analytics Engine
+SQL API, through Cloudflare's MCP with the operator's own Cloudflare access (ADR 0124).
 
 ### Inspection
 

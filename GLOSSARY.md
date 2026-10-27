@@ -420,7 +420,7 @@ One content-free step of how people and agents move through conversations (a sen
 Persona's answer, a routine firing), recorded with its operation (ADR 0037).
 
 **Reference**:
-The short id a failure shows the owner (`… · ref 7f3a9c12`), which finds that request's log lines (`goblin lookup`).
+The short id a failure shows the owner (`… · ref 7f3a9c12`), which finds that request's log lines in Workers Observability (ADR 0124).
 _Avoid_: error id, trace id
 
 **SingleFlight**:

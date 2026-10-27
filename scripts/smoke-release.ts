@@ -67,7 +67,7 @@ const wait = (milliseconds: number): Promise<void> => new Promise((resolve) => s
 /**
  * The smoke's own sends reached the stage's Analytics Engine flows dataset (ADR 0037): a `send` point written since
  * `since`. It reads with the operator's own `CLOUDFLARE_API_TOKEN` (Account Analytics read) and
- * `CLOUDFLARE_ACCOUNT_ID`, as `goblin stats` does, and records why it was skipped when they are not set or cannot read.
+ * `CLOUDFLARE_ACCOUNT_ID`, and records why it was skipped when they are not set or cannot read.
  */
 export async function flowsCheck(stage: string, since: number): Promise<string> {
   if (stage === 'local') return 'skipped: the local stack writes no Analytics Engine points'

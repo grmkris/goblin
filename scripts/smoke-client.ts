@@ -1,6 +1,6 @@
 /**
  * Everything the smoke sends to one stage: the owner's cookie once signed in, a fresh `x-goblin-request` id, the CSRF
- * header on every write, and each answer's status and reference (`x-goblin-ref`, for `goblin lookup <ref>`) logged as a
+ * header on every write, and each answer's status and reference (`x-goblin-ref`, which finds its log lines) logged as a
  * step. Once signed in, a member's calls go under the owner's first workspace (`/w/<slug>/api/…`, ADR 0089), as the
  * app's do. The owner and account APIs go through their typed clients; Better Auth, `/mcp`, `/health` and the owner's
  * file bytes are plain requests.
@@ -19,7 +19,7 @@ import { randomBytes } from 'node:crypto'
 import { AccountApi, OwnerApi, WorkspaceAccountApi } from '../packages/contracts/src/api/index.ts'
 import { readSession } from './session.ts'
 
-/** One request the smoke sent: its status, and the reference the answer quoted (`goblin lookup <ref>`). */
+/** One request the smoke sent: its status, and the reference the answer quoted, which finds its log lines. */
 export type Step = { readonly step: string; readonly status: number; readonly ref?: string }
 export type OwnerClient = HttpApiClient.ForApi<typeof OwnerApi>
 export type AccountClient = HttpApiClient.ForApi<typeof WorkspaceAccountApi>

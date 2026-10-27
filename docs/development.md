@@ -405,9 +405,6 @@ until it runs, real provider and Telegram delivery remain unverified.
   bun run goblin conversation 1         # main's entries, in full
   bun run goblin flows --chat 12        # how a chat's conversation moved, content-free
   bun run goblin details --operation <id> # what happened behind one message, and its related operations
-  bun run goblin logs <operation-id>     # Workers Logs lines that mention an id
-  bun run goblin lookup 7f3a9c12        # a reference the app showed: its log lines, then its operation's details
-  bun run goblin stats --since 24h      # flow totals across every agent of the stage (Analytics Engine)
   bun run goblin follow 12              # a chat live, as it happens (--json: each of its AG-UI events)
   GOBLIN_CLIENT_ID=… GOBLIN_CLIENT_SECRET=… bun run goblin token  # an installed app's access token (ADR 0118)
   ```
@@ -422,10 +419,10 @@ until it runs, real provider and Telegram delivery remain unverified.
   `--origin` (or `GOBLIN_ORIGIN`) names the deployment and is required: there is no default (ADR 0064); goblin's own
   daily instance is `https://dev.goblin.surf`, the local stack `http://localhost:18971`. Credentials live in
   `~/.config/goblin/credentials.json` (mode 600). The sign-in redirects to `http://127.0.0.1:18979/callback`; when the
-  browser is on another machine, paste the URL it lands on into the prompt. `goblin logs`, `goblin lookup` and
-  `goblin stats` read Cloudflare with your own `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` and the stage
-  Worker from `/health`; the Worker never sees them. `goblin stats` queries the stage's Analytics Engine dataset
-  (`goblin-<stage>-flows`) and needs a token with Account Analytics read. `--json` prints a tool's structured result; `bun link` in `apps/cli` puts `goblin` on your path.
+  browser is on another machine, paste the URL it lands on into the prompt. The Worker's log lines (a reference the app showed, a
+  request or an operation id) and the flow totals of the stage's Analytics Engine dataset (`goblin-<stage>-flows`) are
+  Cloudflare's: read them through Cloudflare's MCP in `.mcp.json`, with your own Cloudflare sign-in (ADR 0124), then
+  `goblin details --operation <id>` for the operation a line names. `--json` prints a tool's structured result; `bun link` in `apps/cli` puts `goblin` on your path.
 
   `goblin turn <operation-id> --otlp` prints the turn as OTLP/JSON traces data (ADR 0107), with its words added on
   your machine from `inspect_conversation` when the sign-in may read conversations. Any OTLP viewer opens it; a

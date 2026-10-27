@@ -104,8 +104,8 @@ Private error details stay in conversation inspection; logs and traces carry fix
 The ledger also records how conversations move, content-free (ADR 0037): sends, threads, moves, share-backs, closes
 and Stops, Personas, Delegates, Topics, organize Undo, routines and Source deliveries. A message's
 Details shows what ran behind it, every failure the app shows quotes a reference (`… · ref 7f3a9c12`) that
-`goblin lookup` finds in the Worker's logs, and `goblin stats` sums flows across every agent of a stage from Workers
-Analytics Engine, under hashed agent ids.
+finds the Worker's log lines, and Workers Analytics Engine holds flows across every agent of a stage under hashed agent
+ids; both are read through Cloudflare's MCP with the reader's own Cloudflare access (ADR 0124).
 
 **Goblin Wallet**, the agent wallet built for the October 2026 hackathon, has left this repository: its source is kept
 at the tag [`hackathon-2026-10`](https://github.com/grmkris/goblin/tree/hackathon-2026-10), and goblin connects to a
