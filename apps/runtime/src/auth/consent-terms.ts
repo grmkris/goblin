@@ -41,8 +41,8 @@ const iso = (at: number | null): string | null => (at === null ? null : new Date
 export const summaryOf = (appUrl: string, grant: GrantRecord, terms: GrantTerms): AccessSummary => ({
   ...terms,
   grantId: grant.id,
-  ...(grant.clientId === undefined ? {} : { clientId: grant.clientId }),
-  ...(grant.keyId === undefined ? {} : { keyId: grant.keyId }),
+  kind: grant.kind,
+  clientId: grant.clientId,
   expiresAt: iso(grant.expiresAt),
   widenUrl: widenUrl(appUrl, grant.id, {}),
 })
@@ -131,7 +131,7 @@ const approvable = async (env: RuntimeEnv, person: Person, grantId: string): Pro
 
 /**
  * What the widening page shows `person` for grant `grantId`: its terms (as the defaults too), summary and id, and what
- * may be chosen: the key's or installation's workspace for theirs, the person's workspaces for a client's.
+ * may be chosen: an installation's workspace for its own, the person's workspaces for a client's.
  */
 export const grantTerms = async (env: RuntimeEnv, person: Person, grantId: string): Promise<ConsentTerms> => {
   const grant = await approvable(env, person, grantId)
@@ -165,7 +165,7 @@ export const widenGrant = async (
 ): Promise<TermsChange> => {
   const grant = await approvable(env, person, grantId)
   const before = await termsOf(env.AUTH_DB, grant)
-  // Widening changes what a grant may do, never what it is called: a key's name is the key's own.
+  // Widening changes what a grant may do, never what it is called: an installation's name is its app's own.
   const after = await setTerms(env.AUTH_DB, person.id, grant, { ...terms, name: before.name }, Date.now())
   const saved = await grantById(env.AUTH_DB, grantId)
   return { grant: saved ?? grant, before, after, expiresAt: iso(saved?.expiresAt ?? null) }

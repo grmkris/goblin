@@ -59,9 +59,9 @@ type ChatRequest = { readonly params: { readonly id: string } }
 type ChatWrite<Payload> = ChatRequest & { readonly payload: Payload }
 
 /**
- * A send into a chat, read from its AG-UI input (ADR 0111): what an API key's request may touch (ADR 0081) is checked
- * first, a chat of its own Topics, then what came with it, tags of its own Personas only. Nothing for the owner's
- * session.
+ * A send into a chat, read from its AG-UI input (ADR 0111): what a credential's request may touch (ADR 0114) is checked
+ * first, a chat of the Topics it reaches, then what came with it, tags of the Personas it reaches only. Nothing for the
+ * owner's session.
  */
 const confinedSend = (chat: string, input: RunInput) =>
   Effect.gen(function* () {
@@ -122,7 +122,7 @@ const withServers = (view: ConversationView) =>
  */
 const declareOn = (parent: string, operationId: string, anchor: ThreadAnchor, servers: readonly ThreadServer[]) =>
   Effect.gen(function* () {
-    // Every server is checked against the key first: one refused makes no thread.
+    // Every server is checked against the credential's grant first: one refused makes no thread.
     const prepared = yield* prepareServers(servers)
     const conversations = yield* Conversations
     const thread = yield* conversations.startThread(parent, operationId, anchor)
@@ -133,7 +133,7 @@ const declareOn = (parent: string, operationId: string, anchor: ThreadAnchor, se
 /**
  * The thread operation from a chat (ADR 0034): Reply at an entry, "+" empty, or Start thread at the chat's newest
  * settled entry, the first message (a send, its run id the operation's) answered in the Thread, its Personas in the
- * order it asks (`personaOrder`), with the MCP servers a key declares on it (ADR 0103).
+ * order it asks (`personaOrder`), with the MCP servers a credential declares on it (ADR 0103).
  */
 const threadStart = ({ params, payload }: ChatWrite<StartThread>) => {
   const servers = payload.mcpServers ?? []
@@ -155,7 +155,7 @@ const threadStart = ({ params, payload }: ChatWrite<StartThread>) => {
 const create = ({ payload }: { readonly payload: CreateConversation }) => createOwnerConversation(payload)
 /**
  * A change of a thread's declared servers (ADR 0103), checked before the request writes anything: a Thread only, open,
- * every server within the key's grant (the owner may only clear them), and an operation that may still set them.
+ * every server within the credential's grant (the owner may only clear them), and an operation that may still set them.
  */
 const preparedFor = (chat: string, change: NonNullable<UpdateConversation['mcpServers']>, closing: boolean) =>
   Effect.gen(function* () {
@@ -168,9 +168,9 @@ const preparedFor = (chat: string, change: NonNullable<UpdateConversation['mcpSe
   })
 
 /**
- * Rename, close or reopen: a key only its own chats, and never pinning a subagent open (ADR 0090); a key also replaces
- * its thread's declared servers, and the owner may clear them (ADR 0103), checked before anything is written. Closing
- * drops the servers of the thread and every chat under it, and reopening restores none.
+ * Rename, close or reopen: a credential only the chats it reaches, and never pinning a subagent open (ADR 0090); a
+ * credential also replaces its thread's declared servers, and the owner may clear them (ADR 0103), checked before
+ * anything is written. Closing drops the servers of the thread and every chat under it, and reopening restores none.
  */
 const update = ({ params, payload }: ChatWrite<UpdateConversation>) =>
   Effect.gen(function* () {
@@ -285,9 +285,9 @@ const sources = ({ params }: ChatRequest) =>
 
 /**
  * A registered chat's AG-UI stream as server-sent events (docs/architecture/streams.md): its opening, then everything
- * that happens in it, until the reader goes away or the producer lets it go (then the connection ends, read or not);
- * a reader that comes back connects again for a fresh opening. A key reaches only its own room's chats. The body runs
- * on its own past the request's scope, and lets go of the chat when it ends.
+ * that happens in it, until the reader goes away or the producer lets it go (then the connection ends, read or not); a
+ * reader that comes back connects again for a fresh opening. A credential reaches only the chats of the Topics it
+ * reaches. The body runs on its own past the request's scope, and lets go of the chat when it ends.
  */
 const stream = ({ params }: ChatRequest) =>
   Effect.gen(function* () {

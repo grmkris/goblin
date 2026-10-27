@@ -5,10 +5,10 @@ import type { Credential } from '../http/api/principal.ts'
 import type { Boundary } from '../topics/boundary.ts'
 
 // What a turn may do (ADR 0115): its power. Who sent each input decides it, never where it is: a person their role's
-// power (`ROLE_POWER`), an OAuth client its person's role and its grant together, a server's key its grant, and work no
-// one sent (a Source, a routine, the system, the agent's own reports) an admin's. It is recorded with each input's
-// receipt at admission, and a run's power is the intersection over the inputs it took. Where the turn works then
-// bounds it: the Persona's or Topic's setup, the boundary, and a credential's connections. Everything here is pure.
+// power (`ROLE_POWER`), an OAuth client its person's role and its grant together, an installed app its grant, and work
+// no one sent (a Source, a routine, the system, the agent's own reports) an admin's. It is recorded with each input's
+// receipt at admission, and a run's power is the intersection over the inputs it took. Where the turn works then bounds
+// it: the Persona's or Topic's setup, the boundary, and a credential's connections. Everything here is pure.
 
 /** What a credential's grant gives a turn: its level and extras, and whether its Topics and connections are lists. */
 export type GrantPower = Pick<Credential, 'grantId' | 'level' | 'extras'> & {
@@ -20,11 +20,11 @@ export type GrantPower = Pick<Credential, 'grantId' | 'level' | 'extras'> & {
 export type Sender =
   | { readonly kind: 'person'; readonly role: WorkspaceRole }
   | { readonly kind: 'client'; readonly role: WorkspaceRole; readonly grant: GrantPower }
-  | { readonly kind: 'key'; readonly grant: GrantPower }
+  | { readonly kind: 'app'; readonly grant: GrantPower }
   | { readonly kind: 'automation' }
 
 /**
- * What a turn's senders may do: the least level and the extras all of them hold; `server` when a server's key sent
+ * What a turn's senders may do: the least level and the extras all of them hold; `server` when an installed app sent
  * any input (its work is a server's, ADR 0087, and never reads the Shared folder or apps outside the hub); the grants
  * whose Topics are a list (in a hub such a turn reaches no further than its own Topic) and whose connections are a list
  * (an MCP connection must be in each).
@@ -59,7 +59,7 @@ export const senderPower = (sender: Sender): TurnPower => {
         ...lists(sender.grant),
       }
     }
-    case 'key':
+    case 'app':
       return { level: sender.grant.level, extras: sender.grant.extras, server: true, ...lists(sender.grant) }
     case 'automation':
       return { ...ROLE_POWER.admin, server: false, topicLists: [], connectionLists: [] }
@@ -97,8 +97,8 @@ export const senderOf = (facts: {
 }): Sender | undefined => {
   const { credential, member } = facts
   const grant = grantOf
-  // An installed app's work is a server's, as a key's is (ADR 0118).
-  if (credential?.kind === 'key' || credential?.kind === 'app') return { kind: 'key', grant: grant(credential) }
+  // An installed app's work is a server's (ADR 0118).
+  if (credential?.kind === 'app') return { kind: 'app', grant: grant(credential) }
   // A client acts for a person; one forwarded without them holds no more than a member would.
   if (credential?.kind === 'client') return { kind: 'client', role: member?.role ?? 'member', grant: grant(credential) }
   return member === undefined ? undefined : { kind: 'person', role: member.role }
@@ -110,9 +110,13 @@ const encodePower = Schema.encodeSync(Schema.fromJsonString(TurnPower))
 /** A power as a receipt stores it. */
 export const storedPower = (power: TurnPower): string => encodePower(power)
 
+/** The origins of goblin's own work, which a receipt without a stored power reads as an admin's. */
+const OWN_ORIGINS: ReadonlySet<string> = new Set(['owner', 'source', 'agent', 'routine', 'system'])
+
 /**
  * A receipt's power: as stored, or for one stored before powers were (or that does not decode) as its origin and role
- * say, failing closed: a key's reads only, a person's as their role, anyone else's an admin's.
+ * say, failing closed: a client's a member's, a person's as their role, goblin's own work (the owner's, a Source's, a
+ * routine's, the agent's or the system's) an admin's, and any other origin, an app's among them, reads only.
  */
 export const receiptPower = (row: {
   readonly power: string | null
@@ -121,10 +125,10 @@ export const receiptPower = (row: {
 }): TurnPower => {
   const stored = row.power === null ? Option.none() : decodePower(row.power)
   if (Option.isSome(stored)) return stored.value
-  if (row.origin === 'key') return { level: 'read', extras: [], server: true, topicLists: [], connectionLists: [] }
   if (row.origin === 'client') return senderPower({ kind: 'person', role: 'member' })
   if (row.role !== null && row.role !== undefined) return senderPower({ kind: 'person', role: row.role })
-  return AUTOMATION
+  if (row.origin === null || row.origin === undefined || OWN_ORIGINS.has(row.origin)) return AUTOMATION
+  return { level: 'read', extras: [], server: true, topicLists: [], connectionLists: [] }
 }
 
 /**
@@ -136,9 +140,9 @@ export type Bound = { readonly subagents: () => boolean }
 /**
  * A turn's power where it works (ADR 0115): its senders' power bounded by the setup there and the boundary. `hub` is
  * whether it reaches every Topic: a hub's, unless a credential whose Topics are a list sent an input; `people` whether
- * a person's turn it is (no server key sent any input), which the Shared folder and apps outside the hub need; an MCP
- * connection is within its power when every credential with a list of connections lists it (`listed` reads a grant's
- * list, `grants/mirror.ts`), as well as the setup holding it.
+ * a person's turn it is (no installed app sent any input), which the Shared folder and apps outside the hub need; an
+ * MCP connection is within its power when every credential with a list of connections lists it (`listed` reads a
+ * grant's list, `grants/mirror.ts`), as well as the setup holding it.
  */
 export type Effective = {
   readonly level: Level

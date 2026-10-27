@@ -1,6 +1,6 @@
 /**
- * How many requests a caller (a server's key or an OAuth client, ADR 0086) may make of its agent in one minute (ADR
- * 0085): a fixed minute of the clock, counted in the agent, which every request a caller sends reaches. A restart
+ * How many requests a caller (an installed app or an OAuth client, ADRs 0086, 0118) may make of its agent in one minute
+ * (ADR 0085): a fixed minute of the clock, counted in the agent, which every request a caller sends reaches. A restart
  * forgets the count, which only ever lets a caller through sooner.
  */
 export const CALLER_REQUESTS_PER_MINUTE = 600

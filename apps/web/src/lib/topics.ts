@@ -37,27 +37,27 @@ const byName = (a: TopicView, b: TopicView) =>
   a.id - b.id
 
 /**
- * The server's key that made a Topic, by its name, or none for the owner's own (ADR 0115). For display only: the
+ * The installed app that made a Topic, by its name, or none for the owner's own (ADR 0115). For display only: the
  * sidebar keeps the many Topics a server makes for its customers apart, and nothing a Topic may do depends on it.
  */
-export const madeByKey = (topic: TopicView): string | undefined => topic.madeBy?.key
+export const madeByApp = (topic: TopicView): string | undefined => topic.madeBy?.app
 
 /**
  * The sidebar's channels: the owner's own active Topics, Personal first and then by name, and apart from them the
- * archived ones. The Topics a server's key made are not among them: `madeByGroups` lists those.
+ * archived ones. The Topics an installed app made are not among them: `madeByGroups` lists those.
  */
 export function channels(topics: readonly TopicView[]): {
   readonly active: readonly TopicView[]
   readonly archived: readonly TopicView[]
 } {
   const all = topicsOf(topics)
-    .filter((topic) => madeByKey(topic) === undefined)
+    .filter((topic) => madeByApp(topic) === undefined)
     .toSorted(byName)
   return { active: all.filter((topic) => !isArchived(topic)), archived: all.filter(isArchived) }
 }
 
-/** The Topics one key made: the key's name, its active Topics with the latest active first, and when that was. */
-export type MadeByGroup = { readonly key: string; readonly topics: readonly TopicView[]; readonly latest: number }
+/** The Topics one app made: the app's name, its active Topics with the latest active first, and when that was. */
+export type MadeByGroup = { readonly app: string; readonly topics: readonly TopicView[]; readonly latest: number }
 
 /** When each channel was last active: its own last reply or start, or a later one in a thread right under it. */
 function lastActive(views: readonly ConversationView[]): ReadonlyMap<string, number> {
@@ -70,26 +70,26 @@ function lastActive(views: readonly ConversationView[]): ReadonlyMap<string, num
 }
 
 /**
- * The active Topics servers' keys made, one group per key, the group with the latest activity first and in each the
+ * The active Topics installed apps made, one group per app, the group with the latest activity first and in each the
  * Topic with the latest activity first (one with no chat yet counts from when it was made). An archived one is in none.
  */
 export function madeByGroups(topics: readonly TopicView[], views: readonly ConversationView[]): readonly MadeByGroup[] {
   const last = lastActive(views)
   const at = (topic: TopicView) => Math.max(last.get(topic.conversation) ?? 0, topic.createdAt)
-  const byKey = new Map<string, TopicView[]>()
+  const byApp = new Map<string, TopicView[]>()
   for (const topic of topics) {
-    const key = madeByKey(topic)
-    if (key === undefined || isArchived(topic)) continue
-    const group = byKey.get(key)
-    if (group === undefined) byKey.set(key, [topic])
+    const app = madeByApp(topic)
+    if (app === undefined || isArchived(topic)) continue
+    const group = byApp.get(app)
+    if (group === undefined) byApp.set(app, [topic])
     else group.push(topic)
   }
-  return [...byKey]
-    .map(([key, made]) => {
+  return [...byApp]
+    .map(([app, made]) => {
       const sorted = made.toSorted((a, b) => at(b) - at(a) || b.id - a.id)
-      return { key, topics: sorted, latest: Math.max(...sorted.map(at)) }
+      return { app, topics: sorted, latest: Math.max(...sorted.map(at)) }
     })
-    .toSorted((a, b) => b.latest - a.latest || a.key.localeCompare(b.key))
+    .toSorted((a, b) => b.latest - a.latest || a.app.localeCompare(b.app))
 }
 
 /** How far a Topic's chats reach (ADR 0115), in the words its channel info says it. */

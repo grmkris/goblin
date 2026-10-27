@@ -314,7 +314,7 @@ describe("a Persona's own model in a server's work (ADR 0087)", () => {
       request: undefined,
       operation: undefined,
       route: 'conversations.submit',
-      credential: credential({ id: 'key-1', name: 'swarmm', level: 'manage' }),
+      credential: credential({ id: 'in-1', name: 'swarmm', level: 'manage' }),
     }
     const own = (model: string) => Effect.runSync(personas.ownModel(model))
     expect([own('sub/claude-opus-5-5'), own('model-a')]).toEqual(['sub/claude-opus-5-5', 'model-a'])
@@ -564,7 +564,7 @@ describe('organize receipts and Undo', () => {
     expect(personas.get(1).archivedAt).toBeTypeOf('number')
   })
 
-  it("drops what a key declared on an archived Topic's threads first, so a chat that cannot stop keeps none (ADR 0103)", async () => {
+  it("drops what a credential declared on an archived Topic's threads first, so a chat that cannot stop keeps none (ADR 0103)", async () => {
     const { layer, topics, db } = services(['30'])
     await Effect.runPromise(topics.create({ name: 'Customer', operationId: 'topic-9' }, 'owner', 5))
     db.insert(appConversations)
@@ -576,7 +576,7 @@ describe('organize receipts and Undo', () => {
       origin: 'https://dev.swarmm.test',
       tools: '[]',
       token: 'sealed',
-      grantId: 'key-1',
+      grantId: 'in-1',
       createdAt: 6,
     }
     db.insert(appThreadServers)

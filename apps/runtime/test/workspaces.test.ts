@@ -112,30 +112,31 @@ describe('workspaces (ADR 0089)', () => {
     )
   })
 
-  it("deletes a workspace for its owner: its agent first, then its keys and their grants, clients' reach of it and memberships", async () => {
+  it("deletes a workspace for its owner: its agent first, then the apps installed in it with their grants, clients' reach of it and memberships", async () => {
     const { db, sqlite } = fixture()
     const made = await createWorkspace(db, KRIS.id, { name: 'Swarmm', slug: 'swarmm' }, NOW)
     sqlite.exec(`
-      INSERT INTO apikey (id, configId, referenceId, key, createdAt, updatedAt) VALUES ('k1', 'default', '${made.id}', 'h', 'x', 'x');
-      INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]');
-      INSERT INTO "grant" (id, kind, keyId, name, level, createdAt, updatedAt) VALUES ('k1', 'key', 'k1', 'k', 'write', 'x', 'x');
+      INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]'), ('c2', 'app-1', '[]');
+      INSERT INTO app (clientId, workspaceId, terms, script, createdBy, createdAt) VALUES ('app-1', '${made.id}', '{}', 1, 'u-kris', 'x');
+      INSERT INTO "grant" (id, kind, clientId, name, level, createdAt, updatedAt) VALUES ('in_1', 'app', 'app-1', 'a', 'write', 'x', 'x');
+      INSERT INTO installation (id, clientId, workspaceId, approvedBy, createdAt) VALUES ('in_1', 'app-1', '${made.id}', 'u-kris', 'x');
       INSERT INTO "grant" (id, kind, clientId, userId, name, level, createdAt, updatedAt)
         VALUES ('cg_1', 'client', 'client-1', 'u-kris', 'c', 'write', 'x', 'x');
-      INSERT INTO grantWorkspace (grantId, workspaceId) VALUES ('k1', '${made.id}'), ('cg_1', '${made.id}');
+      INSERT INTO grantWorkspace (grantId, workspaceId) VALUES ('in_1', '${made.id}'), ('cg_1', '${made.id}');
     `)
     const failing = agents(made.id)
     await expect(deleteWorkspace({ db, eraseAgent: failing.eraseAgent }, KRIS.id, made.id)).rejects.toThrow()
     expect(count(sqlite, 'organization')).toBe(1)
-    expect(count(sqlite, 'apikey')).toBe(1)
+    expect(count(sqlite, 'installation')).toBe(1)
     const working = agents()
     await expect(deleteWorkspace({ db, eraseAgent: working.eraseAgent }, ANA.id, made.id)).rejects.toEqual(
       new NotFound({ what: 'workspace' }),
     )
     await deleteWorkspace({ db, eraseAgent: working.eraseAgent }, KRIS.id, made.id)
     expect(working.erased).toEqual([made.id])
-    for (const table of ['organization', 'member', 'apikey', 'grantWorkspace'])
+    for (const table of ['organization', 'member', 'app', 'installation', 'grantWorkspace'])
       expect(count(sqlite, table), table).toBe(0)
-    // The client's grant is its person's, for whatever else it reaches; the key's went with the key.
+    // The client's grant is its person's, for whatever else it reaches; the app's went with its installation.
     expect(sqlite.prepare('SELECT id FROM "grant"').all()).toEqual([{ id: 'cg_1' }])
   })
 

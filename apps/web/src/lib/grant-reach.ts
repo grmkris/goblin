@@ -89,8 +89,8 @@ export const entryWords = (entry: WorkspaceReach): string =>
 
 /**
  * `reach` in words, as the summary line says it after "can write": "everything in all your workspaces", "2 Topics,
- * all Personas and all connections in Acme". `within` names the one workspace a key lives in; its reach is said
- * without it. The MCP servers it may bring come last.
+ * all Personas and all connections in Acme". `within` names the one workspace an installation lives in; its
+ * reach is said without it. The MCP servers it may bring come last.
  */
 export const describeReach = (reach: GoblinReach, workspaces: readonly Named[], within?: string): string => {
   const nameOf = (id: string) => workspaces.find((workspace) => workspace.id === id)?.name ?? 'a workspace you left'

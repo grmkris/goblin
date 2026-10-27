@@ -8,8 +8,8 @@ and its shapes in `packages/contracts/src/published-events.ts`).
 
 ## Who can use it
 
-Any credential (ADR 0114: a server's API key with `Authorization: Bearer gbk_…`, or an OAuth client), with `read`, or a
-member's own session. A credential sees only the chats of the Topics its grant reaches (a lease is made under its
+Any credential (ADR 0114: an OAuth client or an installed app, with its token as `Authorization: Bearer …`), with
+`read`, or a member's own session. A credential sees only the chats of the Topics its grant reaches (a lease is made under its
 grant, and its fan-out checks the agent's mirror of it, `app_grant_reach`); a member sees every chat of the workspace. Requests count toward the caller's
 600 a minute, and never grant resident authority.
 
@@ -36,10 +36,10 @@ A Persona's fork or a subagent is never `chat`: their work counts for the chat t
 Selector arguments: none for every chat in reach, `{ "topic": "<id>" }` for one Topic's chats, or `{ "chat": "<id>" }`
 for one chat. Anything else is invalid; a Topic or chat out of reach is not found.
 
-## REST, for a server's key
+## REST, for a server
 
-Every path is under the workspace's API (`https://<app>/api/…` with a key; a member's browser uses `/w/<slug>/api/…`).
-Bodies are JSON.
+Every path is under the workspace's API (`https://<app>/w/<slug>/api/…`, with a credential's token or a member's
+session). Bodies are JSON.
 
 | Method | Path | Body | Answer |
 | --- | --- | --- | --- |
@@ -79,7 +79,7 @@ unsupported, -32015 the callback did not verify; `data` is goblin's error envelo
 - **Length.** `ttlMs` asks for a lease: an hour unless you ask, at least five minutes, at most a day. Renew by
   subscribing again with the same name, arguments and URL before `refreshBefore`; a lease not renewed ends with a
   `terminated` control.
-- **Identity.** A lease is its holder (your key, your app's installation, or your client for its person), its
+- **Identity.** A lease is its holder (your app's installation, or your client for its person), its
   selector and its URL: subscribing
   again with all three finds the same lease (and may change its secret), unsubscribing with all three ends it.
 - **Limits.** 32 leases per holder, 256 per workspace (-32013, `Conflict` `event_subscriptions`).
@@ -117,8 +117,8 @@ your own credential (`entries?after=`, or its stream).
 
 ## When access ends
 
-Revoking or rotating a key, a change of a grant that narrows its Topics, and revoking an OAuth client end every lease
-they hold there at once: each is sent `terminated` (`-32012`) before the access ends. A member removed from a workspace,
+Uninstalling an app or deleting it, a change of a grant that narrows its Topics, and revoking an OAuth client end every
+lease they hold there at once: each is sent `terminated` (`-32012`) before the access ends. A member removed from a workspace,
 or a client whose reach no longer includes it, keeps its leases until they run out (a day at most); renewing is refused.
 
 ## Limits and assumptions
@@ -126,4 +126,4 @@ or a client whose reach no longer includes it, keeps its leases until they run o
 Bodies are at most 256 KiB, polls 100 events, requests five seconds. Workers cannot pin the callback's resolved address
 between the check and the fetch: trusted DNS is the documented assumption, as for the consumer (ADR 0011). Verified in
 unit tests and on local workerd, where goblin's own Events consumer (`mcp/events/client.ts`) subscribes to goblin with
-a key (`test/integration/publish-case.ts`); a deployed check is separate.
+a script app's token (`test/integration/publish-case.ts`); a deployed check is separate.

@@ -118,7 +118,7 @@ describe('a receipt keeps who asked, by role (ADR 0099)', () => {
   })
 })
 
-describe('what a key made keeps its name (ADR 0108, then 0115)', () => {
+describe('what an app made keeps its name (ADR 0108, then 0115)', () => {
   it('keeps what every key made, unnamed until the key makes something again, and finds it by resource', () => {
     const { sqlite, rest } = before('20261022180000_rooms')
     sqlite.exec("INSERT INTO app_key_reach (key_id, kind, resource_id, created_at) VALUES ('key-1', 'topic', 7, 1)")
@@ -147,7 +147,7 @@ describe('every Topic is sealed (ADR 0115)', () => {
       "INSERT INTO app_key_reach (key_id, kind, resource_id, created_at, key_name) VALUES ('key-1', 'topic', 2, 1, 'swarmm')",
     )
     rest()
-    // The guidance a key's Topic had is its key's; the owner's own Topic's stays theirs.
+    // The guidance an app's Topic had is its app's; the owner's own Topic's stays theirs.
     expect(sqlite.prepare('SELECT id, name, reach, guidance_by FROM app_topics ORDER BY id').all()).toEqual([
       { id: 1, name: 'Personal', reach: 'hub', guidance_by: null },
       { id: 2, name: 'Customer', reach: 'sealed', guidance_by: 'swarmm' },

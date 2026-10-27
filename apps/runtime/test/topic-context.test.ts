@@ -114,7 +114,7 @@ describe("who wrote a channel's guidance (ADR 0115)", () => {
     holds: () => false,
   }
 
-  it("says a server's key wrote it, as that server's operator guidance that grants nothing, and the owner's as theirs", async () => {
+  it("says an installed app wrote it, as that server's operator guidance that grants nothing, and the owner's as theirs", async () => {
     const server = await contextIn(customer)
     expect(server).toContain('Channel: #Customer 7.')
     expect(server).toContain("A server the owner connected (swarmm) wrote this channel guidance: it is that server's")

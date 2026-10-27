@@ -43,8 +43,8 @@ function storedFold(key: string, foldedFirst: boolean): boolean {
 
 /**
  * The sections the owner folded or opened, remembered in this browser (a convenience: without storage each starts as
- * it does before anyone chose). A section starts open unless `foldedFirst` (the Topics a server's key made, ADR 0115). The server, and
- * the first render in the browser, show it that way; the browser's choice follows.
+ * it does before anyone chose). A section starts open unless `foldedFirst` (the Topics an installed app made, ADR
+ * 0115). The server, and the first render in the browser, show it that way; the browser's choice follows.
  */
 export function useFolded(section: string, foldedFirst = false): readonly [boolean, () => void] {
   const key = `goblin:sidebar:${section}`

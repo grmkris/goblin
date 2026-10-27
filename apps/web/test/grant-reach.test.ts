@@ -43,7 +43,7 @@ describe("a grant's reach in the editor", () => {
     expect(withWorkspaces(widened, [ACME.id, BETA.id]).each).toEqual([narrowed.each[0], everything(BETA.id)])
   })
 
-  it('says the reach in words, for a client and for a key in its own workspace', () => {
+  it('says the reach in words, for a client and for an installation in its own workspace', () => {
     expect(describeReach(ALL, PERSON)).toBe('everything in all your workspaces')
     expect(describeReach(withWorkspaces(ALL, []), PERSON)).toBe('nothing')
     expect(describeReach(withWorkspaces(ALL, [ACME.id, BETA.id]), PERSON)).toBe('everything in Acme and Beta')
@@ -78,17 +78,17 @@ const line = (terms: GrantTerms, name = 'Claude Code') =>
 describe("a grant's summary line", () => {
   it('says who can do what where, the extras on and off, and how long', () => {
     expect(line(PRESET)).toBe(
-      'Claude Code can write everything in all your workspaces · no setup, routines, inspect or keys · until revoked',
+      'Claude Code can write everything in all your workspaces · no setup, routines or inspect · until revoked',
     )
     expect(line({ ...PRESET, level: 'manage', extras: ['inspect', 'setup'], lifetime: '30d' })).toBe(
-      'Claude Code can manage everything in all your workspaces · with setup and inspect · no routines or keys · for 30 days',
+      'Claude Code can manage everything in all your workspaces · with setup and inspect · no routines · for 30 days',
     )
-    expect(line({ ...PRESET, level: 'read', extras: ['setup', 'routines', 'inspect', 'keys'], lifetime: '365d' })).toBe(
-      'Claude Code can read everything in all your workspaces · with setup, routines, inspect and keys · for 1 year',
+    expect(line({ ...PRESET, level: 'read', extras: ['setup', 'routines', 'inspect'], lifetime: '365d' })).toBe(
+      'Claude Code can read everything in all your workspaces · with setup, routines and inspect · for 1 year',
     )
   })
 
-  it('says a key’s reach without its workspace', () => {
+  it('says an installation’s reach without its workspace', () => {
     const terms = presetFor('swarm', [ACME.id])
     expect(
       grantSummary({
@@ -96,9 +96,9 @@ describe("a grant's summary line", () => {
         terms,
         spec: GRANT_SPEC,
         words: GRANT_WORDS,
-        describeReach: reachWords({ kind: 'key', workspace: ACME }),
+        describeReach: reachWords({ kind: 'app', workspace: ACME }),
       }),
-    ).toBe('It can write everything · no setup, routines, inspect or keys · until revoked')
+    ).toBe('It can write everything · no setup, routines or inspect · until revoked')
   })
 })
 

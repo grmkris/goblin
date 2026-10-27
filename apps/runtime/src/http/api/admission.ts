@@ -4,8 +4,8 @@ import * as Effect from 'effect/Effect'
 import type { Credential, Member } from './principal.ts'
 
 /**
- * How the edge admits a credential (ADRs 0081, 0114, 0116, 0118): a server's API key on `/api/…`, an OAuth token (a
- * client's or an installed app's) on a workspace's path, each held to what the endpoint it names needs.
+ * How the edge admits a credential (ADRs 0114, 0116, 0118, 0120): an OAuth token, a client's or an installed app's, on
+ * a workspace's path, held to what the endpoint it names needs.
  */
 
 /** An OAuth token admitted on a workspace's path: its workspace, credential, and the person it acts for if any. */
@@ -15,17 +15,10 @@ export interface TokenAdmission {
   readonly member?: Member
 }
 
-/** What admitting a credential asks of the deployment: its own origin, and the key and token checks. */
+/** What admitting a credential asks of the deployment: its own origin, and the token check. */
 export interface CredentialEdge {
   /** The app's own origin: every browser write comes from it, and a refusal's widening link is under it. */
   readonly origin: string
-  /**
-   * The workspace a server's API key belongs to, and the credential its grant makes there (ADR 0114);
-   * `Unauthenticated` for any key that does not admit.
-   */
-  readonly key: (
-    key: string,
-  ) => Effect.Effect<{ readonly workspaceId: string; readonly credential: Credential }, AppError>
   /**
    * An OAuth token on a workspace's path (ADR 0116): the workspace at the slug among those it reaches now, the credential
    * its grant makes there, and for a client acting for a person that person as a member of it (an installed app's, ADR
@@ -44,25 +37,6 @@ const holds = (edge: CredentialEdge, credential: Credential, need: Need | undefi
   const missing = missingFor(GRANT_SPEC, credential, need)
   return missing === null ? Effect.void : accessInsufficient(edge.origin, credential.grantId, missing)
 }
-
-/**
- * Admission of a server by its API key (ADR 0081): a key is a server's, so a browser's cookie or Origin with it is
- * refused; the key must admit, and its grant must hold what the endpoint needs (`holds`). The workspace the key
- * belongs to, and its credential (ADR 0086).
- */
-export const admitKey = (
-  request: Request,
-  edge: CredentialEdge,
-  key: string,
-  need: Need | undefined,
-): Effect.Effect<{ readonly workspaceId: string; readonly credential: Credential }, AppError> =>
-  Effect.gen(function* () {
-    if (request.headers.has('cookie') || request.headers.has('origin'))
-      return yield* new Forbidden({ reason: 'key_browser' })
-    const admitted = yield* edge.key(key)
-    yield* holds(edge, admitted.credential, need)
-    return admitted
-  })
 
 /**
  * Admission of an OAuth token on a workspace's path (ADRs 0116, 0118): one request has one principal, so a session

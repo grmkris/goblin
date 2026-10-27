@@ -324,7 +324,7 @@ export class Models extends Context.Service<
     readonly ownerOnly: (id: string) => boolean
     /** The model a server's work answers with (ADR 0087): the pick, unless it is one of the owner's own, then the default. */
     readonly forServers: Effect.Effect<string, AppError>
-    /** The choice as a server's key reads it (ADR 0087): without the owner's own subscriptions. */
+    /** The choice as an installed app reads it (ADR 0087): without the owner's own subscriptions. */
     readonly choiceForServers: Effect.Effect<ModelChoice, AppError>
   }
 >()('goblin/models/Models') {}

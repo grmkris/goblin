@@ -29,47 +29,6 @@ const PERSON_PATHS = [
   '/api/client-errors',
 ]
 
-/**
- * A new key's body as Settings sends it (ADR 0114): its name and its grant's terms over `who`'s workspace, `manage`
- * unless `terms` say, for a day. `lists` makes its Topics and Personas lists, growing with what it makes, so it reaches
- * nothing of anyone else's; `connections` lists the connections its setups may name.
- */
-export const keyBody = (
-  who: Person,
-  name: string,
-  terms: {
-    readonly level?: 'read' | 'write' | 'manage'
-    readonly extras?: readonly ('setup' | 'routines' | 'inspect')[]
-    readonly lists?: boolean
-    readonly connections?: readonly string[]
-    readonly origins?: readonly { readonly origin: string; readonly tools: readonly string[] }[]
-  } = {},
-) => {
-  const list = terms.lists === true ? { kind: 'list', ids: [] } : { kind: 'all' }
-  return {
-    name,
-    terms: {
-      name,
-      level: terms.level ?? 'manage',
-      extras: terms.extras ?? [],
-      lifetime: '1d',
-      reach: {
-        workspaces: 'list',
-        each: [
-          {
-            workspace: who.workspace,
-            topics: list,
-            personas: list,
-            connections:
-              terms.connections === undefined ? { kind: 'all' } : { kind: 'list', ids: [...terms.connections] },
-          },
-        ],
-        origins: terms.origins ?? [],
-      },
-    },
-  }
-}
-
 /** `path` as `who`'s browser sends it: a member's `/api/…` path under `/w/<their workspace's slug>` (ADR 0089). */
 export const inWorkspace = (who: Person, path: string): string =>
   path.startsWith('/api/') && !PERSON_PATHS.some((prefix) => path.startsWith(prefix)) ? `/w/${who.slug}${path}` : path
@@ -140,6 +99,108 @@ export const call = (base: string, who: Person, path: string, body?: unknown, he
   ownerFetch(`${base}${inWorkspace(who, path)}`, {
     method: body === undefined ? 'GET' : 'POST',
     headers: { ...browserHeaders(who), ...headers },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  })
+
+/** What a test server's grant holds (ADR 0114), as `scriptApp` takes it. */
+export interface ServerTerms {
+  readonly level?: 'read' | 'write' | 'manage'
+  readonly extras?: readonly ('setup' | 'routines' | 'inspect')[]
+  readonly lists?: boolean
+  readonly connections?: readonly string[]
+  readonly origins?: readonly { readonly origin: string; readonly tools: readonly string[] }[]
+}
+
+/**
+ * A grant's terms over `who`'s workspace for a server named `name` (ADR 0114), `manage` unless `terms` say, for a day.
+ * `lists` makes its Topics and Personas lists, growing with what it makes, so it reaches nothing of anyone else's;
+ * `connections` lists the connections its setups may name.
+ */
+export const serverTerms = (who: Person, name: string, terms: ServerTerms = {}) => {
+  const list = terms.lists === true ? { kind: 'list', ids: [] } : { kind: 'all' }
+  return {
+    name,
+    level: terms.level ?? 'manage',
+    extras: terms.extras ?? [],
+    lifetime: '1d',
+    reach: {
+      workspaces: 'list',
+      each: [
+        {
+          workspace: who.workspace,
+          topics: list,
+          personas: list,
+          connections:
+            terms.connections === undefined ? { kind: 'all' } : { kind: 'list', ids: [...terms.connections] },
+        },
+      ],
+      origins: terms.origins ?? [],
+    },
+  }
+}
+
+/** A server as a test drives it (ADRs 0118, 0120): a script app installed in `who`'s workspace, and its token. */
+export interface Server {
+  readonly name: string
+  readonly clientId: string
+  readonly secret: string
+  /** Its installation, whose id is its grant's: what a widening link names. */
+  readonly installationId: string
+  readonly token: string
+  /** The workspace it is installed in, by slug: where its requests go. */
+  readonly slug: string
+}
+
+const Registered = Schema.Struct({
+  app: Schema.Struct({ clientId: Schema.String }),
+  clientSecret: Schema.String,
+  installation: Schema.Struct({ id: Schema.String }),
+})
+const Token = Schema.Struct({ access_token: Schema.String })
+
+/** An app's token request (ADR 0118): client_credentials with its secret as HTTP Basic, for goblin's /mcp resource. */
+export const tokenRequest = (base: string, clientId: string, secret: string) =>
+  ownerFetch(`${base}/api/auth/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      authorization: `Basic ${btoa(`${clientId}:${secret}`)}`,
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({ grant_type: 'client_credentials', resource: `${APP}/mcp`, scope: 'goblin' }).toString(),
+  })
+
+/** An app's access token, which the token endpoint must give (`tokenRequest`). */
+export async function appToken(base: string, clientId: string, secret: string): Promise<string> {
+  const answered = await tokenRequest(base, clientId, secret)
+  expect(answered.status, await answered.clone().text()).toBe(200)
+  return Schema.decodeUnknownSync(Token)(await answered.json()).access_token
+}
+
+/**
+ * A script app `who` registers and installs in their workspace in one step (ADR 0118), named `name` with `terms` as
+ * its grant, and its token: how a server or a script calls goblin since keys are gone (ADR 0120).
+ */
+export async function scriptApp(base: string, who: Person, name: string, terms: ServerTerms = {}): Promise<Server> {
+  const made = await call(base, who, '/api/developer/apps', {
+    name,
+    returnUrls: [],
+    script: true,
+    terms: serverTerms(who, name, terms),
+  })
+  expect(made.status, await made.clone().text()).toBe(201)
+  const { app, clientSecret, installation } = Schema.decodeUnknownSync(Registered)(await made.json())
+  const token = await appToken(base, app.clientId, clientSecret)
+  return { name, clientId: app.clientId, secret: clientSecret, installationId: installation.id, token, slug: who.slug }
+}
+
+/**
+ * One request of `server` (`path` an owner API path, `/api/…`): its token as the bearer under its workspace's path, no
+ * cookie, no Origin, a JSON body when there is one.
+ */
+export const asServer = (base: string, server: Server, method: string, path: string, body?: unknown) =>
+  ownerFetch(`${base}/w/${server.slug}${path}`, {
+    method,
+    headers: { authorization: `Bearer ${server.token}`, 'content-type': 'application/json' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
 

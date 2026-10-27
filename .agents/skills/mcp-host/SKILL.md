@@ -45,20 +45,19 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   (ADR 0122, `auth/protocol.ts`): a client is its Client ID Metadata Document (dynamic registration stays until the
   known clients connect that way), redirect URIs are `localhost` or https (no `cursor://`), tokens are plain bearer with
   DPoP stripped, every authorization asks `offline_access`, the 401 names `goblin` alone and says `invalid_token` for a
-  refused bearer. Never add a DPoP path without proof checks at `/mcp`. Every credential, key or client, has one grant:
+  refused bearer. Never add a DPoP path without proof checks at `/mcp`. Every credential, installed app or client, has one grant:
   level × reach × extras × lifetime (`packages/contracts/src/grants.ts`, stored in `auth/grants.ts`, mirrored in the
   agent by `grants/service.ts`). The workspaces a client reaches are its grant's (ADR 0097), read with the person's
-  memberships on every call: a tool
-  of a client that reaches more than one takes a required `workspace` (`inbound/mcp-server.ts` `naming`), and a new
-  tool needs nothing extra for it as long as its input is a Struct made by `standard`.
-  An inbound client's messages go into main, labelled with its name. A server key's go into the Topics it reaches,
-  labelled `[from server <key name>]`; every Topic is sealed (ADR 0115), and what a turn may do is its senders' power
+  memberships on every call, and an app's are its installations': a tool of a caller that reaches more than one takes a
+  required `workspace` (`inbound/mcp-server.ts` `naming`), and a new tool needs nothing extra for it as long as its
+  input is a Struct made by `standard`. An inbound client's messages go into main, labelled with its name. An installed
+  app's go into the Topics it reaches, labelled `[from server <app name>]`; every Topic is sealed (ADR 0115), and what a turn may do is its senders' power
   (`grants/power.ts`): every tool has its need in `pi/tool-needs.ts` (`TOOL_NEEDS`), read by the filter, the call-time
   guard (`pi/power.ts`, deny by default) and the tool itself; never add a tool without giving it its need on purpose,
   and check what depends on a call's arguments (a connection, another Topic, a setup) in the tool.
 - Every `EndpointAccess` endpoint has its tool in `inbound/tools.ts` but the streamed ones (`STREAMED`): a chat's stream
-  (ADR 0110) is server-sent events a key reads over HTTP with its own credential, and the server's instructions say
-  where. A key reads a chat's stream in full, so nothing a tool returns may carry a credential; the stream's frames
+  (ADR 0110) is server-sent events a credential reads over HTTP with its own token on `/w/<slug>/api`, and the
+  server's instructions say where. An app reads a chat's stream in full, so nothing a tool returns may carry a credential; the stream's frames
   redact goblin-shaped secrets as a backstop (`streams/redact.ts`), never the boundary.
 - A send is AG-UI's `RunAgentInput` (ADR 0111): `conversation_send` and `thread_start` keep plain fields a model writes
   (`PlainSend`, `PlainThreadStart`) and build the body with the contracts' `runInput` and `threadStart`, so the tool
@@ -78,7 +77,8 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   grant reaches, by the agent's mirror (`app_grant_reach`), with no request. Leases are verified by
   a signed challenge outside any transaction; deliveries are claimed, sent through `publishFetch` and settled under
   their claim, never inside a transaction. The account API ends a holder's leases (`/internal/publish/terminate`)
-  before it revokes, rotates or narrows a key or revokes a client; keep that ahead of any new way access ends.
+  before it uninstalls or narrows an installation, deletes an app or revokes a client; keep that ahead of any new way
+  access ends.
 - Sources (`sources/`, ADRs 0066, 0069) are how any server's events carry the owner's own messages: an owner-confirmed setup
   of JSON pointers and whole-value argument templates (`SourceSetup`), never a server's name. Confirmation grants the
   wake selector and the read and reply tools, subscribes `source:<id>` (handler `source-wake`) and binds the Source to
@@ -113,8 +113,8 @@ goblin's own server (`apps/runtime/src/inbound/`), authorized by Better Auth.
   `mcp` group's raw `oauthCallback` (`GET /api/mcp/oauth/callback`; the edge sends a non-member of the state's
   workspace to `/connect-elsewhere` instead, ADR 0096), a redirect to Connections, with `ref` when it
   failed.
-- Inbound `/mcp` is one server for every credential (ADRs 0086, 0114): an OAuth client acting for a person or a
-  server's `gbk_` key (`inbound/route.ts`). Each tool in the registry (`inbound/tools.ts`, `mcp-server.ts`,
+- Inbound `/mcp` is one server for every credential (ADRs 0086, 0114, 0120): an OAuth access token, a client's acting
+  for a person or an installed app's (`inbound/route.ts`); any other bearer gets the sign-in challenge. Each tool in the registry (`inbound/tools.ts`, `mcp-server.ts`,
   `inspect-tools.ts`, `config-tools.ts`) calls one owner endpoint as the credential (`ownerCall` in
   `inbound/client.ts`, forwarding `x-goblin-caller`) and is listed only when the grant's level and extras hold the
   endpoint's `EndpointAccess` (`offers`); owner admission checks the same, a client's person's role too

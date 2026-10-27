@@ -44,19 +44,8 @@ const INVITATION = {
   expiresAt: '2026-10-28T00:00:00.000Z',
 } as const
 const SECRET = 'secret-words'
-const KEY = `gbk_${'k'.repeat(64)}`
-/** The secret a rotation of `key-1` answers (ADR 0105). */
-const ROTATED = `gbk_${'r'.repeat(64)}`
-
-const KEY_VIEW = {
-  id: 'key-1',
-  name: 'svc',
-  createdAt: '2026-10-20T00:00:00.000Z',
-  grantId: 'key-1',
-  terms: TERMS(),
-}
-/** The credential the key admits (ADR 0114): `write` over everything of its workspace. */
-const KEY_CREDENTIAL = credential({ id: 'key-1', name: 'swarmm', level: 'write', generation: 3 })
+/** A server API key of before ADR 0120: a bearer like any other now, which admits nothing. */
+const OLD_KEY = `gbk_${'k'.repeat(64)}`
 /** An OAuth client's token the owner consented to (ADR 0116), and one whose grant is only `read`. */
 const TOKEN = 'eyJhbGciOi.eyJzdWIiOiJvd25lciJ9.c2ln'
 const READ_TOKEN = 'eyJhbGciOi.eyJyZWFkIjp0cnVlfQ.c2ln'
@@ -78,7 +67,6 @@ const changed = (grantId: string, terms: GrantTerms) => ({
   grant: {
     id: grantId,
     kind: 'client' as const,
-    keyId: undefined,
     clientId: 'client.1',
     userId: OWNER,
     name: terms.name,
@@ -132,17 +120,6 @@ const accountRecords = (crash: AccountRecords['crash'] = () => Effect.void) => {
         : Effect.fail(new NotFound({ what: 'grant' })),
     widen: (_person, grantId, terms) =>
       grantId === 'cg_1' ? Effect.succeed(changed(grantId, terms)) : Effect.fail(new NotFound({ what: 'grant' })),
-    keys: () => Effect.succeed([]),
-    createKey: () => Effect.die(new Error('no keys in this fixture')),
-    updateKey: (_workspace, _user, keyId, change) =>
-      keyId === 'key-1'
-        ? Effect.succeed({ before: KEY_VIEW, after: { ...KEY_VIEW, terms: change.terms } })
-        : Effect.fail(new NotFound({ what: 'key' })),
-    rotateKey: (_workspace, keyId) =>
-      keyId === 'key-1'
-        ? Effect.succeed({ key: { ...KEY_VIEW, start: ROTATED.slice(0, 10) }, secret: ROTATED })
-        : Effect.fail(new NotFound({ what: 'key' })),
-    revokeKey: () => Effect.void,
     apps: fake<AccountRecords['apps']>({ list: () => Effect.succeed([]), installations: () => Effect.succeed([]) }),
     crash: (report, userId) => {
       crashes.push(Option.getOrUndefined(userId))
@@ -171,13 +148,6 @@ const deployment = (
         return Effect.fail(new Unauthenticated({ reason: 'session required' }))
       return Effect.succeed(PERSON)
     },
-    key: (key) =>
-      key === KEY
-        ? Effect.succeed({
-            workspaceId: WS,
-            credential: { ...KEY_CREDENTIAL, ws: { ...KEY_CREDENTIAL.ws, workspace: WS } },
-          })
-        : Effect.fail(new Unauthenticated({ reason: 'key' })),
     client: (token, slug) => {
       if (token === APP_TOKEN && slug === MEMBERSHIP.slug)
         return Effect.succeed({
@@ -212,7 +182,7 @@ const deployment = (
 const built = Effect.runPromise(makeEdgeHttp)
 /** One request through the edge: its response and the lines it logged. */
 const through = async (
-  side: 'account' | 'workspace' | 'signIn' | 'owner',
+  side: 'account' | 'workspace' | 'signIn',
   request: Request,
   edge: Edge,
 ): Promise<{ readonly response: Response; readonly lines: readonly unknown[] }> => {
@@ -377,19 +347,21 @@ describe("a member's forward (ADR 0089)", () => {
       404,
       'not_found',
     ],
-    [
-      'a session on a path with no workspace',
-      new Request(`${APP}/api/topics`, { headers: { cookie: 'session=owner' } }),
-      404,
-      'not_found',
-    ],
   ] as const)('refuses %s without waking an agent', async (_case, request, status, code) => {
     const { seen, edge } = deployment()
-    const side = isWorkspacePath(new URL(request.url).pathname) ? 'workspace' : 'owner'
-    const { response } = await through(side, request, edge)
+    const { response } = await through('workspace', request, edge)
     expect(response.status).toBe(status)
     expect(await response.json()).toMatchObject({ error: { code } })
     expect(seen).toHaveLength(0)
+  })
+
+  it('never forwards a grant a session request names', async () => {
+    const { seen, edge } = deployment()
+    const request = write(`${BASE}/api/topics`, {
+      headers: { 'x-goblin-caller': '{"kind":"app","id":"forged"}' },
+    })
+    await through('workspace', request, edge)
+    expect(seen[0]?.headers.get('x-goblin-caller')).toBeNull()
   })
 
   it('refuses a JSON body over 64 KB without waking the agent, but streams a file upload through', async () => {
@@ -460,107 +432,6 @@ describe("a member's forward (ADR 0089)", () => {
   })
 })
 
-describe("a server's API key (ADR 0081)", () => {
-  /** A request a server sends with `key`: no cookie, no Origin, no CSRF header. */
-  const server = (path: string, init: { method?: string; headers?: Record<string, string>; body?: string } = {}) =>
-    new Request(`${APP}${path}`, {
-      method: init.method ?? 'POST',
-      headers: { authorization: `Bearer ${KEY}`, 'content-type': 'application/json', ...init.headers },
-      ...(init.body === undefined ? {} : { body: init.body }),
-    })
-
-  it("reaches its workspace's agent without a CSRF header, forwarding its credential and never the key, a member or an App mark", async () => {
-    const { seen, agents, edge } = deployment()
-    const request = server('/api/topics', {
-      headers: {
-        'x-mcp-caller': 'app',
-        'x-goblin-caller': '{"kind":"key","keyId":"forged","scopes":["personas"],"servers":[]}',
-        'x-goblin-member': '{"user":"forged","role":"owner"}',
-      },
-      body: JSON.stringify({ name: 'x' }),
-    })
-    const { response } = await through('owner', request, edge)
-    expect(response.status).toBe(200)
-    expect(agents).toEqual([WS])
-    const [forwarded] = seen
-    expect(forwarded?.headers.get('authorization')).toBeNull()
-    expect(forwarded?.headers.get('x-mcp-caller')).toBeNull()
-    expect(forwarded?.headers.get('x-goblin-member')).toBeNull()
-    expect(forwarded?.headers.get('x-goblin-forwarded')).toBe('owner')
-    expect(JSON.parse(forwarded?.headers.get('x-goblin-caller') ?? '')).toEqual({
-      ...KEY_CREDENTIAL,
-      ws: { ...KEY_CREDENTIAL.ws, workspace: WS },
-    })
-  })
-
-  it('never forwards a grant a session request names', async () => {
-    const { seen, edge } = deployment()
-    const request = write(`${BASE}/api/topics`, {
-      headers: { 'x-goblin-caller': '{"kind":"key","keyId":"forged","scopes":[],"servers":[]}' },
-    })
-    await through('workspace', request, edge)
-    expect(seen[0]?.headers.get('x-goblin-caller')).toBeNull()
-  })
-
-  it.each([
-    [
-      'an unknown key',
-      server('/api/topics', { headers: { authorization: `Bearer gbk_${'z'.repeat(64)}` } }),
-      401,
-      'key',
-    ],
-    ['a key with a cookie', server('/api/topics', { headers: { cookie: 'session=owner' } }), 403, 'key_browser'],
-    ['a key with an Origin', server('/api/topics', { headers: { origin: APP } }), 403, 'key_browser'],
-    ['an endpoint no credential reaches', server('/api/agent/resident', { method: 'GET' }), 403, 'credential'],
-    [
-      'a level its grant lacks',
-      server('/api/personas', { body: '{}' }),
-      403,
-      'https://goblin.test/consent/widen?grant=key-1&level=manage',
-    ],
-    ['an extra its grant lacks', server('/api/inspect/turns', { method: 'GET' }), 403, '"extra":"inspect"'],
-    ['a file upload', server('/api/files/uploads/a.txt', { method: 'PUT', body: 'x' }), 403, 'credential'],
-    ['a path that is no endpoint', server('/api/nothing/here', { method: 'GET' }), 403, 'credential'],
-    [
-      'an inbound OAuth token',
-      server('/api/topics', { headers: { authorization: 'Bearer eyJhbGciOi.eyJzdWIiOi.c2ln' } }),
-      404,
-      'route',
-    ],
-  ] as const)('refuses %s without waking the agent', async (_case, request, status, reason) => {
-    const { seen, edge } = deployment()
-    const { response } = await through('owner', request, edge)
-    expect(response.status).toBe(status)
-    expect(JSON.stringify(await response.json())).toContain(reason)
-    expect(seen).toHaveLength(0)
-  })
-
-  it("passes its agent's rate-limit refusal on with Retry-After (ADR 0085)", async () => {
-    const limited = new Unauthenticated({ reason: 'rate_limited', retryAfter: 17 })
-    const { edge } = deployment(() => Response.json(envelopeOf(limited), { status: 401 }))
-    const { response } = await through('owner', server('/api/topics', { method: 'GET' }), edge)
-    expect(response.status).toBe(401)
-    expect(response.headers.get('retry-after')).toBe('17')
-    expect(await response.json()).toMatchObject({ error: { reason: 'rate_limited', retryAfter: 17 } })
-  })
-
-  it('never reaches the account APIs: a key cannot list, make, change or rotate keys, nor use a member path', async () => {
-    const { seen, edge } = deployment()
-    for (const request of [
-      server(`${BASE}/api/keys`, { method: 'GET' }),
-      server(`${BASE}/api/keys`, { body: '{}' }),
-      server(`${BASE}/api/keys/key-1`, { method: 'PATCH', body: JSON.stringify({ terms: KEY_VIEW.terms }) }),
-      server(`${BASE}/api/keys/key-1/rotate`, {}),
-      server(`${BASE}/api/topics`, { method: 'GET' }),
-    ]) {
-      const { response } = await through('workspace', request, edge)
-      expect(response.status).toBe(401)
-    }
-    expect((await through('account', server('/api/workspaces', { method: 'GET' }), edge)).response.status).toBe(401)
-    expect(seen).toHaveLength(0)
-  })
-})
-
 /** A request a client sends with `token`: no cookie and no CSRF header, as a server sends one. */
 const client = (
   path: string,
@@ -582,7 +453,7 @@ describe("an OAuth client's token on its workspace's path (ADR 0116)", () => {
     const request = client(`${BASE}/api/topics`, {
       headers: {
         'x-mcp-caller': 'app',
-        'x-goblin-caller': '{"kind":"key","id":"forged"}',
+        'x-goblin-caller': '{"kind":"app","id":"forged"}',
         'x-goblin-member': '{"user":"forged","role":"owner"}',
       },
       body: JSON.stringify({ name: 'x' }),
@@ -641,7 +512,12 @@ describe("an OAuth client's token on its workspace's path (ADR 0116)", () => {
       'bearer_and_session',
     ],
     ["the workspace's members", client(`${BASE}/api/members`, { method: 'GET' }), 403, 'credential'],
-    ["the workspace's keys", client(`${BASE}/api/keys`, { method: 'GET' }), 403, 'credential'],
+    [
+      'a server API key of before ADR 0120',
+      client(`${BASE}/api/topics`, { method: 'GET', token: OLD_KEY }),
+      401,
+      'token',
+    ],
     ['an endpoint no credential reaches', client(`${BASE}/api/agent/resident`, { method: 'GET' }), 403, 'credential'],
     [
       'a level its grant lacks',
@@ -676,18 +552,6 @@ describe("an OAuth client's token on its workspace's path (ADR 0116)", () => {
   })
 })
 
-/** A manager's change of key `key-1`, as Settings sends it. */
-const patchKey = (body: unknown) =>
-  write(`${BASE}/api/keys/key-1`, {
-    method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-
-/** A manager's rotation of key `keyId`'s secret, as Settings sends it (ADR 0105). */
-const rotate = (keyId: string, headers: Record<string, string> = {}) =>
-  write(`${BASE}/api/keys/${keyId}/rotate`, { headers })
-
 /** The widening page's read of grant `id`'s terms, with the owner's session. */
 const grantTerms = (id: string) =>
   new Request(`${APP}/api/grants/${id}/terms`, { headers: { cookie: 'session=owner' } })
@@ -700,73 +564,6 @@ const widen = (id: string, body: unknown) =>
   })
 
 describe('the account APIs in the Worker', () => {
-  it("gives a workspace's key new terms and audits who did it, never for a foreign Origin (ADRs 0084, 0114)", async () => {
-    const { edge } = deployment()
-    const origins = [{ origin: 'https://mcp.swarmm.app', tools: ['job_submit'] }]
-    const terms = TERMS({ level: 'manage', extras: ['inspect'], reach: { ...TERMS().reach, origins } })
-    const { response, lines } = await through('workspace', patchKey({ terms }), edge)
-    expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ id: 'key-1', terms: { level: 'manage', extras: ['inspect'] } })
-    expect(lines).toContainEqual(
-      expect.objectContaining({
-        event: 'api_key',
-        kind: 'grant',
-        id: 'key-1',
-        agent: WS,
-        by: OWNER,
-        scopes: ['manage', 'inspect'],
-        'scopes.before': ['write'],
-        count: 1,
-      }),
-    )
-    // How many origins, never naming one.
-    expect(JSON.stringify(lines)).not.toContain('swarmm.app')
-    const patch = (headers: Record<string, string>) =>
-      write(`${BASE}/api/keys/key-1`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json', ...headers },
-        body: JSON.stringify({ terms }),
-      })
-    expect((await through('workspace', patch({ origin: 'https://evil.test' }), edge)).response.status).toBe(403)
-    const gone = write(`${BASE}/api/keys/key-9`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ terms }),
-    })
-    expect((await through('workspace', gone, edge)).response.status).toBe(404)
-    expect((await through('workspace', patchKey({ scopes: ['topics'] }), edge)).response.status).toBe(400)
-    expect((await through('workspace', patchKey({ terms: { ...terms, level: 'admin' } }), edge)).response.status).toBe(
-      400,
-    )
-  })
-
-  it("rotates a key's secret and audits who did it, never the secret, never for a member (ADR 0105)", async () => {
-    const { edge } = deployment()
-    const { response, lines } = await through('workspace', rotate('key-1'), edge)
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ key: { ...KEY_VIEW, start: ROTATED.slice(0, 10) }, secret: ROTATED })
-    expect(lines).toContainEqual(
-      expect.objectContaining({ event: 'api_key', kind: 'secret', id: 'key-1', agent: WS, by: OWNER }),
-    )
-    expect(JSON.stringify(lines)).not.toContain(ROTATED.slice(4))
-    expect((await through('workspace', rotate('key-9'), edge)).response.status).toBe(404)
-    expect((await through('workspace', rotate('key-1', { origin: 'https://evil.test' }), edge)).response.status).toBe(
-      403,
-    )
-    const member = deployment(undefined, accountRecords(), 'member')
-    const refused = (await through('workspace', rotate('key-1'), member.edge)).response
-    expect(refused.status).toBe(403)
-    expect(await refused.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
-  })
-
-  it("keeps a workspace's keys from a member who is not an owner or admin", async () => {
-    const { edge } = deployment(undefined, accountRecords(), 'member')
-    const list = new Request(`${APP}${BASE}/api/keys`, { headers: { cookie: 'session=owner' } })
-    const { response } = await through('workspace', list, edge)
-    expect(response.status).toBe(403)
-    expect(await response.json()).toMatchObject({ error: { code: 'forbidden', reason: 'role' } })
-  })
-
   it("lists a workspace's members for any member, and invites only for an owner or admin (ADR 0093)", async () => {
     const owner = deployment()
     const list = new Request(`${APP}${BASE}/api/members`, { headers: { cookie: 'session=owner' } })
@@ -960,7 +757,7 @@ describe('the account APIs in the Worker', () => {
     const { response } = await through('account', new Request(`${APP}/api/workspaces/x/y/z`), edge)
     expect(response.status).toBe(404)
     expect(await response.json()).toMatchObject({ error: { code: 'not_found' } })
-    const unknown = new Request(`${APP}${BASE}/api/keys/x/y/z`, { headers: { cookie: 'session=owner' } })
+    const unknown = new Request(`${APP}${BASE}/api/members/x/y/z`, { headers: { cookie: 'session=owner' } })
     expect((await through('workspace', unknown, edge)).response.status).toBe(404)
   })
 })

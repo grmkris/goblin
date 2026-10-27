@@ -9,7 +9,7 @@ import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { type AppError, attemptSync } from '../http/errors.ts'
-import { requestKey } from '../grants/policy.ts'
+import { requestApp } from '../grants/policy.ts'
 import { epochSeconds } from '../clock.ts'
 import { Changes } from '../runtime/changes.ts'
 import type { NewInvocation, PersonaInvocations, Settlement } from './invocations.ts'
@@ -67,7 +67,7 @@ export class Personas extends Context.Service<
      * server's work (a key's request, ADRs 0087, 0115: tenancy is the sender's). None: the chat's model.
      */
     readonly ownModel: (model: string | undefined) => Effect.Effect<string | undefined>
-    /** Whether `model` is one of the owner's own subscriptions, which a server's key never names (ADR 0087). */
+    /** Whether `model` is one of the owner's own subscriptions, which an installed app never names (ADR 0087). */
     readonly ownerOnly: (model: string) => boolean
     /** A new Persona at revision 1, or the one `input.operationId` already made. A taken name is a `Conflict`. */
     readonly create: (input: CreatePersona, actor: PersonaActor) => Effect.Effect<MadePersona, AppError>
@@ -110,7 +110,7 @@ export class Personas extends Context.Service<
         ownModel: Effect.fn('Personas.ownModel')(function* (model: string | undefined) {
           if (model === undefined || !store.offers(model)) return undefined
           if (!fence.ownerOnly(model)) return model
-          return (yield* requestKey) === undefined ? model : undefined
+          return (yield* requestApp) === undefined ? model : undefined
         }),
         ownerOnly: fence.ownerOnly,
         create: Effect.fn('Personas.create')(function* (input: CreatePersona, actor: PersonaActor) {

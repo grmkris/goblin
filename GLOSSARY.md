@@ -40,14 +40,17 @@ An MCP client (Claude Code, another agent) a person authorized to call goblin's 
 **grant** they gave it and never more than their role (ADRs 0097, 0114). Settings lists them as MCP clients.
 _Avoid_: apps that use your agent
 
-**API key**:
-A `gbk_` key an owner or admin makes in Settings for a server the workspace runs (ADR 0081). It belongs to that
-workspace (ADR 0089), does what its **grant** allows over `/api` or `/mcp`, and never keeps the agent active. The Topics
-it makes are sealed like any other, and named as made by it for display only (ADR 0115).
-_Avoid_: token, service account
+**Installed app**:
+A product or a script registered by a workspace (Settings → Developer) and installed in a workspace by its owner or an
+admin, with a **grant** per installation (ADR 0118). Its backend calls `/w/<slug>/api` or `/mcp` with its own
+client_credentials token, as a server, and never keeps the agent active. A script app is one installed only in the
+workspace that registered it, which is how a script or CI calls goblin (`goblin token`, ADR 0120). The Topics and
+Personas it makes are sealed like any other, and named as made by it for display only (ADR 0115).
+_Avoid_: API key, service account
 
 **Credential**:
-An API key or an inbound client: what calls goblin for a server or a person's agent, each with its own grant (ADR 0114).
+An installed app or an inbound client: what calls goblin for a server or a person's agent, each with its own grant (ADR
+0114).
 _Avoid_: caller, principal
 
 **Grant**:
@@ -60,7 +63,7 @@ How much a grant may do within its reach: `read` sees, `write` also sends and ma
 makes and changes Personas and a Topic's settings.
 
 **Extra**:
-A named power beside a grant's level: `setup`, `routines` (both risky), `inspect`, and `keys`, which only an owner gives.
+A named power beside a grant's level: `setup` and `routines` (both risky), and `inspect`.
 
 **Reach**:
 What a grant reaches: all of its person's workspaces or those named, and in each its Topics, Personas and
@@ -68,11 +71,11 @@ connections, each all or a list that grows with what the credential makes.
 
 **Lifetime**:
 How long a grant lasts: until revoked, or 1, 7, 30, 90 or 365 days from its last approval.
-_Avoid_: expiry (of a key)
+_Avoid_: expiry (of an installation)
 
 **Widening**:
-Approving more for a grant on the page a refusal links to, by the person who may approve it: an owner or admin for a
-key, its own person for an inbound client.
+Approving more for a grant on the page a refusal links to, by the person who may approve it: an owner or admin for an
+installation, its own person for an inbound client.
 _Avoid_: re-consent, upgrade
 
 **Tool grant**:
@@ -112,7 +115,7 @@ the first Topic and holds Main.
 
 **Sealed Topic**:
 Every Topic unless it is a hub (ADR 0115): its chats see only it, its own chats and its own files (and the **Shared
-folder** on a person's turn), and act only on it. Whoever made it, the owner or a server's key.
+folder** on a person's turn), and act only on it. Whoever made it, a person or an installed app.
 _Avoid_: room, private topic
 
 **Hub**:
@@ -122,7 +125,7 @@ _Avoid_: admin topic, main (for this)
 
 **Turn power**:
 What one turn of the agent may do (ADR 0115): what everyone who sent its inputs may do, together. A person's role, an
-inbound client's grant within its person's role, a server key's grant; work no one sent is an admin's. Where the turn
+inbound client's grant within its person's role, an installed app's grant; work no one sent is an admin's. Where the turn
 works bounds it further: the Topic's or the Persona's setup, the Topic's reach, a credential's connections.
 _Avoid_: permissions (for this), room
 
@@ -362,7 +365,7 @@ The workspace's files (ADRs 0022, 0115): each Topic's folder (`/topics/<id>/uplo
 
 **Shared folder**:
 `/uploads` and `/agent`, outside every Topic (ADR 0115): what the workspace kept before Topics had folders. A person's
-turn reads it in any Topic; a turn a server's key sent never does.
+turn reads it in any Topic; a turn an installed app sent never does.
 _Avoid_: public folder
 
 **Attachment**:

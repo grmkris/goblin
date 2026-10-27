@@ -1,6 +1,5 @@
 import type { WorkspaceView } from '@goblin/contracts'
-import { credentialOf } from '../auth/api-keys.ts'
-import { type GrantRecord, type WorkspaceCoverage, coveragesOf } from '../auth/grants.ts'
+import { type GrantRecord, type WorkspaceCoverage, coveragesOf, credentialOf } from '../auth/grants.ts'
 import { clientName, verifyAccessToken } from '../auth/index.ts'
 import { type AppInstallation, appInstallations } from '../auth/installs.ts'
 import { reachedBy } from '../auth/workspaces.ts'

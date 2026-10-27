@@ -156,10 +156,10 @@ describe('the places Jump to lists', () => {
     expect(apps.map((item) => item.tile)).toEqual(['mysi', 'mysi', 'tracker', 'draft'])
   })
 
-  it("lists the Topics a server's key made after the Topics, by key, found by a query but not before one is typed", () => {
+  it('lists the Topics an app made after the Topics, by app, found by a query but not before one is typed', () => {
     const made = [
-      topic(4, 'deal-4', '40', { madeBy: { key: 'swarmm-prod' } }),
-      topic(5, 'deal-5', '50', { madeBy: { key: 'swarmm-prod' }, archivedAt: 9 }),
+      topic(4, 'deal-4', '40', { madeBy: { app: 'swarmm-prod' } }),
+      topic(5, 'deal-5', '50', { madeBy: { app: 'swarmm-prod' }, archivedAt: 9 }),
     ]
     const items = jumpItems(sources({ topics: [...TOPICS, ...made] }))
     expect(rows(of(items, 'topic'))).toEqual(['Personal — Topic', 'Travel — Topic', 'deal-4 — Made by swarmm-prod'])

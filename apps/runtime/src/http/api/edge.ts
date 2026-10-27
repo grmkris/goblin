@@ -26,7 +26,7 @@ import { attempt, isAppError } from '../errors.ts'
 import type { Person } from '../../auth/workspaces.ts'
 import { stateWorkspace } from '../../mcp/oauth/sign-in.ts'
 import { AccountRequest, type AccountRecords } from './account.ts'
-import { type CredentialEdge, admitClient, admitKey } from './admission.ts'
+import { type CredentialEdge, admitClient } from './admission.ts'
 import { AccountApiLayer, WorkspaceAccountApiLayer } from './account-layers.ts'
 import {
   RequestContext,
@@ -42,7 +42,6 @@ import {
   type Credential,
   MEMBER_HEADER,
   type Member,
-  bearerKey,
   bearerToken,
   credentialHeader,
   memberHeader,
@@ -55,9 +54,10 @@ import { answer, refusal, secured } from './render.ts'
  * the account APIs itself. It forwards every other request to the agent of one workspace, marked as an owner forward so
  * the agent never takes it for an internal request, with who it comes from. The credential decides the workspace: a
  * member's session names it in the path (`/w/<workspace slug>/api/…`), checked against their membership, and so does an
- * OAuth client's token, checked against the workspaces its grant reaches for its person (ADR 0116); a server's API key
- * (ADR 0081) belongs to one and reaches it at `/api/…`. An outbound sign-in comes back to one address for every
- * workspace, its `state` naming the workspace, checked against the person's membership the same way.
+ * OAuth token, a client's checked against the workspaces its grant reaches for its person (ADR 0116), an installed
+ * app's against its installation (ADR 0118). Nothing reaches an agent on bare `/api/…` (ADR 0120). An outbound sign-in
+ * comes back to one address for every workspace, its `state` naming the workspace, checked against the person's
+ * membership the same way.
  */
 
 /**
@@ -107,15 +107,12 @@ const SENDS: ReadonlySet<string> = new Set(['conversations.submit', 'conversatio
 const REPORT_BODY_LIMIT = 4096
 const FILES = '/api/files'
 
-/** The owner paths the edge forwards: under `/api/`, never the account API's. */
-const OWNER_PREFIX = '/api/'
-
 /** A member's path: a workspace's slug, then the API path its agent or the workspace account API answers. */
 const WORKSPACE_PATH = /^\/w\/([\w-]{1,200})(\/api\/.*)$/u
 
 /**
- * Who a forwarded request comes from: a member (a session), a credential (a key), or a credential acting for its person
- * as a member (an OAuth client, ADR 0116).
+ * Who a forwarded request comes from: a member (a session), a credential (an installed app, ADR 0118), or a credential
+ * acting for its person as a member (an OAuth client, ADR 0116).
  */
 type Principal =
   | { readonly member: Member; readonly credential?: undefined }
@@ -193,7 +190,7 @@ const codeOf = (response: Response): Effect.Effect<string | undefined> =>
     : Effect.succeed(undefined)
 
 /**
- * An agent's refusal that says when to come back (`retryAfter`: a key past its rate limit, ADR 0085) with
+ * An agent's refusal that says when to come back (`retryAfter`: a credential past its rate limit, ADR 0085) with
  * `Retry-After`; any other answer as it is.
  */
 const withRetryAfter = (response: Response): Effect.Effect<Response> =>
@@ -265,7 +262,7 @@ const ACCOUNT_PATHS = [
   '/api/client-errors',
 ] as const
 /** The workspace account API's paths, under `/w/<workspace slug>`: answered by the Worker, never the agent. */
-const WORKSPACE_ACCOUNT_PATHS = ['/api/keys', '/api/members', '/api/developer', '/api/installations'] as const
+const WORKSPACE_ACCOUNT_PATHS = ['/api/members', '/api/developer', '/api/installations'] as const
 const under = (path: string, prefix: string): boolean => path === prefix || path.startsWith(`${prefix}/`)
 export const isAccountPath = (path: string): boolean => ACCOUNT_PATHS.some((prefix) => under(path, prefix))
 const isWorkspaceAccountPath = (path: string): boolean => WORKSPACE_ACCOUNT_PATHS.some((prefix) => under(path, prefix))
@@ -274,7 +271,7 @@ const isWorkspaceAccountPath = (path: string): boolean => WORKSPACE_ACCOUNT_PATH
 export const isWorkspacePath = (path: string): boolean => WORKSPACE_PATH.test(path)
 
 /**
- * Each account endpoint's admission: a person's workspaces and invitations for any signed-in person (a key never
+ * Each account endpoint's admission: a person's workspaces and invitations for any signed-in person (no credential
  * reaches them); crash reports, and an invitation's preview (its link is all a visitor has, ADR 0093), for anyone. One
  * that needs no session but comes with one names its person (a crash's flow point is indexed by their hash).
  */
@@ -307,12 +304,6 @@ export interface EdgeHttp {
    * and their membership of it, read now; then forwards it to that workspace's agent as a member's request.
    */
   readonly signIn: (request: Request, edge: Edge) => Effect.Effect<Response>
-  /**
-   * Admits a server's request by its API key and forwards it to the agent of the key's workspace. Only an `/api/*` path
-   * that is not the account API's is forwarded, as the parsed URL names it (`..` and `%2e%2e` already resolved); any
-   * other is a 404 in the envelope, and so is one without a key: a session names its workspace in the path.
-   */
-  readonly owner: (request: Request, edge: Edge) => Effect.Effect<Response>
   /**
    * One of the Worker's own routes (`/mcp`, `/hooks/*`, anything else it does not serve): `serve`'s answer with the
    * API's headers, or the envelope of the failure it ended in, and the failure line either way. `serve` is given the
@@ -476,7 +467,9 @@ const forwardClient = (
     })
   })
 
-/** A member's request of the workspace account API (members, keys), answered in the Worker; `route` the one it names. */
+/**
+ * A member's request of the workspace account API (members, apps), answered in the Worker; `route` the one it names.
+ */
 const answerWorkspaceAccount = (
   workspaceHttp: AccountHttp,
   at: WorkspaceRequest & { readonly facts: RequestFacts; readonly named: string | undefined },
@@ -567,32 +560,6 @@ const signInOf =
     return Effect.provideContext(served, observed)
   }
 
-const ownerOf =
-  ({ ownerRoute, ownerNeeds, observed }: Built): EdgeHttp['owner'] =>
-  (request, edge) => {
-    const url = new URL(request.url)
-    const facts = { ...requestFacts(request, ownerRoute(request) ?? routeTemplate(url.pathname)), ref: refOf(request) }
-    const served = settle(request, facts, (known) =>
-      Effect.gen(function* () {
-        const token = bearerKey(request)
-        if (!url.pathname.startsWith(OWNER_PREFIX) || isAccountPath(url.pathname) || token === undefined)
-          return yield* new NotFound({ what: 'route' })
-        const { workspaceId, credential } = yield* admitKey(request, edge, token, ownerNeeds.get(facts.route))
-        known(workspaceId)
-        return yield* forward({
-          request,
-          ref: facts.ref,
-          route: facts.route,
-          path: url.pathname,
-          search: url.search,
-          principal: { credential },
-          agent: edge.agent(workspaceId),
-        })
-      }),
-    )
-    return Effect.provideContext(served, observed)
-  }
-
 const routeOf =
   ({ observed }: Built): EdgeHttp['route'] =>
   (request, serve) => {
@@ -622,7 +589,6 @@ export const makeEdgeHttp: Effect.Effect<EdgeHttp> = Effect.gen(function* () {
     account: accountOf(built),
     workspace: workspaceOf(built),
     signIn: signInOf(built),
-    owner: ownerOf(built),
     route: routeOf(built),
   }
 })

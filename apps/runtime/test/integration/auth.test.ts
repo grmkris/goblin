@@ -8,7 +8,7 @@ import Stack from './auth-stack.ts'
 import { call, person, signedIn } from './owner-requests.ts'
 import { tasksCase } from './tasks-case.ts'
 import { answerOf } from './probe-reads.ts'
-import { connectionSetupCase, inspectAuthCase, keyWideningCase, reachCase, restBearerCase } from './auth-inspect.ts'
+import { appWideningCase, connectionSetupCase, inspectAuthCase, reachCase, restBearerCase } from './auth-inspect.ts'
 import { installsCase } from './installs-case.ts'
 import { cimdCase, protocolCase } from './protocol-case.ts'
 
@@ -224,7 +224,7 @@ harness.test(
     const { url } = yield* stack
     yield* Effect.promise(() => inspectAuthCase(url))
     yield* Effect.promise(() => reachCase(url))
-    yield* Effect.promise(() => keyWideningCase(url))
+    yield* Effect.promise(() => appWideningCase(url))
   }),
 )
 harness.test(

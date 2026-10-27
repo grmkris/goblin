@@ -1,5 +1,4 @@
 import { Predicate } from 'effect'
-import { apiKey } from '@better-auth/api-key'
 import { cimd } from '@better-auth/cimd'
 import { mcp } from '@better-auth/mcp'
 import { type Account, betterAuth, type BetterAuthPlugin } from 'better-auth'
@@ -14,7 +13,7 @@ import { codeMail, mailerOf } from './mail.ts'
 import { guardOidc, oidcPlugin, oidcProviderOf, refuseUnverifiedOidcUser, withoutProviderTokens } from './oidc.ts'
 import { clientSecretHash } from './client-secret.ts'
 import { guardAuthorization, guardRegistration, manualRedirects } from './protocol.ts'
-import { KEY_LENGTH, KEY_PREFIX, KEY_START_LENGTH, MCP_SCOPES, mcpResource } from './resources.ts'
+import { MCP_SCOPES, mcpResource } from './resources.ts'
 import { workspaceAccess } from './roles.ts'
 import { deleteAgentOf } from './account.ts'
 import { deleteOwnedAlone } from './workspaces.ts'
@@ -80,30 +79,6 @@ const codePlugin = (env: AuthEnvironment, delivery: MailDelivery) =>
         delivery.failed = true
       }
     },
-  })
-
-/**
- * Server API keys (ADR 0081): hashed at rest, named and `gbk_`-prefixed. A key's lifetime is its grant's (ADR 0114),
- * so the plugin keeps no expiry of its own: with no default it leaves a key's `expiresAt` empty (any default would be
- * written for every key made without one). A key is never turned into a session. Keys are made, listed, rotated and ended only through
- * `auth/api-keys.ts`; the plugin's own routes are not served (`handleAuth`). The plugin's per-key limiter is off, for
- * keys made before too (its global switch is read first): it resets only after a quiet window, so a steady client
- * piled up to the limit and was cut off. A key's agent counts its requests per fixed minute instead (ADR 0085).
- */
-const keyPlugin = () =>
-  apiKey({
-    // A key belongs to a workspace (ADR 0089): its `referenceId` is the workspace's ID, and who made it is in its
-    // metadata.
-    references: 'organization',
-    defaultPrefix: KEY_PREFIX,
-    defaultKeyLength: KEY_LENGTH,
-    requireName: true,
-    maximumNameLength: 64,
-    enableMetadata: true,
-    enableSessionForAPIKeys: false,
-    startingCharactersConfig: { shouldStore: true, charactersLength: KEY_START_LENGTH },
-    keyExpiration: { defaultExpiresIn: null, minExpiresIn: 1, maxExpiresIn: 365 },
-    rateLimit: { enabled: false },
   })
 
 /**
@@ -296,7 +271,6 @@ const authOptions = (env: AuthEnvironment, database: D1Database, needs: AuthNeed
       }),
       codePlugin(env, delivery),
       workspacePlugin(),
-      keyPlugin(),
       ...(provider === undefined ? [] : [oidcPlugin(provider)]),
     ],
   }

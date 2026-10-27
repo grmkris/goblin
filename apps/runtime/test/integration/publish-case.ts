@@ -12,7 +12,18 @@ import { decodeEnvelope, verifyWebhook } from '../../src/mcp/events/webhook.ts'
 import { CredentialCipher } from '../../src/mcp/oauth/cipher.ts'
 import { fake } from '../fake.ts'
 import { callOwner } from '../owner-client.ts'
-import { type Person, call, holding, keyBody, lever, ownerFetch, person, showing, signedIn } from './owner-requests.ts'
+import {
+  type Person,
+  type Server,
+  asServer,
+  call,
+  holding,
+  lever,
+  person,
+  scriptApp,
+  showing,
+  signedIn,
+} from './owner-requests.ts'
 import type { Received } from './publish-receiver.ts'
 import { waitFor } from './until.ts'
 
@@ -22,47 +33,27 @@ const FROM_START = '0'.repeat(16)
 /** The consumer's own credential key: it seals the secrets it subscribes with, as goblin's agent does. */
 const CONSUMER_KEY = 'Y29uc3VtZXItdGVzdC1maXh0dXJlLWtleSEhISEhISE='
 
-const Made = Schema.Struct({ key: Schema.Struct({ id: Schema.String }), secret: Schema.String })
 const Polled = Schema.Struct({
   events: Schema.Array(Schema.Struct({ eventId: Schema.String, data: ConversationUpdated, cursor: Schema.String })),
   cursor: Schema.String,
   hasMore: Schema.Boolean,
 })
 
-/**
- * A key of `who` for a server, named `name`, whose grant writes in only the rooms it makes (ADR 0114: its Topics a
- * list), as a server that makes rooms and follows them needs.
- */
-async function keyOf(base: string, who: Person, name: string) {
-  const made = await call(base, who, '/api/keys', keyBody(who, name, { level: 'write', lists: true }))
-  expect(made.status, await made.clone().text()).toBe(201)
-  const created = Schema.decodeUnknownSync(Made)(await made.json())
-  return { id: created.key.id, secret: created.secret }
-}
-
-/** One request of a server with `secret`: no cookie, no Origin, a JSON body when there is one. */
-const asKey = (base: string, secret: string, method: string, path: string, body?: unknown) =>
-  ownerFetch(`${base}${path}`, {
-    method,
-    headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  })
-
-/** The room a key makes: its Topic's Conversation. */
-async function roomOf(base: string, secret: string, name: string): Promise<string> {
-  const made = await asKey(base, secret, 'POST', '/api/topics', { name, operationId: `publish:${name}` })
+/** The room a server makes: its Topic's Conversation. */
+async function roomOf(base: string, server: Server, name: string): Promise<string> {
+  const made = await asServer(base, server, 'POST', '/api/topics', { name, operationId: `publish:${name}` })
   expect(made.status, await made.clone().text()).toBe(201)
   return Schema.decodeUnknownSync(TopicView)(await made.json()).conversation
 }
 
-/** goblin's own MCP client of /mcp, as a server holding `secret`. */
-async function mcpAs(base: string, secret: string): Promise<Client> {
+/** goblin's own MCP client of /mcp, as an installed app holding `token`. */
+async function mcpAs(base: string, token: string): Promise<Client> {
   const client = new Client({ name: 'publish-conformance', version: '1.0.0' })
   await client.connect(
     new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
       fetch: (input, init) => {
         const sent = new Headers(init?.headers)
-        sent.set('authorization', `Bearer ${secret}`)
+        sent.set('authorization', `Bearer ${token}`)
         sent.set('connection', 'close')
         return fetch(input, { ...init, headers: sent })
       },
@@ -157,24 +148,24 @@ const controls = (received: readonly Received[], type: string) =>
   received.filter((each) => each.body.includes(`"type":"${type}"`))
 
 /**
- * ADR 0112 on the real Worker and agent, and goblin's own Events consumer as the conformance check: a server's key
+ * ADR 0112 on the real Worker and agent, and goblin's own Events consumer as the conformance check: an installed app
  * subscribes over /mcp with `mcp/events/client.ts`; the challenge, then a signed `conversation.updated` within about a
- * second of a message in its room, and an idle one when the turn ends; another key's room never reaches it; REST and
+ * second of a message in its room, and an idle one when the turn ends; another app's room never reaches it; REST and
  * MCP polls agree and `null` answers where now is; a receiver that keeps failing is retried, then given a `gap`; and
- * revoking the key ends its leases with `terminated`.
+ * uninstalling the app ends its leases with `terminated`.
  */
 export async function publishCase(url: string): Promise<void> {
   const owner = await person(url)
   const me = signedIn(url, owner)
   // The owner's own request gives the agent resident authority, which the rooms' turns need.
   await callOwner(me, (api) => api.personas.list({ query: {} }))
-  const a = await keyOf(url, owner, 'publish-a')
-  const b = await keyOf(url, owner, 'publish-b')
-  const roomA = await roomOf(url, a.secret, 'Customer A')
-  const roomB = await roomOf(url, b.secret, 'Customer B')
+  const a = await scriptApp(url, owner, 'publish-a', { level: 'write', lists: true })
+  const b = await scriptApp(url, owner, 'publish-b', { level: 'write', lists: true })
+  const roomA = await roomOf(url, a, 'Customer A')
+  const roomB = await roomOf(url, b, 'Customer B')
 
   // goblin's consumer subscribes to goblin, verified by the signed challenge.
-  const mcp = await mcpAs(url, a.secret)
+  const mcp = await mcpAs(url, a.token)
   expect(mcp.getServerCapabilities()?.extensions).toHaveProperty(['io.modelcontextprotocol/events'])
   const listed = await mcp.request({ method: 'events/list', params: {} }, Schema.toStandardSchemaV1(EventsListResult))
   expect(listed.events.map(({ name, delivery }) => ({ name, delivery }))).toEqual([
@@ -218,10 +209,10 @@ export async function publishCase(url: string): Promise<void> {
     await verified(consumer.secret, each)
   }
 
-  // Another key's room: the owner's poll sees its chat change; key A's deliveries and polls never do.
-  const sentB = await asKey(
+  // Another app's room: the owner's poll sees its chat change; app A's deliveries and polls never do.
+  const sentB = await asServer(
     url,
-    b.secret,
+    b,
     'POST',
     `/api/conversations/${roomB}/messages`,
     runInput(roomB, { input: 'in room b', operationId: 'publish:b:1' }),
@@ -234,9 +225,9 @@ export async function publishCase(url: string): Promise<void> {
     )
   await waitFor(ownerPoll, ({ events }) => events.some(({ data }) => data.chat === roomB), 'room B journaled', 10_000)
 
-  // REST and MCP polls agree, and a key's reach no other room; a null cursor answers where now is.
+  // REST and MCP polls agree, and an app's reach no other room; a null cursor answers where now is.
   const rest = Schema.decodeUnknownSync(Polled)(
-    await (await asKey(url, a.secret, 'POST', '/api/events/poll', { name: NAME, cursor: FROM_START })).json(),
+    await (await asServer(url, a, 'POST', '/api/events/poll', { name: NAME, cursor: FROM_START })).json(),
   )
   const viaMcp = await Effect.runPromise(pollEvents(consumer.client, { ...consumer.lease(), cursor: FROM_START }))
   expect(Schema.is(EventsPollResult)(viaMcp)).toBe(true)
@@ -245,7 +236,7 @@ export async function publishCase(url: string): Promise<void> {
   expect(rest.events.map(({ data }) => data.chat)).toContain(roomA)
   for (const wake of wakesOf(await receivedAt(url, owner, '/hooks/a'))) expect(wake.chat).not.toBe(roomB)
   const now = Schema.decodeUnknownSync(Polled)(
-    await (await asKey(url, a.secret, 'POST', '/api/events/poll', { name: NAME, cursor: null })).json(),
+    await (await asServer(url, a, 'POST', '/api/events/poll', { name: NAME, cursor: null })).json(),
   )
   expect(now.events).toEqual([])
   expect(Number(now.cursor)).toBeGreaterThanOrEqual(Number(rest.cursor))
@@ -272,8 +263,10 @@ export async function publishCase(url: string): Promise<void> {
   if (gap === undefined) throw new Error('no gap')
   expect(await verified(failing.secret, gap)).toMatchObject({ type: 'gap', cursor: expect.stringMatching(/^\d{16}$/u) })
 
-  // Revoking the key ends its leases: each is sent `terminated` before the key stops admitting.
-  const revoked = await me.fetch(new Request(`https://goblin.test/api/keys/${a.id}`, { method: 'DELETE' }))
+  // Uninstalling the app ends its leases: each is sent `terminated` before the app stops admitting.
+  const revoked = await me.fetch(
+    new Request(`https://goblin.test/api/installations/${a.installationId}`, { method: 'DELETE' }),
+  )
   expect(revoked.status, await revoked.clone().text()).toBe(200)
   const ended = await waitFor(
     () => receivedAt(url, owner, '/hooks/a'),

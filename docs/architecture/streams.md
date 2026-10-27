@@ -24,10 +24,10 @@ started it ended.
 
 ## Reading a stream
 
-1. **Connect.** `GET /api/conversations/:id/stream`: a member's browser under `/w/<slug>/api/…` with its session
-   cookie, an OAuth client under the same path with its token as its bearer
-   ([ADR 0116](../adr/0116-an-oauth-client-uses-the-owner-api-too.md)), a server's key on `/api/…` with the key as its
-   bearer (a credential's grant's `read`, ADR 0114). A credential reaches only the chats of the Topics its grant
+1. **Connect.** `GET /api/conversations/:id/stream` under `/w/<slug>/api/…`: a member's browser with its session
+   cookie, an OAuth client or an installed app with its token as its bearer
+   ([ADRs 0116](../adr/0116-an-oauth-client-uses-the-owner-api-too.md),
+   [0118](../adr/0118-a-product-installs-into-a-workspace.md); a credential's grant's `read`, ADR 0114). A credential reaches only the chats of the Topics its grant
    reaches; any other answers `access_insufficient` (403), and a chat that is not
    there 404, in the error envelope. The answer is
    `text/event-stream`, never cached.
@@ -48,18 +48,18 @@ started it ended.
    built, so nothing is resumed, read twice or lost. There are no offsets and no `Last-Event-ID`. The server ends a
    connection cleanly after fifteen minutes, or when the reader fell 512 batches behind; connect again then.
 5. **Refusals.** Before anything streams, a refusal answers in the error envelope: 404 for a chat out of reach, 401
-   for a session or key that is not valid, 403 for a key without `conversations`, and 409 `Conflict` `stream_busy`
-   when the chat already has 32 readers, or the workspace's agent 256 (try again later).
+   for a session or token that is not valid, 403 for a credential whose grant does not cover it, and 409 `Conflict`
+   `stream_busy` when the chat already has 32 readers, or the workspace's agent 256 (try again later).
 6. **Older history.** `GET /api/conversations/:id/history?before=<entry>` answers the page of entries before `before`
    as the same AG-UI messages a snapshot holds (one mapping, `streams/messages.ts`), oldest first, with `next`, the
    entry to read the page before, and `more`. Start at the snapshot's `before`.
 
 ```sh
-curl -N "$GOBLIN_ORIGIN/api/conversations/<chat>/stream" -H "authorization: Bearer $GOBLIN_KEY"
+curl -N "$GOBLIN_ORIGIN/w/<slug>/api/conversations/<chat>/stream" -H "authorization: Bearer $(goblin token)"
 ```
 
-No string in any frame holds a secret goblin issues or keeps: one that holds something shaped like a server's key
-(`gbk_…`), a thread server's token (`swt_…`) or a webhook secret (`whsec_…`) is sent as `[redacted]`
+No string in any frame holds a secret goblin issues or keeps: one that holds something shaped like a thread server's
+token (`swt_…`) or a webhook secret (`whsec_…`) is sent as `[redacted]`
 (`streams/redact.ts`). Credentials never enter the events; this pass is the backstop.
 
 ## Driving a chat
@@ -109,7 +109,7 @@ message with `name`) and ends once they all answered (`interrupt` when an answer
 (`metadata.goblin.replayed`); one under way opens with what its run said so far. A run stream ends after fifteen
 minutes in `RUN_ERROR` `stream_lifetime`; the run goes on in the chat.
 
-A stock `@ag-ui/client` `HttpAgent` does all this: its URL is the endpoint, the key its `authorization` header, the chat
+A stock `@ag-ui/client` `HttpAgent` does all this: its URL is the endpoint, the token its `authorization` header, the chat
 its `threadId`; `scripts/agui-client-check.ts` runs one turn on a stage with it.
 
 `POST /api/conversations/:id/threads` (the thread operation) takes `{ anchor, title?, mcpServers?, message }`, `message`
@@ -161,7 +161,7 @@ Pi's events are its experimental `watchEvents` (spec §9.4), one batch per commi
 **`metadata.goblin`** (`GoblinMetadata`) on events and messages, each field only where it applies:
 
 - every committed message: `entryId`; a message's first event and snapshot messages: `at` (epoch ms);
-- a user message: `author` (also its `name`) when someone other than the owner's composer wrote it (a Source, a key, an
+- a user message: `author` (also its `name`) when someone other than the owner's composer wrote it (a Source, an installed app, an
   MCP client, a subagent, `Routine`), or `member` (also its `name`) in a workspace of several people; `own`, the owner's
   own turn from elsewhere; `attachments`; `context`, what an open App shared (untrusted); `selections`, the composer's
   choices; `outcome` and `kept`, how a held call ended; `thread`, where a shared note or report came from; `ask`, the
@@ -273,8 +273,8 @@ parent as a message of its own.
   a Persona, the `goblin.delegate_result` activity for a subagent, without AG-UI's `subagentRunId` (it is the chat's
   own) and with `metadata.goblin.subagentRunId`, the child it closes. A reader that persists answers once keys
   them by `entryId`; `operationId` with the Persona's `id` names the invocation.
-- **A key's chats.** Their children are their Personas' forks and helpers, carried in that chat's own stream only, in
-  full to the key that reads it.
+- **An app's chats.** Their children are their Personas' forks and helpers, carried in that chat's own stream only, in
+  full to the app that reads it.
 - **Late readers.** A connection opens with each child working then: `SUBAGENT_STARTED`, then what it did so far: a
   Persona's work from its invocation's prompt on, a subagent's run in flight with its answer so far.
 - **Producing them** (`streams/children.ts`, `streams/child-follow.ts`): the producer follows the children of each
@@ -322,15 +322,15 @@ reader that joins mid-answer gets its own opening while the first reads on as if
 burst of joins opens one watch, the last reader to leave stops the chat's watch and its child's, a full sink lets only
 that reader go, a reader connected fifteen minutes is let go, a reader opening mid-run gets its run's operations, and
 the 33rd reader of a chat is `stream_busy`. `frames.test.ts` holds the frames: one `data:` frame per event, LF only,
-comments while idle, and a tool result echoing a key, a thread server's token and a webhook secret sent with each as
+comments while idle, and a tool result echoing a thread server's token and a webhook secret sent with each as
 `[redacted]`.
 
 In local workerd (`apps/runtime/test/integration/streams-case.ts`, `streams-children-case.ts`): a member reads their
 chat through `/w/<slug>/api` with their session, the opening then a turn's run, thinking, tool call and result and
-answer live; after the reader went away and the chat went on, a reconnect's opening holds what came meanwhile; a key
-reads its own Topic's chat in full (thinking and steps included) and gets 404 for another key's Topic and the owner's
-chat; a chat's 33rd reader is `stream_busy`. The owner tags a Persona held at its model call and reads its start, its
-work, its end naming the answer and the answer; a key reads the same of its own Topic's chat, the fork's own work included,
+answer live; after the reader went away and the chat went on, a reconnect's opening holds what came meanwhile; an
+installed app reads its own Topic's chat in full (thinking and steps included) and gets 404 for another app's Topic and
+the owner's chat; a chat's 33rd reader is `stream_busy`. The owner tags a Persona held at its model call and reads its start, its
+work, its end naming the answer and the answer; an app reads the same of its own Topic's chat, the fork's own work included,
 matching the forward read's invocation and entry; a subagent's run streams the same way, and a reader that connects
 while it works opens with it in flight. Not proven there: that the agent hears of a client that went away (local
 workerd never tells it, from outside the dev proxy or from inside the Worker), so a gone reader is freed by the
@@ -342,8 +342,8 @@ failed and a stopped one, a send queued behind another run, a retry of a run und
 placed into a run in flight, a run that asks, finished retries, a withdrawn input, the stream's life, and an ask of
 Personas (its answer, its questions, a failure, a stop, a retry; never a fork's own work). In local workerd
 (`run-streams-case.ts`): a run with thinking and a tool call under the send's id, then its retry at once; a send queued
-behind a held run; a question answered by a `resume` alone; a Persona ask; a key sending as Swarmm does; a 300 KB
-history taken and a body past 1 MiB refused; and a stock `HttpAgent` running a turn with a key.
+behind a held run; a question answered by a `resume` alone; a Persona ask; an installed app sending as Swarmm does; a 300 KB
+history taken and a body past 1 MiB refused; and a stock `HttpAgent` running a turn with an app's token.
 
 The web holds its reducer to the same goldens (`apps/web/test/agui-reducer.test.ts`): for every case the transcript
 built from the live events, all at once or one event at a time, is the one a new connection opens with; a child's

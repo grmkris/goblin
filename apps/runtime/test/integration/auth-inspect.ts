@@ -5,7 +5,7 @@ import { Schema } from 'effect'
 import { createHash } from 'node:crypto'
 import { expect } from 'vitest'
 import { joinedMember } from './members-case.ts'
-import { type Person, call, keyBody, person } from './owner-requests.ts'
+import { type Person, asServer, call, person, scriptApp, serverTerms } from './owner-requests.ts'
 
 export const APP = 'https://goblin.test'
 export const REDIRECT = 'http://127.0.0.1:9/callback'
@@ -242,40 +242,18 @@ const MANAGEMENT = [
 ]
 const management = (tools: readonly string[]) => tools.filter((name) => MANAGEMENT.includes(name)).toSorted()
 
-/** A key of the owner's (ADR 0081) whose grant is `level` with `extras` over everything, as its id and secret. */
-async function ownerKey(
-  base: string,
-  who: Person,
-  level: 'read' | 'manage',
-  extras: readonly ('inspect' | 'setup')[] = [],
-) {
-  const made = await fetch(`${base}/w/${who.slug}/api/keys`, {
-    method: 'POST',
-    headers: browserOf(who),
-    body: JSON.stringify(keyBody(who, `service-${level}`, { level, extras })),
-  })
-  expect(made.status, await made.clone().text()).toBe(201)
-  return Schema.decodeUnknownSync(Schema.Struct({ key: Schema.Struct({ id: Schema.String }), secret: Schema.String }))(
-    await made.json(),
-  )
-}
-
-/** A Persona one of the owner's own API keys made (ADR 0081), by its name. */
-async function keyMadePersona(base: string, who: Person): Promise<string> {
-  const { secret } = await ownerKey(base, who, 'manage')
-  const persona = await fetch(`${base}/api/personas`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      name: 'Keymade',
-      avatar: { glyph: 'K', hue: 10 },
-      role: 'Made by a key',
-      instructions: 'Be brief.',
-      operationId: 'service:persona:1',
-    }),
+/** A Persona one of the owner's own installed apps made (ADR 0118), by its name. */
+async function appMadePersona(base: string, who: Person): Promise<string> {
+  const server = await scriptApp(base, who, 'service-manage', { level: 'manage' })
+  const persona = await asServer(base, server, 'POST', '/api/personas', {
+    name: 'Appmade',
+    avatar: { glyph: 'A', hue: 10 },
+    role: 'Made by an app',
+    instructions: 'Be brief.',
+    operationId: 'service:persona:1',
   })
   expect(persona.status, await persona.clone().text()).toBe(201)
-  return 'Keymade'
+  return 'Appmade'
 }
 const INSPECTION = [
   'inspect_conversations',
@@ -337,11 +315,11 @@ export async function inspectAuthCase(base: string) {
     expect(management(names)).toEqual(MANAGEMENT)
     const access = await client.callTool({ name: 'access_read', arguments: {} })
     expect(Schema.decodeUnknownSync(Summary)(access.structuredContent)).toMatchObject({ grantId, level: 'manage' })
-    // Every Persona of the workspace: one of the owner's keys made is the client's to read too.
-    const keyMade = await keyMadePersona(base, owner)
+    // Every Persona of the workspace: one of the owner's apps made is the client's to read too.
+    const appMade = await appMadePersona(base, owner)
     const personas = await client.callTool({ name: 'persona_list', arguments: {} })
     expect(personas.isError, JSON.stringify(personas)).toBeFalsy()
-    expect(JSON.stringify(personas.structuredContent)).toContain(keyMade)
+    expect(JSON.stringify(personas.structuredContent)).toContain(appMade)
     const topics = await client.callTool({ name: 'topic_list', arguments: { limit: 5 } })
     expect(JSON.stringify(topics.structuredContent)).toContain('"personal":true')
     const conversations = await client.callTool({ name: 'inspect_conversations', arguments: {} })
@@ -405,13 +383,13 @@ export async function inspectAuthCase(base: string) {
 }
 
 /**
- * A server's key over HTTP (ADR 0114): a call its grant does not cover answers `access_insufficient` with a widening
- * link; its workspace's owner approves there, and the same key then passes.
+ * An installed app over HTTP (ADRs 0114, 0118): a call its grant does not cover answers `access_insufficient` with a
+ * widening link to its installation's grant; its workspace's owner approves there, and the same token then passes.
  */
-export async function keyWideningCase(base: string) {
+export async function appWideningCase(base: string) {
   const owner = await person(base)
-  const { key, secret } = await ownerKey(base, owner, 'read')
-  const turns = () => fetch(`${base}/api/inspect/turns`, { headers: { authorization: `Bearer ${secret}` } })
+  const server = await scriptApp(base, owner, 'service-read', { level: 'read' })
+  const turns = () => asServer(base, server, 'GET', '/api/inspect/turns')
   const refused = await turns()
   expect(refused.status).toBe(403)
   const body = Schema.decodeUnknownSync(
@@ -421,22 +399,22 @@ export async function keyWideningCase(base: string) {
   const link = new URL(body.error.widenUrl)
   expect([link.pathname, link.searchParams.get('grant'), link.searchParams.get('extra')]).toEqual([
     '/consent/widen',
-    key.id,
+    server.installationId,
     'inspect',
   ])
-  const widened = await fetch(`${base}/api/grants/${key.id}`, {
+  const widened = await fetch(`${base}/api/grants/${server.installationId}`, {
     method: 'PUT',
     headers: browserOf(owner),
     body: JSON.stringify({
-      grantId: key.id,
-      terms: keyBody(owner, 'ignored', { level: 'read', extras: ['inspect'] }).terms,
+      grantId: server.installationId,
+      terms: serverTerms(owner, 'service-read', { level: 'read', extras: ['inspect'] }),
     }),
   })
   expect(widened.status, await widened.clone().text()).toBe(200)
   expect((await turns()).status).toBe(200)
   // Another person may not approve it: the grant is not there for them.
   const stranger = await person(base)
-  const theirs = await fetch(`${base}/api/grants/${key.id}/terms`, { headers: browserOf(stranger) })
+  const theirs = await fetch(`${base}/api/grants/${server.installationId}/terms`, { headers: browserOf(stranger) })
   expect(theirs.status).toBe(404)
 }
 
@@ -577,6 +555,21 @@ export async function restBearerCase(base: string) {
   })
   expect(revoked.status).toBe(200)
   expect((await bearer(`/w/${owner.slug}/api/topics`)).status).toBe(401)
+  // A server API key of before ADR 0120 is a bearer like any other: nothing on bare /api, the sign-in challenge on
+  // /mcp.
+  const oldKey = `gbk_${'k'.repeat(64)}`
+  expect((await fetch(`${base}/api/topics`, { headers: { authorization: `Bearer ${oldKey}` } })).status).toBe(404)
+  const challenged = await fetch(`${base}/mcp`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${oldKey}`,
+      accept: 'application/json, text/event-stream',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+  })
+  expect(challenged.status).toBe(401)
+  expect(challenged.headers.get('www-authenticate')).toContain('resource_metadata')
 }
 
 /** The tools of a workspace's connections themselves (ADR 0117), sorted. */
@@ -648,14 +641,10 @@ export async function connectionSetupCase(base: string) {
   const lacking = await addAs(granted.access, owner.slug)
   expect(lacking.status).toBe(403)
   expect(await lacking.json()).toMatchObject({ error: { code: 'access_insufficient' } })
-  // A server's key with manage and setup configures its own workspace's connections too.
-  const { secret } = await ownerKey(base, owner, 'manage', ['setup'])
-  const keyed = await fetch(`${base}/api/mcp/servers`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ endpoint: 'https://keyed-fixture.test/mcp' }),
-  })
-  expect(keyed.status, await keyed.clone().text()).toBe(201)
+  // An installed app with manage and setup configures its own workspace's connections too.
+  const server = await scriptApp(base, owner, 'service-setup', { level: 'manage', extras: ['setup'] })
+  const added = await asServer(base, server, 'POST', '/api/mcp/servers', { endpoint: 'https://app-fixture.test/mcp' })
+  expect(added.status, await added.clone().text()).toBe(201)
   // A member's client never configures the workspace, even with a grant that holds it: the member's role refuses it.
   const member = await joinedMember(base, owner)
   const theirs = await authorize(base, member, await register(base, member), {

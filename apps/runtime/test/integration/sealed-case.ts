@@ -3,10 +3,9 @@ import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { BOUNDARY_TEXT, POWER_TEXT } from '../../src/pi/asker.ts'
 import { callOwner } from '../owner-client.ts'
-import { type Person, call, keyBody, lever, ownerFetch, person, showing, signedIn } from './owner-requests.ts'
+import { type Person, type Server, asServer, lever, person, scriptApp, showing, signedIn } from './owner-requests.ts'
 import { until, waitFor } from './until.ts'
 
-const Secret = Schema.Struct({ secret: Schema.String })
 const Seen = Schema.Struct({
   requests: Schema.Array(
     Schema.Struct({
@@ -19,24 +18,9 @@ const Seen = Schema.Struct({
 })
 type Request = (typeof Seen.Type)['requests'][number]
 
-/** A key of `who` for a server (ADR 0081) named `name`, with `terms` as its grant (ADR 0114). Its secret. */
-async function keyOf(base: string, who: Person, name: string, terms: Parameters<typeof keyBody>[2]): Promise<string> {
-  const made = await call(base, who, '/api/keys', keyBody(who, name, terms))
-  expect(made.status, await made.clone().text()).toBe(201)
-  return Schema.decodeUnknownSync(Secret)(await made.json()).secret
-}
-
-/** One request of a server with `secret`: no cookie, no Origin, a JSON body when there is one. */
-const asKey = (base: string, secret: string, method: string, path: string, body?: unknown) =>
-  ownerFetch(`${base}${path}`, {
-    method,
-    headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  })
-
-/** A Topic a key makes, with nothing in its setup. */
-async function keyTopic(base: string, secret: string, name: string): Promise<TopicView> {
-  const made = await asKey(base, secret, 'POST', '/api/topics', { name, operationId: `svc:${name}` })
+/** A Topic a server makes, with nothing in its setup. */
+async function serverTopic(base: string, server: Server, name: string): Promise<TopicView> {
+  const made = await asServer(base, server, 'POST', '/api/topics', { name, operationId: `svc:${name}` })
   expect(made.status, await made.clone().text()).toBe(201)
   return Schema.decodeUnknownSync(TopicView)(await made.json())
 }
@@ -92,25 +76,25 @@ const resultAfter = async (base: string, owner: Person, words: string): Promise<
 
 /**
  * ADR 0115 on the real Worker and agent: every Topic is sealed and Personal is the hub, and what a turn may do is its
- * sender's power. A server's key makes two customer Topics: each one's search and automatic retrieval never reach the
- * other's words while the hub's do, an owner's sealed Topic cannot see either, a key's message is marked as the
+ * sender's power. An installed app makes two customer Topics: each one's search and automatic retrieval never reach the
+ * other's words while the hub's do, an owner's sealed Topic cannot see either, an app's message is marked as the
  * server's, one customer's file is not found from the other, the Shared folder is the owner's turn's and never the
- * server's, and renaming the other customer from one is refused while the hub renames it. A `write` key is never
+ * server's, and renaming the other customer from one is refused while the hub renames it. A `write` app is never
  * offered `routine_propose`, a call a stale filter still let through is refused at call time, and the next turn after
  * a restart has the filter again.
  */
 export async function sealedCase(url: string): Promise<void> {
   const owner = await person(url)
   const me = signedIn(url, owner)
-  // The owner's own request gives the agent resident authority, which a key's turns still need.
+  // The owner's own request gives the agent resident authority, which an app's turns still need.
   await callOwner(me, (api) => api.personas.list({ query: {} }))
-  const secret = await keyOf(url, owner, 'sealed', { lists: true })
-  const a = await keyTopic(url, secret, 'Customer A')
-  const b = await keyTopic(url, secret, 'Customer B')
-  expect([a.reach, b.reach, a.madeBy]).toEqual(['sealed', 'sealed', { key: 'sealed' }])
-  const keySays = async (topic: TopicView, input: string, operationId: string) => {
+  const server = await scriptApp(url, owner, 'sealed', { lists: true })
+  const a = await serverTopic(url, server, 'Customer A')
+  const b = await serverTopic(url, server, 'Customer B')
+  expect([a.reach, b.reach, a.madeBy]).toEqual(['sealed', 'sealed', { app: 'sealed' }])
+  const serverSays = async (topic: TopicView, input: string, operationId: string) => {
     const path = `/api/conversations/${topic.conversation}/messages`
-    const sent = await asKey(url, secret, 'POST', path, runInput(topic.conversation, { input, operationId }))
+    const sent = await asServer(url, server, 'POST', path, runInput(topic.conversation, { input, operationId }))
     expect(sent.status, await sent.clone().text()).toBe(202)
   }
   const ownerSays = (chat: string, input: string, operationId: string) =>
@@ -119,25 +103,25 @@ export async function sealedCase(url: string): Promise<void> {
     )
 
   // Each customer's words, said by the server; its message is marked as the server's.
-  await keySays(a, 'the plum harvest in the orchard is due', 'svc:a:1')
+  await serverSays(a, 'the plum harvest in the orchard is due', 'svc:a:1')
   const first = await requestFor(url, owner, 'the plum harvest in the orchard is due')
   expect(first.messages.findLast((message) => message.role === 'user')?.text.startsWith('[from server sealed]\n')).toBe(
     true,
   )
-  // A manage key without the routines extra is not offered routines, nor apps outside the hub.
+  // A manage app without the routines extra is not offered routines, nor apps outside the hub.
   expect(first.tools).not.toContain('routine_propose')
   expect(first.tools).not.toContain('app_call')
-  await keySays(b, 'the walnut delivery is on friday', 'svc:b:1')
+  await serverSays(b, 'the walnut delivery is on friday', 'svc:b:1')
   await showing(me, b.conversation, 'echo: the walnut delivery is on friday')
 
   // From A, B's words are never found, by search or automatic retrieval, and B is not even a Topic to name.
-  await keySays(a, 'call search_chats {"query":"walnut delivery"}', 'svc:a:2')
+  await serverSays(a, 'call search_chats {"query":"walnut delivery"}', 'svc:a:2')
   expect(await resultAfter(url, owner, 'call search_chats {"query":"walnut delivery"}')).toContain(
     'No earlier messages matched',
   )
-  await keySays(a, 'call search_chats {"query":"walnut","topic":"Customer B"}', 'svc:a:3')
+  await serverSays(a, 'call search_chats {"query":"walnut","topic":"Customer B"}', 'svc:a:3')
   expect(await resultAfter(url, owner, '"topic":"Customer B"')).toContain('That Topic was not found')
-  await keySays(a, 'pick-sources what about the walnut delivery on friday', 'svc:a:4')
+  await serverSays(a, 'pick-sources what about the walnut delivery on friday', 'svc:a:4')
   const fromA = await requestFor(url, owner, 'pick-sources what about the walnut delivery')
   expect(fromA.context ?? '').not.toContain('walnut delivery is on friday')
 
@@ -167,12 +151,12 @@ export async function sealedCase(url: string): Promise<void> {
     }),
   )
   expect(shared.status, await shared.clone().text()).toBe(201)
-  await keySays(a, 'call files_write {"path":"orders.md","content":"plum orders"}', 'svc:a:files:1')
+  await serverSays(a, 'call files_write {"path":"orders.md","content":"plum orders"}', 'svc:a:files:1')
   const kept = `/topics/${String(a.id)}/agent/orders.md`
   expect(await resultAfter(url, owner, '"path":"orders.md"')).toContain(kept)
-  await keySays(b, `call files_read {"path":"${kept}"}`, 'svc:b:files:1')
+  await serverSays(b, `call files_read {"path":"${kept}"}`, 'svc:b:files:1')
   expect(await resultAfter(url, owner, `call files_read {"path":"${kept}"}`)).toContain('NotFound')
-  await keySays(a, 'call files_read {"path":"/uploads/shared-plan.txt"}', 'svc:a:files:2')
+  await serverSays(a, 'call files_read {"path":"/uploads/shared-plan.txt"}', 'svc:a:files:2')
   expect(await resultAfter(url, owner, 'call files_read {"path":"/uploads/shared-plan.txt"}')).toContain('NotFound')
   await ownerSays(a.conversation, 'call files_read {"path":"/uploads/shared-plan.txt"}', 'own:files:1')
   expect(await resultAfter(url, owner, 'call files_read {"path":"/uploads/shared-plan.txt"}')).toContain(
@@ -180,7 +164,7 @@ export async function sealedCase(url: string): Promise<void> {
   )
 
   // Renaming B from A is acting on another Topic: refused, and B keeps its name. From the hub it is renamed.
-  await keySays(a, 'call topic_rename {"topic":"Customer B","name":"Taken over"}', 'svc:a:5')
+  await serverSays(a, 'call topic_rename {"topic":"Customer B","name":"Taken over"}', 'svc:a:5')
   expect(await resultAfter(url, owner, '"name":"Taken over"')).toContain(BOUNDARY_TEXT.slice(0, 40))
   expect((await callOwner(me, (api) => api.topics.get({ params: { id: b.id } }))).name).toBe('Customer B')
   await ownerSays('1', 'call topic_rename {"topic":"Customer B","name":"Customer B2"}', 'own:4')
@@ -197,13 +181,13 @@ export async function sealedCase(url: string): Promise<void> {
   expect(ownerInA.tools).toContain('routine_propose')
   expect(ownerInA.tools).not.toContain('source_route')
 
-  // A write key is never offered routine_propose; a filter that still offers it (stored before, or stale) is
+  // A write app is never offered routine_propose; a filter that still offers it (stored before, or stale) is
   // refused at call time, and the next turn after a restart has the filter again.
-  const writer = await keyOf(url, owner, 'writer', { level: 'write' })
-  const mine = await keyTopic(url, writer, 'Customer W')
+  const writer = await scriptApp(url, owner, 'writer', { level: 'write' })
+  const mine = await serverTopic(url, writer, 'Customer W')
   const writes = async (input: string, operationId: string) => {
     const path = `/api/conversations/${mine.conversation}/messages`
-    const sent = await asKey(url, writer, 'POST', path, runInput(mine.conversation, { input, operationId }))
+    const sent = await asServer(url, writer, 'POST', path, runInput(mine.conversation, { input, operationId }))
     expect(sent.status, await sent.clone().text()).toBe(202)
   }
   await writes('hello from the writer', 'svc:w:1')

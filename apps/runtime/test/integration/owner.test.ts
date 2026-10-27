@@ -10,7 +10,7 @@ import { appsCase } from './apps-case.ts'
 import { agentAppViewCase } from './agent-app-view-case.ts'
 import { queueCase } from './queue-case.ts'
 import { topicsCase } from './topics-case.ts'
-import { keyThreadsCase } from './key-threads-case.ts'
+import { appThreadsCase } from './app-threads-case.ts'
 import { threadServersCase } from './thread-servers-case.ts'
 import { membersCase } from './members-case.ts'
 import { sealedCase } from './sealed-case.ts'
@@ -104,11 +104,11 @@ harness.test(
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => threadHeadsCase(url)))),
 )
 harness.test(
-  'native: a key titles, renames, closes and reopens its own threads, reads back its message to a Persona (ADR 0090), and keeps them rotated (ADR 0105)',
-  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => keyThreadsCase(url)))),
+  'native: an app titles, renames, closes and reopens its own threads, reads back its message to a Persona (ADR 0090), and keeps them with a rotated secret (ADR 0118)',
+  stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => appThreadsCase(url)))),
 )
 harness.test(
-  "native: a key's thread declares an MCP server its native Persona calls by name, a retry with a new token is the same thread, and closing drops it",
+  "native: an app's thread declares an MCP server its native Persona calls by name, a retry with a new token is the same thread, and closing drops it",
   stack.pipe(Effect.flatMap(({ url }) => Effect.promise(() => threadServersCase(url)))),
   { timeout: 240_000 },
 )

@@ -2,21 +2,21 @@
 
 Deployment scripts use Alchemy only. Secrets are read from mode-600 files under `.local/` and are never printed.
 
-| Command                                                                              | What it does                                                                               |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `bun dev`                                                                            | Local stack on `http://localhost:18971` (workerd), model calls through CLIProxy.           |
-| `bun run plan:dev`                                                                   | Preview changes to the dev stage.                                                          |
-| `GOBLIN_BREAK_GLASS=1 bun run deploy:dev`                                            | Deploy the dev stage (`https://dev.goblin.surf`) by hand; CI normally does (see below).    |
-| `GOBLIN_BREAK_GLASS=1 bun run destroy:dev -- --confirm-reset`                        | Erase the dev stage: every account, conversation and MCP credential.                       |
-| `GOBLIN_BREAK_GLASS=1 GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset` | Erase the prod stage the same way, at a release the owner decided resets it.               |
-| `bun run promote <full-sha>`                                                         | Pre-flight an accepted dev SHA and fast-forward `prod`; CI then deploys prod.              |
-| `bun scripts/state-copy.ts --stack <stack> --stage <stage>`                          | One-off copy of a stack's Alchemy state between local files and the Cloudflare store.      |
-| `bun run smoke:dev`                                                                  | Acceptance against the deployed dev stage.                                                 |
-| `bun run smoke:local`                                                                | The same acceptance against the local stack.                                               |
-| `bun run ui:acceptance [session-file]`                                               | Read-only UI checks and screenshots against dev (see UI acceptance below).                 |
-| `bun run icons`                                                                      | Redraw the app icons and favicon in `apps/web/public` from the shared goblin mark.         |
-| `heavy bun scripts/patch-shadcn-react.ts --test`                                     | Rebuild the MessageScroller patch from upstream source (`patches/shadcn-react/README.md`). |
-| `GOBLIN_ORIGIN=… GOBLIN_KEY=… bun scripts/agui-client-check.ts`                      | One turn on a stage with a stock AG-UI `HttpAgent` and a key; prints event types only.     |
+| Command                                                                                            | What it does                                                                                          |
+| -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `bun dev`                                                                                          | Local stack on `http://localhost:18971` (workerd), model calls through CLIProxy.                      |
+| `bun run plan:dev`                                                                                 | Preview changes to the dev stage.                                                                     |
+| `GOBLIN_BREAK_GLASS=1 bun run deploy:dev`                                                          | Deploy the dev stage (`https://dev.goblin.surf`) by hand; CI normally does (see below).               |
+| `GOBLIN_BREAK_GLASS=1 bun run destroy:dev -- --confirm-reset`                                      | Erase the dev stage: every account, conversation and MCP credential.                                  |
+| `GOBLIN_BREAK_GLASS=1 GOBLIN_CONFIRM_PROD=1 bun run destroy:prod -- --confirm-reset`               | Erase the prod stage the same way, at a release the owner decided resets it.                          |
+| `bun run promote <full-sha>`                                                                       | Pre-flight an accepted dev SHA and fast-forward `prod`; CI then deploys prod.                         |
+| `bun scripts/state-copy.ts --stack <stack> --stage <stage>`                                        | One-off copy of a stack's Alchemy state between local files and the Cloudflare store.                 |
+| `bun run smoke:dev`                                                                                | Acceptance against the deployed dev stage.                                                            |
+| `bun run smoke:local`                                                                              | The same acceptance against the local stack.                                                          |
+| `bun run ui:acceptance [session-file]`                                                             | Read-only UI checks and screenshots against dev (see UI acceptance below).                            |
+| `bun run icons`                                                                                    | Redraw the app icons and favicon in `apps/web/public` from the shared goblin mark.                    |
+| `heavy bun scripts/patch-shadcn-react.ts --test`                                                   | Rebuild the MessageScroller patch from upstream source (`patches/shadcn-react/README.md`).            |
+| `GOBLIN_ORIGIN=… GOBLIN_WORKSPACE=… GOBLIN_TOKEN=$(goblin token) bun scripts/agui-client-check.ts` | One turn on a stage with a stock AG-UI `HttpAgent` and a script app's token; prints event types only. |
 
 Stage configuration comes from `.local/<stage>.env` (see `.env.example`); `plan:dev`, `deploy:dev` and `destroy:dev`
 also read the Cloudflare credentials in `.local/cloud.env` (mode 600, only `CLOUDFLARE_API_TOKEN` and

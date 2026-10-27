@@ -1,4 +1,4 @@
-import type { KeyOrigin, ThreadServer, ThreadServerView } from '@goblin/contracts'
+import type { GrantOrigin, ThreadServer, ThreadServerView } from '@goblin/contracts'
 import { Client, StreamableHTTPClientTransport, type Tool } from '@modelcontextprotocol/client'
 import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/client/validators/cf-worker'
 import { and, desc, eq, inArray } from 'drizzle-orm'
@@ -95,7 +95,7 @@ const digestOf = (servers: readonly Checked[]) =>
 /**
  * `servers` checked against the request's credential, before any thread is made or changed: a credential's alone
  * (`credential_only`), save that a member may clear a thread's servers with none; each endpoint https to a named host
- * (`thread_server_url`); each origin and tool within its grant (`key_origin`, `key_origin_tool`).
+ * (`thread_server_url`); each origin and tool within its grant (`origin`, `origin_tool`).
  */
 export const prepareServers = Effect.fn('ThreadServers.prepare')(function* (servers: readonly ThreadServer[]) {
   const credential = yield* requestCredential
@@ -260,7 +260,7 @@ export type ThreadEndpoint = {
 const stillGranted = (row: Row) =>
   Effect.gen(function* () {
     const { grantOrigins } = yield* AgentInput
-    const origins: readonly KeyOrigin[] | undefined = yield* attempt(() => grantOrigins(row.grantId))
+    const origins: readonly GrantOrigin[] | undefined = yield* attempt(() => grantOrigins(row.grantId))
     const granted = origins?.find((each) => each.origin === row.origin)
     if (granted !== undefined) return toolsOf(row.tools).filter((tool) => granted.tools.includes(tool))
     const dropped =
@@ -268,7 +268,7 @@ const stillGranted = (row: Row) =>
         ? eq(appThreadServers.grantId, row.grantId)
         : and(eq(appThreadServers.grantId, row.grantId), eq(appThreadServers.origin, row.origin))
     yield* Db.useSync((db) => db.delete(appThreadServers).where(dropped).run())
-    return yield* new Forbidden({ reason: 'key_origin' })
+    return yield* new Forbidden({ reason: 'origin' })
   })
 
 /**

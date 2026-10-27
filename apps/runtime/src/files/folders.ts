@@ -32,7 +32,7 @@ export const CLOSED_VIEW: FileView = { reads: () => false, writes: () => false, 
 
 /**
  * A turn's reach within `boundary` (ADR 0115): its own Topic's folder, every Topic's from a hub, and the Shared folder
- * on a person's turn (`people`) only, never on a turn a server's key sent an input to. It writes only under its own
+ * on a person's turn (`people`) only, never on a turn an installed app sent an input to. It writes only under its own
  * Topic's `agent` folder.
  */
 export const viewOf = (boundary: Boundary, people: boolean): FileView => {

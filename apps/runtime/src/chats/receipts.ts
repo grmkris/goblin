@@ -34,8 +34,8 @@ export const OPERATION_KINDS = [
 
 /** What an operation in a chat is: one of `OPERATION_KINDS`, or `write:<entry kind>` for a passive write. */
 export type OperationKind = (typeof OPERATION_KINDS)[number] | `write:${string}`
-/** Who started an operation: `key` is a server's API key (ADR 0115), whose message is never the owner's. */
-export const ReceiptOrigin = Schema.Literals(['owner', 'key', 'client', 'source', 'agent', 'routine', 'system'])
+/** Who started an operation: `key` is an installed app (ADR 0115), whose message is never the owner's. */
+export const ReceiptOrigin = Schema.Literals(['owner', 'app', 'client', 'source', 'agent', 'routine', 'system'])
 export type ReceiptOrigin = typeof ReceiptOrigin.Type
 
 /**
@@ -51,7 +51,7 @@ export type ReceiptInput = {
   readonly origin: ReceiptOrigin
   /**
    * The role of the member whose request admitted it (ADR 0099), which tells a member's turn from an admin's; none for
-   * work no member sent: a Source's, a routine's, a server key's, the system's.
+   * work no member sent: a Source's, a routine's, an installed app's, the system's.
    */
   readonly role?: WorkspaceRole
   /**

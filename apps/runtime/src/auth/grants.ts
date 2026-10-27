@@ -2,28 +2,28 @@ import {
   Extra,
   type GoblinReach,
   type GrantTerms,
-  KeyOrigin,
+  GrantOrigin,
   Level,
   Lifetime,
   type ReachKind,
   type WorkspaceReach,
   type WorkspaceRole,
   expiresAt as endOf,
-  keyOriginsOf,
+  grantOriginsOf,
 } from '@goblin/contracts'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type { RuntimeEnv } from '../env.ts'
-import { Forbidden, InvalidInput, NotFound } from '../http/errors.ts'
+import type { Credential } from '../http/api/principal.ts'
+import { InvalidInput, NotFound } from '../http/errors.ts'
 
 /**
  * Every credential's grant (`packages/contracts/src/grants.ts`, myapps ADR 0015) in goblin's own auth D1 tables (0005):
- * a server's API key has one, its id the key's own; an OAuth client has one per person who approved it; an installed
- * app (ADR 0118, 0006) one per installation, its id the installation's. Its terms are
- * the row (level, extras, lifetime, origins, whether it reaches all of its person's workspaces), one `grantWorkspace`
- * row per workspace it names (each kind `all` or `list`, with the generation an agent compares to know its lists
- * moved) and the listed ids in `grantReach`. Plain async over D1, like `clients.ts`; a change that spans rows is one
- * batch, which D1 runs as a transaction.
+ * an OAuth client has one per person who approved it; an installed app (ADRs 0118, 0120) one per installation, its id
+ * the installation's. Its terms are the row (level, extras, lifetime, origins, whether it reaches all of its person's
+ * workspaces), one `grantWorkspace` row per workspace it names (each kind `all` or `list`, with the generation an agent
+ * compares to know its lists moved) and the listed ids in `grantReach`. Plain async over D1, like `clients.ts`; a
+ * change that spans rows is one batch, which D1 runs as a transaction.
  */
 
 type Database = RuntimeEnv['AUTH_DB']
@@ -34,9 +34,8 @@ export type Coverage = 'all' | 'list'
 /** A grant as the auth store keeps it; times are epoch milliseconds. */
 export interface GrantRecord {
   readonly id: string
-  readonly kind: 'key' | 'client' | 'app'
-  readonly keyId: string | undefined
-  readonly clientId: string | undefined
+  readonly kind: 'client' | 'app'
+  readonly clientId: string
   readonly userId: string | undefined
   readonly name: string
   readonly level: Level
@@ -44,9 +43,26 @@ export interface GrantRecord {
   readonly lifetime: Lifetime
   readonly expiresAt: number | null
   readonly workspacesAll: boolean
-  readonly origins: readonly KeyOrigin[]
+  readonly origins: readonly GrantOrigin[]
   readonly revokedAt: number | null
 }
+
+/** The credential `grant` makes in a workspace whose coverage is `ws`, for the client or app `identity` names. */
+export const credentialOf = (
+  grant: GrantRecord,
+  identity: { readonly id: string; readonly name: string },
+  ws: Credential['ws'],
+): Credential => ({
+  kind: grant.kind,
+  id: identity.id,
+  name: identity.name.slice(0, 200),
+  grantId: grant.id,
+  level: grant.level,
+  extras: grant.extras,
+  expiresAt: grant.expiresAt,
+  ws,
+  origins: grant.origins,
+})
 
 /** What a grant reaches in one workspace without its lists: each kind all or a list, and the lists' generation. */
 export interface WorkspaceCoverage {
@@ -60,8 +76,7 @@ export interface WorkspaceCoverage {
 interface GrantRow {
   readonly id: string
   readonly kind: string
-  readonly keyId: string | null
-  readonly clientId: string | null
+  readonly clientId: string
   readonly userId: string | null
   readonly name: string
   readonly level: string
@@ -90,7 +105,7 @@ interface ReachRow {
 const decodeLevel = Schema.decodeUnknownOption(Level)
 const decodeLifetime = Schema.decodeUnknownOption(Lifetime)
 const decodeExtras = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Extra)))
-const decodeOrigins = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(KeyOrigin)))
+const decodeOrigins = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(GrantOrigin)))
 const isReachKind = Schema.is(Schema.Literals(['topic', 'persona', 'connection']))
 
 /** A stored time as epoch milliseconds: D1 keeps Better Auth's dates as ISO text, and ours alike. */
@@ -102,9 +117,8 @@ const iso = (at: number): string => new Date(at).toISOString()
 /** A row as its record; anything unreadable reads as the least it could mean (`read`, no extras, no origins). */
 const recordOf = (row: GrantRow): GrantRecord => ({
   id: row.id,
-  kind: row.kind === 'key' || row.kind === 'app' ? row.kind : 'client',
-  keyId: row.keyId ?? undefined,
-  clientId: row.clientId ?? undefined,
+  kind: row.kind === 'app' ? 'app' : 'client',
+  clientId: row.clientId,
   userId: row.userId ?? undefined,
   name: row.name,
   level: Option.getOrElse(decodeLevel(row.level), () => 'read' as const),
@@ -126,7 +140,7 @@ const coverageOf = (row: CoverageRow): WorkspaceCoverage => ({
   generation: row.generation,
 })
 
-const COLUMNS = `"id", "kind", "keyId", "clientId", "userId", "name", "level", "extras", "lifetime", "expiresAt",
+const COLUMNS = `"id", "kind", "clientId", "userId", "name", "level", "extras", "lifetime", "expiresAt",
   "workspacesAll", "origins", "revokedAt"`
 
 const one = async (db: Database, where: string, ...values: string[]): Promise<GrantRecord | undefined> => {
@@ -139,9 +153,6 @@ const one = async (db: Database, where: string, ...values: string[]): Promise<Gr
 
 /** The grant with id `id`, live or not. */
 export const grantById = (db: Database, id: string) => one(db, '"id" = ?', id)
-
-/** Key `keyId`'s grant. */
-export const grantOfKey = (db: Database, keyId: string) => one(db, '"keyId" = ?', keyId)
 
 /** The grant `userId` gave MCP client `clientId`, live or not. */
 export const grantOfClient = (db: Database, clientId: string, userId: string) =>
@@ -267,8 +278,8 @@ export const termsOf = async (db: Database, grant: GrantRecord): Promise<GrantTe
 }
 
 /** Origins as a grant stores them (ADR 0091), or the approver's input refused for its first problem. */
-const checkedOrigins = (origins: readonly KeyOrigin[]): readonly KeyOrigin[] => {
-  const checked = keyOriginsOf(origins)
+const checkedOrigins = (origins: readonly GrantOrigin[]): readonly GrantOrigin[] => {
+  const checked = grantOriginsOf(origins)
   if ('problem' in checked) throw new InvalidInput({ reason: checked.problem })
   return checked.origins
 }
@@ -367,10 +378,10 @@ const everything = (workspace: string): WorkspaceReach => ({
 })
 
 /**
- * A key's terms as its grant keeps them: its one workspace, listed, with what the terms say there (everything when they
- * name nothing for it); any other workspace is dropped.
+ * An installation's terms as its grant keeps them: its one workspace, listed, with what the terms say there (everything
+ * when they name nothing for it); any other workspace is dropped.
  */
-export const keyTerms = (terms: GrantTerms, workspaceId: string): GrantTerms => ({
+export const workspaceTerms = (terms: GrantTerms, workspaceId: string): GrantTerms => ({
   ...terms,
   reach: {
     workspaces: 'list',
@@ -390,28 +401,19 @@ const rolesOf = async (db: Database, userId: string): Promise<ReadonlyMap<string
   )
 }
 
-/** The one workspace a key's grant (its key's) or an installed app's (its installation's, ADR 0118) belongs to. */
+/** The one workspace an installed app's grant (its installation's, ADR 0118) belongs to. */
 const workspaceOfGrant = async (db: Database, grant: GrantRecord): Promise<string | undefined> =>
   (
     await db
-      .prepare(
-        grant.kind === 'app'
-          ? 'SELECT "workspaceId" AS workspace FROM "installation" WHERE "id" = ?'
-          : 'SELECT "referenceId" AS workspace FROM "apikey" WHERE "id" = ?',
-      )
-      .bind(grant.kind === 'app' ? grant.id : (grant.keyId ?? ''))
+      .prepare('SELECT "workspaceId" AS workspace FROM "installation" WHERE "id" = ?')
+      .bind(grant.id)
       .first<{ workspace: string }>()
   )?.workspace
 
-/** Only an owner may grant `keys` (vocabulary only for now): a role that may not is `Forbidden` `role`. */
-const ownerOnly = (terms: GrantTerms, owner: boolean): void => {
-  if (terms.extras.includes('keys') && !owner) throw new Forbidden({ reason: 'role' })
-}
-
 /**
- * The terms `approver` (a person's user ID) may give `grant`, as saved: a key's or an installed app's need an owner or
- * admin of its workspace and reach only it; a client's need its own person and reach only workspaces they are a member
- * of. A grant they may not approve is `NotFound` (`grant`), so asking reveals none.
+ * The terms `approver` (a person's user ID) may give `grant`, as saved: an installed app's need an owner or admin of
+ * its workspace and reach only it; a client's need its own person and reach only workspaces they are a member of. A
+ * grant they may not approve is `NotFound` (`grant`), so asking reveals none.
  */
 export const approvedTerms = async (
   db: Database,
@@ -424,32 +426,23 @@ export const approvedTerms = async (
     const workspace = await workspaceOfGrant(db, grant)
     const role = workspace === undefined ? undefined : roles.get(workspace)
     if (workspace === undefined || role === undefined || role === 'member') throw new NotFound({ what: 'grant' })
-    ownerOnly(terms, role === 'owner')
-    return keyTerms(terms, workspace)
+    return workspaceTerms(terms, workspace)
   }
   if (grant.userId !== approver) throw new NotFound({ what: 'grant' })
-  ownerOnly(terms, [...roles.values()].includes('owner'))
   return { ...terms, reach: within(terms.reach, new Set(roles.keys())) }
 }
 
 /**
- * The terms a new key or installation of `workspaceId` starts with, made by `userId`: its one workspace, origins
- * checked, and `keys` only from an owner. The caller checks that they may make keys or install apps there at all.
+ * The terms a new installation of `workspaceId` starts with: its one workspace, origins checked. The caller checks that
+ * the person may install apps there at all.
  */
-export const newWorkspaceTerms = async (
-  db: Database,
-  userId: string,
-  workspaceId: string,
-  terms: GrantTerms,
-): Promise<GrantTerms> => {
-  ownerOnly(terms, (await rolesOf(db, userId)).get(workspaceId) === 'owner')
-  const saved = keyTerms(terms, workspaceId)
+export const newWorkspaceTerms = (workspaceId: string, terms: GrantTerms): GrantTerms => {
+  const saved = workspaceTerms(terms, workspaceId)
   return { ...saved, reach: { ...saved.reach, origins: checkedOrigins(saved.reach.origins) } }
 }
 
 /**
- * Whether `approver` may see and change `grant`: its key's or installation's workspace's owner or admin, or its
- * client's person.
+ * Whether `approver` may see and change `grant`: its installation's workspace's owner or admin, or its client's person.
  */
 export const mayApprove = async (db: Database, approver: string, grant: GrantRecord): Promise<boolean> => {
   if (grant.kind === 'client') return grant.userId === approver
@@ -478,50 +471,24 @@ export const setTerms = async (
 const insertGrant = (
   db: Database,
   row: { readonly id: string; readonly kind: GrantRecord['kind']; readonly createdBy: string; readonly name: string },
-  owner: { readonly keyId?: string; readonly clientId?: string; readonly userId?: string },
+  owner: { readonly clientId: string; readonly userId?: string },
   now: number,
 ) =>
   db
     .prepare(
-      `INSERT INTO "grant" ("id", "kind", "keyId", "clientId", "userId", "name", "level", "createdBy", "createdAt", "updatedAt")
-        VALUES (?, ?, ?, ?, ?, ?, 'read', ?, ?, ?)`,
+      `INSERT INTO "grant" ("id", "kind", "clientId", "userId", "name", "level", "createdBy", "createdAt", "updatedAt")
+        VALUES (?, ?, ?, ?, ?, 'read', ?, ?, ?)`,
     )
-    .bind(
-      row.id,
-      row.kind,
-      owner.keyId ?? null,
-      owner.clientId ?? null,
-      owner.userId ?? null,
-      row.name,
-      row.createdBy,
-      iso(now),
-      iso(now),
-    )
+    .bind(row.id, row.kind, owner.clientId, owner.userId ?? null, row.name, row.createdBy, iso(now), iso(now))
 
 /**
- * Key `keyId`'s grant, made with it by `userId` with `terms` for its workspace `workspaceId`; its id is the key's. The
- * caller has checked they may make keys there and that the terms are theirs to give (`approvedTerms` on a draft).
- */
-export const createKeyGrant = async (
-  db: Database,
-  key: { readonly keyId: string; readonly workspaceId: string; readonly userId: string },
-  terms: GrantTerms,
-  now: number,
-): Promise<GrantTerms> => {
-  const saved = keyTerms(terms, key.workspaceId)
-  const row = { id: key.keyId, kind: 'key', createdBy: key.userId, name: terms.name } as const
-  await db.batch([...newGrantStatements(db, row, { keyId: key.keyId }, saved, now)])
-  return saved
-}
-
-/**
- * The statements that make grant `row` (as `owner`'s: a key, a client and person, or an app's client) with `terms` as
+ * The statements that make grant `row` (as `owner`'s: a client and its person, or an app's client) with `terms` as
  * saved; a caller adds its own to the same batch.
  */
 export const newGrantStatements = (
   db: Database,
   row: { readonly id: string; readonly kind: GrantRecord['kind']; readonly createdBy: string; readonly name: string },
-  owner: { readonly keyId?: string; readonly clientId?: string; readonly userId?: string },
+  owner: { readonly clientId: string; readonly userId?: string },
   terms: GrantTerms,
   now: number,
 ): readonly D1PreparedStatement[] => [insertGrant(db, row, owner, now), ...termsStatements(db, row.id, terms, now)]
@@ -544,7 +511,6 @@ export const setClientTerms = async (
   const draft: GrantRecord = existing ?? {
     id,
     kind: 'client',
-    keyId: undefined,
     clientId,
     userId,
     name: terms.name,

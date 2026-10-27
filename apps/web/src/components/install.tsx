@@ -164,7 +164,7 @@ function InstallForm(props: {
   readonly onEdit: (terms: GrantTerms) => void
   readonly disabled: boolean
 }) {
-  const holder: GrantHolder = { kind: 'key', workspace: { ...props.target, members: 1 } }
+  const holder: GrantHolder = { kind: 'app', workspace: { ...props.target, members: 1 } }
   return (
     <>
       <TargetPicker

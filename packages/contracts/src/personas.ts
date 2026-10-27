@@ -45,13 +45,13 @@ export const PersonaDefinition = Schema.Struct({
 export type PersonaDefinition = typeof PersonaDefinition.Type
 
 /**
- * A Persona a server's API key made (ADR 0115): `key` is the key's name, or its id while goblin has not learnt the name
- * yet (one made before names were kept, until the key's next request).
+ * A Persona an installed app made (ADRs 0115, 0118), for display only: `app` is the app's name, or the id of the server
+ * that made it where goblin never learnt a name.
  */
-const PersonaMaker = Schema.Struct({ key: Schema.String })
+const PersonaMaker = Schema.Struct({ app: Schema.String })
 
 /**
- * A Persona at its current revision; `madeBy` says which key made it, when one did (ADR 0115). An archived one no
+ * A Persona at its current revision; `madeBy` says which app made it, when one did (ADR 0115). An archived one no
  * longer answers but keeps its history. Times in seconds.
  */
 export const PersonaView = Schema.Struct({
@@ -66,9 +66,9 @@ export const PersonaView = Schema.Struct({
 export type PersonaView = typeof PersonaView.Type
 
 /**
- * A Persona in a list (`GET /api/personas`): who it is and which key made it (`madeBy`, for display, ADR 0115), its revision and
- * model, and its setup in a line; its instructions and full setup are what `GET /api/personas/:id` answers. `updatedAt`
- * is its last change, in seconds.
+ * A Persona in a list (`GET /api/personas`): who it is and which app made it (`madeBy`, for display, ADR 0115), its
+ * revision and model, and its setup in a line; its instructions and full setup are what `GET /api/personas/:id`
+ * answers. `updatedAt` is its last change, in seconds.
  */
 export const PersonaSummary = Schema.Struct({
   id: PersonaId,

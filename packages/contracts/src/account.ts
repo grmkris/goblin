@@ -23,40 +23,6 @@ export const ClientErrorReport = Schema.Struct({
 )
 export type ClientErrorReport = typeof ClientErrorReport.Type
 
-/** A key's name: 1 to 64 letters, digits, spaces and `_.:-`. */
-const KeyName = Schema.String.check(Schema.isPattern(/^[\w .:-]{1,64}$/u))
-
-/** `POST /api/keys`: a key for a server the owner runs, its name and the terms of its grant (`grants.ts`, ADR 0114). */
-export const CreateApiKeyTerms = Schema.Struct({ name: KeyName, terms: GrantTerms })
-export type CreateApiKeyTerms = typeof CreateApiKeyTerms.Type
-
-/**
- * `PATCH /api/keys/:keyId`: the terms of the key's grant from now on (ADR 0114), its name among them; its id and secret
- * stay.
- */
-export const UpdateApiKeyTerms = Schema.Struct({ terms: GrantTerms })
-export type UpdateApiKeyTerms = typeof UpdateApiKeyTerms.Type
-
-/**
- * A key as the owner sees it: its first characters, never its secret, and its grant (ADR 0114): its id, which is the
- * key's, and its terms. `expiresAt` is when its grant ends; none until revoked.
- */
-export const ApiKeyView = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  start: Schema.optional(Schema.String),
-  createdAt: Schema.String,
-  expiresAt: Schema.optional(Schema.String),
-  lastUsedAt: Schema.optional(Schema.String),
-  grantId: Schema.String,
-  terms: GrantTerms,
-})
-export type ApiKeyView = typeof ApiKeyView.Type
-
-/** A new key and its secret, which is shown this once. */
-export const CreatedApiKey = Schema.Struct({ key: ApiKeyView, secret: Schema.String })
-export type CreatedApiKey = typeof CreatedApiKey.Type
-
 /**
  * A member's role in a workspace (ADR 0089): an owner may delete it, an owner or admin manages it, a member works in
  * it.

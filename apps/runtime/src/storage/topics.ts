@@ -7,7 +7,7 @@ import { EVERYTHING_JSON } from './migrations/setup.ts'
  * Topic in `app_conversations.topic_id`. An active name is unique, ignoring case (a partial index in the migration);
  * `revision` counts changes. `operation_id` makes a create idempotent. `setup` is the Topic's setup as JSON (ADR 0040).
  * `reach` is how far its chats see (ADR 0115): `sealed`, or `hub` (Personal's, until an admin says otherwise).
- * `guidance_by` names the server's key that last wrote its guidance, none when a person did: its chats read it as that
+ * `guidance_by` names the installed app that last wrote its guidance, none when a person did: its chats read it as that
  * server's operator guidance, never the owner's.
  */
 export const appTopics = sqliteTable('app_topics', {

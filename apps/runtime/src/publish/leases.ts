@@ -95,7 +95,10 @@ function endLeases<R>(db: Db<R>, where: SQL | undefined, ending: Ending, now: nu
   return ended.length
 }
 
-/** Every lease `holder` holds ends, its access gone (a key revoked, rotated or losing `conversations`; a client revoked). */
+/**
+ * Every lease `holder` holds ends, its access gone (an app uninstalled or a client revoked, or either losing
+ * `conversations`).
+ */
 export const endHolder = (db: Db, holder: string, now: number): number =>
   db.transaction((tx) => endLeases(tx, eq(appPublishSubscriptions.principal, holder), 'revoked', now))
 

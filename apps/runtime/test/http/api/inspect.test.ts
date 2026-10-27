@@ -25,7 +25,7 @@ const fixture = () => {
   cleanup(inspection.close)
   const grants = memoryGrants()
   const { fetch } = serve(
-    served([InspectGroup], InspectHandlers, undefined, grants.layer).pipe(
+    served([InspectGroup], InspectHandlers, grants.layer).pipe(
       Layer.provide(
         Layer.mergeAll(inspection.layer, Layer.succeed(Resident, resident.service), sqliteDb(inspection.db)),
       ),
@@ -105,10 +105,10 @@ describe('the inspect group served by the agent', () => {
 })
 
 /** The key the edge forwards (ADRs 0081, 0114): its grant reads with `extras`, and lists its Topics. */
-const KEY = credential({ id: 'key-1', name: 'swarmm', level: 'read', extras: ['inspect'], topics: 'list' })
+const APP = credential({ id: 'in-1', name: 'swarmm', level: 'read', extras: ['inspect'], topics: 'list' })
 const keyed = (extras: readonly ('inspect' | 'setup')[] = ['inspect']) => ({
   'x-goblin-ref': 'ref-1',
-  ...credentialHeaders({ ...KEY, extras }),
+  ...credentialHeaders({ ...APP, extras }),
 })
 
 /** A run event of operation `operationId` in Pi session `session`, from `start` to `end` ms, `ok`. */
@@ -167,7 +167,7 @@ const ask = flowRunEvent(
  * The key reaches Topic 2: its thread `12` (Pi session `40`) and the Persona fork `13` (session `41`) under it. Main
  * (`1`) is Personal's and `14` (session `42`) another Topic's; the owner ran a turn in each.
  */
-const keyFixture = () => {
+const appFixture = () => {
   const { fetch, ledger, db, resident, grants } = fixture()
   db.insert(appConversations)
     .values([
@@ -176,7 +176,7 @@ const keyFixture = () => {
       { chatId: '14', piSession: '42', kind: 'main', role: 'conversation', topicId: 3, createdAt: 1 },
     ])
     .run()
-  grants.set(KEY, [{ kind: 'topic', id: '2' }])
+  grants.set(APP, [{ kind: 'topic', id: '2' }])
   for (const each of [...forkTurn, ask]) ledger.ended(each)
   ledger.ended(event('turn:main', 'turn.submitted', 'owner:op-1', ['1', 2_000, 3_000]))
   ledger.ended(event('turn:other', 'turn.submitted', 'owner:op-2', ['42', 2_000, 3_000]))
@@ -189,9 +189,9 @@ const keyFixture = () => {
   return { fetch, read, resident }
 }
 
-describe("the inspect group under a server's API key whose grant lists its Topics (ADRs 0084, 0114)", () => {
+describe('the inspect group under an installed app whose grant lists its Topics (ADRs 0084, 0114)', () => {
   it("answers a Persona fork's turn by its operation: its steps in order and where its 60 seconds went", async () => {
-    const { read, resident } = keyFixture()
+    const { read, resident } = appFixture()
     const answered = await read(`/api/inspect/turn?operation=${encodeURIComponent(FORK)}`)
     expect(answered.status).toBe(200)
     const timeline = Schema.decodeUnknownSync(TurnTimeline)(await answered.json())
@@ -211,12 +211,12 @@ describe("the inspect group under a server's API key whose grant lists its Topic
       servers: [{ server: 'mycut', calls: 1, ms: 30_000 }],
       otherMs: 9_000,
     })
-    // Nothing a key reads grants resident authority.
+    // Nothing an app reads grants resident authority.
     expect(resident.grants).toHaveLength(0)
   })
 
   it("answers its turn as an OpenTelemetry trace too, and another's not at all (ADR 0107)", async () => {
-    const { read } = keyFixture()
+    const { read } = appFixture()
     const trace = await decoded(
       OtlpTraceData,
       read(`/api/inspect/turn?operation=${encodeURIComponent(FORK)}&format=otlp`),
@@ -235,7 +235,7 @@ describe("the inspect group under a server's API key whose grant lists its Topic
   })
 
   it("lists and finds only what its own chats ran; the owner's and another Topic's are not there", async () => {
-    const { read, fetch } = keyFixture()
+    const { read, fetch } = appFixture()
     for (const operation of ['owner:op-1', 'owner:op-2'])
       expect((await read(`/api/inspect/turn?operation=${operation}`)).status).toBe(404)
     const turns = await decoded(InspectTurns, read('/api/inspect/turns?since=0'))
@@ -251,7 +251,7 @@ describe("the inspect group under a server's API key whose grant lists its Topic
   })
 
   it("shows the details of its send with its Persona's answer related, and nothing outside its reach", async () => {
-    const { read } = keyFixture()
+    const { read } = appFixture()
     const details = await read('/api/inspect/details?operation=svc%3Ajob%3A1%3Afirst')
     expect(details.status).toBe(200)
     expect(await details.json()).toMatchObject({
@@ -266,7 +266,7 @@ describe("the inspect group under a server's API key whose grant lists its Topic
   })
 
   it('reads in full only the conversations of the Topics it reaches', async () => {
-    const { read } = keyFixture()
+    const { read } = appFixture()
     expect((await read('/api/inspect/conversations')).status).toBe(200)
     expect((await read('/api/inspect/conversation?conversation=12')).status).toBe(200)
     const refused = await read('/api/inspect/conversation?conversation=14')
@@ -277,14 +277,14 @@ describe("the inspect group under a server's API key whose grant lists its Topic
   })
 
   it('is refused without the inspect extra before anything is read, with a link to widen it', async () => {
-    const { read } = keyFixture()
+    const { read } = appFixture()
     const refused = await read(`/api/inspect/turn?operation=${encodeURIComponent(FORK)}`, [])
     expect(refused.status).toBe(403)
     expect(await refused.json()).toMatchObject({
       error: {
         code: 'access_insufficient',
         missing: { extra: 'inspect' },
-        widenUrl: 'https://goblin.test/consent/widen?grant=key-1&extra=inspect',
+        widenUrl: 'https://goblin.test/consent/widen?grant=in-1&extra=inspect',
       },
     })
     expect((await read('/api/inspect/details?operation=svc%3Ajob%3A1%3Afirst', ['setup'])).status).toBe(403)

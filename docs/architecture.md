@@ -3,7 +3,7 @@
 One Cloudflare Worker serves the web app and the API. Behind it, every workspace has its own `PersonalAgent` Durable
 Object, named by the workspace's ID (ADR 0089): it runs Pi, holds the workspace's outbound MCP connections and
 credentials, and keeps application state in its own SQLite. D1 holds Better Auth's tables (users, sessions, workspaces
-and their members, inbound OAuth, API keys). A person signs in once and reaches every workspace they belong to.
+and their members, inbound OAuth) and goblin's grants, apps and installations. A person signs in once and reaches every workspace they belong to.
 
 ```mermaid
 flowchart LR

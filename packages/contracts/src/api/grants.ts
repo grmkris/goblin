@@ -4,7 +4,7 @@ import * as HttpApiGroup from 'effect/http-api/HttpApiGroup'
 import { ClientGrantTerms, ConsentTerms, WidenRequest, WidenResult } from '../grants.ts'
 import { API_ERRORS } from './errors.ts'
 
-/** A grant's id in a path: a key's id, or `cg_` and a client grant's own. */
+/** A grant's id in a path: an installation's id, or `cg_` and a client grant's own. */
 const GrantId = Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u))
 /** A registered client's id in a path. */
 /** Better Auth's own id, or a Client ID Metadata Document's https URL (ADR 0122). */
@@ -14,9 +14,9 @@ const ClientId = Schema.String.check(Schema.isPattern(/^(?:[\w.-]{1,200}|https:\
  * Grants, as the person who approves them sees them (`grants.ts`, ADR 0114), served by the Worker for their session
  * without waking an agent. Paths are relative to the API's `/api` prefix. Each can answer any `AppError` envelope.
  *
- * - `terms`: `GET /api/grants/:id/terms`, what the widening page shows for a grant the person may approve (a key's of a
- *   workspace they own or administer, or a client's they gave): its current terms, summary and what may be chosen. Any
- *   other is not found.
+ * - `terms`: `GET /api/grants/:id/terms`, what the widening page shows for a grant the person may approve (an
+ *   installation's in a workspace they own or administer, or a client's they gave): its current terms, summary and what
+ *   may be chosen. Any other is not found.
  * - `widen`: `PUT /api/grants/:id` saves the terms the person approved for it, widened or narrowed; the body names the
  *   same grant (else invalid input). Its end restarts from its lifetime.
  * - `clientTerms`: `GET /api/clients/:clientId/terms`, what the consent page shows for an MCP client: the default

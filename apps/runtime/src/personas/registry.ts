@@ -15,7 +15,7 @@ import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { Conflict, InvalidInput, NotFound } from '../http/errors.ts'
 import { listedIds } from '../grants/mirror.ts'
-import { makerColumn, makerOf } from '../keys/made-by.ts'
+import { makerColumn, makerOf } from '../credentials/made-by.ts'
 import { after, pageOf } from '../storage/page.ts'
 import { appPersonaRevisions, appPersonas } from '../storage/personas.ts'
 
@@ -58,13 +58,13 @@ const definitionOf = (row: Row | RevisionRow): PersonaDefinition => ({
   setup: personaSetupOf(row.setup),
 })
 
-/** A Persona's row with the key that made it, when one did, for display (ADR 0115). */
+/** A Persona's row with the app that made it, when one did, for display (ADR 0115). */
 type Made = Row & { readonly maker: string | null | undefined }
 
 const view = (row: Made): PersonaView => ({
   ...definitionOf(row),
   id: row.id,
-  ...(row.maker === null || row.maker === undefined ? {} : { madeBy: { key: row.maker } }),
+  ...(row.maker === null || row.maker === undefined ? {} : { madeBy: { app: row.maker } }),
   revision: row.revision,
   ...(row.archivedAt === null ? {} : { archivedAt: row.archivedAt }),
   createdAt: row.createdAt,
@@ -116,14 +116,14 @@ export class PersonaRegistry<RunResult = unknown> {
     return row
   }
 
-  /** Personas with the key that made each, one statement for any number of them. */
+  /** Personas with the app that made each, one statement for any number of them. */
   #made() {
     return this.#db
       .select({ ...getTableColumns(appPersonas), maker: makerColumn('persona', appPersonas.id) })
       .from(appPersonas)
   }
 
-  /** A row just read or written, with the key that made it. */
+  /** A row just read or written, with the app that made it. */
   #view(row: Row): PersonaView {
     return view({ ...row, maker: makerOf(this.#db, 'persona', row.id) })
   }

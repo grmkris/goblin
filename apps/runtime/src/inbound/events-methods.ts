@@ -126,7 +126,7 @@ export const EVENTS_GUIDE = (power: Power): string =>
  * top-level `capabilities.events` (which the pinned SDK keeps on the wire, for `initialize` and `server/discover`)
  * and `extensions["io.modelcontextprotocol/events"]`.
  */
-export function eventMethods(server: McpServer, power: Power, call: OwnerCaller, reach: CallerReach | undefined): void {
+export function eventMethods(server: McpServer, power: Power, call: OwnerCaller, reach: CallerReach): void {
   if (!reaches(power)) return
   // SAFETY: the SDK's ServerCapabilities type has no draft `events`; registerCapabilities merges it as given.
   server.server.registerCapabilities({ events: {}, extensions: { [EVENTS_EXTENSION]: {} } } as never)
@@ -140,7 +140,7 @@ export function eventMethods(server: McpServer, power: Power, call: OwnerCaller,
   server.server.setRequestHandler('events/list', { params: standardParams }, async (params) => {
     const workspace = typeof params['workspace'] === 'string' ? params['workspace'] : undefined
     const listed = await answer((api) => api.events.list(), workspace)
-    return reach?.named === true ? withWorkspace(listed, reach) : listed
+    return reach.named ? withWorkspace(listed, reach) : listed
   })
   server.server.setRequestHandler('events/subscribe', { params: standardParams }, async (raw) => {
     const { params, workspace } = named(raw)

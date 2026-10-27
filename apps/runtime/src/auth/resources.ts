@@ -12,16 +12,6 @@ export const MCP_SCOPES = ['openid', 'profile', 'email', 'offline_access', 'gobl
  */
 export const RESOURCE_SCOPES = ['goblin'] as const
 
-/**
- * Every server API key's prefix (ADR 0081). An inbound OAuth access token is a JWS, so a bearer with this prefix is
- * never one of those, and the edge and /mcp tell the two apart by it alone.
- */
-export const KEY_PREFIX = 'gbk_'
-/** A key's secret after its prefix: this many letters, the plugin's default length. */
-export const KEY_LENGTH = 64
-/** How much of a key's secret the plugin keeps in the clear (`start`, the prefix and 6 letters), to tell keys apart. */
-export const KEY_START_LENGTH = 10
-
 const METADATA_PATH = '/.well-known/oauth-protected-resource'
 const base = (appUrl: string) => appUrl.replace(/\/$/u, '')
 

@@ -6,7 +6,7 @@ import {
   channels,
   isChannel,
   madeByGroups,
-  madeByKey,
+  madeByApp,
   matchingTopics,
   reachChange,
   reachNote,
@@ -119,11 +119,11 @@ describe("a Topic's threads in the sidebar", () => {
   })
 })
 
-/** A Topic a server's key made, for display (ADR 0115). */
-const made = (id: number, name: string, key: string, extra: Partial<TopicView> = {}) =>
-  topic(id, name, String(id * 10), { madeBy: { key }, createdBy: 'agent', createdAt: id, ...extra })
+/** A Topic an installed app made, for display (ADR 0115). */
+const made = (id: number, name: string, app: string, extra: Partial<TopicView> = {}) =>
+  topic(id, name, String(id * 10), { madeBy: { app }, createdBy: 'agent', createdAt: id, ...extra })
 
-describe("the Topics a server's key made, in the sidebar (ADR 0115)", () => {
+describe('the Topics an installed app made, in the sidebar (ADR 0115)', () => {
   const MADE = [
     ...TOPICS,
     made(5, 'deal-5', 'swarmm-prod'),
@@ -139,22 +139,22 @@ describe("the Topics a server's key made, in the sidebar (ADR 0115)", () => {
     view('80', { kind: 'main', conversation: true, parent: undefined, topic: 8, lastReplyAt: 50 }),
   ]
 
-  it("keeps the owner's own channels as they were, with none a key made", () => {
+  it("keeps the owner's own channels as they were, with none an app made", () => {
     expect(channels(MADE)).toEqual(channels(TOPICS))
-    expect(madeByKey(MADE[5] ?? PERSONAL)).toBe('swarmm-prod')
-    expect(madeByKey(PERSONAL)).toBeUndefined()
+    expect(madeByApp(MADE[5] ?? PERSONAL)).toBe('swarmm-prod')
+    expect(madeByApp(PERSONAL)).toBeUndefined()
   })
 
-  it('groups the active ones by key, the latest active first, a reply in a thread counting for its Topic', () => {
+  it('groups the active ones by app, the latest active first, a reply in a thread counting for its Topic', () => {
     const groups = madeByGroups(MADE, views)
-    expect(groups.map(({ key, topics, latest }) => ({ key, topics: topics.map(({ name }) => name), latest }))).toEqual([
-      { key: 'swarmm-prod', topics: ['deal-6', 'deal-5'], latest: 70 },
-      { key: 'sidequest', topics: ['quest-8', 'quest-9'], latest: 50 },
+    expect(groups.map(({ app, topics, latest }) => ({ app, topics: topics.map(({ name }) => name), latest }))).toEqual([
+      { app: 'swarmm-prod', topics: ['deal-6', 'deal-5'], latest: 70 },
+      { app: 'sidequest', topics: ['quest-8', 'quest-9'], latest: 50 },
     ])
   })
 
-  it('counts a Topic with no chat yet from when it was made, and has no group when no key made any', () => {
-    expect(madeByGroups(MADE, []).map(({ key, topics }) => [key, topics.map(({ id }) => id)])).toEqual([
+  it('counts a Topic with no chat yet from when it was made, and has no group when no app made any', () => {
+    expect(madeByGroups(MADE, []).map(({ app, topics }) => [app, topics.map(({ id }) => id)])).toEqual([
       ['sidequest', [9, 8]],
       ['swarmm-prod', [6, 5]],
     ])

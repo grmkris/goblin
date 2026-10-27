@@ -70,9 +70,9 @@ tokens count toward the owner's daily usage like any other.
 **The owner's own models** ([ADR 0087](../adr/0087-the-owners-own-subscription-models.md)). `GOBLIN_OWNER_MODELS` are
 models on the deployment owner's own subscriptions, offered in `GOBLIN_OWNER_WORKSPACE_ID`'s workspace alone (ADR 0089), after every
 account's (`offeredEndpoint`); another account never lists, picks or reaches one. A server's work never runs on them:
-work through an API key, or in a Topic a key made (`serverWorkIn`, `grants/policy.ts`), answers on `Models.forServers`
-(the pick, unless it is one of the owner's own, then the default), a Persona's own model there must not be one
-(`Personas.ownModel`), a key reads the models without them (`Models.choiceForServers`) and cannot write one onto a
+work through an installed app, or in a Topic an app made (`serverWorkIn`, `grants/policy.ts`), answers on
+`Models.forServers` (the pick, unless it is one of the owner's own, then the default), a Persona's own model there must
+not be one (`Personas.ownModel`), an app reads the models without them (`Models.choiceForServers`) and cannot write one onto a
 Persona. Nor do they serve other people: a workspace offered them takes no invitations (`offersOwnerModels`,
 [ADR 0095](../adr/0095-the-owners-subscription-workspace-takes-no-members.md)).
 

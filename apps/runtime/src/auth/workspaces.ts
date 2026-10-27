@@ -220,20 +220,18 @@ export const updateWorkspace = async (
 }
 
 /**
- * Removes a workspace's records once its agent is gone: its keys with their grants, the apps installed in it with their
- * grants and the apps it registered with every installation of them (ADR 0118), its place in MCP clients' grants (ADRs
- * 0097, 0114), and the workspace, whose memberships and invitations go with it.
+ * Removes a workspace's records once its agent is gone: the apps installed in it with their grants and the apps it
+ * registered with every installation of them (ADR 0118), its place in MCP clients' grants (ADRs 0097, 0114), and the
+ * workspace, whose memberships and invitations go with it.
  */
 const removeRecords = (db: Database, workspaceId: string) =>
   db.batch([
-    db.prepare('DELETE FROM "grant" WHERE "keyId" IN (SELECT id FROM apikey WHERE referenceId = ?)').bind(workspaceId),
     db
       .prepare('DELETE FROM "grant" WHERE "id" IN (SELECT "id" FROM "installation" WHERE "workspaceId" = ?)')
       .bind(workspaceId),
     db
       .prepare('DELETE FROM "oauthClient" WHERE "clientId" IN (SELECT "clientId" FROM "app" WHERE "workspaceId" = ?)')
       .bind(workspaceId),
-    db.prepare('DELETE FROM apikey WHERE referenceId = ?').bind(workspaceId),
     db.prepare('DELETE FROM "grantWorkspace" WHERE "workspaceId" = ?').bind(workspaceId),
     db.prepare('DELETE FROM organization WHERE id = ?').bind(workspaceId),
   ])

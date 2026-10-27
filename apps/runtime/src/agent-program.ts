@@ -25,7 +25,7 @@ import { AgentInput } from './runtime/input.ts'
 import { conversationId } from './pi/context.ts'
 import { PiSessions, fromPi } from './pi/sessions.ts'
 import type { HeldCallOutcome } from './mcp/connections/types.ts'
-import { requestAuthor, requestFlowOrigin, requestKey } from './grants/policy.ts'
+import { requestAuthor, requestFlowOrigin, requestApp } from './grants/policy.ts'
 import { type SharedContext, outcomeContent, ownerContent, withAuthor } from './pi/content.ts'
 import { askPersonas } from './personas/ask.ts'
 
@@ -193,16 +193,16 @@ const routineAnswer = (operationId: string, text: string) => (admitted: SessionI
   RoutineControl.use((control) => control.answer(admitted, operationId, text))
 
 /**
- * What a message's admission records and may answer: a server key's (`keyed`, ADR 0115) is recorded as the key's and
- * never answers a routine's question, which is the owner's to answer.
+ * What a message's admission records and may answer: an installed app's (`fromApp`, ADRs 0115, 0118) is recorded as the
+ * app's and never answers a routine's question, which is the owner's to answer.
  */
-const admissionOf = (input: OwnerSubmit, keyed: boolean) => ({
+const admissionOf = (input: OwnerSubmit, fromApp: boolean) => ({
   receipt: {
     kind: 'send',
-    origin: keyed ? 'key' : 'owner',
+    origin: fromApp ? 'app' : 'owner',
     ...(input.parentOp === undefined ? {} : { parentOp: input.parentOp }),
   } as const,
-  ...(keyed ? {} : { answer: routineAnswer(input.operationId, input.text) }),
+  ...(fromApp ? {} : { answer: routineAnswer(input.operationId, input.text) }),
 })
 
 /**
@@ -230,7 +230,7 @@ export const submitOwner = (input: OwnerSubmit) =>
     const view = Option.getOrUndefined(yield* conversations.view(input.thread))
     const content = withAuthor(yield* requestAuthor, ownerContent(input.text, shared, attachments, selections))
     const origin = yield* requestFlowOrigin
-    const keyed = (yield* requestKey) !== undefined
+    const fromApp = (yield* requestApp) !== undefined
     if (personaIds.length > 0) {
       if (view?.kind === 'subagent') return yield* new InvalidInput({ reason: 'persona_subagent' })
       return yield* askPersonas(input, personaIds, personaOrder, content)
@@ -242,7 +242,7 @@ export const submitOwner = (input: OwnerSubmit) =>
     return yield* (yield* ChatOperations).send<Conversations | RoutineControl | PiSessions | AgentInput>({
       chat: input.thread,
       operationId: input.operationId,
-      ...admissionOf(input, keyed),
+      ...admissionOf(input, fromApp),
       flow: { flow: 'send', ...origin },
       content,
       ...(relay === undefined ? {} : { relay }),

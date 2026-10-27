@@ -73,22 +73,22 @@ goblin's components, charts, maps and diagrams, schedules that run on their own,
 the owner's MCP tools, a cheap model, notifications, other apps) that each wait for the owner's Allow. The Apps page lists them; an app can
 fill the workspace with its conversation docked beside it, roll back to an earlier version, or be deleted.
 
-goblin is reachable by AI clients over MCP and by scripts over the API (ADRs 0081, 0086). An MCP client (Claude Code,
-claude.ai, VS Code) signs in to `/mcp` with OAuth, and the owner consents to each scope it asks for: managing Topics,
-sending in chats, managing Personas, reading conversations and runs; with them it manages the agent as the owner does,
-from the same tools a server's key gets. A server the owner runs gets a
-`gbk_` API key from Settings with a grant (ADR 0114: a level, the Topics, Personas and connections it reaches, extras
-and a lifetime, the same shape an MCP client's consent gives) and, with it, makes Topics and Personas, sends into their
-chats and reads the replies after a cursor, at `/api` or as the same operations on `/mcp`. With the `inspect` extra it
-sees how chats within its reach ran, content-free, down to where each turn's time went (ADR 0084); a call its grant
-does not cover answers with a link where the owner can widen it. A key never keeps the agent active. Every Topic is sealed
-(ADR 0115): its chats see only it, its own files and, on a person's turn, the Shared folder, and only the hub (Personal,
-unless an admin chose another) reaches every Topic; what a turn may do is its sender's power, so a key's turn does what
-its grant allows and its messages are marked as the server's requests. A secret that may have leaked is rotated in Settings: the same
-key, with all it made, and the old secret refused at once (ADR 0105). A product built on goblin installs instead of holding a key (ADR
-0118): its workspace registers it as an app (Settings → Developer), any workspace's owner or admin installs it from
-its "Connect goblin" link with a grant, and its backend's own client_credentials token reaches the workspaces it is
-installed in, as a server, at `/w/<slug>/api` and on `/mcp`; a script app does the same for one workspace's scripts.
+goblin is reachable by AI clients over MCP and by servers and scripts over the API (ADRs 0086, 0118, 0120). An MCP
+client (Claude Code, claude.ai, VS Code) signs in to `/mcp` with OAuth, and its person chooses what it may do there;
+with that it manages the agent as they do, from the same tools an installed app gets. A product built on goblin is an
+app (ADR 0118): its workspace registers it (Settings → Developer), any workspace's owner or admin installs it from its
+"Connect goblin" link with a grant, and its backend's own client_credentials token reaches the workspaces it is
+installed in, as a server, at `/w/<slug>/api` and on `/mcp`. A script, a server the workspace runs or CI is a script
+app of that workspace, installed there as it is registered; `goblin token` gets its token from the shell. Every
+credential has one grant (ADR 0114: a level, the Topics, Personas and connections it reaches, extras and a lifetime)
+and, with it, makes Topics and Personas, sends into their chats and reads the replies after a cursor. With the `inspect`
+extra it sees how chats within its reach ran, content-free, down to where each turn's time went (ADR 0084); a call its
+grant does not cover answers with a link where the owner can widen it. An app never keeps the agent active. Every Topic
+is sealed (ADR 0115): its chats see only it, its own files and, on a person's turn, the Shared folder, and only the hub
+(Personal, unless an admin chose another) reaches every Topic; what a turn may do is its sender's power, so an app's
+turn does what its grant allows and its messages are marked as the server's requests. A secret that may have leaked is
+rotated in Settings → Developer: the same app, its installations and all they made, and the old secret refused at
+once.
 
 Every turn can be seen end to end (ADR 0024). Beside Pi's own record, each agent keeps a 30-day run ledger of how its
 turns ran: model attempts, tool calls, retries, MCP steps, Source replies, timings, tokens and errors, never content.

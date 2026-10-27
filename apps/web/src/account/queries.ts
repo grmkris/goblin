@@ -1,5 +1,4 @@
 import type {
-  CreateApiKeyTerms,
   CreateWorkspace,
   GrantTerms,
   InstallApproval,
@@ -13,9 +12,10 @@ import * as Effect from 'effect/Effect'
 import { account, inWorkspaceOf, owner, workspaceAccount } from '../lib/api.ts'
 
 /**
- * The person's workspaces, MCP clients and the grants they approve (`AccountApi`), and this workspace's API keys and
- * members (`WorkspaceAccountApi`), answered by the Worker: keys are `['account', kind]`, and each change refreshes what
- * it changed before it settles. One page is one workspace's (ADR 0089), so its keys need no workspace in their keys.
+ * The person's workspaces, MCP clients and the grants they approve (`AccountApi`), and this workspace's members, apps
+ * and installations (`WorkspaceAccountApi`), answered by the Worker: keys are `['account', kind]`, and each change
+ * refreshes what it changed before it settles. One page is one workspace's (ADR 0089), so its keys need no workspace in
+ * their keys.
  */
 const accountKeys = {
   workspaces: ['account', 'workspaces'] as const,
@@ -23,7 +23,6 @@ const accountKeys = {
   invitations: ['account', 'invitations'] as const,
   mine: ['account', 'invitations', 'mine'] as const,
   clients: ['account', 'clients'] as const,
-  keys: ['account', 'keys'] as const,
   apps: ['account', 'apps'] as const,
   installations: ['account', 'installations'] as const,
   install: (clientId: string) => ['account', 'install', clientId] as const,
@@ -99,7 +98,7 @@ export const grantTermsQuery = (grantId: string) =>
     queryFn: (api) => api.grants.terms({ params: { id: grantId } }),
   })
 
-/** Saves the terms the person approved for a grant: a key's or an MCP client's, whichever it is. */
+/** Saves the terms the person approved for a grant: an installation's or an MCP client's, whichever it is. */
 export const widenGrantMutation = mutationOptions({
   ...account.apiMutation({
     mutationFn: (api, { grantId, terms }: { readonly grantId: string; readonly terms: GrantTerms }) =>
@@ -108,11 +107,10 @@ export const widenGrantMutation = mutationOptions({
   onSuccess: (_saved, { grantId }, _result, { client }) => grantsChanged(client, grantId),
 })
 
-/** Every read a grant's new terms change: its own, and the keys, clients and installations that show them. */
+/** Every read a grant's new terms change: its own, and the clients and installations that show them. */
 const grantsChanged = (client: QueryClient, grantId: string) =>
   Promise.all([
     client.invalidateQueries({ queryKey: accountKeys.grantTerms(grantId) }),
-    client.invalidateQueries({ queryKey: accountKeys.keys }),
     client.invalidateQueries({ queryKey: accountKeys.clients }),
     client.invalidateQueries({ queryKey: accountKeys.installations }),
   ])
@@ -123,39 +121,6 @@ export const revokeClientMutation = mutationOptions({
     mutationFn: (api, clientId: string) => api.clients.revoke({ params: { clientId } }),
   }),
   onSuccess: (_revoked, _clientId, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.clients }),
-})
-
-/** The workspace's API keys, for servers it runs (ADR 0081), without secrets. */
-export const keysQuery = workspaceAccount.apiQuery({ queryKey: accountKeys.keys, queryFn: (api) => api.keys.list() })
-
-/** A new key and its grant's terms (ADR 0114); its answer holds the secret, which is never shown again. */
-export const createKeyMutation = mutationOptions({
-  ...workspaceAccount.apiMutation({ mutationFn: (api, payload: CreateApiKeyTerms) => api.keys.create({ payload }) }),
-  onSuccess: (_created, _payload, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),
-})
-
-/** New terms for one key's grant (ADR 0114): the same key, with its id and secret. */
-export const updateKeyMutation = mutationOptions({
-  ...workspaceAccount.apiMutation({
-    mutationFn: (api, { keyId, terms }: { readonly keyId: string; readonly terms: GrantTerms }) =>
-      api.keys.update({ params: { keyId }, payload: { terms } }),
-  }),
-  onSuccess: (_updated, _change, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),
-})
-
-/**
- * A new secret for one key (ADR 0105): the same key, which keeps what it made; its answer holds the secret, which is
- * never shown again, and the old one is refused from then on.
- */
-export const rotateKeyMutation = mutationOptions({
-  ...workspaceAccount.apiMutation({ mutationFn: (api, keyId: string) => api.keys.rotate({ params: { keyId } }) }),
-  onSuccess: (_rotated, _keyId, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),
-})
-
-/** Ends one key at once. */
-export const revokeKeyMutation = mutationOptions({
-  ...workspaceAccount.apiMutation({ mutationFn: (api, keyId: string) => api.keys.revoke({ params: { keyId } }) }),
-  onSuccess: (_revoked, _keyId, _result, { client }) => client.invalidateQueries({ queryKey: accountKeys.keys }),
 })
 
 /** The apps this workspace registered (ADR 0118), newest first, without secrets. */

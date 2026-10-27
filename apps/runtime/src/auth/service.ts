@@ -113,10 +113,9 @@ const CLIENT_ROUTES: ReadonlySet<string> = new Set([
  */
 export const handleAuth = async (request: Request, env: RuntimeEnv): Promise<Response> => {
   const path = new URL(request.url).pathname
-  // API keys, workspaces and apps are made, changed and ended only through the account APIs (ADRs 0081, 0089, 0118):
-  // none of their plugins' own routes is served.
+  // Workspaces and apps are made, changed and ended only through the account APIs (ADRs 0089, 0118): none of their
+  // plugins' own routes is served.
   if (
-    path.startsWith(`${AUTH_BASE_PATH}/api-key/`) ||
     path.startsWith(`${AUTH_BASE_PATH}/organization/`) ||
     path.startsWith(`${AUTH_BASE_PATH}/admin/`) ||
     CLIENT_ROUTES.has(path.slice(AUTH_BASE_PATH.length))

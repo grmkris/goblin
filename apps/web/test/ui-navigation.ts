@@ -3,9 +3,9 @@
  * strip and its shortcut, the Topics popover, and the phone's drawer and dot. The page is in a workspace
  * (`/w/swarmm-prod/…`, ADR 0089) where the person is an admin, with two more workspaces and two invitations waiting
  * (ADR 0093): the workspace menu's count, roles and tooltip, and the invitations answered in place there and in
- * Activity. Two server keys made Topics and Personas (ADR 0115): each key's Topics fold under the Topics, filter and
- * page once open; a Topic's info says how far it reaches, an admin's hub switch asks for exactly that reach, and a
- * member reads the line alone; the Personas page folds each key's. Screenshots land in .local.
+ * Activity. Two installed apps made Topics and Personas (ADR 0115): each app's Topics fold under the Topics, filter
+ * and page once open; a Topic's info says how far it reaches, an admin's hub switch asks for exactly that reach, and a
+ * member reads the line alone; the Personas page folds each app's. Screenshots land in .local.
  */
 import assert from 'node:assert/strict'
 import { mkdirSync } from 'node:fs'
@@ -120,7 +120,7 @@ function patched(id: string, request: ReturnType<MockRoute['request']>): unknown
     id: Number(id),
     name: personal ? 'Personal' : 'deal-08',
     conversation: personal ? '1' : '1070',
-    ...(personal ? { personal: true } : { madeBy: { key: 'swarmm-prod' } }),
+    ...(personal ? { personal: true } : { madeBy: { app: 'swarmm-prod' } }),
     reach,
     revision: 1,
     setup: { mcpServers: 'all', skills: 'all', apps: 'all', subagents: true },
@@ -252,7 +252,7 @@ try {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
     assert.equal(overflow, 0)
 
-    // The Topics a key made: a folded section each under the Topics, the key active last first, with a dot while one
+    // The Topics an app made: a folded section each under the Topics, the app active last first, with a dot while one
     // has unread replies; folded, the Topic the page shows keeps its row.
     const made = page.locator('nav.shell-sidebar [data-section="made-by"]')
     assert.deepEqual(await words(made.locator('.sidebar-section-toggle')), [
@@ -284,7 +284,7 @@ try {
     await page.screenshot({ path: path.join(out, `desktop-${colorScheme}-made-by-filtered.png`) })
     await made.first().locator('.sidebar-section-toggle').click()
 
-    // A Topic a key made is sealed like any other: its info says so, and an admin's switch makes it a hub, asking for
+    // A Topic an app made is sealed like any other: its info says so, and an admin's switch makes it a hub, asking for
     // exactly that reach; Personal is the hub, with Hub beside its name.
     await at('/topic-info')
     const info = page.getByRole('dialog', { name: '#deal-08' })

@@ -1,7 +1,6 @@
-import { Extra, KeyOrigin, Level, WorkspaceId, WorkspaceRole } from '@goblin/contracts'
+import { Extra, GrantOrigin, Level, WorkspaceId, WorkspaceRole } from '@goblin/contracts'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { KEY_PREFIX } from '../../auth/resources.ts'
 
 /** The header the Worker forwards a credential in. */
 export const CALLER_HEADER = 'x-goblin-caller'
@@ -9,17 +8,16 @@ export const CALLER_HEADER = 'x-goblin-caller'
 const Coverage = Schema.Literals(['all', 'list'])
 
 /**
- * A credential as the Worker forwards it (ADR 0114): a server's API key, an OAuth client acting for a person or an
- * installed app (ADR 0118, whose `id` is its client and whose grant is its installation's), its
- * name, its grant's id, level and extras, when it ends (epoch milliseconds, `null` until revoked), and in the workspace
- * the request reaches whether its Topics, Personas and connections are all or a list, with the reach's generation, so
- * the agent knows when to read the lists again (`Grants.sync`). The lists themselves never travel in the header; the
- * MCP origins its threads may bring do (ADR 0091). It holds what its grant holds, never renews resident authority and
- * is counted per minute. Only the Worker sets it: the edge for a key on `/api` or an OAuth client on `/w/<slug>/api`
- * (ADR 0116), `/mcp` for either.
+ * A credential as the Worker forwards it (ADRs 0114, 0120): an OAuth client acting for a person, or an installed app
+ * (ADR 0118, whose `id` is its client and whose grant is its installation's), its name, its grant's id, level and
+ * extras, when it ends (epoch milliseconds, `null` until revoked), and in the workspace the request reaches whether its
+ * Topics, Personas and connections are all or a list, with the reach's generation, so the agent knows when to read the
+ * lists again (`Grants.sync`). The lists themselves never travel in the header; the MCP origins its threads may bring
+ * do (ADR 0091). It holds what its grant holds, never renews resident authority and is counted per minute. Only the
+ * Worker sets it: the edge for a token on `/w/<slug>/api` (ADR 0116), `/mcp` for one there.
  */
 export const Credential = Schema.Struct({
-  kind: Schema.Literals(['key', 'client', 'app']),
+  kind: Schema.Literals(['client', 'app']),
   id: Schema.String.check(Schema.isPattern(/^[\w.:-]{1,200}$/u)),
   name: Schema.String.check(Schema.isMaxLength(200)),
   grantId: Schema.String.check(Schema.isPattern(/^[\w-]{1,200}$/u)),
@@ -33,7 +31,7 @@ export const Credential = Schema.Struct({
     connections: Coverage,
     generation: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   }),
-  origins: Schema.Array(KeyOrigin),
+  origins: Schema.Array(GrantOrigin),
 })
 export type Credential = typeof Credential.Type
 
@@ -85,9 +83,9 @@ export const memberName = (person: { readonly name: string; readonly email: stri
   (person.name.trim() === '' ? (person.email.split('@')[0] ?? '') : person.name.trim()).slice(0, 80)
 
 /**
- * Who a forwarded request comes from, as its headers say (ADRs 0089, 0114): a member (a session), a credential (a key),
- * or a credential and the member it acts for (an OAuth client). `undefined` for a request that says neither, or whose
- * header does not decode: it is refused, never taken for the owner.
+ * Who a forwarded request comes from, as its headers say (ADRs 0089, 0114): a member (a session), a credential (an
+ * installed app), or a credential and the member it acts for (an OAuth client). `undefined` for a request that says
+ * neither, or whose header does not decode: it is refused, never taken for the owner.
  */
 export const forwardedPrincipal = (
   request: Request,
@@ -110,20 +108,12 @@ export const forwardedPrincipal = (
 export const credentialId = (credential: Credential): string => `grant:${credential.grantId}`
 
 /**
- * The OAuth client token a request carries (ADR 0116): its `Authorization` bearer when that is not a key's. Whether it is
- * one is the client check's to say (`inbound/client-access.ts`).
+ * The OAuth token a request carries (ADRs 0116, 0118): its `Authorization` bearer, a client's or an installed app's.
+ * Whether it is one is the token check's to say (`inbound/client-access.ts`).
  */
 export const bearerToken = (request: Request): string | undefined => {
   const header = request.headers.get('authorization')
   if (header === null || !header.startsWith('Bearer ')) return undefined
   const token = header.slice('Bearer '.length)
-  return token === '' || token.startsWith(KEY_PREFIX) ? undefined : token
-}
-
-/** The key a request carries, when its `Authorization` header is a `gbk_` bearer: never an inbound OAuth token. */
-export const bearerKey = (request: Request): string | undefined => {
-  const header = request.headers.get('authorization')
-  if (header === null || !header.startsWith(`Bearer ${KEY_PREFIX}`)) return undefined
-  const key = header.slice('Bearer '.length)
-  return /^gbk_[A-Za-z0-9]{32,128}$/u.test(key) ? key : undefined
+  return token === '' ? undefined : token
 }

@@ -1,8 +1,8 @@
 // Driving a chat with AG-UI on the real Worker and agent (ADR 0111, docs/architecture/streams.md "Driving a chat"): a
 // send asked for server-sent events answers with the run that took it, under its own run id, which a stock client's
 // verifier accepts; a queued send waits for its own run; a question is answered by a resume; an ask of Personas is a
-// run of its own; a retry answers its end at once; a server's key sends as Swarmm does; a body of a whole history fits;
-// and a stock `HttpAgent` runs a turn end to end.
+// run of its own; a retry answers its end at once; an installed app sends as Swarmm does; a body of a whole history
+// fits; and a stock `HttpAgent` runs a turn end to end.
 import { HttpAgent, verifyEvents } from '@ag-ui/client'
 import { type AguiEvent, EventType, MessageReceipt, StartedThread, TopicView, runInput } from '@goblin/contracts'
 import * as Schema from 'effect/Schema'
@@ -10,7 +10,7 @@ import { from, lastValueFrom, toArray } from 'rxjs'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
 import { type Person, call, holding, lever, ownerFetch, person, signedIn } from './owner-requests.ts'
-import { ended, keyFetch, newKey, ofType, streamOf } from './streams-case.ts'
+import { ended, newServer, ofType, serverFetch, streamOf } from './streams-case.ts'
 
 const SSE = { accept: 'text/event-stream' }
 
@@ -123,15 +123,15 @@ async function personaAsk(url: string, owner: Person): Promise<void> {
   expect(again.at(-1)?.metadata).toMatchObject({ goblin: { replayed: { answers: [expect.any(Number)] } } })
 }
 
-/** A server's key sends as Swarmm does: AG-UI bodies written by hand, a Persona tag in `forwardedProps.goblin`. */
-async function keySends(url: string, owner: Person): Promise<void> {
-  const asKey = keyFetch(url, await newKey(url, owner, 'drive'))
+/** An installed app sends as Swarmm does: AG-UI bodies written by hand, a Persona tag in `forwardedProps.goblin`. */
+async function appSends(url: string, owner: Person): Promise<void> {
+  const asApp = serverFetch(url, await newServer(url, owner, 'drive'))
   const topic = Schema.decodeUnknownSync(TopicView)(
-    await (await asKey('POST', '/api/topics', { name: 'Driven room', operationId: 'drive:topic' })).json(),
+    await (await asApp('POST', '/api/topics', { name: 'Driven room', operationId: 'drive:topic' })).json(),
   )
   const persona = Schema.decodeUnknownSync(Schema.Struct({ id: Schema.Number }))(
     await (
-      await asKey('POST', '/api/personas', {
+      await asApp('POST', '/api/personas', {
         name: 'Roomer',
         avatar: { glyph: 'R', hue: 90 },
         role: 'Answers the room',
@@ -141,7 +141,7 @@ async function keySends(url: string, owner: Person): Promise<void> {
     ).json(),
   )
   const chat = topic.conversation
-  const sent = await asKey('POST', `/api/conversations/${chat}/messages`, {
+  const sent = await asApp('POST', `/api/conversations/${chat}/messages`, {
     threadId: chat,
     runId: 'swarmm-msg-1',
     messages: [{ id: 'swarmm-msg-1', role: 'user', content: 'Can you design my cover?' }],
@@ -149,7 +149,7 @@ async function keySends(url: string, owner: Person): Promise<void> {
   })
   expect(sent.status, await sent.clone().text()).toBe(202)
   expect(Schema.decodeUnknownSync(MessageReceipt)(await sent.json())).toMatchObject({ operationId: 'swarmm-msg-1' })
-  const started = await asKey('POST', `/api/conversations/${chat}/threads`, {
+  const started = await asApp('POST', `/api/conversations/${chat}/threads`, {
     anchor: 'latest',
     title: 'Job 1',
     message: {
@@ -178,18 +178,20 @@ async function wholeHistory(url: string, owner: Person): Promise<void> {
   expect((await call(url, owner, '/api/conversations/1/messages', huge)).status).toBe(413)
 }
 
-/** A stock `HttpAgent` drives its key's room with the key: one turn, its events verified by the client itself. */
+/**
+ * A stock `HttpAgent` drives its app's room with the app's token: one turn, its events verified by the client itself.
+ */
 async function stockAgent(url: string, owner: Person): Promise<void> {
-  const secret = await newKey(url, owner, 'stock')
+  const server = await newServer(url, owner, 'stock')
   const topic = Schema.decodeUnknownSync(TopicView)(
     await (
-      await keyFetch(url, secret)('POST', '/api/topics', { name: 'Stock room', operationId: 'stock:topic' })
+      await serverFetch(url, server)('POST', '/api/topics', { name: 'Stock room', operationId: 'stock:topic' })
     ).json(),
   )
   const room = topic.conversation
   const agent = new HttpAgent({
-    url: `${url}/api/conversations/${room}/messages`,
-    headers: { authorization: `Bearer ${secret}` },
+    url: `${url}/w/${server.slug}/api/conversations/${room}/messages`,
+    headers: { authorization: `Bearer ${server.token}` },
     threadId: room,
     fetch: (target, init) => ownerFetch(target, init),
   })
@@ -205,7 +207,7 @@ export async function runStreamsCase(url: string): Promise<void> {
   await queued(url, owner)
   await resumed(url, owner)
   await personaAsk(url, owner)
-  await keySends(url, owner)
+  await appSends(url, owner)
   await wholeHistory(url, owner)
   await stockAgent(url, owner)
 }

@@ -6,30 +6,30 @@ export const activePersonas = (personas: readonly PersonaView[]): readonly Perso
     .filter((persona) => persona.archivedAt === undefined)
     .toSorted((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
 
-/** The Personas a server's API key made, under its name, for display (ADR 0115). */
-export type KeyPersonas = { readonly key: string; readonly personas: readonly PersonaView[] }
+/** The Personas an installed app made, under its name, for display (ADR 0115). */
+export type AppPersonas = { readonly app: string; readonly personas: readonly PersonaView[] }
 
 /**
- * The Personas that answer, as the Personas page lists them: the owner's own by name, then those each key made, one
- * group per key by the key's name, each by name.
+ * The Personas that answer, as the Personas page lists them: the owner's own by name, then those each installed app
+ * made, one group per app by its name, each by name.
  */
 export function personasByMaker(personas: readonly PersonaView[]): {
   readonly own: readonly PersonaView[]
-  readonly keys: readonly KeyPersonas[]
+  readonly apps: readonly AppPersonas[]
 } {
   const active = activePersonas(personas)
-  const byKey = new Map<string, PersonaView[]>()
+  const byApp = new Map<string, PersonaView[]>()
   for (const persona of active) {
     if (persona.madeBy === undefined) continue
-    const group = byKey.get(persona.madeBy.key)
-    if (group === undefined) byKey.set(persona.madeBy.key, [persona])
+    const group = byApp.get(persona.madeBy.app)
+    if (group === undefined) byApp.set(persona.madeBy.app, [persona])
     else group.push(persona)
   }
   return {
     own: active.filter((persona) => persona.madeBy === undefined),
-    keys: [...byKey]
-      .map(([key, made]) => ({ key, personas: made }))
-      .toSorted((a, b) => a.key.localeCompare(b.key, undefined, { sensitivity: 'base' })),
+    apps: [...byApp]
+      .map(([app, made]) => ({ app, personas: made }))
+      .toSorted((a, b) => a.app.localeCompare(b.app, undefined, { sensitivity: 'base' })),
   }
 }
 

@@ -156,11 +156,11 @@ in the same Topic, then submits `message` into the Thread through the ordinary o
 with its Persona order (`forwardedProps.goblin.personaOrder`). For `latest` (Start thread) it first writes an `app.thread_head` entry (`ThreadHeadData`,
 request id `thread-head:<op>`) into the chat as a passive write whose model text is a bounded `[the owner started a
 thread: "…"]`. `app_conversations.origin_op` (unique) makes one Thread per operation id, also for concurrent repeats,
-and `POST /api/conversations` with an `operationId` goes through the same path. A key's thread operation may declare up to four MCP
-servers (`mcpServers`, [ADR 0103](../adr/0103-a-thread-declares-its-mcp-servers.md), `mcp/thread-servers.ts`): each
-checked against the key's granted origins and tools, its token encrypted in `app_thread_servers`, stored before the
-first message, replaced as a whole by the key's `PATCH` (only the newest operation changes them; it again with new tokens
-makes those the live ones), checked against the key's grant at every use, and dropped when the thread closes or its
+and `POST /api/conversations` with an `operationId` goes through the same path. A credential's thread operation may
+declare up to four MCP servers (`mcpServers`, [ADR 0103](../adr/0103-a-thread-declares-its-mcp-servers.md),
+`mcp/thread-servers.ts`): each checked against its grant's origins and tools, its token encrypted in
+`app_thread_servers`, stored before the first message, replaced as a whole by its `PATCH` (only the newest operation
+changes them; it again with new tokens makes those the live ones), checked against its grant at every use, and dropped when the thread closes or its
 Topic is archived. Its native Persona forks call their tools as
 `<name>__<tool>`, statelessly and act-only. The web keeps a Reply or "+" draft in
 the browser until its first send, which is this one call.

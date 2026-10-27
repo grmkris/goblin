@@ -256,9 +256,9 @@ const decide = (
   })
 
 /**
- * Considers the newest exchange of a conversation (never a server key's, which its hook leaves out, ADR 0115). Cheap
- * checks first: skills on for some server (the learner is part of using skills), today's cap, a signal in the owner's
- * last message. Only then the model, and only an actual procedure becomes a draft.
+ * Considers the newest exchange of a conversation (never an installed app's, which its hook leaves out, ADR 0115).
+ * Cheap checks first: skills on for some server (the learner is part of using skills), today's cap, a signal in the
+ * owner's last message. Only then the model, and only an actual procedure becomes a draft.
  */
 const considered = (teacher: Teacher, id: ConversationId, signal: AbortSignal | undefined) =>
   Effect.gen(function* () {

@@ -179,7 +179,8 @@ const sendWith =
         Effect.gen(function* () {
           if (answer !== undefined && (yield* answer(session)))
             return { session, operationId, accepted: true } satisfies PiReceipt
-          // A server key's work runs on the deployment's models (ADR 0087); its sender decides what the turn is offered.
+          // An installed app's work runs on the deployment's models (ADR 0087); its sender decides what the turn is
+          // offered.
           const power = (yield* requestPower) ?? input.receipt.power ?? AUTOMATION
           yield* useModel(pi, applied, session, power.server).pipe(Effect.provideService(Models, models))
           yield* useTools(retooling, input.chat, session, power)

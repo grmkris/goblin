@@ -2,7 +2,6 @@ import { createRoot } from 'react-dom/client'
 import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from '@tanstack/react-router'
 import type { WorkspaceView } from '@goblin/contracts'
 import { ClientsCard } from '../../src/components/account-cards.tsx'
-import { ApiKeysCard } from '../../src/components/api-keys-card.tsx'
 import { DeveloperAppsCard, InstalledAppsCard } from '../../src/components/apps-cards.tsx'
 import { Consent } from '../../src/components/consent.tsx'
 import { Install } from '../../src/components/install.tsx'
@@ -18,9 +17,9 @@ document.documentElement.classList.toggle('dark', matchMedia('(prefers-color-sch
 const ACME: WorkspaceView = { id: 'ws_acme', name: 'Acme', slug: 'acme', role: 'owner', members: 2 }
 
 /**
- * The screens that edit a grant (ADRs 0114, 0118) and the widening page, from source, by `?screen=`: Settings' API
- * keys, MCP clients and apps as the settings page lays them out, and the consent, install and widening pages as a
- * person's own pages.
+ * The screens that edit a grant (ADRs 0114, 0118) and the widening page, from source, by `?screen=`: Settings' MCP
+ * clients and apps as the settings page lays them out, and the consent, install and widening pages as a person's own
+ * pages.
  */
 function Screen() {
   const search = new URLSearchParams(location.search)
@@ -42,10 +41,12 @@ function Screen() {
         <Install clientId={search.get('client_id') ?? ''} />
       </main>
     )
-  if (screen === 'keys' || screen === 'clients')
+  if (screen === 'clients')
     return (
       <main className="shell">
-        <div className="page-stack">{screen === 'keys' ? <ApiKeysCard workspace={ACME} /> : <ClientsCard />}</div>
+        <div className="page-stack">
+          <ClientsCard />
+        </div>
       </main>
     )
   return (

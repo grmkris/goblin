@@ -74,7 +74,7 @@ describe('run ledger reads', () => {
     expect(ledger.skipped).toBe(4)
   })
 
-  it('finds the operations that start with a prefix, as long as a server key makes them and holding _ and %', () => {
+  it('finds the operations that start with a prefix, as long as an installed app makes them and holding _ and %', () => {
     const { ledger } = fixture()
     const job = 'swarmm:dev:job:job_8df3bec61affd7618a69675ca5231978:1:first'
     for (const operationId of [

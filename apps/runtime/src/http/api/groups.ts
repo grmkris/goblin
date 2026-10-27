@@ -25,7 +25,6 @@ import { NoticesHandlers } from '../../notices/api.ts'
 import { OnboardingHandlers } from '../../onboarding/api.ts'
 import { WorkspaceHandlers } from '../../workspace/api.ts'
 import { EventsHandlers, PublishInternalHandlers } from '../../publish/api.ts'
-import { KeyNames } from '../../keys/names.ts'
 import { InternalGateLive, OwnerAdmissionLive } from './middleware.ts'
 
 /** Every owner group's handlers behind owner admission. */
@@ -54,7 +53,7 @@ const OwnerApiLayer = HttpApiBuilder.layer(OwnerApi).pipe(
     EventsHandlers,
     AccessHandlers,
   ]),
-  Layer.provide(OwnerAdmissionLive.pipe(Layer.provide(KeyNames.layer))),
+  Layer.provide(OwnerAdmissionLive),
 )
 
 /** The internal API's handlers behind the internal gate. */

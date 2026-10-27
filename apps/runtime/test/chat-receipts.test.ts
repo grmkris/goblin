@@ -129,15 +129,15 @@ describe('chat operation receipts (unit)', () => {
   it('keeps the power of whoever admitted an operation, and narrows it when someone who may do less replays it', () => {
     const { db } = database()
     const key = senderPower({
-      kind: 'key',
-      grant: { grantId: 'key-1', level: 'write', extras: [], topics: 'list', connections: 'all' },
+      kind: 'app',
+      grant: { grantId: 'in-1', level: 'write', extras: [], topics: 'list', connections: 'all' },
     })
     const owner = senderPower({ kind: 'person', role: 'owner' })
     admitReceipt(db, { chat: '1', operationId: 'op', receipt: { ...send, power: owner }, session: () => '41', now: 1 })
     expect(receiptIn(db, '1', 'op')?.power).toEqual(owner)
     admitReceipt(db, { chat: '1', operationId: 'op', receipt: { ...send, power: key }, session: () => '41', now: 2 })
     expect(receiptPowers(db, ['op'])).toEqual([
-      { level: 'write', extras: [], server: true, topicLists: ['key-1'], connectionLists: [] },
+      { level: 'write', extras: [], server: true, topicLists: ['in-1'], connectionLists: [] },
     ])
   })
 

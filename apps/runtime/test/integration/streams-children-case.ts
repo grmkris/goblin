@@ -1,6 +1,6 @@
 // A chat's children in its AG-UI stream on the real Worker and agent (docs/architecture/streams.md): a Persona the
 // owner tags works in its fork, and the fork's work streams into the chat under its `subagentRunId` between
-// SUBAGENT_STARTED and SUBAGENT_FINISHED, its answer after; a server's key reads the same of its room, the fork's own
+// SUBAGENT_STARTED and SUBAGENT_FINISHED, its answer after; an installed app reads the same of its room, the fork's own
 // work included, and the stream agrees with the forward read; a subagent's run streams the same way, and a reader that
 // connects while it works opens with it in flight.
 import { type AguiEvent, ConversationEntries, EventType, TopicView, runInput } from '@goblin/contracts'
@@ -8,7 +8,7 @@ import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
 import { type Person, holding, lever, person, signedIn } from './owner-requests.ts'
-import { ended, keyFetch, memberStream, newKey, ofType, streamOf } from './streams-case.ts'
+import { ended, memberStream, newServer, ofType, serverFetch, streamOf } from './streams-case.ts'
 
 const Made = Schema.Struct({ id: Schema.Int })
 
@@ -98,15 +98,15 @@ async function personaInOwnersChat(url: string, owner: Person) {
 }
 
 /**
- * Swarmm's case: a server's key tags its own Persona in its room and reads the room's stream in full: the lifecycle,
+ * Swarmm's case: an installed app tags its own Persona in its room and reads the room's stream in full: the lifecycle,
  * with who answered for which operation, how it ended and the answer's entry; the fork's own work under its
  * `subagentRunId` between them; and the answer. The stream and the forward read name the same entry, invocation and
  * fork.
  */
-async function personaInKeysRoom(url: string, owner: Person) {
-  const asKey = keyFetch(url, await newKey(url, owner, 'children'))
+async function personaInAppsRoom(url: string, owner: Person) {
+  const asApp = serverFetch(url, await newServer(url, owner, 'children'))
   const json = async (method: string, path: string, body?: unknown) => {
-    const response = await asKey(method, path, body)
+    const response = await asApp(method, path, body)
     expect(response.status, await response.clone().text()).toBeLessThan(300)
     return response.json()
   }
@@ -117,7 +117,7 @@ async function personaInKeysRoom(url: string, owner: Person) {
     await json('POST', '/api/topics', { name: 'Child room', operationId: 'children:topic' }),
   )
   const room = topic.conversation
-  const stream = streamOf(await asKey('GET', `/api/conversations/${room}/stream`))
+  const stream = streamOf(await asApp('GET', `/api/conversations/${room}/stream`))
   await stream.until((events) => events.length >= 2)
   const operationId = 'children:ask'
   await json(
@@ -206,6 +206,6 @@ async function subagentInOwnersChat(url: string, owner: Person) {
 export async function streamChildrenCase(url: string): Promise<void> {
   const owner = await person(url)
   await personaInOwnersChat(url, owner)
-  await personaInKeysRoom(url, owner)
+  await personaInAppsRoom(url, owner)
   await subagentInOwnersChat(url, owner)
 }

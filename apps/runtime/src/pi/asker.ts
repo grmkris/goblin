@@ -74,7 +74,7 @@ export const powerAmong = (inputs: readonly SubmissionId[], context: PiContext) 
 
 /**
  * What the run `api`'s call or hook serves may do (ADR 0115): its inputs' power, the first message's and every message
- * steered into it since, so a run that batched an owner's and a server key's input does only what both may. A call
+ * steered into it since, so a run that batched an owner's and an installed app's input does only what both may. A call
  * outside a live run is the agent's own work, an admin's.
  */
 export const turnPower = (api: CallApi, context: PiContext) =>

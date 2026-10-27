@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it } from 'vitest'
 import { openAsks } from '../src/attention.ts'
 import { type ToolSets, chatScope, piToolsFor, routinesOutside, sessionScope } from '../src/setup/scope.ts'
-import { recordMaker } from '../src/keys/made-by.ts'
+import { recordMaker } from '../src/credentials/made-by.ts'
 import { senderPower } from '../src/grants/power.ts'
 import { outsideScopeResult } from '../src/pi/setup.ts'
 import { appPersonaChats } from '../src/storage/personas.ts'
@@ -252,27 +252,27 @@ const toolSets = (): ToolSets => ({
 /** The names a filter removes, sorted; none for no filter. */
 const names = (tools: ReturnType<typeof piToolsFor>) => (tools?.remove ?? []).map((tool) => tool.name).toSorted()
 
-/** A server key's power with a `write` grant over every Topic and connection. */
-const KEY = senderPower({
-  kind: 'key',
-  grant: { grantId: 'key-1', level: 'write', extras: [], topics: 'all', connections: 'all' },
+/** An installed app's power with a `write` grant over every Topic and connection. */
+const APP = senderPower({
+  kind: 'app',
+  grant: { grantId: 'in-1', level: 'write', extras: [], topics: 'all', connections: 'all' },
 })
 
-/** The fixture with Topic 2 made by a key, and with subagents and an app in its setup all the same. */
-const keyMade = () => {
+/** The fixture with Topic 2 made by an app, and with subagents and an app in its setup all the same. */
+const appMade = () => {
   const made = forks()
   made
     .update(appTopics)
     .set({ setup: storedSetup({ ...WORK, subagents: true }) })
     .where(eq(appTopics.id, 2))
     .run()
-  recordMaker(made, { keyId: 'key-1', name: 'swarmm' }, 'topic', 2, 1)
+  recordMaker(made, { id: 'in-1', name: 'swarmm' }, 'topic', 2, 1)
   return made
 }
 
-describe('a Topic a key made is sealed like any other, and its sender decides what a turn is offered (ADR 0115)', () => {
+describe('a Topic an app made is sealed like any other, and its sender decides what a turn is offered (ADR 0115)', () => {
   it("is every chat's boundary under it: its Conversation, threads, subagents, Persona forks and routine runs", () => {
-    const db = keyMade()
+    const db = appMade()
     for (const chat of ['20', '21', '22', '23', '24', '25'])
       expect(chatScope(db, chat).boundary, chat).toEqual({ topic: 2, hub: false })
     expect(sessionScope(db, 's22').boundary).toEqual({ topic: 2, hub: false })
@@ -280,7 +280,7 @@ describe('a Topic a key made is sealed like any other, and its sender decides wh
   })
 
   it('keeps its setup whoever made it: subagents and apps where the setup holds them', () => {
-    const db = keyMade()
+    const db = appMade()
     for (const chat of ['20', '21']) {
       expect(chatScope(db, chat).subagents(), chat).toBe(true)
       expect(chatScope(db, chat).app('tracker'), chat).toBe(true)
@@ -291,18 +291,18 @@ describe('a Topic a key made is sealed like any other, and its sender decides wh
     expect(chatScope(db, '23').tool('mail', 'send')).toBe(false)
   })
 
-  it("offers a server key's turn what its grant reaches, and the owner's turn in the same chat everything there", () => {
-    const db = keyMade()
+  it("offers an installed app's turn what its grant reaches, and the owner's turn in the same chat everything there", () => {
+    const db = appMade()
     const sets = toolSets()
     // The hub's tools (a Source's route) are offered only in a hub, and no tool the table does not know anywhere.
     expect(names(piToolsFor(db, sets, '20'))).toEqual(['later_tool', 'source_route'])
-    expect(names(piToolsFor(db, sets, '20', KEY))).toEqual([
+    expect(names(piToolsFor(db, sets, '20', APP))).toEqual([
       'app_call',
       'later_tool',
       'routine_propose',
       'source_route',
     ])
-    expect(names(piToolsFor(db, sets, '1', KEY))).toEqual(['later_tool', 'routine_propose', 'source_route'])
+    expect(names(piToolsFor(db, sets, '1', APP))).toEqual(['later_tool', 'routine_propose', 'source_route'])
   })
 })
 

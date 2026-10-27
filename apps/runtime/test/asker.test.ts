@@ -144,7 +144,7 @@ describe("a member's turn is a member's power (unit, ADRs 0099, 0115)", () => {
     }),
   )
 
-  it.effect("counts a Source's and a routine's input as an admin's, and a key's as its receipt says", () =>
+  it.effect("counts a Source's and a routine's input as an admin's, and an app's as its receipt says", () =>
     Effect.gen(function* () {
       expect(yield* asked(3)).toBe(false)
       expect(yield* asked(4)).toBe(false)

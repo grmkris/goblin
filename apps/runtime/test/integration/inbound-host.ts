@@ -1,6 +1,7 @@
 import { createMcpHandler } from 'agents/mcp/server'
 import { inboundHosts } from '../../src/inbound/route.ts'
 import { mcpServer } from '../../src/inbound/mcp-server.ts'
+import { ONE_WORKSPACE } from '../grants-fixture.ts'
 
 /** Fixture transport uses the real Agents SDK on a custom host; authentication is tested separately. */
 export function inboundHostProbe(request: Request): Promise<Response> {
@@ -9,9 +10,13 @@ export function inboundHostProbe(request: Request): Promise<Response> {
   headers.set('host', url.host)
   const handler = createMcpHandler(
     () =>
-      mcpServer({ level: 'write', extras: [] }, async () => {
-        throw new Error('no agent behind the host probe')
-      }),
+      mcpServer(
+        { level: 'write', extras: [] },
+        async () => {
+          throw new Error('no agent behind the host probe')
+        },
+        ONE_WORKSPACE,
+      ),
     { route: '/mcp', ...inboundHosts(url.origin) },
   )
   return handler.fetch(new Request(url, { method: request.method, headers, body: request.body }))

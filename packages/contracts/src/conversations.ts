@@ -12,9 +12,9 @@ export const ConversationKind = Schema.Literals(['main', 'thread', 'subagent'])
 export type ConversationKind = typeof ConversationKind.Type
 
 /**
- * An MCP server a server's key declares on one of its threads (ADR 0103): `name` is what its tools are called by in the
- * thread's Persona forks (`<name>__<tool>`, ADR 0101), `url` its Streamable HTTP endpoint on an origin the owner granted
- * the key (ADR 0091), `token` the bearer it is called with, and `tools` the ones of that origin's list it may call (all
+ * An MCP server a credential declares on one of its threads (ADR 0103): `name` is what its tools are called by in the
+ * thread's Persona forks (`<name>__<tool>`, ADR 0101), `url` its Streamable HTTP endpoint on an origin its grant names
+ * (ADR 0091), `token` the bearer it is called with, and `tools` the ones of that origin's list it may call (all
  * of them when absent). The token is kept encrypted and never answered back.
  */
 export const ThreadServer = Schema.Struct({
@@ -73,15 +73,15 @@ export const ConversationView = Schema.Struct({
   attention: Schema.optional(Schema.Array(Attention)),
   /** A Thread a running or finished turn was moved into: the chat it left and the move's operation id. */
   movedFrom: Schema.optional(Schema.Struct({ chat: ChatId, operationId: Schema.String })),
-  /** The MCP servers a key declared on it (ADR 0103), answered to the thread operation and its change. */
+  /** The MCP servers a credential declared on it (ADR 0103), answered to the thread operation and its change. */
   mcpServers: Schema.optional(Schema.Array(ThreadServerView)),
 })
 export type ConversationView = typeof ConversationView.Type
 
 /**
- * Rename, close or reopen (with everything under it), or pin a subagent open. A key may also replace its thread's
- * declared MCP servers as a whole (ADR 0103): `set` is every server it has from then on (`[]` removes them all), and
- * the same `operationId` changes them once.
+ * Rename, close or reopen (with everything under it), or pin a subagent open. A credential may also replace its
+ * thread's declared MCP servers as a whole (ADR 0103): `set` is every server it has from then on (`[]` removes them
+ * all), and the same `operationId` changes them once.
  */
 export const UpdateConversation = Schema.Struct({
   title: Schema.optional(NonEmptyString(120)),
@@ -187,8 +187,8 @@ export const StartThread = Schema.Struct({
   title: Schema.optional(NonEmptyString(120)),
   message: RunInput,
   /**
-   * The MCP servers the Thread's Persona forks call natively (ADR 0103), a key's alone. A replay of the operation with
-   * new tokens for the same servers keeps the Thread and makes the newest tokens the live ones.
+   * The MCP servers the Thread's Persona forks call natively (ADR 0103), a credential's alone. A replay of the
+   * operation with new tokens for the same servers keeps the Thread and makes the newest tokens the live ones.
    */
   mcpServers: Schema.optional(ThreadServers),
 })
@@ -280,10 +280,10 @@ export const clientAuthor = (client: string, member?: string): string => {
 }
 
 /**
- * The author of a message a server's API key sent (ADR 0115): `server <key name>`, which goblin writes in front of each,
- * so the agent reads a request from a party the owner connected, never the owner's own words.
+ * The author of a message an installed app sent (ADRs 0115, 0120): `server <app name>`, which goblin writes in front of
+ * each, so the agent reads a request from a party the owner connected, never the owner's own words.
  */
-export const serverAuthor = (key: string): string => `server ${plainName(key).slice(0, 64) || 'key'}`
+export const serverAuthor = (app: string): string => `server ${plainName(app).slice(0, 64) || 'app'}`
 
 const MEMBER_AUTHOR = /^member (.{1,50}) · ([\w-]{1,200})$/u
 

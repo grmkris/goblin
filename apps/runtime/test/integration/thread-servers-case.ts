@@ -2,10 +2,9 @@ import { ConversationEntries, StartedThread, TopicView, runInput, threadStart } 
 import * as Schema from 'effect/Schema'
 import { expect } from 'vitest'
 import { callOwner } from '../owner-client.ts'
-import { type Person, call, keyBody, lever, ownerFetch, person, signedIn, workspaceOf } from './owner-requests.ts'
+import { asServer, call, lever, person, scriptApp, signedIn, workspaceOf } from './owner-requests.ts'
 import { until } from './until.ts'
 
-const Secret = Schema.Struct({ secret: Schema.String })
 const Made = Schema.Struct({ id: Schema.Int })
 const Refusal = Schema.Struct({ error: Schema.Struct({ reason: Schema.optional(Schema.String) }) })
 const Calls = Schema.Array(Schema.Struct({ name: Schema.String, args: Schema.Unknown }))
@@ -19,54 +18,31 @@ const Seen = Schema.Struct({
   ),
 })
 
-/** The fixture's origin and its one tool, as the owner grants them to the key (ADR 0091). */
+/** The fixture's origin and its one tool, as the owner grants them to the app (ADR 0091). */
 const ORIGIN = 'https://apps-fixture.test'
 const SERVER = { name: 'swarmm', url: `${ORIGIN}/mcp`, tools: ['board'] }
-
-/**
- * A key of `who` whose grant gives `origins` (ADRs 0091, 0114) and reaches only what it makes, as the owner makes it in
- * Settings: its secret.
- */
-async function keyOf(base: string, who: Person): Promise<{ readonly secret: string; readonly id: string }> {
-  const made = await call(
-    base,
-    who,
-    '/api/keys',
-    keyBody(who, 'jobs', { lists: true, origins: [{ origin: ORIGIN, tools: ['board'] }] }),
-  )
-  expect(made.status, await made.clone().text()).toBe(201)
-  const created = Schema.decodeUnknownSync(
-    Schema.Struct({ ...Secret.fields, key: Schema.Struct({ id: Schema.String }) }),
-  )(await made.json())
-  return { secret: created.secret, id: created.key.id }
-}
-
-const asKey = (base: string, secret: string, method: string, path: string, body?: unknown) =>
-  ownerFetch(`${base}${path}`, {
-    method,
-    headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  })
 
 const reasonOf = async (response: Response) => Schema.decodeUnknownSync(Refusal)(await response.json()).error.reason
 
 /**
- * ADR 0103 on the real Worker and agent: a key declares an MCP server on the job thread it starts; the Persona it tags
- * there (native tools, ADR 0102) calls the server's tool by its declared name; a replay with a new token is the same
- * thread; the owner's session cannot declare one; and closing the thread drops it.
+ * ADR 0103 on the real Worker and agent: an installed app declares an MCP server on the job thread it starts; the
+ * Persona it tags there (native tools, ADR 0102) calls the server's tool by its declared name; a replay with a new
+ * token is the same thread; the owner's session cannot declare one; and closing the thread drops it.
  */
 export async function threadServersCase(url: string): Promise<void> {
   const owner = await person(url)
   const me = signedIn(url, owner)
-  // The owner's own request gives the agent resident authority, which a key's thread still needs.
+  // The owner's own request gives the agent resident authority, which an app's thread still needs.
   await callOwner(me, (api) => api.personas.list({ query: {} }))
-  const { secret, id: keyId } = await keyOf(url, owner)
+  const server = await scriptApp(url, owner, 'jobs', { lists: true, origins: [{ origin: ORIGIN, tools: ['board'] }] })
   const topic = Schema.decodeUnknownSync(TopicView)(
-    await (await asKey(url, secret, 'POST', '/api/topics', { name: 'Customer 7', operationId: 'svc:topic:7' })).json(),
+    await (
+      await asServer(url, server, 'POST', '/api/topics', { name: 'Customer 7', operationId: 'svc:topic:7' })
+    ).json(),
   )
   const persona = Schema.decodeUnknownSync(Made)(
     await (
-      await asKey(url, secret, 'POST', '/api/personas', {
+      await asServer(url, server, 'POST', '/api/personas', {
         name: 'Maker',
         avatar: { glyph: 'M', hue: 30 },
         role: 'Makes the job',
@@ -88,7 +64,7 @@ export async function threadServersCase(url: string): Promise<void> {
       mcpServers: [{ ...SERVER, token }],
     })
   const threads = `/api/conversations/${topic.conversation}/threads`
-  const started = await asKey(url, secret, 'POST', threads, start('job-token-1'))
+  const started = await asServer(url, server, 'POST', threads, start('job-token-1'))
   expect(started.status, await started.clone().text()).toBe(201)
   const { thread } = Schema.decodeUnknownSync(StartedThread)(await started.json())
   // The answer echoes the server without its token.
@@ -104,19 +80,19 @@ export async function threadServersCase(url: string): Promise<void> {
   )
   expect(ran).toContainEqual({ name: 'board', args: { operationKey: 'thread-server' } })
   const read = Schema.decodeUnknownSync(ConversationEntries)(
-    await (await asKey(url, secret, 'GET', `/api/conversations/${thread.id}/entries?after=0`)).json(),
+    await (await asServer(url, server, 'GET', `/api/conversations/${thread.id}/entries?after=0`)).json(),
   )
   expect(JSON.stringify(read)).not.toContain('job-token-1')
 
   // A retry of the same operation with a fresh token is the same thread, not a conflict.
-  const replay = await asKey(url, secret, 'POST', threads, start('job-token-2'))
+  const replay = await asServer(url, server, 'POST', threads, start('job-token-2'))
   expect(replay.status, await replay.clone().text()).toBe(201)
   expect(Schema.decodeUnknownSync(StartedThread)(await replay.json()).thread.id).toBe(thread.id)
   // The same operation naming another server is.
   const other = { ...start('job-token-3'), mcpServers: [{ ...SERVER, url: `${ORIGIN}/other`, token: 'x' }] }
-  expect(await reasonOf(await asKey(url, secret, 'POST', threads, other))).toBe('thread_servers')
+  expect(await reasonOf(await asServer(url, server, 'POST', threads, other))).toBe('thread_servers')
 
-  // The owner's own session declares none, and an origin the key was not granted is refused.
+  // The owner's own session declares none, and an origin the app was not granted is refused.
   const mine = await call(url, owner, '/api/conversations/1/threads', start('t', '1', 'own:job:1'))
   expect(mine.status).toBe(403)
   expect(await reasonOf(mine)).toBe('credential_only')
@@ -124,11 +100,11 @@ export async function threadServersCase(url: string): Promise<void> {
     ...start('t', topic.conversation, 'svc:job:8', 'Job 8'),
     mcpServers: [{ ...SERVER, url: 'https://evil.test/mcp', token: 't' }],
   }
-  expect(await reasonOf(await asKey(url, secret, 'POST', threads, elsewhere))).toBe('key_origin')
+  expect(await reasonOf(await asServer(url, server, 'POST', threads, elsewhere))).toBe('origin')
   // Refused before anything was made: there is no thread of that operation.
   expect((await workspaceOf(url, owner)).conversations.some((view) => view.title === 'Job 8')).toBe(false)
   // Servers are a Thread's alone: not its Topic's Conversation's.
-  const onChannel = await asKey(url, secret, 'PATCH', `/api/conversations/${topic.conversation}`, {
+  const onChannel = await asServer(url, server, 'PATCH', `/api/conversations/${topic.conversation}`, {
     mcpServers: { operationId: 'svc:servers:channel', set: [{ ...SERVER, token: 't' }] },
   })
   expect(await reasonOf(onChannel)).toBe('not_a_thread')
@@ -136,7 +112,7 @@ export async function threadServersCase(url: string): Promise<void> {
   // A Persona on the gateway (ADR 0102) in the same thread is offered no thread server's tools.
   const plain = Schema.decodeUnknownSync(Made)(
     await (
-      await asKey(url, secret, 'POST', '/api/personas', {
+      await asServer(url, server, 'POST', '/api/personas', {
         name: 'Plain',
         avatar: { glyph: 'P', hue: 60 },
         role: 'Answers plainly',
@@ -145,9 +121,9 @@ export async function threadServersCase(url: string): Promise<void> {
       })
     ).json(),
   )
-  await asKey(
+  await asServer(
     url,
-    secret,
+    server,
     'POST',
     `/api/conversations/${thread.id}/messages`,
     runInput(thread.id, {
@@ -167,7 +143,7 @@ export async function threadServersCase(url: string): Promise<void> {
   expect(plainRequest?.tools).toContain('mcp_call')
   expect(plainRequest?.tools).not.toContain('swarmm__board')
 
-  // A key tagged it (ADR 0115): its Persona's fork keeps what a server's job needs, its native tools, skills and
+  // An app tagged it (ADR 0115): its Persona's fork keeps what a server's job needs, its native tools, skills and
   // questions, its native call ran above, and it is offered nothing its asker's power leaves out.
   const all = await seen()
   const maker = all.find((request) => request.context?.includes('You are Maker') === true)
@@ -179,11 +155,11 @@ export async function threadServersCase(url: string): Promise<void> {
   expect(maker.context).toContain('A server the owner connected tagged @Maker')
 
   // Closing the thread drops its servers; reopening brings none back.
-  const patch = (change: unknown) => asKey(url, secret, 'PATCH', `/api/conversations/${thread.id}`, change)
+  const patch = (change: unknown) => asServer(url, server, 'PATCH', `/api/conversations/${thread.id}`, change)
   expect((await patch({ closed: true })).status).toBe(200)
   const reopened = await (await patch({ closed: false })).json()
   expect(reopened).not.toHaveProperty('mcpServers')
-  // A key's change sets them again, as a whole.
+  // An app's change sets them again, as a whole.
   const set = await patch({ mcpServers: { operationId: 'svc:servers:7', set: [{ ...SERVER, token: 'job-token-4' }] } })
   expect(set.status, await set.clone().text()).toBe(200)
   expect(await set.json()).toMatchObject({ mcpServers: [SERVER] })
@@ -196,9 +172,9 @@ export async function threadServersCase(url: string): Promise<void> {
   )
   expect(cleared).not.toHaveProperty('mcpServers')
 
-  // Once the owner revokes the key, its thread's servers reach nothing: the next answer is offered none of them.
+  // Once the owner uninstalls the app, its thread's servers reach nothing: the next answer is offered none of them.
   await patch({ mcpServers: { operationId: 'svc:servers:8', set: [{ ...SERVER, token: 'job-token-5' }] } })
-  const revoked = await me.fetch(new Request(`${url}/api/keys/${keyId}`, { method: 'DELETE' }))
+  const revoked = await me.fetch(new Request(`${url}/api/installations/${server.installationId}`, { method: 'DELETE' }))
   expect(revoked.status, await revoked.clone().text()).toBeLessThan(300)
   await callOwner(me, (api) =>
     api.conversations.submit({

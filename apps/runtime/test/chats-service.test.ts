@@ -191,7 +191,7 @@ describe("a server's work never runs on the owner's own subscriptions (ADRs 0087
           request: undefined,
           operation: undefined,
           route: 'r',
-          credential: credential({ id: 'key-1', name: 'swarmm', level: 'manage' }),
+          credential: credential({ id: 'in-1', name: 'swarmm', level: 'manage' }),
         }),
       )
       yield* send('op-owner')
