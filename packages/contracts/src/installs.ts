@@ -132,6 +132,20 @@ export const InstallApproval = Schema.Struct({
 })
 export type InstallApproval = typeof InstallApproval.Type
 
+/**
+ * `POST /api/install/:clientId/decline`: the person cancels the install. `returnUrl`, one the app registered (its first
+ * when none is named), receives `error=access_denied` and `state` back, as an OAuth refusal does.
+ */
+export const InstallDecline = Schema.Struct({
+  state: Schema.optional(NonEmptyString(512)),
+  returnUrl: Schema.optional(AppUrl),
+})
+export type InstallDecline = typeof InstallDecline.Type
+
+/** A declined install: where to send the person back (none for a script app, which has no return address). */
+export const InstallDeclined = Schema.Struct({ redirect: Schema.optional(Schema.String) })
+export type InstallDeclined = typeof InstallDeclined.Type
+
 /** An approved install: the installation, and where to send the person back (none for a script app). */
 export const InstallAnswer = Schema.Struct({
   installation: InstallationView,

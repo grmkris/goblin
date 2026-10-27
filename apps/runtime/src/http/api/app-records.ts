@@ -3,6 +3,8 @@ import type {
   GrantTerms,
   InstallAnswer,
   InstallApproval,
+  InstallDecline,
+  InstallDeclined,
   InstallInfo,
   InstallationView,
   RegisterApp,
@@ -16,6 +18,7 @@ import { narrowedTopics } from '../../auth/consent-terms.ts'
 import {
   type InstallationChange,
   approveInstall,
+  declineInstall,
   deleteApp,
   installInfo,
   installationsOfApp,
@@ -60,6 +63,7 @@ export interface AppRecords {
     clientId: string,
     approval: InstallApproval,
   ) => Effect.Effect<InstallAnswer, AppError>
+  readonly declineInstall: (clientId: string, decline: InstallDecline) => Effect.Effect<InstallDeclined, AppError>
 }
 
 /** The records as the deployment keeps them. */
@@ -96,4 +100,5 @@ export const appRecords = (env: RuntimeEnv): AppRecords => ({
         yield* endLeases(env, approval.workspace, installed(installation.id))
       return answer
     }),
+  declineInstall: (clientId, decline) => attempt(() => declineInstall(env, clientId, decline)),
 })

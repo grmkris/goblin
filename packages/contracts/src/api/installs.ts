@@ -7,6 +7,8 @@ import {
   DeveloperApp,
   InstallAnswer,
   InstallApproval,
+  InstallDecline,
+  InstallDeclined,
   InstallInfo,
   InstallationId,
   InstallationView,
@@ -82,6 +84,8 @@ export class InstallationsGroup extends HttpApiGroup.make('installations').add(
  * - `approve`: `POST /api/install/:clientId`, the installation in the workspace it names with those terms (made, or
  *   given the new terms), and the app's return address with `installation`, `workspace` and `state`. A workspace the
  *   person does not own or administer is `Forbidden` `role`.
+ * - `decline`: `POST /api/install/:clientId/decline`, the person cancels: the app's return address with
+ *   `error=access_denied` and `state`, as an OAuth refusal; nothing is written. A script app has none to go back to.
  */
 export class InstallGroup extends HttpApiGroup.make('install').add(
   HttpApiEndpoint.get('info', '/install/:clientId', {
@@ -93,6 +97,12 @@ export class InstallGroup extends HttpApiGroup.make('install').add(
     params: { clientId: AppClientId },
     payload: InstallApproval,
     success: InstallAnswer,
+    error: API_ERRORS,
+  }),
+  HttpApiEndpoint.post('decline', '/install/:clientId/decline', {
+    params: { clientId: AppClientId },
+    payload: InstallDecline,
+    success: InstallDeclined,
     error: API_ERRORS,
   }),
 ) {}

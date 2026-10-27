@@ -92,7 +92,7 @@ export const InstallationsHandlers = HttpApiBuilder.group(WorkspaceAccountApi, '
     ),
 )
 
-/** The install page's calls (ADR 0118), for the signed-in person; an approval audited (`auditApp`). */
+/** The install page's calls (ADR 0118), for the signed-in person; an approval audited (`auditApp`), a decline writes nothing. */
 export const InstallHandlers = HttpApiBuilder.group(AccountApi, 'install', (handlers) =>
   handlers
     .handle('info', ({ params }) =>
@@ -107,5 +107,8 @@ export const InstallHandlers = HttpApiBuilder.group(AccountApi, 'install', (hand
           return answer
         }),
       ),
+    )
+    .handle('decline', ({ params, payload }) =>
+      quoted(Effect.flatMap(signedIn, ({ records }) => records.apps.declineInstall(params.clientId, payload))),
     ),
 )

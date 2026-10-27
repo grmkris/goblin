@@ -4,6 +4,8 @@ import {
   GrantTerms,
   type InstallAnswer,
   type InstallApproval,
+  type InstallDecline,
+  type InstallDeclined,
   type InstallInfo,
   type InstallationView,
   type RegisterApp,
@@ -485,6 +487,25 @@ export const approveInstall = async (
   const state = approval.state === undefined ? {} : { state: approval.state }
   const redirect = withQuery(returnUrl, { installation: id, workspace: workspace.slug, ...state })
   return { answer: { installation, redirect }, before }
+}
+
+/**
+ * The person cancels installing app `clientId`: nothing is written, and an app with return addresses gets the person
+ * back at the one `decline` names (its first when none is) with `error=access_denied` and `state`, as an OAuth
+ * refusal. A script app has no return address: its answer names none.
+ */
+export const declineInstall = async (
+  env: RuntimeEnv,
+  clientId: string,
+  decline: InstallDecline,
+): Promise<InstallDeclined> => {
+  const row = await appRow(env.AUTH_DB, clientId)
+  if (row === undefined) throw new NotFound({ what: 'app' })
+  const app = developerAppOf(row)
+  if (app.script) return {}
+  const returnUrl = returnUrlOf(app, decline.returnUrl)
+  const state = decline.state === undefined ? {} : { state: decline.state }
+  return { redirect: withQuery(returnUrl, { error: 'access_denied', ...state }) }
 }
 
 /** One installation an app's token reaches: its workspace, and its grant and coverage there. */

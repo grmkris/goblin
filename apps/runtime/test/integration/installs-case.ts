@@ -31,6 +31,7 @@ const Answer = Schema.Struct({
   installation: Schema.Struct({ id: Schema.String }),
   redirect: Schema.optional(Schema.String),
 })
+const Declined = Schema.Struct({ redirect: Schema.optional(Schema.String) })
 const Token = Schema.Struct({ access_token: Schema.String })
 const Slugged = Schema.Struct({ id: Schema.String, slug: Schema.String })
 const Sent = Schema.Array(Schema.Struct({ invitation: Schema.Struct({ id: Schema.String }) }))
@@ -119,6 +120,21 @@ export async function installsCase(base: string): Promise<void> {
     name: 'Product',
     script: false,
     workspaces: [{ id: owner.workspace, slug: owner.slug, role: 'owner', installed: false }],
+  })
+  // Cancelled first: back at the app's return address with access_denied and the state, and nothing installed.
+  const declined = await call(base, owner, `/api/install/${app.clientId}/decline`, { state: 'opaque-0' })
+  expect(declined.status, await declined.clone().text()).toBe(200)
+  const refusal = new URL(Schema.decodeUnknownSync(Declined)(await declined.json()).redirect ?? '')
+  expect([
+    `${refusal.origin}${refusal.pathname}`,
+    refusal.searchParams.get('error'),
+    refusal.searchParams.get('state'),
+  ]).toEqual([RETURN, 'access_denied', 'opaque-0'])
+  expect(
+    (await call(base, owner, `/api/install/${app.clientId}/decline`, { returnUrl: 'https://elsewhere.test/x' })).status,
+  ).toBe(400)
+  expect(await (await call(base, owner, `/api/install/${app.clientId}`)).json()).toMatchObject({
+    workspaces: [{ installed: false }],
   })
   const approved = await call(base, owner, `/api/install/${app.clientId}`, {
     workspace: owner.workspace,
@@ -217,6 +233,10 @@ export async function installsCase(base: string): Promise<void> {
   expect(script.status, await script.clone().text()).toBe(201)
   const scripted = Schema.decodeUnknownSync(Registered)(await script.json())
   expect(scripted.installation).toBeDefined()
+  // A script app has no return address to go back to: its decline names none.
+  const scriptDeclined = await call(base, owner, `/api/install/${scripted.app.clientId}/decline`, {})
+  expect(scriptDeclined.status).toBe(200)
+  expect(await scriptDeclined.json()).toEqual({})
   const scriptToken = await tokenOf(base, scripted.app.clientId, scripted.clientSecret)
   expect((await asApp(base, scriptToken, `/w/${owner.slug}/api/topics`)).status).toBe(200)
 

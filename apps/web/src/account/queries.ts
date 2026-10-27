@@ -2,6 +2,7 @@ import type {
   CreateWorkspace,
   GrantTerms,
   InstallApproval,
+  InstallDecline,
   InviteMembers,
   RegisterApp,
   UpdateWorkspace,
@@ -194,6 +195,14 @@ export const approveInstallMutation = mutationOptions({
   ...account.apiMutation({
     mutationFn: (api, { clientId, ...payload }: InstallApproval & { readonly clientId: string }) =>
       api.install.approve({ params: { clientId }, payload }),
+  }),
+})
+
+/** Cancels an install; the answer says where to send the person back to the app, with `error=access_denied`. */
+export const declineInstallMutation = mutationOptions({
+  ...account.apiMutation({
+    mutationFn: (api, { clientId, ...payload }: InstallDecline & { readonly clientId: string }) =>
+      api.install.decline({ params: { clientId }, payload }),
   }),
 })
 

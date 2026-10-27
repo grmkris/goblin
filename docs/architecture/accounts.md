@@ -75,8 +75,9 @@ An owner or admin of a workspace installs it there from `/install/<clientId>` (`
 one of the workspaces they own or administer, the grant editor prefilled with what the app asks for. The installation
 (`installation`, once per app and workspace) has a grant of kind `app` whose id is its own, reaching that workspace
 only; Settings → Installed apps (`/w/<slug>/api/installations`) changes or ends it. Approving sends the person back to
-a return address the app registered, with `installation`, `workspace` and `state`. A script app has none and is
-installed in its own workspace as it is registered.
+a return address the app registered, with `installation`, `workspace` and `state`; Cancel
+(`POST /api/install/:clientId/decline`) sends them back there with `error=access_denied` and `state`, as an OAuth
+refusal, and writes nothing. A script app has none and is installed in its own workspace as it is registered.
 
 The app's backend gets an hour-long token from `POST /api/auth/oauth2/token` (`grant_type=client_credentials`, HTTP
 Basic, `resource=<origin>/mcp`, `scope=goblin`; `goblin token` in the CLI). Its subject is the client

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { GRANT_SPEC, type GrantTerms, type InstallInfo, type InstallTarget } from '@goblin/contracts'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
 import {
   Alert,
   AlertDescription,
@@ -15,7 +14,7 @@ import {
   NativeSelectOption,
   Skeleton,
 } from '@goblin/ui'
-import { approveInstallMutation, installInfoQuery } from '../account/queries.ts'
+import { approveInstallMutation, declineInstallMutation, installInfoQuery } from '../account/queries.ts'
 import { messageOf } from '../lib/query/app-error.ts'
 import { AuthShell } from './auth-shell.tsx'
 import { GRANT_WORDS, type GrantHolder, GrantEditor, grantFailure, grantProblem, reachWords } from './grant-editor.tsx'
@@ -110,10 +109,19 @@ function Installed(props: { readonly name: string; readonly slug: string }) {
   )
 }
 
+/** What the app's link carried for its way back: its `state` and the return address it named. */
+function linked() {
+  const search = new URLSearchParams(window.location.search)
+  const state = search.get('state')
+  const returnUrl = search.get('return_url')
+  return { ...(state === null ? {} : { state }), ...(returnUrl === null ? {} : { returnUrl }) }
+}
+
 /** The install page's state: the app, the chosen workspace and terms, and the approval, with what is wrong. */
 function useInstall(clientId: string) {
   const read = useQuery(installInfoQuery(clientId))
   const approve = useMutation(approveInstallMutation)
+  const decline = useMutation(declineInstallMutation)
   const info = read.data
   const [chosen, setChosen] = useState<string>()
   const [edited, setEdited] = useState<GrantTerms>()
@@ -124,18 +132,19 @@ function useInstall(clientId: string) {
   const problem = terms === undefined ? '' : grantProblem(terms)
   function install(): void {
     if (target === undefined || terms === undefined) return
-    const search = new URLSearchParams(window.location.search)
-    const state = search.get('state')
-    const returnUrl = search.get('return_url')
     approve.mutate(
-      {
-        clientId,
-        workspace: target.id,
-        terms,
-        ...(state === null ? {} : { state }),
-        ...(returnUrl === null ? {} : { returnUrl }),
-      },
+      { clientId, workspace: target.id, terms, ...linked() },
       { onSuccess: (answer) => answer.redirect !== undefined && window.location.assign(answer.redirect) },
+    )
+  }
+  /** Back to the app, told the person declined; to goblin's home when the app has nowhere to go back to, or it failed. */
+  function cancel(): void {
+    decline.mutate(
+      { clientId, ...linked() },
+      {
+        onSuccess: (answer) => window.location.assign(answer.redirect ?? '/'),
+        onError: () => window.location.assign('/'),
+      },
     )
   }
   return {
@@ -145,8 +154,9 @@ function useInstall(clientId: string) {
     choose: setChosen,
     edit: setEdited,
     install,
+    cancel,
     // Leaving for the app's return address: the button stays busy.
-    pending: approve.isPending || approve.data?.redirect !== undefined,
+    pending: approve.isPending || approve.data?.redirect !== undefined || decline.isPending || decline.isSuccess,
     installed: approve.data !== undefined && approve.data.redirect === undefined,
     decided: approve.data !== undefined,
     failure: readFailure || approveFailure || problem,
@@ -241,7 +251,7 @@ export function Install(props: { readonly clientId: string }) {
             >
               Install
             </Button>
-            <Button size="lg" variant="outline" disabled={state.pending} nativeButton={false} render={<Link to="/" />}>
+            <Button size="lg" variant="outline" disabled={state.pending} onClick={state.cancel}>
               Cancel
             </Button>
           </div>
