@@ -6,6 +6,7 @@ import { GRANTS } from './migrations/grants.ts'
 import { INVOCATION_FORK } from './migrations/invocation-fork.ts'
 import { INVOCATION_REASON } from './migrations/invocation-reason.ts'
 import { KEY_REACH } from './migrations/key-reach.ts'
+import { NO_KEY_POWERS } from './migrations/no-key-powers.ts'
 import { PERSONA_THINKING } from './migrations/persona-thinking.ts'
 import { PERSONA_TOOL_MODE } from './migrations/persona-tool-mode.ts'
 import { PERSONA_TOOLS } from './migrations/persona-tools.ts'
@@ -43,6 +44,7 @@ export const MIGRATIONS = [
   PUBLISH,
   GRANTS,
   SEALED,
+  NO_KEY_POWERS,
 ] as const
 
 export function runApplicationMigrations(storage: DurableObjectStorage): void {

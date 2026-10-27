@@ -336,7 +336,7 @@ async function apps(page: Page, origin: string, label: string, touch: boolean) {
   // SAFETY: the page sent UpdateInstallation.
   const changed = lastSent(label, 'PATCH', '/api/installations/in_swarmm') as { readonly terms: GrantTerms }
   assert.equal(changed.terms.level, 'read')
-  // A script app, how a script or CI calls goblin (ADR 0120), with its access picked before it is registered.
+  // A script app, how a script or CI calls goblin (ADR 0125), with its access picked before it is registered.
   await page.getByLabel('Name', { exact: true }).fill('deploy-bot')
   await page.getByRole('switch', { name: /A script of this workspace's/u }).click()
   await page.getByText(/deploy-bot can write everything\s·\sno setup, routines or inspect\s·\suntil revoked/u).waitFor()

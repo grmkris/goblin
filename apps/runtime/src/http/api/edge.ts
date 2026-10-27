@@ -55,7 +55,7 @@ import { answer, refusal, secured } from './render.ts'
  * the agent never takes it for an internal request, with who it comes from. The credential decides the workspace: a
  * member's session names it in the path (`/w/<workspace slug>/api/…`), checked against their membership, and so does an
  * OAuth token, a client's checked against the workspaces its grant reaches for its person (ADR 0116), an installed
- * app's against its installation (ADR 0118). Nothing reaches an agent on bare `/api/…` (ADR 0120). An outbound sign-in
+ * app's against its installation (ADR 0118). Nothing reaches an agent on bare `/api/…` (ADR 0125). An outbound sign-in
  * comes back to one address for every workspace, its `state` naming the workspace, checked against the person's
  * membership the same way.
  */

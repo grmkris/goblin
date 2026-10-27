@@ -44,7 +44,7 @@ _Avoid_: apps that use your agent
 A product or a script registered by a workspace (Settings → Developer) and installed in a workspace by its owner or an
 admin, with a **grant** per installation (ADR 0118). Its backend calls `/w/<slug>/api` or `/mcp` with its own
 client_credentials token, as a server, and never keeps the agent active. A script app is one installed only in the
-workspace that registered it, which is how a script or CI calls goblin (`goblin token`, ADR 0120). The Topics and
+workspace that registered it, which is how a script or CI calls goblin (`goblin token`, ADR 0125). The Topics and
 Personas it makes are sealed like any other, and named as made by it for display only (ADR 0115).
 _Avoid_: API key, service account
 

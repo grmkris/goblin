@@ -1,4 +1,4 @@
--- Keys are gone (ADR 0120): every credential is a person's OAuth client or an installed app. Server API keys and every
+-- Keys are gone (ADR 0125): every credential is a person's OAuth client or an installed app. Server API keys and every
 -- grant of kind `key` go, with their workspace reach and listed ids; every other row stays as it was. `grant` loses
 -- `keyId` (which referenced `apikey`) and takes the kinds client and app alone.
 --
@@ -58,3 +58,10 @@ drop table "installation_0007";
 drop table "grantReach_0007";
 drop table "grantWorkspace_0007";
 drop table "grant_0007";
+
+-- Remove only the retired extra. Otherwise a formerly valid grant or app's terms would fail the new decoder and
+-- silently lose its remaining powers. Keep every other term, scope and expiry exactly as approved.
+update "grant" set "extras" = (select json_group_array(value) from json_each("grant"."extras") where value <> 'keys')
+where exists (select 1 from json_each("grant"."extras") where value = 'keys');
+update "app" set "terms" = json_set("terms", '$.extras', json((select json_group_array(value) from json_each("app"."terms", '$.extras') where value <> 'keys')))
+where exists (select 1 from json_each("app"."terms", '$.extras') where value = 'keys');

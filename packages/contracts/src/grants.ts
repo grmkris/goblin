@@ -285,7 +285,7 @@ export const ROLE_POWER: Readonly<Record<WorkspaceRole, Power>> = {
 
 /**
  * `GET /api/access` and the consent summary: a grant's terms, which grant it is and whose (`kind`: a person's MCP
- * client, or an installed app, ADR 0120) with that credential's client id, when it ends (ISO, or `null` until revoked)
+ * client, or an installed app, ADR 0125) with that credential's client id, when it ends (ISO, or `null` until revoked)
  * and its widening link.
  */
 export const AccessSummary = Schema.Struct({

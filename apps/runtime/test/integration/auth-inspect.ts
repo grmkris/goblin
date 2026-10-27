@@ -555,7 +555,7 @@ export async function restBearerCase(base: string) {
   })
   expect(revoked.status).toBe(200)
   expect((await bearer(`/w/${owner.slug}/api/topics`)).status).toBe(401)
-  // A server API key of before ADR 0120 is a bearer like any other: nothing on bare /api, the sign-in challenge on
+  // A server API key of before ADR 0125 is a bearer like any other: nothing on bare /api, the sign-in challenge on
   // /mcp.
   const oldKey = `gbk_${'k'.repeat(64)}`
   expect((await fetch(`${base}/api/topics`, { headers: { authorization: `Bearer ${oldKey}` } })).status).toBe(404)

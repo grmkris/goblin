@@ -1,4 +1,4 @@
-# ADR 0124: Keys are gone: every credential is a person's client or an installed app
+# ADR 0125: Keys are gone: every credential is a person's client or an installed app
 
 Status: Accepted 2026-10-24 (owner). Supersedes ADR 0105 in full (archived). Also supersedes the key parts of:
 - ADRs 0081, 0084, 0085, 0090 and 0091;
@@ -9,8 +9,8 @@ Status: Accepted 2026-10-24 (owner). Supersedes ADR 0105 in full (archived). Als
 ## Context
 
 ADR 0118 made a product an app that each workspace installs, with its own client_credentials token. It also made a
-script an app of its own workspace. Server API keys (`gbk_…`, ADR 0081) stayed only until nothing used them. Swarmm now
-runs on installations, so nothing does.
+script an app of its own workspace. Server API keys (`gbk_…`, ADR 0081) stayed only until nothing used them. Swarmm is moving
+to installations. This release must stay held until every deployed consumer has migrated and passed live acceptance.
 
 Keeping them meant two server credentials with two of everything:
 - two admission paths at the edge and on `/mcp`;
@@ -46,13 +46,13 @@ There is no server API key. Gone with it are:
   client is counted on its own.
 - **What a key made (ADRs 0108, 0115)** says the app that made it, for display: `madeBy: { app: <app name> }` on a Topic
   or a Persona. The agent's `app_made_by` keeps its columns `key_id` and `key_name`, which now hold the app's client id
-  and name. No agent migration is needed.
+  and name. The attribution rows are retained.
 - **A key's threads and the MCP servers they declare (ADRs 0090, 0091, 0103)** are any credential's, within its grant,
   as ADR 0114 made them. The refusal reasons lose their prefix: `key_origin`, `key_origin_tools` and `key_origin_tool`
   are now `origin`, `origin_tools` and `origin_tool`.
 - **A message a key sent** is an app's. Its receipt's origin is `app`, and its author is `server <app name>` (ADR 0115).
-  A receipt written before with origin `key` reads as read-only server power, as every origin goblin does not know
-  does.
+  Existing receipts with origin `key` migrate to `app`; their stored powers retain every scope and extra except
+  the retired `keys` extra. A receipt without stored powers remains read-only server power.
 
 **Every bearer names its workspace.**
 - **The owner API:** a credential calls `/w/<slug>/api/…` (ADR 0116). The Worker no longer routes a bearer on bare
@@ -70,9 +70,11 @@ There is no server API key. Gone with it are:
 
 **Migration.** Auth D1 `0007_no_keys.sql` drops `apikey` and every grant of kind `key`, with its `grantWorkspace` and
 `grantReach` rows. It rebuilds `grant` without `keyId`, with the check `(kind = 'client' and userId is not null) or
-(kind = 'app' and userId is null)`, and rebuilds `installation`, which references it. Every other row is kept as it was.
+(kind = 'app' and userId is null)`, and rebuilds `installation`, which references it. Every other row is preserved; only the retired `keys` extra is stripped from surviving grants and app terms.
 The pattern is 0006's: `PRAGMA defer_foreign_keys`, the rows copied aside, the tables dropped children first, made
-again and refilled. `installation` is rebuilt too because dropping `grant` would cascade into it.
+again and refilled. `installation` is rebuilt too because dropping `grant` would cascade into it. The application-owned
+`no_key_powers` migration updates receipt attribution and removes the same retired extra from stored turn powers.
+It does not touch vendor tables or broaden any remaining scope.
 
 ## Consequences
 

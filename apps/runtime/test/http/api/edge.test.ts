@@ -44,7 +44,7 @@ const INVITATION = {
   expiresAt: '2026-10-28T00:00:00.000Z',
 } as const
 const SECRET = 'secret-words'
-/** A server API key of before ADR 0120: a bearer like any other now, which admits nothing. */
+/** A server API key of before ADR 0125: a bearer like any other now, which admits nothing. */
 const OLD_KEY = `gbk_${'k'.repeat(64)}`
 /** An OAuth client's token the owner consented to (ADR 0116), and one whose grant is only `read`. */
 const TOKEN = 'eyJhbGciOi.eyJzdWIiOiJvd25lciJ9.c2ln'
@@ -513,7 +513,7 @@ describe("an OAuth client's token on its workspace's path (ADR 0116)", () => {
     ],
     ["the workspace's members", client(`${BASE}/api/members`, { method: 'GET' }), 403, 'credential'],
     [
-      'a server API key of before ADR 0120',
+      'a server API key of before ADR 0125',
       client(`${BASE}/api/topics`, { method: 'GET', token: OLD_KEY }),
       401,
       'token',

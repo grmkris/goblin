@@ -8,7 +8,7 @@ export const CALLER_HEADER = 'x-goblin-caller'
 const Coverage = Schema.Literals(['all', 'list'])
 
 /**
- * A credential as the Worker forwards it (ADRs 0114, 0120): an OAuth client acting for a person, or an installed app
+ * A credential as the Worker forwards it (ADRs 0114, 0125): an OAuth client acting for a person, or an installed app
  * (ADR 0118, whose `id` is its client and whose grant is its installation's), its name, its grant's id, level and
  * extras, when it ends (epoch milliseconds, `null` until revoked), and in the workspace the request reaches whether its
  * Topics, Personas and connections are all or a list, with the reach's generation, so the agent knows when to read the

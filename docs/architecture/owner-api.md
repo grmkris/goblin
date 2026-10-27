@@ -16,7 +16,7 @@ when there is none), answers the workspace account API's groups itself (`members
 OAuth client's or an installed app's token on the same path ([ADRs 0116](../adr/0116-an-oauth-client-uses-the-owner-api-too.md),
 [0118](../adr/0118-a-product-installs-into-a-workspace.md)) is admitted by the workspaces it reaches instead (a client's
 grant for its person, an app's installations; `inbound/client-access.ts`, as `/mcp` admits it), and only forwarded,
-an app's with no member. Nothing reaches an agent on bare `/api/…` ([ADR 0120](../adr/0120-keys-are-gone.md)): a
+an app's with no member. Nothing reaches an agent on bare `/api/…` ([ADR 0125](../adr/0125-keys-are-gone.md)): a
 bearer there is no route. Every request on its way to an agent is admitted in this order, then forwarded:
 
 1. a write whose `Origin` names another site is refused;

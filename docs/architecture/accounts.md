@@ -90,7 +90,7 @@ Every credential has one grant ([ADR 0114](../adr/0114-one-grant-for-every-crede
 (its level, extras, lifetime and end, whether it reaches all of its person's workspaces, the MCP origins its threads
 may bring, revoked or not), `grantWorkspace` (per workspace, Topics, Personas and connections each `all` or `list`,
 and a generation that only moves on) and `grantReach` (the listed ids). Its `kind` is `client` or `app` ([ADR
-0120](../adr/0120-keys-are-gone.md)): a client's has its own id (`cg_…`), one per client and person; an installation's
+0125](../adr/0125-keys-are-gone.md)): a client's has its own id (`cg_…`), one per client and person; an installation's
 has the installation's id and reaches its one workspace. A change bumps the generation of every
 workspace it names, and a credential's create appends what it made to a list it has (`appendReach`).
 

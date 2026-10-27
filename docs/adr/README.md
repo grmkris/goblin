@@ -96,7 +96,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0102](0102-native-tools-are-a-personas-choice.md) | Native tools are a Persona's choice | Accepted |
 | [0103](0103-a-thread-declares-its-mcp-servers.md) | A thread declares the MCP servers its Personas call | Accepted |
 | [0104](0104-routine-data-stays-as-its-producer-sent-it.md) | Routine data stays as its producer sent it | Accepted |
-| [0105](0105-a-keys-secret-rotates-in-place.md) | A key's secret rotates in place | Accepted; amended by 0114 (a key's end is its grant's) |
+| [0105](archive/0105-a-keys-secret-rotates-in-place.md) | A key's secret rotates in place | Accepted; amended by 0114 (a key's end is its grant's) |
 | [0106](0106-the-deploy-smoke-makes-no-model-call.md) | The deploy smoke makes no model call | Accepted |
 | [0107](0107-a-turn-says-what-it-ran-with-and-reads-as-an-opentelemetry-trace.md) | A turn says what it ran with, and reads as an OpenTelemetry trace | Accepted; built |
 | [0108](archive/0108-a-keys-topic-is-a-room.md) | A key's Topic is a room | Superseded by 0115 |

@@ -358,7 +358,7 @@ describe('auth D1 baseline', () => {
     expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([])
   })
 
-  it('drops every key and its grant, keeping every other grant and installation as it was (0007, ADR 0120)', () => {
+  it('drops every key and its grant, keeping every other grant and installation as it was (0007, ADR 0125)', () => {
     const db = new DatabaseSync(':memory:')
     databases.push(db)
     const noKeys = '0007_no_keys.sql'
@@ -370,11 +370,11 @@ describe('auth D1 baseline', () => {
       INSERT INTO organization (id, name, slug, createdAt) VALUES ('w1', 'Mine', 'mine', '${NOW}');
       INSERT INTO apikey (id, configId, referenceId, key, createdAt, updatedAt) VALUES ('k1', 'default', 'w1', 'h', '${NOW}', '${NOW}');
       INSERT INTO oauthClient (id, clientId, redirectUris) VALUES ('c1', 'client-1', '[]'), ('c2', 'app-1', '[]');
-      INSERT INTO app (clientId, workspaceId, terms, script, createdBy, createdAt) VALUES ('app-1', 'w1', '{}', 0, 'u1', '${NOW}');
+      INSERT INTO app (clientId, workspaceId, terms, script, createdBy, createdAt) VALUES ('app-1', 'w1', '{"name":"Swarmm","extras":["keys","routines"]}', 0, 'u1', '${NOW}');
       INSERT INTO "grant" (id, kind, keyId, name, level, extras, lifetime, workspacesAll, origins, createdAt, updatedAt)
         VALUES ('k1', 'key', 'k1', 'svc', 'manage', '["setup"]', '365d', 0, '[]', '${NOW}', '${NOW}');
       INSERT INTO "grant" (id, kind, clientId, userId, name, level, extras, origins, createdAt, updatedAt)
-        VALUES ('cg_1', 'client', 'client-1', 'u1', 'Claude', 'write', '["inspect"]', '[]', '${NOW}', '${NOW}');
+        VALUES ('cg_1', 'client', 'client-1', 'u1', 'Claude', 'write', '["setup","keys","inspect"]', '[]', '${NOW}', '${NOW}');
       INSERT INTO "grant" (id, kind, clientId, name, level, origins, createdAt, updatedAt)
         VALUES ('in_1', 'app', 'app-1', 'Swarmm', 'manage', '[{"origin":"https://swarmm.app","tools":["plan"]}]', '${NOW}', '${NOW}');
       INSERT INTO grantWorkspace (grantId, workspaceId, topics, personas, connections, generation)
@@ -395,10 +395,16 @@ describe('auth D1 baseline', () => {
     const before = kept()
     db.exec(readFileSync(join(DIR, noKeys), 'utf8'))
     expect(kept()).toEqual({
-      grants: before.grants.filter(notKey),
+      grants: before.grants
+        .filter(notKey)
+        .map((row) => (row['id'] === 'cg_1' ? { ...row, extras: '["setup","inspect"]' } : row)),
       workspaces: before.workspaces.filter(notKey),
       listed: before.listed.filter(notKey),
       installations: before.installations,
+    })
+    expect(JSON.parse(String(rows('SELECT terms FROM app')[0]?.['terms']))).toEqual({
+      name: 'Swarmm',
+      extras: ['routines'],
     })
     const tables = rows("SELECT name FROM sqlite_master WHERE type = 'table'").map((row) => row['name'])
     expect(tables).not.toContain('apikey')

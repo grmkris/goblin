@@ -19,7 +19,7 @@ import { InvalidInput, NotFound } from '../http/errors.ts'
 
 /**
  * Every credential's grant (`packages/contracts/src/grants.ts`, myapps ADR 0015) in goblin's own auth D1 tables (0005):
- * an OAuth client has one per person who approved it; an installed app (ADRs 0118, 0120) one per installation, its id
+ * an OAuth client has one per person who approved it; an installed app (ADRs 0118, 0125) one per installation, its id
  * the installation's. Its terms are the row (level, extras, lifetime, origins, whether it reaches all of its person's
  * workspaces), one `grantWorkspace` row per workspace it names (each kind `all` or `list`, with the generation an agent
  * compares to know its lists moved) and the listed ids in `grantReach`. Plain async over D1, like `clients.ts`; a

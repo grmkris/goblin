@@ -27,7 +27,7 @@ infrastructure. Read
 - Better Auth (`mcp()` + `jwt()` + `organization()`) lives in an isolated D1 auth store. Do not add
   `oauthProvider()`, `apiKey()` or a custom adapter. A credential (an OAuth client acting for a person, or an installed
   app) reaches what its grant reaches, an OAuth client never more than its person's role, and neither renews resident
-  authority (ADRs 0114, 0118, 0120).
+  authority (ADRs 0114, 0118, 0125).
 - Every Topic is sealed: its chats see only it, and only a hub reaches every Topic (ADR 0115). What a turn may do is its
   senders' power (`grants/power.ts`), never who made the Topic: every Pi tool has its need in `pi/tool-needs.ts`, and a
   tool without one is never offered and never runs.

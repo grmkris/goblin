@@ -21,4 +21,4 @@ replaced it. Living docs never cite an archived ADR as current behaviour.
 | [0009](0009-telegram-through-myagent.md) | Telegram through myagent | [0066](../0066-sources.md), [0069](../0069-external-messages-use-sources.md) |
 | [0055](0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | [0066](../0066-sources.md), [0069](../0069-external-messages-use-sources.md) |
 | [0108](0108-a-keys-topic-is-a-room.md) | A key's Topic is a room | [0115](../0115-every-topic-is-sealed.md) |
-| [0105](0105-a-keys-secret-rotates-in-place.md) | A key's secret rotates in place | [0120](../0120-keys-are-gone.md) |
+| [0105](0105-a-keys-secret-rotates-in-place.md) | A key's secret rotates in place | [0125](../0125-keys-are-gone.md) |

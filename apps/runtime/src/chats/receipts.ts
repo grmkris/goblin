@@ -34,7 +34,7 @@ export const OPERATION_KINDS = [
 
 /** What an operation in a chat is: one of `OPERATION_KINDS`, or `write:<entry kind>` for a passive write. */
 export type OperationKind = (typeof OPERATION_KINDS)[number] | `write:${string}`
-/** Who started an operation: `key` is an installed app (ADR 0115), whose message is never the owner's. */
+/** Who started an operation: `app` is an installed app (ADRs 0115, 0125), whose message is never the owner's. */
 export const ReceiptOrigin = Schema.Literals(['owner', 'app', 'client', 'source', 'agent', 'routine', 'system'])
 export type ReceiptOrigin = typeof ReceiptOrigin.Type
 

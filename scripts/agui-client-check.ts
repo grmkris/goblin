@@ -1,7 +1,7 @@
 /**
  * `bun scripts/agui-client-check.ts`: a stock AG-UI client drives a stage (ADR 0111). Given `GOBLIN_ORIGIN` (the
  * stage's app origin), `GOBLIN_WORKSPACE` (the workspace's slug) and `GOBLIN_TOKEN` (a script app's access token, from
- * `goblin token`, whose installation may write there; ADR 0120), it makes a Topic,
+ * `goblin token`, whose installation may write there; ADR 0125), it makes a Topic,
  * runs one turn there with `@ag-ui/client`'s `HttpAgent` (which checks every event with its own verifier), prints the
  * event types and whether the verifier passed, never what was said, and archives the Topic again. Not run by CI: the
  * turn spends a model call.

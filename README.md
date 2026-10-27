@@ -73,7 +73,7 @@ goblin's components, charts, maps and diagrams, schedules that run on their own,
 the owner's MCP tools, a cheap model, notifications, other apps) that each wait for the owner's Allow. The Apps page lists them; an app can
 fill the workspace with its conversation docked beside it, roll back to an earlier version, or be deleted.
 
-goblin is reachable by AI clients over MCP and by servers and scripts over the API (ADRs 0086, 0118, 0120). An MCP
+goblin is reachable by AI clients over MCP and by servers and scripts over the API (ADRs 0086, 0118, 0125). An MCP
 client (Claude Code, claude.ai, VS Code) signs in to `/mcp` with OAuth, and its person chooses what it may do there;
 with that it manages the agent as they do, from the same tools an installed app gets. A product built on goblin is an
 app (ADR 0118): its workspace registers it (Settings → Developer), any workspace's owner or admin installs it from its

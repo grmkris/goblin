@@ -4,7 +4,7 @@ import * as Effect from 'effect/Effect'
 import type { Credential, Member } from './principal.ts'
 
 /**
- * How the edge admits a credential (ADRs 0114, 0116, 0118, 0120): an OAuth token, a client's or an installed app's, on
+ * How the edge admits a credential (ADRs 0114, 0116, 0118, 0125): an OAuth token, a client's or an installed app's, on
  * a workspace's path, held to what the endpoint it names needs.
  */
 

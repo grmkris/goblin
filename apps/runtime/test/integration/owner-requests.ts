@@ -178,7 +178,7 @@ export async function appToken(base: string, clientId: string, secret: string): 
 
 /**
  * A script app `who` registers and installs in their workspace in one step (ADR 0118), named `name` with `terms` as
- * its grant, and its token: how a server or a script calls goblin since keys are gone (ADR 0120).
+ * its grant, and its token: how a server or a script calls goblin since keys are gone (ADR 0125).
  */
 export async function scriptApp(base: string, who: Person, name: string, terms: ServerTerms = {}): Promise<Server> {
   const made = await call(base, who, '/api/developer/apps', {

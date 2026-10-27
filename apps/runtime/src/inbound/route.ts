@@ -15,7 +15,7 @@ export const inboundHosts = (appUrl: string) => ({
 })
 
 /**
- * Who a bearer on /mcp is, and which agents it reaches (ADR 0120): an OAuth client those of the workspaces its grant
+ * Who a bearer on /mcp is, and which agents it reaches (ADR 0125): an OAuth client those of the workspaces its grant
  * reaches now (ADRs 0097, 0114), acting for its person as a member of each, with the credential its grant makes in
  * each; an installed app those it is installed in (ADR 0118), with each installation's credential and no person.
  */

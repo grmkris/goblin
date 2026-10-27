@@ -16,7 +16,7 @@ still check exact grants (`mcp/servers/api.ts`, `pi/resident-mcp.ts`, `pi/skills
 
 goblin is an MCP server at `/mcp`, the one protected resource of Better Auth's `mcp()` authorization server, and one
 server for every credential ([ADR 0086](../adr/0086-one-mcp-for-every-caller.md)): an OAuth client acting for a person
-(Claude Code, claude.ai, VS Code) or an installed app ([ADR 0120](../adr/0120-keys-are-gone.md): no other bearer is
+(Claude Code, claude.ai, VS Code) or an installed app ([ADR 0125](../adr/0125-keys-are-gone.md): no other bearer is
 admitted, and one that is not an access token gets the sign-in challenge). What either may do is its grant ([ADR
 0114](../adr/0114-one-grant-for-every-credential.md), [accounts](accounts.md#grants)): a level (`read` < `write` <
 `manage`), extras (`setup`, `routines`, `inspect`), a reach of Topics, Personas and connections per workspace
@@ -124,7 +124,7 @@ admitted, and one that is not an access token gets the sign-in challenge). What 
 
 A server, a script or CI reaches goblin as an app ([ADR 0118](../adr/0118-a-product-installs-into-a-workspace.md),
 [accounts](accounts.md#apps-and-installations)): a product any workspace installs, or a script app installed in the
-workspace that registered it. Server API keys are gone ([ADR 0120](../adr/0120-keys-are-gone.md)). Its backend gets a
+workspace that registered it. Server API keys are gone ([ADR 0125](../adr/0125-keys-are-gone.md)). Its backend gets a
 token with client_credentials (`/api/auth/oauth2/token`, HTTP Basic; `goblin token` from a shell, with
 `GOBLIN_CLIENT_ID` and `GOBLIN_CLIENT_SECRET`) and calls `/w/<slug>/api/…` (the owner endpoints whose `EndpointAccess`
 its installation's grant holds; the edge refuses the rest before an agent wakes) or `/mcp` (the tools above). A bearer

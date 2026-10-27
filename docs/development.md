@@ -225,7 +225,7 @@ until it runs, real provider and Telegram delivery remain unverified.
 
 ## Using it
 
-- **Scripts and servers.** A script, a server you run or CI calls goblin as a script app (ADRs 0118, 0120): Settings →
+- **Scripts and servers.** A script, a server you run or CI calls goblin as a script app (ADRs 0118, 0125): Settings →
   Developer, a name, "A script of this workspace's" on and the access it gets; copy the client id and secret then, the
   secret is not shown again. Rotate secret gives the app a new one when the old one may have leaked: the old one admits
   nothing from then on, so give the script the new one. `goblin token` (with `GOBLIN_CLIENT_ID` and
