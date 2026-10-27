@@ -47,9 +47,12 @@ jobs:
     concurrency:
       group: goblin-deploy-dev
       cancel-in-progress: false
+    # id-token: the smoke signs in as the checks account by an emailed code, read through a mysi workload whose
+    # policy names this workflow, its ref and its environment (ADR 0128). No session or key is stored for it.
     permissions:
       contents: read
       actions: read
+      id-token: write
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -65,13 +68,17 @@ jobs:
         env:
           GOBLIN_STAGE_ENV: ${{ secrets.GOBLIN_STAGE_ENV }}
           GOBLIN_CLOUD_ENV: ${{ secrets.GOBLIN_CLOUD_ENV }}
-          GOBLIN_SMOKE_SESSION: ${{ secrets.GOBLIN_SMOKE_SESSION }}
           ALCHEMY_STATE_STORE_CREDENTIALS: ${{ secrets.ALCHEMY_STATE_STORE_CREDENTIALS }}
         run: python3 -B scripts/ci_credentials.py dev
+      # Unset variables leave the smoke public, with the reason in its receipt (ADR 0128).
       - name: Release goblin dev
         env:
           GOBLIN_RECEIPTS_DIR: ${{ runner.temp }}/receipts
           GOBLIN_LOG_DIR: ${{ runner.temp }}/release-logs
+          # A secret, so the public log masks the checks account's address.
+          GOBLIN_SMOKE_EMAIL: ${{ secrets.GOBLIN_SMOKE_EMAIL }}
+          GOBLIN_SMOKE_MAILBOX_WORKLOAD: ${{ vars.GOBLIN_SMOKE_MAILBOX_WORKLOAD }}
+          MYSI_ORIGIN: ${{ vars.MYSI_ORIGIN }}
         run: python3 -B scripts/release.py dev "$GITHUB_SHA"
       # The sanitized receipts: Deploy prod requires this artifact of the same sha.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -87,7 +94,8 @@ jobs:
         run: python3 -B scripts/ci_credentials.py dev --cleanup
 
   # A push to prod (`bun run promote <sha>`) deploys goblin prod, only for a sha with current
-  # authenticated dev acceptance, fast-forwarded and not force-pushed (scripts/release.py).
+  # dev acceptance, fast-forwarded and not force-pushed (scripts/release.py), and runs the same smoke.
+  # A failure is a red run, a step summary and a Telegram message; nothing is rolled back (ADR 0128).
   deploy-prod:
     name: Deploy prod
     needs: check
@@ -100,9 +108,11 @@ jobs:
     concurrency:
       group: goblin-deploy-prod
       cancel-in-progress: false
+    # id-token: the smoke's mailbox and the failure alert are mysi workloads (ADR 0128), as in Deploy dev.
     permissions:
       contents: read
       actions: read
+      id-token: write
     env:
       GH_TOKEN: ${{ github.token }}
       GOBLIN_CONFIRM_PROD: '1'
@@ -126,6 +136,9 @@ jobs:
         env:
           GOBLIN_RECEIPTS_DIR: ${{ runner.temp }}/receipts
           GOBLIN_LOG_DIR: ${{ runner.temp }}/release-logs
+          GOBLIN_SMOKE_EMAIL: ${{ secrets.GOBLIN_SMOKE_EMAIL }}
+          GOBLIN_SMOKE_MAILBOX_WORKLOAD: ${{ vars.GOBLIN_SMOKE_MAILBOX_WORKLOAD }}
+          MYSI_ORIGIN: ${{ vars.MYSI_ORIGIN }}
         run: python3 -B scripts/release.py prod "$GITHUB_SHA"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -135,6 +148,14 @@ jobs:
           if-no-files-found: error
           # A re-run attempt replaces this run's receipts with the ones of the deploy it just made.
           overwrite: true
+      # The failed step and the way back in the summary, and a Telegram message when the alert workload is set.
+      - name: Alert on failure
+        if: failure()
+        env:
+          GOBLIN_LOG_DIR: ${{ runner.temp }}/release-logs
+          GOBLIN_ALERT_WORKLOAD: ${{ vars.GOBLIN_ALERT_WORKLOAD }}
+          MYSI_ORIGIN: ${{ vars.MYSI_ORIGIN }}
+        run: bun scripts/release-alert.ts prod
       - name: Remove transient credentials
         if: always()
         run: python3 -B scripts/ci_credentials.py prod --cleanup

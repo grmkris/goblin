@@ -50,6 +50,8 @@ class PromotionTest(unittest.TestCase):
             FakeGitHub(checked=False),
             FakeGitHub(receipt=receipt | {'sha': B}),
             FakeGitHub(receipt=receipt | {'acceptance': 'public'}),
+            FakeGitHub(receipt=receipt | {'acceptance': 'public',
+                                          'signIn': 'skipped: no mailbox access (no OIDC token in this job)'}),
             FakeGitHub(live='dev-v2'),
             FakeGitHub(status='behind'),
             FakeGitHub(status='diverged'),
@@ -57,6 +59,14 @@ class PromotionTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 promote(A, github)
             self.assertNotIn('move_prod', [call[0] for call in github.calls])
+
+    def test_public_dev_acceptance_promotes_only_while_the_smoke_cannot_sign_in(self):
+        # ADR 0128: until the checks account's mailbox workload is configured, the dev smoke passes its public checks.
+        unset = {'sha': A, 'acceptance': 'public', 'version': 'dev-v1',
+                 'signIn': 'skipped: no mailbox access (no workload configured)'}
+        github = FakeGitHub(receipt=unset)
+        promote(A, github)
+        self.assertEqual(github.calls[-1], ('move_prod', A))
 
     def test_only_a_full_sha_is_promoted(self):
         for sha in [A[:12], 'dev', A.upper(), '']:

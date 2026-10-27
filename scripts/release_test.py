@@ -3,11 +3,13 @@ from pathlib import Path
 import tempfile
 import unittest
 import release
-from release import (acceptance_run, directories, merged_runs, pick_database, prod_push, require_check,
-                     require_clean_checkout, require_dev, require_existing, require_fast_forward, require_ref,
-                     require_signup, resources, safe_plan, smoke_until_settled, tail, failure_reason)
+from release import (StepFailed, acceptance_of, acceptance_run, directories, failure_record, merged_runs,
+                     pick_database, prod_push, require_check, require_clean_checkout, require_dev, require_existing,
+                     require_fast_forward, require_ref, require_signup, resources, safe_plan, smoke_configured,
+                     smoke_until_settled, tail, failure_reason, without_oidc)
 
 A, B = "a" * 40, "b" * 40
+UNSET = "skipped: no mailbox access (no workload configured)"
 
 
 class ReleaseTest(unittest.TestCase):
@@ -65,12 +67,49 @@ class ReleaseTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 require_clean_checkout(lines)
 
-    def test_requires_same_sha_authenticated_and_current_version(self):
+    def test_requires_same_sha_accepted_and_current_version(self):
         good = {"sha": A, "acceptance": "authenticated", "version": "v1"}
         require_dev(good, A, "v1")
-        for change in [{"sha": B}, {"acceptance": "public"}, {"version": "v0"}]:
+        # Public dev acceptance stands only while the smoke's sign-in is not configured (ADR 0128).
+        require_dev(good | {"acceptance": "public", "signIn": UNSET}, A, "v1")
+        for change in [{"sha": B}, {"acceptance": "public"}, {"version": "v0"},
+                       {"acceptance": "public", "signIn": "skipped: no mailbox access (no OIDC token in this job)"},
+                       {"acceptance": "none", "signIn": UNSET}]:
             with self.assertRaises(RuntimeError):
                 require_dev(good | change, A, "v1")
+
+    def test_a_smoke_that_did_not_sign_in_is_public_only_while_unconfigured(self):
+        self.assertEqual(acceptance_of({"signIn": "email code via mysi"}, True), "authenticated")
+        self.assertEqual(acceptance_of({"signIn": "email code via mysi"}, False), "authenticated")
+        public = {"mode": "read-only", "signIn": UNSET}
+        self.assertEqual(acceptance_of(public, False), "public")
+        self.assertEqual(acceptance_of(public | {"signIn": "skipped: no mailbox access (no test account configured)"},
+                                       False), "public")
+        with self.assertRaisesRegex(RuntimeError, "configured_smoke_must_sign_in"):
+            acceptance_of(public, True)
+        for reason in [None, "skipped: no mailbox access (no OIDC token in this job)", "skipped"]:
+            with self.assertRaisesRegex(RuntimeError, "public_smoke_needs_its_reason"):
+                acceptance_of({"mode": "read-only", "signIn": reason}, False)
+
+    def test_the_smoke_is_configured_once_its_account_and_mailbox_workload_are_both_set(self):
+        both = {"GOBLIN_SMOKE_EMAIL": "checks@example.com", "GOBLIN_SMOKE_MAILBOX_WORKLOAD": "wl_1"}
+        self.assertTrue(smoke_configured(both))
+        for change in [{"GOBLIN_SMOKE_EMAIL": ""}, {"GOBLIN_SMOKE_MAILBOX_WORKLOAD": " "}]:
+            self.assertFalse(smoke_configured(both | change))
+        self.assertFalse(smoke_configured({}))
+
+    def test_only_the_smoke_gets_the_jobs_oidc_request(self):
+        env = {"PATH": "/bin", "ACTIONS_ID_TOKEN_REQUEST_URL": "https://t.example", "ACTIONS_ID_TOKEN_REQUEST_TOKEN": "x"}
+        self.assertEqual(without_oidc(env), {"PATH": "/bin"})
+
+    def test_a_failed_release_records_its_step_and_the_smokes_reason_only(self):
+        smoke = StepFailed("20261027T101010Z-prod-aaaaaaaaaaaa-smoke-3.log", "turn_not_pong")
+        self.assertEqual(failure_record("prod", A, smoke),
+                         {"stage": "prod", "sha": A, "step": "smoke", "reason": "turn_not_pong"})
+        deploy = StepFailed("20261027T101010Z-prod-aaaaaaaaaaaa-deploy.log", None)
+        self.assertEqual(failure_record("prod", A, deploy), {"stage": "prod", "sha": A, "step": "deploy"})
+        self.assertEqual(failure_record("prod", A, RuntimeError("drift_not_clean")),
+                         {"stage": "prod", "sha": A, "step": "drift_not_clean"})
 
     def test_dev_acceptance_comes_from_a_successful_dev_push_of_the_same_sha(self):
         good = {"id": 7, "head_sha": A, "head_branch": "dev", "event": "push", "conclusion": "success"}

@@ -20,13 +20,13 @@ def store_credentials():
 
 
 def secrets(stage):
-    """(environment variable, destination, kind) for every secret the stage's deploy job materializes."""
-    entries = [('GOBLIN_STAGE_ENV', LOCAL / (stage + '.env'), 'env'),
-               ('GOBLIN_CLOUD_ENV', LOCAL / 'cloud.env', 'env'),
-               ('ALCHEMY_STATE_STORE_CREDENTIALS', store_credentials(), 'json')]
-    if stage == 'dev':
-        entries.append(('GOBLIN_SMOKE_SESSION', LOCAL / 'dev-session.json', 'json'))
-    return entries
+    """
+    (environment variable, destination, kind) for every secret the stage's deploy job materializes. No session: the
+    smoke signs in by an emailed code (ADR 0128).
+    """
+    return [('GOBLIN_STAGE_ENV', LOCAL / (stage + '.env'), 'env'),
+            ('GOBLIN_CLOUD_ENV', LOCAL / 'cloud.env', 'env'),
+            ('ALCHEMY_STATE_STORE_CREDENTIALS', store_credentials(), 'json')]
 
 
 def env_values(text):
@@ -65,7 +65,7 @@ def mask_command(value):
     return '::add-mask::' + value.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
 
 
-def validate(stage, given):
+def validate(given):
     cloud = env_values(given['GOBLIN_CLOUD_ENV'])
     if set(cloud) != CLOUD_KEYS or not all(cloud.values()):
         raise RuntimeError('cloud_env_must_hold_exactly_CLOUDFLARE_API_TOKEN_and_CLOUDFLARE_ACCOUNT_ID')
@@ -76,10 +76,6 @@ def validate(stage, given):
     # Alchemy discards a credential minted for another account and would need a Secrets Store scope to re-derive it.
     if store['accountId'] != cloud['CLOUDFLARE_ACCOUNT_ID']:
         raise RuntimeError('state_store_credentials_minted_for_another_account')
-    if stage == 'dev':
-        session = json.loads(given['GOBLIN_SMOKE_SESSION'])
-        if not isinstance(session, dict) or not session.get('origin') or not session.get('cookie'):
-            raise RuntimeError('smoke_session_needs_origin_and_cookie')
 
 
 def private(path, text):
@@ -87,12 +83,6 @@ def private(path, text):
     path.parent.chmod(0o700)
     path.write_text(text)
     path.chmod(0o600)
-
-
-def with_session(text, session):
-    # The smoke reads its session from the file the stage env names; point it at the materialized copy.
-    lines = [line for line in text.splitlines() if not line.startswith('GOBLIN_SMOKE_SESSION_FILE=')]
-    return '\n'.join(lines + ['GOBLIN_SMOKE_SESSION_FILE=' + str(session.resolve())]) + '\n'
 
 
 def materialize(stage):
@@ -112,13 +102,10 @@ def materialize(stage):
     for key, _, kind in entries:
         for value in masks(kind, given[key]):
             print(mask_command(value), flush=True)
-    validate(stage, given)
+    validate(given)
     os.umask(0o077)
     for key, path, _ in entries:
-        text = given[key]
-        if key == 'GOBLIN_STAGE_ENV' and stage == 'dev':
-            text = with_session(text, LOCAL / 'dev-session.json')
-        private(path, text)
+        private(path, given[key])
     with open(os.environ['GITHUB_ENV'], 'a') as handle:
         handle.write('GOBLIN_CLOUD_ENV_FILE=' + str((LOCAL / 'cloud.env').resolve()) + '\n')
     print(stage + ': materialized ' + ', '.join(key for key, _, _ in entries), flush=True)

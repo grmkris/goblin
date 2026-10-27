@@ -11,20 +11,16 @@ ACCOUNT = 'a' * 32
 TOKEN = 'cloudflare-token-fixture'
 STORE = {'url': 'https://alchemy-state-store.example.workers.dev', 'authToken': 'store-bearer-fixture',
          'accountId': ACCOUNT}
-SESSION = {'origin': 'https://dev.goblin.example', 'cookie': 'session-cookie-fixture\nsecond-line-fixture'}
+STAGE_ENV = ('GOBLIN_APP_URL=https://dev.goblin.example\nGOBLIN_SIGNUP_MODE=invite\n'
+             'GOBLIN_CREDENTIAL_KEY="credential-key-fixture"\n')
 
 
-def secrets(stage):
-    values = {
-        'GOBLIN_STAGE_ENV': 'GOBLIN_APP_URL=https://dev.goblin.example\nGOBLIN_SIGNUP_MODE=invite\n'
-                            'GOBLIN_SMOKE_SESSION_FILE=/home/operator/.local/dev-session.json\n'
-                            'GOBLIN_CREDENTIAL_KEY="credential-key-fixture"\n',
+def secrets():
+    return {
+        'GOBLIN_STAGE_ENV': STAGE_ENV,
         'GOBLIN_CLOUD_ENV': f'CLOUDFLARE_API_TOKEN={TOKEN}\nCLOUDFLARE_ACCOUNT_ID={ACCOUNT}\n',
         'ALCHEMY_STATE_STORE_CREDENTIALS': json.dumps(STORE),
     }
-    if stage == 'dev':
-        values['GOBLIN_SMOKE_SESSION'] = json.dumps(SESSION)
-    return values
 
 
 class CredentialsTest(unittest.TestCase):
@@ -50,41 +46,37 @@ class CredentialsTest(unittest.TestCase):
     def store(self):
         return self.home / '.alchemy/credentials/default/cloudflare-state-store.json'
 
-    def test_dev_materializes_private_files_and_points_the_smoke_at_its_session(self):
-        result = self.run_script('dev', **secrets('dev'))
+    def test_dev_materializes_private_files_and_no_session(self):
+        result = self.run_script('dev', **secrets())
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.local('').stat().st_mode & 0o777, 0o700)
         self.assertEqual(self.store().parent.stat().st_mode & 0o777, 0o700)
-        for path in [self.local('dev.env'), self.local('cloud.env'),
-                     self.local('dev-session.json'), self.store()]:
+        for path in [self.local('dev.env'), self.local('cloud.env'), self.store()]:
             self.assertEqual(path.stat().st_mode & 0o777, 0o600, path)
         self.assertEqual(json.loads(self.store().read_text()), STORE)
-        stage = self.local('dev.env').read_text().splitlines()
-        session = str(self.local('dev-session.json').resolve())
-        self.assertEqual([line for line in stage if line.startswith('GOBLIN_SMOKE_SESSION_FILE=')],
-                         ['GOBLIN_SMOKE_SESSION_FILE=' + session])
-        self.assertIn('GOBLIN_CREDENTIAL_KEY="credential-key-fixture"', stage)
+        self.assertEqual(self.local('dev.env').read_text(), STAGE_ENV)
+        # The smoke signs in by an emailed code (ADR 0128): no session cookie reaches CI.
+        self.assertEqual(sorted(path.name for path in self.local('').iterdir()), ['cloud.env', 'dev.env'])
         self.assertEqual((self.directory / 'github-env').read_text(),
                          'GOBLIN_CLOUD_ENV_FILE=' + str(self.local('cloud.env').resolve()) + '\n')
 
     def test_masks_every_long_value_before_anything_else_and_prints_no_value(self):
-        result = self.run_script('dev', **secrets('dev'))
+        result = self.run_script('dev', **secrets())
         self.assertEqual(result.returncode, 0, result.stderr)
         lines = result.stdout.splitlines()
         masked = {line.removeprefix('::add-mask::') for line in lines if line.startswith('::add-mask::')}
         for value in ['https://dev.goblin.example', 'credential-key-fixture',
-                      TOKEN, ACCOUNT, STORE['url'], 'store-bearer-fixture',
-                      'session-cookie-fixture', 'second-line-fixture', '/home/operator/.local/dev-session.json']:
+                      TOKEN, ACCOUNT, STORE['url'], 'store-bearer-fixture']:
             self.assertIn(value, masked)
         self.assertNotIn('invite', masked)
         self.assertNotIn('accountId', masked)
         self.assertEqual(lines[-1], 'dev: materialized GOBLIN_STAGE_ENV, GOBLIN_CLOUD_ENV, '
-                                    'ALCHEMY_STATE_STORE_CREDENTIALS, GOBLIN_SMOKE_SESSION')
+                                    'ALCHEMY_STATE_STORE_CREDENTIALS')
         self.assertTrue(all(line.startswith('::add-mask::') for line in lines[:-1]))
         self.assertEqual(result.stderr, '')
 
     def test_cleanup_removes_every_materialized_file(self):
-        self.assertEqual(self.run_script('dev', **secrets('dev')).returncode, 0)
+        self.assertEqual(self.run_script('dev', **secrets()).returncode, 0)
         self.local('smoke-dev-receipt.json').write_text('{}')
         cleaned = self.run_script('dev', '--cleanup')
         self.assertEqual(cleaned.returncode, 0, cleaned.stderr)
@@ -93,19 +85,18 @@ class CredentialsTest(unittest.TestCase):
         self.assertEqual(self.run_script('dev', '--cleanup').returncode, 0)
 
     def test_a_missing_required_secret_writes_nothing(self):
-        for stage, missing in [('dev', 'GOBLIN_SMOKE_SESSION'), ('prod', 'GOBLIN_CLOUD_ENV'),
+        for stage, missing in [('dev', 'GOBLIN_STAGE_ENV'), ('prod', 'GOBLIN_CLOUD_ENV'),
                                ('prod', 'ALCHEMY_STATE_STORE_CREDENTIALS')]:
-            given = secrets(stage)
+            given = secrets()
             del given[missing]
             result = self.run_script(stage, **given)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('missing_environment_secret: ' + missing, result.stderr)
             self.assertFalse((self.directory / '.local').exists())
             self.assertFalse(self.store().exists())
-        prod = self.run_script('prod', **secrets('prod'))
+        prod = self.run_script('prod', **secrets())
         self.assertEqual(prod.returncode, 0, prod.stderr)
-        self.assertFalse(self.local('dev-session.json').exists())
-        self.assertIn('GOBLIN_SMOKE_SESSION_FILE=/home/operator', self.local('prod.env').read_text())
+        self.assertEqual(self.local('prod.env').read_text(), STAGE_ENV)
 
     def test_refuses_secrets_the_deploy_must_not_hold(self):
         cases = [
@@ -117,7 +108,7 @@ class CredentialsTest(unittest.TestCase):
              'state_store_credentials_need_url_authToken_and_accountId'),
         ]
         for key, value, reason in cases:
-            given = secrets('dev')
+            given = secrets()
             given[key] = value
             result = self.run_script('dev', **given)
             self.assertNotEqual(result.returncode, 0, key)

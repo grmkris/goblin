@@ -67,9 +67,46 @@ def require_clean_checkout(lines):
         raise RuntimeError("release_checkout_must_be_clean")
 
 
+# What a smoke that could not sign in records as its reason, followed by why (scripts/smoke-signin.ts, ADR 0128).
+NO_MAILBOX = "skipped: no mailbox access"
+# The reasons that mean the smoke's sign-in is not configured yet; a configured one that fails is a failed smoke.
+UNCONFIGURED = [NO_MAILBOX + " (no test account configured)", NO_MAILBOX + " (no workload configured)"]
+
+
+# The deploy job's OIDC request (`id-token: write`), which mints the tokens mysi's workloads accept (ADR 0128).
+OIDC_REQUEST = ["ACTIONS_ID_TOKEN_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"]
+
+
+def without_oidc(env):
+    """`env` without the OIDC request: only the smoke may mint a token for mysi, not an install, plan or deploy."""
+    return {key: value for key, value in env.items() if key not in OIDC_REQUEST}
+
+
+def smoke_configured(env):
+    """Whether this job may sign the smoke in (ADR 0128): the checks account and its mailbox workload are both set."""
+    return bool(env.get("GOBLIN_SMOKE_EMAIL", "").strip() and env.get("GOBLIN_SMOKE_MAILBOX_WORKLOAD", "").strip())
+
+
+def acceptance_of(smoke, configured):
+    """
+    `authenticated` when the smoke signed in. `public` only while its sign-in is not configured, with the reason it
+    recorded; once it is, a smoke that did not sign in fails the release (ADR 0128).
+    """
+    if smoke.get("mode") != "read-only":
+        return "authenticated"
+    if configured:
+        raise RuntimeError("configured_smoke_must_sign_in")
+    if smoke.get("signIn") not in UNCONFIGURED:
+        raise RuntimeError("public_smoke_needs_its_reason")
+    return "public"
+
+
 def require_dev(receipt, sha, version):
-    if receipt.get("sha") != sha or receipt.get("acceptance") != "authenticated" or receipt.get("version") != version:
-        raise RuntimeError("prod_requires_current_authenticated_dev_of_same_sha")
+    # A public dev receipt is accepted only for the reason its smoke could not sign in: not configured (ADR 0128).
+    accepted = receipt.get("acceptance") == "authenticated" or (
+        receipt.get("acceptance") == "public" and receipt.get("signIn") in UNCONFIGURED)
+    if receipt.get("sha") != sha or not accepted or receipt.get("version") != version:
+        raise RuntimeError("prod_requires_current_accepted_dev_of_same_sha")
 
 
 def require_check(runs, jobs, sha, branch):
@@ -250,6 +287,14 @@ def failure_reason(text):
     return match.group(1) if match else None
 
 
+class StepFailed(RuntimeError):
+    """A release step that exited non-zero: its log's name, and the machine reason a failed smoke wrote."""
+
+    def __init__(self, log, reason):
+        super().__init__("release_step_failed: " + log)
+        self.reason = reason
+
+
 def execute(command, env, log):
     log.touch(mode=0o600)
     with log.open("w") as handle:
@@ -260,8 +305,23 @@ def execute(command, env, log):
         text = log.read_text()
         reason = failure_reason(text)
         print(f"--- last 40 lines of {log.name} ---\n{tail(text)}\n---" + (f"\nreason: {reason}" if reason else ""), flush=True)
-        raise RuntimeError("release_step_failed: " + log.name)
+        raise StepFailed(log.name, reason)
     return log.read_text()
+
+
+STEP_LOG = re.compile(r"release_step_failed: \S+?-(install|plan|deploy|smoke|drift)(?:-\d+)?\.log")
+
+
+def failure_record(stage, sha, error):
+    """
+    What a failed release leaves for its alert (scripts/release-alert.ts, ADR 0128): the step that failed (a step's log
+    names it, else the release's own refusal) and the smoke's machine reason. Nothing else, no content and no secret.
+    """
+    message = str(error)
+    match = STEP_LOG.fullmatch(message)
+    record = {"stage": stage, "sha": sha, "step": match.group(1) if match else message}
+    reason = getattr(error, "reason", None)
+    return record | ({"reason": reason} if reason else {})
 
 
 # Right after a deploy the agents' Durable Objects run the old code for some minutes, and a request may meet one being
@@ -309,8 +369,8 @@ def release(stage, sha):
     receipts, logs = directories(os.environ)
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     prefix = f"{stamp}-{stage}-{sha[:12]}"
-    env = dict(os.environ, GOBLIN_STAGE=stage, GOBLIN_ENV_DIR=str(LOCAL), GOBLIN_CLOUD_ENV_FILE=str(cloud_env()),
-               ALCHEMY_PLAIN="1", CI="true")
+    env = without_oidc(dict(os.environ, GOBLIN_STAGE=stage, GOBLIN_ENV_DIR=str(LOCAL),
+                            GOBLIN_CLOUD_ENV_FILE=str(cloud_env()), ALCHEMY_PLAIN="1", CI="true"))
     execute(["bun", "install", "--frozen-lockfile"], env, logs / f"{prefix}-install.log")
     plan = execute(["bun", "run", "plan:" + stage], env, logs / f"{prefix}-plan.log")
     expected = sorted(p.name for p in (ROOT / "apps/runtime/migrations").glob("*.sql"))
@@ -319,8 +379,10 @@ def release(stage, sha):
     print(stage + ": non-destructive plan verified", flush=True)
     execute(["bun", "run", "deploy:" + stage], env, logs / f"{prefix}-deploy.log")
     print(stage + ": deployed; verifying smoke and drift", flush=True)
-    # The smoke's flows check reads Analytics Engine with the stage's Cloudflare credentials.
-    smoke_env = env | {key: config[key] for key in ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]}
+    # The smoke's flows check reads Analytics Engine with the stage's Cloudflare credentials, and its sign-in reads the
+    # checks account's mailbox through a mysi workload with the job's OIDC request.
+    smoke_env = (env | {key: config[key] for key in ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]}
+                 | {key: os.environ[key] for key in OIDC_REQUEST if key in os.environ})
     smoke_until_settled(["bun", "--env-file", str(LOCAL / (stage + ".env")), "scripts/smoke-dev.ts"], smoke_env,
                         lambda attempt: logs / (f"{prefix}-smoke.log" if attempt == 1 else f"{prefix}-smoke-{attempt}.log"))
     drift = execute(["bun", "run", "drift:" + stage], env, logs / f"{prefix}-drift.log")
@@ -329,9 +391,7 @@ def release(stage, sha):
     smoke = json.loads((LOCAL / f"smoke-{stage}-receipt.json").read_text())
     if smoke.get("status") != "passed" or smoke.get("stage") != stage:
         raise RuntimeError("stage_smoke_required")
-    acceptance = "public" if smoke.get("mode") == "read-only" else "authenticated"
-    if stage == "dev" and acceptance != "authenticated":
-        raise RuntimeError("dev_requires_authenticated_smoke")
+    acceptance = acceptance_of(smoke, smoke_configured(os.environ))
     auth = f"goblin-{stage}-auth"
     db = pick_database(cloud(config, "/d1/database?name=" + urllib.parse.quote(auth)), auth)
     migrations = cloud(config, f"/d1/database/{db}/query", {"sql": "SELECT name FROM __alchemy_migrations ORDER BY id"})
@@ -339,7 +399,8 @@ def release(stage, sha):
     if sorted(names) != expected:
         raise RuntimeError("migration_inventory_mismatch")
     receipt = {"utc": stamp, "stage": stage, "sha": sha, "ci": check["html_url"],
-               "version": version(config, stage), "acceptance": acceptance, "drift": "verified",
+               "version": version(config, stage), "acceptance": acceptance, "signIn": smoke.get("signIn"),
+               "drift": "verified",
                "providerNormalizations": ["Web.domain.zone bookkeeping", "D1 default disabled replication"],
                "migrations": names, "resources": resources(stage, db)}
     # No content, credentials, owner identity, or provider token enters this receipt.
@@ -356,4 +417,6 @@ if __name__ == "__main__":
         release(args.stage, args.sha)
     except (RuntimeError, subprocess.CalledProcessError) as error:
         print(str(error))
+        _, logs = directories(os.environ)
+        (logs / "failure.json").write_text(json.dumps(failure_record(args.stage, args.sha, error)) + "\n")
         raise SystemExit(1) from None
