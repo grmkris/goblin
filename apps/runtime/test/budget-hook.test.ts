@@ -3,7 +3,7 @@ import type { UsageToday } from '@goblin/contracts'
 import * as Effect from 'effect/Effect'
 import { Budget, refuseSpent } from '../src/budget.ts'
 import { type AppError, BudgetExhausted, Internal } from '../src/http/errors.ts'
-import { BUDGET_BLOCKS, budgetVerdict } from '../src/pi/budget.ts'
+import { BUDGET_BLOCKS, blockFor, budgetVerdict } from '../src/pi/budget.ts'
 
 /** The hook's verdict when today's budget answers `today`, refusing a spent day as the budget does. */
 const verdictOf = (today: Effect.Effect<UsageToday, AppError>) => {
@@ -39,4 +39,18 @@ describe('the budget hook before a tool (R1)', () => {
       expect(BUDGET_BLOCKS.exhausted).toContain('used up')
     }),
   )
+
+  it('says a spent budget stopped the work and nothing resumes it, a reset only to a person', () => {
+    const person = blockFor('exhausted', false)
+    const app = blockFor('exhausted', true)
+    for (const text of [person, app]) {
+      expect(text).toContain('so this stopped')
+      expect(text).toContain('Nothing resumes on its own')
+      expect(text).not.toMatch(/tell the user|resume (it|later)|will resume/iu)
+    }
+    expect(person).toContain('resets at 00:00 UTC')
+    expect(app).not.toContain('00:00')
+    expect(blockFor('failed', true)).toBe(BUDGET_BLOCKS.failed)
+    expect(blockFor('unconfigured', false)).toBe(BUDGET_BLOCKS.unconfigured)
+  })
 })
