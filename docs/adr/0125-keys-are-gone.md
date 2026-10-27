@@ -58,7 +58,8 @@ There is no server API key. Gone with it are:
 - **The owner API:** a credential calls `/w/<slug>/api/…` (ADR 0116). The Worker no longer routes a bearer on bare
   `/api/<owner path>`, so it is not found (404).
 - **`/mcp`:** admits OAuth access tokens only, a person's client's or an app's. Any other bearer, a former `gbk_` key
-  included, gets the sign-in challenge (401 with `WWW-Authenticate` naming the resource metadata).
+  included, gets the sign-in challenge (401 with `WWW-Authenticate` naming the resource metadata and, for a bearer
+  that was presented, `invalid_token`, ADR 0122).
 - **The `workspace` argument:** every caller's tools take it, as its reach says. An app's reach is its installations.
   `workspace_list` is always offered.
 
