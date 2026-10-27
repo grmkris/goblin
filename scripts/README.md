@@ -27,7 +27,7 @@ they run in GitHub Actions or `GOBLIN_BREAK_GLASS=1` is set (`deploy_runs_in_ci_
 
 ## UI acceptance
 
-`bun run ui:acceptance` opens the stage named by the smoke session file (`.local/dev-session.json` unless another
+`bun run ui:acceptance` opens the stage named by a saved session file (`.local/dev-session.json` unless another
 is given; a `http://localhost` session runs it against the local stack) in headless Chromium, as a phone (390×844,
 touch), landscape phone (844×390), tablet (820×1180), hybrid pointer device and desktop (1440×900), light and dark,
 on `/c/1`, a thread's panel, Threads, Activity, Work, Settings, Connections and Apps. It only taps and clicks what
@@ -52,19 +52,36 @@ Its private receipts and screenshots go under `.local/goblin-acceptance/local-*`
 
 ## Smoke
 
-The smoke needs `GOBLIN_OWNER_EMAIL` and `GOBLIN_SMOKE_SESSION_FILE`. Capture a session through a real OTP login,
-then save `{"origin":"https://dev.goblin.surf","cookie":"<session cookie>"}` in a mode-600 private JSON file.
-Smoke checks that origin, validates the live session and verifies its owner email before agent requests. It never
-requests a login code or creates an account. Local uses `http://localhost:18971` and Alchemy's captured `.eml` code.
+On dev and prod the smoke signs in as a checks account by emailed code
+([ADR 0128](../docs/adr/0128-the-post-deploy-smoke-signs-in-for-real-and-runs-one-model-turn.md)). Through a mysi
+trusted workload (the deploy job's GitHub OIDC token exchanged for a 15-minute mysi token, no stored key,
+`scripts/smoke-workload.ts`) it takes the account's mailbox cursor with myinbox's `address_cursor`, asks the stage for a
+code, reads it with `verification_wait` and signs in (`scripts/smoke-signin.ts`). The session stays in the smoke's
+memory; it is never written or logged. It needs `GOBLIN_SMOKE_EMAIL` (the account's address), `GOBLIN_SMOKE_MAILBOX_WORKLOAD`
+(the workload policy's client id) and a job with `permissions: id-token: write`; `MYSI_ORIGIN` names another mysi than
+`https://mysi.lol`. The stage's `GOBLIN_SIGNUP_INVITE_CODE` goes with the sign-in, so the first deploy after a reset
+makes the account again. Without any of them the smoke runs only the public checks and records why in `signIn`:
+`skipped: no mailbox access (no test account configured)`, `(no workload configured)` or `(no OIDC token in this job)`.
+Outside CI there is no OIDC request, so `smoke:dev` and `smoke:prod` from the box run the public checks.
 
-By default the smoke makes no model call ([ADR 0106](../docs/adr/0106-the-deploy-smoke-makes-no-model-call.md)): it
-runs steps 1 to 3 and step 4 without its turns (consent, token, `initialize`, the tool list, an inspection read, a read
-of main's recent messages, revocation and a 401). That is what every dev deploy runs. With `GOBLIN_SMOKE_TURNS=1` it
-also runs the agent turns in steps 4 to 9, which spend model tokens and write conversation history: turns in main, a
-new side thread and a background subagent. It leaves the owner's grants unchanged and renews resident authority
-through owner requests. With `GOBLIN_SMOKE_MODEL` set, the turns temporarily select that offered model
-(`GOBLIN_MODEL_ID` or `GOBLIN_MODELS`) and the owner's effective pick is restored in `finally`, including after a failed
-step. Unset, turns use the owner's pick. Housekeeping still uses `GOBLIN_MEMORY_MODEL`.
+The public checks: health and the client bundle's build, `/health`'s sign-in methods and sign-up policy, an anonymous
+member path refused 401, the internal routes refused, a sign-up without the invite code refused (unless sign-up is
+open), the MCP resource metadata, the page, and on prod the canonical `www` redirect.
+
+The local stack has no real mailbox, so `smoke:local` signs in with a saved session: capture one through a real OTP
+login (Alchemy's captured `.eml` code), save `{"origin":"http://localhost:18971","cookie":"<session cookie>"}` in a
+mode-600 private JSON file, and set `GOBLIN_SMOKE_SESSION_FILE` and `GOBLIN_OWNER_EMAIL` in `.local/local.env`. The
+smoke checks that origin and the session's email. Never print or commit the cookie.
+
+Signed in, the smoke makes one model turn by default (ADR 0128; ADR 0106 keeps the others off): it runs steps 1 to 3,
+step 4 without its turns (consent, token, `initialize`, the tool list, an inspection read, a read of main's recent
+messages, revocation and a 401), then steps 9 and 10. That is what every dev and prod deploy runs. With
+`GOBLIN_SMOKE_TURNS=1` it also runs the agent turns in steps 4 to 8, which spend more model tokens and write
+conversation history: turns in main, a new side thread and a background subagent. It leaves the account's grants
+unchanged and renews resident authority through its own requests. With `GOBLIN_SMOKE_MODEL` set (the stage's cheapest
+offered model, `GOBLIN_MODEL_ID` or `GOBLIN_MODELS`), every turn runs on it and the account's own pick is restored in
+`finally`, including after a failed step. Unset, turns use the account's pick. Housekeeping still uses
+`GOBLIN_MEMORY_MODEL`.
 
 1. health; the deployed client bundle names this checkout's commit (`VITE_GOBLIN_BUILD`, which `scripts/stage.ts`
    sets for every deployed stage, so crash reports name their release; skipped on the local stack); unless sign-up is
@@ -85,33 +102,44 @@ step. Unset, turns use the owner's pick. Housekeeping still uses `GOBLIN_MEMORY_
 8. an agent app (`scripts/smoke-apps.ts`): in a new thread the agent builds `smoke-counter` from exact code, the owner
    runs its schedule now and its revision moves by one, then the owner deletes it (typing its name) and the thread
    closes;
-9. the smoke's own sends reached the stage's Analytics Engine flows dataset (`goblin-<stage>-flows`, ADR 0037): a
-   `send` point since the smoke started, waited for up to two minutes. It reads with the operator's own
-   `CLOUDFLARE_API_TOKEN` (Account Analytics read) and `CLOUDFLARE_ACCOUNT_ID` from the environment; without them, or with a token that cannot read Analytics Engine, the receipt says why it was skipped.
+9. the integrator paths (`scripts/smoke-integrator.ts`) around the deploy's one turn: a fresh app registered with an
+   https return URL; its install through `/api/install/:clientId` (the redirect carries `installation`, `workspace` and
+   `state`) and its decline (`error=access_denied`); its `client_credentials` token (Basic auth, `resource=<origin>/mcp`,
+   scope `goblin`) reads `/w/<slug>/api/access`, creates and lists a Topic, polls the Topic's Events and opens its
+   stream; an MCP client connected by consent sends `Reply with the single word: pong` to that Topic with the Tasks
+   extension and follows `tasks/get` to `completed`, after `tasks/get` without the extension is refused (`-32021`); the
+   app's stream opened with `MESSAGES_SNAPSHOT` and reached `RUN_FINISHED`, Events saw the turn, and another workspace
+   (404), the bare `/api/topics` (404) and `/api/members` (403) are refused. The Topic is archived, the app deleted and
+   the client revoked;
+10. the smoke's own sends reached the stage's Analytics Engine flows dataset (`goblin-<stage>-flows`, ADR 0037): a
+    `send` point since the smoke started, waited for up to two minutes. It reads with the operator's own
+    `CLOUDFLARE_API_TOKEN` (Account Analytics read) and `CLOUDFLARE_ACCOUNT_ID` from the environment; without them, or with a token that cannot read Analytics Engine, the receipt says why it was skipped.
 
-Inbound turns run in main as `goblin-smoke`. The threads are archived, the app deleted and the client revoked through
+Inbound turns run in main as `goblin-smoke`. The threads are archived, the apps deleted and the clients revoked through
 `finally` cleanup; their history and the subagent remain. Cleanup requests can themselves fail.
 
 On success the script writes `.local/smoke-<stage>-receipt.json` (mode 600) and prints it. A failure prints its reason
 and completed HTTP steps but writes no new receipt; an older file may remain. Receipts contain model/server names,
 statuses, counts and booleans, never tokens, cookies or message bodies.
 
-| Receipt field                          | What it checks or records                                                                                      |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `stage`, `signup`, `resident`, `model` | Target stage, sign-up mode, active authority and smoke model, `owner pick`, or `none` without turns.           |
-| `build`                                | The commit the deployed client bundle names, or `skipped: <reason>` on the local stack.                        |
-| `flows`                                | `ok`: a `send` point of the smoke reached the flows dataset; or `skipped: <reason>`.                           |
-| `servers`                              | Server statuses, tool/grant counts and probe outcome (`ok`, `error` or `none`) with the tool probed.           |
-| `files`                                | `ok`: the owner's file round trip, the file deleted again.                                                     |
-| `edge`                                 | `envelope: ok` and `csrf: refused`: failures answer in the envelope with their ref; CSRF on every write.       |
-| `app`                                  | `ok`: an agent app built, run by the owner (revision +1) and deleted.                                          |
-| `inbound`                              | Initialization, inspection read, model turn and resident tool call (`skipped` without turns), history, 401.    |
-| `inbound.author`                       | `ok`: the smoke user's message has author `goblin-smoke`.                                                      |
-| `thread`, `shared`                     | `ok` and `true`: the empty thread ran and wrote a new `app.shared` entry to main.                              |
-| `subagent`                             | `reported`: the Delegate's result reached main (passively, or answered when synthesis was asked for).          |
-| `memory.messages`                      | Messages logged since memory activation; must be greater than zero.                                            |
-| `memory.summarized`                    | Messages covered before the newest input by the last placed memory view; recorded without a minimum assertion. |
-| `utc`, `status`, `steps`               | Completion timestamp, `passed` and HTTP steps with status and the answer's ref (its log lines, ADR 0124).      |
+| Receipt field                          | What it checks or records                                                                                       |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `stage`, `signup`, `resident`, `model` | Target stage, sign-up mode, active authority, and the smoke model or `own pick`.                                |
+| `signIn`                               | `email code via mysi`, `saved session` (local), or `skipped: no mailbox access (<why>)` with `mode: read-only`. |
+| `integrator`                           | Step 9: install, decline, token, REST, stream, Events count, MCP, Task `completed`, turn `pong`, refusals.      |
+| `build`                                | The commit the deployed client bundle names, or `skipped: <reason>` on the local stack.                         |
+| `flows`                                | `ok`: a `send` point of the smoke reached the flows dataset; or `skipped: <reason>`.                            |
+| `servers`                              | Server statuses, tool/grant counts and probe outcome (`ok`, `error` or `none`) with the tool probed.            |
+| `files`                                | `ok`: the owner's file round trip, the file deleted again.                                                      |
+| `edge`                                 | `envelope: ok` and `csrf: refused`: failures answer in the envelope with their ref; CSRF on every write.        |
+| `app`                                  | `ok`: an agent app built, run by the owner (revision +1) and deleted.                                           |
+| `inbound`                              | Initialization, inspection read, model turn and resident tool call (`skipped` without turns), history, 401.     |
+| `inbound.author`                       | `ok`: the smoke user's message has author `goblin-smoke`.                                                       |
+| `thread`, `shared`                     | `ok` and `true`: the empty thread ran and wrote a new `app.shared` entry to main.                               |
+| `subagent`                             | `reported`: the Delegate's result reached main (passively, or answered when synthesis was asked for).           |
+| `memory.messages`                      | Messages logged since memory activation; must be greater than zero.                                             |
+| `memory.summarized`                    | Messages covered before the newest input by the last placed memory view; recorded without a minimum assertion.  |
+| `utc`, `status`, `steps`               | Completion timestamp, `passed` and HTTP steps with status and the answer's ref (its log lines, ADR 0124).       |
 
 Not covered here: the owner's Connect flow (it needs the owner at the remote server's consent screen), rendering
 MCP Apps, the browser UI, thread branching, memory-summary quality, skills, and live Source message/reply or notice
@@ -119,9 +147,7 @@ delivery. Those use the separate [attended acceptance checklist](../docs/develop
 
 Prod commands use `.local/prod.env` and require `GOBLIN_CONFIRM_PROD=1` in the calling shell:
 `bun run plan:prod`, `bun run deploy:prod` (break-glass outside CI), `bun run smoke:prod`.
-`smoke:prod` defaults to public health, the client bundle's build, anonymous auth refusal, invite refusal, MCP metadata, the page and the canonical `www` redirect. Owner email/session remain empty until the real OTP bootstrap.
-Only supplying the email and private OTP session file for an operator test account enables the full acceptance flow, including model turns.
-Use a dedicated operator test account for production smoke.
+`smoke:prod` is the same smoke; from the box it has no OIDC request, so it runs the public checks.
 
 `GOBLIN_DOMAIN` with the required `GOBLIN_ZONE_ID` attaches the stage's custom domain through Alchemy: `dev.goblin.surf` on dev, `goblin.surf` on
 prod, plus `www.goblin.surf` on prod. The Worker redirects alternate hosts to `GOBLIN_APP_URL`, preserving the path
@@ -137,25 +163,44 @@ Branches: `dev` (the default) deploys dev, `prod` deploys prod. Everything runs 
   masks every secret value of eight or more characters in the log, then writes the stage files mode 600; `--cleanup`
   removes them in an `always()` step. `scripts/release.py dev <sha>` requires a clean checkout at that sha, the sha to
   be the dev tip and the `Check` job of its `ci.yml` push run to have passed; it plans (no delete or replace, and no
-  create of goblinAuth, Files or Web, which would mean lost state), deploys, runs the authenticated smoke, drift and the
+  create of goblinAuth, Files or Web, which would mean lost state), deploys, runs the smoke, drift and the
   D1 migration inventory (the database found by exact name through the Cloudflare API), and writes `dev.json`, the
-  run's `dev-acceptance` artifact (90 days). Receipts go to `GOBLIN_RECEIPTS_DIR`, step logs to
+  run's `dev-acceptance` artifact (90 days). Its `acceptance` is `authenticated` when the smoke signed in, or `public`
+  with the smoke's `signIn` reason while the checks account or its mailbox workload is not configured; once both are,
+  a smoke that did not sign in fails the release (ADR 0128). The job's OIDC request reaches the smoke alone. Receipts go to `GOBLIN_RECEIPTS_DIR`, step logs to
   `GOBLIN_LOG_DIR` (default `.local/receipts` and `.local/release-logs`); a failed step prints its log's last 40 lines.
 - **Promote** with `bun run promote <full-sha>` from any checkout with `gh` signed in and `.local/cloud.env`. It needs
   no prod credentials: it requires the sha to be the dev tip with a passing Check, its `dev-acceptance` receipt to be
-  authenticated and name the live dev Worker version, and `prod...sha` to fast-forward, then moves `prod` with
+  accepted (authenticated, or public because the smoke's sign-in is not configured) and name the live dev Worker
+  version, and `prod...sha` to fast-forward, then moves `prod` with
   `force=false` and prints the started run.
 - **Deploy prod** runs after Check for every push to `prod`, in the `prod` environment. `release.py prod` repeats the
   provenance and acceptance checks, requires the push to fast-forward from its `before` sha and not be forced, keeps the
-  first release invite-only (until the `goblin-prod` Worker serves a version), then releases as on dev with the public
-  smoke unless an operator test session is configured. Its artifact is `prod-acceptance`.
+  first release invite-only (until the `goblin-prod` Worker serves a version), then releases as on dev, with the same
+  smoke. Its artifact is `prod-acceptance`. When a step fails, `release.py` leaves a content-free `failure.json` (the
+  step and the smoke's machine reason) in `GOBLIN_LOG_DIR`, and `scripts/release-alert.ts prod` writes the job's step
+  summary (the failed step, the prod commit before the push and the way back) and sends one Telegram line through the
+  `GOBLIN_ALERT_WORKLOAD` workload, or says why it skipped it. Nothing is rolled back.
 
 GitHub secrets per environment, each a whole file (`gh secret set <name> --env <stage> < file`, never echoed):
 `GOBLIN_STAGE_ENV` (`.local/<stage>.env`), `GOBLIN_CLOUD_ENV` (only
 `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`), `ALCHEMY_STATE_STORE_CREDENTIALS` (the cached
 `~/.alchemy/credentials/default/cloudflare-state-store.json`, because the Cloudflare token cannot read the Secrets
-Store to mint it) and, on dev only, `GOBLIN_SMOKE_SESSION` (`dev-session.json`). The `dev` environment admits only the
-dev branch and `prod` only prod; a pull request runs on its merge ref and reaches neither.
+Store to mint it) and `GOBLIN_SMOKE_EMAIL` (the checks account's address, a secret so the public log masks it). The
+`dev` environment admits only the dev branch and `prod` only prod; a pull request runs on its merge ref and reaches
+neither. No session cookie is stored (ADR 0128).
+
+GitHub variables (`gh variable set <name> --env <stage> --body <value>`): `GOBLIN_SMOKE_MAILBOX_WORKLOAD` on `dev` and
+on `prod`, each the client id (`wl_…`) of that environment's mailbox policy; `GOBLIN_ALERT_WORKLOAD` on `prod`, the alert
+policy's client id; optionally `MYSI_ORIGIN`. Unset, the smoke stays public and the alert skips, each saying why.
+
+The owner makes three trusted-workload policies in mysi. Each policy's claims are exact:
+
+| Policy        | `repository`     | `ref`             | `workflow_ref`                                            | `environment` | Saved access                                                                               |
+| ------------- | ---------------- | ----------------- | --------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------ |
+| Mailbox, dev  | `grmkris/goblin` | `refs/heads/dev`  | `grmkris/goblin/.github/workflows/ci.yml@refs/heads/dev`  | `dev`         | myinbox read (`address_cursor`, `verification_wait`) on the checks account's address only. |
+| Mailbox, prod | `grmkris/goblin` | `refs/heads/prod` | `grmkris/goblin/.github/workflows/ci.yml@refs/heads/prod` | `prod`        | The same.                                                                                  |
+| Alert, prod   | `grmkris/goblin` | `refs/heads/prod` | `grmkris/goblin/.github/workflows/ci.yml@refs/heads/prod` | `prod`        | mygram `message_send` at reply level, limited to the alerts chat.                          |
 
 Alchemy state for dev and prod lives in the account's shared Cloudflare state store (`scripts/alchemy-state.ts`), as
 `goblin/<stage>` beside myapps' and the retired Goblin Wallet's stacks. It has no lock: each stage deploys in one
@@ -166,7 +211,7 @@ stacks, refuses a non-empty destination or an unsettled record, verifies sha256 
 
 The first production release is invite-only with no configured invite or owner email, so it admits nobody until the
 operator securely supplies those values. Its dedicated model key offers the approved five models and caps spending at
-$10 per 30 days. After the owner signs in with delivered OTP, run authenticated prod smoke.
+$10 per 30 days. Its smoke signs in as the checks account once the prod mailbox workload is configured (ADR 0128).
 
 Roll back code with a revert commit on `dev`: CI deploys it to dev with full acceptance, then `bun run promote` it.
 When prod cannot wait for that, roll the `goblin-prod` Worker back to its previous version in

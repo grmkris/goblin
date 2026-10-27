@@ -49,8 +49,8 @@ to override. To try sign-in through an OpenID Connect provider, set `GOBLIN_OIDC
 `GOBLIN_OIDC_CLIENT_SECRET` there, with `http://localhost:18971/api/auth/callback/oidc` allowed at the provider.
 
 Open the app and use **Create an account**, enter an email and the six-digit code captured under
-`apps/web/.alchemy/local/email/`. Each account gets a workspace of its own, with its agent (ADR 0089). Smoke uses the session from
-an actual OTP login: store `{"origin":"http://localhost:18971","cookie":"<session cookie>"}` in
+`apps/web/.alchemy/local/email/`. Each account gets a workspace of its own, with its agent (ADR 0089). `smoke:local`
+uses the session from an actual OTP login (a deployed stage's smoke signs in by itself, ADR 0128): store `{"origin":"http://localhost:18971","cookie":"<session cookie>"}` in
 `.local/local-session.json` with mode 600, then configure `GOBLIN_OWNER_EMAIL` and `GOBLIN_SMOKE_SESSION_FILE`. Never
 print or commit the cookie. Smoke validates the file origin and the authenticated owner before making agent calls.
 
@@ -150,15 +150,15 @@ Dev (`https://dev.goblin.surf`) is the daily instance. Its configuration is `.lo
 | `GOBLIN_MAIL_SENDER` | The sign-in code sender, on a Cloudflare Email Sending domain. A deployment needs it, an OpenID Connect provider, or both (ADR 0064). |
 | `GOBLIN_OIDC_ISSUER`, `GOBLIN_OIDC_CLIENT_ID`, `GOBLIN_OIDC_CLIENT_SECRET` | Optional, all three or none: sign-in through an OpenID Connect provider (discovery from the issuer, PKCE, `openid email profile`). The provider must allow the redirect URI `<GOBLIN_APP_URL>/api/auth/callback/oidc`. The secret is bound as a secret. |
 | `GOBLIN_OIDC_LABEL` | The provider button's words, such as `Sign in with mysi`; unset, "Sign in with" the issuer's host. |
-| `GOBLIN_OWNER_EMAIL`, `GOBLIN_SMOKE_SESSION_FILE` | Existing owner email and mode-600 OTP session JSON; only smoke reads them. |
+| `GOBLIN_OWNER_EMAIL`, `GOBLIN_SMOKE_SESSION_FILE` | The local stack only: an existing owner's email and a mode-600 OTP session JSON for `smoke:local`. A deployed stage's smoke signs in as the checks account instead (ADR 0128). |
 | `GOBLIN_BETTER_AUTH_SECRET` | Better Auth's secret. |
 | `GOBLIN_MODEL_BASE_URL`, `GOBLIN_MODEL_ID`, `GOBLIN_MODEL_KEY` | Optional, all three or none: the deployment's own model endpoint (dev and prod: Railway LiteLLM and the dedicated capped key, never the master key). Without them each owner brings their own in Settings, and until they do every model call is refused with `NoModelEndpoint` (ADR 0064). |
 | `GOBLIN_MODELS` | More LiteLLM model names users may pick, comma-separated; `GOBLIN_MODEL_ID` stays the default. Allow each on the LiteLLM key too. |
 | `GOBLIN_OWNER_WORKSPACE_ID`, `GOBLIN_OWNER_MODELS` | Optional: the deployment owner's own workspace ID (private: keep it in `.local`; `GET /api/workspaces` names it) and comma-separated LiteLLM model names on the owner's own subscriptions, offered in that workspace alone and never in a server's work: through an API key, or in a Topic a key made (ADR 0087). A name also in `GOBLIN_MODELS` is everyone's. Allow each on the LiteLLM key too. |
 | `GOBLIN_DAILY_TOKEN_CAP` | The most model tokens one account may use in a UTC day, a positive whole number; unset or anything else, no cap (ADR 0058). Once a capped day is spent, model calls are refused until 00:00 UTC. |
 | `GOBLIN_MEMORY_MODEL` | The offered model for thread names, Topic Conversation memory summaries and skill-draft decisions. It is not selected by price; unset or not offered uses the default. |
-| `GOBLIN_SMOKE_TURNS` | `1` runs the smoke's agent turns, which spend model tokens; unset, the smoke makes no model call (ADR 0106). |
-| `GOBLIN_SMOKE_MODEL` | Optional model for smoke turns. It must be one of the offered models; unset keeps the owner's pick. |
+| `GOBLIN_SMOKE_TURNS` | `1` runs the smoke's agent turns beyond its one pong turn, which spend more model tokens (ADRs 0106, 0128). |
+| `GOBLIN_SMOKE_MODEL` | The stage's cheapest offered model, for every smoke turn; unset keeps the signed-in account's own pick. |
 | `GOBLIN_MCP_SERVERS` | JSON list of outbound servers every account starts with (`[]` for none): `[{"connectionId":"notes","endpoint":"https://mcp.example.com/mcp","label":"Notes"}]`. Each owner still signs in, and grants start empty; nothing in code depends on which servers they are (ADR 0063). |
 | `GOBLIN_MCP_SHELF` | Optional JSON list of shelf entries (`id`, `title`, `description`, `endpoint`, `group`, `signIn`): one with the id of goblin's own entry replaces it, the others are added after (ADR 0061). Unset, the shelf is goblin's. |
 | `GOBLIN_CREDENTIAL_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts outbound MCP credentials and Events secrets/envelopes; derives purpose-separated hook tokens. |
@@ -198,23 +198,21 @@ Keep Alchemy pinned to the version shared with myapps. A reset changes only `gob
    wait for any active Deploy dev job to finish; disabling the workflow does not stop one already running. Ensure
    no other operator is deploying or destroying the stage. Keep the reset commit local until recreation succeeds.
 3. Check the stage's mode-600 `.local/dev.env`, `.local/cloud.env` and state-store credentials without printing them.
-   Keep signup invite-only or closed, with a working path for the operator to create the replacement smoke account.
+   Keep signup invite-only or closed; the smoke's checks account signs up again with the invite code (ADR 0128).
    Run `bun run plan:dev` and verify the target is the dev stack.
 4. From the checked commit, run `GOBLIN_BREAK_GLASS=1 bun run destroy:dev -- --confirm-reset`, then
    `GOBLIN_BREAK_GLASS=1 bun run deploy:dev`. Both commands must succeed. If recreation fails, keep CI paused and
    investigate the failed resource before retrying; do not copy or delete unrelated stacks' state.
 5. Check `/health` and the served build SHA. Create the operator account through the real sign-up and one-time-code
-   flow, then save its session as `.local/dev-session.json` with mode 600. The old session is invalid. Set
-   `GOBLIN_OWNER_EMAIL` and `GOBLIN_SMOKE_SESSION_FILE` in the private dev configuration, and update the GitHub
-   environment secret without echoing it:
-   `gh secret set GOBLIN_SMOKE_SESSION --repo grmkris/goblin --env dev < .local/dev-session.json`.
-   Update `GOBLIN_STAGE_ENV` through the same file-input mechanism if its configuration changed.
-6. Run authenticated `bun run smoke:dev` and `bun run drift:dev`. Reconnect and grant any services required by the
-   smoke, or record their explicit skips. The smoke's agent turns (`GOBLIN_SMOKE_TURNS=1`) require a configured model endpoint. A public health check
-   alone is not authenticated acceptance.
+   flow. No session is saved for CI: Deploy dev's smoke signs in as the checks account by an emailed code and makes it
+   again with the invite code (ADR 0128). Update the `GOBLIN_STAGE_ENV` secret without echoing it if its configuration
+   changed: `gh secret set GOBLIN_STAGE_ENV --repo grmkris/goblin --env dev < .local/dev.env`.
+6. Run `bun run smoke:dev` and `bun run drift:dev`. From the box the smoke has no OIDC request, so it runs its public
+   checks; Deploy dev's smoke in step 7 signs in. The smoke's turns require a configured model endpoint.
 7. Re-enable `ci.yml` with `gh workflow enable ci.yml --repo grmkris/goblin`, then push the checked dev commit. CI must
    pass Check and Deploy dev for that exact SHA. Its `dev-acceptance` receipt must name that SHA and live Worker
-   version, authenticated smoke, verified drift and the migration filenames present in `apps/runtime/migrations`.
+   version, the smoke's acceptance (`authenticated`, or `public` with its reason while the mailbox workload is not
+   configured), verified drift and the migration filenames present in `apps/runtime/migrations`.
    Re-enabling a workflow does not replay a push made while it was disabled.
 
 Recreate the owner's setup in a separate attended session: sign in, reconnect MySI, review the exact tools and Events
@@ -508,22 +506,26 @@ only after Cloudflare Email Sending verifies the sender. A deploy needs mail, an
 authorize a production deploy.
 
 `GOBLIN_CONFIRM_PROD=1 bun run plan:prod` previews, and the same explicit guard protects `deploy:prod` and
-`smoke:prod`; a `deploy:prod` outside CI is also break-glass (`GOBLIN_BREAK_GLASS=1`). The default prod smoke is read-only: health and an anonymous protected-route probe. An operator smoke
-account's mode-600 OTP session file opts into the full flow. MCP clients authorize against the stage's origin.
+`smoke:prod`; a `deploy:prod` outside CI is also break-glass (`GOBLIN_BREAK_GLASS=1`). Deploy prod runs the same
+signed-in smoke as dev (ADR 0128); from the box, without an OIDC request, `smoke:prod` runs its public checks. MCP
+clients authorize against the stage's origin.
 
 There are two branches: `dev` (the default; every change lands here) deploys to `dev.goblin.surf`, and `prod` to
 `goblin.surf`. One workflow, `.github/workflows/ci.yml`,
 runs on GitHub-hosted runners. Check runs on every push and pull request. A push to `dev` that passes Check runs Deploy
 dev: `scripts/release.py dev` requires that exact dev tip and its passing Check, plans without a delete, replace or
-re-create of goblinAuth, Files or Web, deploys, and verifies authenticated smoke, drift and the D1 migration inventory.
+re-create of goblinAuth, Files or Web, deploys, and verifies the smoke (signed in as the checks account once its mailbox
+workload is configured, ADR 0128), drift and the D1 migration inventory.
 The smoke runs up to three times, four minutes apart: right after a deploy the agents' Durable Objects still run the
 old code for some minutes.
 Its sanitized receipt is the run's `dev-acceptance` artifact. A superseded dev commit cannot deploy.
 
 Promote with `bun run promote <full-sha>` from any checkout with `gh` signed in and `.local/cloud.env`. It deploys nothing:
-it requires that SHA's dev Check, its `dev-acceptance` receipt (authenticated, at the live dev Worker version) and a
-fast-forward, then moves `prod`. That push runs Deploy prod, which repeats those checks, refuses a forced push, and
-releases goblin prod.
+it requires that SHA's dev Check, its `dev-acceptance` receipt (authenticated, or public while the smoke's sign-in is
+not configured, at the live dev Worker version) and a fast-forward, then moves `prod`. That push runs Deploy prod, which
+repeats those checks, refuses a forced push, and releases goblin prod with the same smoke. A failed prod release is a
+red run, a step summary naming the failed step and the prod commit before the push, and a Telegram message through a
+mysi workload; nothing is rolled back (scripts/README.md, "Release operation").
 Destructive plans still require a separate explicit reset decision: CI refuses a plan that deletes, replaces,
 destroys or unbinds anything (unbinding a Durable Object namespace deletes its class and its data), and such a change
 is released by hand, break-glass, once its plan has been reviewed.
@@ -539,9 +541,8 @@ secrets are GitHub environment secrets behind branch policies (`dev` for the dev
 the logs before use; pull requests run only Check and never reach them. See
 [ADR 0046](adr/0046-production-promotion-and-public-source.md).
 
-For the first production bootstrap, an operator supplies `GOBLIN_OWNER_EMAIL` and `GOBLIN_SIGNUP_INVITE_CODE` in the
-mode-600 prod environment, signs in through the real email OTP flow, and records the resulting mode-600
-`prod-session.json`.
+For the first production bootstrap, an operator supplies `GOBLIN_SIGNUP_INVITE_CODE` in the mode-600 prod environment
+and signs in through the real email OTP flow. The prod smoke makes its checks account with the same code.
 
 ## Owner routing and Apps tests
 

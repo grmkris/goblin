@@ -33,8 +33,9 @@ smoke are different evidence.
   where it has one) through `probeOf`. Poll with `until`/`waitFor` (`until.ts`).
 - Test grants and resident authority before any model, MCP or App call.
 - No credentials in fixtures, transcripts, logs or receipts.
-- `bun run smoke:local` and `bun run smoke:dev` prove the real paths, including inbound OAuth, without touching the
-  owner's main thread or grants.
+- `bun run smoke:local` and the deploys' smoke prove the real paths, including inbound OAuth, an installed app and one
+  model turn, as their own account (the deploys' checks account, ADR 0128), never the owner's. From the box,
+  `smoke:dev` has no OIDC request and runs only its public checks.
 - Report provider, network, auth and deployment gaps as unknown; synthetic tests do not prove real hosts.
 - Events tests use `test/mcp/events-fixture.ts` in workerd: exact capabilities, raw-byte signatures, challenge,
   replay, gaps, early refresh, termination, shared consumers, durable skill invalidation and failed-handler recovery.

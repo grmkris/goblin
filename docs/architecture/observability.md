@@ -185,3 +185,12 @@ owner can ask through a Source why something failed. Without an operation id it 
 with one, that turn's timeline. Each event comes in a line (kind, status, timing, tool or model, error), never
 content, and the result is marked untrusted because its private details can come from remote servers. It grants nothing. A conversation
 that is not in `app_conversations` (a routine's run) has no entries page; its turns and events are still in the ledger.
+
+### After a deploy
+
+Every dev and prod deploy runs the smoke (`scripts/smoke-dev.ts`, ADR 0128) signed in as a checks account by an emailed
+code read through a mysi workload. Its one model turn is sent by an MCP client as a Task and watched on an installed
+app's stream and Events, and its `send` must reach the flows dataset. A failed prod release is a red run, a step
+summary naming the failed step and the prod commit before the push, and one Telegram line through a second mysi
+workload; nothing is rolled back. Until the mailbox workload is configured the smoke runs its public checks and its
+receipt says why (scripts/README.md, "Smoke").

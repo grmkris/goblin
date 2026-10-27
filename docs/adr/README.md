@@ -43,7 +43,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0040](0040-topic-and-persona-setup.md) | Topic setup and Persona setup | Accepted; amended by 0067 |
 | [0041](0041-connections-tell-me-hand-to.md) | Connections, Tell me and Hand to | Accepted; amended by 0066, 0068, 0070 and 0073; its notice scrub superseded by 0104 |
 | [0042](0042-mcp-2026-client.md) | MCP 2026 client: live tool lists, URL requests and step-up | Accepted |
-| [0046](0046-production-promotion-and-public-source.md) | Daily development, deliberate production promotion and public source | Accepted; amended by 0077, 0106 |
+| [0046](0046-production-promotion-and-public-source.md) | Daily development, deliberate production promotion and public source | Accepted; amended by 0077, 0106, 0128 (prod runs the signed-in smoke; public dev acceptance while its sign-in is unconfigured) |
 | [0052](0052-one-mysi-connection-and-a-shelf-that-needs-no-sign-in.md) | One mysi connection and a shelf that needs no sign-in | Accepted; amended by 0061, 0063, 0075 and 0096 |
 | [0053](0053-pinned-services-and-apps-with-a-chat-bar.md) | Pinned services and Apps with a chat bar | Accepted; amended by 0063; its pins by default superseded by 0078 |
 | [0055](archive/0055-telegram-chats-route-to-topics.md) | Telegram chats route to Topics | Superseded by 0066 and 0069 |
@@ -97,7 +97,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0103](0103-a-thread-declares-its-mcp-servers.md) | A thread declares the MCP servers its Personas call | Accepted |
 | [0104](0104-routine-data-stays-as-its-producer-sent-it.md) | Routine data stays as its producer sent it | Accepted |
 | [0105](archive/0105-a-keys-secret-rotates-in-place.md) | A key's secret rotates in place | Superseded by 0125 |
-| [0106](0106-the-deploy-smoke-makes-no-model-call.md) | The deploy smoke makes no model call | Accepted |
+| [0106](0106-the-deploy-smoke-makes-no-model-call.md) | The deploy smoke makes no model call | Accepted; amended by 0128 (one pong turn per deploy, on the stage's cheapest model) |
 | [0107](0107-a-turn-says-what-it-ran-with-and-reads-as-an-opentelemetry-trace.md) | A turn says what it ran with, and reads as an OpenTelemetry trace | Accepted; built |
 | [0108](archive/0108-a-keys-topic-is-a-room.md) | A key's Topic is a room | Superseded by 0115 |
 | [0109](0109-every-chat-streams-ag-ui-through-a-durable-stream.md) | Every chat streams AG-UI events through a durable stream | Accepted; built; amends 0081; its transport, join, signed URL, epochs and tiers superseded by 0110; the Durable Streams class removed from every stage (2026-10-24) |
@@ -119,3 +119,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0125](0125-keys-are-gone.md) | Keys are gone: every credential is a person's client or an installed app | Accepted; supersedes 0105 and the key parts of 0081, 0084, 0085, 0090, 0091, 0114, 0116 and 0118 |
 | [0126](0126-preserve-powers-when-keys-retire.md) | Preserve approved powers when keys retire | Accepted; amends 0125's migration and stored receipt behavior |
 | [0127](0127-a-client-may-ask-for-a-workspace-its-person-belongs-to.md) | A client may ask for a workspace its person belongs to: refused with a link that adds it whole | Accepted; amends 0097, 0114, 0116 |
+| [0128](0128-the-post-deploy-smoke-signs-in-for-real-and-runs-one-model-turn.md) | The post-deploy smoke signs in for real and runs one model turn: an emailed code read through a mysi workload, no cookie in CI, on dev and prod; public with its reason until configured; a failure is a red run and Telegram, no rollback | Accepted; amends 0046, 0106 |
