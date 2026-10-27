@@ -135,3 +135,14 @@ export const failureAttributes = (error: unknown): RunAttributes => ({
   [RunAttribute.errorType]: outcomeOf(error),
   [RunAttribute.error]: failureSummary(outcomeOf(error)),
 })
+
+/**
+ * A failed task's attributes: the code its task recorded (`detail.code`, e.g. a Persona turn's `no_answer`) when
+ * telemetry knows it, else its error's type. Never its message.
+ */
+export const taskFailureAttributes = (error: { readonly detail?: unknown }): RunAttributes => {
+  const code = Predicate.hasProperty(error.detail, 'code') ? safeFailureCode(error.detail.code) : 'error'
+  return code === 'error'
+    ? failureAttributes(error)
+    : { [RunAttribute.errorType]: code, [RunAttribute.error]: failureSummary(code) }
+}

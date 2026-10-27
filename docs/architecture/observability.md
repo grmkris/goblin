@@ -24,7 +24,11 @@ a run. The ledger supplies exact submission/task correlation when a cache entry 
 - **Tool call:** a tool task, ended by its result entry: name, family (`mcp`, `app`, `subagent`, `memory`,
   `builtin`), argument and result sizes, the MCP server and tool of an `mcp_call`, and `blocked`, `interrupted` or
   `error` with the first diagnostic. A call to a tool that is not there is one event, from the generation.
-- **Compaction** tasks, and any other task that faults or is orphaned (a subagent relay, an anchor).
+- **Compaction** tasks, and any other task that faults, fails or is orphaned (a subagent relay, an anchor, a Persona's
+  turn): an `error` event from when this isolate first saw the task to when it ended (one first seen ended, after a
+  restart, starts and ends at once). A failure carries its code in `error.detail.code` (a Persona's turn: `no_answer`,
+  `provider_error`, `aborted`, `ask_missing`, `fork_missing`, `answer_unwritten`, or its refusal's type, such as
+  `BudgetExhausted`), which becomes the event's error type; a failure with a message alone is `error`.
 
 Every event also says what it ran with (ADR 0107, `telemetry/ran-with.ts`, stamped by `RunTelemetry`): the release's
 commit (`gen_ai.agent.version`, from `VITE_GOBLIN_BUILD`), and on a model call (`model.attempt`, `model.aux`) the

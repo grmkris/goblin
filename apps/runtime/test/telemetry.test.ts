@@ -209,6 +209,11 @@ const nameList = (count: number, length: number) =>
   Array.from({ length: count }, (_, index) => `${String(index).padStart(2, '0')}${'n'.repeat(length - 2)}`).join(',')
 
 const ofKind = (events: readonly RunEvent[], kind: RunEvent['kind']) => events.filter((event) => event.kind === kind)
+/** A Persona turn's task record `id` in conversation 3, in `state`. */
+const personaTurn = (id: number, state: object) => ({
+  type: 'task',
+  value: { id, conversationId: 3, kind: 'goblin.persona-turn', input: {}, state },
+})
 /** `work` as one remote MCP step, reported to `report` when it ends; its value, or its own rejection. */
 const step = <A>(mcpStep: McpStep, work: () => Promise<A>, report: StepReport) =>
   Effect.runPromise(Effect.promise(work).pipe(timed(mcpStep, report)))
@@ -356,6 +361,48 @@ describe('run telemetry from Pi commits (unit, in-memory Pi)', () => {
     })
     expect(Object.keys(second?.attributes ?? {})).not.toContain(RunAttribute.toolsRemoved)
     expect(JSON.stringify(events)).not.toContain('PRIVATE_')
+  })
+
+  it('records a failed task from when it was first seen, under the code it recorded, never its message', () => {
+    const collected = new Collected()
+    const at = { now: 1000 }
+    const recorder = new PiRunRecorder(
+      new RunTelemetry([collected], (id) => collected.read(id)),
+      collected,
+      () => at.now,
+    )
+    recorder.observe(commit(1, [personaTurn(12, { status: 'running', checkpoint: { phase: 'ask' } })]))
+    at.now = 5000
+    recorder.observe(
+      commit(2, [
+        personaTurn(12, {
+          status: 'terminal',
+          outcome: { status: 'failed', error: { message: 'PRIVATE_MESSAGE', detail: { code: 'no_answer' } } },
+        }),
+      ]),
+    )
+    const [failed] = ofKind(collected.events(), 'error')
+    expect(failed).toMatchObject({
+      status: 'error',
+      startedAt: 1000,
+      endedAt: 5000,
+      attributes: { [RunAttribute.errorType]: 'no_answer', [RunAttribute.error]: 'The model gave no answer.' },
+    })
+    // A code telemetry does not know falls back to the error's type; a task first seen ended starts and ends at once.
+    recorder.observe(
+      commit(3, [
+        personaTurn(13, {
+          status: 'terminal',
+          outcome: { status: 'failed', error: { message: 'x', detail: { code: 'made up' } } },
+        }),
+      ]),
+    )
+    expect(ofKind(collected.events(), 'error').at(-1)).toMatchObject({
+      startedAt: 5000,
+      endedAt: 5000,
+      attributes: { [RunAttribute.errorType]: 'error' },
+    })
+    expect(JSON.stringify(collected.events())).not.toContain('PRIVATE_')
   })
 
   it('marks a restatement after compaction a baseline, counted and never named, and drops section text', () => {

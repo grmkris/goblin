@@ -44,6 +44,10 @@ const FAILURES: Readonly<Record<string, string>> = {
   outside_power: 'Outside the turn’s power.',
   interrupted: 'Execution interrupted.',
   aborted: 'Execution cancelled.',
+  no_answer: 'The model gave no answer.',
+  ask_missing: 'The message to answer is gone.',
+  fork_missing: 'The Persona’s conversation is gone.',
+  answer_unwritten: 'The answer could not be written.',
 }
 const UPSTREAM = new Set([
   'unauthorized',

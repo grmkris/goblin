@@ -66,7 +66,8 @@ const System = Schema.Struct({
 })
 const Outcome = Schema.Struct({
   status: Schema.String,
-  error: Schema.optional(Schema.Struct({ message: Schema.String })),
+  /** A failure's message and, when its task recorded one, its telemetry code (`detail.code`); the recorder reads only the code. */
+  error: Schema.optional(Schema.Struct({ message: Schema.String, detail: Schema.optional(Schema.Unknown) })),
   reason: Schema.optional(Schema.String),
 })
 const Task = Schema.Struct({

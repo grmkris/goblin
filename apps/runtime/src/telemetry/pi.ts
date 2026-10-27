@@ -2,7 +2,7 @@ import { type CommitPublication, type Harness, type Session } from '@earendil-wo
 import { RunAttribute, type RunAttributes, type RunEvent, type RunEventKind } from '@goblin/contracts/telemetry'
 import { nowMillis } from '../clock.ts'
 import { BACKGROUND, type PiContext } from '../pi/context.ts'
-import { GEN_AI_PROVIDER, answerAttributes, failureAttributes, statusOfStop } from './attributes.ts'
+import { GEN_AI_PROVIDER, answerAttributes, statusOfStop, taskFailureAttributes } from './attributes.ts'
 import { expectedFailure, failureSummary, safeFailureCode } from './safety.ts'
 import { MAX_FAILURE_LINES, type RunTelemetry, reportTelemetryFailure } from './events.ts'
 import { rehydrateTelemetry } from './rehydrate.ts'
@@ -190,7 +190,7 @@ const outcomeStatus = (outcome: Outcome) => {
 }
 const outcomeAttributes = (outcome: Outcome): RunAttributes => ({
   [RunAttribute.reason]: outcome.status,
-  ...(outcome.error === undefined ? {} : failureAttributes(outcome.error)),
+  ...(outcome.error === undefined ? {} : taskFailureAttributes(outcome.error)),
   ...(outcome.reason === undefined
     ? {}
     : {
@@ -198,6 +198,9 @@ const outcomeAttributes = (outcome: Outcome): RunAttributes => ({
         [RunAttribute.error]: failureSummary(outcome.reason),
       }),
 })
+
+/** The task kinds whose run events their own entries start and end (a model attempt, a tool call, a compaction). */
+const OWN_EVENTS: ReadonlySet<string> = new Set(['pi.generation', 'pi.tool', 'pi.compaction'])
 
 /** At most this many tool calls and submissions remembered between commits; older ones resolve from the ledger. */
 const MAX_REMEMBERED = 500
@@ -232,6 +235,8 @@ export class PiRunRecorder {
   readonly #attempts = new Map<string, { readonly id: string; readonly attempt: number; partial: boolean }>()
   /** Per generation task, what its `pi.system` entries changed, for the attempt they come before. */
   readonly #prompts = new Map<string, PromptChange>()
+  /** When this recorder first saw each other task (a Persona turn, a relay): its failure's run event starts there. */
+  readonly #starts = new Map<string, number>()
   #failures = 0
 
   constructor(telemetry: RunTelemetry, ledger: RecorderLedger, clock: () => number = nowMillis) {
@@ -487,6 +492,7 @@ export class PiRunRecorder {
     const { state } = task
     if (state.outcome !== undefined)
       return this.#ended(task.kind, { id: taskId, conversation, taskId }, state.outcome, now)
+    if (!OWN_EVENTS.has(task.kind) && !this.#starts.has(taskId)) remember(this.#starts, taskId, now)
     if (task.kind === 'pi.generation') {
       const checkpoint = state.checkpoint
       if (state.status !== 'running' || checkpoint?.phase !== 'request' || checkpoint.attempt === undefined) return
@@ -572,6 +578,9 @@ export class PiRunRecorder {
 
   /** A task that ended without the entry that normally ends its event: a fault, an abort, a lost definition. */
   #ended(kind: string, place: Place, outcome: Outcome, now: number): void {
+    // From when this recorder first saw the task; one it first sees ended (after a restart) starts and ends at once.
+    const startedAt = this.#starts.get(place.taskId) ?? now
+    this.#starts.delete(place.taskId)
     const status = outcomeStatus(outcome)
     const attributes = status === 'ok' ? {} : outcomeAttributes(outcome)
     if (kind === 'pi.generation') {
@@ -590,7 +599,7 @@ export class PiRunRecorder {
         kind: 'error',
         status: 'error',
         ...this.#scope(place.conversation, place.taskId),
-        startedAt: now,
+        startedAt,
         endedAt: now,
         attributes: { [RunAttribute.taskKind]: kind, ...attributes },
       })
