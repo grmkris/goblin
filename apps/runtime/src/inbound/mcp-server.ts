@@ -1,3 +1,4 @@
+import type { ReachedWorkspace } from '../auth/workspaces.ts'
 import {
   ChatId,
   CreatePersona,
@@ -15,7 +16,6 @@ import {
   runInput,
   threadStart,
 } from '@goblin/contracts'
-import type { WorkspaceView } from '@goblin/contracts'
 import { McpServer } from '@modelcontextprotocol/server'
 import * as Schema from 'effect/Schema'
 import { grantTools, routineTools, serverTools, setupTools } from './config-tools.ts'
@@ -337,16 +337,17 @@ const personaTools = (server: McpServer, add: Add, reply: Reply) => {
  * grant names, each with their role. `named` when a call must say which: unless the client reaches exactly one it was
  * given.
  */
-export interface CallerReach {
+/** The workspaces a caller reaches now, and whether its calls must name one. */
+export interface CallerReach<W extends ReachedWorkspace = ReachedWorkspace> {
   readonly all: boolean
-  readonly workspaces: readonly WorkspaceView[]
+  readonly workspaces: readonly W[]
   readonly named: boolean
 }
 
 /** What the guide adds for a client: the workspaces it reaches and how a call names one. */
 const reachGuide = (reach: CallerReach): string => {
   // Slugs and roles only: a workspace's name is free text its admins write, and these instructions reach the model.
-  const named = reach.workspaces.map(({ slug, role }) => `${slug} (${role})`).join(', ')
+  const named = reach.workspaces.map(({ slug, role }) => `${slug} (${role ?? 'installed app'})`).join(', ')
   if (reach.workspaces.length === 0)
     return ' This client reaches no workspace now: its person changes that in Settings → MCP clients.'
   const which = reach.all ? `all of its person's workspaces, ones they join later included: ${named}` : named
@@ -404,14 +405,20 @@ const workspaceList = (server: McpServer, reach: CallerReach) =>
     {
       title: 'Workspaces this client reaches',
       description:
-        "The workspaces this client reaches now, with its person's role and how many people each has; `all` when it reaches every one of its person's, ones they join later included. Name one by its id or slug in a tool's `workspace`.",
+        "The workspaces this client reaches now, with its person's role (an installed app's carry none: it is no member) and how many people each has; `all` when it reaches every one of its person's, ones they join later included. Name one by its id or slug in a tool's `workspace`.",
       inputSchema: standard(Schema.Struct({})),
       annotations: reads,
     },
     () =>
       text({
         all: reach.all,
-        workspaces: reach.workspaces.map(({ id, slug, name, role, members }) => ({ id, slug, name, role, members })),
+        workspaces: reach.workspaces.map(({ id, slug, name, role, members }) => ({
+          id,
+          slug,
+          name,
+          ...(role === undefined ? {} : { role }),
+          members,
+        })),
       }),
   )
 

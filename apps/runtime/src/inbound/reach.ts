@@ -1,9 +1,9 @@
-import type { WorkspaceView } from '@goblin/contracts'
 import { InvalidInput, NotFound } from '../http/errors.ts'
+import type { ReachedWorkspace } from '../auth/workspaces.ts'
 import type { CallerReach } from './mcp-server.ts'
 
 /** The workspace a client's call is for: the one it names, by id or slug, or its only one when it names none. */
-export const workspaceFor = (reach: CallerReach, named: string | undefined): WorkspaceView => {
+export const workspaceFor = <W extends ReachedWorkspace>(reach: CallerReach<W>, named: string | undefined): W => {
   const [only] = reach.workspaces
   if (named === undefined) {
     if (reach.named || only === undefined) throw new InvalidInput({ reason: 'workspace' })

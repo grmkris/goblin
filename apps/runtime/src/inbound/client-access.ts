@@ -2,7 +2,7 @@ import type { WorkspaceView } from '@goblin/contracts'
 import { type GrantRecord, type WorkspaceCoverage, coveragesOf, credentialOf } from '../auth/grants.ts'
 import { clientName, verifyAccessToken } from '../auth/index.ts'
 import { type AppInstallation, appInstallations } from '../auth/installs.ts'
-import { reachedBy } from '../auth/workspaces.ts'
+import { type ReachedWorkspace, reachedBy } from '../auth/workspaces.ts'
 import type { RuntimeEnv } from '../env.ts'
 import { type Credential, type Member, memberName } from '../http/api/principal.ts'
 import { NotFound, Unauthenticated } from '../http/errors.ts'
@@ -19,7 +19,7 @@ export interface ClientAccess {
   readonly grant: GrantRecord
   readonly coverage: ReadonlyMap<string, WorkspaceCoverage>
   readonly person: { readonly user: string; readonly name: string }
-  readonly reach: CallerReach
+  readonly reach: CallerReach<WorkspaceView>
   readonly expiresAt: number
 }
 
@@ -40,7 +40,7 @@ export interface AppAccess {
 export type TokenAccess = ClientAccess | AppAccess
 
 /** A reach of `workspaces`: one never named, several (or "all") always named, so joining another never changes a call. */
-const reachOf = (all: boolean, workspaces: readonly WorkspaceView[]): CallerReach => ({
+const reachOf = <W extends ReachedWorkspace>(all: boolean, workspaces: readonly W[]): CallerReach<W> => ({
   all,
   workspaces,
   named: all || workspaces.length !== 1,
@@ -93,11 +93,18 @@ export interface TokenCall {
   readonly member?: Member
 }
 
+/** A client's person's role in `workspaceId`, one of its reach's; `NotFound` for any other. */
+const roleIn = (access: ClientAccess, workspaceId: string) => {
+  const view = access.reach.workspaces.find((each) => each.id === workspaceId)
+  if (view === undefined) throw new NotFound({ what: 'workspace' })
+  return view.role
+}
+
 /**
  * The credential a token's grant makes in `workspace` (ADR 0114): a client's, with its person as a member there with
  * their role; an app's, its installation's there, with no member (ADR 0118). `workspace` is one of its reach's.
  */
-export const callIn = (access: TokenAccess, workspace: WorkspaceView): TokenCall => {
+export const callIn = (access: TokenAccess, workspace: ReachedWorkspace): TokenCall => {
   const identity = { id: access.clientId, name: access.name }
   if (access.kind === 'app') {
     const installation = access.installations.get(workspace.id)
@@ -113,7 +120,7 @@ export const callIn = (access: TokenAccess, workspace: WorkspaceView): TokenCall
   }
   return {
     credential: credentialOf(access.grant, identity, ws),
-    member: { ...access.person, role: workspace.role, shared: workspace.members > 1 },
+    member: { ...access.person, role: roleIn(access, workspace.id), shared: workspace.members > 1 },
   }
 }
 
@@ -125,7 +132,7 @@ export const tokenAt = async (
   env: RuntimeEnv,
   token: string,
   slug: string,
-): Promise<TokenCall & { readonly workspace: WorkspaceView }> => {
+): Promise<TokenCall & { readonly workspace: ReachedWorkspace }> => {
   const access = await tokenAccess(env, token)
   const workspace = access.reach.workspaces.find((each) => each.slug === slug)
   if (workspace === undefined) throw new NotFound({ what: 'workspace' })

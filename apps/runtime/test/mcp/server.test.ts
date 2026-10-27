@@ -328,6 +328,20 @@ describe('one /mcp, the workspaces a consent reaches (ADR 0097)', () => {
     }
   })
 
+  it("lists an installed app's workspaces with no role, since an app is no member (ADR 0118)", async () => {
+    const { role: _owner, ...installedA } = A
+    const { role: _member, ...installedB } = B
+    const { mcp } = await reaching({ all: false, workspaces: [installedA, installedB], named: true })
+    try {
+      const listedReach = textOf(await mcp.callTool({ name: 'workspace_list', arguments: {} }))
+      expect(listedReach).toEqual({ all: false, workspaces: [installedA, installedB] })
+      expect(mcp.getInstructions()).toContain('swarmm (installed app), sidequest (installed app)')
+      expect(mcp.getInstructions()).not.toContain('(member)')
+    } finally {
+      await mcp.close()
+    }
+  })
+
   it('needs no workspace from a client given exactly one, yet checks one it names after its reach shrank', async () => {
     const { mcp, calls } = await reaching({ all: false, workspaces: [A], named: false })
     try {

@@ -47,7 +47,7 @@ admitted, and one that is not an access token gets the sign-in challenge, naming
   holds each call to its own installation's grant.
 - **Workspaces.** Every request reads the grant's workspaces (`reachedBy`, `auth/workspaces.ts`): the person's
   memberships when it reaches all of them, else those it names that they are still a member of, with their role in
-  each; an app's are its installations. Every tool takes a `workspace` argument (an id or slug), added as each tool
+  each; an app's are its installations, with no role, since an app is no member. Every tool takes a `workspace` argument (an id or slug), added as each tool
   registers (`inbound/mcp-server.ts`): optional for a caller that reaches exactly one, required for any other; and
   `workspace_list` plus the server's instructions name what it reaches. Each call goes to that workspace's agent with
   the credential its grant makes there and, for a client, the person as a member with their role there

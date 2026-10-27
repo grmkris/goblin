@@ -11,6 +11,12 @@ import type { RuntimeEnv } from '../env.ts'
 
 type Database = RuntimeEnv['AUTH_DB']
 
+/**
+ * A workspace a caller reaches: for an OAuth client with its person's role there; for an installed app with none, since
+ * an app is no member and its installation's grant alone decides (ADR 0118).
+ */
+export type ReachedWorkspace = Omit<WorkspaceView, 'role'> & { readonly role?: WorkspaceView['role'] }
+
 /** The signed-in person, as their session names them. */
 export interface Person {
   readonly id: string

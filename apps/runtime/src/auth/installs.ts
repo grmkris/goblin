@@ -31,7 +31,7 @@ import {
   workspaceTerms,
 } from './grants.ts'
 import { createAuth } from './options.ts'
-import { type Person, workspacesOf } from './workspaces.ts'
+import { type Person, type ReachedWorkspace, workspacesOf } from './workspaces.ts'
 
 /**
  * Apps and their installations (ADR 0118), in goblin's own auth D1 tables (0006) beside Better Auth's. An app is a
@@ -489,7 +489,7 @@ export const approveInstall = async (
 
 /** One installation an app's token reaches: its workspace, and its grant and coverage there. */
 export interface AppInstallation {
-  readonly workspace: WorkspaceView
+  readonly workspace: ReachedWorkspace
   readonly grant: GrantRecord
   readonly coverage: WorkspaceCoverage
 }
@@ -504,7 +504,7 @@ interface ReachRow {
 
 /**
  * The live installations of app `clientId` (ADR 0118): what its token reaches, each workspace with its grant. An app is
- * no member: its workspaces carry the role `member` only as the least a view may say; its grant alone decides.
+ * no member, so its workspaces carry no role; its grant alone decides.
  */
 export const appInstallations = async (env: RuntimeEnv, clientId: string): Promise<readonly AppInstallation[]> => {
   const db = env.AUTH_DB
@@ -524,13 +524,7 @@ export const appInstallations = async (env: RuntimeEnv, clientId: string): Promi
       if (grant === undefined || !isLive(grant, now)) return undefined
       const coverage = await coverageIn(db, grant, row.workspaceId)
       if (coverage === undefined) return undefined
-      const workspace = {
-        id: row.workspaceId,
-        slug: row.slug,
-        name: row.name,
-        role: 'member',
-        members: row.members,
-      } as const
+      const workspace = { id: row.workspaceId, slug: row.slug, name: row.name, members: row.members }
       return { workspace, grant, coverage }
     }),
   )

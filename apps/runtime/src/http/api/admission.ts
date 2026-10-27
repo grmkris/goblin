@@ -1,7 +1,8 @@
-import { GRANT_SPEC, type Need, ROLE_POWER, type WorkspaceView, missingFor } from '@goblin/contracts'
+import { GRANT_SPEC, type Need, ROLE_POWER, missingFor } from '@goblin/contracts'
 import { type AppError, Forbidden, accessInsufficient } from '@goblin/contracts/api'
 import * as Effect from 'effect/Effect'
 import type { Credential, Member } from './principal.ts'
+import type { ReachedWorkspace } from '../../auth/workspaces.ts'
 
 /**
  * How the edge admits a credential (ADRs 0114, 0116, 0118, 0125): an OAuth token, a client's or an installed app's, on
@@ -10,7 +11,7 @@ import type { Credential, Member } from './principal.ts'
 
 /** An OAuth token admitted on a workspace's path: its workspace, credential, and the person it acts for if any. */
 export interface TokenAdmission {
-  readonly workspace: WorkspaceView
+  readonly workspace: ReachedWorkspace
   readonly credential: Credential
   readonly member?: Member
 }
