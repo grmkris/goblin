@@ -99,6 +99,9 @@ export default defineConfig({
     ],
     // Replaced by anti-slop's SAFETY-comment rule: an assertion is allowed when it states its invariant.
     'typescript/no-unsafe-type-assertion': 'off',
+    // oxlint 1.90 asks the type-aware backend for this rule, and the pinned tsrs-lint release (tools/tsrs-lint.ts) does
+    // not implement it, so it refuses to start. It was never on under 1.89. Turn it on when the pin gains it.
+    'typescript/no-unsafe-enum-assignment': 'off',
     // Off: it flags Effect's `return yield* Effect.fail(...)` (which Effect's missingReturnYieldStar diagnostic
     // requires), exhaustive switches, `process.exit` and React effect cleanups. TypeScript reports a missing return
     // value on its own.
