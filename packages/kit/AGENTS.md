@@ -1,7 +1,7 @@
 # Kit
 
-Read the root instructions first. Owns goblin's rich blocks: Mermaid diagrams (Pele, ADR 0129), charts (Recharts)
-and maps (Leaflet), with the pure spec parsers they share. One implementation serves chat and agent app UIs. Each
+Read the root instructions first. Owns goblin's rich blocks: Mermaid diagrams and charts (Pele, ADRs 0129 and 0130)
+and maps (Leaflet, through the kit's own `MapView`), with the pure spec parsers they share. One implementation serves chat and agent app UIs. Each
 heavy module is its own entry so it loads only when used. Charts, maps and diagrams render in the browser; the app's server render check uses stand-ins for them.
 
 No network beyond the map's tile host; specs come from model output, so parse them as untrusted input and fall back

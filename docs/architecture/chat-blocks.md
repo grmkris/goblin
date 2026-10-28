@@ -16,8 +16,11 @@ links, scripts, handlers, styles, URLs and a diagram's own classes never reach t
 its natural size in the kit's native dialog, with Panzoom 4.6.2, fitted 1–4× zoom, bounded dragging/pinch gestures and
 keyboard node selection; a graph kind's neighbours come from Pele's parsed model (`diagram-graph.ts`), and other kinds
 zoom and pan without selectable nodes. `Diagram` defaults to interactive; `interactive={false}` draws without the
-explorer. The dialog stays inside an agent app's frame. Charts are Recharts in the five `--chart-*` tokens; maps are Leaflet over
-OpenStreetMap's raster tiles, quieted to the theme by a CSS filter, the one host a block fetches from. The persona prefers ordinary Markdown and describes the supported fence grammars; text-only external message tools receive the fenced text.
+explorer. The dialog stays inside an agent app's frame. Charts are Pele's drawings too (ADR 0130): `chartSource` writes the spec
+as a Mermaid `xychart` (bars or lines, named series, the unit on the value axis) or `pie`, drawn through the same
+allowlist, each series in the next `--chart-*` token; there are no area or stacked charts and no hover values. Maps are
+Leaflet itself, driven by the kit's `MapView` (no react-leaflet), over OpenStreetMap's raster tiles, quieted to the
+theme by a CSS filter, the one host a block fetches from; a label reaches a tooltip as text, never HTML. The persona prefers ordinary Markdown and describes the supported fence grammars; text-only external message tools receive the fenced text.
 
 ## Interactive replies
 

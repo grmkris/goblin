@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { chartSource } from '../src/chart.tsx'
 import { diagramLinks } from '../src/diagram-graph.ts'
 import { diagramSvg } from '../src/diagram-render.ts'
 import { mapPoints } from '../src/specs.ts'
@@ -25,6 +26,9 @@ describe('chart specs', () => {
     const base = { type: 'line', x: 'day', series: [{ key: 'v' }], data: [{ day: 'Mon', v: 1 }] }
     expect(chartSpec('{"type":')).toBeUndefined()
     expect(chartSpec(JSON.stringify({ ...base, type: 'radar' }))).toBeUndefined()
+    // Pele draws charts (ADR 0130): Mermaid's chart grammar has no area or stacked series.
+    expect(chartSpec(JSON.stringify({ ...base, type: 'area' }))).toBeUndefined()
+    expect(chartSpec(JSON.stringify({ ...base, stacked: true }))?.type).toBe('line')
     expect(chartSpec(JSON.stringify({ ...base, series: [] }))).toBeUndefined()
     expect(
       chartSpec(JSON.stringify({ ...base, series: Array.from({ length: 6 }, (_, n) => ({ key: `s${n}` })) })),
@@ -107,5 +111,40 @@ describe('diagrams', () => {
     ])
     expect(await diagramLinks('pie title Pets\n "Dogs" : 40')).toBeUndefined()
     expect(await diagramLinks('not a diagram at all')).toBeUndefined()
+  })
+})
+
+describe('charts drawn by Pele', () => {
+  const sales = {
+    type: 'bar' as const,
+    x: 'month',
+    unit: 'k€',
+    series: [{ key: 'eu', label: 'Europe "EU"' }, { key: 'us' }],
+    data: [
+      { month: 'Jan, early', eu: 3, us: 4 },
+      { month: 'Feb', eu: '5', us: null },
+      { month: 'Mar', eu: 0.0000001, us: -2 },
+    ],
+  }
+  it('write a spec as Mermaid: quoted categories and names, the unit on the value axis, plain decimals', () => {
+    expect(chartSource(sales)).toBe(
+      [
+        'xychart-beta',
+        '  x-axis ["Jan, early", "Feb", "Mar"]',
+        '  y-axis "k€"',
+        '  bar "Europe #quot;EU#quot;" [3, 5, 0.0000001]',
+        '  bar "us" [4, 0, -2]',
+      ].join('\n'),
+    )
+    expect(chartSource({ ...sales, type: 'pie' })).toBe(
+      ['pie', '  "Jan, early" : 3', '  "Feb" : 5', '  "Mar" : 0.0000001'].join('\n'),
+    )
+  })
+  it('draw every kind it writes, named series in a legend', async () => {
+    for (const type of ['bar', 'line', 'pie'] as const) {
+      const svg = await diagramSvg(chartSource({ ...sales, type }))
+      expect(svg?.startsWith('<svg')).toBe(true)
+      expect(svg).toContain(type === 'pie' ? 'Jan, early' : 'Europe')
+    }
   })
 })

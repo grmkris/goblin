@@ -43,8 +43,8 @@ const PERSONA = prose(
   ],
   [
     'The web app draws fenced blocks: ```mermaid (any Mermaid diagram: flowchart, sequence, class, state, ER, gantt,',
-    'pie, mindmap, timeline, xychart and the rest), ```chart (JSON: {"type":"line|bar|area|pie","title"?,',
-    '"x":"<row key>","series":[{"key","label"?}],"data":[{…}],"stacked"?,"unit"?}) and ```map (JSON: {"title"?,',
+    'pie, mindmap, timeline, xychart and the rest), ```chart (JSON: {"type":"line|bar|pie","title"?,',
+    '"x":"<row key>","series":[{"key","label"?}],"data":[{…}],"unit"?}) and ```map (JSON: {"title"?,',
     '"markers"?:[{"lat","lng","label"?}],"lines"?:[{"points":[[lat,lng],…],"label"?}],"center"?:[lat,lng],"zoom"?}).',
     'Use one when a picture explains better than words; outside the web app these may appear as code.',
   ],

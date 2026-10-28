@@ -179,7 +179,7 @@ export type State = {
   `window` or `document` in `useEffect` or event handlers, never while rendering: the check cannot run those and says
   so in `viewWarning`.
 - Imports: `react`, `@goblin/app`, `@goblin/ui`, `@goblin/kit/chart`, `@goblin/kit/map`, `@goblin/kit/diagram`,
-  `recharts`, `react-leaflet`, `leaflet`, `lucide-react` (icons), and types from `./app`. Nothing else.
+  `leaflet`, `lucide-react` (icons), and types from `./app`. Nothing else.
 - Style with Tailwind classes and goblin's colours, which follow light and dark: `bg-background`, `bg-card`,
   `bg-muted`, `text-foreground`, `text-muted-foreground`, `text-primary`, `text-destructive`, `border`. Do not write
   colours like `#fff` or `bg-white`. Lay it out as **Design** says; the width changes, so let rows wrap.
@@ -204,7 +204,7 @@ export type State = {
 
 ```tsx
 import { Chart } from '@goblin/kit/chart'
-// type: line, bar, area or pie; x names the category column; up to five numeric series
+// type: line, bar or pie; x names the category column; up to five numeric series, each named in the legend
 <Chart spec={{ type: 'bar', x: 'day', series: [{ key: 'minutes', label: 'Minutes' }], data: rows }} />
 
 import { MapView } from '@goblin/kit/map'
@@ -222,8 +222,8 @@ import { Check, Trash2 } from 'lucide-react'
 <Trash2 className="size-4" />
 ```
 
-Use Recharts or react-leaflet directly for what the kit does not draw; on a react-leaflet map use `CircleMarker`, not
-`Marker`.
+For what the kit does not draw, draw SVG yourself in the view, or use `leaflet` directly for a map (its `circleMarker`,
+not `marker`, whose image the frame cannot load).
 
 ## App placement
 

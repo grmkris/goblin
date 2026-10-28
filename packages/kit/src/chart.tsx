@@ -1,127 +1,74 @@
-import type { ReactElement } from 'react'
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { mount, register } from 'pele/core'
+import pie from 'pele/diagrams/pie'
+import xychart from 'pele/diagrams/xychart'
+import { type ReactNode, useState } from 'react'
+import { type PeleMount, PeleDrawing } from './pele-drawing.tsx'
+import { DIAGRAM_OPTIONS } from './pele-options.ts'
 import type { ChartSpec } from './specs.ts'
 
-/** The n-th series colour: goblin's five chart tokens, in order. */
-const color = (index: number) => `var(--chart-${(index % 5) + 1})`
+// A chart is only ever an xychart or a pie, so those two renderers are all this chunk carries.
+register(xychart, pie)
+const mountChart: PeleMount = (element, text, options) => Promise.resolve(mount(element, text, options))
 
-const tick = { fill: 'var(--muted-foreground)', fontSize: 12 }
-const tooltip = {
-  contentStyle: {
-    background: 'var(--popover)',
-    border: '1px solid var(--border)',
-    borderRadius: 8,
-    color: 'var(--popover-foreground)',
-    fontSize: 12,
-  },
-  cursor: { fill: 'var(--muted)', opacity: 0.5 },
+/** A chart's source can be longer than a diagram's (500 rows of five series); Pele still bounds it. */
+const CHART_OPTIONS = { ...DIAGRAM_OPTIONS, limit: 100_000 } as const
+
+/** A label in Mermaid's quotes: a quote mark as its entity, whitespace as one space. */
+const quoted = (text: string): string => `"${text.replaceAll('"', '#quot;').replaceAll(/\s+/gu, ' ').trim()}"`
+
+/** Plain decimals: Mermaid's chart grammar refuses exponents (`1e-7`). */
+const DECIMAL = new Intl.NumberFormat('en-US', { useGrouping: false, maximumFractionDigits: 20 })
+
+/** A cell as a number: a finite number or a numeric string, else 0, since a chart's series has a value at every row. */
+function value(cell: string | number | null | undefined): number {
+  const number = typeof cell === 'string' ? Number(cell) : (cell ?? 0)
+  return Number.isFinite(number) ? number : 0
 }
 
-function cartesian(spec: ChartSpec, rows: Record<string, string | number | null>[]): ReactElement {
-  const stack = spec.stacked === true ? { stackId: 'stack' } : {}
-  const axes = [
-    <CartesianGrid key="grid" stroke="var(--border)" vertical={false} />,
-    <XAxis key="x" dataKey={spec.x} tick={tick} tickLine={false} axisLine={false} />,
-    <YAxis
-      key="y"
-      tick={tick}
-      tickLine={false}
-      axisLine={false}
-      width={44}
-      {...(spec.unit !== undefined && { unit: spec.unit })}
-    />,
-    <Tooltip key="tooltip" {...tooltip} />,
-    ...(spec.series.length > 1 ? [<Legend key="legend" wrapperStyle={{ fontSize: 12 }} />] : []),
-  ]
-  if (spec.type === 'bar')
-    return (
-      <BarChart data={rows}>
-        {axes}
-        {spec.series.map((series, index) => (
-          <Bar
-            key={series.key}
-            dataKey={series.key}
-            name={series.label ?? series.key}
-            fill={color(index)}
-            radius={3}
-            {...stack}
-          />
-        ))}
-      </BarChart>
+const category = (spec: ChartSpec, row: ChartSpec['data'][number]): string => quoted(String(row[spec.x] ?? ''))
+
+/**
+ * The Mermaid source Pele draws a chart spec as (ADR 0130): a pie of the first series' positive values by category,
+ * or an xychart of each series as bars or a line, named for the legend, with the unit as the value axis' title.
+ */
+export function chartSource(spec: ChartSpec): string {
+  if (spec.type === 'pie') {
+    const key = spec.series[0]?.key ?? ''
+    const slices = spec.data.flatMap((row) =>
+      value(row[key]) > 0 ? [`  ${category(spec, row)} : ${DECIMAL.format(value(row[key]))}`] : [],
     )
-  if (spec.type === 'area')
-    return (
-      <AreaChart data={rows}>
-        {axes}
-        {spec.series.map((series, index) => (
-          <Area
-            key={series.key}
-            dataKey={series.key}
-            name={series.label ?? series.key}
-            stroke={color(index)}
-            fill={color(index)}
-            fillOpacity={0.2}
-            {...stack}
-          />
-        ))}
-      </AreaChart>
-    )
-  return (
-    <LineChart data={rows}>
-      {axes}
-      {spec.series.map((series, index) => (
-        <Line
-          key={series.key}
-          dataKey={series.key}
-          name={series.label ?? series.key}
-          stroke={color(index)}
-          strokeWidth={2}
-          dot={false}
-        />
-      ))}
-    </LineChart>
-  )
+    return ['pie', ...slices].join('\n')
+  }
+  return [
+    'xychart-beta',
+    `  x-axis [${spec.data.map((row) => category(spec, row)).join(', ')}]`,
+    ...(spec.unit === undefined ? [] : [`  y-axis ${quoted(spec.unit)}`]),
+    ...spec.series.map(
+      (series) =>
+        `  ${spec.type} ${quoted(series.label ?? series.key)} [${spec.data.map((row) => DECIMAL.format(value(row[series.key]))).join(', ')}]`,
+    ),
+  ].join('\n')
 }
 
-function pie(spec: ChartSpec, rows: Record<string, string | number | null>[]): ReactElement {
-  const value = spec.series[0]?.key ?? ''
-  // Each slice takes its colour from its row.
-  const slices = rows.map((row, index) => ({ ...row, fill: color(index) }))
-  return (
-    <PieChart>
-      <Tooltip {...tooltip} />
-      <Legend wrapperStyle={{ fontSize: 12 }} />
-      <Pie data={slices} dataKey={value} nameKey={spec.x} innerRadius="45%" stroke="var(--background)" />
-    </PieChart>
-  )
-}
-
-/** A chart drawn from a spec in goblin's chart colours, following the theme through its tokens. */
-export function Chart({ spec }: { readonly spec: ChartSpec }) {
-  const rows = spec.data.map((row) => ({ ...row }))
+/**
+ * A chart drawn from a spec by Pele, through the diagrams' allowlist, in goblin's chart colours (`--pele-series-*` in
+ * `kit.css`); one Pele does not draw shows `fallback`.
+ */
+export function Chart({ spec, fallback = null }: { readonly spec: ChartSpec; readonly fallback?: ReactNode }) {
+  const source = chartSource(spec)
+  const [failed, setFailed] = useState<string>()
+  if (failed === source) return fallback
   return (
     <figure className="kit-chart">
       {spec.title !== undefined && <figcaption>{spec.title}</figcaption>}
-      <div className="kit-chart-plot">
-        <ResponsiveContainer width="100%" height="100%">
-          {spec.type === 'pie' ? pie(spec, rows) : cartesian(spec, rows)}
-        </ResponsiveContainer>
-      </div>
+      <PeleDrawing
+        source={source}
+        label={spec.title === undefined ? `Chart (${spec.type})` : `Chart: ${spec.title}`}
+        className="kit-chart-drawing"
+        options={CHART_OPTIONS}
+        mount={mountChart}
+        onFail={() => setFailed(source)}
+      />
     </figure>
   )
 }

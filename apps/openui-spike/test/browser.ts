@@ -79,7 +79,7 @@ try {
     checks.push(`${label}: source edits render`)
 
     await page.getByRole('tab', { name: 'Review the week' }).click()
-    await page.locator('.recharts-wrapper').waitFor()
+    await page.locator('.kit-chart-drawing > svg').waitFor()
     await page.waitForTimeout(700)
     await fit(page, `${label} dashboard`)
     await page.screenshot({ path: resolve(output, `${label}-dashboard.png`), fullPage: true })

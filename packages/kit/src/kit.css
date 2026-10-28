@@ -16,7 +16,8 @@
  * no redraw. Lines stay strong as Pele draws them; node borders sit between text and page.
  */
 .kit-diagram,
-.kit-diagram-explorer {
+.kit-diagram-explorer,
+.kit-chart {
   --pele-bg: var(--background);
   --pele-fg: var(--foreground);
   --pele-muted: var(--muted-foreground);
@@ -206,13 +207,24 @@
     border-radius: 0;
   }
 }
-.kit-chart-plot {
-  height: 16rem;
+/* Charts are Pele's too (ADR 0130): each series, and each pie slice, in the next of goblin's five chart colours. */
+.kit-chart {
+  --pele-series-1: var(--chart-1);
+  --pele-series-2: var(--chart-2);
+  --pele-series-3: var(--chart-3);
+  --pele-series-4: var(--chart-4);
+  --pele-series-5: var(--chart-5);
+  --pele-series-6: var(--chart-1);
+  --pele-series-7: var(--chart-2);
+  --pele-series-8: var(--chart-3);
+  --pele-series-9: var(--chart-4);
+  --pele-series-10: var(--chart-5);
 }
-.kit-chart .recharts-wrapper:focus-visible,
-.kit-chart .recharts-surface:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+.kit-chart-drawing > svg {
+  display: block;
+  max-inline-size: 100%;
+  block-size: auto;
+  margin: 0;
 }
 /*
  * The web imports this sheet into a layer while leaflet.css arrives unlayered, and an unlayered rule beats any layered

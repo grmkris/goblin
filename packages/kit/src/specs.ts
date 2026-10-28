@@ -12,9 +12,9 @@ const Label = Schema.String.check(Schema.isMaxLength(120))
 const Key = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))
 const Cell = Schema.Union([Schema.String.check(Schema.isMaxLength(200)), Schema.Finite, Schema.Null])
 
-/** A line, bar, area or pie chart: `x` names each row's category, each series a numeric column (at most five). */
+/** A line, bar or pie chart: `x` names each row's category, each series a numeric column (at most five). */
 export const ChartSpec = Schema.Struct({
-  type: Schema.Literals(['line', 'bar', 'area', 'pie']),
+  type: Schema.Literals(['line', 'bar', 'pie']),
   title: Schema.optional(Label),
   x: Key,
   series: Schema.Array(Schema.Struct({ key: Key, label: Schema.optional(Label) })).check(
@@ -22,7 +22,6 @@ export const ChartSpec = Schema.Struct({
     Schema.isMaxLength(5),
   ),
   data: Schema.Array(Schema.Record(Schema.String, Cell)).check(Schema.isMinLength(1), Schema.isMaxLength(500)),
-  stacked: Schema.optional(Schema.Boolean),
   unit: Schema.optional(Schema.String.check(Schema.isMaxLength(16))),
 })
 export type ChartSpec = typeof ChartSpec.Type

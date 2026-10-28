@@ -6,6 +6,6 @@ Some components and patterns were adapted from other projects owned by the same 
 
 These grants do not replace third-party licenses. Keep the notices next to vendored source, including the anti-slop lint rules, JSON viewer and shadcn patch provenance. Installed dependencies retain their own terms.
 
-React Leaflet 5 and @react-leaflet/core 3 use Hippocratic-2.1, which includes ethical use restrictions and is not an OSI-approved license. Geist uses OFL-1.1, caniuse-lite data uses CC-BY-4.0, and libvips in the Sharp build toolchain uses LGPL-3.0-or-later. Review the installed packages' complete license texts before distributing bundles or binaries.
+Geist uses OFL-1.1, caniuse-lite data uses CC-BY-4.0, and libvips in the Sharp build toolchain uses LGPL-3.0-or-later. Review the installed packages' complete license texts before distributing bundles or binaries.
 
 The shelf's server marks (`apps/web/public/shelf`) take their glyphs from Simple Icons (CC0-1.0); the marks themselves are trademarks of their owners, used to identify their services, and are not covered by the MIT License.

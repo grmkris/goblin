@@ -34,7 +34,7 @@ function drawn(kind: BlockKind, source: string, code: ReactNode): ReactNode {
   if (kind === 'mermaid') return <Diagram source={source} fallback={code} />
   if (kind === 'chart') {
     const spec = chartSpec(source)
-    return spec === undefined ? code : <Chart spec={spec} />
+    return spec === undefined ? code : <Chart spec={spec} fallback={code} />
   }
   const spec = mapSpec(source)
   return spec === undefined ? code : <MapView spec={spec} />

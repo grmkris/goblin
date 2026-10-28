@@ -19,6 +19,38 @@ const families = [
   'mindmap\n  root((goblin))\n    Topics\n    Personas',
 ]
 
+/** A chart with two named series, one name with a quote, and a map whose label is markup: both must stay text. */
+const BARS = {
+  type: 'bar',
+  title: 'Minutes',
+  x: 'day',
+  unit: 'min',
+  series: [
+    { key: 'ana', label: 'Ana "A"' },
+    { key: 'bo', label: 'Bo' },
+  ],
+  data: [
+    { day: 'Mon', ana: 3, bo: 5 },
+    { day: 'Tue', ana: 7, bo: 2 },
+  ],
+}
+const PLACES = {
+  markers: [
+    { lat: 59.44, lng: 24.75, label: '<img src=x onerror="document.title=1">Tallinn' },
+    { lat: 60.17, lng: 24.94, label: 'Helsinki' },
+  ],
+  lines: [
+    {
+      points: [
+        [59.44, 24.75],
+        [60.17, 24.94],
+      ],
+      label: 'Ferry',
+    },
+  ],
+}
+const fence = (kind: string, spec: unknown) => `\`\`\`${kind}\n${JSON.stringify(spec)}\n\`\`\``
+
 function Fixture() {
   const [safety, setSafety] = useState<string[]>([])
   const [visible, setVisible] = useState(true)
@@ -50,6 +82,15 @@ function Fixture() {
         ))}
       <section aria-label="Inert diagram">
         <Diagram source={flow} fallback="fallback" interactive={false} />
+      </section>
+      <section aria-label="Bar chart">
+        <MessageText text={fence('chart', BARS)} />
+      </section>
+      <section aria-label="Pie chart">
+        <MessageText text={fence('chart', { ...BARS, type: 'pie' })} />
+      </section>
+      <section aria-label="Map">
+        <MessageText text={fence('map', PLACES)} />
       </section>
       <section aria-label="Invalid diagram">
         <MessageText text={'```mermaid\nnot a diagram\n```'} />

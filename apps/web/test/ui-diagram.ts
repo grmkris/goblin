@@ -11,6 +11,13 @@ const out = path.resolve(import.meta.dirname, '../../../.local/goblin-acceptance
 const checks: string[] = []
 const errors: string[] = []
 const requests: string[] = []
+const tiles: string[] = []
+const TILES = 'https://tile.openstreetmap.org/'
+/** A 1×1 transparent PNG. */
+const BLANK_TILE = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'base64',
+)
 const dialog = (page: Page) => page.getByRole('dialog', { name: 'Explore diagram' })
 const scale = async (root: Locator) => Number((await root.getByLabel('Zoom level').innerText()).replace('%', ''))
 
@@ -31,6 +38,7 @@ async function desktop(page: Page) {
   assert(!String(safety[0]).startsWith('failed:'), String(safety[0]))
   assert(safety.length >= 55)
   checks.push(`${safety.length} SVG boundary/metadata assertions`)
+  await blocks(page)
   const outside = await page.getByLabel('Outside SVG').evaluate((svg) => ({
     font: getComputedStyle(svg.querySelector('text') ?? svg).fontFamily,
     color: getComputedStyle(svg).getPropertyValue('--_fg'),
@@ -161,6 +169,30 @@ async function desktop(page: Page) {
   )
 }
 
+/** Charts are Pele's drawings (ADR 0130), with named series; a map is Leaflet's, its labels inert text. */
+async function blocks(page: Page) {
+  const bars = page.getByLabel('Bar chart', { exact: true })
+  const chart = bars.locator('.kit-chart-drawing > svg.pele-xychart')
+  await chart.waitFor()
+  const text = await chart.textContent()
+  assert(text?.includes('Ana "A"') && text.includes('Bo') && text.includes('min'), `chart labels: ${text}`)
+  assert.equal(await bars.getByText('Minutes', { exact: true }).count(), 1)
+  await page.getByLabel('Pie chart', { exact: true }).locator('.kit-chart-drawing > svg.pele-pie').waitFor()
+  const map = page.getByLabel('Map', { exact: true })
+  await map.locator('.leaflet-container .leaflet-interactive').first().waitFor()
+  assert.equal(await map.locator('path.leaflet-interactive').count(), 3)
+  await map.locator('path.leaflet-interactive').nth(1).hover()
+  const tooltip = map.locator('.leaflet-tooltip').first()
+  await tooltip.waitFor()
+  assert.equal(await tooltip.locator('img').count(), 0)
+  assert((await tooltip.innerText()).includes('<img'), 'a marker label stays text')
+  assert.notEqual(await page.title(), '1')
+  assert(tiles.length > 0, 'the map asked for its tiles')
+  checks.push(
+    'bar and pie charts drawn by Pele with named series and unit; Leaflet map with markers, a line and inert labels',
+  )
+}
+
 async function mobile(page: Page) {
   await page.getByLabel('Diagram 0', { exact: true }).getByRole('button', { name: 'Explore diagram' }).tap()
   const root = dialog(page)
@@ -231,11 +263,15 @@ async function main() {
     const context = await browser.newContext()
     // Guard real network traffic to prove unsafe diagrams never fetch external resources.
     await context.route('**/*', (route) => {
-      if (!route.request().url().startsWith(origin)) {
-        requests.push(route.request().url())
-        return route.abort()
+      const url = route.request().url()
+      if (url.startsWith(origin)) return route.continue()
+      // A map's one host (ADR 0023): its tiles are answered here, blank, and counted apart from any other request.
+      if (url.startsWith(TILES)) {
+        tiles.push(url)
+        return route.fulfill({ status: 200, contentType: 'image/png', body: BLANK_TILE })
       }
-      return route.continue()
+      requests.push(url)
+      return route.abort()
     })
     const page = await context.newPage()
     page.setDefaultTimeout(10000)
@@ -255,8 +291,10 @@ async function main() {
     touch.on('pageerror', (error) => errors.push(error.message))
     // Keep the same external-network guard for the touch context.
     await touch.route('**/*', (route) => {
-      if (route.request().url().startsWith(origin)) return route.continue()
-      requests.push(route.request().url())
+      const url = route.request().url()
+      if (url.startsWith(origin)) return route.continue()
+      if (url.startsWith(TILES)) return route.fulfill({ status: 200, contentType: 'image/png', body: BLANK_TILE })
+      requests.push(url)
       return route.abort()
     })
     await touch.goto(`${origin}diagram.html`)
