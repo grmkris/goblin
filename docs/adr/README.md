@@ -26,7 +26,7 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0020](0020-durable-apps-one-iframe-per-instance.md) | Durable Apps, one iframe per instance | Accepted; amended by 0067 |
 | [0021](0021-agent-apps.md) | Agent apps | Accepted; amended by 0070 and 0078 |
 | [0022](0022-owner-files-shell-and-r2.md) | The owner's files, in Shell's Workspace and R2 | Accepted; amended by 0065 and 0115 (files per Topic, and a Shared folder) |
-| [0023](0023-chat-blocks-and-one-kit.md) | Chat blocks, one kit | Accepted |
+| [0023](0023-chat-blocks-and-one-kit.md) | Chat blocks, one kit | Accepted; its diagram renderer, image preview and kinds amended by 0129 |
 | [0024](0024-observing-conversations.md) | Observing conversations | Accepted; amended by 0084, 0086, 0107 |
 | [0027](0027-typed-tools.md) | Typed tools and one `app_call` | Accepted; amended by 0067 and 0101 |
 | [0028](0028-mcp-call-approvals.md) | Owner approval for an exact MCP call | Accepted |
@@ -120,3 +120,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0126](0126-preserve-powers-when-keys-retire.md) | Preserve approved powers when keys retire | Accepted; amends 0125's migration and stored receipt behavior |
 | [0127](0127-a-client-may-ask-for-a-workspace-its-person-belongs-to.md) | A client may ask for a workspace its person belongs to: refused with a link that adds it whole | Accepted; amends 0097, 0114, 0116 |
 | [0128](0128-the-post-deploy-smoke-signs-in-for-real-and-runs-one-model-turn.md) | The post-deploy smoke signs in for real and runs one model turn: an emailed code read through a mysi workload, no cookie in CI, on dev and prod; public with its reason until configured; a failure is a red run and Telegram, no rollback | Accepted; amends 0046, 0106 |
+| [0129](0129-diagrams-are-drawn-inline-by-pele.md) | Diagrams are drawn inline by Pele: one sanitized inline drawing themed by CSS variables, every Mermaid kind, selection for graph kinds from Pele's model | Accepted; amends 0023 |
