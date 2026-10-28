@@ -7,6 +7,7 @@ import {
   defineTask,
   hook,
 } from '@earendil-works/pi-durable'
+import { boundedReplay } from './context.ts'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import { requireBudget } from '../budget.ts'
@@ -23,6 +24,7 @@ export const MemoryBuilder = defineDoc<{ task: TaskId | null }>({
   history: 'latest',
   fork: 'initial',
   initial: () => ({ task: null }),
+  checkpointWhen: boundedReplay,
 })
 
 /**

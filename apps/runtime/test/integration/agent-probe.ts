@@ -152,13 +152,22 @@ async function destroySequence(namespace: ProbeEnv['AGENTS'], name: string) {
     // expected: the probe answers with what deleteAgentData threw, for the case to assert on
     deleted = { thrown: cause instanceof Error ? cause.message : 'unknown' }
   }
-  const fresh = namespace.getByName(name)
+  // Agent.destroy() aborts the object on a timer after it answers, so the first call can still reach it and fail with
+  // "destroyed"; the same call on a new stub meets a fresh object.
+  const afterAbort = async <A>(call: (agent: ReturnType<typeof namespace.getByName>) => Promise<A>): Promise<A> => {
+    try {
+      return await call(namespace.getByName(name))
+    } catch (cause) {
+      if (!(cause instanceof Error) || !cause.message.includes('destroyed')) throw cause
+      return call(namespace.getByName(name))
+    }
+  }
   return {
     submitted,
     before,
     deleted,
-    after: await entries(fresh),
-    resident: await ownerResult(fresh, (api) => api.resident.status()),
+    after: await afterAbort(entries),
+    resident: await afterAbort((fresh) => ownerResult(fresh, (api) => api.resident.status())),
   }
 }
 

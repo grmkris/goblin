@@ -20,7 +20,7 @@ import { runBinding } from '../routines/persona.ts'
 import { wakeIn } from '../routines/runner.ts'
 import { definitionOf, runHandOver } from '../routines/store.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
-import { BACKGROUND, conversationId } from './context.ts'
+import { BACKGROUND, conversationId, boundedReplay } from './context.ts'
 import { Internal } from '../http/errors.ts'
 import { type FrozenPersona, markPersona, personaText } from './persona-turn.ts'
 
@@ -31,6 +31,7 @@ const Bindings = defineDoc<{ sessions: Record<string, ConversationId>; tasks: Re
   history: 'latest',
   fork: 'initial',
   initial: () => ({ sessions: {}, tasks: {} }),
+  checkpointWhen: boundedReplay,
 })
 const background = { ownership: { kind: 'conversation' }, background: true } as const
 const Anchor = defineTask<null, { phase: 'done' }, null>({

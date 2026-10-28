@@ -307,7 +307,7 @@ The web reads the stream as any reader does (`apps/web/src/lib/`):
 
 ## Where it is proven
 
-`apps/runtime/test/streams/`: Pi batches recorded on a real Pi 1.3.0 Harness (in memory, in the test process, with a
+`apps/runtime/test/streams/`: Pi batches recorded on a real Pi 1.4.0 Harness (in memory, in the test process, with a
 scripted model that streams block by block; not workerd) for a plain reply, reasoning, a tool call with progress, a
 member's message with attachments, a run that asks, a stopped run, a failed model call after a retry, Persona answers
 and a hold, activities, a queued follow-up, an overflow mid-answer, and a Persona's fork (a tool call, then thinking

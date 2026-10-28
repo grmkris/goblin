@@ -11,7 +11,7 @@ import { DelegateResultData } from '@goblin/contracts'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { Conflict, NotFound } from '../http/errors.ts'
-import { BACKGROUND, entryId } from './context.ts'
+import { BACKGROUND, entryId, boundedReplay } from './context.ts'
 import { MemoryBuilder } from './memory.ts'
 import { SUBAGENT_RELAY, type Subagent, Subagents, relayTarget } from './subagent-relay.ts'
 
@@ -25,6 +25,7 @@ const MoveWitness = defineDocFamily<{ fork: number | null }, null>({
   scope: 'session',
   family: true,
   initial: () => ({ fork: null }),
+  checkpointWhen: boundedReplay,
 })
 
 /** The entries of a turn that belong to it, as the chat omits them: what the owner and the model said in it. */

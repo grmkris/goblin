@@ -26,7 +26,7 @@ import { requireResident } from '../mcp/service.ts'
 import { FlowEvents } from '../observability/flows.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { authoredContent } from './content.ts'
-import { BACKGROUND, entryId, conversationId as piConversationId } from './context.ts'
+import { BACKGROUND, entryId, conversationId as piConversationId, boundedReplay } from './context.ts'
 
 /**
  * The task that carries one message to a subagent and its answer back to the spawner. While one is live in a
@@ -60,6 +60,7 @@ export const Subagents = defineDoc<{ agents: Record<string, Subagent> }>({
   history: 'latest',
   fork: 'initial',
   initial: () => ({ agents: {} }),
+  checkpointWhen: boundedReplay,
 })
 
 export type RelayInput = {

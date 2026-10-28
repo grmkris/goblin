@@ -35,7 +35,7 @@ import { Invocations } from '../personas/service.ts'
 import type { RunProgram } from '../runtime/bridge.ts'
 import { withContext } from './context-tail.ts'
 import { authoredContent } from './content.ts'
-import { BACKGROUND, entryId } from './context.ts'
+import { BACKGROUND, entryId, boundedReplay } from './context.ts'
 import { type ForkToolsKit, freezeForkTools, toolsText, withForkTools } from './fork-tools.ts'
 import { PERSONA_DENIED_TOOLS, PERSONA_EXTENSION, personaSelection } from './persona-selection.ts'
 import { questionJson } from './ask-user.ts'
@@ -72,6 +72,7 @@ const PersonaText = defineDoc<{ text: string }>({
   history: 'latest',
   fork: 'initial',
   initial: () => ({ text: '' }),
+  checkpointWhen: boundedReplay,
 })
 
 /** Guards an ask: the tasks made for one owner operation, so a replayed send makes none twice. */
@@ -82,6 +83,7 @@ const PersonaAsks = defineDoc<{ tasks: Record<string, TaskId<null>[]> }>({
   history: 'latest',
   fork: 'initial',
   initial: () => ({ tasks: {} }),
+  checkpointWhen: boundedReplay,
 })
 
 /** Remembered asks per conversation: older ones can no longer be replayed. */
@@ -273,7 +275,8 @@ const waitPhase: Phase<'wait'> = async (task, runtime, context) => {
 
 /**
  * Until the owner's message (the ask) is in the chat: a queued write lands at the chat's next boundary, so this polls in
- * short sleeps and never holds anything. In a sequence the fork is cut at the answer before it, otherwise at the ask.
+ * short durable sleeps (Pi's `sleeping` state, committed with the poll) that hold no invocation. In a sequence the fork
+ * is cut at the answer before it, otherwise at the ask.
  */
 const placePhase =
   (run: RunProgram): Phase<'place'> =>
@@ -287,19 +290,19 @@ const placePhase =
             await run(Invocations.use((invocations) => invocations.get(operationId, previousPersona))),
           )
     const seen: { outcome: 'placed' | 'waiting' | 'missing' } = { outcome: 'waiting' }
+    const until = runtime.now() + Math.min(2000, 250 * (polls + 1))
     await runtime.commit(async (tx) => {
       const ask = await tx.submissionByRequest(parent, operationId)
       if (ask === undefined || ask.status === 'unanswered') {
         seen.outcome = 'missing'
         return failed('The owner message is not in the chat.', ASK_MISSING.code)
       }
-      if (ask.status !== 'done') return { status: 'running', checkpoint: { phase: 'place', polls: polls + 1 } }
+      if (ask.status !== 'done') return { status: 'sleeping', until, checkpoint: { phase: 'place', polls: polls + 1 } }
       seen.outcome = 'placed'
       const at = before?.state === 'answered' && before.answerEntry !== undefined ? before.answerEntry : ask.entry
       return { status: 'running', checkpoint: { phase: 'fork', at } }
     }, context)
     if (seen.outcome === 'missing') await run(settle(task.input, failure(ASK_MISSING.reason), ASK_MISSING.code))
-    if (seen.outcome === 'waiting') await runtime.sleep(runtime.now() + Math.min(2000, 250 * (polls + 1)), context)
   }
 
 /**
@@ -417,11 +420,8 @@ export const askPhase =
     )
     if (refused !== undefined) {
       const why = refusalOf(refused.error)
-      if (!why.final && retried !== true) {
-        await runtime.commit(() => ({ status: 'running', checkpoint: { phase: 'ask', fork, retried: true } }), context)
-        await runtime.sleep(runtime.now() + RETRY_MS, context)
-        return
-      }
+      if (!why.final && retried !== true)
+        return runtime.sleepUntil(runtime.now() + RETRY_MS, { phase: 'ask', fork, retried: true }, context)
       return giveUp(run, task.input, runtime, context, why)
     }
     await conversation.submit({ type: 'input', content, whenBusy: 'followUp', requestId }, context)

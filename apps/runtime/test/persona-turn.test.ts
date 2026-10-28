@@ -94,7 +94,11 @@ function runtimeOf(asked: boolean) {
         },
       }),
     now: () => 0,
-    sleep: async (until) => void slept.push(until),
+    // A durable sleep is stored as the task's state, like a commit (Pi 1.4's `sleeping`).
+    sleepUntil: async (until, checkpoint) => {
+      slept.push(until)
+      states.push({ status: 'sleeping', until, checkpoint })
+    },
   })
   return { runtime, states, submits, slept }
 }
@@ -138,7 +142,9 @@ describe("a Persona turn's ask", () => {
     const first = services({ resident: [transient] })
     const once = runtimeOf(false)
     await askPhase(first.run)(task(), once.runtime, unread)
-    expect(once.states).toEqual([{ status: 'running', checkpoint: { phase: 'ask', fork: FORK, retried: true } }])
+    expect(once.states).toEqual([
+      { status: 'sleeping', until: expect.any(Number), checkpoint: { phase: 'ask', fork: FORK, retried: true } },
+    ])
     expect([once.slept.length, first.settled.length]).toEqual([1, 0])
 
     const second = services({ resident: [transient] })

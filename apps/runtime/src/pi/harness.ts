@@ -66,9 +66,11 @@ export function makePiHarness(
     compaction: { reserveTokens: MAX_OUTPUT_TOKENS + 4096 },
   }
   return new PiHarness({
-    harness: async ({ storage, context }) => {
+    // Run again when Pi reopens after a storage error, so it only installs and attaches. `onWake` lets the object sleep
+    // until Pi's next task is due instead of staying in memory (agents 0.30).
+    harness: async ({ storage, context, onWake }) => {
       for (const each of [apps, ...installed]) each.restore()
-      const harness = await Harness.open(storage, { models: pi.models, registry, settings, onReport }, context)
+      const harness = await Harness.open(storage, { models: pi.models, registry, settings, onReport, onWake }, context)
       recorder.attach(harness)
       await recorder.restore(harness, context)
       return harness
