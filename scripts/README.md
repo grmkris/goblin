@@ -194,13 +194,16 @@ GitHub variables (`gh variable set <name> --env <stage> --body <value>`): `GOBLI
 on `prod`, each the client id (`wl_…`) of that environment's mailbox policy; `GOBLIN_ALERT_WORKLOAD` on `prod`, the alert
 policy's client id; optionally `MYSI_ORIGIN`. Unset, the smoke stays public and the alert skips, each saying why.
 
-The owner makes three trusted-workload policies in mysi. Each policy's claims are exact:
+The owner makes three trusted-workload policies in mysi, each from its form's Branch choice, so its claims are exactly
+the repository, the ref and the workflow. They name no environment: mysi's form takes a branch or an environment, not
+both, and the environment would add nothing. Only Deploy dev and Deploy prod may mint an OIDC token
+(`id-token: write`), a pull request runs on its merge ref, and each environment admits only its own branch.
 
-| Policy        | `repository`     | `ref`             | `workflow_ref`                                            | `environment` | Saved access                                                                               |
-| ------------- | ---------------- | ----------------- | --------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------ |
-| Mailbox, dev  | `grmkris/goblin` | `refs/heads/dev`  | `grmkris/goblin/.github/workflows/ci.yml@refs/heads/dev`  | `dev`         | myinbox read (`address_cursor`, `verification_wait`) on the checks account's address only. |
-| Mailbox, prod | `grmkris/goblin` | `refs/heads/prod` | `grmkris/goblin/.github/workflows/ci.yml@refs/heads/prod` | `prod`        | The same.                                                                                  |
-| Alert, prod   | `grmkris/goblin` | `refs/heads/prod` | `grmkris/goblin/.github/workflows/ci.yml@refs/heads/prod` | `prod`        | mygram `message_send` at reply level, limited to the alerts chat.                          |
+| Policy        | `repository`     | `ref`             | `workflow_ref`                                            | Saved access                                                                               |
+| ------------- | ---------------- | ----------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Mailbox, dev  | `grmkris/goblin` | `refs/heads/dev`  | `grmkris/goblin/.github/workflows/ci.yml@refs/heads/dev`  | myinbox read (`address_cursor`, `verification_wait`) on the checks account's address only. |
+| Mailbox, prod | `grmkris/goblin` | `refs/heads/prod` | `grmkris/goblin/.github/workflows/ci.yml@refs/heads/prod` | The same.                                                                                  |
+| Alert, prod   | `grmkris/goblin` | `refs/heads/prod` | `grmkris/goblin/.github/workflows/ci.yml@refs/heads/prod` | mygram at reply level, reaching only the shared bot's direct messages.                     |
 
 Alchemy state for dev and prod lives in the account's shared Cloudflare state store (`scripts/alchemy-state.ts`), as
 `goblin/<stage>` beside myapps' and the retired Goblin Wallet's stacks. It has no lock: each stage deploys in one
