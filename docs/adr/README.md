@@ -24,9 +24,9 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0018](0018-subagents-nest-steer-and-close.md) | Subagents nest, steer and close | Accepted |
 | [0019](0019-panes-for-everything.md) | Panes for everything | Superseded by 0036 |
 | [0020](0020-durable-apps-one-iframe-per-instance.md) | Durable Apps, one iframe per instance | Accepted; amended by 0067 |
-| [0021](0021-agent-apps.md) | Agent apps | Accepted; amended by 0070 and 0078 |
+| [0021](0021-agent-apps.md) | Agent apps | Accepted; amended by 0070, 0078 and 0130 (view imports) |
 | [0022](0022-owner-files-shell-and-r2.md) | The owner's files, in Shell's Workspace and R2 | Accepted; amended by 0065 and 0115 (files per Topic, and a Shared folder) |
-| [0023](0023-chat-blocks-and-one-kit.md) | Chat blocks, one kit | Accepted; its diagram renderer, image preview and kinds amended by 0129 |
+| [0023](0023-chat-blocks-and-one-kit.md) | Chat blocks, one kit | Accepted; its diagram renderer, image preview and kinds amended by 0129; its chart and map libraries by 0130 |
 | [0024](0024-observing-conversations.md) | Observing conversations | Accepted; amended by 0084, 0086, 0107 |
 | [0027](0027-typed-tools.md) | Typed tools and one `app_call` | Accepted; amended by 0067 and 0101 |
 | [0028](0028-mcp-call-approvals.md) | Owner approval for an exact MCP call | Accepted |
@@ -121,3 +121,4 @@ status; a partly replaced ADR stays here and names what replaced which part.
 | [0127](0127-a-client-may-ask-for-a-workspace-its-person-belongs-to.md) | A client may ask for a workspace its person belongs to: refused with a link that adds it whole | Accepted; amends 0097, 0114, 0116 |
 | [0128](0128-the-post-deploy-smoke-signs-in-for-real-and-runs-one-model-turn.md) | The post-deploy smoke signs in for real and runs one model turn: an emailed code read through a mysi workload, no cookie in CI, on dev and prod; public with its reason until configured; a failure is a red run and Telegram, no rollback | Accepted; amends 0046, 0106 |
 | [0129](0129-diagrams-are-drawn-inline-by-pele.md) | Diagrams are drawn inline by Pele: one sanitized inline drawing themed by CSS variables, every Mermaid kind, selection for graph kinds from Pele's model | Accepted; amends 0023 |
+| [0130](0130-charts-are-drawn-by-pele-maps-run-on-leaflet-itself.md) | Charts are drawn by Pele, maps run on Leaflet itself: the chart spec as Mermaid xychart or pie, no area or stacking; a kit-owned Leaflet wrapper; recharts and react-leaflet leave goblin and app views | Accepted; amends 0021, 0023 |
