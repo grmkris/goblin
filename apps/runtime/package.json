@@ -36,7 +36,7 @@
   "devDependencies": {
     "@ag-ui/client": "1.0.3",
     "@ag-ui/core": "1.0.3",
-    "@cloudflare/workers-types": "5.20261019.1",
+    "@cloudflare/workers-types": "5.20261028.1",
     "@effect/platform-bun": "4.0.5",
     "@effect/platform-node": "4.0.5",
     "@effect/vitest": "4.0.5",

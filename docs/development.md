@@ -488,7 +488,9 @@ until it runs, real provider and Telegram delivery remain unverified.
   dependency (root `patchedDependencies`) stays pinned to the version its patch was made for, and `bun run
   check:patches` fails when the installed file is not the patched one; `patches/shadcn-react/README.md` says how the
   MessageScroller patch is rebuilt. Versions are exact. The `@earendil-works/pi-*` packages move together, alchemy
-  moves with myapps (the shared state store, `.agents/skills/alchemy`), and a few follow something else rather than
+  moves with myapps (the shared state store, `.agents/skills/alchemy`), Effect moves with alchemy (alchemy's own
+  dependencies must accept the Effect it runs on), oxlint moves with the pinned tsrs-lint release (a newer oxlint asks
+  tsrs-lint for rules it does not know), and a few follow something else rather than
   their newest release: `typebox` the version pi-durable pins (one TypeBox in the Worker), `katex` the 0.16 line
   `@streamdown/math` renders with (goblin loads only its stylesheet, which must match), `@types/node` and `@types/bun`
   the box's Node 22 LTS and Bun, and workerd alchemy's pin.
