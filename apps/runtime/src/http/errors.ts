@@ -4,7 +4,7 @@ import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { writeLine } from '../observability/logger.ts'
-import { framesOf, safeErrorType } from '../observability/report.ts'
+import { framesOf, restartedByDeploy, safeErrorType } from '../observability/report.ts'
 
 /**
  * The runtime's failure vocabulary lives with the API contract (`@goblin/contracts/api`), which gives each one its HTTP
@@ -51,12 +51,15 @@ const locatedFrames = (cause: unknown): string[] =>
  */
 export const toAppError = (cause: unknown, where = 'http.toAppError'): AppError => {
   if (isAppError(cause)) return cause
-  writeLine('error', {
+  // A Durable Object restarted onto a deploy's code is a deploy, not a fault: Info, as the failure reporter logs it.
+  const deploy = restartedByDeploy(cause)
+  writeLine(deploy ? 'info' : 'error', {
     event: 'failure',
     where,
     'error.type': safeErrorType(cause),
+    ...(deploy ? { code: 'code_update' } : {}),
     frames: locatedFrames(cause),
-    severity: 'Error',
+    severity: deploy ? 'Info' : 'Error',
   })
   return new Internal({ reason: 'unexpected' })
 }

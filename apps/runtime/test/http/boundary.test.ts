@@ -13,6 +13,7 @@ import {
   isAppError,
   toAppError,
 } from '../../src/http/errors.ts'
+import { reportTelemetryFailure } from '../../src/telemetry/events.ts'
 
 const SECRET = 'secret-value'
 const parseLine = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))
@@ -82,6 +83,24 @@ test('the failure line keeps the frames that name a location, even beside one th
       severity: 'Error',
     },
   ])
+})
+
+test("a Durable Object restarted onto a deploy's code is an Info line with code_update, never its message", () => {
+  const reset = new Error('SQL query failed', {
+    cause: new Error('Durable Object reset because its code was updated.'),
+  })
+  reset.name = 'DrizzleQueryError'
+  let error: unknown
+  const lines = linesOf('log', () => {
+    error = toAppError(reset)
+    reportTelemetryFailure('ledger', reset)
+  })
+  expect(error).toBeInstanceOf(Internal)
+  expect(lines).toMatchObject([
+    { where: 'http.toAppError', level: 'info', severity: 'Info', code: 'code_update' },
+    { where: 'telemetry.ledger', level: 'info', severity: 'Info', code: 'code_update' },
+  ])
+  expect(JSON.stringify(lines)).not.toContain('reset because')
 })
 
 test('attempt and attemptSync keep a typed failure, and report anything else under `where` as Internal', async () => {

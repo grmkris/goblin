@@ -10,20 +10,23 @@ import {
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { writeLine } from '../observability/logger.ts'
-import { framesOf, safeErrorType } from '../observability/report.ts'
+import { framesOf, restartedByDeploy, safeErrorType } from '../observability/report.ts'
 import { sanitizeAttributes } from './safety.ts'
 
 /**
  * A telemetry step that failed outside any fiber (a sink, a Pi commit listener, the restart sweep), as one `failure`
- * line: `telemetry.<where>`, the error's type and its stack locations, never its message. Recording carries on.
+ * line: `telemetry.<where>`, the error's type and its stack locations, never its message. Recording carries on. A
+ * Durable Object restarted onto a deploy's code is `Info` with `code: code_update`, as the failure reporter logs it.
  */
 export function reportTelemetryFailure(where: string, error: unknown): void {
-  writeLine('warn', {
+  const deploy = restartedByDeploy(error)
+  writeLine(deploy ? 'info' : 'warn', {
     event: 'failure',
     where: `telemetry.${where}`,
     'error.type': safeErrorType(error),
+    ...(deploy ? { code: 'code_update' } : {}),
     ...(error instanceof Error ? { frames: framesOf(error) } : {}),
-    severity: 'Warn',
+    severity: deploy ? 'Info' : 'Warn',
   })
 }
 

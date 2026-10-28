@@ -92,7 +92,7 @@ const CODE_UPDATE_RESET = 'Durable Object reset because its code was updated'
  * Whether `error`, or one of its first causes, is a Durable Object restarted onto a deploy's code: a deploy, not a fault,
  * which Pi recovers from. Its text is only matched, never logged.
  */
-const restartedByDeploy = (error: unknown): boolean => {
+export const restartedByDeploy = (error: unknown): boolean => {
   let current = error
   for (let depth = 0; depth < 4 && Predicate.isObject(current); depth += 1) {
     if ('message' in current && Predicate.isString(current.message) && current.message.includes(CODE_UPDATE_RESET))
