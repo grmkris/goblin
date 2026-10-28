@@ -237,6 +237,7 @@ export const routineCases = (phase: Phase): readonly NativeCase[] => [
     (result) =>
       expect(result).toMatchObject({
         duplicateScheduleCount: 1,
+        sourcesWakes: 1,
         earlierWakeRetained: true,
         recurringWakeRetained: true,
         nativeReminderCompleted: true,

@@ -193,7 +193,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
     // The published Events' deliveries and leases are looked at again after a restart (ADR 0112).
     await this.#scheduleWake('publishWake', Date.now() + 1000)
     // The Sources' subscriptions and the answers they owe are looked at again after a restart.
-    await this.schedule(1, 'sourcesWake')
+    await this.#scheduleWake('sourcesWake', Date.now() + 1000)
     await reconcileAppJobs(this.#apps)
   }
 
@@ -221,7 +221,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
       scheduleEvents: (at) => this.#scheduleWake('mcpEventsWake', at),
       schedulePublish: (at) => this.#scheduleWake('publishWake', at),
       publishFetch: this.publishFetch(),
-      scheduleSources: (seconds) => void this.schedule(seconds, 'sourcesWake'),
+      scheduleSources: (seconds) => void this.#scheduleWake('sourcesWake', Date.now() + seconds * 1000),
       mcpFetch: this.mcpFetch(),
       grantOrigins: async (grantId) => grantOriginsNow(this.env, this.name, grantId),
       agentApps: this.#apps,
@@ -246,8 +246,14 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
   }
   /** A move committed `phase`; the integration harness stops the object here to prove a restart finishes it. */
   protected async moveBoundary(_phase: MovePhase, _operation: string): Promise<void> {}
-  /** One earliest Events wake. Agent schedules are durable and reconstructed independently of Pi. */
-  async #scheduleWake(callback: 'mcpEventsWake' | 'routinesWake' | 'publishWake', at: number): Promise<void> {
+  /**
+   * One earliest wake of each kind: a sooner pending one stands, later ones give way, and a restart asking again adds no
+   * row. Agent schedules are durable and reconstructed independently of Pi.
+   */
+  async #scheduleWake(
+    callback: 'mcpEventsWake' | 'routinesWake' | 'publishWake' | 'sourcesWake',
+    at: number,
+  ): Promise<void> {
     // listSchedules includes the currently executing wake; only future jobs can replace the next sweep.
     const now = nowSeconds()
     const pending = (await this.listSchedules()).filter((job) => job.callback === callback && job.time > now)
@@ -280,7 +286,7 @@ export class PersonalAgent extends Agent<RuntimeEnv> implements AgentRpcMethods 
 
   /** The Sources' alarm (sources/wake.ts, ADR 0066): each Source tended and the answers due sent. */
   async sourcesWake(): Promise<void> {
-    await sourcesWake(this.#bridge.run, (seconds) => this.schedule(seconds, 'sourcesWake'))
+    await sourcesWake(this.#bridge.run, (seconds) => this.#scheduleWake('sourcesWake', Date.now() + seconds * 1000))
   }
 
   /** Erases the agent: its files in R2 first (a failure leaves everything to retry), then services and storage. */

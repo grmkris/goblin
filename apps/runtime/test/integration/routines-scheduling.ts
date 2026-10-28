@@ -90,7 +90,14 @@ async function routineScheduleProbe(storage: DurableObjectStorage, agent: Person
   })
   if (current !== null) await agent.runRoutine({ routineId: cronId, revision: 1, firedAt: current })
   const after = runs.list(cronId)
+  // A restart asks for every wake again: each stays one row (a one-shot per restart would run it once per restart).
+  await agent.onStart()
+  await agent.onStart()
+  const sourcesWakes = (await agent.listSchedules()).filter(
+    (job) => job.callback === 'sourcesWake' && job.time > Math.floor(Date.now() / 1000),
+  ).length
   return {
+    sourcesWakes,
     duplicateScheduleCount,
     recurringWakeRetained,
     earlierWakeRetained: wakes.length === 1 && (wakes[0]?.time ?? Number.MAX_SAFE_INTEGER) < later / 1000,
