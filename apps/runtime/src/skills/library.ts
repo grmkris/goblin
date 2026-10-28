@@ -385,6 +385,9 @@ export const makeSkills = Effect.fnUntraced(function* (state: SkillState) {
     ) {
       return yield* selected(library, sessionId, connectionId, uri, options)
     }),
+    activated: Effect.fn('Skills.activated')(function* (sessionId: string, handle: string) {
+      return (yield* activationOf(library.state, sessionId, handle)).connectionId
+    }),
     read: Effect.fn('Skills.read')(function* (
       sessionId: string,
       handle: string,

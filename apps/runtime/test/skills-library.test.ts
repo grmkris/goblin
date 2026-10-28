@@ -203,6 +203,10 @@ describe('skills over MCP (unit)', () => {
     const loaded = await run(library.activate('s5', 'library:code-review'))
     expect(loaded.skill.handle).toBe('lib:code-review')
     expect(await run(library.read('s5', 'code-review', 'references/checklist.md'))).toMatchObject({ kind: 'text' })
+    // A file is read from the server the activation came from, whatever prefix the model's handle carries.
+    expect(await run(library.activated('s5', 'code-review'))).toBe('lib')
+    expect(await run(library.activated('s5', 'gone-connection:code-review'))).toBe('lib')
+    await expect(run(library.activated('s5', 'lib:missing'))).rejects.toMatchObject({ _tag: 'NotFound' })
     // A library the chat leaves out is not searched for a bare name.
     await expect(run(library.resolve('code-review', {}, () => false))).rejects.toMatchObject({ _tag: 'NotFound' })
   })

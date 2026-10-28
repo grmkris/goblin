@@ -142,12 +142,12 @@ const skillsOff = (session: string, handle: string) =>
   })
 
 /**
- * How a Persona fork names the tools of the server a skill handle (`<server>:<name>`) is from, in that skill's text
- * (ADR 0101); none in any other conversation, or for a server it has no native tool of.
+ * How a Persona fork names the tools of server `connectionId` in that server's skill text (ADR 0101); none in any
+ * other conversation, or for a server it has no native tool of.
  */
-const namingOf = (session: string, handle: string) =>
+const namingOf = (session: string, connectionId: string) =>
   Db.useSync((db) => {
-    const naming = forkNaming(db, session, handle.slice(0, Math.max(0, handle.indexOf(':'))))
+    const naming = forkNaming(db, session, connectionId)
     return naming === undefined
       ? { options: {}, render: (text: string) => text }
       : { options: { toolPrefix: naming.toolPrefix }, render: naming.render }
@@ -179,7 +179,7 @@ const activateTool = (run: RunProgram) =>
           if (!(yield* reachesConnection(api, context, connectionId)))
             return new ReadyResult(connectionOutsideResult(connectionId))
           const authorize = yield* skillScope(session)
-          const naming = yield* namingOf(session, handle)
+          const naming = yield* namingOf(session, connectionId)
           const loaded = yield* Skills.use((skills) =>
             skills.activate(session, handle, {
               authorize,
@@ -220,12 +220,15 @@ const readTool = (run: RunProgram) =>
       run(
         Effect.gen(function* () {
           yield* requireResident
-          const off = yield* skillsOff(String(api.conversationId), skill)
+          const session = String(api.conversationId)
+          const off = yield* skillsOff(session, skill)
           if (off !== undefined) return new ReadyResult(off)
-          const authorize = yield* skillScope(String(api.conversationId))
-          const naming = yield* namingOf(String(api.conversationId), skill)
+          const authorize = yield* skillScope(session)
+          // The server writes tool names into the text the manifest's digests cover, so a file is asked for with the
+          // naming of the server the activation came from, not of the prefix the model wrote (bare, or a stale server).
+          const naming = yield* namingOf(session, yield* Skills.use((skills) => skills.activated(session, skill)))
           const file = yield* Skills.use((skills) =>
-            skills.read(String(api.conversationId), skill, path, {
+            skills.read(session, skill, path, {
               authorize,
               ...naming.options,
               ...(context.abortSignal === undefined ? {} : { signal: context.abortSignal }),

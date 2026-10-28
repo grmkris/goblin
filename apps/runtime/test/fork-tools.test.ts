@@ -39,6 +39,8 @@ import {
 } from '../src/pi/fork-tools.ts'
 import { MAX_DESCRIPTION, NATIVE_NAME, aliasOf, cleanText, nativeName, nativeSchema } from '../src/pi/native-tools.ts'
 import { RoutineRuns } from '../src/routines/service.ts'
+import { skillsExtension } from '../src/pi/skills.ts'
+import { Skills } from '../src/skills/service.ts'
 import { AgentInput, type AgentInputs } from '../src/runtime/input.ts'
 import { Setups } from '../src/setup/service.ts'
 import { chatDatabase, durable } from './chats-sqlite.ts'
@@ -559,5 +561,29 @@ describe("a Persona fork's native MCP tools (ADR 0101)", () => {
       'Call mycut__job_submit, then job_wait.',
     )
     expect(forkNaming(durable(database.db), '99', 'cut')).toBeUndefined()
+  })
+
+  it("reads an activated skill's file with the naming of the server it came from, whatever prefix the handle has", async () => {
+    await nativeIn('7')
+    const asked: (string | undefined)[] = []
+    // The conversation activated `guide` from `cut`; the library finds that activation by name.
+    const skills = stub(Skills, {
+      sources: () => Effect.succeed(['cut']),
+      activated: () => Effect.succeed('cut'),
+      read: (_session, _handle, path, options) =>
+        Effect.sync(() => {
+          asked.push(options?.toolPrefix)
+          return { kind: 'text' as const, path, text: 'Call mycut__job_status.' }
+        }),
+    })
+    const withSkills = <A>(program: Effect.Effect<A, AppError, AgentServices>): Promise<A> =>
+      // SAFETY: skill_read needs only the skills, setup, resident authority and database services here.
+      Effect.runPromise(Effect.provide(program, Layer.merge(layer, skills)) as Effect.Effect<A, AppError>)
+    const read = skillsExtension(withSkills).tools?.find((each) => each.name === 'skill_read')
+    if (read === undefined) throw new Error('skill_read missing')
+    // The server writes tool names into the text its digests cover: a stale or bare prefix must not change them.
+    for (const skill of ['cut:guide', 'guide', 'gone-connection:guide'])
+      expect((await executeTool(read, { skill, path: 'a.md' }, inConversation(7))).isError).not.toBe(true)
+    expect(asked).toEqual(['mycut__', 'mycut__', 'mycut__'])
   })
 })

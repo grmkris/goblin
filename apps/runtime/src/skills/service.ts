@@ -49,6 +49,11 @@ export class Skills extends Context.Service<
       uri: string,
       options: SkillRequestOptions,
     ) => Effect.Effect<Activated, AppError>
+    /**
+     * The server of the skill the conversation activated under `handle`, found as `read` finds it: a bare or stale
+     * prefix is matched by the skill's name. `NotFound` when it activated none.
+     */
+    readonly activated: (session: string, handle: string) => Effect.Effect<string, AppError>
     /** A file of a skill the conversation activated, verified against the manifest it was loaded with. */
     readonly read: (
       session: string,
