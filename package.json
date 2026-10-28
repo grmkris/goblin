@@ -91,7 +91,7 @@
   "packageManager": "bun@1.4.2",
   "patchedDependencies": {
     "@shadcn/react@0.3.1": "patches/@shadcn%2Freact@0.3.1.patch",
-    "@openuidev/react-lang@1.0.1": "patches/@openuidev%2Freact-lang@1.0.1.patch",
-    "@better-auth/oauth-provider@1.7.14": "patches/@better-auth%2Foauth-provider@1.7.14.patch"
+    "@better-auth/oauth-provider@1.7.14": "patches/@better-auth%2Foauth-provider@1.7.14.patch",
+    "@openuidev/react-lang@1.0.2": "patches/@openuidev%2Freact-lang@1.0.2.patch"
   }
 }

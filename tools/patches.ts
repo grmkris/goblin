@@ -29,7 +29,7 @@ export const PATCHES: readonly PatchSpec[] = [
     source: 'patches/better-auth-oauth-provider/revoke.diff',
   },
   {
-    key: '@openuidev/react-lang@1.0.1',
+    key: '@openuidev/react-lang@1.0.2',
     entry: '@openuidev/react-lang',
     from: 'apps/web/src',
     source: 'patches/openui/inspector.diff',

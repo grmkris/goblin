@@ -1,6 +1,6 @@
 # OpenUI inspector
 
-OpenUI React Lang 1.0.1 automatically mounts its inspector when imported in development. Goblin renders private
+OpenUI React Lang 1.0.2 (as 1.0.1 before it) automatically mounts its inspector when imported in development. Goblin renders private
 conversations, so importing a reply renderer must not mount an inspection UI or load its assets. The package patch
 makes that bootstrap unreachable in both ESM and CommonJS. `publishObservability={false}` also keeps each reply
 out of the library's observability store. Production and development use the same renderer.
