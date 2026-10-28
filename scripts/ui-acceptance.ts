@@ -1,3 +1,5 @@
+/// <reference lib="dom" />
+// The page callbacks below run in Chromium, so this file reads the DOM's types; the rest of the root project does not.
 /**
  * `bun run ui:acceptance [session-file]`: read-only UI acceptance of the Slack-style shell, in headless Chromium,
  * against a deployed stage (or the local stack). It signs in with the owner session saved for smoke
@@ -149,7 +151,7 @@ async function panelCheck(page: Page, origin: string, checks: Record<string, Che
   }
   const box = await panel.evaluate((element) => ({
     width: Math.round(element.getBoundingClientRect().width),
-    viewport: element.ownerDocument.defaultView?.innerWidth ?? 0,
+    viewport: innerWidth,
     search: element.ownerDocument.location.search,
   }))
   const channel = await page.locator('.channel-column').first().isVisible()
@@ -172,7 +174,7 @@ async function deskChecks(page: Page, origin: string, checks: Record<string, Che
   }
   const ease = await page
     .locator('html')
-    .evaluate((root) => root.ownerDocument.defaultView.getComputedStyle(root).getPropertyValue('--ease-out').trim())
+    .evaluate((root) => getComputedStyle(root).getPropertyValue('--ease-out').trim())
   checks['desk.token.ease-out'] = { ok: ease.includes('.23'), detail: ease }
   // The first page after a deploy can still be hydrating once the network is idle: wait for the picker itself.
   const picker = page.locator('[data-slot="composer-actions"] button[aria-haspopup="menu"]').first()
@@ -185,9 +187,7 @@ async function deskChecks(page: Page, origin: string, checks: Record<string, Che
     await picker.click()
     const menu = page.locator('[data-slot="dropdown-menu-content"]').first()
     await menu.waitFor({ timeout: 5000 })
-    const transition = await menu.evaluate(
-      (element) => element.ownerDocument.defaultView.getComputedStyle(element).transitionProperty,
-    )
+    const transition = await menu.evaluate((element) => getComputedStyle(element).transitionProperty)
     checks['desk.menu.scales'] = { ok: transition.includes('scale'), detail: transition }
     await page.keyboard.press('Escape')
   } else checks['desk.menu.scales'] = skipped('no model picker in this account snapshot')
@@ -205,15 +205,13 @@ async function transcriptChecks(page: Page, checks: Record<string, Check>): Prom
   const reserved = await page
     .locator('.message-item > .message-actions')
     .evaluateAll((items) =>
-      items
-        .map((item) => item.ownerDocument.defaultView.getComputedStyle(item).position)
-        .filter((position) => position !== 'absolute'),
+      items.map((item) => getComputedStyle(item).position).filter((position) => position !== 'absolute'),
     )
   checks['desk.actions.no-room'] = { ok: reserved.length === 0, detail: { reserved } }
   const ceiling = await page
     .locator('.chat-dock')
     .first()
-    .evaluate((dock) => dock.ownerDocument.defaultView.getComputedStyle(dock).maxHeight)
+    .evaluate((dock) => getComputedStyle(dock).maxHeight)
   checks['desk.dock.ceiling'] = { ok: ceiling !== 'none', detail: ceiling }
   checks['desk.main.jump-button'] = {
     ok: (await page.locator('[data-slot="message-scroller-button"]').count()) > 0,
@@ -267,12 +265,12 @@ async function phoneChecks(page: Page, origin: string, checks: Record<string, Ch
   await visit(page, origin, '/c/1')
   const coarse = await page
     .locator('html')
-    .evaluate((root) => root.ownerDocument.defaultView.matchMedia('(pointer: coarse), (any-pointer: coarse)').matches)
+    .evaluate((root) => matchMedia('(pointer: coarse), (any-pointer: coarse)').matches)
   checks[`${prefix}.pointer-coarse`] = { ok: coarse, detail: null }
   const size = await page
     .locator('textarea[data-slot="composer-input"]')
     .first()
-    .evaluate((element) => element.ownerDocument.defaultView.getComputedStyle(element).fontSize)
+    .evaluate((element) => getComputedStyle(element).fontSize)
   checks[`${prefix}.composer.16px`] = { ok: size === '16px', detail: size }
   const hint = await page.locator('textarea[data-slot="composer-input"]').first().getAttribute('enterkeyhint')
   checks[`${prefix}.composer.enterkeyhint`] = { ok: hint === 'enter', detail: hint }
@@ -282,16 +280,14 @@ async function phoneChecks(page: Page, origin: string, checks: Record<string, Ch
     (await icon.count()) === 0
       ? null
       : await icon.evaluate((element) => {
-          const after = element.ownerDocument.defaultView.getComputedStyle(element, '::after')
+          const after = getComputedStyle(element, '::after')
           return { position: after.position, inset: after.inset }
         })
   checks[`${prefix}.icon.hit-area`] =
     hit === null ? skipped('no small icon control on this page') : { ok: hit.position === 'absolute', detail: hit }
   await setupCheck(page, checks, prefix)
   await usageCheck(page, checks, prefix)
-  const narrow = await page
-    .locator('html')
-    .evaluate((root) => root.ownerDocument.defaultView.matchMedia('(max-width: 767px)').matches)
+  const narrow = await page.locator('html').evaluate((root) => matchMedia('(max-width: 767px)').matches)
   if (narrow) {
     await sidebarCheck(page, checks, prefix)
     await sidebarSwipeCheck(page, checks, prefix)
@@ -313,7 +309,7 @@ async function editableChecks(page: Page, checks: Record<string, Check>, prefix:
         tag: element.tagName.toLowerCase(),
         type: element.getAttribute('type'),
         code: element.getAttribute('data-variant') === 'code',
-        font: Number.parseFloat(element.ownerDocument.defaultView?.getComputedStyle(element).fontSize ?? '0'),
+        font: Number.parseFloat(getComputedStyle(element).fontSize),
       })),
   )
   checks[`${prefix}.editable.readable`] =
@@ -459,9 +455,7 @@ async function screenshots(
         await visit(page, session.origin, route)
         const slug = route === thread ? 'thread' : route.slice(1).replaceAll('/', '_')
         await editableChecks(page, checks, `${device}.${colorScheme}.${slug}`)
-        const width = await page
-          .locator('html')
-          .evaluate((root) => ({ page: root.scrollWidth, screen: root.ownerDocument.defaultView?.innerWidth ?? 0 }))
+        const width = await page.locator('html').evaluate((root) => ({ page: root.scrollWidth, screen: innerWidth }))
         checks[`${device}.${colorScheme}.${slug}.no-overflow`] = { ok: width.page <= width.screen, detail: width }
         await page.screenshot({ path: path.join(out, `${device}-${colorScheme}-${slug}.png`) })
         count += 1

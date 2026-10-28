@@ -5,7 +5,7 @@
  * Imported by `alchemy.run.ts` files only, never by Worker code.
  */
 import * as Alchemy from 'alchemy'
-import * as Cloudflare from 'alchemy/Cloudflare'
+import * as Cloudflare from '@alchemy.run/cloudflare'
 import type { State } from 'alchemy/State'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'

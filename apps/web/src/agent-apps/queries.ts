@@ -23,12 +23,7 @@ export const agentAppQuery = (name: string) =>
 export const changeAgentAppMutation = (name: string) =>
   mutationOptions({
     ...owner.apiMutation({
-      mutationFn: (api, change: AgentAppChange) =>
-        api.agentApps.change(
-          // SAFETY: `change` is one of AgentAppChange's members, and the client takes a request for each member; it does
-          // not distribute a union payload over them itself.
-          { params: { name }, payload: change } as Parameters<typeof api.agentApps.change>[0],
-        ),
+      mutationFn: (api, change: AgentAppChange) => api.agentApps.change({ params: { name }, payload: change }),
     }),
     onSuccess: (detail, _change, _result, { client }) => {
       client.setQueryData(agentAppKeys.detail(name), detail)

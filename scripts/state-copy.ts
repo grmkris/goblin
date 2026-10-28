@@ -114,13 +114,13 @@ export const copy = Effect.fn('StateCopy.copy')(function* (
 
 /**
  * A local store rooted at `root`, a directory named `state` (Alchemy keeps `<.alchemy>/state/<stack>/<stage>`). It
- * opens through the CLI's own `Alchemist.State.store({ backend: 'local' })`, pointed at `root`'s parent.
+ * opens through the CLI's own `Alchemist.State.store({ _tag: 'Local' })`, pointed at `root`'s parent.
  */
 export const localStore = (root: string) =>
   Effect.gen(function* () {
     const absolute = resolve(root)
     if (basename(absolute) !== 'state') return yield* refuse('local_root_must_be_a_state_directory')
-    return yield* Alchemist.State.store({ backend: 'local' }).pipe(
+    return yield* Alchemist.State.store({ _tag: 'Local' }).pipe(
       Effect.provideService(AlchemyContext, {
         dotAlchemy: dirname(absolute),
         dev: false,
@@ -169,7 +169,7 @@ const main = Effect.gen(function* () {
   if ((statSync(envFile).mode & 0o077) !== 0) return yield* refuse('private_cloud_env_requires_mode_600')
   const local = yield* localStore(values['local-root'] ?? resolve(root, STACKS[target.stack] ?? '', '.alchemy/state'))
   // `updateStateStore` stays false (Alchemist.layer()): this never deploys or upgrades the shared store.
-  const cloudflare = yield* Alchemist.State.store({ backend: 'cloudflare', envFile })
+  const cloudflare = yield* Alchemist.State.store({ _tag: 'Provider', backend: 'cloudflare', envFile })
   const [source, destination] = values.to === 'cloudflare' ? [local, cloudflare] : [cloudflare, local]
   const comparisons = values['verify-only']
     ? yield* verify(source, destination, target)

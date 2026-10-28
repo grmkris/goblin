@@ -1,5 +1,5 @@
 import * as Alchemy from 'alchemy'
-import * as Cloudflare from 'alchemy/Cloudflare'
+import * as Cloudflare from '@alchemy.run/cloudflare'
 import * as Test from 'alchemy/Test/Vitest'
 import { Config, ConfigProvider, Effect, Schema } from 'effect'
 import { expect } from 'vitest'

@@ -11,6 +11,6 @@
     "@modelcontextprotocol/server": "2.3.1"
   },
   "devDependencies": {
-    "effect": "4.0.5"
+    "effect": "4.0.7"
   }
 }
