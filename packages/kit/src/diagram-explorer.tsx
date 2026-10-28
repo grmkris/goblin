@@ -1,16 +1,20 @@
-import { type RefObject, useEffect, useMemo, useRef, useState } from 'react'
+import { type RefObject, useEffect, useRef, useState } from 'react'
+import { diagramLinks } from './diagram-graph.ts'
 import { diagramPan } from './diagram-pan.ts'
 import { diagramInteraction } from './diagram-interaction.ts'
+import { diagramSvg } from './diagram-render.ts'
 import { sanitizeDiagramSvg } from './diagram-svg.ts'
 
 type ExplorerProps = {
-  readonly svg: string
+  readonly source: string
+  readonly label: string
   readonly scope: string
   readonly onClose: () => void
   readonly triggerRef: RefObject<HTMLButtonElement | null>
 }
 
-function useExplorer({ svg, scope, triggerRef }: ExplorerProps) {
+/** Draws the source again at its natural size, through the same allowlist, then lets it be panned, zoomed and read. */
+function useExplorer({ source, label, triggerRef }: ExplorerProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
@@ -19,23 +23,31 @@ function useExplorer({ svg, scope, triggerRef }: ExplorerProps) {
   const [selected, setSelected] = useState(false)
   const [scale, setScale] = useState(1)
   const [announcement, setAnnouncement] = useState('')
-  const safeSvg = useMemo(() => sanitizeDiagramSvg(svg, scope), [svg, scope])
 
   useEffect(() => {
     const dialog = dialogRef.current
     const viewport = viewportRef.current
     const canvas = canvasRef.current
-    const drawing = canvas?.querySelector('svg')
-    if (dialog === null || viewport === null || canvas === null || !(drawing instanceof SVGSVGElement)) return
+    if (dialog === null || viewport === null || canvas === null) return
     const trigger = triggerRef.current
+    let live = true
     dialog.showModal()
     dialog.querySelector<HTMLButtonElement>('[data-diagram-close]')?.focus()
-    controls.current = diagramPan(viewport, canvas, setScale)
-    interaction.current = diagramInteraction(viewport, drawing, (node, count) => {
-      setSelected(node !== undefined)
-      setAnnouncement(node === undefined ? 'Selection cleared.' : `${node.label} selected. ${count} connected nodes.`)
+    const draw = ([svg, links]: readonly [string | undefined, Awaited<ReturnType<typeof diagramLinks>>]) => {
+      const drawing = svg === undefined ? undefined : sanitizeDiagramSvg(svg, label)
+      if (!live || drawing === undefined) return
+      canvas.replaceChildren(drawing)
+      controls.current = diagramPan(viewport, canvas, setScale)
+      interaction.current = diagramInteraction(viewport, drawing, links, (node, count) => {
+        setSelected(node !== undefined)
+        setAnnouncement(node === undefined ? 'Selection cleared.' : `${node.label} selected. ${count} connected nodes.`)
+      })
+    }
+    Promise.all([diagramSvg(source), diagramLinks(source)]).then(draw, () => {
+      // expected: neither rejects (each answers nothing for a source it cannot draw); the canvas stays empty
     })
     return () => {
+      live = false
       controls.current?.destroy()
       controls.current = undefined
       interaction.current?.destroy()
@@ -43,17 +55,15 @@ function useExplorer({ svg, scope, triggerRef }: ExplorerProps) {
       dialog.close()
       trigger?.focus()
     }
-  }, [safeSvg, triggerRef])
+  }, [source, label, triggerRef])
 
-  return { dialogRef, viewportRef, canvasRef, controls, interaction, selected, scale, announcement, safeSvg }
+  return { dialogRef, viewportRef, canvasRef, controls, interaction, selected, scale, announcement }
 }
 
 /** Mounted only while exploring. Native modality confines focus, including within an app's sandbox frame. */
 export function DiagramExplorer(props: ExplorerProps) {
   const { scope, onClose } = props
-  const { dialogRef, viewportRef, canvasRef, controls, interaction, selected, scale, announcement, safeSvg } =
-    useExplorer(props)
-  if (safeSvg === undefined) return null
+  const { dialogRef, viewportRef, canvasRef, controls, interaction, selected, scale, announcement } = useExplorer(props)
   return (
     <dialog
       ref={dialogRef}
@@ -97,8 +107,8 @@ export function DiagramExplorer(props: ExplorerProps) {
         </div>
       </header>
       <div ref={viewportRef} className="kit-diagram-explorer-viewport" role="group" aria-label="Diagram viewport">
-        {/* Only the allowlisted, scoped SVG from diagram-svg crosses this boundary. */}
-        <div ref={canvasRef} className="kit-diagram-explorer-canvas" dangerouslySetInnerHTML={{ __html: safeSvg }} />
+        {/* Only the allowlisted SVG from diagram-svg crosses this boundary. */}
+        <div ref={canvasRef} className="kit-diagram-explorer-canvas" />
       </div>
       <p id={`${scope}-help`} className="kit-diagram-explorer-help">
         Scroll or pinch to zoom. Drag or use arrow keys when zoomed. Select a node to see its connections.

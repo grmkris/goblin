@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { diagramSvg } from '../src/diagram.tsx'
+import { diagramLinks } from '../src/diagram-graph.ts'
+import { diagramSvg } from '../src/diagram-render.ts'
 import { mapPoints } from '../src/specs.ts'
 import { chartSpec, mapSpec } from '../src/index.ts'
-
-const colors = { bg: '#ffffff', fg: '#27272a', accent: '#2563eb', muted: '#71717a', border: '#e4e4e7' }
 
 describe('chart specs', () => {
   it('read a bar chart with its series and rows', () => {
@@ -66,15 +65,47 @@ describe('map specs', () => {
 })
 
 describe('diagrams', () => {
-  it('draw a flowchart without fetching a font', () => {
-    const svg = diagramSvg('graph LR\n  Draft --> Review --> Ship', colors)
-    expect(svg?.startsWith('<svg')).toBe(true)
-    expect(svg).toContain('Review')
-    expect(svg).not.toContain('@import')
-    expect(svg).not.toContain('googleapis')
+  it('draw every kind Pele knows, themed by its variables, with nothing to fetch or follow', async () => {
+    const flow = await diagramSvg('graph LR\n  Draft --> Review --> Ship\n  click Draft "https://example.invalid"')
+    expect(flow?.startsWith('<svg')).toBe(true)
+    expect(flow).toContain('Review')
+    expect(flow).toContain('var(--pele-fg')
+    expect(flow).not.toContain('example.invalid')
+    expect(flow).not.toContain('<a')
+    for (const source of [
+      'pie title Pets\n "Dogs" : 40\n "Cats" : 30',
+      'gantt\n dateFormat YYYY-MM-DD\n section A\n Task :a1, 2026-01-01, 3d',
+      'mindmap\n  root((goblin))\n    Topics',
+      'xychart-beta\n x-axis [Jan, Feb]\n y-axis 0 --> 10\n bar [3, 7]',
+    ])
+      expect((await diagramSvg(source))?.startsWith('<svg')).toBe(true)
   })
-  it('give nothing for what is not a diagram it can draw', () => {
-    expect(diagramSvg('not a diagram at all', colors)).toBeUndefined()
-    expect(diagramSvg(`graph LR\n${'  A --> B\n'.repeat(3000)}`, colors)).toBeUndefined()
+  it('give nothing for what is not a diagram it can draw', async () => {
+    expect(await diagramSvg('not a diagram at all')).toBeUndefined()
+    expect(await diagramSvg('graph LR\n A -->')).toBeUndefined()
+    expect(await diagramSvg(`graph LR\n${'  A --> B\n'.repeat(3000)}`)).toBeUndefined()
+  })
+  it("name a graph's edges by the ids Pele draws them with, and its nodes as drawn", async () => {
+    expect(await diagramLinks('graph LR\n A --> B\n B --> C')).toEqual([
+      { id: 'L_A_B_0', from: 'A', to: 'B' },
+      { id: 'L_B_C_0', from: 'B', to: 'C' },
+    ])
+    expect(await diagramLinks('stateDiagram-v2\n [*] --> Idle\n Idle --> Running')).toEqual([
+      { id: 'edge0', from: 'root_start', to: 'Idle' },
+      { id: 'edge1', from: 'Idle', to: 'Running' },
+    ])
+    expect(await diagramLinks('sequenceDiagram\n A->>B: one\n Note over A: n\n B->>A: two')).toEqual([
+      { id: 'i0', from: 'A', to: 'B' },
+      { id: 'i2', from: 'B', to: 'A' },
+    ])
+    expect(await diagramLinks('classDiagram\n Animal <|-- Dog\n Dog --> Bone')).toEqual([
+      { id: 'id_Animal_Dog_1', from: 'Animal', to: 'Dog' },
+      { id: 'id_Dog_Bone_2', from: 'Dog', to: 'Bone' },
+    ])
+    expect(await diagramLinks('erDiagram\n PERSON ||--o{ ORDER : places')).toEqual([
+      { id: 'id_entity-PERSON-0_entity-ORDER-1_0', from: 'PERSON', to: 'ORDER' },
+    ])
+    expect(await diagramLinks('pie title Pets\n "Dogs" : 40')).toBeUndefined()
+    expect(await diagramLinks('not a diagram at all')).toBeUndefined()
   })
 })

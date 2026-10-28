@@ -1,24 +1,20 @@
 const SVG_NS = 'http://www.w3.org/2000/svg'
 const ELEMENTS = new Set([
   'svg',
-  'style',
-  'defs',
-  'marker',
-  'polygon',
-  'polyline',
-  'line',
+  'g',
   'path',
   'rect',
   'circle',
   'ellipse',
-  'g',
+  'line',
+  'polyline',
+  'polygon',
   'text',
   'tspan',
   'title',
   'desc',
 ])
 const ATTRIBUTES = new Set([
-  'id',
   'class',
   'style',
   'viewBox',
@@ -49,14 +45,6 @@ const ATTRIBUTES = new Set([
   'opacity',
   'fill-opacity',
   'stroke-opacity',
-  'marker-start',
-  'marker-end',
-  'markerWidth',
-  'markerHeight',
-  'markerUnits',
-  'refX',
-  'refY',
-  'orient',
   'font-size',
   'font-weight',
   'font-style',
@@ -64,56 +52,36 @@ const ATTRIBUTES = new Set([
   'text-anchor',
   'dominant-baseline',
   'data-id',
-  'data-label',
-  'data-from',
-  'data-to',
-  'data-entity1',
-  'data-entity2',
-  'data-actor',
 ])
-const VARIABLES = new Set([
-  '--bg',
-  '--fg',
-  '--line',
-  '--accent',
-  '--muted',
-  '--surface',
-  '--border',
-  '--_text',
-  '--_text-sec',
-  '--_text-muted',
-  '--_text-faint',
-  '--_line',
-  '--_arrow',
-  '--_node-fill',
-  '--_node-stroke',
-  '--_group-fill',
-  '--_group-hdr',
-  '--_inner-stroke',
-  '--_key-badge',
+/** Only the drawing's root names what it is to assistive technology. */
+const ROOT_ATTRIBUTES = new Set(['role', 'aria-roledescription'])
+const STYLE_PROPERTIES = new Set([
+  'fill',
+  'stroke',
+  'stroke-width',
+  'stroke-dasharray',
+  'font',
+  'font-family',
+  'font-size',
+  'font-weight',
+  'color',
+  'direction',
+  'letter-spacing',
+  'word-spacing',
+  'text-transform',
+  'rx',
+  'max-width',
+  'height',
 ])
-const STYLE_PROPERTIES = new Set(['font-family', 'fill', 'stroke', ...VARIABLES])
-const CLASSES = new Set([
-  'node',
-  'actor',
-  'class-node',
-  'entity',
-  'subgraph',
-  'edge',
-  'edge-label',
-  'class-relationship',
-  'er-relationship',
-  'message',
-  'lifeline',
-  'activation',
-  'mono',
-])
+/** Pele's own variables: the page's `--pele-*` theme, which the root reads into its private `--_*` ones. */
+const VARIABLE = /^--(?:pele-|_)[\w-]+$/u
+const CLASS = /^pele(?:-[a-z0-9-]+)?$/u
 
-/** A deliberately small CSS vocabulary: no escapes, URLs, declarations or inherited arbitrary variables. */
+/** A deliberately small CSS vocabulary: no escapes, URLs, declarations or variables other than Pele's. */
 function safeValue(value: string): boolean {
   if (!/^[\w\s#.,()%+'"-]+$/u.test(value) || /(?:url|image|expression)\s*\(/iu.test(value)) return false
   for (const variable of value.matchAll(/var\(\s*(--[\w-]+)/gu)) {
-    if (!VARIABLES.has(variable[1] ?? '')) return false
+    if (!VARIABLE.test(variable[1] ?? '')) return false
   }
   return true
 }
@@ -122,90 +90,65 @@ function safeStyle(style: CSSStyleDeclaration): string {
   const result: string[] = []
   for (const property of style) {
     const value = style.getPropertyValue(property)
-    if (STYLE_PROPERTIES.has(property) && safeValue(value)) result.push(`${property}:${value}`)
+    if ((STYLE_PROPERTIES.has(property) || VARIABLE.test(property)) && safeValue(value))
+      result.push(`${property}:${value}`)
   }
   return result.join(';')
 }
 
-/** Parse CSS without attaching it: imports and every rule except the renderer's three selectors are discarded. */
-function scopedStyle(css: string, scope: string): string {
-  const sheet = new CSSStyleSheet()
-  sheet.replaceSync(css.replaceAll(/@import\s+url\([^)]*\)\s*;?/giu, ''))
-  const result: string[] = []
-  for (const rule of sheet.cssRules) {
-    if (!(rule instanceof CSSStyleRule)) continue
-    const selector = rule.selectorText
-    if (!['svg', 'text', '.mono'].includes(selector)) continue
-    const scoped = selector === 'svg' ? `#${scope}` : `#${scope} ${selector}`
-    result.push(`${scoped}{${safeStyle(rule.style)}}`)
-  }
-  return result.join('\n')
-}
-
-function safeAttribute(name: string, value: string, ids: ReadonlyMap<string, string>): string | undefined {
-  if (name === 'id') return ids.get(value)
+function safeAttribute(name: string, value: string): string | undefined {
   if (name === 'class')
+    // A diagram's own `classDef` names (`hidden`, `fixed`) would be the page's classes once inline: only Pele's stay.
     return value
       .split(/\s+/u)
-      .filter((item) => CLASSES.has(item))
+      .filter((item) => CLASS.test(item))
       .join(' ')
   if (name === 'style') {
     const style = document.createElement('span').style
     style.cssText = value
     return safeStyle(style)
   }
-  if (name.startsWith('data-')) return value
-  const reference = /^url\(\s*["']?#([^\s)'"]+)["']?\s*\)$/iu.exec(value)
-  if (reference !== null) {
-    const id = ids.get(reference[1] ?? '')
-    return id === undefined ? undefined : `url(#${id})`
-  }
+  if (name === 'data-id') return value
   return safeValue(value) ? value : undefined
 }
 
-function copyAttributes(element: Element, safe: Element, ids: ReadonlyMap<string, string>): void {
+function copyAttributes(element: Element, safe: Element, root: boolean): void {
   for (const attribute of element.attributes) {
-    if (!ATTRIBUTES.has(attribute.name) || attribute.namespaceURI !== null) continue
-    const value = safeAttribute(attribute.name, attribute.value, ids)
+    const allowed = ATTRIBUTES.has(attribute.name) || (root && ROOT_ATTRIBUTES.has(attribute.name))
+    if (!allowed || attribute.namespaceURI !== null) continue
+    const value = safeAttribute(attribute.name, attribute.value)
     if (value !== undefined) safe.setAttribute(attribute.name, value)
   }
 }
 
-function copyElement(element: Element, ids: ReadonlyMap<string, string>, scope: string): Element | undefined {
+function copyElement(element: Element, root: boolean): Element | undefined {
   if (element.namespaceURI !== SVG_NS || !ELEMENTS.has(element.localName)) return
   const safe = document.createElementNS(SVG_NS, element.localName)
-  copyAttributes(element, safe, ids)
-  if (element.localName === 'style') safe.textContent = scopedStyle(element.textContent ?? '', scope)
-  else
-    for (const child of element.childNodes) {
-      const safeChild = copyChild(child, ids, scope)
-      if (safeChild !== undefined) safe.appendChild(safeChild)
-    }
+  copyAttributes(element, safe, root)
+  for (const child of element.childNodes) {
+    const safeChild = copyChild(child)
+    if (safeChild !== undefined) safe.appendChild(safeChild)
+  }
   return safe
 }
 
-function copyChild(child: Node, ids: ReadonlyMap<string, string>, scope: string): Node | undefined {
-  if (child instanceof Element) return child.localName === 'svg' ? undefined : copyElement(child, ids, scope)
+function copyChild(child: Node): Node | undefined {
+  if (child instanceof Element) return child.localName === 'svg' ? undefined : copyElement(child, false)
   if (child.nodeType === Node.TEXT_NODE) return document.createTextNode(child.textContent ?? '')
   return
 }
 
 /**
- * Only the pinned renderer's passive SVG vocabulary may cross the inline boundary.
- * Rebuild it in a detached tree so raw style/paint values never reach the page.
+ * Only Pele's passive SVG vocabulary may cross the inline boundary (ADR 0129): shapes, text and Pele's classes,
+ * variables and data ids. The drawing is rebuilt in a detached tree, so no raw attribute, style, link, script or id
+ * from the source reaches the page; `label` names it for assistive technology.
  */
-export function sanitizeDiagramSvg(source: string, instance: string): string | undefined {
-  const scope = instance.replaceAll(/[^a-zA-Z0-9_-]/gu, '-')
+export function sanitizeDiagramSvg(source: string, label: string): SVGSVGElement | undefined {
   const parsed = new DOMParser().parseFromString(source, 'image/svg+xml')
   const root = parsed.documentElement
   if (root.localName !== 'svg' || root.namespaceURI !== SVG_NS || parsed.querySelector('parsererror') !== null) return
-  const ids = new Map<string, string>()
-  for (const element of root.querySelectorAll('[id]')) {
-    const id = element.getAttribute('id')
-    if (id !== null && !ids.has(id)) ids.set(id, `${scope}-marker-${ids.size}`)
-  }
-  const safe = copyElement(root, ids, scope)
-  if (safe === undefined) return
-  safe.setAttribute('id', scope)
-  return new XMLSerializer().serializeToString(safe)
+  const safe = copyElement(root, true)
+  if (!(safe instanceof SVGSVGElement)) return
+  safe.setAttribute('aria-label', label)
+  return safe
 }

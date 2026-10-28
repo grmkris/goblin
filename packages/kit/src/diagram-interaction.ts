@@ -1,3 +1,4 @@
+import type { DiagramLink } from './diagram-graph.ts'
 import { diagramNodes, highlightDiagram, type DiagramNode } from './diagram-selection.ts'
 
 /** Distinguish a tap from dragging/pinching, including release beyond the viewport. */
@@ -42,17 +43,23 @@ function prepareNodes(svg: SVGSVGElement) {
   return nodes
 }
 
+/**
+ * Node selection in the explorer: tap, click or Enter/Space selects, hover previews, and neighbours follow `links`. A
+ * diagram without links (a kind that is not a graph) has no selectable nodes.
+ */
 export function diagramInteraction(
   viewport: HTMLDivElement,
   svg: SVGSVGElement,
+  links: readonly DiagramLink[] | undefined,
   onSelection: (node: DiagramNode | undefined, count: number) => void,
 ) {
-  const nodes = prepareNodes(svg)
+  const graph = links ?? []
+  const nodes = links === undefined ? [] : prepareNodes(svg)
   const gesture = trackGesture(viewport)
   let selected: DiagramNode | undefined
   const select = (node: DiagramNode | undefined) => {
     selected = node
-    const count = highlightDiagram(svg, node?.id)
+    const count = highlightDiagram(svg, graph, node?.id)
     for (const item of nodes) item.element.setAttribute('aria-pressed', String(item.id === node?.id))
     onSelection(node, count)
   }
@@ -73,9 +80,11 @@ export function diagramInteraction(
   }
   const hover = (event: PointerEvent) => {
     if (!matchMedia('(hover: hover) and (pointer: fine)').matches || gesture.dragging()) return
-    highlightDiagram(svg, nodeAt(event.target)?.id ?? selected?.id)
+    if (links !== undefined) highlightDiagram(svg, graph, nodeAt(event.target)?.id ?? selected?.id)
   }
-  const leave = () => highlightDiagram(svg, selected?.id)
+  const leave = () => {
+    if (links !== undefined) highlightDiagram(svg, graph, selected?.id)
+  }
   viewport.addEventListener('click', click)
   viewport.addEventListener('keydown', keydown)
   viewport.addEventListener('pointerover', hover)

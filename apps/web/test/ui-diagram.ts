@@ -23,13 +23,17 @@ async function desktop(page: Page) {
   assert.equal(await page.getByLabel('Invalid diagram', { exact: true }).locator('pre').count(), 1)
   assert.equal(await page.getByLabel('Inert diagram', { exact: true }).getByRole('button').count(), 0)
   assert.equal(await page.getByLabel('Streaming diagram', { exact: true }).locator('pre').count(), 1)
-  const safety: unknown = JSON.parse(await page.getByLabel('SVG safety checks').innerText())
+  // The checks draw with Pele, which loads each kind's renderer on demand: wait for their result.
+  const output = page.getByLabel('SVG safety checks')
+  await output.filter({ hasNotText: '[]' }).waitFor()
+  const safety: unknown = JSON.parse(await output.innerText())
   assert(Array.isArray(safety))
-  assert(safety.length >= 35)
+  assert(!String(safety[0]).startsWith('failed:'), String(safety[0]))
+  assert(safety.length >= 55)
   checks.push(`${safety.length} SVG boundary/metadata assertions`)
   const outside = await page.getByLabel('Outside SVG').evaluate((svg) => ({
     font: getComputedStyle(svg.querySelector('text') ?? svg).fontFamily,
-    color: getComputedStyle(svg).getPropertyValue('--_text'),
+    color: getComputedStyle(svg).getPropertyValue('--_fg'),
   }))
   await trigger.click()
   const root = dialog(page)
@@ -107,7 +111,7 @@ async function desktop(page: Page) {
   assert.deepEqual(
     await page.getByLabel('Outside SVG').evaluate((svg) => ({
       font: getComputedStyle(svg.querySelector('text') ?? svg).fontFamily,
-      color: getComputedStyle(svg).getPropertyValue('--_text'),
+      color: getComputedStyle(svg).getPropertyValue('--_fg'),
     })),
     outside,
   )
@@ -116,23 +120,34 @@ async function desktop(page: Page) {
   assert(await trigger.evaluate((button) => button === document.activeElement))
   await page.getByRole('button', { name: 'Finish stream' }).click()
   await page.getByLabel('Streaming diagram', { exact: true }).getByRole('button', { name: 'Explore diagram' }).waitFor()
-  for (const n of [1, 2, 3, 4, 5]) {
+  // Graph kinds (1-4) select nodes; xychart, pie, gantt and mindmap (5-8) draw and zoom without selectable nodes.
+  for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {
     await page.getByLabel(`Diagram ${n}`, { exact: true }).getByRole('button', { name: 'Explore diagram' }).click()
-    const node = dialog(page).locator('[data-diagram-selectable]').first()
+    await dialog(page).locator('.kit-diagram-explorer-canvas svg').waitFor()
+    const nodes = dialog(page).locator('[data-diagram-selectable]')
     if (n < 5) {
-      await node.click()
-      assert.equal(await node.getAttribute('aria-pressed'), 'true')
-    }
+      await nodes.first().click()
+      assert.equal(await nodes.first().getAttribute('aria-pressed'), 'true')
+    } else assert.equal(await nodes.count(), 0)
     await dialog(page).getByRole('button', { name: 'Close', exact: true }).click()
   }
+  // The page's tokens theme the drawing through Pele's variables: the same SVG, untouched, changes colour.
+  const preview = page.getByLabel('Diagram 0', { exact: true }).locator('.kit-diagram-drawing .pele-node').first()
+  const drawing = await page
+    .getByLabel('Diagram 0', { exact: true })
+    .locator('.kit-diagram-drawing > svg')
+    .elementHandle()
+  const fill = () => preview.evaluate((node) => getComputedStyle(node.querySelector('rect, path') ?? node).fill)
+  const light = await fill()
   await page.getByRole('button', { name: 'Toggle theme' }).click()
-  await trigger.click()
+  assert.notEqual(await fill(), light)
   assert(
-    await dialog(page)
-      .locator('svg')
-      .getAttribute('style')
-      .then((style) => style?.includes('oklch')),
+    await page
+      .getByLabel('Diagram 0', { exact: true })
+      .locator('.kit-diagram-drawing > svg')
+      .evaluate((svg, kept) => svg === kept, drawing),
   )
+  await trigger.click()
   await page.setViewportSize({ width: 900, height: 650 })
   await dialog(page).getByLabel('Zoom level').filter({ hasText: '100%' }).waitFor()
   await dialog(page).getByRole('button', { name: 'Close', exact: true }).click()
@@ -142,7 +157,7 @@ async function desktop(page: Page) {
   await dialog(page).getByRole('button', { name: 'Select Draft', exact: true }).click()
   await dialog(page).getByRole('button', { name: 'Close', exact: true }).click()
   checks.push(
-    'chat fence, fallback/streaming/inert opt-out; hover/click/keyboard/blank/Escape; wheel/buttons/drag/fit; 6 diagram families; focus return, CSS isolation, dark theme, resize and remount',
+    'chat fence, fallback/streaming/inert opt-out; hover/click/keyboard/blank/Escape; wheel/buttons/drag/fit; 9 diagram kinds; focus return, CSS isolation, dark theme by variables without a redraw, resize and remount',
   )
 }
 

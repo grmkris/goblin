@@ -14,13 +14,18 @@ const families = [
   'erDiagram\n PERSON ||--o{ ORDER : places',
   'stateDiagram-v2\n [*] --> Idle\n Idle --> Running',
   'xychart-beta\n x-axis [Jan, Feb]\n y-axis 0 --> 10\n bar [3, 7]',
+  'pie title Pets\n "Dogs" : 40\n "Cats" : 30',
+  'gantt\n dateFormat YYYY-MM-DD\n section A\n Task :a1, 2026-01-01, 3d',
+  'mindmap\n  root((goblin))\n    Topics\n    Personas',
 ]
 
 function Fixture() {
   const [safety, setSafety] = useState<string[]>([])
   const [visible, setVisible] = useState(true)
   const [live, setLive] = useState(true)
-  useEffect(() => setSafety(checkDiagramSafety()), [])
+  useEffect(() => {
+    checkDiagramSafety().then(setSafety, (error: unknown) => setSafety([`failed: ${String(error)}`]))
+  }, [])
   return (
     <main className="p-6 mx-auto max-w-3xl">
       <button type="button" onClick={() => setVisible((value) => !value)}>
