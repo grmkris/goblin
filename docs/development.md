@@ -493,7 +493,7 @@ until it runs, real provider and Telegram delivery remain unverified.
   tsrs-lint for rules it does not know), and a few follow something else rather than
   their newest release: `typebox` the version pi-durable pins (one TypeBox in the Worker), `katex` the 0.16 line
   `@streamdown/math` renders with (goblin loads only its stylesheet, which must match), `@types/node` and `@types/bun`
-  the box's Node 22 LTS and Bun, and workerd alchemy's pin.
+  the box's Node 24 LTS and Bun, and workerd alchemy's pin.
 
 Unit tests, local workerd and the deployed dev stage are separate kinds of evidence. Say which one you ran.
 
